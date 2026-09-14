@@ -12,17 +12,6 @@
 // CrowdSec and a MikroTik bouncer, where a blocked runner IP would silently
 // degrade this site to a stale snapshot. GitHub serves the same bytes and is
 // already a hard dependency of the build, since the checkout comes from it.
-//
-// The committed snapshot below is the offline fallback, only reached if that
-// fetch fails, which given the URL is on the same host as the checkout
-// effectively means GitHub is down and there is no build anyway. The warning
-// is deliberately loud so a stale identity never ships unnoticed. Refresh it
-// with `pnpm run identity:sync`.
-//
-// It is imported rather than read from disk because the module is bundled
-// before it runs, and a path resolved against `import.meta.url` at that point
-// addresses the bundle's directory rather than the repository's.
-import snapshot from "../../identity/person.snapshot.json" with { type: "json" };
 
 export const CANONICAL_IDENTITY_URL =
 	"https://raw.githubusercontent.com/jmrplens/jmrp.io/main/public/identity/person.jsonld";
@@ -56,19 +45,41 @@ export function personNode() {
 	return pending;
 }
 
-/** @returns {Promise<Record<string, unknown>>} live document, or the snapshot. */
+/**
+ * Reads the canonical document, or stops the build.
+ *
+ * There is no committed fallback (2026-09-15): the snapshot that used to sit
+ * beside this file was a second copy of the canonical document, refreshed by a
+ * commit into this repository every time the original changed, which is the
+ * hand-sync the arrangement exists to remove. Nor is parsing enough on its own:
+ * an error page can be valid JSON, and so is `{}`, and either would have been
+ * spliced into the graph as a Person with no identity in it.
+ *
+ * @returns {Promise<Record<string, unknown>>} the canonical document.
+ */
 async function fetchDocument() {
 	try {
 		const response = await fetch(CANONICAL_IDENTITY_URL, {
 			signal: AbortSignal.timeout(10_000),
 		});
 		if (!response.ok) throw new Error(`HTTP ${response.status}`);
-		return await response.json();
+		const document = await response.json();
+		// This repository already names the node it splices, so the check can be
+		// the exact id rather than the mere shape its siblings settle for.
+		if (document?.["@type"] !== "Person" || document?.["@id"] !== PERSON_ID) {
+			throw new Error(
+				`the document is not ${PERSON_ID} ` +
+					`(@type=${JSON.stringify(document?.["@type"])}, ` +
+					`@id=${JSON.stringify(document?.["@id"])})`,
+			);
+		}
+		return document;
 	} catch (error) {
-		console.warn(
-			`\n[identity] WARNING: could not fetch the canonical Person entity (${error.message}).\n` +
-				`  Falling back to the committed snapshot. This build may ship a stale identity.\n`,
+		throw new Error(
+			`[identity] Canonical Person entity unusable: ${error.message}. ` +
+				`The build stops here on purpose: this site publishes the canonical ` +
+				`identity or it does not build.`,
+			{ cause: error },
 		);
-		return snapshot;
 	}
 }

@@ -97,7 +97,6 @@ jobs:
         run: |
           pnpm run contrast:check
           pnpm run i18n:check
-          pnpm run identity:check
           pnpm run stats:check
           pnpm run figures:check
           pnpm run docs:check
