@@ -1,0 +1,305 @@
+---
+title: Cadencias
+description: Las tres capas del bloque every, la cadencia interna de cada familia, el aviso cuando una configuración la acelera, y el heartbeat.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+```yaml
+every:
+  default: 15m
+  groups:
+    ci: 1m
+    feeds: 10m
+  families:
+    actions: 30s
+```
+
+## Las tres capas
+
+Gana la más específica. La entrada de una familia gana a la de su grupo, la de
+un grupo gana a `default`, y `default` gana al valor interno. Lo que se omite
+cae a la capa de abajo, así que un fichero que solo tenga `families:` se
+comporta exactamente como siempre. El valor es una duración de Go: `30s`,
+`15m`, `2h`, `36h`.
+
+| Capa               | Alcanza                                   | Se escribe              |
+| ------------------ | ----------------------------------------- | ----------------------- |
+| `every.families`   | una familia                               | `families: {keys: 24h}` |
+| `every.groups`     | todas las familias de un grupo            | `groups: {ci: 1m}`      |
+| `every.default`    | todas las que no nombren las dos de arriba | `default: 15m`         |
+| la tabla interna   | todas las que no nombre ninguna capa      | nada                    |
+
+Son tres claves de un bloque anidado y no tres claves planas porque un mapa
+plano no puede con este vocabulario. `security` y `account` son a la vez nombre
+de familia **y** nombre de grupo, así que `every: {security: 1m}` tiene dos
+lecturas y ninguna forma de elegir entre ellas. Bajo `families:` la palabra es
+la familia; bajo `groups:` es el grupo; ya no queda sitio donde plantear la
+duda. Ese mismo anidamiento es lo que hace seguras las palabras `default` y
+`groups`: son campos de una estructura fija, y una clave desconocida se rechaza
+al arrancar, así que ninguna familia puede tapar una capa ni ninguna capa una
+familia.
+
+<Aside type="caution" title="Las dos capas amplias nunca encienden una familia">
+  `default` y `groups` no alcanzan a una familia cuya cadencia interna es `0`.
+  `deps`, `history` y `joblogs` vienen apagadas y se activan nombrándolas bajo
+  `families:` y de ninguna otra forma. Solo `deps` son 1,8 MB de SBOM por
+  repositorio, y un `default` escrito para acelerar las familias rápidas no debe
+  encender además tres familias que nunca mencionaste. Es la misma regla que ya
+  sigue `groups`.
+</Aside>
+
+Del revés sale la forma más corta de recoger poco: apagarlo todo con `default`
+y luego nombrar lo que quieres de vuelta.
+
+```yaml
+every:
+  default: 0
+  families:
+    traffic: 6h
+    actions: 15m
+```
+
+## Cada familia, su grupo y su cadencia interna
+
+Los valores internos no son números redondos elegidos por prolijidad. Salieron
+de una auditoría con sus costes, y el motivo de cada uno vive junto al número en
+el código. Esa es la fuente, y esta tabla está anclada a ella: un test de
+`internal/config` compara cada grupo, cada duración y cada motivo de aquí abajo
+con el código en ambos sentidos, así que una familia que se añada, se mueva o
+cambie de coste sin que esta tabla la siga rompe la compilación.
+`ghchronicle -groups` imprime esa misma pertenencia.
+
+| Grupo       | Familia       | Por omisión | Motivo                                                                                                                                            |
+| ----------- | ------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `account`   | `account`     | `12h`       | el calendario de contribuciones cambia una vez al día, y la familia entera cuesta un punto de GraphQL                                             |
+| `account`   | `achievements` | `24h`      | las insignias de la página pública del perfil, leídas de la propia página porque ninguna API las lista, y al lado la distancia de cada insignia a su siguiente nivel, sacada de la API; una insignia se gana en semanas y el día cuesta una página y unos treinta puntos de GraphQL |
+| `account`   | `billing`     | `6h`        | GitHub actualiza el informe de uso unas pocas veces al día como mucho                                                                             |
+| `account`   | `history`     | `0`         | apagada hasta que se la nombre: recorre cada año pasado y lo que va de este, y las filas son idempotentes                                         |
+| `account`   | `keys`        | `24h`       | una clave SSH o GPG cambia cuando alguien la cambia, y lo que importa es su fecha de caducidad, no la hora en que se vio                          |
+| `account`   | `outbound`    | `12h`       | las estrellas dadas y el trabajo en repositorios ajenos van a la velocidad de una persona                                                         |
+| `account`   | `profile`     | `12h`       | paquetes, gists y cuentas sociales, todo ello editado a mano                                                                                      |
+| `account`   | `totals`      | `12h`       | dos veces al día sobra para un número que solo crece                                                                                              |
+| `audience`  | `forks`       | `12h`       | la lista entera cabe en una página, y un fork es un suceso raro                                                                                   |
+| `audience`  | `stars`       | `6h`        | el recorrido completo ocurre una vez; después las cien estrellas más nuevas viajan en una consulta GraphQL por cada diez repositorios             |
+| `audience`  | `traffic`     | `6h`        | la ventana de catorce días se reescribe entera cada vez, así que una pasada perdida se repara en la siguiente                                     |
+| `ci`        | `actions`     | `15m`       | una ejecución de workflow termina en minutos, y su tiempo en cola solo merece verse mientras ocurre                                                |
+| `ci`        | `artifacts`   | `1h`        | los artefactos aparecen con la ejecución que los hizo y caducan en escala de días                                                                 |
+| `ci`        | `deployments` | `1h`        | es la superficie que lee un dashboard de entrega, y la página más nueva es barata: un punto de GraphQL por cada cinco repositorios                    |
+| `ci`        | `joblogs`     | `0`         | apagada hasta que se la nombre: es texto y no una medida, cuesta una petición por fallo, y solo tiene sentido con un almacén de logs conectado    |
+| `collector` | `ratelimit`   | `15m`       | es gratis, y merece la pena tenerla a la resolución de la familia más rápida                                                                      |
+| `feeds`     | `activity`    | `30m`       | el log del repositorio guarda cien entradas, que cubrieron veintiséis horas en el repositorio más activo medido                                   |
+| `feeds`     | `events`      | `30m`       | el feed guarda los últimos trescientos eventos sean cuales sean sus fechas, así que esto es el tamaño de una ventana, no una velocidad            |
+| `feeds`     | `notifs`      | `30m`       | las notificaciones leídas desaparecen rápido, así que esto es el tamaño de una ventana, no una velocidad                                          |
+| `repos`     | `branches`    | `24h`       | las ramas se crean y se borran todo el día, pero lo que responde la fila es cuáles están rancias ahora mismo, que es una pregunta diaria          |
+| `repos`     | `deps`        | `0`         | apagada hasta que se la nombre: el SBOM son 1,8 MB por repositorio y tiene su propio presupuesto de cien por minuto                                |
+| `repos`     | `inventory`   | `24h`       | cuatro peticiones core por repositorio, para ajustes que cambian solo cuando alguien los cambia                                                   |
+| `repos`     | `policyfiles` | `24h`       | SECURITY.md, CODEOWNERS, dependabot.yml y FUNDING.yml se mueven una vez por trimestre                                                             |
+| `repos`     | `repo`        | `1h`        | estrellas, forks, lenguajes y temas se mueven despacio, y esto es una petición por repositorio                                                    |
+| `repos`     | `rulesets`    | `24h`       | un ruleset se edita unas pocas veces al año, cada versión conserva su propia fecha, y las dos peticiones responden 304 hasta que alguien edita uno |
+| `repos`     | `settings`    | `6h`        | webhooks, rulesets, entornos y claves de despliegue cambian solo cuando alguien los cambia                                                        |
+| `security`  | `analyses`    | `6h`        | GitHub poda los análisis de code scanning, y un repositorio produce un puñado al día                                                              |
+| `security`  | `security`    | `1h`        | una alerta es algo sobre lo que actuar hoy, y la lista de abiertas es corta                                                                       |
+| `work`      | `commits`     | `1h`        | una petición por commit, así que el coste sigue a cuánto se ha subido y no a cada cuánto se pregunta                                              |
+| `work`      | `discussions` | `2h`        | una discusión se responde en horas o días, y pocos repositorios tienen alguna                                                                     |
+| `work`      | `issueevents` | `1h`        | la cronología de lo que se movió en dos cadencias, un punto GraphQL por repositorio, así que la hora es lo pronto que merece verse una transición                                                            |
+| `work`      | `issues`      | `1h`        | una petición por elemento, así que el coste sigue a cuánto hay abierto y no a cada cuánto se pregunta                                             |
+| `work`      | `planning`    | `6h`        | etiquetas e hitos se editan a mano, unas pocas veces por semana como mucho                                                                        |
+| `work`      | `stats`       | `12h`       | GitHub las recalcula despacio de todas formas, así que preguntar más a menudo devuelve los mismos números                                         |
+
+## El aviso cuando una cadencia va más rápido de lo que el valor merece
+
+Una capa amplia es una forma barata de ralentizarlo todo y una forma cara de
+acelerarlo todo. `default: 15m` le pide a GitHub las claves SSH de la cuenta
+noventa y seis veces al día para un valor que cambia dos veces al año, y una
+cadencia de grupo hace lo mismo un nivel más abajo: `work` contiene familias que
+la auditoría midió en `1h` y en `12h`, así que un número ahí es un número sobre
+seis respuestas distintas.
+
+Por eso cada familia que una configuración recoge **cuatro veces más a menudo o
+más** que su cadencia interna se nombra al arrancar, con la clave que la fijó,
+los dos números, y el motivo de que ese número sea el que es:
+
+```text
+level=WARN msg="every.default sets keys to 15m against a built-in 24h, 96 times
+  more often: an SSH or GPG key changes when somebody changes it, and what
+  matters is its expiry date, not the hour it was noticed"
+level=WARN msg="every.groups.work sets stats to 1h against a built-in 12h, 12
+  times more often: GitHub recomputes these slowly anyway, so asking more often
+  returns the same numbers"
+```
+
+Es un aviso y nunca un rechazo, y es siempre por familia, nunca por grupo. Una
+línea que dijese "el grupo `work` va demasiado rápido" no nombraría nada sobre
+lo que actuar: el motivo de que una cadencia sea la que es pertenece a la
+familia, así que el aviso también.
+
+Cuatro es el umbral porque los valores internos son una escalera, `15m` `30m`
+`1h` `2h` `6h` `12h` `24h`, y el mayor salto entre dos peldaños vecinos es de
+tres, de `2h` a `6h`. Cuatro es por tanto el menor factor que ningún peldaño
+suelto alcanza. Bajar un peldaño es un ajuste deliberado de quien está mirando
+esa familia y se queda callado; cuatro o más solo puede ser una capa amplia
+cayendo donde nunca se la eligió, o un número escrito sin leer esta tabla.
+
+Nada avisa por ir más despacio. Esto va de desperdicio, no de gusto.
+
+## Grupos: recoger menos que todo
+
+`every` fija cada cuánto corre una familia. `groups` fija qué familias existen
+de verdad para esta instalación. Si se omite la clave, recoge para todos los
+grupos, que es el valor por defecto y lo que "cada métrica que GitHub expone"
+ha significado siempre.
+
+```yaml
+groups: [audience, account, repos, security]
+```
+
+Nombrar cualquier grupo apaga los demás: sus familias no se piden nunca y sus
+medidas no se escriben nunca. `ghchronicle -groups` imprime la lista, que es:
+
+| Grupo       | Familias                                                                 |
+| ----------- | ------------------------------------------------------------------------ |
+| `audience`  | `forks`, `stars`, `traffic`                                              |
+| `account`   | `account`, `achievements`, `billing`, `history`, `keys`, `outbound`, `profile`, `totals` |
+| `repos`     | `branches`, `deps`, `inventory`, `policyfiles`, `repo`, `rulesets`, `settings`       |
+| `work`      | `commits`, `discussions`, `issueevents`, `issues`, `planning`, `stats`   |
+| `ci`        | `actions`, `artifacts`, `deployments`, `joblogs`                         |
+| `security`  | `analyses`, `security`                                                   |
+| `feeds`     | `activity`, `events`, `notifs`                                           |
+| `collector` | `ratelimit`                                                              |
+
+El `groups` de primer nivel y `every.groups` son dos preguntas distintas sobre
+los mismos ocho nombres: la primera decide si un grupo llega a recogerse, la
+segunda cada cuánto. Una cadencia bajo `every.groups` para un grupo que el
+`groups` de primer nivel deja fuera es legal y avisa, en lugar de fallar:
+estrechar una instalación no debería obligar además a podar un bloque `every`
+que ajustaste el año pasado.
+
+Los dos ejes tienen que decir que sí, y solo uno de ellos puede decir que no.
+Un grupo que no se nombra apaga sus familias diga lo que diga `every`, y
+nombrar un grupo nunca resucita una familia cuya cadencia es cero. En eso
+consiste que una familia venga apagada mientras el valor por defecto es todo.
+
+Escribir `groups: []` se rechaza en lugar de leerse como "no recojas nada":
+omitir la clave es la forma de pedirlo todo, así que una lista vacía solo puede
+ser un error.
+
+Hay tres superficies que no se pueden recuperar después, se haga lo que se haga,
+y están en tres grupos distintos: el feed de eventos y las notificaciones leídas
+(`feeds`), la ventana de catorce días del tráfico (`audience`) y los logs de los
+jobs, que se borran a los noventa días (`ci`). Un día no recogido de esas es un
+día que no existe. Todo lo demás se puede rellenar luego con `-backfill`.
+
+<Aside type="caution" title="Los paneles de un grupo apagado darán error">
+  Una medida que no se escribe nunca no existe como tabla, e InfluxDB 3 responde
+  con un error, y no con cero filas, a una consulta que nombra una tabla que no
+  tiene. Los dashboards se generan una vez, para el conjunto completo de
+  métricas, así que cada panel alimentado por un grupo apagado muestra ese
+  error. Es lo esperado. Son una demostración de lo que el colector sabe
+  dibujar, no una vista que se reorganice según tu configuración. PostgreSQL y
+  Elasticsearch se comportan igual; Prometheus y Graphite no tienen esquema que
+  echar en falta, así que esos mismos paneles leen No data.
+</Aside>
+
+Las secciones de los dashboards tampoco están alineadas con los grupos, así que
+un grupo apagado vacía algunos paneles de varias secciones en lugar de una
+sección entera. `Stars and forks` lee `gh_repo` de `repos` además de `gh_star`
+de `audience`; `Code` lee `gh_workflow_run` de `ci` y `gh_repo_activity` de
+`feeds` junto a sus propios commits; `Inventory` lee de `repos` y de `account`, y
+sus paneles de licencias leen `gh_dependency_license`, que es la familia `deps` y
+viene apagada se seleccione `repos` o no.
+
+## Qué significa `0`
+
+`0` apaga todas las familias que alcance la capa en la que está escrito. No es
+"tan a menudo como se pueda" ni "usa el valor por defecto": esas familias no
+corren nunca, no escriben nada y no cuestan nada.
+
+```yaml
+every:
+  families:
+    billing: 0 # nada de datos de facturación
+    artifacts: 0 # nada de filas de artefactos
+```
+
+Tres familias vienen apagadas y se activan dándoles cualquier duración, bajo
+`families:` y en ningún otro sitio:
+
+- **`joblogs`** es la cola del log de cada job fallido. Es texto y no una
+  medida, cuesta una petición por fallo, y solo tiene sentido con un almacén de
+  logs conectado. El destino de InfluxDB lo excluye por omisión.
+- **`history`** recorre el calendario de contribuciones de cada año pasado, un
+  punto de GraphQL por año, hasta el día en que se creó la cuenta, y el año en
+  curso de enero a hoy. Los años pasados no cambian y las filas son
+  idempotentes; la fila del año en curso es una instantánea marcada `partial`,
+  así que una cadencia diaria la mantiene al día y una única pasada la deja
+  congelada en el día en que corrió.
+- **`deps`** es el grafo de dependencias. El SBOM son 1,8 MB por repositorio y
+  tiene su propio presupuesto de cien por minuto.
+
+Una configuración que no deja nada activado lo dice al arrancar, en vez de
+correr un bucle vacío en silencio.
+
+<Aside type="caution" title="Un nombre desconocido es fatal al arrancar">
+```text
+every.families.trafic: unknown collector (known: account, achievements, actions, activity, ...)
+every.families.feeds: "feeds" is a group, not a family; every.groups.feeds is where a whole group's cadence lives
+every.groups.actions: "actions" is a family, not a group; it is in group "ci", and every.families.actions is where its cadence lives
+```
+
+Cada nombre se comprueba contra los colectores conocidos y los grupos conocidos
+antes de la primera llamada a la API. De lo contrario, una errata significaría
+una familia corriendo en silencio con su valor por defecto para siempre, y a un
+nombre escrito en la capa equivocada se le dice en qué capa iba.
+
+</Aside>
+
+## `heartbeat`: el tic del bucle, que no es una cadencia
+
+`heartbeat` fuerza cada cuánto despierta el bucle de pasadas a preguntar qué
+familias tocan. No le da intervalo a ninguna familia, no se compara con nada de
+la tabla de arriba, y no se gana ninguno de los avisos de esta página.
+
+```yaml
+heartbeat: 15s
+```
+
+Si se omite, el bucle late a la cadencia más corta configurada, entre un minuto
+y una hora, que es lo que quiere una instalación real: una familia que corre
+cada cuarto de hora no se retrasa por otra que corre cada doce horas. El techo
+importa en una configuración cuyas cadencias son todas más lentas que una hora:
+la búsqueda de la más corta arranca en una hora, así que el bucle sigue
+despertando cada hora y no encuentra nada que hacer. Se pone cuando
+lo que quieres bajo control es el bucle en sí, que casi siempre es una pasada de
+prueba. Es la única forma de hacer girar el bucle más rápido que ese suelo de un
+minuto, porque el suelo existe para sobrevivir a una cadencia mal tecleada y un
+heartbeat explícito no lo es.
+
+Un heartbeat **más largo** que la cadencia más corta frena a esa familia, y el
+arranque lo dice:
+
+```text
+level=WARN msg="heartbeat is 1h and the shortest cadence is 15m (actions), so
+  no family can run more often than every 1h"
+```
+
+## Hacerlas más lentas
+
+Si el presupuesto aprieta, alarga `artifacts` y después `actions`. Son las dos
+únicas cuyo coste crece con lo activos que estén los repositorios y no con
+cuántos haya. Ver [coste de una pasada](/ghchronicle/es/api/cost/).
+
+El síntoma de unas cadencias demasiado rápidas es un aviso en cada pasada:
+
+```text
+level=WARN msg="rate limit reserve reached, family skipped" family=actions
+```
+
+## Cadencia no es resolución
+
+Alargar una cadencia no hace más gruesa la historia, porque los puntos se fechan
+por la cosa que ocurrió y no por la pasada. Recoger las ejecuciones de workflows
+cada hora en vez de cada quince minutos sigue registrando cada ejecución en el
+segundo en que terminó. Lo que arriesga una cadencia larga es perder una ventana
+entera: `events`, `notifs` y `activity` son ventanas y no velocidades, como dice
+la tabla de arriba, y ninguna más lo es.

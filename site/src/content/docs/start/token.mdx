@@ -1,0 +1,92 @@
+---
+title: The token
+description: Which scopes buy which families, and why the automatic GITHUB_TOKEN is not enough.
+---
+
+import { Tabs, TabItem, Aside, Steps } from "@astrojs/starlight/components";
+
+Everything here is read access. The collector never writes to GitHub. What
+varies is how much of the account a given token is allowed to see, and a
+handful of scopes are worth understanding rather than just granting.
+
+## Creating one
+
+<Steps>
+
+1. Go to `https://github.com/settings/tokens`.
+
+2. Choose the kind of token and give it the scopes below.
+
+    <Tabs syncKey="token">
+      <TabItem label="Classic">
+        `repo`, `read:packages`, `read:user`, `read:org`, `security_events`,
+        `read:public_key` and `read:gpg_key` covers everything this collects.
+      </TabItem>
+      <TabItem label="Fine-grained">
+        Read access to the repositories, plus the account permissions for
+        followers, gists, packages, plan, Git SSH keys and GPG keys.
+      </TabItem>
+    </Tabs>
+
+3. Put it where the process can read it, and nowhere else.
+
+    ```sh
+    export GITHUB_TOKEN=github_pat_...
+    ```
+
+    The configuration file refers to it as `${GITHUB_TOKEN}`, which is expanded
+    from the environment at start-up. That is what lets the file be committed
+    while the token stays out of it.
+
+</Steps>
+
+## What each scope buys
+
+| Scope                         | Without it                                                                                       |
+| ----------------------------- | ------------------------------------------------------------------------------------------------ |
+| Push access to the repository | Traffic is a 403. GitHub only shows views and clones to someone who could push                   |
+| `security_events`             | Dependabot and code scanning alerts look exactly like a repository with the feature switched off |
+| `read:packages`               | The container registry is invisible. Package versions cost one call per package                  |
+| `read:user`                   | Followers, contributions, gists and social accounts are missing                                  |
+| `read:org`                    | Repositories owned by an organisation are not discovered                                         |
+| `read:public_key`, `read:gpg_key` | The `keys` family writes nothing, and says nothing. No other scope implies either            |
+
+Traffic is the one that surprises people. It is not a read scope at all: GitHub
+decides who may see views and clones by asking whether the caller could push,
+so a read-only token gets a 403 for every repository. The collector records
+that as "unavailable" and moves on, which is why the symptom is an empty
+traffic panel rather than a failed sweep.
+
+<Aside type="tip" title="Unavailable is not an error">
+  Anything the token cannot see is recorded as unavailable and skipped. A
+  repository with a feature switched off must not stop the sweep for the other
+  forty, so the log says `not available (403)` and the sweep continues.
+</Aside>
+
+## Why the automatic GITHUB_TOKEN is not enough
+
+A workflow gets a `GITHUB_TOKEN` for free. It is not enough for this, and the
+reason is worth being specific about rather than letting someone discover it as
+an empty dashboard.
+
+- **It is scoped to one repository.** Traffic needs push access to _every_
+  repository being collected. The automatic token has it for the repository the
+  workflow is running in, and nothing else.
+- **It has no `security_events`.** Dependabot and code scanning alerts are
+  invisible to it.
+- **It has no `read:packages`.** The container registry is invisible to it.
+- **It is not a user.** Everything account-wide (followers, the contribution
+  calendar, billing, notifications, the stars you gave) is about the person,
+  not about a repository, and the automatic token is an installation, not a
+  person.
+
+So a workflow needs a personal access token stored as a repository secret and
+passed in as the `token` input. See
+[GitHub Actions](/ghchronicle/install/actions/).
+
+## Running without a token
+
+Possible, and honest about what it costs. A card of public numbers can be drawn
+from unauthenticated calls, but the traffic and alert panels will be empty and
+the log will say `not available (403)` for each of them. That is the collector
+reporting a permission, not a failure.

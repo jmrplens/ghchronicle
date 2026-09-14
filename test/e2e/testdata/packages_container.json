@@ -1,0 +1,14 @@
+[
+  {
+    "id": 7001,
+    "name": "ghchronicle",
+    "package_type": "container",
+    "owner": {"login": "octocat"},
+    "version_count": 0,
+    "visibility": "public",
+    "url": "https://api.github.com/users/octocat/packages/container/ghchronicle",
+    "created_at": "2026-06-01T10:00:00Z",
+    "updated_at": "2026-09-01T10:00:00Z",
+    "repository": {"id": 1296269, "full_name": "octocat/hello-world"}
+  }
+]

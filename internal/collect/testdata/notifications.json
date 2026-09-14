@@ -1,0 +1,47 @@
+[
+  {
+    "id": "1",
+    "unread": true,
+    "reason": "mention",
+    "updated_at": "2026-09-07T12:00:00Z",
+    "last_read_at": null,
+    "subject": {"title": "Flaky test on arm64", "url": "https://api.github.com/repos/octocat/hello-world/issues/9", "latest_comment_url": null, "type": "Issue"},
+    "repository": {"id": 1296269, "full_name": "octocat/hello-world", "private": false}
+  },
+  {
+    "id": "2",
+    "unread": false,
+    "reason": "review_requested",
+    "updated_at": "2026-09-05T08:30:00Z",
+    "last_read_at": "2026-09-05T09:00:00Z",
+    "subject": {"title": "Add retry to the influx sink", "url": "https://api.github.com/repos/octocat/hello-world/pulls/43", "latest_comment_url": "https://api.github.com/repos/octocat/hello-world/pulls/43", "type": "PullRequest"},
+    "repository": {"id": 1296269, "full_name": "octocat/hello-world", "private": true}
+  },
+  {
+    "id": "3",
+    "unread": true,
+    "reason": "comment",
+    "updated_at": "2026-09-09T17:45:10Z",
+    "last_read_at": null,
+    "subject": {"title": "Prefer the comment over the thread", "url": "https://api.github.com/repos/octocat/hello-world/pulls/691", "latest_comment_url": "https://api.github.com/repos/octocat/hello-world/issues/comments/5619299616", "type": "PullRequest"},
+    "repository": {"id": 1296269, "full_name": "octocat/hello-world", "private": false}
+  },
+  {
+    "id": "4",
+    "unread": true,
+    "reason": "ci_activity",
+    "updated_at": "2026-09-10T13:50:33Z",
+    "last_read_at": null,
+    "subject": {"title": "Windows workflow run, Attempt #2 failed for fix/manual-dns-stale-order-link branch", "url": null, "latest_comment_url": null, "type": "CheckSuite"},
+    "repository": {"id": 1296269, "full_name": "octocat/hello-world", "private": false}
+  },
+  {
+    "id": "5",
+    "unread": false,
+    "reason": "subscribed",
+    "updated_at": "2026-09-06T11:20:00Z",
+    "last_read_at": "2026-09-06T12:00:00Z",
+    "subject": {"title": "Scheduled alerts stop after the first trigger", "url": "https://api.github.com/repos/octocat/hello-world/discussions/14131", "latest_comment_url": null, "type": "Discussion"},
+    "repository": {"id": 1296269, "full_name": "octocat/hello-world", "private": false}
+  }
+]

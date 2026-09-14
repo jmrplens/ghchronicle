@@ -1,0 +1,143 @@
+---
+title: Layouts
+description: Ten layouts in two visual families, three of them animated, with what each one draws by default.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+```sh
+ghchronicle -card-layouts
+```
+
+Prints them with the fields each shows by default. The captures below are the
+dark theme; every layout also renders light, and `auto` puts both in one file.
+
+| Layout              | Family    | Animated | Default fields                                                                       |
+| ------------------- | --------- | -------- | ------------------------------------------------------------------------------------ |
+| `summary`           | chronicle | no       | stars, forks, followers, repos, contributions, views, visitors, sparkline, top_repos |
+| `github-stats`      | github    | no       | repos, stars, forks, followers, commits, pull_requests, views, clones, languages     |
+| `github-compact`    | github    | no       | stars, forks, followers, repos, commits                                              |
+| `badge-row`         | chronicle | no       | stars, forks, followers, repos, contributions                                        |
+| `wide-banner`       | chronicle | yes      | stars, forks, followers, contributions, sparkline                                    |
+| `sparkline-hero`    | chronicle | yes      | contributions, stars, followers, sparkline                                           |
+| `language-ring`     | github    | no       | languages, stars, repos                                                              |
+| `repo-list`         | github    | no       | top_repos, stars, forks, repos                                                       |
+| `activity-heatmap`  | github    | no       | sparkline, contributions, commits, pull_requests                                     |
+| `animated-counters` | chronicle | yes      | stars, forks, followers, repos, contributions, views, sparkline                      |
+
+## The two families
+
+The **chronicle** family is this tool's own look. The **github** family uses
+GitHub's Primer palette and monospace numbers so the card sits in a profile
+README as if GitHub had drawn it.
+
+## summary
+
+The original card: title, two rows of numbers, a sparkline and the most starred
+repositories.
+
+![The summary layout: a title, two rows of large numbers, a contribution sparkline and a list of the most starred repositories](../../../assets/card-summary.png)
+
+## github-stats
+
+GitHub's own box: a header band, rows of four monospace numbers and a language
+share bar with its legend. The widest layout at 800 pixels, and the one that
+looks most native in a profile README.
+
+![The github-stats layout: a header band, rows of four monospace numbers and a horizontal language share bar with its legend](../../../assets/card-github-stats.png)
+
+## github-compact
+
+One row of monospace numbers under a thin header band.
+
+![The github-compact layout: a thin header band above a single row of monospace numbers](../../../assets/card-github-compact.png)
+
+## badge-row
+
+A row of 20 pixel pill badges, one per number, for a README line. The width
+follows the content rather than being set.
+
+![The badge-row layout: a horizontal row of small pill badges, each with a label and a number](../../../assets/card-badge-row.png)
+
+## wide-banner
+
+A full-width 60 pixel banner: login on the left, numbers spread across, the
+sparkline drawing itself behind them.
+
+![The wide-banner layout: a wide, short banner with the login on the left, numbers spread across and a sparkline behind them](../../../assets/card-wide-banner.png)
+
+## sparkline-hero
+
+The contribution sparkline is the whole card, with up to three numbers
+overlaid. The line draws itself on load.
+
+![The sparkline-hero layout: a large contribution sparkline filling the card with three numbers overlaid](../../../assets/card-sparkline-hero.png)
+
+## language-ring
+
+A donut of language shares with the legend beside it and a row of headline
+numbers.
+
+![The language-ring layout: a donut chart of language shares with a legend beside it and a row of headline numbers](../../../assets/card-language-ring.png)
+
+## repo-list
+
+The most starred repositories as the main content: language dot, stars and a
+bar per row, totals underneath.
+
+![The repo-list layout: one row per repository with a language dot, the star count and a proportional bar, with totals underneath](../../../assets/card-repo-list.png)
+
+## activity-heatmap
+
+The last twelve weeks of the contribution calendar as GitHub's green squares,
+with up to three numbers beside it.
+
+![The activity-heatmap layout: twelve weeks of contribution squares in GitHub's green scale with three numbers beside them](../../../assets/card-activity-heatmap.png)
+
+## animated-counters
+
+Numbers that count up on load over a sparkline that draws itself, settling to
+the static card.
+
+![The animated-counters layout: a grid of large numbers over a contribution sparkline](../../../assets/card-animated-counters.png)
+
+<Aside type="note" title="The settled frame is the whole card">
+  Animation is CSS inside the SVG, it plays once and settles, and the settled
+  frame is the complete static card. A renderer that ignores animation shows the
+  finished state, and `prefers-reduced-motion` switches it off. The captures
+  above are those settled frames.
+</Aside>
+
+## Width
+
+Each layout declares its own width, and a minimum it would refuse to go below.
+Nothing asks for a different one: `render.Options` carries a `Width`, the
+binary leaves it at zero, and there is no way to set it from outside, so every
+card comes out at its layout's own width. `badge-row` declares neither, because
+a pill row stretched to a fixed width would have gaps in it; its width follows
+its content.
+
+## Fields a layout cannot draw
+
+Each layout declares which fields it supports. Asking for one it does not, such
+as `top_repos` on `github-compact`, drops it silently. Asking for a name that is
+not in the vocabulary at all is an error listing the valid ones.
+
+Twelve of the fifteen fields are numbers, and every layout takes all twelve.
+Only the three that need room of their own are restricted:
+
+| Field        | Drawn by                                                          |
+| ------------ | ----------------------------------------------------------------- |
+| `languages`  | `summary`, `github-stats`, `language-ring`                        |
+| `top_repos`  | `summary`, `github-stats`, `repo-list`                            |
+| `sparkline`  | `summary`, `github-stats`, `wide-banner`, `sparkline-hero`, `activity-heatmap`, `animated-counters` |
+
+`ghchronicle -card-layouts` prints the layouts with the fields each one draws
+by default.
+
+## Where to go next
+
+- [The card](/ghchronicle/card/) is what draws these, and how to put one in a
+  README.
+- [Calling it from a program](/ghchronicle/reference/subprocess/) is the
+  supported way to get one out of another language.

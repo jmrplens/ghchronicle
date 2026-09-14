@@ -1,0 +1,153 @@
+---
+title: File and stdout
+description: A rotating file for a shipper you already run, the simplest durable buffer there is, and line protocol on standard output.
+---
+
+import { Tabs, TabItem, Aside } from "@astrojs/starlight/components";
+
+## File
+
+```yaml
+sinks:
+  file:
+    path: /var/log/ghchronicle/points.lp
+    format: influx # or json
+    max_bytes: 67108864
+    keep: 5
+```
+
+For the setups that already run a shipper. Telegraf tails line protocol,
+Promtail and Vector tail JSON, and neither needs this process to know anything
+about their backend.
+
+It is also the simplest durable buffer there is: when the database is down, the
+file still has the data.
+
+### Rotation
+
+By size, with numbered suffixes, so retention is a count and two rotations in
+the same second cannot collide. The size counter is read from the file on
+start-up, so a restart does not reset it and let the file grow without bound.
+
+<Tabs syncKey="file-format">
+  <TabItem label="influx">
+    ```text
+    gh_traffic,full_name=acme/telemetry,kind=views,owner=acme,repo=telemetry count=220i,uniques=131i 1788739200000000000
+    ```
+  </TabItem>
+  <TabItem label="json">
+    ```json
+    {"time":"2026-09-07T00:00:00Z","measurement":"gh_traffic","tags":{"full_name":"acme/telemetry","kind":"views","owner":"acme","repo":"telemetry"},"fields":{"count":220,"uniques":131}}
+    ```
+  </TabItem>
+</Tabs>
+
+One object per line in JSON, which is the shape a line-oriented shipper wants.
+
+## Standard output
+
+```yaml
+sinks:
+  stdout: true
+  stdout_format: influx # or json
+```
+
+Line protocol on standard output, for piping into Telegraf or for seeing what
+would be written before pointing this at a database. It is the fastest way to
+answer "what does this actually collect".
+
+```sh
+ghchronicle -config config.yaml -once | head -20
+ghchronicle -config config.yaml -once | grep gh_workflow_run
+```
+
+`stdout_format: json` prints one object per line instead, the same shape the
+file sink writes.
+
+<Aside
+  type="caution"
+  title="Do not combine it with the SQL sink on standard output"
+>
+  `sinks.sql.path: "-"` also writes to standard output. Interleaving SQL
+  statements with line protocol produces a stream neither psql nor Telegraf can
+  read.
+</Aside>
+
+## As a buffer
+
+The file sink is the answer to "what happens when the database is down". Run it
+alongside the real store: the write to the database fails and is logged, the
+sweep continues, and the points are on disk. Replaying them afterwards is a
+`curl` for InfluxDB, or `psql -f` for the SQL sink, and it converges rather
+than duplicating because the points carry their own timestamps.
+
+```sh
+curl -s -XPOST "http://localhost:8181/api/v2/write?org=default&bucket=github&precision=ns" \
+  -H "Authorization: Token $INFLUX_TOKEN" \
+  --data-binary @/var/log/ghchronicle/points.lp
+```
+
+## Permissions
+
+The dump is created `0600` inside a `0750` directory. A sweep of a private
+account puts private repository names, Dependabot severities and whole job log
+lines in it, so it is not created readable by the whole machine just because a
+shipper is coming to read it.
+
+### Letting the shipper read it
+
+Telegraf, Promtail, Vector and Fluent Bit all read as their own user. None of
+them documents a required mode, and every one of them documents the same
+remedy, which is a group: their own answers say `usermod -aG adm`. So the grant
+is yours to make, and it is two commands:
+
+```sh
+usermod -aG ghchronicle telegraf            # the shipper joins the service's group
+chmod 0640 /var/log/ghchronicle/points.lp   # or create it that way beforehand
+```
+
+The grant sticks. The sink never changes the mode of a file that is already
+there, and a rotation creates the replacement with the mode of the file it is
+renaming away, so the `chmod` is not undone the first time the dump fills up.
+
+<Aside type="caution" title="The failure this prevents is a silent one">
+  A shipper that cannot open the file it is tailing does not announce it, and
+  this process keeps writing to a handle it already holds. Neither end logs
+  anything, so the first symptom is a dashboard that stopped days ago.
+</Aside>
+
+If you would rather the dump belonged to the shipper's own group, own the
+directory with it and set the setgid bit, which is what makes every file
+created in it inherit the group, rotations included:
+
+```sh
+install -d -o ghchronicle -g telegraf -m 2750 /var/log/ghchronicle
+```
+
+That settles which group owns the dump, not what the group may do with it, so
+the `chmod 0640` above is still the other half. Making the directory yourself is
+worth doing whichever route you take: the one this process creates when the
+directory is missing is `0750` less whatever the process umask takes off it, and
+a shipper that cannot traverse the directory fails as quietly as one that cannot
+read the file.
+
+An ACL is not carried, because it belongs to the file it was set on and a
+rotation creates a new one, so grant through the group rather than through
+`setfacl` on the dump. What a rotation does carry is the mode, not the owner:
+this process cannot `chown` a file to a user it is not. The write ledger behind
+`sinks.dedupe_file` is the opposite case and gets the opposite answer: nothing
+but this process is meant to read it, so it is written `0600` and every save
+puts it back to `0600`.
+
+### Where it can write at all
+
+Under the hardened systemd unit, the directory has to be in `ReadWritePaths`.
+In a container it has to be writable by uid 65532. Both are the same mistake in
+two clothes: the process is deliberately allowed to write almost nowhere.
+
+## Where to go next
+
+- [Choosing a store](/ghchronicle/sinks/) compares the file sink with the other nine,
+  and holds the write ledger every one of them shares.
+- [The dashboards](/ghchronicle/dashboards/) says which of the five is drawn
+  against which store, and what a panel a store cannot answer becomes.

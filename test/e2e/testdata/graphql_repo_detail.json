@@ -1,0 +1,50 @@
+{
+  "data": {
+    "r0": {
+      "nameWithOwner": "octocat/hello-world",
+      "url": "https://github.com/octocat/hello-world",
+      "languages": {"edges": [
+        {"size": 84523, "node": {"name": "Go"}},
+        {"size": 3120, "node": {"name": "Shell"}}
+      ]},
+      "repositoryTopics": {"nodes": [
+        {"url": "https://github.com/topics/go", "topic": {"name": "go"}},
+        {"url": "https://github.com/topics/metrics", "topic": {"name": "metrics"}}
+      ]},
+      "branchProtectionRules": {"nodes": [
+        {"pattern": "main",
+         "allowsDeletions": false, "allowsForcePushes": false, "blocksCreations": false,
+         "dismissesStaleReviews": true, "isAdminEnforced": false,
+         "requiresApprovingReviews": true, "requiredApprovingReviewCount": 0,
+         "requiresCodeOwnerReviews": false, "requiresCommitSignatures": false,
+         "requiresConversationResolution": false, "requiresLinearHistory": true,
+         "requiresStatusChecks": true, "requiresStrictStatusChecks": true,
+         "requiresDeployments": false, "restrictsPushes": false,
+         "restrictsReviewDismissals": false,
+         "requiredStatusChecks": [{"context": "Go analysis"}, {"context": "Tests"}]},
+        {"pattern": "release/*",
+         "allowsDeletions": false, "allowsForcePushes": false, "blocksCreations": false,
+         "dismissesStaleReviews": false, "isAdminEnforced": false,
+         "requiresApprovingReviews": false, "requiredApprovingReviewCount": null,
+         "requiresCodeOwnerReviews": false, "requiresCommitSignatures": false,
+         "requiresConversationResolution": false, "requiresLinearHistory": false,
+         "requiresStatusChecks": false, "requiresStrictStatusChecks": true,
+         "requiresDeployments": false, "restrictsPushes": false,
+         "restrictsReviewDismissals": false,
+         "requiredStatusChecks": []}
+      ]},
+      "rulesets": {"nodes": [
+        {"name": "Protect main", "target": "BRANCH", "enforcement": "ACTIVE",
+         "updatedAt": "2026-07-15T10:00:00Z",
+         "rules": {"nodes": [
+           {"type": "DELETION"}, {"type": "NON_FAST_FORWARD"},
+           {"type": "PULL_REQUEST"}, {"type": "REQUIRED_STATUS_CHECKS"}
+         ]},
+         "conditions": {"refName": {"include": ["refs/heads/main"], "exclude": []}},
+         "bypassActors": {"totalCount": 2, "nodes": [
+           {"bypassMode": "ALWAYS"}, {"bypassMode": "PULL_REQUEST"}
+         ]}}
+      ]}
+    }
+  }
+}

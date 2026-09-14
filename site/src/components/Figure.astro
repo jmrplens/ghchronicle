@@ -1,0 +1,65 @@
+---
+/**
+ * One generated figure, inline, in the locale of the page it sits on.
+ *
+ * The drawing is not written here. `scripts/gen-figures.mjs` reads the
+ * repository and emits one SVG per figure, locale and layout under
+ * `src/data/figures/`; this component only chooses which of them the page
+ * shows, and `pnpm run figures:check` fails when any of them no longer matches
+ * the source it was drawn from.
+ *
+ * Two layouts, not one scaled: a seventeen-row matrix shrunk to a phone is a
+ * picture of a matrix rather than a matrix. Which one is shown is a container
+ * query in `styles/diagram.css`, so it follows the width of the prose column
+ * and not the width of the window.
+ *
+ * The locale is read off the URL, the way `overrides/Head.astro` reads it,
+ * rather than being passed in: the twins invoke this component identically,
+ * which is what `scripts/check-i18n-parity.mjs` compares, and a Spanish page
+ * carrying an English drawing would be a defect no gate here could see.
+ */
+import { BASE, localeOf } from "../lib/site.mjs";
+
+interface Props {
+	/** The figure's name, which is the stem of its files under src/data/figures. */
+	name: string;
+}
+
+const { name } = Astro.props;
+
+const route = Astro.url.pathname
+	.slice(BASE.length)
+	.replace(/^\/+/, "")
+	.replace(/\/+$/, "");
+const locale = localeOf(route);
+
+const drawings = import.meta.glob<string>("../data/figures/*.svg", {
+	query: "?raw",
+	import: "default",
+	eager: true,
+});
+
+/** @param variant which layout to take */
+function drawing(variant: "wide" | "narrow"): string {
+	const key = `../data/figures/${name}.${locale}.${variant}.svg`;
+	const found = drawings[key];
+	if (!found) {
+		throw new Error(
+			`<Figure name="${name}" /> on a ${locale} page has no ${variant} drawing. ` +
+				"Add it to FIGURES in site/scripts/gen-figures.mjs and run pnpm run figures.",
+		);
+	}
+	return found;
+}
+---
+
+<figure class="rb-figure">
+	<div
+		class="rb-figure__wide"
+		set:html={drawing("wide")}
+	/>
+	<div
+		class="rb-figure__narrow"
+		set:html={drawing("narrow")}
+	/>
+</figure>

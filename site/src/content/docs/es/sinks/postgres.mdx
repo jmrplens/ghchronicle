@@ -1,0 +1,119 @@
+---
+title: PostgreSQL
+description: Sentencias INSERT que se pasan a psql, el esquema que declaran y por qué la cláusula de conflicto actualiza en vez de no hacer nada.
+---
+
+import { Aside, Steps } from "@astrojs/starlight/components";
+import stats from "../../../../data/stats.json";
+
+```yaml
+sinks:
+  sql:
+    dialect: postgres
+    path: /var/lib/ghchronicle/points.sql
+    max_bytes: 67108864
+    keep: 5
+```
+
+Sentencias INSERT en el dialecto de PostgreSQL, escritas a un fichero rotatorio
+o, con `path: "-"`, a la salida estándar.
+
+```sh
+ghchronicle -config config.yaml -once | psql "$DATABASE_URL"
+```
+
+Este es el destino para quien usa Grafana con un PostgreSQL o TimescaleDB propio
+y sin InfluxDB. La herramienta no puede hablar el protocolo de cable de
+PostgreSQL sin un driver, y un driver es una dependencia que este repositorio no
+asume, así que emite el SQL y deja la conexión a psql. El datasource de
+PostgreSQL de Grafana tiene entonces un esquema real que consultar.
+
+## El esquema es el contrato
+
+- Una tabla por medida, con su nombre: `gh_repo`, `gh_traffic`,
+  `gh_workflow_run`.
+- `time TIMESTAMPTZ NOT NULL`, la fecha en que ocurrió la cosa.
+- Una columna `TEXT NOT NULL DEFAULT ''` por etiqueta, con cadena vacía donde el
+  punto no tenía valor.
+- Una columna por campo, tipada a partir del valor: `BIGINT` para un entero,
+  `DOUBLE PRECISION` para un flotante, `BOOLEAN`, `TEXT`, y `TIMESTAMPTZ` para
+  un campo que es en sí una hora.
+- `PRIMARY KEY (time, <columnas de etiqueta en orden de nombre>)`.
+- Todo identificador va entre comillas dobles, porque `user`, `type` y `state`
+  son aquí nombres de etiqueta y allí palabras reservadas.
+
+Esa clave primaria es la clave de serie de InfluxDB escrita como restricción, y
+es lo que hace que una reescritura de la ventana de tráfico de catorce días
+converja en vez de acumular.
+
+```sql
+CREATE TABLE IF NOT EXISTS "gh_traffic" ("time" TIMESTAMPTZ NOT NULL, "full_name" TEXT NOT NULL DEFAULT '', "kind" TEXT NOT NULL DEFAULT '', "owner" TEXT NOT NULL DEFAULT '', "repo" TEXT NOT NULL DEFAULT '', "count" BIGINT, "uniques" BIGINT, "url" TEXT, PRIMARY KEY ("time", "full_name", "kind", "owner", "repo"));
+INSERT INTO "gh_traffic" ("time", "full_name", "kind", "owner", "repo", "count", "uniques", "url") VALUES ('2026-09-07T00:00:00Z'::timestamptz, 'acme/telemetry', 'views', 'acme', 'telemetry', 41, 12, 'https://github.com/acme/telemetry/graphs/traffic') ON CONFLICT ("time", "full_name", "kind", "owner", "repo") DO UPDATE SET "count" = EXCLUDED."count", "uniques" = EXCLUDED."uniques", "url" = EXCLUDED."url";
+```
+
+<Aside type="tip" title="DO UPDATE, no DO NOTHING">
+  La fila de tráfico de hoy se reescribe con un recuento mayor en cada pasada.
+  Una fila congelada en su primer valor sería justo el error que todo el diseño
+  del punto fechado existe para evitar.
+</Aside>
+
+## Cómo llegan las declaraciones
+
+El `CREATE TABLE IF NOT EXISTS` se emite la primera vez que se ve una medida en
+un fichero, con la unión de las columnas que lleva ese lote. Una columna que
+aparece en un lote posterior llega como
+`ALTER TABLE ... ADD COLUMN IF NOT EXISTS`. Un fichero rotado empieza otra vez
+sus declaraciones, así que cualquier fichero se puede reproducir por su cuenta.
+
+Una etiqueta vista por primera vez después de declarar la tabla no puede
+unirse a la clave primaria sin reescribirla, así que se convierte en una columna
+normal. Eso solo ocurre cuando un colector cambia su conjunto de etiquetas entre
+pasadas.
+
+## TimescaleDB
+
+Convierte cada tabla en hypertable una vez exista. La clave primaria ya incluye
+`time`, que es la única condición que le pone TimescaleDB.
+
+```sql
+SELECT create_hypertable('gh_traffic', 'time', if_not_exists => TRUE);
+SELECT create_hypertable('gh_workflow_run', 'time', if_not_exists => TRUE);
+```
+
+Nada del dashboard cambia.
+
+## Cómo montarlo
+
+<Steps>
+
+1. Apunta el destino a un fichero, o a la salida estándar para una tubería
+    directa.
+
+2. Cárgalo.
+
+    ```sh
+    psql "$DATABASE_URL" -f /var/lib/ghchronicle/points.sql
+    ```
+
+    O, para la disposición en flujo, ejecuta el colector con `-once` desde un
+    planificador y encadénalo directamente.
+
+3. Apunta el datasource de PostgreSQL de Grafana a la base de datos e importa
+    `ghchronicle-postgres.json`.
+
+    ```sql
+    SELECT time, "count" FROM gh_traffic WHERE kind = 'views' AND repo = $repo
+    ```
+
+</Steps>
+
+`dashboards/ghchronicle-postgres.json` tiene los mismos {stats.panels} paneles que el de
+InfluxDB, con cada consulta traducida a PostgreSQL contra este esquema.
+
+## Por dónde seguir
+
+- [Elegir almacén](/ghchronicle/es/sinks/) compara PostgreSQL con los otros nueve, y
+  lleva el registro de escrituras que todos comparten.
+- [Los dashboards](/ghchronicle/es/dashboards/) dice cuál de los cinco se dibuja
+  contra cada almacén, y en qué se convierte un panel que un almacén no puede
+  responder.

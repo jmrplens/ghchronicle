@@ -1,0 +1,631 @@
+---
+title: Qué muestran
+description: Las diecisiete secciones y sus ciento cincuenta y dos paneles, una captura de cada una, y qué cambia cuando el almacén no puede responder.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+Un dashboard, renderizado una vez por almacén. Diecisiete secciones, ciento
+cincuenta y dos paneles, en los mismos sitios y con los mismos títulos sea cual
+sea la base de datos elegida. Abajo hay una captura por sección, en el orden en
+que el dashboard las coloca.
+
+Todas las secciones salvo Overview se abren plegadas. Abiertas, las siete
+primeras eran veintitrés pantallas de teléfono antes de que el lector supiera
+que había diez más; plegadas, la segunda pantalla de un teléfono es el índice
+de las dieciséis, cada una a un toque, y Grafana conserva en la URL lo que se
+abrió. En un escritorio cuesta un clic por sección, y la primera carga pide los
+paneles de Overview y no todos.
+
+<Aside
+  type="note"
+  title="Las capturas de sección son de una base de datos de demostración"
+>
+  Todas las capturas de sección de abajo son del dashboard de InfluxDB sobre
+  noventa días de una base de datos de demostración, generada para que todos los
+  paneles tengan algo que dibujar. Una cuenta real deja varios legítimamente
+  vacíos: no ha habido ninguna estrella esta semana, ningún workflow fallido en
+  la ventana, ningún hito abierto, y una captura de un panel vacío no enseña
+  nada. La base de datos la llenó un generador que no forma parte de este
+  repositorio, y tomó cada medida, etiqueta, campo y tipo de columna de la
+  [referencia de medidas](/ghchronicle/es/collectors/measurements/) y de una
+  base de datos en producción, así que la forma es real. Lo único inventado es
+  la cuenta: `acme` y cinco repositorios que son claramente ejemplos. La única
+  captura que no sale de ahí es la última de esta página, del dashboard de
+  Prometheus, que viene de la suite end-to-end en contenedores, y el texto que
+  la acompaña lo dice. Ninguna captura de esta página es de una cuenta real.
+</Aside>
+
+## Overview
+
+Una cabecera y no un panel: la marca, grande y centrada, el nombre debajo, y
+bajo el nombre un botón a esta documentación y otro al código, sobre la propia
+página y sin caja alrededor. Después cuatro grupos de cifras: Repositories (repositorios, estrellas, forks),
+Traffic in range (visitas, visitantes únicos, clones), Community (seguidores,
+seguidos, patrocinadores, patrocinados) y Account (contribuciones del último
+año, edad de la cuenta, vigilados, estrellas dadas, gists, paquetes). Un grupo
+es un panel de estadística con varios valores y no una tarjeta por cifra: en un
+escritorio se lee como la fila de tarjetas a la que sustituye, y en un
+teléfono, donde cada panel es una columna, dieciséis tarjetas eran cuatro
+pantallas de cifras sueltas y cuatro grupos son una. La variable de repositorio
+que hay al lado filtra todas las secciones a la vez. Estrellas y forks suman la
+fila más reciente de cada repositorio y no todas las del rango, porque ambas son
+estado actual y una suma sobre el rango contaría cada pasada.
+
+![La fila Overview: el selector de repositorio y el rango de 90 días en la parte superior, el distintivo de ghchronicle con sus botones Docs y Source, y luego cuatro grupos de tarjetas con 5 repositorios, 350 estrellas y 51 forks; 37,5 mil visitas, 21,1 mil visitantes únicos y 19,6 mil clones; 117 seguidores, 58 seguidos, 4 patrocinadores y 2 patrocinados; y una cuenta con 3,22 mil contribuciones y 7,78 años de antigüedad](../../../../assets/dashboards/overview.png)
+
+Lee `gh_account`, `gh_repo`, `gh_traffic` y `gh_contributions_total`.
+
+## Lifetime
+
+Seis cifras que son ciertas desde que existe la cuenta, en un solo panel, y una
+fila por repositorio con su vida entera: pull requests fusionadas y revisadas alguna vez,
+commits totales, issues abiertas, lo fusionado en repositorios ajenos y lo
+comentado allí.
+
+![La sección Lifetime: un grupo de tarjetas con 1,18 mil pull requests fusionadas, 386 revisadas, 6,68 mil commits, 148 issues abiertas, 27 fusionadas fuera y 96 comentarios fuera; la tabla de todos los repositorios de siempre con commits, fusionadas, issues, releases, estrellas, ramas y etiquetas; y debajo los repositorios creados, el único repositorio archivado y las ejecuciones de workflow de siempre como una barra por repositorio](../../../../assets/dashboards/lifetime.png)
+
+Todas las demás secciones cuentan filas dentro del rango del dashboard. Estas no:
+las cuenta GitHub, en una búsqueda o un campo de GraphQL cada una, y el colector
+guarda la respuesta como una sola fila. Por eso son instantáneas y por eso ya son
+correctas en la primera pasada de una instalación nueva, cosa que un contador
+acumulado por esta herramienta no sería. Es además la forma que un almacén puede
+responder sin leer todo lo que guarda: InfluxDB 3 Core rechaza una consulta que
+abra más ficheros que su tope, cuarenta mil donde esto se midió, y "cuántas en
+total" a partir de una fila por hecho es exactamente esa consulta.
+
+Lee `gh_account_total` y `gh_repo_total`.
+
+## Audience
+
+Visitas, visitantes únicos y clones en el tiempo, los referrers y las rutas
+principales. GitHub sirve catorce días y reescribe la ventana entera en cada
+pasada, así que las series se extienden tan atrás como lleve corriendo el
+colector y no catorce días. Los referrers y las rutas no llevan fecha propia, de
+modo que son la instantánea más reciente de esa ventana y no una serie.
+
+![La sección Audience: visitas, visitantes únicos y clones por día como barras apiladas por repositorio, la tabla de referrers principales encabezada por Google con 250 visitas, la tabla de rutas principales con el título de cada ruta, y la tabla de amplificación de clones con los clones por clonador, alrededor de 1,3 en todos los repositorios](../../../../assets/dashboards/audience.png)
+
+<Aside type="tip" title="Los clones no cuentan personas">
+  La integración continua clona un repositorio miles de veces por cada visita
+  humana. Medido en un repositorio, setenta y tres clones por cada clonador
+  único. El último panel de la sección divide uno entre otro, que es la única
+  cifra que separa adopción de maquinaria.
+</Aside>
+
+Lee `gh_traffic`, `gh_traffic_referrer` y `gh_traffic_path`.
+
+## Stars and forks
+
+Estrellas ganadas en el tiempo, la curva acumulada, estrellas por repositorio,
+las cincuenta estrellas más recientes con el usuario y el momento, y forks en el
+tiempo. Se nombran los ocho repositorios que más ganaron en el rango y el resto
+van a `other`: de los diecisiete que ganaron alguna estrella en dos años, nueve
+ganaron entre una y tres, y diecisiete entradas de leyenda escondían un tercio
+del trazado. La curva acumulada se remonta a la primera estrella porque el recorrido
+de stargazers recogió cada una con su propio `starred_at`, no porque el colector
+lleve corriendo tanto tiempo. Los forks en el tiempo se dibujan igual desde
+`gh_fork`, cada fork con la fecha en que se hizo, así que también se remontan
+más allá del día en que arrancó el colector en vez de empezar en la primera
+instantánea. Las dos curvas se dibujan hasta los dos bordes del rango: un
+recuento acumulado sobre filas fechadas solo tiene punto donde hay fila, así
+que una curva de forks sobre un mes tranquilo era una línea del primer fork al
+último y nada a los lados, lo que se lee como que la recogida se paró. Cada
+extremo lleva un bucket de cero, así que la línea mantiene su valor hasta el
+final del rango.
+
+![La sección Stars and forks: estrellas ganadas por día como barras por repositorio, la curva acumulada subiendo hasta 350, estrellas por repositorio como gráfico de barras, una tabla de estrellas recientes con marcas de tiempo y usuarios, y forks en el tiempo subiendo hasta 51](../../../../assets/dashboards/stars-and-forks.png)
+
+Lee `gh_star` y `gh_repo`.
+
+## Contributions
+
+El calendario de contribuciones como serie y después como la rejilla que dibuja
+GitHub, una columna por semana y una fila por día de la semana, con el tono de
+cada celda en función del recuento de ese mismo día; commits por
+semana, los totales del último año y la mezcla que forman esos totales, los
+cuatro tipos de contribución como partes de su suma, que es el radar que dibuja
+el perfil, al lado de la rejilla como lo pone el perfil; commits por hora del
+día y por día de la semana, commits por
+repositorio y una fila por cada año pasado. La rejilla es un panel de historial
+de estado sobre un campo por día de la semana, porque Grafana no tiene panel de
+calendario y ese es el único panel del núcleo que dibuja una rejilla de celdas
+coloreadas por valor. Es la rejilla de GitHub medida en la página del perfil el
+2026-09-14 y copiada: diez unidades de ancho por cinco dibujan la celda del
+propio perfil, diez píxeles en cuadro en una ventana de 1920, con una separación
+de tres a cuatro píxeles a lo ancho y de cinco a seis a lo alto, donde la del
+perfil son tres en ambos ejes; los
+cuatro verdes son los del tema oscuro de GitHub leídos de esa misma página ese
+mismo día, sobre el gris de un día vacío;
+tres filas llevan nombre, lunes, miércoles y viernes, como las nombra el
+perfil; y el tono son los quintos del día más activo del año, la regla que
+reprodujo los 366 cuadrados del perfil al aplicarla a los recuentos del propio
+GitHub. El panel mantiene ese año sea cual sea el rango del dashboard, igual
+que la rejilla del perfil es siempre de un año: a cinco años esas mismas 53
+columnas serían 262 de seis píxeles, y a una semana, dos barras. Tres cosas que
+un panel del núcleo de Grafana no puede copiar. El nombre del mes sobre la
+primera semana de cada mes: un historial de estado construye sus propias marcas
+del eje x, una cada varias columnas, así que una marca siempre cae en una
+semana y el paso depende del ancho en píxeles del panel, que a tres semanas
+escribe el mismo mes dos veces; en su lugar las marcas nombran el domingo en
+que empieza cada columna, que no se repite en ninguna otra. El cuadrado a
+cualquier tamaño: la celda es una fracción de la banda que recibe su fila, así
+que el cuadrado aguanta a 1920 y otra vez a 768, donde el panel ocupa todo el
+ancho de un teléfono, y entre medias se mantienen los diez píxeles de alto
+mientras el ancho se estrecha, ocho a 1600, siete a 1280, cinco a 430; y donde
+el panel está en el dashboard se estira hasta una barra alta al maximizarlo, 27
+por 67 píxeles en una ventana de 1920 por 900 y 27 por 84 en una más alta. Y un
+tooltip que diga el día y el recuento, porque la celda se colorea por el valor
+que lleva, así que ese valor tiene que ser el tono y una columna es una semana.
+Los dos punch cards son estado actual y no historia: cada pasada reescribe la
+rejilla entera, así que una suma sobre un rango cuenta todas las pasadas y lo
+que se lee en esos paneles es la forma.
+
+![La sección Contributions: contribuciones por día, el calendario de contribuciones dibujado como la propia rejilla de GitHub para el último año con sus etiquetas Mon, Wed y Fri, la mezcla de contribuciones con un 70,1 por ciento de commits, commits por semana con los propios superpuestos, la tabla de totales, el histograma por hora con el pico en la tarde, las barras por día de la semana, commits por repositorio, la tabla de cinco años, commits por día y repositorio, y el gráfico que separa los commits que el perfil esconde en propios y ajenos, públicos y privados](../../../../assets/dashboards/contributions.png)
+
+Lee `gh_contribution_day`, `gh_commits_week`, `gh_contributions_total`,
+`gh_commit_punchcard`, `gh_contribution_repo` y `gh_contribution_year`.
+
+## Pull requests and issues
+
+Catorce paneles, y la sección donde la recolección por elemento se paga sola.
+Fusionados, tiempo hasta fusionar, tiempo hasta la primera revisión, issues
+cerrados, tiempo hasta cerrar y líneas cambiadas como un grupo de seis valores;
+luego el mismo reparto por estado en el tiempo, las pull requests fusionadas más
+grandes y los desgloses por autor, por repositorio y por revisor. Un elemento
+que sigue abierto se escribe una vez al día mientras lo esté, y esas filas se
+quedan cuando se cierra, así que los paneles fechados cuentan los abiertos como
+números distintos bajo "Open that day" y los dibujan como una línea junto a la
+pila de lo que se cerró, y las tablas de "open the longest" leen cada elemento
+de su fila más reciente.
+
+![La sección Pull requests and issues: un grupo de tarjetas con 467 pull requests fusionadas, 10,3 horas hasta fusionar, 9,81 horas hasta la primera revisión, 137 issues cerradas, 1,75 días hasta cerrar una y 75 líneas por pull request; pull requests e issues por día separados por estado; tiempo hasta fusionar y tamaño de la pull request en el tiempo; las fusionadas más grandes con su título, asociación y etiquetas; pull requests por autor; la tabla por repositorio; la tabla de revisores encabezada por review-bot con 209 revisiones; revisiones por día; las dos tablas de los que llevan más tiempo abiertos; hilos de revisión por día separados en bot y humano; y la tabla de deuda de revisión](../../../../assets/dashboards/pull-requests-and-issues.png)
+
+<Aside
+  type="caution" title="Cuidado al leer el tiempo hasta la primera revisión" >
+  El panel cuenta la primera revisión de alguien que no es el autor ni un bot,
+  así que en una cuenta revisada solo por bots dice No data en vez de los pocos
+  segundos de los bots. Medido, nueve de cada diez pull requests tuvieron una
+  revisión de un bot en menos de un minuto; la tabla Reviewers lo enseña, con
+  cada bot marcado como tal y las respuestas del propio autor en una sola fila.
+</Aside>
+
+Lee `gh_pull_request`, `gh_pull_request_review` y `gh_issue`.
+
+## Continuous integration
+
+Catorce paneles: número de ejecuciones, tasa de éxito sobre las ejecuciones que
+acabaron bien o mal, las canceladas y omitidas al lado, duración, espera en
+cola, almacenamiento de artefactos y tamaño de la caché, las siete como un solo
+grupo; luego las mismas cifras en el tiempo, los workflows, los jobs y los pasos
+más lentos, y luego los seis que dicen qué hacer al respecto: minutos gastados
+en ejecuciones que fallaron, los workflows que fallan siempre, el paso que falla
+en vez del job, los workflows declarados que nunca se han ejecutado, los
+artefactos creados en el tiempo y cuánto del almacenamiento de artefactos se
+llegó a contar.
+
+![La sección Continuous integration: un grupo de tarjetas con 1,51 mil ejecuciones, un 90,2 por ciento de éxito, 84 ejecuciones sin resolver, 15,2 minutos por ejecución, 34 segundos de espera en cola, 141 mebibytes de artefactos y 3,08 gibibytes de caché; ejecuciones por día según su resultado; duración y espera en cola en el tiempo; almacenamiento de artefactos en el tiempo con una línea por repositorio; y las tablas de workflows, jobs más lentos, pasos más lentos, minutos gastados en ejecuciones fallidas, workflows que fallan una y otra vez, pasos que fallan y artefactos](../../../../assets/dashboards/continuous-integration.png)
+
+La espera en cola es una cifra de job. La de la ejecución mete la espera dentro
+de la duración, así que una ejecución que tardó veinte minutos porque un job
+esperó dieciocho por un runner es idéntica a una que pasó dieciocho ejecutando.
+
+Dos de ellos son los primeros que hay que mirar. "Workflows that keep failing"
+no va de flakiness: medido, dos workflows habían fallado en todas y cada una de
+sus ejecuciones, decenas de ejecuciones cada uno, y nadie los había apagado.
+"Workflows that never ran" es la otra cara de lo mismo, y necesita
+`gh_workflow` y `gh_workflow_run` a la vez, que es por lo que es el único panel
+aquí que solo pueden responder los dos almacenes SQL.
+
+"Artifact storage counted" existe porque el total es un suelo. GitHub dice cuántos artefactos tiene un repositorio, el colector anota
+cuántos recorrió de verdad, y cuando el segundo es menor el tamaño vivo se queda
+corto: en un repositorio de aquí, por un factor de cincuenta y seis.
+
+Lee `gh_workflow_run`, `gh_workflow_job`, `gh_workflow_step`, `gh_workflow`,
+`gh_artifact`, `gh_artifact_total` y `gh_actions_cache`.
+
+## Code
+
+Commits, líneas añadidas y eliminadas, la proporción de commits firmados, líneas
+cambiadas en el tiempo, actividad del repositorio por tipo, commits por autor y
+por firma, y los force push con quién los hizo y en qué rama.
+
+![La sección Code: un grupo de tarjetas con 752 commits, 49,0 mil líneas añadidas, 20,0 mil eliminadas y un 55,6 por ciento firmados en los últimos 90 días; líneas añadidas y eliminadas por día; actividad del repositorio por tipo; la tabla de commits por autor; commits por firma; la tabla de force push; commits por día según el estado de la puerta de CI; la tabla de checks que no son de Actions; y la tabla de commits que quedan detrás de una rama en rojo](../../../../assets/dashboards/code.png)
+
+`signature` distingue `unsigned`, que significa que no había firma en absoluto,
+de una firma que no se pudo verificar. Son hechos distintos y el gráfico de
+barras los mantiene separados.
+
+Los tres últimos paneles van de la puerta, no del código. "Commits by
+gate state" no dice lo mismo que una ejecución fallida: una ejecución dice que
+falló un job, el rollup dice que el commit salió en rojo, y en la cuenta medida
+veintisiete de cincuenta commits de la rama principal salieron así. "Checks that
+are not Actions" guarda lo que las dos secciones anteriores no ven, el servicio
+de calidad de código y el bot de dependencias. Y "Commits behind a red branch"
+une los dos por el hash del commit, que es el único panel que
+justifica guardar `oid` y `head_sha`.
+
+<Aside type="caution" title="Esta sección tiene su propio rango">
+  Los seis paneles sobre `gh_commit` están fijados a noventa días diga lo que
+  diga el selector de tiempo, y Grafana lo indica junto a cada título. Una fila
+  por commit es un fichero Parquet por commit en InfluxDB 3 Core, que rechaza
+  una consulta que abriría más de cuarenta mil: medido, un rango de 270 días
+  abría justo por debajo de ese tope y respondía, 300 días se rechazaban, y el
+  rechazo le llega al lector como un panel vacío y no como un error. Noventa
+  días abren un tercio del tope, lo que deja sitio para que la historia siga
+  creciendo.
+</Aside>
+
+Lee `gh_commit`, `gh_commit_check`, `gh_workflow_run` y `gh_repo_activity`.
+
+## Planning and community
+
+Las etiquetas con cuánto se usa cada una, los hitos con su progreso, los forks
+ganados en el tiempo, la lista de forks, las discusiones por categoría y según estén respondidas
+o no, y junto a ese recuento las discusiones mismas: las cincuenta más recientes
+una a una, con su categoría, cuántos comentarios tienen, si están respondidas y
+un enlace a cada una, sea cual sea el rango, porque una cuenta tiene un puñado y
+un rango de un mes las escondía todas menos una bajo una fila que decía "Ideas".
+
+![La sección Planning and community: la tabla de etiquetas encabezada por dependencies, la tabla de hitos con barras de progreso, forks por día, la lista de forks con quién forkeó y si llegó a subir algo, la tabla de discusiones por categoría, las discusiones más recientes con su estado de respuesta, las transiciones de issues por día, los comentarios dejados por repositorio, las respuestas en discusiones y la tabla de respuestas fuera](../../../../assets/dashboards/planning-and-community.png)
+
+La lista de forks lleva `advanced`, que es lo que separa una derivación real de
+un marcador. La mayoría de los forks son marcadores.
+
+Otros tres paneles van de la conversación y no del plan. Las transiciones por día
+son cuándo se etiquetó, se cerró, se reabrió o se renombró algo, que el estado de
+una issue no registra: una reapertura no existe en ninguna otra medida. Las dos
+tablas de comentarios cuentan lo escrito en cualquier sitio, incluidos los
+repositorios que la cuenta no posee, que es donde ocurre casi todo: cuando se
+midió, los comentarios dejados en repositorios ajenos superaban en más de un
+orden de magnitud a las discusiones de dentro de la cuenta. Junto al recuento
+por repositorio de comentarios en discusiones, los comentarios mismos: cada uno
+dejado en una discusión de un repositorio ajeno, del más reciente al más
+antiguo, con si el mantenedor lo aceptó como respuesta y un enlace al
+comentario en su hilo.
+
+Lee `gh_label`, `gh_milestone`, `gh_fork`, `gh_discussion`, `gh_issue_event`,
+`gh_issue_comment` y `gh_discussion_comment`.
+
+## Delivery and access
+
+La tasa de fallo de los webhooks, las entregas por código de estado, los
+endpoints ordenados por fallos, los rulesets y las claves de despliegue con
+cuánto tiempo llevan sin usarse.
+
+![La sección Delivery and access: un medidor con 20,1 por ciento de fallo de webhooks, entregas por hora según el código de estado, la tabla de endpoints con legacy.example.net fallando la mayoría de sus entregas, la tabla de rulesets, la de claves de despliegue, el panel de texto sobre la salida de los jobs fallidos, los webhooks configurados, las tablas de entornos y de ramas estancadas, las reglas de protección de rama por repositorio, las reglas de ruleset con sus excepciones, los cambios de ruleset, los despliegues por día y entorno, y la tabla de despliegues por entorno](../../../../assets/dashboards/delivery-and-access.png)
+
+Los webhooks fallan en silencio. Medido, un hook llevaba respondiendo 403 en
+setenta y ocho de sus últimas cien entregas y no había nada en ninguna parte
+que lo dijera. Solo se guarda el host de la URL del webhook, porque la ruta
+suele llevar un secreto.
+
+Un panel es texto en los ficheros exportados, "Where failure output went",
+porque la salida de un job fallido es texto y su sitio es un almacén de logs, y
+quien importa el dashboard puede no tener ninguno: un dashboard atado a un solo
+datasource no puede consultar dos. Publicado en un Grafana que sí tiene un
+datasource de Loki, con `cmd/publish_dashboard -loki <datasource-uid>`, el mismo
+panel dibuja las últimas líneas de cada job fallido leídas de Loki, las más
+recientes primero, con el workflow, el job y la ejecución de cada línea en su
+cola logfmt. La variable de repositorio se aplica en los dashboards de InfluxDB,
+PostgreSQL y Prometheus; las variables de Graphite y Elasticsearch usan el
+asterisco de glob como valor de "All", que no es una expresión regular, así que
+allí el panel muestra todos los repositorios y lo dice.
+
+Los dos últimos son inventarios y no tráfico. "Webhooks configured" existe porque
+la tabla de endpoints se construye desde las entregas, así que un hook que nunca
+ha entregado nada no aparece en ella, y un hook activo sin tráfico es justo la
+fila interesante. "Environments" le hace la pregunta de las claves de despliegue
+a los destinos de despliegue: un entorno de aquí llevaba mil ciento setenta y
+siete días sin tocarse.
+
+Lee `gh_webhook_delivery`, `gh_webhook`, `gh_ruleset`, `gh_deploy_key` y
+`gh_environment`.
+
+## Releases
+
+Descargas totales, descargas por release y cada asset con su tamaño y su propio
+recuento de descargas.
+
+![La sección Releases: 11,6 mil descargas en 14 releases, un gráfico de barras de descargas por etiqueta de release, la tabla de assets con descargas y tamaños por asset, y la tabla de descargas ganadas en el rango](../../../../assets/dashboards/releases.png)
+
+Los tres primeros son estado actual. GitHub da un total acumulado por asset y
+nunca una historia, así que la serie que necesitaría un panel de descargas por
+día no existe para recogerla. El cuarto panel es lo que sí se puede recuperar de
+ahí: la diferencia entre el primer y el último valor dentro del rango, que es lo
+que cada asset ganó de verdad. Un día de eso en la cuenta medida mostró que el
+noventa y siete por ciento de las descargas van a un único binario de Linux y a
+su fichero de checksums, que es un instalador y no una persona.
+
+Lee `gh_release` y `gh_release_asset`.
+
+## Security
+
+Alertas abiertas de Dependabot y de code scanning, los desgloses por severidad y
+por ecosistema, las alertas abiertas en el tiempo, la tabla de funciones y el
+tiempo que se tarda en resolver una alerta según su severidad.
+
+![La sección Security: la tarjeta de alertas abiertas con 25 de Dependabot y 29 de code scanning, alertas por severidad y por ecosistema, alertas abiertas por severidad en el tiempo, la tabla de funciones de seguridad con on y off por repositorio, ejecuciones de code scanning por día y herramienta, la tabla de tiempo hasta resolver con cada aviso y su CVSS, las alertas de escaneo resueltas, los resultados por herramienta, las alertas abiertas más antiguas, las tablas de ajustes de seguridad y de configuración por defecto de code scanning, los permisos del token de los workflows y la tabla de rotación de secretos](../../../../assets/dashboards/security.png)
+
+La tabla de funciones es lo que distingue "no hay alertas" de "la función está
+apagada". Sin `gh_security_feature`, un repositorio con Dependabot desactivado
+es indistinguible de uno que no tiene nada que arreglar.
+
+Los recuentos de alertas son estado actual, reescritos en cada pasada, así que
+todos los paneles de aquí toman la fila más reciente de cada serie y suman esas,
+no el rango. Sumar el rango cuenta cada alerta una vez por pasada: antes de
+arreglarlo la tarjeta marcaba 3,61 mil donde la cuenta tiene unas pocas decenas.
+
+Los dos últimos paneles son información nueva, no otra vista. El tiempo hasta
+resolver una alerta de code scanning sale de unas fechas que se descargaban y se
+tiraban, así que hasta ahora solo existía el recuento de abiertas; de treinta y
+cuatro alertas de un repositorio, treinta estaban arregladas y tres descartadas,
+y las treinta y tres eran invisibles. "Scan results by tool" dice qué encontró un
+análisis en vez de que se ejecutó, que es lo que explica un salto en el número de
+alertas.
+
+Lee `gh_dependabot_alert`, `gh_dependabot_alert_item`,
+`gh_code_scanning_alert`, `gh_code_scanning_alert_item`,
+`gh_code_scanning_analysis` y `gh_security_feature`.
+
+## Cost
+
+Bruto, la parte cubierta por el plan, lo que de verdad se facturó, los minutos
+de Actions, el coste en el tiempo por producto, los minutos en el tiempo por SKU
+y el uso por repositorio.
+
+![La sección Cost: un grupo de tarjetas con 360 dólares brutos, 249 cubiertos por el plan, 111 facturados de verdad y 21,9 mil minutos de Actions; coste por día y producto; minutos por día y SKU; la tabla de uso por repositorio con SKU, cantidad, unidad y precio; las entradas de caché por clave; y la caché frente al tope](../../../../assets/dashboards/cost.png)
+
+Bruto, descuento y neto se guardan los tres en vez de derivar uno de los otros,
+porque el neto no siempre es cero y el descuento es donde aparece el crédito
+mensual. El precio por unidad está en la tabla por el mismo motivo: es lo que
+explica que treinta mil minutos de macOS cuesten más que doscientos cuarenta mil
+de Linux. Un repositorio puede salir en esa tabla y en ningún otro panel, porque
+la lista que factura y la que se recorre no son la misma.
+
+Los dos paneles de caché van del techo. GitHub limita cada repositorio a diez
+gigabytes y expulsa la entrada menos usada al pasarlo, así que la barra es cada
+repositorio contra ese tope y el panel se lee por lo que queda de margen; la
+tabla de entradas dice qué clave se está tirando y cuál lleva una semana sin
+tocarse.
+
+Lee `gh_billing_usage`, `gh_actions_cache` y `gh_actions_cache_entry`.
+
+## Activity
+
+Eventos a lo largo del tiempo, eventos por tipo y por repositorio,
+notificaciones por motivo y por tipo, notificaciones a lo largo del tiempo y el
+trabajo hecho en repositorios de otras personas. Los dos paneles fechados
+agrupan según el rango, no en una hora ni en un día fijos.
+
+![La sección Activity: eventos por día y tipo, el donut de eventos por tipo encabezado por PushEvent con un 39 por ciento, eventos por repositorio, la tabla de notificaciones por motivo, notificaciones por día, las notificaciones más recientes, la tabla de trabajo fuera con pull requests e issues en repositorios de otras personas, el gráfico de lenguajes marcados como favoritos y la tabla de favoritos recientes](../../../../assets/dashboards/activity.png)
+
+Los eventos y las notificaciones son ventanas, no historias. GitHub guarda los
+últimos trescientos eventos sean de cuando sean y descarta rápido las
+notificaciones leídas, así que lo que queda guardado es lo que había cuando pasó
+la pasada.
+
+El donut lleva la parte de cada tipo en su leyenda y no escribe nada sobre los
+sectores, porque Grafana omite la etiqueta del sector en el que no cabe y los
+sectores finos nunca tenían la suya. La leyenda es una lista debajo del gráfico
+y no una columna a su lado, por medida y no por gusto: por debajo de 992
+píxeles Grafana pone toda leyenda debajo del gráfico y la limita al 35 por
+ciento del panel, pida lo que pida el panel, y una leyenda colocada al lado se
+dibuja allí como columna, una entrada por línea, que en un teléfono se cortaba
+tras siete entradas; una lista colocada debajo se ajusta en varias líneas, y con
+la altura que tiene el pastel los once tipos de un mes caben enteros a 360
+píxeles.
+
+Los dos últimos paneles son el espejo de la sección de estrellas: las estrellas
+que dio esta cuenta, no las que recibió, por lenguaje y por proyecto, fechadas
+cuando dio cada una. Si los proyectos son pequeños o famosos es otra pregunta
+distinta de cuántos son, así que la segunda tabla lleva sus propias estrellas.
+
+Lee `gh_event`, `gh_notification`, `gh_external_contribution` y
+`gh_star_given`.
+
+## Inventory
+
+Código por lenguaje, la puntuación del perfil de comunidad de cada repositorio,
+la tabla de repositorios, los temas, los paquetes, los gists y las etiquetas de
+contenedor con el momento en que se publicó cada una.
+
+![La sección Inventory: código por lenguaje, la tabla de perfil de comunidad, la tabla de repositorios con estrellas, forks, tamaño, edad y licencia, las tablas de temas, paquetes y gists, las etiquetas de contenedor publicadas, las tablas de ajustes del repositorio y de claves de la cuenta, dependencias por licencia, las tablas de cuentas sociales, cambios de configuración, ficheros de política y ecosistemas de Dependabot, y dependencias por ecosistema y cambios de dependencias](../../../../assets/dashboards/inventory.png)
+
+`open_issues` en la tabla de repositorios es el campo propio de GitHub, y GitHub
+cuenta las pull requests dentro. `gh_issue` es con lo que se cuentan las issues.
+
+El perfil de comunidad enseña las casillas que hay detrás de la nota además de
+la nota, porque el porcentaje esconde cuál falta: en la cuenta medida ocho de
+treinta y cinco repositorios no tienen licencia. La casilla de plantilla de
+issue no es la de GitHub: la bandera `issue_template` de la API solo informa
+del fichero único heredado `ISSUE_TEMPLATE.md`, no de un directorio de
+plantillas, mientras que la página de comunidad y `health_percentage` sí cuentan
+el directorio, así que la bandera decía "no" en todos los repositorios de una
+cuenta cuyos repositorios puntúan 100 con cuatro formularios cada uno (el hueco
+está reportado en community/community#207706). La columna es el número de
+plantillas que el repositorio tiene de verdad, formularios y Markdown, de
+`gh_repo_policy.issue_templates`, unido a la fila del perfil por repositorio en
+los dashboards de InfluxDB, PostgreSQL y Prometheus; Graphite y Elasticsearch no
+pueden unir dos medidas en un panel y conservan la bandera de la API,
+diciéndolo. La tabla de ajustes es la misma idea para lo que permite un repositorio, y
+`codeowners_errors` es la entrada que falla en silencio, porque un fichero
+CODEOWNERS roto deja de pedir revisiones y no dice nada. La tabla de claves de la
+cuenta es donde aparece una clave SSH que no se ha usado nunca, y donde queda
+apuntada la caducidad de la que firma todos los commits.
+
+El último panel está vacío casi siempre, y esa es la gracia: una fila en
+"Configuration changes" significa que un repositorio se
+renombró, se archivó, se hizo privado, cambió de licencia o movió su rama por
+defecto. La columna de identidad cuenta valores distintos de `repo_id`, que es la
+única forma de distinguir un renombrado de un repositorio nuevo, porque GitHub no
+publica ningún historial de renombrados.
+
+Lee `gh_repo`, `gh_repo_language`, `gh_repo_community`, `gh_repo_topic`,
+`gh_repo_policy`, `gh_package`, `gh_package_version`, `gh_gist`, `gh_key`,
+`gh_social_account` y `gh_dependency_license`.
+
+## Profile and sponsorship
+
+Lo que anuncia el perfil y lo que mueve Sponsors: el dinero que entra y sale,
+los patrocinios en ambos sentidos, los niveles ofrecidos, los ítems fijados,
+las banderas del perfil, las listas de estrellas y las insignias de logros con
+la distancia de cada una a su siguiente escalón.
+
+![La sección Profile and sponsorship: las cuatro cifras de patrocinio, 1,28 K dólares recibidos de por vida, 65 al mes, 32,5 en el próximo pago y 24 gastados patrocinando, después la tabla de patrocinios junto a la de niveles, los ítems fijados junto a las banderas del perfil, las listas de estrellas, los logros encabezados por Pull Shark en oro, y la tabla de progreso de logros con una barra por insignia](../../../../assets/dashboards/profile-and-sponsorship.png)
+
+Las cuatro cifras son la lectura más reciente de una instantánea que se
+reescribe en cada pasada, no una suma sobre el rango, que informaría del total
+de por vida una vez por pasada. El total de por vida es el que conserva la
+historia: la estimación mensual se va a cero en cuanto caduca el último
+patrocinio, y el dinero que sí llegó deja de verse en ningún otro sitio. Lo
+gastado patrocinando no es el gasto de la sección Cost, que es lo que GitHub
+cobra por Actions, paquetes y almacenamiento; esto es dinero que se va al
+trabajo de otra persona.
+
+Las tablas de debajo son inventarios y no historias, y lo dicen nombrando su
+propia ventana: un patrocinio hecho en 2021 aparece con los treinta días por
+defecto, donde un panel al rango del dashboard dibujaría un eje vacío sobre un
+puñado de filas repartidas por años. Un patrocinio se fecha el día en que
+empezó y no el día de ningún pago, ambas conexiones se leen con `activeOnly`
+desactivado para recuperar uno caducado, y el patrocinable es la palabra
+literal private cuando la otra parte queda oculta, sin adivinar ningún enlace.
+Los niveles se anclan al comienzo del día UTC por la misma razón: fechados en
+su creación caerían todos fuera de cualquier rango y se leerían como que no hay
+ninguno.
+
+Los ítems fijados llevan la posición como campo y no como etiqueta, porque un
+repositorio que pasa del hueco dos al tres es el mismo fijado, y como etiqueta
+cada recolocación bifurcaría la serie. El filtro de repositorio de la cabecera
+del dashboard no llega a ese panel: un fijado se llama owner/name, o es un
+gist, y la variable no guarda ninguna de las dos cosas.
+
+Los logros se leen una vez al día de la página pública del perfil, porque
+ninguna API los lista. "Next tier at" es el umbral observado por la comunidad
+(Schweinepriester/github-profile-achievements) y no un número que GitHub
+publique, así que la última columna dice si la página del perfil coincide con
+el escalón que implica el recuento; una fila que no coincide es una regla que
+la página contradice, y no lleva objetivo ni barra. Los dos paneles de logros
+están vacíos hasta que esa familia haya corrido una vez.
+
+Lee `gh_sponsors_listing`, `gh_sponsorship`, `gh_sponsors_tier`,
+`gh_pinned_item`, `gh_profile_flag`, `gh_star_list`, `gh_achievement` y
+`gh_achievement_progress`.
+
+## The collector itself
+
+Lo que le queda al colector por gastar: el presupuesto de cada uno de los quince
+límites de GitHub en el tiempo, y una tabla con todos ellos ordenada por cuánto
+se ha gastado de cada uno.
+
+![La sección The collector itself: el presupuesto de peticiones usado por cubo en el rango, y la tabla de todos los cubos con su límite, el máximo usado y el mínimo restante, encabezada por core con 3134 usados de 5000 y 1866 restantes](../../../../assets/dashboards/the-collector-itself.png)
+
+El gráfico muestra solo los cubos con más de treinta peticiones, porque el de
+búsqueda tiene treinta por minuto y aplastaría el eje. Leer todo esto no cuesta
+nada: `GET /rate_limit` es el único endpoint que GitHub no cobra. Sin él, una
+familia saltada por falta de presupuesto es indistinguible de una que no tenía
+nada que contar.
+
+Lee `gh_rate_limit`.
+
+## La columna Link
+
+Toda tabla cuyas filas son ítems de GitHub selecciona una columna llamada Link,
+la `url` de la fila, y la oculta: el enlace cuelga de la primera columna de la
+tabla, el nombre de la cosa, y abre la página de la propia fila en una pestaña
+nueva. En un teléfono la columna del extremo derecho se alcanzaba en dos tablas
+de veintiocho, y la primera columna siempre está en pantalla; por la misma
+razón la columna por la que se ordena una tabla es la segunda, y una fecha se
+muestra al minuto y no al segundo. Unas pocas tablas enlazan desde otra url que
+lleva la fila: Recent
+stars abre a la persona que dio la estrella, Top referrers el host que envió
+las visitas, Deployments by environment tiene una segunda columna, Live, con la
+dirección del propio entorno. Release assets conserva su fichero bajo Download,
+que descarga el binario, y añade la página de la release como su Link; un clic
+en una barra de Downloads by release también abre la release. Cuando la página
+es una que GitHub solo muestra al propietario, los ajustes de un repositorio,
+su gráfico de tráfico, una alerta, el título al pasar el ratón por el enlace lo
+dice.
+
+La columna llega a un almacén solo donde su consulta la devuelve: los dos
+almacenes SQL la seleccionan por nombre y Elasticsearch agrupa por
+`url.keyword`, así que un documento sin ella cae en una celda vacía y no fuera
+de la tabla. Prometheus no lleva url y Graphite no guarda cadenas, y cada una
+de sus tablas dice en su descripción que la columna Link del dashboard de
+InfluxDB está ausente allí. `cmd/check_dashboards` somete cada columna de
+enlace de un dashboard renderizado a esa regla: la columna tiene que volver, y
+no contener más que urls absolutas y celdas vacías, un nulo de los almacenes
+SQL o la cadena vacía de ese bucket.
+
+## Cuando un almacén no puede responder
+
+Los almacenes no pueden responder las mismas preguntas, y los paneles lo dicen
+en vez de fingir.
+
+- **InfluxDB y PostgreSQL** guardan una fila por hecho, fechada cuando ocurrió,
+  así que dibujan el tráfico de un martes concreto, la curva de estrellas desde
+  2018 y el tiempo de fusión de una pull request cerrada en julio. El juego de
+  PostgreSQL es el SQL de InfluxDB traducido, porque el destino SQL escribe los
+  mismos hechos como tablas.
+- **Prometheus** sella cada muestra en el momento del scrape, así que el
+  exportador reduce las filas por elemento a valores actuales más, para las
+  medidas que se cuentan, un `_total` monótono de elementos distintos vistos
+  desde que arrancó. `increase()` sobre eso es como se responden los paneles
+  "por día" y "sobre el rango".
+- **Graphite** conserva los puntos fechados pero no tiene filas: una tabla ahí
+  es un número por serie reducido sobre el rango, así que una tabla que necesita
+  varios campos de una fila se queda con la columna por la que ordena y dice
+  cuál ha soltado, y un booleano allí ni siquiera es una métrica.
+- **Elasticsearch** conserva los documentos fechados, así que una tabla por
+  elemento son los documentos más recientes y todo lo demás es una agregación
+  por buckets, sobre el subcampo `.keyword` de cada etiqueta.
+
+Cada panel cuyo gemelo en otro almacén es más rico lo dice en una frase de su
+descripción.
+
+## Veinticuatro paneles no tienen respuesta en Prometheus
+
+Top paths, el calendario de contribuciones, los dos punch cards de commits y los
+dos repartos por repositorio del calendario, las pull requests más grandes, pull
+requests por autor, las issues abiertas más tiempo, la deuda de revisión, los
+pasos más lentos, los pasos que fallan, los workflows que nunca se ejecutaron,
+los artefactos creados a lo largo del tiempo, los commits que dejaron la rama en
+rojo, las últimas discusiones y las respuestas dejadas fuera, los assets de
+release, lo que ganó cada asset, las alertas abiertas más antiguas, los eventos
+por repositorio, las últimas notificaciones, las etiquetas de contenedor y la
+configuración que cambió. El exportador o se salta la medida, o descarta la
+identidad de la que trata el panel, o el panel es un cruce entre dos medidas.
+
+Adónde fue la salida de los fallos es un panel de texto en todos los almacenes,
+este incluido: es una nota sobre dónde mirar, no una consulta.
+
+Tres de esos son cruces o diferencias de conjuntos y tampoco tienen respuesta
+en Graphite ni en Elasticsearch, por lo mismo: una agregación corre dentro de un
+índice o de un árbol, y estos necesitan dos. El calendario no la tiene en
+ninguno de los dos por otra razón: la rejilla necesita la semana en un eje y el
+día de la semana en el otro, y un histograma de fechas o un summarize agrupan
+por un solo intervalo. Cada uno de los dos pierde algo más por su cuenta:
+Graphite las alertas abiertas más antiguas y las últimas notificaciones, porque
+guarda números y no las cadenas de las que están hechas esas tablas, y
+Elasticsearch lo que ganó cada asset, que es la diferencia entre el primer y el
+último valor del rango.
+
+Se emiten igualmente, como paneles de texto con el mismo título que dicen qué
+mostrarían y por qué el almacén no puede, para que los diseños sigan siendo
+idénticos.
+
+![El dashboard de Prometheus sobre diez minutos: el Overview con los valores actuales del juego de datos de octocat (42 repositorios, 80 estrellas, 9 forks; 361 visitas, 54 visitantes únicos, 19 clones; 1,20 mil seguidores; 1,11 mil contribuciones en 15,6 años), después la sección Audience en la que Views, Unique visitors y Clones over time dicen No data mientras Top referrers y Clone amplification traen filas y Top paths es el panel de texto que explica que el exportador se salta gh_traffic_path, las catorce cabeceras de sección plegadas, y al pie el Rate budget used del propio colector dibujado como una línea plana al 0,06 por ciento](../../../../assets/dashboard-prometheus-e2e.png)
+
+Esa captura no es de ninguna cuenta. Es el dashboard de Prometheus de la suite
+end-to-end en contenedores (`test/e2e/docker`), donde el colector recorre el
+GitHub falso de `test/e2e/fakegh`, cuya cuenta es `octocat` con un solo
+repositorio, y Prometheus hace scrape del exportador cada cinco segundos. El
+rango son los diez minutos que llevaba recolectando cuando se tomó la captura,
+que es lo que hace que merezca la pena enseñarla: cada número del Overview, y
+las dos tablas de la sección Audience, es un valor actual, porque un valor
+actual es todo lo que el exportador puede servir; `Rate budget used` es una
+línea plana, porque un gauge repetido en cada scrape es una línea plana; `Top
+paths` es el panel de texto descrito arriba; y `Views`, `Unique visitors` y
+`Clones over time` dicen "No data" porque su bucket tiene un suelo de un día y
+este Prometheus lleva minutos. En un servidor que lleve meses haciendo scrape
+esos tres dibujan, empezando el día en que arrancó el exportador.

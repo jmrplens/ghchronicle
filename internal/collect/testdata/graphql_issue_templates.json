@@ -1,0 +1,296 @@
+{
+  "data": {
+    "r0": {
+      "nameWithOwner": "jmrplens/gitlab-mcp-server",
+      "url": "https://github.com/jmrplens/gitlab-mcp-server",
+      "databaseId": 1208139072,
+      "createdAt": "2026-04-11T21:48:02Z",
+      "pushedAt": "2026-09-12T12:23:55Z",
+      "isFork": false,
+      "isArchived": false,
+      "archivedAt": null,
+      "isPrivate": false,
+      "diskUsage": 70563,
+      "stargazerCount": 36,
+      "forkCount": 4,
+      "watchers": {
+        "totalCount": 1
+      },
+      "issuesOpen": {
+        "totalCount": 17
+      },
+      "issuesClosed": {
+        "totalCount": 130
+      },
+      "pullsOpen": {
+        "totalCount": 0
+      },
+      "pullsMerged": {
+        "totalCount": 466
+      },
+      "pullsClosed": {
+        "totalCount": 73
+      },
+      "releases": {
+        "totalCount": 55
+      },
+      "discussions": {
+        "totalCount": 0
+      },
+      "labels": {
+        "totalCount": 32
+      },
+      "milestones": {
+        "totalCount": 3
+      },
+      "branches": {
+        "totalCount": 3
+      },
+      "tags": {
+        "totalCount": 56
+      },
+      "defaultBranchRef": {
+        "target": {
+          "history": {
+            "totalCount": 568
+          }
+        }
+      },
+      "isSecurityPolicyEnabled": true,
+      "hasVulnerabilityAlertsEnabled": true,
+      "forkingAllowed": true,
+      "hasDiscussionsEnabled": false,
+      "hasIssuesEnabled": true,
+      "hasWikiEnabled": false,
+      "hasSponsorshipsEnabled": true,
+      "isBlankIssuesEnabled": true,
+      "autoMergeAllowed": true,
+      "deleteBranchOnMerge": true,
+      "mergeCommitAllowed": false,
+      "rebaseMergeAllowed": false,
+      "squashMergeAllowed": true,
+      "fundingLinks": [
+        {
+          "platform": "GITHUB"
+        }
+      ],
+      "issueTemplates": [],
+      "pullRequestTemplates": [
+        {
+          "filename": "pull_request_template.md"
+        }
+      ],
+      "branchProtectionRules": {
+        "totalCount": 0
+      },
+      "codeowners": {
+        "errors": []
+      },
+      "issueForms": {
+        "entries": [
+          {
+            "name": "bug-report.yml"
+          },
+          {
+            "name": "config.yml"
+          },
+          {
+            "name": "documentation.yml"
+          },
+          {
+            "name": "enhancement.yml"
+          },
+          {
+            "name": "feature-request.yml"
+          }
+        ]
+      }
+    },
+    "r1": {
+      "nameWithOwner": "jmrplens/jmrp.io",
+      "url": "https://github.com/jmrplens/jmrp.io",
+      "databaseId": 1116368999,
+      "createdAt": "2025-12-14T18:13:24Z",
+      "pushedAt": "2026-09-11T23:18:10Z",
+      "isFork": false,
+      "isArchived": false,
+      "archivedAt": null,
+      "isPrivate": false,
+      "diskUsage": 335207,
+      "stargazerCount": 0,
+      "forkCount": 0,
+      "watchers": {
+        "totalCount": 0
+      },
+      "issuesOpen": {
+        "totalCount": 0
+      },
+      "issuesClosed": {
+        "totalCount": 2
+      },
+      "pullsOpen": {
+        "totalCount": 0
+      },
+      "pullsMerged": {
+        "totalCount": 216
+      },
+      "pullsClosed": {
+        "totalCount": 282
+      },
+      "releases": {
+        "totalCount": 1
+      },
+      "discussions": {
+        "totalCount": 0
+      },
+      "labels": {
+        "totalCount": 18
+      },
+      "milestones": {
+        "totalCount": 0
+      },
+      "branches": {
+        "totalCount": 1
+      },
+      "tags": {
+        "totalCount": 0
+      },
+      "defaultBranchRef": {
+        "target": {
+          "history": {
+            "totalCount": 413
+          }
+        }
+      },
+      "isSecurityPolicyEnabled": true,
+      "hasVulnerabilityAlertsEnabled": true,
+      "forkingAllowed": true,
+      "hasDiscussionsEnabled": false,
+      "hasIssuesEnabled": true,
+      "hasWikiEnabled": false,
+      "hasSponsorshipsEnabled": false,
+      "isBlankIssuesEnabled": true,
+      "autoMergeAllowed": false,
+      "deleteBranchOnMerge": true,
+      "mergeCommitAllowed": false,
+      "rebaseMergeAllowed": false,
+      "squashMergeAllowed": true,
+      "fundingLinks": [
+        {
+          "platform": "GITHUB"
+        }
+      ],
+      "issueTemplates": [
+        {
+          "name": "Bug Report"
+        },
+        {
+          "name": "Feature Request"
+        }
+      ],
+      "pullRequestTemplates": [
+        {
+          "filename": "PULL_REQUEST_TEMPLATE.md"
+        }
+      ],
+      "branchProtectionRules": {
+        "totalCount": 1
+      },
+      "codeowners": {
+        "errors": []
+      },
+      "issueForms": {
+        "entries": [
+          {
+            "name": "bug_report.md"
+          },
+          {
+            "name": "feature_request.md"
+          }
+        ]
+      }
+    },
+    "r2": {
+      "nameWithOwner": "jmrplens/jmrplens",
+      "url": "https://github.com/jmrplens/jmrplens",
+      "databaseId": 355160180,
+      "createdAt": "2021-04-06T11:14:30Z",
+      "pushedAt": "2026-09-12T12:13:56Z",
+      "isFork": false,
+      "isArchived": false,
+      "archivedAt": null,
+      "isPrivate": false,
+      "diskUsage": 2206,
+      "stargazerCount": 1,
+      "forkCount": 0,
+      "watchers": {
+        "totalCount": 1
+      },
+      "issuesOpen": {
+        "totalCount": 0
+      },
+      "issuesClosed": {
+        "totalCount": 0
+      },
+      "pullsOpen": {
+        "totalCount": 0
+      },
+      "pullsMerged": {
+        "totalCount": 9
+      },
+      "pullsClosed": {
+        "totalCount": 2
+      },
+      "releases": {
+        "totalCount": 0
+      },
+      "discussions": {
+        "totalCount": 1
+      },
+      "labels": {
+        "totalCount": 12
+      },
+      "milestones": {
+        "totalCount": 0
+      },
+      "branches": {
+        "totalCount": 4
+      },
+      "tags": {
+        "totalCount": 0
+      },
+      "defaultBranchRef": {
+        "target": {
+          "history": {
+            "totalCount": 3375
+          }
+        }
+      },
+      "isSecurityPolicyEnabled": false,
+      "hasVulnerabilityAlertsEnabled": true,
+      "forkingAllowed": true,
+      "hasDiscussionsEnabled": true,
+      "hasIssuesEnabled": true,
+      "hasWikiEnabled": true,
+      "hasSponsorshipsEnabled": true,
+      "isBlankIssuesEnabled": true,
+      "autoMergeAllowed": false,
+      "deleteBranchOnMerge": false,
+      "mergeCommitAllowed": true,
+      "rebaseMergeAllowed": true,
+      "squashMergeAllowed": true,
+      "fundingLinks": [
+        {
+          "platform": "GITHUB"
+        }
+      ],
+      "issueTemplates": [],
+      "pullRequestTemplates": [],
+      "branchProtectionRules": {
+        "totalCount": 0
+      },
+      "codeowners": null,
+      "issueForms": null
+    }
+  }
+}

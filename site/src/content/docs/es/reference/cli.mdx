@@ -1,0 +1,78 @@
+---
+title: La línea de órdenes
+description: Las trece opciones, qué hace cada una y cuáles imprimen algo y salen.
+---
+
+El binario acepta trece opciones y ningún subcomando. Todo lo demás está en el
+fichero de configuración, porque un horario no es algo que se reescriba a mano.
+
+```sh
+ghchronicle -config /etc/ghchronicle/config.yaml
+```
+
+## Todas las opciones
+
+| Opción             | Por omisión   | Qué hace                                                                                                     |
+| ------------------ | ------------- | -------------------------------------------------------------------------------------------------------------- |
+| `-config`          | `config.yaml` | Ruta del fichero de configuración                                                                            |
+| `-once`            | apagada       | Hace una pasada y sale, digan lo que digan las cadencias                                                     |
+| `-list`            | apagada       | Imprime los repositorios que se recogerían, y cuáles quedan aparte, y sale                                   |
+| `-version`         | apagada       | Imprime la versión, el commit y la fecha de compilación, y sale                                              |
+| `-groups`          | apagada       | Imprime los grupos con las familias de cada uno, y sale                                                      |
+| `-backfill`        | apagada       | Llega tan atrás como permita cada superficie, esperando a que se reponga el límite en vez de parar           |
+| `-backfill-since`  | ninguno       | Acota el relleno: una fecha (`2024-01-01`), una duración (`720h`), días (`90d`) o años (`2y`)                |
+| `-card`            | ninguno       | Hace una pasada y escribe un SVG de resumen en esta ruta                                                     |
+| `-card-only`       | apagada       | Con `-card`, escribe el SVG y nada más: no hace falta ningún destino y no se escribe en ninguno              |
+| `-card-theme`      | `auto`        | `dark`, `light` o `auto`                                                                                     |
+| `-card-layout`     | `summary`     | Cuál de los diez diseños dibujar                                                                             |
+| `-card-fields`     | ninguno       | Campos que muestra la tarjeta, separados por comas; vacío significa el valor por omisión del diseño          |
+| `-card-layouts`    | apagada       | Imprime los diseños con los campos que dibuja cada uno, y sale                                               |
+
+## Las cuatro que imprimen y salen
+
+`-version`, `-groups`, `-card-layouts` y `-list` responden y paran. Las tres
+primeras no necesitan token ni configuración; `-list` lee la configuración y le
+pregunta a GitHub en qué repositorios se resuelven los objetivos, que es la
+forma barata de comprobar un cambio antes de gastar cuota en una pasada.
+
+```sh
+ghchronicle -version
+ghchronicle -groups
+ghchronicle -card-layouts
+ghchronicle -config config.yaml -list
+```
+
+## Las tres formas de hacer una pasada
+
+```sh
+ghchronicle -config config.yaml           # el bucle: cada familia en su cadencia
+ghchronicle -config config.yaml -once     # una pasada, en primer plano, y salir
+ghchronicle -config config.yaml -backfill # el recorrido de la historia, una vez
+```
+
+El bucle es lo que ejecuta un servicio. `-once` es lo que ejecuta un trabajo
+programado, y es también la forma más rápida de ver qué hace un cambio de
+configuración. Un [relleno histórico](/ghchronicle/es/how/backfill/) es otra
+intención y lo dice: recorre cada superficie hasta el final y espera a que se
+reponga un presupuesto agotado en vez de rendirse.
+
+```sh
+ghchronicle -config config.yaml -backfill -backfill-since 2y
+```
+
+## La tarjeta, en una línea
+
+```sh
+ghchronicle -config config.yaml -card profile.svg -card-only \
+  -card-layout github-stats -card-theme dark
+```
+
+`-card-only` es la combinación que conviene recordar: hace una ejecución que no
+escribe puntos, así que no necesita ningún destino configurado y se acepta una
+configuración que de otro modo se rechazaría al arrancar.
+[La tarjeta](/ghchronicle/es/card/) tiene los diseños y los campos.
+
+## Dónde está lo demás
+
+Todo lo que no está en esa tabla es una clave de configuración y no una opción:
+[el fichero](/ghchronicle/es/configuration/) es el mapa de todas ellas.

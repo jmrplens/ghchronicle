@@ -1,0 +1,165 @@
+---
+title: Choosing a store
+description: Ten stores, what each one can and cannot answer, and the one property that decides between them.
+---
+
+import { CardGrid, LinkCard, Aside } from "@astrojs/starlight/components";
+
+Ten sinks, and running more than one is the normal arrangement. Every one of
+them pushes: the tool is meant to run wherever it is convenient and reach its
+stores from there, not to be scraped. The Prometheus exporter is the one
+exception, and it exists because Prometheus insists.
+
+## The comparison
+
+| Store                                              | Keeps                                        | Good for                                       | Config                          |
+| -------------------------------------------------- | -------------------------------------------- | ---------------------------------------------- | ------------------------------- |
+| [InfluxDB](/ghchronicle/sinks/influxdb/)           | the dated history                            | "how fast were we merging in July"             | `url`, `token`, `org`, `bucket` |
+| [PostgreSQL](/ghchronicle/sinks/postgres/)         | the dated history, as SQL you pipe into psql | a Grafana user with a Postgres and no InfluxDB | `dialect`, `path`               |
+| [Graphite](/ghchronicle/sinks/graphite/)           | the dated history                            | a Graphite that is already there               | `addr`, `prefix`                |
+| [Elasticsearch](/ghchronicle/sinks/elasticsearch/) | the dated history, as documents              | search across everything collected             | `url`, `prefix`, `api_key`      |
+| [Prometheus](/ghchronicle/sinks/prometheus/)       | the current value                            | alerting, and a number on a wall               | `listen`, `path`                |
+| [OpenTelemetry](/ghchronicle/sinks/otlp/)          | either, depending on the backend             | an existing collector pipeline                 | `endpoint`, `raw`               |
+| [Loki](/ghchronicle/sinks/loki/)                   | the events, as log lines                     | "what happened, in order"                      | `url`, `labels`, `max_age`      |
+| [Telegraf](/ghchronicle/sinks/telegraf/)           | whatever its outputs keep                    | reaching anything Telegraf can reach           | `url`                           |
+| [File and stdout](/ghchronicle/sinks/file/)        | line protocol or JSON                        | a shipper you already run, and a buffer        | `path`, `format`                |
+
+There is no sink for a specific hosted vendor, and that is deliberate. A managed
+backend is reached through one of the two sinks that exist to route onward:
+Telegraf, whose own outputs cover Datadog, New Relic, Wavefront, Azure Monitor
+and a hundred more, or OpenTelemetry, which most of them now accept directly. A
+sink per vendor is a key to rotate, an API to track and a test that needs a paid
+account, for a hop those two already make.
+
+## The thing that decides everything
+
+A point carries the date the thing happened. A star is dated when it was given,
+a workflow run when it finished, a traffic day at that day's own date.
+
+InfluxDB keys a point by measurement, tag set and timestamp, so writing the
+same fourteen-day traffic window every six hours converges on the right answer
+rather than accumulating copies. That is what makes the whole backfill design
+work, and it is why InfluxDB is the sink that keeps history.
+
+Prometheus cannot do that. It stamps a sample at scrape time and rejects
+anything meaningfully older: measured against Prometheus 3.14 with the OTLP
+receiver enabled and a thirty-minute out-of-order window, a sample dated two
+days back comes back as HTTP 400. So the exporter reduces the per-item rows to
+current values before serving them.
+
+The full argument, and what the reduction does to each measurement, is on
+[dating a point](/ghchronicle/how/dating/).
+
+## Only what changed is written
+
+A sweep offers the same history every time: the fourteen day traffic window,
+every open pull request, the contribution calendar. Writing it all again is
+harmless to what the store holds, since a row is keyed by series and timestamp
+and simply overwrites, and it is how a collector that was down for a day
+repairs itself.
+
+It is not harmless to the store's files. InfluxDB 3 Core writes one Parquet
+file per partition per write request and never compacts them, and it refuses
+any query that would open more than its file limit. Measured before the fix
+below and with the limit then at ten thousand: `gh_notification` held barely
+more than one row per Parquet file, and a query over fourteen days came back
+with "Query would scan 10000 Parquet files, exceeding the file limit".
+
+Asking for a coarser interval does not help, because the limit counts the files
+the planner opens, before any aggregation. So the tool keeps a small ledger of
+what it has already written and sends only the points whose values have moved:
+
+```yaml
+sinks:
+  dedupe_file: /var/lib/ghchronicle/state-written.bin # default: beside state_file
+  dedupe_horizon: 720h # forget a point nothing offers any more
+  influxdb:
+    dedupe: true # the default, here and for telegraf, graphite, sql and elasticsearch
+```
+
+The ledger stores two 64 bit hashes and a day per point, so a large account
+costs a few megabytes. It is keyed by sink, so a store that was unreachable
+still receives everything on its next write. Losing it, or setting
+`dedupe_file: off`, costs one sweep of rewriting and nothing else, which is
+exactly what a store that has been wiped and needs filling again wants. It is
+the second file worth putting on a persistent path, next to the
+[state file](/ghchronicle/configuration/).
+
+A run that ends when its sweep does never opens the ledger at all. `-once`,
+`-backfill` and a card render write once and exit, so there is nothing to save
+and nothing to prune, and each of them offers the whole history again. That is
+what a backfill is for; it is also why a scheduled `-once` job, which is the
+shape [the Action](/ghchronicle/install/actions/) runs in, writes every point
+every time. Where that matters, run the loop instead.
+
+The sweep log says what this saved:
+
+```text
+level=INFO msg=written sink=influxdb family=events points=0 unchanged=300
+```
+
+If the files have already accumulated, the writer fix stops the growth but does
+not remove them: raise `--query-file-limit` on the server, rewrite the affected
+tables, or move to InfluxDB 3 Enterprise, which compacts on its own and is free
+for home use.
+
+## Start here
+
+<CardGrid>
+  <LinkCard
+    title="You want the history"
+    description="InfluxDB is the reference implementation and the dashboard is built against it. PostgreSQL, Graphite and Elasticsearch keep the same facts in their own shapes."
+    href="/ghchronicle/sinks/influxdb/"
+  />
+  <LinkCard
+    title="You want alerts"
+    description="Prometheus serves the current value of everything that has one. Run it alongside a history store rather than instead of one."
+    href="/ghchronicle/sinks/prometheus/"
+  />
+  <LinkCard
+    title="You want to read what happened"
+    description="Loki turns twenty-two of the measurements into log lines that read as sentences and carry every tag after them in logfmt."
+    href="/ghchronicle/sinks/loki/"
+  />
+  <LinkCard
+    title="You already have a pipeline"
+    description="Telegraf and OpenTelemetry hand the points to something that already knows where they should go."
+    href="/ghchronicle/sinks/telegraf/"
+  />
+</CardGrid>
+
+## Running several
+
+Normal, and cheap: the collection happens once and the points are handed to
+every configured sink. The usual arrangement is one history store plus one of
+the current-value ones.
+
+```yaml
+sinks:
+  influxdb:
+    url: http://localhost:8181
+    token: ${INFLUX_TOKEN}
+    org: default
+    bucket: github
+  prometheus:
+    listen: 127.0.0.1:9605
+    path: /metrics
+```
+
+<Aside type="caution" title="One combination to avoid">
+  `sinks.sql.path: "-"` and `sinks.stdout: true` both write to standard output,
+  and interleaving SQL statements with line protocol produces a stream that
+  neither psql nor Telegraf can read. Choose one.
+</Aside>
+
+## What every sink does with a failure
+
+A sink that fails is logged and the sweep continues; a database being down does
+not stop collection, and with the file sink configured the data is still on
+disk when it comes back. Two failures are reported specially rather than as
+errors, because they are partial successes:
+
+- **rejected lines**, where everything parseable was written and the refused
+  lines are logged individually with the store's own reason.
+- **dropped entries**, which is Loki's age horizon leaving out what its
+  out-of-order window would have refused, rather than losing the whole push.

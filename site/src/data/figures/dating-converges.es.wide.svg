@@ -1,0 +1,120 @@
+<svg xmlns="http://www.w3.org/2000/svg" class="gf" viewBox="-1 -1 722 275"
+ role="img" aria-labelledby="gf-dating-es-wide-t gf-dating-es-wide-d">
+<title id="gf-dating-es-wide-t">Dos maneras de escribir los mismos catorce días</title>
+<desc id="gf-dating-es-wide-d">Dos maneras de escribir la ventana de tráfico de 14 días de GitHub, una al lado de la otra. A la izquierda, el fechado tal como está hecho: 4 pasadas al día, cada 6 horas, releen la ventana entera y sellan cada día con su propia fecha, así que las 4 caen sobre las mismas 14 filas y el recuento más reciente sustituye al anterior. Al cabo de una semana el almacén tiene 14 filas por repositorio. A la derecha, las mismas pasadas selladas en el momento de recogerlas: cada una añade 14 filas en vez de sustituir 14, así que al cabo de una semana el almacén tiene 392 filas por repositorio, 28 copias de cada día, y sumarlas da 28 veces el tráfico.</desc>
+<style>.gf{font-family:var(--sl-font,ui-sans-serif,system-ui,sans-serif)}.gf text{fill:var(--rb-body,#c3ccd2);font-size:12.5px}.gf .gf-title{fill:var(--rb-heading,#f2f6f8);font-size:14.5px;font-weight:600}.gf .gf-col{fill:var(--rb-heading,#f2f6f8);font-size:12px;font-weight:600}.gf .gf-muted{fill:var(--rb-muted,#8b969d);font-size:11px}.gf .gf-small{font-size:11px}.gf .gf-count{font-size:26px;font-weight:700}.gf .gf-keep{fill:var(--rb-accent,#3fb950)}.gf .gf-add{fill:var(--rb-status-drop,#e0605c)}.gf .gf-box{fill:var(--rb-surface,#151c20);stroke:var(--rb-border,#2a333a);stroke-width:1}.gf .gf-cell-keep{fill:var(--rb-accent-soft,#0d2115);stroke:var(--rb-accent,#3fb950);stroke-width:1}.gf .gf-cell-add{fill:var(--rb-status-drop-soft,#2b1618);stroke:var(--rb-status-drop,#e0605c);stroke-width:1}.gf .gf-bar{fill:var(--rb-accent-soft,#0d2115)}.gf .gf-edge{fill:var(--rb-accent,#3fb950)}.gf .gf-rule{stroke:var(--rb-border,#2a333a);stroke-width:1}.gf .gf-line{stroke:var(--rb-muted,#8b969d);stroke-width:1;fill:none}.gf .gf-head{fill:var(--rb-muted,#8b969d)}</style>
+<text x="0" y="13" class="gf-title">Fechado, tal como está hecho</text>
+<text x="0" y="30" class="gf-muted">cada pasada relee la ventana entera de 14 días</text>
+<text x="0" y="48" class="gf-muted">4 pasadas al día, cada 6 horas</text>
+<rect x="55.5" y="58" width="54" height="19" rx="3" class="gf-box" />
+<text x="82.5" y="71.5" class="gf-small" text-anchor="middle">00:00</text>
+<line x1="82.5" y1="81" x2="168.56" y2="96.3" class="gf-line" /><polygon points="172.5,97 167.69,98.35 168.45,94.07" class="gf-head" />
+<rect x="115.5" y="58" width="54" height="19" rx="3" class="gf-box" />
+<text x="142.5" y="71.5" class="gf-small" text-anchor="middle">06:00</text>
+<line x1="142.5" y1="81" x2="168.97" y2="95.12" class="gf-line" /><polygon points="172.5,97 167.5,96.8 169.55,92.96" class="gf-head" />
+<rect x="175.5" y="58" width="54" height="19" rx="3" class="gf-box" />
+<text x="202.5" y="71.5" class="gf-small" text-anchor="middle">12:00</text>
+<line x1="202.5" y1="81" x2="176.03" y2="95.12" class="gf-line" /><polygon points="172.5,97 175.45,92.96 177.5,96.8" class="gf-head" />
+<rect x="235.5" y="58" width="54" height="19" rx="3" class="gf-box" />
+<text x="262.5" y="71.5" class="gf-small" text-anchor="middle">18:00</text>
+<line x1="262.5" y1="81" x2="176.44" y2="96.3" class="gf-line" /><polygon points="172.5,97 176.55,94.07 177.31,98.35" class="gf-head" />
+<rect x="0" y="102" width="22.79" height="26" rx="2" class="gf-cell-keep" />
+<rect x="24.79" y="102" width="22.79" height="26" rx="2" class="gf-cell-keep" />
+<rect x="49.57" y="102" width="22.79" height="26" rx="2" class="gf-cell-keep" />
+<rect x="74.36" y="102" width="22.79" height="26" rx="2" class="gf-cell-keep" />
+<rect x="99.14" y="102" width="22.79" height="26" rx="2" class="gf-cell-keep" />
+<rect x="123.93" y="102" width="22.79" height="26" rx="2" class="gf-cell-keep" />
+<rect x="148.71" y="102" width="22.79" height="26" rx="2" class="gf-cell-keep" />
+<rect x="173.5" y="102" width="22.79" height="26" rx="2" class="gf-cell-keep" />
+<rect x="198.29" y="102" width="22.79" height="26" rx="2" class="gf-cell-keep" />
+<rect x="223.07" y="102" width="22.79" height="26" rx="2" class="gf-cell-keep" />
+<rect x="247.86" y="102" width="22.79" height="26" rx="2" class="gf-cell-keep" />
+<rect x="272.64" y="102" width="22.79" height="26" rx="2" class="gf-cell-keep" />
+<rect x="297.43" y="102" width="22.79" height="26" rx="2" class="gf-cell-keep" />
+<rect x="322.21" y="102" width="22.79" height="26" rx="2" class="gf-cell-keep" />
+<text x="0" y="142" class="gf-small gf-muted">hace 14 días</text>
+<text x="345" y="142" class="gf-small gf-muted" text-anchor="end">hoy</text>
+<text x="0" y="174" class="gf-count gf-keep">14</text>
+<text x="42" y="174" class="gf-muted">filas tras una semana, por repositorio</text>
+<text x="0" y="198">Una fila por día. La pasada más reciente sustituye el día</text>
+<text x="0" y="213.5">que releyó.</text>
+<text x="375" y="13" class="gf-title">Sellado al recoger</text>
+<text x="375" y="30" class="gf-muted">cada pasada escribe otra vez lo que leyó</text>
+<text x="375" y="48" class="gf-muted">4 pasadas al día, cada 6 horas</text>
+<text x="375" y="75" class="gf-small gf-muted">00:00</text>
+<rect x="419" y="66" width="17.64" height="11" rx="2" class="gf-cell-add" />
+<rect x="438.64" y="66" width="17.64" height="11" rx="2" class="gf-cell-add" />
+<rect x="458.29" y="66" width="17.64" height="11" rx="2" class="gf-cell-add" />
+<rect x="477.93" y="66" width="17.64" height="11" rx="2" class="gf-cell-add" />
+<rect x="497.57" y="66" width="17.64" height="11" rx="2" class="gf-cell-add" />
+<rect x="517.21" y="66" width="17.64" height="11" rx="2" class="gf-cell-add" />
+<rect x="536.86" y="66" width="17.64" height="11" rx="2" class="gf-cell-add" />
+<rect x="556.5" y="66" width="17.64" height="11" rx="2" class="gf-cell-add" />
+<rect x="576.14" y="66" width="17.64" height="11" rx="2" class="gf-cell-add" />
+<rect x="595.79" y="66" width="17.64" height="11" rx="2" class="gf-cell-add" />
+<rect x="615.43" y="66" width="17.64" height="11" rx="2" class="gf-cell-add" />
+<rect x="635.07" y="66" width="17.64" height="11" rx="2" class="gf-cell-add" />
+<rect x="654.71" y="66" width="17.64" height="11" rx="2" class="gf-cell-add" />
+<rect x="674.36" y="66" width="17.64" height="11" rx="2" class="gf-cell-add" />
+<text x="698" y="75" class="gf-small gf-add">+14</text>
+<text x="375" y="89" class="gf-small gf-muted">06:00</text>
+<rect x="419" y="80" width="17.64" height="11" rx="2" class="gf-cell-add" />
+<rect x="438.64" y="80" width="17.64" height="11" rx="2" class="gf-cell-add" />
+<rect x="458.29" y="80" width="17.64" height="11" rx="2" class="gf-cell-add" />
+<rect x="477.93" y="80" width="17.64" height="11" rx="2" class="gf-cell-add" />
+<rect x="497.57" y="80" width="17.64" height="11" rx="2" class="gf-cell-add" />
+<rect x="517.21" y="80" width="17.64" height="11" rx="2" class="gf-cell-add" />
+<rect x="536.86" y="80" width="17.64" height="11" rx="2" class="gf-cell-add" />
+<rect x="556.5" y="80" width="17.64" height="11" rx="2" class="gf-cell-add" />
+<rect x="576.14" y="80" width="17.64" height="11" rx="2" class="gf-cell-add" />
+<rect x="595.79" y="80" width="17.64" height="11" rx="2" class="gf-cell-add" />
+<rect x="615.43" y="80" width="17.64" height="11" rx="2" class="gf-cell-add" />
+<rect x="635.07" y="80" width="17.64" height="11" rx="2" class="gf-cell-add" />
+<rect x="654.71" y="80" width="17.64" height="11" rx="2" class="gf-cell-add" />
+<rect x="674.36" y="80" width="17.64" height="11" rx="2" class="gf-cell-add" />
+<text x="698" y="89" class="gf-small gf-add">+14</text>
+<text x="375" y="103" class="gf-small gf-muted">12:00</text>
+<rect x="419" y="94" width="17.64" height="11" rx="2" class="gf-cell-add" />
+<rect x="438.64" y="94" width="17.64" height="11" rx="2" class="gf-cell-add" />
+<rect x="458.29" y="94" width="17.64" height="11" rx="2" class="gf-cell-add" />
+<rect x="477.93" y="94" width="17.64" height="11" rx="2" class="gf-cell-add" />
+<rect x="497.57" y="94" width="17.64" height="11" rx="2" class="gf-cell-add" />
+<rect x="517.21" y="94" width="17.64" height="11" rx="2" class="gf-cell-add" />
+<rect x="536.86" y="94" width="17.64" height="11" rx="2" class="gf-cell-add" />
+<rect x="556.5" y="94" width="17.64" height="11" rx="2" class="gf-cell-add" />
+<rect x="576.14" y="94" width="17.64" height="11" rx="2" class="gf-cell-add" />
+<rect x="595.79" y="94" width="17.64" height="11" rx="2" class="gf-cell-add" />
+<rect x="615.43" y="94" width="17.64" height="11" rx="2" class="gf-cell-add" />
+<rect x="635.07" y="94" width="17.64" height="11" rx="2" class="gf-cell-add" />
+<rect x="654.71" y="94" width="17.64" height="11" rx="2" class="gf-cell-add" />
+<rect x="674.36" y="94" width="17.64" height="11" rx="2" class="gf-cell-add" />
+<text x="698" y="103" class="gf-small gf-add">+14</text>
+<text x="375" y="117" class="gf-small gf-muted">18:00</text>
+<rect x="419" y="108" width="17.64" height="11" rx="2" class="gf-cell-add" />
+<rect x="438.64" y="108" width="17.64" height="11" rx="2" class="gf-cell-add" />
+<rect x="458.29" y="108" width="17.64" height="11" rx="2" class="gf-cell-add" />
+<rect x="477.93" y="108" width="17.64" height="11" rx="2" class="gf-cell-add" />
+<rect x="497.57" y="108" width="17.64" height="11" rx="2" class="gf-cell-add" />
+<rect x="517.21" y="108" width="17.64" height="11" rx="2" class="gf-cell-add" />
+<rect x="536.86" y="108" width="17.64" height="11" rx="2" class="gf-cell-add" />
+<rect x="556.5" y="108" width="17.64" height="11" rx="2" class="gf-cell-add" />
+<rect x="576.14" y="108" width="17.64" height="11" rx="2" class="gf-cell-add" />
+<rect x="595.79" y="108" width="17.64" height="11" rx="2" class="gf-cell-add" />
+<rect x="615.43" y="108" width="17.64" height="11" rx="2" class="gf-cell-add" />
+<rect x="635.07" y="108" width="17.64" height="11" rx="2" class="gf-cell-add" />
+<rect x="654.71" y="108" width="17.64" height="11" rx="2" class="gf-cell-add" />
+<rect x="674.36" y="108" width="17.64" height="11" rx="2" class="gf-cell-add" />
+<text x="698" y="117" class="gf-small gf-add">+14</text>
+<text x="419" y="133" class="gf-small gf-muted">hace 14 días</text>
+<text x="692" y="133" class="gf-small gf-muted" text-anchor="end">hoy</text>
+<text x="375" y="165" class="gf-count gf-add">392</text>
+<text x="434" y="165" class="gf-muted">filas tras una semana, por repositorio</text>
+<text x="375" y="189">28 copias de cada día. Sumar las visitas del mes da 28</text>
+<text x="375" y="204.5">veces el tráfico.</text>
+<line x1="360" y1="0" x2="360" y2="229" class="gf-rule" />
+<line x1="0" y1="245" x2="720" y2="245" class="gf-rule" />
+<rect x="0" y="250" width="18" height="12" rx="2" class="gf-cell-keep" />
+<text x="24" y="260" class="gf-small">una fila que se reescribe</text>
+<rect x="183" y="250" width="18" height="12" rx="2" class="gf-cell-add" />
+<text x="207" y="260" class="gf-small">una fila que se añade</text>
+</svg>

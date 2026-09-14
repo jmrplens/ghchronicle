@@ -1,0 +1,55 @@
+[
+  {
+    "id": 1,
+    "tag_name": "v1.2.0",
+    "name": "v1.2.0",
+    "draft": false,
+    "prerelease": false,
+    "created_at": "2026-08-10T09:00:00Z",
+    "published_at": "2026-08-10T09:30:00Z",
+    "assets": [
+      {
+        "id": 11,
+        "name": "ghchronicle_1.2.0_linux_amd64.tar.gz",
+        "content_type": "application/gzip",
+        "state": "uploaded",
+        "size": 4812331,
+        "download_count": 12,
+        "digest": "sha256:6d974306d539ea933a542913f5736ab490d43c46029665b9e83d5290e566f3b6",
+        "uploader": {
+          "login": "github-actions[bot]",
+          "type": "Bot"
+        },
+        "created_at": "2026-08-10T09:29:00Z",
+        "updated_at": "2026-08-10T09:29:02Z",
+        "browser_download_url": "https://github.com/octocat/hello-world/releases/download/v1.2.0/ghchronicle_1.2.0_linux_amd64.tar.gz"
+      },
+      {
+        "id": 12,
+        "name": "ghchronicle_1.2.0_darwin_arm64.tar.gz",
+        "content_type": "application/gzip",
+        "state": "uploaded",
+        "size": 4703112,
+        "download_count": 4,
+        "digest": null,
+        "uploader": {
+          "login": "octocat",
+          "type": "User"
+        },
+        "created_at": "2026-09-01T09:00:00Z",
+        "updated_at": "2026-09-01T09:00:01Z",
+        "browser_download_url": "https://github.com/octocat/hello-world/releases/download/v1.2.0/ghchronicle_1.2.0_darwin_arm64.tar.gz"
+      }
+    ]
+  },
+  {
+    "id": 2,
+    "tag_name": "v1.3.0-rc1",
+    "name": "v1.3.0 release candidate",
+    "draft": false,
+    "prerelease": true,
+    "created_at": "2026-09-01T09:00:00Z",
+    "published_at": "2026-09-01T09:05:00Z",
+    "assets": []
+  }
+]

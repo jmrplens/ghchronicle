@@ -1,0 +1,763 @@
+{
+  "data": {
+    "search": {
+      "issueCount": 50,
+      "pageInfo": {
+        "hasNextPage": false,
+        "endCursor": "Y3Vyc29yOjUw"
+      },
+      "nodes": [
+        {
+          "mergeCommit": {
+            "message": "Pair session 1 (#1)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
+          },
+          "commits": {
+            "totalCount": 1,
+            "nodes": [
+              {
+                "commit": {
+                  "message": "work 1"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "mergeCommit": {
+            "message": "Pair session 2 (#2)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
+          },
+          "commits": {
+            "totalCount": 1,
+            "nodes": [
+              {
+                "commit": {
+                  "message": "work 2"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "mergeCommit": {
+            "message": "Pair session 3 (#3)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
+          },
+          "commits": {
+            "totalCount": 1,
+            "nodes": [
+              {
+                "commit": {
+                  "message": "work 3"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "mergeCommit": {
+            "message": "Pair session 4 (#4)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
+          },
+          "commits": {
+            "totalCount": 1,
+            "nodes": [
+              {
+                "commit": {
+                  "message": "work 4"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "mergeCommit": {
+            "message": "Pair session 5 (#5)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
+          },
+          "commits": {
+            "totalCount": 1,
+            "nodes": [
+              {
+                "commit": {
+                  "message": "work 5"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "mergeCommit": {
+            "message": "Pair session 6 (#6)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
+          },
+          "commits": {
+            "totalCount": 1,
+            "nodes": [
+              {
+                "commit": {
+                  "message": "work 6"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "mergeCommit": {
+            "message": "Pair session 7 (#7)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
+          },
+          "commits": {
+            "totalCount": 1,
+            "nodes": [
+              {
+                "commit": {
+                  "message": "work 7"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "mergeCommit": {
+            "message": "Pair session 8 (#8)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
+          },
+          "commits": {
+            "totalCount": 1,
+            "nodes": [
+              {
+                "commit": {
+                  "message": "work 8"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "mergeCommit": {
+            "message": "Pair session 9 (#9)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
+          },
+          "commits": {
+            "totalCount": 1,
+            "nodes": [
+              {
+                "commit": {
+                  "message": "work 9"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "mergeCommit": {
+            "message": "Pair session 10 (#10)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
+          },
+          "commits": {
+            "totalCount": 1,
+            "nodes": [
+              {
+                "commit": {
+                  "message": "work 10"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "mergeCommit": {
+            "message": "Pair session 11 (#11)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
+          },
+          "commits": {
+            "totalCount": 1,
+            "nodes": [
+              {
+                "commit": {
+                  "message": "work 11"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "mergeCommit": {
+            "message": "Pair session 12 (#12)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
+          },
+          "commits": {
+            "totalCount": 1,
+            "nodes": [
+              {
+                "commit": {
+                  "message": "work 12"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "mergeCommit": {
+            "message": "Pair session 13 (#13)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
+          },
+          "commits": {
+            "totalCount": 1,
+            "nodes": [
+              {
+                "commit": {
+                  "message": "work 13"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "mergeCommit": {
+            "message": "Pair session 14 (#14)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
+          },
+          "commits": {
+            "totalCount": 1,
+            "nodes": [
+              {
+                "commit": {
+                  "message": "work 14"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "mergeCommit": {
+            "message": "Pair session 15 (#15)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
+          },
+          "commits": {
+            "totalCount": 1,
+            "nodes": [
+              {
+                "commit": {
+                  "message": "work 15"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "mergeCommit": {
+            "message": "Pair session 16 (#16)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
+          },
+          "commits": {
+            "totalCount": 1,
+            "nodes": [
+              {
+                "commit": {
+                  "message": "work 16"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "mergeCommit": {
+            "message": "Pair session 17 (#17)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
+          },
+          "commits": {
+            "totalCount": 1,
+            "nodes": [
+              {
+                "commit": {
+                  "message": "work 17"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "mergeCommit": {
+            "message": "Pair session 18 (#18)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
+          },
+          "commits": {
+            "totalCount": 1,
+            "nodes": [
+              {
+                "commit": {
+                  "message": "work 18"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "mergeCommit": {
+            "message": "Pair session 19 (#19)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
+          },
+          "commits": {
+            "totalCount": 1,
+            "nodes": [
+              {
+                "commit": {
+                  "message": "work 19"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "mergeCommit": {
+            "message": "Pair session 20 (#20)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
+          },
+          "commits": {
+            "totalCount": 1,
+            "nodes": [
+              {
+                "commit": {
+                  "message": "work 20"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "mergeCommit": {
+            "message": "Pair session 21 (#21)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
+          },
+          "commits": {
+            "totalCount": 1,
+            "nodes": [
+              {
+                "commit": {
+                  "message": "work 21"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "mergeCommit": {
+            "message": "Pair session 22 (#22)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
+          },
+          "commits": {
+            "totalCount": 1,
+            "nodes": [
+              {
+                "commit": {
+                  "message": "work 22"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "mergeCommit": {
+            "message": "Pair session 23 (#23)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
+          },
+          "commits": {
+            "totalCount": 1,
+            "nodes": [
+              {
+                "commit": {
+                  "message": "work 23"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "mergeCommit": {
+            "message": "Pair session 24 (#24)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
+          },
+          "commits": {
+            "totalCount": 1,
+            "nodes": [
+              {
+                "commit": {
+                  "message": "work 24"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "mergeCommit": {
+            "message": "Pair session 25 (#25)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
+          },
+          "commits": {
+            "totalCount": 1,
+            "nodes": [
+              {
+                "commit": {
+                  "message": "work 25"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "mergeCommit": {
+            "message": "Pair session 26 (#26)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
+          },
+          "commits": {
+            "totalCount": 1,
+            "nodes": [
+              {
+                "commit": {
+                  "message": "work 26"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "mergeCommit": {
+            "message": "Pair session 27 (#27)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
+          },
+          "commits": {
+            "totalCount": 1,
+            "nodes": [
+              {
+                "commit": {
+                  "message": "work 27"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "mergeCommit": {
+            "message": "Pair session 28 (#28)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
+          },
+          "commits": {
+            "totalCount": 1,
+            "nodes": [
+              {
+                "commit": {
+                  "message": "work 28"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "mergeCommit": {
+            "message": "Pair session 29 (#29)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
+          },
+          "commits": {
+            "totalCount": 1,
+            "nodes": [
+              {
+                "commit": {
+                  "message": "work 29"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "mergeCommit": {
+            "message": "Pair session 30 (#30)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
+          },
+          "commits": {
+            "totalCount": 1,
+            "nodes": [
+              {
+                "commit": {
+                  "message": "work 30"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "mergeCommit": {
+            "message": "Pair session 31 (#31)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
+          },
+          "commits": {
+            "totalCount": 1,
+            "nodes": [
+              {
+                "commit": {
+                  "message": "work 31"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "mergeCommit": {
+            "message": "Pair session 32 (#32)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
+          },
+          "commits": {
+            "totalCount": 1,
+            "nodes": [
+              {
+                "commit": {
+                  "message": "work 32"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "mergeCommit": {
+            "message": "Pair session 33 (#33)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
+          },
+          "commits": {
+            "totalCount": 1,
+            "nodes": [
+              {
+                "commit": {
+                  "message": "work 33"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "mergeCommit": {
+            "message": "Pair session 34 (#34)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
+          },
+          "commits": {
+            "totalCount": 1,
+            "nodes": [
+              {
+                "commit": {
+                  "message": "work 34"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "mergeCommit": {
+            "message": "Pair session 35 (#35)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
+          },
+          "commits": {
+            "totalCount": 1,
+            "nodes": [
+              {
+                "commit": {
+                  "message": "work 35"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "mergeCommit": {
+            "message": "Pair session 36 (#36)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
+          },
+          "commits": {
+            "totalCount": 1,
+            "nodes": [
+              {
+                "commit": {
+                  "message": "work 36"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "mergeCommit": {
+            "message": "Pair session 37 (#37)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
+          },
+          "commits": {
+            "totalCount": 1,
+            "nodes": [
+              {
+                "commit": {
+                  "message": "work 37"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "mergeCommit": {
+            "message": "Pair session 38 (#38)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
+          },
+          "commits": {
+            "totalCount": 1,
+            "nodes": [
+              {
+                "commit": {
+                  "message": "work 38"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "mergeCommit": {
+            "message": "Pair session 39 (#39)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
+          },
+          "commits": {
+            "totalCount": 1,
+            "nodes": [
+              {
+                "commit": {
+                  "message": "work 39"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "mergeCommit": {
+            "message": "Pair session 40 (#40)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
+          },
+          "commits": {
+            "totalCount": 1,
+            "nodes": [
+              {
+                "commit": {
+                  "message": "work 40"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "mergeCommit": {
+            "message": "Pair session 41 (#41)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
+          },
+          "commits": {
+            "totalCount": 1,
+            "nodes": [
+              {
+                "commit": {
+                  "message": "work 41"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "mergeCommit": {
+            "message": "Pair session 42 (#42)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
+          },
+          "commits": {
+            "totalCount": 1,
+            "nodes": [
+              {
+                "commit": {
+                  "message": "work 42"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "mergeCommit": {
+            "message": "Pair session 43 (#43)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
+          },
+          "commits": {
+            "totalCount": 1,
+            "nodes": [
+              {
+                "commit": {
+                  "message": "work 43"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "mergeCommit": {
+            "message": "Pair session 44 (#44)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
+          },
+          "commits": {
+            "totalCount": 1,
+            "nodes": [
+              {
+                "commit": {
+                  "message": "work 44"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "mergeCommit": {
+            "message": "Pair session 45 (#45)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
+          },
+          "commits": {
+            "totalCount": 1,
+            "nodes": [
+              {
+                "commit": {
+                  "message": "work 45"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "mergeCommit": {
+            "message": "Pair session 46 (#46)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
+          },
+          "commits": {
+            "totalCount": 1,
+            "nodes": [
+              {
+                "commit": {
+                  "message": "work 46"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "mergeCommit": {
+            "message": "Pair session 47 (#47)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
+          },
+          "commits": {
+            "totalCount": 1,
+            "nodes": [
+              {
+                "commit": {
+                  "message": "work 47"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "mergeCommit": {
+            "message": "Pair session 48 (#48)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
+          },
+          "commits": {
+            "totalCount": 1,
+            "nodes": [
+              {
+                "commit": {
+                  "message": "work 48"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "mergeCommit": {
+            "message": "Solo change (#49)"
+          },
+          "commits": {
+            "totalCount": 1,
+            "nodes": [
+              {
+                "commit": {
+                  "message": "work 49"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "mergeCommit": {
+            "message": "Solo change (#50)"
+          },
+          "commits": {
+            "totalCount": 1,
+            "nodes": [
+              {
+                "commit": {
+                  "message": "work 50"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

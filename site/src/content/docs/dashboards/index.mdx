@@ -1,0 +1,153 @@
+---
+title: Importing
+description: Five generated Grafana dashboards, one per store, and how to import each of them.
+---
+
+import { Tabs, TabItem, Steps, Aside } from "@astrojs/starlight/components";
+import stats from "../../../data/stats.json";
+import Figure from "../../../components/Figure.astro";
+
+Five dashboards, all in English, all in Grafana's shareable export format: the
+datasource is a `${DS_...}` placeholder and the `__inputs` block asks the
+importer to choose their own.
+
+| File                             | Panels | Store                                                    |
+| -------------------------------- | ------ | -------------------------------------------------------- |
+| `ghchronicle-influxdb.json`      | {stats.panels} | InfluxDB 3, queried with SQL                             |
+| `ghchronicle-prometheus.json`    | {stats.panels} | Prometheus                                               |
+| `ghchronicle-postgres.json`      | {stats.panels} | PostgreSQL or TimescaleDB, from the SQL sink             |
+| `ghchronicle-graphite.json`      | {stats.panels} | Graphite, from the Graphite sink                         |
+| `ghchronicle-elasticsearch.json` | {stats.panels} | Elasticsearch or OpenSearch, from the Elasticsearch sink |
+
+The five hold the same panels in the same order. What differs is how many of
+them the store behind each one can answer.
+
+<Figure name="store-matrix" />
+
+![The InfluxDB dashboard over ninety days of the demonstration database: the repository picker and the range across the top, the Overview with the ghchronicle badge and four tile groups reading 5 repositories with 350 stars and 51 forks, 37.5 thousand views with 21.1 thousand unique visitors and 19.6 thousand clones, 117 followers and 58 following with 4 sponsors and 2 sponsored, and 3.22 thousand contributions over 7.78 years, then the collapsed Lifetime header and the Audience section with views, unique visitors and clones per day, the top referrers, the top paths and clone amplification](../../../assets/dashboard-influxdb-demo.png)
+
+The account in that capture is the invented one every capture in this
+documentation uses, `acme` and five repositories, described beside [what the
+panels show](/ghchronicle/dashboards/panels/). Every section but the Overview
+ships collapsed, which is why Lifetime is a header there.
+
+## Importing from the UI
+
+<Steps>
+
+1. In Grafana, go to **Dashboards**, then **New**, then **Import**.
+
+2. Upload the `ghchronicle-<store>.json` for the store you are using.
+
+3. Choose the datasource Grafana asks for.
+
+    <Tabs syncKey="ds">
+      <TabItem label="InfluxDB">
+        The InfluxDB 3 datasource for the database the sink writes to, **in SQL
+        mode**.
+      </TabItem>
+      <TabItem label="Prometheus">
+        The Prometheus that scrapes ghchronicle's exporter.
+      </TabItem>
+      <TabItem label="PostgreSQL">
+        The PostgreSQL datasource for the database the SQL sink's statements were
+        piped into. TimescaleDB is the same datasource with the TimescaleDB
+        switch on; the queries do not change.
+      </TabItem>
+      <TabItem label="Graphite">
+        The Graphite the sink writes to. The paths assume the default prefix,
+        `github`, and the functions need Graphite 1.1 or later.
+      </TabItem>
+      <TabItem label="Elasticsearch">
+        An Elasticsearch datasource whose index pattern is `ghchronicle-*` and
+        whose time field is `@timestamp`. One datasource serves every panel,
+        because each target names its own index in the query. OpenSearch works
+        through the same plugin.
+      </TabItem>
+    </Tabs>
+
+</Steps>
+
+## Importing with the API
+
+Name the input the file declares:
+
+```sh
+curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d "{\"dashboard\": $(cat ghchronicle-influxdb.json), \"inputs\": [
+        {\"name\":\"DS_INFLUXDB\",\"type\":\"datasource\",\"pluginId\":\"influxdb\",\"value\":\"<uid>\"}],
+      \"overwrite\": true}" \
+  "$GRAFANA/api/dashboards/import"
+```
+
+The inputs are `DS_INFLUXDB` (`influxdb`), `DS_PROMETHEUS` (`prometheus`),
+`DS_POSTGRES` (`grafana-postgresql-datasource`), `DS_GRAPHITE` (`graphite`) and
+`DS_ELASTICSEARCH` (`elasticsearch`).
+
+## The uid
+
+Each file carries a fixed `uid` (`ghchronicle-<store>`). That is deliberate for
+a repository import, where a stable uid means a stable URL and a re-import
+updates in place rather than duplicating. Importing two of these into one
+Grafana is fine, because the uids differ per store and cannot collide.
+
+## They are generated, never hand-edited
+
+`cmd/internal/dashboards` holds one ordered list of sections and panels, and
+every panel carries one query set per store. The generator picks one set and
+emits the JSON, so every file has the same panels in the same places with the
+same titles, and it refuses to write files whose layouts have drifted apart.
+
+```sh
+go run ./cmd/gen_dashboards          # writes all five files
+go run ./cmd/gen_dashboards -check   # writes nothing, fails if they are stale
+```
+
+Edit `cmd/internal/dashboards/sections_*.go`, not the JSON. `panels.go` holds
+the panel constructors it uses, `query.go` the query helpers for each store,
+and `stores.go` only chooses a query set and a datasource.
+
+<Aside type="note" title="No builder is trusted without running the queries">
+The raw database API accepts things the Grafana plugin then fails to render, so
+the checkers go through Grafana's own query path where a datasource exists.
+
+```sh
+GRAFANA_TOKEN=... go run ./cmd/check_dashboards influxdb <datasource-uid>
+GRAFANA_TOKEN=... go run ./cmd/check_prometheus <metrics-dump> <datasource-uid>
+go run ./cmd/check_postgres <schema.json>
+```
+
+`check_dashboards` reports every panel as ok, empty or failing.
+`check_prometheus` additionally checks each metric name against a live dump of
+the exporter's own `/metrics`, because a typo in a metric name is not a syntax
+error: PromQL parses it happily and returns nothing forever.
+
+Both of them, and `cmd/publish_dashboard`, read two variables: `GRAFANA_TOKEN`
+for the credential, and `GRAFANA_URL` for the server. The compiled-in default
+is `http://localhost:3000`, which is the address Grafana itself ships with, so
+anything else has to be named: the first symptom of not naming it is a
+connection refused.
+
+</Aside>
+
+## Publishing to the Grafana directory
+
+The files are already in the shape the directory requires: `__inputs` declares
+the datasource the importer must choose, `__requires` names the Grafana version
+and the plugin, and there is no `id` key, which the directory assigns on
+publication.
+
+Keep the listing names distinct, because five dashboards with the same title
+are indistinguishable in search results: "ghchronicle for InfluxDB",
+"ghchronicle for Prometheus", "ghchronicle for PostgreSQL and TimescaleDB",
+"ghchronicle for Graphite", "ghchronicle for Elasticsearch and OpenSearch".
+
+Publishing again against the same listing adds a revision rather than replacing
+it, so a regeneration that changes panels is a new revision of the same five
+listings, not five new listings.
+
+That is what a reader needs to know. The step by step, with the listing names,
+what each screenshot should show and what to do when a revision is rejected, is
+a maintainer's task and lives in
+[`dashboards/PUBLISHING.md`](https://github.com/jmrplens/ghchronicle/blob/main/dashboards/PUBLISHING.md)
+in the repository.

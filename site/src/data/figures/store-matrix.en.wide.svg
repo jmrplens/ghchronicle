@@ -1,0 +1,356 @@
+<svg xmlns="http://www.w3.org/2000/svg" class="gf" viewBox="-1 -1 722 606"
+ role="img" aria-labelledby="gf-stores-en-wide-t gf-stores-en-wide-d">
+<title id="gf-stores-en-wide-t">What each store can answer, section by section</title>
+<desc id="gf-stores-en-wide-d">A matrix of the dashboard's 17 sections against the five stores, most capable first. Each cell gives the panels that store answers with a query out of the panels in that section, and fills in proportion. In total: InfluxDB 150, PostgreSQL 150, Elasticsearch 145, Graphite 144, Prometheus 126, out of 150. 7 sections are answered in full by all five. Prometheus answers fewest, and loses most in Contributions (6 of 11), Pull requests and issues (10 of 14), Continuous integration (10 of 14), Planning and community (8 of 10).</desc>
+<style>.gf{font-family:var(--sl-font,ui-sans-serif,system-ui,sans-serif)}.gf text{fill:var(--rb-body,#c3ccd2);font-size:12.5px}.gf .gf-title{fill:var(--rb-heading,#f2f6f8);font-size:14.5px;font-weight:600}.gf .gf-col{fill:var(--rb-heading,#f2f6f8);font-size:12px;font-weight:600}.gf .gf-muted{fill:var(--rb-muted,#8b969d);font-size:11px}.gf .gf-small{font-size:11px}.gf .gf-count{font-size:26px;font-weight:700}.gf .gf-keep{fill:var(--rb-accent,#3fb950)}.gf .gf-add{fill:var(--rb-status-drop,#e0605c)}.gf .gf-box{fill:var(--rb-surface,#151c20);stroke:var(--rb-border,#2a333a);stroke-width:1}.gf .gf-cell-keep{fill:var(--rb-accent-soft,#0d2115);stroke:var(--rb-accent,#3fb950);stroke-width:1}.gf .gf-cell-add{fill:var(--rb-status-drop-soft,#2b1618);stroke:var(--rb-status-drop,#e0605c);stroke-width:1}.gf .gf-bar{fill:var(--rb-accent-soft,#0d2115)}.gf .gf-edge{fill:var(--rb-accent,#3fb950)}.gf .gf-rule{stroke:var(--rb-border,#2a333a);stroke-width:1}.gf .gf-line{stroke:var(--rb-muted,#8b969d);stroke-width:1;fill:none}.gf .gf-head{fill:var(--rb-muted,#8b969d)}</style>
+<text x="221" y="13" class="gf-col" text-anchor="middle">InfluxDB</text>
+<text x="333" y="13" class="gf-col" text-anchor="middle">PostgreSQL</text>
+<text x="445" y="13" class="gf-col" text-anchor="middle">Elasticsearch</text>
+<text x="557" y="13" class="gf-col" text-anchor="middle">Graphite</text>
+<text x="669" y="13" class="gf-col" text-anchor="middle">Prometheus</text>
+<line x1="0" y1="21" x2="720" y2="21" class="gf-rule" />
+<text x="0" y="45">Overview</text>
+<rect x="170" y="30" width="102" height="21" rx="2" class="gf-box" />
+<rect x="170" y="30" width="102" height="21" rx="2" class="gf-bar" />
+<text x="221" y="44" class="gf-small" text-anchor="middle">4/4</text>
+<rect x="282" y="30" width="102" height="21" rx="2" class="gf-box" />
+<rect x="282" y="30" width="102" height="21" rx="2" class="gf-bar" />
+<text x="333" y="44" class="gf-small" text-anchor="middle">4/4</text>
+<rect x="394" y="30" width="102" height="21" rx="2" class="gf-box" />
+<rect x="394" y="30" width="102" height="21" rx="2" class="gf-bar" />
+<text x="445" y="44" class="gf-small" text-anchor="middle">4/4</text>
+<rect x="506" y="30" width="102" height="21" rx="2" class="gf-box" />
+<rect x="506" y="30" width="102" height="21" rx="2" class="gf-bar" />
+<text x="557" y="44" class="gf-small" text-anchor="middle">4/4</text>
+<rect x="618" y="30" width="102" height="21" rx="2" class="gf-box" />
+<rect x="618" y="30" width="102" height="21" rx="2" class="gf-bar" />
+<text x="669" y="44" class="gf-small" text-anchor="middle">4/4</text>
+<text x="0" y="72">Lifetime</text>
+<rect x="170" y="57" width="102" height="21" rx="2" class="gf-box" />
+<rect x="170" y="57" width="102" height="21" rx="2" class="gf-bar" />
+<text x="221" y="71" class="gf-small" text-anchor="middle">5/5</text>
+<rect x="282" y="57" width="102" height="21" rx="2" class="gf-box" />
+<rect x="282" y="57" width="102" height="21" rx="2" class="gf-bar" />
+<text x="333" y="71" class="gf-small" text-anchor="middle">5/5</text>
+<rect x="394" y="57" width="102" height="21" rx="2" class="gf-box" />
+<rect x="394" y="57" width="102" height="21" rx="2" class="gf-bar" />
+<text x="445" y="71" class="gf-small" text-anchor="middle">5/5</text>
+<rect x="506" y="57" width="102" height="21" rx="2" class="gf-box" />
+<rect x="506" y="57" width="102" height="21" rx="2" class="gf-bar" />
+<text x="557" y="71" class="gf-small" text-anchor="middle">5/5</text>
+<rect x="618" y="57" width="102" height="21" rx="2" class="gf-box" />
+<rect x="618" y="57" width="102" height="21" rx="2" class="gf-bar" />
+<text x="669" y="71" class="gf-small" text-anchor="middle">5/5</text>
+<text x="0" y="99">Audience</text>
+<rect x="170" y="84" width="102" height="21" rx="2" class="gf-box" />
+<rect x="170" y="84" width="102" height="21" rx="2" class="gf-bar" />
+<text x="221" y="98" class="gf-small" text-anchor="middle">6/6</text>
+<rect x="282" y="84" width="102" height="21" rx="2" class="gf-box" />
+<rect x="282" y="84" width="102" height="21" rx="2" class="gf-bar" />
+<text x="333" y="98" class="gf-small" text-anchor="middle">6/6</text>
+<rect x="394" y="84" width="102" height="21" rx="2" class="gf-box" />
+<rect x="394" y="84" width="102" height="21" rx="2" class="gf-bar" />
+<text x="445" y="98" class="gf-small" text-anchor="middle">6/6</text>
+<rect x="506" y="84" width="102" height="21" rx="2" class="gf-box" />
+<rect x="506" y="84" width="102" height="21" rx="2" class="gf-bar" />
+<text x="557" y="98" class="gf-small" text-anchor="middle">6/6</text>
+<rect x="618" y="84" width="102" height="21" rx="2" class="gf-box" />
+<rect x="618" y="84" width="85" height="21" rx="2" class="gf-bar" />
+<rect x="701.5" y="84" width="1.5" height="5" rx="0" class="gf-edge" />
+<rect x="701.5" y="100" width="1.5" height="5" rx="0" class="gf-edge" />
+<text x="669" y="98" class="gf-small" text-anchor="middle">5/6</text>
+<text x="0" y="126">Stars and forks</text>
+<rect x="170" y="111" width="102" height="21" rx="2" class="gf-box" />
+<rect x="170" y="111" width="102" height="21" rx="2" class="gf-bar" />
+<text x="221" y="125" class="gf-small" text-anchor="middle">5/5</text>
+<rect x="282" y="111" width="102" height="21" rx="2" class="gf-box" />
+<rect x="282" y="111" width="102" height="21" rx="2" class="gf-bar" />
+<text x="333" y="125" class="gf-small" text-anchor="middle">5/5</text>
+<rect x="394" y="111" width="102" height="21" rx="2" class="gf-box" />
+<rect x="394" y="111" width="102" height="21" rx="2" class="gf-bar" />
+<text x="445" y="125" class="gf-small" text-anchor="middle">5/5</text>
+<rect x="506" y="111" width="102" height="21" rx="2" class="gf-box" />
+<rect x="506" y="111" width="102" height="21" rx="2" class="gf-bar" />
+<text x="557" y="125" class="gf-small" text-anchor="middle">5/5</text>
+<rect x="618" y="111" width="102" height="21" rx="2" class="gf-box" />
+<rect x="618" y="111" width="102" height="21" rx="2" class="gf-bar" />
+<text x="669" y="125" class="gf-small" text-anchor="middle">5/5</text>
+<text x="0" y="153">Contributions</text>
+<rect x="170" y="138" width="102" height="21" rx="2" class="gf-box" />
+<rect x="170" y="138" width="102" height="21" rx="2" class="gf-bar" />
+<text x="221" y="152" class="gf-small" text-anchor="middle">11/11</text>
+<rect x="282" y="138" width="102" height="21" rx="2" class="gf-box" />
+<rect x="282" y="138" width="102" height="21" rx="2" class="gf-bar" />
+<text x="333" y="152" class="gf-small" text-anchor="middle">11/11</text>
+<rect x="394" y="138" width="102" height="21" rx="2" class="gf-box" />
+<rect x="394" y="138" width="92.73" height="21" rx="2" class="gf-bar" />
+<rect x="485.23" y="138" width="1.5" height="5" rx="0" class="gf-edge" />
+<rect x="485.23" y="154" width="1.5" height="5" rx="0" class="gf-edge" />
+<text x="445" y="152" class="gf-small" text-anchor="middle">10/11</text>
+<rect x="506" y="138" width="102" height="21" rx="2" class="gf-box" />
+<rect x="506" y="138" width="92.73" height="21" rx="2" class="gf-bar" />
+<rect x="597.23" y="138" width="1.5" height="5" rx="0" class="gf-edge" />
+<rect x="597.23" y="154" width="1.5" height="5" rx="0" class="gf-edge" />
+<text x="557" y="152" class="gf-small" text-anchor="middle">10/11</text>
+<rect x="618" y="138" width="102" height="21" rx="2" class="gf-box" />
+<rect x="618" y="138" width="55.64" height="21" rx="2" class="gf-bar" />
+<rect x="672.14" y="138" width="1.5" height="5" rx="0" class="gf-edge" />
+<rect x="672.14" y="154" width="1.5" height="5" rx="0" class="gf-edge" />
+<text x="669" y="152" class="gf-small" text-anchor="middle">6/11</text>
+<text x="0" y="180">Pull requests and issues</text>
+<rect x="170" y="165" width="102" height="21" rx="2" class="gf-box" />
+<rect x="170" y="165" width="102" height="21" rx="2" class="gf-bar" />
+<text x="221" y="179" class="gf-small" text-anchor="middle">14/14</text>
+<rect x="282" y="165" width="102" height="21" rx="2" class="gf-box" />
+<rect x="282" y="165" width="102" height="21" rx="2" class="gf-bar" />
+<text x="333" y="179" class="gf-small" text-anchor="middle">14/14</text>
+<rect x="394" y="165" width="102" height="21" rx="2" class="gf-box" />
+<rect x="394" y="165" width="102" height="21" rx="2" class="gf-bar" />
+<text x="445" y="179" class="gf-small" text-anchor="middle">14/14</text>
+<rect x="506" y="165" width="102" height="21" rx="2" class="gf-box" />
+<rect x="506" y="165" width="102" height="21" rx="2" class="gf-bar" />
+<text x="557" y="179" class="gf-small" text-anchor="middle">14/14</text>
+<rect x="618" y="165" width="102" height="21" rx="2" class="gf-box" />
+<rect x="618" y="165" width="72.86" height="21" rx="2" class="gf-bar" />
+<rect x="689.36" y="165" width="1.5" height="5" rx="0" class="gf-edge" />
+<rect x="689.36" y="181" width="1.5" height="5" rx="0" class="gf-edge" />
+<text x="669" y="179" class="gf-small" text-anchor="middle">10/14</text>
+<text x="0" y="207">Continuous integration</text>
+<rect x="170" y="192" width="102" height="21" rx="2" class="gf-box" />
+<rect x="170" y="192" width="102" height="21" rx="2" class="gf-bar" />
+<text x="221" y="206" class="gf-small" text-anchor="middle">14/14</text>
+<rect x="282" y="192" width="102" height="21" rx="2" class="gf-box" />
+<rect x="282" y="192" width="102" height="21" rx="2" class="gf-bar" />
+<text x="333" y="206" class="gf-small" text-anchor="middle">14/14</text>
+<rect x="394" y="192" width="102" height="21" rx="2" class="gf-box" />
+<rect x="394" y="192" width="94.71" height="21" rx="2" class="gf-bar" />
+<rect x="487.21" y="192" width="1.5" height="5" rx="0" class="gf-edge" />
+<rect x="487.21" y="208" width="1.5" height="5" rx="0" class="gf-edge" />
+<text x="445" y="206" class="gf-small" text-anchor="middle">13/14</text>
+<rect x="506" y="192" width="102" height="21" rx="2" class="gf-box" />
+<rect x="506" y="192" width="94.71" height="21" rx="2" class="gf-bar" />
+<rect x="599.21" y="192" width="1.5" height="5" rx="0" class="gf-edge" />
+<rect x="599.21" y="208" width="1.5" height="5" rx="0" class="gf-edge" />
+<text x="557" y="206" class="gf-small" text-anchor="middle">13/14</text>
+<rect x="618" y="192" width="102" height="21" rx="2" class="gf-box" />
+<rect x="618" y="192" width="72.86" height="21" rx="2" class="gf-bar" />
+<rect x="689.36" y="192" width="1.5" height="5" rx="0" class="gf-edge" />
+<rect x="689.36" y="208" width="1.5" height="5" rx="0" class="gf-edge" />
+<text x="669" y="206" class="gf-small" text-anchor="middle">10/14</text>
+<text x="0" y="234">Code</text>
+<rect x="170" y="219" width="102" height="21" rx="2" class="gf-box" />
+<rect x="170" y="219" width="102" height="21" rx="2" class="gf-bar" />
+<text x="221" y="233" class="gf-small" text-anchor="middle">9/9</text>
+<rect x="282" y="219" width="102" height="21" rx="2" class="gf-box" />
+<rect x="282" y="219" width="102" height="21" rx="2" class="gf-bar" />
+<text x="333" y="233" class="gf-small" text-anchor="middle">9/9</text>
+<rect x="394" y="219" width="102" height="21" rx="2" class="gf-box" />
+<rect x="394" y="219" width="90.67" height="21" rx="2" class="gf-bar" />
+<rect x="483.17" y="219" width="1.5" height="5" rx="0" class="gf-edge" />
+<rect x="483.17" y="235" width="1.5" height="5" rx="0" class="gf-edge" />
+<text x="445" y="233" class="gf-small" text-anchor="middle">8/9</text>
+<rect x="506" y="219" width="102" height="21" rx="2" class="gf-box" />
+<rect x="506" y="219" width="90.67" height="21" rx="2" class="gf-bar" />
+<rect x="595.17" y="219" width="1.5" height="5" rx="0" class="gf-edge" />
+<rect x="595.17" y="235" width="1.5" height="5" rx="0" class="gf-edge" />
+<text x="557" y="233" class="gf-small" text-anchor="middle">8/9</text>
+<rect x="618" y="219" width="102" height="21" rx="2" class="gf-box" />
+<rect x="618" y="219" width="90.67" height="21" rx="2" class="gf-bar" />
+<rect x="707.17" y="219" width="1.5" height="5" rx="0" class="gf-edge" />
+<rect x="707.17" y="235" width="1.5" height="5" rx="0" class="gf-edge" />
+<text x="669" y="233" class="gf-small" text-anchor="middle">8/9</text>
+<text x="0" y="261">Planning and community</text>
+<rect x="170" y="246" width="102" height="21" rx="2" class="gf-box" />
+<rect x="170" y="246" width="102" height="21" rx="2" class="gf-bar" />
+<text x="221" y="260" class="gf-small" text-anchor="middle">10/10</text>
+<rect x="282" y="246" width="102" height="21" rx="2" class="gf-box" />
+<rect x="282" y="246" width="102" height="21" rx="2" class="gf-bar" />
+<text x="333" y="260" class="gf-small" text-anchor="middle">10/10</text>
+<rect x="394" y="246" width="102" height="21" rx="2" class="gf-box" />
+<rect x="394" y="246" width="102" height="21" rx="2" class="gf-bar" />
+<text x="445" y="260" class="gf-small" text-anchor="middle">10/10</text>
+<rect x="506" y="246" width="102" height="21" rx="2" class="gf-box" />
+<rect x="506" y="246" width="102" height="21" rx="2" class="gf-bar" />
+<text x="557" y="260" class="gf-small" text-anchor="middle">10/10</text>
+<rect x="618" y="246" width="102" height="21" rx="2" class="gf-box" />
+<rect x="618" y="246" width="81.6" height="21" rx="2" class="gf-bar" />
+<rect x="698.1" y="246" width="1.5" height="5" rx="0" class="gf-edge" />
+<rect x="698.1" y="262" width="1.5" height="5" rx="0" class="gf-edge" />
+<text x="669" y="260" class="gf-small" text-anchor="middle">8/10</text>
+<text x="0" y="288">Delivery and access</text>
+<rect x="170" y="273" width="102" height="21" rx="2" class="gf-box" />
+<rect x="170" y="273" width="102" height="21" rx="2" class="gf-bar" />
+<text x="221" y="287" class="gf-small" text-anchor="middle">13/13</text>
+<rect x="282" y="273" width="102" height="21" rx="2" class="gf-box" />
+<rect x="282" y="273" width="102" height="21" rx="2" class="gf-bar" />
+<text x="333" y="287" class="gf-small" text-anchor="middle">13/13</text>
+<rect x="394" y="273" width="102" height="21" rx="2" class="gf-box" />
+<rect x="394" y="273" width="102" height="21" rx="2" class="gf-bar" />
+<text x="445" y="287" class="gf-small" text-anchor="middle">13/13</text>
+<rect x="506" y="273" width="102" height="21" rx="2" class="gf-box" />
+<rect x="506" y="273" width="102" height="21" rx="2" class="gf-bar" />
+<text x="557" y="287" class="gf-small" text-anchor="middle">13/13</text>
+<rect x="618" y="273" width="102" height="21" rx="2" class="gf-box" />
+<rect x="618" y="273" width="102" height="21" rx="2" class="gf-bar" />
+<text x="669" y="287" class="gf-small" text-anchor="middle">13/13</text>
+<text x="0" y="315">Releases</text>
+<rect x="170" y="300" width="102" height="21" rx="2" class="gf-box" />
+<rect x="170" y="300" width="102" height="21" rx="2" class="gf-bar" />
+<text x="221" y="314" class="gf-small" text-anchor="middle">4/4</text>
+<rect x="282" y="300" width="102" height="21" rx="2" class="gf-box" />
+<rect x="282" y="300" width="102" height="21" rx="2" class="gf-bar" />
+<text x="333" y="314" class="gf-small" text-anchor="middle">4/4</text>
+<rect x="394" y="300" width="102" height="21" rx="2" class="gf-box" />
+<rect x="394" y="300" width="76.5" height="21" rx="2" class="gf-bar" />
+<rect x="469" y="300" width="1.5" height="5" rx="0" class="gf-edge" />
+<rect x="469" y="316" width="1.5" height="5" rx="0" class="gf-edge" />
+<text x="445" y="314" class="gf-small" text-anchor="middle">3/4</text>
+<rect x="506" y="300" width="102" height="21" rx="2" class="gf-box" />
+<rect x="506" y="300" width="102" height="21" rx="2" class="gf-bar" />
+<text x="557" y="314" class="gf-small" text-anchor="middle">4/4</text>
+<rect x="618" y="300" width="102" height="21" rx="2" class="gf-box" />
+<rect x="618" y="300" width="51" height="21" rx="2" class="gf-bar" />
+<rect x="667.5" y="300" width="1.5" height="5" rx="0" class="gf-edge" />
+<rect x="667.5" y="316" width="1.5" height="5" rx="0" class="gf-edge" />
+<text x="669" y="314" class="gf-small" text-anchor="middle">2/4</text>
+<text x="0" y="342">Security</text>
+<rect x="170" y="327" width="102" height="21" rx="2" class="gf-box" />
+<rect x="170" y="327" width="102" height="21" rx="2" class="gf-bar" />
+<text x="221" y="341" class="gf-small" text-anchor="middle">14/14</text>
+<rect x="282" y="327" width="102" height="21" rx="2" class="gf-box" />
+<rect x="282" y="327" width="102" height="21" rx="2" class="gf-bar" />
+<text x="333" y="341" class="gf-small" text-anchor="middle">14/14</text>
+<rect x="394" y="327" width="102" height="21" rx="2" class="gf-box" />
+<rect x="394" y="327" width="102" height="21" rx="2" class="gf-bar" />
+<text x="445" y="341" class="gf-small" text-anchor="middle">14/14</text>
+<rect x="506" y="327" width="102" height="21" rx="2" class="gf-box" />
+<rect x="506" y="327" width="94.71" height="21" rx="2" class="gf-bar" />
+<rect x="599.21" y="327" width="1.5" height="5" rx="0" class="gf-edge" />
+<rect x="599.21" y="343" width="1.5" height="5" rx="0" class="gf-edge" />
+<text x="557" y="341" class="gf-small" text-anchor="middle">13/14</text>
+<rect x="618" y="327" width="102" height="21" rx="2" class="gf-box" />
+<rect x="618" y="327" width="94.71" height="21" rx="2" class="gf-bar" />
+<rect x="711.21" y="327" width="1.5" height="5" rx="0" class="gf-edge" />
+<rect x="711.21" y="343" width="1.5" height="5" rx="0" class="gf-edge" />
+<text x="669" y="341" class="gf-small" text-anchor="middle">13/14</text>
+<text x="0" y="369">Cost</text>
+<rect x="170" y="354" width="102" height="21" rx="2" class="gf-box" />
+<rect x="170" y="354" width="102" height="21" rx="2" class="gf-bar" />
+<text x="221" y="368" class="gf-small" text-anchor="middle">6/6</text>
+<rect x="282" y="354" width="102" height="21" rx="2" class="gf-box" />
+<rect x="282" y="354" width="102" height="21" rx="2" class="gf-bar" />
+<text x="333" y="368" class="gf-small" text-anchor="middle">6/6</text>
+<rect x="394" y="354" width="102" height="21" rx="2" class="gf-box" />
+<rect x="394" y="354" width="102" height="21" rx="2" class="gf-bar" />
+<text x="445" y="368" class="gf-small" text-anchor="middle">6/6</text>
+<rect x="506" y="354" width="102" height="21" rx="2" class="gf-box" />
+<rect x="506" y="354" width="102" height="21" rx="2" class="gf-bar" />
+<text x="557" y="368" class="gf-small" text-anchor="middle">6/6</text>
+<rect x="618" y="354" width="102" height="21" rx="2" class="gf-box" />
+<rect x="618" y="354" width="102" height="21" rx="2" class="gf-bar" />
+<text x="669" y="368" class="gf-small" text-anchor="middle">6/6</text>
+<text x="0" y="396">Activity</text>
+<rect x="170" y="381" width="102" height="21" rx="2" class="gf-box" />
+<rect x="170" y="381" width="102" height="21" rx="2" class="gf-bar" />
+<text x="221" y="395" class="gf-small" text-anchor="middle">9/9</text>
+<rect x="282" y="381" width="102" height="21" rx="2" class="gf-box" />
+<rect x="282" y="381" width="102" height="21" rx="2" class="gf-bar" />
+<text x="333" y="395" class="gf-small" text-anchor="middle">9/9</text>
+<rect x="394" y="381" width="102" height="21" rx="2" class="gf-box" />
+<rect x="394" y="381" width="102" height="21" rx="2" class="gf-bar" />
+<text x="445" y="395" class="gf-small" text-anchor="middle">9/9</text>
+<rect x="506" y="381" width="102" height="21" rx="2" class="gf-box" />
+<rect x="506" y="381" width="90.67" height="21" rx="2" class="gf-bar" />
+<rect x="595.17" y="381" width="1.5" height="5" rx="0" class="gf-edge" />
+<rect x="595.17" y="397" width="1.5" height="5" rx="0" class="gf-edge" />
+<text x="557" y="395" class="gf-small" text-anchor="middle">8/9</text>
+<rect x="618" y="381" width="102" height="21" rx="2" class="gf-box" />
+<rect x="618" y="381" width="79.33" height="21" rx="2" class="gf-bar" />
+<rect x="695.83" y="381" width="1.5" height="5" rx="0" class="gf-edge" />
+<rect x="695.83" y="397" width="1.5" height="5" rx="0" class="gf-edge" />
+<text x="669" y="395" class="gf-small" text-anchor="middle">7/9</text>
+<text x="0" y="423">Inventory</text>
+<rect x="170" y="408" width="102" height="21" rx="2" class="gf-box" />
+<rect x="170" y="408" width="102" height="21" rx="2" class="gf-bar" />
+<text x="221" y="422" class="gf-small" text-anchor="middle">16/16</text>
+<rect x="282" y="408" width="102" height="21" rx="2" class="gf-box" />
+<rect x="282" y="408" width="102" height="21" rx="2" class="gf-bar" />
+<text x="333" y="422" class="gf-small" text-anchor="middle">16/16</text>
+<rect x="394" y="408" width="102" height="21" rx="2" class="gf-box" />
+<rect x="394" y="408" width="95.63" height="21" rx="2" class="gf-bar" />
+<rect x="488.13" y="408" width="1.5" height="5" rx="0" class="gf-edge" />
+<rect x="488.13" y="424" width="1.5" height="5" rx="0" class="gf-edge" />
+<text x="445" y="422" class="gf-small" text-anchor="middle">15/16</text>
+<rect x="506" y="408" width="102" height="21" rx="2" class="gf-box" />
+<rect x="506" y="408" width="95.63" height="21" rx="2" class="gf-bar" />
+<rect x="600.13" y="408" width="1.5" height="5" rx="0" class="gf-edge" />
+<rect x="600.13" y="424" width="1.5" height="5" rx="0" class="gf-edge" />
+<text x="557" y="422" class="gf-small" text-anchor="middle">15/16</text>
+<rect x="618" y="408" width="102" height="21" rx="2" class="gf-box" />
+<rect x="618" y="408" width="89.25" height="21" rx="2" class="gf-bar" />
+<rect x="705.75" y="408" width="1.5" height="5" rx="0" class="gf-edge" />
+<rect x="705.75" y="424" width="1.5" height="5" rx="0" class="gf-edge" />
+<text x="669" y="422" class="gf-small" text-anchor="middle">14/16</text>
+<text x="0" y="450">Profile and sponsorship</text>
+<rect x="170" y="435" width="102" height="21" rx="2" class="gf-box" />
+<rect x="170" y="435" width="102" height="21" rx="2" class="gf-bar" />
+<text x="221" y="449" class="gf-small" text-anchor="middle">8/8</text>
+<rect x="282" y="435" width="102" height="21" rx="2" class="gf-box" />
+<rect x="282" y="435" width="102" height="21" rx="2" class="gf-bar" />
+<text x="333" y="449" class="gf-small" text-anchor="middle">8/8</text>
+<rect x="394" y="435" width="102" height="21" rx="2" class="gf-box" />
+<rect x="394" y="435" width="102" height="21" rx="2" class="gf-bar" />
+<text x="445" y="449" class="gf-small" text-anchor="middle">8/8</text>
+<rect x="506" y="435" width="102" height="21" rx="2" class="gf-box" />
+<rect x="506" y="435" width="102" height="21" rx="2" class="gf-bar" />
+<text x="557" y="449" class="gf-small" text-anchor="middle">8/8</text>
+<rect x="618" y="435" width="102" height="21" rx="2" class="gf-box" />
+<rect x="618" y="435" width="102" height="21" rx="2" class="gf-bar" />
+<text x="669" y="449" class="gf-small" text-anchor="middle">8/8</text>
+<text x="0" y="477">The collector itself</text>
+<rect x="170" y="462" width="102" height="21" rx="2" class="gf-box" />
+<rect x="170" y="462" width="102" height="21" rx="2" class="gf-bar" />
+<text x="221" y="476" class="gf-small" text-anchor="middle">2/2</text>
+<rect x="282" y="462" width="102" height="21" rx="2" class="gf-box" />
+<rect x="282" y="462" width="102" height="21" rx="2" class="gf-bar" />
+<text x="333" y="476" class="gf-small" text-anchor="middle">2/2</text>
+<rect x="394" y="462" width="102" height="21" rx="2" class="gf-box" />
+<rect x="394" y="462" width="102" height="21" rx="2" class="gf-bar" />
+<text x="445" y="476" class="gf-small" text-anchor="middle">2/2</text>
+<rect x="506" y="462" width="102" height="21" rx="2" class="gf-box" />
+<rect x="506" y="462" width="102" height="21" rx="2" class="gf-bar" />
+<text x="557" y="476" class="gf-small" text-anchor="middle">2/2</text>
+<rect x="618" y="462" width="102" height="21" rx="2" class="gf-box" />
+<rect x="618" y="462" width="102" height="21" rx="2" class="gf-bar" />
+<text x="669" y="476" class="gf-small" text-anchor="middle">2/2</text>
+<line x1="0" y1="492" x2="720" y2="492" class="gf-rule" />
+<text x="0" y="515" class="gf-title">Total</text>
+<rect x="170" y="500" width="102" height="21" rx="2" class="gf-box" />
+<rect x="170" y="500" width="102" height="21" rx="2" class="gf-bar" />
+<text x="221" y="514" class="gf-title" text-anchor="middle">150/150</text>
+<rect x="282" y="500" width="102" height="21" rx="2" class="gf-box" />
+<rect x="282" y="500" width="102" height="21" rx="2" class="gf-bar" />
+<text x="333" y="514" class="gf-title" text-anchor="middle">150/150</text>
+<rect x="394" y="500" width="102" height="21" rx="2" class="gf-box" />
+<rect x="394" y="500" width="98.6" height="21" rx="2" class="gf-bar" />
+<rect x="491.1" y="500" width="1.5" height="5" rx="0" class="gf-edge" />
+<rect x="491.1" y="516" width="1.5" height="5" rx="0" class="gf-edge" />
+<text x="445" y="514" class="gf-title" text-anchor="middle">145/150</text>
+<rect x="506" y="500" width="102" height="21" rx="2" class="gf-box" />
+<rect x="506" y="500" width="97.92" height="21" rx="2" class="gf-bar" />
+<rect x="602.42" y="500" width="1.5" height="5" rx="0" class="gf-edge" />
+<rect x="602.42" y="516" width="1.5" height="5" rx="0" class="gf-edge" />
+<text x="557" y="514" class="gf-title" text-anchor="middle">144/150</text>
+<rect x="618" y="500" width="102" height="21" rx="2" class="gf-box" />
+<rect x="618" y="500" width="85.68" height="21" rx="2" class="gf-bar" />
+<rect x="702.18" y="500" width="1.5" height="5" rx="0" class="gf-edge" />
+<rect x="702.18" y="516" width="1.5" height="5" rx="0" class="gf-edge" />
+<text x="669" y="514" class="gf-title" text-anchor="middle">126/150</text>
+<text x="0" y="547" class="gf-muted">A panel a store cannot answer ships as a text panel with the same title, so all five dashboards have the same shape and the same</text>
+<text x="0" y="561.5" class="gf-muted">152 panels. 2 of those are prose in every store and are left out of this count.</text>
+<line x1="0" y1="576" x2="720" y2="576" class="gf-rule" />
+<rect x="0" y="581" width="18" height="12" rx="2" class="gf-bar" />
+<text x="24" y="591" class="gf-small">answered by a query</text>
+<rect x="150.6" y="581" width="18" height="12" rx="2" class="gf-box" />
+<text x="174.6" y="591" class="gf-small">answered as a text panel instead</text>
+</svg>

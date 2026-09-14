@@ -1,0 +1,164 @@
+---
+title: El fichero
+description: Un fichero YAML, todos los valores expandibles desde el entorno, y para qué sirve cada bloque de primer nivel.
+---
+
+import { Aside, FileTree } from "@astrojs/starlight/components";
+
+```sh
+cp config.example.yaml config.yaml
+```
+
+`config.example.yaml` documenta cada opción en comentarios. Es el fichero que
+hay que copiar, y se mantiene al día con el código: añadir un ajuste implica
+añadirlo también allí.
+
+## Los bloques
+
+```yaml
+github: # el token, la reserva, el timeout
+targets: # qué repositorios
+groups: # qué categorías de métrica llegan a recogerse
+sinks: # a dónde van los puntos
+every: # cada cuánto corre todo: un valor por defecto, por grupo, por familia
+heartbeat: # cada cuánto despierta el bucle, para una prueba
+log: # nivel, formato y un fichero rotatorio opcional
+state_file: # lo que recuerda un reinicio
+backfill: # el límite, al ejecutar con -backfill
+```
+
+Solo `github.token` y uno de `targets.user`, `targets.orgs` o `targets.repos`
+son verdaderamente obligatorios, más al menos un destino. Todo lo demás tiene
+valor por defecto.
+
+## Expansión de `${VAR}`
+
+Todo valor de tipo cadena se expande desde el entorno al arrancar.
+`${GITHUB_TOKEN}` se convierte en el valor de esa variable, o en una cadena
+vacía si no está definida.
+
+```yaml
+github:
+  token: ${GITHUB_TOKEN}
+sinks:
+  influxdb:
+    url: http://localhost:8181
+    token: ${INFLUX_TOKEN}
+```
+
+Esta es toda la razón de que el fichero se pueda versionar. La configuración es
+la forma del despliegue y le corresponde estar en control de versiones; los
+tokens son credenciales y les corresponde un fichero de entorno con modo 600, o
+un almacén de secretos.
+
+<FileTree>
+
+- /etc/ghchronicle/
+  - config.yaml legible por todos, versionado
+  - ghchronicle.env modo 600, nunca versionado
+
+</FileTree>
+
+## `github`
+
+```yaml
+github:
+  token: ${GITHUB_TOKEN}
+  reserve_rate: 500
+  timeout: 30s
+  # base_url: https://github.example.com/api/v3
+  # web_url: https://github.example.com
+```
+
+| Clave          | Por omisión         | Significado                                                                                                                                              |
+| -------------- | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `token`        | obligatoria         | Un token personal clásico o fine-grained                                                                                                                 |
+| `reserve_rate` | `500`               | Llamadas que no se gastan nunca, para que lo demás que use el token siga funcionando                                                                     |
+| `timeout`      | `30s`               | Por petición. GraphQL sobre una cuenta grande puede ser lento                                                                                            |
+| `base_url`     | api.github.com      | Una instancia de GitHub Enterprise usa `https://<host>/api/v3`                                                                                           |
+| `web_url`      | derivada de la API  | El sitio donde está la página de perfil, que `achievements` lee sin el token. Solo hace falta cuando `base_url` es un proxy delante de la API |
+
+La reserva se escala por cubo; ver [límites de la API](/ghchronicle/es/api/).
+
+## `state_file`
+
+```yaml
+state_file: /var/lib/ghchronicle/state.json
+```
+
+Seis cosas, y borrar el fichero cuesta una distinta por cada una:
+
+| Recuerda                                                                                          | Borrarlo cuesta                                                                        |
+| ------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `last_run`, cuándo corrió cada familia por última vez                                             | todas las familias vencen a la vez, así que la pasada siguiente es completa             |
+| `first_saw`, cuándo se vio cada repositorio por primera vez                                       | el recorrido completo de la historia de estrellas se vuelve a hacer                     |
+| `last_head`, el commit en que estaba cada repositorio cuando corrió el diff de dependencias       | los cambios de dependencias del hueco: la pasada siguiente tiene la fotografía y no el diff |
+| `last_full`, cuándo leyó una página entera cada familia que normalmente lee solo lo que ha cambiado | ausente se lee como vencida, así que la pasada siguiente las lee todas enteras          |
+| `last_notified`, por dónde se cortó la ventana del buzón                                          | a cero pide el buzón entero                                                             |
+| `last_event`, el evento más reciente que tenía el feed                                            | vacío lee el feed entero                                                                |
+
+Cinco de las seis cuestan solo cuota, porque lo que se vuelve a recoger se
+indexa por medida, etiquetas y marca de tiempo y sobrescribe lo que ya está
+guardado. `last_head` es la que pierde algo: los cambios de dependencias entre
+la cabeza que tenía y la siguiente se leen de un rango que nadie puede nombrar
+una vez que la cabeza ha desaparecido.
+
+### El otro fichero en el que una pasada se recuerda a sí misma
+
+```yaml
+sinks:
+  dedupe_file: /var/lib/ghchronicle/state-written.bin
+  dedupe_horizon: 720h
+```
+
+| Clave                  | Por omisión                                     | Significado                                                                        |
+| ---------------------- | ----------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `sinks.dedupe_file`    | junto a `state_file`, como `<nombre>-written.bin` | El registro de lo que ya se ha escrito. `off` lo desactiva para todos los destinos |
+| `sinks.dedupe_horizon` | `720h`                                          | Cuánto recuerda el registro un punto que ya nadie ofrece                           |
+
+Perderlo cuesta una pasada de reescritura y nada más, que es justo lo que quiere
+un almacén que se ha vaciado y hay que volver a llenar. Los dos ficheros quieren
+una ruta persistente:
+[solo se escribe lo que ha cambiado](/ghchronicle/es/sinks/#solo-se-escribe-lo-que-ha-cambiado).
+
+## `backfill`
+
+```yaml
+backfill:
+  since: 2y
+```
+
+Solo se aplica a una ejecución lanzada con `-backfill`, y `-backfill-since` lo
+sobrescribe. Ver [relleno histórico](/ghchronicle/es/how/backfill/).
+
+## Cuando está mal, lo dice al arrancar
+
+La configuración se valida antes de hacer la primera llamada, y los mensajes
+nombran la clave y lo que necesita.
+
+| Mensaje                                                               | Significa                                                          |
+| --------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `github.token is empty and GITHUB_TOKEN is unset`                     | Exactamente lo que dice                                            |
+| `targets: set at least one of user, orgs or repos`                    | No hay nada que recoger                                            |
+| `sinks: enable at least one of ...`                                   | Una ejecución que recoge y tira casi nunca es lo que alguien quiso |
+| `every.families.<name>: unknown collector`                            | El nombre no es una familia. El mensaje lista las que existen      |
+| `sinks.influxdb: url and bucket are required`                         | Cada destino valida sus propias claves obligatorias y dice cuáles  |
+| `sinks.sql.dialect: "mysql" is not postgres, the only dialect so far` | El valor no es uno de los aceptados, y el mensaje los lista        |
+
+<Aside type="note" title="Una cadencia para una familia inexistente es fatal">
+  `every` se comprueba contra la lista de colectores conocidos al arrancar en
+  vez de ignorarse. De lo contrario, una errata ahí significaría una familia
+  corriendo en silencio con su valor por defecto para siempre, algo que ya ha
+  mordido dos veces.
+</Aside>
+
+## El resto
+
+- [Objetivos](/ghchronicle/es/configuration/targets/): qué repositorios, y los
+  valores por defecto de forks y archivados.
+- [Cadencias](/ghchronicle/es/configuration/cadences/): el bloque `every`, y qué
+  significa `0`.
+- [Registro](/ghchronicle/es/configuration/logging/): nivel, formato y el
+  fichero rotatorio.
+- [Elegir almacén](/ghchronicle/es/sinks/): el bloque `sinks`, una página por
+  almacén.

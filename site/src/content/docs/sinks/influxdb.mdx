@@ -1,0 +1,113 @@
+---
+title: InfluxDB
+description: The reference store for the dated history, why re-collection converges, and the one write error worth recognising.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+```yaml
+sinks:
+  influxdb:
+    url: http://localhost:8181
+    token: ${INFLUX_TOKEN}
+    org: default
+    bucket: github
+    batch: 5000
+    # exclude: [gh_job_log]
+```
+
+## The wire contract
+
+Line protocol posted to the **v2 write endpoint**, which InfluxDB 2 and 3 both
+serve, so one sink covers both. The token goes in an `Authorization` header,
+`org` and `bucket` in the query string.
+
+Precision is **nanoseconds**, because the traffic points are days and the
+workflow ones are seconds and one precision has to cover both.
+
+Batches default to 5000 lines per request. `batch` lowers that for a server
+with a smaller body limit.
+
+## What it can answer that the others cannot
+
+Everything dated, which is most of the project:
+
+- The traffic of a particular Tuesday, months later.
+- The star curve since the first star, drawn from one row per star.
+- The merge time of a pull request closed in July.
+- Lines added and removed per commit, per author, over years.
+
+InfluxDB keys a point by measurement, tag set and timestamp, so **rewriting a
+point that already exists is not a duplicate**. Replaying the same fourteen-day
+traffic window every six hours converges instead of accumulating, which is what
+makes the whole [backfill](/ghchronicle/how/backfill/) design work.
+
+The [dashboards](/ghchronicle/dashboards/) are generated against this store
+first; the other four query sets are translations of it.
+
+## Rewriting is free in rows and not in files
+
+InfluxDB 3 Core writes one Parquet file per partition per write request and
+never compacts them, and it refuses any query that would open more than its
+file limit. So the row that overwrites harmlessly still costs a file, and a
+sweep that offers the same history every six hours buys "Query would scan
+10000 Parquet files, exceeding the file limit" a few weeks later.
+
+That is why the write ledger exists, why `dedupe` is on by default here, and
+why turning it off is a decision rather than a tidy-up:
+[only what changed is written](/ghchronicle/sinks/#only-what-changed-is-written).
+
+## `exclude`
+
+Names measurements this sink should not receive. It defaults to `gh_job_log`,
+which is text meant for a log store: writing thousands of lines of build output
+into a metrics database is a lot of storage for something nobody will query as
+a number.
+
+## Column types are fixed on first sight
+
+<Aside type="danger" title="InfluxDB 3 will not let a name change side">
+InfluxDB 3 fixes a column as a tag or a field the first time it sees it, and
+rejects later writes that disagree. If a version of this tool ever moves a name
+between the two, the table has to be dropped rather than repaired:
+
+```http
+DELETE /api/v3/configure/table
+```
+
+This is the usual cause of `influx write: 400`.
+
+</Aside>
+
+## Rejected lines
+
+A write that comes back 400 is bisected: the sink halves the batch, retries,
+and narrows down to the individual lines the server refuses to parse. Those are
+logged one by one with the server's own reason, everything else is written, and
+the sweep reports a warning rather than a failure.
+
+```text
+level=WARN msg="sink rejected some lines" sink=influxdb family=actions rejected=2
+```
+
+That behaviour matters because a batch is five thousand lines. Failing the
+whole batch on one malformed value would lose four thousand nine hundred and
+ninety-nine good points.
+
+## Grafana
+
+Use the **InfluxDB 3 datasource in SQL mode** for the shipped dashboard, and
+point it at the database the sink writes to. The dashboard file declares
+`DS_INFLUXDB` as an input, so importing asks you to choose your own datasource
+rather than carrying somebody else's uid.
+
+```sql
+SELECT time, "count" FROM gh_traffic WHERE kind = 'views' AND repo = 'ghchronicle'
+```
+
+## Where to go next
+
+- [Choosing a store](/ghchronicle/sinks/) compares InfluxDB with the other nine,
+  and holds the write ledger every one of them shares.
+- [The dashboards](/ghchronicle/dashboards/) says which of the five is drawn
+  against which store, and what a panel a store cannot answer becomes.

@@ -1,0 +1,20 @@
+[
+  {
+    "id": "1",
+    "unread": true,
+    "reason": "mention",
+    "updated_at": "2026-09-07T12:00:00Z",
+    "last_read_at": null,
+    "subject": {"title": "Flaky test on arm64", "url": "https://api.github.com/repos/octocat/hello-world/issues/9", "type": "Issue"},
+    "repository": {"id": 1296269, "full_name": "octocat/hello-world", "private": false}
+  },
+  {
+    "id": "2",
+    "unread": false,
+    "reason": "review_requested",
+    "updated_at": "2026-09-05T08:30:00Z",
+    "last_read_at": "2026-09-05T09:00:00Z",
+    "subject": {"title": "Add retry to the influx sink", "url": "https://api.github.com/repos/octocat/hello-world/pulls/43", "type": "PullRequest"},
+    "repository": {"id": 1296269, "full_name": "octocat/hello-world", "private": true}
+  }
+]

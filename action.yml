@@ -1,0 +1,122 @@
+name: ghchronicle
+description: Collect GitHub metrics for an account and, optionally, render a profile card SVG.
+author: jmrplens
+branding:
+  icon: activity
+  color: blue
+
+inputs:
+  token:
+    description: >
+      A personal access token. The automatic GITHUB_TOKEN is not enough for most
+      of what this collects: traffic needs push access to every repository and
+      Dependabot alerts need the security_events scope.
+    required: true
+  config:
+    description: Path to a ghchronicle configuration file. Omit to run with defaults built from `user`.
+    required: false
+    default: ""
+  user:
+    description: The account to collect when no config file is given.
+    required: false
+    default: ${{ github.repository_owner }}
+  mode:
+    description: "`once` for one sweep, `backfill` to reach as far back as GitHub allows, `card` to only render the SVG."
+    required: false
+    default: once
+  backfill-since:
+    description: Bound for `backfill` mode. A date (2024-01-01), days (90d), years (2y) or a duration (720h). Empty means no bound.
+    required: false
+    default: ""
+  card:
+    description: Path of the SVG to write. Empty means no card.
+    required: false
+    default: ""
+  card-layout:
+    description: One of the registered layouts (summary, github-stats, github-compact, badge-row, wide-banner, sparkline-hero, language-ring, repo-list, activity-heatmap, animated-counters).
+    required: false
+    default: summary
+  card-theme:
+    description: dark, light or auto.
+    required: false
+    default: auto
+  card-fields:
+    description: Comma-separated field identifiers to show. Empty means the layout's default.
+    required: false
+    default: ""
+  version:
+    description: The ghchronicle release to install. `latest` resolves the newest tag.
+    required: false
+    default: latest
+
+runs:
+  using: composite
+  steps:
+    - name: Install ghchronicle
+      shell: bash
+      env:
+        VERSION: ${{ inputs.version }}
+      run: |
+        set -euo pipefail
+        # A release binary rather than `go install`, so the Action needs no Go
+        # toolchain on the runner and starts in seconds.
+        if [ "$VERSION" = "latest" ]; then
+          VERSION=$(curl -fsSL https://api.github.com/repos/jmrplens/ghchronicle/releases/latest | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p')
+        fi
+        os=$(uname -s | tr '[:upper:]' '[:lower:]')
+        arch=$(uname -m); case "$arch" in x86_64) arch=amd64;; aarch64|arm64) arch=arm64;; esac
+        curl -fsSL "https://github.com/jmrplens/ghchronicle/releases/download/${VERSION}/ghchronicle_${VERSION#v}_${os}_${arch}.tar.gz" | tar -xz -C "$RUNNER_TEMP" ghchronicle
+        echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+
+    - name: Write a default configuration
+      if: inputs.config == ''
+      shell: bash
+      env:
+        USER_LOGIN: ${{ inputs.user }}
+      run: |
+        # Every family on, nothing written anywhere: the card is the only
+        # output of a default run. A user who wants a database supplies a
+        # config file of their own.
+        cat > "$RUNNER_TEMP/ghchronicle.yaml" <<YAML
+        github:
+          token: \${GITHUB_TOKEN}
+        targets:
+          user: ${USER_LOGIN}
+          include_private: true
+        sinks: {}
+        state_file: ${RUNNER_TEMP}/ghchronicle-state.json
+        YAML
+        echo "GHC_CONFIG=$RUNNER_TEMP/ghchronicle.yaml" >> "$GITHUB_ENV"
+
+    - name: Use the given configuration
+      if: inputs.config != ''
+      shell: bash
+      run: echo "GHC_CONFIG=${{ inputs.config }}" >> "$GITHUB_ENV"
+
+    - name: Run
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.token }}
+        MODE: ${{ inputs.mode }}
+        SINCE: ${{ inputs.backfill-since }}
+        CARD: ${{ inputs.card }}
+        LAYOUT: ${{ inputs.card-layout }}
+        THEME: ${{ inputs.card-theme }}
+        FIELDS: ${{ inputs.card-fields }}
+      run: |
+        set -euo pipefail
+        args=(-config "$GHC_CONFIG")
+        case "$MODE" in
+          once) args+=(-once) ;;
+          backfill) args+=(-backfill); [ -n "$SINCE" ] && args+=(-backfill-since "$SINCE") ;;
+          card) ;;
+          *) echo "mode must be once, backfill or card, got '$MODE'" >&2; exit 2 ;;
+        esac
+        if [ -n "$CARD" ]; then
+          args+=(-card "$CARD" -card-layout "$LAYOUT" -card-theme "$THEME")
+          [ -n "$FIELDS" ] && args+=(-card-fields "$FIELDS")
+          [ "$MODE" = card ] && args+=(-card-only)
+        elif [ "$MODE" = card ]; then
+          echo "mode card needs a card path" >&2; exit 2
+        fi
+        ghchronicle "${args[@]}"

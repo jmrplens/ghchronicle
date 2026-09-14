@@ -1,0 +1,82 @@
+# Every datasource the five dashboards need, provisioned at boot.
+#
+# The uids are fixed rather than generated because /api/ds/query addresses a
+# datasource by uid, and cmd/check_dashboards takes one on the command line.
+# The harness exports these same strings, so a test never parses this file.
+#
+# Every address here is a service name on the compose network, not one of the
+# published loopback ports: this is Grafana reaching its neighbours, not the
+# host reaching Grafana.
+apiVersion: 1
+
+datasources:
+  # InfluxDB 3 speaks SQL, which is what the InfluxDB dashboard's panels are
+  # written in, so the datasource is in SQL mode rather than InfluxQL or Flux.
+  # The server runs --without-auth and ignores the token, but Grafana insists
+  # on having one.
+  - name: e2e-influxdb
+    uid: e2e-influxdb
+    type: influxdb
+    access: proxy
+    url: http://influxdb:8181
+    jsonData:
+      version: SQL
+      dbName: ghchronicle
+      httpMode: POST
+      insecureGrpc: true
+    secureJsonData:
+      token: e2e
+
+  - name: e2e-postgres
+    uid: e2e-postgres
+    type: grafana-postgresql-datasource
+    access: proxy
+    url: postgres:5432
+    user: ghchronicle
+    jsonData:
+      database: ghchronicle
+      sslmode: disable
+      postgresVersion: 1800
+      timescaledb: false
+    secureJsonData:
+      password: ghchronicle
+
+  # The sink writes no mapping, so the dashboards aggregate on the .keyword
+  # sub-fields dynamic mapping produces. Whether that actually works is the
+  # question two audits have recorded as unverifiable, and this datasource is
+  # what lets a test answer it.
+  - name: e2e-elasticsearch
+    uid: e2e-elasticsearch
+    type: elasticsearch
+    access: proxy
+    url: http://elasticsearch:9200
+    database: ghchronicle-*
+    jsonData:
+      index: ghchronicle-*
+      timeField: "@timestamp"
+      maxConcurrentShardRequests: 5
+
+  # Port 80 is nginx in front of the render API, which is the one the
+  # dashboards query; carbon's plaintext receiver is a different port.
+  - name: e2e-graphite
+    uid: e2e-graphite
+    type: graphite
+    access: proxy
+    url: http://graphite:80
+    jsonData:
+      graphiteVersion: "1.1"
+
+  - name: e2e-prometheus
+    uid: e2e-prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    jsonData:
+      httpMethod: POST
+      timeInterval: 5s
+
+  - name: e2e-loki
+    uid: e2e-loki
+    type: loki
+    access: proxy
+    url: http://loki:3100

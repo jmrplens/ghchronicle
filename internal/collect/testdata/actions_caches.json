@@ -1,0 +1,13 @@
+{
+  "total_count": 2,
+  "actions_caches": [
+    {"id": 1, "ref": "refs/heads/main",
+     "key": "node-cache-Linux-x64-pnpm-95070cf0a7bb1e24893222dad3a0f17146df6b709443a20a85e19daccfb434c0",
+     "size_in_bytes": 344766379,
+     "created_at": "2026-09-05T12:13:43Z", "last_accessed_at": "2026-09-07T12:00:00Z"},
+    {"id": 2, "ref": "refs/pull/495/merge",
+     "key": "cache-lychee-source-826f92781d79adf96fb819ce652d809241ddaa44",
+     "size_in_bytes": 1590,
+     "created_at": "2026-09-07T21:41:42Z", "last_accessed_at": "2026-09-07T21:41:42Z"}
+  ]
+}

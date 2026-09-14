@@ -1,0 +1,136 @@
+# The containerized end-to-end suite: one sweep from the fake GitHub into the
+# real stores, read back point by point, then the five dashboards' own queries
+# run through Grafana's /api/ds/query.
+#
+# What it buys, and why it is not in CI. `make test` already runs test/e2e,
+# which points every sink at a capture server and asserts the exact bytes. A
+# capture server accepts anything: it answers 204 to a write InfluxDB 3 would
+# refuse for a column that was a tag last time, it has no dynamic mapping to
+# decide whether Elasticsearch can aggregate a url at all, it plans no SQL, and
+# it has no opinion on how deep a Graphite path is. Those four gaps are the
+# whole subject of this workflow, and none of them can be checked without
+# starting the store. Nine containers and around 10 GB of image are too much to
+# put on every pull request, so this runs on its own.
+#
+# Duration: a few minutes, nearly all of it pulling images. Measured on the
+# development machine with the images already local, the stack is ready in 30 s
+# (Elasticsearch is the slowest at 29 s) and `make test-e2e-docker` end to end,
+# teardown included, is 53 s.
+#
+# Three ways in. Manually, from the "Use workflow from" dropdown, optionally
+# with a custom ref such as a fork pull request's merge SHA. As a reusable
+# workflow, which is how a release pipeline gates a tag on it: one `uses:` line
+# rather than a copy of this job that drifts from the original the first time
+# the harness is fixed in one of the two. And once a week on main, because
+# nothing else in this repository ever starts a container: without the schedule
+# the suite would only ever run when somebody remembered it. That is not a
+# hypothetical. In the project this file is modeled on
+# (jmrplens/gitlab-mcp-server) the first release rehearsal found three tests
+# that had been broken on main for weeks, one of them green against a copy of
+# the server it was meant to test, because nothing ran the suite between
+# releases. The weekly run is not a required check; it is the one place the
+# suite meets real stores while nobody is tagging.
+#
+# One thing this workflow gets for free. The Prometheus exporter is the single
+# sink that is scraped rather than pushed to, so the scrape has to cross from
+# the container back out to the host. A machine that firewalls its docker
+# bridge (ufw, default-deny INPUT) needs one narrow rule for that, which
+# docs/testing.md spells out; without it the harness reports
+# ErrExporterUnreachable and the Prometheus assertions skip with a reason. A
+# GitHub runner does not firewall the bridge, so they always execute here.
+
+name: E2E (real stores)
+
+on:
+  schedule:
+    # Mondays, 04:41 UTC: off the hour, because GitHub delays runs that pile up
+    # on round times, and before the week's first pushes.
+    - cron: "41 4 * * 1"
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Git ref to check out (branch, tag, or a fork pull request's merge SHA)"
+        default: ""
+        type: string
+  workflow_call:
+    inputs:
+      ref:
+        description: "Git ref to check out; empty means the calling workflow's ref"
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+
+# Serialized per ref rather than raced. cancel-in-progress stays false on
+# purpose: a run killed between `up` and the teardown leaves nine containers
+# behind, which costs nothing on an ephemeral runner and is a mess on a
+# self-hosted one, and there is nothing to gain by getting the second answer
+# sooner.
+concurrency:
+  group: e2e-${{ github.workflow }}-${{ inputs.ref || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  e2e:
+    name: E2E (Docker stores)
+    runs-on: ubuntu-latest
+    # Generous against the image pull, which is the part that varies: the suite
+    # itself has a 30m bound of its own inside the Makefile target.
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0
+        with:
+          # Track the toolchain declared in go.mod so this file never drifts
+          # from the module it builds.
+          go-version-file: go.mod
+          cache: true
+
+      # One command, the same one a developer runs, rather than a compose
+      # invocation restated here: the project name, the compose file, the build
+      # tag and the timeout all live in the Makefile, and a copy of them in this
+      # file would be a second place to keep them right. The target brings the
+      # stack up, runs the tagged package, tears the stack down on every path
+      # including a failing assertion, and then asserts that `docker ps` shows
+      # nothing of the project left. Compose pulls the pinned images as part of
+      # `up`, which is why there is no pull step above.
+      - name: Run the containerized suite
+        run: make test-e2e-docker
+
+      # A failure while the stack is coming up is the one that leaves nothing
+      # in the job log: make stops before its teardown, so the containers are
+      # still there and their own logs are the only account of what happened.
+      # A failed assertion is the other case, and there the target has already
+      # torn the stack down and `go test -v` has already said everything in the
+      # step above, so this file is empty and the upload below is skipped.
+      - name: Collect the stores' logs
+        if: failure()
+        run: |
+          make e2e-docker-logs > e2e-docker-logs.txt 2>&1 || true
+          if [ ! -s e2e-docker-logs.txt ]; then
+            echo "Nothing of the stack was still running; the failure is in the step above." > e2e-docker-logs.txt
+          fi
+
+      - name: Upload the stores' logs
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: e2e-docker-logs
+          path: e2e-docker-logs.txt
+          retention-days: 14
+
+      # The Makefile target already tears down on every path it controls. This
+      # covers the one it does not: a job cancelled or timed out mid-run kills
+      # make between `up` and `down`, and on a self-hosted runner that would
+      # leave the containers and their volumes behind.
+      - name: Make sure nothing is left running
+        if: always()
+        run: make e2e-docker-down

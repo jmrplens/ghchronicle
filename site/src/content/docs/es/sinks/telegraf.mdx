@@ -1,0 +1,85 @@
+---
+title: Telegraf
+description: Line protocol enviado a http_listener_v2, y la razón de que esto sea un destino en vez de cien.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+```yaml
+sinks:
+  telegraf:
+    url: http://telegraf:8186/telegraf
+    username: ""
+    password: ""
+    batch: 5000
+```
+
+Line protocol enviado a la entrada `http_listener_v2` de Telegraf, como
+`text/plain`, con autenticación básica cuando hay un usuario puesto.
+
+<Aside type="note" title="Una URL sin ruta recibe /telegraf">
+  El listener responde 404 a `/` sin decir por qué, así que a una URL con ruta
+  vacía se le pone la ruta por omisión de la entrada en vez de mandarla a un
+  sitio que fallará en silencio.
+</Aside>
+
+## La entrada correspondiente
+
+```toml
+[[inputs.http_listener_v2]]
+  service_address = ":8186"
+  paths = ["/telegraf"]
+  data_format = "influx"
+```
+
+## Por qué existe como un solo destino
+
+Telegraf tiene una salida para Kafka, Datadog, New Relic, Graphite, Loki,
+Elasticsearch, Wavefront, Azure Monitor, Google Cloud Monitoring y otras cien.
+En vez de hacer crecer aquí un destino por cada una, los puntos van a Telegraf
+como el line protocol que ya habla, y sus propios bloques `[[outputs.*]]` los
+encaminan.
+
+Ese es todo el argumento. Es un destino que alcanza todo lo que alcanza
+Telegraf, y no le cuesta a este proyecto ninguna dependencia nueva ni ningún
+formato de cable nuevo.
+
+## Qué pasa con las fechas
+
+Telegraf conserva las marcas de tiempo tal como se las dan, así que la historia
+fechada sobrevive hasta donde permita cada salida. Una salida que sella al
+recibir, o una que rechaza muestras viejas, la pierde, exactamente igual que
+harían esos backends si esta herramienta les escribiera directamente.
+
+Así que la pregunta no es "¿conserva Telegraf la historia?" sino "¿la conserva
+la salida que he configurado?". Kafka e InfluxDB sí. Un remote write de
+Prometheus no.
+
+## Un ejemplo que reparte
+
+```toml
+[[inputs.http_listener_v2]]
+  service_address = ":8186"
+  paths = ["/telegraf"]
+  data_format = "influx"
+
+[[outputs.influxdb_v2]]
+  urls = ["http://influxdb:8181"]
+  token = "$INFLUX_TOKEN"
+  organization = "default"
+  bucket = "github"
+
+[[outputs.kafka]]
+  brokers = ["kafka:9092"]
+  topic = "github-metrics"
+```
+
+Una pasada, dos destinos, y el colector no sabe de ninguno de los dos.
+
+## Por dónde seguir
+
+- [Elegir almacén](/ghchronicle/es/sinks/) compara Telegraf con los otros nueve, y
+  lleva el registro de escrituras que todos comparten.
+- [Los dashboards](/ghchronicle/es/dashboards/) dice cuál de los cinco se dibuja
+  contra cada almacén, y en qué se convierte un panel que un almacén no puede
+  responder.

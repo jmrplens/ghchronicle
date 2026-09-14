@@ -1,0 +1,225 @@
+{
+  "data": {
+    "r0": {
+      "nameWithOwner": "jmrplens/jmrp.io",
+      "f0": {
+        "byteSize": 917,
+        "isTruncated": false,
+        "text": "version: 2\nupdates:\n  - package-ecosystem: \"npm\"\n    directory: \"/\"\n    schedule:\n      interval: \"weekly\"\n    open-pull-requests-limit: 10\n    ignore:\n      # TypeScript stays on 6.x until Astro supports 7. TS 7 dropped the\n      # programmatic API `astro check` builds on, so a major bump turns the\n      # type-check job red on arrival and there is nothing to fix on our side.\n      # Minor and patch releases still come through. Drop this entry once\n      # Astro ships TS 7 support.\n      - dependency-name: \"typescript\"\n        update-types: [\"version-update:semver-major\"]\n    # Optional: Groups updates to reduce noise\n    groups:\n      astro-ecosystem:\n        patterns:\n          - \"astro\"\n          - \"@astrojs/*\"\n      icons:\n        patterns:\n          - \"@iconify-json/*\"\n\n  - package-ecosystem: \"github-actions\"\n    directory: \"/\"\n    schedule:\n      interval: \"weekly\"\n    open-pull-requests-limit: 5\n"
+      },
+      "f1": {
+        "byteSize": 55,
+        "isTruncated": false,
+        "text": "# Default owner for everything in the repo\n* @jmrplens\n"
+      },
+      "f2": null,
+      "f3": {
+        "byteSize": 1345,
+        "isTruncated": false
+      },
+      "f4": {
+        "byteSize": 286,
+        "isTruncated": false
+      },
+      "defaultBranchRef": {
+        "target": {
+          "h0": {
+            "totalCount": 2,
+            "nodes": [
+              {
+                "committedDate": "2026-08-28T21:58:24Z"
+              }
+            ]
+          },
+          "h1": {
+            "totalCount": 1,
+            "nodes": [
+              {
+                "committedDate": "2026-02-16T23:44:04Z"
+              }
+            ]
+          },
+          "h2": {
+            "totalCount": 0,
+            "nodes": []
+          },
+          "h3": {
+            "totalCount": 1,
+            "nodes": [
+              {
+                "committedDate": "2026-02-16T23:44:04Z"
+              }
+            ]
+          },
+          "h4": {
+            "totalCount": 1,
+            "nodes": [
+              {
+                "committedDate": "2026-08-29T12:28:21Z"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "r1": {
+      "nameWithOwner": "jmrplens/Cloudflare-DNS-Updater",
+      "f0": null,
+      "f1": {
+        "byteSize": 12,
+        "isTruncated": false,
+        "text": "* @jmrplens\n"
+      },
+      "f2": null,
+      "f3": {
+        "byteSize": 1653,
+        "isTruncated": false
+      },
+      "f4": {
+        "byteSize": 73,
+        "isTruncated": false
+      },
+      "defaultBranchRef": {
+        "target": {
+          "h0": {
+            "totalCount": 2,
+            "nodes": [
+              {
+                "committedDate": "2025-12-29T11:47:20Z"
+              }
+            ]
+          },
+          "h1": {
+            "totalCount": 2,
+            "nodes": [
+              {
+                "committedDate": "2025-12-29T11:47:20Z"
+              }
+            ]
+          },
+          "h2": {
+            "totalCount": 0,
+            "nodes": []
+          },
+          "h3": {
+            "totalCount": 1,
+            "nodes": [
+              {
+                "committedDate": "2026-07-07T06:57:21Z"
+              }
+            ]
+          },
+          "h4": {
+            "totalCount": 5,
+            "nodes": [
+              {
+                "committedDate": "2026-06-28T14:06:42Z"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "r2": {
+      "nameWithOwner": "jmrplens/mcp.jmrp.io",
+      "f0": null,
+      "f1": null,
+      "f2": null,
+      "f3": null,
+      "f4": {
+        "byteSize": 277,
+        "isTruncated": false
+      },
+      "defaultBranchRef": {
+        "target": {
+          "h0": {
+            "totalCount": 0,
+            "nodes": []
+          },
+          "h1": {
+            "totalCount": 0,
+            "nodes": []
+          },
+          "h2": {
+            "totalCount": 0,
+            "nodes": []
+          },
+          "h3": {
+            "totalCount": 0,
+            "nodes": []
+          },
+          "h4": {
+            "totalCount": 1,
+            "nodes": [
+              {
+                "committedDate": "2026-08-29T15:05:44Z"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "r3": {
+      "nameWithOwner": "jmrplens/gitlab-mcp-server",
+      "f0": {
+        "byteSize": 3781,
+        "isTruncated": false,
+        "text": "# Dependabot configuration \u2014 gitlab-mcp-server\n# Docs: https://docs.github.com/en/code-security/reference/supply-chain-security/dependabot-options-reference\n#\n# Every ecosystem states its own cooldown. GitHub has applied a three-day\n# default since July 2026, but a default is a property of the platform, not of\n# this repository: it can be changed, and an absent key would then mean\n# something different without anything here changing. A week is long enough for\n# a compromised release to be yanked (the September 2025 npm maintainer\n# phishing that hit `debug`, `chalk` and 16 other packages was caught in\n# hours), and security updates ignore cooldown entirely, so this delays\n# convenience, not fixes.\n#\n# Two deliberate omissions:\n#   * docker-compose carries no cooldown \u2014 its images are :latest test fixtures\n#     that generate no pull request. SemVer sub-keys are also left off the\n#     docker entries: Dependabot scopes them to SemVer-aware managers and\n#     rejects the whole configuration otherwise, which would stop that\n#     ecosystem's updates completely.\n#   * npm/gitlab-mcp-server, the published launcher, has no entry on purpose.\n#     Its only dependencies are the per-platform packages, pinned to the exact\n#     release version by scripts/update-server-json-sha.sh; a Dependabot bump\n#     there would fight the release stamp and desynchronise the launcher from\n#     the binaries it resolves.\n\nversion: 2\n\nupdates:\n  # Go modules (root go.mod)\n  - package-ecosystem: \"gomod\"\n    directory: \"/\"\n    schedule:\n      interval: \"weekly\"\n      day: \"monday\"\n      timezone: \"Europe/Madrid\"\n    cooldown:\n      default-days: 7\n      semver-minor-days: 14\n      semver-major-days: 30\n    commit-message:\n      prefix: \"chore\"\n      include: \"scope\"\n    labels:\n      - \"dependencies\"\n      - \"go\"\n    groups:\n      go-minor-patch:\n        applies-to: version-updates\n        update-types:\n          - \"minor\"\n          - \"patch\"\n    open-pull-requests-limit: 10\n\n  # pnpm / Astro docs site (site/package.json)\n  - package-ecosystem: \"npm\"\n    directory: \"/site\"\n    schedule:\n      interval: \"weekly\"\n      day: \"monday\"\n      timezone: \"Europe/Madrid\"\n    cooldown:\n      default-days: 7\n      semver-minor-days: 14\n      semver-major-days: 30\n    commit-message:\n      prefix: \"chore\"\n      include: \"scope\"\n    labels:\n      - \"dependencies\"\n      - \"javascript\"\n    groups:\n      npm-minor-patch:\n        applies-to: version-updates\n        update-types:\n          - \"minor\"\n          - \"patch\"\n    open-pull-requests-limit: 5\n\n  # GitHub Actions workflows\n  - package-ecosystem: \"github-actions\"\n    directory: \"/\"\n    schedule:\n      interval: \"weekly\"\n      day: \"monday\"\n      timezone: \"Europe/Madrid\"\n    # No SemVer sub-keys: an action pin is a commit SHA with a version comment,\n    # and the cooldown that matters is the flat one before a hijacked tag is\n    # adopted.\n    cooldown:\n      default-days: 7\n    commit-message:\n      prefix: \"chore\"\n      include: \"scope\"\n    labels:\n      - \"dependencies\"\n      - \"github-actions\"\n    groups:\n      actions-all:\n        applies-to: version-updates\n        patterns:\n          - \"*\"\n\n  # Docker (root Dockerfile)\n  - package-ecosystem: \"docker\"\n    directory: \"/\"\n    schedule:\n      interval: \"weekly\"\n      day: \"monday\"\n      timezone: \"Europe/Madrid\"\n    cooldown:\n      default-days: 7\n    commit-message:\n      prefix: \"chore\"\n      include: \"scope\"\n    labels:\n      - \"dependencies\"\n      - \"docker\"\n\n  # Docker Compose\n  - package-ecosystem: \"docker-compose\"\n    directory: \"/\"\n    schedule:\n      interval: \"weekly\"\n      day: \"monday\"\n      timezone: \"Europe/Madrid\"\n    commit-message:\n      prefix: \"chore\"\n      include: \"scope\"\n    labels:\n      - \"dependencies\"\n      - \"docker\"\n"
+      },
+      "f1": null,
+      "f2": {
+        "byteSize": 908,
+        "isTruncated": false,
+        "text": "# CODEOWNERS \u2014 gitlab-mcp-server\n#\n# GitHub uses this file to automatically request reviews from code owners.\n# Each line maps a file pattern to one or more owners. The last matching\n# pattern takes precedence.\n#\n# Docs: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners\n\n# Default owner for everything\n* @jmrplens\n\n# Go source code\n*.go @jmrplens\ngo.mod @jmrplens\ngo.sum @jmrplens\n\n# Build\nMakefile @jmrplens\nscripts/ @jmrplens\n\n# Documentation\ndocs/ @jmrplens\nREADME.md @jmrplens\nCONTRIBUTING.md @jmrplens\n\n# MCP tool implementations\ninternal/tools/ @jmrplens\ninternal/resources/ @jmrplens\ninternal/prompts/ @jmrplens\n\n# MCP capabilities\ninternal/completions/ @jmrplens\ninternal/progress/ @jmrplens\ninternal/elicitation/ @jmrplens\n\n# Configuration and GitLab client\ninternal/config/ @jmrplens\ninternal/gitlab/ @jmrplens\n"
+      },
+      "f3": {
+        "byteSize": 17754,
+        "isTruncated": false
+      },
+      "f4": {
+        "byteSize": 19,
+        "isTruncated": false
+      },
+      "defaultBranchRef": {
+        "target": {
+          "h0": {
+            "totalCount": 2,
+            "nodes": [
+              {
+                "committedDate": "2026-09-03T06:14:02Z"
+              }
+            ]
+          },
+          "h1": {
+            "totalCount": 0,
+            "nodes": []
+          },
+          "h2": {
+            "totalCount": 2,
+            "nodes": [
+              {
+                "committedDate": "2026-06-24T13:27:29Z"
+              }
+            ]
+          },
+          "h3": {
+            "totalCount": 10,
+            "nodes": [
+              {
+                "committedDate": "2026-09-09T07:17:41Z"
+              }
+            ]
+          },
+          "h4": {
+            "totalCount": 1,
+            "nodes": [
+              {
+                "committedDate": "2026-04-21T08:54:26Z"
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}

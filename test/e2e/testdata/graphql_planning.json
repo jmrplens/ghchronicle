@@ -1,0 +1,36 @@
+{
+  "data": {
+    "repository": {
+      "labels": {
+        "nodes": [
+          {"name": "bug", "color": "d73a4a", "issues": {"totalCount": 5}, "pullRequests": {"totalCount": 2}},
+          {"name": "wontfix", "color": "ffffff", "issues": {"totalCount": 0}, "pullRequests": {"totalCount": 0}}
+        ]
+      },
+      "milestones": {
+        "nodes": [
+          {
+            "title": "v2.0",
+            "state": "OPEN",
+            "createdAt": "2026-06-01T00:00:00Z",
+            "dueOn": "2026-12-31T00:00:00Z",
+            "closedAt": null,
+            "progressPercentage": 37.5,
+            "issues": {"totalCount": 8},
+            "pullRequests": {"totalCount": 3}
+          },
+          {
+            "title": "v1.2",
+            "state": "CLOSED",
+            "createdAt": "2026-03-01T00:00:00Z",
+            "dueOn": "2026-08-01T00:00:00Z",
+            "closedAt": "2026-08-10T09:30:00Z",
+            "progressPercentage": 100,
+            "issues": {"totalCount": 12},
+            "pullRequests": {"totalCount": 6}
+          }
+        ]
+      }
+    }
+  }
+}

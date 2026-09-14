@@ -1,0 +1,299 @@
+---
+title: Las capas de prueba
+description: "Tres capas, y solo la primera es gratis: el contrato de los bytes, los almacenes reales en contenedores y las consultas propias de los dashboards."
+---
+
+import { Aside, Steps } from "@astrojs/starlight/components";
+
+Las pruebas están en tres capas, y conviene distinguirlas porque solo la
+primera es gratis. Dos de ellas levantan nueve contenedores, y quien decide si
+espera merece saber qué compra con esa espera.
+
+| Capa               | Orden                  | Docker | Tiempo           | Qué demuestra                                                                                   |
+| ------------------ | ---------------------- | ------ | ---------------- | ----------------------------------------------------------------------------------------------- |
+| L1, el contrato    | `make test`            | no     | unos 5 s         | los bytes exactos que cada destino pone en el cable                                             |
+| L2, los almacenes  | `make test-e2e-docker` | sí     | 53 s en caliente | que un almacén real acepta esos bytes y conserva la fecha del hecho                             |
+| L3, los dashboards | el mismo objetivo      | sí     | incluido arriba  | que las consultas propias de los cinco dashboards responden contra lo que escribieron los destinos |
+
+L1 corre en cada push. L2 y L3 son una sola suite tras la etiqueta de
+compilación `dockere2e`, así que `go test ./...` no levanta ningún contenedor;
+en CI corren semanalmente, a demanda y como puerta de publicación.
+
+## L1: los bytes en el cable
+
+`test/e2e` compila el binario real, lo ejecuta contra un GitHub falso cuyas
+fixtures están en `test/e2e/testdata` y cuya tabla de rutas es `test/e2e/fakegh`,
+y apunta cada destino a un servidor de captura `httptest`. Después comprueba los
+bytes: el line protocol, el sobre `_bulk`, las sentencias SQL, la ruta de
+Graphite, la carga OTLP.
+
+El falso además cobra sus respuestas como lo hace api.github.com: un ETag por
+fixture REST y ninguno en las respuestas GraphQL, un 304 sin coste para la
+petición que lo presenta, uno por cada otra respuesta de la API, nada por el
+almacenamiento de objetos al que redirige un log de job, y el bloque de
+presupuesto en cada respuesta GraphQL. Eso es lo que permite que
+`TestTheSecondSweepIsPricedByTheCache` ejecute dos pasadas en un mismo proceso
+y sostenga que cada URL respondida 200
+la primera vez volvió 304 la segunda, que la segunda pasada cobró menos de la
+mitad de las peticiones core de la primera, y que `own_cost` en la fila
+`gh_rate_limit` es el número de consultas que hizo el proceso y no cero.
+
+Esa es la prueba correcta para un formato, y es lo bastante rápida para correr
+mientras se toca un destino. Lo que no puede detectar es nada sobre lo que el
+receptor tenga una opinión. Un servidor de captura responde 204 a todo. No
+tiene tipos de columna, ni mapping, ni planificador de consultas, ni esquema.
+
+## L2: los almacenes de verdad
+
+`test/e2e/docker` levanta los almacenes reales en contenedores, ejecuta una
+pasada desde el mismo GitHub falso hacia todos ellos y luego relee cada almacén
+y comprueba el valor, las etiquetas y sobre todo la marca de tiempo.
+
+La regla de fechado es el producto de esta herramienta: una estrella se fecha
+cuando se dio, una ejecución de workflow cuando terminó, un día de tráfico en
+la fecha de ese día. Ninguna prueba de captura puede demostrar que el almacén
+guardó la fecha del hecho y no la de la pasada, porque guardarla es trabajo del
+almacén.
+
+Estos son los defectos por los que existe esta capa, todos reales:
+
+**InfluxDB fija el tipo de una columna la primera vez que la ve.** InfluxDB 3
+decide si una columna es etiqueta o campo en cuanto la ve y rechaza toda
+escritura posterior que no coincida: `400 invalid column type for column
+'owner', expected iox::column_type::tag`. Un servidor de captura responde 204 y
+no se entera. Esto ya costó borrar una base de datos, y reproducirlo fue lo
+primero que se hizo con el stack en contenedores.
+
+**El mapping dinámico de Elasticsearch decide si los dashboards pueden agregar.**
+Un panel saca una url con un `top_metrics`, que normalmente necesita un campo
+keyword y no uno de texto. Dos auditorías distintas lo anotaron como no
+verificable por falta de un Elasticsearch real. Esta capa lo responde:
+indexando por `_bulk` y releyendo el mapping que el clúster se construyó solo.
+
+**PostgreSQL tiene que aceptar el DDL.** El destino SQL emite sentencias en
+lugar de hablar el protocolo, así que hasta ahora nadie las había parseado
+nunca. La suite las pasa por `psql`, inserta y planifica las consultas de los
+paneles contra el esquema que creó el destino, y no contra uno transcrito de
+InfluxDB.
+
+**Las rutas de Graphite deben tener la profundidad que indexan los dashboards.**
+Los dashboards direccionan los nodos de la ruta por posición, y el acuerdo entre
+esas posiciones y lo que escribe el destino lo mantenía una tabla a mano que no
+comprobaba nadie. Aquí el destino escribe a carbon y se le pide la ruta de
+vuelta a la API de render.
+
+## L3: las consultas propias de los dashboards
+
+Con los almacenes ya cargados, los cinco dashboards generados se ejecutan por
+`/api/ds/query` de Grafana, que es el camino que toma `cmd/check_dashboards`
+contra un Grafana vivo. Cada datasource se provisiona al arrancar con un uid
+fijo y el arnés emite un token de cuenta de servicio, así que la consulta de un
+panel pasa por Grafana igual que para una persona que mira el dashboard.
+
+Eso es lo que convierte tres comprobadores manuales en algo que la CI ejecuta, y
+lo que zanja la duda de Elasticsearch de arriba: un panel que no puede agregar
+no devuelve ningún data frame.
+
+## Lo que no detecta ninguna
+
+Todas las capas corren contra el GitHub falso, así que aquí nadie se entera de
+que GitHub cambie una carga, retire un endpoint o limite de otra manera. Para
+eso está `ghchronicle -once` contra un token real.
+
+Tampoco demuestran nada sobre un almacén que la suite no levanta. La respuesta
+cubre InfluxDB 3 Core, PostgreSQL 18, Elasticsearch 9, Graphite 1.1,
+Prometheus 3, Loki 3, el colector de OpenTelemetry y Telegraf, en las versiones
+fijadas. OpenSearch, TimescaleDB y todo lo que quede detrás del salto de
+Telegraf o de OTLP siguen siendo una inferencia a partir del formato.
+
+Hay cuatro cosas más, y ninguna es una capa. Cada una se enciende con una
+variable de entorno y se salta cuando no está, así que un `go test ./...`
+corriente sigue sin red.
+
+**El almacén que tú ejecutas.** `test/live` envía por push un puñado de puntos a
+un Loki o a un colector de OpenTelemetry nombrados en `GHC_LIVE_LOKI` o
+`GHC_LIVE_OTLP`. Responde a la única pregunta que los contenedores no pueden: si
+tu instancia los acepta.
+
+```sh
+GHC_LIVE_LOKI=http://localhost:3100 go test ./test/live/
+```
+
+**La API real, de extremo a extremo.** `GHC_E2E_LIVE=1` corre `TestLiveAPI`
+contra GitHub en vez de contra el falso, con un `GITHUB_TOKEN` de verdad, y hace
+la pasada sobre la cuenta que nombra `GHC_E2E_USER`.
+
+```sh
+GHC_E2E_LIVE=1 GHC_E2E_USER=octocat GITHUB_TOKEN=ghp_... go test ./test/e2e/ -run TestLiveAPI
+```
+
+**Lo que cuesta una pasada en caché.** `GHC_LIVE_CONFIG` apunta
+`TestLiveSweepCacheFootprint` a un fichero de configuración y hace la pasada
+sobre la cuenta que nombra, informando de las entradas y los bytes que guarda la
+caché de peticiones condicionales tras cada pasada. Esas son las cifras sobre
+las que descansan la cota de 256 MB y el
+[coste de una pasada](/ghchronicle/es/api/cost/), y así es como se reproducen
+para tu propia cuenta. `GHC_LIVE_DUMP=1` añade la lista por url a la salida
+estándar.
+
+```sh
+GHC_LIVE_CONFIG=config.yaml go test ./internal/ghapi/ -run TestLiveSweepCacheFootprint -v
+```
+
+**Un repositorio, una familia.** `cmd/probe` corre los colectores contra un solo
+repositorio e imprime la línea que escribirían, sin escribir nada en ningún
+sitio. `GHC_DUMP=<familia>` imprime entero cada punto de esa familia, que es la
+forma más rápida de ver lo que produce de verdad un colector.
+
+```sh
+go run ./cmd/probe owner/name
+GHC_DUMP=actions go run ./cmd/probe owner/name
+```
+
+## Levantar el stack
+
+Docker con el plugin de compose, y sitio para las imágenes. Luego:
+
+```sh
+make test-e2e-docker
+```
+
+Arriba, ejecutar, abajo por todos los caminos incluido el de una comprobación
+fallida, y después una verificación de que `docker ps` no deja nada del
+proyecto. Una suite que deja nueve contenedores tras un fallo es una suite que
+nadie ejecuta dos veces.
+
+<Aside type="tip" title="Nada de esto escucha fuera de loopback">
+  Cada puerto se publica en `127.0.0.1`, en un puerto libre que Docker elige
+  entre 49200 y 49299, nunca el puerto por defecto del almacén: 9200, 8086,
+  5432, 2003, 9090, 3100, 3000 y 4318 son de lo que ya haya en la máquina. El
+  arnés relee los puertos elegidos con `docker compose port`, y el proyecto se
+  llama `ghchronicle-e2e` tanto en el fichero de compose como en cada orden,
+  así que nada de aquí puede tocar un contenedor que no arrancó.
+</Aside>
+
+Arranque, medido en frío con las imágenes ya descargadas: Elasticsearch 29 s,
+Loki 21 s, Grafana 13 s, la API de render de Graphite 10 s, InfluxDB 8 s,
+PostgreSQL 6 s, el resto 6 s. El stack está listo en 30 s; el objetivo de
+principio a fin, con el desmontaje incluido, son 53 s.
+
+## Depurar con el stack en pie
+
+El motivo para fallar una comprobación es ir a mirar el almacén, y un almacén
+que ya se ha desmontado no se puede mirar. Por eso las dos mitades son
+objetivos separados, y el arnés reutiliza un stack que encuentra ya levantado y
+lo deja levantado.
+
+<Steps>
+
+1. Levanta los almacenes y déjalos en pie. La orden imprime el puerto en el
+    que acabó cada servicio.
+
+    ```sh
+    make e2e-docker-up
+    ```
+
+2. Ejecuta la suite, o una sola prueba de ella, tantas veces como haga falta.
+
+    ```sh
+    go test -count=1 -tags dockere2e -timeout 30m -v ./test/e2e/docker/
+    ```
+
+    `GHCHRONICLE_E2E_KEEP=1` además impide que el binario de pruebas desmonte un
+    stack que levantó él mismo, que es lo que quieres cuando falla un único
+    `-run`.
+
+3. Pregúntale al almacén qué piensa y luego desmóntalo.
+
+    ```sh
+    make e2e-docker-logs SERVICE=influxdb
+    make e2e-docker-down
+    ```
+
+</Steps>
+
+Con los puertos del paso 1:
+
+```sh
+# Qué cree InfluxDB que es cada columna. Esta es la respuesta a un 400 al escribir.
+curl -s "http://127.0.0.1:<influx>/api/v3/query_sql?db=ghchronicle" \
+  --data-urlencode "q=SELECT * FROM information_schema.columns WHERE table_name = 'gh_repo'"
+
+# El mapping que Elasticsearch se construyó solo.
+curl -s "http://127.0.0.1:<es>/ghchronicle-*/_mapping?pretty"
+
+# Lo que el destino SQL creó de verdad.
+psql "postgres://ghchronicle:ghchronicle@127.0.0.1:<pg>/ghchronicle" -c '\d+ gh_repo'
+
+# La ruta de Graphite, nodo a nodo.
+curl -s "http://127.0.0.1:<graphite>/metrics/find?query=github.repo.*"
+```
+
+Grafana está en el puerto que publicó, con `admin` y `admin`, y todos los
+datasources vienen provisionados, así que la consulta de un panel se puede
+pegar en Explore y ejecutar a mano.
+
+## Tres cosas que hubo que decirle al stack
+
+Cada una de estas produjo en silencio una respuesta equivocada antes de que se
+encontrara, y cada una está en el fichero de compose o en su configuración con
+la medición al lado:
+
+- **Carbon descarta sin avisar un punto más antiguo que su archivo más largo.**
+  Una estrella fechada en 2020 desapareció bajo una retención de seis años y la
+  escritura se dio por aceptada. Por eso la retención es `1d:12y`.
+- **El `MAX_CREATES_PER_MINUTE` por defecto de carbon es 50**, menos rutas de
+  las que crea una sola pasada, así que se perdería la mayor parte de la
+  primera.
+- **Loki responde 204 a un push y no lo sirve hasta que se vuelca el chunk.**
+  La prueba sondea en vez de preguntar una vez, y `chunk_idle_period` es 5 s.
+
+<Aside
+  type="caution"
+  title="Una máquina con cortafuegos necesita una regla para hacer scrape del exportador"
+>
+  El exportador de Prometheus es el único destino del que se hace scrape en
+  lugar de recibir envíos, así que el scrape tiene que salir del contenedor de
+  vuelta al anfitrión. Donde la política INPUT por defecto es denegar, ningún
+  contenedor de ningún puente alcanza ningún puerto del anfitrión. Basta con una
+  regla estrecha: permitir TCP 49300-49399, el rango que acotan `scrapePortLow`
+  y `scrapePortHigh` en `sweep_push_stores_test.go`, desde el espacio de
+  direcciones de los contenedores y desde nada más. Con ufw es
+
+  ```sh
+  ufw allow proto tcp from 172.16.0.0/12 to any port 49300:49399
+  ```
+
+  Sin ella el arnés lo informa como `ErrExporterUnreachable` y las
+  comprobaciones de Prometheus se saltan con un motivo en lugar de fallar, lo
+  que significa que nunca se han ejecutado en esa máquina. Un runner de CI no
+  necesita regla, y una máquina de trabajo normal tampoco.
+</Aside>
+
+Una máquina que añade la regla ejecuta esas comprobaciones por primera vez, que
+es cuando `promNeedsHistory` en `dashboards_test.go` empieza a importar: el
+exportador vive solo lo que dura el test, así que cada panel de series
+temporales y cada panel construido sobre `increase()` se comprueba contra nada,
+y solo se afirman los paneles instantáneos.
+
+## En CI
+
+`.github/workflows/e2e.yml` ejecuta `make test-e2e-docker` y tiene tres formas
+de entrar: lanzamiento manual con una ref opcional, una programación semanal
+sobre main y `workflow_call`, para que un pipeline de publicación condicione
+una etiqueta a él con una línea en vez de con una copia del trabajo que se
+desvía del original.
+
+No es una comprobación obligatoria en una pull request: nueve contenedores y
+unos 10 GB de imágenes son demasiado para cada push, y para eso está L1. La
+ejecución semanal es el sentido de la programación. Nada más en el repositorio
+levanta un contenedor, así que sin ella la suite solo correría cuando alguien
+se acordara, que es como una suite acaba rota durante semanas sin que nadie lo
+sepa.
+
+La misma suite corre también bajo el detector de carreras, en
+`.github/workflows/race.yml`: cada semana, en cada publicación junto a la
+puerta de E2E, y a mano. El arnés compila el colector con `-race` y lo arranca
+con `GORACE=halt_on_error=1`, así que una carrera dentro del colector hace
+fallar la prueba que lo lanzó, con el informe. En local es
+`make test-e2e-docker-race`.

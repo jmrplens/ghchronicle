@@ -1,0 +1,160 @@
+name: Deploy documentation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/docs.yml"
+      - "site/**"
+  workflow_dispatch:
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+# Workflow-wide: a read token and nothing else. The build job runs third-party
+# code (pnpm install, a headless Chromium fetched outside any lockfile), so the
+# Pages credential and the OIDC identity that mints it live on `deploy`, which
+# runs one pinned action and no code of its own.
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build docs
+    runs-on: ubuntu-latest
+    # The build, the gates that read it and pa11y's browser run are minutes
+    # between them. A hung browser must not hold a runner for the six-hour
+    # default.
+    timeout-minutes: 20
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+          # Starlight's `lastUpdated` and the sitemap's per-page `<lastmod>`
+          # both read git history per file. A shallow checkout has only the
+          # latest commit, so every page would carry the same date.
+          fetch-depth: 0
+
+      # pnpm/action-setup installs pnpm itself from the npm registry on every
+      # run. The installed pnpm is cached, keyed on the exact packageManager
+      # string in site/package.json, and on a hit the action is skipped and
+      # its bin directory put on PATH. Same arrangement as ci.yml's two site
+      # jobs, so all three and a developer's machine run the same pnpm.
+      - name: Read the pinned pnpm version
+        id: pnpm
+        run: echo "spec=$(jq -r .packageManager site/package.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache pnpm
+        id: pnpm-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: ~/setup-pnpm
+          key: pnpm-${{ runner.os }}-${{ steps.pnpm.outputs.spec }}
+
+      - name: Set up pnpm
+        if: steps.pnpm-cache.outputs.cache-hit != 'true'
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413  # v6.1.0
+        with:
+          package_json_file: site/package.json
+
+      - name: Put the cached pnpm on PATH
+        if: steps.pnpm-cache.outputs.cache-hit == 'true'
+        run: echo "$HOME/setup-pnpm/node_modules/.bin" >> "$GITHUB_PATH"
+
+      # site/.node-version, like the ci.yml site jobs, so the Node that builds
+      # the site is the one that linted it.
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+        with:
+          node-version-file: site/.node-version
+          cache: pnpm
+          cache-dependency-path: site/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: site
+        run: pnpm install --frozen-lockfile
+
+      # rehype-mermaid renders every mermaid block to inline SVG at build time
+      # with a headless Chromium, so the browser must be present before the
+      # build. It is a download outside any lockfile, so it is cached keyed on
+      # the lockfile: the Playwright version the lockfile pins is what decides
+      # which browser build is fetched. `--with-deps` installs system libraries
+      # with apt on every run regardless, which is cheap and not cacheable.
+      - name: Cache the Playwright browser
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('site/pnpm-lock.yaml') }}
+
+      - name: Install the browser mermaid renders with
+        working-directory: site
+        run: ./node_modules/.bin/playwright install --with-deps chromium
+
+      - name: Check
+        working-directory: site
+        run: |
+          pnpm run contrast:check
+          pnpm run i18n:check
+          pnpm run identity:check
+          pnpm run stats:check
+          pnpm run figures:check
+          pnpm run docs:check
+          pnpm check
+          pnpm run eslint
+          pnpm run format:check
+
+      - name: Build
+        working-directory: site
+        run: pnpm build
+
+      - name: Validate the built HTML
+        working-directory: site
+        run: |
+          pnpm run html-validate
+          pnpm run htmlhint
+
+      # directives:check is here because an Astro directive that leaks into the
+      # output as a literal attribute passes every HTML validator above: it is
+      # well-formed HTML that renders wrong.
+      - name: Check what the build says to machines
+        working-directory: site
+        run: |
+          pnpm run a11y:check
+          pnpm run schema:check
+          pnpm run directives:check
+          pnpm run twins:check
+          pnpm run llms:check
+
+      # pa11y drives a real browser. The `pa11y` script points it at the
+      # Chromium installed above for mermaid, so pages are audited in the
+      # browser that rendered their diagrams. puppeteer's install script still
+      # downloads a Chrome of its own, which nothing here launches. The script
+      # starts the preview on a free port and audits the URL the preview
+      # announces, so a server already holding 4321 cannot be audited by
+      # mistake (scripts/run-pa11y.mjs says how that happened).
+      - name: Accessibility (pa11y)
+        working-directory: site
+        run: pnpm run pa11y
+
+      - name: Upload the site
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9  # v5.0.0
+        with:
+          path: site/dist
+
+  deploy:
+    name: Deploy
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write # publish the uploaded artifact
+      id-token: write # actions/deploy-pages authenticates to Pages with OIDC
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346  # v5.0.1

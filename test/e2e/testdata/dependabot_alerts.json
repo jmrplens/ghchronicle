@@ -1,0 +1,36 @@
+[
+  {
+    "number": 3,
+    "html_url": "https://github.com/octocat/hello-world/security/dependabot/3",
+    "state": "open",
+    "created_at": "2026-08-25T06:00:00Z",
+    "updated_at": "2026-08-25T06:00:00Z",
+    "fixed_at": null,
+    "dismissed_at": null,
+    "security_advisory": {"ghsa_id": "GHSA-aaaa-bbbb-cccc", "summary": "HTTP/2 rapid reset can cause excessive work", "severity": "high", "cvss": {"score": 7.5, "vector_string": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"}, "cvss_severities": {"cvss_v3": {"score": 7.5, "vector_string": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"}, "cvss_v4": {"score": 8.2, "vector_string": "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:N/VI:N/VA:H/SC:N/SI:N/SA:N"}}},
+    "dependency": {"package": {"ecosystem": "go", "name": "golang.org/x/net"}, "manifest_path": "go.mod", "scope": "runtime"}
+  },
+  {
+    "number": 2,
+    "html_url": "https://github.com/octocat/hello-world/security/dependabot/2",
+    "state": "fixed",
+    "created_at": "2026-07-01T00:00:00Z",
+    "updated_at": "2026-07-03T00:00:00Z",
+    "fixed_at": "2026-07-03T00:00:00Z",
+    "dismissed_at": null,
+    "security_advisory": {"ghsa_id": "GHSA-dddd-eeee-ffff", "summary": "Prototype pollution in lodash", "severity": "critical", "cvss": {"score": 9.8, "vector_string": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"}, "cvss_severities": {"cvss_v3": {"score": 9.8, "vector_string": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"}, "cvss_v4": {"vector_string": null, "score": 0.0}}},
+    "dependency": {"package": {"ecosystem": "npm", "name": "lodash"}, "manifest_path": "dashboards/package-lock.json", "scope": "development"}
+  },
+  {
+    "number": 1,
+    "html_url": "https://github.com/octocat/hello-world/security/dependabot/1",
+    "state": "dismissed",
+    "created_at": "2026-06-01T00:00:00Z",
+    "updated_at": "2026-06-11T00:00:00Z",
+    "fixed_at": null,
+    "dismissed_at": "2026-06-11T00:00:00Z",
+    "dismissed_reason": "tolerable_risk",
+    "security_advisory": {"ghsa_id": "GHSA-gggg-hhhh-iiii", "summary": "Regular expression denial of service", "severity": "low", "cvss": {"score": 3.1, "vector_string": "CVSS:3.1/AV:N/AC:H/PR:L/UI:N/S:U/C:L/I:N/A:N"}},
+    "dependency": {"package": {"ecosystem": "pip", "name": "requests"}, "manifest_path": "dashboards/requirements.txt", "scope": "development"}
+  }
+]

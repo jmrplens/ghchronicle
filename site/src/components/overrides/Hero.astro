@@ -1,0 +1,53 @@
+---
+/**
+ * The hero, with the mark as its figure.
+ *
+ * Starlight's `hero.image.file` renders an `<img>`, and the mark carries
+ * `currentColor` so the palette can paint it, which an external stylesheet
+ * cannot reach inside an image to do. Supplying it here rather than as
+ * `hero.image.html` in each index file keeps one copy of the markup: two
+ * copies, one per locale, is exactly the drift this avoids.
+ *
+ * A page that declares its own hero image keeps it; this only fills the gap.
+ */
+import Default from "@astrojs/starlight/components/Hero.astro";
+import mark from "../../assets/logo.svg?raw";
+
+const hero = Astro.locals.starlightRoute.entry.data.hero;
+if (hero && !hero.image) {
+	// `alt` is empty on purpose: the mark repeats the site title beside it,
+	// so a reader announcing it again would be noise. The schema requires
+	// the key, not a value.
+	hero.image = { html: `<span class="ghc-hero-mark">${mark}</span>`, alt: "" };
+}
+---
+
+<Default><slot /></Default>
+
+<style is:global>
+	/* The hero shares the measure of everything under it. Starlight lets the
+	 * hero fill the whole container while the landing's own blocks are 60rem
+	 * wide, so the title started sixty pixels to the left of every heading
+	 * that follows it. One column, one left edge. */
+	.sl-container:has(.hero) > .hero {
+		max-width: 60rem;
+		margin-inline: auto;
+	}
+
+	/* Starlight puts `hero.image.html` in a flex box and leaves what it finds
+	 * there at the start of it. The mark is narrower than that box, so it sat
+	 * 27px to the left of the title it captions, which on a phone is exactly
+	 * the width of a square of the grid it draws. An auto margin on the SVG
+	 * cannot fix that: the span it sits in is a flex item shrunk to the SVG's
+	 * own width, so there is nothing for the margin to take. */
+	.hero .hero-html {
+		justify-content: center;
+	}
+
+	.ghc-hero-mark svg {
+		display: block;
+		width: min(14rem, 60vw);
+		height: auto;
+		color: var(--rb-accent);
+	}
+</style>

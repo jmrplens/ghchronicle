@@ -1,0 +1,126 @@
+---
+title: Loki
+description: Las veintidós medidas que son eventos y no números, y el horizonte de antigüedad que evita que se rechace un envío.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+```yaml
+sinks:
+  loki:
+    url: http://loki:3100/loki/api/v1/push
+    tenant_id: ""
+    labels:
+      job: ghchronicle
+    max_age: 1h
+    batch: 1000
+```
+
+## Medidas y eventos
+
+Parte de lo que informa GitHub es una medida y parte es un evento. "El
+repositorio tiene 148 estrellas" es una medida. "Alguien le dio una estrella a
+las 03:03, se publicó esta release, aquel workflow falló en main, se abrió esta
+alerta" son eventos: cada uno ocurrió una vez, en un momento conocido, y lo que
+uno quiere después es leerlos en orden y buscarlos, no promediarlos.
+
+**Veintidós medidas tienen una representación de evento**: estrellas en ambas
+direcciones, forks, releases, versiones de paquete publicadas, pull requests,
+revisiones, hilos de revisión, issues, commits, ejecuciones de workflows, logs
+de jobs, actividad del repositorio, alertas de Dependabot, análisis de code
+scanning, el feed de eventos, las notificaciones, las discusiones, las entregas
+de webhook, los despliegues, las versiones de ruleset y las contribuciones
+externas. Todo lo demás es un gauge disfrazado y no se envía.
+
+Una medida sin representación se descarta en silencio, lo cual está bien para un
+gauge y mal para un evento que nadie ha llegado a escribir: los despliegues y los
+hilos de revisión fueron eventos fechados sin línea de log durante meses y nada
+lo dijo. Por eso ahora toda medida fechada tiene que aparecer en una de las dos
+tablas de `internal/sink/loki.go`, la de representaciones o la de rechazos, y
+cada rechazo lleva el motivo por el que no es una línea de log. Una prueba falla
+ante una medida fechada que no aparezca en ninguna de las dos.
+
+## El formato de línea
+
+Cada línea se lee primero como una frase y lleva detrás cada etiqueta y cada
+campo en logfmt, así que la misma línea es greppable en una terminal y
+consultable en Grafana sin mantener dos copias de los datos.
+
+```text
+someone starred acme/telemetry full_name="acme/telemetry" user="someone" starred=1
+```
+
+`batch` es cuántas entradas van en un envío, 1000 salvo que se baje.
+
+La etiqueta de stream es `kind`, que es por lo que se filtra primero.
+
+```text
+{job="ghchronicle", kind="workflow_run"} |= "failure"
+{job="ghchronicle", kind="job_log"}
+```
+
+<Aside type="tip" title="Deja pocas etiquetas más">
+  Loki indexa las etiquetas, y una etiqueta de cardinalidad alta cuesta mucho
+  más que una línea ancha. `labels` en la configuración es para las fijas que
+  identifican a este colector, no para nada que varíe por punto.
+</Aside>
+
+## `max_age`, y por qué la razón no es la obvia
+
+Loki rechaza un envío entero cuando una entrada es anterior a
+`reject_old_samples_max_age`, una semana por omisión, y la mitad de lo que
+produce este colector es más viejo que eso a propósito: una estrella de 2020, un
+pull request de 2024.
+
+Pero el límite que de verdad muerde es el otro. Loki también rechaza una entrada
+que esté más atrasada que su ventana de desorden respecto a la entrada más nueva
+que ya hay en ese stream, unas dos horas por omisión.
+
+**Medido contra un Loki 3 real**: una vez que el stream tenía una entrada de las
+19:14, una de las 00:35 del mismo día volvió como "entry too far behind".
+
+Así que el horizonte se aplica de tres formas:
+
+1. contra el reloj de pared,
+2. contra la entrada más nueva de cada stream dentro del lote,
+3. contra la entrada más nueva que se ha enviado antes a ese stream.
+
+Lo que cae fuera se deja fuera y se cuenta, a nivel de depuración, en vez de
+costar el envío entero.
+
+`max_age` vale una hora por omisión, que está dentro de la ventana por defecto
+de Loki. Súbelo solo si has subido `out_of_order_time_window` a juego.
+
+## Para qué no sirve Loki
+
+Para la historia fechada. De eso se encarga un almacén de métricas, y por eso
+los dos van juntos y no uno en lugar del otro. Un log responde "qué pasó
+recientemente, en orden"; una serie temporal responde "cuánto, en qué periodo".
+
+## Los logs de jobs pertenecen aquí
+
+`every.joblogs` recoge las últimas cuarenta líneas de cada job fallido de GitHub
+Actions. Es texto y no una medida, así que el destino de InfluxDB lo excluye por
+omisión y el exportador de Prometheus lo salta. Loki es donde le corresponde, y
+la consulta es:
+
+```text
+{job="ghchronicle", kind="job_log"}
+```
+
+Los dashboards exportados no lo muestran, porque un dashboard atado a un
+datasource no puede consultar dos y quien lo importa puede no tener Loki: llevan
+un panel de texto, "Where failure output went", con esa consulta. En un Grafana
+que sí tiene un datasource de Loki, `cmd/publish_dashboard -loki
+<datasource-uid>` publica el dashboard con las líneas leídas de Loki en el
+lugar de ese panel, las más recientes primero, filtradas por la variable de
+repositorio del dashboard allí donde la variable del almacén se puede leer como
+expresión regular. Los pasos están en `dashboards/PUBLISHING.md`.
+
+## Por dónde seguir
+
+- [Elegir almacén](/ghchronicle/es/sinks/) compara Loki con los otros nueve, y
+  lleva el registro de escrituras que todos comparten.
+- [Los dashboards](/ghchronicle/es/dashboards/) dice cuál de los cinco se dibuja
+  contra cada almacén, y en qué se convierte un panel que un almacén no puede
+  responder.

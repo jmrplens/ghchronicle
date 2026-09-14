@@ -1,0 +1,111 @@
+---
+title: Overview
+description: A self-contained SVG for a profile README, drawn from the same points the databases receive.
+---
+
+import { Aside, Tabs, TabItem } from "@astrojs/starlight/components";
+
+```sh
+ghchronicle -config config.yaml -card profile.svg -card-only
+```
+
+<Aside type="note" title="This is a side feature">
+  The point of the project is the ingestion. The card exists because the numbers
+  were already there, and it is drawn from exactly the same points the databases
+  receive, so the card and the dashboard cannot disagree.
+</Aside>
+
+## The flags
+
+| Flag                              | Does                                                      |
+| --------------------------------- | --------------------------------------------------------- |
+| `-card <path>`                    | Runs one sweep and writes the SVG there                   |
+| `-card-only`                      | Writes the SVG and nothing else, so no database is needed |
+| `-card-layout <name>`             | One of the ten [layouts](/ghchronicle/card/layouts/)      |
+| `-card-theme <dark\|light\|auto>` | Auto emits both palettes behind a media query             |
+| `-card-fields <list>`             | Comma-separated, in drawing order                         |
+| `-card-layouts`                   | Prints the layouts with their default fields, then exits  |
+
+Without `-card-only` the card is written **as well as** everything the sinks
+would normally get, which is the arrangement for a host that is already
+collecting and wants a picture too.
+
+## What it draws
+
+Stars, forks, followers and repository count; contributions over the last year;
+views and unique visitors over GitHub's fourteen-day traffic window; a
+sparkline of the contribution calendar; and the top repositories by stars with
+their language.
+
+Stars and forks are **summed from the repositories the sweep collected**,
+because GitHub's account endpoint reports neither total. That means excluding
+forks or archived repositories in `targets` is visible on the card too, which
+is the honest reading rather than a hidden discrepancy.
+
+## The fields
+
+`-card-fields` takes a comma-separated list, in drawing order, from:
+
+`stars`, `forks`, `followers`, `repos`, `contributions`, `views`, `visitors`,
+`clones`, `commits`, `pull_requests`, `reviews`, `issues`, `languages`,
+`top_repos`, `sparkline`.
+
+A layout skips a field it cannot draw. An unknown name is an error that lists
+the valid ones, rather than a silent skip: a typo would otherwise remove a
+number and nobody would notice until the card was already committed.
+
+```sh
+ghchronicle -config config.yaml -card profile.svg -card-only \
+  -card-layout github-stats -card-theme auto \
+  -card-fields repos,stars,forks,followers,commits,pull_requests,languages
+```
+
+Empty means the layout's default set.
+
+## Themes
+
+<Tabs syncKey="card-theme">
+  <TabItem label="auto">
+    Both palettes in one file, behind a `prefers-color-scheme` media query,
+    which GitHub honours. One file works in a README on either setting.
+  </TabItem>
+  <TabItem label="dark and light">
+    One palette each. For a README that switches with `#gh-dark-mode-only` and
+    `#gh-light-mode-only`, render the card twice: from the Action, that is two
+    calls, one with `card-theme: dark` and one with `card-theme: light`.
+  </TabItem>
+</Tabs>
+
+## Three constraints it respects
+
+**Self-contained.** No external stylesheet, no webfont, no `<image>` pointing
+at a URL, no script. GitHub's camo proxy serves README images from its own
+domain and blocks all of that, so anything external would simply not render.
+
+**Deterministic.** The same input produces a byte-identical file, so a
+scheduled job that commits the card does not produce a diff on every run.
+
+**Written atomically.** Rendered to a temporary file and renamed, so a reader
+watching the path never sees half a document.
+
+Animation, where a layout has it, is CSS inside the SVG. It plays once and
+settles, and the settled frame is the complete static card, so a renderer that
+ignores animation shows the finished state. `prefers-reduced-motion` switches
+it off. There is no script, ever.
+
+## In a README
+
+```markdown
+![GitHub statistics](https://raw.githubusercontent.com/<you>/<you>/main/profile.svg)
+```
+
+The workflow that keeps it current is on
+[GitHub Actions](/ghchronicle/install/actions/).
+
+## There is no Go library
+
+The renderer lives in `internal/render`, and Go refuses that import from
+outside the module, so there is no way to draw a card from your own program by
+calling into this one. A program that wants an SVG runs the binary with
+`-card` and reads the file, the same way it would run any other command: see
+[calling it from a program](/ghchronicle/reference/subprocess/).

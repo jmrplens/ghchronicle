@@ -1,0 +1,33 @@
+{
+  "data": {
+    "viewer": {
+      "issueComments": {
+        "totalCount": 2,
+        "pageInfo": {
+          "hasPreviousPage": false,
+          "startCursor": "Y3Vyc29yOjE="
+        },
+        "nodes": [
+          {
+            "createdAt": "2026-09-06T08:00:00Z",
+            "issue": {
+              "number": 7,
+              "repository": {
+                "nameWithOwner": "octocat/hello-world"
+              }
+            }
+          },
+          {
+            "createdAt": "2026-09-07T20:06:45Z",
+            "issue": {
+              "number": 42,
+              "repository": {
+                "nameWithOwner": "torvalds/linux"
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

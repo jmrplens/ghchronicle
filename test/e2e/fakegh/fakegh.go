@@ -1,0 +1,530 @@
+// Package fakegh is the fake GitHub both end-to-end suites collect from.
+//
+// It serves the fixtures under test/e2e/testdata on the paths the collectors
+// ask for, for one account (octocat) with one repository (hello-world). Every
+// fixture is a real response shape; the only liberty is four tokens.
+//
+//   - "@NOW@" becomes the current time, so a family that only looks at the last
+//     few minutes still finds something: job logs, for one, are fetched for runs
+//     updated within twice their own cadence.
+//   - "@TODAY@" becomes the start of the current UTC day, for a point whose date
+//     is part of its identity, so that two sweeps of one test read the same date
+//     rather than two timestamps seconds apart.
+//   - "@SOON@" and "@SOON_EPOCH@" become an hour from now, as RFC 3339 and as
+//     Unix seconds. A rate limit window that has already closed is not a window,
+//     and a fixed one would publish a reset years in the past and a negative
+//     countdown with it.
+//
+// It prices what it answers the way api.github.com does, so a suite can say
+// what a sweep cost and hold the number: every REST fixture carries one ETag,
+// a request that presents it is answered 304 and charged nothing, every other
+// answer on the API charges its bucket one, the object storage a job log
+// redirects to charges nothing and carries no headers at all, the
+// x-ratelimit-* headers carry the running totals, and every GraphQL answer
+// that asked for the budget block gets one.
+//
+// It is a package rather than a helper inside one suite because it used to be
+// two. The original lived in a _test.go file of package e2e, which no other
+// package can import, so test/e2e/docker carried a second copy of the route
+// table; the audit's first group added three GraphQL fragments and four REST
+// paths to the original and the copy never learned them, and every family
+// behind those routes collected nothing in the containerized suite while
+// passing in the other. One route table, imported twice, is what stops that
+// happening again.
+package fakegh
+
+import (
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+
+	"github.com/jmrplens/ghchronicle/internal/ghapi"
+)
+
+// The account the fixtures describe, and its one repository. Login is what a
+// config points targets.user at; repoPath is only ever a prefix in the table
+// below.
+const (
+	Login    = "octocat"
+	repoPath = "/repos/octocat/hello-world"
+)
+
+// The two answers that are not a fixture. emptyPage is a page past the first:
+// an empty JSON array, which is how the real API ends a paginated walk.
+// graphQLUnknown is a query no marker matches, which GraphQL reports as a
+// two-hundred carrying an errors array rather than as a status.
+const (
+	emptyPage      = "@empty"
+	graphQLUnknown = "@graphql-unknown"
+)
+
+// graphQLNoFixture is the body graphQLUnknown writes.
+const graphQLNoFixture = `{"errors":[{"type":"UNKNOWN","message":"no fixture for this query"}]}`
+
+// rest maps a request path to the fixture that answers it.
+var rest = map[string]string{
+	"/user/repos":                                   "user_repos.json",
+	repoPath:                                        "repo.json",
+	repoPath + "/traffic/views":                     "traffic_views.json",
+	repoPath + "/traffic/clones":                    "traffic_clones.json",
+	repoPath + "/traffic/popular/referrers":         "traffic_referrers.json",
+	repoPath + "/traffic/popular/paths":             "traffic_paths.json",
+	repoPath + "/languages":                         "repo_languages.json",
+	repoPath + "/community/profile":                 "repo_community.json",
+	repoPath + "/topics":                            "repo_topics.json",
+	repoPath + "/releases":                          "releases.json",
+	repoPath + "/stargazers":                        "stargazers_page1.json",
+	repoPath + "/actions/runs/1000163135/jobs":      "actions_jobs.json",
+	repoPath + "/actions/runs/1000163134/jobs":      "actions_jobs_failed.json",
+	repoPath + "/actions/cache/usage":               "actions_cache.json",
+	repoPath + "/actions/artifacts":                 "artifacts.json",
+	repoPath + "/actions/workflows":                 "workflows.json",
+	repoPath + "/dependabot/alerts":                 "dependabot_alerts.json",
+	repoPath + "/code-scanning/alerts":              "code_scanning_alerts.json",
+	repoPath + "/code-scanning/analyses":            "code_scanning_analyses.json",
+	repoPath + "/stats/participation":               "stats_participation.json",
+	repoPath + "/stats/punch_card":                  "stats_punch_card.json",
+	repoPath + "/activity":                          "repo_activity.json",
+	repoPath + "/forks":                             "forks.json",
+	repoPath + "/hooks":                             "hooks.json",
+	repoPath + "/hooks/12345678/deliveries":         "hook_deliveries.json",
+	repoPath + "/rulesets":                          "rulesets.json",
+	repoPath + "/rulesets/21/history":               "ruleset_history.json",
+	repoPath + "/rulesets/22/history":               "ruleset_history_single.json",
+	repoPath + "/actions/permissions/workflow":      "actions_permissions_workflow.json",
+	repoPath + "/actions/secrets":                   "actions_secrets.json",
+	repoPath + "/dependabot/secrets":                "dependabot_secrets.json",
+	repoPath + "/code-scanning/default-setup":       "code_scanning_setup.json",
+	repoPath + "/environments":                      "environments.json",
+	repoPath + "/keys":                              "deploy_keys.json",
+	"/users/octocat/events":                         "events.json",
+	"/notifications":                                "notifications.json",
+	"/users/octocat/settings/billing/usage":         "billing_usage.json",
+	"/user/packages/container/ghchronicle/versions": "package_versions.json",
+	"/gists":                         "gists.json",
+	"/users/octocat/social_accounts": "social_accounts.json",
+	"/user/starred":                  "user_starred.json",
+	"/search/issues":                 "search_issues.json",
+	"/search/commits":                "search_commits.json",
+	"/storage/2000000011.txt":        "job_log.txt",
+	// The profile page beside the API: the one family no API answers reads
+	// its badges off it. Off every bucket, like storage.
+	profilePage: "achievements_page.html",
+}
+
+// profilePage is the account's public profile, which the achievements family
+// reads with ?tab=achievements and no token.
+const profilePage = "/" + Login
+
+// jobLogPath is the one request the real API answers with a redirect to object
+// storage, which the collector following it is part of what the suites prove.
+const jobLogPath = repoPath + "/actions/jobs/2000000011/logs"
+
+// graphQL picks a fixture from the query text, first marker wins.
+//
+// Order matters: the history query also mentions the calendar, the creation
+// probe is a subset of the account query, and the totals fragment mentions
+// pullRequests( as well.
+//
+// The three fragment names below are matched first because a fragment name
+// cannot appear in any other query, so they can neither be shadowed nor shadow
+// anything.
+var graphQL = []struct{ marker, fixture string }{
+	{"fragment branchInventory on Repository", "graphql_branches.json"},
+	{"fragment deploypage on DeploymentConnection", "graphql_deployments.json"},
+	{"fragment policyfiles on Repository", "graphql_policy_files.json"},
+	{"fragment audience on Repository", "graphql_audience.json"},
+	{"repositoryDiscussionComments", "graphql_discussion_comments.json"},
+	// The two queries of the achievements family are named, so the name is
+	// the marker: the counts also search ISSUE and the walk also pages a
+	// search, and neither may fall through to those.
+	{"query achievementCounts(", "graphql_achievement_counts.json"},
+	{"query coauthoredPulls(", "graphql_coauthored_pulls.json"},
+	{"issueComments(", "graphql_issue_comments.json"},
+	// The account query mentions starredRepositories too, as a count; the
+	// argument list is what only the starred walk carries. Likewise the
+	// totals counters search ISSUE as well, with no page: the page size is
+	// what only an outbound search carries.
+	{"starredRepositories(first:", "graphql_starred.json"},
+	{"search(type: ISSUE, first: 100", "graphql_search_issues.json"},
+	{"search(type: REPOSITORY", "graphql_search_counts.json"},
+	{"fragment totals on Repository", "graphql_repo_totals.json"},
+	{"fragment detail on Repository", "graphql_repo_detail.json"},
+	{"contributionsCollection(from:", "graphql_history.json"},
+	{"user(login: $login) { createdAt } }", "graphql_created_at.json"},
+	{"contributionCalendar", "graphql_account.json"},
+	{"pullRequests(", "graphql_pulls.json"},
+	{"discussions(", "graphql_discussions.json"},
+	{"history(", "graphql_commits_page1.json"},
+	{"milestones(", "graphql_planning.json"},
+}
+
+// Request is one call the fake was asked to answer, and what the answer cost.
+type Request struct {
+	Method, Path, Query, Auth string
+	// Status is what was answered. 304 is the one that costs nothing: the
+	// request carried the validator of the fixture it would have been served,
+	// which is how a second sweep of the same account is mostly free.
+	Status int
+	// Cost is what the answer charged the bucket it came from, priced as
+	// GitHub prices them: one for an answer that carried a body, nothing for
+	// a 304 and nothing for the budget probe.
+	Cost int
+	// GraphQL is the query text when the call was one, so a test can tell
+	// the batches of one family from another: every one of them is a POST
+	// to the same path.
+	GraphQL string
+}
+
+// Server is the running fake.
+type Server struct {
+	tb  testing.TB
+	srv *httptest.Server
+	// bodies is the fixture directory, read once at start-up and keyed by file
+	// name. Nothing here opens a file named by a request: the names come from
+	// the directory, and a request only ever looks one up.
+	bodies map[string][]byte
+
+	mu       sync.Mutex
+	requests []Request
+	// used is what each bucket has been charged since the fake started. It is
+	// what the x-ratelimit-used header and the budget block report, so a
+	// sweep's cost can be read the way it is read against api.github.com:
+	// from the answers, never by subtracting two readings.
+	used map[string]int
+}
+
+// budgets is the limit of each bucket the fake prices. Search has its own
+// small budget, and the collector scales its reserve to it.
+var budgets = map[string]int{"core": 5000, "graphql": 5000, "search": 30}
+
+// New starts a fake serving the fixtures in dir, which is testdata relative to
+// the calling suite's own directory. It stops when the test ends.
+func New(tb testing.TB, dir string) *Server {
+	tb.Helper()
+	s := &Server{tb: tb, bodies: readFixtures(tb, dir), used: map[string]int{}}
+	s.srv = httptest.NewServer(http.HandlerFunc(s.serve))
+	tb.Cleanup(s.srv.Close)
+	return s
+}
+
+// readFixtures reads the fixture directory into memory.
+func readFixtures(tb testing.TB, dir string) map[string][]byte {
+	tb.Helper()
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		tb.Fatalf("the fixtures the suites drive themselves with: %v", err)
+	}
+	bodies := make(map[string][]byte, len(entries))
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		body, readErr := os.ReadFile(filepath.Join(dir, e.Name()))
+		if readErr != nil {
+			tb.Fatalf("fixture %s: %v", e.Name(), readErr)
+		}
+		bodies[e.Name()] = body
+	}
+	return bodies
+}
+
+// URL is the base URL to point github.base_url at.
+func (s *Server) URL() string { return s.srv.URL }
+
+// Requests returns a copy of everything served so far.
+func (s *Server) Requests() []Request {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]Request(nil), s.requests...)
+}
+
+func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
+	body, _ := io.ReadAll(r.Body)
+	bucket := bucketOf(r.URL.Path)
+	a := s.answer(r, body)
+	// A validator that still names the fixture the request would be served
+	// is answered 304 with no body, as GitHub does, and is charged nothing.
+	// The ETag is per fixture and not per rendering, so the tokens a fixture
+	// carries do not turn every repeat into a 200.
+	if a.etag != "" && r.Header.Get("If-None-Match") == a.etag {
+		a = answer{status: http.StatusNotModified, etag: a.etag, cost: 0}
+	}
+
+	s.mu.Lock()
+	s.used[bucket] += a.cost
+	used := s.used[bucket]
+	s.requests = append(s.requests, Request{
+		Method: r.Method, Path: r.URL.Path, Query: r.URL.RawQuery, Auth: r.Header.Get("Authorization"),
+		Status: a.status, Cost: a.cost, GraphQL: a.graphQL,
+	})
+	s.mu.Unlock()
+
+	soon := time.Now().UTC().Add(time.Hour)
+	if a.graphQL != "" && strings.Contains(a.graphQL, ghapi.RateLimitAlias) {
+		a.body = withBudget(a.body, used, soon)
+	}
+	h := w.Header()
+	if bucket != "" {
+		// The collector reads the bucket the response declares to decide
+		// what it has left, so search has to say search, with search's own
+		// small budget. Object storage is off the API and says nothing.
+		h.Set("x-ratelimit-resource", bucket)
+		h.Set("x-ratelimit-limit", strconv.Itoa(budgets[bucket]))
+		h.Set("x-ratelimit-used", strconv.Itoa(used))
+		h.Set("x-ratelimit-remaining", strconv.Itoa(budgets[bucket]-used))
+		h.Set("x-ratelimit-reset", strconv.FormatInt(soon.Unix(), 10))
+	}
+	if a.etag != "" {
+		h.Set("ETag", a.etag)
+	}
+	if a.location != "" {
+		h.Set("Location", a.location)
+	}
+	if a.contentType != "" {
+		h.Set("Content-Type", a.contentType)
+	}
+	w.WriteHeader(a.status)
+	_, _ = w.Write(a.body)
+}
+
+// storagePrefix is where the job log redirect lands: object storage, which
+// is not api.github.com. It charges no bucket and carries neither the rate
+// headers nor a validator, and the client reads the budget off the redirect
+// on the way through rather than off this answer.
+const storagePrefix = "/storage/"
+
+// OffAPI says whether a path is served beside the API rather than by it:
+// the object storage a job log redirects to, and the public profile page the
+// achievements family reads. Neither is charged, validated, nor sent the
+// token, and the suites hold both to that.
+func OffAPI(path string) bool {
+	return strings.HasPrefix(path, storagePrefix) || path == profilePage
+}
+
+// bucketOf names the budget a path is charged to, the way the client infers
+// it: GraphQL has its own, anything under /search has its own, everything
+// else on the API is core, and object storage is no bucket at all.
+func bucketOf(path string) string {
+	switch {
+	case path == "/graphql":
+		return "graphql"
+	case strings.HasPrefix(path, "/search/"):
+		return "search"
+	case OffAPI(path):
+		return ""
+	}
+	return "core"
+}
+
+// answer is one response before it is written: what a request would be
+// served if it carried no validator.
+type answer struct {
+	status      int
+	contentType string
+	body        []byte
+	// etag is the validator of the fixture behind the body, empty for an
+	// answer GitHub does not validate: a 404, a redirect, a GraphQL answer.
+	etag     string
+	location string
+	// cost is what the answer charges its bucket unless it becomes a 304.
+	cost int
+	// graphQL is the query text when the answer is to one, so the budget
+	// block can be put under the alias the client asked for it by.
+	graphQL string
+}
+
+const jsonType = "application/json; charset=utf-8"
+
+// answer decides what a request is served.
+func (s *Server) answer(r *http.Request, body []byte) answer {
+	if r.URL.Path == jobLogPath {
+		return answer{status: http.StatusFound, location: "/storage/2000000011.txt", cost: 1}
+	}
+	var query string
+	if r.URL.Path == "/graphql" {
+		query = graphQLQuery(body)
+	}
+	switch name := route(r, body); name {
+	case "":
+		return answer{
+			status: http.StatusNotFound, contentType: jsonType, cost: 1,
+			body: []byte(`{"message":"Not Found","documentation_url":"https://docs.github.com/rest"}`),
+		}
+	case emptyPage:
+		return answer{status: http.StatusOK, contentType: jsonType, body: []byte("[]"), etag: etagOf([]byte(emptyPage)), cost: 1}
+	case graphQLUnknown:
+		return answer{status: http.StatusOK, contentType: jsonType, body: []byte(graphQLNoFixture), cost: 1, graphQL: query}
+	default:
+		a := s.render(name)
+		a.graphQL = query
+		switch {
+		case OffAPI(r.URL.Path):
+			// Off the API: nothing to charge and nothing to validate.
+			a.cost, a.etag = 0, ""
+		case query != "":
+			// A POST is never conditional, and the gateway sends no
+			// validator with a GraphQL answer.
+			a.etag = ""
+			// The budget probe is the one query GitHub does not charge
+			// for (measured, see ghapi.GraphQLRate), and the block it
+			// carries is still priced at one.
+			if strings.TrimSpace(query) == ghapi.BudgetQuery {
+				a.cost = 0
+			}
+		}
+		return a
+	}
+}
+
+// graphQLQuery reads the query text out of a GraphQL request body.
+func graphQLQuery(body []byte) string {
+	var env struct {
+		Query string `json:"query"`
+	}
+	if err := json.Unmarshal(body, &env); err != nil {
+		return ""
+	}
+	return env.Query
+}
+
+// etagOf is the validator of a fixture: a digest of the file as it is on
+// disk, before any token is rendered, so it is the same for every request
+// that lands on the fixture and different for every other fixture. Strong
+// rather than weak, quoted, the way GitHub sends them.
+func etagOf(fixture []byte) string {
+	sum := sha256.Sum256(fixture)
+	return `"` + hex.EncodeToString(sum[:8]) + `"`
+}
+
+// withBudget puts the budget block under the alias the client selects it by,
+// beside whatever the fixture's data already holds, so every GraphQL answer
+// prices itself the way api.github.com's do: this query cost one, and the
+// bucket has been charged used so far. A body that is not a data envelope,
+// an errors-only answer for one, is left as it is.
+func withBudget(body []byte, used int, reset time.Time) []byte {
+	var env map[string]json.RawMessage
+	if err := json.Unmarshal(body, &env); err != nil || len(env["data"]) == 0 {
+		return body
+	}
+	var data map[string]json.RawMessage
+	if err := json.Unmarshal(env["data"], &data); err != nil || data == nil {
+		return body
+	}
+	block, err := json.Marshal(map[string]any{
+		"limit": budgets["graphql"], "cost": 1, "used": used,
+		"remaining": budgets["graphql"] - used, "resetAt": reset.Format(time.RFC3339),
+	})
+	if err != nil {
+		return body
+	}
+	data[ghapi.RateLimitAlias] = block
+	if env["data"], err = json.Marshal(data); err != nil {
+		return body
+	}
+	out, err := json.Marshal(env)
+	if err != nil {
+		return body
+	}
+	return out
+}
+
+// route names the fixture that answers this request, "" for a 404 and
+// emptyPage for a page past the first.
+func route(r *http.Request, body []byte) string {
+	q := r.URL.Query()
+	switch r.URL.Path {
+	case "/graphql":
+		return graphQLFixture(body)
+	case repoPath + "/actions/runs":
+		if q.Get("status") == "failure" {
+			return "actions_runs_failed.json"
+		}
+		return "actions_runs.json"
+	case "/user/packages":
+		if q.Get("package_type") == "container" {
+			return "packages_container.json"
+		}
+		return emptyPage
+	}
+	name, ok := rest[r.URL.Path]
+	switch {
+	case !ok:
+		return ""
+	case q.Get("page") != "" && q.Get("page") != "1":
+		return emptyPage
+	default:
+		return name
+	}
+}
+
+// graphQLFixture reads the query out of the body and matches it against the
+// markers.
+func graphQLFixture(body []byte) string {
+	query := graphQLQuery(body)
+	if query == "" {
+		return graphQLUnknown
+	}
+	// The budget probe is matched by equality against the constant the client
+	// sends, because no substring of it identifies the probe: the same block is
+	// injected into the root of every other query as well.
+	if strings.TrimSpace(query) == ghapi.BudgetQuery {
+		return "graphql_rate_limit.json"
+	}
+	for _, q := range graphQL {
+		if strings.Contains(query, q.marker) {
+			return q.fixture
+		}
+	}
+	return graphQLUnknown
+}
+
+// render is a fixture as it is served: its tokens replaced, its type set by
+// its extension, and the validator of the file it came from beside it.
+func (s *Server) render(name string) answer {
+	body, ok := s.bodies[name]
+	if !ok {
+		s.tb.Errorf("no fixture named %s", name)
+		return answer{status: http.StatusInternalServerError, cost: 1}
+	}
+	a := answer{status: http.StatusOK, etag: etagOf(body), cost: 1}
+	if !strings.HasSuffix(name, ".json") {
+		a.contentType = "text/plain; charset=utf-8"
+		if strings.HasSuffix(name, ".html") {
+			a.contentType = "text/html; charset=utf-8"
+		}
+		a.body = body
+		return a
+	}
+	a.contentType = jsonType
+	now := time.Now().UTC()
+	soon := now.Add(time.Hour)
+	rendered := strings.ReplaceAll(string(body), "@NOW@", now.Format(time.RFC3339))
+	rendered = strings.ReplaceAll(rendered, "@TODAY@", today())
+	rendered = strings.ReplaceAll(rendered, "@SOON_EPOCH@", strconv.FormatInt(soon.Unix(), 10))
+	rendered = strings.ReplaceAll(rendered, "@SOON@", soon.Format(time.RFC3339))
+	a.body = []byte(rendered)
+	return a
+}
+
+// today is what "@TODAY@" becomes: the start of the current UTC day.
+//
+// A dated point carries its own date as part of its identity, so a fixture
+// that spells one "@NOW@" gives two sweeps of the same test two different
+// points. TestFileSinkWritesTheSamePointsInBothFormats caught that on a
+// sponsorship whose two renderings were sixteen seconds apart. The start of
+// the day is recent enough for any dashboard window and is the same string for
+// both sweeps, except across midnight, which is rare and loud.
+func today() string {
+	return time.Now().UTC().Truncate(24 * time.Hour).Format(time.RFC3339)
+}

@@ -1,0 +1,47 @@
+---
+/**
+ * The mark inlined beside the title, rather than handed to Starlight's `logo`.
+ *
+ * `logo` renders an `<img>`, and an external stylesheet cannot reach inside
+ * one, so the mark would need a light file and a dark file with two palettes
+ * kept in step by hand. Inlined, it carries `currentColor` and the palette
+ * paints it: one asset, one set of colours, nothing to synchronise.
+ *
+ * It also arrives with the document, so the header paints once instead of
+ * reflowing when an image lands.
+ */
+import mark from "../../assets/logo.svg?raw";
+
+const { siteTitle, siteTitleHref } = Astro.locals.starlightRoute;
+---
+
+<a href={siteTitleHref} class="site-title sl-flex">
+	<span class="ghc-mark" aria-hidden="true" set:html={mark} />
+	<span class="ghc-site-name">{siteTitle}</span>
+</a>
+
+<style>
+	@layer starlight.core {
+		.site-title {
+			align-items: center;
+			gap: 0.55rem;
+			color: var(--sl-color-text-accent);
+			text-decoration: none;
+			min-width: 0;
+		}
+		/* One number sets the mark's whole presence: at this size it reads as
+		 * a favicon beside a word rather than a picture with a caption. */
+		.ghc-mark :global(svg) {
+			display: block;
+			width: 1.5rem;
+			height: 1.5rem;
+			color: var(--rb-accent);
+		}
+		.ghc-site-name {
+			font-weight: 600;
+			white-space: nowrap;
+			overflow: hidden;
+			text-overflow: ellipsis;
+		}
+	}
+</style>

@@ -1,0 +1,11 @@
+{
+  "data": {
+    "ghcRateLimit": {
+      "limit": 5000,
+      "cost": 1,
+      "used": 37,
+      "remaining": 4963,
+      "resetAt": "@SOON@"
+    }
+  }
+}

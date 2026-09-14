@@ -1,0 +1,183 @@
+---
+title: systemd
+description: Una unidad blindada para el único proceso de la máquina que guarda un token de GitHub, y para qué sirve cada restricción.
+---
+
+import { Steps, Aside, FileTree } from "@astrojs/starlight/components";
+
+## La unidad
+
+```ini title="/etc/systemd/system/ghchronicle.service"
+[Unit]
+Description=ghchronicle, GitHub metrics collector
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ghchronicle
+Group=ghchronicle
+EnvironmentFile=/etc/ghchronicle/ghchronicle.env
+ExecStart=/usr/local/bin/ghchronicle -config /etc/ghchronicle/config.yaml
+Restart=always
+RestartSec=30s
+
+# This is the only process on the host holding a GitHub token, so it gets
+# nothing it does not need.
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+ProtectProc=invisible
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictAddressFamilies=AF_INET AF_INET6
+
+StateDirectory=ghchronicle
+ReadWritePaths=/var/lib/ghchronicle
+
+[Install]
+WantedBy=multi-user.target
+```
+
+## Por qué está blindada
+
+El modelo de amenaza es corto y es toda la justificación: **este es muy
+probablemente el único proceso de la máquina que guarda un token de GitHub con
+acceso de lectura a todos los repositorios de una cuenta.** Un token es una
+credencial al portador. Cualquier cosa que pueda leer la memoria de este proceso
+o su fichero de entorno tiene la cuenta.
+
+Así que la unidad le da al proceso exactamente lo que necesita, que resulta ser
+casi nada: un socket TCP saliente y un directorio escribible.
+
+| Directiva                                                                                                                                                                | Qué quita                                                                                                                |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
+| `CapabilityBoundingSet=`, `AmbientCapabilities=`                                                                                                                         | Todas las capacidades de Linux. No abre puertos privilegiados ni posee dispositivos                                      |
+| `NoNewPrivileges=true`                                                                                                                                                   | Cualquier vía para ganar privilegios mediante exec, incluidos los binarios setuid                                        |
+| `ProtectSystem=strict`                                                                                                                                                   | El acceso de escritura a todo el sistema de ficheros, salvo `ReadWritePaths`                                             |
+| `ProtectHome=true`                                                                                                                                                       | Todos los directorios personales, que es donde suelen vivir las credenciales interesantes de una máquina                 |
+| `PrivateTmp=true`, `PrivateDevices=true`                                                                                                                                 | Los ficheros temporales compartidos y los nodos de dispositivo físicos                                                   |
+| `ProtectProc=invisible`                                                                                                                                                  | La capacidad de ver los procesos de otros usuarios en `/proc`, así que no puede leer la línea de órdenes de otro proceso |
+| `RestrictAddressFamilies=AF_INET AF_INET6`                                                                                                                               | Los sockets Unix y netlink. Habla HTTPS y nada más                                                                       |
+| `MemoryDenyWriteExecute=true`, `LockPersonality=true`                                                                                                                    | Las primitivas habituales de shellcode                                                                                   |
+| `SystemCallFilter=@system-service`                                                                                                                                       | Toda llamada al sistema fuera del conjunto ordinario de servicio, incluidas las de módulos y ajuste del núcleo           |
+| `ProtectKernelTunables`, `ProtectKernelModules`, `ProtectControlGroups`, `ProtectClock`, `ProtectHostname`, `RestrictNamespaces`, `RestrictRealtime`, `RestrictSUIDSGID` | Todas las vías que quedan para cambiar la máquina desde dentro del servicio                                              |
+
+`StateDirectory=ghchronicle` hace que systemd cree `/var/lib/ghchronicle` con el
+dueño correcto al arrancar, así que el fichero de estado tiene dónde vivir sin
+un `mkdir` manual y un `chown` que alguien olvidará tras una reinstalación.
+
+Ahí viven dos ficheros, no uno. Junto a `state.json` la pasada guarda su
+registro de escrituras, `state-written.bin` por omisión, que es lo que evita
+volver a escribir un punto que no ha cambiado; `ReadWritePaths` cubre el
+directorio, así que los dos están ya permitidos. Si pones alguno en otro sitio,
+esa ruta hay que añadirla aquí, y perder el registro cuesta una pasada de
+reescritura:
+[solo se escribe lo que ha cambiado](/ghchronicle/es/sinks/#solo-se-escribe-lo-que-ha-cambiado).
+
+## Instalarla
+
+<Steps>
+
+1. Crea el usuario y los directorios.
+
+    ```sh
+    sudo useradd --system --no-create-home --shell /usr/sbin/nologin ghchronicle
+    sudo mkdir -p /etc/ghchronicle
+    ```
+
+2. Pon la configuración en su sitio.
+
+    <FileTree>
+
+    - /etc/ghchronicle/
+      - config.yaml legible por todos, sin secretos dentro
+      - ghchronicle.env modo 600, los tokens
+    - /var/lib/ghchronicle/
+      - state.json lo crea el servicio
+      - state-written.bin el registro de escrituras, al lado
+
+    </FileTree>
+
+3. Escribe el fichero de entorno, y nada más en él.
+
+    ```sh title="/etc/ghchronicle/ghchronicle.env"
+    GITHUB_TOKEN=github_pat_...
+    INFLUX_TOKEN=...
+    ```
+
+    ```sh
+    sudo chmod 600 /etc/ghchronicle/ghchronicle.env
+    ```
+
+    Todo en `config.yaml` los lee mediante `${VAR}`, que es lo que permite que la
+    configuración sea legible por todos y esté versionada mientras los secretos
+    no lo están.
+
+4. Arráncalo.
+
+    ```sh
+    sudo systemctl daemon-reload
+    sudo systemctl enable --now ghchronicle
+    sudo systemctl status ghchronicle
+    ```
+
+</Steps>
+
+## Qué vigilar
+
+El log dice qué se escribió y dónde.
+
+```text
+level=INFO msg=written sink=influxdb family=traffic points=629
+level=INFO msg="rate budget" bucket=core remaining=4354 limit=5000
+```
+
+Dos avisos merecen una alerta:
+
+- **`rate limit reserve reached`** significa que se saltó una familia para
+  proteger el presupuesto. Una vez está bien; en cada pasada significa que las
+  cadencias son demasiado rápidas para el número de repositorios.
+- **`family failed everywhere, not marking it as run`** significa que todos los
+  repositorios fallaron en una familia, así que se reintentará en vez de darla
+  por hecha.
+
+```sh
+journalctl -u ghchronicle -f
+journalctl -u ghchronicle -p warning --since today
+```
+
+<Aside type="tip" title="Revisa el sandbox tras editar la unidad">
+  `systemd-analyze security ghchronicle` puntúa la unidad y nombra todo lo que
+  el sandbox no está cubriendo. Es la forma más rápida de ver que una edición
+  quitó en silencio una restricción.
+</Aside>
+
+## cron en vez de un servicio
+
+`-once` ejecuta una sola pasada y termina, que es todo lo que necesita un
+planificador.
+
+```text
+0 * * * * /usr/local/bin/ghchronicle -config /etc/ghchronicle/config.yaml -once
+```
+
+Deja el fichero de estado en una ruta persistente también en este modo. Es lo
+que evita que el recorrido de estrellas y el relleno año por año del calendario
+de contribuciones vuelvan a ocurrir en cada ejecución. Ten en cuenta que un cron
+horario da a cada familia una cadencia horaria como mucho, así que el ritmo de
+quince minutos de `actions` se pierde.

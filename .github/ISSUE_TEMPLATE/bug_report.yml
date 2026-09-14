@@ -1,0 +1,68 @@
+name: Bug report
+description: Something collected the wrong thing, or nothing at all.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before opening this, two pages answer most of what lands here:
+        [troubleshooting](https://jmrplens.github.io/ghchronicle/reference/troubleshooting/),
+        which lists the messages that look like errors and are not, and
+        [what GitHub will not give](https://jmrplens.github.io/ghchronicle/api/limits/),
+        which lists the endpoints that are verified not to answer.
+
+        A security vulnerability does not go here. See SECURITY.md.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The output of `ghchronicle -version`.
+      placeholder: v1.0.0
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How it runs
+      options:
+        - systemd
+        - Docker or another container runtime
+        - GitHub Actions
+        - By hand, in a terminal
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what you expected instead
+    validations:
+      required: true
+  - type: textarea
+    id: config
+    attributes:
+      label: The configuration
+      description: >
+        With the token and any other secret removed. `${VAR}` is enough, that
+        is how the file is meant to be written.
+      render: yaml
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: The log
+      description: >
+        Run it with `log.level: debug` and paste the lines around the problem.
+        The log names the family and the sink, which is usually the whole
+        answer.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else
+      description: >
+        The store and its version, the panel that looks wrong, the query you
+        ran against the data.

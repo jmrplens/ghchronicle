@@ -1,0 +1,14 @@
+[
+  {
+    "provider": "mastodon",
+    "url": "https://mstdn.jmrp.io/@jmrplens"
+  },
+  {
+    "provider": "linkedin",
+    "url": "https://linkedin.com/in/jmrplens"
+  },
+  {
+    "provider": "bluesky",
+    "url": "https://bsky.app/profile/jmrp.io"
+  }
+]

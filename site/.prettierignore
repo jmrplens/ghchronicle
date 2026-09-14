@@ -1,0 +1,15 @@
+# Generated output. Prettier reformatting a build artifact is work that the
+# next build throws away, and it makes `format:check` depend on whether a
+# build has happened since the last format.
+dist/
+.astro/
+pnpm-lock.yaml
+# .astro components are handled by `astro check`/eslint, not prettier
+# (no prettier-plugin-astro installed).
+*.astro
+# The documentation content is Markdown in an MDX envelope, and markdownlint
+# owns it. Prettier reflowed a fenced code block nested in a <TabItem> onto its
+# own opening fence line, which rendered the quickstart's install tab as an
+# empty code block; keeping both authorities on the same files made each
+# formatter dirty the other.
+src/content/docs/**/*.mdx

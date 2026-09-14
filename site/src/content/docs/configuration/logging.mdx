@@ -1,0 +1,103 @@
+---
+title: Logging
+description: Level, format, the rotating file that never replaces standard error, and the two lines worth alerting on.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+```yaml
+log:
+  level: info # debug, info, warn, error
+  format: text # text or json
+  file: /var/log/ghchronicle/ghchronicle.log
+  max_bytes: 67108864
+  keep: 5
+```
+
+## The keys
+
+| Key         | Default    | Meaning                                       |
+| ----------- | ---------- | --------------------------------------------- |
+| `level`     | `info`     | `debug`, `info`, `warn` or `error`            |
+| `format`    | `text`     | `text` for a human, `json` for a shipper      |
+| `file`      | none       | A rotating file **as well as** standard error |
+| `max_bytes` | `67108864` | Rotate at 64 MiB                              |
+| `keep`      | `5`        | How many rotated files to keep                |
+
+## Both, never instead
+
+A configured `file` does not replace standard error, it is written in addition
+to it. Under systemd the journal is where anyone looks first, and a log file
+that silently took the journal's place would be a trap: `journalctl -u
+ghchronicle` would go quiet and the obvious conclusion would be that the
+service had stopped.
+
+Rotation is by size with numbered suffixes, so retention is a count rather than
+a date and two rotations in the same second cannot collide. The size counter is
+read from the file at start-up, so a restart does not reset it and let the file
+grow without bound.
+
+## What the log says on a good day
+
+```text
+level=INFO msg="repositories discovered" count=18
+level=INFO msg=written sink=influxdb family=traffic points=629
+level=INFO msg="rate budget" bucket=core remaining=4354 limit=5000
+```
+
+A family that is not due yet simply does not appear. That is normal, and it is
+the first thing to check when a measurement seems to be missing: with a
+twelve-hour cadence, half a day of logs can legitimately never mention
+`account`.
+
+## The two lines worth an alert
+
+**`rate limit reserve reached`** means a family was skipped to protect the
+budget.
+
+```text
+level=WARN msg="rate limit reserve reached, family skipped" family=artifacts
+```
+
+Once is fine. Every sweep means the cadences are too fast for the number of
+repositories.
+
+**`family failed everywhere, not marking it as run`** means every repository
+failed for one family.
+
+```text
+level=WARN msg="family failed everywhere, not marking it as run" family=security
+```
+
+The family is deliberately not marked as done, so it is retried at the next
+cadence rather than being treated as complete. That is the line that separates
+"a feature is off on one repository" from "the token lost a scope".
+
+## Debugging
+
+```yaml
+log:
+  level: debug
+```
+
+Debug adds three lines, and no more: how many points the written-points ledger
+came back with at start-up, that the account-wide families were skipped because
+`targets.user` is unset, and how many entries a sink left out for being older
+than its horizon. That last one is the only way to see that a push was trimmed
+rather than rejected. There is no per-request log: the client in
+`internal/ghapi` carries no logger, so which endpoint was called and which
+answer came back 304 are not visible at any level.
+
+<Aside type="tip" title="JSON for a shipper, text for a person">
+  `format: json` emits one object per line, which is what Promtail, Vector or
+  Filebeat want. It is the same information; only the encoding changes.
+  Combining `format: json` with a `file` is the arrangement for a host that
+  already ships logs somewhere.
+</Aside>
+
+## Not to be confused with the job log collector
+
+`log` is the tool's own diary. `every.joblogs` is a _collector_: it fetches the
+last forty lines of every failed GitHub Actions job and turns them into points.
+They are unrelated settings, and the second one belongs in a log store rather
+than in a metrics database. See [Loki](/ghchronicle/sinks/loki/).

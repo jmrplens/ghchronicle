@@ -1,0 +1,293 @@
+---
+title: Qué se recoge
+description: Las treinta y cuatro familias, qué le pide cada una a GitHub y por qué existe cada una.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+Treinta y cuatro familias, noventa y una medidas. Esta página es para qué sirve
+cada familia; la [referencia de medidas](/ghchronicle/es/collectors/measurements/)
+es cada etiqueta y cada campo.
+
+Las familias además están agrupadas, y `groups:` en la configuración enciende o
+apaga un área entera. El binario imprime la agrupación que usa de verdad, que es
+la que hay que creer:
+
+```sh
+ghchronicle -groups
+```
+
+```text
+account     the account itself: its lifetime numbers, its profile, its keys, its spending and what it does in other people's repositories
+            account, achievements, billing, history, keys, outbound, profile, totals
+audience    who is looking at the projects, who starred them and who copied them
+            forks, stars, traffic
+ci          continuous integration and deployment: runs, jobs, steps, artifacts, caches and deployments
+            actions, artifacts, deployments, joblogs
+...
+```
+
+## Audiencia
+
+**`traffic`** recoge los únicos datos que GitHub tira de verdad. Las visitas y
+los clones viven exactamente catorce días y luego dejan de existir en ningún
+sitio. La ventana entera se relee y se reescribe en cada pasada, con cada día
+sellado en su propia fecha, así que un colector apagado una semana no pierde
+nada mientras vuelva dentro de la ventana.
+
+Los referrers y las rutas populares son distintos: la API devuelve una
+instantánea de diez sin fecha alguna, así que se sellan al inicio del día UTC y
+se leen como "quién mandaba tráfico cuando preguntamos".
+
+**`stars`** reconstruye la curva de estrellas desde su principio. El endpoint de
+stargazers devuelve un `starred_at` por usuario si se pide con el media type de
+estrellas, así que toda la historia está disponible en la primera ejecución: una
+gráfica que se remonta años, no una que empieza el día en que se instaló el
+colector. Tras la primera pasada solo se leen las cien más nuevas, ya que las
+estrellas nuevas caen al final, y se leen para todos los repositorios a la vez
+en una consulta GraphQL por cada diez. Esa es la diferencia entre un punto y
+280 llamadas para un repositorio con 28.000 estrellas.
+
+**`forks`** recoge quién hizo fork y cuándo. La instantánea del repositorio
+lleva un contador de forks, que dice cuántos pero nunca cuándo ni de quién. La
+lista se recorre por REST en la primera pasada de una instalación nueva y en un
+backfill; después los cien más nuevos de cada repositorio viajan en el mismo
+tipo de lote que las estrellas. Una fila de fork no es estática como una
+estrella: lleva las estrellas del propio fork y cuánto hace que recibió un push,
+así que un repositorio del que el lote informa que tiene más de cien forks se
+recorre también por REST, que refresca eso en hasta quinientos forks como
+siempre hizo.
+
+## Repositorios
+
+**`repo`** recoge lo que un repositorio es ahora mismo, más las cosas que se
+acumulan del lado de GitHub: lenguajes por bytes, temas, salud de la comunidad y
+descargas de release **por fichero**, que es lo que distingue una compilación
+para Linux de una para macOS. Los bytes por lenguaje importan porque la etiqueta
+del lenguaje dominante no puede mostrar un repositorio pasando de un lenguaje a
+otro con el tiempo.
+
+**`settings`** recoge la configuración que cambia, y cómo de bien funcionan las
+partes que hablan con el exterior. Una cosa de aquí es una serie temporal de
+verdad y no una instantánea: las entregas de webhook llevan un código de estado
+y una latencia.
+
+**`rulesets`** recoge el historial de cada ruleset, una fila por versión
+guardada con actor y fecha, que es el único rastro que GitHub conserva del
+momento en que se desactivó una protección. El ruleset en sí, lo que impone y
+quién puede saltárselo, es una instantánea diaria en `repo`; esto es la
+historia que el `days_since_change` de esa instantánea solo resume.
+
+**`branches`** recoge la lista viva de ramas, una fila por rama con la edad de
+su punta. Nada más responde a "qué ramas se abandonaron": la propia lista de
+GitHub ordena por nombre y olvida, así que una rama cuyo último commit es de
+hace cuatro meses parece exactamente igual que una que recibió un push esta
+mañana. A propósito no pregunta qué pull requests apuntan a cada rama, que es
+lo que encarece esa consulta; ese cruce es cosa del panel.
+
+**`inventory`** recoge las tres superficies de política por repositorio que
+cambian en una escala de meses: qué puede hacer el `GITHUB_TOKEN` de un
+workflow, qué edad tiene cada secreto guardado, y si el code scanning lo
+enciende GitHub o un workflow propio. Cuatro peticiones core por repositorio al
+día. Las tres son ajustes y no eventos, así que se sellan al inicio del día UTC
+y un cambio se lee como el día en que el valor se movió.
+
+**`policyfiles`** anota qué ficheros de gobernanza lleva un repositorio,
+`SECURITY.md`, `CODEOWNERS`, `dependabot.yml` y `FUNDING.yml`, y cuándo cambió
+cada uno por última vez. Si la mayoría existen hoy ya está en `gh_repo_policy`;
+cuándo cambiaron no está en ningún otro sitio, y `.github/dependabot.yml` no
+está en ninguna otra medida, que es lo que convierte "¿recibe este repositorio
+actualizaciones de dependencias por alguna de las dos vías?" en una pregunta que
+los datos pueden responder.
+
+<Aside type="caution" title="Los webhooks fallan en silencio">
+  Medido, un hook llevaba respondiendo 403 en setenta y ocho de sus últimas
+  cien entregas y no había nada en ningún sitio que lo dijera. Solo se guarda
+  el host de la URL del webhook; la ruta suele llevar un secreto.
+</Aside>
+
+## Desarrollo
+
+**`issues`** recoge pull requests e issues uno a uno, no como recuentos. Un
+recuento de pull requests abiertas no dice nada de cómo va realmente el trabajo;
+los números interesantes son duraciones. Cuánto tardó alguien en revisarlo,
+cuánto tardó en fusionarse, cómo de grande era el diff, cuántas rondas de
+revisión hicieron falta. Una consulta de GraphQL por repositorio cubre ambos:
+una pasada recorre lo que cambió en las dos últimas cadencias, de diez en diez,
+y una vez al día lee una página completa dimensionada al repositorio, que es la
+única lectura que reescribe una pull request abierta que nadie ha tocado.
+
+**`commits`** recoge la historia de commits con su tamaño y su firma. Esto es lo
+que sustituye a `stats/code_frequency`, que responde 202 con cuerpo vacío para
+siempre en una cuenta personal. GraphQL da líneas añadidas y quitadas por
+commit, atribuidas a un autor y fechadas en el commit y no en una semana, y la
+firma viene con la misma consulta.
+
+**`issueevents`** recoge las transiciones en lugar del estado. `issues` dice en
+qué acabó una pull request; esto dice cuándo se etiquetó, se cerró, se reabrió,
+se renombró o se pidió revisión. Una reapertura no existe en ninguna otra
+medida. La lista a nivel de repositorio, `/issues/events`, es la referencia de
+qué es un evento y cómo se llama, e incrusta la issue entera en cada evento:
+alrededor de un megabyte por página de cien, del que el colector conserva el
+tres por ciento. Así que una pasada pide a GraphQL la cronología de las issues
+y pull requests actualizadas en su ventana, diez ítems por página porque se
+midió que la pasarela descarta cronologías en silencio a partir de veinte, y un
+backfill recorre el endpoint por issue, `/issues/{n}/events`, que son las
+mismas filas sin la issue. Medido durante una semana de dos repositorios, la
+cronología coincide con la lista en todos los eventos de todos los tipos que
+sabe nombrar, campo a campo; una pull request en una pila se lee por su propia
+lista porque `added_to_stack` no tiene tipo en la cronología, y lo único que la
+lista ve y esto no es un commit que referencia una issue que nadie ha tocado,
+tres eventos de 2.217.
+
+**`deps`** recoge el grafo de dependencias, apagado por defecto. Dos formas del
+mismo asunto: el SBOM como fotografía, que es un histograma de licencias, y el
+diferencial entre dos commits, que dice qué entró y qué salió y con qué aviso de
+seguridad. Solo se guardan agregados, porque un solo bump de dependencias son
+trescientos setenta cambios y seis filas dicen lo mismo.
+
+**`discussions`** recoge la mitad de foro de un repositorio. Las discusiones son
+invisibles para todos los endpoints de issues y pull requests, y una pregunta
+respondida es un coste de soporte que no aparece nunca en los números de issues.
+Un repositorio con el foro apagado no se consulta: el listado que lo descubrió
+ya lo dice, y la consulta cuesta lo mismo haya o no algo que paginar.
+
+**`planning`** recoge etiquetas e hitos. Un hito es el único sitio donde GitHub
+registra una intención con fecha de vencimiento, y su porcentaje de completitud
+se calcula en el servidor.
+
+**`activity`** recoge el log de actividad propio de un repositorio. Es el único
+sitio donde queda registrado un force push: el feed público de eventos no lo
+distingue, y nada más dice que se creó o se borró una rama ni que una fusión fue
+un squash y no un rebase. Es tan perecedero como el tráfico: cien entradas
+cubrieron veintiséis horas en el repositorio más activo medido.
+
+## Integración continua
+
+**`actions`** recoge las ejecuciones de workflows como hechos fechados. Una
+ejecución pertenece al instante en que terminó, no al instante en que nos
+enteramos, que es lo que hace que se pueda responder "cuánto tardó la CI el
+martes pasado".
+
+El tiempo a nivel de ejecución esconde dónde se fue el tiempo: una ejecución que
+tarda veinte minutos porque un job esperó dieciocho por un runner es idéntica a
+una que pasó dieciocho ejecutando. Solo el nivel de job los separa, y solo el
+nivel de job nombra el runner y los pasos, así que los jobs de cada ejecución se
+expanden a una petición extra por ejecución. Una vez: los jobs de un intento
+terminado no cambian nunca, así que una ejecución cuyos jobs este proceso ya
+escribió no se vuelve a listar, y una reejecución es un intento nuevo que sí.
+Una pasada ordinaria lee la lista de ejecuciones en páginas de treinta y pasa
+de página mientras vengan llenas de ejecuciones más nuevas que su ventana; la
+primera pasada tras el arranque y un backfill leen páginas de cien.
+
+**`artifacts`** recoge lo que dejaron atrás los workflows, con tamaños y
+caducidad.
+
+**`joblogs`** recoge el texto que imprimió un job fallido. Es lo único aquí que
+es un log y no una medida, y responde la pregunta que una gráfica nunca puede:
+no "la compilación falló" sino por qué. Solo los fallos, y solo sus últimas
+cuarenta líneas. Apagado por omisión.
+
+**`deployments`** recoge los despliegues más recientes de cada repositorio, que
+es la superficie que lee un dashboard de entregas. Un punto de GraphQL por cada
+cinco repositorios: cinco y no diez porque la pasarela abandona una consulta que
+no puede terminar en unos diez segundos, y esta pide conexiones y no números
+sueltos.
+
+## Seguridad
+
+**`security`** cuenta las alertas abiertas por severidad y estado, y registra
+**explícitamente qué funciones están activadas**. Esa última parte es la razón
+de que "sin datos" y "sin alertas" sean distinguibles: sin ella, un repositorio
+con Dependabot apagado es idéntico a uno sin nada que arreglar.
+
+**`analyses`** recoge los análisis de code scanning en sí, no solo las alertas.
+Una alerta dice qué está mal ahora. Un análisis dice que el escaneo corrió,
+cuándo, sobre qué commit, con qué versión de la herramienta y cuántos resultados
+encontró, que es lo que responde "¿corrió de verdad el escaneo en esa release?".
+GitHub los poda, así que hay que capturarlos mientras están.
+
+## Cuenta
+
+**`account`** es una consulta de GraphQL y lo más barato del proyecto. Devuelve
+el calendario de contribuciones completo de 366 días, todos los totales de
+contribución, el desglose de commits por repositorio y el bloque de patrocinios
+por **un punto de un presupuesto de cinco mil**. Lo mismo por REST serían
+docenas de llamadas y no incluiría el calendario en absoluto.
+
+**`profile`** recoge paquetes, gists, cuentas sociales y el grafo de seguidores.
+Los paquetes vienen de REST a propósito: GraphQL informa de cero paquetes para
+una cuenta mientras REST los lista.
+
+**`outbound`** es la otra mitad de todo lo demás. Todas las otras familias miden
+lo que la cuenta posee; esta mide lo que lee y a lo que contribuye: las
+estrellas que dio, y las pull requests que abrió en repositorios ajenos. Todo
+es GraphQL, un punto por consulta: la lista de estrellas dadas, cinco búsquedas
+de issues y los dos recorridos de comentarios.
+
+**`totals`** le pide a GitHub los números que son ciertos desde el principio:
+pull requests fusionadas alguna vez, commits totales, issues abiertas alguna
+vez, y la vida entera de cada repositorio. Es la única familia que existe por
+cómo se lee un almacén y no por lo que ofrece GitHub. Todo lo demás aquí es una
+fila por hecho, que es la forma correcta para "cuántas en julio" y la equivocada
+para "cuántas en total": responder eso desde las filas obliga a recorrer la
+tabla entera, y InfluxDB 3 Core rechaza una consulta que abra más ficheros que
+su tope, cuarenta mil donde esto se midió. La búsqueda devuelve un total para
+cualquier consulta y GraphQL uno para cualquier conexión, así que una consulta
+de diez búsquedas con alias, una búsqueda REST para el contador de commits y una
+consulta en lote dan un número que es una sola fila y que ya es correcto en la
+primera pasada de una instalación nueva.
+
+**`ratelimit`** es la única medida que el colector toma de sí mismo: lo que
+queda en cada uno de los quince presupuestos independientes de GitHub y cuándo
+se reinicia cada uno. `GET /rate_limit` no cuesta nada, y sin ella una familia
+saltada por falta de presupuesto es indistinguible de una que no tenía nada que
+contar.
+
+**`keys`** recoge las claves SSH y GPG de la propia cuenta: cuáles no se han
+usado nunca, y cuándo caduca la que firma todos los commits.
+
+**`stats`** recoge los commits por semana y el punch card de hora de la semana,
+los dos endpoints de `stats` que sí responden en una cuenta personal.
+
+**`history`** recorre el calendario de contribuciones de cada año pasado, un
+punto de GraphQL por año, hasta el día en que se creó la cuenta. Apagada por
+omisión porque solo hace falta una vez.
+
+**`achievements`** recoge las insignias de la página pública del perfil, y es la
+única familia que no sale de la API: GitHub no lista los logros ni en REST ni en
+GraphQL, así que la página se lee una vez al día como visitante anónimo, sin el
+token y sin cargarse a ningún presupuesto. Junto a cada insignia escribe cuánto
+le falta a la cuenta para el siguiente nivel de esa insignia, que eso sí sale de
+la API. El analizador es estricto a propósito: cuando GitHub rediseñe la página
+la familia no escribe nada y lo dice una vez, en vez de escribir números
+equivocados que parecerían exactamente igual de buenos.
+
+## Actividad y coste
+
+**`events`** recoge el feed de actividad de la cuenta, la superficie más
+perecedera que tiene GitHub. Guarda aproximadamente los últimos trescientos
+eventos y descarta lo más viejo, sea cual sea su fecha, y nada más registra que
+un repositorio recibió una estrella, un fork, un seguimiento o un push en un
+minuto concreto.
+
+**`notifs`** recoge la bandeja de entrada. Como el feed de eventos es una
+ventana, no una historia: GitHub guarda las notificaciones no leídas alrededor
+de un año y las leídas mucho menos, y `per_page` se limita en silencio a 50 se
+pida lo que se pida.
+
+**`billing`** recoge lo que la cuenta gastó realmente, día a día, por producto,
+SKU y repositorio, que es el único sitio que dice qué repositorio quemó los
+minutos. Se guardan el bruto, el descuento y el neto en vez de derivar uno de
+los otros, porque el neto no siempre es cero: en la cuenta con la que se
+desarrolló esto lleva el crédito mensual.
+
+<Aside
+  type="note"
+  title="Una familia que falla en un repositorio no tumba la pasada"
+>
+  De cincuenta repositorios, la mayoría tiene Dependabot apagado, y cada uno
+  responde 403. Eso se anota como "no activado" y la pasada sigue. Solo una
+  familia en la que fallaron *todos* los repositorios se deja sin marcar, para
+  que se reintente en vez de darse por hecha.
+</Aside>

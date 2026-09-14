@@ -1,0 +1,121 @@
+[
+  {
+    "number": 3,
+    "state": "open",
+    "html_url": "https://github.com/octocat/hello-world/security/dependabot/3",
+    "created_at": "2026-08-25T06:00:00Z",
+    "updated_at": "2026-08-25T06:00:00Z",
+    "fixed_at": null,
+    "dismissed_at": null,
+    "auto_dismissed_at": null,
+    "dismissed_reason": null,
+    "security_advisory": {
+      "ghsa_id": "GHSA-aaaa-bbbb-cccc",
+      "cve_id": "CVE-2026-11111",
+      "summary": "golang.org/x/net vulnerable to excessive resource consumption",
+      "severity": "high",
+      "published_at": "2026-08-23T06:00:00Z",
+      "cvss": {"score": 7.5, "vector_string": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"},
+      "cvss_severities": {
+        "cvss_v3": {"score": 7.5, "vector_string": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"},
+        "cvss_v4": {"score": 6.6, "vector_string": "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:N/VI:N/VA:H/SC:N/SI:N/SA:N"}
+      },
+      "epss": {"percentage": 0.00278, "percentile": 0.20421},
+      "cwes": [{"cwe_id": "CWE-400", "name": "Uncontrolled Resource Consumption"}, {"cwe_id": "CWE-770", "name": "Allocation of Resources Without Limits"}]
+    },
+    "security_vulnerability": {
+      "package": {"ecosystem": "go", "name": "golang.org/x/net"},
+      "vulnerable_version_range": ">= 0.7.0, < 0.7.5",
+      "first_patched_version": {"identifier": "0.7.5"}
+    },
+    "dependency": {"package": {"ecosystem": "go", "name": "golang.org/x/net"}, "manifest_path": "go.mod", "scope": "runtime", "relationship": "direct"}
+  },
+  {
+    "number": 2,
+    "state": "fixed",
+    "html_url": "https://github.com/octocat/hello-world/security/dependabot/2",
+    "created_at": "2026-07-01T00:00:00Z",
+    "updated_at": "2026-07-03T00:00:00Z",
+    "fixed_at": "2026-07-03T00:00:00Z",
+    "dismissed_at": null,
+    "auto_dismissed_at": null,
+    "security_advisory": {
+      "ghsa_id": "GHSA-dddd-eeee-ffff",
+      "cve_id": null,
+      "summary": "Prototype Pollution in lodash",
+      "severity": "critical",
+      "published_at": "2026-06-29T00:00:00Z",
+      "cvss": {"score": 9.8, "vector_string": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"},
+      "cvss_severities": {"cvss_v3": {"score": 9.8, "vector_string": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"}, "cvss_v4": {"vector_string": null, "score": 0.0}},
+      "epss": null,
+      "cwes": []
+    },
+    "security_vulnerability": {
+      "package": {"ecosystem": "npm", "name": "lodash"},
+      "vulnerable_version_range": "< 4.17.21",
+      "first_patched_version": null
+    },
+    "dependency": {"package": {"ecosystem": "npm", "name": "lodash"}, "manifest_path": "dashboards/package-lock.json", "scope": "development", "relationship": "transitive"}
+  },
+  {
+    "number": 1,
+    "state": "dismissed",
+    "html_url": "https://github.com/octocat/hello-world/security/dependabot/1",
+    "created_at": "2026-06-01T00:00:00Z",
+    "updated_at": "2026-06-11T00:00:00Z",
+    "fixed_at": null,
+    "dismissed_at": "2026-06-11T00:00:00Z",
+    "auto_dismissed_at": null,
+    "dismissed_reason": "tolerable_risk",
+    "dismissed_comment": "Not reachable from our code.",
+    "dismissed_by": {"login": "octocat"},
+    "security_advisory": {
+      "ghsa_id": "GHSA-gggg-hhhh-iiii",
+      "cve_id": "CVE-2026-33333",
+      "summary": "Requests leaks Proxy-Authorization headers",
+      "severity": "low",
+      "published_at": "2026-05-30T00:00:00Z",
+      "cvss": {"score": 3.1, "vector_string": "CVSS:3.1/AV:N/AC:H/PR:L/UI:N/S:U/C:L/I:N/A:N"},
+      "cvss_severities": {"cvss_v3": {"score": 3.1, "vector_string": "CVSS:3.1/AV:N/AC:H/PR:L/UI:N/S:U/C:L/I:N/A:N"}},
+      "epss": {"percentage": 0.00044, "percentile": 0.11},
+      "cwes": [{"cwe_id": "CWE-200", "name": "Exposure of Sensitive Information"}]
+    },
+    "security_vulnerability": {
+      "package": {"ecosystem": "pip", "name": "requests"},
+      "vulnerable_version_range": "< 2.32.0",
+      "first_patched_version": {"identifier": "2.32.0"}
+    },
+    "dependency": {"package": {"ecosystem": "pip", "name": "requests"}, "manifest_path": "dashboards/requirements.txt", "scope": "development", "relationship": "unknown"}
+  },
+  {
+    "number": 151,
+    "state": "auto_dismissed",
+    "html_url": "https://github.com/octocat/hello-world/security/dependabot/151",
+    "created_at": "2026-09-01T18:30:19Z",
+    "updated_at": "2026-09-03T18:30:19Z",
+    "fixed_at": null,
+    "dismissed_at": null,
+    "dismissed_reason": null,
+    "auto_dismissed_at": "2026-09-03T18:30:19Z",
+    "security_advisory": {
+      "ghsa_id": "GHSA-px8p-9vwx-vf98",
+      "cve_id": "CVE-2026-45820",
+      "summary": "fflate vulnerable to denial of service",
+      "severity": "medium",
+      "published_at": "2026-07-22T09:32:13Z",
+      "cvss": {"score": 0.0, "vector_string": null},
+      "cvss_severities": {
+        "cvss_v3": {"score": 0.0, "vector_string": null},
+        "cvss_v4": {"score": 6.6, "vector_string": "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:N/VI:N/VA:H/SC:N/SI:N/SA:N"}
+      },
+      "epss": {"percentage": 0.00278, "percentile": 0.20421},
+      "cwes": [{"cwe_id": "CWE-400", "name": "Uncontrolled Resource Consumption"}]
+    },
+    "security_vulnerability": {
+      "package": {"ecosystem": "npm", "name": "fflate"},
+      "vulnerable_version_range": ">= 0.7.0, < 0.7.5",
+      "first_patched_version": {"identifier": "0.7.5"}
+    },
+    "dependency": {"package": {"ecosystem": "npm", "name": "fflate"}, "manifest_path": "pnpm-lock.yaml", "scope": "development", "relationship": "transitive"}
+  }
+]

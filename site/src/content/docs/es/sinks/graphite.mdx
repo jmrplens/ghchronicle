@@ -1,0 +1,97 @@
+---
+title: Graphite
+description: El protocolo de texto plano sobre TCP, y la ruta métrica exacta, que es el contrato del dashboard.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+import stats from "../../../../data/stats.json";
+
+```yaml
+sinks:
+  graphite:
+    addr: graphite:2003
+    prefix: github
+    batch: 1000
+```
+
+El protocolo de texto plano sobre TCP: `ruta valor marca-de-tiempo`, una línea
+por campo numérico. Los campos de texto se saltan, porque Graphite no tiene
+forma de sostener uno.
+
+Graphite guarda un punto en la hora que se le dio, así que los puntos fechados
+salen tal cual y la ventana de tráfico cae en sus propios días. Escribir el
+mismo punto dos veces llena la misma ranura del mismo fichero whisper, que es
+exactamente lo que quiere una reescritura de la ventana.
+
+La conexión se reabre tras una escritura fallida, una vez, antes de informar la
+escritura como fallida.
+
+## La ruta es el contrato del dashboard
+
+```text
+<prefijo>.<medida sin gh_>.<valores de etiqueta, en orden de clave>.<campo>
+```
+
+- Cada etiqueta es un nodo con su valor. Los nodos se ordenan por la **clave**
+  de la etiqueta, alfabéticamente, nunca por el orden en que las puso un
+  colector.
+- Un valor de etiqueta vacío se escribe como `none`, para que la profundidad de
+  una medida no cambie de un punto al siguiente y
+  `github.repo.*.*.*.*.*.*.*.*.*.stars` siga casando.
+- Un nodo conserva letras ASCII, dígitos, `_`, `-` y `:`. Todo lo demás pasa a
+  `_`: el punto, el espacio, la coma y la barra de `owner/repo`. Un punto
+  partiría el nodo y una barra anidaría un directorio.
+
+Así, un punto `gh_repo` etiquetado `archived=false default_branch=main
+fork=false full_name=acme/edge-cache language=Go license=MIT
+owner=acme repo=edge-cache visibility=public` con un campo `stars` queda
+como:
+
+```text
+github.repo.false.main.false.acme_edge-cache.Go.MIT.acme.edge-cache.public.stars 37 1757280000
+```
+
+Un campo que comparte nombre con una etiqueta se salta, la misma regla que
+aplica el line protocol: gana la etiqueta, porque es la que permite agrupar.
+
+<Aside
+  type="caution"
+  title="Una etiqueta nueva cambia la profundidad de la ruta"
+>
+  Añadir una etiqueta a un colector inserta un nodo en cada ruta de esa medida,
+  así que todos los objetivos de dashboard existentes dejan de casar. Este es el
+  precio de un almacén sin esquema, y por eso `TAGS` en la especificación del
+  dashboard refleja el conjunto de etiquetas de cada medida.
+</Aside>
+
+## Qué no puede responder
+
+Graphite guarda los puntos fechados pero no tiene filas. Una serie es una ruta y
+un número, así que:
+
+- No se puede construir una tabla que necesite varios campos de una misma fila.
+  El dashboard incluido conserva la columna por la que ordena y dice en la
+  descripción qué columnas descartó.
+- Un booleano no es una métrica allí en absoluto, ni tampoco un título ni
+  ninguna otra cadena. Esos paneles lo dicen.
+
+Todo lo que tiene forma de tiempo funciona con normalidad, que es la mayor parte
+del dashboard.
+
+## El dashboard
+
+`dashboards/ghchronicle-graphite.json` tiene los mismos {stats.panels} paneles que el de
+InfluxDB, escritos contra estas rutas con el prefijo por omisión. Necesita
+**Graphite 1.1 o posterior** para las funciones que usa, y cualquier panel que
+una serie no pueda llevar lo dice en su descripción.
+
+Cambia `prefix` y los objetivos del dashboard tienen que cambiar con él, ya que el
+prefijo es el primer nodo de cada ruta.
+
+## Por dónde seguir
+
+- [Elegir almacén](/ghchronicle/es/sinks/) compara Graphite con los otros nueve, y
+  lleva el registro de escrituras que todos comparten.
+- [Los dashboards](/ghchronicle/es/dashboards/) dice cuál de los cinco se dibuja
+  contra cada almacén, y en qué se convierte un panel que un almacén no puede
+  responder.

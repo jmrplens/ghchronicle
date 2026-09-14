@@ -1,0 +1,132 @@
+# Race detector workflow for ghchronicle.
+#
+# Where it runs, and where it deliberately does not. Not on every pull request:
+# ci.yml converges on one job, "CI", which is the single check branch
+# protection requires, and a job added there becomes a gate on every pull
+# request for a class of defect that is rare and not introduced by most
+# changes. Instead, the way github.com/jmrplens/gitlab-mcp-server runs it:
+#
+#   * at release, called by release.yml beside the E2E gate, so a race cannot
+#     reach a tag;
+#   * once a week on main, after the scheduled E2E run, so a race introduced
+#     this week surfaces this week rather than at the next tag;
+#   * by hand, from the dispatch menu.
+#
+# Reusable, not copied. release.yml calls this file, so the command a
+# maintainer can run by hand is the command the release gate runs, and both
+# are `make test-race`, which is what a developer runs locally.
+
+name: Race Detector
+
+on:
+  schedule:
+    # Mondays, 06:23 UTC: the same day as the scheduled E2E run (04:41) and
+    # after it, off the hour because GitHub delays runs that pile up on round
+    # times.
+    - cron: "23 6 * * 1"
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  # Every test under the detector, the end-to-end suite included. That suite
+  # drives the collector as a separate process, which `go test -race` alone
+  # would not instrument: the harness passes the detector on to the binary it
+  # builds through a build-tag seam (test/e2e/harness_race_test.go), starts it
+  # with GORACE=halt_on_error=1, and fails the test with the race report it
+  # finds in the collector's output (test/e2e/racereport), so a race in the
+  # collector fails this job and says where. The containerized suite has a job
+  # of its own below.
+  #
+  # `go test -timeout` bounds each package's test binary, not the run, so the
+  # Makefile's RACE_TIMEOUT has to cover the worst single package rather than
+  # their sum. It is there to end a genuine deadlock with every goroutine stack
+  # printed, which a job-level kill does not. The job bound is what covers the
+  # whole set.
+  unit:
+    name: Race (every suite)
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - run: go mod download
+
+      # A race build shares no cache with an ordinary one, so the collector the
+      # end-to-end suite builds is a cold build. It is done here rather than
+      # inside that suite's build bound.
+      - name: Warm the race build cache
+        run: go build -race -o /dev/null ./cmd/ghchronicle
+
+      - name: Every suite under the race detector
+        run: make test-race
+
+  # The containerized suite with the collector built under the detector, the
+  # same seam as above (test/e2e/docker/harness_race_test.go). This is where
+  # gitlab-mcp-server and this repository part ways on purpose: that project
+  # runs none of its container suites under the detector, and here the
+  # containers are the sinks, the half of the program with the most
+  # concurrency. The exporter answers scrapes while a sweep is still writing
+  # and the push sinks retry against stores that are slow for real, which is
+  # the timing no fake in the unit suite reproduces. Its own job rather than a
+  # step above, so a race here and a race there are two lines in the verdict.
+  docker:
+    name: Race (containerized suite)
+    runs-on: ubuntu-latest
+    # e2e.yml's bound for the same suite, plus the slower race build.
+    timeout-minutes: 60
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - run: go mod download
+
+      - name: Warm the race build cache
+        run: go build -race -o /dev/null ./cmd/ghchronicle
+
+      # The same target e2e.yml runs, with -race: it brings the stack up,
+      # tears it down on every path it controls and fails if anything of the
+      # project is left running.
+      - name: Run the containerized suite under the race detector
+        run: make test-e2e-docker-race
+
+      - name: Collect the stores' logs
+        if: failure()
+        run: |
+          make e2e-docker-logs > e2e-docker-logs.txt 2>&1 || true
+          if [ ! -s e2e-docker-logs.txt ]; then
+            echo "Nothing of the stack was still running; the failure is in the step above." > e2e-docker-logs.txt
+          fi
+
+      - name: Upload the stores' logs
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: e2e-docker-race-logs
+          path: e2e-docker-logs.txt
+          retention-days: 14
+
+      # A job cancelled or timed out mid-run kills make between `up` and
+      # `down`; this is the teardown that still runs.
+      - name: Make sure nothing is left running
+        if: always()
+        run: make e2e-docker-down

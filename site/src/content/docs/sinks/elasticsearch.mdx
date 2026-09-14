@@ -1,0 +1,108 @@
+---
+title: Elasticsearch
+description: The bulk API, one index per measurement, and a document id that makes a rewrite replace rather than duplicate.
+---
+
+import { Aside, Tabs, TabItem } from "@astrojs/starlight/components";
+import stats from "../../../data/stats.json";
+
+```yaml
+sinks:
+  elasticsearch:
+    url: http://elasticsearch:9200
+    prefix: ghchronicle
+    api_key: ${ES_API_KEY} # or username and password
+    batch: 1000
+```
+
+The `_bulk` API, which Elasticsearch and OpenSearch share, so the same sink
+serves both, and Kibana or the OpenSearch dashboards on top of either.
+
+## Credentials
+
+<Tabs syncKey="es-auth">
+  <TabItem label="API key">
+    ```yaml
+    api_key: ${ES_API_KEY}
+    ```
+
+    Sent as `Authorization: ApiKey`.
+
+  </TabItem>
+  <TabItem label="Basic">
+    ```yaml
+    username: ghchronicle
+    password: ${ES_PASSWORD}
+    ```
+
+    Sent as basic auth.
+
+  </TabItem>
+</Tabs>
+
+Not both. Configuring an API key alongside a username fails validation at
+start-up with `sinks.elasticsearch: set either api_key or username and
+password, not both`.
+
+## The documents
+
+One index per measurement, named `<prefix>-<measurement>`:
+`ghchronicle-gh_repo`, `ghchronicle-gh_traffic`.
+
+One document per point, with the time as `@timestamp` in RFC 3339,
+`measurement`, and every tag and field as a top-level key, so nothing has to be
+unnested before it can be filtered on.
+
+```json
+{
+  "@timestamp": "2026-09-07T00:00:00Z",
+  "measurement": "gh_traffic",
+  "owner": "acme",
+  "repo": "telemetry",
+  "full_name": "acme/telemetry",
+  "kind": "views",
+  "count": 220,
+  "uniques": 131
+}
+```
+
+## Why re-collection converges here too
+
+The document id is the **SHA-256 of the measurement, the tags that are set and
+the timestamp**, and the action is `index` rather than `create`. So writing the
+same fourteen-day traffic window every six hours replaces fourteen documents
+instead of adding fourteen more, which is the same convergence InfluxDB gives
+for free.
+
+<Aside type="caution" title="A bulk request answers 200 even when items failed">
+  Elasticsearch reports per-item verdicts inside a successful response. The sink
+  reads them, logs each refused document with the cluster's own reason, and
+  reports the count as a warning rather than a failure, because everything else
+  in the batch was written.
+</Aside>
+
+## No mapping is written
+
+The sink creates no index template. Dynamic mapping gives every string field a
+`.keyword` sub-field, which is what the dashboard aggregates on.
+
+If you want explicit mappings, create the index templates before the first
+write. Nothing in the sink depends on them; only the panels' choice of
+`.keyword` does.
+
+## The dashboard
+
+`dashboards/ghchronicle-elasticsearch.json` has the same {stats.panels} panels as the
+InfluxDB one, as Lucene filters and aggregations over **one** datasource
+pointing at `<prefix>-*`, because each target names its own index in its query.
+
+Set the datasource's time field to `@timestamp`. A per-item table there is the
+newest documents themselves; everything else is a bucket aggregation.
+OpenSearch works through the same plugin.
+
+## Where to go next
+
+- [Choosing a store](/ghchronicle/sinks/) compares Elasticsearch with the other nine,
+  and holds the write ledger every one of them shares.
+- [The dashboards](/ghchronicle/dashboards/) says which of the five is drawn
+  against which store, and what a panel a store cannot answer becomes.

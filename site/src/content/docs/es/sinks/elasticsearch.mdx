@@ -1,0 +1,114 @@
+---
+title: Elasticsearch
+description: La API bulk, un índice por medida, y un id de documento que hace que una reescritura reemplace en vez de duplicar.
+---
+
+import { Aside, Tabs, TabItem } from "@astrojs/starlight/components";
+import stats from "../../../../data/stats.json";
+
+```yaml
+sinks:
+  elasticsearch:
+    url: http://elasticsearch:9200
+    prefix: ghchronicle
+    api_key: ${ES_API_KEY} # o username y password
+    batch: 1000
+```
+
+La API `_bulk`, que comparten Elasticsearch y OpenSearch, así que el mismo
+destino sirve a ambos, y a Kibana o a los dashboards de OpenSearch encima de
+cualquiera de los dos.
+
+## Credenciales
+
+<Tabs syncKey="es-auth">
+  <TabItem label="Clave de API">
+    ```yaml
+    api_key: ${ES_API_KEY}
+    ```
+
+    Se envía como `Authorization: ApiKey`.
+
+  </TabItem>
+  <TabItem label="Básica">
+    ```yaml
+    username: ghchronicle
+    password: ${ES_PASSWORD}
+    ```
+
+    Se envía como autenticación básica.
+
+  </TabItem>
+</Tabs>
+
+No las dos. Configurar una clave de API junto a un usuario falla la validación
+al arrancar con `sinks.elasticsearch: set either api_key or username and
+password, not both`.
+
+## Los documentos
+
+Un índice por medida, llamado `<prefijo>-<medida>`: `ghchronicle-gh_repo`,
+`ghchronicle-gh_traffic`.
+
+Un documento por punto, con la hora como `@timestamp` en RFC 3339,
+`measurement`, y cada etiqueta y cada campo como clave de primer nivel, para que
+no haya que desanidar nada antes de poder filtrar por ello.
+
+```json
+{
+  "@timestamp": "2026-09-07T00:00:00Z",
+  "measurement": "gh_traffic",
+  "owner": "acme",
+  "repo": "telemetry",
+  "full_name": "acme/telemetry",
+  "kind": "views",
+  "count": 220,
+  "uniques": 131
+}
+```
+
+## Por qué aquí también converge volver a recoger
+
+El id del documento es el **SHA-256 de la medida, las etiquetas que tienen valor
+y la marca de tiempo**, y la acción es `index` y no `create`. Así que escribir la
+misma ventana de tráfico de catorce días cada seis horas reemplaza catorce
+documentos en vez de añadir otros catorce, que es la misma convergencia que
+InfluxDB da de balde.
+
+<Aside
+  type="caution"
+  title="Una petición bulk responde 200 aunque fallen elementos"
+>
+  Elasticsearch informa de los veredictos por elemento dentro de una respuesta
+  correcta. El destino los lee, registra cada documento rechazado con la razón
+  del propio clúster e informa la cuenta como aviso y no como fallo, porque todo
+  lo demás del lote se escribió.
+</Aside>
+
+## No se escribe ningún mapping
+
+El destino no crea plantilla de índice. El mapping dinámico da a cada campo de
+texto un subcampo `.keyword`, que es sobre lo que agrega el dashboard.
+
+Si quieres mappings explícitos, crea las plantillas de índice antes de la
+primera escritura. Nada del destino depende de ellas; solo la elección de
+`.keyword` en los paneles.
+
+## El dashboard
+
+`dashboards/ghchronicle-elasticsearch.json` tiene los mismos {stats.panels} paneles que el
+de InfluxDB, como filtros Lucene y agregaciones sobre **un solo** datasource
+apuntando a `<prefijo>-*`, porque cada objetivo nombra su propio índice en su
+consulta.
+
+Pon el campo de tiempo del datasource a `@timestamp`. Una tabla por elemento
+allí son los documentos más nuevos en sí; todo lo demás es una agregación por
+cubos. OpenSearch funciona con el mismo plugin.
+
+## Por dónde seguir
+
+- [Elegir almacén](/ghchronicle/es/sinks/) compara Elasticsearch con los otros nueve, y
+  lleva el registro de escrituras que todos comparten.
+- [Los dashboards](/ghchronicle/es/dashboards/) dice cuál de los cinco se dibuja
+  contra cada almacén, y en qué se convierte un panel que un almacén no puede
+  responder.

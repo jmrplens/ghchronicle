@@ -1,0 +1,162 @@
+---
+title: The file
+description: One YAML file, every value expandable from the environment, and what each top-level block is for.
+---
+
+import { Aside, FileTree } from "@astrojs/starlight/components";
+
+```sh
+cp config.example.yaml config.yaml
+```
+
+`config.example.yaml` documents every option in comments. It is the file to
+copy, and it is kept in step with the code: adding a setting means adding it
+there too.
+
+## The blocks
+
+```yaml
+github: # the token, the reserve, the timeout
+targets: # which repositories
+groups: # which categories of metric are collected at all
+sinks: # where the points go
+every: # how often things run: a default, per group, per family
+heartbeat: # how often the sweep loop wakes, for a test run
+log: # level, format, and an optional rotating file
+state_file: # what a restart remembers
+backfill: # the bound, when run with -backfill
+```
+
+Only `github.token` and one of `targets.user`, `targets.orgs` or
+`targets.repos` are genuinely required, plus at least one sink. Everything else
+has a default.
+
+## `${VAR}` expansion
+
+Every string value is expanded from the environment at start-up. `${GITHUB_TOKEN}`
+becomes the value of that variable, or an empty string if it is not set.
+
+```yaml
+github:
+  token: ${GITHUB_TOKEN}
+sinks:
+  influxdb:
+    url: http://localhost:8181
+    token: ${INFLUX_TOKEN}
+```
+
+This is the whole reason the file can be committed. The configuration is the
+shape of the deployment and belongs in version control; the tokens are
+credentials and belong in an environment file with mode 600, or in a secret
+store.
+
+<FileTree>
+
+- /etc/ghchronicle/
+  - config.yaml world readable, version controlled
+  - ghchronicle.env mode 600, never committed
+
+</FileTree>
+
+## `github`
+
+```yaml
+github:
+  token: ${GITHUB_TOKEN}
+  reserve_rate: 500
+  timeout: 30s
+  # base_url: https://github.example.com/api/v3
+  # web_url: https://github.example.com
+```
+
+| Key            | Default              | Meaning                                                                                                                                     |
+| -------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `token`        | required             | A classic or fine-grained personal access token                                                                                             |
+| `reserve_rate` | `500`                | Calls never spent, so whatever else uses the token keeps working                                                                            |
+| `timeout`      | `30s`                | Per request. GraphQL over a large account can be slow                                                                                       |
+| `base_url`     | api.github.com       | A GitHub Enterprise instance uses `https://<host>/api/v3`                                                                                   |
+| `web_url`      | derived from the API | The site the profile page is on, read by `achievements` without the token. Needed only when `base_url` is a proxy in front of the API |
+
+The reserve is scaled per bucket; see [rate limits](/ghchronicle/api/).
+
+## `state_file`
+
+```yaml
+state_file: /var/lib/ghchronicle/state.json
+```
+
+Six things, and deleting the file costs a different one for each:
+
+| Remembers                                                                              | Deleting it costs                                                              |
+| -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `last_run`, when each family last ran                                                  | every family is due at once, so the next sweep is a full one                    |
+| `first_saw`, when each repository was first seen                                       | the one-off full walk of the star history is done again                         |
+| `last_head`, the commit each repository was on when the dependency diff last ran       | the dependency changes in the gap: the next sweep has the photograph and no diff |
+| `last_full`, when each family that normally reads what changed last read a whole page  | absent reads as due, so the next sweep reads them all whole                     |
+| `last_notified`, where the inbox window was cut                                        | zero asks for the whole inbox                                                   |
+| `last_event`, the newest event the feed had                                            | empty reads the whole feed                                                      |
+
+Five of the six cost only quota, because what is collected again is keyed by
+measurement, tags and timestamp and overwrites what is already stored.
+`last_head` is the one that loses something: the dependency changes between the
+head it held and the next one are read from a range that nothing can name once
+the head is gone.
+
+### The other file a sweep remembers itself in
+
+```yaml
+sinks:
+  dedupe_file: /var/lib/ghchronicle/state-written.bin
+  dedupe_horizon: 720h
+```
+
+| Key                    | Default                                     | Meaning                                                                    |
+| ---------------------- | ------------------------------------------- | -------------------------------------------------------------------------- |
+| `sinks.dedupe_file`    | beside `state_file`, as `<name>-written.bin` | The ledger of what has already been written. `off` disables it for every sink |
+| `sinks.dedupe_horizon` | `720h`                                      | How long the ledger remembers a point nothing offers any more              |
+
+Losing it costs one sweep of rewriting and nothing else, which is exactly what a
+store that has been wiped and needs filling again wants. Both files want a
+persistent path:
+[only what changed is written](/ghchronicle/sinks/#only-what-changed-is-written).
+
+## `backfill`
+
+```yaml
+backfill:
+  since: 2y
+```
+
+Only applies to a run started with `-backfill`, and is overridden by
+`-backfill-since`. See [backfill](/ghchronicle/how/backfill/).
+
+## When it is wrong, it says so at start-up
+
+Configuration is validated before the first call is made, and the messages name
+the key and what it needs.
+
+| Message                                                               | Means                                                                 |
+| --------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| `github.token is empty and GITHUB_TOKEN is unset`                     | Exactly what it says                                                  |
+| `targets: set at least one of user, orgs or repos`                    | Nothing to collect                                                    |
+| `sinks: enable at least one of ...`                                   | A run that collects and discards is almost never what anyone meant    |
+| `every.families.<name>: unknown collector`                            | The name is not a family. The message lists the ones that exist       |
+| `sinks.influxdb: url and bucket are required`                         | Each sink validates its own required keys and says which              |
+| `sinks.sql.dialect: "mysql" is not postgres, the only dialect so far` | The value is not one of the accepted ones, and the message lists them |
+
+<Aside type="note" title="A cadence for a family that does not exist is fatal">
+  `every` is checked against the list of known collectors at start-up rather
+  than being ignored. A typo there would otherwise mean a family silently
+  running at its default forever, which has bitten twice.
+</Aside>
+
+## The rest
+
+- [Targets](/ghchronicle/configuration/targets/): which repositories, and the
+  fork and archived defaults.
+- [Cadences](/ghchronicle/configuration/cadences/): the `every` block, and what
+  `0` means.
+- [Logging](/ghchronicle/configuration/logging/): level, format and the
+  rotating file.
+- [Choosing a store](/ghchronicle/sinks/): the `sinks` block, one page per
+  store.

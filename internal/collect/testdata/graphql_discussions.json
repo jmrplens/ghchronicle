@@ -1,0 +1,45 @@
+{
+  "data": {
+    "repository": {
+      "discussions": {
+        "totalCount": 2,
+        "nodes": [
+          {
+            "number": 12,
+            "createdAt": "2026-08-15T10:00:00Z",
+            "updatedAt": "2026-08-16T10:00:00Z",
+            "isAnswered": true,
+            "upvoteCount": 3,
+            "answerChosenAt": "2026-08-15T14:30:00Z",
+            "answerChosenBy": {"login": "erin"},
+            "answer": {"author": {"login": "octocat"}},
+            "closed": true,
+            "closedAt": "2026-08-16T10:00:00Z",
+            "stateReason": "RESOLVED",
+            "author": {"login": "erin"},
+            "category": {"name": "Q&A", "emoji": ":pray:", "isAnswerable": true},
+            "comments": {"totalCount": 2},
+            "reactions": {"totalCount": 1}
+          },
+          {
+            "number": 13,
+            "createdAt": "2026-09-02T09:00:00Z",
+            "updatedAt": "2026-09-02T09:00:00Z",
+            "isAnswered": null,
+            "upvoteCount": 0,
+            "answerChosenAt": null,
+            "answerChosenBy": null,
+            "answer": null,
+            "closed": false,
+            "closedAt": null,
+            "stateReason": null,
+            "author": null,
+            "category": {"name": "Ideas", "emoji": ":bulb:", "isAnswerable": false},
+            "comments": {"totalCount": 0},
+            "reactions": {"totalCount": 0}
+          }
+        ]
+      }
+    }
+  }
+}

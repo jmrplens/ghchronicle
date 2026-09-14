@@ -1,0 +1,1 @@
+gh_account_total,user=octocat commented_elsewhere=113i,commits=9228i,issues_closed=137i,issues_elsewhere=27i,issues_opened=167i,pulls_merged=1696i,pulls_merged_elsewhere=19i,pulls_open_now=17i,pulls_opened=1799i,pulls_reviewed=453i,repositories=35i,url="https://github.com/octocat" 1788879845000000000

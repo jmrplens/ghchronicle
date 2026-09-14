@@ -1,0 +1,4 @@
+[
+  {"id": 21, "name": "protect main", "target": "branch", "source_type": "Repository", "source": "octocat/hello-world", "enforcement": "active", "created_at": "2025-06-01T00:00:00Z", "updated_at": "2026-07-15T00:00:00Z"},
+  {"id": 22, "name": "tag policy", "target": "tag", "source_type": "Repository", "source": "octocat/hello-world", "enforcement": "disabled", "created_at": "2025-06-01T00:00:00Z", "updated_at": "2026-09-01T00:00:00Z"}
+]

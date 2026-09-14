@@ -1,0 +1,287 @@
+---
+title: Calling it from a program
+description: There is no Go library. What there is instead is one sweep, NDJSON on standard output, and good reasons not to call it in a loop.
+---
+
+import { Aside, Tabs, TabItem } from "@astrojs/starlight/components";
+
+<Aside type="caution" title="There is no Go library">
+  Every package this tool has lives under `internal/`, and Go refuses that
+  import from outside the module. The subprocess route on this page is not a
+  workaround for something you have missed; it is the interface.
+</Aside>
+
+```text
+main.go:6:2: use of internal package github.com/jmrplens/ghchronicle/internal/collect not allowed
+```
+
+What exists instead is a binary that runs one sweep, writes one JSON object per
+line to standard output and exits. Anything that can spawn a process and read a
+pipe can use it, in any language, and it gets the same points a database would
+rather than a second pass over the API.
+
+## A configuration for one question
+
+```yaml
+github:
+  token: ${GITHUB_TOKEN}
+  reserve_rate: 500
+
+targets:
+  repos: [acme/telemetry]
+
+sinks:
+  stdout: true
+  stdout_format: json
+
+state_file: /tmp/ghchronicle-adhoc.json
+
+log:
+  level: warn
+```
+
+Two things about `targets` are worth getting right the first time.
+
+**Name repositories, not the account.** `repos` is an inclusion, not a filter:
+adding `user: acme` beside it does not narrow anything, it discovers the
+whole account and collects that as well. `-list` is the cheap way to check
+before spending quota on it.
+
+```sh
+ghchronicle -config adhoc.yaml -list
+```
+
+```text
+acme/telemetry
+```
+
+**Leaving `user` out switches off eleven families for free.** The account-wide
+collectors (`account`, `totals`, `ratelimit`, `events`, `notifs`, `billing`,
+`profile`, `outbound`, `history`, `achievements` and `keys`) have no login to
+ask about and are skipped, which is most of what an application asking about
+one repository does not want to pay for.
+
+The log goes to standard error, always and whatever the level, so standard
+output carries data and nothing else. That is what makes the pipe safe to parse
+without filtering it first.
+
+## The command
+
+```sh
+ghchronicle -config adhoc.yaml -once > points.ndjson 2> sweep.log
+```
+
+`-once` runs a single sweep and exits. It starts no exporter and holds no port,
+so it does not collide with a long-running instance on the same host.
+
+## What comes out
+
+Three lines of it, from the demonstration account every example here uses:
+
+```json
+{"time":"2026-09-08T16:08:17.651862791Z","measurement":"gh_repo","tags":{"archived":"false","default_branch":"main","fork":"false","full_name":"acme/telemetry","language":"Go","license":"apache-2.0","owner":"acme","repo":"telemetry","visibility":"public"},"fields":{"age_days":1290,"days_since_push":0,"forks":21,"network":21,"open_issues":9,"repo_id":1043778215,"size_kb":18422,"stars":148,"url":"https://github.com/acme/telemetry","watchers":11}}
+{"time":"2026-09-07T00:00:00Z","measurement":"gh_traffic","tags":{"full_name":"acme/telemetry","kind":"clones","owner":"acme","repo":"telemetry"},"fields":{"count":94,"uniques":71,"url":"https://github.com/acme/telemetry/graphs/traffic"}}
+{"time":"2026-09-08T16:08:17.651862791Z","measurement":"gh_release","tags":{"draft":"false","full_name":"acme/telemetry","owner":"acme","prerelease":"false","repo":"telemetry","tag":"v2.4.0"},"fields":{"age_days":22,"assets":4,"downloads":1840,"url":"https://github.com/acme/telemetry/releases/tag/v2.4.0"}}
+```
+
+Four keys, and they are the same four for every point:
+
+| Key           | What it holds                                                          |
+| ------------- | ---------------------------------------------------------------------- |
+| `time`        | The date the thing happened, RFC 3339. Not the time of the sweep       |
+| `measurement` | What kind of thing this is, always prefixed `gh_`                      |
+| `tags`        | Strings, and only strings. Together they identify the series           |
+| `fields`      | The values: numbers, booleans, and the occasional string such as `url` |
+
+The `time` distinction is the whole design, and it shows in those three lines.
+The traffic point is dated `2026-09-07T00:00:00Z` because that is the day those
+94 clones happened, and every sweep for the next fortnight will offer it again
+with the same date. The repository point is stamped at the moment of the sweep,
+because "148 stars" is true now and has no other date to carry. The release
+carries its age in a field for the same reason.
+
+Every measurement and every field is listed in
+[Measurements](/ghchronicle/collectors/measurements/).
+
+`stdout_format: influx` prints InfluxDB line protocol instead, which is the
+better choice when the receiving end already speaks it.
+
+## Narrowing it to what you want
+
+Even against one repository a sweep runs twenty-one families, the twenty-three
+per-repository ones less `deps` and `joblogs`, which ship switched off. `every`
+switches
+them off, and `default` is the layer that does it in one line: put everything to
+`0`, then name back what you want.
+
+```yaml
+every:
+  default: 0
+  families:
+    traffic: 6h
+```
+
+That run costs five API calls, one to resolve the repository named in `targets`
+and four for the traffic family, and prints 48 objects: 28 `gh_traffic`, 10
+`gh_traffic_path` and 10 `gh_traffic_referrer`.
+
+<Aside type="tip" title="A default of 0 never switches the off ones on">
+  `deps`, `history` and `joblogs` ship with a built-in cadence of `0`, and
+  neither `default` nor `every.groups` can reach a family that ships switched
+  off. Naming it under `families:` is the only way to turn one on, so the
+  configuration above collects traffic and nothing else, the dependency graph
+  included.
+</Aside>
+
+A family is not a measurement, which is the other half of this: `repo` alone
+emits `gh_repo`, `gh_repo_language`, `gh_repo_topic`, `gh_release` and several
+more. Switching the family off is what saves the API calls; filtering the stream
+is what saves you reading them.
+
+```sh
+ghchronicle -config adhoc.yaml -once | grep '"gh_traffic"'
+ghchronicle -config adhoc.yaml -once | jq -c 'select(.measurement == "gh_repo") | {repo: .tags.full_name, stars: .fields.stars}'
+```
+
+A family name spelled wrong is a start-up error, and the message lists every
+name there is, so there is no need to keep a copy of the list anywhere.
+
+## Reading it from another program
+
+Any language, since the contract is a pipe and a line of JSON. Python here,
+because a Go program cannot import this and would be running the same
+subprocess.
+
+```python
+import json
+import subprocess
+
+proc = subprocess.Popen(
+    ["ghchronicle", "-config", "adhoc.yaml", "-once"],
+    stdout=subprocess.PIPE,
+    stderr=subprocess.DEVNULL,
+    text=True,
+)
+
+stars = {}
+for line in proc.stdout:
+    point = json.loads(line)
+    if point["measurement"] == "gh_repo":
+        stars[point["tags"]["full_name"]] = point["fields"]["stars"]
+
+if proc.wait() != 0:
+    raise SystemExit("the sweep failed; run it again without stderr suppressed")
+
+print(stars)
+```
+
+```text
+{'acme/telemetry': 148}
+```
+
+Read the pipe as it fills rather than after the process exits. The sink flushes
+once per family, so a consumer sees the traffic points while the commit
+collector is still working, and a sweep over a whole account takes minutes.
+Waiting for the end also means holding all of it in memory: over a handful of
+busy repositories the `actions` family alone can produce more than ten thousand
+objects in a single sweep.
+
+Sending the log to `DEVNULL` is right for a program that only needs to know
+whether the sweep succeeded. It is the wrong default while you are still writing
+that program: keep it, and read it.
+
+## Two smaller questions
+
+<Tabs syncKey="adhoc-cheap">
+  <TabItem label="-list">
+    Prints the repositories in scope, one full name per line, and costs the
+    discovery calls and nothing else.
+
+    ```sh
+    ghchronicle -config adhoc.yaml -list
+    ```
+
+  </TabItem>
+  <TabItem label="-card">
+    Still runs a full sweep, but writes a self-contained SVG with no database
+    configured at all. The card is about an account rather than a repository,
+    so it needs a config with `targets.user` in it: the one above has none, and
+    gets `render: card has no login` and a 1. See
+    [the card](/ghchronicle/card/).
+
+    ```sh
+    ghchronicle -config account.yaml -card summary.svg -card-only
+    ```
+
+  </TabItem>
+</Tabs>
+
+## Exit codes
+
+| Code | Means                                                                                                          |
+| ---- | -------------------------------------------------------------------------------------------------------------- |
+| 0    | The sweep ran                                                                                                  |
+| 1    | It could not start, or could not list the repositories: no config file, an invalid one, a token GitHub refused |
+| 2    | An unknown flag. This is Go's flag package, and it has already printed the usage                               |
+
+Zero answers "did the sweep run", not "did everything work". A collector that
+fails is logged and the sweep continues, because a repository with a feature
+switched off must not stop the sweep for the other forty.
+
+```text
+level=ERROR msg="collector failed" family=issueevents repo=acme/parser err="/repos/acme/parser/issues/events?per_page=100&page=1: 504 Gateway Timeout"
+```
+
+A caller that needs to know about that has to read standard error. There is no
+exit code for it, deliberately: on a large account some family fails somewhere
+most sweeps, and a status that reported it would be permanently red.
+
+Killing the process usually gets a 1 as well. `SIGTERM` and `SIGINT` cancel the
+sweep, what is already on the pipe stays there, and the run ends with
+`ghchronicle: context canceled`. Usually, because the code depends on where the
+signal lands: during discovery it is a 1 carrying the cancelled request's own
+error instead, and in the last repository of a family it is logged as a
+collector failure and the sweep still finishes with a 0. A caller with its own
+deadline should treat a kill it ordered as "incomplete" rather than read the
+exit code for it.
+
+## Calling it in a loop is the wrong shape
+
+A sweep costs API calls: four per repository for traffic, three per repository
+plus two GraphQL points per ten repositories for the repository family, one
+GraphQL point per repository for commits and one to two for issues. [Cost of a sweep](/ghchronicle/api/cost/) has the measured
+table. The budget is 5000 REST calls an hour for the whole token, shared with
+everything else that uses it, and the collector brakes before spending the last
+`reserve_rate` of them: it stops a family rather than crossing that line, and
+says so in the log.
+
+So a program that calls this on every request, or on a tight timer, is answered
+with an empty sweep and a warning rather than with fresher numbers. Two things
+follow, and the second one surprises people.
+
+**Cache the answer.** These numbers move on the order of hours. GitHub's own
+traffic window updates once a day.
+
+**Expect the second run to print nothing.** A family is collected only when its
+cadence says it is due, and `-once` marks it as run in the state file. Two
+sweeps a minute apart therefore give a full stream and then an empty one, exit
+code 0 both times, which reads like a bug and is the brake working. At `info`
+the log says so by omission:
+
+```text
+level=INFO msg="repositories discovered" count=1
+level=INFO msg="rate budget" bucket=core remaining=3949 limit=5000
+level=INFO msg="sweep finished"
+```
+
+No `written` line, because nothing was due. Deleting the state file collects
+everything again at full price, including the one-off walk of every star, so
+point `state_file` somewhere the application controls and leave it there.
+
+<Aside type="note" title="When it is not ad hoc">
+  If the program wants a continuous feed rather than an answer now, stop
+  spawning it: run it as a service and give it a [sink](/ghchronicle/sinks/).
+  The file sink writes this same JSON to a rotating file for anything that tails
+  it, and the push sinks reach a store the program can query without touching
+  GitHub at all.
+</Aside>

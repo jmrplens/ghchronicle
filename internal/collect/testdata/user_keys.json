@@ -1,0 +1,4 @@
+[
+  {"id": 1, "title": "nginx", "created_at": "2026-05-28T10:00:00Z", "last_used": "2026-09-01T08:58:11Z", "verified": true, "read_only": false},
+  {"id": 2, "title": "matrix", "created_at": "2026-05-28T10:00:00Z", "last_used": null, "verified": true, "read_only": false}
+]

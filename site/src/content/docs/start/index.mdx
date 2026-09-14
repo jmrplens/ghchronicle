@@ -1,0 +1,57 @@
+---
+title: What it is
+description: What ghchronicle collects, and the problem it exists to solve.
+sidebar:
+  order: 1
+---
+
+import { Aside } from "@astrojs/starlight/components";
+import stats from "../../../data/stats.json";
+
+GitHub answers most questions about the present and almost none about the past.
+
+The traffic API serves fourteen days and forgets. The activity feed keeps the
+last three hundred events, whatever their dates. Read notifications disappear
+within weeks. Job logs are deleted after ninety days. The star list will tell
+you when each star was given, but only if you ask before the list gets long
+enough to be expensive to walk. None of it is archived anywhere unless you
+archive it.
+
+`ghchronicle` sweeps those surfaces on a schedule and writes every observation
+as a point stamped with the date the thing actually happened, so a year from
+now the question "how fast were we merging in July" still has an answer.
+
+```sh
+ghchronicle -config config.yaml
+```
+
+It is one Go binary with no dependencies beyond a YAML parser, and it pushes to
+every store it supports, so it runs wherever it can reach them: a server, a
+container, a scheduled workflow.
+
+<Aside type="note" title="The card is not the point">
+  It can also draw an SVG summary card for a profile README. That is a side
+  feature. The reason the project exists is the ingestion.
+</Aside>
+
+## The six words the rest of this uses
+
+| Word            | What it means here                                                                                   |
+| --------------- | ------------------------------------------------------------------------------------------------------ |
+| **family**      | One collector, named in the configuration: `actions`, `stars`, `issues`. There are {stats.families}                |
+| **group**       | A named set of families, for switching a whole area on or off: `ci`, `security`, `audience`. There are {stats.groups} |
+| **measurement** | One kind of row in the store, named `gh_*`: `gh_star`, `gh_workflow_run`. There are {stats.measurements}               |
+| **point**       | One row: a measurement, its tags, its fields and the date the thing happened                         |
+| **sweep**       | One pass over the families that are due, which is what the process does on a loop                    |
+| **backfill**    | A run with `-backfill`, which walks the history instead of the increment                             |
+
+`ghchronicle -groups` prints the groups with their families, and
+`ghchronicle -config config.yaml -list` prints the repositories a sweep would
+cover.
+
+## Where to go next
+
+- [Quickstart](/ghchronicle/start/quickstart/): from nothing to a first sweep.
+- [The token](/ghchronicle/start/token/): which scope buys which family.
+- [Dating a point](/ghchronicle/how/dating/): the design idea everything else
+  follows from.

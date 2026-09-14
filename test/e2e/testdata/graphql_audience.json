@@ -1,0 +1,35 @@
+{
+  "data": {
+    "r0": {
+      "stargazers": {
+        "edges": [
+          {"starredAt": "2024-03-01T10:00:00Z", "node": {"login": "alice"}},
+          {"starredAt": "2024-06-15T18:30:00Z", "node": {"login": "bob"}},
+          {"starredAt": "2025-01-20T08:45:00Z", "node": {"login": "carol"}},
+          {"starredAt": "2026-08-30T22:10:00Z", "node": {"login": "dave"}}
+        ]
+      },
+      "forks": {
+        "totalCount": 2,
+        "nodes": [
+          {
+            "nameWithOwner": "alice/hello-world",
+            "createdAt": "2025-02-10T10:00:00Z",
+            "pushedAt": "2025-02-20T10:00:00Z",
+            "stargazerCount": 2,
+            "url": "https://github.com/alice/hello-world",
+            "owner": {"login": "alice"}
+          },
+          {
+            "nameWithOwner": "bob/hello-world",
+            "createdAt": "2026-08-01T10:00:00Z",
+            "pushedAt": "2026-08-01T10:00:30Z",
+            "stargazerCount": 0,
+            "url": "https://github.com/bob/hello-world",
+            "owner": {"login": "bob"}
+          }
+        ]
+      }
+    }
+  }
+}

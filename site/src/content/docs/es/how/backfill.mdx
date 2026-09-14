@@ -1,0 +1,171 @@
+---
+title: Relleno histórico
+description: Un recorrido deliberado hasta el final de cada superficie, hasta dónde llega, y las tres cosas que ningún relleno alcanza.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+```sh
+ghchronicle -config config.yaml -backfill
+```
+
+Una pasada es un incremento. Un relleno histórico es un recorrido. Son
+intenciones opuestas y la herramienta las trata como tales.
+
+## La diferencia en una tabla
+
+|                        | Pasada                                    | Relleno                                                  |
+| ---------------------- | ----------------------------------------- | -------------------------------------------------------- |
+| Páginas por colector   | el pequeño valor por defecto del colector | hasta que se acabe la API, o hasta el límite dado        |
+| Al llegar a la reserva | saltar la familia y avisar                | esperar a que la ventana se reinicie y seguir            |
+| Qué familias corren    | las que tienen el intervalo vencido       | todas las activas, diga lo que diga el fichero de estado |
+| Con qué frecuencia     | según horario, siempre                    | a propósito, normalmente una vez                         |
+
+Una pasada normal nunca debe bloquear. Protege la reserva para que lo demás que
+use el mismo token siga funcionando, y salta una familia antes que dormir. Un
+relleno se lanza a propósito y lo único que importa es que termine, así que
+aparca hasta que el presupuesto vuelva a estar entero. Un relleno que se rinde a
+medias ha gastado la parte cara del presupuesto y conserva solo las familias que
+llegó a terminar: cada una se escribe y se marca en cuanto acaba, así que lo que
+hay que volver a lanzar es el resto.
+
+## La espera
+
+Cuando un cubo está en su reserva o por debajo, el relleno espera. La espera no
+se adivina: cada respuesta de GitHub dice exactamente cuándo se reinicia su
+ventana, así que el colector duerme hasta ese instante más un segundo de holgura
+y registra lo que está haciendo.
+
+```text
+level=INFO msg="rate limit reserve reached, waiting for the window to reset" family=commits wait=23m11s
+```
+
+Dos guardas sobre esa espera. Está limitada a una hora, para que un desfase de
+reloj o una cabecera obsoleta no se conviertan en un sueño ilimitado, y tiene un
+suelo de un segundo, para que no se convierta en un bucle activo. Un contexto
+cancelado termina la espera de inmediato, que es lo que hace que `Ctrl+C`
+funcione durante un relleno nocturno.
+
+## Hasta dónde
+
+`-backfill-since` en la línea de órdenes, o `backfill.since` en el fichero de
+configuración. Cuatro formas de escribirlo, porque cada cual tira de una:
+
+| Valor                     | Significa                         |
+| ------------------------- | --------------------------------- |
+| `2024-01-01`              | esa fecha                         |
+| `90d`                     | hace noventa días                 |
+| `2y`                      | hace dos años                     |
+| `720h`                    | una duración de Go antes de ahora |
+| vacío, `all`, `unlimited` | sin límite alguno                 |
+
+Sin límite significa que el recorrido solo se detiene donde se detiene la API,
+por muchas horas o días que eso lleve, con una pausa en cada reinicio de límite
+por el camino.
+
+```sh
+ghchronicle -config config.yaml -backfill -backfill-since 2y
+```
+
+## Lánzalo una vez, primero
+
+Una instalación nueva debería lanzar un relleno antes de arrancar el servicio,
+o justo después. La primera pasada es un incremento más ancho, no una historia:
+un mes de ejecuciones de workflows, la historia de estrellas entera y la página
+más reciente de todo lo demás. Los puntos van fechados, así que a cualquier
+almacén le vale; a un dashboard a noventa días o a dos años no, porque la
+historia que dibuja empieza el día en que se instaló el colector.
+
+Medido tras un día de pasadas y sin relleno, sobre repositorios con cientos de
+pull requests cada uno: pull requests, alrededor de una quinta parte de las que
+declaran los repositorios, porque una pasada lee una sola página de cincuenta
+por repositorio por muchas que tenga; issues, alrededor de la mitad; commits,
+bastante menos de una décima parte y ninguno de más de treinta días; jobs y
+pasos de una décima parte de las ejecuciones de workflows, así que la espera en
+cola, los jobs más lentos y los pasos que fallan se calcularon sobre esa décima
+parte. A dos años, _Pull requests merged_ marcaba una quinta parte de lo que
+decía _Pull requests merged, ever_. Estrellas, forks, releases, despliegues y
+alertas estaban completos, porque la primera pasada los recorre hasta el final
+de todos modos.
+
+## Qué alcanza que una pasada no
+
+- Toda la historia de commits, en lugar de la última página. Esta es la única
+  familia en la que un relleno es cualitativamente distinto y no solo más
+  ancho: sin él la serie de líneas cambiadas empieza el día en que instalaste el
+  colector.
+- Dos años de ejecuciones de workflows, y cada ejecución expandida en sus jobs y
+  sus pasos.
+- Los repositorios archivados, enteros, diga lo que diga `include_archived`. Su
+  historia es la historia de la cuenta y ya no se mueve, que es justo por lo
+  que una pasada los deja fuera y por lo que un solo recorrido basta. Los forks
+  quedan como estén configurados. Una pasada sigue escribiendo la única fila
+  que tiene cada repositorio archivado, la fecha en que se archivó: el listado
+  que ya paga dice cuáles, y una consulta por pasada de `totals` dice cuándo.
+- Todas las páginas de artefactos, veinte páginas de actividad del repositorio y
+  los análisis de code scanning.
+- Cien pull requests e issues por repositorio.
+- Las notificaciones leídas además de las no leídas.
+- Veinticuatro meses de facturación.
+- Cien entregas de webhook por hook.
+
+## Qué no enciende
+
+Un relleno corre todas las familias activas diga lo que diga el fichero de
+estado. No enciende ninguna. Las tres familias que vienen con cadencia `0`,
+`deps`, `history` y `joblogs`, siguen apagadas si no se les ha dado una por
+nombre bajo `every.families`, y `-backfill` no cambia eso.
+
+`history` es la que sorprende, porque recorrer cada año pasado del calendario de
+contribuciones es justo lo que tiene en la cabeza quien pide "toda la historia".
+Dale antes una cadencia:
+
+```yaml
+every:
+  families:
+    history: 24h
+```
+
+En [cadencias](/ghchronicle/es/configuration/cadences/) está por qué `default` y
+`groups` tampoco pueden encender estas tres.
+
+## Dos endpoints que necesitaron trato aparte
+
+Ambos se descubrieron ejecutándolo, no leyendo documentación.
+
+**Dependabot rechaza los números de página.** Responde con un error a `page=`
+sin más y pagina por cursor, así que el recorrido de alertas está escrito contra
+cursores.
+
+**La pasarela de GraphQL se rinde con cien pull requests.** Pedir cien pull
+requests con sus revisiones en una consulta responde un **502 en HTML** al cabo
+de unos diez segundos. El recorrido de pull requests parte su página por la
+mitad y reintenta sobre el mismo cursor, en silencio: los colectores no llevan
+registrador, así que un relleno de un repositorio activo lo muestra solo como
+una familia más lenta, nunca como una línea.
+
+<Aside type="caution" title="Tres cosas no se pueden rellenar a ningún precio">
+Ninguna espera cambia esto, y son la razón de que el proyecto exista.
+
+- **El feed de eventos guarda trescientos eventos**, sea cual sea su fecha.
+  Pasado ese techo GitHub responde 422 "pagination is limited for this
+  resource", que el colector lee como el final de los datos.
+- **El tráfico son catorce días.** Nada más viejo llegó nunca a guardarse en
+  GitHub.
+- **Los logs de los jobs se borran a los noventa días** y responden 410 después,
+  mientras que los metadatos de la ejecución a la que pertenecen sobreviven
+  años.
+
+</Aside>
+
+## Cómo lanzar uno con seguridad
+
+Es idempotente. Los puntos se indexan por medida, etiquetas y marca de tiempo,
+así que un relleno ejecutado dos veces reescribe las mismas filas en vez de
+duplicarlas, en todo almacén que guarde la historia. Lo que cuesta es cuota de
+API y tiempo.
+
+Dos cosas que conviene hacer antes: ejecutar `-list` para confirmar el conjunto
+de repositorios, y comprobar que el almacén al que escribes es de los que
+guardan fechas. Rellenar hacia Prometheus recoge muchísima historia y
+después la reduce entera a un único valor actual.

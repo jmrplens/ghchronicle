@@ -1,0 +1,140 @@
+---
+title: Rate limits
+description: GitHub runs fifteen independent budgets; three of them matter here, and the brake is scaled to each.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+GitHub does not have a rate limit. It has fifteen of them, and every response
+says which one it just charged in the `x-ratelimit-resource` header.
+
+## The three that matter here
+
+| Bucket    | Limit                | Spent by                                                         |
+| --------- | -------------------- | ---------------------------------------------------------------- |
+| `core`    | 5000 per hour        | Every REST call                                                  |
+| `graphql` | 5000 points per hour | The account, commits, discussions, labels and milestones queries, and since 2026-09-11 the newest stars and forks, the starred list, the outbound searches and ten of the eleven totals counts |
+| `search`  | 30 per minute        | The commit count of `totals`, and nothing else: GraphQL search has no COMMIT type |
+
+Two more are charged by one family each: `webhook_deliveries` (500 a minute) by
+the delivery list of every hook in `settings`, and `dependency_sbom` (100 a
+minute) by the SBOM in `deps`. Neither is one of the fifteen `/rate_limit`
+reports; they exist only in the headers of the endpoints that charge them, and
+both are named in the [cost table](/ghchronicle/api/cost/) where they apply.
+The brake looks at the three above, not at whichever bucket was charged last,
+which matters for the reason below.
+
+## The brake
+
+`github.reserve_rate` is how many calls are never spent. It defaults to 500.
+The collector stops a family rather than crossing that line, so whatever else
+uses the same token keeps working.
+
+```yaml
+github:
+  token: ${GITHUB_TOKEN}
+  reserve_rate: 500
+```
+
+The reserve is scaled to each bucket: a fifth of its limit, or the configured
+value, whichever is smaller.
+
+<Aside type="caution" title="The scaling is a bug fix, not a refinement">
+  Search allows thirty requests a minute. One call to it leaves "29 remaining",
+  and comparing that against a flat reserve of 500 read as exhausted, so every
+  remaining family in the sweep was skipped. Judging a thirty-request bucket by
+  a five-thousand-request reserve stops the collector dead.
+</Aside>
+
+When a bucket is below its reserve, the collector waits for the reset the
+response already told it about, rather than sleeping a guessed interval and
+retrying. In a normal sweep the family is skipped with a warning:
+
+```text
+level=WARN msg="rate limit reserve reached, family skipped" family=artifacts
+```
+
+Once is fine. Every sweep means the cadences are too fast for the number of
+repositories; see [cost of a sweep](/ghchronicle/api/cost/) for what to
+lengthen first.
+
+## ETags, and why a 304 is free
+
+Every response is cached by its ETag. A repeat request sends `If-None-Match`,
+and GitHub answers 304 Not Modified when nothing has changed.
+
+**A 304 costs no quota at all.** That is not an optimisation detail, it is the
+thing that makes short cadences affordable. Most of what this collects barely
+moves: a repository's language breakdown, its topics, its community profile,
+the list of workflows. Asking for them every hour would be unaffordable if each
+question cost a call. Asking whether they changed costs nothing.
+
+The consequence is that the measured cost of a sweep in the next page is an
+upper bound reached on the first sweep and after a change, not the steady-state
+figure.
+
+What the cache keeps beside each ETag is the value the collector decoded,
+encoded again, not the body GitHub sent. A page of a hundred workflow runs is
+1.4 MB of which the collector keeps a few hundred bytes per run, so a sweep's
+cache holds about a ninth of what the raw bodies would, and a 304 decodes a
+ninth of the bytes. A test runs every REST collector twice against a fake
+GitHub that answers the repeat 304 and fails on the first point that differs,
+which is what keeps the replay the same answer as the original. An entry is
+keyed by the URL and the type that decoded it, so the one URL two collectors
+read differently, `GET /repos/{owner}/{repo}` (four flags for discovery of a
+repository named in `targets.repos`, forty fields for the repo family), has an
+entry per reader and neither is answered from the other's.
+
+The cache is bounded, and the bound is 256 MB. It is an LRU, and an entry is
+charged the bytes it holds plus two hundred for the map slot, the list element
+and the struct around them, so a cache full of small answers is accounted at
+what it really costs rather than at half of it. There is no key for it in the
+configuration file: a deployment whose live set does not fit raises it from Go
+with `SetCacheLimit`, and `CacheStats().Evicted` is the number that says whether
+it had to, because it stays at zero for as long as one sweep's live set fits.
+
+Two things follow. A limit below one sweep's live set is not a smaller cache but
+no cache, since every sweep would evict what the next one is about to ask for.
+And the bound is resident memory once the cache is full, which is the number to
+know before giving the process a container with a memory limit: it can hold that
+much of decoded bodies on top of its own footprint.
+
+## A refusal is remembered too
+
+A 403 or a 404 is how GitHub says a feature is switched off: Dependabot on a
+repository that does not use it, code scanning where it was never enabled, a
+forum on a repository with discussions off. That is not an error, and the
+collector turns it into "there is nothing here".
+
+What it is not is free. A refusal carries no ETag, so where a page that did not
+change costs nothing, a feature that is off is charged in full on every sweep,
+for ever. So a refusal is remembered for a day, keyed by family, repository and
+endpoint, and the sweeps inside that day ask nothing.
+
+Two consequences worth knowing:
+
+- Switch a feature on and it is noticed a day later at the latest, not on the
+  next sweep.
+- Restarting the process asks again straight away. The memory lives in the
+  process, like the ETag cache, not in the state file.
+
+A spent budget is a 403 as well and is never remembered as one: the client
+types it apart precisely so that a rate limit is not read as a feature that is
+off.
+
+## The budget in the log
+
+```text
+level=INFO msg="rate budget" bucket=core remaining=4354 limit=5000
+```
+
+Worth an alert on the warning above rather than on this line. A budget that
+dips is normal; a family skipped every sweep is a configuration problem.
+
+## A backfill inverts the rule
+
+A [backfill](/ghchronicle/how/backfill/) is the opposite intention and says so.
+When a bucket runs out it waits for the window to reset rather than giving up,
+because a backfill that stops half way has spent the expensive part of the
+budget and keeps only the families it finished: each one is written and marked
+as it completes, and the rest has to be run again.

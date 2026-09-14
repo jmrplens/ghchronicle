@@ -1,0 +1,178 @@
+---
+title: systemd
+description: A hardened unit for the one process on the host that holds a GitHub token, and what each restriction is for.
+---
+
+import { Steps, Aside, FileTree } from "@astrojs/starlight/components";
+
+## The unit
+
+```ini title="/etc/systemd/system/ghchronicle.service"
+[Unit]
+Description=ghchronicle, GitHub metrics collector
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ghchronicle
+Group=ghchronicle
+EnvironmentFile=/etc/ghchronicle/ghchronicle.env
+ExecStart=/usr/local/bin/ghchronicle -config /etc/ghchronicle/config.yaml
+Restart=always
+RestartSec=30s
+
+# This is the only process on the host holding a GitHub token, so it gets
+# nothing it does not need.
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+ProtectProc=invisible
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictAddressFamilies=AF_INET AF_INET6
+
+StateDirectory=ghchronicle
+ReadWritePaths=/var/lib/ghchronicle
+
+[Install]
+WantedBy=multi-user.target
+```
+
+## Why it is hardened
+
+The threat model is short and it is the whole justification: **this is very
+likely the only process on the host holding a GitHub token with read access to
+every repository of an account.** A token is a bearer credential. Anything that
+can read this process's memory or its environment file has the account.
+
+So the unit gives the process exactly what it needs, which turns out to be
+almost nothing: an outbound TCP socket and one writable directory.
+
+| Directive                                                                                                                                                                | What it removes                                                                                        |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
+| `CapabilityBoundingSet=`, `AmbientCapabilities=`                                                                                                                         | Every Linux capability. It binds no privileged port and owns no device                                 |
+| `NoNewPrivileges=true`                                                                                                                                                   | Any path to gaining privileges through exec, including setuid binaries                                 |
+| `ProtectSystem=strict`                                                                                                                                                   | Write access to the entire filesystem, except `ReadWritePaths`                                         |
+| `ProtectHome=true`                                                                                                                                                       | Every home directory, which is where the interesting credentials on a host usually live                |
+| `PrivateTmp=true`, `PrivateDevices=true`                                                                                                                                 | Shared temporary files, and the physical device nodes                                                  |
+| `ProtectProc=invisible`                                                                                                                                                  | The ability to see other users' processes in `/proc`, so it cannot read another process's command line |
+| `RestrictAddressFamilies=AF_INET AF_INET6`                                                                                                                               | Unix and netlink sockets. It talks HTTPS and nothing else                                              |
+| `MemoryDenyWriteExecute=true`, `LockPersonality=true`                                                                                                                    | The usual shellcode primitives                                                                         |
+| `SystemCallFilter=@system-service`                                                                                                                                       | Every syscall outside the ordinary service set, including the module and kernel-tuning ones            |
+| `ProtectKernelTunables`, `ProtectKernelModules`, `ProtectControlGroups`, `ProtectClock`, `ProtectHostname`, `RestrictNamespaces`, `RestrictRealtime`, `RestrictSUIDSGID` | Every remaining route to changing the host from inside the service                                     |
+
+`StateDirectory=ghchronicle` makes systemd create `/var/lib/ghchronicle` with
+the right ownership on start, so the state file has somewhere to live without a
+manual `mkdir` and a `chown` that someone will forget after a reinstall.
+
+Two files live there, not one. Beside `state.json` the sweep keeps its write
+ledger, `state-written.bin` by default, which is what stops an unchanged point
+being written again; `ReadWritePaths` covers the directory, so both are already
+allowed. Put either somewhere else and that path needs adding here, and losing
+the ledger costs one sweep of rewriting:
+[only what changed is written](/ghchronicle/sinks/#only-what-changed-is-written).
+
+## Installing it
+
+<Steps>
+
+1. Create the user and the directories.
+
+    ```sh
+    sudo useradd --system --no-create-home --shell /usr/sbin/nologin ghchronicle
+    sudo mkdir -p /etc/ghchronicle
+    ```
+
+2. Put the configuration in place.
+
+    <FileTree>
+
+    - /etc/ghchronicle/
+      - config.yaml world readable, no secrets in it
+      - ghchronicle.env mode 600, the tokens
+    - /var/lib/ghchronicle/
+      - state.json created by the service
+      - state-written.bin the write ledger, beside it
+
+    </FileTree>
+
+3. Write the environment file, and nothing else in it.
+
+    ```sh title="/etc/ghchronicle/ghchronicle.env"
+    GITHUB_TOKEN=github_pat_...
+    INFLUX_TOKEN=...
+    ```
+
+    ```sh
+    sudo chmod 600 /etc/ghchronicle/ghchronicle.env
+    ```
+
+    Everything in `config.yaml` reads these through `${VAR}`, which is what
+    lets the config be world readable and version controlled while the secrets
+    are not.
+
+4. Start it.
+
+    ```sh
+    sudo systemctl daemon-reload
+    sudo systemctl enable --now ghchronicle
+    sudo systemctl status ghchronicle
+    ```
+
+</Steps>
+
+## What to watch
+
+The log says what was written and where.
+
+```text
+level=INFO msg=written sink=influxdb family=traffic points=629
+level=INFO msg="rate budget" bucket=core remaining=4354 limit=5000
+```
+
+Two warnings are worth an alert:
+
+- **`rate limit reserve reached`** means a family was skipped to protect the
+  budget. Once is fine; every sweep means the cadences are too fast for the
+  number of repositories.
+- **`family failed everywhere, not marking it as run`** means every repository
+  failed for one family, so it will be retried rather than treated as done.
+
+```sh
+journalctl -u ghchronicle -f
+journalctl -u ghchronicle -p warning --since today
+```
+
+<Aside type="tip" title="Check the sandbox after editing the unit">
+  `systemd-analyze security ghchronicle` scores the unit and names anything the
+  sandbox is not covering. It is the fastest way to see that an edit quietly
+  removed a restriction.
+</Aside>
+
+## cron instead of a service
+
+`-once` runs a single sweep and exits, which is all a scheduler needs.
+
+```text
+0 * * * * /usr/local/bin/ghchronicle -config /etc/ghchronicle/config.yaml -once
+```
+
+Keep the state file on a persistent path even in this mode. It is what stops
+the stargazer walk and the year-by-year contribution backfill happening again
+on every run. Note that an hourly cron gives every family an hourly cadence at
+best, so the fifteen-minute rhythm of `actions` is lost.

@@ -1,0 +1,96 @@
+# CodeQL code scanning, advanced setup.
+#
+# Written by hand rather than switched on as GitHub's default setup so the Go
+# leg can install the toolchain the module asks for. Default setup pins
+# GOTOOLCHAIN=local to whatever Go the CodeQL runtime shipped with, which
+# breaks every time go.mod moves ahead of it, and go.mod here is already on a
+# version newer than most runtime images carry.
+#
+# The three languages are what default setup would have analyzed anyway: the
+# workflows themselves, the Go collector, and the TypeScript the documentation
+# site under site/ is written in.
+
+name: CodeQL
+
+on:
+  push:
+    branches: [main]
+  # Unfiltered, for the same reason as ci.yml: a stacked pull request is based
+  # on the branch below it, and a base-branch filter would leave every layer
+  # above the bottom one unanalyzed.
+  pull_request:
+  schedule:
+    # Weekly, at a minute nobody else picked, so the scheduled run does not
+    # queue behind the top of the hour.
+    - cron: "37 5 * * 3"
+
+# A separate group from ci.yml's, so a cancelled CI run never cancels an
+# in-flight security analysis, and the other way round. A new push to the same
+# ref makes the analysis in flight obsolete.
+concurrency:
+  group: codeql-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    # The Go leg is the long one: building every package for the extractor,
+    # then the analysis. A hung extractor must not hold a runner for the
+    # six-hour default.
+    timeout-minutes: 20
+    permissions:
+      security-events: write
+      packages: read
+      actions: read
+      contents: read
+    strategy:
+      # One language failing says nothing about the other two, and a scan that
+      # stops early leaves the alerts it did not reach looking resolved.
+      fail-fast: false
+      matrix:
+        include:
+          - language: actions
+            build-mode: none
+          - language: go
+            build-mode: manual
+          - language: javascript-typescript
+            build-mode: none
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        if: matrix.language == 'go'
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@b96794f015dfd88f77b49b1c93e0fa7110f94c63  # v4.38.0
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+
+      # A manual build keeps the Go extractor on the toolchain setup-go just
+      # installed instead of letting autobuild probe for one. ./... rather than
+      # the collector alone, so the extractor sees the other seven commands
+      # too. `go build` compiles no _test.go file and nothing behind the
+      # dockere2e tag, so of the end-to-end tree only the fake GitHub under
+      # test/e2e/fakegh is extracted; the tests themselves are not analyzed.
+      - name: Build Go
+        if: matrix.language == 'go'
+        run: |
+          go mod download
+          go build ./...
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@b96794f015dfd88f77b49b1c93e0fa7110f94c63  # v4.38.0
+        with:
+          category: "/language:${{ matrix.language }}"

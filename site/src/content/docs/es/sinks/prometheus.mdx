@@ -1,0 +1,151 @@
+---
+title: Prometheus
+description: Un exportador, no un emisor, y qué le hace a cada medida la reducción a valores actuales.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+```yaml
+sinks:
+  prometheus:
+    listen: 127.0.0.1:9605
+    path: /metrics
+```
+
+Un exportador, no un emisor: apúntale un scrape. Es el único destino del
+proyecto que no es saliente, y existe porque Prometheus insiste en tirar de los
+datos.
+
+## Qué sirve
+
+Los nombres de métrica son `github_<medida>_<campo>`, con las etiquetas como
+labels.
+
+```text
+github_repo_stars{repo="ghchronicle",language="Go",visibility="public"} 283
+github_workflow_runs_count{repo="ghchronicle",conclusion="success"} 412
+```
+
+## Qué no puede servir
+
+La historia fechada, y no por elección. Prometheus sella una muestra en el
+instante del scrape y rechaza cualquier cosa apreciablemente más vieja: medido
+contra Prometheus 3.14 con `--web.enable-otlp-receiver` y una ventana de
+desorden de treinta minutos, una muestra fechada dos días atrás vuelve como
+**HTTP 400**.
+
+A través de este destino, la ventana de tráfico de catorce días de GitHub se
+colapsa a su día más reciente, y la historia de estrellas al total actual. Eso
+merece decirse claro en vez de esconderse. Úsalo junto a un almacén de historia,
+no en su lugar; ambos pueden correr a la vez y la recolección ocurre una sola
+vez.
+
+## La reducción
+
+Antes de servir, `Summarize` reduce cada medida según una regla.
+
+| Regla      | Qué sobrevive                                                       |
+| ---------- | ------------------------------------------------------------------- |
+| `keepLast` | El valor más reciente de cada conjunto de etiquetas. Instantáneas   |
+| `sum`      | El lote sumado. Ventanas, como las visitas de los catorce días      |
+| `count`    | Un recuento más la media de cada campo numérico. Elementos fechados |
+| `skip`     | Nada                                                                |
+
+Una medida sin regla se salta, así que un colector nuevo no puede inundar en
+silencio el exportador con una serie por estrella.
+
+El reductor publica además `total`, un recuento acumulado de elementos
+distintos por serie. Eso es lo que permite que un dashboard de Prometheus diga
+"por día" mediante `increase()`, ya que no tiene filas que contar.
+
+## Dos medidas se saltan por tamaño
+
+El punch card de commits es una serie por repositorio, día de la semana y hora,
+y los ficheros de release una por cada fichero publicado alguna vez. Medido,
+juntas eran **cuatro quintas partes de toda la salida del exportador**. Ambas
+se dibujan bien en el dashboard de InfluxDB.
+
+Otras ocho se saltan por un motivo distinto del tamaño, siete por ser historia
+y una por ser texto, así que diez medidas en total no llegan nunca al
+exportador. La lista, con el motivo de cada una, está
+en [la fecha del punto](/ghchronicle/es/how/dating/#las-diez-que-no-se-sirven-nunca).
+
+El exportador solo tiene lo que recogió la última pasada, y para las
+ejecuciones de workflows eso son las treinta más nuevas por repositorio entre
+builds: una pasada ordinaria lee la lista de ejecuciones en páginas de treinta,
+y solo pasa de página mientras una página venga llena de ejecuciones más nuevas
+que su ventana de dos horas. Los almacenes guardan cada ejecución que el
+recorrido vio alguna vez; este es el único sitio donde la página más pequeña se
+nota.
+
+Los jobs de workflow son el otro: una pasada lleva los jobs de las ejecuciones
+que listó por primera vez, así que `gh_workflow_jobs` cuenta los jobs nuevos
+para este proceso y no los de las veinte ejecuciones más nuevas, y una pasada
+en el que no terminó ninguna ejecución no lleva ninguno, con lo que el último
+recuento se mantiene hasta que caduca un día después. El `total` de al lado no
+cambia, porque cuenta cada job distinto que el proceso ha visto alguna vez; los
+almacenes tampoco, porque un job se escribe una vez y se fecha cuando terminó.
+
+<Aside type="caution" title="Una etiqueta llamada job chocaría">
+  Prometheus añade etiquetas `job` e `instance` en el scrape, y el receptor OTLP
+  sobrescribe un atributo `job` con el nombre del servicio. Por eso los jobs de
+  workflow se etiquetan `job_name`.
+</Aside>
+
+## Cómo consultarlo
+
+```yaml
+scrape_configs:
+  - job_name: ghchronicle
+    static_configs:
+      - targets: ["127.0.0.1:9605"]
+```
+
+El exportador guarda sus muestras en memoria, así que un reinicio lo vacía. Por
+eso la primera pasada tras el arranque corre todas las familias activas diga lo
+que diga el fichero de estado: sin ella, una familia de doce horas dejaría sus
+paneles a cero medio día.
+
+```yaml
+sinks:
+  prometheus:
+    listen: 0.0.0.0:9605
+    path: /metrics
+    no_prime: true # deja la primera pasada en su horario normal
+```
+
+`no_prime: true` apaga esa pasada de cebado, para una cuenta con la cuota tan
+justa que una pasada completa en cada reinicio no salga a cuenta. El precio es
+exactamente el comportamiento que el cebado existe para evitar: hasta que a cada
+familia le toque su cadencia, los paneles que la leen no tienen nada, y en una
+familia de doce horas eso es medio día de ceros. Los almacenes no se ven
+afectados en ningún caso, porque conservan lo que se recogió antes del reinicio.
+
+Una serie que lleva **24 horas** sin reescribirse se descarta, para que un
+repositorio que sale de la pasada deje de informarse como si siguiera ahí. El
+horizonte no se configura.
+
+## Errores al arrancar, no en una goroutine
+
+```text
+prometheus exporter: listen tcp :9605: bind: address already in use
+```
+
+Se informa al arrancar el proceso en vez de quedar sepultado en una goroutine
+de fondo,
+para que un choque de puerto no te deje con un colector corriendo y un
+exportador ausente en silencio.
+
+## En un contenedor
+
+El ejemplo escucha en `127.0.0.1`, que dentro de un contenedor es el loopback
+del propio contenedor e inalcanzable desde la máquina anfitriona. Ahí usa
+`0.0.0.0:9605` y deja que la publicación del puerto decida quién llega.
+
+## Por dónde seguir
+
+- [Elegir almacén](/ghchronicle/es/sinks/) compara Prometheus con los otros nueve, y
+  lleva el registro de escrituras que todos comparten.
+- [Los dashboards](/ghchronicle/es/dashboards/) dice cuál de los cinco se dibuja
+  contra cada almacén, y en qué se convierte un panel que un almacén no puede
+  responder.

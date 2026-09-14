@@ -1,0 +1,55 @@
+# Working notes and design docs: useful to whoever works here, not part of the
+# published tool. Kept out of git deliberately.
+/plan/
+
+# Local configuration and credentials
+config.yaml
+.env
+*.token
+
+# Build output. `make build` writes bin/, `make build-all` and GoReleaser
+# write dist/.
+/bin/
+/dist/
+
+# One binary per command, where `go build ./cmd/<name>` drops it: the working
+# directory, named after the directory it was built from. Building a single
+# package is the ordinary way to try one of the utilities out, and the result
+# is a ten megabyte file sitting exactly where `git add .` will find it.
+#
+# Anchored: a bare "ghchronicle" also matches the cmd/ghchronicle directory,
+# which silently kept main.go out of the first commit. The same trap applies to
+# every name below, since each is both a command and its source directory.
+/check_dashboards
+/check_postgres
+/check_prometheus
+/gen_brand
+/gen_dashboards
+/ghchronicle
+/probe
+/publish_dashboard
+
+# The same build under GOOS=windows, which none of the anchored names above
+# match. A release puts its Windows binaries in dist/; this is for one built by
+# hand.
+*.exe
+
+# Go test and coverage artifacts. `*.out` covers the coverage.out that `make
+# test` and `make cover-check` write; the HTML report `make coverage` renders
+# from it needs a line of its own.
+*.test
+*.out
+coverage.html
+
+# SonarCloud scans from the working copy: `make sonar` runs sonar-scanner, and
+# sonar-project.properties sets no sonar.working.directory, so the scanner
+# writes its cache and report into .scannerwork/ at the root.
+.scannerwork/
+
+# Without this, `go mod vendor` would commit the whole dependency tree.
+vendor/
+
+# The documentation site's build output and dependencies
+/site/dist/
+/site/node_modules/
+/site/.astro/

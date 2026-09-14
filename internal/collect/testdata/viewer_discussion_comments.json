@@ -1,0 +1,100 @@
+{
+  "data": {
+    "viewer": {
+      "login": "octocat",
+      "repositoryDiscussionComments": {
+        "totalCount": 3,
+        "pageInfo": {
+          "hasPreviousPage": false,
+          "startCursor": "Y3Vyc29yOjE="
+        },
+        "nodes": [
+          {
+            "createdAt": "2024-04-02T01:00:00Z",
+            "isAnswer": false,
+            "upvoteCount": 1,
+            "discussion": {
+              "number": 867,
+              "title": "Cannot find the generated mocks",
+              "createdAt": "2024-04-01T01:59:12Z",
+              "isAnswered": true,
+              "answerChosenAt": "2024-04-03T01:59:12Z",
+              "answerChosenBy": {
+                "login": "lapo4719"
+              },
+              "answer": {
+                "author": {
+                  "login": "mvandervoord"
+                }
+              },
+              "closed": true,
+              "closedAt": "2024-04-04T01:59:12Z",
+              "stateReason": "RESOLVED",
+              "category": {
+                "name": "Q&A",
+                "isAnswerable": true
+              },
+              "repository": {
+                "nameWithOwner": "ThrowTheSwitch/Ceedling"
+              }
+            }
+          },
+          {
+            "createdAt": "2026-08-19T09:00:00Z",
+            "isAnswer": false,
+            "upvoteCount": 0,
+            "discussion": {
+              "number": 4,
+              "title": "Roadmap",
+              "createdAt": "2026-08-18T09:00:00Z",
+              "isAnswered": false,
+              "answerChosenAt": null,
+              "answerChosenBy": null,
+              "answer": null,
+              "closed": false,
+              "closedAt": null,
+              "stateReason": null,
+              "category": {
+                "name": "Ideas",
+                "isAnswerable": false
+              },
+              "repository": {
+                "nameWithOwner": "octocat/hello-world"
+              }
+            }
+          },
+          {
+            "createdAt": "2026-09-05T10:00:00Z",
+            "isAnswer": true,
+            "upvoteCount": 3,
+            "discussion": {
+              "number": 118,
+              "title": "How do I bind a second port",
+              "createdAt": "2026-09-05T08:00:00Z",
+              "isAnswered": true,
+              "answerChosenAt": "2026-09-05T12:00:00Z",
+              "answerChosenBy": {
+                "login": "nozamdavid"
+              },
+              "answer": {
+                "author": {
+                  "login": "octocat"
+                }
+              },
+              "closed": false,
+              "closedAt": null,
+              "stateReason": null,
+              "category": {
+                "name": "Q&A",
+                "isAnswerable": true
+              },
+              "repository": {
+                "nameWithOwner": "fosrl/pangolin"
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

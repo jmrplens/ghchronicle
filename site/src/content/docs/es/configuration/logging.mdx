@@ -1,0 +1,103 @@
+---
+title: Registro
+description: Nivel, formato, el fichero rotatorio que nunca sustituye a la salida de error, y las dos líneas que merecen alerta.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+```yaml
+log:
+  level: info # debug, info, warn, error
+  format: text # text o json
+  file: /var/log/ghchronicle/ghchronicle.log
+  max_bytes: 67108864
+  keep: 5
+```
+
+## Las claves
+
+| Clave       | Por omisión | Significado                                           |
+| ----------- | ----------- | ----------------------------------------------------- |
+| `level`     | `info`      | `debug`, `info`, `warn` o `error`                     |
+| `format`    | `text`      | `text` para una persona, `json` para un agente de envío    |
+| `file`      | ninguno     | Un fichero rotatorio **además de** la salida de error |
+| `max_bytes` | `67108864`  | Rota a los 64 MiB                                     |
+| `keep`      | `5`         | Cuántos ficheros rotados conservar                    |
+
+## Los dos, nunca en lugar de
+
+Un `file` configurado no sustituye a la salida de error, se escribe además de
+ella. Bajo systemd el journal es donde mira todo el mundo primero, y un fichero
+de log que ocupara en silencio el lugar del journal sería una trampa:
+`journalctl -u ghchronicle` se quedaría mudo y la conclusión obvia sería que el
+servicio se ha parado.
+
+La rotación es por tamaño con sufijos numerados, así que la retención es un
+recuento y no una fecha y dos rotaciones en el mismo segundo no pueden chocar. El
+contador de tamaño se lee del fichero al arrancar, así que un reinicio no lo
+pone a cero dejando que el fichero crezca sin límite.
+
+## Qué dice el log un día bueno
+
+```text
+level=INFO msg="repositories discovered" count=18
+level=INFO msg=written sink=influxdb family=traffic points=629
+level=INFO msg="rate budget" bucket=core remaining=4354 limit=5000
+```
+
+Una familia que aún no toca sencillamente no aparece. Eso es normal, y es lo
+primero que hay que mirar cuando parece faltar una medida: con una cadencia de
+doce horas, medio día de logs puede legítimamente no mencionar nunca `account`.
+
+## Las dos líneas que merecen alerta
+
+**`rate limit reserve reached`** significa que se saltó una familia para
+proteger el presupuesto.
+
+```text
+level=WARN msg="rate limit reserve reached, family skipped" family=artifacts
+```
+
+Una vez está bien. En cada pasada significa que las cadencias son demasiado
+rápidas para el número de repositorios.
+
+**`family failed everywhere, not marking it as run`** significa que fallaron
+todos los repositorios en una familia.
+
+```text
+level=WARN msg="family failed everywhere, not marking it as run" family=security
+```
+
+La familia no se marca como hecha a propósito, así que se reintenta en la
+siguiente cadencia en vez de darse por completa. Esa es la línea que separa "una
+función está apagada en un repositorio" de "el token ha perdido un permiso".
+
+## Depuración
+
+```yaml
+log:
+  level: debug
+```
+
+Debug añade tres líneas, y ninguna más: con cuántos puntos volvió el libro de
+escrituras al arrancar, que las familias de cuenta se saltaron porque
+`targets.user` está vacío, y cuántas entradas dejó fuera un destino por ser más
+antiguas que su horizonte. Esa última es la única forma de ver que un envío se
+recortó en lugar de rechazarse. No hay registro por petición: el cliente de
+`internal/ghapi` no lleva registrador, así que qué endpoint se llamó y qué
+respuesta volvió 304 no se ven en ningún nivel.
+
+<Aside type="tip" title="JSON para un agente de envío, texto para una persona">
+  `format: json` emite un objeto por línea, que es lo que quieren Promtail,
+  Vector o Filebeat. Es la misma información; solo cambia la codificación.
+  Combinar `format: json` con un `file` es la disposición para una máquina que
+  ya envía logs a algún sitio.
+</Aside>
+
+## No confundir con el colector de logs de jobs
+
+`log` es el diario de la propia herramienta. `every.joblogs` es un _colector_:
+recoge las últimas cuarenta líneas de cada job fallido de GitHub Actions y las
+convierte en puntos. Son ajustes sin relación, y el segundo pertenece a un
+almacén de logs y no a una base de datos de métricas. Ver
+[Loki](/ghchronicle/es/sinks/loki/).

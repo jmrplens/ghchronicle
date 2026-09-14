@@ -1,0 +1,117 @@
+---
+title: InfluxDB
+description: El almacén de referencia para la historia fechada, por qué volver a recoger converge, y el único error de escritura que conviene reconocer.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+```yaml
+sinks:
+  influxdb:
+    url: http://localhost:8181
+    token: ${INFLUX_TOKEN}
+    org: default
+    bucket: github
+    batch: 5000
+    # exclude: [gh_job_log]
+```
+
+## Lo que va por el cable
+
+Line protocol enviado al **endpoint de escritura v2**, que sirven tanto
+InfluxDB 2 como InfluxDB 3, así que un solo destino cubre ambos. El token va en
+una cabecera `Authorization`, y `org` y `bucket` en la cadena de consulta.
+
+La precisión es de **nanosegundos**, porque los puntos de tráfico son días y los
+de workflows son segundos y una sola precisión tiene que cubrir ambos.
+
+Los lotes son de 5000 líneas por petición por omisión. `batch` lo baja para un
+servidor con un límite de cuerpo menor.
+
+## Qué puede responder que los demás no
+
+Todo lo fechado, que es casi todo el proyecto:
+
+- El tráfico de un martes concreto, meses después.
+- La curva de estrellas desde la primera, dibujada con una fila por estrella.
+- El tiempo de fusión de una pull request cerrada en julio.
+- Líneas añadidas y quitadas por commit, por autor, a lo largo de años.
+
+InfluxDB indexa un punto por medida, conjunto de etiquetas y marca de tiempo,
+así que **reescribir un punto que ya existe no es un duplicado**. Repetir la
+misma ventana de tráfico de catorce días cada seis horas converge en vez de
+acumular, que es lo que hace funcionar todo el diseño del
+[relleno histórico](/ghchronicle/es/how/backfill/).
+
+Los [dashboards](/ghchronicle/es/dashboards/) se generan contra este almacén
+primero; los otros cuatro conjuntos de consultas son traducciones de él.
+
+## Reescribir sale gratis en filas y no en ficheros
+
+InfluxDB 3 Core escribe un fichero Parquet por partición y por petición de
+escritura, no los compacta nunca, y rechaza cualquier consulta que abriría más
+ficheros que su límite. Así que la fila que se sobrescribe sin daño cuesta de
+todos modos un fichero, y una pasada que ofrece la misma historia cada seis
+horas compra un "Query would scan 10000 Parquet files, exceeding the file
+limit" unas semanas después.
+
+Por eso existe el registro de escrituras, por eso `dedupe` viene encendido aquí,
+y por eso apagarlo es una decisión y no una limpieza:
+[solo se escribe lo que ha cambiado](/ghchronicle/es/sinks/#solo-se-escribe-lo-que-ha-cambiado).
+
+## `exclude`
+
+Nombra las medidas que este destino no debe recibir. Por omisión es
+`gh_job_log`, que es texto destinado a un almacén de logs: escribir miles de
+líneas de salida de compilación en una base de datos de métricas es mucho
+almacenamiento para algo que nadie va a consultar como número.
+
+## Los tipos de columna se fijan al primer contacto
+
+<Aside type="danger" title="InfluxDB 3 no deja que un nombre cambie de bando">
+InfluxDB 3 fija una columna como etiqueta o como campo la primera vez que la ve,
+y rechaza las escrituras posteriores que no coincidan. Si alguna versión de esta
+herramienta llegara a mover un nombre de un lado al otro, hay que borrar la
+tabla en vez de repararla:
+
+```http
+DELETE /api/v3/configure/table
+```
+
+Esta es la causa habitual de `influx write: 400`.
+
+</Aside>
+
+## Líneas rechazadas
+
+Una escritura que vuelve 400 se biseca: el destino parte el lote por la mitad,
+reintenta y acota hasta las líneas concretas que el servidor se niega a
+analizar. Esas se registran una a una con la razón del propio servidor, todo lo
+demás se escribe, y la pasada informa de un aviso y no de un fallo.
+
+```text
+level=WARN msg="sink rejected some lines" sink=influxdb family=actions rejected=2
+```
+
+Ese comportamiento importa porque un lote son cinco mil líneas. Fallar el lote
+entero por un valor malformado perdería cuatro mil novecientos noventa y nueve
+puntos buenos.
+
+## Grafana
+
+Usa el **datasource de InfluxDB 3 en modo SQL** para el dashboard incluido, y
+apúntalo a la base de datos en la que escribe el destino. El fichero del dashboard
+declara `DS_INFLUXDB` como entrada, así que al importarlo te pide elegir tu
+propio datasource en vez de arrastrar el uid de otra persona.
+
+```sql
+SELECT time, "count" FROM gh_traffic WHERE kind = 'views' AND repo = 'ghchronicle'
+```
+
+## Por dónde seguir
+
+- [Elegir almacén](/ghchronicle/es/sinks/) compara InfluxDB con los otros nueve, y
+  lleva el registro de escrituras que todos comparten.
+- [Los dashboards](/ghchronicle/es/dashboards/) dice cuál de los cinco se dibuja
+  contra cada almacén, y en qué se convierte un panel que un almacén no puede
+  responder.

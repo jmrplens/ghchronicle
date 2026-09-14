@@ -1,0 +1,160 @@
+---
+title: Fichero y stdout
+description: Un fichero rotatorio para un agente de envío que ya tengas, el búfer duradero más simple que hay, y line protocol por la salida estándar.
+---
+
+import { Tabs, TabItem, Aside } from "@astrojs/starlight/components";
+
+## Fichero
+
+```yaml
+sinks:
+  file:
+    path: /var/log/ghchronicle/points.lp
+    format: influx # o json
+    max_bytes: 67108864
+    keep: 5
+```
+
+Para las instalaciones que ya ejecutan un agente de envío. Telegraf lee line
+protocol, Promtail y Vector leen JSON, y ninguno necesita que este proceso sepa
+nada de su backend.
+
+Es además el búfer duradero más simple que hay: cuando la base de datos está
+caída, el fichero sigue teniendo los datos.
+
+### Rotación
+
+Por tamaño, con sufijos numerados, así que la retención es un recuento y dos
+rotaciones en el mismo segundo no pueden chocar. El contador de tamaño se lee
+del fichero al arrancar, así que un reinicio no lo pone a cero dejando que el
+fichero crezca sin límite.
+
+<Tabs syncKey="file-format">
+  <TabItem label="influx">
+    ```text
+    gh_traffic,full_name=acme/telemetry,kind=views,owner=acme,repo=telemetry count=220i,uniques=131i 1788739200000000000
+    ```
+  </TabItem>
+  <TabItem label="json">
+    ```json
+    {"time":"2026-09-07T00:00:00Z","measurement":"gh_traffic","tags":{"full_name":"acme/telemetry","kind":"views","owner":"acme","repo":"telemetry"},"fields":{"count":220,"uniques":131}}
+    ```
+  </TabItem>
+</Tabs>
+
+Un objeto por línea en JSON, que es la forma que quiere un agente de envío
+orientado a líneas.
+
+## Salida estándar
+
+```yaml
+sinks:
+  stdout: true
+  stdout_format: influx # o json
+```
+
+Line protocol por la salida estándar, para encadenarlo con Telegraf o para ver
+qué se escribiría antes de apuntar esto a una base de datos. Es la forma más
+rápida de responder "¿qué recoge esto en realidad?".
+
+```sh
+ghchronicle -config config.yaml -once | head -20
+ghchronicle -config config.yaml -once | grep gh_workflow_run
+```
+
+`stdout_format: json` imprime en su lugar un objeto por línea, la misma forma
+que escribe el destino de fichero.
+
+<Aside
+  type="caution"
+  title="No lo combines con el destino SQL en salida estándar"
+>
+  `sinks.sql.path: "-"` también escribe por la salida estándar. Entrelazar
+  sentencias SQL con line protocol produce un flujo que no puede leer ni psql ni
+  Telegraf.
+</Aside>
+
+## Como búfer
+
+El destino de fichero es la respuesta a "qué pasa cuando la base de datos está
+caída". Úsalo junto al almacén real: la escritura a la base de datos falla y se
+registra, la pasada continúa, y los puntos están en disco. Reproducirlos después
+es un `curl` para InfluxDB, o un `psql -f` para el destino SQL, y converge en
+vez de duplicar porque los puntos llevan sus propias marcas de tiempo.
+
+```sh
+curl -s -XPOST "http://localhost:8181/api/v2/write?org=default&bucket=github&precision=ns" \
+  -H "Authorization: Token $INFLUX_TOKEN" \
+  --data-binary @/var/log/ghchronicle/points.lp
+```
+
+## Permisos
+
+El volcado se crea `0600` dentro de un directorio `0750`. Una pasada sobre una
+cuenta privada mete en él nombres de repositorios privados, severidades de
+Dependabot y líneas enteras de logs de jobs, así que no se crea legible para
+toda la máquina solo porque vaya a venir un agente de envío a leerlo.
+
+### Dejar que el agente de envío lo lea
+
+Telegraf, Promtail, Vector y Fluent Bit leen todos con su propio usuario.
+Ninguno documenta un modo obligatorio, y todos documentan el mismo remedio, que
+es un grupo: sus propias respuestas dicen `usermod -aG adm`. Así que la
+concesión es tuya, y son dos órdenes:
+
+```sh
+usermod -aG ghchronicle telegraf            # el agente de envío entra en el grupo del servicio
+chmod 0640 /var/log/ghchronicle/points.lp   # o créalo así de antemano
+```
+
+La concesión se mantiene. El destino nunca cambia el modo de un fichero que ya
+existe, y una rotación crea el sustituto con el modo del fichero que está
+renombrando, así que el `chmod` no se deshace la primera vez que el volcado se
+llena.
+
+<Aside type="caution" title="El fallo que esto evita es silencioso">
+  Un agente de envío que no puede abrir el fichero que sigue no lo anuncia, y
+  este proceso sigue escribiendo en un descriptor que ya tenía abierto. Ninguno
+  de los dos registra nada, así que el primer síntoma es un dashboard que se
+  paró hace días.
+</Aside>
+
+Si prefieres que el volcado pertenezca al grupo del propio agente de envío, haz
+que el directorio también sea suyo y ponle el bit setgid, que es lo que hace que
+todo fichero creado dentro herede el grupo, rotaciones incluidas:
+
+```sh
+install -d -o ghchronicle -g telegraf -m 2750 /var/log/ghchronicle
+```
+
+Eso decide de qué grupo es el volcado, no qué puede hacer ese grupo con él, así
+que el `chmod 0640` de arriba sigue siendo la otra mitad. Crear el directorio a
+mano compensa vayas por donde vayas: el que crea este proceso cuando no existe
+es `0750` menos lo que se lleve la umask, y un agente de envío que no puede
+atravesar el directorio falla tan en silencio como uno que no puede leer el
+fichero.
+
+Una ACL no se arrastra, porque pertenece al fichero sobre el que se puso y una
+rotación crea otro, así que concede por grupo en lugar de con `setfacl` sobre el
+volcado. Lo que una rotación sí arrastra es el modo, no el propietario: este
+proceso no puede hacer `chown` de un fichero a un usuario que no es. El
+registro de escrituras que hay detrás de `sinks.dedupe_file` es el caso
+contrario y recibe la respuesta
+contraria: nada salvo este proceso debe leerlo, así que se escribe `0600` y cada
+guardado lo devuelve a `0600`.
+
+### Dónde llega a poder escribir
+
+Bajo la unidad de systemd blindada, el directorio tiene que estar en
+`ReadWritePaths`. En un contenedor tiene que ser escribible por el uid 65532.
+Ambos son el mismo error con dos ropajes: al proceso se le permite escribir casi
+en ningún sitio a propósito.
+
+## Por dónde seguir
+
+- [Elegir almacén](/ghchronicle/es/sinks/) compara el destino de fichero con los otros nueve, y
+  lleva el registro de escrituras que todos comparten.
+- [Los dashboards](/ghchronicle/es/dashboards/) dice cuál de los cinco se dibuja
+  contra cada almacén, y en qué se convierte un panel que un almacén no puede
+  responder.

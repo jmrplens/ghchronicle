@@ -1,0 +1,107 @@
+---
+title: OpenTelemetry
+description: OTLP over HTTP with the JSON encoding, and why raw is false by default.
+---
+
+import { Aside, Tabs, TabItem } from "@astrojs/starlight/components";
+
+```yaml
+sinks:
+  otlp:
+    endpoint: http://collector:4318/v1/metrics
+    service: ghchronicle
+    headers:
+      Authorization: Bearer ${OTLP_TOKEN}
+    raw: false
+    batch: 2000
+```
+
+## The wire contract
+
+OTLP over HTTP with the **JSON encoding**, which every receiver worth using
+accepts on the same endpoint. That is a deliberate trade: JSON is larger on the
+wire, and it keeps a code generator, a protobuf runtime and their transitive
+dependencies out of a tool whose entire dependency list is one YAML parser.
+
+`endpoint` is the full URL of the metrics path, not a base. `headers` go with
+every request, which is where an API key or a tenant id belongs. `service`
+becomes the resource attribute the backend groups by. `batch` is how many data
+points go in one request, 2000 unless it is lowered for a receiver with a
+smaller body limit.
+
+Metric names use dots, following the OpenTelemetry convention:
+`github.workflow.run.duration.seconds`. A receiver exporting onward to
+Prometheus converts them itself; going the other way it cannot.
+
+## `raw`
+
+<Tabs syncKey="otlp-raw">
+  <TabItem label="raw: false (default)">
+    Sends the same reduced current values as the Prometheus exporter. Safe with
+    any backend, including Prometheus's own OTLP receiver, because nothing in
+    the payload is older than the sweep.
+  </TabItem>
+  <TabItem label="raw: true">
+    Sends the dated points. Whether they survive is entirely the backend's
+    decision: OTLP data points carry an explicit timestamp, so a store that
+    accepts old ones keeps the history, and one that does not rejects them.
+  </TabItem>
+</Tabs>
+
+<Aside type="caution" title="Prometheus's OTLP receiver is one that does not">
+  Measured: against Prometheus 3.14 with `--web.enable-otlp-receiver` and
+  `out_of_order_time_window: 30m`, a sample dated two days back comes back as
+  HTTP 400. With `raw: true` pointed at Prometheus, roughly half of every sweep
+  is refused. Use `raw: false` there, or send to a store that keeps the dates.
+</Aside>
+
+## `repeat`
+
+A gauge asserted once and then never again fades from the dashboards, and a
+family that runs every twelve hours would be a flat line with a dot in it. With
+`repeat` set, the sink keeps asserting the newest value of every series it has
+seen until the next sweep replaces it.
+
+```yaml
+sinks:
+  otlp:
+    endpoint: http://collector:4318/v1/metrics
+    repeat: 1m
+```
+
+This matters for a backend that answers an instant query from the last sample
+within a lookback window.
+
+## A collector in front
+
+The usual arrangement is a collector that receives from here and exports
+onward, which is what makes this sink worth having at all: the tool speaks one
+protocol and the pipeline decides where the data ends up.
+
+```yaml
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+
+exporters:
+  prometheusremotewrite:
+    endpoint: http://prometheus:9090/api/v1/write
+
+service:
+  pipelines:
+    metrics:
+      receivers: [otlp]
+      exporters: [prometheusremotewrite]
+```
+
+With that pipeline, keep `raw: false`: the exporter at the far end is
+Prometheus, and the constraint follows the data rather than the protocol.
+
+## Where to go next
+
+- [Choosing a store](/ghchronicle/sinks/) compares OpenTelemetry with the other nine,
+  and holds the write ledger every one of them shares.
+- [The dashboards](/ghchronicle/dashboards/) says which of the five is drawn
+  against which store, and what a panel a store cannot answer becomes.

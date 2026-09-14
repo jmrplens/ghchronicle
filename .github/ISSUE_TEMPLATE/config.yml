@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Documentation
+    url: https://jmrplens.github.io/ghchronicle/
+    about: The measurements, the stores, the cost of a sweep, and troubleshooting, in English and Spanish.
+  - name: Security vulnerability
+    url: https://github.com/jmrplens/ghchronicle/security/advisories/new
+    about: Report it privately. It does not go in a public issue.

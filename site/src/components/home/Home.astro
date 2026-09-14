@@ -1,0 +1,361 @@
+---
+/**
+ * The landing page body.
+ *
+ * Four blocks, each answering one question a first-time visitor has: what is
+ * this, what does it look like in use, how is it shaped, and where do I start.
+ * "Who it is for" and "what it is not" sit together, because a claim about an
+ * audience means little without the matching claim about the boundary.
+ *
+ * Copy comes from src/data/home.ts, one typed object per locale, so the two
+ * landings cannot drift structurally. Numbers come from src/data/stats.json,
+ * which scripts/gen-stats.mjs derives from the repository, and are read here,
+ * never typed, so a new collector updates the landing by itself.
+ */
+import { Code } from "@astrojs/starlight/components";
+import type { HomeContent } from "../../data/home";
+import stats from "../../data/stats.json";
+
+interface Props {
+	content: HomeContent;
+}
+
+const { content } = Astro.props;
+const format = (n: number): string => n.toLocaleString(content.numberLocale);
+
+const readout = [
+	{
+		value: stats.measurements,
+		label: content.statLabels.measurements,
+		href: content.statHrefs.measurements,
+	},
+	{
+		value: stats.families,
+		label: content.statLabels.families,
+		href: content.statHrefs.families,
+	},
+	{
+		value: stats.sinks,
+		label: content.statLabels.sinks,
+		href: content.statHrefs.sinks,
+	},
+	{
+		value: stats.panels,
+		label: content.statLabels.panels,
+		href: content.statHrefs.panels,
+	},
+];
+---
+
+<div class="home">
+	<section class="readout-block" aria-label={content.statsLabel}>
+		<div class="readout">
+			{
+				readout.map((cell) => (
+					<div class="readout-cell">
+						<span class="readout-value">{format(cell.value)}</span>
+						<span class="readout-label">
+							<a href={cell.href}>{cell.label}</a>
+						</span>
+					</div>
+				))
+			}
+		</div>
+		<p class="readout-claim">{content.claim}</p>
+	</section>
+
+	<section class="block">
+		<h2>{content.what.title}</h2>
+		<div class="prose">{content.what.body.map((p) => <p set:html={p} />)}</div>
+		<div class="two-up">
+			<div class="panel">
+				<h3>{content.who.title}</h3>
+				<ul class="tick">{content.who.items.map((i) => <li>{i}</li>)}</ul>
+			</div>
+			<div class="panel panel-quiet">
+				<h3>{content.honest.title}</h3>
+				<ul class="tick tick-minus">
+					{content.honest.items.map((i) => <li>{i}</li>)}
+				</ul>
+			</div>
+		</div>
+	</section>
+
+	<section class="block">
+		<h2>{content.proof.title}</h2>
+		<p class="lead">{content.proof.lead}</p>
+		<div class="demo">
+			<h3>{content.proof.installTitle}</h3>
+			<p class="note">{content.proof.installNote}</p>
+			<Code code={content.proof.install} lang="sh" />
+		</div>
+		<div class="demo">
+			<h3>{content.proof.configTitle}</h3>
+			<p class="note">{content.proof.configNote}</p>
+			<Code code={content.proof.config} lang="yaml" />
+		</div>
+		<div class="demo">
+			<h3>{content.proof.outputTitle}</h3>
+			<p class="note">{content.proof.outputNote}</p>
+			<Code code={content.proof.output} lang="text" />
+		</div>
+	</section>
+
+	<section class="block">
+		<h2>{content.shape.title}</h2>
+		<p class="lead">{content.shape.lead}</p>
+		<ol class="steps">
+			{
+				content.shape.steps.map((step) => (
+					<li>
+						<h3>{step.title}</h3>
+						<p>{step.body}</p>
+					</li>
+				))
+			}
+		</ol>
+	</section>
+
+	<section class="block">
+		<h2>{content.start.title}</h2>
+		<div class="starts">
+			{
+				content.start.links.map((link) => (
+					<a class="start" href={link.href}>
+						<span class="start-text">{link.text}</span>
+						<span class="start-note">{link.note}</span>
+					</a>
+				))
+			}
+		</div>
+	</section>
+</div>
+
+<style>
+	.home {
+		max-width: 60rem;
+		margin-inline: auto;
+	}
+	.block {
+		margin-block: 4rem;
+	}
+	.block h2 {
+		font-size: var(--sl-text-3xl);
+		margin-block-end: 0.75rem;
+	}
+	.lead,
+	.prose p {
+		color: var(--rb-body);
+		line-height: 1.7;
+	}
+
+	/* Starlight spaces adjacent elements inside `.sl-markdown-content` with a
+	 * top margin, at any depth, and it reaches this component because the
+	 * landing renders inside that container. The blocks below lay themselves
+	 * out with grid and space themselves with `gap`, so that margin lands on
+	 * every item except the first of the whole grid: the first cell of a row
+	 * ended up a rem above the one beside it, which on a phone read as two
+	 * numbers at two different heights. The grids own their own spacing. */
+	.readout > *,
+	.two-up > *,
+	.steps > * {
+		margin-top: 0;
+	}
+
+	/* The readout. Four numbers, each a link to the page that explains it,
+	 * because a number nobody can chase is decoration. */
+	.readout-block {
+		margin-block: 2rem 3.5rem;
+	}
+	.readout {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+		gap: 1.5rem;
+		padding: 1.5rem;
+		border: 1px solid var(--rb-border);
+		border-radius: var(--rb-radius);
+		background: var(--rb-surface);
+	}
+	.readout-cell {
+		display: flex;
+		flex-direction: column;
+		gap: 0.15rem;
+		text-align: center;
+	}
+	.readout-value {
+		font-size: var(--sl-text-4xl);
+		font-weight: 700;
+		line-height: 1.05;
+		color: var(--rb-heading);
+	}
+	.readout-label a {
+		color: var(--rb-muted);
+		font-size: var(--sl-text-sm);
+		text-decoration: none;
+	}
+	.readout-label a:hover {
+		color: var(--rb-accent);
+		text-decoration: underline;
+	}
+	.readout-claim {
+		margin-block-start: 1rem;
+		color: var(--rb-muted);
+		font-size: var(--sl-text-sm);
+		text-align: center;
+	}
+
+	/* On a phone the readout is the first thing under the hero and it was
+	 * taking a third of the second screen to say four numbers: a rem of the
+	 * hero's own bottom padding, two more of its own margin, and a box whose
+	 * figures are set at the size of a page title. Halve the space around it
+	 * and step the figures down two stops, to the size a heading in the prose
+	 * below them uses. The desktop sizes are untouched: there the four cells
+	 * sit in one row and the box is already a band rather than a block. */
+	@media (max-width: 48rem) {
+		.readout-block {
+			margin-block: 0.5rem 2rem;
+		}
+		.readout {
+			/* Two columns, named rather than fitted: with the smaller padding
+			 * three of the 7rem tracks fit a 430px phone, which leaves the
+			 * longest label alone on a row of its own and wrapped in two. */
+			grid-template-columns: repeat(2, 1fr);
+			gap: 1rem 0.75rem;
+			padding: 1rem 0.75rem;
+		}
+		.readout-value {
+			font-size: var(--sl-text-2xl);
+		}
+		.readout-claim {
+			margin-block-start: 0.75rem;
+		}
+	}
+
+	.two-up {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+		gap: 1rem;
+		margin-block-start: 1.5rem;
+	}
+	.panel {
+		padding: 1.25rem;
+		border: 1px solid var(--rb-border);
+		border-radius: var(--rb-radius);
+		background: var(--rb-surface);
+	}
+	.panel-quiet {
+		background: transparent;
+	}
+	.panel h3 {
+		margin-block: 0 0.75rem;
+		font-size: var(--sl-text-lg);
+	}
+	.tick {
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+	.tick li {
+		position: relative;
+		padding-inline-start: 1.4rem;
+		margin-block: 0.5rem;
+		color: var(--rb-body);
+		font-size: var(--sl-text-sm);
+		line-height: 1.55;
+	}
+	.tick li::before {
+		content: "+";
+		position: absolute;
+		inset-inline-start: 0;
+		color: var(--rb-accent);
+		font-weight: 700;
+	}
+	.tick-minus li::before {
+		content: "\2212";
+		color: var(--rb-muted);
+	}
+
+	.demo {
+		margin-block-start: 1.75rem;
+	}
+	.demo h3 {
+		margin-block: 0 0.25rem;
+		font-size: var(--sl-text-lg);
+	}
+	.note {
+		margin-block: 0 0.6rem;
+		color: var(--rb-muted);
+		font-size: var(--sl-text-sm);
+	}
+
+	.steps {
+		counter-reset: step;
+		margin: 1.5rem 0 0;
+		padding: 0;
+		list-style: none;
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+		gap: 1rem;
+	}
+	.steps li {
+		counter-increment: step;
+		position: relative;
+		padding: 1.25rem 1.25rem 1.25rem 3.25rem;
+		border: 1px solid var(--rb-border);
+		border-radius: var(--rb-radius);
+		background: var(--rb-surface);
+	}
+	.steps li::before {
+		content: counter(step);
+		position: absolute;
+		inset-inline-start: 1.25rem;
+		top: 1.15rem;
+		width: 1.5rem;
+		height: 1.5rem;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		border-radius: 50%;
+		background: var(--rb-accent-soft);
+		color: var(--rb-accent);
+		font-size: var(--sl-text-xs);
+		font-weight: 700;
+	}
+	.steps h3 {
+		margin-block: 0 0.35rem;
+		font-size: var(--sl-text-base);
+	}
+	.steps p {
+		margin: 0;
+		color: var(--rb-body);
+		font-size: var(--sl-text-sm);
+		line-height: 1.55;
+	}
+
+	.starts {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+		gap: 0.75rem;
+		margin-block-start: 1.25rem;
+	}
+	.start {
+		display: flex;
+		flex-direction: column;
+		gap: 0.2rem;
+		padding: 1rem 1.15rem;
+		border: 1px solid var(--rb-border);
+		border-radius: var(--rb-radius);
+		text-decoration: none;
+	}
+	.start:hover {
+		border-color: var(--rb-accent);
+	}
+	.start-text {
+		color: var(--rb-accent);
+		font-weight: 600;
+	}
+	.start-note {
+		color: var(--rb-muted);
+		font-size: var(--sl-text-sm);
+	}
+</style>

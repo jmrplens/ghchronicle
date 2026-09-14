@@ -1,0 +1,115 @@
+---
+title: Resumen
+description: Un SVG autocontenido para un README de perfil, dibujado con los mismos puntos que reciben las bases de datos.
+---
+
+import { Aside, Tabs, TabItem } from "@astrojs/starlight/components";
+
+```sh
+ghchronicle -config config.yaml -card profile.svg -card-only
+```
+
+<Aside type="note" title="Esto es una función secundaria">
+  El objetivo del proyecto es la ingesta. La tarjeta existe porque los números
+  ya estaban ahí, y se dibuja exactamente con los mismos puntos que reciben las
+  bases de datos, así que la tarjeta y el dashboard no pueden contradecirse.
+</Aside>
+
+## Las opciones
+
+| Opción                            | Hace                                                           |
+| --------------------------------- | -------------------------------------------------------------- |
+| `-card <ruta>`                    | Ejecuta una pasada y escribe el SVG ahí                        |
+| `-card-only`                      | Escribe el SVG y nada más, así que no hace falta base de datos |
+| `-card-layout <nombre>`           | Uno de los diez [diseños](/ghchronicle/es/card/layouts/)       |
+| `-card-theme <dark\|light\|auto>` | Auto emite ambas paletas tras una media query                  |
+| `-card-fields <lista>`            | Separados por comas, en orden de dibujo                        |
+| `-card-layouts`                   | Imprime los diseños con sus campos por defecto y termina       |
+
+Sin `-card-only` la tarjeta se escribe **además de** todo lo que recibirían
+normalmente los destinos, que es la disposición para una máquina que ya está
+recogiendo y quiere además una imagen.
+
+## Qué dibuja
+
+Estrellas, forks, seguidores y número de repositorios; contribuciones del último
+año; visitas y visitantes únicos de la ventana de tráfico de catorce días de
+GitHub; un sparkline del calendario de contribuciones; y los repositorios con
+más estrellas junto a su lenguaje.
+
+Las estrellas y los forks se **suman de los repositorios que recogió la pasada**,
+porque el endpoint de cuenta de GitHub no informa de ninguno de los dos totales.
+Eso significa que excluir forks o archivados en `targets` se nota también en la
+tarjeta, que es la lectura honesta y no una discrepancia oculta.
+
+## Los campos
+
+`-card-fields` acepta una lista separada por comas, en orden de dibujo, entre:
+
+`stars`, `forks`, `followers`, `repos`, `contributions`, `views`, `visitors`,
+`clones`, `commits`, `pull_requests`, `reviews`, `issues`, `languages`,
+`top_repos`, `sparkline`.
+
+Un diseño se salta un campo que no sabe dibujar. Un nombre desconocido es un
+error que lista los válidos, en vez de un salto silencioso: de lo contrario,
+una errata quitaría un número y nadie se daría cuenta hasta tener la tarjeta ya
+subida.
+
+```sh
+ghchronicle -config config.yaml -card profile.svg -card-only \
+  -card-layout github-stats -card-theme auto \
+  -card-fields repos,stars,forks,followers,commits,pull_requests,languages
+```
+
+Vacío significa el conjunto por defecto del diseño.
+
+## Temas
+
+<Tabs syncKey="card-theme">
+  <TabItem label="auto">
+    Ambas paletas en un fichero, tras una media query `prefers-color-scheme`,
+    que GitHub respeta. Un solo fichero funciona en un README con cualquier
+    ajuste.
+  </TabItem>
+  <TabItem label="dark y light">
+    Una paleta cada uno. Para un README que cambia con `#gh-dark-mode-only` y
+    `#gh-light-mode-only`, dibuja la tarjeta dos veces: desde la Action son dos
+    llamadas, una con `card-theme: dark` y otra con `card-theme: light`.
+  </TabItem>
+</Tabs>
+
+## Tres restricciones que respeta
+
+**Autocontenida.** Sin hoja de estilos externa, sin webfont, sin `<image>`
+apuntando a una URL, sin script. El proxy camo de GitHub sirve las imágenes de
+un README desde su propio dominio y bloquea todo eso, así que cualquier cosa
+externa sencillamente no se dibujaría.
+
+**Determinista.** La misma entrada produce un fichero idéntico byte a byte, así
+que un job programado que haga commit de la tarjeta no produce un diff en cada
+ejecución.
+
+**Escrita atómicamente.** Se dibuja en un fichero temporal y se renombra, así
+que quien esté mirando la ruta nunca ve medio documento.
+
+La animación, donde un diseño la tiene, es CSS dentro del SVG. Se reproduce una
+vez y se asienta, y el fotograma final es la tarjeta estática completa, así que
+un renderizador que ignore la animación muestra el estado terminado.
+`prefers-reduced-motion` la desactiva. No hay script, nunca.
+
+## En un README
+
+```markdown
+![GitHub statistics](https://raw.githubusercontent.com/<tu-usuario>/<tu-usuario>/main/profile.svg)
+```
+
+El workflow que la mantiene al día está en
+[GitHub Actions](/ghchronicle/es/install/actions/).
+
+## No hay biblioteca Go
+
+El renderizador vive en `internal/render`, y Go rechaza esa importación desde
+fuera del módulo, así que no hay manera de dibujar una tarjeta desde un
+programa propio llamando a este. Un programa que quiera un SVG ejecuta el
+binario con `-card` y lee el fichero, igual que ejecutaría cualquier otra
+orden: ver [llamarlo desde un programa](/ghchronicle/es/reference/subprocess/).

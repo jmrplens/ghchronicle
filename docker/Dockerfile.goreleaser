@@ -1,0 +1,33 @@
+# syntax=docker/dockerfile:1@sha256:ecfaec9ed6d810b56388c508f4121597bfbba70d41a6dfeee4d8cad5f295fc32
+
+# The image GoReleaser publishes. It compiles nothing: the binary it copies is
+# the same one the release archives carry, already stamped and already the
+# artifact people download, so the image and the tarball cannot disagree about
+# what they contain. The Dockerfile at the repository root is the other half of
+# this pair and still compiles from source, for `docker build .` and `make
+# docker-build`.
+#
+# TARGETPLATFORM is how GoReleaser lays the build context out: one directory
+# per platform, each holding that platform's binary.
+#
+# There is no LABEL block here. GoReleaser passes the OCI labels on the build
+# command line from .goreleaser.yaml, where the version, the commit and the
+# date are known; a second copy in this file could only repeat them wrong.
+#
+# The base is the root Dockerfile's runtime stage, pinned to the same version
+# and digest, so the two images differ only in where the binary came from.
+# Change both together.
+
+FROM gcr.io/distroless/static-debian13:nonroot@sha256:1c2c046bc09ed40fad370b599a0b1ae7987f55b01e247cf27a7c27cd97e5bbc7
+
+ARG TARGETPLATFORM
+COPY ${TARGETPLATFORM}/ghchronicle /ghchronicle
+
+# Numeric for the same reason as in the root Dockerfile: Kubernetes enforces
+# runAsNonRoot only against a user it can read as a number.
+USER 65532:65532
+
+# Prometheus exporter.
+EXPOSE 9605
+
+ENTRYPOINT ["/ghchronicle"]

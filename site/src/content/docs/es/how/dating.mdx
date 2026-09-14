@@ -1,0 +1,187 @@
+---
+title: La fecha del punto
+description: Cada punto lleva el momento en que ocurrió la cosa, y esa única regla decide qué puede responder todo el proyecto.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+import Figure from "../../../../components/Figure.astro";
+
+**Un punto lleva la fecha en que ocurrió la cosa, no la fecha en que se
+recogió.**
+
+Esa es la única regla de la que se deriva todo lo demás. Una ejecución de
+workflow se sella cuando terminó. Una estrella se sella cuando se dio. Un día
+de tráfico se sella en la fecha de ese mismo día. Una pull request se sella
+cuando se cerró. Ninguno se sella en el instante en que el colector se enteró.
+
+## Los tres tipos de punto
+
+No todo lo que GitHub informa tiene fecha propia, así que hay tres tratamientos
+y cada medida declara cuál le corresponde.
+
+| Tipo        | Sellado en                        | Ejemplo                                                         |
+| ----------- | --------------------------------- | --------------------------------------------------------------- |
+| **Fechado** | el momento en que ocurrió la cosa | `gh_star`, `gh_workflow_run`, `gh_traffic`, `gh_commit`         |
+| **Diario**  | el inicio del día UTC             | `gh_traffic_referrer`, `gh_label`, `gh_milestone`, `gh_webhook` |
+| **Ahora**   | el instante de la pasada          | `gh_repo`, `gh_actions_cache`, `gh_dependabot_alert`            |
+
+Diario es para una instantánea sin fecha propia. GitHub devuelve los diez
+primeros referrers de los catorce días anteriores como una lista sin día
+asociado, así que no es una serie. Sellarla en el instante de la pasada
+escribiría cuatro copias al día y cualquier consulta que las sumara informaría
+de cuatro veces el tráfico. Sellarla al inicio del día UTC hace que las pasadas
+de un día reescriban una sola fila.
+
+Ahora es para algo que de verdad es un estado actual. El tamaño de la caché de
+Actions, el número de alertas abiertas, el inventario de workflows: ninguno
+ocurrió en un momento, así que fingir lo contrario sería una mentira con marca
+de tiempo.
+
+## Por qué existe la regla: volver a recoger tiene que converger
+
+InfluxDB indexa un punto por medida, conjunto de etiquetas y marca de tiempo.
+Tres campos, una fila. Escribe los mismos tres otra vez y la fila se reemplaza,
+no se suma.
+
+Escrito del todo, dos pasadas separadas por seis horas ofrecen el mismo día dos
+veces, y la segunda reemplaza a la primera porque las tres claves son idénticas:
+
+```text
+gh_traffic,owner=acme,repo=telemetry,kind=views count=220i,uniques=131i 1757203200000000000
+gh_traffic,owner=acme,repo=telemetry,kind=views count=238i,uniques=140i 1757203200000000000
+```
+
+```text
+gh_traffic,owner=acme,repo=telemetry,kind=views count=238i,uniques=140i 1757203200000000000
+```
+
+Una fila, con el número más reciente que GitHub dio para ese día. Sella esas dos
+líneas en el momento de recogerlas y son dos filas, y toda suma sobre ellas está
+equivocada por tantas veces como pasadas hayan corrido.
+
+Eso es lo que hace funcionar todo el diseño. La ventana de tráfico de GitHub es
+de catorce días, y el colector reescribe _los catorce_ en cada pasada en vez de
+intentar averiguar qué día es nuevo:
+
+<Figure name="dating-converges" />
+
+La misma propiedad es la que hace seguro ejecutar dos veces un relleno
+histórico, y la que permite borrar el fichero de estado sin corromper nada:
+volver a recoger reescribe filas que ya había escrito.
+
+<Aside type="tip" title="Todo almacén de historia tiene esta propiedad">
+  No es específico de InfluxDB. La clave primaria del destino SQL es `(time,
+  columnas de etiqueta)`, que es la misma clave de serie escrita como
+  restricción, y sus inserciones terminan en `ON CONFLICT ... DO UPDATE` y no en
+  `DO NOTHING`. Elasticsearch deriva el id del documento de la medida, las
+  etiquetas y la marca de tiempo, e indexa en vez de crear. Graphite escribe en
+  la ranura de whisper que nombra la marca de tiempo. Los cuatro convergen por
+  la misma razón.
+</Aside>
+
+## Lo que Prometheus no puede sostener por construcción
+
+Prometheus sella una muestra en el instante del scrape. No toma una marca de
+tiempo del productor, y rechaza cualquier cosa apreciablemente más vieja que
+ahora.
+
+Esto se midió, no se supuso. Contra **Prometheus 3.14**, con
+`--web.enable-otlp-receiver` y `out_of_order_time_window: 30m`, una muestra
+fechada dos días atrás vuelve como **HTTP 400**.
+
+La mitad de lo que esto recoge es más viejo que eso a propósito: una estrella de
+2020, una pull request fusionada en julio, el tráfico de ayer. Así que no hay
+configuración de Prometheus en la que sobreviva la historia fechada. Ensanchar
+la ventana de desorden mueve la frontera; no la elimina.
+
+<Aside type="danger" title="No le des marcas de tiempo al exportador">
+  El "arreglo" obvio es que el exportador emita cada muestra con la marca de
+  tiempo del punto. El formato de exposición de Prometheus lo permite, y
+  Prometheus rechazará justo las que importan. El exportador descarta la marca
+  de tiempo a propósito, y la reducción de abajo es la razón de que eso no sea
+  una pérdida.
+</Aside>
+
+## El reductor, y qué hace con cada medida
+
+Como el almacén no puede sostener la historia, la reducción ocurre _antes_ de
+que Prometheus o un backend OTLP con `raw: false` vean los datos.
+`Summarize` da a cada medida una de cuatro reglas.
+
+| Regla      | Qué hace                                                              | Se usa para                                                                                   |
+| ---------- | --------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `keepLast` | Gana el punto más reciente de cada conjunto de etiquetas              | Instantáneas: `gh_repo`, `gh_account`, `gh_release`                                           |
+| `sum`      | Se suman todos los puntos del lote                                    | Ventanas: las visitas de los catorce días                                                     |
+| `count`    | Los puntos pasan a ser un recuento más la media de cada campo numérico | Elementos fechados: las pull requests pasan a ser "cuántas se fusionaron" y "cuánto tardaron" |
+| `skip`     | No se sirve nada                                                      | Historia sin valor actual honesto                                                             |
+
+Una medida sin regla se salta en vez de adivinarse. Ese es el valor por defecto
+seguro, y es deliberado: sin él, un colector nuevo podría inundar en silencio un
+exportador con una serie por estrella.
+
+`count` promedia cada uno de sus números excepto los identificadores. Un campo
+que une una fila con otra, `run_id`, `workflow_id`, `pull_request`, `number`,
+`stack` y los demás, es un nombre y no una cantidad: promediado sobre una cuenta
+se convierte en un número con la forma exacta del identificador del que está
+hecho y que no pertenece a nada, y `gh_deployment` publicó `run_id_mean` así.
+Esos campos quedan fuera de la reducción, y también las marcas que un punto
+lleva solo para tener algún campo, cuya media es 1,0 para siempre.
+
+El reductor publica además `total`, un recuento acumulado de elementos
+distintos vistos por serie. Eso es lo que permite que un dashboard de
+Prometheus responda "por día", mediante `increase()` sobre un contador
+monótono, ya que no tiene filas que contar.
+
+### Las diez que no se sirven nunca
+
+Diez de las medidas llevan `skip`, así que un exportador de Prometheus y un
+backend OTLP con `raw: false` no las ven nunca. Siete son historia, dos son
+tamaño y una es texto:
+
+| Medida                     | Por qué                                                                                        |
+| -------------------------- | ----------------------------------------------------------------------------------------------- |
+| `gh_artifact`              | Historia. Una fila por artefacto de siempre, y ninguna se vuelve a mover                       |
+| `gh_commit_punchcard`      | Tamaño. Una serie por repositorio, día de la semana y hora                                     |
+| `gh_commits_week`          | Historia. La serie semanal de commits                                                          |
+| `gh_contribution_day`      | Historia. El calendario verde, una fila por día                                                |
+| `gh_contribution_day_repo` | Historia. El mismo calendario partido por repositorio, que acuñaría una serie por día          |
+| `gh_job_log`               | Texto, no un número. Su sitio es un almacén de logs                                            |
+| `gh_package_version`       | Historia. La fecha de publicación de cada tag; su recuento ya es un campo de `gh_package`        |
+| `gh_release_asset`         | Tamaño. Una serie por cada fichero publicado alguna vez                                        |
+| `gh_traffic_path`          | Historia. Las rutas por día                                                                    |
+| `gh_workflow_step`         | Historia. Los tiempos por paso                                                                 |
+
+Las dos que se saltan por tamaño son las que conviene conocer, porque son
+números de verdad y no historia: medido, juntas eran cuatro quintas partes de
+toda la salida del exportador. Ambas se dibujan bien en el dashboard de
+InfluxDB, y `gh_release` guarda las descargas por release, que es para lo que se
+leían los ficheros.
+
+## Qué guarda cada almacén
+
+| Almacén                                       | La historia fechada              | Por qué                                                                                                                   |
+| --------------------------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| InfluxDB, PostgreSQL, Graphite, Elasticsearch | sí                               | La marca de tiempo es parte de la identidad de una fila                                                                   |
+| Telegraf                                      | hasta donde permitan sus salidas | Reenvía las marcas de tiempo sin tocarlas; una salida que sella al recibir las pierde                                     |
+| Fichero y stdout                              | sí                               | La marca de tiempo va en la línea                                                                                         |
+| Loki                                          | solo eventos recientes           | Loki rechaza una entrada demasiado atrasada respecto a la más nueva de su stream. Ver [Loki](/ghchronicle/es/sinks/loki/) |
+| OpenTelemetry                                 | lo decide el backend             | Los puntos OTLP llevan una marca de tiempo explícita; que se respete no depende de esta herramienta                       |
+| Prometheus                                    | no                               | Solo valores actuales, según las reglas de arriba                                                                         |
+
+## Tres consecuencias que conviene conocer
+
+**Una etiqueta es una serie, un campo es un valor.** Todo lo no acotado va en un
+campo. El nombre del runner de Actions parece una buena etiqueta hasta que uno
+se fija en que un runner alojado se nombra de forma única en cada ejecución
+(`GitHub Actions 1000163135`), lo que crearía una serie por cada job ejecutado
+alguna vez. Es un campo.
+
+**Las filas semanales se anclan a la semana, no a hoy.** `gh_commits_week` se
+sella en el domingo con el que empieza cada semana. Una pasada del martes y otra
+del viernes tienen que caer en la misma fila, o cada relectura escribe una
+segunda copia del año.
+
+**Prometheus reserva algunos nombres de etiqueta.** Una etiqueta llamada `job` o
+`instance` choca con las etiquetas del scrape, y el receptor OTLP la sobrescribe
+con el nombre del servicio. Por eso los jobs de workflow se etiquetan
+`job_name`.

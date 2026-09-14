@@ -1,0 +1,284 @@
+---
+title: What is collected
+description: The thirty-four families, what each one asks GitHub for, and the reason each exists.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+Thirty-four families, ninety-one measurements. This page is what each family
+is _for_; the [measurements reference](/ghchronicle/collectors/measurements/)
+is every tag and field.
+
+The families are also grouped, and `groups:` in the configuration switches a
+whole area on or off. The binary prints the grouping it actually uses, which is
+the one to trust:
+
+```sh
+ghchronicle -groups
+```
+
+```text
+account     the account itself: its lifetime numbers, its profile, its keys, its spending and what it does in other people's repositories
+            account, achievements, billing, history, keys, outbound, profile, totals
+audience    who is looking at the projects, who starred them and who copied them
+            forks, stars, traffic
+ci          continuous integration and deployment: runs, jobs, steps, artifacts, caches and deployments
+            actions, artifacts, deployments, joblogs
+...
+```
+
+## Audience
+
+**`traffic`** collects the only data GitHub genuinely throws away. Views and
+clones live for exactly fourteen days and then cease to exist anywhere. The
+whole window is re-read and rewritten on every sweep, each day stamped with its
+own date, so a collector that was off for a week loses nothing as long as it
+comes back inside the window.
+
+Referrers and popular paths are different: the API returns a top-ten snapshot
+with no dates at all, so they are stamped at the start of the UTC day and read
+as "who was sending traffic when we asked".
+
+**`stars`** reconstructs the star curve from its beginning. The stargazers
+endpoint returns a `starred_at` per user when asked with the star media type,
+so the entire history is available on the first run: a chart that goes back
+years, not one that starts the day the collector was installed. After the first
+sweep only the newest hundred are read, since new stars land at the end, and
+they are read for every repository at once in one GraphQL query per ten. That
+is the difference between one point and 280 calls for a repository with 28,000
+stars.
+
+**`forks`** collects who forked and when. The repository snapshot carries a
+fork count, which says how many but never when or by whom. The list is walked
+through REST on the first sweep of a fresh install and in a backfill; after
+that the newest hundred of every repository ride in the same kind of batch
+the stars do. A fork row is not static the way a star is: it carries the
+fork's own stars and how long since it was pushed, so a repository the batch
+reports holding more than a hundred forks is walked through REST as well,
+which refreshes those on up to five hundred forks as it always did.
+
+## Repositories
+
+**`repo`** collects what a repository is right now, plus the things that
+accumulate on GitHub's side: languages by bytes, topics, community health, and
+release downloads **per asset**, which is what tells a Linux build from a macOS
+one. Bytes per language matter because the dominant-language label cannot show
+a repository shifting from one language to another over time.
+
+**`settings`** collects the configuration that changes, and how well the parts
+of it that talk to the outside world are working. One thing here is a real time
+series rather than a snapshot: webhook deliveries carry a status code and a
+latency.
+
+**`rulesets`** collects the changelog of every ruleset, one row per saved
+version with an actor and a date, which is the only record GitHub keeps of the
+moment a protection was turned off. The ruleset itself, what it enforces and
+who may walk past it, is a daily snapshot in `repo`; this is the history that
+snapshot's `days_since_change` only summarizes.
+
+**`branches`** collects the live branch list, one row per branch carrying the
+age of its tip. Nothing else answers "which branches were abandoned": GitHub's
+own list sorts by name and forgets, so a branch whose last commit is four
+months old looks exactly like one pushed this morning. It deliberately does not
+ask which pull requests point at a branch, which is what makes that query
+expensive; the join belongs in the panel.
+
+**`inventory`** collects the three per-repository policy surfaces that change on
+a scale of months: what the `GITHUB_TOKEN` of a workflow is allowed to do, how
+old every stored secret is, and whether code scanning is switched on by GitHub
+rather than by a workflow of its own. Four core requests per repository a day.
+All three are settings rather than events, so they are stamped at the start of
+the UTC day and a change reads as the day the value moved.
+
+**`policyfiles`** records which governance files a repository carries,
+`SECURITY.md`, `CODEOWNERS`, `dependabot.yml` and `FUNDING.yml`, and when each
+of them last changed. Whether most of them exist today is already in
+`gh_repo_policy`; when they changed is nowhere else, and `.github/dependabot.yml`
+is in no other measurement at all, which is what makes "is this repository
+receiving dependency updates by either route" a question the data can answer.
+
+<Aside type="caution" title="Webhooks fail silently">
+  Measured, one hook had been answering 403 for seventy-eight of its last
+  hundred deliveries and nothing anywhere said so. Only the host of a webhook
+  URL is stored; the path usually carries a secret.
+</Aside>
+
+## Development
+
+**`issues`** collects pull requests and issues one by one, not as counts. A
+count of open pull requests says nothing about how the work actually goes; the
+interesting numbers are durations. How long until someone reviewed it, how long
+until it merged, how big the diff was, how many review rounds it took. One
+GraphQL query per repository covers both: a sweep walks what was updated in
+the last two cadences, ten at a time, and once a day reads a whole page sized
+to the repository, which is the only read that rewrites an open pull request
+nobody touched.
+
+**`commits`** collects the commit history with its size and its signature. This
+is what replaces `stats/code_frequency`, which answers 202 with an empty body
+forever on a personal account. GraphQL gives lines added and removed per
+commit, attributed to an author and dated to the commit rather than to a week,
+and the signature comes with it for the same query.
+
+**`issueevents`** collects the transitions rather than the state. `issues` says
+what a pull request ended up as; this says when it was labelled, closed,
+reopened, renamed or had a review requested. A reopening exists in no other
+measurement. The repository-level list, `/issues/events`, is the reference for
+what an event is and how it is named, and it embeds the whole issue in every
+event: about a megabyte per page of a hundred, of which the collector keeps
+three per cent. So a sweep asks GraphQL for the timeline of the issues and
+pull requests updated in its window, ten items a page because the gateway was
+measured to drop timelines silently at twenty, and a backfill walks the
+per-issue endpoint, `/issues/{n}/events`, which is the same rows without the
+issue. Measured over a week of two repositories, the timeline agrees with the
+list on every event of every type it can name, field for field; a pull
+request in a stack is read through its own list because `added_to_stack` has
+no timeline type, and the one thing the list sees that this does not is a
+commit referencing an issue nobody has touched, three events in 2,217.
+
+**`deps`** collects the dependency graph, off by default. Two shapes of the
+same subject: the SBOM as a photograph, which is a licence histogram, and the
+difference between two commits, which says what entered and left and what
+advisory it carried. Only aggregates are stored, because one dependency bump is
+three hundred and seventy changes and six rows say the same thing.
+
+**`discussions`** collects the forum half of a repository. Discussions are
+invisible to every issue and pull request endpoint, and an answered question is
+a support cost that never appears in the issue numbers. A repository whose
+forum is switched off is never asked: the listing that discovered it already
+said so, and the query costs the same whether or not there is anything to page.
+
+**`planning`** collects labels and milestones. A milestone is the only place
+GitHub records an intention with a due date, and its completion percentage is
+computed server side.
+
+**`activity`** collects a repository's own activity log. It is the only place a
+force push is recorded: the public event feed does not distinguish one, and
+nothing else says that a branch was created or deleted or that a merge was a
+squash rather than a rebase. It is as perishable as traffic, a hundred entries
+covered twenty-six hours on the busiest repository measured.
+
+## Continuous integration
+
+**`actions`** collects workflow runs as dated facts. A run belongs at the
+instant it completed, not at the instant we noticed, which is what makes "how
+long did CI take last Tuesday" answerable.
+
+Run-level timing hides where the time went: a run that takes twenty minutes
+because one job waited eighteen for a runner looks exactly like one that spent
+eighteen executing. Only the job level separates them, and only the job level
+names the runner and the steps, so the jobs of each run are expanded at one
+extra request per run. Once: the jobs of a finished attempt never change, so a
+run whose jobs this process already wrote is not listed again, and a re-run is
+a new attempt that is. An ordinary sweep reads the run list in pages of thirty
+and pages on while they are full of runs newer than its window; the first sweep
+after start and a backfill read pages of a hundred.
+
+**`artifacts`** collects what the workflows left behind, with sizes and
+expiry.
+
+**`joblogs`** collects the text a failed job printed. It is the one thing here
+that is a log rather than a measurement, and it answers the question a chart
+never can: not "the build failed" but why. Only failures, and only their last
+forty lines. Off by default.
+
+**`deployments`** collects the newest deployments of every repository, which is
+the surface a delivery dashboard reads. One GraphQL point per five
+repositories: five rather than ten because the gateway gives up on a query it
+cannot finish in about ten seconds, and this one asks for connections rather
+than plain numbers.
+
+## Security
+
+**`security`** counts open alerts by severity and state, and records
+**explicitly which features are switched on**. That last part is why no data
+and no alerts are distinguishable: without it, a repository with Dependabot off
+looks exactly like one with nothing to fix.
+
+**`analyses`** collects the code scanning analyses themselves, not just the
+alerts. An alert says what is wrong now. An analysis says the scan ran, when,
+on which commit, with which version of the tool, and how many results it found,
+which is what answers "did the scan actually run on that release". GitHub
+prunes them, so they have to be captured while they are there.
+
+## Account
+
+**`account`** is one GraphQL query and the cheapest thing in the project. It
+returns the full 366-day contribution calendar, every contribution total, the
+per-repository commit breakdown and the sponsors block for **one point of a
+five thousand point budget**. The same data over REST would be dozens of calls
+and would not include the calendar at all.
+
+**`profile`** collects packages, gists, social accounts and the follower graph.
+Packages come from REST deliberately: GraphQL reports zero packages for an
+account while REST lists them.
+
+**`outbound`** is the other half of everything else here. Every other family
+measures what the account owns; this measures what it reads and what it
+contributes to: the stars it gave, and the pull requests it opened in other
+people's repositories. All of it is GraphQL, one point a query: the starred
+list, five issue searches and the two comment walks.
+
+**`totals`** asks GitHub for the numbers that are true since the beginning:
+pull requests merged ever, commits ever, issues opened ever, and the whole life
+of each repository. It is the one family that exists because of how a store
+reads rather than because of what GitHub offers. Every other measurement here
+is a row per fact, which is the right shape for "how many in July" and the
+wrong one for "how many ever": answering that from rows means scanning the
+whole table, and InfluxDB 3 Core refuses a query that would open more than its
+file limit, forty thousand where this was measured. Search reports a total for
+any query and GraphQL reports one for any connection, so one query of ten
+aliased searches, one REST search for
+the commit count and one batched query give a number that is one row and is
+right on the first sweep of a fresh install.
+
+**`ratelimit`** is the only measurement the collector takes of itself: what is
+left in each of GitHub's fifteen independent budgets and when each resets.
+`GET /rate_limit` costs nothing at all, and without it a family skipped for
+want of budget looks exactly like a family with nothing to report.
+
+**`keys`** collects the account's own SSH and GPG keys: which have never been
+used, and when the key that signs every commit expires.
+
+**`stats`** collects commits per week and the hour-of-week punch card, the two
+`stats` endpoints that actually answer for a personal account.
+
+**`history`** walks every past year's contribution calendar, one GraphQL point
+per year, back to the day the account was created. Off by default because it
+only needs to happen once.
+
+**`achievements`** collects the badges on the public profile page, and it is the
+one family that does not come from the API at all: GitHub lists achievements in
+neither REST nor GraphQL, so the page is read once a day as an anonymous
+visitor, without the token and charged to no budget. Beside each badge it
+writes how far the account is from that badge's next tier, which does come from
+the API. The parser is strict on purpose: when GitHub redesigns the page the
+family writes nothing and says so once, rather than writing wrong numbers that
+would look exactly like right ones.
+
+## Activity and cost
+
+**`events`** collects the account's activity feed, the most perishable surface
+GitHub has. It keeps roughly the last three hundred events and drops anything
+older, whatever its date, and nothing else records that a repository was
+starred, forked, watched or pushed to at a given minute.
+
+**`notifs`** collects the inbox. Like the event feed it is a window, not a
+history: GitHub keeps unread notifications for about a year and read ones for
+far less, and `per_page` is silently capped at 50 whatever is asked for.
+
+**`billing`** collects what the account actually spent, day by day, per
+product, SKU and repository, which is the only place that says which repository
+burned the minutes. Gross, discount and net are all kept rather than one being
+derived from the others, because the net is not always zero: on the account
+this was developed against it carries the monthly credit.
+
+<Aside
+  type="note"
+  title="A family that fails on one repository does not fail the sweep"
+>
+  Of fifty repositories, most have Dependabot switched off, and each of them
+  answers 403. That is recorded as "not enabled" and the sweep moves on. Only a
+  family where _every_ repository failed is left unmarked, so it is retried
+  rather than treated as done.
+</Aside>

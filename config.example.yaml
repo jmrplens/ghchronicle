@@ -1,0 +1,323 @@
+# ghchronicle configuration.
+#
+# Copy to config.yaml and edit. Every ${VAR} is read from the environment at
+# start-up, so this file can be committed while the secrets stay out of it.
+#
+# This file is the inventory: every setting there is, with a comment. The prose
+# that explains them is at https://jmrplens.github.io/ghchronicle/configuration/
+
+github:
+  # A classic or fine-grained personal access token. Read scopes are enough,
+  # but traffic needs push access to the repository and Dependabot alerts need
+  # the security_events scope. Anything the token cannot see is recorded as
+  # unavailable rather than as a failure.
+  token: ${GITHUB_TOKEN}
+
+  # Calls never spent, so whatever else uses this token keeps working. The
+  # collector stops a family early rather than exhausting the budget.
+  reserve_rate: 500
+
+  # Per request. GraphQL queries over a large account can be slow.
+  timeout: 30s
+
+  # The API root: api.github.com unless named, https://<host>/api/v3 on a
+  # GitHub Enterprise instance.
+  # base_url: https://github.example.com/api/v3
+
+  # The site the profile page is on, which the achievements family reads
+  # without the token because no API lists the badges. Derived from base_url
+  # (github.com, or the Enterprise host) unless named; name it when base_url
+  # is a proxy in front of the API, whose root says nothing about the site.
+  # web_url: https://github.example.com
+
+targets:
+  # The account to collect. Its repositories are discovered automatically.
+  user: your-github-login
+
+  # Organisations to include as well.
+  orgs: []
+
+  # Repositories to collect whatever the filters below say. Naming one is the
+  # clearest possible statement of intent, so it overrides every exclusion.
+  repos: []
+
+  # Shell globs. "someone/experiment-*" drops a whole prefix.
+  exclude: []
+
+  # Forks and archived repositories are off by default. A fork's traffic is
+  # almost always zero and an archived repository cannot change, so collecting
+  # them spends the rate limit on rows that never move. An archived repository
+  # left out still gets the one row it has, the date it was archived: the
+  # listing a sweep already pays for says which, and one GraphQL query per
+  # totals sweep says when. And a -backfill collects archived repositories in
+  # full whatever this says, because their history never moves again and one
+  # walk is enough.
+  include_forks: false
+  include_archived: false
+
+  # Private repositories are on by default: the token already reaches them and
+  # they are most of what an account with any private work has. Set it to
+  # false to collect only what the world can see.
+  include_private: true
+
+sinks:
+  # A sweep offers the same history every time, and rewriting a row that has
+  # not changed costs nothing in what a store holds and a Parquet file per
+  # partition in InfluxDB 3 Core, which never compacts them. So the tool
+  # remembers what it has written and sends only what moved. The ledger lives
+  # beside the state file; "off" disables it, which is what a store that has
+  # been wiped and needs filling again wants for one run.
+  # dedupe_file: /var/lib/ghchronicle/state-written.bin
+  # dedupe_horizon: 720h
+
+  # InfluxDB keeps the dated history: the traffic window as days, the star
+  # curve since the first star, the merge time of a pull request closed months
+  # ago. Points are keyed by measurement, tags and timestamp, so re-collecting
+  # a window rewrites it instead of duplicating it.
+  influxdb:
+    url: http://localhost:8181
+    token: ${INFLUX_TOKEN}
+    org: default
+    bucket: github
+    batch: 5000
+    # Measurements this sink should not receive. Defaults to the job log,
+    # which is text meant for a log store.
+    # exclude: [gh_job_log]
+    # Skip a point whose fields have not changed since the last write. On by
+    # default here and for telegraf, graphite, sql and elasticsearch, because
+    # a store keyed by series and timestamp holds nothing new from a rewrite.
+    # Set it to false to send every point again, which is what a store that
+    # has been wiped wants for one run.
+    # dedupe: true
+
+  # The exporter serves the current value of everything that has one. It cannot
+  # carry the dated history: Prometheus stamps a sample at scrape time and
+  # rejects meaningfully older ones. Both sinks can run at once.
+  prometheus:
+    listen: 127.0.0.1:9605
+    path: /metrics
+    # The first sweep after start-up runs every family, because the exporter
+    # keeps its samples in memory and a restart empties it. Set this to keep
+    # that first sweep on the normal schedule instead, at the cost of a
+    # dashboard reading zero until each cadence comes round.
+    # no_prime: false
+
+  # OpenTelemetry over HTTP, JSON encoding. Whether the dated history survives
+  # is the backend's decision: OTLP data points carry an explicit timestamp, a
+  # store that accepts old ones keeps the history, and Prometheus's own OTLP
+  # receiver does not. `raw: false` sends the same reduced current values as
+  # the exporter above, which is safe anywhere.
+  # otlp:
+  #   endpoint: http://collector:4318/v1/metrics
+  #   service: ghchronicle
+  #   raw: false
+  #   batch: 2000
+  #   # Republish the current state at this interval, so a Prometheus fed by
+  #   # push keeps answering instant queries between sweeps: its lookback is
+  #   # five minutes. Omitted means no repeat, which is right for a backend
+  #   # that keeps history of its own.
+  #   repeat: 1m
+  #   headers:
+  #     Authorization: Bearer ${OTLP_TOKEN}
+
+  # The events, not the numbers. A star given, a release published, a workflow
+  # failed: each happened once at a known moment, and what you want later is to
+  # read them in order, not to average them. Twenty-two measurements have an
+  # event rendering; the rest are gauges in disguise and are not sent.
+  # loki:
+  #   url: http://loki:3100/loki/api/v1/push
+  #   # X-Scope-OrgID, for a multi-tenant Loki. Omitted sends no header.
+  #   tenant_id: ""
+  #   batch: 1000
+  #   labels:
+  #     job: ghchronicle
+  #   # How far behind an entry may be, one hour unless named. Loki refuses
+  #   # one that is more than its out-of-order window behind the newest entry
+  #   # in the same stream, about two hours by default, and much of this
+  #   # history is older than that on purpose. What falls outside is left out
+  #   # rather than costing the whole push, which is why the default is an
+  #   # hour and not a day. Raise it only alongside out_of_order_time_window.
+  #   max_age: 1h
+
+  # A rotating file, for a setup that already runs a log shipper. Also the
+  # simplest durable buffer there is: when the database is down, the file still
+  # has the data.
+  # file:
+  #   path: /var/log/ghchronicle/points.lp
+  #   format: influx      # or json
+  #   max_bytes: 67108864
+  #   keep: 5
+
+  # Line protocol posted to Telegraf's http_listener_v2 input. This is the
+  # door to everything Telegraf can reach: Kafka, Datadog, New Relic,
+  # Graphite, Loki and a hundred more, routed by Telegraf's own outputs.
+  # telegraf:
+  #   url: http://telegraf:8186/telegraf
+  #   username: ""
+  #   password: ""
+  #   batch: 5000
+  #   dedupe: true
+
+  # Graphite's plaintext protocol over TCP. Graphite keeps a point at the time
+  # it was given, so the dated history goes out as it is. The path is
+  # <prefix>.<measurement without gh_>.<tag values in key order>.<field>;
+  # see https://jmrplens.github.io/ghchronicle/sinks/graphite/ for the exact
+  # rules, they are the dashboard's contract.
+  # graphite:
+  #   addr: graphite:2003
+  #   prefix: github
+  #   batch: 1000
+  #   dedupe: true
+
+  # PostgreSQL INSERT statements, to pipe into psql: a table per measurement
+  # with a primary key on time and tags, so a rewrite of a window converges.
+  # For the Grafana user on PostgreSQL or TimescaleDB with no InfluxDB. A path
+  # of "-" writes to standard output; do not combine that with stdout: true.
+  # sql:
+  #   dialect: postgres
+  #   path: /var/lib/ghchronicle/points.sql
+  #   max_bytes: 67108864
+  #   keep: 5
+  #   dedupe: true
+
+  # The _bulk API of Elasticsearch or OpenSearch, one index per measurement
+  # named <prefix>-<measurement>, with a document id derived from the point's
+  # identity so a rewrite replaces rather than duplicates.
+  # elasticsearch:
+  #   url: http://elasticsearch:9200
+  #   prefix: ghchronicle
+  #   api_key: ${ES_API_KEY}     # or username and password, never both
+  #   username: ""
+  #   password: ""
+  #   batch: 1000
+  #   dedupe: true
+
+  # Line protocol on standard output, for piping into Telegraf or for seeing
+  # what would be written before pointing this at a database. `stdout_format:
+  # json` prints one object per line instead, the shape the file sink writes.
+  stdout: false
+  # stdout_format: influx
+
+# Which groups of metrics this deployment collects. Omit the key for all of
+# them, which is the default. Naming any group turns the rest off: their
+# families are never requested and their measurements are never written.
+# `ghchronicle -groups` prints the groups and the families in each.
+#
+# groups: [audience, account, repos, security]
+
+# How often each family is collected, in three layers. The most specific one
+# wins: a family's own entry, then its group's, then default, then the built-in
+# value. Anything omitted keeps the layer below it. A 0 anywhere switches the
+# families it reaches off entirely.
+#
+# The built-in values are not round numbers picked for tidiness, they came out
+# of a costed audit, and each one has a reason recorded against it. A broad
+# layer is a cheap way to slow everything down and an expensive way to speed
+# everything up: a default of 15m asks GitHub for the account's SSH keys
+# ninety-six times a day for a value that changes twice a year. Every family a
+# configuration speeds up substantially, four times or more, is named at
+# start-up with its resolved cadence, its built-in one, and the reason that
+# number is what it is. It is a warning, never a refusal.
+#
+# default and groups deliberately cannot reach a family whose built-in cadence
+# is zero: deps, history and joblogs are switched on by naming them under
+# families and by nothing else.
+#
+# The full table, every family with its group, its built-in cadence and why
+# that value, is in the documentation under Configuration / Cadences.
+every:
+  # One number for every family that neither of the two layers below names.
+  # default: 15m
+
+  # One number for a whole group of families. `ghchronicle -groups` prints the
+  # groups and the families in each. This flattens what the audit measured:
+  # group work holds families measured at 1h and at 12h, so one number here is
+  # one number over six different answers.
+  # groups:
+  #   ci: 1m
+  #   feeds: 10m
+
+  # One number for one family, which is the layer that can say anything the
+  # other two cannot. These are the built-in values, so the whole block below
+  # is a reference you can prune rather than a setting you have to keep.
+  families:
+    traffic: 6h       # GitHub's window is 14 days and is rewritten whole each time
+    repo: 1h          # stars, forks, languages, topics, releases
+    stars: 6h         # walked whole once per repository, then the newest hundred in a GraphQL batch
+    issues: 1h        # pull requests, issues and reviews, per item
+    commits: 1h       # lines changed and signature state, per commit
+    actions: 15m      # the only family with a per-minute rhythm
+    artifacts: 1h
+    activity: 30m     # the repository log, where a force push is recorded
+    analyses: 6h      # code scanning runs, which GitHub prunes
+    security: 1h
+    forks: 12h        # the whole list fits in one page
+    planning: 6h      # labels and milestones
+    stats: 12h        # GitHub recomputes these slowly anyway
+    discussions: 2h
+    account: 12h      # profile, contribution calendar, contribution totals
+    events: 30m       # the feed keeps only the last 300 events, whatever their date
+    notifs: 30m       # read notifications disappear quickly
+    billing: 6h
+    profile: 12h      # packages, gists, social accounts
+    outbound: 12h     # stars given, and work in other people's repositories
+    settings: 6h      # webhooks and their deliveries, rulesets, environments, keys
+    branches: 24h     # one row per live branch, and how old its tip is
+    inventory: 24h    # workflow token policy, secret ages, code scanning setup
+    deployments: 1h   # deployments and their outcome, dated when they were created
+    policyfiles: 24h  # SECURITY.md, CODEOWNERS, dependabot.yml, FUNDING.yml
+    rulesets: 24h     # every saved version of every ruleset, dated when it was saved
+    issueevents: 1h   # labelled, closed, reopened: the transitions a state does not keep
+    totals: 12h       # the lifetime counts, asked of GitHub rather than added up here
+    keys: 24h         # the account's SSH and GPG keys, and when they expire
+    achievements: 24h # the profile's badges, read off the public profile page (no API lists them), and how far each is from its next tier
+    ratelimit: 15m    # the collector's own budget, in all fifteen buckets; costs nothing
+    # The tail of every failed job's log. Off by default: it is text rather than
+    # a measurement, it costs a request per failure, and it only makes sense with
+    # a log store attached. The InfluxDB sink excludes it by default.
+    joblogs: 0
+    # Every past year's contribution calendar, one GraphQL point per year, back
+    # to the day the account was created, plus the year so far as a snapshot
+    # marked partial. Off by default; the past years never change and the rows
+    # are idempotent, and a daily cadence is what keeps this year's row current.
+    history: 0
+    # The dependency graph: the licence histogram, and what entered and left
+    # between two commits. Off by default because the SBOM is 1.8 MB per
+    # repository and has its own budget of a hundred a minute.
+    deps: 0
+
+# How often the sweep loop wakes to ask which families are due. This is the
+# loop's heartbeat and not a cadence: it gives no family an interval and is
+# measured against nothing. Omit it and the loop ticks at the shortest cadence
+# configured, which is what a real deployment wants. Set it to force the loop
+# for a test run, including faster than the one minute floor a derived tick
+# keeps. A heartbeat longer than the shortest cadence holds that family back,
+# and start-up says so.
+#
+# heartbeat: 15s
+
+# How far back a -backfill walks. A date (2024-01-01), a Go duration, or a
+# count of days or years (90d, 2y). Omit it for no bound at all, which stops
+# only when the API does, however many hours that takes. It applies to a run
+# started with -backfill and to nothing else.
+#
+# backfill:
+#   since: 2y
+
+# What a sweep remembers between runs: when each family last ran, which
+# repositories have already had their one-off full star walk, the commit each
+# dependency diff starts from, when each family last read a whole page instead
+# of what changed, where the notification window was cut, and the newest event
+# the feed had. Deleting it makes the next sweep take every one of those from
+# the beginning and pay for it; everything re-collected overwrites what is
+# already stored, except the dependency changes since the head it held, which
+# are read from a range nothing can name once the head is gone.
+state_file: /var/lib/ghchronicle/state.json
+
+log:
+  level: info     # debug, info, warn, error
+  format: text    # text or json
+  # A rotating log file as well as standard error, never instead of it.
+  # file: /var/log/ghchronicle/ghchronicle.log
+  # max_bytes: 67108864
+  # keep: 5

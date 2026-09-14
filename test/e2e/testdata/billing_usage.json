@@ -1,0 +1,30 @@
+{
+  "usageItems": [
+    {
+      "date": "2026-09-01T00:00:00Z",
+      "product": "Actions",
+      "sku": "Actions Linux",
+      "quantity": 214,
+      "unitType": "Minutes",
+      "pricePerUnit": 0.008,
+      "grossAmount": 1.712,
+      "discountAmount": 1.712,
+      "netAmount": 0,
+      "organizationName": "octocat",
+      "repositoryName": "hello-world"
+    },
+    {
+      "date": "2026-09-02T00:00:00Z",
+      "product": "Copilot",
+      "sku": "Copilot Individual",
+      "quantity": 1,
+      "unitType": "Seats",
+      "pricePerUnit": 10,
+      "grossAmount": 10,
+      "discountAmount": 0,
+      "netAmount": 10,
+      "organizationName": "octocat",
+      "repositoryName": "octocat"
+    }
+  ]
+}

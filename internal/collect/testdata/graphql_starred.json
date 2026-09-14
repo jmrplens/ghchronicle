@@ -1,0 +1,23 @@
+{
+  "data": {
+    "viewer": {
+      "starredRepositories": {
+        "pageInfo": {"hasNextPage": false, "endCursor": "Y3Vyc29yOjM="},
+        "edges": [
+          {
+            "starredAt": "2026-09-01T07:30:00Z",
+            "node": {"nameWithOwner": "influxdata/influxdb", "stargazerCount": 29000, "primaryLanguage": {"name": "Rust"}}
+          },
+          {
+            "starredAt": "2026-08-20T09:15:00Z",
+            "node": {"nameWithOwner": "sindresorhus/awesome", "stargazerCount": 355000, "primaryLanguage": null}
+          },
+          {
+            "starredAt": "2026-08-12T20:00:00Z",
+            "node": {"nameWithOwner": "golang/go", "stargazerCount": 125000, "primaryLanguage": {"name": "Go"}}
+          }
+        ]
+      }
+    }
+  }
+}

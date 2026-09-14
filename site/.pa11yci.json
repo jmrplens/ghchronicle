@@ -1,0 +1,34 @@
+{
+  "defaults": {
+    "standard": "WCAG2AA",
+    "timeout": 15000,
+    "wait": 2000,
+    "chromeLaunchConfig": {
+      "args": ["--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage"]
+    }
+  },
+  "urls": [
+    "http://localhost:4321/ghchronicle/",
+    "http://localhost:4321/ghchronicle/start/quickstart/",
+    "http://localhost:4321/ghchronicle/how/dating/",
+    "http://localhost:4321/ghchronicle/api/cost/",
+    "http://localhost:4321/ghchronicle/install/systemd/",
+    "http://localhost:4321/ghchronicle/configuration/targets/",
+    "http://localhost:4321/ghchronicle/collectors/measurements/",
+    "http://localhost:4321/ghchronicle/sinks/loki/",
+    "http://localhost:4321/ghchronicle/dashboards/panels/",
+    "http://localhost:4321/ghchronicle/card/",
+    "http://localhost:4321/ghchronicle/reference/troubleshooting/",
+    "http://localhost:4321/ghchronicle/es/",
+    "http://localhost:4321/ghchronicle/es/start/quickstart/",
+    "http://localhost:4321/ghchronicle/es/how/dating/",
+    "http://localhost:4321/ghchronicle/es/api/cost/",
+    "http://localhost:4321/ghchronicle/es/install/systemd/",
+    "http://localhost:4321/ghchronicle/es/configuration/targets/",
+    "http://localhost:4321/ghchronicle/es/collectors/measurements/",
+    "http://localhost:4321/ghchronicle/es/sinks/loki/",
+    "http://localhost:4321/ghchronicle/es/dashboards/panels/",
+    "http://localhost:4321/ghchronicle/es/card/",
+    "http://localhost:4321/ghchronicle/es/reference/troubleshooting/"
+  ]
+}

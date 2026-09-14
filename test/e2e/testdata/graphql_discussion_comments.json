@@ -1,0 +1,27 @@
+{
+  "data": {
+    "viewer": {
+      "login": "octocat",
+      "repositoryDiscussionComments": {
+        "totalCount": 2,
+        "pageInfo": {"hasPreviousPage": false, "startCursor": "Y3Vyc29yOjI="},
+        "nodes": [
+          {
+            "createdAt": "2026-09-05T10:00:00Z",
+            "url": "https://github.com/fosrl/pangolin/discussions/118#discussioncomment-18283966",
+            "isAnswer": true,
+            "upvoteCount": 3,
+            "discussion": {"number": 118, "title": "How do I bind a second port", "repository": {"nameWithOwner": "fosrl/pangolin"}}
+          },
+          {
+            "createdAt": "2026-08-19T09:00:00Z",
+            "url": "https://github.com/octocat/hello-world/discussions/4#discussioncomment-18283967",
+            "isAnswer": false,
+            "upvoteCount": 0,
+            "discussion": {"number": 4, "title": "Roadmap", "repository": {"nameWithOwner": "octocat/hello-world"}}
+          }
+        ]
+      }
+    }
+  }
+}

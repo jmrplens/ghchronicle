@@ -1,0 +1,98 @@
+---
+/**
+ * The header, with controls that stay visible at every width.
+ *
+ * Starlight hides its whole right-hand group below the `md` breakpoint, which
+ * puts the theme and language controls at the bottom of the drawer. This
+ * renders a compact set beside the default header instead: a two-state theme
+ * toggle and an icon-only language picker, reachable without opening anything.
+ *
+ * The default header keeps everything else, the title, the search and the
+ * social links; only its own theme and language selects are hidden, and only
+ * within the header, so the drawer's preferences footer is untouched.
+ */
+import Default from "@astrojs/starlight/components/Header.astro";
+import LanguageSelect from "@astrojs/starlight/components/LanguageSelect.astro";
+import ThemeToggle from "./ThemeToggle.astro";
+---
+
+<div class="ghc-header">
+	<div class="ghc-default"><Default><slot /></Default></div>
+	<div class="ghc-controls">
+		<ThemeToggle />
+		<div class="ghc-lang"><LanguageSelect /></div>
+	</div>
+</div>
+
+<style>
+	.ghc-header {
+		display: flex;
+		gap: var(--sl-nav-gap);
+		align-items: center;
+		height: 100%;
+	}
+	.ghc-default {
+		flex: 1;
+		min-width: 0;
+		height: 100%;
+	}
+	/* The default header's own controls, hidden here and only here. */
+	.ghc-default :global(starlight-theme-select),
+	.ghc-default :global(starlight-lang-select) {
+		display: none !important;
+	}
+	.ghc-controls {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+	}
+	@media print {
+		.ghc-controls {
+			display: none;
+		}
+	}
+
+	/* The language control, reduced to its globe. The stock one spends about
+	 * eight characters of width on the locale name. A transparent native
+	 * select stretched over the icon keeps the browser's own dropdown, which
+	 * is the part worth keeping. */
+	.ghc-lang :global(label) {
+		position: relative;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 2rem;
+		height: 2rem;
+		margin: 0;
+		color: var(--sl-color-gray-2);
+	}
+	.ghc-lang :global(label):hover {
+		color: var(--sl-color-white);
+	}
+	/* The select is transparent, so its focus ring is invisible; the visible
+	 * label has to carry it or keyboard users cannot see where they are. */
+	.ghc-lang :global(label):focus-within {
+		color: var(--sl-color-white);
+		outline: 2px solid var(--sl-color-accent);
+		outline-offset: 2px;
+		border-radius: 0.25rem;
+	}
+	.ghc-lang :global(.label-icon) {
+		position: static;
+		transform: none;
+		font-size: 1.15rem;
+	}
+	.ghc-lang :global(.caret) {
+		display: none;
+	}
+	.ghc-lang :global(select) {
+		position: absolute;
+		inset: 0;
+		width: 100%;
+		height: 100%;
+		padding: 0;
+		margin: 0;
+		opacity: 0;
+		cursor: pointer;
+	}
+</style>

@@ -1,0 +1,39 @@
+name: Idea
+description: Something GitHub exposes that this does not collect, or a store it does not reach.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The two most useful ideas for this project are a surface GitHub exposes
+        that is not collected yet, and a question the collected data cannot
+        answer. Both are welcome.
+  - type: textarea
+    id: what
+    attributes:
+      label: What is missing
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: The question it would let you answer
+      description: >
+        What you would put on a dashboard, or ask of the data, that you cannot
+        today.
+    validations:
+      required: true
+  - type: input
+    id: endpoint
+    attributes:
+      label: The endpoint or the store
+      description: >
+        For a new measurement, the REST path or the GraphQL field it would come
+        from. For a new sink, the store and its write API.
+  - type: textarea
+    id: cost
+    attributes:
+      label: What it would cost
+      description: >
+        Optional, and the thing that usually decides. One request per
+        repository per sweep is a different proposition from one per item.

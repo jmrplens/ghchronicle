@@ -1,0 +1,176 @@
+---
+/**
+ * The page frame, with the mobile navigation on every page rather than only on
+ * the ones that have a sidebar.
+ *
+ * Starlight renders the sidebar drawer and the button that opens it inside
+ * `hasSidebar`, which is false for a `splash` page. The landing is the page
+ * most likely to be someone's first, so it was the one page with no way into
+ * the documentation other than the hero's call to action, and it carried a
+ * dropdown of its own to make up for it. Two menus that look different, sit in
+ * different places in the header and open different things, on the two halves
+ * of the same site.
+ *
+ * This is Starlight's own frame with the condition moved: the drawer is built
+ * for every page, and only the part that turns it into a permanent column at
+ * `md` stays behind `hasSidebar`, so the landing keeps its full-width layout
+ * and gains the same button, in the same corner, opening the same drawer.
+ */
+import MobileMenuToggle from "@astrojs/starlight/components/MobileMenuToggle.astro";
+import Sidebar from "@astrojs/starlight/components/Sidebar.astro";
+
+const { hasSidebar } = Astro.locals.starlightRoute;
+---
+
+<div class="page sl-flex">
+	<header class="header"><slot name="header" /></header>
+	<nav
+		class="sidebar print:hidden"
+		aria-label={Astro.locals.t("sidebarNav.accessibleLabel")}
+	>
+		<MobileMenuToggle />
+		<script>
+			// The mobile menu uses the popover API to open and close without
+			// JavaScript. Starlight enhances that with focus trapping while the
+			// menu is open, and this is its element, carried over with it.
+			class StarlightSidebarPane extends HTMLElement {
+				constructor() {
+					super();
+
+					// Close the menu when the viewport is resized between mobile and
+					// desktop sizes.
+					matchMedia("(min-width: 50em)").addEventListener("change", () =>
+						this.hidePopover(),
+					);
+
+					// Update the menu state when the sidebar popover is toggled.
+					this.addEventListener("toggle", ({ newState }) =>
+						this.trapFocus(newState === "open"),
+					);
+				}
+				/** Trap keyboard focus inside the header and menu when the menu is expanded. */
+				trapFocus(shouldTrap: boolean) {
+					document
+						.querySelectorAll<HTMLElement>(".main-frame, .sl-skip-link")
+						.forEach((el) => {
+							el.toggleAttribute("inert", shouldTrap);
+						});
+				}
+			}
+			customElements.define("sl-sidebar-pane", StarlightSidebarPane);
+		</script>
+		<sl-sidebar-pane popover="" id="starlight__sidebar" class="sidebar-pane">
+			<div class="sidebar-content sl-flex">
+				{/* Page.astro fills this slot only where the route has a sidebar,
+				so the pages that do not have one render the same sidebar here. */}
+				{hasSidebar ? <slot name="sidebar" /> : <Sidebar />}
+			</div>
+		</sl-sidebar-pane>
+	</nav>
+	<div class="main-frame"><slot /></div>
+</div>
+
+<style>
+	/* Starlight's own frame styles, and they have to be repeated rather than
+	 * inherited: its styles are scoped to its component, which this replaces.
+	 * Two rules differ from the original and each says so. */
+	@layer starlight.core {
+		.page {
+			flex-direction: column;
+			min-height: 100vh;
+		}
+
+		.header {
+			z-index: var(--sl-z-index-navbar);
+			position: fixed;
+			inset-inline-start: 0;
+			inset-block-start: 0;
+			width: 100%;
+			height: var(--sl-nav-height);
+			border-bottom: 1px solid var(--sl-color-hairline-shade);
+			padding: var(--sl-nav-pad-y) var(--sl-nav-pad-x);
+			padding-inline-end: var(--sl-nav-pad-x);
+			background-color: var(--sl-color-bg-nav);
+		}
+
+		/* CHANGED: the original reserves the button's corner only on a page with
+		 * a sidebar. Every page has the button now, so the corner is reserved by
+		 * default and given back below, in the one case where the button is not
+		 * on screen: a page whose sidebar is a column of its own from `md` up. */
+		.header {
+			padding-inline-end: calc(
+				var(--sl-nav-gap) + var(--sl-nav-pad-x) + var(--sl-menu-button-size)
+			);
+		}
+
+		@media (min-width: 50rem) {
+			:global([data-has-sidebar]) .header {
+				padding-inline-end: var(--sl-nav-pad-x);
+			}
+		}
+
+		.sidebar-pane {
+			/* By default, user agents apply some opinionated styles to popovers,
+			 * which we don't want. */
+			border: unset;
+			padding: unset;
+			height: unset;
+			color: unset;
+
+			position: fixed;
+			z-index: var(--sl-z-index-menu);
+			inset-block: var(--sl-nav-height) 0;
+			inset-inline-start: 0;
+			width: 100%;
+			background-color: var(--sl-color-black);
+			overflow-y: auto;
+			scrollbar-gutter: stable;
+		}
+
+		.sidebar-content {
+			height: 100%;
+			min-height: max-content;
+			padding: 1rem var(--sl-sidebar-pad-x) 0;
+			flex-direction: column;
+			gap: 1rem;
+		}
+
+		@media (min-width: 50rem) {
+			.sidebar-content::after {
+				content: "";
+				padding-bottom: 1px;
+			}
+		}
+
+		.main-frame {
+			padding-top: calc(var(--sl-nav-height) + var(--sl-mobile-toc-height));
+			padding-inline-start: var(--sl-content-inline-start);
+		}
+
+		@media (min-width: 50rem) {
+			/* CHANGED: the drawer becomes a permanent column only where the route
+			 * has a sidebar. On a splash page it stays a closed popover, which is
+			 * what keeps the landing full width. */
+			:global([data-has-sidebar]) .sidebar-pane {
+				display: block;
+				width: var(--sl-sidebar-width);
+				background-color: var(--sl-color-bg-sidebar);
+				border-inline-end: 1px solid var(--sl-color-hairline-shade);
+			}
+		}
+	}
+</style>
+
+<style is:global>
+	/* A page with no sidebar has no navigation column at any width, so its
+	 * button stays past `md` rather than hiding along with the drawer it
+	 * opens. The hiding is `md:sl-hidden` from `@layer starlight.utils`,
+	 * which sorts after `starlight.core`, so this cannot live in the block
+	 * above whatever its specificity: unlayered is the only thing that wins.
+	 * See the head of sidebar.css for the same argument. */
+	@media (min-width: 50rem) {
+		html:not([data-has-sidebar]) .sl-menu-button {
+			display: flex;
+		}
+	}
+</style>

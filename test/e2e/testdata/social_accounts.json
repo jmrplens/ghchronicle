@@ -1,0 +1,4 @@
+[
+  {"provider": "mastodon", "url": "https://mastodon.social/@octocat"},
+  {"provider": "linkedin", "url": "https://www.linkedin.com/in/octocat"}
+]

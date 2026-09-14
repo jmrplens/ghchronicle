@@ -1,0 +1,4 @@
+gh_star,full_name=octocat/hello-world,owner=octocat,repo=hello-world,user=alice starred=1i,url="https://github.com/octocat/hello-world/stargazers",user_url="https://github.com/alice" 1709287200000000000
+gh_star,full_name=octocat/hello-world,owner=octocat,repo=hello-world,user=bob starred=1i,url="https://github.com/octocat/hello-world/stargazers",user_url="https://github.com/bob" 1718476200000000000
+gh_star,full_name=octocat/hello-world,owner=octocat,repo=hello-world,user=carol starred=1i,url="https://github.com/octocat/hello-world/stargazers",user_url="https://github.com/carol" 1737362700000000000
+gh_star,full_name=octocat/hello-world,owner=octocat,repo=hello-world,user=dave starred=1i,url="https://github.com/octocat/hello-world/stargazers",user_url="https://github.com/dave" 1788127800000000000

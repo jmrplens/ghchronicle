@@ -1,0 +1,118 @@
+{
+  "data": {
+    "r0": {
+      "nameWithOwner": "octocat/hello-world",
+      "url": "https://github.com/octocat/hello-world",
+      "databaseId": 1296269,
+      "createdAt": "2020-01-01T00:00:00Z",
+      "pushedAt": "2026-09-01T00:00:00Z",
+      "isFork": false,
+      "isArchived": false,
+      "archivedAt": null,
+      "isPrivate": false,
+      "diskUsage": 108,
+      "stargazerCount": 80,
+      "forkCount": 9,
+      "watchers": {
+        "totalCount": 4
+      },
+      "issuesOpen": {
+        "totalCount": 3
+      },
+      "issuesClosed": {
+        "totalCount": 40
+      },
+      "pullsOpen": {
+        "totalCount": 1
+      },
+      "pullsMerged": {
+        "totalCount": 208
+      },
+      "pullsClosed": {
+        "totalCount": 12
+      },
+      "releases": {
+        "totalCount": 7
+      },
+      "discussions": {
+        "totalCount": 2
+      },
+      "labels": {
+        "totalCount": 18
+      },
+      "milestones": {
+        "totalCount": 1
+      },
+      "branches": {
+        "totalCount": 2
+      },
+      "tags": {
+        "totalCount": 7
+      },
+      "defaultBranchRef": {
+        "target": {
+          "history": {
+            "totalCount": 405
+          }
+        }
+      }
+    },
+    "r1": {
+      "nameWithOwner": "octocat/linguist",
+      "databaseId": 1296270,
+      "createdAt": "2017-09-13T00:18:54Z",
+      "pushedAt": "2026-09-01T00:00:00Z",
+      "isFork": false,
+      "isArchived": true,
+      "archivedAt": "2026-08-29T15:22:31Z",
+      "isPrivate": false,
+      "diskUsage": 108,
+      "stargazerCount": 80,
+      "forkCount": 9,
+      "watchers": {
+        "totalCount": 4
+      },
+      "issuesOpen": {
+        "totalCount": 3
+      },
+      "issuesClosed": {
+        "totalCount": 40
+      },
+      "pullsOpen": {
+        "totalCount": 1
+      },
+      "pullsMerged": {
+        "totalCount": 208
+      },
+      "pullsClosed": {
+        "totalCount": 12
+      },
+      "releases": {
+        "totalCount": 7
+      },
+      "discussions": {
+        "totalCount": 2
+      },
+      "labels": {
+        "totalCount": 18
+      },
+      "milestones": {
+        "totalCount": 1
+      },
+      "branches": {
+        "totalCount": 2
+      },
+      "tags": {
+        "totalCount": 7
+      },
+      "defaultBranchRef": {
+        "target": {
+          "history": {
+            "totalCount": 405
+          }
+        }
+      },
+      "url": "https://github.com/octocat/linguist"
+    }
+  }
+}

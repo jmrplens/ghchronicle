@@ -1,0 +1,87 @@
+# The image is built by `COPY . .` and then `go build ./cmd/ghchronicle`, so
+# everything this file does not name is uploaded to the daemon on every build,
+# and every change to any of it invalidates the cached compile. What the build
+# actually reads is go.mod, go.sum, version.go with the VERSION file it embeds,
+# cmd/ and internal/, about one megabyte. The context measured 542 MB before the
+# entries below existed.
+#
+# Deliberately a denylist. An allowlist would be tighter, but it silently drops
+# whatever is added at the root later that the build does need, and the build
+# does read the root.
+#
+# Stricter than gitlab-mcp-server's .dockerignore on purpose, and the owner's
+# decision, to be kept when the two are aligned again. Beyond what that file
+# excludes, this one keeps out config.yaml and *.token, so a local
+# configuration or GitHub token never reaches a layer of an image, and site/,
+# the host's own binaries and the scanner's working directory, so the context
+# stays near the megabyte the build reads instead of hundreds of them.
+
+# Working notes: not part of the published tool.
+plan/
+
+# History and CI definitions: the build reads neither, and .git alone is the
+# second largest thing in the tree.
+.git
+.github
+
+# Local configuration and credentials must never reach an image layer. `.env.*`
+# is the variant a second environment gets (.env.local, .env.production), and
+# it holds the same kind of secret as the file it copies.
+config.yaml
+.env
+.env.*
+*.token
+
+# Build output from the host: bin/ is `make build`, dist/ is `make build-all`
+# and GoReleaser, and the loose files are what `go build ./cmd/<name>`, `go
+# test`, `make coverage` and `make cover-check` leave in the working directory:
+# coverage.out and coverage.html. The eight command
+# names are spelled out because none of them carries an extension, and together
+# they are 84 MB of host binary that the image build would upload and then
+# ignore, since it compiles its own from source. golangci-report*.txt is a lint
+# run saved to a file for reading later, which the build has no use for either.
+#
+# Unlike .gitignore, a pattern here is matched against the whole path, so
+# "probe" names the file at the root and cannot reach cmd/probe.
+bin/
+dist/
+check_dashboards
+check_postgres
+check_prometheus
+gen_brand
+gen_dashboards
+ghchronicle
+probe
+publish_dashboard
+*.exe
+*.test
+*.out
+coverage*
+golangci-report*.txt
+
+# The scanner's configuration, and the working directory `make sonar` leaves at
+# the root: sonar-project.properties sets no sonar.working.directory, so
+# sonar-scanner uses its default. The image build reads neither.
+sonar-project.properties
+.scannerwork/
+
+# The documentation site: node_modules alone is 598 MB, and nothing in the
+# image reads a line of it. This one entry is most of the difference between a
+# 542 MB context and the 1.6 MB one it is now.
+site/
+
+# Prose, images and generated dashboards. None of it is embedded: the module's
+# only go:embed is in version.go, which reads the VERSION file beside it at the
+# root, and neither of those two is excluded here. So copying these in would
+# only invalidate the compile layer every time a document is edited.
+#
+# Before excluding anything else at the root, check it is not what version.go
+# embeds: a build that cannot see VERSION does not fail, it reports "dev".
+docs/
+brand/
+dashboards/
+*.md
+
+# The end-to-end suite builds its own binary and drives it against a fake
+# GitHub. The image build never compiles it.
+test/

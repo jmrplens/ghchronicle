@@ -1,0 +1,186 @@
+---
+title: Resolución de problemas
+description: Los mensajes que parecen errores y no lo son, los que sí lo son, y los datos que parecen mal y no lo están.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+## Cosas que parecen errores y no lo son
+
+**`not available (403)` o `(404)`.** La función está apagada en ese repositorio,
+o el token no la ve. Dependabot, code scanning, las discusiones y el grafo de
+dependencias responden así cuando están desactivados. El colector anota el hecho
+y sigue: un repositorio con una función apagada no debe detener la pasada de los
+otros cuarenta.
+
+Si son _todos_ los repositorios y no uno, es el token. El tráfico necesita
+acceso de escritura; las alertas necesitan `security_events`. Ver
+[el token](/ghchronicle/es/start/token/).
+
+**Una función encendida y nada recogido de ella.** Code scanning activado esta
+mañana, Dependabot encendido, un foro abierto: el colector preguntó antes de que
+lo hicieras, le dijeron que no, y recuerda ese rechazo un día en vez de pagarlo
+en cada pasada. Se nota como muy tarde al día siguiente, y reiniciar el proceso
+vuelve a preguntar en el acto. Ver
+[un rechazo también se recuerda](/ghchronicle/es/api/#un-rechazo-también-se-recuerda).
+
+**`still being computed by GitHub (202)`.** GitHub calcula los endpoints
+`stats/*` de forma asíncrona y responde 202 con cuerpo vacío mientras trabaja.
+La siguiente pasada suele conseguir los números.
+
+Dos de ellos no lo hacen nunca. En una cuenta personal
+`stats/code_frequency` y `stats/contributors` devuelven 202 con cuerpo vacío
+indefinidamente, que es por lo que este proyecto no los llama: las líneas
+añadidas y quitadas salen del colector de commits.
+
+**`pagination is limited for this resource` (422).** El final de un feed de
+actividad, no un fallo. GitHub sirve tres páginas del feed de eventos y rechaza
+la cuarta.
+
+**Un repositorio sin tráfico mostrando una ventana que terminó hace semanas.**
+GitHub sigue devolviendo los últimos catorce días que _tuvieron_ datos, no los
+últimos catorce días. El colector anota lo que le dicen.
+
+**Una familia que no aparece nunca en el log.** Aún no le toca. Con una cadencia
+de doce horas, medio día de logs puede legítimamente no mencionar nunca
+`account`.
+
+## Cosas que sí son errores
+
+**`github.token is empty and GITHUB_TOKEN is unset`.** Exactamente lo que dice.
+
+**`every.families.<name>: unknown collector`.** El nombre no es una familia. El
+mensaje lista las treinta y cuatro que existen, en un paréntesis tras los dos
+puntos.
+
+**`groups: is empty`.** `groups: []` no recogería absolutamente nada. Omite la
+clave para recogerlo todo, que es lo que significa cuando no está.
+
+**`groups[N]: "<name>" is not a group`.** El nombre no es un grupo. El mensaje
+lista los que existen, y `ghchronicle -groups` imprime cada uno con sus familias.
+
+**`groups[N]: "<name>" is a family, not a group`.** Familias y grupos son
+sustantivos en minúscula de la misma tabla, así que este es fácil de encontrar.
+El mensaje nombra el grupo en el que está la familia, que probablemente es lo que
+querías, y apunta a `every.families.<name>`, que es donde vive la cadencia de una
+sola familia.
+
+**`sinks: enable at least one of ...`.** Una ejecución que recoge y tira es casi
+nunca lo que alguien quiso. `-card-only` es la excepción y no necesita ningún
+destino.
+
+**`prometheus exporter: listen tcp :9605: bind: address already in use`.** Se
+informa al arrancar en vez de quedar sepultado en una goroutine, para que un
+choque de
+puerto no te deje con un colector corriendo y un exportador ausente en silencio.
+
+**`influx write: 400`.** Casi siempre una colisión de tipo de columna. InfluxDB
+fija una columna como etiqueta o como campo la primera vez que la ve y rechaza
+las escrituras posteriores que no coincidan. Si un colector cambió de qué tipo
+es un nombre, hay que borrar la tabla: `DELETE /api/v3/configure/table`.
+
+**`family failed everywhere, not marking it as run`.** Fallaron todos los
+repositorios en una familia, así que se reintentará en vez de darse por hecha.
+Que falle un repositorio es normal; que fallen todos es el token, la red o una
+caída.
+
+**`rate limit reserve reached, family skipped`.** Una vez está bien. En cada
+pasada significa que las cadencias son demasiado rápidas para el número de
+repositorios. Alarga `artifacts` y después `actions`; ver
+[coste de una pasada](/ghchronicle/es/api/cost/).
+
+## Los datos parecen mal
+
+**Un número es múltiplo del número de pasadas.** Algo que es una instantánea se
+está sumando en el tiempo. Los referrers, las rutas, las etiquetas y los hitos
+son instantáneas de una ventana sin fecha propia; se sellan al inicio del día
+UTC para que las pasadas de un día reescriban una fila, y el dashboard toma la más
+reciente y no la suma.
+
+**La mediana de tiempo hasta la primera revisión dice No data.** El panel lee
+`seconds_to_first_human_review`, que deja fuera a los bots de revisión y las
+respuestas del propio autor; en una cuenta donde nadie más revisa, ninguna pull
+request lo lleva y la tarjeta está honestamente vacía. La velocidad de los bots
+está en la tabla Reviewers, donde cada uno va marcado como bot: medido, nueve
+de cada diez pull requests tuvieron una revisión de un bot en menos de un
+minuto.
+
+**Los clones son enormes comparados con las visitas.** La integración continua
+clona un repositorio miles de veces por cada visita humana. Un repositorio
+medido aquí tuvo más de cien clones por cada visita. `clones` no cuenta
+personas.
+
+**`open_issues` no cuadra con el número de issues.** Ese campo es de GitHub, y
+GitHub cuenta las pull requests como issues dentro. La medida `gh_issue` es la
+que cuenta issues.
+
+**El almacenamiento de artefactos parece pequeño.** Compara el campo `walked`
+con `count` en `gh_artifact_total`. Cuando no coinciden, el tamaño vivo es un
+suelo: el repositorio tiene más artefactos de los que recorrió el tope de
+páginas.
+
+**La gráfica de tráfico solo llega catorce días atrás.** Eso es una primera
+pasada. La ventana se reescribe día a día en cada pasada, así que la serie se
+extiende conforme el colector sigue corriendo. No se puede rellenar: GitHub
+nunca guardó nada más viejo.
+
+**Un panel dice "Query would scan 10000 Parquet files".** InfluxDB 3 Core
+escribe un fichero por partición y por petición de escritura, y no los compacta
+nunca, así que un almacén alimentado por una versión de esta herramienta
+anterior al registro de escrituras guarda sus filas en muchos más ficheros de
+los que necesita. Ensanchar el intervalo del panel no ayuda: el límite cuenta
+los ficheros que abre el planificador, antes de cualquier agregación. Lo que
+ayuda es el registro, que viene encendido y detiene el crecimiento, y después
+una de tres cosas para lo ya acumulado: subir `--query-file-limit` en el
+servidor, reescribir las tablas afectadas, o pasar a InfluxDB 3 Enterprise, que
+compacta por su cuenta y es gratis para uso doméstico. Ver
+[solo se escribe lo que ha cambiado](/ghchronicle/es/sinks/#solo-se-escribe-lo-que-ha-cambiado).
+
+**Un panel de Prometheus muestra una línea plana.** Eso es el almacén, no los
+datos. El exportador sirve valores actuales, así que la ventana de tráfico de
+catorce días se colapsa a su día más reciente y la historia de estrellas al
+total actual. Ver [la fecha del punto](/ghchronicle/es/how/dating/).
+
+## No se escribe nada
+
+Ejecuta una pasada en primer plano y lee lo que dice. Después comprueba, en
+orden:
+
+1. que `-list` imprime los repositorios que esperas,
+2. que el log de la pasada dice `written`,
+3. que el destino es alcanzable.
+
+```sh
+ghchronicle -config config.yaml -list        # los repositorios, y cuáles quedan aparte
+ghchronicle -config config.yaml -once        # una pasada en primer plano, y salir
+journalctl -u ghchronicle -f                 # bajo systemd
+```
+
+`debug` añade tres líneas a eso y nada más: el tamaño del libro de escrituras
+al arrancar, las familias de cuenta saltadas por falta de `targets.user` y las
+entradas que un destino dejó fuera por viejas. No hay registro por petición en
+ningún nivel. Ver [registro](/ghchronicle/es/configuration/logging/).
+
+```yaml
+log:
+  level: debug
+```
+
+Una familia a la que aún no le toca sencillamente no aparece.
+
+<Aside type="tip" title="Borrar el fichero de estado cuesta cuota, y una cosa más">
+  Recuerda seis cosas, y cinco de ellas solo cuestan cuota cuando se van: lo que
+  se vuelve a recoger se indexa por medida, etiquetas y marca de tiempo y
+  sobrescribe. La sexta, `last_head`, es el commit desde el que arrancaba cada
+  diff de dependencias, y sin ella la pasada siguiente tiene la fotografía y no
+  el diff. Ver
+  [el fichero de estado](/ghchronicle/es/configuration/#state_file).
+</Aside>
+
+## Loki descarta entradas
+
+Busca la línea de depuración que las cuenta. Loki rechaza una entrada que esté
+más atrasada que su ventana de desorden respecto a la entrada más nueva que ya
+hay en ese stream, unas dos horas por omisión, así que el destino deja fuera las
+más viejas en vez de perder el envío entero. Sube `max_age` solo junto al propio
+`out_of_order_time_window` de Loki. Ver [Loki](/ghchronicle/es/sinks/loki/).

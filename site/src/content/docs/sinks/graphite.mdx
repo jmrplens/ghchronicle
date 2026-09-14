@@ -1,0 +1,89 @@
+---
+title: Graphite
+description: The plaintext protocol over TCP, and the exact metric path, which is the dashboard's contract.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+import stats from "../../../data/stats.json";
+
+```yaml
+sinks:
+  graphite:
+    addr: graphite:2003
+    prefix: github
+    batch: 1000
+```
+
+The plaintext protocol over TCP: `path value timestamp`, one line per numeric
+field. String fields are skipped, because Graphite has no way to hold one.
+
+Graphite keeps a point at the time it was given, so the raw dated points go out
+as they are and the traffic window lands on its own days. Writing the same
+point twice fills the same slot of the same whisper file, which is exactly what
+a rewrite of the window wants.
+
+The connection is reopened on a failed write, once, before the write is
+reported as failed.
+
+## The path is the dashboard's contract
+
+```text
+<prefix>.<measurement without gh_>.<tag values, in tag key order>.<field>
+```
+
+- Every tag is one node, holding its value. The nodes are ordered by the tag's
+  **key**, alphabetically, never by the order a collector set them.
+- An empty tag value is written as `none`, so a measurement's depth never
+  changes from one point to the next and
+  `github.repo.*.*.*.*.*.*.*.*.*.stars` keeps matching.
+- A node keeps ASCII letters, digits, `_`, `-` and `:`. Everything else becomes
+  `_`: the dot, the space, the comma, and the slash in `owner/repo`. A dot
+  would split the node and a slash would nest a directory.
+
+So a `gh_repo` point tagged `archived=false default_branch=main fork=false
+full_name=acme/edge-cache language=Go license=MIT owner=acme
+repo=edge-cache visibility=public` with a `stars` field becomes:
+
+```text
+github.repo.false.main.false.acme_edge-cache.Go.MIT.acme.edge-cache.public.stars 37 1757280000
+```
+
+A field that shares its name with a tag is skipped, the same rule the line
+protocol applies: the tag wins, because it is the one that can be grouped by.
+
+<Aside type="caution" title="A new tag changes the path depth">
+  Adding a tag to a collector inserts a node into every path of that
+  measurement, so every existing dashboard target for it stops matching. This is
+  the cost of a store with no schema, and it is why `TAGS` in the dashboard
+  specification mirrors the tag set of each measurement.
+</Aside>
+
+## What it cannot answer
+
+Graphite keeps the dated points but has no rows. A series is a path and a
+number, so:
+
+- A table that needs several fields of one row cannot be built. The shipped
+  dashboard keeps the column it is sorted by and says in the panel description
+  which columns it dropped.
+- A boolean is not a metric there at all, and neither is a title or any other
+  string. Those panels say so.
+
+Everything time-shaped works normally, which is most of the dashboard.
+
+## The dashboard
+
+`dashboards/ghchronicle-graphite.json` has the same {stats.panels} panels as the InfluxDB
+one, written against these paths with the default prefix. It needs **Graphite
+1.1 or later** for the functions it uses, and any panel a series cannot carry
+says so in its description.
+
+Change `prefix` and the dashboard targets have to change with it, since the
+prefix is the first node of every path.
+
+## Where to go next
+
+- [Choosing a store](/ghchronicle/sinks/) compares Graphite with the other nine,
+  and holds the write ledger every one of them shares.
+- [The dashboards](/ghchronicle/dashboards/) says which of the five is drawn
+  against which store, and what a panel a store cannot answer becomes.

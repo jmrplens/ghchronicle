@@ -1,0 +1,184 @@
+{
+  "data": {
+    "user": {
+      "login": "octocat",
+      "createdAt": "2011-01-25T18:44:36Z",
+      "followers": {"totalCount": 1200},
+      "following": {"totalCount": 4},
+      "starredRepositories": {"totalCount": 340},
+      "watching": {"totalCount": 27},
+      "gists": {"totalCount": 8},
+      "repositories": {"totalCount": 42},
+      "projectsV2": {"totalCount": 2},
+      "packages": {"totalCount": 0},
+      "sponsoring": {"totalCount": 1},
+      "sponsors": {"totalCount": 3},
+      "pronouns": "he/him",
+      "isHireable": true,
+      "isDeveloperProgramMember": true,
+      "isCampusExpert": false,
+      "isGitHubStar": false,
+      "isBountyHunter": false,
+      "isEmployee": false,
+      "status": {
+        "message": "I may be slow to respond.",
+        "createdAt": "2022-07-06T06:56:39Z",
+        "indicatesLimitedAvailability": true
+      },
+      "pinnedItems": {
+        "nodes": [
+          {
+            "__typename": "Repository",
+            "nameWithOwner": "octocat/hello-world",
+            "stargazerCount": 113,
+            "pushedAt": "2026-09-06T12:03:27Z"
+          },
+          {
+            "__typename": "Gist",
+            "name": "aa5a315d61ae9438b18d"
+          }
+        ]
+      },
+      "hasSponsorsListing": true,
+      "monthlyEstimatedSponsorsIncomeInCents": 0,
+      "estimatedNextSponsorsPayoutInCents": 0,
+      "totalSponsorshipAmountAsSponsorInCents": 500,
+      "lifetimeReceivedSponsorshipValues": {
+        "totalCount": 1,
+        "nodes": [{"amountInCents": 1000}]
+      },
+      "sponsorsListing": {
+        "name": "sponsors-octocat",
+        "isPublic": true,
+        "createdAt": "2021-04-07T17:46:02Z",
+        "nextPayoutDate": "2026-10-22",
+        "activeGoal": {
+          "kind": "TOTAL_SPONSORS_COUNT",
+          "title": "10 monthly sponsors",
+          "targetValue": 10,
+          "percentComplete": 0
+        },
+        "tiers": {
+          "totalCount": 2,
+          "nodes": [
+            {
+              "name": "$5 one time",
+              "monthlyPriceInCents": 500,
+              "isOneTime": true,
+              "createdAt": "2021-04-07T18:03:39Z",
+              "adminInfo": {"isRetired": false}
+            },
+            {
+              "name": "$30 a month",
+              "monthlyPriceInCents": 3000,
+              "isOneTime": false,
+              "createdAt": "2021-04-07T18:09:34Z",
+              "adminInfo": {"isRetired": true}
+            }
+          ]
+        }
+      },
+      "sponsorshipsAsSponsor": {
+        "nodes": [
+          {
+            "createdAt": "2026-09-03T20:41:47Z",
+            "isActive": true,
+            "isOneTimePayment": true,
+            "privacyLevel": "PUBLIC",
+            "sponsorable": {"login": "unifiedjs"},
+            "tier": {"name": "$5 one time", "monthlyPriceInCents": 500}
+          }
+        ]
+      },
+      "sponsorshipsAsMaintainer": {
+        "nodes": [
+          {
+            "createdAt": "2021-08-31T06:42:50Z",
+            "isActive": false,
+            "isOneTimePayment": true,
+            "privacyLevel": "PUBLIC",
+            "sponsorEntity": {"login": "mwp4444"},
+            "tier": {"name": "$10 one time", "monthlyPriceInCents": 1000}
+          },
+          {
+            "createdAt": "2020-02-02T09:00:00Z",
+            "isActive": false,
+            "isOneTimePayment": false,
+            "privacyLevel": "PRIVATE",
+            "sponsorEntity": null,
+            "tier": null
+          }
+        ]
+      },
+      "lists": {
+        "totalCount": 2,
+        "nodes": [
+          {"name": "Self-Hosted", "slug": "self-hosted", "isPrivate": false, "createdAt": "2024-02-03T08:55:02Z", "lastAddedAt": "2026-09-01T01:27:12Z", "items": {"totalCount": 6}},
+          {"name": "To Check", "slug": "to-check", "isPrivate": true, "createdAt": "2024-12-11T10:23:58Z", "lastAddedAt": "2024-12-11T10:23:59Z", "items": {"totalCount": 1}}
+        ]
+      },
+      "contributionsCollection": {
+        "totalCommitContributions": 812,
+        "totalIssueContributions": 40,
+        "totalPullRequestContributions": 96,
+        "totalPullRequestReviewContributions": 31,
+        "totalRepositoryContributions": 6,
+        "restrictedContributionsCount": 120,
+        "contributionCalendar": {
+          "totalContributions": 1105,
+          "weeks": [
+            {"contributionDays": [
+              {"date": "2026-08-30", "contributionCount": 0, "contributionLevel": "NONE"},
+              {"date": "2026-08-31", "contributionCount": 4, "contributionLevel": "SECOND_QUARTILE"},
+              {"date": "2026-09-01", "contributionCount": 7, "contributionLevel": "THIRD_QUARTILE"}
+            ]},
+            {"contributionDays": [
+              {"date": "2026-09-06", "contributionCount": 2, "contributionLevel": "FIRST_QUARTILE"},
+              {"date": "2026-09-07", "contributionCount": 9, "contributionLevel": "FOURTH_QUARTILE"}
+            ]}
+          ]
+        },
+        "commitContributionsByRepository": [
+          {
+            "repository": {"nameWithOwner": "octocat/hello-world", "isPrivate": false},
+            "contributions": {
+              "totalCount": 500,
+              "nodes": [
+                {"occurredAt": "2026-09-07T07:00:00Z", "commitCount": 8},
+                {"occurredAt": "2026-09-06T07:00:00Z", "commitCount": 3},
+                {"occurredAt": "2026-01-15T08:00:00Z", "commitCount": 489}
+              ]
+            }
+          },
+          {
+            "repository": {"nameWithOwner": "someone/else", "isPrivate": false},
+            "contributions": {
+              "totalCount": 12,
+              "nodes": [
+                {"occurredAt": "2026-08-31T07:00:00Z", "commitCount": 12}
+              ]
+            }
+          },
+          {
+            "repository": {"nameWithOwner": "octocat/secret-thing", "isPrivate": true},
+            "contributions": {
+              "totalCount": 40,
+              "nodes": [
+                {"occurredAt": "2026-09-07T07:00:00Z", "commitCount": 40}
+              ]
+            }
+          }
+        ],
+        "issueContributionsByRepository": [
+          {"repository": {"nameWithOwner": "someone/else"}, "contributions": {"totalCount": 7}}
+        ],
+        "pullRequestContributionsByRepository": [
+          {"repository": {"nameWithOwner": "someone/else"}, "contributions": {"totalCount": 4}}
+        ],
+        "pullRequestReviewContributionsByRepository": [
+          {"repository": {"nameWithOwner": "octocat/hello-world"}, "contributions": {"totalCount": 2}}
+        ]
+      }
+    }
+  }
+}

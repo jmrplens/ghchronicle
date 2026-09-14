@@ -1,0 +1,152 @@
+{
+  "data": {
+    "r0": {
+      "deployments": {
+        "totalCount": 433,
+        "pageInfo": {
+          "hasNextPage": true,
+          "endCursor": "deploy-cursor-1"
+        },
+        "nodes": [
+          {
+            "databaseId": 6372116605,
+            "createdAt": "2026-09-10T12:56:00Z",
+            "environment": "github-pages",
+            "state": "ACTIVE",
+            "task": "deploy",
+            "latestStatus": {
+              "state": "SUCCESS",
+              "createdAt": "2026-09-10T12:56:33Z",
+              "logUrl": "https://github.com/jmrplens/phonometry/actions/runs/34477701377/job/102878591597",
+              "environmentUrl": "https://jmrplens.github.io/phonometry/"
+            },
+            "creator": {
+              "login": "jmrplens"
+            },
+            "commit": {
+              "oid": "5385c9d67e6257c7a39d72af892900fffb61f8ec"
+            },
+            "ref": {
+              "name": "main"
+            }
+          },
+          {
+            "databaseId": 6369856254,
+            "createdAt": "2026-09-10T10:42:33Z",
+            "environment": "github-pages",
+            "state": "INACTIVE",
+            "task": "deploy",
+            "latestStatus": {
+              "state": "INACTIVE",
+              "createdAt": "2026-09-10T12:56:34Z",
+              "logUrl": "https://github.com/jmrplens/phonometry/actions/runs/34465872349/job/102839298933",
+              "environmentUrl": null
+            },
+            "creator": {
+              "login": "jmrplens"
+            },
+            "commit": {
+              "oid": "d625d9b9ae3c1e50c837ec781359a8a821d73cf7"
+            },
+            "ref": {
+              "name": "main"
+            }
+          }
+        ]
+      }
+    },
+    "r1": {
+      "deployments": {
+        "totalCount": 360,
+        "pageInfo": {
+          "hasNextPage": false,
+          "endCursor": "deploy-cursor-2"
+        },
+        "nodes": [
+          {
+            "databaseId": 6370198397,
+            "createdAt": "2026-09-10T11:04:17Z",
+            "environment": "github-pages",
+            "state": "ERROR",
+            "task": "deploy",
+            "latestStatus": {
+              "state": "ERROR",
+              "createdAt": "2026-09-10T11:14:26Z",
+              "logUrl": "https://github.com/jmrplens/gitlab-mcp-server/actions/runs/34469226427/job/102845341243",
+              "environmentUrl": null
+            },
+            "creator": {
+              "login": "jmrplens"
+            },
+            "commit": {
+              "oid": "df52b3a8059505f4024662bed0f35ad2c9727a9b"
+            },
+            "ref": {
+              "name": "main"
+            }
+          },
+          {
+            "databaseId": 6267407798,
+            "createdAt": "2026-09-04T15:21:21Z",
+            "environment": "release",
+            "state": "FAILURE",
+            "task": "deploy",
+            "latestStatus": {
+              "state": "FAILURE",
+              "createdAt": "2026-09-04T15:21:37Z",
+              "logUrl": "https://github.com/jmrplens/gitlab-mcp-server/actions/runs/33886351681/job/101075752669",
+              "environmentUrl": null
+            },
+            "creator": {
+              "login": "jmrplens"
+            },
+            "commit": {
+              "oid": "73ae1035b1966f8e33b49123ab2ae53e310d7cc1"
+            },
+            "ref": null
+          },
+          {
+            "databaseId": 6267400316,
+            "createdAt": "2026-09-04T15:20:56Z",
+            "environment": "release",
+            "state": "ACTIVE",
+            "task": "deploy",
+            "latestStatus": {
+              "state": "SUCCESS",
+              "createdAt": "2026-09-04T15:21:11Z",
+              "logUrl": "https://github.com/jmrplens/gitlab-mcp-server/actions/runs/33886351681/job/101075622017",
+              "environmentUrl": null
+            },
+            "creator": {
+              "login": "jmrplens"
+            },
+            "commit": {
+              "oid": "73ae1035b1966f8e33b49123ab2ae53e310d7cc1"
+            },
+            "ref": null
+          },
+          {
+            "databaseId": 6267400301,
+            "createdAt": "2026-09-04T15:20:56Z",
+            "environment": "release",
+            "state": "ACTIVE",
+            "task": "deploy",
+            "latestStatus": {
+              "state": "SUCCESS",
+              "createdAt": "2026-09-04T15:21:21Z",
+              "logUrl": "https://github.com/jmrplens/gitlab-mcp-server/actions/runs/33886351681/job/101075621955",
+              "environmentUrl": null
+            },
+            "creator": {
+              "login": "jmrplens"
+            },
+            "commit": {
+              "oid": "73ae1035b1966f8e33b49123ab2ae53e310d7cc1"
+            },
+            "ref": null
+          }
+        ]
+      }
+    }
+  }
+}

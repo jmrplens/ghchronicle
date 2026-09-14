@@ -1,0 +1,115 @@
+/* ============================================================
+ * diagram.css, figures: generated SVG and mermaid diagrams.
+ * ============================================================
+ *
+ * THE DRAWING CONVENTION. Every figure on this site is read the
+ * same way, and the rule is written here because this is the file
+ * a contributor opens when a figure looks wrong:
+ *
+ *   SOLID edge   a POINT TRAVELS. A collector hands a point to a
+ *                sink and the sink writes it to a store. Whatever
+ *                the edge ends at now holds something it did not
+ *                hold before.
+ *   DASHED edge  a QUESTION that may cost nothing: a conditional
+ *                request GitHub answers 304, a panel querying a
+ *                store, a family asking whether its interval has
+ *                elapsed. Nothing is written.
+ *
+ * Three channels carry that distinction, so a figure survives
+ * greyscale, colour vision deficiency and a black-and-white
+ * printout, in that order of importance:
+ *
+ *   1. the line pattern      (solid / dashed, always present)
+ *   2. colour                (`themeCSS` at the rehypeMermaid
+ *                            registration in astro.config.mjs
+ *                            re-points dashed edges to the accent;
+ *                            solid edges keep `lineColor`)
+ *   3. a legend INSIDE each figure, so it is part of the image and
+ *      survives being copied, printed or embedded elsewhere.
+ *
+ * A number a figure states is never typed into it. Every figure
+ * under `src/data/figures/` is emitted by `scripts/gen-figures.mjs`
+ * from the Go source and the generated dashboards, and
+ * `pnpm run figures:check` fails when one of them no longer
+ * matches. The one figure this site had before that existed was
+ * hand-drawn, and thirteen families had been added since anybody
+ * looked at it.
+ *
+ * NO COLOUR LITERALS. `src/styles/theme.css` owns the palette and
+ * `scripts/check-contrast.mjs` gates it by resolving `--rb-*`
+ * tokens; a raw hex here, or inside a figure, is invisible to that
+ * gate. The generated SVG obeys the same rule: every colour in it
+ * is `var(--rb-…, fallback)`, where the fallback is only what a
+ * reader sees opening the file on its own.
+ * ------------------------------------------------------------ */
+
+/* ---- Generated figures (components/Figure.astro) -------------
+ * Two layouts of the same figure, one wide and one narrow, and
+ * the choice is a CONTAINER query rather than a media query: what
+ * decides is the width of the prose column, which on this site is
+ * a fraction of the window and changes with the sidebar, not the
+ * width of the screen. */
+.rb-figure {
+	container-type: inline-size;
+	margin-block: 1.5rem;
+}
+
+.rb-figure svg {
+	display: block;
+	width: 100%;
+	height: auto;
+}
+
+/* The narrow layout is the one shown until the column says
+ * otherwise, for the same reason the dark theme is: it is the one
+ * that is right when nothing is known. */
+.rb-figure__wide {
+	display: none;
+}
+
+@container (min-width: 44rem) {
+	.rb-figure__wide {
+		display: block;
+	}
+
+	.rb-figure__narrow {
+		display: none;
+	}
+}
+
+/* ---- Mermaid figures ----------------------------------------
+ * The <picture> pairs a light and a dark render of the same
+ * diagram. Both are line art on the page colour, so they need the
+ * page to give them room, not a card: a filled panel behind a
+ * diagram whose own background is already the page colour just
+ * draws a second, slightly-off rectangle.
+ *
+ * Nothing here can reach inside a mermaid diagram: rehype-mermaid
+ * renders with `strategy: "img-svg"`, so each diagram is an <img>
+ * with an SVG data URI, and a page stylesheet stops at its border.
+ * Colour inside the drawing is set at build time, see
+ * astro.config.mjs. This file styles the BOX around it. That is
+ * also the reason a figure that has to follow the theme toggle is
+ * generated SVG and not mermaid.
+ *
+ * Which is also why `chrome.css`'s `.rehype-mermaid svg` rule does
+ * nothing: that class only exists under the `inline-svg` strategy,
+ * and no element in `dist/` carries it. The rules below are what
+ * actually reaches a diagram on this site.
+ *
+ * One inherited constraint still holds, and it is the reason the
+ * selectors below never touch `background`: the light and dark
+ * renders are swapped by flipping the `media` attribute of the
+ * <picture>'s dark <source>, so a background painted on the box
+ * would stay put while the drawing on it changed. */
+.sl-markdown-content picture:has(img[id^="mermaid-"]) {
+	display: block;
+	margin-block: 1.5rem;
+}
+
+.sl-markdown-content img[id^="mermaid-"] {
+	display: block;
+	max-width: 100%;
+	height: auto;
+	margin-inline: auto;
+}

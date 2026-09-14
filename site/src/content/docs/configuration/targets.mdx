@@ -1,0 +1,114 @@
+---
+title: Targets
+description: Which repositories a sweep touches, and why forks and archived repositories are excluded by default.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+```yaml
+targets:
+  user: your-github-login
+  orgs: []
+  repos: []
+  exclude: []
+  include_forks: false
+  include_archived: false
+  include_private: true
+```
+
+## The keys
+
+| Key                | Default | What it does                                                          |
+| ------------------ | ------- | --------------------------------------------------------------------- |
+| `user`             | none    | The account to collect. Its repositories are discovered automatically |
+| `orgs`             | `[]`    | Organisations to include as well                                      |
+| `repos`            | `[]`    | Repositories to collect whatever the filters say                      |
+| `exclude`          | `[]`    | Shell globs, matched against `owner/name`                             |
+| `include_forks`    | `false` | Whether forks are collected                                           |
+| `include_archived` | `false` | Whether archived repositories are collected                           |
+| `include_private`  | `true`  | Whether private repositories are collected                            |
+
+At least one of `user`, `orgs` or `repos` must be set, or start-up fails with
+`targets: set at least one of user, orgs or repos`.
+
+`user` is also what makes the account-wide families possible. A configuration
+that names repositories alone has no login to hand to GraphQL, so the
+contribution calendar, the event feed, notifications, billing, packages and the
+outbound families are all skipped.
+
+## Naming a repository overrides every exclusion
+
+`repos` is not another filter. It is a statement of intent, and it wins:
+naming `someone/thing` collects it even if it is a fork, even if it is
+archived, even if a glob in `exclude` would have matched it.
+
+```yaml
+targets:
+  user: acme
+  repos:
+    - someone-else/a-fork-i-actually-maintain
+  exclude:
+    - "acme/experiment-*"
+```
+
+`exclude` takes shell globs, so `someone/experiment-*` drops a whole prefix in
+one line.
+
+## Why forks and archived are off by default
+
+Both defaults exist for the same reason, which is the rate limit.
+
+- **A fork's traffic is almost always zero.** GitHub reports views and clones
+  per repository, and for a fork that nobody visits, that is fourteen days of
+  zeroes per sweep. It costs four calls per repository to learn nothing.
+- **An archived repository cannot change.** Its stars can still move, but
+  nothing else can, and collecting it spends the budget on rows that never
+  move again.
+
+Turn either on when the assumption does not hold for you. A fork you actually
+develop in is a real repository with real traffic, and `repos` is the way to
+name that one without also collecting the forty bookmarks.
+
+Off is not invisible, on two counts. An archived repository still gets the one
+row it has, `gh_repo_archived`, dated the instant it was archived: the listing
+a sweep already pays for says which repositories are archived, and the
+`totals` family asks the date of all of them in one query at its own cadence,
+so the _Repositories archived_ table exists from the first sweep and costs one
+point per `totals` sweep after it. And a [backfill](/ghchronicle/how/backfill/) collects archived
+repositories in full whatever this key says, because their history is the
+account's history and one walk of it is enough. Forks stay as configured in
+both cases: an archived fork under `include_forks: false` has no row.
+
+<Aside type="tip" title="Check the set before spending quota on it">
+```sh
+ghchronicle -config config.yaml -list
+```
+
+That prints the repositories in scope and writes nothing. If something you
+expected is missing, this is the command that tells you before a sweep spends
+any quota on the wrong set.
+
+</Aside>
+
+## Private repositories
+
+`include_private` defaults to `true`, because a token that can see them was
+given deliberately and the point of the tool is to keep the history of the
+account, not of its public half.
+
+What is stored is the same measurements as for a public repository: counts,
+durations and names. Two things are worth knowing about what that means:
+
+- Repository and branch names appear as tag values, so they will be visible to
+  anyone who can read the dashboard.
+- Only the _host_ of a webhook URL is stored, never the path, because the path
+  usually carries a secret.
+
+Set it to `false` to collect only public repositories.
+
+## The discovery cadence
+
+The repository list is rebuilt at most once an hour. Repositories are created
+rarely and listing them costs a page per hundred, so a new repository can take
+up to an hour to enter the sweep. Naming it in `repos` does not change that;
+restarting the process does.

@@ -1,0 +1,5 @@
+# What the stack writes back out to the host: the collector's exported data
+# points, Telegraf's file output, and the scrape target the harness hands to
+# Prometheus. All of it belongs to one run.
+*
+!.gitignore

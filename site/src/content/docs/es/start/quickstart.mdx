@@ -1,0 +1,144 @@
+---
+title: Inicio rápido
+description: De cero a la primera pasada, y qué hace esa primera pasada que las siguientes no hacen.
+---
+
+import { Steps, Tabs, TabItem, Aside } from "@astrojs/starlight/components";
+
+Seis pasos y un fichero de configuración. La única decisión que merece
+pensarse antes de empezar es qué almacén guarda la historia, y se puede aplazar
+imprimiendo primero los puntos por la terminal.
+
+## De cero a la primera pasada
+
+<Steps>
+
+1. **Instala el binario.**
+
+    <Tabs syncKey="install">
+      <TabItem label="Go">
+        ```sh
+        go install github.com/jmrplens/ghchronicle/cmd/ghchronicle@latest
+        ```
+      </TabItem>
+      <TabItem label="Release">
+        Coge el archivo de tu plataforma en la [página de
+        releases](https://github.com/jmrplens/ghchronicle/releases) y pon
+        `ghchronicle` en el `PATH`.
+      </TabItem>
+      <TabItem label="Contenedor">
+        ```sh
+        docker pull ghcr.io/jmrplens/ghchronicle
+        ```
+      </TabItem>
+    </Tabs>
+
+2. **Crea un token** en `https://github.com/settings/tokens` y expórtalo.
+
+    ```sh
+    export GITHUB_TOKEN=github_pat_...
+    ```
+
+    Un token clásico con `repo`, `read:packages`, `read:user`, `read:org`,
+    `security_events`, `read:public_key` y `read:gpg_key` ve todo lo que esto
+    recoge. La
+    [página del token](/ghchronicle/es/start/token/) explica qué permiso compra
+    qué familia, y por qué el `GITHUB_TOKEN` automático de una Action no basta.
+
+3. **Escribe la configuración.** Dos decisiones, y este es el fichero entero:
+
+    ```yaml
+    # config.yaml
+    github:
+      token: ${GITHUB_TOKEN}
+    targets:
+      user: tu-login
+    sinks:
+      stdout: true # cámbialo por influxdb cuando tengas dónde guardarlo
+    ```
+
+    Cada `${VAR}` se lee del entorno al arrancar, así que el fichero no contiene
+    secretos y se puede versionar. Todo lo demás tiene un valor por omisión.
+
+    La versión documentada, la que comenta todas las opciones que hay, vive en
+    el repositorio y no en la instalación, así que cógela de ahí cuando quieras
+    leer el resto:
+
+    ```sh
+    curl -O https://raw.githubusercontent.com/jmrplens/ghchronicle/main/config.example.yaml
+    ```
+
+4. **Mira qué se recogería**, antes de gastar cuota en ello.
+
+    ```sh
+    ghchronicle -config config.yaml -list
+    ```
+
+    Eso imprime los repositorios en alcance. Los forks y los archivados quedan
+    fuera por omisión. Si falta algo que esperabas, esta es la orden que te lo
+    dice.
+
+5. **Ejecuta una pasada.**
+
+    ```sh
+    ghchronicle -config config.yaml -once
+    ```
+
+    Con `sinks.stdout: true` los puntos salen por la terminal como line protocol
+    en vez de ir a una base de datos, que es la forma más barata de ver la forma
+    de lo que estás a punto de guardar.
+
+6. **Déjalo corriendo.**
+
+    ```sh
+    ghchronicle -config config.yaml
+    ```
+
+    Cada familia corre entonces con su propia cadencia: las ejecuciones de
+    workflows cada quince minutos, el calendario de contribuciones cada doce
+    horas.
+
+</Steps>
+
+## Qué hace la primera pasada que las siguientes no hacen
+
+Tres cosas ocurren una sola vez, y son la razón de que la primera pasada sea la
+cara.
+
+| Una vez                                                                                                                         | Después                                                    |
+| ------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| Se recorre entera la lista de estrellas, página a página, para que cada estrella lleve la fecha en que se dio                   | Las cien más nuevas de cada repositorio viajan en una consulta GraphQL por cada diez |
+| Un mes de ejecuciones de workflows, para que una instalación nueva no dibuje una historia de CI que empieza hace quince minutos | El doble de la cadencia, y nunca menos de dos horas        |
+| El calendario de contribuciones de cada año, si `every.history` está puesto, hasta el día en que se creó la cuenta              | Solo el año en curso, reescrito a su cadencia              |
+
+Espera unos pocos miles de puntos de una primera pasada sobre veinte
+repositorios, y unos pocos cientos de cada una de las siguientes.
+
+Nada de eso es la historia. La primera pasada es un incremento más ancho, y un
+dashboard a noventa días o a dos años empieza entonces el día en que instalaste
+el colector: medido tras un día de pasadas, alrededor de una quinta parte de
+las pull requests que declaran los repositorios, commits solo de los últimos
+treinta días y jobs de una décima parte de las ejecuciones de workflows. Lanza
+`ghchronicle -config config.yaml -backfill` una vez, antes del servicio o justo
+después; [la página del relleno](/ghchronicle/es/how/backfill/) dice hasta
+dónde llega y lo que cuesta.
+
+<Aside type="caution" title="Conserva el fichero de estado">
+  `state_file` es lo que recuerda por dónde iba cada familia, y
+  [dentro viven seis cosas](/ghchronicle/es/configuration/#state_file). Bórralo y
+  la siguiente pasada lo recoge todo otra vez, lo que cuesta cuota y nada más en
+  cinco de las seis; la sexta es el commit desde el que arranca cada diff de
+  dependencias, y los cambios del hueco no se vuelven a recoger.
+</Aside>
+
+## Por dónde seguir
+
+- [Formas de instalar](/ghchronicle/es/install/) es lo que convierte la orden
+  de arriba en algo que sigue corriendo: systemd, Docker o una Action
+  programada.
+- [La fecha del punto](/ghchronicle/es/how/dating/) es la idea de diseño de la
+  que se deriva todo lo demás.
+- [Elegir almacén](/ghchronicle/es/sinks/) decide qué preguntas podrás hacer
+  después.
+- [Coste de una pasada](/ghchronicle/es/api/cost/) es el precio medido en
+  llamadas a la API.

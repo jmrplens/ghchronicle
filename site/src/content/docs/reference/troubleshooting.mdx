@@ -1,0 +1,180 @@
+---
+title: Troubleshooting
+description: The messages that look like errors and are not, the ones that are, and the data that looks wrong and is not.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+## Things that look like errors and are not
+
+**`not available (403)` or `(404)`.** The feature is switched off for that
+repository, or the token cannot see it. Dependabot, code scanning, discussions
+and the dependency graph all answer this way when disabled. The collector
+records the fact and moves on: a repository with a feature off must not stop
+the sweep for the other forty.
+
+If it is _every_ repository rather than one, it is the token. Traffic needs
+push access; alerts need `security_events`. See
+[the token](/ghchronicle/start/token/).
+
+**A feature switched on, and nothing collected from it.** Code scanning enabled
+this morning, Dependabot turned on, a forum opened: the collector asked before
+you did it, was refused, and remembers the refusal for a day rather than paying
+for it on every sweep. It is noticed a day later at the latest, and restarting
+the process asks again straight away. See
+[a refusal is remembered too](/ghchronicle/api/#a-refusal-is-remembered-too).
+
+**`still being computed by GitHub (202)`.** GitHub computes the `stats/*`
+endpoints asynchronously and answers 202 with an empty body while it works. The
+next sweep usually gets the numbers.
+
+Two of them never do. On a personal account `stats/code_frequency` and
+`stats/contributors` return 202 with an empty body indefinitely, which is why
+this project does not call them: the lines added and removed come from the
+commits collector instead.
+
+**`pagination is limited for this resource` (422).** The end of an activity
+feed, not a failure. GitHub serves three pages of the event feed and refuses
+the fourth.
+
+**A repository with no traffic showing a window that ended weeks ago.** GitHub
+keeps returning the last fourteen days that _had_ data, not the last fourteen
+days. The collector records what it is told.
+
+**A family that never appears in the log.** It is not due yet. With a
+twelve-hour cadence, half a day of logs can legitimately never mention
+`account`.
+
+## Things that are errors
+
+**`github.token is empty and GITHUB_TOKEN is unset`.** Exactly what it says.
+
+**`every.families.<name>: unknown collector`.** The name is not a family. The
+message lists the thirty-four that exist, in one parenthesis after the colon.
+
+**`groups: is empty`.** `groups: []` would collect nothing at all. Omit the key
+to collect everything, which is what it means when it is absent.
+
+**`groups[N]: "<name>" is not a group`.** The name is not a group. The message
+lists the ones that exist, and `ghchronicle -groups` prints each with its
+families.
+
+**`groups[N]: "<name>" is a family, not a group`.** Families and groups are both
+lowercase nouns from the same table, so this is an easy one to hit. The message
+names the group the family is in, which is probably what you wanted, and points
+at `every.families.<name>`, which is where a single family's cadence lives.
+
+**`sinks: enable at least one of ...`.** A run that collects and discards is
+almost never what anyone meant. `-card-only` is the exception and needs no sink
+at all.
+
+**`prometheus exporter: listen tcp :9605: bind: address already in use`.**
+Reported at start-up rather than swallowed in a goroutine, so a port clash
+cannot leave you with a running collector and a silently missing exporter.
+
+**`influx write: 400`.** Almost always a column type collision. InfluxDB fixes
+a column as a tag or a field the first time it sees it and rejects later writes
+that disagree. If a collector changed which one a name is, the table has to be
+dropped: `DELETE /api/v3/configure/table`.
+
+**`family failed everywhere, not marking it as run`.** Every repository failed
+for one family, so it will be retried rather than treated as done. One
+repository failing is normal; all of them is the token, the network or an
+outage.
+
+**`rate limit reserve reached, family skipped`.** Once is fine. Every sweep
+means the cadences are too fast for the number of repositories. Lengthen
+`artifacts` and then `actions`; see
+[cost of a sweep](/ghchronicle/api/cost/).
+
+## The data looks wrong
+
+**A number is a multiple of the sweep count.** Something that is a snapshot is
+being summed over time. Referrers, paths, labels and milestones are snapshots
+of a window with no date of their own; they are stamped at the start of the UTC
+day so a day's sweeps rewrite one row, and the dashboard takes the newest
+rather than the sum.
+
+**Median time to first review reads No data.** The panel reads
+`seconds_to_first_human_review`, which leaves out review bots and the author's
+own replies; on an account where nobody else reviews, no pull request carries
+it and the tile is honestly empty. The bots' speed is in the Reviewers table,
+where each one is marked as a bot: measured, nine pull requests in ten had a
+bot review inside a minute.
+
+**Clones are enormous compared with views.** Continuous integration clones a
+repository thousands of times for every human visit. One repository measured
+here took more than a hundred clones for every view. `clones` does not count
+people.
+
+**`open_issues` disagrees with the issue count.** That field is GitHub's, and
+GitHub counts pull requests as issues in it. The `gh_issue` measurement is the
+one that counts issues.
+
+**Artifact storage looks too small.** Check the `walked` field against `count`
+in `gh_artifact_total`. When they disagree, the live size is a floor: the
+repository has more artifacts than the page cap walked.
+
+**The traffic chart only goes back fourteen days.** That is a first sweep. The
+window is rewritten day by day on every sweep, so the series extends as the
+collector keeps running. It cannot be backfilled: GitHub never stored anything
+older.
+
+**A panel says "Query would scan 10000 Parquet files".** InfluxDB 3 Core
+writes one file per partition per write request and never compacts them, so a
+store fed by a version of this tool older than the write ledger holds its rows
+in far more files than it needs. Widening the panel's interval does not help:
+the limit counts the files the planner opens, before any aggregation. What helps
+is the ledger, which is on by default and stops the growth, and then one of
+three things for what has already accumulated: `--query-file-limit` raised on
+the server, the affected tables rewritten, or InfluxDB 3 Enterprise, which
+compacts on its own and is free for home use. See
+[only what changed is written](/ghchronicle/sinks/#only-what-changed-is-written).
+
+**A Prometheus panel shows one flat line.** That is the store, not the data.
+The exporter serves current values, so the fourteen-day traffic window collapses
+to its most recent day and the star history to the current total. See
+[dating a point](/ghchronicle/how/dating/).
+
+## Nothing is being written
+
+Run one sweep in the foreground and read what it says. Then check, in order:
+
+1. that `-list` prints the repositories you expect,
+2. that the sweep log says `written`,
+3. that the sink is reachable.
+
+```sh
+ghchronicle -config config.yaml -list        # the repositories, and which are set aside
+ghchronicle -config config.yaml -once        # one sweep in the foreground, then exit
+journalctl -u ghchronicle -f                 # under systemd
+```
+
+`debug` adds three lines to that and nothing else: the size of the
+written-points ledger at start-up, the account-wide families skipped for want
+of a `targets.user`, and the entries a sink left out for being too old. There
+is no per-request log at any level. See
+[logging](/ghchronicle/configuration/logging/).
+
+```yaml
+log:
+  level: debug
+```
+
+A family that is not due yet simply does not appear.
+
+<Aside type="tip" title="Deleting the state file costs quota, and one thing more">
+  It remembers six things, and five of them cost only quota when they go: what
+  is collected again is keyed by measurement, tags and timestamp and overwrites.
+  The sixth, `last_head`, is the commit each dependency diff started from, and
+  without it the next sweep has the photograph and no diff. See
+  [the state file](/ghchronicle/configuration/#state_file).
+</Aside>
+
+## Loki drops entries
+
+Look for the debug line counting them. Loki refuses an entry more than its
+out-of-order window behind the newest entry already in that stream, about two
+hours by default, so the sink leaves the older ones out rather than losing the
+whole push. Raise `max_age` only alongside Loki's own
+`out_of_order_time_window`. See [Loki](/ghchronicle/sinks/loki/).

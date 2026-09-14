@@ -1,0 +1,96 @@
+---
+title: Lo que GitHub no da
+description: Los endpoints que se ha verificado que no funcionan en una cuenta personal, escritos para que nadie los vuelva a descubrir.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+Cada entrada de aquí se comprobó contra la API real. Está escrita para que nadie
+pierda una tarde volviendo a averiguarlo, y para que un panel que falta se pueda
+distinguir de un colector roto.
+
+## Estadísticas que no llegan nunca
+
+`stats/code_frequency` y `stats/contributors` responden **202 con cuerpo vacío,
+indefinidamente**, en una cuenta personal. Un 202 normalmente significa "aún se
+está calculando, vuelve a preguntar", y para estos dos la siguiente respuesta es
+otro 202. No se llaman a propósito.
+
+Las líneas añadidas y quitadas que habría dado `code_frequency` salen en su
+lugar del colector de commits, por commit y no por semana, atribuidas a un autor
+y fechadas en el commit. `stats/participation` y `stats/punch_card` sí funcionan
+y se usan.
+
+Diez segundos bastan para verlo en tu propia cuenta:
+
+```sh
+curl -s -o /dev/null -w '%{http_code}\n' \
+  -H "Authorization: Bearer $GITHUB_TOKEN" \
+  https://api.github.com/repos/OWNER/REPO/stats/code_frequency   # 202, para siempre
+curl -s -o /dev/null -w '%{http_code}\n' \
+  -H "Authorization: Bearer $GITHUB_TOKEN" \
+  https://api.github.com/repos/OWNER/REPO/stats/participation    # 200
+```
+
+## Facturación
+
+| Endpoint                                | Respuesta |
+| --------------------------------------- | --------- |
+| `/settings/billing/actions`             | 410 Gone  |
+| `/settings/billing/packages`            | 410 Gone  |
+| `/settings/billing/shared-storage`      | 410 Gone  |
+| `/user/settings/billing/usage`          | 404       |
+| `/users/{login}/settings/billing/usage` | funciona  |
+
+Solo la última forma funciona para una cuenta personal, y devuelve marcas de
+tiempo RFC 3339 completas en un campo que su documentación describe como fecha.
+
+## Solo para organización o empresa
+
+Propiedades personalizadas de repositorio, proyectos clásicos, centros de coste
+y el registro de auditoría. Una cuenta personal no puede ver ninguno, sean
+cuales sean los permisos del token.
+
+## Endpoints que responden, pero no dicen nada
+
+- **`workflows/{id}/timing`** devuelve 200 con un objeto `billable` siempre
+  vacío. Parece la fuente de los minutos por workflow y no lo es.
+- **`stargazers/history`** devuelve solo las últimas treinta semanas. No
+  sustituye al recorrido de `starred_at`; se comprobó en tres repositorios.
+- **`/user/installations`** devuelve 403 sin una GitHub App.
+
+## GraphQL se equivoca con los paquetes
+
+GraphQL informa de cero paquetes para una cuenta mientras REST los lista. Aquí
+la consulta bonita está sencillamente equivocada, así que los paquetes vienen de
+REST, a una llamada por paquete para sus versiones.
+
+## El tráfico se queda obsoleto, no vacío
+
+Un repositorio sin tráfico no devuelve una ventana vacía. GitHub sigue
+devolviendo los últimos catorce días que _tuvieron_ datos, así que la ventana
+puede terminar hace semanas. El colector anota lo que le dicen.
+
+<Aside type="note" title="Por esto existe gh_security_feature">
+  Varias de las entradas de arriba tienen la misma forma: un endpoint que no
+  responde nada es indistinguible de una función apagada, que es indistinguible
+  de un repositorio sin nada que informar. `gh_security_feature` anota
+  explícitamente qué funciones están activadas, para que "sin alertas" y "sin
+  datos" dejen de parecerse en un dashboard.
+</Aside>
+
+## Qué significa esto para una pasada
+
+Nada de lo anterior se trata como un fallo. `ghapi.UnavailableError` (403 o
+404: la función está apagada) y `ghapi.NotReadyError` (202: GitHub aún está
+calculando) significan ambos "aquí no hay nada", y la pasada sigue con el
+siguiente
+repositorio. Los feeds de actividad tienen su propia versión de esto: pasado su
+techo GitHub responde **422 "pagination is limited for this resource"**, que se
+lee como el final de los datos y no como un error.
+
+## Por dónde seguir
+
+- [Límites de la API](/ghchronicle/es/api/) es la otra mitad de esto: lo que
+  cuestan las llamadas que sí funcionan, y por qué un 304 no cuesta nada.
+- [Coste de una pasada](/ghchronicle/es/api/cost/) pone precio a cada familia.

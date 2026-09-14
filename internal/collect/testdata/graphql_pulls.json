@@ -1,0 +1,332 @@
+{
+  "data": {
+    "repository": {
+      "pullRequests": {
+        "nodes": [
+          {
+            "number": 42,
+            "title": "Add the widget",
+            "state": "MERGED",
+            "isDraft": false,
+            "createdAt": "2026-08-20T10:00:00Z",
+            "closedAt": "2026-08-22T16:00:00Z",
+            "mergedAt": "2026-08-22T16:00:00Z",
+            "additions": 120,
+            "deletions": 30,
+            "changedFiles": 4,
+            "author": {
+              "login": "alice"
+            },
+            "authorAssociation": "OWNER",
+            "labels": {
+              "totalCount": 2,
+              "nodes": [
+                {
+                  "name": "enhancement"
+                },
+                {
+                  "name": "breaking"
+                }
+              ]
+            },
+            "reviews": {
+              "totalCount": 4,
+              "nodes": [
+                {
+                  "author": {
+                    "login": "sourcery-ai",
+                    "__typename": "Bot"
+                  },
+                  "state": "COMMENTED",
+                  "submittedAt": "2026-08-20T10:00:05Z",
+                  "url": "https://github.com/octocat/hello-world/pull/42#pullrequestreview-1"
+                },
+                {
+                  "author": {
+                    "login": "alice",
+                    "__typename": "User"
+                  },
+                  "state": "COMMENTED",
+                  "submittedAt": "2026-08-20T11:00:00Z",
+                  "url": "https://github.com/octocat/hello-world/pull/42#pullrequestreview-2"
+                },
+                {
+                  "author": {
+                    "login": "bob",
+                    "__typename": "User"
+                  },
+                  "state": "APPROVED",
+                  "submittedAt": "2026-08-21T09:00:00Z"
+                },
+                {
+                  "author": null,
+                  "state": "COMMENTED",
+                  "submittedAt": "2026-08-21T11:30:00Z"
+                }
+              ]
+            },
+            "comments": {
+              "totalCount": 3
+            },
+            "commits": {
+              "totalCount": 5
+            },
+            "reviewDecision": "APPROVED",
+            "timelineItems": {
+              "nodes": [
+                {
+                  "createdAt": "2026-08-20T10:00:05Z"
+                }
+              ]
+            },
+            "totalCommentsCount": 10,
+            "mergeable": "CONFLICTING",
+            "mergeStateStatus": "DIRTY",
+            "baseRefName": "main",
+            "headRefName": "feature/thing",
+            "mergedBy": {
+              "login": "alice"
+            },
+            "mergeCommit": {
+              "oid": "7733804423c0229c27b667f862160c34688da811"
+            },
+            "reviewRequests": {
+              "totalCount": 0
+            },
+            "stackEntry": {
+              "position": 2,
+              "stack": {
+                "number": 690,
+                "size": 3
+              }
+            },
+            "reviewThreads": {
+              "totalCount": 4,
+              "nodes": [
+                {
+                  "isResolved": true,
+                  "isOutdated": true,
+                  "path": "tools/build-all.sh",
+                  "subjectType": "LINE",
+                  "resolvedBy": {
+                    "login": "coderabbitai[bot]"
+                  },
+                  "comments": {
+                    "totalCount": 3,
+                    "nodes": [
+                      {
+                        "databaseId": 3979413666,
+                        "createdAt": "2026-08-21T07:15:00Z",
+                        "author": {
+                          "login": "coderabbitai",
+                          "__typename": "Bot"
+                        }
+                      }
+                    ]
+                  }
+                },
+                {
+                  "isResolved": true,
+                  "isOutdated": true,
+                  "path": "tools/build-all.sh",
+                  "subjectType": "LINE",
+                  "resolvedBy": {
+                    "login": "coderabbitai[bot]"
+                  },
+                  "comments": {
+                    "totalCount": 3,
+                    "nodes": [
+                      {
+                        "databaseId": 3979413673,
+                        "createdAt": "2026-08-21T07:15:00Z",
+                        "author": {
+                          "login": "coderabbitai",
+                          "__typename": "Bot"
+                        }
+                      }
+                    ]
+                  }
+                },
+                {
+                  "isResolved": false,
+                  "isOutdated": false,
+                  "path": "docs/index.mdx",
+                  "subjectType": "FILE",
+                  "resolvedBy": null,
+                  "comments": {
+                    "totalCount": 1,
+                    "nodes": [
+                      {
+                        "databaseId": 3979413690,
+                        "createdAt": "2026-08-21T08:30:00Z",
+                        "author": {
+                          "login": "alice",
+                          "__typename": "User"
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "number": 43,
+            "state": "OPEN",
+            "isDraft": true,
+            "createdAt": "2026-09-05T08:00:00Z",
+            "closedAt": null,
+            "mergedAt": null,
+            "additions": 10,
+            "deletions": 2,
+            "changedFiles": 1,
+            "author": null,
+            "reviews": {
+              "totalCount": 0,
+              "nodes": []
+            },
+            "comments": {
+              "totalCount": 0
+            },
+            "commits": {
+              "totalCount": 1
+            },
+            "reviewDecision": null,
+            "timelineItems": {
+              "nodes": []
+            },
+            "totalCommentsCount": 0,
+            "mergeable": "CONFLICTING",
+            "mergeStateStatus": "DIRTY",
+            "baseRefName": "main",
+            "headRefName": "wip",
+            "mergedBy": null,
+            "mergeCommit": null,
+            "reviewRequests": {
+              "totalCount": 2
+            },
+            "stackEntry": null,
+            "reviewThreads": {
+              "totalCount": 2,
+              "nodes": [
+                {
+                  "isResolved": false,
+                  "isOutdated": false,
+                  "path": "src/main.go",
+                  "subjectType": "LINE",
+                  "resolvedBy": null,
+                  "comments": {
+                    "totalCount": 1,
+                    "nodes": [
+                      {
+                        "databaseId": 3979413701,
+                        "createdAt": "2026-09-06T11:45:00Z",
+                        "author": null
+                      }
+                    ]
+                  }
+                },
+                {
+                  "isResolved": false,
+                  "isOutdated": false,
+                  "path": "src/gone.go",
+                  "subjectType": "LINE",
+                  "resolvedBy": null,
+                  "comments": {
+                    "totalCount": 0,
+                    "nodes": []
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "issues": {
+        "nodes": [
+          {
+            "number": 7,
+            "state": "CLOSED",
+            "createdAt": "2026-08-01T12:00:00Z",
+            "closedAt": "2026-08-03T12:00:00Z",
+            "author": {
+              "login": "carol"
+            },
+            "comments": {
+              "totalCount": 4
+            },
+            "reactions": {
+              "totalCount": 2
+            },
+            "labels": {
+              "nodes": [
+                {
+                  "name": "bug"
+                },
+                {
+                  "name": "help wanted"
+                }
+              ]
+            },
+            "stateReason": "COMPLETED",
+            "parent": {
+              "number": 365
+            },
+            "subIssuesSummary": {
+              "total": 0,
+              "completed": 0
+            },
+            "assignees": {
+              "nodes": [
+                {
+                  "login": "dave"
+                }
+              ]
+            },
+            "milestone": {
+              "title": "3.1.0"
+            },
+            "closedByPullRequestsReferences": {
+              "totalCount": 1,
+              "nodes": [
+                {
+                  "number": 42
+                }
+              ]
+            }
+          },
+          {
+            "number": 8,
+            "state": "OPEN",
+            "createdAt": "2026-09-06T09:00:00Z",
+            "closedAt": null,
+            "author": null,
+            "comments": {
+              "totalCount": 0
+            },
+            "reactions": {
+              "totalCount": 0
+            },
+            "labels": {
+              "nodes": []
+            },
+            "stateReason": null,
+            "parent": null,
+            "subIssuesSummary": {
+              "total": 100,
+              "completed": 94
+            },
+            "assignees": {
+              "nodes": []
+            },
+            "milestone": null,
+            "closedByPullRequestsReferences": {
+              "totalCount": 0,
+              "nodes": []
+            }
+          }
+        ]
+      }
+    }
+  }
+}

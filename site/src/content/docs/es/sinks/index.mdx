@@ -1,0 +1,171 @@
+---
+title: Elegir almacén
+description: Diez almacenes, qué puede y qué no puede responder cada uno, y la propiedad que decide entre ellos.
+---
+
+import { CardGrid, LinkCard, Aside } from "@astrojs/starlight/components";
+
+Diez destinos, y usar más de uno es lo normal. Todos envían por push: la
+herramienta está pensada para correr donde sea cómodo y alcanzar sus almacenes
+desde ahí, no para que la consulten. El exportador de Prometheus es la única
+excepción, y existe porque Prometheus insiste.
+
+## La comparación
+
+| Almacén                                               | Guarda                                         | Bueno para                                       | Configuración                   |
+| ----------------------------------------------------- | ---------------------------------------------- | ------------------------------------------------ | ------------------------------- |
+| [InfluxDB](/ghchronicle/es/sinks/influxdb/)           | la historia fechada                            | "a qué velocidad fusionábamos en julio"          | `url`, `token`, `org`, `bucket` |
+| [PostgreSQL](/ghchronicle/es/sinks/postgres/)         | la historia fechada, como SQL que pasas a psql | quien usa Grafana con un Postgres y sin InfluxDB | `dialect`, `path`               |
+| [Graphite](/ghchronicle/es/sinks/graphite/)           | la historia fechada                            | un Graphite que ya está ahí                      | `addr`, `prefix`                |
+| [Elasticsearch](/ghchronicle/es/sinks/elasticsearch/) | la historia fechada, como documentos           | buscar en todo lo recogido                       | `url`, `prefix`, `api_key`      |
+| [Prometheus](/ghchronicle/es/sinks/prometheus/)       | el valor actual                                | alertas, y un número en una pared                | `listen`, `path`                |
+| [OpenTelemetry](/ghchronicle/es/sinks/otlp/)          | una cosa u otra, según el backend              | un pipeline de collector ya existente            | `endpoint`, `raw`               |
+| [Loki](/ghchronicle/es/sinks/loki/)                   | los eventos, como líneas de log                | "qué pasó, en orden"                             | `url`, `labels`, `max_age`      |
+| [Telegraf](/ghchronicle/es/sinks/telegraf/)           | lo que guarden sus salidas                     | alcanzar todo lo que alcance Telegraf            | `url`                           |
+| [Fichero y stdout](/ghchronicle/es/sinks/file/)       | line protocol o JSON                           | un agente de envío que ya tengas, y un búfer          | `path`, `format`                |
+
+No hay destino para ningún proveedor gestionado concreto, y es deliberado. A un
+backend gestionado se llega por uno de los dos destinos que existen para eso:
+Telegraf, cuyas salidas cubren Datadog, New Relic, Wavefront, Azure Monitor y
+cien más, u OpenTelemetry, que la mayoría ya acepta directamente. Un destino por
+proveedor es una clave que rotar, una API que seguir y un test que necesita una
+cuenta de pago, para un salto que esos dos ya hacen.
+
+## Lo que lo decide todo
+
+Un punto lleva la fecha en que ocurrió la cosa. Una estrella se fecha cuando se
+dio, una ejecución de workflow cuando terminó, un día de tráfico en la fecha de
+ese mismo día.
+
+InfluxDB indexa un punto por medida, conjunto de etiquetas y marca de tiempo,
+así que escribir la misma ventana de tráfico de catorce días cada seis horas
+converge en la respuesta correcta en vez de acumular copias. Eso es lo que hace
+funcionar todo el diseño del relleno histórico, y es por lo que InfluxDB es el
+destino que guarda la historia.
+
+Prometheus no puede hacer eso. Sella una muestra en el instante del scrape y
+rechaza cualquier cosa apreciablemente más vieja: medido contra Prometheus 3.14
+con el receptor OTLP activado y una ventana de desorden de treinta minutos, una
+muestra fechada dos días atrás vuelve como HTTP 400. Así que el exportador
+reduce las filas por elemento a valores actuales antes de servirlas.
+
+El argumento completo, y qué le hace la reducción a cada medida, está en
+[la fecha del punto](/ghchronicle/es/how/dating/).
+
+## Solo se escribe lo que ha cambiado
+
+Una pasada ofrece la misma historia cada vez: la ventana de tráfico de catorce
+días, cada pull request abierta, el calendario de contribuciones. Volver a
+escribirlo todo es inofensivo para lo que guarda el almacén, porque la fila se
+indexa por serie y marca de tiempo y simplemente se sobrescribe, y es así como
+se repara un colector que estuvo caído un día.
+
+No es inofensivo para los ficheros del almacén. InfluxDB 3 Core escribe un
+fichero Parquet por partición y por petición de escritura, no los compacta
+nunca, y rechaza cualquier consulta que abriría más ficheros que su límite.
+Medido antes del arreglo de abajo y con el límite entonces en diez mil:
+`gh_notification` tenía poco más de una fila por fichero Parquet, y una consulta
+sobre catorce días volvió con "Query would scan 10000 Parquet files, exceeding
+the file limit".
+
+Pedir un intervalo más grueso no ayuda, porque el límite cuenta los ficheros que
+abre el planificador, antes de cualquier agregación. Así que la herramienta
+mantiene un pequeño registro de lo que ya ha escrito y envía solo los puntos
+cuyos valores se han movido:
+
+```yaml
+sinks:
+  dedupe_file: /var/lib/ghchronicle/state-written.bin # por omisión: junto a state_file
+  dedupe_horizon: 720h # olvida un punto que ya nadie ofrece
+  influxdb:
+    dedupe: true # el valor por omisión, aquí y en telegraf, graphite, sql y elasticsearch
+```
+
+El registro guarda dos hashes de 64 bits y un día por punto, así que una cuenta
+grande cuesta unos pocos megabytes. Va indexado por destino, así que un almacén
+que estuvo inalcanzable recibe todo en su siguiente escritura. Perderlo, o
+poner `dedupe_file: off`, cuesta una pasada de reescritura y nada más, que es
+justo lo que quiere un almacén que se ha vaciado y hay que volver a llenar. Es
+el segundo fichero que conviene poner en una ruta persistente, junto al
+[fichero de estado](/ghchronicle/es/configuration/).
+
+Una ejecución que termina cuando termina su pasada no abre el registro. `-once`,
+`-backfill` y el dibujo de una tarjeta escriben una vez y salen, así que no hay
+nada que guardar ni nada que podar, y cada una de ellas vuelve a ofrecer la
+historia entera. Para eso está el relleno histórico; y por eso una tarea
+programada con `-once`, que es la forma en que corre
+[la Action](/ghchronicle/es/install/actions/), escribe todos los puntos cada
+vez. Donde eso importe, hay que correr el bucle.
+
+El registro de la pasada dice lo que esto ha ahorrado:
+
+```text
+level=INFO msg=written sink=influxdb family=events points=0 unchanged=300
+```
+
+Si los ficheros ya se han acumulado, el arreglo del escritor detiene el
+crecimiento pero no los quita: sube `--query-file-limit` en el servidor,
+reescribe las tablas afectadas, o pasa a InfluxDB 3 Enterprise, que compacta
+por su cuenta y es gratis para uso doméstico.
+
+## Por dónde empezar
+
+<CardGrid>
+  <LinkCard
+    title="Quieres la historia"
+    description="InfluxDB es la implementación de referencia y el dashboard está hecho contra ella. PostgreSQL, Graphite y Elasticsearch guardan los mismos hechos con su propia forma."
+    href="/ghchronicle/es/sinks/influxdb/"
+  />
+  <LinkCard
+    title="Quieres alertas"
+    description="Prometheus sirve el valor actual de todo lo que tiene uno. Úsalo junto a un almacén de historia, no en su lugar."
+    href="/ghchronicle/es/sinks/prometheus/"
+  />
+  <LinkCard
+    title="Quieres leer qué pasó"
+    description="Loki convierte veintidós de las medidas en líneas de log que se leen como frases y llevan detrás cada etiqueta en logfmt."
+    href="/ghchronicle/es/sinks/loki/"
+  />
+  <LinkCard
+    title="Ya tienes un pipeline"
+    description="Telegraf y OpenTelemetry entregan los puntos a algo que ya sabe a dónde deben ir."
+    href="/ghchronicle/es/sinks/telegraf/"
+  />
+</CardGrid>
+
+## Usar varios
+
+Es normal, y es barato: la recolección ocurre una vez y los puntos se entregan a
+todos los destinos configurados. La disposición habitual es un almacén de
+historia más uno de los de valor actual.
+
+```yaml
+sinks:
+  influxdb:
+    url: http://localhost:8181
+    token: ${INFLUX_TOKEN}
+    org: default
+    bucket: github
+  prometheus:
+    listen: 127.0.0.1:9605
+    path: /metrics
+```
+
+<Aside type="caution" title="Una combinación que hay que evitar">
+  `sinks.sql.path: "-"` y `sinks.stdout: true` escriben ambos por la salida
+  estándar, y entrelazar sentencias SQL con line protocol produce un flujo que
+  no puede leer ni psql ni Telegraf. Elige uno.
+</Aside>
+
+## Qué hace cada destino ante un fallo
+
+Un destino que falla se registra y la pasada continúa; que una base de datos
+esté caída no detiene la recolección, y con el destino de fichero configurado
+los datos siguen en disco cuando vuelva. Dos fallos se informan de forma
+especial en vez de como errores, porque son éxitos parciales:
+
+- **líneas rechazadas**, donde se escribió todo lo analizable y las líneas
+  rechazadas se registran una a una con la razón que dio el almacén.
+- **entradas descartadas**, que es el horizonte de antigüedad de Loki dejando
+  fuera lo que su ventana de desorden habría rechazado, en vez de perder el
+  envío entero.

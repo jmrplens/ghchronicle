@@ -1,0 +1,16 @@
+# markdownlint-cli2 configuration, the YAML twin of .markdownlint-cli2.jsonc.
+#
+# markdownlint-cli2 reads the first configuration file it finds in a
+# directory, and .markdownlint-cli2.jsonc comes first, so this file takes
+# effect only for a tool that reads YAML alone. It carries the same rules
+# gitlab-mcp-server's copy does, so either file gives the same verdict on the
+# rules it names.
+
+config:
+  # Line length: tables and links naturally exceed 80 chars
+  MD013: false
+  # Code block style: tabbed and admonition syntax nests fenced blocks under
+  # indentation by design
+  MD046: false
+  # Table column style: pipe alignment style is not enforced
+  MD060: false

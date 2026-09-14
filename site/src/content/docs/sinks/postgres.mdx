@@ -1,0 +1,116 @@
+---
+title: PostgreSQL
+description: INSERT statements you pipe into psql, the schema they declare, and why the conflict clause updates rather than does nothing.
+---
+
+import { Aside, Steps } from "@astrojs/starlight/components";
+import stats from "../../../data/stats.json";
+
+```yaml
+sinks:
+  sql:
+    dialect: postgres
+    path: /var/lib/ghchronicle/points.sql
+    max_bytes: 67108864
+    keep: 5
+```
+
+INSERT statements in PostgreSQL's dialect, written to a rotating file or, with
+`path: "-"`, to standard output.
+
+```sh
+ghchronicle -config config.yaml -once | psql "$DATABASE_URL"
+```
+
+This is the sink for the Grafana user who self-hosts PostgreSQL or TimescaleDB
+and runs no InfluxDB. The tool cannot speak the PostgreSQL wire protocol
+without a driver, and a driver is a dependency this repository does not take,
+so it emits the SQL and leaves the connection to psql. Grafana's PostgreSQL
+datasource then has a real schema to query.
+
+## The schema is the contract
+
+- One table per measurement, named after it: `gh_repo`, `gh_traffic`,
+  `gh_workflow_run`.
+- `time TIMESTAMPTZ NOT NULL`, the date the thing happened.
+- One `TEXT NOT NULL DEFAULT ''` column per tag, an empty string where the
+  point had no value.
+- One column per field, typed from the value: `BIGINT` for an integer,
+  `DOUBLE PRECISION` for a float, `BOOLEAN`, `TEXT`, and `TIMESTAMPTZ` for a
+  field that is itself a time.
+- `PRIMARY KEY (time, <tag columns in name order>)`.
+- Every identifier is double-quoted, because `user`, `type` and `state` are tag
+  names here and reserved words there.
+
+That primary key is InfluxDB's series key spelled as a constraint, and it is
+what makes a rewrite of the fourteen-day traffic window converge instead of
+accumulate.
+
+```sql
+CREATE TABLE IF NOT EXISTS "gh_traffic" ("time" TIMESTAMPTZ NOT NULL, "full_name" TEXT NOT NULL DEFAULT '', "kind" TEXT NOT NULL DEFAULT '', "owner" TEXT NOT NULL DEFAULT '', "repo" TEXT NOT NULL DEFAULT '', "count" BIGINT, "uniques" BIGINT, "url" TEXT, PRIMARY KEY ("time", "full_name", "kind", "owner", "repo"));
+INSERT INTO "gh_traffic" ("time", "full_name", "kind", "owner", "repo", "count", "uniques", "url") VALUES ('2026-09-07T00:00:00Z'::timestamptz, 'acme/telemetry', 'views', 'acme', 'telemetry', 41, 12, 'https://github.com/acme/telemetry/graphs/traffic') ON CONFLICT ("time", "full_name", "kind", "owner", "repo") DO UPDATE SET "count" = EXCLUDED."count", "uniques" = EXCLUDED."uniques", "url" = EXCLUDED."url";
+```
+
+<Aside type="tip" title="DO UPDATE, not DO NOTHING">
+  Today's traffic row is rewritten with a higher count on every sweep. A row
+  frozen at its first value would be the one bug the whole dated-point design
+  exists to avoid.
+</Aside>
+
+## How the declarations arrive
+
+The `CREATE TABLE IF NOT EXISTS` is emitted the first time a measurement is
+seen in a file, with the union of the columns that batch carries. A column that
+turns up in a later batch arrives as `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`.
+A rotated file starts its declarations again, so any one file can be replayed
+on its own.
+
+A tag first seen after the table was declared cannot join the primary key
+without rewriting it, so it becomes a plain column. That only happens when a
+collector changes its tag set between sweeps.
+
+## TimescaleDB
+
+Turn each table into a hypertable once it exists. The primary key already
+includes `time`, which is the one condition TimescaleDB puts on it.
+
+```sql
+SELECT create_hypertable('gh_traffic', 'time', if_not_exists => TRUE);
+SELECT create_hypertable('gh_workflow_run', 'time', if_not_exists => TRUE);
+```
+
+Nothing in the dashboard changes.
+
+## Setting it up
+
+<Steps>
+
+1. Point the sink at a file, or at standard output for a direct pipe.
+
+2. Load it.
+
+    ```sh
+    psql "$DATABASE_URL" -f /var/lib/ghchronicle/points.sql
+    ```
+
+    Or, for the streaming arrangement, run the collector with `-once` from a
+    scheduler and pipe it straight in.
+
+3. Point Grafana's PostgreSQL datasource at the database and import
+    `ghchronicle-postgres.json`.
+
+    ```sql
+    SELECT time, "count" FROM gh_traffic WHERE kind = 'views' AND repo = $repo
+    ```
+
+</Steps>
+
+`dashboards/ghchronicle-postgres.json` has the same {stats.panels} panels as the InfluxDB
+one, with every query translated to PostgreSQL against this schema.
+
+## Where to go next
+
+- [Choosing a store](/ghchronicle/sinks/) compares PostgreSQL with the other nine,
+  and holds the write ledger every one of them shares.
+- [The dashboards](/ghchronicle/dashboards/) says which of the five is drawn
+  against which store, and what a panel a store cannot answer becomes.

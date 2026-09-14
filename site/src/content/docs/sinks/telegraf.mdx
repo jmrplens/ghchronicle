@@ -1,0 +1,83 @@
+---
+title: Telegraf
+description: Line protocol posted to http_listener_v2, and the reason this is one sink instead of a hundred.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+```yaml
+sinks:
+  telegraf:
+    url: http://telegraf:8186/telegraf
+    username: ""
+    password: ""
+    batch: 5000
+```
+
+Line protocol posted to Telegraf's `http_listener_v2` input, as `text/plain`,
+with basic auth when a username is set.
+
+<Aside type="note" title="A URL with no path gets /telegraf">
+  The listener answers 404 to `/` without saying why, so a URL with an empty
+  path is given the input's default path rather than being sent somewhere that
+  will silently fail.
+</Aside>
+
+## The matching input
+
+```toml
+[[inputs.http_listener_v2]]
+  service_address = ":8186"
+  paths = ["/telegraf"]
+  data_format = "influx"
+```
+
+## Why this exists as one sink
+
+Telegraf has an output for Kafka, Datadog, New Relic, Graphite, Loki,
+Elasticsearch, Wavefront, Azure Monitor, Google Cloud Monitoring and a hundred
+more. Rather than grow a sink here for each of them, the points go to Telegraf
+as the line protocol it already speaks, and its own `[[outputs.*]]` blocks
+route them onward.
+
+That is the whole argument. It is one sink that reaches everything Telegraf
+reaches, and it costs this project no new dependency and no new wire format.
+
+## What happens to the dates
+
+Telegraf keeps the timestamps as given, so the dated history survives as far as
+each output lets it. An output that stamps at receipt, or one that rejects old
+samples, loses it, exactly as those backends would if this tool wrote to them
+directly.
+
+So the question to ask is not "does Telegraf keep the history" but "does the
+output I configured keep it". Kafka and InfluxDB do. A Prometheus remote write
+does not.
+
+## An example that fans out
+
+```toml
+[[inputs.http_listener_v2]]
+  service_address = ":8186"
+  paths = ["/telegraf"]
+  data_format = "influx"
+
+[[outputs.influxdb_v2]]
+  urls = ["http://influxdb:8181"]
+  token = "$INFLUX_TOKEN"
+  organization = "default"
+  bucket = "github"
+
+[[outputs.kafka]]
+  brokers = ["kafka:9092"]
+  topic = "github-metrics"
+```
+
+One sweep, both destinations, and the collector knows about neither.
+
+## Where to go next
+
+- [Choosing a store](/ghchronicle/sinks/) compares Telegraf with the other nine,
+  and holds the write ledger every one of them shares.
+- [The dashboards](/ghchronicle/dashboards/) says which of the five is drawn
+  against which store, and what a panel a store cannot answer becomes.

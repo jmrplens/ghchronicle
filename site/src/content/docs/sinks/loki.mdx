@@ -1,0 +1,123 @@
+---
+title: Loki
+description: The twenty-two measurements that are events rather than numbers, and the age horizon that keeps a push from being refused.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+```yaml
+sinks:
+  loki:
+    url: http://loki:3100/loki/api/v1/push
+    tenant_id: ""
+    labels:
+      job: ghchronicle
+    max_age: 1h
+    batch: 1000
+```
+
+## Measurements and events
+
+Some of what GitHub reports is a measurement and some of it is an event. "The
+repository has 148 stars" is a measurement. "Someone starred it at 03:03, this
+release was published, that workflow failed on main, this alert was raised" are
+events: each happened once, at a known moment, and what you want later is to
+read them in order and search them, not to average them.
+
+**Twenty-two measurements have an event rendering**: stars in both directions,
+forks, releases, published package versions, pull requests, reviews, review
+threads, issues, commits, workflow runs, job logs, repository activity,
+Dependabot alerts, code scanning analyses, the event feed, notifications,
+discussions, webhook deliveries, deployments, ruleset versions and external
+contributions. Everything else is a gauge in disguise and is not sent.
+
+A measurement with no rendering is dropped in silence, which is right for a
+gauge and wrong for an event nobody has got round to: deployments and review
+threads were dated events with no log line for months, and nothing said so. So
+every dated measurement now has to appear in one of two tables in
+`internal/sink/loki.go`, the renderings or the refusals, and each refusal
+carries the reason it is not a log line. A test fails on a dated measurement
+that appears in neither.
+
+## The line format
+
+Each line reads as a sentence first and carries every tag and field after it in
+logfmt, so the same line is greppable in a terminal and queryable in Grafana
+without keeping two copies of the data.
+
+```text
+someone starred acme/telemetry full_name="acme/telemetry" user="someone" starred=1
+```
+
+`batch` is how many entries go in one push, 1000 unless it is lowered.
+
+The stream label is `kind`, which is what you filter on first.
+
+```text
+{job="ghchronicle", kind="workflow_run"} |= "failure"
+{job="ghchronicle", kind="job_log"}
+```
+
+<Aside type="tip" title="Keep the other labels few">
+  Loki indexes labels, and a high cardinality label costs far more than a wide
+  line. `labels` in the configuration is for the fixed ones that identify this
+  collector, not for anything that varies per point.
+</Aside>
+
+## `max_age`, and why the reason is not the obvious one
+
+Loki refuses an entire push when one entry predates
+`reject_old_samples_max_age`, a week by default, and half of what this
+collector produces is older than that on purpose: a star from 2020, a pull
+request from 2024.
+
+But the limit that actually bites is the other one. Loki also refuses an entry
+more than its out-of-order window behind the newest entry already in that
+stream, about two hours by default.
+
+**Measured against a real Loki 3**: once the stream held an entry from 19:14,
+one from 00:35 the same day came back as "entry too far behind".
+
+So the horizon is applied three ways:
+
+1. against the wall clock,
+2. against the newest entry of each stream inside the batch,
+3. against the newest entry that stream has been sent before.
+
+What falls outside is left out and counted, at debug level, rather than costing
+the whole push.
+
+`max_age` defaults to one hour, which is inside Loki's default window. Raise it
+only if you have raised `out_of_order_time_window` to match.
+
+## What Loki is not for
+
+The dated history. That is what a metrics store is for, and it is why the two
+run together rather than one replacing the other. A log answers "what happened
+recently, in order"; a time series answers "how much, over which period".
+
+## Job logs belong here
+
+`every.joblogs` collects the last forty lines of every failed GitHub Actions
+job. It is text rather than a measurement, so the InfluxDB sink excludes it by
+default and the Prometheus exporter skips it. Loki is where it belongs, and the
+query is:
+
+```text
+{job="ghchronicle", kind="job_log"}
+```
+
+The exported dashboards do not show it, because a dashboard bound to one
+datasource cannot query two and an importer may have no Loki: they carry a text
+panel, "Where failure output went", with that query. On a Grafana that has a
+Loki datasource, `cmd/publish_dashboard -loki <datasource-uid>` publishes the
+dashboard with the lines drawn from Loki in that panel's place, newest first,
+filtered by the dashboard's repository variable where the store's variable can
+be read as a regular expression. The steps are in `dashboards/PUBLISHING.md`.
+
+## Where to go next
+
+- [Choosing a store](/ghchronicle/sinks/) compares Loki with the other nine,
+  and holds the write ledger every one of them shares.
+- [The dashboards](/ghchronicle/dashboards/) says which of the five is drawn
+  against which store, and what a panel a store cannot answer becomes.

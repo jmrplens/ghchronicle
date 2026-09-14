@@ -1,0 +1,291 @@
+# The real stores, for the suite that proves they accept what the sinks emit.
+#
+# test/e2e is a contract test of the bytes: it points every sink at a capture
+# server and asserts what came out. That cannot prove a store accepts those
+# bytes, and the gap has already cost real bugs. InfluxDB 3 fixes a column as a
+# tag or a field the first time it sees it and refuses later writes that
+# disagree; a capture server answers 204 and never notices. Whether
+# Elasticsearch's dynamic mapping lets the dashboards aggregate at all is still
+# recorded as unverifiable by two audits. So this file runs the stores
+# themselves, one container each, and Grafana on top of them to run the
+# dashboards' own queries.
+#
+# What each service is here for:
+#
+#   influxdb       the sink that keeps the dated history, and the one whose
+#                  column typing this suite exists to pin down
+#   postgres       the target of the SQL sink's DDL and INSERTs, fed by psql
+#   elasticsearch  the _bulk sink, and the dynamic mapping the dashboards
+#                  aggregate on through the .keyword sub-fields
+#   graphite       the plaintext protocol on 2003, and the render API the
+#                  dashboards index their path nodes from
+#   prometheus     scrapes the exporter, which is the one sink that does not
+#                  push; the target is fed in by the harness through file_sd
+#   loki           the event lines, with their out-of-order window widened
+#   otelcol        an OTLP receiver whose pipeline writes what it is sent to a
+#                  file, so a test can read back the exact data points
+#   telegraf       the http_listener_v2 input the Telegraf sink posts line
+#                  protocol to, with a file output that keeps the timestamps
+#   grafana        runs the five dashboards' queries through /api/ds/query,
+#                  which is what cmd/check_dashboards does against a live one
+#
+# Rules this file obeys, because it runs on a machine with real services:
+#
+#   * every port is published on 127.0.0.1, and on a free port Docker picks
+#     out of 49200-49299, never a service's default. 9200, 8086, 5432, 2003,
+#     9090, 3100, 3000 and 4318 belong to whatever else is on the box. The
+#     range is stated rather than left empty because an empty host port takes
+#     whatever the kernel's local port range starts at, which on this machine
+#     is 1024. The harness reads the chosen ports back with
+#     `docker compose port`, so nothing anywhere assumes one.
+#   * the project name is fixed here as well as passed with -p, so a command
+#     that forgets the flag still lands in this project and cannot touch
+#     anything else.
+#   * no restart policy anywhere: nothing here comes back after a teardown.
+#
+# Every image is pinned to an exact version. A floating tag would make this
+# suite's whole subject, the behavior of a specific store, move under it.
+name: ghchronicle-e2e
+
+services:
+  # InfluxDB 3 Core. The version is the reason this suite exists: 3.x is what
+  # fixes a column as a tag or a field on first sight, and 3.11.2 is the
+  # newest Core release at the time of writing. The object store is memory
+  # because nothing here outlives the run and Core's one-Parquet-file-per-write
+  # behavior has no reason to touch a disk. --without-auth removes the token
+  # dance; the sink still sends one and the server ignores it.
+  influxdb:
+    image: influxdb:3.11.2-core
+    command:
+      - influxdb3
+      - serve
+      - --node-id=e2e
+      - --object-store=memory
+      - --http-bind=0.0.0.0:8181
+      - --without-auth
+    ports:
+      - "127.0.0.1:49200-49299:8181"
+    mem_limit: 2g
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:8181/health"]
+      interval: 2s
+      timeout: 3s
+      retries: 60
+      start_period: 5s
+
+  # PostgreSQL for the SQL sink. The sink writes statements rather than
+  # speaking the wire protocol, so a test pipes its file through psql inside
+  # this container; the harness has a helper for it.
+  postgres:
+    image: postgres:18.6-alpine
+    environment:
+      POSTGRES_USER: ghchronicle
+      POSTGRES_PASSWORD: ghchronicle
+      POSTGRES_DB: ghchronicle
+      # Nothing here survives the run, so durability buys nothing and costs
+      # every INSERT an fsync.
+      POSTGRES_INITDB_ARGS: "--nosync"
+    command: ["postgres", "-c", "fsync=off", "-c", "full_page_writes=off", "-c", "synchronous_commit=off"]
+    ports:
+      - "127.0.0.1:49200-49299:5432"
+    mem_limit: 1g
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ghchronicle -d ghchronicle"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+      start_period: 3s
+
+  # Elasticsearch, with security off because this cluster is reachable from
+  # loopback only and a password would just be one more thing to pass around.
+  # The heap is pinned small on purpose: unbounded, it takes a share of the
+  # host's memory, and this runs beside real services.
+  #
+  # allow_mmap=false keeps it off the host's vm.max_map_count, which a CI
+  # runner will not have raised, and the disk allocation thresholds are off so
+  # a nearly full runner disk cannot flip the indices to read-only mid-suite
+  # and turn a mapping question into a disk question.
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.5.3
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      xpack.license.self_generated.type: basic
+      xpack.ml.enabled: "false"
+      ingest.geoip.downloader.enabled: "false"
+      node.store.allow_mmap: "false"
+      bootstrap.memory_lock: "false"
+      cluster.routing.allocation.disk.threshold_enabled: "false"
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+    ports:
+      - "127.0.0.1:49200-49299:9200"
+    mem_limit: 2g
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf 'http://127.0.0.1:9200/_cluster/health?wait_for_status=yellow&timeout=1s' >/dev/null"]
+      interval: 3s
+      timeout: 5s
+      retries: 60
+      start_period: 10s
+
+  # Graphite: carbon's plaintext receiver on 2003, and the render API behind
+  # nginx on 80. Both configuration files are mounted because both defaults
+  # are wrong for this: see config/carbon.conf and config/storage-schemas.conf.
+  graphite:
+    image: graphiteapp/graphite-statsd:1.1.10-5
+    environment:
+      # The statsd and collectd services in this image have nothing to do with
+      # the sink and only add processes to wait on.
+      STATSD_DISABLED: "1"
+      COLLECTD_DISABLED: "1"
+      REDIS_DISABLED: "1"
+    volumes:
+      - ./config/carbon.conf:/opt/graphite/conf/carbon.conf:ro
+      - ./config/storage-schemas.conf:/opt/graphite/conf/storage-schemas.conf:ro
+    ports:
+      - "127.0.0.1:49200-49299:2003"
+      - "127.0.0.1:49200-49299:80"
+    mem_limit: 1g
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 2003 && wget -q -O /dev/null http://127.0.0.1/render"]
+      interval: 3s
+      timeout: 5s
+      retries: 60
+      start_period: 10s
+
+  # Prometheus. The exporter is the one sink that is scraped rather than
+  # pushed to, and it runs on the host as part of the collector process, on a
+  # port the test picks. So the scrape target is not in this file: it is a
+  # file_sd file the harness writes once it knows that port, and
+  # host.docker.internal is how this container reaches back out to it.
+  #
+  # It runs as root only so that it can read that file out of a directory the
+  # test process created.
+  #
+  # The scrape crosses from this container back out to the host, which a
+  # machine that firewalls its docker bridge refuses: ufw with a default-deny
+  # INPUT policy drops it, and then the target stays down however healthy the
+  # exporter is. The harness reports that as ErrExporterUnreachable rather than
+  # as a failure of the sink.
+  prometheus:
+    image: prom/prometheus:v3.14.0
+    user: "0:0"
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=1d
+      - --web.listen-address=0.0.0.0:9090
+    volumes:
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./out/prometheus-targets:/etc/prometheus/targets:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "127.0.0.1:49200-49299:9090"
+    mem_limit: 1g
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:9090/-/ready"]
+      interval: 2s
+      timeout: 3s
+      retries: 60
+      start_period: 3s
+
+  # Loki. The image ships one binary and no shell, so it has no healthcheck
+  # compose can run: the harness polls /ready from the host instead, which is
+  # the gate that actually matters. Same for otelcol below.
+  loki:
+    image: grafana/loki:3.7.7
+    command: ["-config.file=/etc/loki/local-config.yaml"]
+    volumes:
+      - ./config/loki.yaml:/etc/loki/local-config.yaml:ro
+      - loki-data:/loki
+    ports:
+      - "127.0.0.1:49200-49299:3100"
+    mem_limit: 1g
+
+  # OpenTelemetry collector. The pipeline has no batch processor and no
+  # transform: what is sent is what lands in the file, timestamps and all, so
+  # a test can assert the data points rather than a rendering of them. It runs
+  # as root to write that file into a host directory the test process owns.
+  otelcol:
+    image: otel/opentelemetry-collector-contrib:0.160.0
+    user: "0:0"
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./config/otel-collector.yaml:/etc/otelcol/config.yaml:ro
+      - ./out/otel:/out
+    ports:
+      - "127.0.0.1:49200-49299:4318"
+      - "127.0.0.1:49200-49299:13133"
+    mem_limit: 512m
+
+  # Telegraf: the http_listener_v2 input the sink posts line protocol to, and
+  # a file output that keeps every timestamp as given, which is the property
+  # the Telegraf sink claims. Root, again, to write into the host directory.
+  telegraf:
+    image: telegraf:1.39.3
+    # The image's entrypoint drops back to the telegraf user whenever it finds
+    # itself running as root, which would undo the user below and leave the
+    # file output unable to write into a host directory the test owns. So the
+    # binary is started directly, tini kept for the signal handling.
+    user: "0:0"
+    entrypoint: ["/usr/bin/tini", "--", "/usr/bin/telegraf"]
+    command: ["--config", "/etc/telegraf/telegraf.conf"]
+    volumes:
+      - ./config/telegraf.conf:/etc/telegraf/telegraf.conf:ro
+      - ./out/telegraf:/out
+    ports:
+      - "127.0.0.1:49200-49299:8186"
+    mem_limit: 512m
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf -o /dev/null -X POST --data-binary '' http://127.0.0.1:8186/telegraf"]
+      interval: 2s
+      timeout: 3s
+      retries: 60
+      start_period: 3s
+
+  # Grafana, with every datasource provisioned at boot so a test never has to
+  # create one. The uids are fixed and the harness exports them, because
+  # /api/ds/query addresses a datasource by uid.
+  grafana:
+    image: grafana/grafana:13.2.1
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_LOG_LEVEL: warn
+      # Every datasource the dashboards use is core, so nothing is downloaded
+      # at boot and the stack comes up with no network at all.
+      GF_INSTALL_PLUGINS: ""
+    volumes:
+      - ./config/grafana-datasources.yaml:/etc/grafana/provisioning/datasources/e2e.yaml:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "127.0.0.1:49200-49299:3000"
+    mem_limit: 1g
+    # Ordering only, deliberately not condition: service_healthy. A datasource
+    # is resolved per query, so Grafana has no reason to wait for a store, and
+    # waiting would make `up -d` block until the slowest one is healthy, which
+    # hides in the harness's timings the very number they are there to report.
+    depends_on:
+      - influxdb
+      - postgres
+      - elasticsearch
+      - graphite
+      - prometheus
+      - loki
+      - otelcol
+      - telegraf
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf -o /dev/null http://127.0.0.1:3000/api/health"]
+      interval: 2s
+      timeout: 3s
+      retries: 60
+      start_period: 5s
+
+# Named volumes rather than bind mounts for the stores' own data, so that
+# `down -v` takes all of it and nothing of this suite is left on the host.
+volumes:
+  loki-data:
+  grafana-data:

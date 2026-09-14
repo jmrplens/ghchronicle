@@ -1,0 +1,61 @@
+---
+title: Qué es
+description: Qué recoge ghchronicle y el problema que viene a resolver.
+sidebar:
+  order: 1
+---
+
+import { Aside } from "@astrojs/starlight/components";
+import stats from "../../../../data/stats.json";
+
+GitHub responde la mayoría de las preguntas sobre el presente y casi ninguna
+sobre el pasado.
+
+La API de tráfico sirve catorce días y olvida. El feed de actividad guarda los
+últimos trescientos eventos, sea cual sea su fecha. Las notificaciones leídas
+desaparecen en semanas. Los logs de los jobs se borran a los noventa días. La
+lista de estrellas dice cuándo se dio cada una, pero solo si se pregunta antes
+de que la lista sea lo bastante larga como para que recorrerla salga caro. Nada
+de eso queda archivado en ningún sitio salvo que uno lo archive.
+
+`ghchronicle` recorre esas superficies según un horario y escribe cada
+observación como un punto sellado con la fecha en que la cosa ocurrió de
+verdad, de modo que dentro de un año la pregunta "a qué velocidad fusionábamos
+en julio" siga teniendo respuesta.
+
+```sh
+ghchronicle -config config.yaml
+```
+
+Es un único binario de Go sin más dependencias que un analizador de YAML, y
+envía por push a todos los almacenes que soporta, así que se ejecuta allí donde
+los alcance: un servidor, un contenedor, un workflow programado.
+
+<Aside type="note" title="La tarjeta no es el objetivo">
+  También sabe dibujar una tarjeta SVG de resumen para un README de perfil. Eso
+  es una función secundaria. La razón por la que el proyecto existe es la
+  ingesta.
+</Aside>
+
+## Las seis palabras que usa todo lo demás
+
+| Palabra         | Qué significa aquí                                                                                       |
+| --------------- | ---------------------------------------------------------------------------------------------------------- |
+| **familia**     | Un colector, nombrado en la configuración: `actions`, `stars`, `issues`. Hay {stats.families}                          |
+| **grupo**       | Un conjunto de familias con nombre, para encender o apagar un área entera: `ci`, `security`, `audience`. Hay {stats.groups} |
+| **medida**      | Un tipo de fila del almacén, nombrada `gh_*`: `gh_star`, `gh_workflow_run`. Hay {stats.measurements}                       |
+| **punto**       | Una fila: una medida, sus etiquetas, sus campos y la fecha en que ocurrió la cosa                        |
+| **pasada**      | Un recorrido por las familias a las que les toca, que es lo que hace el proceso en bucle                 |
+| **relleno**     | Una ejecución con `-backfill`, que recorre la historia en vez del incremento                             |
+
+`ghchronicle -groups` imprime los grupos con sus familias, y
+`ghchronicle -config config.yaml -list` imprime los repositorios que cubriría
+una pasada.
+
+## Por dónde seguir
+
+- [Inicio rápido](/ghchronicle/es/start/quickstart/): de cero a una primera
+  pasada.
+- [El token](/ghchronicle/es/start/token/): qué ámbito compra qué familia.
+- [La fecha del punto](/ghchronicle/es/how/dating/): la idea de diseño de la que
+  se sigue todo lo demás.

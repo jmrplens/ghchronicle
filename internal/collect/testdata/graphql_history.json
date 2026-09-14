@@ -1,0 +1,41 @@
+{
+  "data": {
+    "user": {
+      "createdAt": "2024-03-05T08:00:00Z",
+      "contributionsCollection": {
+        "totalCommitContributions": 300,
+        "totalIssueContributions": 12,
+        "totalPullRequestContributions": 30,
+        "totalPullRequestReviewContributions": 8,
+        "totalRepositoryContributions": 3,
+        "restrictedContributionsCount": 40,
+        "contributionCalendar": {
+          "totalContributions": 393,
+          "weeks": [
+            {"contributionDays": [
+              {"date": "2025-01-01", "contributionCount": 1, "contributionLevel": "FIRST_QUARTILE"},
+              {"date": "2025-01-02", "contributionCount": 0, "contributionLevel": "NONE"},
+              {"date": "2025-01-03", "contributionCount": 5, "contributionLevel": "FOURTH_QUARTILE"}
+            ]},
+            {"contributionDays": [
+              {"date": "2025-12-30", "contributionCount": 2, "contributionLevel": "SECOND_QUARTILE"},
+              {"date": "2025-12-31", "contributionCount": 3, "contributionLevel": "THIRD_QUARTILE"}
+            ]}
+          ]
+        },
+        "commitContributionsByRepository": [
+          {
+            "repository": {"nameWithOwner": "octocat/hello-world", "isPrivate": false},
+            "contributions": {
+              "totalCount": 300,
+              "nodes": [
+                {"occurredAt": "2025-01-03T08:00:00Z", "commitCount": 5},
+                {"occurredAt": "2025-12-31T08:00:00Z", "commitCount": 295}
+              ]
+            }
+          }
+        ]
+      }
+    }
+  }
+}

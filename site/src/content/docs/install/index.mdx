@@ -1,0 +1,108 @@
+---
+title: Ways to install
+description: Four ways to get the binary running, and what each one is good for.
+---
+
+import {
+  Tabs,
+  TabItem,
+  CardGrid,
+  LinkCard,
+  Aside,
+} from "@astrojs/starlight/components";
+
+One static binary with no runtime dependencies. How it gets onto the machine is
+the only decision, and it follows from where you want it to run.
+
+## Getting the binary
+
+<Tabs syncKey="install">
+  <TabItem label="Go">
+    ```sh
+    go install github.com/jmrplens/ghchronicle/cmd/ghchronicle@latest
+    ```
+
+    Needs a Go toolchain, and builds from source at whatever the newest tag is.
+
+  </TabItem>
+  <TabItem label="Release">
+    Take the archive for your platform from the
+    [releases page](https://github.com/jmrplens/ghchronicle/releases).
+    Archives are built for Linux, macOS and Windows, on amd64 and arm64, and
+    ship as `tar.gz` (`zip` on Windows).
+
+    ```sh
+    tar -xzf ghchronicle_1.0.0_linux_amd64.tar.gz
+    sudo install -m 755 ghchronicle /usr/local/bin/
+    ```
+
+  </TabItem>
+  <TabItem label="Container">
+    ```sh
+    docker run -v $PWD/config.yaml:/config.yaml:ro -e GITHUB_TOKEN \
+      ghcr.io/jmrplens/ghchronicle -config /config.yaml
+    ```
+
+    Distroless, static, and running as uid 65532.
+
+  </TabItem>
+  <TabItem label="Action">
+    ```yaml
+    - uses: jmrplens/ghchronicle@v1
+      with:
+        token: ${{ secrets.GHCHRONICLE_TOKEN }}
+        mode: once
+        config: .github/ghchronicle.yaml
+    ```
+
+    A composite Action that downloads a release binary, so the runner needs no
+    Go toolchain.
+
+  </TabItem>
+</Tabs>
+
+## Choosing where it runs
+
+The collector pushes to every store it supports, so it does not need to be
+reachable from anywhere. It needs to reach GitHub and to reach its databases.
+That is the only constraint, and it is what makes all four of these viable.
+
+<CardGrid>
+  <LinkCard
+    title="systemd"
+    description="A long-running service on a host you own. The default choice: the state file persists, the schedule is the tool's own, and the unit can be locked down hard."
+    href="/ghchronicle/install/systemd/"
+  />
+  <LinkCard
+    title="Docker"
+    description="The same thing in a container. Mount a writable volume for the state file and any file sink."
+    href="/ghchronicle/install/docker/"
+  />
+  <LinkCard
+    title="GitHub Actions"
+    description="No host at all. Good for the card and for a scheduled sweep; the state file does not survive between runs unless you cache it."
+    href="/ghchronicle/install/actions/"
+  />
+  <LinkCard
+    title="cron"
+    description="`-once` runs a single sweep and exits, which is all a scheduler needs. Keep the state file on a persistent path."
+    href="/ghchronicle/install/systemd/#cron-instead-of-a-service"
+  />
+</CardGrid>
+
+## The three run modes
+
+| Command                                     | Does                                                       |
+| ------------------------------------------- | ---------------------------------------------------------- |
+| `ghchronicle -config config.yaml`           | Runs forever, each family on its own cadence               |
+| `ghchronicle -config config.yaml -once`     | One sweep, then exits                                      |
+| `ghchronicle -config config.yaml -backfill` | Walks every surface to its end, waiting for the rate limit |
+
+Plus two that write nothing: `-list` prints the repositories in scope, and
+`-card ... -card-only` renders the SVG without touching a database.
+
+<Aside type="note" title="The state file is the one thing that must persist">
+  Whichever way it runs, keep `state_file` on a path that survives a restart. It
+  is what stops the full stargazer walk and the year-by-year contribution
+  backfill happening again on every run.
+</Aside>

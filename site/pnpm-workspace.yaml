@@ -1,0 +1,58 @@
+packages:
+  - .
+
+overrides:
+  lodash: 4.18.1
+  yaml: 2.9.0
+  yaml-language-server@1.20.0>yaml: 2.9.0
+  # brace-expansion ReDoS (GHSA-3jxr-9vmj-r5cp) and unbounded-expansion DoS
+  # (GHSA-mh99-v99m-4gvg, GHSA-rgw5-rvv9-x895); dev/build deps only.
+  # The 1.x line now has a fixed release on the maintenance-v1 tag (1.1.18), so
+  # both branches can be pinned to a patched version and neither needs an audit
+  # exception. Do not force 5.x onto a 1.x consumer: v1 exported the expand
+  # function directly where v5 exports an object.
+  "brace-expansion@<1.1.18": 1.1.18
+  "brace-expansion@>=3.0.0 <5.0.9": 5.0.9
+  # js-yaml quadratic CPU consumption in !!omap resolution (GHSA-5p4m-2wfm-xmqj,
+  # CVE-2026-59870), and then maxTotalMergeKeys not bounding CPU for empty
+  # merge sources (GHSA-2883-xcg3-v3hh), which 4.3.1 is itself vulnerable to.
+  # Build deps only (@astrojs/internal-helpers and friends). 4.3.2 is the
+  # v4-legacy tag: the 4.x line is what Astro depends on, and pinning 5.x onto
+  # it is a major bump an advisory fix should not drag in.
+  "js-yaml@>=4.0.0 <4.3.2": 4.3.2
+  # 7.3.1 added a pass that moves a <style> element's text into a `set:html`
+  # property, and runs it before the pass that collapses static MDX subtrees
+  # to an HTML string. Starlight turns that collapsing on, so the property is
+  # serialized as a literal attribute: Expressive Code's stylesheet shipped as
+  # `<style set:html="...">` on every page with a code block, and every code
+  # block lost its frame, its colors and its copy button. 7.3.0 predates the
+  # new pass and has no such bug. Lift this pin once a release fixes the order
+  # and scripts/check-directives.mjs passes on its build.
+  "@astrojs/markdown-remark": 7.3.0
+
+auditConfig:
+  ignoreGhsas:
+    # extract-zip symlink path traversal: the advisory lists >=2.0.2 as patched,
+    # but no release after 2.0.1 exists on npm, so there is nothing to pin to.
+    # Dev-only path (pa11y-ci > puppeteer > @puppeteer/browsers). Remove this
+    # exception once extract-zip publishes a fixed release.
+    - GHSA-jmr9-qjv8-65gv
+    # extract-zip arbitrary file writes through symlink archive entries: the
+    # same package, the same dev-only path, and the same absence of anywhere to
+    # go. This one records no patched version at all, and 2.0.1 is still the
+    # last release published. Both exceptions retire together, on the release
+    # that fixes either.
+    - GHSA-7pqw-9j4j-h8q3
+
+peerDependencyRules:
+  allowedVersions:
+    typescript: ">=6.0.0"
+
+allowBuilds:
+  esbuild: true
+  puppeteer: true
+  sharp: true
+
+# Disable the supply-chain release-age gate so dependencies always resolve to
+# the latest published versions (pnpm 11.8 applies a non-zero default otherwise).
+minimumReleaseAge: 0

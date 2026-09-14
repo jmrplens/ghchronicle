@@ -1,0 +1,19 @@
+{
+  "total_count": 1,
+  "workflow_runs": [
+    {
+      "id": 1000163134,
+      "run_number": 134,
+      "name": "CI",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "failure",
+      "head_branch": "feature/x",
+      "head_sha": "b2c3d4e5f60718293a4b5c6d7e8f901234567890",
+      "run_attempt": 2,
+      "created_at": "@NOW@",
+      "run_started_at": "@NOW@",
+      "updated_at": "@NOW@"
+    }
+  ]
+}

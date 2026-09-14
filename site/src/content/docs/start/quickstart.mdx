@@ -1,0 +1,140 @@
+---
+title: Quickstart
+description: From nothing to a first sweep, and what that first sweep does that later ones do not.
+---
+
+import { Steps, Tabs, TabItem, Aside } from "@astrojs/starlight/components";
+
+Six steps and a configuration file. The only decision worth thinking about
+before you start is which store keeps the history, and you can defer that by
+printing the points to the terminal first.
+
+## Zero to a first sweep
+
+<Steps>
+
+1. **Install the binary.**
+
+    <Tabs syncKey="install">
+      <TabItem label="Go">
+        ```sh
+        go install github.com/jmrplens/ghchronicle/cmd/ghchronicle@latest
+        ```
+      </TabItem>
+      <TabItem label="Release">
+        Take the archive for your platform from the [releases
+        page](https://github.com/jmrplens/ghchronicle/releases) and put
+        `ghchronicle` on your `PATH`.
+      </TabItem>
+      <TabItem label="Container">
+        ```sh
+        docker pull ghcr.io/jmrplens/ghchronicle
+        ```
+      </TabItem>
+    </Tabs>
+
+2. **Create a token** at `https://github.com/settings/tokens` and export it.
+
+    ```sh
+    export GITHUB_TOKEN=github_pat_...
+    ```
+
+    A classic token with `repo`, `read:packages`, `read:user`, `read:org`,
+    `security_events`, `read:public_key` and `read:gpg_key` sees everything this
+    collects. The
+    [token page](/ghchronicle/start/token/) explains which scope buys which
+    family, and why the automatic `GITHUB_TOKEN` of an Action is not enough.
+
+3. **Write the configuration.** Two decisions, and this is the whole file:
+
+    ```yaml
+    # config.yaml
+    github:
+      token: ${GITHUB_TOKEN}
+    targets:
+      user: your-login
+    sinks:
+      stdout: true # swap for influxdb once you have somewhere to put it
+    ```
+
+    Every `${VAR}` is read from the environment at start-up, so the file itself
+    holds no secrets and can be committed. Everything else has a default.
+
+    The documented version, which comments every option there is, lives in the
+    repository rather than in the install, so take it from there when you want
+    to read the rest:
+
+    ```sh
+    curl -O https://raw.githubusercontent.com/jmrplens/ghchronicle/main/config.example.yaml
+    ```
+
+4. **See what would be collected**, before spending any quota on it.
+
+    ```sh
+    ghchronicle -config config.yaml -list
+    ```
+
+    That prints the repositories in scope. Forks and archived repositories are
+    excluded by default. If something you expected is missing, this is the
+    command that tells you.
+
+5. **Run one sweep.**
+
+    ```sh
+    ghchronicle -config config.yaml -once
+    ```
+
+    With `sinks.stdout: true` the points go to the terminal as line protocol
+    instead of to a database, which is the cheapest way to see the shape of what
+    you are about to store.
+
+6. **Leave it running.**
+
+    ```sh
+    ghchronicle -config config.yaml
+    ```
+
+    Each family then runs on its own cadence: workflow runs every fifteen
+    minutes, the contribution calendar every twelve hours.
+
+</Steps>
+
+## What the first sweep does that later ones do not
+
+Three things happen once, and they are why the first run is the expensive one.
+
+| Once                                                                                                        | Then                                                      |
+| ----------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| The whole stargazer list is walked, page by page, so every star carries the date it was given               | The newest hundred of every repository ride in one GraphQL query per ten of them |
+| A month of workflow runs, so a fresh install does not chart a CI history that begins fifteen minutes ago    | Twice the cadence, and never less than two hours          |
+| Every year's contribution calendar, if `every.history` is set, back to the day the account was created      | Only the year in progress, rewritten at its cadence       |
+
+Expect a few thousand points from a first sweep of twenty repositories, and a
+few hundred from each one after.
+
+None of that is the history. The first sweep is a wider increment, and a
+dashboard at ninety days or two years then begins on the day you installed the
+collector: measured after a day of sweeps, about a fifth of the pull requests
+the repositories report, commits from the last thirty days only, and jobs for
+a tenth of the workflow runs. Run `ghchronicle -config config.yaml -backfill`
+once, before the service or right after it;
+[the backfill page](/ghchronicle/how/backfill/) says what it reaches and what
+it costs.
+
+<Aside type="caution" title="Keep the state file">
+  `state_file` is what remembers where each family got to, and
+  [six things live in it](/ghchronicle/configuration/#state_file). Delete it and
+  the next sweep re-collects everything, which costs quota and nothing else for
+  five of the six; the sixth is the commit each dependency diff starts from, and
+  the changes in the gap are not collected again.
+</Aside>
+
+## Where to go next
+
+- [Ways to install](/ghchronicle/install/) is what turns the command above into
+  something that keeps running: systemd, Docker or a scheduled Action.
+- [Dating a point](/ghchronicle/how/dating/) is the design idea everything else
+  follows from.
+- [Choosing a store](/ghchronicle/sinks/) decides which questions you will be
+  able to ask later.
+- [Cost of a sweep](/ghchronicle/api/cost/) is the measured price in API calls.

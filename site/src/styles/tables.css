@@ -1,0 +1,103 @@
+/* ============================================================
+ * tables.css, one place, one set of rules.
+ * ============================================================
+ *
+ * Tables used to be styled twice, under two section numbers: bare
+ * `table`/`th`/`td` in one place and `.sl-markdown-content table` in
+ * another, with the second silently winning on specificity. This is
+ * the merged rule set. Prose tables scroll horizontally rather than
+ * forcing the page to.
+ * ============================================================ */
+
+.sl-markdown-content table {
+	/* No `display: block` and no overflow here: the wrapper owns the scroll,
+	 * and this rule owning it too is what made the head and the body size
+	 * their columns apart. */
+	width: 100%;
+	border-collapse: separate;
+	border-spacing: 0;
+	border-radius: var(--rb-radius);
+	font-size: 0.85rem;
+}
+
+.sl-markdown-content th {
+	background: var(--sl-color-accent-low);
+	font-weight: 700;
+	text-align: left;
+	white-space: nowrap;
+}
+
+.sl-markdown-content td,
+.sl-markdown-content th {
+	padding: 0.625rem 0.875rem;
+	border-bottom: 1px solid var(--rb-border);
+}
+
+.sl-markdown-content tr:last-child td {
+	border-bottom: none;
+}
+
+.sl-markdown-content tr:hover td {
+	background: var(--rb-surface);
+}
+
+/* ------------------------------------------------------------
+ * The scroll lives on a wrapper, not on the table.
+ *
+ * `display: block; overflow-x: auto` on the table itself is the
+ * usual shortcut and it quietly breaks the table: the property
+ * drops the table layout, so the head and the body size their
+ * columns independently and a narrow screen shows a header of four
+ * compressed columns above rows twice as wide.
+ *
+ * src/lib/rehype-scrollable-tables.mjs wraps every prose table in
+ * `.table-scroll` at build time. The table keeps `display: table`
+ * and sizes its columns as one; the wrapper scrolls, and the fade
+ * on its trailing edge is the only cue a reader on a phone has
+ * that there is more to the right.
+ * ------------------------------------------------------------ */
+.sl-markdown-content .table-scroll {
+	overflow-x: auto;
+	border-radius: var(--rb-radius);
+	/* The fade rides the scroll: painted against the page, pinned to
+	 * the edges of the scroll port, and gone once the end is reached. */
+	background:
+		linear-gradient(
+				to right,
+				var(--rb-page) 30%,
+				rgb(from var(--rb-page) r g b / 0%)
+			)
+			left center / 2rem 100% no-repeat,
+		linear-gradient(
+				to left,
+				var(--rb-page) 30%,
+				rgb(from var(--rb-page) r g b / 0%)
+			)
+			right center / 2rem 100% no-repeat;
+	background-attachment: local, local;
+}
+
+.sl-markdown-content .table-scroll:focus-visible {
+	outline: 2px solid var(--rb-accent);
+	outline-offset: 2px;
+}
+
+.sl-markdown-content .table-scroll > table {
+	display: table;
+	/* A floor, not a width. `max-content` alone leaves the browser free to
+	 * wrap a four-column table into the viewport, which on a phone turns
+	 * "dated, one point per day" into five lines of one word. The floor makes
+	 * the wrapper scroll instead, which is the behaviour the fade advertises.
+	 * 34rem is the narrowest a four-column reference table stays readable at. */
+	width: 100%;
+	min-width: max(100%, 34rem);
+}
+
+.sl-markdown-content td {
+	vertical-align: top;
+}
+
+.sl-markdown-content td code,
+.sl-markdown-content th code {
+	white-space: nowrap;
+}

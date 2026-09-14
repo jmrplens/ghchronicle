@@ -1,0 +1,64 @@
+{
+  "data": {
+    "repository": {
+      "discussions": {
+        "totalCount": 1,
+        "pageInfo": {"hasNextPage": false, "endCursor": "Y3Vyc29yOjE="},
+        "nodes": [
+          {
+            "number": 867,
+            "title": "Cannot find the generated mocks",
+            "url": "https://github.com/octocat/hello-world/discussions/867",
+            "createdAt": "2024-04-01T01:59:12Z",
+            "updatedAt": "2024-04-04T01:59:12Z",
+            "isAnswered": true,
+            "upvoteCount": 2,
+            "answerChosenAt": "2024-04-03T01:59:12Z",
+            "answerChosenBy": {"login": "lapo4719"},
+            "answer": {"author": {"login": "mvandervoord"}},
+            "closed": true,
+            "closedAt": "2024-04-04T01:59:12Z",
+            "stateReason": "RESOLVED",
+            "author": {"login": "lapo4719"},
+            "category": {"name": "Q&A", "emoji": ":pray:", "isAnswerable": true},
+            "reactions": {"totalCount": 1},
+            "comments": {
+              "totalCount": 2,
+              "nodes": [
+                {
+                  "databaseId": 9724102,
+                  "createdAt": "2024-04-02T01:00:00Z",
+                  "url": "https://github.com/octocat/hello-world/discussions/867#discussioncomment-9724102",
+                  "upvoteCount": 1,
+                  "isAnswer": false,
+                  "author": {"login": "octocat"},
+                  "replies": {
+                    "totalCount": 1,
+                    "nodes": [
+                      {
+                        "databaseId": 9724110,
+                        "createdAt": "2024-04-02T06:00:00Z",
+                        "url": "https://github.com/octocat/hello-world/discussions/867#discussioncomment-9724110",
+                        "upvoteCount": 0,
+                        "author": {"login": "lapo4719"}
+                      }
+                    ]
+                  }
+                },
+                {
+                  "databaseId": 9724500,
+                  "createdAt": "2024-04-03T01:00:00Z",
+                  "url": "https://github.com/octocat/hello-world/discussions/867#discussioncomment-9724500",
+                  "upvoteCount": 4,
+                  "isAnswer": true,
+                  "author": {"login": "mvandervoord"},
+                  "replies": {"totalCount": 0, "nodes": []}
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  }
+}

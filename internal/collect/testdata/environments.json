@@ -1,0 +1,41 @@
+{
+  "total_count": 3,
+  "environments": [
+    {
+      "id": 161088068,
+      "name": "production",
+      "url": "https://api.github.com/repos/octocat/hello-world/environments/production",
+      "html_url": "https://github.com/octocat/hello-world/deployments/activity_log?environments_filter=production",
+      "created_at": "2025-01-01T00:00:00Z",
+      "updated_at": "2026-06-01T00:00:00Z",
+      "can_admins_bypass": false,
+      "protection_rules": [
+        {"id": 52082796, "type": "required_reviewers"},
+        {"id": 52082797, "type": "branch_policy"}
+      ],
+      "deployment_branch_policy": {"protected_branches": false, "custom_branch_policies": true}
+    },
+    {
+      "id": 161088069,
+      "name": "github-pages",
+      "url": "https://api.github.com/repos/octocat/hello-world/environments/github-pages",
+      "html_url": "https://github.com/octocat/hello-world/deployments/activity_log?environments_filter=github-pages",
+      "created_at": "2026-04-11T22:21:29Z",
+      "updated_at": "2026-04-11T22:21:29Z",
+      "can_admins_bypass": true,
+      "protection_rules": [{"id": 52082798, "type": "branch_policy"}],
+      "deployment_branch_policy": {"protected_branches": true, "custom_branch_policies": false}
+    },
+    {
+      "id": 161088070,
+      "name": "PYPI_TOKEN",
+      "url": "https://api.github.com/repos/octocat/hello-world/environments/PYPI_TOKEN",
+      "html_url": "https://github.com/octocat/hello-world/deployments/activity_log?environments_filter=PYPI_TOKEN",
+      "created_at": "2026-09-01T16:30:15Z",
+      "updated_at": "2026-09-01T16:30:15Z",
+      "can_admins_bypass": true,
+      "protection_rules": [],
+      "deployment_branch_policy": null
+    }
+  ]
+}

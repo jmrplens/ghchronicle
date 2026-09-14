@@ -1,0 +1,18 @@
+{
+    "state": "not-configured",
+    "languages": [
+        "actions",
+        "go",
+        "javascript",
+        "javascript-typescript",
+        "python",
+        "ruby",
+        "typescript"
+    ],
+    "query_suite": "default",
+    "threat_model": "remote",
+    "updated_at": null,
+    "schedule": null,
+    "runner_type": "standard",
+    "runner_label": null
+}

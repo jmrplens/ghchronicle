@@ -1,0 +1,21 @@
+{
+  "data": {
+    "pulls": {
+      "issueCount": 1
+    },
+    "answers": {
+      "discussionCount": 1
+    },
+    "user": {
+      "createdAt": "2024-03-05T08:00:00Z",
+      "repositories": {
+        "nodes": [
+          {
+            "nameWithOwner": "octocat/hello-world",
+            "stargazerCount": 4321
+          }
+        ]
+      }
+    }
+  }
+}

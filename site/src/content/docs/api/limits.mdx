@@ -1,0 +1,95 @@
+---
+title: What GitHub will not give
+description: The endpoints that are verified not to work on a personal account, written down so nobody rediscovers them.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+Every entry here was checked against the live API. It is written down so nobody
+spends an afternoon finding it out again, and so that a missing panel can be
+told apart from a broken collector.
+
+## Statistics that never arrive
+
+`stats/code_frequency` and `stats/contributors` answer **202 with an empty body,
+indefinitely**, on a personal account. A 202 normally means "still being
+computed, ask again", and for these two the next answer is another 202. They
+are deliberately not called.
+
+The lines added and removed that `code_frequency` would have given come from
+the commits collector instead, per commit rather than per week, attributed to
+an author and dated to the commit. `stats/participation` and `stats/punch_card`
+do work and are used.
+
+Ten seconds is all it takes to see it on your own account:
+
+```sh
+curl -s -o /dev/null -w '%{http_code}\n' \
+  -H "Authorization: Bearer $GITHUB_TOKEN" \
+  https://api.github.com/repos/OWNER/REPO/stats/code_frequency   # 202, for ever
+curl -s -o /dev/null -w '%{http_code}\n' \
+  -H "Authorization: Bearer $GITHUB_TOKEN" \
+  https://api.github.com/repos/OWNER/REPO/stats/participation    # 200
+```
+
+## Billing
+
+| Endpoint                                | Answer   |
+| --------------------------------------- | -------- |
+| `/settings/billing/actions`             | 410 Gone |
+| `/settings/billing/packages`            | 410 Gone |
+| `/settings/billing/shared-storage`      | 410 Gone |
+| `/user/settings/billing/usage`          | 404      |
+| `/users/{login}/settings/billing/usage` | works    |
+
+Only the last form works for a personal account, and it returns full RFC 3339
+timestamps in a field its documentation describes as a date.
+
+## Organisation and enterprise only
+
+Custom repository properties, classic projects, cost centres and the audit log.
+A personal account cannot see any of them, however the token is scoped.
+
+## Endpoints that answer, but say nothing
+
+- **`workflows/{id}/timing`** returns 200 with an always-empty `billable`
+  object. It looks like the source for per-workflow minutes and is not.
+- **`stargazers/history`** returns only the last thirty weeks. It does not
+  replace the `starred_at` walk; this was checked on three repositories.
+- **`/user/installations`** returns 403 without a GitHub App.
+
+## GraphQL is wrong about packages
+
+GraphQL reports zero packages for an account while REST lists them. The pretty
+query is simply wrong here, so packages come from REST, at one call per package
+for its versions.
+
+## Traffic goes stale rather than empty
+
+A repository with no traffic does not return an empty window. GitHub keeps
+returning the last fourteen days that _had_ data, so the window can end weeks
+ago. The collector records what it is told.
+
+<Aside type="note" title="This is why gh_security_feature exists">
+  Several of the entries above have the same shape: an endpoint that answers
+  nothing is indistinguishable from a feature that is switched off, which is
+  indistinguishable from a repository with nothing to report.
+  `gh_security_feature` records explicitly which features are enabled, so "no
+  alerts" and "no data" stop looking alike on a dashboard.
+</Aside>
+
+## What this means for a sweep
+
+None of the above is treated as a failure. `ghapi.UnavailableError` (403 or
+404: the feature is switched off) and `ghapi.NotReadyError` (202: GitHub is
+still computing) both mean "there is nothing here", and the sweep continues to
+the next
+repository. The activity feeds have their own version of this: past their
+ceiling GitHub answers **422 "pagination is limited for this resource"**, which
+is read as the end of the data rather than as an error.
+
+## Where to go next
+
+- [Rate limits](/ghchronicle/api/) is the other half of this: what the calls
+  that do work cost, and why a 304 costs nothing.
+- [Cost of a sweep](/ghchronicle/api/cost/) prices every family.

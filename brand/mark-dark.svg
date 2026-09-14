@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="ghchronicle">
+  <g fill="#3fb950">
+    <rect x="8.00" y="8.00" width="7.60" height="7.60" rx="2.28" opacity="0.18"/>
+    <rect x="17.60" y="8.00" width="7.60" height="7.60" rx="2.28" opacity="0.18"/>
+    <rect x="27.20" y="8.00" width="7.60" height="7.60" rx="2.28" opacity="0.32"/>
+    <rect x="36.80" y="8.00" width="7.60" height="7.60" rx="2.28" opacity="0.55"/>
+    <rect x="46.40" y="8.00" width="7.60" height="7.60" rx="2.28" opacity="1"/>
+    <rect x="8.00" y="17.60" width="7.60" height="7.60" rx="2.28" opacity="0.18"/>
+    <rect x="17.60" y="17.60" width="7.60" height="7.60" rx="2.28" opacity="0.32"/>
+    <rect x="27.20" y="17.60" width="7.60" height="7.60" rx="2.28" opacity="0.55"/>
+    <rect x="36.80" y="17.60" width="7.60" height="7.60" rx="2.28" opacity="1"/>
+    <rect x="46.40" y="17.60" width="7.60" height="7.60" rx="2.28" opacity="0.55"/>
+    <rect x="8.00" y="27.20" width="7.60" height="7.60" rx="2.28" opacity="0.32"/>
+    <rect x="17.60" y="27.20" width="7.60" height="7.60" rx="2.28" opacity="0.55"/>
+    <rect x="27.20" y="27.20" width="7.60" height="7.60" rx="2.28" opacity="1"/>
+    <rect x="36.80" y="27.20" width="7.60" height="7.60" rx="2.28" opacity="0.55"/>
+    <rect x="46.40" y="27.20" width="7.60" height="7.60" rx="2.28" opacity="0.32"/>
+    <rect x="8.00" y="36.80" width="7.60" height="7.60" rx="2.28" opacity="0.55"/>
+    <rect x="17.60" y="36.80" width="7.60" height="7.60" rx="2.28" opacity="1"/>
+    <rect x="27.20" y="36.80" width="7.60" height="7.60" rx="2.28" opacity="0.55"/>
+    <rect x="36.80" y="36.80" width="7.60" height="7.60" rx="2.28" opacity="0.32"/>
+    <rect x="46.40" y="36.80" width="7.60" height="7.60" rx="2.28" opacity="0.18"/>
+    <rect x="8.00" y="46.40" width="7.60" height="7.60" rx="2.28" opacity="1"/>
+    <rect x="17.60" y="46.40" width="7.60" height="7.60" rx="2.28" opacity="0.55"/>
+    <rect x="27.20" y="46.40" width="7.60" height="7.60" rx="2.28" opacity="0.32"/>
+    <rect x="36.80" y="46.40" width="7.60" height="7.60" rx="2.28" opacity="0.18"/>
+    <rect x="46.40" y="46.40" width="7.60" height="7.60" rx="2.28" opacity="0.18"/>
+  </g>
+</svg>

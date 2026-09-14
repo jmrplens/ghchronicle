@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="ghchronicle">
+  <g fill="#3fb950">
+    <rect x="8.00" y="8.00" width="12.00" height="12.00" rx="3.60" opacity="0.2"/>
+    <rect x="24.00" y="8.00" width="12.00" height="12.00" rx="3.60" opacity="0.42"/>
+    <rect x="40.00" y="8.00" width="12.00" height="12.00" rx="3.60" opacity="1"/>
+    <rect x="8.00" y="24.00" width="12.00" height="12.00" rx="3.60" opacity="0.42"/>
+    <rect x="24.00" y="24.00" width="12.00" height="12.00" rx="3.60" opacity="1"/>
+    <rect x="40.00" y="24.00" width="12.00" height="12.00" rx="3.60" opacity="0.42"/>
+    <rect x="8.00" y="40.00" width="12.00" height="12.00" rx="3.60" opacity="1"/>
+    <rect x="24.00" y="40.00" width="12.00" height="12.00" rx="3.60" opacity="0.42"/>
+    <rect x="40.00" y="40.00" width="12.00" height="12.00" rx="3.60" opacity="0.2"/>
+  </g>
+</svg>

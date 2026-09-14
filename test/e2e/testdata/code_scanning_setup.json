@@ -1,0 +1,16 @@
+{
+    "state": "configured",
+    "languages": [
+        "actions",
+        "javascript",
+        "javascript-typescript",
+        "python",
+        "typescript"
+    ],
+    "query_suite": "default",
+    "threat_model": "remote",
+    "updated_at": "2026-07-26T02:55:11Z",
+    "schedule": "weekly",
+    "runner_type": "standard",
+    "runner_label": ""
+}

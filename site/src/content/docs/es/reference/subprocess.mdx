@@ -1,0 +1,296 @@
+---
+title: Llamarlo desde un programa
+description: No hay biblioteca de Go. Lo que hay es una pasada, NDJSON por la salida estándar, y buenas razones para no llamarlo en bucle.
+---
+
+import { Aside, Tabs, TabItem } from "@astrojs/starlight/components";
+
+<Aside type="caution" title="No hay biblioteca de Go">
+  Todos los paquetes de esta herramienta viven bajo `internal/`, y Go prohíbe
+  esa importación desde fuera del módulo. La vía del subproceso de esta página
+  no es un apaño para algo que se te haya escapado: es la interfaz.
+</Aside>
+
+```text
+main.go:6:2: use of internal package github.com/jmrplens/ghchronicle/internal/collect not allowed
+```
+
+Lo que hay en su lugar es un binario que hace una pasada, escribe un objeto JSON
+por línea en la salida estándar y termina. Cualquier cosa capaz de lanzar un
+proceso y leer una tubería puede usarlo, en cualquier lenguaje, y obtiene los
+mismos puntos que recibiría una base de datos en vez de una segunda pasada por
+la API.
+
+## Una configuración para una sola pregunta
+
+```yaml
+github:
+  token: ${GITHUB_TOKEN}
+  reserve_rate: 500
+
+targets:
+  repos: [acme/telemetry]
+
+sinks:
+  stdout: true
+  stdout_format: json
+
+state_file: /tmp/ghchronicle-adhoc.json
+
+log:
+  level: warn
+```
+
+Hay dos cosas de `targets` que conviene acertar a la primera.
+
+**Nombra repositorios, no la cuenta.** `repos` es una inclusión, no un filtro:
+añadir `user: acme` al lado no acota nada, descubre la cuenta entera y la
+recoge también. `-list` es la forma barata de comprobarlo antes de gastar cuota
+en ello.
+
+```sh
+ghchronicle -config adhoc.yaml -list
+```
+
+```text
+acme/telemetry
+```
+
+**Omitir `user` apaga once familias sin coste.** Los colectores de cuenta
+(`account`, `totals`, `ratelimit`, `events`, `notifs`, `billing`, `profile`,
+`outbound`, `history`, `achievements` y `keys`) no tienen ninguna cuenta por la
+que preguntar y se saltan, que es casi todo lo que una aplicación que pregunta
+por un solo repositorio no quiere pagar.
+
+El log va siempre a la salida de error, sea cual sea el nivel, así que la salida
+estándar lleva datos y nada más. Eso es lo que hace que la tubería se pueda
+analizar sin filtrarla antes.
+
+## La orden
+
+```sh
+ghchronicle -config adhoc.yaml -once > points.ndjson 2> sweep.log
+```
+
+`-once` hace una sola pasada y termina. No arranca el exportador ni ocupa
+ningún puerto, así que no choca con una instancia permanente en la misma
+máquina.
+
+## Qué sale
+
+Tres líneas de salida, de la cuenta de demostración que usan todos los
+ejemplos de aquí:
+
+```json
+{"time":"2026-09-08T16:08:17.651862791Z","measurement":"gh_repo","tags":{"archived":"false","default_branch":"main","fork":"false","full_name":"acme/telemetry","language":"Go","license":"apache-2.0","owner":"acme","repo":"telemetry","visibility":"public"},"fields":{"age_days":1290,"days_since_push":0,"forks":21,"network":21,"open_issues":9,"repo_id":1043778215,"size_kb":18422,"stars":148,"url":"https://github.com/acme/telemetry","watchers":11}}
+{"time":"2026-09-07T00:00:00Z","measurement":"gh_traffic","tags":{"full_name":"acme/telemetry","kind":"clones","owner":"acme","repo":"telemetry"},"fields":{"count":94,"uniques":71,"url":"https://github.com/acme/telemetry/graphs/traffic"}}
+{"time":"2026-09-08T16:08:17.651862791Z","measurement":"gh_release","tags":{"draft":"false","full_name":"acme/telemetry","owner":"acme","prerelease":"false","repo":"telemetry","tag":"v2.4.0"},"fields":{"age_days":22,"assets":4,"downloads":1840,"url":"https://github.com/acme/telemetry/releases/tag/v2.4.0"}}
+```
+
+Cuatro claves, y son las mismas cuatro en todos los puntos:
+
+| Clave         | Qué contiene                                                       |
+| ------------- | ------------------------------------------------------------------ |
+| `time`        | La fecha en que ocurrió la cosa, RFC 3339. No la hora de la pasada |
+| `measurement` | Qué clase de cosa es, siempre con el prefijo `gh_`                 |
+| `tags`        | Cadenas, y solo cadenas. Juntas identifican la serie               |
+| `fields`      | Los valores: números, booleanos y alguna cadena suelta como `url`  |
+
+La distinción de `time` es el diseño entero, y se ve en esas tres líneas. El
+punto de tráfico lleva la fecha `2026-09-07T00:00:00Z` porque ese es el día en
+que ocurrieron esos 94 clones, y todas las pasadas de la próxima quincena lo
+volverán a ofrecer con la misma fecha. El punto del repositorio lleva el momento
+de la pasada, porque "148 estrellas" es cierto ahora y no tiene otra fecha que
+llevar. La release lleva su antigüedad en un campo por la misma razón.
+
+Todas las medidas y todos los campos están en
+[Medidas](/ghchronicle/es/collectors/measurements/).
+
+`stdout_format: influx` imprime line protocol de InfluxDB en su lugar, que es la
+mejor opción cuando el otro extremo ya lo habla.
+
+## Acotarlo a lo que te interesa
+
+Incluso contra un solo repositorio, una pasada ejecuta veintiuna familias: las
+veintitrés por repositorio menos `deps` y `joblogs`, que vienen apagadas.
+`every` las apaga, y `default` es la capa que lo hace en una línea: pon todo a
+`0` y luego nombra lo que quieras de vuelta.
+
+```yaml
+every:
+  default: 0
+  families:
+    traffic: 6h
+```
+
+Esa ejecución cuesta cinco llamadas a la API, una para resolver el repositorio
+nombrado en `targets` y cuatro para la familia de tráfico, e imprime 48 objetos:
+28 `gh_traffic`, 10 `gh_traffic_path` y 10 `gh_traffic_referrer`.
+
+<Aside type="tip" title="Un default de 0 nunca enciende las apagadas">
+  `deps`, `history` y `joblogs` vienen con una cadencia interna de `0`, y ni
+  `default` ni `every.groups` alcanzan a una familia que viene apagada.
+  Nombrarla bajo `families:` es la única forma de encender una, así que la
+  configuración de arriba recoge tráfico y nada más, el grafo de dependencias
+  incluido.
+</Aside>
+
+Una familia no es una medida, que es la otra mitad de esto: `repo` por sí sola
+emite `gh_repo`, `gh_repo_language`, `gh_repo_topic`, `gh_release` y varias más.
+Apagar la familia es lo que ahorra llamadas a la API; filtrar el flujo es lo que
+te ahorra leerlas.
+
+```sh
+ghchronicle -config adhoc.yaml -once | grep '"gh_traffic"'
+ghchronicle -config adhoc.yaml -once | jq -c 'select(.measurement == "gh_repo") | {repo: .tags.full_name, stars: .fields.stars}'
+```
+
+Un nombre de familia mal escrito es un error de arranque, y el mensaje enumera
+todos los nombres que existen, así que no hace falta guardar una copia de la
+lista en ninguna parte.
+
+## Leerlo desde otro programa
+
+En cualquier lenguaje, porque el contrato es una tubería y una línea de JSON.
+Aquí Python, porque un programa en Go no puede importar esto y acabaría
+lanzando el mismo subproceso.
+
+```python
+import json
+import subprocess
+
+proc = subprocess.Popen(
+    ["ghchronicle", "-config", "adhoc.yaml", "-once"],
+    stdout=subprocess.PIPE,
+    stderr=subprocess.DEVNULL,
+    text=True,
+)
+
+stars = {}
+for line in proc.stdout:
+    point = json.loads(line)
+    if point["measurement"] == "gh_repo":
+        stars[point["tags"]["full_name"]] = point["fields"]["stars"]
+
+if proc.wait() != 0:
+    raise SystemExit("la pasada falló; repítela sin silenciar la salida de error")
+
+print(stars)
+```
+
+```text
+{'acme/telemetry': 148}
+```
+
+Lee la tubería según se va llenando, no después de que el proceso termine. El
+destino vacía su búfer una vez por familia, así que quien consume ve los puntos
+de tráfico mientras el colector de commits sigue trabajando, y una pasada sobre
+una cuenta entera tarda minutos. Esperar al final significa además tenerlo todo
+en memoria: sobre un puñado de repositorios con actividad, solo la familia
+`actions` puede producir más de diez mil objetos en una sola pasada.
+
+Mandar el log a `DEVNULL` está bien para un programa al que solo le importa si
+la pasada salió bien. Es el valor por defecto equivocado mientras estás
+escribiendo ese programa: consérvalo y léelo.
+
+## Dos preguntas más pequeñas
+
+<Tabs syncKey="adhoc-cheap">
+  <TabItem label="-list">
+    Imprime los repositorios en alcance, un nombre completo por línea, y cuesta
+    las llamadas de descubrimiento y nada más.
+
+    ```sh
+    ghchronicle -config adhoc.yaml -list
+    ```
+
+  </TabItem>
+  <TabItem label="-card">
+    Hace igualmente una pasada completa, pero escribe un SVG autocontenido sin
+    ninguna base de datos configurada. La tarjeta va de una cuenta y no de un
+    repositorio, así que necesita una configuración con `targets.user`: la de
+    arriba no lo tiene, y recibe `render: card has no login` y un 1. Ver
+    [la tarjeta](/ghchronicle/es/card/).
+
+    ```sh
+    ghchronicle -config account.yaml -card summary.svg -card-only
+    ```
+
+  </TabItem>
+</Tabs>
+
+## Códigos de salida
+
+| Código | Significa                                                                                                                       |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| 0      | La pasada se ejecutó                                                                                                            |
+| 1      | No pudo arrancar, o no pudo listar los repositorios: no hay fichero de configuración, o no es válido, o GitHub rechazó el token |
+| 2      | Una opción desconocida. Es el paquete flag de Go, y ya ha impreso el uso                                                        |
+
+El cero responde a "¿se ejecutó la pasada?", no a "¿funcionó todo?". Un colector
+que falla se registra y la pasada continúa, porque un repositorio con una
+función apagada no debe detener la pasada de los otros cuarenta.
+
+```text
+level=ERROR msg="collector failed" family=issueevents repo=acme/parser err="/repos/acme/parser/issues/events?per_page=100&page=1: 504 Gateway Timeout"
+```
+
+Quien llame y necesite enterarse de eso tiene que leer la salida de error. No
+hay código de salida para ello, a propósito: en una cuenta grande alguna familia
+falla en algún sitio casi todas las pasadas, y un estado que lo dijera estaría
+permanentemente en rojo.
+
+Matar el proceso también suele dar un 1. `SIGTERM` y `SIGINT` cancelan la
+pasada, lo que ya está en la tubería se queda ahí, y la ejecución termina con
+`ghchronicle: context canceled`. Suele, porque el código depende de dónde caiga
+la señal: durante el descubrimiento es un 1 que lleva el error de la propia
+petición cancelada, y en el último repositorio de una familia se registra como
+un fallo de colector y la pasada termina igualmente con un 0. Quien llame con su
+propio plazo debería tratar una muerte que ha ordenado él como "incompleta", en
+vez de leer el código de salida para saberlo.
+
+## Llamarlo en bucle es la forma equivocada
+
+Una pasada cuesta llamadas a la API: cuatro por repositorio para el tráfico,
+tres por repositorio más dos puntos de GraphQL por cada diez repositorios para
+la familia del repositorio, un punto de GraphQL por repositorio para commits y
+uno o dos para issues.
+[Coste de una pasada](/ghchronicle/es/api/cost/) tiene la tabla medida. El
+presupuesto son 5000 llamadas REST por hora para todo el token, compartidas con
+lo demás que lo use, y el colector frena antes de gastar las últimas
+`reserve_rate`: detiene una familia en vez de cruzar esa línea, y lo dice en el
+log.
+
+Así que un programa que llame a esto en cada petición, o con un temporizador
+apretado, recibe una pasada vacía y un aviso, no números más frescos. De ahí se
+siguen dos cosas, y la segunda sorprende.
+
+**Cachea la respuesta.** Estos números se mueven en escala de horas. La propia
+ventana de tráfico de GitHub se actualiza una vez al día.
+
+**Espera que la segunda ejecución no imprima nada.** Una familia solo se recoge
+cuando su cadencia dice que toca, y `-once` la marca como ejecutada en el
+fichero de estado. Dos pasadas con un minuto de diferencia dan por tanto un
+flujo completo y luego uno vacío, con código de salida 0 las dos veces, lo que
+parece un fallo y es el freno funcionando. En nivel `info` el log lo dice por
+ausencia:
+
+```text
+level=INFO msg="repositories discovered" count=1
+level=INFO msg="rate budget" bucket=core remaining=3949 limit=5000
+level=INFO msg="sweep finished"
+```
+
+Ninguna línea `written`, porque no tocaba nada. Borrar el fichero de estado
+recoge todo otra vez a precio completo, incluido el recorrido único de todas las
+estrellas, así que apunta `state_file` a un sitio que controle la aplicación y
+déjalo ahí.
+
+<Aside type="note" title="Cuando no es puntual">
+  Si lo que el programa quiere es un flujo continuo y no una respuesta ahora,
+  deja de lanzarlo: ejecútalo como servicio y dale un
+  [destino](/ghchronicle/es/sinks/). El destino de fichero escribe este mismo
+  JSON en un fichero rotatorio para cualquier cosa que lo siga, y los destinos
+  de push llegan a un almacén que el programa puede consultar sin tocar
+  GitHub.
+</Aside>

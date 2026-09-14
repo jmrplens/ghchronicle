@@ -1,0 +1,222 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+version: 2
+
+project_name: ghchronicle
+
+before:
+  hooks:
+    - go mod download
+
+builds:
+  - id: ghchronicle
+    main: ./cmd/ghchronicle
+    binary: ghchronicle
+    env:
+      # A static binary is what lets docker/Dockerfile.goreleaser copy it onto
+      # distroless `static`, an image with no C library and no dynamic loader.
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    # No -buildmode=pie, where gitlab-mcp-server passes it: a deliberate
+    # difference, and the owner's decision, to be kept when the two are aligned
+    # again. A PIE binary needs a dynamic loader to start, and the image
+    # docker/Dockerfile.goreleaser copies this one onto is distroless `static`,
+    # which has none, so the container fails with "exec /ghchronicle: no such
+    # file or directory". gitlab-mcp-server can pass the flag only because its
+    # runtime image is Alpine, which ships a loader.
+    flags:
+      - -trimpath
+    ldflags:
+      # main.version is what the release number reaches the binary by, and the
+      # tag is what names it: the VERSION file is a floor the root package
+      # embeds, and the preflight job holds the two equal before this runs.
+      # The date is the commit's, not the build's, so rebuilding the same tag
+      # produces the same binary; mod_timestamp below does the same for the
+      # file's mtime.
+      - -s -w -X main.version={{ .Version }} -X main.commit={{ .ShortCommit }} -X main.date={{ .CommitDate }}
+    mod_timestamp: "{{ .CommitTimestamp }}"
+
+archives:
+  - id: ghchronicle
+    ids:
+      - ghchronicle
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    formats:
+      - tar.gz
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+
+checksum:
+  name_template: checksums.txt
+
+# `archive`, not `binary`: this project ships tar.gz and zip archives, and the
+# artifact filter has to name the kind that actually exists or GoReleaser logs
+# "no artifacts matching current filters" and ships no SBOM at all.
+sboms:
+  - id: archive
+    artifacts: archive
+    documents:
+      - "{{ .ArtifactName }}.spdx.json"
+
+# Keyless signing: the identity is the workflow that ran, recorded in a public
+# transparency log, so there is no private key for anyone to lose or leak. The
+# checksum file covers every archive through its digest; the SBOMs are signed
+# in their own right because they are consumed separately from the archives.
+signs:
+  - id: checksums
+    cmd: cosign
+    signature: "${artifact}.sigstore.json"
+    args:
+      - sign-blob
+      - "--bundle=${signature}"
+      - "${artifact}"
+      - --yes
+    artifacts: checksum
+  - id: sboms
+    cmd: cosign
+    signature: "${artifact}.sigstore.json"
+    args:
+      - sign-blob
+      - "--bundle=${signature}"
+      - "${artifact}"
+      - --yes
+    artifacts: sbom
+
+changelog:
+  use: github
+  sort: asc
+  groups:
+    - title: Features
+      regexp: '^.*?feat(\([[:word:]]+\))??!?:.+$'
+      order: 0
+    - title: Bug fixes
+      regexp: '^.*?fix(\([[:word:]]+\))??!?:.+$'
+      order: 1
+    - title: Performance
+      regexp: '^.*?perf(\([[:word:]]+\))??!?:.+$'
+      order: 2
+    - title: Refactoring
+      regexp: '^.*?refactor(\([[:word:]]+\))??!?:.+$'
+      order: 3
+    - title: Documentation
+      regexp: '^.*?docs(\([[:word:]]+\))??!?:.+$'
+      order: 4
+    - title: Build and dependencies
+      regexp: '^.*?(build|chore|ci|deps)(\([[:word:]]+\))??!?:.+$'
+      order: 5
+    - title: Other
+      order: 99
+  filters:
+    exclude:
+      - "^test:"
+      - "^style:"
+      - Merge pull request
+      - Merge branch
+
+# One entry per registry rather than one entry listing both, so that a missing
+# Docker Hub credential costs the Docker Hub image and nothing else: without
+# the split, a release on a repository whose secrets nobody has created yet
+# would fail after the binaries were already published. The cost is that the
+# image is built twice, once per entry.
+#
+# GoReleaser assembles the multi-architecture manifest itself, so there is no
+# docker_manifests block: on a real release it runs a single `buildx build
+# --platform linux/amd64,linux/arm64 --push`, which is also why the index
+# annotations below are accepted. A local `goreleaser release --snapshot`
+# builds each platform separately with --load instead, and buildx refuses index
+# annotations on a single-platform export, so a local dry run needs
+# `--skip=docker`.
+dockers_v2:
+  - id: ghcr
+    images:
+      - "ghcr.io/jmrplens/ghchronicle"
+    tags:
+      - "v{{ .Version }}"
+      - latest
+    platforms:
+      - linux/amd64
+      - linux/arm64
+    dockerfile: docker/Dockerfile.goreleaser
+    # Labels describe each architecture's image; GHCR reads a multi-arch
+    # package page's description from the INDEX annotations instead, so the
+    # two say the same thing on purpose. Reword them together, and keep them
+    # in step with the LABEL block in the Dockerfile at the repository root.
+    labels: &oci_labels
+      "org.opencontainers.image.title": "ghchronicle"
+      "org.opencontainers.image.description": "Collects everything GitHub will tell you about an account, and keeps it with the date it happened"
+      "org.opencontainers.image.source": "https://github.com/jmrplens/ghchronicle"
+      "org.opencontainers.image.url": "https://github.com/jmrplens/ghchronicle"
+      "org.opencontainers.image.documentation": "https://github.com/jmrplens/ghchronicle/tree/main/docs"
+      "org.opencontainers.image.licenses": "MIT"
+      "org.opencontainers.image.vendor": "jmrplens"
+      "org.opencontainers.image.version": "{{ .Version }}"
+      "org.opencontainers.image.revision": "{{ .FullCommit }}"
+      "org.opencontainers.image.created": "{{ .CommitDate }}"
+    annotations: &oci_annotations
+      "index:org.opencontainers.image.title": "ghchronicle"
+      "index:org.opencontainers.image.description": "Collects everything GitHub will tell you about an account, and keeps it with the date it happened"
+      "index:org.opencontainers.image.source": "https://github.com/jmrplens/ghchronicle"
+      "index:org.opencontainers.image.url": "https://github.com/jmrplens/ghchronicle"
+      "index:org.opencontainers.image.documentation": "https://github.com/jmrplens/ghchronicle/tree/main/docs"
+      "index:org.opencontainers.image.licenses": "MIT"
+      "index:org.opencontainers.image.vendor": "jmrplens"
+      "index:org.opencontainers.image.version": "{{ .Version }}"
+      "index:org.opencontainers.image.revision": "{{ .FullCommit }}"
+      "index:org.opencontainers.image.created": "{{ .CommitDate }}"
+
+  - id: dockerhub
+    # Docker Hub is published only when the release job logged in. The workflow
+    # sets DOCKERHUB_USERNAME on the GoReleaser step exactly when both Docker
+    # Hub secrets exist, and it warns when it does not, so a repository that
+    # has never had those secrets still gets a complete release minus this one
+    # image.
+    disable: '{{ not (isEnvSet "DOCKERHUB_USERNAME") }}'
+    images:
+      - "docker.io/jmrplens/ghchronicle"
+    tags:
+      - "v{{ .Version }}"
+      - latest
+    platforms:
+      - linux/amd64
+      - linux/arm64
+    dockerfile: docker/Dockerfile.goreleaser
+    labels: *oci_labels
+    annotations: *oci_annotations
+
+release:
+  github:
+    owner: jmrplens
+    name: ghchronicle
+  # Published straight away rather than as a draft: nothing uploads assets
+  # after GoReleaser finishes, so there is no window a draft would protect.
+  draft: false
+  prerelease: auto
+  name_template: "v{{ .Version }}"
+  # The Docker Hub line is gated on the same variable as the dockerhub entry
+  # above, and for the same reason: when the credentials are absent that image
+  # is never pushed, and release notes telling people to pull an image that
+  # does not exist are worse than notes that do not mention it.
+  footer: |
+    ---
+    **Docker:**
+    `docker pull ghcr.io/jmrplens/ghchronicle:v{{ .Version }}`
+    {{ if isEnvSet "DOCKERHUB_USERNAME" }}`docker pull jmrplens/ghchronicle:v{{ .Version }}`
+    {{ end }}
+
+    **Verify the checksums** (keyless, no key to fetch):
+    ```
+    cosign verify-blob \
+      --certificate-identity-regexp 'https://github.com/jmrplens/ghchronicle/.github/workflows/release.yml@refs/tags/.*' \
+      --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+      --bundle checksums.txt.sigstore.json \
+      checksums.txt
+    ```
+
+    **Full changelog:** https://github.com/jmrplens/ghchronicle/compare/{{ .PreviousTag }}...{{ .Tag }}

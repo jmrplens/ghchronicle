@@ -1,0 +1,161 @@
+---
+title: Backfill
+description: One deliberate walk to the end of every surface, how far back it goes, and the three things no backfill can reach.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+```sh
+ghchronicle -config config.yaml -backfill
+```
+
+A sweep is an increment. A backfill is a walk. They are opposite intentions and
+the tool treats them as such.
+
+## The difference in one table
+
+|                             | Sweep                             | Backfill                                           |
+| --------------------------- | --------------------------------- | -------------------------------------------------- |
+| Pages per collector         | the collector's own small default | until the API runs out, or the bound is reached    |
+| When the reserve is reached | skip the family and warn          | wait for the window to reset, then carry on        |
+| Which families run          | those whose interval has elapsed  | every enabled family, whatever the state file says |
+| How often                   | on a schedule, forever            | deliberately, usually once                         |
+
+A normal sweep must never block. It protects the reserve so whatever else uses
+the same token keeps working, and it skips a family rather than sleeping. A
+backfill is run on purpose and the only thing that matters is that it finishes,
+so it parks until the budget is whole again. A backfill that gives up half way
+has spent the expensive part of the budget and keeps only the families it got
+to the end of: each one is written and marked as soon as it finishes, so the
+rest is what has to be run again.
+
+## The cooldown
+
+When a bucket is at or below its reserve, the backfill waits. The wait is not
+guessed: every GitHub response says exactly when its window resets, so the
+collector sleeps until that instant plus a second of slack, and logs what it is
+doing.
+
+```text
+level=INFO msg="rate limit reserve reached, waiting for the window to reset" family=commits wait=23m11s
+```
+
+Two guards on that wait. It is capped at one hour, so a clock skew or a stale
+header cannot turn into an unbounded sleep, and it has a floor of one second,
+so it cannot become a busy loop. A cancelled context ends the wait immediately,
+which is what makes `Ctrl+C` work during an overnight backfill.
+
+## How far back
+
+`-backfill-since` on the command line, or `backfill.since` in the configuration
+file. Four spellings, because people reach for different ones:
+
+| Value                     | Means                    |
+| ------------------------- | ------------------------ |
+| `2024-01-01`              | that date                |
+| `90d`                     | ninety days ago          |
+| `2y`                      | two years ago            |
+| `720h`                    | a Go duration before now |
+| empty, `all`, `unlimited` | no bound at all          |
+
+No bound means the walk stops only where the API does, however many hours or
+days that takes, pausing at every rate limit reset along the way.
+
+```sh
+ghchronicle -config config.yaml -backfill -backfill-since 2y
+```
+
+## Run it once, first
+
+A new install should run a backfill before, or right after, starting the
+service. A sweep's first pass is a wider increment, not a history: a month of
+workflow runs, the star history in full, and the newest page of everything
+else. The points are dated, so every store is fine with that; a dashboard at
+ninety days or two years is not, because the history it draws begins on the
+day the collector was installed.
+
+Measured after a day of sweeps and no backfill, over repositories holding
+hundreds of pull requests each: pull requests, about a fifth of what the
+repositories report, because a sweep reads one page of fifty per repository
+however many it holds; issues, about half; commits, well under a tenth and none
+older than thirty days; jobs and steps for a tenth of the workflow runs, so the
+queue wait, the slowest jobs and the steps that fail were computed over that
+tenth. At two years, _Pull requests merged_ read a fifth of what _Pull requests
+merged, ever_ said. Stars, forks, releases, deployments and the alerts were
+complete, because the first sweep walks those to the end anyway.
+
+## What it reaches that a sweep does not
+
+- The whole commit history, rather than the last page. This is the one family
+  where a backfill is qualitatively different rather than merely wider: without
+  it the lines-changed series begins on the day you installed the collector.
+- Two years of workflow runs, and every run expanded into its jobs and steps.
+- The archived repositories, in full, whatever `include_archived` says. Their
+  history is the account's history and it never moves again, which is exactly
+  why a sweep leaves them out and why one walk of them is enough. Forks stay
+  as configured. A sweep still writes the one row each archived repository
+  has, the date it was archived: the listing it already pays for says which,
+  and one query per `totals` sweep says when.
+- Every artifact page, twenty pages of repository activity, and the code
+  scanning analyses.
+- A hundred pull requests and issues per repository.
+- The read notifications as well as the unread.
+- Twenty-four months of billing.
+- A hundred webhook deliveries per hook.
+
+## What it does not switch on
+
+A backfill runs every enabled family whatever the state file says. It enables
+none of them. The three families that ship with a cadence of `0`, `deps`,
+`history` and `joblogs`, stay off unless they have been given one by name under
+`every.families`, and `-backfill` does not change that.
+
+`history` is the one that surprises people, because walking every past year of
+the contribution calendar is exactly what somebody asking for "the whole
+history" has in mind. Give it a cadence first:
+
+```yaml
+every:
+  families:
+    history: 24h
+```
+
+See [cadences](/ghchronicle/configuration/cadences/) for why `default` and
+`groups` cannot switch these three on either.
+
+## Two endpoints that needed their own handling
+
+Both were found by running it, not by reading documentation.
+
+**Dependabot refuses page numbers.** It answers an error to `page=` outright
+and pages by cursor instead, so the alert walk is written against cursors.
+
+**The GraphQL gateway gives up on a hundred pull requests.** Asking for a
+hundred pull requests with their reviews in one query answers an **HTML 502**
+after about ten seconds. The pull request walk halves its page size and retries
+on the same cursor, silently: the collectors carry no logger, so a backfill of a
+busy repository shows this only as a slower family, never as a line.
+
+<Aside type="caution" title="Three things cannot be backfilled at any price">
+No amount of waiting changes these, and they are the reason the project exists
+at all.
+
+- **The event feed keeps three hundred events**, whatever their dates. Past
+  that ceiling GitHub answers 422 "pagination is limited for this resource",
+  which the collector reads as the end of the data.
+- **Traffic is fourteen days.** Anything older was never stored by GitHub.
+- **Job logs are deleted after ninety days** and answer 410 afterwards, while
+  the run metadata they belong to survives for years.
+
+</Aside>
+
+## Running one safely
+
+It is idempotent. Points are keyed by measurement, tags and timestamp, so a
+backfill run twice rewrites the same rows rather than doubling them, in every
+store that keeps the history. What it costs is API quota and time.
+
+Two things worth doing first: run `-list` to confirm the repository set, and
+check that the store you are writing to is the one that keeps dates. Backfilling
+into Prometheus collects a great deal of history and then reduces all
+of it to a single current value.

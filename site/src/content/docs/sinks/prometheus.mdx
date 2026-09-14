@@ -1,0 +1,143 @@
+---
+title: Prometheus
+description: An exporter, not a pusher, and what the reduction to current values does to each measurement.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+```yaml
+sinks:
+  prometheus:
+    listen: 127.0.0.1:9605
+    path: /metrics
+```
+
+An exporter, not a pusher: point a scrape at it. It is the one sink in the
+project that is not outbound, and it exists because Prometheus insists on
+pulling.
+
+## What it serves
+
+Metric names are `github_<measurement>_<field>`, with the tags as labels.
+
+```text
+github_repo_stars{repo="ghchronicle",language="Go",visibility="public"} 283
+github_workflow_runs_count{repo="ghchronicle",conclusion="success"} 412
+```
+
+## What it cannot serve
+
+The dated history, and not by choice. Prometheus stamps a sample at scrape time
+and rejects anything meaningfully older: measured against Prometheus 3.14 with
+`--web.enable-otlp-receiver` and a thirty-minute out-of-order window, a sample
+dated two days back comes back as **HTTP 400**.
+
+Through this sink, GitHub's fourteen-day traffic window collapses to its most
+recent day, and the star history to the current total. That is worth stating
+plainly rather than hiding. Run it alongside a history store rather than
+instead of one; both can run at once and the collection happens only once.
+
+## The reduction
+
+Before serving, `Summarize` reduces each measurement according to a rule.
+
+| Rule       | What survives                                                     |
+| ---------- | ----------------------------------------------------------------- |
+| `keepLast` | The most recent value per label set. Snapshots                    |
+| `sum`      | The batch added up. Windows, such as views over the fourteen days |
+| `count`    | A count plus the mean of each numeric field. Dated items          |
+| `skip`     | Nothing                                                           |
+
+A measurement with no rule is skipped, so a new collector cannot quietly flood
+the exporter with one series per star.
+
+The reducer also publishes `total`, a running distinct-item count per series.
+That is what lets a Prometheus dashboard say "per day" through `increase()`,
+since it has no rows to count.
+
+## Two measurements are skipped for size
+
+The commit punch card is one series per repository, weekday and hour, and the
+release assets one per file ever published. Measured, together they were **four
+fifths of the exporter's entire output**. Both are drawn properly by the
+InfluxDB dashboard.
+
+Eight more are skipped for a reason other than size, seven of them as history
+and one as text, so ten measurements in all never reach the exporter. The list, with the reason for each, is on
+[dating a point](/ghchronicle/how/dating/#the-ten-that-are-never-served).
+
+The exporter holds only what the last sweep collected, and for workflow runs
+that is the newest thirty per repository between builds: an ordinary sweep
+reads the run list in pages of thirty, and pages on only while a page is full
+of runs newer than its two hour window. The stores keep every run the walk
+ever saw; this is the one place the smaller page is visible.
+
+Workflow jobs are the other: a sweep carries the jobs of the runs it listed
+for the first time, so `gh_workflow_jobs` counts the jobs new to this process
+rather than those of the newest twenty runs, and a sweep in which no run
+finished carries none, leaving the last count standing until it goes stale a
+day later. The `total` beside it is unaffected, since it counts every distinct
+job the process has ever seen; the stores are unaffected too, since a job is
+written once and dated when it finished.
+
+<Aside type="caution" title="A tag called job would collide">
+  Prometheus adds `job` and `instance` labels at scrape time, and the OTLP
+  receiver overwrites a `job` attribute with the service name. Workflow jobs are
+  therefore tagged `job_name`.
+</Aside>
+
+## Scraping it
+
+```yaml
+scrape_configs:
+  - job_name: ghchronicle
+    static_configs:
+      - targets: ["127.0.0.1:9605"]
+```
+
+The exporter holds its samples in memory, so a restart empties it. That is why
+the first sweep after start-up runs every enabled family whatever the state
+file says: without it, a twelve-hour family would leave its panels reading zero
+for half a day.
+
+```yaml
+sinks:
+  prometheus:
+    listen: 0.0.0.0:9605
+    path: /metrics
+    no_prime: true # leave the first sweep on its ordinary schedule
+```
+
+`no_prime: true` switches that priming sweep off, for an account whose quota is
+tight enough that a full sweep on every restart is not affordable. The price is
+exactly the behaviour the priming exists to avoid: until each family's cadence
+comes round, the panels that read it have nothing, and for a twelve-hour family
+that is half a day of zeros. The stores are unaffected either way, since they
+keep what was collected before the restart.
+
+A series that has not been rewritten for **24 hours** is dropped, so a
+repository that leaves the sweep stops being reported as if it were still there.
+The horizon is not configurable.
+
+## Errors at start-up, not in a goroutine
+
+```text
+prometheus exporter: listen tcp :9605: bind: address already in use
+```
+
+Reported when the process starts rather than swallowed in a background
+goroutine, so a port clash cannot leave you with a running collector and a
+silently missing exporter.
+
+## In a container
+
+The example listens on `127.0.0.1`, which inside a container is the container's
+own loopback and unreachable from the host. Use `0.0.0.0:9605` there and let
+the port publication decide who can reach it.
+
+## Where to go next
+
+- [Choosing a store](/ghchronicle/sinks/) compares Prometheus with the other nine,
+  and holds the write ledger every one of them shares.
+- [The dashboards](/ghchronicle/dashboards/) says which of the five is drawn
+  against which store, and what a panel a store cannot answer becomes.

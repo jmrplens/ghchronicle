@@ -1,0 +1,40 @@
+# The collector the OTLP sink posts to.
+#
+# The pipeline is deliberately bare: no batch processor, no transform, no
+# resource detection. What the sink sends is what the file exporter writes,
+# data point timestamps included, so a test reads back the sink's own output
+# as the collector understood it rather than a rendering of it.
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+
+exporters:
+  # One OTLP JSON document per flush, appended. /out is a host directory the
+  # test process owns, so the assertions read the file directly.
+  file:
+    path: /out/metrics.json
+    flush_interval: 1s
+  # Keeps the container log useful when an assertion fails and the stack has
+  # been left up to look at.
+  debug:
+    verbosity: normal
+
+extensions:
+  # The only way in to ask this container whether it is ready: the image ships
+  # no shell, so the harness probes this port from the host.
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+service:
+  extensions: [health_check]
+  pipelines:
+    metrics:
+      receivers: [otlp]
+      exporters: [file, debug]
+  telemetry:
+    logs:
+      level: warn
+    metrics:
+      level: none

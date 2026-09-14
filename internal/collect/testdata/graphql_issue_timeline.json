@@ -1,0 +1,46 @@
+{
+  "data": {
+    "repository": {
+      "issues": {
+        "pageInfo": {"hasNextPage": false, "endCursor": "Y3Vyc29yOnYyOpK5MjAyNi0wOS0wNlQxMTowMDowMCswMjowMM4AAAAM"},
+        "nodes": [
+          {
+            "number": 12,
+            "title": "Cannot bind a second port",
+            "url": "https://github.com/octocat/hello-world/issues/12",
+            "updatedAt": "2026-09-06T11:00:00Z",
+            "timelineItems": {
+              "pageInfo": {"hasNextPage": false},
+              "nodes": [
+                {"__typename": "MilestonedEvent", "createdAt": "2026-09-05T10:00:00Z", "actor": {"login": "octocat", "__typename": "User"}, "milestoneTitle": "v2.8.0"},
+                {"__typename": "ClosedEvent", "createdAt": "2026-09-05T11:00:00Z", "actor": {"login": "octocat", "__typename": "User"}, "closer": null},
+                {"__typename": "ReopenedEvent", "createdAt": "2026-09-06T10:00:00Z", "actor": {"login": "octocat", "__typename": "User"}},
+                {"__typename": "ReferencedEvent", "createdAt": "2026-09-06T11:00:00Z", "actor": {"login": "octocat", "__typename": "User"}, "commit": {"oid": "4d73bc0213b3daea8477a1bf43fc7bfa0d755338"}}
+              ]
+            }
+          }
+        ]
+      },
+      "pullRequests": {
+        "pageInfo": {"hasNextPage": false, "endCursor": "Y3Vyc29yOnYyOpK5MjAyNi0wOS0wN1QwNjo0NTo0MiswMjowMM4AAAAp"},
+        "nodes": [
+          {
+            "number": 41,
+            "title": "Bump docker/build-push-action from 6 to 7",
+            "url": "https://github.com/octocat/hello-world/pull/41",
+            "updatedAt": "2026-09-07T06:45:42Z",
+            "stackEntry": null,
+            "timelineItems": {
+              "pageInfo": {"hasNextPage": false},
+              "nodes": [
+                {"__typename": "RenamedTitleEvent", "createdAt": "2026-09-07T06:00:00Z", "actor": {"login": "octocat", "__typename": "User"}, "previousTitle": "sent tail fields", "currentTitle": "feat(tools): publish the tail of the fields GitLab sends and we dropped"},
+                {"__typename": "ReviewRequestedEvent", "createdAt": "2026-09-07T06:45:41Z", "actor": {"login": "dependabot", "__typename": "Bot"}, "requestedReviewer": {"__typename": "User", "login": "octocat"}},
+                {"__typename": "LabeledEvent", "createdAt": "2026-09-07T06:45:42Z", "actor": {"login": "dependabot", "__typename": "Bot"}, "label": {"name": "docker"}}
+              ]
+            }
+          }
+        ]
+      }
+    }
+  }
+}

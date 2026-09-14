@@ -1,0 +1,31 @@
+# GitGuardian configuration, read by the GitGuardian Security Checks app and by
+# ggshield once either is installed on the repository. Both flag any string
+# that matches a real secret pattern.
+#
+# The settings are those of github.com/jmrplens/gitlab-mcp-server. That
+# repository ignores one subtree, a fixture of deliberate "detector bait" that
+# exists to make a downstream secret scanner emit findings. This repository
+# has no such fixture, so it has no ignored path either: every file is
+# scanned.
+#
+# The credentials that do appear in the tree are placeholders a reader cannot
+# mistake for real ones, and they should keep that shape so the scan stays
+# clean without an exclusion:
+#
+#   - github_pat_... in the documentation, an ellipsis where the token goes.
+#   - ghp_secret in internal/config, the value a unit test puts in the
+#     environment to prove a ${VAR} in the configuration file is expanded.
+#   - e2e-token, the token the end-to-end suite hands its fake GitHub, and
+#     influx-token, es-api-key and telegraf-pass, the credentials it hands the
+#     recorders that stand in for InfluxDB, Elasticsearch and Telegraf.
+#   - ghchronicle and admin, the PostgreSQL and Grafana passwords of the
+#     containerized end-to-end stack, and e2e, the token its InfluxDB never
+#     checks because it runs --without-auth. The stack publishes every port on
+#     127.0.0.1 only and holds nothing but what a test run writes into it.
+#
+# A new test value keeps the same shape. One in the format of a real secret
+# would be reported, and the fix is a different value, not an ignored path.
+#
+# Documentation: https://docs.gitguardian.com/internal-repositories-monitoring/ggshield/reference/files#gitguardianyaml
+
+version: 2

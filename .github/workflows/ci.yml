@@ -1,0 +1,903 @@
+# CI pipeline for ghchronicle.
+#
+# Runs on: pull requests (any base branch), pushes to main.
+#
+# Shape. A job depends on another only when it consumes something the other
+# produced, and everything converges on one final job, "CI", which is the one
+# check branch protection requires. That is what lets the job list change
+# without touching a repository setting: a required check named after a job is
+# a setting that has to move with the job. The jobs, the actions and their
+# settings are the ones github.com/jmrplens/gitlab-mcp-server runs, so the two
+# repositories keep one standard; what differs is only what names a project.
+#
+#   compile ─┬─ typecheck (windows/amd64 · darwin/arm64 · linux/arm64)
+#            └─ e2e
+#   coverage ─── sonarcloud
+#   docker (×2) ─── docker-build
+#   cross_platform (×3) ─── cross_platform_summary
+#   generated · golangci-lint · govulncheck · markdown · site-lint · hadolint
+#   docs-audit ─── checks
+#                      └──► ci
+#
+# Every edge joins neighboring columns, and that is deliberate. GitHub draws a
+# job with no parent and no child in one box with every other such job, and
+# draws that box's single edge straight to whatever needs it, across every node
+# in between. So the standalone jobs fan into "checks" first, and "ci" needs
+# only second-column nodes. compile and coverage are still decided there,
+# because when either fails its children are skipped, and a skip is a failure
+# to the verdict script.
+#
+# The race detector is not here: it runs from race.yml, weekly and as a release
+# gate, for the reason given in that file.
+#
+# Every check that has a Makefile target calls that target rather than
+# restating the command, so a developer running `make analyze` locally runs
+# what CI runs.
+#
+# Every actions/checkout here, and in every other workflow of this repository,
+# sets persist-credentials: false, where gitlab-mcp-server keeps the default on
+# most of its jobs. That is a deliberate difference, and the owner's decision:
+# stricter than the reference, and to be kept when the two are aligned again.
+# The default writes the job's token into .git/config, where every later step
+# can read it, including code this repository did not write: every action a job
+# uses after the checkout, and the install scripts `pnpm install` runs. No job
+# here talks to git after its checkout, so the token would be exposed for
+# nothing.
+
+name: CI
+
+on:
+  # Deliberately unfiltered by base branch. A stacked pull request is based on
+  # the branch below it rather than on main, so a `branches: [main]` filter
+  # would silently give every layer but the bottom one no CI at all: the checks
+  # do not fail, they never run, which reads as "nothing to report". Pushes are
+  # filtered, because a branch that is not yet a pull request has nothing to
+  # gate and was running the whole suite twice.
+  pull_request:
+  push:
+    branches: [main]
+
+# A new push to the same branch makes the run in flight obsolete.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+# The Go version is not stated here: every setup-go step reads it from go.mod,
+# which is the one place a Go bump has to touch. The same goes for Node
+# (site/.node-version) and pnpm (the packageManager field in site/package.json).
+
+jobs:
+  # The unit suite with coverage, and nothing else, because the only consumer
+  # of its output is the SonarCloud scan below. The floor, the package list and
+  # the profile name all live in the Makefile, so this job and a developer's
+  # `make cover-check` measure the same thing.
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - run: go mod download
+
+      # One profile over every package under cmd/ and internal/, measured with
+      # -coverpkg so a package counts what any test reaches in it, then held to
+      # COVERAGE_MIN. SonarCloud reads the same coverage.out.
+      - name: Coverage floor
+        run: make cover-check
+
+      - name: Upload the coverage profile
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: coverage
+          path: coverage.out
+          retention-days: 1
+
+  # Every gate that compares a committed artifact with what the source tree
+  # would generate now. None of them needs the suite.
+  generated:
+    name: Generated artifacts
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - run: go mod download
+
+      # The five dashboards under dashboards/ are generated from
+      # cmd/internal/dashboards and never hand-edited. Nothing enforced that
+      # until this job: an edit to the specification that was never
+      # regenerated, or an edit to the JSON that the next generation would
+      # throw away, both looked exactly like a clean tree.
+      - name: The committed dashboards match their specification
+        run: make check-dashboards
+
+  sonarcloud:
+    name: SonarCloud
+    runs-on: ubuntu-latest
+    # The scan is minutes of work on top of the setup, and a timeout that fires
+    # after the analysis and before the upload wastes the whole run; 15 still
+    # ends a genuine hang long before the six-hour default.
+    timeout-minutes: 15
+    needs: [coverage]
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          # Sonar reads history for blame and for the new-code period, and a
+          # shallow clone gives it neither.
+          fetch-depth: 0
+          persist-credentials: false
+
+      # The profile the coverage job already produced, rather than a second
+      # run of the suite that would have to agree with the first.
+      - name: Download the coverage profile
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
+        with:
+          name: coverage
+
+      # Skipped rather than failed when the secret is absent, which is the case
+      # on a fork and on any clone that has not been wired to SonarCloud, and
+      # allowed to fail when it is present, because an outage at SonarCloud is
+      # not a reason to block a merge. The secret is copied into the job's env
+      # above because a step's `if` cannot see the step's own env.
+      - name: SonarCloud scan
+        if: env.SONAR_TOKEN != ''
+        uses: SonarSource/sonarqube-scan-action@22918119ff8e1ca75a623e15c8296b6ea4fbe28f  # v8.2.1
+        continue-on-error: true
+        env:
+          SONAR_HOST_URL: https://sonarcloud.io
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # The documentation site's dependency audit, in a job of its own. What it
+  # reports is the state of somebody else's advisory database, which can turn
+  # red without a commit, and the registry it asks can fail to answer; neither
+  # belongs inside a job named after something else. The verdict prints this
+  # job's result and does not decide on it.
+  docs-audit:
+    name: Site dependency audit
+    runs-on: ubuntu-latest
+    # The whole job is one call to somebody else's registry. Without a bound, a
+    # registry that accepts the connection and never answers holds a runner for
+    # the six-hour default.
+    timeout-minutes: 15
+    steps:
+      # `pnpm install` runs code this repository did not write, so the checkout
+      # token does not stay in .git/config while it does. Nothing here talks to
+      # git after the checkout.
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      # pnpm/action-setup installs pnpm itself from the npm registry on every
+      # run, which is slower than the dependency install that follows it from
+      # cache. So the installed pnpm is cached too, keyed on the exact
+      # packageManager string in site/package.json, and on a hit the action is
+      # skipped and its bin directory put on PATH.
+      - name: Read the pinned pnpm version
+        id: pnpm
+        run: echo "spec=$(jq -r .packageManager site/package.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache pnpm
+        id: pnpm-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: ~/setup-pnpm
+          key: pnpm-${{ runner.os }}-${{ steps.pnpm.outputs.spec }}
+
+      - name: Set up pnpm
+        if: steps.pnpm-cache.outputs.cache-hit != 'true'
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413  # v6.1.0
+        with:
+          package_json_file: site/package.json
+
+      - name: Put the cached pnpm on PATH
+        if: steps.pnpm-cache.outputs.cache-hit == 'true'
+        run: echo "$HOME/setup-pnpm/node_modules/.bin" >> "$GITHUB_PATH"
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+        with:
+          node-version-file: site/.node-version
+          cache: pnpm
+          cache-dependency-path: site/pnpm-lock.yaml
+
+      - name: Install site dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: site
+
+      # Advisories already judged live in site/pnpm-workspace.yaml, under
+      # auditConfig.ignoreGhsas, each with the reason beside it: from pnpm 10 a
+      # `pnpm` field in package.json is ignored with a warning, so that is the
+      # only place pnpm reads them from.
+      #
+      # A registry that does not answer produces no verdict, and a red check
+      # that means "npmjs.org timed out" is indistinguishable from one that
+      # means "a dependency has a high advisory", so the second stops being
+      # read. pnpm exits non-zero for both, so the two are told apart by what
+      # it printed, and an unanswered run is annotated rather than failed.
+      - name: Audit the site's dependencies
+        shell: bash
+        working-directory: site
+        run: |
+          set +e
+          output=$(pnpm audit --audit-level=high 2>&1)
+          status=$?
+          printf '%s\n' "$output"
+          if [ "$status" -ne 0 ] && printf '%s' "$output" |
+              grep -qE 'TimeoutError|operation was aborted|ENOTFOUND|EAI_AGAIN|ECONNRESET|ECONNREFUSED|socket hang up'; then
+            echo "::warning title=Dependency audit did not run::the npm advisories endpoint did not answer, so this run says nothing about the dependencies"
+            exit 0
+          fi
+          exit "$status"
+
+  # The one thing the jobs below it have in common: every command compiles, and
+  # so does the containerized suite behind its build tag. It is the parent of
+  # the type-check matrix and of the end-to-end suite so that the graph shows
+  # them as what they are, questions asked of the same build.
+  compile:
+    name: Compile
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - run: go mod download
+
+      # ./... rather than the collector alone: seven of the eight commands are
+      # never built by anything else, so a break in one of them would otherwise
+      # surface the next time somebody ran it by hand.
+      - name: Build every command
+        run: go build ./...
+
+      # The containerized suite runs only from e2e.yml, weekly, on demand and
+      # before a release, so without this step a compile error in it would
+      # wait until one of those.
+      - name: Verify the containerized E2E tests compile
+        run: go test -tags dockere2e -c -o /dev/null ./test/e2e/docker/
+
+  # Type-checks every build-constrained file including the tests, for each
+  # platform this project ships, on a Linux runner. Build constraints resolve
+  # against the host, so a file behind a windows or darwin constraint would
+  # otherwise first be compiled by GoReleaser during a release, where a compile
+  # error breaks the release instead of a pull request. linux/amd64 is not in
+  # the list because golangci-lint's govet already vets it.
+  #
+  # One job per target rather than a loop in one job: a failure names the
+  # platform in the job list instead of in a log.
+  typecheck:
+    name: Type-check (${{ matrix.target }})
+    runs-on: ubuntu-latest
+    needs: [compile]
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [windows/amd64, darwin/arm64, linux/arm64]
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - run: go mod download
+
+      - name: Vet for ${{ matrix.target }}
+        env:
+          TARGET: ${{ matrix.target }}
+        run: GOOS="${TARGET%%/*}" GOARCH="${TARGET##*/}" go vet ./...
+
+  # The end-to-end suite under test/: it builds the collector, starts it as a
+  # separate process against a fake GitHub, and asserts the exact bytes every
+  # sink receives. That process is invisible to the coverage profile, which is
+  # why the coverage job leaves ./test/... out, and this job is where it runs
+  # instead. It needs no credential and no container.
+  e2e:
+    name: End-to-end (fake GitHub)
+    runs-on: ubuntu-latest
+    needs: [compile]
+    timeout-minutes: 20
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - run: go mod download
+
+      - name: End-to-end suite
+        run: go test -count=1 -timeout 900s ./test/...
+
+  # golangci-lint is installed from a release binary for an exact version and
+  # cached by the official action, instead of being compiled from source on
+  # every run with whichever version the proxy served that morning. The action
+  # only installs; the Makefile target is still what runs, so CI and a
+  # developer's `make golangci-lint` are the same three commands.
+  golangci-lint:
+    name: golangci-lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - run: go mod download
+
+      # The pin lives in the Makefile, so the version a developer installs with
+      # `make install-tools` and the version CI runs are the same number in one
+      # place. Read rather than restated here; if the variable ever moves, this
+      # step fails loudly instead of quietly linting with something else.
+      - name: Read the pinned golangci-lint version
+        id: pin
+        run: |
+          version="$(sed -n 's/^GOLANGCI_LINT_VERSION *:= *//p' Makefile)"
+          if [ -z "$version" ]; then
+            echo "::error::GOLANGCI_LINT_VERSION is not defined in the Makefile"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Install golangci-lint
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a  # v9.3.0
+        with:
+          version: ${{ steps.pin.outputs.version }}
+          install-only: true
+
+      # golangci-lint keeps a per-package analysis cache and skips what has not
+      # changed. The key names the linter config and go.sum, so a change to
+      # either starts fresh; restore-keys lets a run reuse the newest cache for
+      # the same config even when go.sum moved, since a dependency bump does
+      # not invalidate the analysis of packages that do not import it.
+      - name: Cache the analysis
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: ~/.cache/golangci-lint
+          key: golangci-lint-${{ hashFiles('.golangci.yml', 'go.sum') }}-${{ github.sha }}
+          restore-keys: |
+            golangci-lint-${{ hashFiles('.golangci.yml', 'go.sum') }}-
+            golangci-lint-
+
+      # Config verify, formatting, then the linters. The build tag of the
+      # containerized suite is in .golangci.yml, so this one run reaches
+      # test/e2e/docker as well as everything else.
+      - name: Lint
+        run: make golangci-lint
+
+  govulncheck:
+    name: govulncheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      # go.mod names an exact release, `go 1.27.1`, and setup-go installs
+      # exactly that one. Most of what govulncheck reports here is the standard
+      # library, so its answer is a property of the commit: when a later patch
+      # fixes a standard-library advisory, this job fails until go.mod moves to
+      # that patch.
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - run: go mod download
+
+      # No version here on purpose: govulncheck is a `tool` directive in go.mod,
+      # so `go install` without @version installs the version go.mod names. A
+      # scanner that changed under us would change what "no known
+      # vulnerability" meant last week, so it moves only in a reviewed commit
+      # (Dependabot does not bump tool modules; see scripts/govulncheck.sh).
+      - name: Install govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck
+
+      - name: Scan
+        run: make govulncheck
+
+  # The linter comes bundled in its own action, which touches no registry. The
+  # action's markdownlint-cli2 release is the one the Makefile's mdlint target
+  # runs, so `make mdlint` and this job are the same linter.
+  analyze-md:
+    name: Markdown
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Lint Markdown and MDX
+        uses: DavidAnson/markdownlint-cli2-action@21c1be1b93ad9ed58fa840aacc3f279cde2a72ff  # v24.2.0
+        with:
+          globs: |
+            **/*.{md,mdx}
+            #plan
+            #node_modules
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+        with:
+          node-version-file: site/.node-version
+
+      # check-doc-links resolves every relative link in tracked Markdown and
+      # MDX, so it needs the working tree and Node, and nothing else.
+      - name: Check documentation local links
+        run: make check-doc-links
+
+  site-lint:
+    name: Site lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      # Same reasoning as docs-audit: this is the other job that installs the
+      # documentation site's dependencies, so it is the other one that runs
+      # code this repository did not write.
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Same arrangement as docs-audit. Reading packageManager is what makes
+      # the two jobs, the Pages build and a developer's machine install the
+      # same pnpm.
+      - name: Read the pinned pnpm version
+        id: pnpm
+        run: echo "spec=$(jq -r .packageManager site/package.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache pnpm
+        id: pnpm-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: ~/setup-pnpm
+          key: pnpm-${{ runner.os }}-${{ steps.pnpm.outputs.spec }}
+
+      - name: Set up pnpm
+        if: steps.pnpm-cache.outputs.cache-hit != 'true'
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413  # v6.1.0
+        with:
+          package_json_file: site/package.json
+
+      - name: Put the cached pnpm on PATH
+        if: steps.pnpm-cache.outputs.cache-hit == 'true'
+        run: echo "$HOME/setup-pnpm/node_modules/.bin" >> "$GITHUB_PATH"
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+        with:
+          node-version-file: site/.node-version
+          cache: pnpm
+          cache-dependency-path: site/pnpm-lock.yaml
+
+      - name: Install site dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: site
+
+      # The build-independent gates: type check, palette contrast, i18n parity,
+      # the Person snapshot, eslint and prettier. The gates that read the built
+      # site (html-validate, htmlhint, pa11y, the structured data, the markdown
+      # twins and llms.txt) stay in docs.yml, which is the workflow that builds
+      # it.
+      - name: Static site gates
+        run: |
+          pnpm run check
+          pnpm run contrast:check
+          pnpm run i18n:check
+          # The Person entity is fetched from its canonical source at build
+          # time, with this snapshot as the offline fallback. A stale snapshot
+          # is invisible while the fetch works and ships an incomplete Person
+          # the moment it does not.
+          pnpm run identity:check
+          # The landing page's counts are generated from the repository. The
+          # generator existed and nothing ran it, so the landing advertised
+          # 68 measurements and 28 families for six days while both the build
+          # and every other gate passed.
+          pnpm run stats:check
+          # Every figure is drawn from the Go source and the generated
+          # dashboards. The one figure this site drew by hand had aged past
+          # thirteen families before anybody noticed.
+          pnpm run figures:check
+          # docs/ is generated from the English pages. Two complete sets of
+          # documentation used to be maintained by hand, and they drifted in
+          # both directions; this is what keeps the second one derived.
+          pnpm run docs:check
+          pnpm run eslint
+          pnpm run format:check
+        working-directory: site
+
+  hadolint:
+    name: hadolint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Lint the source-build Dockerfile
+        uses: hadolint/hadolint-action@06be81baf89a55ffd0e24b8f04a4185738dd3387  # v3.5.0
+        with:
+          dockerfile: Dockerfile
+          failure-threshold: warning
+          ignore: DL3008,DL3018
+
+      # The file the released images are built from, by GoReleaser. It is the
+      # image a user actually pulls, so it is held to the same rules.
+      - name: Lint the GoReleaser Dockerfile
+        uses: hadolint/hadolint-action@06be81baf89a55ffd0e24b8f04a4185738dd3387  # v3.5.0
+        with:
+          dockerfile: docker/Dockerfile.goreleaser
+          failure-threshold: warning
+          ignore: DL3008,DL3018
+
+  # Both platforms, each one built AND started. A multi-platform image is
+  # assembled from cross-compiled binaries that nothing has executed, and
+  # gitlab-mcp-server once shipped an arm64 image that could not exec at all,
+  # past every gate that only built it. Only on pull requests that touch the
+  # files the image is made from; release.yml runs the published images the
+  # same way.
+  docker:
+    name: Docker (${{ matrix.platform }})
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [linux/amd64, linux/arm64]
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Check for Docker changes
+        id: filter
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          changed="$(git diff --name-only "${BASE_SHA}...${HEAD_SHA}" -- Dockerfile .dockerignore)"
+          if [ -n "$changed" ]; then
+            echo "docker=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "docker=false" >> "$GITHUB_OUTPUT"
+            echo "No Docker-related files changed, skipping the build"
+          fi
+
+      - name: Compute the build date
+        if: steps.filter.outputs.docker == 'true'
+        id: build-date
+        run: echo "date=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_OUTPUT"
+
+      # QEMU so the non-native variant can be executed here, not only built.
+      - name: Set up QEMU
+        if: steps.filter.outputs.docker == 'true'
+        uses: docker/setup-qemu-action@1f40c72289eff860ee54a304f1438e3cff362e0a  # v4.3.0
+
+      - name: Set up Docker Buildx
+        if: steps.filter.outputs.docker == 'true'
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e  # v4.3.0
+
+      - name: Build the image
+        if: steps.filter.outputs.docker == 'true'
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a  # v7.3.0
+        with:
+          context: .
+          push: false
+          load: true
+          platforms: ${{ matrix.platform }}
+          tags: ghchronicle:ci
+          build-args: |
+            VERSION=ci
+            COMMIT=${{ github.sha }}
+            BUILD_DATE=${{ steps.build-date.outputs.date }}
+
+      # -version is the one thing the binary does without a config, and its
+      # line carries the stamped version, so it proves both that the image
+      # executes on this platform and that the build arguments reached it.
+      - name: Smoke test the image
+        if: steps.filter.outputs.docker == 'true'
+        env:
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          out="$(docker run --rm --platform "${PLATFORM}" ghchronicle:ci -version)"
+          echo "${PLATFORM}: ${out}"
+          case "${out}" in
+            "ghchronicle ci "*) ;;
+            *)
+              echo "::error::the ${PLATFORM} image reports '${out}', expected version ci"
+              exit 1
+              ;;
+          esac
+
+  # One node for the matrix above: the final job wants one answer for "did the
+  # images build" rather than one per platform, and the graph reads better
+  # with the fan-in drawn.
+  docker-build:
+    name: Docker images
+    needs: docker
+    # always(), so a failing matrix is reported rather than skipped along with
+    # it. The event guard matches the matrix's own, so pushes to main see this
+    # check no more than they see the job it summarizes.
+    if: always() && github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Report the platform builds
+        env:
+          RESULT: ${{ needs.docker.result }}
+        run: |
+          echo "Docker matrix result: $RESULT"
+          # skipped is a pass: the matrix skips its own steps when no Docker
+          # file changed, and a skipped job must not hold a pull request.
+          case "$RESULT" in
+            success|skipped) ;;
+            *) echo "::error::the Docker platform builds did not succeed ($RESULT)"; exit 1 ;;
+          esac
+
+  # One node for the jobs that depend on nothing, for the graph's sake as
+  # explained at the top of the file. Everything that can fail a change is
+  # listed, the test jobs included, so a failing suite cannot sit under a green
+  # required check. The cross-platform summary already tells the known Go
+  # runtime crash on Windows hosts with Intel AMX apart from a failing test
+  # (golang/go#81238, handled by .github/scripts/go-test-crash-aware.sh), so
+  # listing it fails the verdict on real failures only. The site dependency
+  # audit reaches here and is printed, but does not decide: it reports the
+  # state of somebody else's advisory database.
+  checks:
+    name: Checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: always()
+    needs:
+      - generated
+      - golangci-lint
+      - govulncheck
+      - analyze-md
+      - site-lint
+      - hadolint
+      - docs-audit
+      - coverage
+      - compile
+      - typecheck
+      - cross_platform_summary
+      - docker-build
+    steps:
+      - name: Check out the verdict script
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+
+      - name: Decide
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+          INFORMATIONAL: docs-audit
+          # The image build only runs for a pull request; on a push it is
+          # skipped by design rather than failed.
+          MAY_SKIP: docker-build
+        run: bash .github/scripts/needs-verdict.sh
+
+  # Every job above runs on Linux, while the project ships binaries for three
+  # platforms. Build constraints resolve against the host, so until this job
+  # existed a file behind a windows or darwin constraint was type-checked by
+  # the typecheck job and never run anywhere, and a test that assumed POSIX
+  # file modes, a slash as the path separator or os.Interrupt as something one
+  # process can send another passed here and would have failed there.
+  #
+  # This job asks only the platform question, and deliberately runs none of the
+  # generated-artifact gates or the coverage floor: their answers cannot depend
+  # on the operating system, so running them three times would triple the flake
+  # surface and add no signal. What does depend on the platform is here, namely
+  # the build constraints, every path the code touches, and the end-to-end
+  # suite that spawns the real binary.
+  #
+  # Linux is in the matrix even though the coverage job already runs the suite
+  # there, because it is the control: without it, a macOS-only failure cannot
+  # be told apart from a command that would have failed anywhere.
+  cross_platform:
+    name: Cross-platform (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    # A hung test must not sit for the six-hour default on a runner billing ten
+    # times the Linux rate (macOS) or twice it (Windows). The Linux unit suite
+    # takes seconds, so this allows being substantially slower without
+    # allowing a hang.
+    timeout-minutes: 60
+    strategy:
+      # Every platform reports. Stopping at the first failure would hide a
+      # second, different one, and telling them apart is the entire point.
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - run: go mod download
+
+      # Build constraints resolve against the host, so these two steps are the
+      # first thing in the pipeline that compiles the windows-only source at
+      # all, and the first that type-checks the unix-only source anywhere other
+      # than Linux.
+      - name: Build every package
+        run: go build ./...
+
+      - name: Vet every package
+        run: go vet ./...
+
+      # The whole tree under cmd/ and internal/, maintainer tooling included:
+      # the tests of cmd/ assumed a slash as the separator, Linux's wording of
+      # a missing file and a refused connection, and a symbolic link any
+      # account can make, and those were made portable instead of being run on
+      # Linux alone. Running them here is what keeps that true.
+      #
+      # Through the crash-aware runner rather than a bare go test: a Windows
+      # leg dies inside the Go runtime now and then, for a reason recorded in
+      # the script (golang/go#81238), and the runner tells that crash apart
+      # from a failing test, reruns only the crashed package, and puts the
+      # outcome in the job summary. A failing test fails the leg as before.
+      # Flags carry their value in the same word, which is how the runner
+      # tells them from packages. gotestsum is the version go.mod pins as a
+      # tool.
+      - name: Install gotestsum
+        run: go install gotest.tools/gotestsum
+
+      - name: Unit suite
+        shell: bash
+        run: bash .github/scripts/go-test-crash-aware.sh test-results/unit-suite -count=1 -timeout=30m ./cmd/... ./internal/...
+
+      # The end-to-end suite needs neither GitHub nor a credential, and it is
+      # why this is not a build-only check: it builds the collector and drives
+      # it as a separate process against a fake GitHub, which is where a
+      # platform difference actually surfaces, in the program's name, in the
+      # files every sink writes and rotates, and in how the process is asked
+      # to stop: os.Interrupt where a process can send it, and on Windows a
+      # CTRL_BREAK to the collector's own console process group, which the Go
+      # runtime delivers as the os.Interrupt it stops on
+      # (test/e2e/process_*_test.go).
+      #
+      # macOS and Windows, not Linux. Linux has it as the e2e job, on the same
+      # runner image with the same command, so running it here as well would
+      # answer a question already answered in the same run. The unit suite
+      # above does stay on Linux, as the control.
+      - name: End-to-end suite
+        if: matrix.os != 'ubuntu-latest'
+        run: go test -count=1 -timeout 900s ./test/...
+
+  # One node for the matrix above, for the same reason the Docker images job
+  # exists: the final job wants one answer for the platform question, and the
+  # graph draws the fan-in.
+  cross_platform_summary:
+    name: Cross-platform
+    needs: cross_platform
+    # always(), so a failing platform is reported rather than skipped along
+    # with the job it belongs to.
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Report the platform suites
+        env:
+          # Underscored job ids on purpose: a hyphen in a job id has to be
+          # reached as needs['cross-platform'], because the expression parser
+          # reads needs.cross-platform as a subtraction.
+          RESULT: ${{ needs.cross_platform.result }}
+        run: |
+          echo "Cross-platform matrix result: $RESULT"
+          case "$RESULT" in
+            success) ;;
+            *) echo "::error::the cross-platform suites did not succeed ($RESULT)"; exit 1 ;;
+          esac
+
+  # The one check branch protection requires. Everything converges here, so
+  # the job list above can change shape without a repository setting having to
+  # follow it, and the graph has an end. `always()` is what makes it run even
+  # when something upstream failed, and the verdict script is what makes it
+  # fail when something did: compile and coverage are decided through their
+  # children, which are skipped when the parent fails, and a skip is a failure
+  # for every job except the Docker summary, which skips itself on pushes.
+  #
+  # One result is read here but does not decide here, for a reason recorded
+  # where the job is defined: the platform matrix has a Windows leg that
+  # crashes inside the Go runtime now and then, whatever the code under test
+  # does (golang/go#81238). Its unit suite runs through
+  # .github/scripts/go-test-crash-aware.sh, which reruns a crashed package
+  # alone and records the crash in the job summary, so a red leg now means a
+  # failing test or a package that crashed twice. It is printed so a red one is
+  # seen. It still decides through "checks", which lists it among the jobs that
+  # can fail a change, so a red platform leg fails this job too; the two are
+  # wired the way gitlab-mcp-server wires them.
+  ci:
+    name: CI
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: always()
+    needs:
+      - typecheck
+      - e2e
+      - sonarcloud
+      - docker-build
+      - cross_platform_summary
+      - checks
+    steps:
+      - name: Check out the verdict script
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+
+      - name: Decide
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+          INFORMATIONAL: cross_platform_summary
+          MAY_SKIP: docker-build
+        run: bash .github/scripts/needs-verdict.sh

@@ -1,0 +1,14 @@
+{
+  "data": {
+    "pulls_opened": {"issueCount": 1799},
+    "pulls_merged": {"issueCount": 1696},
+    "pulls_open_now": {"issueCount": 17},
+    "pulls_merged_elsewhere": {"issueCount": 19},
+    "pulls_reviewed": {"issueCount": 453},
+    "issues_opened": {"issueCount": 167},
+    "issues_closed": {"issueCount": 137},
+    "issues_elsewhere": {"issueCount": 27},
+    "commented_elsewhere": {"issueCount": 113},
+    "repositories": {"repositoryCount": 35}
+  }
+}

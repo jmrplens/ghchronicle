@@ -1,0 +1,119 @@
+---
+title: Objetivos
+description: Qué repositorios toca una pasada, y por qué los forks y los archivados quedan fuera por omisión.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+```yaml
+targets:
+  user: your-github-login
+  orgs: []
+  repos: []
+  exclude: []
+  include_forks: false
+  include_archived: false
+  include_private: true
+```
+
+## Las claves
+
+| Clave              | Por omisión | Qué hace                                                   |
+| ------------------ | ----------- | ---------------------------------------------------------- |
+| `user`             | ninguno     | La cuenta que recoger. Sus repositorios se descubren solos |
+| `orgs`             | `[]`        | Organizaciones que incluir además                          |
+| `repos`            | `[]`        | Repositorios que recoger digan lo que digan los filtros    |
+| `exclude`          | `[]`        | Globs de shell, comparados contra `owner/name`             |
+| `include_forks`    | `false`     | Si se recogen los forks                                    |
+| `include_archived` | `false`     | Si se recogen los repositorios archivados                  |
+| `include_private`  | `true`      | Si se recogen los repositorios privados                    |
+
+Hay que poner al menos uno de `user`, `orgs` o `repos`, o el arranque falla con
+`targets: set at least one of user, orgs or repos`.
+
+`user` es además lo que hace posibles las familias de cuenta. Una configuración
+que solo nombra repositorios no tiene login que darle a GraphQL, así que el
+calendario de contribuciones, el feed de eventos, las notificaciones, la
+facturación, los paquetes y las familias salientes se saltan todas.
+
+## Nombrar un repositorio anula toda exclusión
+
+`repos` no es otro filtro. Es una declaración de intenciones, y gana: nombrar
+`someone/thing` lo recoge aunque sea un fork, aunque esté archivado y aunque un
+glob de `exclude` lo hubiera capturado.
+
+```yaml
+targets:
+  user: acme
+  repos:
+    - someone-else/a-fork-i-actually-maintain
+  exclude:
+    - "acme/experiment-*"
+```
+
+`exclude` acepta globs de shell, así que `someone/experiment-*` descarta un
+prefijo entero en una línea.
+
+## Por qué forks y archivados están apagados por omisión
+
+Ambos valores por defecto existen por la misma razón, que es el límite de
+peticiones.
+
+- **El tráfico de un fork es casi siempre cero.** GitHub informa de visitas y
+  clones por repositorio, y para un fork que nadie visita eso son catorce días
+  de ceros por pasada. Cuesta cuatro llamadas por repositorio para no aprender
+  nada.
+- **Un repositorio archivado no puede cambiar.** Sus estrellas todavía pueden
+  moverse, pero nada más, y recogerlo gasta el presupuesto en filas que ya no se
+  mueven.
+
+Actívalos cuando la suposición no valga en tu caso. Un fork en el que de verdad
+desarrollas es un repositorio real con tráfico real, y `repos` es la forma de
+nombrarlo sin recoger también los cuarenta marcadores.
+
+Apagado no es invisible, por dos vías. Un repositorio archivado sigue teniendo
+la única fila que le corresponde, `gh_repo_archived`, fechada en el instante en
+que se archivó: el listado que una pasada ya paga dice qué repositorios están
+archivados, y la familia `totals` pregunta la fecha de todos en una consulta a
+su propia cadencia, así que la tabla _Repositories archived_ existe desde la
+primera pasada y cuesta un punto por pasada de `totals` después. Y un
+[relleno histórico](/ghchronicle/es/how/backfill/) recoge los repositorios
+archivados enteros diga lo que diga esta clave, porque su historia es la
+historia de la cuenta y basta con recorrerla una vez. Los forks quedan como
+estén configurados en ambos casos: un fork archivado con `include_forks: false`
+no tiene fila.
+
+<Aside type="tip" title="Comprueba el conjunto antes de gastar cuota en él">
+```sh
+ghchronicle -config config.yaml -list
+```
+
+Eso imprime los repositorios en alcance y no escribe nada. Si falta algo que
+esperabas, esta es la orden que te lo dice antes de que una pasada gaste cuota
+en el conjunto equivocado.
+
+</Aside>
+
+## Repositorios privados
+
+`include_private` vale `true` por omisión, porque un token que puede verlos se
+concedió a propósito y el objetivo de la herramienta es guardar la historia de
+la cuenta, no de su mitad pública.
+
+Lo que se guarda son las mismas medidas que para un repositorio público:
+recuentos, duraciones y nombres. Conviene saber dos cosas sobre lo que eso
+implica:
+
+- Los nombres de repositorio y de rama aparecen como valores de etiqueta, así
+  que serán visibles para cualquiera que pueda leer el dashboard.
+- Solo se guarda el _host_ de una URL de webhook, nunca la ruta, porque la ruta
+  suele llevar un secreto.
+
+Ponlo a `false` para recoger solo repositorios públicos.
+
+## La cadencia del descubrimiento
+
+La lista de repositorios se rehace como mucho una vez por hora. Los repositorios
+se crean pocas veces y listarlos cuesta una página por cada cien, así que un
+repositorio nuevo puede tardar hasta una hora en entrar en la pasada. Nombrarlo
+en `repos` no cambia eso; reiniciar el proceso sí.

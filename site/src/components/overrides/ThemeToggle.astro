@@ -1,0 +1,79 @@
+---
+/**
+ * A two-state light and dark toggle for the header, with no "auto".
+ *
+ * It drives Starlight's own theme system rather than a second one: the same
+ * `starlight-theme` key in localStorage, the same `documentElement.dataset
+ * .theme`, and a call into `StarlightThemeProvider.updatePickers` so the
+ * picker in the mobile drawer agrees with it. Two systems would disagree the
+ * first time someone used the other control.
+ *
+ * The icon shown is the target, not the current state: a sun while dark, a
+ * moon while light. That is what makes a single button legible without a
+ * label.
+ */
+import { Icon } from "@astrojs/starlight/components";
+
+const label = Astro.locals.t("themeSelect.accessibleLabel");
+---
+
+<ghc-theme-toggle>
+	<button type="button" class="ghc-theme-toggle" aria-label={label}>
+		<Icon name="sun" class="ghc-icon ghc-icon-sun" />
+		<Icon name="moon" class="ghc-icon ghc-icon-moon" />
+	</button>
+</ghc-theme-toggle>
+
+<script>
+	class GhcThemeToggle extends HTMLElement {
+		constructor() {
+			super();
+			this.querySelector("button")?.addEventListener("click", () => {
+				const current =
+					document.documentElement.dataset.theme === "light" ? "light" : "dark";
+				const next = current === "light" ? "dark" : "light";
+				document.documentElement.dataset.theme = next;
+				try {
+					localStorage.setItem("starlight-theme", next);
+				} catch {
+					// Private mode: the theme still applies to this page.
+				}
+				(
+					window as unknown as {
+						StarlightThemeProvider?: { updatePickers(theme: string): void };
+					}
+				).StarlightThemeProvider?.updatePickers(next);
+			});
+		}
+	}
+	customElements.define("ghc-theme-toggle", GhcThemeToggle);
+</script>
+
+<style>
+	.ghc-theme-toggle {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 2rem;
+		height: 2rem;
+		padding: 0;
+		border: 0;
+		border-radius: 0.25rem;
+		background: transparent;
+		color: var(--sl-color-gray-2);
+		cursor: pointer;
+	}
+	.ghc-theme-toggle:hover {
+		color: var(--sl-color-white);
+	}
+	.ghc-icon {
+		font-size: 1.25rem;
+	}
+	/* Only the target-mode icon is shown. */
+	:global([data-theme="light"]) .ghc-icon-sun {
+		display: none;
+	}
+	:global([data-theme="dark"]) .ghc-icon-moon {
+		display: none;
+	}
+</style>

@@ -1,0 +1,137 @@
+---
+title: Docker
+description: La imagen distroless, qué hay que montar con escritura y un compose junto a InfluxDB.
+---
+
+import { Tabs, TabItem, Aside } from "@astrojs/starlight/components";
+
+```sh
+docker run -d --name ghchronicle \
+  -v /etc/ghchronicle/config.yaml:/config.yaml:ro \
+  -e GITHUB_TOKEN -e INFLUX_TOKEN \
+  -p 9605:9605 \
+  ghcr.io/jmrplens/ghchronicle -config /config.yaml
+```
+
+## La imagen
+
+Construida `FROM gcr.io/distroless/static-debian13:nonroot` sobre un binario
+estático con `CGO_ENABLED=0`. No lleva shell ni gestor de paquetes, así que la
+ejecución de código dentro del contenedor no tiene con qué pivotar, y la
+etiqueta `nonroot` fija el **uid 65532**, lo que lo mantiene fuera de root
+incluso cuando el orquestador no pone ningún `securityContext` propio.
+
+Dos consecuencias que conviene saber antes de depurarlo:
+
+- `docker exec ... sh` no funciona. No hay `sh`. Lee los logs en su lugar.
+- Todo lo que el contenedor escriba debe pertenecer al uid 65532 o ser
+  escribible por él.
+
+## Qué tiene que ser escribible
+
+El fichero de configuración se monta de solo lectura. Cuatro cosas no:
+
+| Ruta                | Necesaria para                                                                              |
+| ------------------- | --------------------------------------------------------------------------------------------- |
+| `state_file`        | Siempre. Sin una ruta persistente el recorrido de estrellas se repite en cada reinicio      |
+| `sinks.dedupe_file` | Siempre. El registro de escrituras, que por omisión vive junto al fichero de estado         |
+| `sinks.file.path`   | Solo con el destino de fichero                                                              |
+| `log.file`          | Solo con un fichero de log configurado                                                      |
+
+Los dos primeros viven por omisión en el mismo directorio, así que un solo
+volumen montado cubre ambos. Montar solo el fichero de estado pierde el registro
+en cada reinicio, y entonces cada reinicio cuesta una pasada entera de
+reescritura, que es justo lo que el registro existe para evitar:
+[solo se escribe lo que ha cambiado](/ghchronicle/es/sinks/#solo-se-escribe-lo-que-ha-cambiado).
+
+```sh
+docker volume create ghchronicle-state
+docker run -d --name ghchronicle \
+  -v /etc/ghchronicle/config.yaml:/config.yaml:ro \
+  -v ghchronicle-state:/var/lib/ghchronicle \
+  -e GITHUB_TOKEN \
+  ghcr.io/jmrplens/ghchronicle -config /config.yaml
+```
+
+## El puerto
+
+`EXPOSE 9605` es el exportador de Prometheus, y es el único listener que el
+proceso abre. Publícalo solo si activaste el destino `prometheus`; todos los
+demás destinos son salientes.
+
+<Aside type="caution" title="Escucha en 0.0.0.0 dentro de un contenedor">
+  La configuración de ejemplo escucha en `127.0.0.1:9605`, que dentro de un
+  contenedor es el loopback del propio contenedor y es inalcanzable desde la
+  máquina anfitriona. Pon `sinks.prometheus.listen: 0.0.0.0:9605` y deja que
+  `-p` decida quién llega.
+</Aside>
+
+## Con compose
+
+<Tabs syncKey="compose">
+  <TabItem label="Solo el colector">
+    ```yaml title="compose.yaml"
+    services:
+      ghchronicle:
+        image: ghcr.io/jmrplens/ghchronicle
+        command: ["-config", "/config.yaml"]
+        restart: unless-stopped
+        environment:
+          GITHUB_TOKEN: ${GITHUB_TOKEN}
+          INFLUX_TOKEN: ${INFLUX_TOKEN}
+        volumes:
+          - ./config.yaml:/config.yaml:ro
+          - state:/var/lib/ghchronicle
+    volumes:
+      state:
+    ```
+  </TabItem>
+  <TabItem label="Con InfluxDB">
+    ```yaml title="compose.yaml"
+    services:
+      influxdb:
+        image: influxdb:3-core
+        volumes:
+          - influx:/var/lib/influxdb3
+        ports:
+          - "8181:8181"
+
+      ghchronicle:
+        image: ghcr.io/jmrplens/ghchronicle
+        command: ["-config", "/config.yaml"]
+        restart: unless-stopped
+        depends_on:
+          - influxdb
+        environment:
+          GITHUB_TOKEN: ${GITHUB_TOKEN}
+          INFLUX_TOKEN: ${INFLUX_TOKEN}
+        volumes:
+          - ./config.yaml:/config.yaml:ro
+          - state:/var/lib/ghchronicle
+
+    volumes:
+      influx:
+      state:
+    ```
+
+    El colector alcanza la base de datos por nombre de servicio, así que
+    `sinks.influxdb.url` es `http://influxdb:8181`.
+
+  </TabItem>
+</Tabs>
+
+## Una pasada y salir
+
+El contenedor acepta las mismas opciones que el binario, así que un planificador
+puede ejecutarlo sin un servicio permanente.
+
+```sh
+docker run --rm \
+  -v /etc/ghchronicle/config.yaml:/config.yaml:ro \
+  -v ghchronicle-state:/var/lib/ghchronicle \
+  -e GITHUB_TOKEN \
+  ghcr.io/jmrplens/ghchronicle -config /config.yaml -once
+```
+
+Monta el volumen de estado también en este modo. Es lo que hace barata la
+segunda ejecución.

@@ -1,0 +1,28 @@
+{
+  "data": {
+    "repository": {
+      "defaultBranchRef": {
+        "name": "main",
+        "target": {
+          "history": {
+            "totalCount": 3,
+            "pageInfo": {"hasNextPage": false, "endCursor": "c3d4e5f60718293a4b5c6d7e8f9012345678901a 2"},
+            "nodes": [
+              {
+                "oid": "c3d4e5f60718293a4b5c6d7e8f9012345678901a",
+                "committedDate": "2026-08-01T08:00:00Z",
+                "additions": 200,
+                "deletions": 120,
+                "changedFilesIfAvailable": 9,
+                "messageHeadline": "refactor: split the sink",
+                "author": {"name": "The Octocat", "user": {"login": "octocat"}},
+                "signature": {"isValid": false, "state": "UNKNOWN_KEY"},
+                "associatedPullRequests": {"nodes": []}
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}

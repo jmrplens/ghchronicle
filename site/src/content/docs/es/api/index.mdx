@@ -1,0 +1,150 @@
+---
+title: Límites de la API
+description: GitHub tiene quince presupuestos independientes; aquí importan tres, y el freno se escala a cada uno.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+GitHub no tiene un límite de peticiones. Tiene quince, y cada respuesta dice a
+cuál acaba de cargar en la cabecera `x-ratelimit-resource`.
+
+## Los tres que importan aquí
+
+| Cubo      | Límite               | Lo gasta                                                         |
+| --------- | -------------------- | ---------------------------------------------------------------- |
+| `core`    | 5000 por hora        | Toda llamada REST                                                |
+| `graphql` | 5000 puntos por hora | Las consultas de cuenta, commits, discusiones, etiquetas e hitos, y desde el 2026-09-11 las estrellas y forks más nuevos, la lista de estrellas dadas, las búsquedas de outbound y diez de los once contadores de totals |
+| `search`  | 30 por minuto        | El contador de commits de `totals`, y nada más: la búsqueda GraphQL no tiene tipo COMMIT |
+
+Dos más los carga una familia cada uno: `webhook_deliveries` (500 por minuto)
+por la lista de entregas de cada hook en `settings`, y `dependency_sbom` (100
+por minuto) por el SBOM en `deps`. Ninguno de los dos está entre los quince que
+informa `/rate_limit`; existen solo en las cabeceras de los endpoints que los
+cargan, y los dos se nombran en la [tabla de coste](/ghchronicle/es/api/cost/)
+donde aplican. El freno mira los tres de arriba, no el cubo que se cargó en
+último lugar, lo que importa por la razón de abajo.
+
+## El freno
+
+`github.reserve_rate` es cuántas llamadas no se gastan nunca. Por omisión son
+500. El colector detiene una familia antes que cruzar esa línea, para que lo
+demás que use el mismo token siga funcionando.
+
+```yaml
+github:
+  token: ${GITHUB_TOKEN}
+  reserve_rate: 500
+```
+
+La reserva se escala a cada cubo: una quinta parte de su límite, o el valor
+configurado, el menor de los dos.
+
+<Aside
+  type="caution"
+  title="El escalado es una corrección de error, no un refinamiento"
+>
+  Search permite treinta peticiones por minuto. Una llamada deja "29 restantes",
+  y comparar eso con una reserva plana de 500 se leía como agotado, así que se
+  saltaban todas las familias que quedaban de la pasada. Juzgar un cubo de
+  treinta peticiones con una reserva de cinco mil deja al colector parado en
+  seco.
+</Aside>
+
+Cuando un cubo baja de su reserva, el colector espera al reinicio que la
+respuesta ya le indicó, en vez de dormir un intervalo adivinado y reintentar. En
+una pasada normal la familia se salta con un aviso:
+
+```text
+level=WARN msg="rate limit reserve reached, family skipped" family=artifacts
+```
+
+Una vez está bien. En cada pasada significa que las cadencias son demasiado
+rápidas para el número de repositorios; ver
+[coste de una pasada](/ghchronicle/es/api/cost/) para saber qué alargar primero.
+
+## Los ETags, y por qué un 304 es gratis
+
+Cada respuesta se cachea por su ETag. Una petición repetida envía
+`If-None-Match`, y GitHub responde 304 Not Modified cuando nada ha cambiado.
+
+**Un 304 no cuesta cuota en absoluto.** Eso no es un detalle de optimización, es
+lo que hace asequibles las cadencias cortas. La mayor parte de lo que esto
+recoge apenas se mueve: el desglose de lenguajes de un repositorio, sus temas,
+su perfil de comunidad, la lista de workflows. Preguntarlos cada hora sería
+inasumible si cada pregunta costara una llamada. Preguntar si cambiaron no
+cuesta nada.
+
+La consecuencia es que el coste medido de una pasada en la página siguiente es
+una cota superior que se alcanza en la primera pasada y tras un cambio, no la
+cifra en régimen estable.
+
+Lo que la caché guarda junto a cada ETag es el valor que el colector
+decodificó, codificado de nuevo, no el cuerpo que envió GitHub. Una página de
+cien ejecuciones de workflow ocupa 1,4 MB de los que el colector conserva
+unos cientos de bytes por ejecución, así que la caché de una pasada ocupa
+alrededor de la novena parte de lo que ocuparían los cuerpos crudos, y un 304
+decodifica la novena parte de los bytes. Un test ejecuta cada
+colector REST dos veces contra un GitHub falso que responde 304 a la
+repetición y falla en el primer punto que difiera, que es lo que mantiene la
+repetición como la misma respuesta que la original. Cada entrada se indexa por
+la URL y por el tipo que la decodificó, así que la única URL que dos
+colectores leen de forma distinta, `GET /repos/{owner}/{repo}` (cuatro
+indicadores para el descubrimiento de un repositorio nombrado en
+`targets.repos`, cuarenta campos para la familia repo), tiene una entrada por
+lector y ninguno recibe la del otro.
+
+La caché está acotada, y la cota son 256 MB. Es un LRU, y a cada entrada se le
+cobran los bytes que guarda más doscientos por la casilla del mapa, el elemento
+de la lista y la estructura que los rodea, para que una caché llena de
+respuestas pequeñas se contabilice por lo que de verdad cuesta y no por la
+mitad. No hay clave para ella en el fichero de configuración: un despliegue cuyo
+conjunto vivo no quepa la sube desde Go con `SetCacheLimit`, y
+`CacheStats().Evicted` es el número que dice si ha hecho falta, porque se queda a
+cero mientras quepa el conjunto vivo de una pasada.
+
+De ahí salen dos cosas. Una cota por debajo del conjunto vivo de una pasada no es
+una caché más pequeña sino ninguna caché, porque cada pasada expulsaría lo que la
+siguiente está a punto de pedir. Y la cota es memoria residente en cuanto la
+caché se llena, que es el número que hay que saber antes de meter el proceso en
+un contenedor con límite de memoria: puede retener esa cantidad de cuerpos
+decodificados además de su propia huella.
+
+## Un rechazo también se recuerda
+
+Un 403 o un 404 es como GitHub dice que una función está apagada: Dependabot en
+un repositorio que no lo usa, code scanning donde nunca se activó, un foro en un
+repositorio con las discusiones apagadas. Eso no es un error, y el colector lo
+convierte en "aquí no hay nada".
+
+Lo que no es, es gratis. Un rechazo no lleva ETag, así que donde una página que
+no ha cambiado no cuesta nada, una función apagada se cobra entera en cada
+pasada, para siempre. Por eso un rechazo se recuerda un día, indexado por
+familia, repositorio y endpoint, y las pasadas de ese día no preguntan nada.
+
+Dos consecuencias que conviene saber:
+
+- Enciende una función y se nota como muy tarde al día siguiente, no en la
+  pasada siguiente.
+- Reiniciar el proceso vuelve a preguntar en el acto. La memoria vive en el
+  proceso, como la caché de ETags, no en el fichero de estado.
+
+Una cuota agotada también es un 403 y nunca se recuerda como tal: el cliente lo
+tipa aparte precisamente para que un límite de peticiones no se lea como una
+función apagada.
+
+## El presupuesto en el log
+
+```text
+level=INFO msg="rate budget" bucket=core remaining=4354 limit=5000
+```
+
+Merece una alerta el aviso de arriba, no esta línea. Un presupuesto que baja es
+normal; una familia saltada en cada pasada es un problema de configuración.
+
+## Un relleno histórico invierte la regla
+
+Un [relleno histórico](/ghchronicle/es/how/backfill/) es la intención contraria
+y lo dice. Cuando un cubo se agota espera a que la ventana se reinicie en vez de
+rendirse, porque un relleno que se detiene a medias ha gastado la parte cara del
+presupuesto y conserva solo las familias que terminó: cada una se escribe y se
+marca en cuanto acaba, y el resto hay que volver a lanzarlo.

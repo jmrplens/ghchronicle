@@ -1,0 +1,39 @@
+{
+  "data": {
+    "repository": {
+      "discussions": {
+        "totalCount": 2,
+        "nodes": [
+          {
+            "number": 12,
+            "title": "How do I bind a second port",
+            "url": "https://github.com/octocat/hello-world/discussions/12",
+            "createdAt": "2026-08-15T10:00:00Z",
+            "updatedAt": "2026-08-16T10:00:00Z",
+            "isAnswered": true,
+            "upvoteCount": 3,
+            "answerChosenAt": "2026-08-15T14:30:00Z",
+            "author": {"login": "erin"},
+            "category": {"name": "Q&A"},
+            "comments": {"totalCount": 2},
+            "reactions": {"totalCount": 1}
+          },
+          {
+            "number": 13,
+            "title": "A dark theme for the docs",
+            "url": "https://github.com/octocat/hello-world/discussions/13",
+            "createdAt": "2026-09-02T09:00:00Z",
+            "updatedAt": "2026-09-02T09:00:00Z",
+            "isAnswered": false,
+            "upvoteCount": 0,
+            "answerChosenAt": null,
+            "author": null,
+            "category": {"name": "Ideas"},
+            "comments": {"totalCount": 0},
+            "reactions": {"totalCount": 0}
+          }
+        ]
+      }
+    }
+  }
+}

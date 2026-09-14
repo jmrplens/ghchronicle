@@ -1,0 +1,179 @@
+---
+title: Dating a point
+description: Every point carries the moment the thing happened, and that single rule decides what the whole project can answer.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+import Figure from "../../../components/Figure.astro";
+
+**A point carries the date the thing happened, not the date it was collected.**
+
+That is the one rule everything else follows from. A workflow run is stamped
+when it finished. A star is stamped when it was given. A traffic day is stamped
+at that day's own date. A pull request is stamped when it closed. None of them
+is stamped at the instant the collector noticed.
+
+## The three kinds of point
+
+Not everything GitHub reports has a date of its own, so there are three
+treatments and each measurement declares which one it gets.
+
+| Kind      | Stamped at                    | Example                                                         |
+| --------- | ----------------------------- | --------------------------------------------------------------- |
+| **Dated** | the moment the thing happened | `gh_star`, `gh_workflow_run`, `gh_traffic`, `gh_commit`         |
+| **Daily** | the start of the UTC day      | `gh_traffic_referrer`, `gh_label`, `gh_milestone`, `gh_webhook` |
+| **Now**   | the instant of the sweep      | `gh_repo`, `gh_actions_cache`, `gh_dependabot_alert`            |
+
+Daily is for a snapshot with no date of its own. GitHub returns the top ten
+referrers of the trailing fourteen days as one list with no day attached, so it
+is not a series. Stamping it at the instant of the sweep would write four
+copies a day and any query that summed them would report four times the
+traffic. Stamping it at the start of the UTC day means a day's sweeps rewrite
+one row.
+
+Now is for something that is genuinely a current state. The size of the Actions
+cache, the number of open alerts, the inventory of workflows: none of these
+happened at a moment, so pretending otherwise would be a lie with a timestamp
+on it.
+
+## Why the rule exists: re-collection has to converge
+
+InfluxDB keys a point by measurement, tag set and timestamp. Three fields, one
+row. Write the same three again and the row is replaced, not added to.
+
+Written out, two sweeps six hours apart offer the same day twice, and the
+second replaces the first because the three keys are identical:
+
+```text
+gh_traffic,owner=acme,repo=telemetry,kind=views count=220i,uniques=131i 1757203200000000000
+gh_traffic,owner=acme,repo=telemetry,kind=views count=238i,uniques=140i 1757203200000000000
+```
+
+```text
+gh_traffic,owner=acme,repo=telemetry,kind=views count=238i,uniques=140i 1757203200000000000
+```
+
+One row, carrying the newest number GitHub reported for that day. Stamp those
+two lines at the moment of collection instead and they are two rows, and every
+sum over them is wrong by however many sweeps have run.
+
+That is what makes the whole design work. GitHub's traffic window is fourteen
+days, and the collector rewrites _all fourteen_ on every sweep rather than
+trying to work out which day is new:
+
+<Figure name="dating-converges" />
+
+The same property is what makes a backfill safe to run twice, and what lets you
+delete the state file without corrupting anything: re-collection rewrites rows
+it has already written.
+
+<Aside type="tip" title="Every history store has this property">
+  It is not InfluxDB-specific. The SQL sink's primary key is `(time, tag
+  columns)`, which is the same series key spelled as a constraint, and its
+  inserts end in `ON CONFLICT ... DO UPDATE` rather than `DO NOTHING`.
+  Elasticsearch derives the document id from the measurement, the tags and the
+  timestamp, and indexes rather than creates. Graphite writes into the whisper
+  slot the timestamp names. All four converge for the same reason.
+</Aside>
+
+## What Prometheus structurally cannot hold
+
+Prometheus stamps a sample at scrape time. It does not take a timestamp from
+the producer, and it rejects anything meaningfully older than now.
+
+This was measured rather than assumed. Against **Prometheus 3.14**, with
+`--web.enable-otlp-receiver` and `out_of_order_time_window: 30m`, a sample
+dated two days back comes back as **HTTP 400**.
+
+Half of what this collects is older than that on purpose: a star from 2020, a
+pull request merged in July, yesterday's traffic. So there is no configuration
+of Prometheus in which the dated history survives. Widening the out-of-order
+window moves the boundary; it does not remove it.
+
+<Aside type="danger" title="Do not give the exporter timestamps">
+  The obvious "fix" is to have the exporter emit each sample with the point's
+  own timestamp. Prometheus's exposition format allows it, and Prometheus will
+  refuse the ones that matter. The exporter deliberately drops the timestamp,
+  and the reduction below is why that is not a loss.
+</Aside>
+
+## The reducer, and what it makes of each measurement
+
+Because the store cannot hold the history, the reduction happens _before_
+Prometheus or an OTLP backend with `raw: false` ever sees the data.
+`Summarize` gives each measurement one of four rules.
+
+| Rule       | What it does                                                  | Used for                                                                     |
+| ---------- | ------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `keepLast` | The most recent point per label set wins                      | Snapshots: `gh_repo`, `gh_account`, `gh_release`                             |
+| `sum`      | Every point in the batch is added up                          | Windows: views over the fourteen days                                        |
+| `count`    | The points become a count plus the mean of each numeric field | Dated items: pull requests become "how many merged" and "how long they took" |
+| `skip`     | Nothing is served                                             | History with no honest current value                                         |
+
+A measurement with no rule is skipped rather than guessed at. That is the safe
+default, and it is deliberate: without it, a new collector could quietly flood
+an exporter with one series per star.
+
+`count` averages each of their numbers except the identifiers. A field that
+joins one row to another, `run_id`, `workflow_id`, `pull_request`, `number`,
+`stack` and the rest, is a name and not a quantity: averaged over a count it
+becomes a number shaped exactly like the identifier it is made of and belonging
+to nothing, and `gh_deployment` published `run_id_mean` that way. Those fields
+are left out of the reduction, and so are the markers a point carries only so
+that it has a field at all, whose mean is 1.0 for ever.
+
+The reducer also publishes `total`, a running count of distinct items seen per
+series. That is what lets a Prometheus dashboard answer "per day" at all, through
+`increase()` over a monotonic counter, since it has no rows to count.
+
+### The ten that are never served
+
+Ten of the measurements carry `skip`, so a Prometheus exporter and an OTLP
+backend with `raw: false` never see them. Seven are history, two are size, and
+one is text:
+
+| Measurement                | Why                                                                                   |
+| -------------------------- | ------------------------------------------------------------------------------------- |
+| `gh_artifact`              | History. One row per artifact ever, and none of them moves again                      |
+| `gh_commit_punchcard`      | Size. One series per repository, weekday and hour                                     |
+| `gh_commits_week`          | History. The weekly commit series                                                     |
+| `gh_contribution_day`      | History. The green calendar, one row per day                                          |
+| `gh_contribution_day_repo` | History. The same calendar split per repository, which would mint a series per day    |
+| `gh_job_log`               | Text, not a number. It belongs in a log store                                         |
+| `gh_package_version`       | History. The publication date of every tag; the count of them is a field on `gh_package` |
+| `gh_release_asset`         | Size. One series per file ever published                                              |
+| `gh_traffic_path`          | History. The per-day paths                                                            |
+| `gh_workflow_step`         | History. The per-step timings                                                         |
+
+The two skipped for size are the ones worth knowing about, because they are
+real numbers rather than history: measured, together they were four fifths of
+the exporter's entire output. Both are drawn properly by the InfluxDB
+dashboard, and `gh_release` keeps the per-release download counts the assets
+were being read for.
+
+## Which store keeps what
+
+| Store                                         | The dated history           | Why                                                                                                 |
+| --------------------------------------------- | --------------------------- | --------------------------------------------------------------------------------------------------- |
+| InfluxDB, PostgreSQL, Graphite, Elasticsearch | yes                         | The timestamp is part of the identity of a row                                                      |
+| Telegraf                                      | as far as its outputs allow | It forwards the timestamps unchanged; an output that stamps at receipt loses them                   |
+| File and stdout                               | yes                         | The timestamp is in the line                                                                        |
+| Loki                                          | recent events only          | Loki refuses an entry too far behind the newest in its stream. See [Loki](/ghchronicle/sinks/loki/) |
+| OpenTelemetry                                 | the backend decides         | OTLP data points carry an explicit timestamp; whether it is honoured is not up to this tool         |
+| Prometheus                                    | no                          | Current values only, by the rules above                                                             |
+
+## Three consequences worth knowing
+
+**A tag is a series, a field is a value.** Anything unbounded goes in a field.
+The Actions runner name looks like a good tag until you notice a hosted runner
+is named uniquely per run (`GitHub Actions 1000163135`), which would create a
+series for every job ever executed. It is a field.
+
+**Weekly rows are anchored to the week, not to today.** `gh_commits_week` is
+stamped at the Sunday that starts each week. A sweep on Tuesday and one on
+Friday have to land on the same row, or every re-read writes a second copy of
+the year.
+
+**Prometheus reserves some tag names.** A tag called `job` or `instance`
+collides with the scrape labels, and the OTLP receiver overwrites it with the
+service name. Workflow jobs are therefore tagged `job_name`.

@@ -1,0 +1,305 @@
+---
+title: Cadences
+description: The three layers of the every block, the built-in cadence of every family, the warning when a configuration speeds one up, and the heartbeat.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+```yaml
+every:
+  default: 15m
+  groups:
+    ci: 1m
+    feeds: 10m
+  families:
+    actions: 30s
+```
+
+## The three layers
+
+Most specific wins. A family's own entry beats its group's, a group's beats
+`default`, and `default` beats the built-in value. Anything omitted falls
+through to the layer below it, so a file with only `families:` in it behaves
+exactly as it always did. The value is a Go duration: `30s`, `15m`, `2h`, `36h`.
+
+| Layer              | Reaches                            | Written as              |
+| ------------------ | ---------------------------------- | ----------------------- |
+| `every.families`   | one family                         | `families: {keys: 24h}` |
+| `every.groups`     | every family of one group          | `groups: {ci: 1m}`      |
+| `every.default`    | every family neither above names   | `default: 15m`          |
+| the built-in table | every family none of the above name | nothing                 |
+
+They are three keys of a nested block rather than three flat ones because a
+flat map cannot hold this vocabulary. `security` and `account` are each both a
+family name **and** a group name, so `every: {security: 1m}` has two readings
+and no way to choose between them. Under `families:` the word is the family;
+under `groups:` it is the group; there is nowhere left for the question to
+arise. The same nesting is what makes `default` and `groups` safe as words:
+they are fields of a fixed structure, and an unknown key is refused at
+start-up, so no family can ever shadow a layer and no layer can ever shadow a
+family.
+
+<Aside type="caution" title="The two broad layers never switch a family on">
+  `default` and `groups` cannot reach a family whose built-in cadence is `0`.
+  `deps`, `history` and `joblogs` ship switched off and are enabled by naming
+  them under `families:` and by nothing else. `deps` alone is 1.8 MB of SBOM per
+  repository, and a default written to speed up the fast families must not also
+  switch on three families you never mentioned. It is the same rule `groups`
+  already follows.
+</Aside>
+
+Turning it around gives the shortest way to collect a little: switch everything
+off with `default`, then name what you want back.
+
+```yaml
+every:
+  default: 0
+  families:
+    traffic: 6h
+    actions: 15m
+```
+
+## Every family, its group and its built-in cadence
+
+The built-in values are not round numbers picked for tidiness. They came out of
+a costed audit, and the reason each one is what it is lives next to the number
+in the code. That is the source, and this table is pinned to it: a test in
+`internal/config` compares every group, every duration and every reason below
+against the code in both directions, so a family added, moved or re-costed
+without this table following it fails the build. `ghchronicle -groups` prints
+the same membership.
+
+| Group       | Family        | Default | Why that value                                                                                                                                  |
+| ----------- | ------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `account`   | `account`     | `12h`   | the contribution calendar changes once a day, and the whole family costs one GraphQL point                                                       |
+| `account`   | `achievements` | `24h`  | the badges on the public profile page, read from the page itself because no API lists them, and the distance to each badge's next tier from the API beside; a badge is earned over weeks and the day costs one page and some thirty GraphQL points |
+| `account`   | `billing`     | `6h`    | GitHub updates the usage report a few times a day at most                                                                                       |
+| `account`   | `history`     | `0`     | off until asked for by name: it walks every past year and the year so far, and the rows are idempotent                                           |
+| `account`   | `keys`        | `24h`   | an SSH or GPG key changes when somebody changes it, and what matters is its expiry date, not the hour it was noticed                             |
+| `account`   | `outbound`    | `12h`   | stars given and work in other people's repositories move at the speed of a person                                                                |
+| `account`   | `profile`     | `12h`   | packages, gists and social accounts, all of them edited by hand                                                                                  |
+| `account`   | `totals`      | `12h`   | twice a day is plenty for a number that only grows                                                                                              |
+| `audience`  | `forks`       | `12h`   | the whole list fits in one page, and a fork is a rare event                                                                                      |
+| `audience`  | `stars`       | `6h`    | the full stargazer walk happens once; after that the newest hundred ride in one GraphQL query per ten repositories                               |
+| `audience`  | `traffic`     | `6h`    | the fourteen-day window is rewritten whole each time, so a missed sweep repairs itself on the next one                                           |
+| `ci`        | `actions`     | `15m`   | a workflow run is over in minutes, and its queue time is only worth watching while it is happening                                               |
+| `ci`        | `artifacts`   | `1h`    | artifacts appear with the run that made them and expire on a scale of days                                                                       |
+| `ci`        | `deployments` | `1h`    | the surface a delivery dashboard reads, and the newest page is cheap: one GraphQL point per five repositories                                    |
+| `ci`        | `joblogs`     | `0`     | off until asked for by name: it is text rather than a measurement, it costs a request per failure, and it only makes sense with a log store attached |
+| `collector` | `ratelimit`   | `15m`   | free, and worth having at the resolution of the busiest family                                                                                  |
+| `feeds`     | `activity`    | `30m`   | the repository log holds a hundred entries, which covered twenty-six hours on the busiest repository measured                                    |
+| `feeds`     | `events`      | `30m`   | the feed keeps the last three hundred events whatever their dates, so this is the size of a window, not a speed                                  |
+| `feeds`     | `notifs`      | `30m`   | read notifications disappear quickly, so this is the size of a window, not a speed                                                               |
+| `repos`     | `branches`    | `24h`   | branches are created and deleted all day, but the question the row answers is which are stale right now, which is a daily one                    |
+| `repos`     | `deps`        | `0`     | off until asked for by name: the SBOM is 1.8 MB per repository and has its own budget of a hundred a minute                                       |
+| `repos`     | `inventory`   | `24h`   | four core requests per repository, for settings that change only when somebody changes them                                                      |
+| `repos`     | `policyfiles` | `24h`   | SECURITY.md, CODEOWNERS, dependabot.yml and FUNDING.yml move about once a quarter                                                                |
+| `repos`     | `repo`        | `1h`    | stars, forks, languages and topics move slowly, and this is one request per repository                                                           |
+| `repos`     | `rulesets`    | `24h`   | a ruleset is edited a few times a year, every version keeps its own date, and both requests answer 304 until somebody edits one                  |
+| `repos`     | `settings`    | `6h`    | webhooks, rulesets, environments and deploy keys change only when somebody changes them                                                          |
+| `security`  | `analyses`    | `6h`    | GitHub prunes code scanning analyses, and a repository produces a handful a day                                                                  |
+| `security`  | `security`    | `1h`    | an alert is something to act on today, and the list of open ones is short                                                                        |
+| `work`      | `commits`     | `1h`    | one request per commit, so the cost follows how much was pushed rather than how often this asks                                                  |
+| `work`      | `discussions` | `2h`    | a discussion is answered over hours or days, and few repositories have any                                                                       |
+| `work`      | `issueevents` | `1h`    | the timeline of what moved in two cadences, one GraphQL point a repository, so the hour is how soon a transition is worth seeing                                                            |
+| `work`      | `issues`      | `1h`    | one request per item, so the cost follows how much is open rather than how often this asks                                                       |
+| `work`      | `planning`    | `6h`    | labels and milestones are edited by hand, a few times a week at most                                                                             |
+| `work`      | `stats`       | `12h`   | GitHub recomputes these slowly anyway, so asking more often returns the same numbers                                                             |
+
+## The warning when a cadence is faster than the value is worth
+
+A broad layer is a cheap way to slow everything down and an expensive way to
+speed everything up. `default: 15m` asks GitHub for the account's SSH keys
+ninety-six times a day for a value that changes twice a year, and a group
+cadence does the same thing one level down: `work` holds families the audit
+measured at `1h` and at `12h`, so one number there is one number over six
+different answers.
+
+So every family a configuration collects **four times more often or more** than
+its built-in cadence is named at start-up, with the key that set it, both
+numbers, and the reason that number is what it is:
+
+```text
+level=WARN msg="every.default sets keys to 15m against a built-in 24h, 96 times
+  more often: an SSH or GPG key changes when somebody changes it, and what
+  matters is its expiry date, not the hour it was noticed"
+level=WARN msg="every.groups.work sets stats to 1h against a built-in 12h, 12
+  times more often: GitHub recomputes these slowly anyway, so asking more often
+  returns the same numbers"
+```
+
+It is a warning and never a refusal, and it is always per family, never per
+group. A line saying "the group `work` is too fast" would name nothing you can
+act on: the reason a cadence is what it is belongs to the family, so the
+warning has to as well.
+
+Four is the threshold because the built-in values are a ladder, `15m` `30m`
+`1h` `2h` `6h` `12h` `24h`, and the widest gap between two neighbouring rungs
+is three, from `2h` to `6h`. Four is therefore the smallest factor no single
+step down that ladder can reach. Moving one rung is a deliberate adjustment
+made by somebody looking at that family and stays quiet; four or more can only
+be a broad layer landing somewhere it was never chosen for, or a number typed
+without reading this table.
+
+Nothing warns for going slower. This is about waste, not about taste.
+
+## Groups: collecting less than everything
+
+`every` sets how often a family runs. `groups` sets which families exist for
+this deployment at all. Omit the key and it collects for every group, which is
+the default and is what "every metric GitHub exposes" has always meant.
+
+```yaml
+groups: [audience, account, repos, security]
+```
+
+Naming any group turns the rest off: their families are never requested and
+their measurements are never written. `ghchronicle -groups` prints the list,
+which is:
+
+| Group       | Families                                                                 |
+| ----------- | ------------------------------------------------------------------------ |
+| `audience`  | `forks`, `stars`, `traffic`                                              |
+| `account`   | `account`, `achievements`, `billing`, `history`, `keys`, `outbound`, `profile`, `totals` |
+| `repos`     | `branches`, `deps`, `inventory`, `policyfiles`, `repo`, `rulesets`, `settings`       |
+| `work`      | `commits`, `discussions`, `issueevents`, `issues`, `planning`, `stats`   |
+| `ci`        | `actions`, `artifacts`, `deployments`, `joblogs`                         |
+| `security`  | `analyses`, `security`                                                   |
+| `feeds`     | `activity`, `events`, `notifs`                                           |
+| `collector` | `ratelimit`                                                              |
+
+The top-level `groups` and `every.groups` are different questions about the
+same eight names: the first decides whether a group is collected at all, the
+second how often. A cadence under `every.groups` for a group the top-level
+`groups` leaves out is legal and warns, rather than failing: narrowing a
+deployment should not also mean pruning an `every` block you tuned last year.
+
+The two axes both have to say yes, and only one of them can say no. A group
+that is not named switches its families off whatever `every` says, and naming
+a group never resurrects a family whose cadence is zero. That is the whole of
+how a family ships switched off while the default is everything.
+
+Writing `groups: []` is refused rather than read as "collect nothing": omitting
+the key is how you ask for everything, so an empty list can only be a mistake.
+
+Three surfaces cannot be recovered later, whatever you do afterwards, and they
+sit in three different groups: the event feed and read notifications (`feeds`),
+the fourteen-day traffic window (`audience`) and job logs, deleted after ninety
+days (`ci`). A day not collected for those is a day that does not exist.
+Everything else can be filled in later with `-backfill`.
+
+<Aside
+  type="caution"
+  title="Panels for a group you switched off will show an error"
+>
+  A measurement that is never written does not exist as a table, and InfluxDB 3
+  answers a query naming a table it does not have with an error rather than with
+  no rows. The dashboards are generated once, for the full set of metrics, so
+  every panel fed by a group you turned off shows that error. It is expected.
+  They are a demonstration of what the collector can chart, not a view that
+  reshapes itself around your configuration. PostgreSQL and Elasticsearch
+  behave the same way; Prometheus and Graphite have no schema to miss, so the
+  same panels there read No data instead.
+</Aside>
+
+The dashboard sections are not aligned to the groups either, so a group
+switched off empties some panels of several sections rather than one section
+cleanly. `Stars and forks` reads `gh_repo` from `repos` as well as `gh_star`
+from `audience`; `Code` reads `gh_workflow_run` from `ci` and `gh_repo_activity`
+from `feeds` alongside its own commits; `Inventory` reads from `repos` and
+`account`, and its licence panels read `gh_dependency_license`, which is family
+`deps` and ships switched off whether or not `repos` is selected.
+
+## What `0` means
+
+`0` switches off every family the layer it is written on reaches. It is not "as
+often as possible" and not "use the default": those families never run, write
+nothing and cost nothing.
+
+```yaml
+every:
+  families:
+    billing: 0 # no billing data at all
+    artifacts: 0 # no artifact rows
+```
+
+Three families ship off and are enabled by giving them any duration, under
+`families:` and nowhere else:
+
+- **`joblogs`** is the tail of every failed job's log. It is text rather than a
+  measurement, it costs a request per failure, and it only makes sense with a
+  log store attached. The InfluxDB sink excludes it by default.
+- **`history`** walks every past year's contribution calendar, one GraphQL
+  point per year, back to the day the account was created, and the year in
+  progress from January to now. The past years never change and the rows are
+  idempotent; the current year's row is a snapshot marked `partial`, so a
+  daily cadence keeps it current and a single sweep leaves it frozen on the
+  day it ran.
+- **`deps`** is the dependency graph. The SBOM is 1.8 MB per repository and has
+  its own budget of a hundred a minute.
+
+A configuration that leaves nothing at all enabled says so at start-up rather
+than running an empty loop in silence.
+
+<Aside type="caution" title="An unknown name is fatal at start-up">
+```text
+every.families.trafic: unknown collector (known: account, achievements, actions, activity, ...)
+every.families.feeds: "feeds" is a group, not a family; every.groups.feeds is where a whole group's cadence lives
+every.groups.actions: "actions" is a family, not a group; it is in group "ci", and every.families.actions is where its cadence lives
+```
+
+Every name is checked against the known collectors and the known groups before
+the first API call. A typo would otherwise mean a family silently running at its
+default forever, and a name written under the wrong layer is told which layer it
+belonged under.
+
+</Aside>
+
+## `heartbeat`: the loop's tick, which is not a cadence
+
+`heartbeat` forces how often the sweep loop wakes to ask which families are
+due. It gives no family an interval, it is compared against nothing in the
+table above, and it earns none of the warnings on this page.
+
+```yaml
+heartbeat: 15s
+```
+
+Omit it and the loop ticks at the shortest cadence configured, held between one
+minute and one hour, which is what a real deployment wants: a family that runs
+every quarter of an hour is not delayed by one that runs every twelve hours.
+The upper end matters to a configuration whose cadences are all slower than an
+hour: the search for the shortest one starts at an hour, so the loop still
+wakes hourly and finds nothing due. Set it when you
+want the loop itself under control, which is almost always a test run. It is
+the only way to turn the loop faster than that one minute floor, because the
+floor exists to survive a mistyped cadence and an explicit heartbeat is not one.
+
+A heartbeat **longer** than the shortest cadence holds that family back, and
+start-up says so:
+
+```text
+level=WARN msg="heartbeat is 1h and the shortest cadence is 15m (actions), so
+  no family can run more often than every 1h"
+```
+
+## Making them slower
+
+If the budget is tight, lengthen `artifacts` and then `actions`. They are the
+only two whose cost scales with how busy the repositories are rather than with
+how many there are. See [cost of a sweep](/ghchronicle/api/cost/).
+
+The symptom of cadences that are too fast is a warning every sweep:
+
+```text
+level=WARN msg="rate limit reserve reached, family skipped" family=actions
+```
+
+## Cadence is not resolution
+
+Lengthening a cadence does not coarsen the history, because the points are
+dated by the thing that happened rather than by the sweep. Collecting workflow
+runs every hour instead of every fifteen minutes still records each run at the
+second it finished. What a longer cadence risks is missing a window entirely:
+`events`, `notifs` and `activity` are windows rather than speeds, as the table
+above says, and nothing else here is.

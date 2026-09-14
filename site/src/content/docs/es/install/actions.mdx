@@ -1,0 +1,175 @@
+---
+title: GitHub Actions
+description: La Action compuesta, sus tres modos y las dos cosas que un runner alojado no conserva.
+---
+
+import { Tabs, TabItem, Aside } from "@astrojs/starlight/components";
+
+El repositorio incluye una Action compuesta, así que un workflow no necesita
+cadena de herramientas de Go: descarga un binario de release y lo llama.
+
+```yaml
+- uses: jmrplens/ghchronicle@v1
+  with:
+    token: ${{ secrets.GHCHRONICLE_TOKEN }}
+    mode: once
+    config: .github/ghchronicle.yaml
+```
+
+## Entradas
+
+| Entrada          | Por omisión              | Qué hace                                                                                     |
+| ---------------- | ------------------------ | -------------------------------------------------------------------------------------------- |
+| `token`          | obligatoria              | Un token personal. El `GITHUB_TOKEN` automático no basta                                     |
+| `config`         | `""`                     | Ruta a un fichero de configuración. Omítela para usar valores por defecto a partir de `user` |
+| `user`           | el dueño del repositorio | La cuenta que recoger cuando no se da fichero de configuración                               |
+| `mode`           | `once`                   | `once`, `backfill` o `card`                                                                  |
+| `backfill-since` | `""`                     | Límite para `backfill`: una fecha, `90d`, `2y` o una duración de Go. Vacío es sin límite     |
+| `card`           | `""`                     | Ruta del SVG que escribir. Vacío significa sin tarjeta                                       |
+| `card-layout`    | `summary`                | Uno de los diez diseños registrados                                                          |
+| `card-theme`     | `auto`                   | `dark`, `light` o `auto`                                                                     |
+| `card-fields`    | `""`                     | Campos separados por comas. Vacío es el conjunto por defecto del diseño                      |
+| `version`        | `latest`                 | La release que instalar                                                                      |
+
+## Los tres modos
+
+<Tabs syncKey="action-mode">
+  <TabItem label="once">
+    Una pasada contra un fichero de configuración que tú das, que es como un
+    workflow alimenta una base de datos.
+
+    ```yaml
+    name: Collect
+    on:
+      schedule:
+        - cron: "*/30 * * * *"
+      workflow_dispatch:
+
+    jobs:
+      collect:
+        runs-on: ubuntu-latest
+        steps:
+          - uses: actions/checkout@v7
+          - uses: jmrplens/ghchronicle@v1
+            with:
+              token: ${{ secrets.GHCHRONICLE_TOKEN }}
+              mode: once
+              config: .github/ghchronicle.yaml
+            env:
+              INFLUX_TOKEN: ${{ secrets.INFLUX_TOKEN }}
+    ```
+
+    El fichero de configuración referencia las credenciales de la base de datos
+    como `${VAR}`, así que entran como secretos y nunca al repositorio.
+
+  </TabItem>
+  <TabItem label="card">
+    Una pasada y un SVG, y nada escrito en ninguna base de datos. Este es el
+    único modo que no necesita almacén alguno configurado.
+
+    ```yaml
+    name: Profile card
+    on:
+      schedule:
+        - cron: "17 6 * * *"
+      workflow_dispatch:
+
+    permissions:
+      contents: write
+
+    jobs:
+      card:
+        runs-on: ubuntu-latest
+        steps:
+          - uses: actions/checkout@v7
+          - uses: jmrplens/ghchronicle@v1
+            with:
+              token: ${{ secrets.GHCHRONICLE_TOKEN }}
+              mode: card
+              card: generated/github-stats.svg
+              card-layout: github-stats
+              card-theme: auto
+          - name: Commit if it changed
+            run: |
+              git config user.name "github-actions[bot]"
+              git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+              git add generated/
+              git diff --staged --quiet || git commit -m "Update the profile card"
+              git push
+    ```
+
+    El SVG es idéntico byte a byte para la misma entrada, así que un día sin
+    cambios no produce ningún commit.
+
+  </TabItem>
+  <TabItem label="backfill">
+    Llega tan atrás como GitHub permita y espera al límite de peticiones en vez
+    de detenerse. Ejecútalo una vez, a mano.
+
+    ```yaml
+    name: Backfill
+    on:
+      workflow_dispatch:
+        inputs:
+          since:
+            description: "A date, 90d, 2y, or empty for no bound"
+            default: "2y"
+
+    jobs:
+      backfill:
+        runs-on: ubuntu-latest
+        timeout-minutes: 360
+        steps:
+          - uses: actions/checkout@v7
+          - uses: jmrplens/ghchronicle@v1
+            with:
+              token: ${{ secrets.GHCHRONICLE_TOKEN }}
+              mode: backfill
+              backfill-since: ${{ inputs.since }}
+              config: .github/ghchronicle.yaml
+    ```
+
+    Dale un `timeout-minutes` generoso: un relleno sin límite aparca en cada
+    reinicio de la ventana, y un job que muere a medias ha gastado la cuota y se
+    ha quedado con parte del beneficio.
+
+  </TabItem>
+</Tabs>
+
+## Dos cosas que un runner alojado no conserva
+
+<Aside type="caution" title="El token tiene que ser un token personal">
+  El tráfico necesita acceso de escritura a *cada* repositorio que se recoja, y
+  el `GITHUB_TOKEN` automático solo lo tiene para el repositorio en el que corre
+  el workflow. Tampoco tiene `security_events` ni `read:packages`, y no es un
+  usuario, así que nada de ámbito de cuenta funciona con él. Ver [el
+  token](/ghchronicle/es/start/token/).
+</Aside>
+
+**El fichero de estado no sobrevive entre ejecuciones.** Cada ejecución vuelve
+por tanto a recorrer entera la lista de estrellas. En una cuenta pequeña son un
+puñado de llamadas; en una cuenta con muchas estrellas, guárdalo en caché:
+
+```yaml
+- uses: actions/cache@v4
+  with:
+    path: ~/.ghchronicle
+    key: ghchronicle-state-${{ github.run_id }}
+    restore-keys: ghchronicle-state-
+```
+
+y apunta `state_file` a `~/.ghchronicle/state.json` en la configuración.
+
+## Sin la Action
+
+Lo mismo a mano, si prefieres no depender de ella:
+
+```yaml
+- uses: actions/setup-go@v7
+  with:
+    go-version: stable
+- run: go install github.com/jmrplens/ghchronicle/cmd/ghchronicle@latest
+- run: ghchronicle -config .github/ghchronicle.yaml -card profile.svg -card-only
+  env:
+    GITHUB_TOKEN: ${{ secrets.GHCHRONICLE_TOKEN }}
+```

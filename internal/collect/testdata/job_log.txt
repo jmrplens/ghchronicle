@@ -1,0 +1,7 @@
+﻿2026-09-06T14:05:50.1234567Z □ Run go test ./...
+2026-09-06T14:05:51.0000000Z [36;1m=== RUN   TestETag[0m
+2026-09-06T14:05:52.0000000Z [31m--- FAIL: TestETag (0.00s)[0m
+
+2026-09-06T14:05:53.0000000Z     client_test.go:42: second request did not send If-None-Match
+2026-09-06T14:05:54.0000000Z FAIL
+2026-09-06T14:05:55.0000000Z [91mError: Process completed with exit code 1.[0m

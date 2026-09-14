@@ -1,0 +1,20 @@
+---
+title: ghchronicle
+description: Collects every metric GitHub exposes about an account and keeps it with the date it happened.
+template: splash
+hero:
+  tagline: GitHub answers questions about the present and almost none about the past. This keeps the past.
+  actions:
+    - text: Start here
+      link: /ghchronicle/start/
+      icon: right-arrow
+    - text: On GitHub
+      link: https://github.com/jmrplens/ghchronicle
+      icon: external
+      variant: minimal
+---
+
+import Home from "../../components/home/Home.astro";
+import { en } from "../../data/home";
+
+<Home content={en} />
