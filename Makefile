@@ -398,9 +398,10 @@ check-docs: ## Fail if docs/ no longer matches the pages it is generated from
 # of one thing per pass. There is no separate gofmt or go vet step: gofumpt is
 # gofmt with more rules, and golangci-lint's govet runs every analyzer go vet
 # runs and more, so both would repeat a question the linter already answered.
-# check-dashboards and check-docs are in the list because a dashboard that no
-# longer matches its specification, or a file under docs/ that no longer
-# matches the page it is generated from, is the same kind of defect as a lint
+# check-dashboards, check-gallery and check-docs are in the list because a
+# dashboard that no longer matches its specification, a card picture that no
+# longer matches the renderer, or a file under docs/ that no longer matches
+# the page it is generated from, is the same kind of defect as a lint
 # finding: something committed that the source no longer produces.
 analyze: ## Run the whole static-analysis suite and report every failure at once
 	@analysis_status=0; \
@@ -426,14 +427,15 @@ analyze: ## Run the whole static-analysis suite and report every failure at once
 	echo "Go analysis packages: $(PKGS)"; \
 	echo "Go analysis build tags: $(E2E_DOCKER_TAG)"; \
 	echo ""; \
-	run_check "[1/8] golangci-lint config verify" golangci-lint config verify; \
-	run_check "[2/8] golangci-lint fmt" golangci-lint fmt --diff $(FMT_PATHS); \
-	run_check "[3/8] golangci-lint run" golangci-lint run $(PKGS); \
-	run_check "[4/8] govulncheck" $(MAKE) --no-print-directory govulncheck; \
-	run_check "[5/8] markdownlint" $(MAKE) --no-print-directory mdlint; \
-	run_check "[6/8] documentation local links" $(MAKE) --no-print-directory check-doc-links; \
-	run_check "[7/8] dashboards up to date" $(MAKE) --no-print-directory check-dashboards; \
-	run_check "[8/8] docs/ up to date" $(MAKE) --no-print-directory check-docs; \
+	run_check "[1/9] golangci-lint config verify" golangci-lint config verify; \
+	run_check "[2/9] golangci-lint fmt" golangci-lint fmt --diff $(FMT_PATHS); \
+	run_check "[3/9] golangci-lint run" golangci-lint run $(PKGS); \
+	run_check "[4/9] govulncheck" $(MAKE) --no-print-directory govulncheck; \
+	run_check "[5/9] markdownlint" $(MAKE) --no-print-directory mdlint; \
+	run_check "[6/9] documentation local links" $(MAKE) --no-print-directory check-doc-links; \
+	run_check "[7/9] dashboards up to date" $(MAKE) --no-print-directory check-dashboards; \
+	run_check "[8/9] card gallery up to date" $(MAKE) --no-print-directory check-gallery; \
+	run_check "[9/9] docs/ up to date" $(MAKE) --no-print-directory check-docs; \
 	echo "============================================================"; \
 	if [ "$$analysis_status" -ne 0 ]; then \
 		echo "Analysis failed. Review the findings above."; \
