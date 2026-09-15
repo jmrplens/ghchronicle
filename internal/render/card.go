@@ -97,6 +97,11 @@ type Options struct {
 	// empty means the layout's default set. A field the layout does not
 	// support is skipped, an unknown one is an error.
 	Fields []string
+
+	// Motion is how an animated layout moves: MotionOnce, MotionLoop or
+	// MotionOff. Empty means MotionOnce. A layout that does not move accepts
+	// every valid value and draws the same card.
+	Motion string
 }
 
 const (
@@ -226,6 +231,13 @@ func SVG(c *Card, o *Options) ([]byte, error) {
 	if theme != "auto" && theme != "dark" && theme != "light" {
 		return nil, fmt.Errorf("%w: %q", ErrTheme, o.Theme)
 	}
+	motion := o.Motion
+	if motion == "" {
+		motion = MotionOnce
+	}
+	if motion != MotionOnce && motion != MotionLoop && motion != MotionOff {
+		return nil, fmt.Errorf("%w: %q (valid: %s, %s, %s)", ErrMotion, o.Motion, MotionOnce, MotionLoop, MotionOff)
+	}
 	def, err := findLayout(o.Layout)
 	if err != nil {
 		return nil, err
@@ -255,6 +267,7 @@ func SVG(c *Card, o *Options) ([]byte, error) {
 		nums:   metricsOf(c, fields),
 		repos:  rank(c.TopRepos, maxRepos),
 		langs:  rankLanguages(c.Languages, maxLanguages),
+		motion: motion,
 	}
 	if !s.has(fieldTopRepos) {
 		s.repos = nil
@@ -280,6 +293,7 @@ type spec struct {
 	nums   []metric
 	repos  []TopRepo
 	langs  []langShare
+	motion string // already validated
 }
 
 func (s *spec) has(field string) bool {
