@@ -28,20 +28,20 @@ text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,san
 .s{font-size:11px}
 .c{font-size:12px}
 .line{fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-.area{opacity:0.14;stroke:none}
+.area{fill-opacity:0.14;stroke:none}
 .axis{stroke-width:1}
 .edge{fill:none;stroke-width:1}
 .line{stroke-width:2.5}
-.area{opacity:0.18}
-.draw{animation:draw 1.6s ease-out 1}
-.fade{animation:fade 1.6s ease-out 1}
-@keyframes draw{from{stroke-dasharray:1;stroke-dashoffset:1}to{stroke-dasharray:1;stroke-dashoffset:0}}
-@keyframes fade{from{opacity:0}}
-@media (prefers-reduced-motion:reduce){.draw,.fade,.cu{animation:none}}
+.area{fill-opacity:0.18}
+.m0{animation:m0 1.6s ease-out 1}
+@keyframes m0{0%{opacity:0}100%{opacity:1}}
+.m1{animation:m1 1.6s ease-out 1}
+@keyframes m1{0%{stroke-dasharray:1;stroke-dashoffset:1}100%{stroke-dasharray:1;stroke-dashoffset:0}}
+@media (prefers-reduced-motion:reduce){.m0,.m1{animation:none}}
 </style>
 <rect class="bg" x="0.5" y="0.5" width="494" height="169" rx="6"/>
-<path class="area fade" d="M1,148 L1,148 L494,148 L494,148Z"/>
-<polyline class="line draw" pathLength="1" points="1,148 494,148"/>
+<path class="area m0" d="M1,148 L1,148 L494,148 L494,148Z"/>
+<polyline class="line m1" pathLength="1" points="1,148 494,148"/>
 <text class="big" x="25" y="40" text-anchor="start">0</text>
 <text class="l" x="25" y="57" text-anchor="start">Stars</text>
 <text class="big" x="173.33" y="40" text-anchor="start">0</text>

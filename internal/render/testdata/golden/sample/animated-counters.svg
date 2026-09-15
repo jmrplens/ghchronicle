@@ -28,7 +28,7 @@ text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,san
 .s{font-size:11px}
 .c{font-size:12px}
 .line{fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-.area{opacity:0.14;stroke:none}
+.area{fill-opacity:0.14;stroke:none}
 .axis{stroke-width:1}
 .edge{fill:none;stroke-width:1}
 .cu{animation-duration:1.4s;animation-timing-function:linear;animation-iteration-count:1}
@@ -66,11 +66,11 @@ text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,san
 @keyframes k15{0%,93.74%{opacity:0}93.75%,99.99%{opacity:1}100%,100%{opacity:0}}
 .cuz{animation-name:kz}
 @keyframes kz{0%,99.99%{opacity:0}}
-.draw{animation:draw 1.6s ease-out 1}
-.fade{animation:fade 1.6s ease-out 1}
-@keyframes draw{from{stroke-dasharray:1;stroke-dashoffset:1}to{stroke-dasharray:1;stroke-dashoffset:0}}
-@keyframes fade{from{opacity:0}}
-@media (prefers-reduced-motion:reduce){.draw,.fade,.cu{animation:none}}
+.m0{animation:m0 1.6s ease-out 1}
+@keyframes m0{0%{opacity:0}100%{opacity:1}}
+.m1{animation:m1 1.6s ease-out 1}
+@keyframes m1{0%{stroke-dasharray:1;stroke-dashoffset:1}100%{stroke-dasharray:1;stroke-dashoffset:0}}
+@media (prefers-reduced-motion:reduce){.m0,.m1{animation:none}}
 </style>
 <rect class="bg" x="0.5" y="0.5" width="494" height="347" rx="6"/>
 <text class="t" x="25" y="34" text-anchor="start">José M. Requena Plens</text>
@@ -293,6 +293,6 @@ text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,san
 <text class="l" x="321.67" y="258" text-anchor="start">Issues (1y)</text>
 <text class="h" x="25" y="282" text-anchor="start">CONTRIBUTIONS PER DAY</text>
 <line class="axis" x1="25" y1="332" x2="470" y2="332"/>
-<path class="area fade" d="M25,332 L25,332 L74.44,325.4 L123.89,305.6 L173.33,316.6 L222.78,332 L272.22,329.8 L321.67,288 L371.11,299 L420.56,323.2 L470,312.2 L470,332Z"/>
-<polyline class="line draw" pathLength="1" points="25,332 74.44,325.4 123.89,305.6 173.33,316.6 222.78,332 272.22,329.8 321.67,288 371.11,299 420.56,323.2 470,312.2"/>
+<path class="area m0" d="M25,332 L25,332 L74.44,325.4 L123.89,305.6 L173.33,316.6 L222.78,332 L272.22,329.8 L321.67,288 L371.11,299 L420.56,323.2 L470,312.2 L470,332Z"/>
+<polyline class="line m1" pathLength="1" points="25,332 74.44,325.4 123.89,305.6 173.33,316.6 222.78,332 272.22,329.8 321.67,288 371.11,299 420.56,323.2 470,312.2"/>
 </svg>

@@ -28,7 +28,7 @@ text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,san
 .s{font-size:11px}
 .c{font-size:12px}
 .line{fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-.area{opacity:0.14;stroke:none}
+.area{fill-opacity:0.14;stroke:none}
 .axis{stroke-width:1}
 .edge{fill:none;stroke-width:1}
 </style>

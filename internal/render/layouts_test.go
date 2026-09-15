@@ -138,28 +138,54 @@ var (
 	animationName = regexp.MustCompile(`animation(?:-name)?:([A-Za-z0-9_-]+)`)
 )
 
-func TestAnimatedLayoutsPlayOnceAndSettleToTheStaticCard(t *testing.T) {
+// TestAnimatedLayoutsMoveOnlyAsTheyAreAsked renders every layout in the three
+// motions. A layout not registered as animated carries no animation in any of
+// them; an animated one plays once and settles, loops forever, or carries
+// nothing, and in the two that move every animation has its keyframes and is
+// switched off under reduced motion.
+func TestAnimatedLayoutsMoveOnlyAsTheyAreAsked(t *testing.T) {
 	c := sample()
 	for _, l := range Layouts() {
-		doc := mustRender(t, c, &Options{Theme: "dark", Layout: l.Name})
-		if !l.Animated {
-			if strings.Contains(doc, "animation") || strings.Contains(doc, "<animate") {
-				t.Errorf("%s: is not registered as animated but carries animation", l.Name)
-			}
-			continue
+		for _, motion := range []string{MotionOnce, MotionLoop, MotionOff} {
+			doc := mustRender(t, c, &Options{Theme: "dark", Layout: l.Name, Motion: motion})
+			checkLayoutMoves(t, l, motion, doc)
 		}
-		if strings.Contains(doc, "infinite") {
-			t.Errorf("%s: an animation must be finite", l.Name)
+	}
+}
+
+// checkLayoutMoves is what TestAnimatedLayoutsMoveOnlyAsTheyAreAsked asserts
+// of one layout under one motion, pulled out of the loop so the loop itself
+// stays readable: a layout not registered as animated carries no animation in
+// any of them; an animated one plays once and settles, loops forever, or
+// carries nothing, and in the two that move every animation has its
+// keyframes and is switched off under reduced motion.
+func checkLayoutMoves(t *testing.T, l Layout, motion, doc string) {
+	t.Helper()
+	moves := strings.Contains(doc, "animation") || strings.Contains(doc, "<animate")
+	if !l.Animated || motion == MotionOff {
+		if moves {
+			t.Errorf("%s under %s carries animation", l.Name, motion)
 		}
-		if !strings.Contains(doc, "@media (prefers-reduced-motion:reduce)") || !strings.Contains(doc, "animation:none") {
-			t.Errorf("%s: must switch its animation off under prefers-reduced-motion", l.Name)
-		}
-		for _, name := range animationsWithoutKeyframes(doc) {
-			t.Errorf("%s: animation %q has no @keyframes", l.Name, name)
-		}
-		if strings.Contains(doc, "<polyline") {
-			checkLineDrawSettles(t, l.Name, doc)
-		}
+		return
+	}
+	if !moves {
+		t.Errorf("%s under %s does not move", l.Name, motion)
+		return
+	}
+	if loops := strings.Contains(doc, "infinite"); loops != (motion == MotionLoop) {
+		t.Errorf("%s under %s: infinite = %v", l.Name, motion, loops)
+	}
+	if !strings.Contains(doc, "@media (prefers-reduced-motion:reduce)") || !strings.Contains(doc, "animation:none") {
+		t.Errorf("%s under %s must switch its animation off under prefers-reduced-motion", l.Name, motion)
+	}
+	if strings.Contains(doc, "animation-delay") {
+		t.Errorf("%s under %s uses animation-delay, which a loop does not repeat", l.Name, motion)
+	}
+	for _, name := range animationsWithoutKeyframes(doc) {
+		t.Errorf("%s under %s: animation %q has no @keyframes", l.Name, motion, name)
+	}
+	if strings.Contains(doc, "<polyline") {
+		checkLineDrawSettles(t, l.Name, doc)
 	}
 }
 
@@ -180,15 +206,43 @@ func animationsWithoutKeyframes(doc string) []string {
 }
 
 // checkLineDrawSettles checks that the line's dash exists only inside the
-// keyframes: the base style is a solid line, which is what a renderer without
-// animation shows.
+// keyframes and that the last of them leaves it fully drawn: the base style is
+// a solid line, which is what a renderer without animation shows.
 func checkLineDrawSettles(t *testing.T, layout, doc string) {
 	t.Helper()
-	if !strings.Contains(doc, "to{stroke-dasharray:1;stroke-dashoffset:0}") {
+	if !strings.Contains(doc, "100%{stroke-dasharray:1;stroke-dashoffset:0}}") {
 		t.Errorf("%s: the draw animation must end fully drawn", layout)
 	}
-	if strings.Contains(doc, ".draw{stroke-dasharray") {
+	if regexp.MustCompile(`\.m\d+\{stroke-dasharray`).MatchString(doc) {
 		t.Errorf("%s: the dash must not be a base style", layout)
+	}
+}
+
+// TestATranslucentAreaFadesInWithoutJumping guards the invariant the fade
+// effect relies on: it ends on opacity 1, so an area that is only faintly
+// filled has to get that from fill-opacity, or the last frame would flash it
+// solid before the base style took over.
+func TestATranslucentAreaFadesInWithoutJumping(t *testing.T) {
+	for _, l := range Layouts() {
+		doc := mustRender(t, sample(), &Options{Theme: "dark", Layout: l.Name})
+		if regexp.MustCompile(`\.area\{([^}]*;)?opacity:`).MatchString(doc) {
+			t.Errorf("%s: .area sets opacity; use fill-opacity", l.Name)
+		}
+	}
+}
+
+// TestAnimatedCardsAreByteIdenticalInEveryMotion is the determinism promise
+// for the new option: a scheduled job commits nothing on a day with no change,
+// whichever motion it renders.
+func TestAnimatedCardsAreByteIdenticalInEveryMotion(t *testing.T) {
+	for _, l := range Layouts() {
+		for _, motion := range []string{MotionOnce, MotionLoop, MotionOff} {
+			o := &Options{Theme: "light", Layout: l.Name, Motion: motion}
+			first, second := mustRender(t, sample(), o), mustRender(t, sample(), o)
+			if first != second {
+				t.Errorf("%s under %s differs between two renders", l.Name, motion)
+			}
+		}
 	}
 }
 

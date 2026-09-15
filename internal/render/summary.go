@@ -67,7 +67,7 @@ func drawSummary(b *strings.Builder, c *Card, s *spec) {
 			// no contributions at all still gets a chart rather than a hole.
 			fmt.Fprintf(&body, `<line class="axis" x1="%s" y1="%s" x2="%s" y2="%s"/>`+"\n",
 				num(pad), num(top+58), num(pad+inner), num(top+58))
-			drawSparkline(&body, c.Sparkline, pad, top+14, inner, 44, false)
+			drawSparkline(&body, c.Sparkline, pad, top+14, inner, 44, sparkMotion{})
 			y = top + 58
 		case fieldTopRepos:
 			if len(s.repos) > 0 {

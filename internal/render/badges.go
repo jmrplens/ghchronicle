@@ -57,27 +57,19 @@ func drawBadgeRow(b *strings.Builder, c *Card, s *spec) {
 	}
 }
 
-// motionCSS is shared by the animated layouts. Every animation runs once and
-// ends on the element's own base style, so a renderer that ignores animation
-// (librsvg, a screenshot tool) shows the finished card, and so does a reader
-// who has asked for reduced motion. The dash that makes the line draw itself
-// lives only inside the keyframes: as a base style it would leave a dotted
-// line in any renderer that does not know pathLength.
-const motionCSS = `.draw{animation:draw 1.6s ease-out 1}
-.fade{animation:fade 1.6s ease-out 1}
-@keyframes draw{from{stroke-dasharray:1;stroke-dashoffset:1}to{stroke-dasharray:1;stroke-dashoffset:0}}
-@keyframes fade{from{opacity:0}}
-@media (prefers-reduced-motion:reduce){.draw,.fade,.cu{animation:none}}
-`
-
 func drawWideBanner(b *strings.Builder, c *Card, s *spec) {
 	const height = 60.0
+	tl := newTimeline(s.motion)
+	var spark sparkMotion
+	if s.has(fieldSparkline) {
+		spark = sparkBeats(tl)
+	}
 	openDoc(b, &chronicleFamily, s, height, describe(c, s),
-		".line{stroke-width:1.25;opacity:0.35}\n.area{opacity:0.07}\n.t2{font-size:15px;font-weight:600}\n"+motionCSS)
+		".line{stroke-width:1.25;opacity:0.35}\n.area{fill-opacity:0.07}\n.t2{font-size:15px;font-weight:600}\n"+tl.css())
 	cardBG(b, s.width, height)
 
 	if s.has(fieldSparkline) {
-		drawSparkline(b, c.Sparkline, 1, 20, s.width-2, 38, true)
+		drawSparkline(b, c.Sparkline, 1, 20, s.width-2, 38, spark)
 	}
 
 	left := 20.0

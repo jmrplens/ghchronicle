@@ -490,16 +490,16 @@ func TestDescribeSpellsTheCardOutSentenceBySentence(t *testing.T) {
 // line visits the same points in order, separated by single spaces.
 func TestDrawSparklineClosesTheAreaAlongTheBaseline(t *testing.T) {
 	var b strings.Builder
-	drawSparkline(&b, []int{0, 2, 1}, 10, 20, 100, 40, false)
+	drawSparkline(&b, []int{0, 2, 1}, 10, 20, 100, 40, sparkMotion{})
 	want := `<path class="area" d="M10,60 L10,60 L60,20 L110,40 L110,60Z"/>` + "\n" +
 		`<polyline class="line" points="10,60 60,20 110,40"/>` + "\n"
 	if b.String() != want {
 		t.Errorf("drawSparkline =\n%s\nwant\n%s", b.String(), want)
 	}
 	b.Reset()
-	drawSparkline(&b, []int{0, 2, 1}, 10, 20, 100, 40, true)
-	want = `<path class="area fade" d="M10,60 L10,60 L60,20 L110,40 L110,60Z"/>` + "\n" +
-		`<polyline class="line draw" pathLength="1" points="10,60 60,20 110,40"/>` + "\n"
+	drawSparkline(&b, []int{0, 2, 1}, 10, 20, 100, 40, sparkMotion{area: "m0", line: "m1"})
+	want = `<path class="area m0" d="M10,60 L10,60 L60,20 L110,40 L110,60Z"/>` + "\n" +
+		`<polyline class="line m1" pathLength="1" points="10,60 60,20 110,40"/>` + "\n"
 	if b.String() != want {
 		t.Errorf("animated drawSparkline =\n%s\nwant\n%s", b.String(), want)
 	}

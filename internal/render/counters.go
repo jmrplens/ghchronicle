@@ -41,6 +41,7 @@ func counterValue(v, i, n int) int {
 
 func drawAnimatedCounters(b *strings.Builder, c *Card, s *spec) {
 	inner := s.width - 2*pad
+	tl := newTimeline(s.motion)
 	var body strings.Builder
 
 	y := 34.0
@@ -71,12 +72,12 @@ func drawAnimatedCounters(b *strings.Builder, c *Card, s *spec) {
 		text(&body, pad, top+8, "h", "start", "CONTRIBUTIONS PER DAY")
 		fmt.Fprintf(&body, `<line class="axis" x1="%s" y1="%s" x2="%s" y2="%s"/>`+"\n",
 			num(pad), num(top+58), num(pad+inner), num(top+58))
-		drawSparkline(&body, c.Sparkline, pad, top+14, inner, 44, true)
+		drawSparkline(&body, c.Sparkline, pad, top+14, inner, 44, sparkBeats(tl))
 		y = top + 58
 	}
 	height := math.Ceil(y + 16)
 
-	openDoc(b, &chronicleFamily, s, height, describe(c, s), counterCSS()+motionCSS)
+	openDoc(b, &chronicleFamily, s, height, describe(c, s), counterCSS()+tl.css())
 	cardBG(b, s.width, height)
 	b.WriteString(body.String())
 }

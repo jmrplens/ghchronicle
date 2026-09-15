@@ -28,21 +28,21 @@ text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,san
 .s{font-size:11px}
 .c{font-size:12px}
 .line{fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-.area{opacity:0.14;stroke:none}
+.area{fill-opacity:0.14;stroke:none}
 .axis{stroke-width:1}
 .edge{fill:none;stroke-width:1}
 .line{stroke-width:1.25;opacity:0.35}
-.area{opacity:0.07}
+.area{fill-opacity:0.07}
 .t2{font-size:15px;font-weight:600}
-.draw{animation:draw 1.6s ease-out 1}
-.fade{animation:fade 1.6s ease-out 1}
-@keyframes draw{from{stroke-dasharray:1;stroke-dashoffset:1}to{stroke-dasharray:1;stroke-dashoffset:0}}
-@keyframes fade{from{opacity:0}}
-@media (prefers-reduced-motion:reduce){.draw,.fade,.cu{animation:none}}
+.m0{animation:m0 1.6s ease-out 1}
+@keyframes m0{0%{opacity:0}100%{opacity:1}}
+.m1{animation:m1 1.6s ease-out 1}
+@keyframes m1{0%{stroke-dasharray:1;stroke-dashoffset:1}100%{stroke-dasharray:1;stroke-dashoffset:0}}
+@media (prefers-reduced-motion:reduce){.m0,.m1{animation:none}}
 </style>
 <rect class="bg" x="0.5" y="0.5" width="799" height="59" rx="6"/>
-<path class="area fade" d="M1,58 L1,58 L89.67,52.3 L178.33,35.2 L267,44.7 L355.67,58 L444.33,56.1 L533,20 L621.67,29.5 L710.33,50.4 L799,40.9 L799,58Z"/>
-<polyline class="line draw" pathLength="1" points="1,58 89.67,52.3 178.33,35.2 267,44.7 355.67,58 444.33,56.1 533,20 621.67,29.5 710.33,50.4 799,40.9"/>
+<path class="area m0" d="M1,58 L1,58 L89.67,52.3 L178.33,35.2 L267,44.7 L355.67,58 L444.33,56.1 L533,20 L621.67,29.5 L710.33,50.4 L799,40.9 L799,58Z"/>
+<polyline class="line m1" pathLength="1" points="1,58 89.67,52.3 178.33,35.2 267,44.7 355.67,58 444.33,56.1 533,20 621.67,29.5 710.33,50.4 799,40.9"/>
 <text class="t2 t" x="20" y="27" text-anchor="start">jmrplens</text>
 <text class="d" x="20" y="44" text-anchor="start">José M. Requena Plens</text>
 <text class="v" x="220" y="30" text-anchor="start">283</text>

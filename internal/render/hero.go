@@ -8,12 +8,17 @@ import (
 func drawSparklineHero(b *strings.Builder, c *Card, s *spec) {
 	const height = 170.0
 	inner := s.width - 2*pad
+	tl := newTimeline(s.motion)
+	var spark sparkMotion
+	if s.has(fieldSparkline) {
+		spark = sparkBeats(tl)
+	}
 	openDoc(b, &chronicleFamily, s, height, describe(c, s),
-		".line{stroke-width:2.5}\n.area{opacity:0.18}\n"+motionCSS)
+		".line{stroke-width:2.5}\n.area{fill-opacity:0.18}\n"+tl.css())
 	cardBG(b, s.width, height)
 
 	if s.has(fieldSparkline) {
-		drawSparkline(b, c.Sparkline, 1, 66, s.width-2, 82, true)
+		drawSparkline(b, c.Sparkline, 1, 66, s.width-2, 82, spark)
 	}
 
 	// Three numbers at most: the chart is the point and a fourth would sit

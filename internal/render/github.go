@@ -66,7 +66,7 @@ func drawGithubStats(b *strings.Builder, c *Card, s *spec) {
 			text(&body, ghPad, y+53, "d", "start", fmt.Sprintf("Last %d days", len(c.Sparkline)))
 			fmt.Fprintf(&body, `<line class="axis" x1="%s" y1="%s" x2="%s" y2="%s"/>`+"\n",
 				num(ghPad), num(y+118), num(ghPad+inner), num(y+118))
-			drawSparkline(&body, c.Sparkline, ghPad, y+66, inner, 52, false)
+			drawSparkline(&body, c.Sparkline, ghPad, y+66, inner, 52, sparkMotion{})
 			y += 122
 		}
 	}
