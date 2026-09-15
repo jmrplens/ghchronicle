@@ -444,8 +444,7 @@ func runSweep(ctx context.Context, runner *run.Runner, accumulator *render.Accum
 	}
 	built := accumulator.Card()
 	for _, f := range files {
-		opts := &render.Options{Theme: f.theme, Layout: o.layout, Motion: o.motion, Fields: splitFields(o.fields)}
-		if err := writeCard(f.path, &built, opts); err != nil {
+		if err := writeCard(f.path, &built, f.opts); err != nil {
 			return err
 		}
 		logger.Info("card written", "path", f.path, "theme", f.theme, "motion", o.motion)
@@ -467,31 +466,45 @@ func splitFields(fields string) []string {
 	return out
 }
 
-// checkCardFiles renders each file's card against a placeholder before the
-// sweep, because a typo in the theme, the motion or a field found after the
-// sweep has already spent the rate limit on a card that was never going to be
-// written.
+// checkCardFiles settles each file's options and renders a placeholder card
+// with them before the sweep, because a typo in the theme, the motion or a
+// field found after the sweep has already spent the rate limit on a card that
+// was never going to be written. It sets files[i].opts rather than building a
+// second value later: the write loop draws with this exact *render.Options,
+// never a value cardOptions was asked to build again, so what is checked here
+// is what is drawn, not something that merely looks the same today.
 func checkCardFiles(o *options, files []cardFile) error {
-	for _, f := range files {
-		if _, err := render.SVG(&render.Card{Login: "check"}, cardOptions(o, f.theme)); err != nil {
+	for i := range files {
+		files[i].opts = cardOptions(o, files[i].theme)
+		if _, err := render.SVG(&render.Card{Login: "check"}, files[i].opts); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-// cardFile is one SVG a run writes and the palette it is drawn in.
-type cardFile struct{ path, theme string }
+// cardFile is one SVG a run writes, the palette it is drawn in, and the
+// options it is drawn with. opts starts nil: cardFiles only names the files
+// -card-theme asks for, and checkCardFiles fills it in from the one call to
+// cardOptions that both the placeholder check and the later write read from,
+// so the two can never draw from different options.
+type cardFile struct {
+	path, theme string
+	opts        *render.Options
+}
 
 // cardFiles is what -card-theme asks for: one file, or under both the light
 // card at the path given and the dark one beside it with _dark before the
 // extension, from the same sweep.
 func cardFiles(path, theme string) []cardFile {
 	if theme != "both" {
-		return []cardFile{{path, theme}}
+		return []cardFile{{path: path, theme: theme}}
 	}
 	ext := filepath.Ext(path)
-	return []cardFile{{path, "light"}, {strings.TrimSuffix(path, ext) + "_dark" + ext, "dark"}}
+	return []cardFile{
+		{path: path, theme: "light"},
+		{path: strings.TrimSuffix(path, ext) + "_dark" + ext, theme: "dark"},
+	}
 }
 
 // cardOptions turns the command line into the renderer's options for one theme.

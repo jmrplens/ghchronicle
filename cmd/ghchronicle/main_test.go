@@ -230,10 +230,10 @@ func TestBothThemesNameTheDarkCardTheWayAPictureElementReadsIt(t *testing.T) {
 		path, theme string
 		want        []cardFile
 	}{
-		{"card.svg", "dark", []cardFile{{"card.svg", "dark"}}},
-		{"out/card.svg", "both", []cardFile{{"out/card.svg", "light"}, {"out/card_dark.svg", "dark"}}},
-		{"profile", "both", []cardFile{{"profile", "light"}, {"profile_dark", "dark"}}},
-		{"a.b/card.v2.svg", "both", []cardFile{{"a.b/card.v2.svg", "light"}, {"a.b/card.v2_dark.svg", "dark"}}},
+		{"card.svg", "dark", []cardFile{{path: "card.svg", theme: "dark"}}},
+		{"out/card.svg", "both", []cardFile{{path: "out/card.svg", theme: "light"}, {path: "out/card_dark.svg", theme: "dark"}}},
+		{"profile", "both", []cardFile{{path: "profile", theme: "light"}, {path: "profile_dark", theme: "dark"}}},
+		{"a.b/card.v2.svg", "both", []cardFile{{path: "a.b/card.v2.svg", theme: "light"}, {path: "a.b/card.v2_dark.svg", theme: "dark"}}},
 	} {
 		if got := cardFiles(tc.path, tc.theme); !slices.Equal(got, tc.want) {
 			t.Errorf("cardFiles(%q, %q) = %v, want %v", tc.path, tc.theme, got, tc.want)
