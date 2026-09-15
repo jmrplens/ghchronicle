@@ -527,7 +527,12 @@ func TestLanguageRingLeavesNoGapForAnArcExactlyAtTheThreshold(t *testing.T) {
 func TestSummaryLanguagesLegendKeepsALabelThatFitsExactly(t *testing.T) {
 	label := "A 50%"
 	w := 14 + textWidth(label, 11)
-	s := &spec{width: 2*pad + w, langs: []langShare{{Name: "A", Color: "#111111", Share: 50}}}
+	width := 2*pad + w
+	inner := width - 2*pad
+	if x := pad; x+w != pad+inner {
+		t.Fatalf("test setup: x+w = %v, pad+inner = %v, want them exactly equal (the boundary moved)", x+w, pad+inner)
+	}
+	s := &spec{width: width, langs: []langShare{{Name: "A", Color: "#111111", Share: 50}}}
 	var b strings.Builder
 	summaryLanguages(&b, s, 0)
 	if !strings.Contains(b.String(), label) {
