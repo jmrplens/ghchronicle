@@ -18,18 +18,20 @@ it downloads a release binary and calls it.
 
 ## Inputs
 
-| Input            | Default              | What it does                                                                     |
-| ---------------- | -------------------- | -------------------------------------------------------------------------------- |
-| `token`          | required             | A personal access token. The automatic `GITHUB_TOKEN` is not enough              |
-| `config`         | `""`                 | Path to a configuration file. Omit to run with defaults built from `user`        |
-| `user`           | the repository owner | The account to collect when no config file is given                              |
-| `mode`           | `once`               | `once`, `backfill` or `card`                                                     |
-| `backfill-since` | `""`                 | Bound for `backfill`: a date, `90d`, `2y` or a Go duration. Empty means no bound |
-| `card`           | `""`                 | Path of the SVG to write. Empty means no card                                    |
-| `card-layout`    | `summary`            | One of the ten registered layouts                                                |
-| `card-theme`     | `auto`               | `dark`, `light` or `auto`                                                        |
-| `card-fields`    | `""`                 | Comma-separated fields. Empty means the layout's default                         |
-| `version`        | `latest`             | The release to install                                                           |
+| Input             | Default              | What it does                                                                                       |
+| ----------------- | -------------------- | -------------------------------------------------------------------------------------------------- |
+| `token`           | required             | A personal access token. The automatic `GITHUB_TOKEN` is not enough for most of what this collects |
+| `config`          | `""`                 | Path to a configuration file. Omit to run with defaults built from `user`                          |
+| `user`            | the repository owner | The account to collect when no config file is given                                                |
+| `mode`            | `once`               | `once`, `backfill` or `card`                                                                       |
+| `backfill-since`  | `""`                 | Bound for `backfill`: a date, `90d`, `2y` or a Go duration. Empty means no bound                   |
+| `card`            | `""`                 | Path of the SVG to write. Empty means no card                                                      |
+| `card-layout`     | `summary`            | One of the ten registered layouts                                                                  |
+| `card-theme`      | `auto`               | `dark`, `light`, `auto`, or `both` for a light card and its `_dark` twin                           |
+| `card-fields`     | `""`                 | Comma-separated fields. Empty means the layout's default                                           |
+| `card-motion`     | `once`               | `once`, `loop` or `off`, for the animated layouts                                                  |
+| `include-private` | `false`              | `true` counts private repositories when no config file is given. See the warning below             |
+| `version`         | `latest`             | The release to install                                                                             |
 
 ## The three modes
 
@@ -88,7 +90,7 @@ it downloads a release binary and calls it.
               mode: card
               card: generated/github-stats.svg
               card-layout: github-stats
-              card-theme: auto
+              card-theme: both
           - name: Commit if it changed
             run: |
               git config user.name "github-actions[bot]"
@@ -135,6 +137,81 @@ it downloads a release binary and calls it.
 
   </TabItem>
 </Tabs>
+
+## A card in your profile README
+
+GitHub shows the README of the repository named after your account, `<you>/<you>`,
+at the top of your profile. The card lives in that repository as a file, the
+README points at it once, and a scheduled workflow replaces the file. The README
+itself is never rewritten.
+
+1. Create a personal access token (see [the token](/ghchronicle/start/token/)) and
+   store it in `<you>/<you>` as the secret `GHCHRONICLE_TOKEN`. For a card of
+   public numbers the automatic `GITHUB_TOKEN` is enough, and then no secret is
+   needed: pass `${{ secrets.GITHUB_TOKEN }}` instead.
+2. Add `.github/workflows/card.yml`:
+
+   ```yaml
+   name: Profile card
+   on:
+     schedule:
+       - cron: "17 6 * * *"
+     workflow_dispatch:
+
+   permissions:
+     contents: write
+
+   # One run at a time: two that overlap would race each other to push.
+   concurrency:
+     group: profile-card
+     cancel-in-progress: false
+
+   jobs:
+     card:
+       runs-on: ubuntu-latest
+       steps:
+         - uses: actions/checkout@v7
+         - uses: jmrplens/ghchronicle@v1
+           with:
+             token: ${{ secrets.GHCHRONICLE_TOKEN }}
+             mode: card
+             card: generated/card.svg
+             card-layout: animated-counters
+             card-theme: both
+             card-motion: loop
+         - name: Commit if it changed
+           run: |
+             git config user.name "github-actions[bot]"
+             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+             git add generated/
+             git diff --staged --quiet || git commit -m "Update the profile card"
+             git push
+   ```
+
+3. Paste this line into `README.md` wherever the card should appear, once:
+
+   ```html
+   <picture><source media="(prefers-color-scheme: dark)" srcset="generated/card_dark.svg"><img src="generated/card.svg" alt="My GitHub statistics"></picture>
+   ```
+
+4. Run the workflow by hand from the Actions tab the first time, so the files
+   exist before the first scheduled run.
+
+**More than one card.** Repeat the `uses: jmrplens/ghchronicle@v1` step with
+another `card` path and layout, and paste one `<picture>` per card. Each step is
+a sweep of its own.
+
+**A README that is not at the root.** The paths in the `<picture>` are relative
+to the README, so a `docs/README.md` points at `../generated/card.svg`.
+
+<Aside type="caution" title="Private repositories">
+  Without a config file, the Action counts public repositories only. With
+  `include-private: true` the card adds the stars, forks, languages and traffic
+  of your private repositories, and the layouts that list repositories
+  (`repo-list`, and any layout given the `top_repos` field) **publish their
+  names**. To count them without naming them, pick the fields yourself and leave
+  `top_repos` out, for example `card-fields: stars,forks,followers,contributions`.
+</Aside>
 
 ## Two things a hosted runner does not keep
 

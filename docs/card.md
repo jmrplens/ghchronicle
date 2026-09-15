@@ -20,14 +20,15 @@ ghchronicle -config config.yaml -card profile.svg -card-only
 
 ### The flags
 
-| Flag                              | Does                                                      |
-| --------------------------------- | --------------------------------------------------------- |
-| `-card <path>`                    | Runs one sweep and writes the SVG there                   |
-| `-card-only`                      | Writes the SVG and nothing else, so no database is needed |
-| `-card-layout <name>`             | One of the ten [layouts](https://jmrp.io/docs/ghchronicle/card/layouts/)      |
-| `-card-theme <dark\|light\|auto>` | Auto emits both palettes behind a media query             |
-| `-card-fields <list>`             | Comma-separated, in drawing order                         |
-| `-card-layouts`                   | Prints the layouts with their default fields, then exits  |
+| Flag                                    | Does                                                         |
+| --------------------------------------- | ------------------------------------------------------------ |
+| `-card <path>`                          | Runs one sweep and writes the SVG there                      |
+| `-card-only`                            | Writes the SVG and nothing else, so no database is needed    |
+| `-card-layout <name>`                   | One of the ten [layouts](https://jmrp.io/docs/ghchronicle/card/layouts/)         |
+| `-card-theme <dark\|light\|auto\|both>` | Both writes the light card and a `_dark` twin from one sweep |
+| `-card-motion <once\|loop\|off>`        | How an animated layout moves; the others ignore it           |
+| `-card-fields <list>`                   | Comma-separated, in drawing order                            |
+| `-card-layouts`                         | Prints the layouts with their default fields, then exits     |
 
 Without `-card-only` the card is written **as well as** everything the sinks
 would normally get, which is the arrangement for a host that is already
@@ -69,10 +70,11 @@ Empty means the layout's default set.
 
 - **dark and light**
 
-  One palette each, and the choice for a README. Render the card twice, which
-  from the Action is two calls, one with `card-theme: light` and one with
-  `card-theme: dark`, and put both in a `<picture>`, the way GitHub documents
-  showing a different picture per theme:
+  One palette each, and the choice for a README. `-card-theme both` (or
+  `card-theme: both` in the Action) writes the light card at the path given
+  and the dark one beside it with `_dark` before the extension, from the same
+  sweep, so the two can never disagree. Put both in a `<picture>`, the way
+  GitHub documents showing a different picture per theme:
 
   ```html
   <picture><source media="(prefers-color-scheme: dark)" srcset="card_dark.svg"><img src="card.svg" alt="My GitHub card"></picture>
@@ -101,19 +103,32 @@ scheduled job that commits the card does not produce a diff on every run.
 **Written atomically.** Rendered to a temporary file and renamed, so a reader
 watching the path never sees half a document.
 
-Animation, where a layout has it, is CSS inside the SVG. It plays once and
-settles, and the settled frame is the complete static card, so a renderer that
-ignores animation shows the finished state. `prefers-reduced-motion` switches
-it off. There is no script, ever.
+### Motion
+
+Animation, where a layout has it, is CSS inside the SVG, and there is no
+script, ever. Every animation ends on the complete static card, so a renderer
+that ignores animation shows the finished state, and `prefers-reduced-motion`
+switches it off in every mode.
+
+| `-card-motion` | What the card does                                                      |
+| -------------- | ----------------------------------------------------------------------- |
+| `once`         | Plays when it loads and settles. The default                            |
+| `loop`         | Plays, holds the finished card still for seven seconds, and plays again |
+| `off`          | No animation at all, and a smaller file                                 |
+
+A loop that rests between plays is deliberate: a README that moves all the time
+is hard to read next to it.
+
+![The animated-counters layout in a loop: the numbers count up, hold, and count up again](../site/src/assets/card-animated-counters-loop.svg)
 
 ### In a README
 
-```markdown
-![GitHub statistics](https://raw.githubusercontent.com/<you>/<you>/main/profile.svg)
+```html
+<picture><source media="(prefers-color-scheme: dark)" srcset="generated/card_dark.svg"><img src="generated/card.svg" alt="My GitHub statistics"></picture>
 ```
 
-The workflow that keeps it current is on
-[GitHub Actions](https://jmrp.io/docs/ghchronicle/install/actions/).
+The workflow that keeps it current, for a profile README or any other, is in
+[A card in your profile README](https://jmrp.io/docs/ghchronicle/install/actions/#a-card-in-your-profile-readme).
 
 ### There is no Go library
 

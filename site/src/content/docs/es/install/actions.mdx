@@ -18,18 +18,20 @@ cadena de herramientas de Go: descarga un binario de release y lo llama.
 
 ## Entradas
 
-| Entrada          | Por omisión              | Qué hace                                                                                     |
-| ---------------- | ------------------------ | -------------------------------------------------------------------------------------------- |
-| `token`          | obligatoria              | Un token personal. El `GITHUB_TOKEN` automático no basta                                     |
-| `config`         | `""`                     | Ruta a un fichero de configuración. Omítela para usar valores por defecto a partir de `user` |
-| `user`           | el dueño del repositorio | La cuenta que recoger cuando no se da fichero de configuración                               |
-| `mode`           | `once`                   | `once`, `backfill` o `card`                                                                  |
-| `backfill-since` | `""`                     | Límite para `backfill`: una fecha, `90d`, `2y` o una duración de Go. Vacío es sin límite     |
-| `card`           | `""`                     | Ruta del SVG que escribir. Vacío significa sin tarjeta                                       |
-| `card-layout`    | `summary`                | Uno de los diez diseños registrados                                                          |
-| `card-theme`     | `auto`                   | `dark`, `light` o `auto`                                                                     |
-| `card-fields`    | `""`                     | Campos separados por comas. Vacío es el conjunto por defecto del diseño                      |
-| `version`        | `latest`                 | La release que instalar                                                                      |
+| Entrada           | Por omisión              | Qué hace                                                                                                 |
+| ----------------- | ------------------------ | -------------------------------------------------------------------------------------------------------- |
+| `token`           | obligatoria              | Un token personal. El `GITHUB_TOKEN` automático no basta para la mayor parte de lo que se recoge         |
+| `config`          | `""`                     | Ruta a un fichero de configuración. Omítela para usar valores por defecto a partir de `user`             |
+| `user`            | el dueño del repositorio | La cuenta que recoger cuando no se da fichero de configuración                                           |
+| `mode`            | `once`                   | `once`, `backfill` o `card`                                                                              |
+| `backfill-since`  | `""`                     | Límite para `backfill`: una fecha, `90d`, `2y` o una duración de Go. Vacío es sin límite                 |
+| `card`            | `""`                     | Ruta del SVG que escribir. Vacío significa sin tarjeta                                                   |
+| `card-layout`     | `summary`                | Uno de los diez diseños registrados                                                                      |
+| `card-theme`      | `auto`                   | `dark`, `light`, `auto`, o `both` para una tarjeta clara y su gemela `_dark`                             |
+| `card-fields`     | `""`                     | Campos separados por comas. Vacío es el conjunto por defecto del diseño                                  |
+| `card-motion`     | `once`                   | `once`, `loop` u `off`, para los diseños animados                                                        |
+| `include-private` | `false`                  | `true` cuenta los repositorios privados cuando no se da fichero de configuración. Ver el aviso más abajo |
+| `version`         | `latest`                 | La release que instalar                                                                                  |
 
 ## Los tres modos
 
@@ -88,7 +90,7 @@ cadena de herramientas de Go: descarga un binario de release y lo llama.
               mode: card
               card: generated/github-stats.svg
               card-layout: github-stats
-              card-theme: auto
+              card-theme: both
           - name: Commit if it changed
             run: |
               git config user.name "github-actions[bot]"
@@ -135,6 +137,82 @@ cadena de herramientas de Go: descarga un binario de release y lo llama.
 
   </TabItem>
 </Tabs>
+
+## Una tarjeta en el README de tu perfil
+
+GitHub muestra en lo alto de tu perfil el README del repositorio que se llama
+como tu cuenta, `<tú>/<tú>`. La tarjeta vive en ese repositorio como un fichero,
+el README apunta a ella una vez y un workflow programado sustituye el fichero.
+El README no se reescribe nunca.
+
+1. Crea un token personal (ver [el token](/ghchronicle/es/start/token/)) y
+   guárdalo en `<tú>/<tú>` como el secreto `GHCHRONICLE_TOKEN`. Para una tarjeta
+   de números públicos basta el `GITHUB_TOKEN` automático, y entonces no hace
+   falta ningún secreto: pasa `${{ secrets.GITHUB_TOKEN }}` en su lugar.
+2. Añade `.github/workflows/card.yml`:
+
+   ```yaml
+   name: Profile card
+   on:
+     schedule:
+       - cron: "17 6 * * *"
+     workflow_dispatch:
+
+   permissions:
+     contents: write
+
+   # One run at a time: two that overlap would race each other to push.
+   concurrency:
+     group: profile-card
+     cancel-in-progress: false
+
+   jobs:
+     card:
+       runs-on: ubuntu-latest
+       steps:
+         - uses: actions/checkout@v7
+         - uses: jmrplens/ghchronicle@v1
+           with:
+             token: ${{ secrets.GHCHRONICLE_TOKEN }}
+             mode: card
+             card: generated/card.svg
+             card-layout: animated-counters
+             card-theme: both
+             card-motion: loop
+         - name: Commit if it changed
+           run: |
+             git config user.name "github-actions[bot]"
+             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+             git add generated/
+             git diff --staged --quiet || git commit -m "Update the profile card"
+             git push
+   ```
+
+3. Pega esta línea en `README.md` donde deba aparecer la tarjeta, una sola vez:
+
+   ```html
+   <picture><source media="(prefers-color-scheme: dark)" srcset="generated/card_dark.svg"><img src="generated/card.svg" alt="Mis estadísticas de GitHub"></picture>
+   ```
+
+4. Ejecuta el workflow a mano desde la pestaña Actions la primera vez, para que
+   los ficheros existan antes de la primera ejecución programada.
+
+**Más de una tarjeta.** Repite el paso `uses: jmrplens/ghchronicle@v1` con otra
+ruta en `card` y otro diseño, y pega un `<picture>` por tarjeta. Cada paso es una
+pasada propia.
+
+**Un README que no está en la raíz.** Las rutas del `<picture>` son relativas al
+README, así que un `docs/README.md` apunta a `../generated/card.svg`.
+
+<Aside type="caution" title="Repositorios privados">
+  Sin fichero de configuración, la Action cuenta solo repositorios públicos. Con
+  `include-private: true` la tarjeta suma las estrellas, forks, lenguajes y
+  tráfico de tus repositorios privados, y los layouts que listan repositorios
+  (`repo-list`, y cualquier layout al que se le pida el campo `top_repos`)
+  **publican sus nombres**. Para contarlos sin nombrarlos, elige tú los campos y
+  deja fuera `top_repos`, por ejemplo
+  `card-fields: stars,forks,followers,contributions`.
+</Aside>
 
 ## Dos cosas que un runner alojado no conserva
 

@@ -42,8 +42,8 @@ account's own figures](site/src/assets/dashboards/overview.png)
 
 A profile card, from the same sweep, in ten layouts and two families. The
 three animated ones animate where the reader's browser lets them. Each card
-here is drawn twice, one per palette, and GitHub shows the one that matches
-the theme you read it in:
+here is two files from one sweep, one per palette, and GitHub shows the one
+that matches the theme you read it in:
 
 <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/jmrplens/ghchronicle/main/site/src/assets/card-animated-counters_dark.svg"><img src="https://raw.githubusercontent.com/jmrplens/ghchronicle/main/site/src/assets/card-animated-counters.svg" alt="The animated-counters layout: a grid of large numbers over a contribution sparkline"></picture>
 
@@ -52,8 +52,7 @@ the theme you read it in:
 <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/jmrplens/ghchronicle/main/site/src/assets/card-badge-row_dark.svg"><img src="https://raw.githubusercontent.com/jmrplens/ghchronicle/main/site/src/assets/card-badge-row.svg" alt="The badge-row layout: a horizontal row of small pill badges, each with a label and a number"></picture>
 
 ```sh
-ghchronicle -config config.yaml -card card.svg -card-layout animated-counters -card-theme light
-ghchronicle -config config.yaml -card card_dark.svg -card-layout animated-counters -card-theme dark
+ghchronicle -config config.yaml -card card.svg -card-layout animated-counters -card-theme both
 ```
 
 [The ten layouts](https://jmrp.io/docs/ghchronicle/card/layouts/), with what
@@ -224,17 +223,22 @@ ghchronicle -config config.yaml -card profile.svg -card-only
 One sweep, one self-contained SVG: no webfont, no external stylesheet, no
 script, and byte-identical output for the same input so a scheduled job that
 commits it does not produce a diff on every run. Ten layouts in two visual
-families, one of them GitHub's own look, three of them animated, all with a
-choosable set of fields. The repository ships as a composite Action:
+families, one of them GitHub's own look, three of them animated, once or in a
+loop, all with a choosable set of fields. The repository ships as a composite
+Action:
 
 ```yaml
 - uses: jmrplens/ghchronicle@v1
   with:
     token: ${{ secrets.GHCHRONICLE_TOKEN }}
     mode: card
-    card: generated/github-stats.svg
-    card-layout: github-stats
+    card: generated/card.svg
+    card-layout: animated-counters
+    card-theme: both
+    card-motion: loop
 ```
+
+Paste `<picture><source media="(prefers-color-scheme: dark)" srcset="generated/card_dark.svg"><img src="generated/card.svg" alt="My GitHub statistics"></picture>` into the README once; the workflow only ever replaces the files. The whole workflow, and what `include-private` would publish, is in [A card in your profile README](https://jmrp.io/docs/ghchronicle/install/actions/#a-card-in-your-profile-readme).
 
 See [docs/card.md](docs/card.md), and
 [.github/ACTION.md](.github/ACTION.md) for how the Action is published and

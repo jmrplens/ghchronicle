@@ -5,6 +5,8 @@ description: Un SVG autocontenido para un README de perfil, dibujado con los mis
 
 import { Aside, Tabs, TabItem } from "@astrojs/starlight/components";
 
+import Card from "../../../../components/Card.astro";
+
 ```sh
 ghchronicle -config config.yaml -card profile.svg -card-only
 ```
@@ -17,14 +19,15 @@ ghchronicle -config config.yaml -card profile.svg -card-only
 
 ## Las opciones
 
-| Opción                            | Hace                                                           |
-| --------------------------------- | -------------------------------------------------------------- |
-| `-card <ruta>`                    | Ejecuta una pasada y escribe el SVG ahí                        |
-| `-card-only`                      | Escribe el SVG y nada más, así que no hace falta base de datos |
-| `-card-layout <nombre>`           | Uno de los diez [diseños](/ghchronicle/es/card/layouts/)       |
-| `-card-theme <dark\|light\|auto>` | Auto emite ambas paletas tras una media query                  |
-| `-card-fields <lista>`            | Separados por comas, en orden de dibujo                        |
-| `-card-layouts`                   | Imprime los diseños con sus campos por defecto y termina       |
+| Opción                                  | Hace                                                                  |
+| --------------------------------------- | --------------------------------------------------------------------- |
+| `-card <ruta>`                          | Ejecuta una pasada y escribe el SVG ahí                               |
+| `-card-only`                            | Escribe el SVG y nada más, así que no hace falta base de datos        |
+| `-card-layout <nombre>`                 | Uno de los diez [diseños](/ghchronicle/es/card/layouts/)              |
+| `-card-theme <dark\|light\|auto\|both>` | Both escribe la tarjeta clara y una gemela `_dark` en una sola pasada |
+| `-card-motion <once\|loop\|off>`        | Cómo se mueve un diseño animado; los demás la ignoran                 |
+| `-card-fields <lista>`                  | Separados por comas, en orden de dibujo                               |
+| `-card-layouts`                         | Imprime los diseños con sus campos por defecto y termina              |
 
 Sin `-card-only` la tarjeta se escribe **además de** todo lo que recibirían
 normalmente los destinos, que es la disposición para una máquina que ya está
@@ -67,10 +70,12 @@ Vacío significa el conjunto por defecto del diseño.
 
 <Tabs syncKey="card-theme">
   <TabItem label="dark y light">
-    Una paleta cada uno, y la opción para un README. Dibuja la tarjeta dos
-    veces, que desde la Action son dos llamadas, una con `card-theme: light` y
-    otra con `card-theme: dark`, y pon las dos en un `<picture>`, que es como
-    GitHub documenta mostrar una imagen distinta según el tema:
+    Una paleta cada uno, y la opción para un README. `-card-theme both` (o
+    `card-theme: both` en la Action) escribe la tarjeta clara en la ruta dada y
+    la oscura a su lado con `_dark` antes de la extensión, en la misma pasada,
+    así que las dos no pueden contradecirse nunca. Pon las dos en un
+    `<picture>`, que es como GitHub documenta mostrar una imagen distinta según
+    el tema:
 
     ```html
     <picture><source media="(prefers-color-scheme: dark)" srcset="card_dark.svg"><img src="card.svg" alt="Mi tarjeta de GitHub"></picture>
@@ -102,19 +107,33 @@ ejecución.
 **Escrita atómicamente.** Se dibuja en un fichero temporal y se renombra, así
 que quien esté mirando la ruta nunca ve medio documento.
 
-La animación, donde un diseño la tiene, es CSS dentro del SVG. Se reproduce una
-vez y se asienta, y el fotograma final es la tarjeta estática completa, así que
-un renderizador que ignore la animación muestra el estado terminado.
-`prefers-reduced-motion` la desactiva. No hay script, nunca.
+## Movimiento
+
+La animación, en los layouts que la tienen, es CSS dentro del SVG, y nunca hay
+script. Toda animación termina en la tarjeta estática completa, así que un
+renderizador que ignora la animación muestra el estado final, y
+`prefers-reduced-motion` la desactiva en todos los modos.
+
+| `-card-motion` | Qué hace la tarjeta                                                           |
+| -------------- | ----------------------------------------------------------------------------- |
+| `once`         | Se reproduce al cargar y se queda quieta. Es el valor por defecto             |
+| `loop`         | Se reproduce, mantiene la tarjeta terminada siete segundos y vuelve a empezar |
+| `off`          | Sin animación, y un fichero más pequeño                                       |
+
+La pausa entre vueltas es deliberada: un README que se mueve todo el rato cuesta
+de leer.
+
+<Card name="animated-counters-loop" alt="El layout animated-counters en bucle: las cifras cuentan, se detienen y vuelven a contar" />
 
 ## En un README
 
-```markdown
-![GitHub statistics](https://raw.githubusercontent.com/<tu-usuario>/<tu-usuario>/main/profile.svg)
+```html
+<picture><source media="(prefers-color-scheme: dark)" srcset="generated/card_dark.svg"><img src="generated/card.svg" alt="Mis estadísticas de GitHub"></picture>
 ```
 
-El workflow que la mantiene al día está en
-[GitHub Actions](/ghchronicle/es/install/actions/).
+El workflow que la mantiene al día, para un README de perfil o cualquier otro,
+está en
+[Una tarjeta en el README de tu perfil](/ghchronicle/es/install/actions/#una-tarjeta-en-el-readme-de-tu-perfil).
 
 ## No hay biblioteca Go
 

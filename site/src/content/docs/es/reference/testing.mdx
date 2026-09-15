@@ -160,9 +160,12 @@ año de contribuciones, los catorce días completos de tráfico de GitHub, cinco
 repositorios que ordenar y uno de ellos en seis lenguajes, que la cuenta más
 pequeña sobre la que afirma el resto de suites no puede dar a una imagen. Un
 fixture llamado `<repo>~<fixture>` responde solo por ese repositorio, y
-cualquier otro toma prestado el de hello-world. Cada diseño sale dos veces,
-`card-<diseño>.svg` en la paleta clara y `card-<diseño>_dark.svg` en la oscura,
-que es lo que leen el `ThemeImage` del sitio y el `<picture>` del README.
+cualquier otro toma prestado el de hello-world. Cada diseño sale de una sola
+pasada con `-card-theme both` como dos ficheros, `card-<diseño>.svg` en la
+paleta clara y `card-<diseño>_dark.svg` en la oscura, que es lo que leen el
+`ThemeImage` del sitio y el `<picture>` del README. Los diseños animados salen
+una segunda vez con `-card-motion loop`, como `card-<diseño>-loop.svg` y su
+gemela `_dark`.
 
 ```sh
 mkdir -p /tmp/cards

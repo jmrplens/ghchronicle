@@ -25,15 +25,20 @@ import (
 //	mkdir -p /tmp/cards
 //	GHC_CARD_GALLERY=/tmp/cards go test ./test/e2e/ -run TestCardGallery
 //
-// Every layout is drawn twice, card-<layout>.svg in the light palette and
-// card-<layout>_dark.svg in the dark one: the names the site's ThemeImage and
-// the README's <picture> read, and the convention jmrplens/phonometry already
-// uses for its own figures. Two files and not one "auto" file, because auto decides its
+// Every card comes from one sweep under -card-theme both, which writes
+// card-<layout>.svg in the light palette and card-<layout>_dark.svg in the
+// dark one beside it: the names the site's ThemeImage and the README's
+// <picture> read, and the convention jmrplens/phonometry already uses for its
+// own figures. Two files and not one "auto" file, because auto decides its
 // palette with a prefers-color-scheme query inside the picture: that follows
 // the reader's operating system rather than the theme they picked on the page,
 // and a browser does not reliably evaluate it again inside an image. On GitHub
 // the README's auto cards were seen switching palettes on a dark page when the
 // tab was left and came back to.
+//
+// The layouts that move are drawn a second time with -card-motion loop, as
+// card-<layout>-loop.svg and its _dark twin, for the page that shows what a
+// loop looks like.
 func TestCardGallery(t *testing.T) {
 	t.Parallel()
 	dir := os.Getenv("GHC_CARD_GALLERY")
@@ -59,31 +64,42 @@ func TestCardGallery(t *testing.T) {
 	// repositories had one row and the language ring was one color.
 	gh := fakegh.New(t, "testdata", "testdata/gallery")
 
-	themes := []struct{ flag, suffix string }{{"light", ".svg"}, {"dark", "_dark.svg"}}
+	type variant struct{ layout, motion, name string }
+	var variants []variant
 	for _, layout := range render.Layouts() {
-		for _, theme := range themes {
-			// A directory per card, because the second sweep of the same state
-			// file is answered 304 for everything and accumulates nothing:
-			// every card after the first came out with a zero in each number,
-			// which is a picture of a bug rather than of a layout.
-			work := t.TempDir()
-			cfg := writeConfig(t, work, gh.URL(), "e2e-token", login, "")
-			card := filepath.Join(work, "card.svg")
-			logs, runErr := run(t, 2*time.Minute, "-config", cfg,
-				"-card", card, "-card-only",
-				"-card-layout", layout.Name, "-card-theme", theme.flag)
-			if runErr != nil {
-				t.Fatalf("%s %s: %v\n%s", layout.Name, theme.flag, runErr, logs)
-			}
-			svg, readErr := os.ReadFile(card)
+		variants = append(variants, variant{layout.Name, render.MotionOnce, "card-" + layout.Name})
+		if layout.Animated {
+			variants = append(variants, variant{layout.Name, render.MotionLoop, "card-" + layout.Name + "-loop"})
+		}
+	}
+	for _, v := range variants {
+		// A directory per card, because the second sweep of the same state
+		// file is answered 304 for everything and accumulates nothing:
+		// every card after the first came out with a zero in each number,
+		// which is a picture of a bug rather than of a layout.
+		work := t.TempDir()
+		cfg := writeConfig(t, work, gh.URL(), "e2e-token", login, "")
+		card := filepath.Join(work, "card.svg")
+		logs, runErr := run(t, 2*time.Minute, "-config", cfg,
+			"-card", card, "-card-only", "-card-layout", v.layout,
+			"-card-theme", "both", "-card-motion", v.motion)
+		if runErr != nil {
+			t.Fatalf("%s: %v\n%s", v.name, runErr, logs)
+		}
+		// A slice and not a map, so the log lists light before dark every time.
+		copies := []struct{ src, dst string }{
+			{card, v.name + ".svg"},
+			{filepath.Join(work, "card_dark.svg"), v.name + "_dark.svg"},
+		}
+		for _, c := range copies {
+			svg, readErr := os.ReadFile(c.src)
 			if readErr != nil {
-				t.Fatalf("%s %s: card not written: %v\n%s", layout.Name, theme.flag, readErr, logs)
+				t.Fatalf("%s: card not written: %v\n%s", c.dst, readErr, logs)
 			}
-			name := "card-" + layout.Name + theme.suffix
-			if writeErr := out.WriteFile(name, svg, 0o600); writeErr != nil {
-				t.Fatalf("%s: %v", name, writeErr)
+			if writeErr := out.WriteFile(c.dst, svg, 0o600); writeErr != nil {
+				t.Fatalf("%s: %v", c.dst, writeErr)
 			}
-			t.Logf("%-32s %6d bytes", name, len(svg))
+			t.Logf("%-36s %6d bytes", c.dst, len(svg))
 		}
 	}
 }
