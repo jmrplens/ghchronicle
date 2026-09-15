@@ -117,9 +117,11 @@ switches it off in every mode.
 | `off`          | No animation at all, and a smaller file                                 |
 
 A loop that rests between plays is deliberate: a README that moves all the time
-is hard to read next to it.
+is hard to read next to it. Still, a card that loops keeps moving for everyone
+reading the README, and a README offers them no control over it, so `once` is
+the considerate choice for a profile.
 
-![The animated-counters layout in a loop: the numbers count up, hold, and count up again](../site/src/assets/card-animated-counters-loop.svg)
+![The animated-counters layout played once: the numbers count up and settle, and the page can also play it in a loop](../site/src/assets/card-animated-counters.svg)
 
 ### In a README
 

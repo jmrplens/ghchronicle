@@ -22,6 +22,12 @@
  * that does not move it would be a control that does nothing, and it starts
  * hidden so a reader without JavaScript never meets one either.
  *
+ * A card that loops is never shown looping by default. It moves every few
+ * seconds for as long as the page is open, and a movement that lasts that long
+ * needs a way to stop it (WCAG 2.2.2). So a `loop` card shows the picture that
+ * plays once, and a toggle swaps both palettes to the looping picture and back,
+ * which is the control: pressed again, the card is the one that settles.
+ *
  * The twins invoke this component identically, which is what
  * `scripts/check-i18n-parity.mjs` compares, so the label's language is read off
  * the URL rather than passed in, the way `Figure.astro` reads it.
@@ -36,9 +42,15 @@ interface Props {
 	alt: string;
 	/** Whether the layout animates, and so whether a replay button is offered. */
 	animated?: boolean;
+	/**
+	 * Whether a toggle offers the looping picture, card-<name>-loop.svg. The
+	 * picture shown until it is pressed is still card-<name>.svg, which plays
+	 * once.
+	 */
+	loop?: boolean;
 }
 
-const { name, alt, animated = false } = Astro.props;
+const { name, alt, animated = false, loop = false } = Astro.props;
 
 const route = Astro.url.pathname
 	.slice(BASE.length)
@@ -71,6 +83,14 @@ if (!src || !darkSrc || !raw) {
 			"Render the gallery with TestCardGallery (see the testing page) and copy them in.",
 	);
 }
+const loopSrc = urls[`../assets/card-${name}-loop.svg`];
+const loopDarkSrc = urls[`../assets/card-${name}-loop_dark.svg`];
+if (loop && (!loopSrc || !loopDarkSrc)) {
+	throw new Error(
+		`<Card name="${name}" loop /> needs both src/assets/card-${name}-loop.svg and card-${name}-loop_dark.svg. ` +
+			"Render the gallery with TestCardGallery (see the testing page) and copy them in.",
+	);
+}
 
 // The card's own size, read off its root element, so the page reserves the box
 // before the image arrives and nothing below it moves when it does.
@@ -86,6 +106,11 @@ const LABELS = {
 	es: "Repetir la animación",
 };
 const label = LABELS[locale];
+const LOOP_LABELS = {
+	en: "Play in a loop",
+	es: "Reproducir en bucle",
+};
+const loopLabel = LOOP_LABELS[locale];
 ---
 
 <figure class="rb-card" data-card>
@@ -119,6 +144,39 @@ const label = LABELS[locale];
 					<path d="M3 4v5h5" />
 				</svg>
 				<span>{label}</span>
+			</button>
+		)
+	}
+	{
+		loop && (
+			<button
+				type="button"
+				class="rb-card__replay rb-card__loop"
+				aria-pressed="false"
+				data-card-loop
+				data-once-light={src}
+				data-once-dark={darkSrc}
+				data-loop-light={loopSrc}
+				data-loop-dark={loopDarkSrc}
+				hidden
+			>
+				<svg
+					aria-hidden="true"
+					viewBox="0 0 24 24"
+					width="16"
+					height="16"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+				>
+					<path d="M17 2l4 4-4 4" />
+					<path d="M3 11V10a4 4 0 0 1 4-4h14" />
+					<path d="M7 22l-4-4 4-4" />
+					<path d="M21 13v1a4 4 0 0 1-4 4H3" />
+				</svg>
+				<span>{loopLabel}</span>
 			</button>
 		)
 	}
@@ -161,6 +219,31 @@ const label = LABELS[locale];
 		});
 		button.hidden = false;
 	}
+
+	for (const button of document.querySelectorAll<HTMLButtonElement>("[data-card-loop]")) {
+		const figure = button.closest("[data-card]");
+		const { onceLight, onceDark, loopLight, loopDark } = button.dataset;
+		if (!figure || !onceLight || !onceDark || !loopLight || !loopDark) continue;
+		button.addEventListener("click", () => {
+			const looping = button.getAttribute("aria-pressed") !== "true";
+			// Both palettes, so switching the page's theme while the card loops
+			// shows the loop in the other palette too. The images are looked up
+			// on every press rather than kept, because the replay button above
+			// replaces an image with a new element. A hidden image under a lazy
+			// load is not fetched until its palette is shown, so the one out of
+			// sight costs nothing here.
+			const pictures: [string, string][] = [
+				["img.light-only", looping ? loopLight : onceLight],
+				["img.dark-only", looping ? loopDark : onceDark],
+			];
+			for (const [selector, next] of pictures) {
+				const image = figure.querySelector<HTMLImageElement>(selector);
+				if (image) image.src = next;
+			}
+			button.setAttribute("aria-pressed", String(looping));
+		});
+		button.hidden = false;
+	}
 </script>
 
 <style>
@@ -190,11 +273,17 @@ const label = LABELS[locale];
 		border-color: var(--sl-color-text-accent);
 		color: var(--sl-color-white);
 	}
+	.rb-card__loop[aria-pressed="true"] {
+		border-color: var(--sl-color-text-accent);
+		background: var(--sl-color-gray-6);
+		color: var(--sl-color-white);
+	}
 	.rb-card__replay[hidden] {
 		display: none;
 	}
 	/* The cards themselves stop animating under this preference, so a button
-	 * that replays nothing would be a control with no effect. */
+	 * that replays nothing, or loops a picture that does not move, would be a
+	 * control with no effect. The loop toggle carries this class too. */
 	@media (prefers-reduced-motion: reduce) {
 		.rb-card__replay {
 			display: none;

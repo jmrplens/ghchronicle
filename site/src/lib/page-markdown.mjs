@@ -236,7 +236,9 @@ function renderSelfClosing(name, attributes, context) {
 	// A picture of the card reduces to the markdown image it replaced, with the
 	// same path relative to the page, so the twin and the files gen-docs.mjs
 	// writes from it say exactly what they said before the component existed.
-	// A markdown image cannot replay an animation, so the flag has no reduction.
+	// A markdown image cannot replay an animation, so the flag has no reduction,
+	// and it cannot offer a loop either: a `loop` card reduces to the picture
+	// it shows until the toggle is pressed, the one that plays once.
 	if (name === "Card") {
 		if (!attributes.name || !attributes.alt) {
 			throw new Error(
