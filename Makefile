@@ -15,6 +15,7 @@
 	test test-short test-race test-e2e coverage cover-check \
 	coverage-conditions coverage-mutants \
 	test-e2e-docker test-e2e-docker-race e2e-docker-up e2e-docker-down e2e-docker-logs \
+	gallery check-gallery \
 	fmt fmt-check vet tidy lint golangci-lint govulncheck analyze analyze-fix sonar \
 	mdlint mdlint-fix check-doc-links docs check-docs \
 	probe gen-dashboards check-dashboards check-dashboards-live \
@@ -281,6 +282,18 @@ e2e-docker-down: ## Stop the containerized stores and remove their volumes
 
 e2e-docker-logs: ## Show the containerized stores' logs (SERVICE=name for one)
 	$(E2E_DOCKER_COMPOSE) logs --no-color --tail 200 $(SERVICE)
+
+# The gallery under site/src/assets/ is what TestCardGallery
+# (test/e2e/card_gallery_test.go) renders: one committed SVG pair per layout,
+# plus a loop pair for the animated ones, which the layouts page and the
+# README's own pictures read directly. GHC_CARD_GALLERY has to be absolute:
+# `go test` runs with the package directory as its working directory, so a
+# relative path would be read against test/e2e/, not the repository root.
+gallery: ## Regenerate the card gallery into site/src/assets (test/e2e/card_gallery_test.go)
+	GHC_CARD_GALLERY=$(CURDIR)/site/src/assets go test -count=1 ./test/e2e/ -run TestCardGallery
+
+check-gallery: ## Fail if the committed card gallery no longer matches the renderer (offline)
+	scripts/check-gallery.sh
 
 coverage: test ## Write the HTML coverage report to coverage.html
 	go tool cover -html=coverage.out -o coverage.html

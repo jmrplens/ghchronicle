@@ -60,6 +60,15 @@ go run ./cmd/gen_dashboards -check   # writes nothing, fails if they are stale
 
 The five JSON files are generated and never hand-edited.
 
+For a change to a card layout:
+
+```sh
+make gallery         # regenerates the pictures under site/src/assets/
+make check-gallery   # writes nothing, fails if they no longer match the renderer
+```
+
+The card pictures are generated and never hand-edited.
+
 ## What a change owes
 
 **A new collector** means: a file in `internal/collect` that takes a

@@ -172,6 +172,11 @@ mkdir -p /tmp/cards
 GHC_CARD_GALLERY=/tmp/cards go test ./test/e2e/ -run TestCardGallery
 ```
 
+`make check-gallery` dibuja la galería en un directorio temporal y falla,
+nombrando cada diferencia, si el conjunto guardado en el repositorio ya no
+coincide byte a byte; `make gallery` la regenera en su sitio. El job
+«Generated artifacts» de CI ejecuta la comprobación en cada pull request.
+
 ## Levantar el stack
 
 Docker con el plugin de compose, y sitio para las imágenes. Luego:

@@ -168,6 +168,11 @@ mkdir -p /tmp/cards
 GHC_CARD_GALLERY=/tmp/cards go test ./test/e2e/ -run TestCardGallery
 ```
 
+`make check-gallery` renders the gallery into a scratch directory and fails,
+naming every difference, if the committed set no longer matches it byte for
+byte; `make gallery` regenerates it in place. CI's "Generated artifacts" job
+runs the check on every pull request.
+
 ## Running the stack
 
 Docker with the compose plugin, and room for the images. Then:
