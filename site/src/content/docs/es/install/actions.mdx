@@ -20,7 +20,7 @@ cadena de herramientas de Go: descarga un binario de release y lo llama.
 
 | Entrada           | Por omisión              | Qué hace                                                                                                 |
 | ----------------- | ------------------------ | -------------------------------------------------------------------------------------------------------- |
-| `token`           | obligatoria              | Un token personal. El `GITHUB_TOKEN` automático no basta para la mayor parte de lo que se recoge         |
+| `token`           | obligatoria              | Un token personal. El `GITHUB_TOKEN` automático no basta                                                 |
 | `config`          | `""`                     | Ruta a un fichero de configuración. Omítela para usar valores por defecto a partir de `user`             |
 | `user`            | el dueño del repositorio | La cuenta que recoger cuando no se da fichero de configuración                                           |
 | `mode`            | `once`                   | `once`, `backfill` o `card`                                                                              |
@@ -146,9 +146,10 @@ el README apunta a ella una vez y un workflow programado sustituye el fichero.
 El README no se reescribe nunca.
 
 1. Crea un token personal (ver [el token](/ghchronicle/es/start/token/)) y
-   guárdalo en `<tú>/<tú>` como el secreto `GHCHRONICLE_TOKEN`. Para una tarjeta
-   de números públicos basta el `GITHUB_TOKEN` automático, y entonces no hace
-   falta ningún secreto: pasa `${{ secrets.GITHUB_TOKEN }}` en su lugar.
+   guárdalo en `<tú>/<tú>` como el secreto `GHCHRONICLE_TOKEN`. El
+   `GITHUB_TOKEN` automático no sirve, ni siquiera para números públicos: no es
+   un usuario, así que la Action no puede listar tus repositorios con él y la
+   tarjeta sale vacía.
 2. Añade `.github/workflows/card.yml`:
 
    ```yaml
@@ -199,7 +200,11 @@ El README no se reescribe nunca.
 
 **Más de una tarjeta.** Repite el paso `uses: jmrplens/ghchronicle@v1` con otra
 ruta en `card` y otro diseño, y pega un `<picture>` por tarjeta. Cada paso es una
-pasada propia.
+pasada propia. Eso vale tal cual cuando la Action escribe su propia
+configuración, porque entonces cada uso tiene su propio fichero de estado. Con un
+fichero en `config`, da a cada paso su propio fichero con un `state_file`
+distinto: una segunda pasada que lee el estado de la primera recibe "no
+modificado" para todo y dibuja una tarjeta de ceros.
 
 **Un README que no está en la raíz.** Las rutas del `<picture>` son relativas al
 README, así que un `docs/README.md` apunta a `../generated/card.svg`.
@@ -207,9 +212,10 @@ README, así que un `docs/README.md` apunta a `../generated/card.svg`.
 <Aside type="caution" title="Repositorios privados">
   Sin fichero de configuración, la Action cuenta solo repositorios públicos. Con
   `include-private: true` la tarjeta suma las estrellas, forks, lenguajes y
-  tráfico de tus repositorios privados, y los layouts que listan repositorios
-  (`repo-list`, y cualquier layout al que se le pida el campo `top_repos`)
-  **publican sus nombres**. Para contarlos sin nombrarlos, elige tú los campos y
+  tráfico de tus repositorios privados, y los diseños que listan repositorios
+  **publican sus nombres**: `repo-list` y `summary` (el diseño por defecto de la
+  Action) los listan de entrada, y también cualquier diseño al que se le pida
+  `top_repos` en `card-fields`. Para contarlos sin nombrarlos, elige tú los campos y
   deja fuera `top_repos`, por ejemplo
   `card-fields: stars,forks,followers,contributions`.
 </Aside>

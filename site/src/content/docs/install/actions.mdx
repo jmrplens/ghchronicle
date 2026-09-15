@@ -18,20 +18,20 @@ it downloads a release binary and calls it.
 
 ## Inputs
 
-| Input             | Default              | What it does                                                                                       |
-| ----------------- | -------------------- | -------------------------------------------------------------------------------------------------- |
-| `token`           | required             | A personal access token. The automatic `GITHUB_TOKEN` is not enough for most of what this collects |
-| `config`          | `""`                 | Path to a configuration file. Omit to run with defaults built from `user`                          |
-| `user`            | the repository owner | The account to collect when no config file is given                                                |
-| `mode`            | `once`               | `once`, `backfill` or `card`                                                                       |
-| `backfill-since`  | `""`                 | Bound for `backfill`: a date, `90d`, `2y` or a Go duration. Empty means no bound                   |
-| `card`            | `""`                 | Path of the SVG to write. Empty means no card                                                      |
-| `card-layout`     | `summary`            | One of the ten registered layouts                                                                  |
-| `card-theme`      | `auto`               | `dark`, `light`, `auto`, or `both` for a light card and its `_dark` twin                           |
-| `card-fields`     | `""`                 | Comma-separated fields. Empty means the layout's default                                           |
-| `card-motion`     | `once`               | `once`, `loop` or `off`, for the animated layouts                                                  |
-| `include-private` | `false`              | `true` counts private repositories when no config file is given. See the warning below             |
-| `version`         | `latest`             | The release to install                                                                             |
+| Input             | Default              | What it does                                                                           |
+| ----------------- | -------------------- | -------------------------------------------------------------------------------------- |
+| `token`           | required             | A personal access token. The automatic `GITHUB_TOKEN` is not enough                    |
+| `config`          | `""`                 | Path to a configuration file. Omit to run with defaults built from `user`              |
+| `user`            | the repository owner | The account to collect when no config file is given                                    |
+| `mode`            | `once`               | `once`, `backfill` or `card`                                                           |
+| `backfill-since`  | `""`                 | Bound for `backfill`: a date, `90d`, `2y` or a Go duration. Empty means no bound       |
+| `card`            | `""`                 | Path of the SVG to write. Empty means no card                                          |
+| `card-layout`     | `summary`            | One of the ten registered layouts                                                      |
+| `card-theme`      | `auto`               | `dark`, `light`, `auto`, or `both` for a light card and its `_dark` twin               |
+| `card-fields`     | `""`                 | Comma-separated fields. Empty means the layout's default                               |
+| `card-motion`     | `once`               | `once`, `loop` or `off`, for the animated layouts                                      |
+| `include-private` | `false`              | `true` counts private repositories when no config file is given. See the warning below |
+| `version`         | `latest`             | The release to install                                                                 |
 
 ## The three modes
 
@@ -146,9 +146,9 @@ README points at it once, and a scheduled workflow replaces the file. The README
 itself is never rewritten.
 
 1. Create a personal access token (see [the token](/ghchronicle/start/token/)) and
-   store it in `<you>/<you>` as the secret `GHCHRONICLE_TOKEN`. For a card of
-   public numbers the automatic `GITHUB_TOKEN` is enough, and then no secret is
-   needed: pass `${{ secrets.GITHUB_TOKEN }}` instead.
+   store it in `<you>/<you>` as the secret `GHCHRONICLE_TOKEN`. The automatic
+   `GITHUB_TOKEN` will not do, even for public numbers: it is not a user, so the
+   Action cannot list your repositories with it and the card comes out empty.
 2. Add `.github/workflows/card.yml`:
 
    ```yaml
@@ -199,7 +199,11 @@ itself is never rewritten.
 
 **More than one card.** Repeat the `uses: jmrplens/ghchronicle@v1` step with
 another `card` path and layout, and paste one `<picture>` per card. Each step is
-a sweep of its own.
+a sweep of its own. That holds as written when the Action writes its own
+configuration, because each use then gets a state file of its own. With a
+`config` file, give each step its own file with a different `state_file`: a
+second sweep that reads the first one's state is answered "not modified" for
+everything and draws a card of zeros.
 
 **A README that is not at the root.** The paths in the `<picture>` are relative
 to the README, so a `docs/README.md` points at `../generated/card.svg`.
@@ -208,8 +212,9 @@ to the README, so a `docs/README.md` points at `../generated/card.svg`.
   Without a config file, the Action counts public repositories only. With
   `include-private: true` the card adds the stars, forks, languages and traffic
   of your private repositories, and the layouts that list repositories
-  (`repo-list`, and any layout given the `top_repos` field) **publish their
-  names**. To count them without naming them, pick the fields yourself and leave
+  **publish their names**: `repo-list` and `summary` (the Action's default
+  layout) list them by default, and so does any layout given `top_repos` in
+  `card-fields`. To count them without naming them, pick the fields yourself and leave
   `top_repos` out, for example `card-fields: stars,forks,followers,contributions`.
 </Aside>
 
