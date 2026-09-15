@@ -528,10 +528,11 @@ site-build: ## Build the documentation site into site/dist
 	cd site && pnpm build
 
 # The gates CI's site-lint job runs, in its order: the ones that need no build.
-site-check: ## Run the site's fast checks: astro check, contrast, i18n parity, the landing's counts, the figures, docs/, eslint and formatting
+site-check: ## Run the site's fast checks: astro check, contrast, i18n parity, the card pictures shown, the landing's counts, the figures, docs/, eslint and formatting
 	cd site && pnpm run check
 	cd site && pnpm run contrast:check
 	cd site && pnpm run i18n:check
+	cd site && pnpm run cards:check
 	cd site && pnpm run stats:check
 	cd site && pnpm run figures:check
 	cd site && pnpm run docs:check
