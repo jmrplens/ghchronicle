@@ -62,6 +62,9 @@ type timeline struct {
 	beats  []beat
 }
 
+// newTimeline starts a card's clock. The classes it hands out, m0, m1 and on,
+// are unique within one document only, so a card uses exactly one timeline:
+// two in the same SVG would each start at m0 and restyle each other's beats.
 func newTimeline(motion string) *timeline {
 	return &timeline{motion: motion}
 }
