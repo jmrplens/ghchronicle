@@ -109,9 +109,11 @@ runs:
         set -euo pipefail
         # A state directory of its own for every use of the Action in a job.
         # runner.temp outlives the step, so one fixed path would hand the
-        # second card of a workflow the first card's state: every request
-        # answered 304, nothing accumulated, and a card of zeros. A state file
-        # that does not exist yet is a first run, which is what each card is.
+        # second use of the Action the state the first one left behind, and a
+        # `once` step would then skip every family that one had marked as run.
+        # A `card` step draws the same card either way: a card run collects
+        # every family whatever the state file says, and `card-only` writes
+        # nothing back to it.
         STATE="$(mktemp -d "$RUNNER_TEMP/ghchronicle.XXXXXX")/state.json"
         export STATE
         bash "$GITHUB_ACTION_PATH/scripts/action-config.sh"

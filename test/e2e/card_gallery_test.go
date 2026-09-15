@@ -72,14 +72,19 @@ func TestCardGallery(t *testing.T) {
 			variants = append(variants, variant{layout.Name, render.MotionLoop, "card-" + layout.Name + "-loop"})
 		}
 	}
+	// One directory for all the cards, which is the arrangement this used to
+	// avoid. Each card had its own, because a card after the first came out
+	// with a zero in each number and that was read as the ETag cache
+	// answering 304 for everything; the cache is per process and each card is
+	// a process of its own, so it never was. What zeroed them was the cadence:
+	// the first card marked every family as run and the next run of the same
+	// state file found none of them due. A card run now collects every family
+	// whatever the cadence says, and -card-only writes nothing to the state
+	// file at all, so one directory draws the same card as twenty.
+	work := t.TempDir()
+	cfg := writeConfig(t, work, gh.URL(), "e2e-token", login, "")
+	card := filepath.Join(work, "card.svg")
 	for _, v := range variants {
-		// A directory per card, because the second sweep of the same state
-		// file is answered 304 for everything and accumulates nothing:
-		// every card after the first came out with a zero in each number,
-		// which is a picture of a bug rather than of a layout.
-		work := t.TempDir()
-		cfg := writeConfig(t, work, gh.URL(), "e2e-token", login, "")
-		card := filepath.Join(work, "card.svg")
 		logs, runErr := run(t, 2*time.Minute, "-config", cfg,
 			"-card", card, "-card-only", "-card-layout", v.layout,
 			"-card-theme", "both", "-card-motion", v.motion)

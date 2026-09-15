@@ -21,8 +21,8 @@ ghchronicle -config /etc/ghchronicle/config.yaml
 | `-groups`         | apagada       | Imprime los grupos con las familias de cada uno, y sale                                                                                   |
 | `-backfill`       | apagada       | Llega tan atrás como permita cada superficie, esperando a que se reponga el límite en vez de parar                                        |
 | `-backfill-since` | ninguno       | Acota el relleno: una fecha (`2024-01-01`), una duración (`720h`), días (`90d`) o años (`2y`)                                             |
-| `-card`           | ninguno       | Hace una pasada y escribe un SVG de resumen en esta ruta                                                                                  |
-| `-card-only`      | apagada       | Con `-card`, escribe el SVG y nada más: no hace falta ningún destino y no se escribe en ninguno                                           |
+| `-card`           | ninguno       | Hace una pasada y escribe un SVG de resumen en esta ruta; esa pasada recoge todas las familias, digan lo que digan las cadencias          |
+| `-card-only`      | apagada       | Con `-card`, escribe el SVG y nada más: no hace falta ningún destino, no se escribe en ninguno y el fichero de estado se queda como estaba |
 | `-card-theme`     | `auto`        | `dark`, `light`, `auto` o `both`: la tarjeta clara en `-card` y la oscura a su lado con `_dark` antes de la extensión, en una sola pasada |
 | `-card-motion`    | `once`        | `once`, `loop` u `off`; un diseño que no se mueve la ignora                                                                               |
 | `-card-layout`    | `summary`     | Cuál de los diez diseños dibujar                                                                                                          |

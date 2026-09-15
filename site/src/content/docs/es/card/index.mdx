@@ -33,6 +33,22 @@ Sin `-card-only` la tarjeta se escribe **además de** todo lo que recibirían
 normalmente los destinos, que es la disposición para una máquina que ya está
 recogiendo y quiere además una imagen.
 
+## La pasada de la tarjeta y el fichero de estado
+
+Una pasada con `-card` recoge **todas las familias**, digan lo que digan las
+cadencias, porque cada número de la tarjeta sale de los puntos de esa única
+pasada y una familia saltada por no tocarle sería un cero en la imagen.
+
+Con `-card-only` además deja el [fichero de
+estado](/ghchronicle/es/configuration/#state_file) tal y como lo encontró. Nada
+de lo que recogió esa pasada llegó a un almacén, así que nada de lo que aprendió
+puede decirle a la siguiente recogida que una familia ya está hecha. Sí lo lee,
+que es lo que le permite saltarse el recorrido único del historial de estrellas:
+lo que el estado recuerda abarata la pasada, nunca encoge la tarjeta.
+
+Así que una tarjeta, una segunda tarjeta y una recogida pueden compartir un
+`state_file`, y cada una de ellas es la cuenta entera.
+
 ## Qué dibuja
 
 Estrellas, forks, seguidores y número de repositorios; contribuciones del último

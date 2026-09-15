@@ -236,7 +236,7 @@ func execute(args []string, stdout, stderr io.Writer) {
 	runner := newRunner(cfg, api, sinks, logger, &o)
 	switch {
 	case o.backfill:
-		err = runBackfill(ctx, runner, cfg, &o, logger)
+		err = runBackfill(ctx, runner, cfg, accumulator, &o, logger)
 	case o.once || o.card != "":
 		err = runSweep(ctx, runner, accumulator, &o, logger)
 	default:
@@ -283,6 +283,11 @@ func newRunner(cfg *config.Config, api *ghapi.Client, sinks []sink.Sink,
 		// A backfill runs every family whatever the state says, because that
 		// is the whole point of asking for one.
 		Backfill: o.backfill,
+		// A card is drawn from one sweep, so that sweep runs every family
+		// whatever the state says; and when it feeds nothing but the card it
+		// leaves the state file alone. See run.Runner's Card and CardOnly.
+		Card:     o.card != "",
+		CardOnly: o.card != "" && o.cardOnly,
 	}
 }
 
@@ -398,14 +403,17 @@ func listRepositories(ctx context.Context, api *ghapi.Client, cfg *config.Config
 // A sweep cut short by a signal is not a failure: what it reached is written,
 // and the log says the backfill finished.
 func runBackfill(ctx context.Context, runner *run.Runner, cfg *config.Config,
-	o *options, logger *slog.Logger,
+	accumulator *render.Accumulator, o *options, logger *slog.Logger,
 ) error {
 	runner.Prime = true
+	files, err := planCards(accumulator, o)
+	if err != nil {
+		return err
+	}
 	bound := cfg.Backfill.Since
 	if o.since != "" {
 		bound = o.since
 	}
-	var err error
 	runner.BackfillSince, err = config.Backfill{Since: bound}.SinceTime(time.Now())
 	if err != nil {
 		return err
@@ -420,7 +428,11 @@ func runBackfill(ctx context.Context, runner *run.Runner, cfg *config.Config,
 		return err
 	}
 	logger.Info("backfill finished")
-	return nil
+	// A backfill asked for a card draws it from what the backfill collected,
+	// the same way a sweep does, and a backfill cut short by a signal draws it
+	// from what it reached: its points have been written, and a card is a
+	// picture of those points.
+	return writeCards(accumulator, files, o, logger)
 }
 
 // runSweep runs one sweep and, when one was asked for, draws the card from
@@ -430,15 +442,38 @@ func runBackfill(ctx context.Context, runner *run.Runner, cfg *config.Config,
 func runSweep(ctx context.Context, runner *run.Runner, accumulator *render.Accumulator,
 	o *options, logger *slog.Logger,
 ) error {
-	files := cardFiles(o.card, o.theme)
-	if accumulator != nil {
-		if err := checkCardFiles(o, files); err != nil {
-			return err
-		}
-	}
-	if err := runner.Once(ctx); err != nil {
+	files, err := planCards(accumulator, o)
+	if err != nil {
 		return err
 	}
+	if sweepErr := runner.Once(ctx); sweepErr != nil {
+		return sweepErr
+	}
+	return writeCards(accumulator, files, o, logger)
+}
+
+// planCards settles the files a run writes before it collects anything, and
+// returns none for a run that was not asked for a card. Checked this early
+// because a typo in the theme, the motion or a field found after the sweep
+// has already spent the rate limit; see checkCardFiles.
+func planCards(accumulator *render.Accumulator, o *options) ([]cardFile, error) {
+	if accumulator == nil {
+		return nil, nil
+	}
+	files := cardFiles(o.card, o.theme)
+	if err := checkCardFiles(o, files); err != nil {
+		return nil, err
+	}
+	return files, nil
+}
+
+// writeCards draws every file planCards named from what the run collected, so
+// a sweep and a backfill write the same card in the same way: one accumulator,
+// the options already checked, and under -card-theme both the light card at
+// -card and the dark one beside it.
+func writeCards(accumulator *render.Accumulator, files []cardFile,
+	o *options, logger *slog.Logger,
+) error {
 	if accumulator == nil {
 		return nil
 	}

@@ -44,6 +44,36 @@ type Runner struct {
 	// one full sweep is the cheaper mistake.
 	Prime bool
 
+	// Card says this sweep draws a card, which runs every enabled family the
+	// way Prime does.
+	//
+	// A card is drawn from the points of this one sweep and from nothing else,
+	// so a family skipped as not due is not a saving, it is a zero on the
+	// card: a card sharing a state file with the sweep before it came out
+	// with a zero in every number. Every number the card shows is asked for
+	// again, which is one sweep's worth of quota for a picture that is
+	// redrawn whole each time.
+	Card bool
+
+	// CardOnly says the points of this sweep reach the card and no store,
+	// which is what -card-only asks for. Such a sweep saves nothing to the
+	// state file.
+	//
+	// Every field in State is a claim that something has already been
+	// delivered somewhere, and a card-only sweep delivers to nobody, so
+	// writing any of them would make the next real collection skip or narrow
+	// a read whose data went into a picture and nowhere else. Field by field:
+	// last_run would make a family not due and skip it outright; first_saw
+	// would retire the one-off full walk of a repository's star history, which
+	// no later sweep does again; last_head would move the dependency diff's
+	// base past changes no range can name afterwards; last_full would spend
+	// the day's whole-page read of the pull requests nobody touched;
+	// last_notified would cut the inbox window past threads the stores never
+	// saw; and last_event would stop the next feed read at an event they never
+	// got. The state file is still read: what it remembers only makes this
+	// sweep cheaper, never less complete.
+	CardOnly bool
+
 	repos   []collect.Repo
 	reposAt time.Time
 	primed  bool
@@ -109,12 +139,15 @@ const discoverInterval = time.Hour
 // marking anything as run.
 func (r *Runner) Once(ctx context.Context) error {
 	now := time.Now()
-	r.prime = r.Prime && !r.primed
+	r.prime = (r.Prime || r.Card) && !r.primed
 	r.primed = true
 	if r.prime {
 		why := "first sweep after start-up, running every family to fill the exporter"
-		if r.Backfill {
+		switch {
+		case r.Backfill:
 			why = "running every family, whatever the state file says they last did"
+		case r.Card:
+			why = "running every family, whatever the state file says they last did, because the card shows all of them"
 		}
 		r.Log.Info(why)
 	}
@@ -374,7 +407,11 @@ func (r *Runner) collectFamily(ctx context.Context, family string, now time.Time
 
 // finish saves what the sweep learned and says what it spent.
 func (r *Runner) finish() {
-	if err := r.State.Save(); err != nil {
+	// Nothing a card-only sweep collected reached a store, so nothing it
+	// learned may tell the next collection that it did. See CardOnly.
+	if r.CardOnly {
+		r.Log.Debug("card-only sweep, the state file is left as it was")
+	} else if err := r.State.Save(); err != nil {
 		r.Log.Warn("state not saved", "err", err)
 	}
 	for name, rate := range r.API.Rates() {

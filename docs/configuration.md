@@ -101,6 +101,11 @@ measurement, tags and timestamp and overwrites what is already stored.
 head it held and the next one are read from a range that nothing can name once
 the head is gone.
 
+A run with `-card-only` writes none of the six. Its points reach [the
+card](https://jmrp.io/docs/ghchronicle/card/) and no store, so a mark it left behind would make the
+next collection skip a family, or narrow a read, whose data went into a picture
+and nowhere else. It reads the file as any other run does.
+
 #### The other file a sweep remembers itself in
 
 ```yaml
