@@ -5,6 +5,19 @@ import (
 	"strings"
 )
 
+// The profile's own repeated words: the SQL that reaches a table, the
+// Graphite function that carries a daily reading forward, and the column
+// titles a panel and its Elasticsearch and Prometheus twins must agree on
+// letter for letter or the twin arrives with an empty column.
+const (
+	profileFrom       = " FROM "
+	profileKeepLast   = "keepLastValue("
+	profileNextTier   = "Next tier at"
+	profilePageAgrees = "Page agrees"
+	profileOneTime    = "One-time"
+	profileLastAdded  = "Last added"
+)
+
 // ── Profile and sponsorship ─────────────────────────────────────────────────
 
 // profileSection is what the profile advertises and what it earns.
@@ -46,21 +59,21 @@ func achievements(b *builder) Panel {
 	rows := `SELECT name AS "Achievement", tier_number AS "Tier", tier_name AS "Level",` +
 		` url AS "Link" FROM (` +
 		"SELECT *, ROW_NUMBER() OVER (PARTITION BY achievement ORDER BY time DESC) AS rn" +
-		" FROM " + ac + " WHERE $__timeFilter(time)) x WHERE rn = 1 ORDER BY 2 DESC, 1"
-	gr, grtf := gTbl(rowsOf("keepLastValue("+gp(ac, "tier_number")+")", gn(ac, "achievement")),
+		profileFrom + ac + " WHERE $__timeFilter(time)) x WHERE rn = 1 ORDER BY 2 DESC, 1"
+	gr, grtf := gTbl(rowsOf(profileKeepLast+gp(ac, "tier_number")+")", gn(ac, "achievement")),
 		"Achievement", []col{{"lastNotNull", "Tier"}})
 	es, estf := esTbl(ac, []any{b.tm("achievement", 50, "_key", "asc"), b.tmURL()},
 		[]any{b.mNewest("tier_number")},
 		[]named{
 			{"achievement.keyword", "Achievement"},
-			{"url.keyword", "Link"},
+			{panelURLField, "Link"},
 			{"tier_number", "Tier"},
 		}, nil)
 	// Ten rows high: the profile it was written against has eight badges,
 	// and a shelf that scrolls inside a six-row table hides half of them.
 	// Nine was measured at 1920 and at 430 to show seven of the eight, the
 	// eighth reached only by a scroll inside the table.
-	return panel("table", "Achievements", 24, 10, 0, 31, []Target{sqlT(rows)}, &P{
+	return panel("table", "Achievements", box{W: 24, H: 10, X: 0, Y: 31}, []Target{sqlT(rows)}, &P{
 		Prom:   []Target{promTbl("max by (achievement) (github_achievement_tier_number)")},
 		PromTF: []any{organize(map[string]string{"achievement": "Achievement", "Value": "Tier"}, []string{"user"}, nil)},
 		Opts:   Opts{"sort": "Tier"},
@@ -95,8 +108,8 @@ func achievementProgress(b *builder) Panel {
 		` next_threshold AS "Next tier at", tier_number AS "Tier", agrees AS "Page agrees",` +
 		` url AS "Link" FROM (` +
 		"SELECT *, ROW_NUMBER() OVER (PARTITION BY achievement ORDER BY time DESC) AS rn" +
-		" FROM " + ap + " WHERE $__timeFilter(time)) x WHERE rn = 1 ORDER BY 3 DESC, 2"
-	gr, grtf := gTbl(rowsOf("keepLastValue("+gp(ap, "percent")+")", gn(ap, "achievement")),
+		profileFrom + ap + " WHERE $__timeFilter(time)) x WHERE rn = 1 ORDER BY 3 DESC, 2"
+	gr, grtf := gTbl(rowsOf(profileKeepLast+gp(ap, "percent")+")", gn(ap, "achievement")),
 		"Achievement", []col{{"lastNotNull", "Progress"}})
 	// The badge image and the url reach the table as buckets of one value
 	// each, the way the url does everywhere: a top metric over a string
@@ -107,12 +120,12 @@ func achievementProgress(b *builder) Panel {
 		[]named{
 			{"achievement.keyword", "Achievement"},
 			{"image.keyword", "Badge"},
-			{"url.keyword", "Link"},
+			{panelURLField, "Link"},
 			{"percent", "Progress"},
 			{"count", "Count"},
-			{"next_threshold", "Next tier at"},
+			{"next_threshold", profileNextTier},
 			{"tier_number", "Tier"},
-			{"agrees", "Page agrees"},
+			{"agrees", profilePageAgrees},
 		}, nil)
 	var prom []Target
 	for i, field := range []string{"percent", "count", "next_threshold", "tier_number", "agrees"} {
@@ -120,16 +133,16 @@ func achievementProgress(b *builder) Panel {
 	}
 	overrides := []any{
 		badgeCell("Badge"), width("Achievement", 170), width("Tier", 100), width("Count", 90),
-		width("Next tier at", 110), progressCell("Progress"), agreesCell("Page agrees"),
-		linkOn("Achievement"), tierNames("Tier"), topTier("Next tier at"),
+		width(profileNextTier, 110), progressCell("Progress"), agreesCell(profilePageAgrees),
+		linkOn("Achievement"), tierNames("Tier"), topTier(profileNextTier),
 	}
 	// Eight rows high: four badges drawn at the larger cell height the badge
 	// image needs to be a badge and not a dot.
-	return panel("table", "Achievement progress", 24, 8, 0, 41, []Target{sqlT(rows)}, &P{
+	return panel("table", "Achievement progress", box{W: 24, H: 8, X: 0, Y: 41}, []Target{sqlT(rows)}, &P{
 		Prom: prom,
 		PromTF: merged(map[string]string{
-			"achievement": "Achievement", "Value #A": "Progress", "Value #B": "Count",
-			"Value #C": "Next tier at", "Value #D": "Tier", "Value #E": "Page agrees",
+			"achievement": "Achievement", panelValueA: "Progress", panelValueB: "Count",
+			panelValueC: profileNextTier, panelValueD: "Tier", panelValueE: profilePageAgrees,
 		}, []string{"user"}, nil),
 		// No sort option: the SQL stores order by progress, and on a phone
 		// a sorted column has to be one of the first two, which are the
@@ -162,10 +175,10 @@ func achievementProgress(b *builder) Panel {
 // needs to be recognizable.
 func badgeCell(name string) any {
 	return override(name, []any{
-		map[string]any{"id": "custom.cellOptions", "value": map[string]any{
+		map[string]any{"id": panelCellOptionsField, "value": map[string]any{
 			"type": "image", "alt": "badge", "title": "The badge as the profile shows it",
 		}},
-		map[string]any{"id": "custom.width", "value": 72},
+		map[string]any{"id": panelWidthField, "value": 72},
 	})
 }
 
@@ -174,7 +187,7 @@ func badgeCell(name string) any {
 // cent is a tenth of the cell, not a tenth of the longest bar in the column.
 func progressCell(name string) any {
 	return override(name, []any{
-		map[string]any{"id": "custom.cellOptions", "value": map[string]any{
+		map[string]any{"id": panelCellOptionsField, "value": map[string]any{
 			"type": "gauge", "mode": "gradient",
 		}},
 		map[string]any{"id": "unit", "value": "percent"},
@@ -201,8 +214,8 @@ func agreesCell(name string) any {
 				"1": map[string]any{"text": "yes", "color": "green", "index": 0},
 			},
 		}}},
-		map[string]any{"id": "custom.cellOptions", "value": map[string]any{"type": "color-text"}},
-		map[string]any{"id": "custom.width", "value": 110},
+		map[string]any{"id": panelCellOptionsField, "value": map[string]any{"type": "color-text"}},
+		map[string]any{"id": panelWidthField, "value": 110},
 	})
 }
 
@@ -266,8 +279,8 @@ func profileBool(name string, w int) any {
 				"1": map[string]any{"text": "yes", "color": "green", "index": 0},
 			},
 		}}},
-		map[string]any{"id": "custom.cellOptions", "value": map[string]any{"type": "color-text"}},
-		map[string]any{"id": "custom.width", "value": w},
+		map[string]any{"id": panelCellOptionsField, "value": map[string]any{"type": "color-text"}},
+		map[string]any{"id": panelWidthField, "value": w},
 	})
 }
 
@@ -348,12 +361,12 @@ func sponsorship(b *builder) []Panel {
 		` amount_cents / 100.0 AS "Amount",` +
 		` CAST(active AS INT) AS "Active", CAST(one_time AS INT) AS "One-time",` +
 		` url AS "Link"` +
-		" FROM " + sp + " WHERE " + wholeHistory + " ORDER BY time DESC LIMIT 200"
+		profileFrom + sp + " WHERE " + wholeHistory + " ORDER BY time DESC LIMIT 200"
 	tiers := `SELECT tier AS "Tier", price_cents / 100.0 AS "Price",` +
 		` CAST(one_time AS INT) AS "One-time", CAST(retired AS INT) AS "Retired",` +
 		` age_days AS "Age", url AS "Link" FROM (` +
 		"SELECT *, ROW_NUMBER() OVER (PARTITION BY tier ORDER BY time DESC) AS rn" +
-		" FROM " + st + " WHERE $__timeFilter(time)) x WHERE rn = 1 ORDER BY 2 DESC"
+		profileFrom + st + " WHERE $__timeFilter(time)) x WHERE rn = 1 ORDER BY 2 DESC"
 
 	// Graphite has no rows and no dates to list by, so the sponsorships become
 	// the price of the tier each was made at, named from the path. A sponsorship
@@ -375,7 +388,7 @@ func sponsorship(b *builder) []Panel {
 		{"tier_number", "Tier"},
 		{"amount_cents", "Amount (cents)"},
 		{"active", "Active"},
-		{"one_time", "One-time"},
+		{"one_time", profileOneTime},
 		{"url", "Link"},
 	}, nil)
 
@@ -392,19 +405,19 @@ func sponsorship(b *builder) []Panel {
 		[]any{b.mNewest("price_cents"), b.mMax("one_time"), b.mMax("retired"), b.mMax("age_days")},
 		[]named{
 			{"tier.keyword", "Tier"},
-			{"url.keyword", "Link"},
+			{panelURLField, "Link"},
 			{"price_cents", "Price (cents)"},
-			{"one_time", "One-time"},
+			{"one_time", profileOneTime},
 			{"retired", "Retired"},
 			{"age_days", "Age"},
 		}, nil)
 
 	return []Panel{
-		statGroup("Sponsorship", 24, 4, 0, 0, []Target{sqlT(
-			"SELECT " + strings.Join(moneyCols, ", ") + " FROM " + sl +
+		statGroup("Sponsorship", box{W: 24, H: 4, X: 0, Y: 0}, []Target{sqlT(
+			"SELECT " + strings.Join(moneyCols, ", ") + profileFrom + sl +
 				" WHERE $__timeFilter(time) ORDER BY time DESC LIMIT 1",
 		)}, money),
-		panel("table", "Sponsorships", 12, 10, 0, 4, []Target{sqlT(sponsorships)}, &P{
+		panel("table", "Sponsorships", box{W: 12, H: 10, X: 0, Y: 4}, []Target{sqlT(sponsorships)}, &P{
 			// The count of the last sweep, not increase() over the monotonic
 			// total. Every sweep re-reads the same finite set of sponsorships,
 			// so that total rises once, when the exporter first sees them, and
@@ -419,9 +432,9 @@ func sponsorship(b *builder) []Panel {
 				promTbl("avg by (direction) (github_sponsorships_one_time_mean)", "D"),
 			},
 			PromTF: merged(map[string]string{
-				"direction": "Direction", "Value #A": "Sponsorships",
-				"Value #B": "Mean amount", "Value #C": "Active share",
-				"Value #D": "One-time share",
+				"direction": "Direction", panelValueA: "Sponsorships",
+				panelValueB: "Mean amount", panelValueC: "Active share",
+				panelValueD: "One-time share",
 			}, []string{"user"}, map[string]int{"direction": 0}),
 			Desc: "Every sponsorship in either direction, dated the day it began and not the day " +
 				"of any payment. Amount is the price of the tier it was made at, which is a rate " +
@@ -447,7 +460,7 @@ func sponsorship(b *builder) []Panel {
 				"whatever range is selected.",
 			Overrides: []any{
 				when("Date"), unitOf("Amount", "currencyUSD", 90),
-				profileBool("Active", 80), profileBool("One-time", 90), linkOn("Sponsorable"),
+				profileBool("Active", 80), profileBool(profileOneTime, 90), linkOn("Sponsorable"),
 			},
 			PromOver: []any{
 				unitOf("Mean amount", "currencyUSD", 130),
@@ -460,7 +473,7 @@ func sponsorship(b *builder) []Panel {
 			ES: spES, ESTF: spEStf,
 			ESDesc: "Elasticsearch lists the documents themselves, newest first. " + esCents + " " + esRange,
 		}),
-		panel("table", "Sponsorship tiers", 12, 10, 12, 4, []Target{sqlT(tiers)}, &P{
+		panel("table", "Sponsorship tiers", box{W: 12, H: 10, X: 12, Y: 4}, []Target{sqlT(tiers)}, &P{
 			Prom: []Target{
 				promTbl("max by (tier) (github_sponsors_tier_price_cents) / 100", "A"),
 				promTbl("max by (tier) (github_sponsors_tier_one_time)", "B"),
@@ -468,8 +481,8 @@ func sponsorship(b *builder) []Panel {
 				promTbl("max by (tier) (github_sponsors_tier_age_days)", "D"),
 			},
 			PromTF: merged(map[string]string{
-				"tier": "Tier", "Value #A": "Price", "Value #B": "One-time",
-				"Value #C": "Retired", "Value #D": "Age",
+				"tier": "Tier", panelValueA: "Price", panelValueB: profileOneTime,
+				panelValueC: "Retired", panelValueD: "Age",
 			}, []string{"user"}, map[string]int{"tier": 0}),
 			Opts: Opts{"sort": "Price"},
 			Desc: "Standing inventory, the way an SSH key is. The listing says how many tiers " +
@@ -478,7 +491,7 @@ func sponsorship(b *builder) []Panel {
 				"no tiers at all, so they are anchored to the start of the UTC day and the " +
 				"creation date survives as an age.",
 			Overrides: []any{
-				unitOf("Price", "currencyUSD", 90), profileBool("One-time", 90),
+				unitOf("Price", "currencyUSD", 90), profileBool(profileOneTime, 90),
 				profileBool("Retired", 85), unitOf("Age", "d", 70), linkOn("Tier"),
 			},
 			GR: tierGR, GRTF: tierGRtf,
@@ -504,7 +517,7 @@ func profileStanding(b *builder) []Panel {
 	pins := `SELECT "position" AS "Position", repo AS "Item", kind AS "Kind",` +
 		` stars AS "Stars", days_since_push AS "Idle", url AS "Link" FROM (` +
 		"SELECT *, ROW_NUMBER() OVER (PARTITION BY repo ORDER BY time DESC) AS rn" +
-		" FROM " + pi + " WHERE $__timeFilter(time)) x WHERE rn = 1 ORDER BY 1"
+		profileFrom + pi + " WHERE $__timeFilter(time)) x WHERE rn = 1 ORDER BY 1"
 	// Two columns and the link. The measurement carries a third field, the
 	// days since the availability status was set, but on one row of eight,
 	// and on live data that row read four years on a flag that was off: it
@@ -516,14 +529,14 @@ func profileStanding(b *builder) []Panel {
 	flags := `SELECT flag AS "Flag", CAST(enabled AS INT) AS "Enabled",` +
 		` url AS "Link" FROM (` +
 		"SELECT *, ROW_NUMBER() OVER (PARTITION BY flag ORDER BY time DESC) AS rn" +
-		" FROM " + pf + " WHERE $__timeFilter(time)) x WHERE rn = 1 ORDER BY 1"
+		profileFrom + pf + " WHERE $__timeFilter(time)) x WHERE rn = 1 ORDER BY 1"
 
 	// Sorted like its four siblings rather than left in the order the paths
 	// expanded in. A reduced Graphite table comes back one row per series, named
 	// by the pin, and the panel's own claim is that it reads in the order the
 	// profile arranges them: without this the slot is a column the reader has to
 	// sort by hand, on the one store of the five where the rows arrive by name.
-	pinGR, pinGRtf := gTbl(rowsOf("keepLastValue("+gp(pi, "position")+")", gn(pi, "repo")),
+	pinGR, pinGRtf := gTbl(rowsOf(profileKeepLast+gp(pi, "position")+")", gn(pi, "repo")),
 		"Item", []col{{"lastNotNull", "Position"}})
 	pinGRtf = append(pinGRtf, profileSortAsc("Position"))
 	// The kind and the link as buckets and never as metrics: they are strings,
@@ -549,20 +562,20 @@ func profileStanding(b *builder) []Panel {
 		[]named{
 			{"repo.keyword", "Item"},
 			{"kind.keyword", "Kind"},
-			{"url.keyword", "Link"},
+			{panelURLField, "Link"},
 			{"position", "Position"},
 			{"stars", "Stars"},
 			{"days_since_push", "Idle"},
 		}, nil, profileSortAsc("Position"))
 
-	flagGR, flagGRtf := gTbl(rowsOf("keepLastValue("+gp(pf, "enabled")+")", gn(pf, "flag")),
+	flagGR, flagGRtf := gTbl(rowsOf(profileKeepLast+gp(pf, "enabled")+")", gn(pf, "flag")),
 		"Flag", []col{{"lastNotNull", "Enabled"}})
 	flagGRtf = append(flagGRtf, profileSortAsc("Flag"))
 	flagES, flagEStf := esTbl(pf, []any{b.tm("flag", 10, "_key", "asc"), b.tmURL()},
 		[]any{b.mMax("enabled")},
 		[]named{
 			{"flag.keyword", "Flag"},
-			{"url.keyword", "Link"},
+			{panelURLField, "Link"},
 			{"enabled", "Enabled"},
 		}, nil)
 
@@ -579,15 +592,15 @@ func profileStanding(b *builder) []Panel {
 		// table. The pair above is the same height because the tier list of
 		// the profile this was written against has eight rows, which eight
 		// showed six of.
-		panel("table", "Pinned items", 12, 10, 0, 14, []Target{sqlT(pins)}, &P{
+		panel("table", "Pinned items", box{W: 12, H: 10, X: 0, Y: 14}, []Target{sqlT(pins)}, &P{
 			Prom: []Target{
 				promTbl("max by (repo) (github_pinned_item_position)", "A"),
 				promTbl("max by (repo) (github_pinned_item_stars)", "B"),
 				promTbl("max by (repo) (github_pinned_item_days_since_push)", "C"),
 			},
 			PromTF: append(merged(map[string]string{
-				"repo": "Item", "Value #A": "Position", "Value #B": "Stars",
-				"Value #C": "Idle",
+				"repo": "Item", panelValueA: "Position", panelValueB: "Stars",
+				panelValueC: "Idle",
 			}, []string{"user"}, map[string]int{"repo": 0}), profileSortAsc("Position")),
 			Desc: "What the profile shows first, in the order it shows it. The row worth seeing " +
 				"is a pinned repository nobody has pushed to in two years. Position is a field " +
@@ -612,7 +625,7 @@ func profileStanding(b *builder) []Panel {
 				"to 0 on a push, so a pin that was pushed to inside the range still reads as " +
 				"idle here until the range has rolled past the push.",
 		}),
-		panel("table", "Profile flags", 12, 10, 12, 14, []Target{sqlT(flags)}, &P{
+		panel("table", "Profile flags", box{W: 12, H: 10, X: 12, Y: 14}, []Target{sqlT(flags)}, &P{
 			Prom: []Target{promTbl("max by (flag) (github_profile_flag_enabled)")},
 			PromTF: []any{organize(map[string]string{
 				"flag": "Flag", "Value": "Enabled",
@@ -657,9 +670,9 @@ func starLists(b *builder) Panel {
 	lists := `SELECT list AS "List", items AS "Items", CAST(private AS INT) AS "Private",` +
 		` age_days AS "Age", days_since_add AS "Last added", url AS "Link" FROM (` +
 		"SELECT *, ROW_NUMBER() OVER (PARTITION BY list ORDER BY time DESC) AS rn" +
-		" FROM " + sl + " WHERE $__timeFilter(time)) x WHERE rn = 1 ORDER BY 2 DESC"
+		profileFrom + sl + " WHERE $__timeFilter(time)) x WHERE rn = 1 ORDER BY 2 DESC"
 
-	listGR, listGRtf := gTbl(rowsOf("keepLastValue("+gp(sl, "items")+")", gn(sl, "list")),
+	listGR, listGRtf := gTbl(rowsOf(profileKeepLast+gp(sl, "items")+")", gn(sl, "list")),
 		"List", []col{{"lastNotNull", "Items"}})
 	// The item count as the newest reading of each list, the age and the days
 	// since the last addition as a max: `days_since_add` is written only for
@@ -680,14 +693,14 @@ func starLists(b *builder) Panel {
 		[]any{b.mNewest("items"), b.mMax("age_days"), b.mMax("days_since_add")},
 		[]named{
 			{"list.keyword", "List"},
-			{"url.keyword", "Link"},
+			{panelURLField, "Link"},
 			{"items", "Items"},
 			{"age_days", "Age"},
-			{"days_since_add", "Last added"},
+			{"days_since_add", profileLastAdded},
 		}, nil)
 
 	// No repository filter: a list is the account's, not a repository's.
-	return panel("table", "Star lists", 24, 7, 0, 24, []Target{sqlT(lists)}, &P{
+	return panel("table", "Star lists", box{W: 24, H: 7, X: 0, Y: 24}, []Target{sqlT(lists)}, &P{
 		Prom: []Target{
 			promTbl("max by (list) (github_star_list_items)", "A"),
 			promTbl("max by (list) (github_star_list_private)", "B"),
@@ -695,8 +708,8 @@ func starLists(b *builder) Panel {
 			promTbl("max by (list) (github_star_list_days_since_add)", "D"),
 		},
 		PromTF: merged(map[string]string{
-			"list": "List", "Value #A": "Items", "Value #B": "Private",
-			"Value #C": "Age", "Value #D": "Last added",
+			"list": "List", panelValueA: "Items", panelValueB: "Private",
+			panelValueC: "Age", panelValueD: profileLastAdded,
 		}, []string{"user"}, map[string]int{"list": 0}),
 		Opts: Opts{"sort": "Items"},
 		Desc: "The lists the account files its stars into, and how many each holds. " +
@@ -708,7 +721,7 @@ func starLists(b *builder) Panel {
 			"sit inside any dashboard range.",
 		Overrides: []any{
 			width("Items", 90), profileBool("Private", 90), unitOf("Age", "d", 80),
-			unitOf("Last added", "d", 110), linkOn("List"),
+			unitOf(profileLastAdded, "d", 110), linkOn("List"),
 		},
 		GR: listGR, GRTF: listGRtf,
 		GRDesc: "Graphite keeps the item count, which is the column this table sorts by. " + grRows,

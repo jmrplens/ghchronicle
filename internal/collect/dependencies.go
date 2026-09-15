@@ -136,7 +136,7 @@ func sbomPoints(ctx context.Context, c *ghapi.Client, m *Refusals, repo Repo, ba
 			Packages []sbomPackage `json:"packages"`
 		} `json:"sbom"`
 	}
-	if _, _, err := m.GetJSON(ctx, c, "/repos/"+repo.FullName+"/dependency-graph/sbom", &res, ""); err != nil {
+	if _, _, err := m.GetJSON(ctx, c, repoPathPrefix+repo.FullName+"/dependency-graph/sbom", &res, ""); err != nil {
 		if isSkippable(err) {
 			return nil, nil
 		}
@@ -189,7 +189,7 @@ const shaMediaType = "application/vnd.github.sha"
 // GitHub's side, so the branch name need not be known here. An empty answer
 // means the range cannot be computed yet, which is not a failure.
 func defaultBranchHead(ctx context.Context, c *ghapi.Client, repo Repo) (string, error) {
-	sha, err := c.GetTextAs(ctx, "/repos/"+repo.FullName+"/commits/HEAD", shaMediaType)
+	sha, err := c.GetTextAs(ctx, repoPathPrefix+repo.FullName+"/commits/HEAD", shaMediaType)
 	if err != nil {
 		if isSkippable(err) {
 			return "", nil
@@ -217,7 +217,7 @@ func dependencyChangePoints(ctx context.Context, c *ghapi.Client, repo Repo,
 			Severity string `json:"severity"`
 		} `json:"vulnerabilities"`
 	}
-	path := "/repos/" + repo.FullName + "/dependency-graph/compare/" + from + "..." + to
+	path := repoPathPrefix + repo.FullName + "/dependency-graph/compare/" + from + "..." + to
 	if _, _, err := c.GetJSON(ctx, path, &changes, ""); err != nil {
 		if isSkippable(err) {
 			return nil, nil

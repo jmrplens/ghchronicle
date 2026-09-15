@@ -52,6 +52,13 @@ type Totals struct {
 	Batch int
 }
 
+// The qualifier each lifetime count of that kind opens with. The login, and
+// whatever narrows the count further, are appended to it.
+const (
+	pullsByAuthor  = "type:pr author:"
+	issuesByAuthor = "type:issue author:"
+)
+
 // searchCounts are the lifetime counts search answers, keyed by the field a
 // dashboard reads, which is the part that must not drift. Ten of the eleven
 // come from one GraphQL query with an alias per count: issueCount is what
@@ -66,16 +73,16 @@ func (t Totals) searchCounts() []searchCount {
 		return searchCount{field: field, kind: "ISSUE", query: q}
 	}
 	return []searchCount{
-		issues("pulls_opened", "type:pr author:"+login),
-		issues("pulls_merged", "type:pr author:"+login+" is:merged"),
-		issues("pulls_open_now", "type:pr author:"+login+" is:open"),
+		issues("pulls_opened", pullsByAuthor+login),
+		issues("pulls_merged", pullsByAuthor+login+" is:merged"),
+		issues("pulls_open_now", pullsByAuthor+login+" is:open"),
 		// Merged somewhere that is not this account: the work that a sweep
 		// over one's own repositories cannot see at all.
-		issues("pulls_merged_elsewhere", "type:pr author:"+login+" is:merged -user:"+login),
+		issues("pulls_merged_elsewhere", pullsByAuthor+login+" is:merged -user:"+login),
 		issues("pulls_reviewed", "type:pr reviewed-by:"+login),
-		issues("issues_opened", "type:issue author:"+login),
-		issues("issues_closed", "type:issue author:"+login+" is:closed"),
-		issues("issues_elsewhere", "type:issue author:"+login+" -user:"+login),
+		issues("issues_opened", issuesByAuthor+login),
+		issues("issues_closed", issuesByAuthor+login+" is:closed"),
+		issues("issues_elsewhere", issuesByAuthor+login+" -user:"+login),
 		issues("commented_elsewhere", "commenter:"+login+" -author:"+login),
 		{field: "repositories", kind: "REPOSITORY", query: "user:" + login},
 	}
@@ -153,28 +160,24 @@ type repoTotals struct {
 	// GET /repos/{r}: an archived repository and a live one both carry
 	// `archived` and neither carries `archived_at`. A pointer because it is
 	// null on every repository that is not archived.
-	ArchivedAt    *time.Time `json:"archivedAt"`
-	IsPrivate     bool       `json:"isPrivate"`
-	DiskUsage     int        `json:"diskUsage"`
-	Stars         int        `json:"stargazerCount"`
-	Forks         int        `json:"forkCount"`
-	Watchers      count      `json:"watchers"`
-	IssuesOpen    count      `json:"issuesOpen"`
-	IssuesClosed  count      `json:"issuesClosed"`
-	PullsOpen     count      `json:"pullsOpen"`
-	PullsMerged   count      `json:"pullsMerged"`
-	PullsClosed   count      `json:"pullsClosed"`
-	Releases      count      `json:"releases"`
-	Discussions   count      `json:"discussions"`
-	Labels        count      `json:"labels"`
-	Milestones    count      `json:"milestones"`
-	Branches      count      `json:"branches"`
-	Tags          count      `json:"tags"`
-	DefaultBranch *struct {
-		Target struct {
-			History count `json:"history"`
-		} `json:"target"`
-	} `json:"defaultBranchRef"`
+	ArchivedAt    *time.Time        `json:"archivedAt"`
+	IsPrivate     bool              `json:"isPrivate"`
+	DiskUsage     int               `json:"diskUsage"`
+	Stars         int               `json:"stargazerCount"`
+	Forks         int               `json:"forkCount"`
+	Watchers      count             `json:"watchers"`
+	IssuesOpen    count             `json:"issuesOpen"`
+	IssuesClosed  count             `json:"issuesClosed"`
+	PullsOpen     count             `json:"pullsOpen"`
+	PullsMerged   count             `json:"pullsMerged"`
+	PullsClosed   count             `json:"pullsClosed"`
+	Releases      count             `json:"releases"`
+	Discussions   count             `json:"discussions"`
+	Labels        count             `json:"labels"`
+	Milestones    count             `json:"milestones"`
+	Branches      count             `json:"branches"`
+	Tags          count             `json:"tags"`
+	DefaultBranch *defaultBranchRef `json:"defaultBranchRef"`
 
 	// The settings, which a previous pass had costed at eleven REST endpoints
 	// and a hundred and ninety eight calls. Here they are part of a batch that
@@ -219,6 +222,14 @@ type repoTotals struct {
 	Codeowners       *struct {
 		Errors []struct{ Kind string } `json:"errors"`
 	} `json:"codeowners"`
+}
+
+// defaultBranchRef is the default branch of a repository, read only for the
+// length of its history, which is the repository's commit count.
+type defaultBranchRef struct {
+	Target struct {
+		History count `json:"history"`
+	} `json:"target"`
 }
 
 func (t Totals) Collect(ctx context.Context, c *ghapi.Client, now time.Time) ([]sink.Point, error) {

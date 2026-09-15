@@ -104,31 +104,43 @@ query($owner: String!, $name: String!) {
   }
 }`
 
+// repoLabel is one label of a repository, with the counts that say whether
+// anybody classifies work with it.
+type repoLabel struct {
+	Name         string `json:"name"`
+	URL          string `json:"url"`
+	Issues       count  `json:"issues"`
+	PullRequests count  `json:"pullRequests"`
+}
+
+// repoMilestone is one milestone, including the completion percentage GraphQL
+// computes and nothing here has to.
+type repoMilestone struct {
+	Title              string     `json:"title"`
+	State              string     `json:"state"`
+	URL                string     `json:"url"`
+	CreatedAt          time.Time  `json:"createdAt"`
+	DueOn              *time.Time `json:"dueOn"`
+	ClosedAt           *time.Time `json:"closedAt"`
+	ProgressPercentage float64    `json:"progressPercentage"`
+	Issues             count      `json:"issues"`
+	PullRequests       count      `json:"pullRequests"`
+}
+
+// planningRepository is the half of a repository planningQuery asks for: how
+// its work is classified, and what it is due under.
+type planningRepository struct {
+	Labels struct {
+		Nodes []repoLabel `json:"nodes"`
+	} `json:"labels"`
+	Milestones struct {
+		Nodes []repoMilestone `json:"nodes"`
+	} `json:"milestones"`
+}
+
 func (Planning) Collect(ctx context.Context, c *ghapi.Client, repo Repo, now time.Time) ([]sink.Point, error) {
 	var res struct {
-		Repository struct {
-			Labels struct {
-				Nodes []struct {
-					Name         string `json:"name"`
-					URL          string `json:"url"`
-					Issues       count  `json:"issues"`
-					PullRequests count  `json:"pullRequests"`
-				} `json:"nodes"`
-			} `json:"labels"`
-			Milestones struct {
-				Nodes []struct {
-					Title              string     `json:"title"`
-					State              string     `json:"state"`
-					URL                string     `json:"url"`
-					CreatedAt          time.Time  `json:"createdAt"`
-					DueOn              *time.Time `json:"dueOn"`
-					ClosedAt           *time.Time `json:"closedAt"`
-					ProgressPercentage float64    `json:"progressPercentage"`
-					Issues             count      `json:"issues"`
-					PullRequests       count      `json:"pullRequests"`
-				} `json:"nodes"`
-			} `json:"milestones"`
-		} `json:"repository"`
+		Repository planningRepository `json:"repository"`
 	}
 	vars := map[string]any{"owner": repo.Owner, "name": repo.Name}
 	if err := c.GraphQL(ctx, planningQuery, vars, &res); err != nil {
@@ -301,36 +313,46 @@ type discussionCommentNode struct {
 	Author *struct {
 		Login string `json:"login"`
 	} `json:"author"`
-	Discussion struct {
-		Number         int        `json:"number"`
-		Title          string     `json:"title"`
-		CreatedAt      time.Time  `json:"createdAt"`
-		IsAnswered     bool       `json:"isAnswered"`
-		AnswerChosenAt *time.Time `json:"answerChosenAt"`
-		AnswerChosenBy *struct {
-			Login string `json:"login"`
-		} `json:"answerChosenBy"`
-		Answer *struct {
-			Author *struct {
-				Login string `json:"login"`
-			} `json:"author"`
-		} `json:"answer"`
-		Closed      bool       `json:"closed"`
-		ClosedAt    *time.Time `json:"closedAt"`
-		StateReason string     `json:"stateReason"`
-		Category    struct {
-			Name string `json:"name"`
-			// isAnswered is null, not false, for a discussion in a category
-			// that cannot be answered. Go decodes that null to false, so
-			// without this the nine comments this account has left on
-			// announcements and general threads would read exactly like a
-			// question nobody answered.
-			IsAnswerable bool `json:"isAnswerable"`
-		} `json:"category"`
-		Repository struct {
-			NameWithOwner string `json:"nameWithOwner"`
-		} `json:"repository"`
-	} `json:"discussion"`
+	Discussion discussionThread `json:"discussion"`
+}
+
+// discussionThread is the discussion a comment hangs on, as both comment walks
+// ask for it. It is read because the comment's own row carries the thread's
+// state with it: see discussionContext.
+type discussionThread struct {
+	Number         int        `json:"number"`
+	Title          string     `json:"title"`
+	CreatedAt      time.Time  `json:"createdAt"`
+	IsAnswered     bool       `json:"isAnswered"`
+	AnswerChosenAt *time.Time `json:"answerChosenAt"`
+	AnswerChosenBy *struct {
+		Login string `json:"login"`
+	} `json:"answerChosenBy"`
+	Answer      *discussionAnswer `json:"answer"`
+	Closed      bool              `json:"closed"`
+	ClosedAt    *time.Time        `json:"closedAt"`
+	StateReason string            `json:"stateReason"`
+	Category    struct {
+		Name string `json:"name"`
+		// isAnswered is null, not false, for a discussion in a category
+		// that cannot be answered. Go decodes that null to false, so
+		// without this the nine comments this account has left on
+		// announcements and general threads would read exactly like a
+		// question nobody answered.
+		IsAnswerable bool `json:"isAnswerable"`
+	} `json:"category"`
+	Repository struct {
+		NameWithOwner string `json:"nameWithOwner"`
+	} `json:"repository"`
+}
+
+// discussionAnswer is the comment chosen as the answer, read only for who
+// wrote it: answering one's own question and being answered by somebody else
+// are different facts.
+type discussionAnswer struct {
+	Author *struct {
+		Login string `json:"login"`
+	} `json:"author"`
 }
 
 // context is what the thread says about itself, carried onto the comment.
@@ -486,6 +508,15 @@ type backwardPageInfo struct {
 	StartCursor     string `json:"startCursor"`
 }
 
+// discussionCommentConnection is a page of
+// viewer.repositoryDiscussionComments, read from its end like the walk that
+// asks for it.
+type discussionCommentConnection struct {
+	TotalCount int                     `json:"totalCount"`
+	PageInfo   backwardPageInfo        `json:"pageInfo"`
+	Nodes      []discussionCommentNode `json:"nodes"`
+}
+
 // discussionComments records every comment left on a discussion, in any
 // repository.
 //
@@ -510,11 +541,7 @@ func (o Outbound) discussionComments(ctx context.Context, c *ghapi.Client, _ tim
 	for page := 1; page <= most; page++ {
 		var res struct {
 			Viewer struct {
-				Comments struct {
-					TotalCount int                     `json:"totalCount"`
-					PageInfo   backwardPageInfo        `json:"pageInfo"`
-					Nodes      []discussionCommentNode `json:"nodes"`
-				} `json:"repositoryDiscussionComments"`
+				Comments discussionCommentConnection `json:"repositoryDiscussionComments"`
 			} `json:"viewer"`
 		}
 		vars := map[string]any{"last": 100}
@@ -552,6 +579,31 @@ query($last: Int!, $before: String) {
   }
 }`
 
+// issueCommentConnection is a page of viewer.issueComments, walked from its
+// end, which is why it carries the backward page info.
+type issueCommentConnection struct {
+	TotalCount int                `json:"totalCount"`
+	PageInfo   backwardPageInfo   `json:"pageInfo"`
+	Nodes      []issueCommentNode `json:"nodes"`
+}
+
+// issueCommentNode is one comment the account left, anywhere.
+type issueCommentNode struct {
+	CreatedAt time.Time      `json:"createdAt"`
+	URL       string         `json:"url"`
+	Issue     commentedIssue `json:"issue"`
+}
+
+// commentedIssue is the issue or pull request a comment sits on, read only for
+// where it is: the repository is what tells a comment left in the account's own
+// work from one left in a stranger's.
+type commentedIssue struct {
+	Number     int `json:"number"`
+	Repository struct {
+		NameWithOwner string `json:"nameWithOwner"`
+	} `json:"repository"`
+}
+
 // issueComments records every comment the account left on an issue or a pull
 // request, anywhere.
 //
@@ -571,20 +623,7 @@ func (o Outbound) issueComments(ctx context.Context, c *ghapi.Client, _ time.Tim
 	for page := 1; page <= most; page++ {
 		var res struct {
 			Viewer struct {
-				Comments struct {
-					TotalCount int              `json:"totalCount"`
-					PageInfo   backwardPageInfo `json:"pageInfo"`
-					Nodes      []struct {
-						CreatedAt time.Time `json:"createdAt"`
-						URL       string    `json:"url"`
-						Issue     struct {
-							Number     int `json:"number"`
-							Repository struct {
-								NameWithOwner string `json:"nameWithOwner"`
-							} `json:"repository"`
-						} `json:"issue"`
-					} `json:"nodes"`
-				} `json:"issueComments"`
+				Comments issueCommentConnection `json:"issueComments"`
 			} `json:"viewer"`
 		}
 		vars := map[string]any{"last": 100}
@@ -631,6 +670,30 @@ func boolInt(b bool) int {
 	return 0
 }
 
+// starredConnection is a page of viewer.starredRepositories. The star's own
+// date hangs on the edge rather than on the repository, which is why this is
+// read as edges.
+type starredConnection struct {
+	PageInfo pageInfo      `json:"pageInfo"`
+	Edges    []starredEdge `json:"edges"`
+}
+
+// starredEdge is one star the account gave: when it was given, and to what.
+type starredEdge struct {
+	StarredAt time.Time         `json:"starredAt"`
+	Node      starredRepository `json:"node"`
+}
+
+// starredRepository is as much of a starred repository as the row says: what
+// it is called, how many stars it has, and what it is written in.
+type starredRepository struct {
+	NameWithOwner string `json:"nameWithOwner"`
+	Stars         int    `json:"stargazerCount"`
+	Language      *struct {
+		Name string `json:"name"`
+	} `json:"primaryLanguage"`
+}
+
 // starred reads the stars the account gave, a page of a hundred per point,
 // as far as the walk allows: five pages on a sweep, everything on a backfill.
 func (o Outbound) starred(ctx context.Context, c *ghapi.Client) ([]sink.Point, error) {
@@ -640,19 +703,7 @@ func (o Outbound) starred(ctx context.Context, c *ghapi.Client) ([]sink.Point, e
 	for page := 1; page <= most; page++ {
 		var res struct {
 			Viewer struct {
-				Starred struct {
-					PageInfo pageInfo `json:"pageInfo"`
-					Edges    []struct {
-						StarredAt time.Time `json:"starredAt"`
-						Node      struct {
-							NameWithOwner string `json:"nameWithOwner"`
-							Stars         int    `json:"stargazerCount"`
-							Language      *struct {
-								Name string `json:"name"`
-							} `json:"primaryLanguage"`
-						} `json:"node"`
-					} `json:"edges"`
-				} `json:"starredRepositories"`
+				Starred starredConnection `json:"starredRepositories"`
 			} `json:"viewer"`
 		}
 		vars := map[string]any{"first": 100}

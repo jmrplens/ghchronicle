@@ -77,59 +77,73 @@ type dependabotRow struct {
 	DismissedBy      *struct {
 		Login string `json:"login"`
 	} `json:"dismissed_by"`
-	SecurityAdvisory struct {
-		GHSAID   string `json:"ghsa_id"`
-		CVEID    string `json:"cve_id"`
-		Severity string `json:"severity"`
-		// Summary is the advisory's title, the one line that says what the
-		// alert is about. Without it a row says "vite" and a GHSA id.
-		Summary string `json:"summary"`
-		// PublishedAt is when the advisory became public. The gap to
-		// created_at is how long GitHub took to notice it here, which nothing
-		// else in the response says.
-		PublishedAt time.Time `json:"published_at"`
-		CVSS        struct {
-			Score float64 `json:"score"`
-		} `json:"cvss"`
-		// The top-level cvss is v3; v4 is only ever in cvss_severities.
-		// GitHub always sends the key: an advisory with no v4 vector comes
-		// as {"vector_string": null, "score": 0.0}, measured on 84 of the 138
-		// alerts of jmrp.io, which is why the field below is written only
-		// above zero rather than only when the key is there.
-		CVSSSeverities struct {
-			V4 struct {
-				Score float64 `json:"score"`
-			} `json:"cvss_v4"`
-		} `json:"cvss_severities"`
-		// EPSS is the modeled probability of exploitation in the next thirty
-		// days. It is the one number here about the outside world rather than
-		// about this repository.
-		EPSS struct {
-			Percentage float64 `json:"percentage"`
-			Percentile float64 `json:"percentile"`
-		} `json:"epss"`
-		CWEs []struct {
-			ID string `json:"cwe_id"`
-		} `json:"cwes"`
-	} `json:"security_advisory"`
-	SecurityVulnerability struct {
-		// The range, next to first_patched, is the action to take.
-		VulnerableVersionRange string `json:"vulnerable_version_range"`
-		FirstPatched           *struct {
-			Identifier string `json:"identifier"`
-		} `json:"first_patched_version"`
-	} `json:"security_vulnerability"`
-	Dependency struct {
-		Package struct {
-			Ecosystem string `json:"ecosystem"`
-			Name      string `json:"name"`
-		} `json:"package"`
-		// A development dependency is not the same risk as a runtime one, and
-		// a transitive alert cannot be fixed by editing your own manifest.
-		ManifestPath string `json:"manifest_path"`
-		Scope        string `json:"scope"`
-		Relationship string `json:"relationship"`
-	} `json:"dependency"`
+	SecurityAdvisory      securityAdvisory      `json:"security_advisory"`
+	SecurityVulnerability securityVulnerability `json:"security_vulnerability"`
+	Dependency            alertDependency       `json:"dependency"`
+}
+
+// securityAdvisory is the published advisory a Dependabot alert is raised
+// from: what the flaw is, and the three scores that rank how much it matters.
+type securityAdvisory struct {
+	GHSAID   string `json:"ghsa_id"`
+	CVEID    string `json:"cve_id"`
+	Severity string `json:"severity"`
+	// Summary is the advisory's title, the one line that says what the
+	// alert is about. Without it a row says "vite" and a GHSA id.
+	Summary string `json:"summary"`
+	// PublishedAt is when the advisory became public. The gap to
+	// created_at is how long GitHub took to notice it here, which nothing
+	// else in the response says.
+	PublishedAt time.Time `json:"published_at"`
+	CVSS        cvssScore `json:"cvss"`
+	// The top-level cvss is v3; v4 is only ever in cvss_severities.
+	// GitHub always sends the key: an advisory with no v4 vector comes
+	// as {"vector_string": null, "score": 0.0}, measured on 84 of the 138
+	// alerts of jmrp.io, which is why the field below is written only
+	// above zero rather than only when the key is there.
+	CVSSSeverities struct {
+		V4 cvssScore `json:"cvss_v4"`
+	} `json:"cvss_severities"`
+	// EPSS is the modeled probability of exploitation in the next thirty
+	// days. It is the one number here about the outside world rather than
+	// about this repository.
+	EPSS struct {
+		Percentage float64 `json:"percentage"`
+		Percentile float64 `json:"percentile"`
+	} `json:"epss"`
+	CWEs []struct {
+		ID string `json:"cwe_id"`
+	} `json:"cwes"`
+}
+
+// cvssScore is one CVSS vector reduced to its score, which is the only part of
+// it a row carries. Both versions of the vector come in this shape.
+type cvssScore struct {
+	Score float64 `json:"score"`
+}
+
+// securityVulnerability is the advisory narrowed to this dependency: which
+// versions are affected, and which one ends it.
+type securityVulnerability struct {
+	// The range, next to first_patched, is the action to take.
+	VulnerableVersionRange string `json:"vulnerable_version_range"`
+	FirstPatched           *struct {
+		Identifier string `json:"identifier"`
+	} `json:"first_patched_version"`
+}
+
+// alertDependency is the package the alert is against, and how this repository
+// came to have it.
+type alertDependency struct {
+	Package struct {
+		Ecosystem string `json:"ecosystem"`
+		Name      string `json:"name"`
+	} `json:"package"`
+	// A development dependency is not the same risk as a runtime one, and
+	// a transitive alert cannot be fixed by editing your own manifest.
+	ManifestPath string `json:"manifest_path"`
+	Scope        string `json:"scope"`
+	Relationship string `json:"relationship"`
 }
 
 type scanRow struct {
@@ -157,15 +171,19 @@ type scanRow struct {
 	// carries it and this collector used to throw it away, so the file, the
 	// line and the commit cost no request at all. Measured on jmrp.io: 24 of
 	// 34 alerts point at one file, which is invisible without this.
-	MostRecentInstance struct {
-		Ref       string `json:"ref"`
-		CommitSHA string `json:"commit_sha"`
-		Category  string `json:"category"`
-		Location  struct {
-			Path      string `json:"path"`
-			StartLine int    `json:"start_line"`
-		} `json:"location"`
-	} `json:"most_recent_instance"`
+	MostRecentInstance scanInstance `json:"most_recent_instance"`
+}
+
+// scanInstance is where a code scanning alert actually is: the commit it was
+// last seen on, and the file and line inside it.
+type scanInstance struct {
+	Ref       string `json:"ref"`
+	CommitSHA string `json:"commit_sha"`
+	Category  string `json:"category"`
+	Location  struct {
+		Path      string `json:"path"`
+		StartLine int    `json:"start_line"`
+	} `json:"location"`
 }
 
 // alertCWEs renders every CWE an advisory names into one field value.

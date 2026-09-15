@@ -179,16 +179,20 @@ type pullNode struct {
 	// pull request; stackEntry answers the same question for one point and
 	// fifty nodes over a page of fifty.
 	StackEntry *struct {
-		Position int `json:"position"`
-		Stack    struct {
-			Number int `json:"number"`
-			Size   int `json:"size"`
-		} `json:"stack"`
+		Position int       `json:"position"`
+		Stack    pullStack `json:"stack"`
 	} `json:"stackEntry"`
 	ReviewThreads struct {
 		TotalCount int          `json:"totalCount"`
 		Nodes      []threadNode `json:"nodes"`
 	} `json:"reviewThreads"`
+}
+
+// pullStack is the stack a pull request belongs to: which stack it is, and how
+// many pull requests are queued in it.
+type pullStack struct {
+	Number int `json:"number"`
+	Size   int `json:"size"`
 }
 
 // threadNode is one review thread: a conversation anchored to a line or a
@@ -273,6 +277,19 @@ type issueNode struct {
 	} `json:"closedByPullRequestsReferences"`
 }
 
+// pullConnection is one page of a repository's pull requests, and
+// issueConnection one of its issues. Two types rather than one because the
+// nodes differ: an issue has no review of any kind.
+type pullConnection struct {
+	PageInfo pageInfo   `json:"pageInfo"`
+	Nodes    []pullNode `json:"nodes"`
+}
+
+type issueConnection struct {
+	PageInfo pageInfo    `json:"pageInfo"`
+	Nodes    []issueNode `json:"nodes"`
+}
+
 func (p Pulls) Collect(ctx context.Context, c *ghapi.Client, repo Repo, now time.Time) ([]sink.Point, error) {
 	first := p.First
 	if first <= 0 {
@@ -284,14 +301,8 @@ func (p Pulls) Collect(ctx context.Context, c *ghapi.Client, repo Repo, now time
 	}
 	var res struct {
 		Repository struct {
-			PullRequests struct {
-				PageInfo pageInfo   `json:"pageInfo"`
-				Nodes    []pullNode `json:"nodes"`
-			} `json:"pullRequests"`
-			Issues struct {
-				PageInfo pageInfo    `json:"pageInfo"`
-				Nodes    []issueNode `json:"nodes"`
-			} `json:"issues"`
+			PullRequests pullConnection  `json:"pullRequests"`
+			Issues       issueConnection `json:"issues"`
 		} `json:"repository"`
 	}
 	base := map[string]string{"owner": repo.Owner, "repo": repo.Name, "full_name": repo.FullName}

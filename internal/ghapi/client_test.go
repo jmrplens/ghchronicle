@@ -1367,7 +1367,7 @@ func TestRefetchingAURLReplacesItsEntryRatherThanAddingOne(t *testing.T) {
 		mu.Lock()
 		size = (4 << 10) + i + 1
 		mu.Unlock()
-		if n := seqOf(t, c, "/moves"); n == first {
+		if seqOf(t, c, "/moves") == first {
 			t.Fatalf("round %d replayed the stored body, so nothing was re-stored", i)
 		}
 	}

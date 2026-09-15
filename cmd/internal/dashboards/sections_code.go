@@ -2,6 +2,19 @@ package dashboards
 
 import "fmt"
 
+// The SQL every commit query opens with, and the column titles each panel
+// here shares with its Elasticsearch, Graphite and Prometheus twins: a twin
+// that renames a column to anything else arrives beside an empty one.
+const (
+	codeSelect         = "SELECT "
+	codeInRange        = " WHERE $__timeFilter(time) AND "
+	codeLinesPerCommit = "Lines per commit"
+	codeForcePushes    = "Force pushes"
+	codeLinesAdded     = "Lines added"
+	codeLinesRemoved   = "Lines removed"
+	codeSignedCommits  = "Signed commits"
+)
+
 // ── Code ────────────────────────────────────────────────────────────────────
 
 // code is the commit record and then the gates the commits went through.
@@ -12,7 +25,7 @@ func code(b *builder) []Panel {
 // commitsAndChurn is what was written: how many commits, how many lines each
 // way, how many were signed, by whom, and the pushes that rewrote a branch.
 func commitsAndChurn(b *builder) []Panel {
-	churn := "SELECT " + timeBin + ", 'added' AS series," +
+	churn := codeSelect + timeBin + ", 'added' AS series," +
 		" SUM(additions) AS lines FROM gh_commit WHERE $__timeFilter(time) AND " + RF +
 		" GROUP BY 1 UNION ALL" +
 		" SELECT " + timeBin + ", 'removed' AS series," +
@@ -24,8 +37,8 @@ func commitsAndChurn(b *builder) []Panel {
 		" FROM gh_commit WHERE $__timeFilter(time) AND " + RF +
 		" GROUP BY 1 ORDER BY 2 DESC LIMIT 20"
 	sigs := `SELECT signature AS "Signature", COUNT(*) AS "Commits" FROM gh_commit` +
-		" WHERE $__timeFilter(time) AND " + RF + " GROUP BY 1 ORDER BY 2 DESC"
-	activity := "SELECT " + timeBin + ", activity AS series," +
+		codeInRange + RF + " GROUP BY 1 ORDER BY 2 DESC"
+	activity := codeSelect + timeBin + ", activity AS series," +
 		" SUM(events) AS n FROM gh_repo_activity WHERE $__timeFilter(time) AND " + RF +
 		" GROUP BY 1, 2 ORDER BY 1"
 	// ref_name is a field: a name minted per pull request was a series per
@@ -59,7 +72,7 @@ func commitsAndChurn(b *builder) []Panel {
 		`limit(sortBy(groupByNode(%s, %d, "avg"), "count", true), 20)`,
 		cpath("churn"), gn(c, "author"),
 	), "Author",
-		[]col{{"count", "Commits"}, {"median", "Lines per commit"}})
+		[]col{{"count", "Commits"}, {"median", codeLinesPerCommit}})
 	authorES, authorEStf := esTbl(c, []any{b.tm("author", 20)},
 		[]any{b.mCount(), b.mSum("additions"), b.mSum("deletions"), b.mPct("churn", 50)},
 		[]named{
@@ -67,7 +80,7 @@ func commitsAndChurn(b *builder) []Panel {
 			{"n", "Commits"},
 			{"a", "Added"},
 			{"r", "Removed"},
-			{"l", "Lines per commit"},
+			{"l", codeLinesPerCommit},
 		}, []string{ESF})
 
 	sigsGR, sigsGRtf := gTbl(fmt.Sprintf(`sortByTotal(groupByNode(isNonNull(%s), %d, "sum"))`,
@@ -79,7 +92,7 @@ func commitsAndChurn(b *builder) []Panel {
 	// reused, was a series per branch), so Graphite, which keeps no strings,
 	// groups the force pushes by repository and actor only.
 	forceGR, forceGRtf := gTbl(rowsOf(forcePath, gn(ra, "repo"), gn(ra, "actor")),
-		"Repository, by", []col{{"sum", "Force pushes"}})
+		"Repository, by", []col{{"sum", codeForcePushes}})
 	forceES, forceEStf := b.esRaw(ra, 25, []named{
 		{"@timestamp", "When"}, {"repo", "Repository"}, {"ref_name", "Branch"}, {"actor", "By"},
 	}, []string{"activity:force_push", ESF})
@@ -95,12 +108,12 @@ func commitsAndChurn(b *builder) []Panel {
 		" FROM gh_commit WHERE $__timeFilter(time) AND " + RF
 
 	return []Panel{
-		statGroup("Commits", 24, 4, 0, 0, []Target{sqlT(commitStats)}, &P{
+		statGroup("Commits", box{W: 24, H: 4, X: 0, Y: 0}, []Target{sqlT(commitStats)}, &P{
 			Prom: []Target{
 				promNamed("A", "Commits", fmt.Sprintf("sum(increase(%s[$__range]))", totalM)),
-				promNamed("B", "Lines added", added),
-				promNamed("C", "Lines removed", removed),
-				promNamed("D", "Signed commits", fmt.Sprintf(
+				promNamed("B", codeLinesAdded, added),
+				promNamed("C", codeLinesRemoved, removed),
+				promNamed("D", codeSignedCommits, fmt.Sprintf(
 					`100 * sum(increase(github_commits_total{signature="VALID",%s}[$__range])) / sum(increase(%s[$__range]))`,
 					PF, totalM,
 				)),
@@ -112,9 +125,9 @@ func commitsAndChurn(b *builder) []Panel {
 			PromDesc: sinceStart + " " + sweepCount,
 			GR: []Target{
 				grNamed("A", "Commits", total(countOf(cpath("churn")))),
-				grNamed("B", "Lines added", total(fmt.Sprintf("sumSeries(%s)", cpath("additions")))),
-				grNamed("C", "Lines removed", total(fmt.Sprintf("sumSeries(%s)", cpath("deletions")))),
-				grNamed("D", "Signed commits", fmt.Sprintf("asPercent(%s, %s)",
+				grNamed("B", codeLinesAdded, total(fmt.Sprintf("sumSeries(%s)", cpath("additions")))),
+				grNamed("C", codeLinesRemoved, total(fmt.Sprintf("sumSeries(%s)", cpath("deletions")))),
+				grNamed("D", codeSignedCommits, fmt.Sprintf("asPercent(%s, %s)",
 					total(countOf(rp(c, "churn", "signature", "VALID"))),
 					total(countOf(cpath("churn"))))),
 			},
@@ -125,16 +138,16 @@ func commitsAndChurn(b *builder) []Panel {
 				esRef("D", b.esTotal(c, b.mAvg("signed"), ESF)),
 			},
 			ESOver: []any{
-				frameName("A", "Commits"), frameName("B", "Lines added"),
-				frameName("C", "Lines removed"), frameName("D", "Signed commits"),
-				fieldThresholds("Signed commits", "percentunit", fractionOf(signedSteps)),
+				frameName("A", "Commits"), frameName("B", codeLinesAdded),
+				frameName("C", codeLinesRemoved), frameName("D", codeSignedCommits),
+				fieldThresholds(codeSignedCommits, "percentunit", fractionOf(signedSteps)),
 			},
 			ESDesc: "In Elasticsearch the signed share is the mean of the boolean `signed` " +
 				"field, as a fraction.",
 			Opts:      mergeOpts(Opts{"thresholds": plainSteps}, bounded()),
-			Overrides: []any{fieldThresholds("Signed commits", "percent", signedSteps)},
+			Overrides: []any{fieldThresholds(codeSignedCommits, "percent", signedSteps)},
 		}),
-		panel("timeseries", "Lines changed over time", 12, 8, 0, 4, []Target{sqlTS(churn)}, &P{
+		panel("timeseries", "Lines changed over time", box{W: 12, H: 8, X: 0, Y: 4}, []Target{sqlTS(churn)}, &P{
 			Prom: []Target{
 				promq(added, withRef("A"), legend("added")),
 				promq("-"+removed, withRef("B"), legend("removed")),
@@ -159,7 +172,7 @@ func commitsAndChurn(b *builder) []Panel {
 			},
 			ESOver: []any{negative},
 		}),
-		panel("timeseries", "Repository activity", 12, 8, 12, 4, []Target{sqlTS(activity)}, &P{
+		panel("timeseries", "Repository activity", box{W: 12, H: 8, X: 12, Y: 4}, []Target{sqlTS(activity)}, &P{
 			Prom: []Target{hourly(fmt.Sprintf(
 				"sum by (activity) (increase(github_repo_activities_total{%s}[1h]))", PF,
 			), "{{activity}}")},
@@ -172,7 +185,7 @@ func commitsAndChurn(b *builder) []Panel {
 			GR:       []Target{grq(perBucket(act, gn(ra, "activity"), "1h"))},
 			ES:       []Target{b.esDaily(ra, b.mSum("events"), "activity", "1h", []string{ESF}, "")},
 		}),
-		panel("table", "Commits by author", 12, 8, 0, 12, []Target{sqlT(perAuthor)}, &P{
+		panel("table", "Commits by author", box{W: 12, H: 8, X: 0, Y: 12}, []Target{sqlT(perAuthor)}, &P{
 			Prom: func() []Target {
 				rank := fmt.Sprintf("sum by (author) (increase(%s[$__range]))", totalM)
 				return []Target{
@@ -183,7 +196,7 @@ func commitsAndChurn(b *builder) []Panel {
 				}
 			}(),
 			PromTF: merged(map[string]string{
-				"author": "Author", "Value #A": "Commits", "Value #B": "Lines per commit",
+				"author": "Author", panelValueA: "Commits", panelValueB: codeLinesPerCommit,
 			}, nil, nil),
 			Opts: mergeOpts(Opts{"sort": "Commits"}, bounded()),
 			Desc: "The twenty authors with the most commits in the window. " +
@@ -194,13 +207,13 @@ func commitsAndChurn(b *builder) []Panel {
 			PromDesc: sinceStart + " " + lastSweep,
 			Overrides: []any{
 				barCell("Commits", "short", 130), width("Added", 110),
-				width("Removed", 110), width("Lines per commit", 130),
+				width("Removed", 110), width(codeLinesPerCommit, 130),
 			},
 			GR: authorGR, GRTF: authorGRtf,
 			GRDesc: "Graphite reduces the churn of each author: how many commits, and the median. " + grRows,
 			ES:     authorES, ESTF: authorEStf,
 		}),
-		panel("barchart", "Commits by signature", 6, 8, 12, 12, []Target{sqlT(sigs)}, &P{
+		panel("barchart", "Commits by signature", box{W: 6, H: 8, X: 12, Y: 12}, []Target{sqlT(sigs)}, &P{
 			Opts:     bounded(),
 			Desc:     commitBound,
 			Prom:     []Target{promTbl(fmt.Sprintf("sum by (signature) (increase(%s[$__range]))", totalM))},
@@ -209,20 +222,20 @@ func commitsAndChurn(b *builder) []Panel {
 			GR:       sigsGR, GRTF: sigsGRtf,
 			ES: sigsES, ESTF: sigsEStf,
 		}),
-		panel("table", "Force pushes", 6, 8, 18, 12, []Target{sqlT(force)}, &P{
+		panel("table", codeForcePushes, box{W: 6, H: 8, X: 18, Y: 12}, []Target{sqlT(force)}, &P{
 			Prom: []Target{promTbl(fmt.Sprintf(
 				`sum by (repo) (increase(github_repo_activities_total{activity="force_push",%s}[$__range])) > 0`, PF,
 			))},
-			PromTF: []any{organize(map[string]string{"repo": "Repository", "Value": "Force pushes"}, nil, nil)},
+			PromTF: []any{organize(map[string]string{"repo": "Repository", "Value": codeForcePushes}, nil, nil)},
 			Desc:   "Each force push, newest first.",
 			PromDesc: "Prometheus keeps no branch or actor, so this counts them per " +
 				"repository over the range. " + sinceStart,
 			Overrides: []any{when("When")},
-			PromOver:  []any{barCell("Force pushes", "short", 120)},
+			PromOver:  []any{barCell(codeForcePushes, "short", 120)},
 			GR:        forceGR, GRTF: forceGRtf,
 			GRDesc: "Graphite has no way to sort by date, so this counts them per repository, " +
 				"branch and actor over the range.",
-			GROver: []any{barCell("Force pushes", "short", 120)},
+			GROver: []any{barCell(codeForcePushes, "short", 120)},
 			ES:     forceES, ESTF: forceEStf,
 		}),
 	}
@@ -234,7 +247,7 @@ func commitChecks(b *builder) []Panel {
 	cc := "gh_commit_check"
 	// gate is a field: the verdict lands after the commit's own date, and as
 	// the tag `checks` a commit seen PENDING and then FAILURE was two rows.
-	gate := "SELECT " + timeBin + ", gate AS series," +
+	gate := codeSelect + timeBin + ", gate AS series," +
 		" COUNT(*) AS commits FROM gh_commit WHERE $__timeFilter(time) AND " + RF +
 		" AND gate <> 'none' GROUP BY 1, 2 ORDER BY 1"
 	otherChecks := `SELECT app AS "App", COUNT(*) AS "Runs", check AS "Check",` +
@@ -254,7 +267,7 @@ func commitChecks(b *builder) []Panel {
 		}, []string{ESF})
 
 	return []Panel{
-		panel("timeseries", "Commits by gate state", 12, 7, 0, 20, []Target{sqlTS(gate)}, &P{
+		panel("timeseries", "Commits by gate state", box{W: 12, H: 7, X: 0, Y: 20}, []Target{sqlTS(gate)}, &P{
 			Prom: []Target{daily(fmt.Sprintf(
 				`sum by (gate) (increase(github_commits_total{gate!="none",%s}[1d]))`, PF,
 			), "{{gate}}")},
@@ -287,7 +300,7 @@ func commitChecks(b *builder) []Panel {
 			ES: []Target{b.esDaily("gh_commit", b.mCount(), "gate", "",
 				[]string{ESF, "NOT gate:none"}, "")},
 		}),
-		panel("table", "Checks that are not Actions", 12, 7, 12, 20, []Target{sqlT(otherChecks)}, &P{
+		panel("table", "Checks that are not Actions", box{W: 12, H: 7, X: 12, Y: 20}, []Target{sqlT(otherChecks)}, &P{
 			Prom: []Target{promTbl(fmt.Sprintf(
 				"sum by (app, conclusion) (increase(github_commit_checks_total{%s}[$__range]))", PF,
 			))},
@@ -303,7 +316,7 @@ func commitChecks(b *builder) []Panel {
 			GR:        checksGR, GRTF: checksGRtf, GRDesc: grSlot,
 			ES: checksES, ESTF: checksEStf,
 		}),
-		panel("table", "Commits behind a red branch", 24, 8, 0, 27, []Target{sqlT(
+		panel("table", "Commits behind a red branch", box{W: 24, H: 8, X: 0, Y: 27}, []Target{sqlT(
 			`SELECT c.repo AS "Repository", c.time AS "When",` +
 				` c.author AS "Author", c.headline AS "Commit",` +
 				// The run's url beside the commit's: the commit is what went in,
@@ -313,10 +326,10 @@ func commitChecks(b *builder) []Panel {
 				` r.failures AS "Failed runs", r.run_number AS "Run number",` +
 				` c.url AS "Link", r.url AS "Run" FROM (` +
 				"SELECT repo, author, time, oid, headline, url FROM gh_commit" +
-				" WHERE $__timeFilter(time) AND " + RF + " AND gate = 'FAILURE') c" +
+				codeInRange + RF + " AND gate = 'FAILURE') c" +
 				" JOIN (SELECT repo, head_sha, COUNT(*) AS failures, MAX(url) AS url," +
 				" MAX(run_number) AS run_number FROM gh_workflow_run" +
-				" WHERE $__timeFilter(time) AND " + RF + " AND conclusion <> 'success'" +
+				codeInRange + RF + " AND conclusion <> 'success'" +
 				" GROUP BY 1, 2) r" +
 				" ON c.repo = r.repo AND c.oid = r.head_sha" +
 				// Newest first: the cap is 25 rows, and ordered by the first

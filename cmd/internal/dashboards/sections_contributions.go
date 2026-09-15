@@ -13,6 +13,25 @@ func contributions(b *builder) []Panel {
 	return append(contributionTotals(b), commitsPerRepository(b)...)
 }
 
+// perFieldRow is how a measurement whose fields are one row of a table is read
+// out of Prometheus: one query per field, the rename that turns the panelValueA
+// columns Grafana names them back into the field names, and the field names
+// themselves, for the Graphite path and the Elasticsearch metric. Both tables
+// below are that shape and differ only in the metric and the label the sum
+// keeps.
+func perFieldRow(metric, by string, cols []named) (
+	prom []Target, rename map[string]string, fields []string,
+) {
+	rename = map[string]string{}
+	fields = make([]string, len(cols))
+	for i, c := range cols {
+		prom = append(prom, promTbl("sum by ("+by+") ("+metric+c.From+")", string(rune('A'+i))))
+		rename[fmt.Sprintf("Value #%c", 'A'+i)] = c.To
+		fields[i] = c.From
+	}
+	return prom, rename, fields
+}
+
 // contributionTotals is the calendar, the weekly commits and the totals
 // GitHub publishes about them, as the profile counts them.
 func contributionTotals(b *builder) []Panel {
@@ -53,7 +72,7 @@ func contributionTotals(b *builder) []Panel {
 
 	totalCols := []named{
 		{"commits", "Commits"},
-		{"pull_requests", "Pull requests"},
+		{"pull_requests", planningPullRequests},
 		{"reviews", "Reviews"},
 		{"issues", "Issues"},
 		{"repositories", "New repositories"},
@@ -62,7 +81,7 @@ func contributionTotals(b *builder) []Panel {
 	yearCols := []named{
 		{"contributions", "Contributions"},
 		{"commits", "Commits"},
-		{"pull_requests", "Pull requests"},
+		{"pull_requests", planningPullRequests},
 		{"reviews", "Reviews"},
 		{"issues", "Issues"},
 		{"repositories", "New repos"},
@@ -101,20 +120,7 @@ func contributionTotals(b *builder) []Panel {
 		return gr, grtf, es, estf
 	}
 
-	var promTotals []Target
-	for i, c := range totalCols {
-		promTotals = append(promTotals, promTbl(
-			"sum by (user) (github_contributions_total_"+c.From+")", string(rune('A'+i)),
-		))
-	}
-	totalRename := map[string]string{}
-	for i, c := range totalCols {
-		totalRename[fmt.Sprintf("Value #%c", 'A'+i)] = c.To
-	}
-	totalFields := make([]string, len(totalCols))
-	for i, c := range totalCols {
-		totalFields[i] = c.From
-	}
+	promTotals, totalRename, totalFields := perFieldRow("github_contributions_total_", "user", totalCols)
 	totalsGR, totalsGRtf := gTbl(rowsOf(gp("gh_contributions_total",
 		"{"+strings.Join(totalFields, ",")+"}"), 3), "Field", []col{{"lastNotNull", "Value"}})
 	totalsES, totalsEStf := b.esRaw("gh_contributions_total", 1, totalCols, nil)
@@ -129,20 +135,8 @@ func contributionTotals(b *builder) []Panel {
 	hourGR, hourGRtf, hourES, hourEStf := punch("hour", "Hour")
 	dayGR, dayGRtf, dayES, dayEStf := punch("weekday", "Weekday")
 
-	var promYears []Target
-	for i, c := range yearCols {
-		promYears = append(promYears, promTbl(
-			"sum by (year) (github_contribution_year_"+c.From+")", string(rune('A'+i)),
-		))
-	}
-	yearRename := map[string]string{"year": "Year"}
-	for i, c := range yearCols {
-		yearRename[fmt.Sprintf("Value #%c", 'A'+i)] = c.To
-	}
-	yearFields := make([]string, len(yearCols))
-	for i, c := range yearCols {
-		yearFields[i] = c.From
-	}
+	promYears, yearRename, yearFields := perFieldRow("github_contribution_year_", "year", yearCols)
+	yearRename["year"] = "Year"
 	yearGR, yearGRtf := gTbl(rowsOf(gp("gh_contribution_year", "contributions"),
 		gn("gh_contribution_year", "year")), "Year", []col{{"lastNotNull", "Contributions"}})
 	yearES, yearEStf := esTbl("gh_contribution_year", []any{b.tm("year", 50, "_term")},
@@ -150,7 +144,7 @@ func contributionTotals(b *builder) []Panel {
 		append([]named{{"year.keyword", "Year"}}, yearCols...), nil)
 
 	return []Panel{
-		panel("timeseries", "Contributions over time", 24, 7, 0, 0, []Target{sqlTS(dailySQL)}, &P{
+		panel("timeseries", "Contributions over time", box{W: 24, H: 7, X: 0, Y: 0}, []Target{sqlTS(dailySQL)}, &P{
 			Prom: []Target{promq("github_contributions_total_calendar_total",
 				legend("Contributions, rolling year"))},
 			Desc: "The profile calendar, one bar per day at that day's own date. This is the " +
@@ -166,7 +160,7 @@ func contributionTotals(b *builder) []Panel {
 		}),
 		contributionCalendar(),
 		contributionMix(b),
-		panel("timeseries", "Commits per week", 12, 7, 0, 12, []Target{sqlTS(weekly)}, &P{
+		panel("timeseries", "Commits per week", box{W: 12, H: 7, X: 0, Y: 12}, []Target{sqlTS(weekly)}, &P{
 			Prom: []Target{promq(fmt.Sprintf("sum(increase(github_commits_total{%s}[7d]))", PF),
 				legend("All commits"), step("7d"))},
 			PromDesc: sinceStart,
@@ -186,7 +180,7 @@ func contributionTotals(b *builder) []Panel {
 					[]string{ESF}, "Own commits"),
 			},
 		}),
-		panel("table", "Contribution totals", 12, 7, 12, 12, []Target{sqlT(totals)}, &P{
+		panel("table", "Contribution totals", box{W: 12, H: 7, X: 12, Y: 12}, []Target{sqlT(totals)}, &P{
 			Desc: "The last year, as the profile counts it: the same numbers GitHub shows " +
 				"under the contribution calendar.",
 			Prom:   promTotals,
@@ -197,7 +191,7 @@ func contributionTotals(b *builder) []Panel {
 			GR: totalsGR, GRTF: totalsGRtf,
 			ES: totalsES, ESTF: append(totalsEStf, transpose...),
 		}),
-		panel("barchart", "Commits by hour of day", 12, 7, 0, 19, []Target{sqlT(byHour)}, &P{
+		panel("barchart", "Commits by hour of day", box{W: 12, H: 7, X: 0, Y: 19}, []Target{sqlT(byHour)}, &P{
 			PromNote: cannot("commits by hour of the day, over the whole life of each "+
 				"repository.", punchcardWhy),
 			// Every other hour labeled: twenty four labels at phone width ran
@@ -208,13 +202,13 @@ func contributionTotals(b *builder) []Panel {
 			GR: hourGR, GRTF: hourGRtf,
 			ES: hourES, ESTF: hourEStf,
 		}),
-		panel("barchart", "Commits by weekday", 6, 7, 12, 19, []Target{sqlT(byDay)}, &P{
+		panel("barchart", "Commits by weekday", box{W: 6, H: 7, X: 12, Y: 19}, []Target{sqlT(byDay)}, &P{
 			PromNote: cannot("commits by weekday, over the whole life of each repository.",
 				punchcardWhy),
 			GR: dayGR, GRTF: dayGRtf,
 			ES: dayES, ESTF: dayEStf,
 		}),
-		panel("table", "Commits by repository", 6, 7, 18, 19, []Target{sqlT(byRepo)}, &P{
+		panel("table", "Commits by repository", box{W: 6, H: 7, X: 18, Y: 19}, []Target{sqlT(byRepo)}, &P{
 			Prom:      []Target{promTbl(`topk(25, sum by (repo) (github_contribution_repo_commits{kind="commits"}))`)},
 			PromTF:    []any{organize(map[string]string{"repo": "Repository", "Value": "Commits"}, nil, nil)},
 			Opts:      Opts{"sort": "Commits"},
@@ -224,7 +218,7 @@ func contributionTotals(b *builder) []Panel {
 			GR: byRepoGR, GRTF: byRepoGRtf,
 			ES: byRepoES, ESTF: byRepoEStf,
 		}),
-		panel("table", "Contributions by year", 24, 8, 0, 26, []Target{sqlT(
+		panel("table", "Contributions by year", box{W: 24, H: 8, X: 0, Y: 26}, []Target{sqlT(
 			`SELECT year AS "Year", contributions AS "Contributions",` +
 				` commits AS "Commits", pull_requests AS "Pull requests",` +
 				` reviews AS "Reviews", issues AS "Issues", repositories AS "New repos"` +
@@ -299,7 +293,7 @@ func commitsPerRepository(b *builder) []Panel {
 		[]named{{"private.keyword", "Private"}, {"commits", "Commits"}}, nil)
 
 	return []Panel{
-		panel("timeseries", "Commits by repository, dated", 16, 8, 0, 34,
+		panel("timeseries", "Commits by repository, dated", box{W: 16, H: 8, X: 0, Y: 34},
 			[]Target{sqlTS(perRepoDay)}, &P{
 				PromNote: cannot("one bar per day, split by the repository the commits "+
 					"belong to.", why),
@@ -317,7 +311,7 @@ func commitsPerRepository(b *builder) []Panel {
 				GR: []Target{grq(perBucket(gp(dayRepo, "commits"), gn(dayRepo, "repo")))},
 				ES: []Target{b.esDaily(dayRepo, b.mSum("commits"), "repo", "", nil, "")},
 			}),
-		panel("barchart", "Commits the profile hides", 8, 8, 16, 34,
+		panel("barchart", "Commits the profile hides", box{W: 8, H: 8, X: 16, Y: 34},
 			[]Target{sqlT(hidden)}, &P{
 				PromNote: cannot("commits over the range split by whether the repository is "+
 					"private and whether it is yours.", why),
@@ -340,6 +334,11 @@ func commitsPerRepository(b *builder) []Panel {
 	}
 }
 
+// contributionsCalendarGrid is what the three stores that cannot draw the
+// calendar are each missing, said the same way in all three notes.
+const contributionsCalendarGrid = "the contribution calendar as GitHub draws it: a column per week, " +
+	"a row per weekday, each cell shaded by that day's count."
+
 // contributionCalendar is the profile's calendar as GitHub draws it, and the
 // two SQL stores are the ones that can draw it: the other three say why not.
 //
@@ -357,17 +356,14 @@ func contributionCalendar() Panel {
 	calendar := "SELECT " + sundayWeek + " AS time," + weekdayColumns() +
 		" FROM (SELECT time, date_part('dow', time) AS dow, " + calendarLevel +
 		" AS level FROM gh_contribution_day WHERE $__timeFilter(time)) d GROUP BY 1 ORDER BY 1"
-	return panel("status-history", "Contribution calendar", 10, 5, 0, 7, []Target{sqlT(calendar)}, &P{
-		PromNote: cannot("the contribution calendar as GitHub draws it: a column per week, "+
-			"a row per weekday, each cell shaded by that day's count.",
+	return panel("status-history", "Contribution calendar", box{W: 10, H: 5, X: 0, Y: 7}, []Target{sqlT(calendar)}, &P{
+		PromNote: cannot(contributionsCalendarGrid,
 			"The exporter skips `gh_contribution_day`: it is history with no current "+
 				"value, and a day of it a year ago is not a sample Prometheus can hold."),
-		GRNote: cannot("the contribution calendar as GitHub draws it: a column per week, "+
-			"a row per weekday, each cell shaded by that day's count.",
+		GRNote: cannot(contributionsCalendarGrid,
 			"Graphite can bucket a series by week and cannot split it by weekday, and "+
 				"the grid needs both at once.", "graphite"),
-		ESNote: cannot("the contribution calendar as GitHub draws it: a column per week, "+
-			"a row per weekday, each cell shaded by that day's count.",
+		ESNote: cannot(contributionsCalendarGrid,
 			"A date histogram buckets by one interval, and the grid needs the week "+
 				"along one axis and the weekday along the other.", "elasticsearch"),
 		Desc: calendarDesc,
@@ -529,7 +525,7 @@ func contributionMix(b *builder) Panel {
 	mixES, mixEStf := esTbl("gh_contributions_total", []any{b.one()},
 		[]any{b.mNewest(fieldsOf(mixParts)...)}, mixParts, nil)
 	mixEStf = append(mixEStf, mixShares()...)
-	return panel("bargauge", "Contribution mix (last year)", 14, 5, 10, 7, []Target{sqlT(mix)}, &P{
+	return panel("bargauge", "Contribution mix (last year)", box{W: 14, H: 5, X: 10, Y: 7}, []Target{sqlT(mix)}, &P{
 		Desc: "The four kinds of contribution as shares of their sum over the last " +
 			"year, the mix the profile draws as a radar: commits, pull requests, " +
 			"issues and code review. The percentages are computed from the totals " +
@@ -603,7 +599,7 @@ var calendarShades = []any{
 // its order, and the field each is read from.
 var mixParts = []named{
 	{"commits", "Commits"},
-	{"pull_requests", "Pull requests"},
+	{"pull_requests", planningPullRequests},
 	{"issues", "Issues"},
 	{"reviews", "Code review"},
 }

@@ -4,6 +4,27 @@ import "fmt"
 
 // ── Delivery and access ─────────────────────────────────────────────────────
 
+// deliveryNewestRow closes the window every table here opens over a snapshot:
+// the rows are numbered newest first per item and only the first of each is
+// kept, so a setting read on thirty sweeps is one row and not thirty. The
+// security section reads its own snapshots with the same tail.
+const deliveryNewestRow = ") x WHERE rn = 1"
+
+// What the columns of this section are called wherever they are read. The same
+// name has to reach the panel from all five stores, since the overrides, the
+// units and the sorts below match a column by it; the security section names
+// the age of a setting the same way.
+const (
+	deliveryLastChanged  = "Last changed"
+	deliveryKeyUnused    = "Unused for"
+	deliveryKeyReadOnly  = "Read only"
+	deliveryHookEvents   = "Events subscribed"
+	deliveryForcePush    = "Force push"
+	deliveryBypassActors = "Bypass actors"
+	deliveryTimeToStatus = "To status"
+	deliveryTimeLive     = "Live for"
+)
+
 // collected marks targets as fetched but not drawn: the inputs a server-side
 // expression reduces, each of which would otherwise be a line of its own on a
 // panel that only wants the result.
@@ -55,14 +76,14 @@ func webhookDeliveries(b *builder) []Panel {
 		[]any{b.mCount(), b.mPct("duration_seconds", 50)},
 		[]named{
 			{"host.keyword", "Endpoint"},
-			{"repo.keyword", "Repository"},
+			{inventoryRepoTerm, "Repository"},
 			{"ok.keyword", "OK"},
 			{"n", "Deliveries"},
 			{"l", "Latency"},
 		}, []string{ESF})
 
 	return []Panel{
-		panel("gauge", "Webhook failure rate", 6, 8, 0, 0, []Target{sqlT(failRate)}, &P{
+		panel("gauge", "Webhook failure rate", box{W: 6, H: 8, X: 0, Y: 0}, []Target{sqlT(failRate)}, &P{
 			Prom: []Target{promNow(fmt.Sprintf(
 				"100 * sum(increase(%s[$__range])) / sum(increase(%s[$__range]))", failed, totalM,
 			))},
@@ -91,7 +112,7 @@ func webhookDeliveries(b *builder) []Panel {
 			ESDesc: "In Elasticsearch the failed and the total deliveries are counted per day, " +
 				"summed and divided by a server-side expression.",
 		}),
-		panel("timeseries", "Deliveries by status code", 18, 8, 6, 0,
+		panel("timeseries", "Deliveries by status code", box{W: 18, H: 8, X: 6, Y: 0},
 			[]Target{sqlTS(overTime)}, &P{
 				Prom: []Target{hourly(fmt.Sprintf("sum by (code) (increase(%s[1h]))", totalM),
 					"{{code}}")},
@@ -104,7 +125,7 @@ func webhookDeliveries(b *builder) []Panel {
 				ES:       []Target{b.esDaily(wd, b.mCount(), "code", "1h", []string{ESF}, "")},
 				Desc:     bucketFollowsRange,
 			}),
-		panel("table", "Webhook endpoints", 12, 8, 0, 8, []Target{sqlT(hooks)}, &P{
+		panel("table", "Webhook endpoints", box{W: 12, H: 8, X: 0, Y: 8}, []Target{sqlT(hooks)}, &P{
 			Prom: []Target{
 				promTbl(fmt.Sprintf("sum by (repo, hook) (increase(%s[$__range]))", totalM), "A"),
 				promTbl(fmt.Sprintf("sum by (repo, hook) (increase(%s[$__range]))", failed), "B"),
@@ -112,8 +133,8 @@ func webhookDeliveries(b *builder) []Panel {
 				promTbl(fmt.Sprintf("avg by (repo, hook) (github_webhook_deliveries_duration_seconds_mean{%s})", PF), "D"),
 			},
 			PromTF: merged(map[string]string{
-				"repo": "Repository", "hook": "Hook", "Value #A": "Deliveries",
-				"Value #B": "Failed", "Value #C": "Retried", "Value #D": "Latency",
+				"repo": "Repository", "hook": "Hook", inventoryValueCol + "A": "Deliveries",
+				inventoryValueCol + "B": "Failed", inventoryValueCol + "C": "Retried", inventoryValueCol + "D": "Latency",
 			}, nil, map[string]int{"repo": 0, "hook": 1}),
 			Opts: Opts{"sort": "Failed"},
 			Desc: "Only the host is stored. The path of a webhook URL usually carries a secret. " +
@@ -142,33 +163,33 @@ func accessConfiguration(b *builder) []Panel {
 		` enforcement AS "Enforcement", target AS "Target",` +
 		` days_since_change AS "Last changed", url AS "Link" FROM (` +
 		"SELECT *, ROW_NUMBER() OVER (PARTITION BY repo, ruleset ORDER BY time DESC) AS rn" +
-		" FROM gh_ruleset WHERE $__timeFilter(time) AND " + RF + ") x WHERE rn = 1" +
+		" FROM gh_ruleset WHERE $__timeFilter(time) AND " + RF + deliveryNewestRow +
 		" ORDER BY 1, 2"
 	keys := `SELECT repo AS "Repository", days_since_use AS "Unused for", key AS "Key",` +
 		` read_only AS "Read only" FROM (` +
 		"SELECT *, ROW_NUMBER() OVER (PARTITION BY repo, key ORDER BY time DESC) AS rn" +
-		" FROM gh_deploy_key WHERE $__timeFilter(time) AND " + RF + ") x WHERE rn = 1" +
+		" FROM gh_deploy_key WHERE $__timeFilter(time) AND " + RF + deliveryNewestRow +
 		" ORDER BY 2 DESC"
 	rs, dk := "gh_ruleset", "gh_deploy_key"
 
 	rulesGR, rulesGRtf := gTbl(rowsOf(rp(rs, "days_since_change"), gn(rs, "repo"),
 		gn(rs, "ruleset"), gn(rs, "enforcement"), gn(rs, "target")),
-		"Ruleset", []col{{"lastNotNull", "Last changed"}})
+		"Ruleset", []col{{"lastNotNull", deliveryLastChanged}})
 	rulesES, rulesEStf := esTbl(rs, []any{
 		b.tm("repo", 50), b.tm("ruleset", 50),
 		b.tm("enforcement", 5), b.tm("target", 5), b.tmURL(),
 	}, []any{b.mNewest("days_since_change")},
 		[]named{
-			{"repo.keyword", "Repository"},
+			{inventoryRepoTerm, "Repository"},
 			{"ruleset.keyword", "Ruleset"},
 			{"enforcement.keyword", "Enforcement"},
 			{"target.keyword", "Target"},
-			{"url.keyword", "Link"},
-			{"d", "Last changed"},
+			{inventoryURLTerm, "Link"},
+			{"d", deliveryLastChanged},
 		}, []string{ESF})
 
 	keysGR, keysGRtf := gTbl(rowsOf(rp(dk, "days_since_use"), gn(dk, "repo"),
-		gn(dk, "key"), gn(dk, "read_only")), "Key", []col{{"lastNotNull", "Unused for"}})
+		gn(dk, "key"), gn(dk, "read_only")), "Key", []col{{"lastNotNull", deliveryKeyUnused}})
 	// A `max` rather than the newest reading, because `days_since_use` is
 	// written only for a key GitHub has seen used and a top_metrics has no
 	// value to hand back for the others. Grafana's Elasticsearch plugin
@@ -180,22 +201,22 @@ func accessConfiguration(b *builder) []Panel {
 	keysES, keysEStf := esTbl(dk, []any{b.tm("repo", 50), b.tm("key", 50), b.tm("read_only", 2)},
 		[]any{b.mMax("days_since_use")},
 		[]named{
-			{"repo.keyword", "Repository"},
+			{inventoryRepoTerm, "Repository"},
 			{"key.keyword", "Key"},
-			{"read_only.keyword", "Read only"},
-			{"d", "Unused for"},
+			{"read_only.keyword", deliveryKeyReadOnly},
+			{"d", deliveryKeyUnused},
 		}, []string{ESF})
 
 	whGR, whGRtf := gTbl(rowsOf("keepLastValue("+rp("gh_webhook", "events")+")",
 		gn("gh_webhook", "repo"), gn("gh_webhook", "host")),
-		"Repository, host", []col{{"lastNotNull", "Events subscribed"}})
+		"Repository, host", []col{{"lastNotNull", deliveryHookEvents}})
 	whES, whEStf := esTbl("gh_webhook", []any{b.tm("repo", 500), b.tm("host", 50), b.tm("active", 2)},
 		[]any{b.mNewest("events")},
 		[]named{
-			{"repo.keyword", "Repository"},
+			{inventoryRepoTerm, "Repository"},
 			{"host.keyword", "Host"},
 			{"active.keyword", "Active"},
-			{"events", "Events subscribed"},
+			{"events", deliveryHookEvents},
 		}, []string{ESF})
 
 	envGR, envGRtf := gTbl(rowsOf("keepLastValue("+rp("gh_environment", "days_since_change")+")",
@@ -204,43 +225,43 @@ func accessConfiguration(b *builder) []Panel {
 	envES, envEStf := esTbl("gh_environment", []any{b.tm("repo", 500), b.tm("environment", 50), b.tmURL()},
 		[]any{b.mNewest("days_since_change")},
 		[]named{
-			{"repo.keyword", "Repository"},
+			{inventoryRepoTerm, "Repository"},
 			{"environment.keyword", "Environment"},
-			{"url.keyword", "Link"},
+			{inventoryURLTerm, "Link"},
 			{"days_since_change", "Idle"},
 		}, []string{ESF})
 	return []Panel{
-		panel("table", "Rulesets", 12, 8, 12, 8, []Target{sqlT(rules)}, &P{
+		panel("table", "Rulesets", box{W: 12, H: 8, X: 12, Y: 8}, []Target{sqlT(rules)}, &P{
 			Prom: []Target{
 				promTbl(fmt.Sprintf("sum by (repo, ruleset, enforcement) (github_ruleset_active{%s})", PF), "A"),
 				promTbl(fmt.Sprintf("sum by (repo, ruleset, enforcement) (github_ruleset_days_since_change{%s})", PF), "B"),
 			},
 			PromTF: merged(map[string]string{
 				"repo": "Repository", "ruleset": "Ruleset", "enforcement": "Enforcement",
-				"Value #A": "Active", "Value #B": "Last changed",
+				inventoryValueCol + "A": "Active", inventoryValueCol + "B": deliveryLastChanged,
 			}, nil, map[string]int{"repo": 0, "ruleset": 1, "enforcement": 2}),
 			Desc: "A 404 from branch protection does not mean unprotected: a repository can be " +
 				"governed entirely by rulesets, which that endpoint knows nothing about.",
 			Overrides: []any{
 				width("Enforcement", 120), width("Target", 100),
-				unitOf("Last changed", "d", 130), ownerLinkOn("Ruleset", "the ruleset settings"),
+				unitOf(deliveryLastChanged, "d", 130), ownerLinkOn("Ruleset", "the ruleset settings"),
 			},
 			PromOver: []any{width("Active", 80)},
 			GR:       rulesGR, GRTF: rulesGRtf,
 			GRDesc: "Graphite names each row repository, ruleset, enforcement and target from the path.",
 			ES:     rulesES, ESTF: rulesEStf,
 		}),
-		panel("table", "Deploy keys", 8, 8, 0, 16, []Target{sqlT(keys)}, &P{
+		panel("table", "Deploy keys", box{W: 8, H: 8, X: 0, Y: 16}, []Target{sqlT(keys)}, &P{
 			Prom: []Target{promTbl(fmt.Sprintf(
 				"sum by (repo, key, read_only) (github_deploy_key_days_since_use{%s})", PF,
 			))},
 			PromTF: []any{organize(map[string]string{
-				"repo": "Repository", "key": "Key", "read_only": "Read only",
-				"Value": "Unused for",
+				"repo": "Repository", "key": "Key", "read_only": deliveryKeyReadOnly,
+				"Value": deliveryKeyUnused,
 			}, nil, map[string]int{"repo": 0, "key": 1, "read_only": 2})},
-			Opts:      Opts{"sort": "Unused for"},
+			Opts:      Opts{"sort": deliveryKeyUnused},
 			Desc:      "A write key nobody has used in a year is a credential to remove.",
-			Overrides: []any{width("Read only", 100), unitOf("Unused for", "d", 120)},
+			Overrides: []any{width(deliveryKeyReadOnly, 100), unitOf(deliveryKeyUnused, "d", 120)},
 			GR:        keysGR, GRTF: keysGRtf,
 			GRDesc: "Graphite names each row repository, key and whether it is read-only from the path.",
 			ES:     keysES, ESTF: keysEStf,
@@ -249,7 +270,7 @@ func accessConfiguration(b *builder) []Panel {
 				"no reading at all, in this dashboard or any of the others, and its cell " +
 				"is empty.",
 		}),
-		panel("text", "Where failure output went", 16, 8, 8, 16, nil, &P{
+		panel("text", "Where failure output went", box{W: 16, H: 8, X: 8, Y: 16}, nil, &P{
 			Opts: Opts{"content": logNote},
 			Logs: &Logs{
 				Selector: jobLogSelector,
@@ -259,12 +280,12 @@ func accessConfiguration(b *builder) []Panel {
 					"ninety days, so what is here is what was captured while it was there.",
 			},
 		}),
-		panel("table", "Webhooks configured", 12, 8, 0, 24, []Target{sqlT(
+		panel("table", "Webhooks configured", box{W: 12, H: 8, X: 0, Y: 24}, []Target{sqlT(
 			`SELECT repo AS "Repository", host AS "Host", hook AS "Hook",` +
 				` active AS "Active", MAX(events) AS "Events subscribed" FROM (` +
 				"SELECT repo, host, hook, active, events, ROW_NUMBER() OVER (" +
 				"PARTITION BY repo, hook, host ORDER BY time DESC) AS rn FROM gh_webhook" +
-				" WHERE $__timeFilter(time) AND " + RF + ") x WHERE rn = 1" +
+				" WHERE $__timeFilter(time) AND " + RF + deliveryNewestRow +
 				" GROUP BY 1, 2, 3, 4 ORDER BY 1, 2",
 		)}, &P{
 			Prom: []Target{promTbl(fmt.Sprintf(
@@ -272,18 +293,18 @@ func accessConfiguration(b *builder) []Panel {
 			))},
 			PromTF: []any{organize(map[string]string{
 				"repo": "Repository", "host": "Host", "hook": "Hook",
-				"active": "Active", "Value": "Events subscribed",
+				"active": "Active", "Value": deliveryHookEvents,
 			}, []string{"owner", "full_name", "instance", "job", "__name__"}, nil)},
 			Desc: "The panel beside this one is built from deliveries, so a hook that has never " +
 				"delivered anything appears in it nowhere. This is the inventory: an active " +
 				"hook with no traffic is the interesting row. Hook is GitHub's id for it, the " +
 				"number in its settings page: GitHub names every webhook \"web\", so the name " +
 				"told nothing apart.",
-			Overrides: []any{width("Host", 200), width("Active", 90), width("Events subscribed", 150)},
+			Overrides: []any{width("Host", 200), width("Active", 90), width(deliveryHookEvents, 150)},
 			GR:        whGR, GRTF: whGRtf, GRDesc: grSlot,
 			ES: whES, ESTF: whEStf,
 		}),
-		panel("table", "Environments", 12, 8, 12, 24, []Target{sqlT(
+		panel("table", "Environments", box{W: 12, H: 8, X: 12, Y: 24}, []Target{sqlT(
 			`SELECT environment AS "Environment", MIN(days_since_change) AS "Idle",` +
 				` repo AS "Repository", MAX(url) AS "Link" FROM gh_environment` +
 				" WHERE $__timeFilter(time) AND " + RF +
@@ -346,7 +367,7 @@ func branchesAndProtections(b *builder) []Panel {
 	branches := `SELECT branch AS "Branch", days_since_commit AS "Idle",` +
 		` repo AS "Repository", is_default AS "Default" FROM (` +
 		"SELECT *, ROW_NUMBER() OVER (PARTITION BY repo, branch ORDER BY time DESC) AS rn" +
-		" FROM gh_branch WHERE $__timeFilter(time) AND " + RF + ") x WHERE rn = 1" +
+		" FROM gh_branch WHERE $__timeFilter(time) AND " + RF + deliveryNewestRow +
 		" ORDER BY 2 DESC"
 	protections := `SELECT repo AS "Repository", pattern AS "Pattern",` +
 		` required_reviews AS "Reviews",` +
@@ -356,13 +377,13 @@ func branchesAndProtections(b *builder) []Panel {
 		` CAST(requires_conversation_resolution AS INT) AS "Threads",` +
 		` required_checks AS "Checks", url AS "Link" FROM (` +
 		"SELECT *, ROW_NUMBER() OVER (PARTITION BY repo, pattern ORDER BY time DESC) AS rn" +
-		" FROM gh_branch_protection WHERE $__timeFilter(time) AND " + RF + ") x WHERE rn = 1" +
+		" FROM gh_branch_protection WHERE $__timeFilter(time) AND " + RF + deliveryNewestRow +
 		" ORDER BY 1, 2"
 	ruleRows := `SELECT rule AS "Rule", bypass_always AS "Always", repo AS "Repository",` +
 		` ruleset AS "Ruleset", bypass_actors AS "Bypass actors",` +
 		` bypass_sampled AS "Sampled" FROM (` +
 		"SELECT *, ROW_NUMBER() OVER (PARTITION BY repo, ruleset, rule ORDER BY time DESC) AS rn" +
-		" FROM gh_ruleset_rule WHERE $__timeFilter(time) AND " + RF + ") x WHERE rn = 1" +
+		" FROM gh_ruleset_rule WHERE $__timeFilter(time) AND " + RF + deliveryNewestRow +
 		" ORDER BY 2 DESC, 3, 4, 1"
 	branchGR, branchGRtf := gTbl(rowsOf(rp(gb, "days_since_commit"),
 		gn(gb, "repo"), gn(gb, "branch"), gn(gb, "is_default")),
@@ -379,7 +400,7 @@ func branchesAndProtections(b *builder) []Panel {
 		[]any{b.tm("repo", 500), b.tm("branch", 500), b.tm("is_default", 2)},
 		[]any{b.mMax("days_since_commit")},
 		[]named{
-			{"repo.keyword", "Repository"},
+			{inventoryRepoTerm, "Repository"},
 			{"branch.keyword", "Branch"},
 			{"is_default.keyword", "Default"},
 			{"days_since_commit", "Idle"},
@@ -403,13 +424,13 @@ func branchesAndProtections(b *builder) []Panel {
 			b.mMax("requires_conversation_resolution"), b.mMax("required_checks"),
 		},
 		[]named{
-			{"repo.keyword", "Repository"},
+			{inventoryRepoTerm, "Repository"},
 			{"pattern.keyword", "Pattern"},
-			{"url.keyword", "Link"},
+			{inventoryURLTerm, "Link"},
 			{"required_reviews", "Reviews"},
 			{"requires_commit_signatures", "Signatures"},
 			{"requires_linear_history", "Linear"},
-			{"allows_force_pushes", "Force push"},
+			{"allows_force_pushes", deliveryForcePush},
 			{"requires_conversation_resolution", "Threads"},
 			{"required_checks", "Checks"},
 		}, []string{ESF})
@@ -419,21 +440,21 @@ func branchesAndProtections(b *builder) []Panel {
 	// the other two. The column the panel sorts by would be the misreading.
 	ruleGR, ruleGRtf := gTbl(rowsOf(rp(rr, "bypass_actors"),
 		gn(rr, "repo"), gn(rr, "ruleset"), gn(rr, "rule")),
-		"Repository, ruleset, rule", []col{{"lastNotNull", "Bypass actors"}})
+		"Repository, ruleset, rule", []col{{"lastNotNull", deliveryBypassActors}})
 	ruleES, ruleEStf := esTbl(rr,
 		[]any{b.tm("repo", 500), b.tm("ruleset", 100), b.tm("rule", 100)},
 		[]any{b.mMax("bypass_actors"), b.mMax("bypass_always"), b.mMax("bypass_sampled")},
 		[]named{
-			{"repo.keyword", "Repository"},
+			{inventoryRepoTerm, "Repository"},
 			{"ruleset.keyword", "Ruleset"},
 			{"rule.keyword", "Rule"},
-			{"bypass_actors", "Bypass actors"},
+			{"bypass_actors", deliveryBypassActors},
 			{"bypass_always", "Always"},
 			{"bypass_sampled", "Sampled"},
 		}, []string{ESF})
 
 	return []Panel{
-		panel("table", "Stale branches", 12, 8, 0, 32, []Target{sqlT(branches)}, &P{
+		panel("table", "Stale branches", box{W: 12, H: 8, X: 0, Y: 32}, []Target{sqlT(branches)}, &P{
 			Prom: []Target{promTbl(promTop(50, fmt.Sprintf(
 				"max by (repo, branch, is_default) (github_branch_days_since_commit{%s})", PF,
 			)))},
@@ -464,7 +485,7 @@ func branchesAndProtections(b *builder) []Panel {
 				"that is not a commit has no age at all, in this dashboard or any of the " +
 				"others, and its cell is empty.",
 		}),
-		panel("table", "Branch protection rules", 12, 8, 12, 32,
+		panel("table", "Branch protection rules", box{W: 12, H: 8, X: 12, Y: 32},
 			[]Target{sqlT(protections)}, &P{
 				Prom: []Target{
 					promTbl(fmt.Sprintf("max by (repo, pattern) (github_branch_protection_required_reviews{%s})", PF), "A"),
@@ -476,9 +497,9 @@ func branchesAndProtections(b *builder) []Panel {
 				},
 				PromTF: merged(map[string]string{
 					"repo": "Repository", "pattern": "Pattern",
-					"Value #A": "Reviews", "Value #B": "Signatures",
-					"Value #C": "Linear", "Value #D": "Force push",
-					"Value #E": "Threads", "Value #F": "Checks",
+					inventoryValueCol + "A": "Reviews", inventoryValueCol + "B": "Signatures",
+					inventoryValueCol + "C": "Linear", inventoryValueCol + "D": deliveryForcePush,
+					inventoryValueCol + "E": "Threads", inventoryValueCol + "F": "Checks",
 				}, nil, map[string]int{"repo": 0, "pattern": 1}),
 				Desc: "What each branch protection enforces. " +
 					"`gh_repo_policy.branch_protection_rules` counts these and stops there, so a " +
@@ -494,7 +515,7 @@ func branchesAndProtections(b *builder) []Panel {
 					width("Pattern", 120), width("Reviews", 80),
 					onOff("Signatures", 100),
 					onOff("Linear", 80),
-					blockedOrAllowed("Force push", 100),
+					blockedOrAllowed(deliveryForcePush, 100),
 					onOff("Threads", 90),
 					width("Checks", 80), ownerLinkOn("Pattern", "the branch settings"),
 				},
@@ -508,7 +529,7 @@ func branchesAndProtections(b *builder) []Panel {
 					"the plugin: a protection switched off inside the range still reads as on " +
 					"until the range has moved past the day it was on.",
 			}),
-		panel("table", "Ruleset rules and bypasses", 24, 8, 0, 40,
+		panel("table", "Ruleset rules and bypasses", box{W: 24, H: 8, X: 0, Y: 40},
 			[]Target{sqlT(ruleRows)}, &P{
 				Prom: []Target{
 					promTbl(fmt.Sprintf("max by (repo, ruleset, rule) (github_ruleset_rule_bypass_actors{%s})", PF), "A"),
@@ -517,7 +538,7 @@ func branchesAndProtections(b *builder) []Panel {
 				},
 				PromTF: merged(map[string]string{
 					"repo": "Repository", "ruleset": "Ruleset", "rule": "Rule",
-					"Value #A": "Bypass actors", "Value #B": "Always", "Value #C": "Sampled",
+					inventoryValueCol + "A": deliveryBypassActors, inventoryValueCol + "B": "Always", inventoryValueCol + "C": "Sampled",
 				}, nil, map[string]int{"repo": 0, "ruleset": 1, "rule": 2}),
 				Opts: Opts{"sort": "Always"},
 				Desc: "Ruleset rules, and who may walk past them. The Rulesets panel above says a " +
@@ -528,7 +549,7 @@ func branchesAndProtections(b *builder) []Panel {
 					"Bypass actors is the exact total, so Sampled says how many were really " +
 					"read, and the comparison is sound only while the three agree.",
 				Overrides: []any{
-					width("Ruleset", 150), width("Rule", 160), width("Bypass actors", 120),
+					width("Ruleset", 150), width("Rule", 160), width(deliveryBypassActors, 120),
 					width("Always", 90), width("Sampled", 90),
 				},
 				GR: ruleGR, GRTF: ruleGRtf,
@@ -581,7 +602,7 @@ func rulesetChanges(b *builder) Panel {
 		{"url", "Link"},
 	}, []string{ESF})
 
-	return panel("table", "Ruleset changes", 24, 8, 0, 48, []Target{sqlT(versions)}, &P{
+	return panel("table", "Ruleset changes", box{W: 24, H: 8, X: 0, Y: 48}, []Target{sqlT(versions)}, &P{
 		// The count of the last sweep, not increase() over the monotonic
 		// total, for the reason the Sponsorships panel gives: every sweep
 		// re-reads the same finite changelog, so the total rises once and an
@@ -655,18 +676,18 @@ func deploymentsToEnvironments(b *builder) []Panel {
 		[]any{b.tm("repo", 500), b.tm("environment", 50), b.tm("outcome", 10), b.tmURL(), b.tmURL("environment_url")},
 		[]any{b.mCount(), b.mPct("seconds_to_status", 50), b.mPct("seconds_live", 50)},
 		[]named{
-			{"repo.keyword", "Repository"},
+			{inventoryRepoTerm, "Repository"},
 			{"environment.keyword", "Environment"},
 			{"outcome.keyword", "Outcome"},
-			{"url.keyword", "Link"},
+			{inventoryURLTerm, "Link"},
 			{"environment_url.keyword", "Live"},
 			{"n", "Deployments"},
-			{"s", "To status"},
-			{"l", "Live for"},
+			{"s", deliveryTimeToStatus},
+			{"l", deliveryTimeLive},
 		}, []string{ESF})
 
 	return []Panel{
-		panel("timeseries", "Deployments over time", 12, 8, 0, 56,
+		panel("timeseries", "Deployments over time", box{W: 12, H: 8, X: 0, Y: 56},
 			[]Target{sqlTS(deploysPerDay)}, &P{
 				Prom: []Target{daily(fmt.Sprintf(
 					"sum by (environment) (increase(github_deployments_total{%s}[1d]))", PF,
@@ -681,7 +702,7 @@ func deploymentsToEnvironments(b *builder) []Panel {
 				GR:       []Target{grq(perBucket("isNonNull("+rp(dp, "deployments")+")", gn(dp, "environment")))},
 				ES:       []Target{b.esDaily(dp, b.mCount(), "environment", "", []string{ESF}, "")},
 			}),
-		panel("table", "Deployments by environment", 12, 8, 12, 56, []Target{sqlT(deploys)}, &P{
+		panel("table", "Deployments by environment", box{W: 12, H: 8, X: 12, Y: 56}, []Target{sqlT(deploys)}, &P{
 			Prom: []Target{
 				promTbl(fmt.Sprintf("sum by (repo, environment) (increase(github_deployments_total{%s}[$__range]))", PF), "A"),
 				promTbl(fmt.Sprintf("avg by (repo, environment) (github_deployments_seconds_to_status_mean{%s})", PF), "B"),
@@ -690,9 +711,9 @@ func deploymentsToEnvironments(b *builder) []Panel {
 				promTbl(fmt.Sprintf(`sum by (repo, environment) (increase(github_deployments_total{outcome="pending",%s}[$__range]))`, PF), "E"),
 			},
 			PromTF: merged(map[string]string{
-				"repo": "Repository", "environment": "Environment", "Value #A": "Deployments",
-				"Value #B": "To status", "Value #C": "Live for",
-				"Value #D": "Successes", "Value #E": "Pending",
+				"repo": "Repository", "environment": "Environment", inventoryValueCol + "A": "Deployments",
+				inventoryValueCol + "B": deliveryTimeToStatus, inventoryValueCol + "C": deliveryTimeLive,
+				inventoryValueCol + "D": "Successes", inventoryValueCol + "E": "Pending",
 			}, nil, map[string]int{"repo": 0, "environment": 1}),
 			Opts: Opts{"sort": "Deployments"},
 			Desc: "To status is the median time the deployment took to report one; Live for " +
@@ -705,7 +726,7 @@ func deploymentsToEnvironments(b *builder) []Panel {
 			// Short headings, so Pending is inside a half-width panel.
 			Overrides: []any{
 				width("Environment", 120), barCell("Deployments", "short", 110),
-				unitOf("To status", "s", 90), unitOf("Live for", "s", 90),
+				unitOf(deliveryTimeToStatus, "s", 90), unitOf(deliveryTimeLive, "s", 90),
 				width("Successes", 90), width("Pending", 80),
 				ownerLinkOn("Environment", "the deployments"), linkColumnAs("Live", "Open the environment"),
 			},

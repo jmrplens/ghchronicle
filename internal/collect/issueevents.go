@@ -354,12 +354,17 @@ type timelineNode struct {
 	StackEntry *struct {
 		Position int `json:"position"`
 	} `json:"stackEntry"`
-	Timeline struct {
-		PageInfo struct {
-			HasNextPage bool `json:"hasNextPage"`
-		} `json:"pageInfo"`
-		Nodes []timelineItem `json:"nodes"`
-	} `json:"timelineItems"`
+	Timeline timelineItems `json:"timelineItems"`
+}
+
+// timelineItems is as much of an item's timeline as one page carries. The
+// cursor is never followed, so only the flag that says the tail was cut is
+// read: a longer timeline is asked for again with a bigger page.
+type timelineItems struct {
+	PageInfo struct {
+		HasNextPage bool `json:"hasNextPage"`
+	} `json:"pageInfo"`
+	Nodes []timelineItem `json:"nodes"`
 }
 
 // item is the node as the REST rows embed it, for the two roads that carry

@@ -48,7 +48,7 @@ func (inv RepoInventory) Collect(ctx context.Context, c *ghapi.Client, repo Repo
 		DefaultWorkflowPermissions string `json:"default_workflow_permissions"`
 		CanApprovePullRequests     bool   `json:"can_approve_pull_request_reviews"`
 	}
-	if _, _, err := inv.Refusals.GetJSON(ctx, c, "/repos/"+repo.FullName+"/actions/permissions/workflow", &policy, ""); err == nil {
+	if _, _, err := inv.Refusals.GetJSON(ctx, c, repoPathPrefix+repo.FullName+"/actions/permissions/workflow", &policy, ""); err == nil {
 		points = append(points, sink.Point{
 			Measurement: "gh_actions_policy",
 			Tags:        merge(base, map[string]string{"permissions": orNone(policy.DefaultWorkflowPermissions)}),
@@ -116,7 +116,7 @@ func secretsOf(ctx context.Context, c *ghapi.Client, m *Refusals, repo Repo, kin
 	var body struct {
 		Secrets []repoSecret `json:"secrets"`
 	}
-	path := "/repos/" + repo.FullName + "/" + kind + "/secrets?per_page=100"
+	path := repoPathPrefix + repo.FullName + "/" + kind + "/secrets?per_page=100"
 	if _, _, err := m.GetJSON(ctx, c, path, &body, ""); err != nil {
 		if isSkippable(err) {
 			return nil, nil
@@ -150,7 +150,7 @@ func codeScanningSetup(ctx context.Context, c *ghapi.Client, m *Refusals, repo R
 	}
 	fields := map[string]any{"setups": 1}
 	state := "unavailable"
-	if _, _, err := m.GetJSON(ctx, c, "/repos/"+repo.FullName+"/code-scanning/default-setup", &setup, ""); err == nil {
+	if _, _, err := m.GetJSON(ctx, c, repoPathPrefix+repo.FullName+"/code-scanning/default-setup", &setup, ""); err == nil {
 		state = setup.State
 		fields["languages"] = len(setup.Languages)
 		// updated_at is null whenever the state is not-configured, measured on

@@ -78,54 +78,63 @@ type checkRollup struct {
 			CompletedAt *time.Time `json:"completedAt"`
 			DetailsURL  string     `json:"detailsUrl"`
 			TargetURL   string     `json:"targetUrl"`
-			CheckSuite  struct {
-				App *struct {
-					Slug string `json:"slug"`
-				} `json:"app"`
-			} `json:"checkSuite"`
-			Context   string     `json:"context"`
-			State     string     `json:"state"`
-			CreatedAt *time.Time `json:"createdAt"`
+			CheckSuite  checkSuite `json:"checkSuite"`
+			Context     string     `json:"context"`
+			State       string     `json:"state"`
+			CreatedAt   *time.Time `json:"createdAt"`
 		} `json:"nodes"`
 	} `json:"contexts"`
+}
+
+// checkSuite is the suite a check run belongs to, read only for the app that
+// ran it: nothing else in a context names the provider behind the check.
+type checkSuite struct {
+	App *struct {
+		Slug string `json:"slug"`
+	} `json:"app"`
 }
 
 type commitRef struct {
 	Name   string `json:"name"`
 	Target struct {
-		History struct {
-			TotalCount int `json:"totalCount"`
-			PageInfo   struct {
-				HasNextPage bool   `json:"hasNextPage"`
-				EndCursor   string `json:"endCursor"`
-			} `json:"pageInfo"`
-			Nodes []struct {
-				OID             string    `json:"oid"`
-				URL             string    `json:"url"`
-				CommittedDate   time.Time `json:"committedDate"`
-				Additions       int       `json:"additions"`
-				Deletions       int       `json:"deletions"`
-				ChangedFiles    int       `json:"changedFilesIfAvailable"`
-				MessageHeadline string    `json:"messageHeadline"`
-				Author          struct {
-					Name string `json:"name"`
-					User *struct {
-						Login string `json:"login"`
-					} `json:"user"`
-				} `json:"author"`
-				Signature *struct {
-					IsValid bool   `json:"isValid"`
-					State   string `json:"state"`
-				} `json:"signature"`
-				AssociatedPullRequests struct {
-					Nodes []struct {
-						Number int `json:"number"`
-					} `json:"nodes"`
-				} `json:"associatedPullRequests"`
-				StatusCheckRollup *checkRollup `json:"statusCheckRollup"`
-			} `json:"nodes"`
-		} `json:"history"`
+		History commitHistory `json:"history"`
 	} `json:"target"`
+}
+
+// commitHistory is one page of a branch's history, newest first.
+type commitHistory struct {
+	TotalCount int      `json:"totalCount"`
+	PageInfo   pageInfo `json:"pageInfo"`
+	Nodes      []struct {
+		OID             string       `json:"oid"`
+		URL             string       `json:"url"`
+		CommittedDate   time.Time    `json:"committedDate"`
+		Additions       int          `json:"additions"`
+		Deletions       int          `json:"deletions"`
+		ChangedFiles    int          `json:"changedFilesIfAvailable"`
+		MessageHeadline string       `json:"messageHeadline"`
+		Author          commitAuthor `json:"author"`
+		Signature       *struct {
+			IsValid bool   `json:"isValid"`
+			State   string `json:"state"`
+		} `json:"signature"`
+		AssociatedPullRequests struct {
+			Nodes []struct {
+				Number int `json:"number"`
+			} `json:"nodes"`
+		} `json:"associatedPullRequests"`
+		StatusCheckRollup *checkRollup `json:"statusCheckRollup"`
+	} `json:"nodes"`
+}
+
+// commitAuthor is who wrote a commit: the name git recorded, and the GitHub
+// account GraphQL matched it to, which is absent for an email it knows nobody
+// by.
+type commitAuthor struct {
+	Name string `json:"name"`
+	User *struct {
+		Login string `json:"login"`
+	} `json:"user"`
 }
 
 func (cm Commits) Collect(ctx context.Context, c *ghapi.Client, repo Repo, _ time.Time) ([]sink.Point, error) {

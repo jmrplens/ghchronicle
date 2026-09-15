@@ -9,6 +9,16 @@ import "fmt"
 // only way a table of it can be opened from, since no row is a page.
 const billingPage = "https://github.com/settings/billing/summary"
 
+// The three money columns of the bill, named the same in the SQL panel and in
+// its Prometheus and Graphite twins so a store swap keeps the same table, and
+// the Graphite function that adds a path's series up.
+const (
+	costCovered        = "Covered by the plan"
+	costBilled         = "Actually billed"
+	costActionsMinutes = "Actions minutes"
+	costSumSeries      = "sumSeries("
+)
+
 func cost(b *builder) []Panel {
 	bu := "gh_billing_usage"
 
@@ -35,7 +45,7 @@ func cost(b *builder) []Panel {
 	byRepoES, byRepoEStf := esTbl(bu, []any{b.tm("repo", 40), b.tm("sku", 50), b.tm("unit", 5)},
 		[]any{b.mSum("quantity"), b.mMax("price_per_unit"), b.mSum("gross"), b.mSum("net")},
 		[]named{
-			{"repo.keyword", "Repository"},
+			{panelRepoField, "Repository"},
 			{"sku.keyword", "SKU"},
 			{"unit.keyword", "Unit"},
 			{"q", "Quantity"},
@@ -52,7 +62,7 @@ func cost(b *builder) []Panel {
 		[]any{b.tm("repo", 500), b.tm("cache", 50)},
 		[]any{b.mSum("size_bytes"), b.mCount(), b.mMax("days_since_use")},
 		[]named{
-			{"repo.keyword", "Repository"},
+			{panelRepoField, "Repository"},
 			{"cache.keyword", "Cache"},
 			{"s", "Size"},
 			{"n", "Entries"},
@@ -63,11 +73,11 @@ func cost(b *builder) []Panel {
 		gn("gh_actions_cache", "repo")), "Repository", []col{{"lastNotNull", "Cache"}})
 	cacheES, cacheEStf := esTbl("gh_actions_cache", []any{b.tm("repo", 500)},
 		[]any{b.mNewest("size_bytes", "count")},
-		[]named{{"repo.keyword", "Repository"}, {"size_bytes", "Cache"}, {"count", "Entries"}},
+		[]named{{panelRepoField, "Repository"}, {"size_bytes", "Cache"}, {"count", "Entries"}},
 		[]string{ESF})
 
 	return []Panel{
-		statGroup("Spend in range", 24, 4, 0, 0, []Target{sqlT(
+		statGroup("Spend in range", box{W: 24, H: 4, X: 0, Y: 0}, []Target{sqlT(
 			`SELECT SUM(gross) AS "Gross", SUM(discount) AS "Covered by the plan",` +
 				` SUM(net) AS "Actually billed",` +
 				` SUM(CASE WHEN unit = 'Minutes' THEN quantity ELSE 0 END) AS "Actions minutes"` +
@@ -75,9 +85,9 @@ func cost(b *builder) []Panel {
 		)}, &P{
 			Prom: []Target{
 				promNamed("A", "Gross", "sum(github_billing_usage_gross)"),
-				promNamed("B", "Covered by the plan", "sum(github_billing_usage_discount)"),
-				promNamed("C", "Actually billed", "sum(github_billing_usage_net)"),
-				promNamed("D", "Actions minutes", `sum(github_billing_usage_quantity{unit="Minutes"})`),
+				promNamed("B", costCovered, "sum(github_billing_usage_discount)"),
+				promNamed("C", costBilled, "sum(github_billing_usage_net)"),
+				promNamed("D", costActionsMinutes, `sum(github_billing_usage_quantity{unit="Minutes"})`),
 			},
 			Desc: "What the usage would have cost at list price, what the plan covered, and " +
 				"what was actually billed, which is not always zero because the monthly " +
@@ -86,10 +96,10 @@ func cost(b *builder) []Panel {
 				"time, and a \"2.3 days\" would be a lie.",
 			PromDesc: sweepCount,
 			GR: []Target{
-				grNamed("A", "Gross", total("sumSeries("+gp(bu, "gross")+")")),
-				grNamed("B", "Covered by the plan", total("sumSeries("+gp(bu, "discount")+")")),
-				grNamed("C", "Actually billed", total("sumSeries("+gp(bu, "net")+")")),
-				grNamed("D", "Actions minutes", total("sumSeries("+mins+")")),
+				grNamed("A", "Gross", total(costSumSeries+gp(bu, "gross")+")")),
+				grNamed("B", costCovered, total(costSumSeries+gp(bu, "discount")+")")),
+				grNamed("C", costBilled, total(costSumSeries+gp(bu, "net")+")")),
+				grNamed("D", costActionsMinutes, total(costSumSeries+mins+")")),
 			},
 			ES: []Target{
 				esRef("A", b.esTotal(bu, b.mSum("gross"))),
@@ -98,13 +108,13 @@ func cost(b *builder) []Panel {
 				esRef("D", b.esTotal(bu, b.mSum("quantity"), "unit:Minutes")),
 			},
 			ESOver: []any{
-				frameName("A", "Gross"), frameName("B", "Covered by the plan"),
-				frameName("C", "Actually billed"), frameName("D", "Actions minutes"),
+				frameName("A", "Gross"), frameName("B", costCovered),
+				frameName("C", costBilled), frameName("D", costActionsMinutes),
 			},
 			Opts:      Opts{"unit": "currencyUSD"},
-			Overrides: []any{unitOf("Actions minutes", "short", 0)},
+			Overrides: []any{unitOf(costActionsMinutes, "short", 0)},
 		}),
-		panel("timeseries", "Cost over time by product", 12, 8, 0, 4,
+		panel("timeseries", "Cost over time by product", box{W: 12, H: 8, X: 0, Y: 4},
 			[]Target{sqlTS(perDay)}, &P{
 				Prom: []Target{promq("sum by (product) (github_billing_usage_gross)",
 					legend("{{product}}"))},
@@ -116,7 +126,7 @@ func cost(b *builder) []Panel {
 				GR:       []Target{grq(perBucket(gp(bu, "gross"), gn(bu, "product")))},
 				ES:       []Target{b.esDaily(bu, b.mSum("gross"), "product", "", nil, "")},
 			}),
-		panel("timeseries", "Actions minutes over time", 12, 8, 12, 4,
+		panel("timeseries", "Actions minutes over time", box{W: 12, H: 8, X: 12, Y: 4},
 			[]Target{sqlTS(minutes)}, &P{
 				Prom: []Target{promq(`sum by (sku) (github_billing_usage_quantity{unit="Minutes"})`,
 					legend("{{sku}}"))},
@@ -129,7 +139,7 @@ func cost(b *builder) []Panel {
 				ES: []Target{b.esDaily(bu, b.mSum("quantity"), "sku", "",
 					[]string{"unit:Minutes"}, "")},
 			}),
-		panel("table", "Usage by repository", 24, 9, 0, 12, []Target{sqlT(byRepo)}, &P{
+		panel("table", "Usage by repository", box{W: 24, H: 9, X: 0, Y: 12}, []Target{sqlT(byRepo)}, &P{
 			Prom: []Target{
 				promTbl(`sum by (repo, sku, unit) (github_billing_usage_quantity{repo!=""})`, "A"),
 				promTbl(`max by (repo, sku, unit) (github_billing_usage_price_per_unit{repo!=""})`, "B"),
@@ -138,8 +148,8 @@ func cost(b *builder) []Panel {
 			},
 			PromTF: merged(map[string]string{
 				"repo": "Repository", "sku": "SKU", "unit": "Unit",
-				"Value #A": "Quantity", "Value #B": "Price", "Value #C": "Gross",
-				"Value #D": "Net",
+				panelValueA: "Quantity", panelValueB: "Price", panelValueC: "Gross",
+				panelValueD: "Net",
 			}, nil, nil),
 			Opts:     mergeOpts(Opts{"sort": "Gross"}, ownerPageLink("Open the bill", billingPage)),
 			PromDesc: sweepCount,
@@ -157,7 +167,7 @@ func cost(b *builder) []Panel {
 			GRDesc: "Graphite names each row repository and SKU from the path. " + grRows,
 			ES:     byRepoES, ESTF: byRepoEStf,
 		}),
-		panel("table", "Cache entries by key", 24, 8, 0, 21, []Target{sqlT(
+		panel("table", "Cache entries by key", box{W: 24, H: 8, X: 0, Y: 21}, []Target{sqlT(
 			`SELECT cache AS "Cache", SUM(size_bytes) AS "Size", repo AS "Repository",` +
 				` COUNT(*) AS "Entries",` +
 				` MIN(days_since_use) AS "Days since use" FROM (` +
@@ -171,8 +181,8 @@ func cost(b *builder) []Panel {
 				promTbl(fmt.Sprintf("min by (repo, cache) (github_actions_cache_entry_days_since_use{%s})", PF), "B"),
 			},
 			PromTF: merged(map[string]string{
-				"repo": "Repository", "cache": "Cache", "Value #A": "Size",
-				"Value #B": "Days since use",
+				"repo": "Repository", "cache": "Cache", panelValueA: "Size",
+				panelValueB: "Days since use",
 			}, nil, map[string]int{"repo": 0, "cache": 1}),
 			Opts: Opts{"sort": "Size"},
 			Desc: "The total says a repository holds twelve gigabytes. This says which key " +
@@ -182,7 +192,7 @@ func cost(b *builder) []Panel {
 			GR:        entryGR, GRTF: entryGRtf, GRDesc: grSlot,
 			ES: entryES, ESTF: entryEStf,
 		}),
-		panel("table", "Cache against the ceiling", 24, 8, 0, 29, []Target{sqlT(
+		panel("table", "Cache against the ceiling", box{W: 24, H: 8, X: 0, Y: 29}, []Target{sqlT(
 			`SELECT repo AS "Repository", MAX(size_bytes) AS "Cache",` +
 				` MAX(count) AS "Entries"` +
 				" FROM gh_actions_cache WHERE $__timeFilter(time) AND " + RF +
@@ -193,7 +203,7 @@ func cost(b *builder) []Panel {
 				promTbl(fmt.Sprintf("max by (repo) (github_actions_cache_count{%s})", PF), "B"),
 			},
 			PromTF: merged(map[string]string{
-				"repo": "Repository", "Value #A": "Cache", "Value #B": "Entries",
+				"repo": "Repository", panelValueA: "Cache", panelValueB: "Entries",
 			}, nil, nil),
 			Opts: Opts{"sort": "Cache"},
 			Desc: "GitHub caps a repository at ten gigabytes and evicts the least recently used " +

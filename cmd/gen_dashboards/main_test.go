@@ -176,11 +176,11 @@ func TestCompareNamesTheFirstDifference(t *testing.T) {
 	if got := compare(first, renamed, map[int]bool{1: true}); got != "" {
 		t.Errorf("compare = %q for a declared title, want nothing", got)
 	}
-	if got := compare(first, renamed, map[int]bool{0: true}); got == "" {
+	if compare(first, renamed, map[int]bool{0: true}) == "" {
 		t.Error("compare accepted a title that differs at a position not declared")
 	}
 	renamedAndMoved := [][2]any{{"Stars", "0 0 12 8"}, {"Forks, 14-day window", "0 8 12 8"}}
-	if got := compare(first, renamedAndMoved, map[int]bool{1: true}); got == "" {
+	if compare(first, renamedAndMoved, map[int]bool{1: true}) == "" {
 		t.Error("compare accepted a moved panel because its title was declared")
 	}
 }

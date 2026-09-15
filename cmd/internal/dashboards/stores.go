@@ -59,6 +59,10 @@ func variable(ds any, definition string, query any, extra map[string]any) map[st
 	return v
 }
 
+// storeDescLead opens the description of all five dashboards: only the tail,
+// naming the store each one reads, differs.
+const storeDescLead = "Every metric GitHub will give about an account, kept with the date it "
+
 // AllStores is every dashboard this generates, in the order the files are
 // written.
 func AllStores() []Store {
@@ -91,7 +95,7 @@ func AllStores() []Store {
 		{
 			Name: "influxdb", DS: "${DS_INFLUXDB}", UID: "ghchronicle-influxdb",
 			File: "ghchronicle-influxdb.json", Title: "GitHub Chronicle (InfluxDB)",
-			Description: "Every metric GitHub will give about an account, kept with the date it " +
+			Description: storeDescLead +
 				"happened. Collected by ghchronicle.",
 			Inputs: input("DS_INFLUXDB", "InfluxDB",
 				"The InfluxDB 3 database ghchronicle writes to, queried with SQL.",
@@ -127,7 +131,7 @@ func AllStores() []Store {
 		{
 			Name: "postgres", DS: "${DS_POSTGRES}", UID: "ghchronicle-postgres",
 			File: "ghchronicle-postgres.json", Title: "GitHub Chronicle (PostgreSQL)",
-			Description: "Every metric GitHub will give about an account, kept with the date it " +
+			Description: storeDescLead +
 				"happened, in the tables the ghchronicle SQL sink writes.",
 			Inputs: input("DS_POSTGRES", "PostgreSQL",
 				"The PostgreSQL or TimescaleDB database the SQL sink's statements were "+
@@ -142,7 +146,7 @@ func AllStores() []Store {
 		{
 			Name: "graphite", DS: "${DS_GRAPHITE}", UID: "ghchronicle-graphite",
 			File: "ghchronicle-graphite.json", Title: "GitHub Chronicle (Graphite)",
-			Description: "Every metric GitHub will give about an account, kept with the date it " +
+			Description: storeDescLead +
 				"happened, from the paths the ghchronicle Graphite sink writes.",
 			Inputs: input("DS_GRAPHITE", "Graphite",
 				"The Graphite the sink writes to, with the default prefix `github`.",
@@ -156,7 +160,7 @@ func AllStores() []Store {
 		{
 			Name: "elasticsearch", DS: "${DS_ELASTICSEARCH}", UID: "ghchronicle-elasticsearch",
 			File: "ghchronicle-elasticsearch.json", Title: "GitHub Chronicle (Elasticsearch)",
-			Description: "Every metric GitHub will give about an account, kept with the date it " +
+			Description: storeDescLead +
 				"happened, from the documents the ghchronicle Elasticsearch sink writes.",
 			Inputs: input("DS_ELASTICSEARCH", "Elasticsearch",
 				"The Elasticsearch or OpenSearch datasource pointing at `ghchronicle-*`, "+
@@ -186,7 +190,7 @@ func (s *Store) BuildWith(ds, logs any) map[string]any {
 	v := map[string]any{}
 	maps.Copy(v, s.Variable)
 	v["datasource"] = ds
-	return Dashboard(s.Name, ds, logs, s.UID, s.Title, s.Description, s.Inputs, s.Requires, v)
+	return Dashboard(s, ds, logs, v)
 }
 
 // ByName is the store of that name, and whether there is one. Every command

@@ -421,7 +421,7 @@ func TestSuccessRateIsGreenFromNinety(t *testing.T) {
 				green = v
 			}
 		}
-		if unit := overrideProperty(p, "Success rate", "unit"); unit == "percentunit" {
+		if overrideProperty(p, "Success rate", "unit") == "percentunit" {
 			green *= 100
 		}
 		if green != 90 {

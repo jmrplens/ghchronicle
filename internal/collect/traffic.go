@@ -10,6 +10,9 @@ import (
 	"github.com/jmrplens/ghchronicle/internal/sink"
 )
 
+// repoPathPrefix opens the REST path of anything asked about one repository.
+const repoPathPrefix = "/repos/"
+
 // Traffic collects the only data GitHub throws away.
 //
 // Views and clones live for exactly 14 days and then cease to exist anywhere.
@@ -41,7 +44,7 @@ func (Traffic) Collect(ctx context.Context, c *ghapi.Client, repo Repo, now time
 		Uniques int            `json:"uniques"`
 		Views   []trafficCount `json:"views"`
 	}
-	if _, _, err := c.GetJSON(ctx, "/repos/"+repo.FullName+"/traffic/views", &views, ""); err != nil {
+	if _, _, err := c.GetJSON(ctx, repoPathPrefix+repo.FullName+"/traffic/views", &views, ""); err != nil {
 		if !isSkippable(err) {
 			return nil, err
 		}
@@ -60,7 +63,7 @@ func (Traffic) Collect(ctx context.Context, c *ghapi.Client, repo Repo, now time
 		Uniques int            `json:"uniques"`
 		Clones  []trafficCount `json:"clones"`
 	}
-	if _, _, err := c.GetJSON(ctx, "/repos/"+repo.FullName+"/traffic/clones", &clones, ""); err != nil {
+	if _, _, err := c.GetJSON(ctx, repoPathPrefix+repo.FullName+"/traffic/clones", &clones, ""); err != nil {
 		if !isSkippable(err) {
 			return nil, err
 		}
@@ -89,7 +92,7 @@ func (Traffic) Collect(ctx context.Context, c *ghapi.Client, repo Repo, now time
 		Count    int    `json:"count"`
 		Uniques  int    `json:"uniques"`
 	}
-	if _, _, err := c.GetJSON(ctx, "/repos/"+repo.FullName+"/traffic/popular/referrers", &referrers, ""); err != nil {
+	if _, _, err := c.GetJSON(ctx, repoPathPrefix+repo.FullName+"/traffic/popular/referrers", &referrers, ""); err != nil {
 		if !isSkippable(err) {
 			return nil, err
 		}
@@ -117,7 +120,7 @@ func (Traffic) Collect(ctx context.Context, c *ghapi.Client, repo Repo, now time
 		Count   int    `json:"count"`
 		Uniques int    `json:"uniques"`
 	}
-	if _, _, err := c.GetJSON(ctx, "/repos/"+repo.FullName+"/traffic/popular/paths", &paths, ""); err != nil {
+	if _, _, err := c.GetJSON(ctx, repoPathPrefix+repo.FullName+"/traffic/popular/paths", &paths, ""); err != nil {
 		if !isSkippable(err) {
 			return nil, err
 		}

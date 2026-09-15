@@ -122,6 +122,18 @@ query achievementCounts($login: String!, $pulls: String!, $answers: String!) {
   }
 }`
 
+// achievementUser is the account half of achievementCountsQuery: when it was
+// created, which bounds the walk, and the star counts the Starstruck tiers are
+// read from.
+type achievementUser struct {
+	CreatedAt    time.Time `json:"createdAt"`
+	Repositories struct {
+		Nodes []struct {
+			Stars int `json:"stargazerCount"`
+		} `json:"nodes"`
+	} `json:"repositories"`
+}
+
 // counts asks for the three cheap counts and the account's creation date.
 func (a Achievements) counts(ctx context.Context, c *ghapi.Client) (achievementCounts, error) {
 	var res struct {
@@ -131,14 +143,7 @@ func (a Achievements) counts(ctx context.Context, c *ghapi.Client) (achievementC
 		Answers struct {
 			DiscussionCount int `json:"discussionCount"`
 		} `json:"answers"`
-		User *struct {
-			CreatedAt    time.Time `json:"createdAt"`
-			Repositories struct {
-				Nodes []struct {
-					Stars int `json:"stargazerCount"`
-				} `json:"nodes"`
-			} `json:"repositories"`
-		} `json:"user"`
+		User *achievementUser `json:"user"`
 	}
 	vars := map[string]any{
 		"login":   a.Login,
@@ -227,12 +232,9 @@ const oneDay = 24 * time.Hour
 // coauthoredPage is one answer of the walk.
 type coauthoredPage struct {
 	Search struct {
-		IssueCount int `json:"issueCount"`
-		PageInfo   struct {
-			HasNextPage bool   `json:"hasNextPage"`
-			EndCursor   string `json:"endCursor"`
-		} `json:"pageInfo"`
-		Nodes []struct {
+		IssueCount int      `json:"issueCount"`
+		PageInfo   pageInfo `json:"pageInfo"`
+		Nodes      []struct {
 			MergeCommit *struct {
 				Message string `json:"message"`
 			} `json:"mergeCommit"`

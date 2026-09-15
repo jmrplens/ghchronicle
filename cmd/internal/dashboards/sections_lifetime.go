@@ -2,6 +2,15 @@ package dashboards
 
 import "fmt"
 
+// Column titles the archive and rate limit tables share with their
+// Elasticsearch, Graphite and Prometheus twins: the twin renames its value
+// column to one of these, and a column named anything else arrives empty.
+const (
+	lifetimeAgeAtArchive    = "Age at archive"
+	lifetimeLowestRemaining = "Lowest remaining"
+	lifetimeMostUsed        = "Most used"
+)
+
 // ── Lifetime ────────────────────────────────────────────────────────────────
 
 // lifetime is the numbers that are true since the beginning, as one row each.
@@ -115,11 +124,11 @@ func lifetime(b *builder) []Panel {
 	// gh_repo_archived does carry the bare `repo`, so it takes the filter
 	// normally.
 	archivedGR, archivedGRtf := gTbl(rowsOf(gp(rar, "age_days_at_archive"), gn(rar, "repo")),
-		"Repository", []col{{"lastNotNull", "Age at archive"}})
+		"Repository", []col{{"lastNotNull", lifetimeAgeAtArchive}})
 	archivedES, archivedEStf := b.esRaw(rar, 500, []named{
 		{"@timestamp", "Archived"},
 		{"repo", "Repository"},
-		{"age_days_at_archive", "Age at archive"},
+		{"age_days_at_archive", lifetimeAgeAtArchive},
 		{"url", "Link"},
 	}, nil)
 
@@ -129,7 +138,7 @@ func lifetime(b *builder) []Panel {
 		[]named{{"repo.keyword", "Repository"}, {"runs", "Runs"}}, []string{ESF})
 
 	return []Panel{
-		fieldGroup(b, "gh_account_total", "Since the account began", 24, 5, 0, 0, []named{
+		fieldGroup(b, "gh_account_total", "Since the account began", box{W: 24, H: 5, X: 0, Y: 0}, []named{
 			{"pulls_merged", "Pull requests merged"},
 			{"pulls_reviewed", "Pull requests reviewed"},
 			{"commits", "Commits"},
@@ -145,17 +154,17 @@ func lifetime(b *builder) []Panel {
 				"repositories. All counted by GitHub's own search rather than by adding " +
 				"up rows.",
 		}),
-		panel("table", "Every repository, ever", 24, 12, 0, 5,
+		panel("table", "Every repository, ever", box{W: 24, H: 12, X: 0, Y: 5},
 			[]Target{sqlT(repos)}, &P{
 				Prom: promRepos,
 				PromTF: merged(map[string]string{
 					"repo": "Repository", "fork": "Fork", "archived": "Archived",
-					"Value #A": "Commits", "Value #B": "Merged",
-					"Value #C": "Issues", "Value #D": "Releases", "Value #E": "Stars",
-					"Value #F": "Branches", "Value #G": "Tags",
+					panelValueA: "Commits", panelValueB: "Merged",
+					panelValueC: "Issues", panelValueD: "Releases", panelValueE: "Stars",
+					panelValueF: "Branches", panelValueG: "Tags",
 				}, []string{
 					"owner", "full_name", "visibility", "instance", "job", "__name__",
-				}, map[string]int{"repo": 0, "Value #A": 1, "fork": 2, "archived": 3}),
+				}, map[string]int{"repo": 0, panelValueA: 1, "fork": 2, "archived": 3}),
 				Opts: Opts{"sort": "Commits"},
 				Desc: "The whole life of each repository in one row: not what happened in the " +
 					"dashboard range, but everything there has ever been. " + forksIncluded +
@@ -168,7 +177,7 @@ func lifetime(b *builder) []Panel {
 				GR: reposGR, GRTF: reposGRtf, GRDesc: grSlot,
 				ES: reposES, ESTF: reposEStf,
 			}),
-		panel("table", "Repositories created", 8, 8, 0, 17, []Target{sqlT(created)}, &P{
+		panel("table", "Repositories created", box{W: 8, H: 8, X: 0, Y: 17}, []Target{sqlT(created)}, &P{
 			// The exporter reduces this measurement to a count, so the answer
 			// here is a real one and it is a smaller one. Said rather than
 			// replaced by a text panel: how many repositories were created, and
@@ -200,7 +209,7 @@ func lifetime(b *builder) []Panel {
 				"the column counts the creation itself, which is one on every row.",
 			ES: createdES, ESTF: createdEStf, ESDesc: esRange,
 		}),
-		panel("table", "Repositories archived", 8, 8, 8, 17, []Target{sqlT(archived)}, &P{
+		panel("table", "Repositories archived", box{W: 8, H: 8, X: 8, Y: 17}, []Target{sqlT(archived)}, &P{
 			// Counted, so the count is not all that survives: the reduction
 			// takes the mean of every number the archived rows carried, and
 			// `age_days_at_archive` is one of them. Two of the panel's four
@@ -211,7 +220,7 @@ func lifetime(b *builder) []Panel {
 				promTbl("avg by (owner) (github_repos_archived_age_days_at_archive_mean)", "B"),
 			},
 			PromTF: merged(map[string]string{
-				"Value #A": "Repositories archived", "Value #B": "Age at archive",
+				panelValueA: "Repositories archived", panelValueB: lifetimeAgeAtArchive,
 			}, nil, nil),
 			PromDesc: "The exporter reduces `gh_repo_archived` to a count by owner, which names " +
 				"the account and not the repository, so Prometheus holds how many have " +
@@ -231,14 +240,14 @@ func lifetime(b *builder) []Panel {
 				"takes no repository filter: the variable lists the repositories a sweep " +
 				"collects, and these are the ones it set aside.",
 			Overrides: []any{
-				when("Archived"), unitOf("Age at archive", "d", 130), linkOn("Repository"),
+				when("Archived"), unitOf(lifetimeAgeAtArchive, "d", 130), linkOn("Repository"),
 			},
 			GR: archivedGR, GRTF: archivedGRtf,
 			GRDesc: grRange + " Graphite names each row from the path, so the column is the " +
 				"age at archive and the date it was archived on is gone.",
 			ES: archivedES, ESTF: archivedEStf, ESDesc: esRange,
 		}),
-		panel("barchart", "Workflow runs, ever", 8, 8, 16, 17, []Target{sqlT(runsEver)}, &P{
+		panel("barchart", "Workflow runs, ever", box{W: 8, H: 8, X: 16, Y: 17}, []Target{sqlT(runsEver)}, &P{
 			Prom: []Target{promTbl(fmt.Sprintf(
 				"topk(10, max by (repo) (github_workflow_run_total_runs{%s}))", PF,
 			))},
@@ -294,18 +303,18 @@ func collectorSection(b *builder) []Panel {
 	rl := "gh_rate_limit"
 
 	bucketsGR, bucketsGRtf := gTbl(rowsOf(fmt.Sprintf("keepLastValue(%s)", gp(rl, "remaining")),
-		gn(rl, "resource")), "Bucket", []col{{"lastNotNull", "Lowest remaining"}})
+		gn(rl, "resource")), "Bucket", []col{{"lastNotNull", lifetimeLowestRemaining}})
 	bucketsES, bucketsEStf := esTbl(rl, []any{b.tm("resource", 20)},
 		[]any{b.mNewest("limit", "remaining", "used")},
 		[]named{
 			{"resource.keyword", "Bucket"},
 			{"limit", "Limit"},
-			{"remaining", "Lowest remaining"},
-			{"used", "Most used"},
+			{"remaining", lifetimeLowestRemaining},
+			{"used", lifetimeMostUsed},
 		}, nil)
 
 	return []Panel{
-		panel("timeseries", "Rate budget used", 12, 11, 0, 0,
+		panel("timeseries", "Rate budget used", box{W: 12, H: 11, X: 0, Y: 0},
 			[]Target{sqlTS(budget)}, &P{
 				Prom: []Target{promq("github_rate_limit_used_ratio and on (resource) (github_rate_limit_limit > 30)",
 					legend("{{resource}}"))},
@@ -325,17 +334,17 @@ func collectorSection(b *builder) []Panel {
 				ES:     []Target{b.esDaily(rl, b.mMax("used_ratio"), "resource", "5m", nil, "")},
 				ESDesc: "In Elasticsearch each point is the largest reading of its five minutes.",
 			}),
-		panel("table", "Every bucket", 12, 11, 12, 0, []Target{sqlT(tableQ)}, &P{
+		panel("table", "Every bucket", box{W: 12, H: 11, X: 12, Y: 0}, []Target{sqlT(tableQ)}, &P{
 			Prom: []Target{
 				promTbl("max by (resource) (github_rate_limit_limit)", "A"),
 				promTbl("min by (resource) (github_rate_limit_remaining)", "B"),
 				promTbl("max by (resource) (github_rate_limit_used)", "C"),
 			},
 			PromTF: merged(map[string]string{
-				"resource": "Bucket", "Value #A": "Limit",
-				"Value #B": "Lowest remaining", "Value #C": "Most used",
+				"resource": "Bucket", panelValueA: "Limit",
+				panelValueB: lifetimeLowestRemaining, panelValueC: lifetimeMostUsed,
 			}, nil, nil),
-			Opts: Opts{"sort": "Most used"},
+			Opts: Opts{"sort": lifetimeMostUsed},
 			Desc: "Fifteen buckets, and the one that runs out first decides what a sweep " +
 				"can collect. Reading them costs nothing: GET /rate_limit is free.",
 			GR: bucketsGR, GRTF: bucketsGRtf, GRDesc: grSlot,

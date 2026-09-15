@@ -351,71 +351,80 @@ type accountUser struct {
 			AmountInCents int `json:"amountInCents"`
 		} `json:"nodes"`
 	} `json:"lifetimeReceivedSponsorshipValues"`
-	SponsorsListing *struct {
-		Name           string    `json:"name"`
-		IsPublic       bool      `json:"isPublic"`
-		CreatedAt      time.Time `json:"createdAt"`
-		NextPayoutDate string    `json:"nextPayoutDate"`
-		ActiveGoal     *struct {
-			Kind            string `json:"kind"`
-			Title           string `json:"title"`
-			TargetValue     int    `json:"targetValue"`
-			PercentComplete int    `json:"percentComplete"`
-		} `json:"activeGoal"`
-		Tiers struct {
-			TotalCount int `json:"totalCount"`
-			Nodes      []struct {
-				Name      string    `json:"name"`
-				Price     int       `json:"monthlyPriceInCents"`
-				IsOneTime bool      `json:"isOneTime"`
-				CreatedAt time.Time `json:"createdAt"`
-				AdminInfo *struct {
-					IsRetired bool `json:"isRetired"`
-				} `json:"adminInfo"`
-			} `json:"nodes"`
-		} `json:"tiers"`
-	} `json:"sponsorsListing"`
-	SponsorshipsAsSponsor    sponsorships `json:"sponsorshipsAsSponsor"`
-	SponsorshipsAsMaintainer sponsorships `json:"sponsorshipsAsMaintainer"`
+	SponsorsListing          *sponsorsListing `json:"sponsorsListing"`
+	SponsorshipsAsSponsor    sponsorships     `json:"sponsorshipsAsSponsor"`
+	SponsorshipsAsMaintainer sponsorships     `json:"sponsorshipsAsMaintainer"`
 	Lists                    struct {
 		TotalCount int        `json:"totalCount"`
 		Nodes      []starList `json:"nodes"`
 	} `json:"lists"`
-	Contributions struct {
-		Commits      int `json:"totalCommitContributions"`
-		Issues       int `json:"totalIssueContributions"`
-		PullRequests int `json:"totalPullRequestContributions"`
-		Reviews      int `json:"totalPullRequestReviewContributions"`
-		Repositories int `json:"totalRepositoryContributions"`
-		Restricted   int `json:"restrictedContributionsCount"`
-		Calendar     struct {
-			Total int `json:"totalContributions"`
-			Weeks []struct {
-				Days []calendarSquare `json:"contributionDays"`
-			} `json:"weeks"`
-		} `json:"contributionCalendar"`
-		ReposWithCommits int `json:"totalRepositoriesWithContributedCommits"`
-		ReposWithIssues  int `json:"totalRepositoriesWithContributedIssues"`
-		ReposWithPulls   int `json:"totalRepositoriesWithContributedPullRequests"`
-		ReposWithReviews int `json:"totalRepositoriesWithContributedPullRequestReviews"`
+	Contributions contributionsCollection `json:"contributionsCollection"`
+}
 
-		ByRepository        commitContributionRepos `json:"commitContributionsByRepository"`
-		IssuesByRepository  contributionRepos       `json:"issueContributionsByRepository"`
-		PullsByRepository   contributionRepos       `json:"pullRequestContributionsByRepository"`
-		ReviewsByRepository contributionRepos       `json:"pullRequestReviewContributionsByRepository"`
+// sponsorsListing is the sponsors page an account publishes. It is null until
+// somebody opens one, which is not the same fact as a listing nobody sponsors.
+type sponsorsListing struct {
+	Name           string    `json:"name"`
+	IsPublic       bool      `json:"isPublic"`
+	CreatedAt      time.Time `json:"createdAt"`
+	NextPayoutDate string    `json:"nextPayoutDate"`
+	ActiveGoal     *struct {
+		Kind            string `json:"kind"`
+		Title           string `json:"title"`
+		TargetValue     int    `json:"targetValue"`
+		PercentComplete int    `json:"percentComplete"`
+	} `json:"activeGoal"`
+	Tiers struct {
+		TotalCount int `json:"totalCount"`
+		Nodes      []struct {
+			Name      string    `json:"name"`
+			Price     int       `json:"monthlyPriceInCents"`
+			IsOneTime bool      `json:"isOneTime"`
+			CreatedAt time.Time `json:"createdAt"`
+			AdminInfo *struct {
+				IsRetired bool `json:"isRetired"`
+			} `json:"adminInfo"`
+		} `json:"nodes"`
+	} `json:"tiers"`
+}
 
-		RepositoryContributions struct {
-			TotalCount int `json:"totalCount"`
-			Nodes      []struct {
-				OccurredAt time.Time `json:"occurredAt"`
-				Repository struct {
-					NameWithOwner string `json:"nameWithOwner"`
-					IsFork        bool   `json:"isFork"`
-					IsPrivate     bool   `json:"isPrivate"`
-				} `json:"repository"`
-			} `json:"nodes"`
-		} `json:"repositoryContributions"`
-	} `json:"contributionsCollection"`
+// contributionsCollection is the last twelve months as GraphQL totals them:
+// what was done, how many repositories it was done in, and the calendar behind
+// both.
+type contributionsCollection struct {
+	Commits      int `json:"totalCommitContributions"`
+	Issues       int `json:"totalIssueContributions"`
+	PullRequests int `json:"totalPullRequestContributions"`
+	Reviews      int `json:"totalPullRequestReviewContributions"`
+	Repositories int `json:"totalRepositoryContributions"`
+	Restricted   int `json:"restrictedContributionsCount"`
+	Calendar     struct {
+		Total int `json:"totalContributions"`
+		Weeks []struct {
+			Days []calendarSquare `json:"contributionDays"`
+		} `json:"weeks"`
+	} `json:"contributionCalendar"`
+	ReposWithCommits int `json:"totalRepositoriesWithContributedCommits"`
+	ReposWithIssues  int `json:"totalRepositoriesWithContributedIssues"`
+	ReposWithPulls   int `json:"totalRepositoriesWithContributedPullRequests"`
+	ReposWithReviews int `json:"totalRepositoriesWithContributedPullRequestReviews"`
+
+	ByRepository        commitContributionRepos `json:"commitContributionsByRepository"`
+	IssuesByRepository  contributionRepos       `json:"issueContributionsByRepository"`
+	PullsByRepository   contributionRepos       `json:"pullRequestContributionsByRepository"`
+	ReviewsByRepository contributionRepos       `json:"pullRequestReviewContributionsByRepository"`
+
+	RepositoryContributions struct {
+		TotalCount int `json:"totalCount"`
+		Nodes      []struct {
+			OccurredAt time.Time `json:"occurredAt"`
+			Repository struct {
+				NameWithOwner string `json:"nameWithOwner"`
+				IsFork        bool   `json:"isFork"`
+				IsPrivate     bool   `json:"isPrivate"`
+			} `json:"repository"`
+		} `json:"nodes"`
+	} `json:"repositoryContributions"`
 }
 
 func (a Account) Collect(ctx context.Context, c *ghapi.Client, now time.Time) ([]sink.Point, error) {
@@ -591,6 +600,10 @@ func contributionsTotalPoint(u *accountUser, base map[string]string, now time.Ti
 	}
 }
 
+// dayLayout is how GitHub writes a contribution day: a date with no time of
+// day at all, which is also its whole length in calendarDay.
+const dayLayout = "2006-01-02"
+
 // contributionDayPoints is the calendar, one point per day at that day's date.
 //
 // This is the only place the green-squares history exists, and it is why the
@@ -600,7 +613,7 @@ func contributionDayPoints(u *accountUser, base map[string]string) []sink.Point 
 	var points []sink.Point
 	for _, w := range u.Contributions.Calendar.Weeks {
 		for _, d := range w.Days {
-			day, err := time.Parse("2006-01-02", d.Date)
+			day, err := time.Parse(dayLayout, d.Date)
 			if err != nil {
 				continue
 			}
@@ -703,10 +716,10 @@ func commitDayPoints(repos commitContributionRepos, login string) []sink.Point {
 // calendarDay reads the date out of a GraphQL timestamp without parsing the
 // time of day, which for occurredAt is not the day boundary it looks like.
 func calendarDay(ts string) (time.Time, error) {
-	if len(ts) > len("2006-01-02") {
-		ts = ts[:len("2006-01-02")]
+	if len(ts) > len(dayLayout) {
+		ts = ts[:len(dayLayout)]
 	}
-	return time.Parse("2006-01-02", ts)
+	return time.Parse(dayLayout, ts)
 }
 
 // repoCreatedPoints is repositories created, dated when they were created.
@@ -986,6 +999,33 @@ query($login: String!, $from: DateTime!, $to: DateTime!) {
   }
 }`
 
+// yearContributions is one past year of a contributionsCollection, the shape
+// historyQuery asks for: the totals, the calendar, and the per-repository
+// commit breakdown that rides along with them.
+type yearContributions struct {
+	TotalCommit     int `json:"totalCommitContributions"`
+	TotalIssue      int `json:"totalIssueContributions"`
+	TotalPR         int `json:"totalPullRequestContributions"`
+	TotalReview     int `json:"totalPullRequestReviewContributions"`
+	TotalRepository int `json:"totalRepositoryContributions"`
+	Restricted      int `json:"restrictedContributionsCount"`
+	ReposCommits    int `json:"totalRepositoriesWithContributedCommits"`
+	ReposIssues     int `json:"totalRepositoriesWithContributedIssues"`
+	ReposPulls      int `json:"totalRepositoriesWithContributedPullRequests"`
+	ReposReviews    int `json:"totalRepositoriesWithContributedPullRequestReviews"`
+	Calendar        struct {
+		TotalContributions int `json:"totalContributions"`
+		Weeks              []struct {
+			Days []calendarSquare `json:"contributionDays"`
+		} `json:"weeks"`
+	} `json:"contributionCalendar"`
+	// The per-repository daily breakdown of a past year, in the same query,
+	// for the same one point: measured against the live API, 2023 came back
+	// cost 1 with its 32 daily rows summing exactly to
+	// totalCommitContributions.
+	ByRepository commitContributionRepos `json:"commitContributionsByRepository"`
+}
+
 func (h History) Collect(ctx context.Context, c *ghapi.Client, now time.Time) ([]sink.Point, error) {
 	first := h.From
 	if first == 0 {
@@ -1018,29 +1058,7 @@ func (h History) Collect(ctx context.Context, c *ghapi.Client, now time.Time) ([
 		}
 		var res struct {
 			User struct {
-				ContributionsCollection struct {
-					TotalCommit     int `json:"totalCommitContributions"`
-					TotalIssue      int `json:"totalIssueContributions"`
-					TotalPR         int `json:"totalPullRequestContributions"`
-					TotalReview     int `json:"totalPullRequestReviewContributions"`
-					TotalRepository int `json:"totalRepositoryContributions"`
-					Restricted      int `json:"restrictedContributionsCount"`
-					ReposCommits    int `json:"totalRepositoriesWithContributedCommits"`
-					ReposIssues     int `json:"totalRepositoriesWithContributedIssues"`
-					ReposPulls      int `json:"totalRepositoriesWithContributedPullRequests"`
-					ReposReviews    int `json:"totalRepositoriesWithContributedPullRequestReviews"`
-					Calendar        struct {
-						TotalContributions int `json:"totalContributions"`
-						Weeks              []struct {
-							Days []calendarSquare `json:"contributionDays"`
-						} `json:"weeks"`
-					} `json:"contributionCalendar"`
-					// The per-repository daily breakdown of a past year, in
-					// the same query, for the same one point: measured
-					// against the live API, 2023 came back cost 1 with its 32
-					// daily rows summing exactly to totalCommitContributions.
-					ByRepository commitContributionRepos `json:"commitContributionsByRepository"`
-				} `json:"contributionsCollection"`
+				ContributionsCollection yearContributions `json:"contributionsCollection"`
 			} `json:"user"`
 		}
 		vars := map[string]any{
@@ -1054,7 +1072,7 @@ func (h History) Collect(ctx context.Context, c *ghapi.Client, now time.Time) ([
 		points = append(points, commitDayPoints(cc.ByRepository, h.Login)...)
 		for _, w := range cc.Calendar.Weeks {
 			for _, d := range w.Days {
-				day, err := time.Parse("2006-01-02", d.Date)
+				day, err := time.Parse(dayLayout, d.Date)
 				if err != nil {
 					continue
 				}

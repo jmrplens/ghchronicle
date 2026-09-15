@@ -29,7 +29,35 @@ const expanded = "Over the runs whose jobs were expanded, which is the newest ru
 // doubles its run count: the url carries the default branch, so a renamed
 // branch is a second distinct row under the same path in the range.
 const declaredWorkflows = "SELECT repo, path, MAX(url) AS url FROM gh_workflow" +
-	" WHERE $__timeFilter(time) AND " + RF + " GROUP BY 1, 2"
+	ciInRange + RF + " GROUP BY 1, 2"
+
+// ciInRange bounds a query by the dashboard's range and leaves the AND open for
+// the repository filter that follows it everywhere. The inventory and security
+// sections bound their own queries with the same clause, and ciFromRuns is the
+// whole tail for the measurement most of this section reads.
+const (
+	ciInRange  = " WHERE $__timeFilter(time) AND "
+	ciFromRuns = " FROM " + ciRun + ciInRange
+)
+
+// ciOnWorkflowPath is how a run meets its declaration: the run carries the file
+// under `workflow` and declaredWorkflows carries it under `path`.
+const ciOnWorkflowPath = " ON w.repo = r.repo AND w.path = r.workflow"
+
+// What this section calls each of its numbers. The stat, the Prometheus query,
+// the Graphite one and the Elasticsearch frame behind one value all have to
+// spell the name alike, and the thresholds and units below match a field by it.
+const (
+	ciRunCount        = "Workflow runs"
+	ciSuccessRate     = "Success rate"
+	ciUndecidedRuns   = "Undecided runs"
+	ciRunTime         = "Run duration"
+	ciQueueWait       = "Queue wait"
+	ciArtifactStorage = "Artifact storage"
+	ciCacheSize       = "Actions cache"
+	ciTimesRun        = "Times run"
+	ciLiveSize        = "Live size"
+)
 
 // GitHub spells this conclusion the British way and the linter's dictionary
 // is American, so the value is assembled rather than written: a query that
@@ -66,24 +94,24 @@ func runOutcomes(b *builder) []Panel {
 	decided := "conclusion IN ('success', 'failure')"
 	success := "SELECT 100.0 * SUM(CASE WHEN conclusion = 'success' THEN 1 ELSE 0 END)" +
 		" / NULLIF(SUM(CASE WHEN " + decided + " THEN 1 ELSE 0 END), 0) AS value" +
-		" FROM gh_workflow_run WHERE $__timeFilter(time) AND " + RF
+		ciFromRuns + RF
 	undecided := "SELECT COUNT(*) AS value FROM gh_workflow_run WHERE $__timeFilter(time) AND " + RF +
 		" AND conclusion IN ('" + cancelledRun + "', 'skipped')"
 	dur := "SELECT approx_percentile_cont(duration_seconds, 0.5) AS value FROM gh_workflow_run" +
-		" WHERE $__timeFilter(time) AND " + RF
+		ciInRange + RF
 	queue := "SELECT approx_percentile_cont(queued_seconds, 0.5) AS value FROM gh_workflow_job" +
-		" WHERE $__timeFilter(time) AND " + RF
-	perDay := "SELECT " + timeBin + ", conclusion AS series," +
+		ciInRange + RF
+	perDay := flowSelect + timeBin + ", conclusion AS series," +
 		" COUNT(*) AS runs FROM gh_workflow_run WHERE $__timeFilter(time) AND " + RF +
 		" GROUP BY 1, 2 ORDER BY 1"
-	durTS := "SELECT " + timeBin + "," +
+	durTS := flowSelect + timeBin + "," +
 		` approx_percentile_cont(duration_seconds, 0.5) AS "Median",` +
 		` approx_percentile_cont(duration_seconds, 0.95) AS "95th percentile"` +
-		" FROM gh_workflow_run WHERE $__timeFilter(time) AND " + RF + " GROUP BY 1 ORDER BY 1"
-	queueTS := "SELECT " + timeBin + "," +
+		ciFromRuns + RF + " GROUP BY 1 ORDER BY 1"
+	queueTS := flowSelect + timeBin + "," +
 		` approx_percentile_cont(queued_seconds, 0.5) AS "Median queue",` +
 		` MAX(queued_seconds) AS "Worst queue" FROM gh_workflow_job` +
-		" WHERE $__timeFilter(time) AND " + RF + " GROUP BY 1 ORDER BY 1"
+		ciInRange + RF + " GROUP BY 1 ORDER BY 1"
 	// A snapshot per repository: the value of a bucket is its newest row, never
 	// a sum of the sweeps in it. The eight repositories holding the most at
 	// their newest reading are named, the rest are one `other` series, and a
@@ -91,7 +119,7 @@ func runOutcomes(b *builder) []Panel {
 	storage := "SELECT time, CASE WHEN rk <= 8 THEN repo ELSE 'other' END AS series," +
 		" SUM(live_bytes) AS bytes FROM (SELECT time, repo, live_bytes," +
 		" DENSE_RANK() OVER (ORDER BY newest DESC, repo) AS rk FROM (" +
-		"SELECT " + timeBin + ", repo, live_bytes," +
+		flowSelect + timeBin + ", repo, live_bytes," +
 		" ROW_NUMBER() OVER (PARTITION BY $__dateBin(time), repo ORDER BY time DESC) AS rn," +
 		" FIRST_VALUE(live_bytes) OVER (PARTITION BY repo ORDER BY time DESC) AS newest" +
 		" FROM gh_artifact_total WHERE $__timeFilter(time) AND " + RF + ") y WHERE rn = 1) x" +
@@ -104,40 +132,40 @@ func runOutcomes(b *builder) []Panel {
 		// by naming its own thresholds on its own field, since a stat's
 		// colors are otherwise the whole panel's and 88.5% in orange painted
 		// the run count and the queue wait beside it.
-		statGroup("Runs in range", 24, 5, 0, 0, []Target{
-			sqlT(namedValue(runs, "Workflow runs")),
-			{Kind: "sql", Format: "table", Ref: "B", SQL: namedValue(success, "Success rate")},
-			{Kind: "sql", Format: "table", Ref: "C", SQL: namedValue(undecided, "Undecided runs")},
-			{Kind: "sql", Format: "table", Ref: "D", SQL: namedValue(dur, "Run duration")},
-			{Kind: "sql", Format: "table", Ref: "E", SQL: namedValue(queue, "Queue wait")},
+		statGroup("Runs in range", box{W: 24, H: 5, X: 0, Y: 0}, []Target{
+			sqlT(namedValue(runs, ciRunCount)),
+			{Kind: "sql", Format: "table", Ref: "B", SQL: namedValue(success, ciSuccessRate)},
+			{Kind: "sql", Format: "table", Ref: "C", SQL: namedValue(undecided, ciUndecidedRuns)},
+			{Kind: "sql", Format: "table", Ref: "D", SQL: namedValue(dur, ciRunTime)},
+			{Kind: "sql", Format: "table", Ref: "E", SQL: namedValue(queue, ciQueueWait)},
 			{Kind: "sql", Format: "table", Ref: "F", SQL: namedValue(
-				latestSumSQL("gh_artifact_total", "live_bytes"), "Artifact storage",
+				latestSumSQL("gh_artifact_total", "live_bytes"), ciArtifactStorage,
 			)},
 			{Kind: "sql", Format: "table", Ref: "G", SQL: namedValue(
-				latestSumSQL("gh_actions_cache", "size_bytes"), "Actions cache",
+				latestSumSQL("gh_actions_cache", "size_bytes"), ciCacheSize,
 			)},
 		}, &P{
 			Prom: []Target{
-				promNamed("A", "Workflow runs", fmt.Sprintf("sum(increase(%s[$__range]))", promRuns)),
-				promNamed("B", "Success rate", fmt.Sprintf(
+				promNamed("A", ciRunCount, fmt.Sprintf("sum(increase(%s[$__range]))", promRuns)),
+				promNamed("B", ciSuccessRate, fmt.Sprintf(
 					`100 * sum(increase(github_workflow_runs_total{conclusion="success",%s}[$__range]))`+
 						` / sum(increase(github_workflow_runs_total{conclusion=~"success|failure",%s}[$__range]))`,
 					PF, PF,
 				)),
-				promNamed("C", "Undecided runs", fmt.Sprintf(
+				promNamed("C", ciUndecidedRuns, fmt.Sprintf(
 					`sum(increase(github_workflow_runs_total{conclusion=~"%s|skipped",%s}[$__range]))`,
 					cancelledRun, PF,
 				)),
-				promNamed("D", "Run duration", fmt.Sprintf(
+				promNamed("D", ciRunTime, fmt.Sprintf(
 					"avg(github_workflow_runs_duration_seconds_mean{%s})", PF,
 				)),
-				promNamed("E", "Queue wait", fmt.Sprintf(
+				promNamed("E", ciQueueWait, fmt.Sprintf(
 					"avg(github_workflow_jobs_queued_seconds_mean{%s})", PF,
 				)),
-				promNamed("F", "Artifact storage", fmt.Sprintf(
+				promNamed("F", ciArtifactStorage, fmt.Sprintf(
 					"sum(github_artifact_total_live_bytes{%s})", PF,
 				)),
-				promNamed("G", "Actions cache", fmt.Sprintf(
+				promNamed("G", ciCacheSize, fmt.Sprintf(
 					"sum(github_actions_cache_size_bytes{%s})", PF,
 				)),
 			},
@@ -151,17 +179,17 @@ func runOutcomes(b *builder) []Panel {
 				"duration. " + expanded + " Last come the bytes the runs left behind.",
 			PromDesc: sinceStart + " " + lastSweep,
 			GR: []Target{
-				grNamed("A", "Workflow runs", total(countOf(runSeconds))),
-				grNamed("B", "Success rate", fmt.Sprintf("asPercent(%s, %s)",
+				grNamed("A", ciRunCount, total(countOf(runSeconds))),
+				grNamed("B", ciSuccessRate, fmt.Sprintf("asPercent(%s, %s)",
 					total(countOf(rp(ciRun, "duration_seconds", "conclusion", "success"))),
 					total(countOf(rp(ciRun, "duration_seconds", "conclusion", "{success,failure}"))))),
-				grNamed("C", "Undecided runs", total(countOf(
+				grNamed("C", ciUndecidedRuns, total(countOf(
 					rp(ciRun, "duration_seconds", "conclusion", "{"+cancelledRun+",skipped}"),
 				))),
-				grNamed("D", "Run duration", medianTotal(runSeconds)),
-				grNamed("E", "Queue wait", medianTotal(jobQueued)),
-				grNamed("F", "Artifact storage", latestSum(artifactBytes)),
-				grNamed("G", "Actions cache", latestSum(rp("gh_actions_cache", "size_bytes"))),
+				grNamed("D", ciRunTime, medianTotal(runSeconds)),
+				grNamed("E", ciQueueWait, medianTotal(jobQueued)),
+				grNamed("F", ciArtifactStorage, latestSum(artifactBytes)),
+				grNamed("G", ciCacheSize, latestSum(rp("gh_actions_cache", "size_bytes"))),
 			},
 			GRDesc: grSlot,
 			ES: func() []Target {
@@ -176,11 +204,11 @@ func runOutcomes(b *builder) []Panel {
 				return append(out, esRefs("G", b.esLatestSum("gh_actions_cache", "size_bytes"))...)
 			}(),
 			ESOver: []any{
-				frameName("A", "Workflow runs"), frameName("B", "Success rate"),
-				frameName("C", "Undecided runs"), frameName("D", "Run duration"),
-				frameName("E", "Queue wait"), frameName("F", "Artifact storage"),
-				frameName("G", "Actions cache"),
-				fieldThresholds("Success rate", "percentunit", fractionOf(rateThresholds)),
+				frameName("A", ciRunCount), frameName("B", ciSuccessRate),
+				frameName("C", ciUndecidedRuns), frameName("D", ciRunTime),
+				frameName("E", ciQueueWait), frameName("F", ciArtifactStorage),
+				frameName("G", ciCacheSize),
+				fieldThresholds(ciSuccessRate, "percentunit", fractionOf(rateThresholds)),
 			},
 			// The two byte totals are a sum over the newest reading of each
 			// series, and the five before them are single values a sum leaves
@@ -190,12 +218,12 @@ func runOutcomes(b *builder) []Panel {
 				"field over those runs, as a fraction.",
 			Opts: Opts{"thresholds": plainSteps},
 			Overrides: []any{
-				fieldThresholds("Success rate", "percent", rateThresholds),
-				unitOf("Run duration", "s", 0), unitOf("Queue wait", "s", 0),
-				unitOf("Artifact storage", "bytes", 0), unitOf("Actions cache", "bytes", 0),
+				fieldThresholds(ciSuccessRate, "percent", rateThresholds),
+				unitOf(ciRunTime, "s", 0), unitOf(ciQueueWait, "s", 0),
+				unitOf(ciArtifactStorage, "bytes", 0), unitOf(ciCacheSize, "bytes", 0),
 			},
 		}),
-		panel("timeseries", "Runs by outcome over time", 12, 8, 0, 5, []Target{sqlTS(perDay)}, &P{
+		panel("timeseries", "Runs by outcome over time", box{W: 12, H: 8, X: 0, Y: 5}, []Target{sqlTS(perDay)}, &P{
 			Prom:     []Target{daily(fmt.Sprintf("sum by (conclusion) (increase(%s[1d]))", promRuns), "{{conclusion}}")},
 			PromDesc: sinceStart,
 			Opts:     mergeOpts(Opts{"bars": true, "stack": true}, dayBins),
@@ -210,7 +238,7 @@ func runOutcomes(b *builder) []Panel {
 			ES:   []Target{b.esDaily(ciRun, b.mCount(), "conclusion", "", []string{ESF}, "")},
 			Desc: bucketFollowsRange,
 		}),
-		panel("timeseries", "Run duration over time", 12, 8, 12, 5, []Target{sqlTS(durTS)}, &P{
+		panel("timeseries", "Run duration over time", box{W: 12, H: 8, X: 12, Y: 5}, []Target{sqlTS(durTS)}, &P{
 			Prom: []Target{promq(fmt.Sprintf("avg(github_workflow_runs_duration_seconds_mean{%s})", PF),
 				legend("Mean of the sweep"))},
 			Opts:     mergeOpts(Opts{"unit": "s"}, dayBins),
@@ -223,7 +251,7 @@ func runOutcomes(b *builder) []Panel {
 			ES:     []Target{esq(ciRun, []any{b.mPct("duration_seconds", 50, 95)}, []any{b.dh()}, "A", []string{ESF}, "")},
 			Desc:   bucketFollowsRange,
 		}),
-		panel("timeseries", "Queue wait over time", 12, 8, 0, 13, []Target{sqlTS(queueTS)}, &P{
+		panel("timeseries", "Queue wait over time", box{W: 12, H: 8, X: 0, Y: 13}, []Target{sqlTS(queueTS)}, &P{
 			Prom: []Target{
 				promq(fmt.Sprintf("avg(github_workflow_jobs_queued_seconds_mean{%s})", PF),
 					withRef("A"), legend("Mean queue")),
@@ -243,7 +271,7 @@ func runOutcomes(b *builder) []Panel {
 				esq(ciJob, []any{b.mMax("queued_seconds")}, []any{b.dh("1h")}, "B", []string{ESF}, "Worst queue"),
 			},
 		}),
-		panel("timeseries", "Artifact storage over time", 12, 8, 12, 13, []Target{sqlTS(storage)}, &P{
+		panel("timeseries", "Artifact storage over time", box{W: 12, H: 8, X: 12, Y: 13}, []Target{sqlTS(storage)}, &P{
 			Prom: []Target{promq(fmt.Sprintf("sum by (repo) (github_artifact_total_live_bytes{%s}) > 0", PF),
 				legend("{{repo}}"))},
 			Opts:    mergeOpts(Opts{"unit": "bytes"}, hourBins),
@@ -275,17 +303,17 @@ func whereTheTimeGoes(b *builder) []Panel {
 		` SUM(CASE WHEN conclusion <> 'success' THEN 1 ELSE 0 END) AS "Not successful",` +
 		` approx_percentile_cont(duration_seconds, 0.5) AS "Duration", MAX(w.url) AS "Link"` +
 		" FROM gh_workflow_run r LEFT JOIN (" + declaredWorkflows + ") w" +
-		" ON w.repo = r.repo AND w.path = r.workflow" +
+		ciOnWorkflowPath +
 		" WHERE $__timeFilter(time) AND r." + RF +
 		" GROUP BY 1, 3 ORDER BY 2 DESC LIMIT 30"
 	jobs := `SELECT job_name AS "Job", approx_percentile_cont(duration_seconds, 0.5) AS "Duration",` +
 		` repo AS "Repository", COUNT(*) AS "Times run",` +
 		` MAX(duration_seconds) AS "Worst" FROM gh_workflow_job` +
-		" WHERE $__timeFilter(time) AND " + RF + " GROUP BY 1, 3 ORDER BY 2 DESC LIMIT 30"
+		ciInRange + RF + " GROUP BY 1, 3 ORDER BY 2 DESC LIMIT 30"
 	steps := `SELECT step AS "Step", approx_percentile_cont(duration_seconds, 0.5) AS "Duration",` +
 		` job_name AS "Job", repo AS "Repository", COUNT(*) AS "Times run",` +
 		` MAX(duration_seconds) AS "Worst" FROM gh_workflow_step` +
-		" WHERE $__timeFilter(time) AND " + RF + " GROUP BY 1, 3, 4" +
+		ciInRange + RF + " GROUP BY 1, 3, 4" +
 		" ORDER BY 2 DESC LIMIT 30"
 	// HAVING drops repositories with no live artifacts: a series pinned at
 	// zero is a legend entry and nothing else.
@@ -297,21 +325,21 @@ func whereTheTimeGoes(b *builder) []Panel {
 		[]any{b.mCount(), b.mAvg("success"), b.mPct("duration_seconds", 50)},
 		[]named{
 			{"workflow.keyword", "Workflow"},
-			{"repo.keyword", "Repository"},
+			{inventoryRepoTerm, "Repository"},
 			{"n", "Runs"},
-			{"s", "Success rate"},
+			{"s", ciSuccessRate},
 			{"d", "Duration"},
 		}, []string{ESF})
 
 	jobsGR, jobsGRtf := gTbl(fmt.Sprintf(`limit(sortBy(groupByNodes(%s, "avg", %d, %d), "median", true), 30)`,
 		jobSeconds, gn(ciJob, "job_name"), gn(ciJob, "repo")), "Job",
-		[]col{{"count", "Times run"}, {"median", "Duration"}, {"max", "Worst"}})
+		[]col{{"count", ciTimesRun}, {"median", "Duration"}, {"max", "Worst"}})
 	jobsES, jobsEStf := esTbl(ciJob, []any{b.tm("job_name", 30), b.tm("repo", 50)},
 		[]any{b.mCount(), b.mPct("duration_seconds", 50), b.mMax("duration_seconds")},
 		[]named{
 			{"job_name.keyword", "Job"},
-			{"repo.keyword", "Repository"},
-			{"n", "Times run"},
+			{inventoryRepoTerm, "Repository"},
+			{"n", ciTimesRun},
 			{"d", "Duration"},
 			{"w", "Worst"},
 		}, []string{ESF})
@@ -320,19 +348,19 @@ func whereTheTimeGoes(b *builder) []Panel {
 		`limit(sortBy(groupByNodes(%s, "avg", %d, %d, %d), "median", true), 30)`,
 		stepSeconds, gn(ciStep, "step"), gn(ciStep, "job_name"), gn(ciStep, "repo"),
 	), "Step",
-		[]col{{"count", "Times run"}, {"median", "Duration"}, {"max", "Worst"}})
+		[]col{{"count", ciTimesRun}, {"median", "Duration"}, {"max", "Worst"}})
 	stepsES, stepsEStf := esTbl(ciStep, []any{b.tm("step", 30), b.tm("job_name", 50), b.tm("repo", 50)},
 		[]any{b.mCount(), b.mPct("duration_seconds", 50), b.mMax("duration_seconds")},
 		[]named{
 			{"step.keyword", "Step"},
 			{"job_name.keyword", "Job"},
-			{"repo.keyword", "Repository"},
-			{"n", "Times run"},
+			{inventoryRepoTerm, "Repository"},
+			{"n", ciTimesRun},
 			{"d", "Duration"},
 			{"w", "Worst"},
 		}, []string{ESF})
 	return []Panel{
-		panel("table", "Workflows", 12, 9, 0, 21, []Target{sqlT(byWF)}, &P{
+		panel("table", "Workflows", box{W: 12, H: 9, X: 0, Y: 21}, []Target{sqlT(byWF)}, &P{
 			Prom: func() []Target {
 				rank := fmt.Sprintf("sum by (repo, workflow) (increase(%s[$__range]))", promRuns)
 				return []Target{
@@ -348,8 +376,8 @@ func whereTheTimeGoes(b *builder) []Panel {
 				}
 			}(),
 			PromTF: merged(map[string]string{
-				"workflow": "Workflow", "repo": "Repository", "Value #A": "Runs",
-				"Value #B": "Not successful", "Value #C": "Duration",
+				"workflow": "Workflow", "repo": "Repository", inventoryValueCol + "A": "Runs",
+				inventoryValueCol + "B": "Not successful", inventoryValueCol + "C": "Duration",
 			}, nil, map[string]int{"workflow": 0, "repo": 1}),
 			Opts:     Opts{"sort": "Runs"},
 			PromDesc: sinceStart + " " + lastSweep,
@@ -362,9 +390,9 @@ func whereTheTimeGoes(b *builder) []Panel {
 			GRDesc: "Graphite names each row workflow and repository from the path; the failures are in the chart above. " + grRows,
 			ES:     wfES, ESTF: wfEStf,
 			ESDesc: "In Elasticsearch the failures are a success rate, the mean of the boolean `success` field.",
-			ESOver: []any{unitOf("Success rate", "percentunit", 110)},
+			ESOver: []any{unitOf(ciSuccessRate, "percentunit", 110)},
 		}),
-		panel("table", "Slowest jobs", 12, 9, 12, 21, []Target{sqlT(jobs)}, &P{
+		panel("table", "Slowest jobs", box{W: 12, H: 9, X: 12, Y: 21}, []Target{sqlT(jobs)}, &P{
 			Prom: func() []Target {
 				rank := fmt.Sprintf("avg by (repo, job_name) (github_workflow_jobs_duration_seconds_mean{%s})", PF)
 				return []Target{
@@ -376,21 +404,21 @@ func whereTheTimeGoes(b *builder) []Panel {
 				}
 			}(),
 			PromTF: merged(map[string]string{
-				"job_name": "Job", "repo": "Repository", "Value #A": "Duration",
-				"Value #B": "Times run",
+				"job_name": "Job", "repo": "Repository", inventoryValueCol + "A": "Duration",
+				inventoryValueCol + "B": ciTimesRun,
 			}, nil, map[string]int{"job_name": 0, "repo": 1}),
 			Opts:     Opts{"sort": "Duration"},
 			Desc:     expanded,
 			PromDesc: lastSweep + " " + sweepCount,
 			Overrides: []any{
-				repoColumn(), width("Times run", 90),
+				repoColumn(), width(ciTimesRun, 90),
 				unitOf("Duration", "s", 100), unitOf("Worst", "s", 90),
 			},
 			GR: jobsGR, GRTF: jobsGRtf,
 			GRDesc: "Graphite names each row job and repository from the path. " + grSlot,
 			ES:     jobsES, ESTF: jobsEStf,
 		}),
-		panel("table", "Slowest steps", 24, 8, 0, 30, []Target{sqlT(steps)}, &P{
+		panel("table", "Slowest steps", box{W: 24, H: 8, X: 0, Y: 30}, []Target{sqlT(steps)}, &P{
 			PromNote: cannot("the thirty slowest steps by median duration, with the job and "+
 				"repository each belongs to and its worst time.",
 				"The exporter skips `gh_workflow_step`: per-step timings are a "+
@@ -402,7 +430,7 @@ func whereTheTimeGoes(b *builder) []Panel {
 			// seven hundred pixels of a full-width panel and left the rest blank.
 			Overrides: []any{
 				width("Job", 220), repoColumn(),
-				width("Times run", 90), unitOf("Duration", "s", 90), unitOf("Worst", "s", 90),
+				width(ciTimesRun, 90), unitOf("Duration", "s", 90), unitOf("Worst", "s", 90),
 			},
 			GR: stepsGR, GRTF: stepsGRtf,
 			GRDesc: "Graphite names each row step, job and repository from the path. " + grSlot,
@@ -419,7 +447,7 @@ func whatKeepsFailing(b *builder) []Panel {
 		rp(ciRun, "duration_seconds"), gn(ciRun, "repo")), "Repository", []col{{"sum", "Total"}})
 	wastedES, wastedEStf := esTbl(ciRun, []any{b.tm("repo", 50)},
 		[]any{b.mSum("duration_seconds"), b.mAvg("success")},
-		[]named{{"repo.keyword", "Repository"}, {"t", "Total"}, {"s", "Success rate"}},
+		[]named{{inventoryRepoTerm, "Repository"}, {"t", "Total"}, {"s", ciSuccessRate}},
 		[]string{ESF})
 
 	failingGR, failingGRtf := gTbl(fmt.Sprintf(
@@ -430,10 +458,10 @@ func whatKeepsFailing(b *builder) []Panel {
 	failingES, failingEStf := esTbl(ciRun, []any{b.tm("repo", 50), b.tm("workflow", 30)},
 		[]any{b.mCount(), b.mAvg("success")},
 		[]named{
-			{"repo.keyword", "Repository"},
+			{inventoryRepoTerm, "Repository"},
 			{"workflow.keyword", "Workflow"},
 			{"n", "Runs"},
-			{"s", "Success rate"},
+			{"s", ciSuccessRate},
 		}, []string{ESF})
 
 	failStepsGR, failStepsGRtf := gTbl(fmt.Sprintf(
@@ -443,17 +471,17 @@ func whatKeepsFailing(b *builder) []Panel {
 	), "Step, repository", []col{{"sum", "Failures"}})
 	failStepsES, failStepsEStf := esTbl(ciStep, []any{b.tm("step", 20), b.tm("repo", 50)},
 		[]any{b.mCount()},
-		[]named{{"step.keyword", "Step"}, {"repo.keyword", "Repository"}, {"n", "Failures"}},
+		[]named{{"step.keyword", "Step"}, {inventoryRepoTerm, "Repository"}, {"n", "Failures"}},
 		[]string{ESF, "conclusion:failure"})
 
 	return []Panel{
-		panel("table", "Minutes spent on failed runs", 12, 8, 0, 38, []Target{sqlT(
+		panel("table", "Minutes spent on failed runs", box{W: 12, H: 8, X: 0, Y: 38}, []Target{sqlT(
 			`SELECT repo AS "Repository",` +
 				` SUM(CASE WHEN conclusion <> 'success' THEN duration_seconds ELSE 0 END) AS "Wasted",` +
 				` SUM(duration_seconds) AS "Total",` +
 				` 100.0 * SUM(CASE WHEN conclusion <> 'success' THEN duration_seconds ELSE 0 END)` +
 				` / NULLIF(SUM(duration_seconds), 0) AS "Share"` +
-				" FROM gh_workflow_run WHERE $__timeFilter(time) AND " + RF +
+				ciFromRuns + RF +
 				" GROUP BY 1 ORDER BY 2 DESC",
 		)}, &P{
 			Prom: []Target{
@@ -461,7 +489,7 @@ func whatKeepsFailing(b *builder) []Panel {
 				promTbl(fmt.Sprintf(`sum by (repo) (increase(github_workflow_runs_total{%s}[$__range])) * on (repo) group_left avg by (repo) (github_workflow_runs_duration_seconds_mean{%s})`, PF, PF), "B"),
 			},
 			PromTF: merged(map[string]string{
-				"repo": "Repository", "Value #A": "Wasted", "Value #B": "Total",
+				"repo": "Repository", inventoryValueCol + "A": "Wasted", inventoryValueCol + "B": "Total",
 			}, nil, nil),
 			Opts: Opts{"sort": "Wasted"},
 			Desc: "Minutes that produced nothing. On the account this was written against, one " +
@@ -477,16 +505,16 @@ func whatKeepsFailing(b *builder) []Panel {
 				"time rather than the wasted part. " + grRows,
 			ES: wastedES, ESTF: wastedEStf,
 			ESDesc: "In Elasticsearch the wasted share is the complement of the success rate.",
-			ESOver: []any{unitOf("Success rate", "percentunit", 120)},
+			ESOver: []any{unitOf(ciSuccessRate, "percentunit", 120)},
 		}),
-		panel("table", "Workflows that keep failing", 12, 8, 12, 38, []Target{sqlT(
+		panel("table", "Workflows that keep failing", box{W: 12, H: 8, X: 12, Y: 38}, []Target{sqlT(
 			`SELECT r.repo AS "Repository",` +
 				` SUM(CASE WHEN conclusion <> 'success' THEN 1 ELSE 0 END) AS "Failures",` +
 				` workflow AS "Workflow", COUNT(*) AS "Runs",` +
 				` 100.0 * SUM(CASE WHEN conclusion <> 'success' THEN 1 ELSE 0 END)` +
 				` / COUNT(*) AS "Failure rate", MAX(w.url) AS "Link"` +
 				" FROM gh_workflow_run r LEFT JOIN (" + declaredWorkflows + ") w" +
-				" ON w.repo = r.repo AND w.path = r.workflow" +
+				ciOnWorkflowPath +
 				" WHERE $__timeFilter(time) AND r." + RF +
 				" GROUP BY 1, 3 HAVING SUM(CASE WHEN conclusion <> 'success' THEN 1 ELSE 0 END) > 3" +
 				" ORDER BY 5 DESC, 2 DESC LIMIT 20",
@@ -505,7 +533,7 @@ func whatKeepsFailing(b *builder) []Panel {
 			}(),
 			PromTF: merged(map[string]string{
 				"repo": "Repository", "workflow": "Workflow",
-				"Value #A": "Failures", "Value #B": "Runs",
+				inventoryValueCol + "A": "Failures", inventoryValueCol + "B": "Runs",
 			}, nil, map[string]int{"repo": 0, "workflow": 1}),
 			Opts: Opts{"sort": "Failures"},
 			Desc: "Not the ones that fail sometimes: the ones nobody has switched off. Two " +
@@ -517,9 +545,9 @@ func whatKeepsFailing(b *builder) []Panel {
 			},
 			GR: failingGR, GRTF: failingGRtf, GRDesc: grSlot,
 			ES: failingES, ESTF: failingEStf,
-			ESOver: []any{unitOf("Success rate", "percentunit", 120)},
+			ESOver: []any{unitOf(ciSuccessRate, "percentunit", 120)},
 		}),
-		panel("table", "Steps that fail", 12, 8, 0, 46, []Target{sqlT(
+		panel("table", "Steps that fail", box{W: 12, H: 8, X: 0, Y: 46}, []Target{sqlT(
 			`SELECT step AS "Step", COUNT(*) AS "Failures", repo AS "Repository"` +
 				" FROM gh_workflow_step WHERE $__timeFilter(time) AND " + RF +
 				" AND conclusion = 'failure' GROUP BY 1, 3 ORDER BY 2 DESC LIMIT 20",
@@ -543,14 +571,14 @@ func whatKeepsFailing(b *builder) []Panel {
 		// Joining name to path matched nothing, and a LEFT JOIN that matches
 		// nothing reports every workflow in the account as never run, which
 		// looks like data rather than like a broken query.
-		panel("table", "Workflows that never ran", 12, 8, 12, 46, []Target{sqlT(
+		panel("table", "Workflows that never ran", box{W: 12, H: 8, X: 12, Y: 46}, []Target{sqlT(
 			`SELECT w.repo AS "Repository", w.workflow AS "Workflow",` +
 				` w.state AS "State", w.url AS "Link" FROM (` +
 				"SELECT DISTINCT repo, workflow, path, state, url FROM gh_workflow" +
-				" WHERE $__timeFilter(time) AND " + RF + ") w" +
+				ciInRange + RF + ") w" +
 				" LEFT JOIN (SELECT DISTINCT repo, workflow FROM gh_workflow_run" +
-				" WHERE $__timeFilter(time) AND " + RF + ") r" +
-				" ON w.repo = r.repo AND w.path = r.workflow" +
+				ciInRange + RF + ") r" +
+				ciOnWorkflowPath +
 				" WHERE r.workflow IS NULL ORDER BY 1, 2",
 		)}, &P{
 			PromNote: cannot("the workflows that are declared in a repository and did not run "+
@@ -586,18 +614,18 @@ func whatKeepsFailing(b *builder) []Panel {
 func artifactStorage(b *builder) []Panel {
 	walkedGR, walkedGRtf := gTbl(rowsOf(fmt.Sprintf("keepLastValue(%s)",
 		rp("gh_artifact_total", "live_bytes")), gn("gh_artifact_total", "repo")),
-		"Repository", []col{{"lastNotNull", "Live size"}})
+		"Repository", []col{{"lastNotNull", ciLiveSize}})
 	walkedES, walkedEStf := esTbl("gh_artifact_total", []any{b.tm("repo", 50)},
 		[]any{b.mNewest("count", "walked", "live_bytes")},
 		[]named{
-			{"repo.keyword", "Repository"},
+			{inventoryRepoTerm, "Repository"},
 			{"count", "Declared"},
 			{"walked", "Walked"},
-			{"live_bytes", "Live size"},
+			{"live_bytes", ciLiveSize},
 		}, []string{ESF})
 
 	return []Panel{
-		panel("timeseries", "Artifacts created over time", 12, 8, 0, 54, []Target{sqlTS(
+		panel("timeseries", "Artifacts created over time", box{W: 12, H: 8, X: 0, Y: 54}, []Target{sqlTS(
 			topSeries("gh_artifact", "repo", "size_bytes", "bytes", RF),
 		)}, &P{
 			Opts:    mergeOpts(Opts{"bars": true, "stack": true, "unit": "bytes"}, dayBins),
@@ -613,7 +641,7 @@ func artifactStorage(b *builder) []Panel {
 			GR: []Target{grq(perBucket(rp("gh_artifact", "size_bytes"), gn("gh_artifact", "repo")))},
 			ES: []Target{b.esDaily("gh_artifact", b.mSum("size_bytes"), "repo", "", []string{ESF}, "")},
 		}),
-		panel("table", "Artifact storage counted", 12, 8, 12, 54,
+		panel("table", "Artifact storage counted", box{W: 12, H: 8, X: 12, Y: 54},
 			[]Target{sqlT(`SELECT repo AS "Repository", MAX(count) AS "Declared",` +
 				` MAX(walked) AS "Walked", MAX(live_bytes) AS "Live size"` +
 				" FROM gh_artifact_total WHERE $__timeFilter(time) AND " + RF +
@@ -624,8 +652,8 @@ func artifactStorage(b *builder) []Panel {
 					promTbl(fmt.Sprintf("max by (repo) (github_artifact_total_live_bytes{%s})", PF), "C"),
 				},
 				PromTF: merged(map[string]string{
-					"repo": "Repository", "Value #A": "Declared", "Value #B": "Walked",
-					"Value #C": "Live size",
+					"repo": "Repository", inventoryValueCol + "A": "Declared", inventoryValueCol + "B": "Walked",
+					inventoryValueCol + "C": ciLiveSize,
 				}, nil, nil),
 				Opts: Opts{"sort": "Declared"},
 				Desc: "Artifact storage, and how much of it was counted. When Walked is lower " +
@@ -633,7 +661,7 @@ func artifactStorage(b *builder) []Panel {
 					"stopped at the page cap. Here it is short by a factor of fifty six, and " +
 					"without this column the tile above would say so nowhere.",
 				Overrides: []any{
-					unitOf("Live size", "bytes", 120), width("Declared", 110),
+					unitOf(ciLiveSize, "bytes", 120), width("Declared", 110),
 					width("Walked", 100),
 				},
 				GR: walkedGR, GRTF: walkedGRtf, GRDesc: grSlot,

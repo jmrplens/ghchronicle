@@ -230,7 +230,7 @@ func TestLokiFlagSwapsTheNoteForTheLines(t *testing.T) {
 			if status != 0 {
 				t.Fatalf("status %d, stderr %q", status, stderr)
 			}
-			if said := strings.Contains(stdout, "reads Loki datasource loki-uid"); said != tc.said {
+			if strings.Contains(stdout, "reads Loki datasource loki-uid") != tc.said {
 				t.Errorf("stdout = %q, want the Loki datasource named: %v", stdout, tc.said)
 			}
 			dashboard, _ := g.bodies[0]["dashboard"].(map[string]any)

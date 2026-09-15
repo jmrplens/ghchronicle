@@ -163,7 +163,10 @@ func (l *Ledger) Len() int {
 // the observation would be lost until its values changed again.
 func (l *Ledger) Reserve(sink string, points []Point) (keep []Point, commit func()) {
 	if l == nil {
-		return points, func() {}
+		return points, func() {
+			// Nothing was remembered, so there is nothing to record. The
+			// commit exists so a caller with no ledger need not branch.
+		}
 	}
 	day := dayNumber(time.Now())
 	type change struct {

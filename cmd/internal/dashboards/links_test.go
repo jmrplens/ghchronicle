@@ -268,7 +268,7 @@ func TestOwnerOnlyPagesSaySo(t *testing.T) {
 		}
 		for _, l := range rowLinkTitles(p) {
 			checked++
-			if says := strings.HasSuffix(l, ownerNote); says != owner {
+			if strings.HasSuffix(l, ownerNote) != owner {
 				t.Errorf("%q links %q and its url comes from an owner-only page: %v", title, l, owner)
 			}
 		}
@@ -277,7 +277,7 @@ func TestOwnerOnlyPagesSaySo(t *testing.T) {
 			url, _ := link["url"].(string)
 			name, _ := link["title"].(string)
 			checked++
-			if says := strings.HasSuffix(name, ownerNote); says != strings.Contains(url, "/settings/") {
+			if strings.HasSuffix(name, ownerNote) != strings.Contains(url, "/settings/") {
 				t.Errorf("%q carries the panel link %q to %s", title, name, url)
 			}
 		}

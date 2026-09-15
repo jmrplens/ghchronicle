@@ -257,6 +257,10 @@ var (
 	achievementDialog = regexp.MustCompile(`<details-dialog\s[^>]*src="/users/([^/"]+)/achievements/([^/"]+)/detail"`)
 )
 
+// badgeReason opens every MarkupError raised while reading one card, so the
+// failure names the badge whose markup moved rather than the page as a whole.
+const badgeReason = "badge "
+
 // parseAchievements reads the earned badges out of the page, or says how the
 // page differs from the one it expects.
 func parseAchievements(page, login string) ([]achievement, error) {
@@ -278,7 +282,7 @@ func parseAchievements(page, login string) ([]achievement, error) {
 			return nil, &MarkupError{Reason: "a card with an empty slug"}
 		}
 		if seen[slug] {
-			return nil, &MarkupError{Reason: "badge " + slug + " listed twice"}
+			return nil, &MarkupError{Reason: badgeReason + slug + " listed twice"}
 		}
 		seen[slug] = true
 		one, err := parseAchievementCard(slug, body, login)
@@ -294,7 +298,7 @@ func parseAchievements(page, login string) ([]achievement, error) {
 func parseAchievementCard(slug, body, login string) (achievement, error) {
 	badge := achievementBadge.FindStringSubmatch(body)
 	if badge == nil {
-		return achievement{}, &MarkupError{Reason: "badge " + slug + ": no badge image with a tier in its name"}
+		return achievement{}, &MarkupError{Reason: badgeReason + slug + ": no badge image with a tier in its name"}
 	}
 	image, tierName := badge[1], badge[3]
 	if badge[2] != slug {
@@ -303,14 +307,14 @@ func parseAchievementCard(slug, body, login string) (achievement, error) {
 	name := html.UnescapeString(badge[4])
 	heading := achievementName.FindStringSubmatch(body)
 	if len(heading) < 2 || html.UnescapeString(strings.TrimSpace(heading[1])) != name {
-		return achievement{}, &MarkupError{Reason: "badge " + slug + ": no heading, or one that disagrees with the image"}
+		return achievement{}, &MarkupError{Reason: badgeReason + slug + ": no heading, or one that disagrees with the image"}
 	}
 	dialog := achievementDialog.FindStringSubmatch(body)
 	// The login is compared case-insensitively: GitHub renders its own
 	// spelling of it, and the configured one need not match it letter for
 	// letter for the same account.
 	if len(dialog) < 3 || !strings.EqualFold(dialog[1], login) || dialog[2] != slug {
-		return achievement{}, &MarkupError{Reason: "badge " + slug + ": no detail dialog for this login and slug"}
+		return achievement{}, &MarkupError{Reason: badgeReason + slug + ": no detail dialog for this login and slug"}
 	}
 	out := achievement{Slug: slug, Name: name, Tier: 1, TierName: tierName, Image: image}
 	label := achievementLabel.FindStringSubmatch(body)
@@ -318,13 +322,13 @@ func parseAchievementCard(slug, body, login string) (achievement, error) {
 	case label == nil && tierName == "default":
 		// No label is the first tier, and the image agrees.
 	case label == nil:
-		return achievement{}, &MarkupError{Reason: "badge " + slug + ": a " + tierName + " image with no tier label"}
+		return achievement{}, &MarkupError{Reason: badgeReason + slug + ": a " + tierName + " image with no tier label"}
 	case label[1] != tierName:
 		return achievement{}, &MarkupError{Reason: fmt.Sprintf("badge %s: label says %s, image says %s", slug, label[1], tierName)}
 	default:
 		n, err := strconv.Atoi(label[2])
 		if err != nil || n < 2 {
-			return achievement{}, &MarkupError{Reason: "badge " + slug + ": tier label x" + label[2]}
+			return achievement{}, &MarkupError{Reason: badgeReason + slug + ": tier label x" + label[2]}
 		}
 		out.Tier = n
 	}

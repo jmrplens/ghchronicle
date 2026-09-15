@@ -62,7 +62,7 @@ func releases(b *builder) []Panel {
 		// One group in the column beside the chart, not two tiles with the
 		// chart between them: on a phone, which stacks by position, the
 		// second number arrived after the chart that explains it.
-		statGroup("Downloads", 6, 8, 0, 0, []Target{
+		statGroup("Downloads", box{W: 6, H: 8, X: 0, Y: 0}, []Target{
 			sqlT(namedValue(totalSQL, "Total")),
 			{Kind: "sql", Format: "table", Ref: "B", SQL: namedValue(countSQL, "Releases")},
 		}, &P{
@@ -93,7 +93,7 @@ func releases(b *builder) []Panel {
 			ESDesc: "In Elasticsearch the second counts distinct tags, downloaded or not: a " +
 				"cardinality cannot be filtered on the newest value.",
 		}),
-		panel("barchart", "Downloads by release", 18, 8, 6, 0, []Target{sqlT(byTag)}, &P{
+		panel("barchart", "Downloads by release", box{W: 18, H: 8, X: 6, Y: 0}, []Target{sqlT(byTag)}, &P{
 			Prom: []Target{promTbl(fmt.Sprintf(
 				`label_join(topk(12, sum by (repo, tag) (github_release_downloads{%s}) > 0),`+
 					` "release", " ", "repo", "tag")`, PF,
@@ -106,7 +106,7 @@ func releases(b *builder) []Panel {
 			ES: byTagES, ESTF: byTagEStf,
 			ESDesc: "In Elasticsearch the bars are named by tag; the repository is the next column.",
 		}),
-		panel("table", "Release assets", 24, 9, 0, 8, []Target{sqlT(assets)}, &P{
+		panel("table", "Release assets", box{W: 24, H: 9, X: 0, Y: 8}, []Target{sqlT(assets)}, &P{
 			PromNote: cannot("every release asset with its download count and size, forty "+
 				"at a time by downloads.",
 				"The exporter skips `gh_release_asset`: one series per file ever "+
@@ -123,7 +123,7 @@ func releases(b *builder) []Panel {
 			GRDesc: "Graphite names each row repository, tag and asset from the path. " + grRows,
 			ES:     assetsES, ESTF: assetsEStf,
 		}),
-		panel("table", "Downloads gained", 24, 8, 0, 17, []Target{sqlT(
+		panel("table", "Downloads gained", box{W: 24, H: 8, X: 0, Y: 17}, []Target{sqlT(
 			`SELECT asset AS "Asset", MAX(downloads) - MIN(downloads) AS "Gained",` +
 				` MAX(downloads) AS "Total", tag AS "Tag", repo AS "Repository",` +
 				` MAX(url) AS "Download"` +

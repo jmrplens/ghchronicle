@@ -58,7 +58,7 @@ func (s Settings) webhookPoints(ctx context.Context, c *ghapi.Client, repo Repo,
 			URL string `json:"url"`
 		} `json:"config"`
 	}
-	if _, _, err := c.GetJSON(ctx, "/repos/"+repo.FullName+"/hooks?per_page=100", &hooks, ""); err != nil {
+	if _, _, err := c.GetJSON(ctx, repoPathPrefix+repo.FullName+"/hooks?per_page=100", &hooks, ""); err != nil {
 		if !isSkippable(err) {
 			return points, err
 		}
@@ -140,7 +140,7 @@ func environmentPoints(ctx context.Context, c *ghapi.Client, repo Repo, base map
 			} `json:"deployment_branch_policy"`
 		} `json:"environments"`
 	}
-	if _, _, err := c.GetJSON(ctx, "/repos/"+repo.FullName+"/environments", &envs, ""); err != nil {
+	if _, _, err := c.GetJSON(ctx, repoPathPrefix+repo.FullName+"/environments", &envs, ""); err != nil {
 		return nil, err
 	}
 	day := now.UTC().Truncate(24 * time.Hour)
@@ -185,7 +185,7 @@ func deployKeyPoints(ctx context.Context, c *ghapi.Client, repo Repo, base map[s
 		LastUsed *time.Time `json:"last_used"`
 		AddedBy  string     `json:"added_by"`
 	}
-	if _, _, err := c.GetJSON(ctx, "/repos/"+repo.FullName+"/keys?per_page=100", &keys, ""); err != nil {
+	if _, _, err := c.GetJSON(ctx, repoPathPrefix+repo.FullName+"/keys?per_page=100", &keys, ""); err != nil {
 		return nil, err
 	}
 	day := now.UTC().Truncate(24 * time.Hour)

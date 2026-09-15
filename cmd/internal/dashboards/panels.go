@@ -11,6 +11,30 @@ import (
 	"strings"
 )
 
+// Names Grafana and Elasticsearch answer to, spelled once because a panel that
+// spells one of them its own way is not wrong, it is silently empty. The
+// section files share them.
+const (
+	panelClassicPalette   = "palette-classic"
+	panelWidthField       = "custom.width"
+	panelCellOptionsField = "custom.cellOptions"
+	panelRepoField        = "repo.keyword"
+	panelURLField         = "url.keyword"
+	panelESTime           = "@timestamp"
+)
+
+// Grafana names the value column of a joined query after the query's letter,
+// so a table that joins several of them renames these.
+const (
+	panelValueA = "Value #A"
+	panelValueB = "Value #B"
+	panelValueC = "Value #C"
+	panelValueD = "Value #D"
+	panelValueE = "Value #E"
+	panelValueF = "Value #F"
+	panelValueG = "Value #G"
+)
+
 // Opts is a panel builder's options: the same keyword arguments the panel
 // constructors take, carried as data so a specification can set one without
 // naming all the others.
@@ -90,12 +114,31 @@ func row(id int, title string, y int, collapsed bool, panels []map[string]any) m
 	}
 }
 
-func base(id int, kind, title string, ds any, targets []any, w, h, x, y int, desc string) map[string]any {
+// box is a panel's gridPos: how wide and tall it is, and the corner of
+// Grafana's 24 column grid it starts from. The four numbers travel as one
+// value because they are one thing, and because as four bare arguments in a
+// row nothing at a call site told the size from the corner.
+type box struct{ W, H, X, Y int }
+
+// panelArgs is what every panel kind carries into Grafana's JSON unchanged:
+// which panel it is, where it sits and what it asks its store. The kinds
+// differ only in the options that follow it, so they all take this one named
+// argument instead of the same nine values in the same order.
+type panelArgs struct {
+	ID      int
+	Title   string
+	DS      any
+	Targets []any
+	Box     box
+	Desc    string
+}
+
+func base(kind string, a panelArgs) map[string]any {
 	return map[string]any{
-		"id": id, "type": kind, "title": title, "description": desc,
-		"datasource": ds,
-		"gridPos":    map[string]any{"w": w, "h": h, "x": x, "y": y},
-		"targets":    targets,
+		"id": a.ID, "type": kind, "title": a.Title, "description": a.Desc,
+		"datasource": a.DS,
+		"gridPos":    map[string]any{"w": a.Box.W, "h": a.Box.H, "x": a.Box.X, "y": a.Box.Y},
+		"targets":    a.Targets,
 		"fieldConfig": map[string]any{
 			"defaults": map[string]any{}, "overrides": []any{},
 		},
@@ -103,8 +146,8 @@ func base(id int, kind, title string, ds any, targets []any, w, h, x, y int, des
 	}
 }
 
-func timeseries(id int, title string, ds any, targets []any, w, h, x, y int, desc string, o Opts) map[string]any {
-	p := base(id, "timeseries", title, ds, targets, w, h, x, y, desc)
+func timeseries(a panelArgs, o Opts) map[string]any {
+	p := base("timeseries", a)
 	stack := "none"
 	if optBool(o, "stack", false) {
 		stack = "normal"
@@ -132,7 +175,7 @@ func timeseries(id int, title string, ds any, targets []any, w, h, x, y int, des
 	unit := optString(o, "unit", "short")
 	defaults := map[string]any{
 		"unit":   unit,
-		"color":  map[string]any{"mode": "palette-classic"},
+		"color":  map[string]any{"mode": panelClassicPalette},
 		"custom": custom,
 	}
 	// `short` here is a count: stars, pull requests, runs. An axis reading
@@ -187,11 +230,11 @@ func binned(p map[string]any, o Opts) {
 	}
 }
 
-func barchart(id int, title string, ds any, targets []any, w, h, x, y int, desc string, o Opts) map[string]any {
-	p := base(id, "barchart", title, ds, targets, w, h, x, y, desc)
+func barchart(a panelArgs, o Opts) map[string]any {
+	p := base("barchart", a)
 	p["fieldConfig"] = map[string]any{
 		"defaults": map[string]any{
-			"unit": optString(o, "unit", "short"), "color": map[string]any{"mode": "palette-classic"},
+			"unit": optString(o, "unit", "short"), "color": map[string]any{"mode": panelClassicPalette},
 			"custom": map[string]any{
 				"lineWidth": 1, "fillOpacity": 80, "gradientMode": "hue", "axisSoftMin": 0,
 			},
@@ -217,8 +260,8 @@ func barchart(id int, title string, ds any, targets []any, w, h, x, y int, desc 
 	return p
 }
 
-func table(id int, title string, ds any, targets []any, w, h, x, y int, desc string, o Opts) map[string]any {
-	p := base(id, "table", title, ds, targets, w, h, x, y, desc)
+func table(a panelArgs, o Opts) map[string]any {
+	p := base("table", a)
 	// fieldMinMax scales a gauge cell by its own column. Without it Grafana
 	// takes the range over every numeric column of the frame, so a column of
 	// seconds or bytes beside a count puts the count's bar at a pixel or
@@ -253,8 +296,8 @@ func table(id int, title string, ds any, targets []any, w, h, x, y int, desc str
 	return p
 }
 
-func stat(id int, title string, ds any, targets []any, w, h, x, y int, desc string, o Opts) map[string]any {
-	p := base(id, "stat", title, ds, targets, w, h, x, y, desc)
+func stat(a panelArgs, o Opts) map[string]any {
+	p := base("stat", a)
 	color := optString(o, "color", "text")
 	thresholds := optList(o, "thresholds")
 	mappings := optList(o, "mappings")
@@ -286,8 +329,8 @@ func stat(id int, title string, ds any, targets []any, w, h, x, y int, desc stri
 	return p
 }
 
-func gauge(id int, title string, ds any, targets []any, w, h, x, y int, desc string, o Opts) map[string]any {
-	p := base(id, "gauge", title, ds, targets, w, h, x, y, desc)
+func gauge(a panelArgs, o Opts) map[string]any {
+	p := base("gauge", a)
 	steps := optList(o, "thresholds")
 	if steps == nil {
 		steps = []any{map[string]any{"color": "green", "value": nil}}
@@ -313,11 +356,11 @@ func gauge(id int, title string, ds any, targets []any, w, h, x, y int, desc str
 	return p
 }
 
-func piechart(id int, title string, ds any, targets []any, w, h, x, y int, desc string, o Opts) map[string]any {
-	p := base(id, "piechart", title, ds, targets, w, h, x, y, desc)
+func piechart(a panelArgs, o Opts) map[string]any {
+	p := base("piechart", a)
 	p["fieldConfig"] = map[string]any{
 		"defaults": map[string]any{
-			"unit": optString(o, "unit", "short"), "color": map[string]any{"mode": "palette-classic"},
+			"unit": optString(o, "unit", "short"), "color": map[string]any{"mode": panelClassicPalette},
 			"custom": map[string]any{"hideFrom": map[string]any{
 				"legend": false, "tooltip": false, "viz": false,
 			}},
@@ -373,8 +416,8 @@ func piechart(id int, title string, ds any, targets []any, w, h, x, y int, desc 
 // Grafana has no calendar panel: a frame of one row per week and one field
 // per weekday is that grid. The row order is the field order, first at the
 // top.
-func statusHistory(id int, title string, ds any, targets []any, w, h, x, y int, desc string, o Opts) map[string]any {
-	p := base(id, "status-history", title, ds, targets, w, h, x, y, desc)
+func statusHistory(a panelArgs, o Opts) map[string]any {
+	p := base("status-history", a)
 	mappings := optList(o, "mappings")
 	if mappings == nil {
 		mappings = []any{}
@@ -409,8 +452,8 @@ func statusHistory(id int, title string, ds any, targets []any, w, h, x, y int, 
 
 // barGauge is one horizontal bar per field, named and valued: the shape of
 // a mix of a few parts, each a share of the whole.
-func barGauge(id int, title string, ds any, targets []any, w, h, x, y int, desc string, o Opts) map[string]any {
-	p := base(id, "bargauge", title, ds, targets, w, h, x, y, desc)
+func barGauge(a panelArgs, o Opts) map[string]any {
+	p := base("bargauge", a)
 	maxv := any(optInt(o, "maxv", 100))
 	if v, ok := optAny(o, "maxv"); ok {
 		maxv = v
@@ -421,7 +464,7 @@ func barGauge(id int, title string, ds any, targets []any, w, h, x, y int, desc 
 			// One decimal: seven reviews among six thousand contributions are
 			// 0.1 per cent, and a bar reading 0 beside seven is a bar that lies.
 			"decimals": 1,
-			"color":    map[string]any{"mode": "palette-classic"},
+			"color":    map[string]any{"mode": panelClassicPalette},
 		},
 		"overrides": overridesOf(o),
 	}
@@ -436,8 +479,12 @@ func barGauge(id int, title string, ds any, targets []any, w, h, x, y int, desc 
 	return p
 }
 
-func textPanel(id int, title, content string, w, h, x, y int, o Opts) map[string]any {
-	p := base(id, "text", title, nil, []any{}, w, h, x, y, "")
+func textPanel(a panelArgs, content string, o Opts) map[string]any {
+	// Prose asks no store anything, so the three fields that describe a query
+	// are the panel's own whatever the caller carried in panelArgs: the content
+	// is the panel, and there is no description beside it.
+	a.DS, a.Targets, a.Desc = nil, []any{}, ""
+	p := base("text", a)
 	delete(p, "datasource")
 	p["options"] = map[string]any{"mode": optString(o, "mode", "markdown"), "content": content}
 	if optBool(o, "transparent", false) {
@@ -463,7 +510,7 @@ func override(name string, props []any) any {
 }
 
 func width(name string, w int) any {
-	return override(name, []any{map[string]any{"id": "custom.width", "value": w}})
+	return override(name, []any{map[string]any{"id": panelWidthField, "value": w}})
 }
 
 // colorOf pins a series to a color by its name, for the panels whose series
@@ -486,7 +533,7 @@ func unitOf(name, unit string, w int) any {
 	}
 	props := []any{map[string]any{"id": "unit", "value": unit}}
 	if w > 0 {
-		props = append(props, map[string]any{"id": "custom.width", "value": w})
+		props = append(props, map[string]any{"id": panelWidthField, "value": w})
 	}
 	return override(name, props)
 }
@@ -555,7 +602,7 @@ func urlColumn(name, word, title string) any {
 		map[string]any{"id": "links", "value": []any{map[string]any{
 			"title": title, "url": linkHref, "targetBlank": true,
 		}}},
-		map[string]any{"id": "custom.width", "value": w},
+		map[string]any{"id": panelWidthField, "value": w},
 		map[string]any{"id": "custom.align", "value": "center"},
 	})
 }
@@ -646,7 +693,7 @@ func linkedColumn(o any) string {
 // own steps and does not come through here.
 func barCell(name, unit string, w int) any {
 	props := []any{
-		map[string]any{"id": "custom.cellOptions", "value": map[string]any{
+		map[string]any{"id": panelCellOptionsField, "value": map[string]any{
 			"type": "gauge", "mode": "gradient",
 		}},
 		map[string]any{"id": "unit", "value": unit},
@@ -656,7 +703,7 @@ func barCell(name, unit string, w int) any {
 		}},
 	}
 	if w > 0 {
-		props = append(props, map[string]any{"id": "custom.width", "value": w})
+		props = append(props, map[string]any{"id": panelWidthField, "value": w})
 	}
 	return override(name, props)
 }

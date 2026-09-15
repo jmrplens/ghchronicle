@@ -124,18 +124,22 @@ type ruleset struct {
 			Type string `json:"type"`
 		} `json:"nodes"`
 	} `json:"rules"`
-	Conditions *struct {
-		RefName *struct {
-			Include []string `json:"include"`
-			Exclude []string `json:"exclude"`
-		} `json:"refName"`
-	} `json:"conditions"`
+	Conditions   *rulesetConditions `json:"conditions"`
 	BypassActors struct {
 		TotalCount int `json:"totalCount"`
 		Nodes      []struct {
 			BypassMode string `json:"bypassMode"`
 		} `json:"nodes"`
 	} `json:"bypassActors"`
+}
+
+// rulesetConditions is the refs a ruleset applies to. A ruleset with no
+// condition at all applies to every ref, which is why the pointer is kept.
+type rulesetConditions struct {
+	RefName *struct {
+		Include []string `json:"include"`
+		Exclude []string `json:"exclude"`
+	} `json:"refName"`
 }
 
 type repoDetail struct {

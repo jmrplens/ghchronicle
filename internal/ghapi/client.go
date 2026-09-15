@@ -24,6 +24,10 @@ import (
 const (
 	defaultBase = "https://api.github.com"
 	userAgent   = "ghchronicle"
+
+	authScheme      = "Bearer "
+	userAgentHeader = "User-Agent"
+	graphqlPath     = "/graphql"
 )
 
 // Client is safe for concurrent use.
@@ -504,8 +508,8 @@ func (c *Client) GetJSON(ctx context.Context, path string, out any, accept strin
 	if err != nil {
 		return "", false, err
 	}
-	req.Header.Set("Authorization", "Bearer "+c.token)
-	req.Header.Set("User-Agent", userAgent)
+	req.Header.Set("Authorization", authScheme+c.token)
+	req.Header.Set(userAgentHeader, userAgent)
 	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
 	if accept == "" {
 		accept = "application/vnd.github+json"
@@ -652,8 +656,8 @@ func (c *Client) GetTextAs(ctx context.Context, path, accept string) (string, er
 	if err != nil {
 		return "", err
 	}
-	req.Header.Set("Authorization", "Bearer "+c.token)
-	req.Header.Set("User-Agent", userAgent)
+	req.Header.Set("Authorization", authScheme+c.token)
+	req.Header.Set(userAgentHeader, userAgent)
 	if accept == "" {
 		accept = "application/vnd.github+json"
 	}
@@ -762,7 +766,7 @@ func (c *Client) GraphQLSpend() GraphQLSpend {
 // decides both whether the brake applies and whether the cost is counted.
 func (c *Client) graphql(ctx context.Context, query string, vars map[string]any, out any, charged bool) error {
 	if charged {
-		if err := c.brake(ctx, "/graphql"); err != nil {
+		if err := c.brake(ctx, graphqlPath); err != nil {
 			return err
 		}
 	}
@@ -771,12 +775,12 @@ func (c *Client) graphql(ctx context.Context, query string, vars map[string]any,
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.base+"/graphql", bytes.NewReader(payload))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.base+graphqlPath, bytes.NewReader(payload))
 	if err != nil {
 		return err
 	}
-	req.Header.Set("Authorization", "Bearer "+c.token)
-	req.Header.Set("User-Agent", userAgent)
+	req.Header.Set("Authorization", authScheme+c.token)
+	req.Header.Set(userAgentHeader, userAgent)
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.http.Do(req)
@@ -837,7 +841,7 @@ func (c *Client) rateLimited(resp *http.Response, path string) error {
 	if resource == "" {
 		resource = "core"
 	}
-	if v := resp.Header.Get("x-ratelimit-remaining"); v == "0" {
+	if resp.Header.Get("x-ratelimit-remaining") == "0" {
 		reset := time.Now().Add(time.Minute)
 		if sec, err := strconv.Atoi(resp.Header.Get("x-ratelimit-reset")); err == nil && sec > 0 {
 			reset = time.Unix(int64(sec), 0)
@@ -877,7 +881,7 @@ func (c *Client) brake(ctx context.Context, path string) error {
 	switch {
 	case strings.HasPrefix(path, "/search"):
 		bucket = "search"
-	case strings.HasSuffix(path, "/graphql"):
+	case strings.HasSuffix(path, graphqlPath):
 		bucket = "graphql"
 	}
 	for {
@@ -923,7 +927,7 @@ func (c *Client) readRate(resp *http.Response) {
 	atoi := func(h string) int { n, _ := strconv.Atoi(resp.Header.Get(h)); return n }
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if v := resp.Header.Get("x-ratelimit-limit"); v != "" {
+	if resp.Header.Get("x-ratelimit-limit") != "" {
 		resource := resp.Header.Get("x-ratelimit-resource")
 		if resource == "" {
 			resource = "core"

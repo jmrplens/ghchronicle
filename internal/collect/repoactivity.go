@@ -45,7 +45,7 @@ func weeklyCommitPoints(ctx context.Context, c *ghapi.Client, repo Repo, base ma
 		All   []int `json:"all"`
 		Owner []int `json:"owner"`
 	}
-	if _, _, err := c.GetJSON(ctx, "/repos/"+repo.FullName+"/stats/participation", &part, ""); err != nil {
+	if _, _, err := c.GetJSON(ctx, repoPathPrefix+repo.FullName+"/stats/participation", &part, ""); err != nil {
 		return nil, err
 	}
 	// Anchored to the Sunday that starts GitHub's current week, not to
@@ -73,7 +73,7 @@ func weeklyCommitPoints(ctx context.Context, c *ghapi.Client, repo Repo, base ma
 // describes the whole life of the repository as of this moment.
 func punchCardPoints(ctx context.Context, c *ghapi.Client, repo Repo, base map[string]string, now time.Time) ([]sink.Point, error) {
 	var punch [][3]int
-	if _, _, err := c.GetJSON(ctx, "/repos/"+repo.FullName+"/stats/punch_card", &punch, ""); err != nil {
+	if _, _, err := c.GetJSON(ctx, repoPathPrefix+repo.FullName+"/stats/punch_card", &punch, ""); err != nil {
 		return nil, err
 	}
 	days := [...]string{"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"}
@@ -115,7 +115,7 @@ func workflowPoints(ctx context.Context, c *ghapi.Client, repo Repo, base map[st
 			HTMLURL   string    `json:"html_url"`
 		} `json:"workflows"`
 	}
-	if _, _, err := c.GetJSON(ctx, "/repos/"+repo.FullName+"/actions/workflows?per_page=100", &wf, ""); err != nil {
+	if _, _, err := c.GetJSON(ctx, repoPathPrefix+repo.FullName+"/actions/workflows?per_page=100", &wf, ""); err != nil {
 		return nil, err
 	}
 	points := make([]sink.Point, 0, len(wf.Workflows))
@@ -207,22 +207,34 @@ query($owner: String!, $name: String!, $first: Int!, $comments: Int!, $replies: 
   }
 }`
 
+// discussionActor is the login of whoever chose an answer, and of whoever
+// wrote it. GitHub declares both nullable, a deleted account answering as
+// null, so both are reached through a pointer. The three authors below keep
+// the anonymous shape instead: login() names that shape in its signature.
+type discussionActor struct {
+	Login string `json:"login"`
+}
+
+// discussionConnection is a page of a repository's discussions: GraphQL hands
+// every connection back this way, the total beside the slice of nodes.
+type discussionConnection struct {
+	TotalCount int              `json:"totalCount"`
+	PageInfo   pageInfo         `json:"pageInfo"`
+	Nodes      []discussionNode `json:"nodes"`
+}
+
 type discussionNode struct {
-	Number         int        `json:"number"`
-	Title          string     `json:"title"`
-	URL            string     `json:"url"`
-	CreatedAt      time.Time  `json:"createdAt"`
-	UpdatedAt      time.Time  `json:"updatedAt"`
-	IsAnswered     bool       `json:"isAnswered"`
-	UpvoteCount    int        `json:"upvoteCount"`
-	AnswerChosenAt *time.Time `json:"answerChosenAt"`
-	AnswerChosenBy *struct {
-		Login string `json:"login"`
-	} `json:"answerChosenBy"`
-	Answer *struct {
-		Author *struct {
-			Login string `json:"login"`
-		} `json:"author"`
+	Number         int              `json:"number"`
+	Title          string           `json:"title"`
+	URL            string           `json:"url"`
+	CreatedAt      time.Time        `json:"createdAt"`
+	UpdatedAt      time.Time        `json:"updatedAt"`
+	IsAnswered     bool             `json:"isAnswered"`
+	UpvoteCount    int              `json:"upvoteCount"`
+	AnswerChosenAt *time.Time       `json:"answerChosenAt"`
+	AnswerChosenBy *discussionActor `json:"answerChosenBy"`
+	Answer         *struct {
+		Author *discussionActor `json:"author"`
 	} `json:"answer"`
 	Closed      bool       `json:"closed"`
 	ClosedAt    *time.Time `json:"closedAt"`
@@ -297,11 +309,7 @@ func (d Discussions) Collect(ctx context.Context, c *ghapi.Client, repo Repo, _ 
 	}
 	var res struct {
 		Repository struct {
-			Discussions struct {
-				TotalCount int              `json:"totalCount"`
-				PageInfo   pageInfo         `json:"pageInfo"`
-				Nodes      []discussionNode `json:"nodes"`
-			} `json:"discussions"`
+			Discussions discussionConnection `json:"discussions"`
 		} `json:"repository"`
 	}
 	base := map[string]string{"owner": repo.Owner, "repo": repo.Name, "full_name": repo.FullName}
@@ -394,29 +402,48 @@ func discussionPoints(nodes []discussionNode, base map[string]string, full, user
 		// anyone else's, and not the reply to a reply, which is where most of
 		// the back and forth in a thread happens.
 		for _, cm := range d.Comments.Nodes {
-			points = append(points, discussionComment(user, full, d, cm.DatabaseID, 0,
-				login(cm.Author), cm.URL, cm.UpvoteCount, cm.IsAnswer, cm.CreatedAt))
+			points = append(points, discussionComment(user, full, d, threadComment{
+				ID: cm.DatabaseID, By: login(cm.Author), URL: cm.URL,
+				Upvotes: cm.UpvoteCount, IsAnswer: cm.IsAnswer, When: cm.CreatedAt,
+			}))
 			for _, rp := range cm.Replies.Nodes {
-				points = append(points, discussionComment(user, full, d, rp.DatabaseID,
-					cm.DatabaseID, login(rp.Author), rp.URL, rp.UpvoteCount, false, rp.CreatedAt))
+				points = append(points, discussionComment(user, full, d, threadComment{
+					ID: rp.DatabaseID, ReplyTo: cm.DatabaseID, By: login(rp.Author),
+					URL: rp.URL, Upvotes: rp.UpvoteCount, When: rp.CreatedAt,
+				}))
 			}
 		}
 	}
 	return points
 }
 
+// threadComment is one entry of a discussion thread as GraphQL returns it. A
+// comment and a reply to a comment are two anonymous types in two places of
+// the same response and are written as one row, so what they have in common is
+// named here once: passed as a row of bare arguments, the two int64 identities
+// and the two strings were four positions nothing distinguished.
+type threadComment struct {
+	ID int64
+	// ReplyTo is the comment this answers, or zero for a comment left on the
+	// thread itself.
+	ReplyTo  int64
+	By       string
+	URL      string
+	Upvotes  int
+	IsAnswer bool
+	When     time.Time
+}
+
 // discussionComment renders one comment or reply with the identity the
 // account-wide walk gives the same thing, so the two converge on one row
 // instead of writing two.
-func discussionComment(user, full string, d *discussionNode, id, replyTo int64,
-	by, url string, upvotes int, isAnswer bool, when time.Time,
-) sink.Point {
+func discussionComment(user, full string, d *discussionNode, c threadComment) sink.Point {
 	fields := map[string]any{
-		"comments": 1, "upvotes": upvotes, "title": d.Title,
-		"answers": boolInt(isAnswer), "url": url,
+		"comments": 1, "upvotes": c.Upvotes, "title": d.Title,
+		"answers": boolInt(c.IsAnswer), "url": c.URL,
 	}
-	if replyTo != 0 {
-		fields["reply_to"] = replyTo
+	if c.ReplyTo != 0 {
+		fields["reply_to"] = c.ReplyTo
 	}
 	// The same fields the account-wide walk writes. Leaving them out here
 	// would give gh_discussion_comment two shapes, and half its rows would
@@ -427,13 +454,13 @@ func discussionComment(user, full string, d *discussionNode, id, replyTo int64,
 		Tags: map[string]string{
 			"user": user, "repo": full,
 			"own":       boolTag(isOwn(full, user)),
-			"is_answer": boolTag(isAnswer),
-			"is_reply":  boolTag(replyTo != 0),
-			"author":    by,
-			"comment":   strconv.FormatInt(id, 10),
+			"is_answer": boolTag(c.IsAnswer),
+			"is_reply":  boolTag(c.ReplyTo != 0),
+			"author":    c.By,
+			"comment":   strconv.FormatInt(c.ID, 10),
 			"number":    strconv.Itoa(d.Number),
 		},
 		Fields: fields,
-		Time:   when,
+		Time:   c.When,
 	}
 }

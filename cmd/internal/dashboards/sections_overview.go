@@ -6,6 +6,17 @@ import (
 	"strings"
 )
 
+// overviewNewestRow ends the queries over gh_account: the table is rewritten
+// whole every sweep, so the account as it stands is the last row of it, never
+// a sum over the range. The titles beside it are what the Elasticsearch,
+// Graphite and Prometheus twins rename their own columns to.
+const (
+	overviewNewestRow      = " WHERE $__timeFilter(time) ORDER BY time DESC LIMIT 1"
+	overviewAccountAge     = "Account age"
+	overviewStarsGiven     = "Stars given"
+	overviewUniqueVisitors = "Unique visitors"
+)
+
 // ── Overview ────────────────────────────────────────────────────────────────
 
 // A stat panel of several numbers. On a desktop Grafana lays the values out
@@ -18,11 +29,11 @@ import (
 // Prometheus, alias() in Graphite, and for Elasticsearch a rename of the
 // column its response parser makes, or an override on the query's refId
 // where two queries would make the same column name.
-func statGroup(title string, w, h, x, y int, sql []Target, p *P) Panel {
+func statGroup(title string, at box, sql []Target, p *P) Panel {
 	opts := Opts{"text_mode": "value_and_name"}
 	maps.Copy(opts, p.Opts)
 	p.Opts = opts
-	return panel("stat", title, w, h, x, y, sql, p)
+	return panel("stat", title, at, sql, p)
 }
 
 // promNamed is one Prometheus instant query drawn under its own name.
@@ -50,7 +61,7 @@ func frameName(ref, name string) any {
 // Elasticsearch top_metrics over them all, whose columns are renamed the way
 // esTbl names them. The newest row is the value: the measurement is rewritten
 // every sweep and a range is never summed.
-func fieldGroup(b *builder, m, title string, w, h, x, y int, fields []named, p *P) Panel {
+func fieldGroup(b *builder, m, title string, at box, fields []named, p *P) Panel {
 	cols := make([]string, len(fields))
 	for i, f := range fields {
 		cols[i] = fmt.Sprintf("%s AS %q", f.From, f.To)
@@ -58,7 +69,7 @@ func fieldGroup(b *builder, m, title string, w, h, x, y int, fields []named, p *
 		p.GR = append(p.GR, grNamed(ref(i), f.To, fmt.Sprintf("keepLastValue(%s)", gp(m, f.From))))
 	}
 	p.ES, p.ESTF = esTbl(m, []any{b.one()}, []any{b.mNewest(fieldsOf(fields)...)}, fields, nil)
-	return statGroup(title, w, h, x, y, []Target{sqlT(fmt.Sprintf(
+	return statGroup(title, at, []Target{sqlT(fmt.Sprintf(
 		"SELECT %s FROM %s WHERE $__timeFilter(time) ORDER BY time DESC LIMIT 1",
 		strings.Join(cols, ", "), m,
 	))}, p)
@@ -122,9 +133,9 @@ func overview(b *builder) []Panel {
 	acctES, acctEStf := esTbl("gh_account", []any{b.one()},
 		[]any{b.mNewest("account_age_days", "watching", "starred", "gists", "packages")},
 		[]named{
-			{"account_age_days", "Account age"},
+			{"account_age_days", overviewAccountAge},
 			{"watching", "Watching"},
-			{"starred", "Stars given"},
+			{"starred", overviewStarsGiven},
 			{"gists", "Gists"},
 			{"packages", "Packages"},
 		}, nil)
@@ -132,9 +143,9 @@ func overview(b *builder) []Panel {
 
 	return []Panel{
 		brandPanel(),
-		statGroup("Repositories", 8, 4, 0, brandHeight, []Target{
+		statGroup("Repositories", box{W: 8, H: 4, X: 0, Y: brandHeight}, []Target{
 			sqlT(`SELECT public_repos AS "Repositories" FROM gh_account` +
-				" WHERE $__timeFilter(time) ORDER BY time DESC LIMIT 1"),
+				overviewNewestRow),
 			{Kind: "sql", Format: "table", Ref: "B", SQL: `SELECT SUM(stars) AS "Stars",` +
 				` SUM(forks) AS "Forks" FROM (` + latestPerRepo([]string{"stars", "forks"}) + ")"},
 		}, &P{
@@ -154,7 +165,7 @@ func overview(b *builder) []Panel {
 			ES: append(countES, reposES...), ESTF: append(countEStf, reposEStf...),
 			ESOpts: Opts{"calc": "sum"},
 		}),
-		statGroup("Traffic in range", 8, 4, 8, brandHeight, []Target{sqlT(
+		statGroup("Traffic in range", box{W: 8, H: 4, X: 8, Y: brandHeight}, []Target{sqlT(
 			"SELECT " + trafficSQL("views", "count") + ` AS "Views", ` +
 				trafficSQL("views", "uniques") + ` AS "Unique visitors", ` +
 				trafficSQL("clones", "count") + ` AS "Clones"` +
@@ -162,7 +173,7 @@ func overview(b *builder) []Panel {
 		)}, &P{
 			Prom: []Target{
 				trafficProm("A", "Views", "views", "count"),
-				trafficProm("B", "Unique visitors", "views", "uniques"),
+				trafficProm("B", overviewUniqueVisitors, "views", "uniques"),
 				trafficProm("C", "Clones", "clones", "count"),
 			},
 			PromTitle: "Traffic, 14-day window",
@@ -170,7 +181,7 @@ func overview(b *builder) []Panel {
 			PromDesc:  windowNote,
 			GR: []Target{
 				trafficGR("A", "Views", "views", "count"),
-				trafficGR("B", "Unique visitors", "views", "uniques"),
+				trafficGR("B", overviewUniqueVisitors, "views", "uniques"),
 				trafficGR("C", "Clones", "clones", "count"),
 			},
 			ES: []Target{
@@ -179,10 +190,10 @@ func overview(b *builder) []Panel {
 				trafficES("C", "clones", "count"),
 			},
 			ESOver: []any{
-				frameName("A", "Views"), frameName("B", "Unique visitors"), frameName("C", "Clones"),
+				frameName("A", "Views"), frameName("B", overviewUniqueVisitors), frameName("C", "Clones"),
 			},
 		}),
-		fieldGroup(b, "gh_account", "Community", 8, 4, 16, brandHeight, []named{
+		fieldGroup(b, "gh_account", "Community", box{W: 8, H: 4, X: 16, Y: brandHeight}, []named{
 			{"followers", "Followers"},
 			{"following", "Following"},
 			{"sponsors", "Sponsors"},
@@ -192,19 +203,19 @@ func overview(b *builder) []Panel {
 				"sweep; the two are different numbers and the second is usually much " +
 				"smaller. Then who sponsors the account and whom it sponsors.",
 		}),
-		statGroup("Account", 24, 5, 0, brandHeight+4, []Target{
+		statGroup("Account", box{W: 24, H: 5, X: 0, Y: brandHeight + 4}, []Target{
 			sqlT(`SELECT calendar_total AS "Contributions" FROM gh_contributions_total` +
-				" WHERE $__timeFilter(time) ORDER BY time DESC LIMIT 1"),
+				overviewNewestRow),
 			{Kind: "sql", Format: "table", Ref: "B", SQL: `SELECT account_age_days AS "Account age",` +
 				` watching AS "Watching", starred AS "Stars given", gists AS "Gists",` +
 				` packages AS "Packages" FROM gh_account` +
-				" WHERE $__timeFilter(time) ORDER BY time DESC LIMIT 1"},
+				overviewNewestRow},
 		}, &P{
 			Prom: []Target{
 				promNamed("A", "Contributions", "github_contributions_total_calendar_total"),
-				promNamed("B", "Account age", "github_account_account_age_days"),
+				promNamed("B", overviewAccountAge, "github_account_account_age_days"),
 				promNamed("C", "Watching", "github_account_watching"),
-				promNamed("D", "Stars given", "github_account_starred"),
+				promNamed("D", overviewStarsGiven, "github_account_starred"),
 				promNamed("E", "Gists", "github_account_gists"),
 				promNamed("F", "Packages", "github_account_packages"),
 			},
@@ -216,14 +227,14 @@ func overview(b *builder) []Panel {
 				"and is not what this reads.",
 			GR: []Target{
 				grNamed("A", "Contributions", gp("gh_contributions_total", "calendar_total")),
-				grNamed("B", "Account age", gp("gh_account", "account_age_days")),
+				grNamed("B", overviewAccountAge, gp("gh_account", "account_age_days")),
 				grNamed("C", "Watching", gp("gh_account", "watching")),
-				grNamed("D", "Stars given", gp("gh_account", "starred")),
+				grNamed("D", overviewStarsGiven, gp("gh_account", "starred")),
 				grNamed("E", "Gists", gp("gh_account", "gists")),
 				grNamed("F", "Packages", gp("gh_account", "packages")),
 			},
 			ES: append(contribES, acctES...), ESTF: append(contribEStf, acctEStf...),
-			Overrides: []any{unitOf("Account age", "d", 0)},
+			Overrides: []any{unitOf(overviewAccountAge, "d", 0)},
 		}),
 	}
 }
@@ -238,9 +249,9 @@ func audience(b *builder) []Panel {
 	perDay := func(field, kind, alias string) string {
 		return topSeries("gh_traffic", "repo", field, alias, "kind = '"+kind+"' AND "+RF)
 	}
-	window := func(field, kind, title string, x, y, w, h int, desc string) Panel {
+	window := func(field, kind, title string, at box, desc string) Panel {
 		alias := lowerFirstWord(title)
-		return panel("timeseries", title, w, h, x, y,
+		return panel("timeseries", title, at,
 			[]Target{sqlTS(perDay(field, kind, alias))}, &P{
 				Prom: []Target{promq(fmt.Sprintf(`sum by (repo) (github_traffic_%s{kind=%q,%s})`,
 					field, kind, PF), legend("{{repo}}"))},
@@ -285,7 +296,7 @@ func audience(b *builder) []Panel {
 		[]any{b.tm("referrer", 25), b.tm("repo", 50), b.tmURL("referrer_url")}, []any{b.mNewest("count", "uniques")},
 		[]named{
 			{"referrer.keyword", "Referrer"},
-			{"repo.keyword", "Repository"},
+			{panelRepoField, "Repository"},
 			{"referrer_url.keyword", "Link"},
 			{"count", "Views"},
 			{"uniques", "Unique"},
@@ -298,7 +309,7 @@ func audience(b *builder) []Panel {
 		[]any{b.tm("path", 25), b.tm("repo", 50), b.tm("title", 1), b.tmURL()}, []any{b.mNewest("count", "uniques")},
 		[]named{
 			{"path.keyword", "Path"},
-			{"repo.keyword", "Repository"},
+			{panelRepoField, "Repository"},
 			{"title.keyword", "Title"},
 			{"url.keyword", "Link"},
 			{"count", "Views"},
@@ -311,27 +322,27 @@ func audience(b *builder) []Panel {
 		"Repository", []col{{"sum", "Clones"}})
 	cloneES, cloneEStf := esTbl("gh_traffic", []any{b.tm("repo", 500), b.tmURL()},
 		[]any{b.mSum("count"), b.mSum("uniques")},
-		[]named{{"repo.keyword", "Repository"}, {"url.keyword", "Link"}, {"c", "Clones"}, {"u", "Cloners"}},
+		[]named{{panelRepoField, "Repository"}, {"url.keyword", "Link"}, {"c", "Clones"}, {"u", "Cloners"}},
 		[]string{ESF, "kind:clones"})
 
 	return []Panel{
-		window("count", "views", "Views over time", 0, 0, 12, 8,
+		window("count", "views", "Views over time", box{W: 12, H: 8, X: 0, Y: 0},
 			"Split by repository. GitHub serves a rolling 14-day window and it is "+
 				"rewritten on every sweep, so a gap means the collector was down for "+
 				"longer than that window."),
-		window("uniques", "views", "Unique visitors over time", 12, 0, 12, 8,
+		window("uniques", "views", "Unique visitors over time", box{W: 12, H: 8, X: 12, Y: 0},
 			"Split by repository."),
-		window("count", "clones", "Clones over time", 0, 8, 12, 8,
+		window("count", "clones", "Clones over time", box{W: 12, H: 8, X: 0, Y: 8},
 			"Its own panel because continuous integration clones a repository "+
 				"thousands of times for every human visit, and on a shared axis the "+
 				"visits become a flat line at zero."),
-		panel("table", "Top referrers", 12, 8, 12, 8, []Target{sqlT(refs)}, &P{
+		panel("table", "Top referrers", box{W: 12, H: 8, X: 12, Y: 8}, []Target{sqlT(refs)}, &P{
 			Prom: []Target{
 				promTbl(fmt.Sprintf("sum by (referrer) (github_traffic_referrer_count{%s})", PF), "A"),
 				promTbl(fmt.Sprintf("sum by (referrer) (github_traffic_referrer_uniques{%s})", PF), "B"),
 			},
 			PromTF: merged(map[string]string{
-				"referrer": "Referrer", "Value #A": "Views", "Value #B": "Unique",
+				"referrer": "Referrer", panelValueA: "Views", panelValueB: "Unique",
 			}, nil, nil),
 			Opts:      Opts{"sort": "Views"},
 			Overrides: []any{barCell("Views", "short", 120), width("Unique", 90), rowLinkOn("Referrer", "Open the referrer")},
@@ -342,7 +353,7 @@ func audience(b *builder) []Panel {
 			GR: refsGR, GRTF: refsGRtf, GRDesc: grRows,
 			ES: refsES, ESTF: refsEStf, ESDesc: esPerRepo,
 		}),
-		panel("table", "Top paths", 24, 8, 0, 16, []Target{sqlT(paths)}, &P{
+		panel("table", "Top paths", box{W: 24, H: 8, X: 0, Y: 16}, []Target{sqlT(paths)}, &P{
 			PromNote: cannot(
 				"the most visited paths of the trailing fourteen days, with their titles.",
 				"The exporter skips `gh_traffic_path`: it is a dated top-ten that changes "+
@@ -357,7 +368,7 @@ func audience(b *builder) []Panel {
 			GRDesc: "Graphite keeps no text, so there is no title. " + grRows,
 			ES:     pathsES, ESTF: pathsEStf, ESDesc: esPerRepo,
 		}),
-		panel("table", "Clone amplification", 24, 8, 0, 24, []Target{sqlT(
+		panel("table", "Clone amplification", box{W: 24, H: 8, X: 0, Y: 24}, []Target{sqlT(
 			`SELECT repo AS "Repository",` +
 				// The 1.0 is the ratio itself. count and uniques are integer
 				// columns in InfluxDB, and DataFusion answers an integer
@@ -379,8 +390,8 @@ func audience(b *builder) []Panel {
 				promTbl(fmt.Sprintf(`sum by (repo) (github_traffic_count{kind="views",%s})`, PF), "C"),
 			},
 			PromTF: merged(map[string]string{
-				"repo": "Repository", "Value #A": "Clones", "Value #B": "Cloners",
-				"Value #C": "Views",
+				"repo": "Repository", panelValueA: "Clones", panelValueB: "Cloners",
+				panelValueC: "Views",
 			}, nil, nil),
 			Opts: Opts{"sort": "Clones each"},
 			Desc: "Clones divided by the people who made them. There are panels for clones and " +

@@ -2,6 +2,16 @@ package dashboards
 
 import "fmt"
 
+// planningNewestRow closes the window that numbered each partition's rows:
+// every table here is rewritten whole each sweep, so only row one is today's.
+// The two titles are shared with the panels' Elasticsearch and Prometheus
+// twins, which rename their columns to them and show nothing if they differ.
+const (
+	planningNewestRow    = ") x WHERE rn = 1"
+	planningPullRequests = "Pull requests"
+	planningPushedTo     = "Pushed to"
+)
+
 // ── Planning and community ──────────────────────────────────────────────────
 
 // planning is the shape of the work and the conversation around it.
@@ -19,13 +29,13 @@ func labelsMilestonesAndForks(b *builder) []Panel {
 		` issues AS "Issues", pull_requests AS "Pull requests", url AS "Link" FROM (` +
 		"SELECT repo, label, used, issues, pull_requests, url, ROW_NUMBER() OVER (" +
 		"PARTITION BY repo, label ORDER BY time DESC) AS rn FROM gh_label" +
-		" WHERE $__timeFilter(time) AND " + RF + ") x WHERE rn = 1" +
+		" WHERE $__timeFilter(time) AND " + RF + planningNewestRow +
 		" ORDER BY 2 DESC LIMIT 25"
 	miles := `SELECT milestone AS "Milestone", progress AS "Progress", repo AS "Repository",` +
 		` state AS "State", issues AS "Issues",` +
 		` pull_requests AS "Pull requests", url AS "Link" FROM (` +
 		"SELECT *, ROW_NUMBER() OVER (PARTITION BY repo, milestone ORDER BY time DESC) AS rn" +
-		" FROM gh_milestone WHERE $__timeFilter(time) AND " + RF + ") x WHERE rn = 1" +
+		" FROM gh_milestone WHERE $__timeFilter(time) AND " + RF + planningNewestRow +
 		" ORDER BY 2 DESC LIMIT 25"
 	forks := topSeries("gh_fork", "repo", "1", "forks", RF)
 	forkTbl := `SELECT by AS "By", time AS "Forked", repo AS "Repository",` +
@@ -43,12 +53,12 @@ func labelsMilestonesAndForks(b *builder) []Panel {
 	labelsES, labelsEStf := esTbl(lb, []any{b.tm("repo", 50), b.tm("label", 25), b.tmURL()},
 		[]any{b.mNewest("used", "issues", "pull_requests")},
 		[]named{
-			{"repo.keyword", "Repository"},
+			{panelRepoField, "Repository"},
 			{"label.keyword", "Label"},
 			{"url.keyword", "Link"},
 			{"used", "Used"},
 			{"issues", "Issues"},
-			{"pull_requests", "Pull requests"},
+			{"pull_requests", planningPullRequests},
 		}, []string{ESF})
 
 	milesGR, milesGRtf := gTbl(topRows(rp(ms, "progress"), 25,
@@ -57,27 +67,27 @@ func labelsMilestonesAndForks(b *builder) []Panel {
 	milesES, milesEStf := esTbl(ms, []any{b.tm("repo", 50), b.tm("milestone", 25), b.tm("state", 5), b.tmURL()},
 		[]any{b.mNewest("progress", "issues", "pull_requests")},
 		[]named{
-			{"repo.keyword", "Repository"},
+			{panelRepoField, "Repository"},
 			{"milestone.keyword", "Milestone"},
 			{"state.keyword", "State"},
 			{"url.keyword", "Link"},
 			{"progress", "Progress"},
 			{"issues", "Issues"},
-			{"pull_requests", "Pull requests"},
+			{"pull_requests", planningPullRequests},
 		}, []string{ESF})
 
 	forkGR, forkGRtf := gTbl(rowsOf(rp(fk, "days_since_push"), gn(fk, "by"), gn(fk, "repo")),
 		"By, repository", []col{{"lastNotNull", "Idle"}})
 	forkES, forkEStf := b.esRaw(fk, 25, []named{
-		{"@timestamp", "Forked"},
+		{panelESTime, "Forked"},
 		{"by", "By"},
 		{"repo", "Repository"},
-		{"advanced", "Pushed to"},
+		{"advanced", planningPushedTo},
 		{"days_since_push", "Idle"},
 		{"url", "Link"},
 	}, []string{ESF})
 	return []Panel{
-		panel("table", "Labels", 12, 8, 0, 0, []Target{sqlT(labels)}, &P{
+		panel("table", "Labels", box{W: 12, H: 8, X: 0, Y: 0}, []Target{sqlT(labels)}, &P{
 			Prom: func() []Target {
 				rank := fmt.Sprintf("max by (repo, label) (github_label_used{%s})", PF)
 				return []Target{
@@ -91,8 +101,8 @@ func labelsMilestonesAndForks(b *builder) []Panel {
 				}
 			}(),
 			PromTF: merged(map[string]string{
-				"repo": "Repository", "label": "Label", "Value #A": "Used",
-				"Value #B": "Issues", "Value #C": "Pull requests",
+				"repo": "Repository", "label": "Label", panelValueA: "Used",
+				panelValueB: "Issues", panelValueC: planningPullRequests,
 			}, nil, map[string]int{"repo": 0, "label": 1}),
 			Opts: Opts{"sort": "Used"},
 			Desc: "The labels in use, per repository, and the link is that label's issue " +
@@ -100,13 +110,13 @@ func labelsMilestonesAndForks(b *builder) []Panel {
 				"applied is not a row.",
 			Overrides: []any{
 				barCell("Used", "short", 120), width("Issues", 100),
-				width("Pull requests", 130), linkOn("Label"),
+				width(planningPullRequests, 130), linkOn("Label"),
 			},
 			GR: labelsGR, GRTF: labelsGRtf,
 			GRDesc: "Graphite names each row repository and label from the path. " + grRows,
 			ES:     labelsES, ESTF: labelsEStf,
 		}),
-		panel("table", "Milestones", 12, 8, 12, 0, []Target{sqlT(miles)}, &P{
+		panel("table", "Milestones", box{W: 12, H: 8, X: 12, Y: 0}, []Target{sqlT(miles)}, &P{
 			Prom: []Target{
 				promTbl(fmt.Sprintf("sum by (repo, milestone, state) (github_milestone_progress{%s})", PF), "A"),
 				promTbl(fmt.Sprintf("sum by (repo, milestone, state) (github_milestone_issues{%s})", PF), "B"),
@@ -114,7 +124,7 @@ func labelsMilestonesAndForks(b *builder) []Panel {
 			},
 			PromTF: merged(map[string]string{
 				"repo": "Repository", "milestone": "Milestone", "state": "State",
-				"Value #A": "Progress", "Value #B": "Issues", "Value #C": "Pull requests",
+				panelValueA: "Progress", panelValueB: "Issues", panelValueC: planningPullRequests,
 			}, nil, map[string]int{"repo": 0, "milestone": 1, "state": 2}),
 			Opts: Opts{"sort": "Progress"},
 			Desc: "The due date is collected as a field when a milestone has one, but it is not " +
@@ -123,14 +133,14 @@ func labelsMilestonesAndForks(b *builder) []Panel {
 				"due date.",
 			Overrides: []any{
 				barCell("Progress", "percent", 130),
-				width("State", 90), width("Issues", 90), width("Pull requests", 130),
+				width("State", 90), width("Issues", 90), width(planningPullRequests, 130),
 				linkOn("Milestone"),
 			},
 			GR: milesGR, GRTF: milesGRtf,
 			GRDesc: "Graphite names each row repository, milestone and state from the path. " + grRows,
 			ES:     milesES, ESTF: milesEStf,
 		}),
-		panel("timeseries", "Forks gained over time", 12, 8, 0, 8, []Target{sqlTS(forks)}, &P{
+		panel("timeseries", "Forks gained over time", box{W: 12, H: 8, X: 0, Y: 8}, []Target{sqlTS(forks)}, &P{
 			Prom: []Target{daily(fmt.Sprintf(
 				"sum by (repo) (increase(github_forks_seen_total{%s}[1d]))", PF,
 			), "{{repo}}")},
@@ -143,26 +153,26 @@ func labelsMilestonesAndForks(b *builder) []Panel {
 			GR:       []Target{grq(perBucket("isNonNull("+rp(fk, "forks")+")", gn(fk, "repo")))},
 			ES:       []Target{b.esDaily(fk, b.mCount(), "repo", "", []string{ESF}, "")},
 		}),
-		panel("table", "Forks", 12, 8, 12, 8, []Target{sqlT(forkTbl)}, &P{
+		panel("table", "Forks", box{W: 12, H: 8, X: 12, Y: 8}, []Target{sqlT(forkTbl)}, &P{
 			Prom: []Target{
 				promTbl(fmt.Sprintf("sum by (repo) (increase(github_forks_seen_total{%s}[$__range]))", PF), "A"),
 				promTbl(fmt.Sprintf("avg by (repo) (github_forks_seen_advanced_mean{%s})", PF), "B"),
 				promTbl(fmt.Sprintf("avg by (repo) (github_forks_seen_days_since_push_mean{%s})", PF), "C"),
 			},
 			PromTF: merged(map[string]string{
-				"repo": "Repository", "Value #A": "Forks", "Value #B": "Pushed to",
-				"Value #C": "Idle",
+				"repo": "Repository", panelValueA: "Forks", panelValueB: planningPushedTo,
+				panelValueC: "Idle",
 			}, nil, nil),
 			Desc: "Whether a fork was ever pushed to separates a derivative from a bookmark, " +
 				"which most forks are.",
 			PromDesc: "Prometheus keeps no forker, so this is per repository: forks seen over " +
 				"the range, the share ever pushed to, and the mean idle time. " + sinceStart,
 			Overrides: []any{
-				when("Forked"), width("Pushed to", 110), unitOf("Idle", "d", 90),
+				when("Forked"), width(planningPushedTo, 110), unitOf("Idle", "d", 90),
 				linkOn("By"),
 			},
 			PromOver: []any{
-				unitOf("Pushed to", "percentunit", 110),
+				unitOf(planningPushedTo, "percentunit", 110),
 				barCell("Forks", "short", 120),
 			},
 			GR: forkGR, GRTF: forkGRtf,
@@ -199,7 +209,7 @@ func discussionAndComments(b *builder) []Panel {
 		` CASE WHEN answerable = 'false' THEN NULL WHEN has_answer THEN 1 ELSE 0 END AS "Answered",` +
 		` url AS "Link" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo, number` +
 		" ORDER BY time DESC, comments DESC) AS rn FROM gh_discussion" +
-		" WHERE " + wholeHistory + " AND " + RF + ") x WHERE rn = 1" +
+		" WHERE " + wholeHistory + " AND " + RF + planningNewestRow +
 		" ORDER BY 2 DESC LIMIT 50"
 	// The comments this account left in discussions of repositories it does
 	// not own, and whether each was marked the accepted answer. The comment
@@ -217,7 +227,7 @@ func discussionAndComments(b *builder) []Panel {
 		gn(dc, "category")), "Repository, number, category", []col{{"lastNotNull", "Comments"}})
 	latestES, latestEStf := b.esRaw(dc, 50, []named{
 		{"title", "Title"},
-		{"@timestamp", "Opened"},
+		{panelESTime, "Opened"},
 		{"repo", "Repository"},
 		{"category", "Category"},
 		{"comments", "Comments"},
@@ -229,7 +239,7 @@ func discussionAndComments(b *builder) []Panel {
 		"Repository, number, accepted", []col{{"lastNotNull", "Comments"}})
 	elsewhereES, elsewhereEStf := b.esRaw(dcc, 50, []named{
 		{"title", "Title"},
-		{"@timestamp", "When"},
+		{panelESTime, "When"},
 		{"repo", "Repository"},
 		{"is_answer", "Accepted"},
 		{"url", "Link"},
@@ -257,28 +267,28 @@ func discussionAndComments(b *builder) []Panel {
 	commentsGR, commentsGRtf := gTbl(rowsOf(countOf(gp("gh_issue_comment", "comments")),
 		gn("gh_issue_comment", "repo")), "Repository", []col{{"sum", "Comments"}})
 	commentsES, commentsEStf := esTbl("gh_issue_comment", []any{b.tm("repo", 20)}, []any{b.mCount()},
-		[]named{{"repo.keyword", "Repository"}, {"n", "Comments"}}, nil)
+		[]named{{panelRepoField, "Repository"}, {"n", "Comments"}}, nil)
 
 	answersGR, answersGRtf := gTbl(rowsOf(countOf(gp("gh_discussion_comment", "comments")),
 		gn("gh_discussion_comment", "repo")), "Repository", []col{{"sum", "Comments"}})
 	answersES, answersEStf := esTbl("gh_discussion_comment", []any{b.tm("repo", 20)},
 		[]any{b.mCount(), b.mSum("answers"), b.mSum("upvotes")},
 		[]named{
-			{"repo.keyword", "Repository"},
+			{panelRepoField, "Repository"},
 			{"n", "Comments"},
 			{"a", "Accepted answers"},
 			{"u", "Upvotes"},
 		}, nil)
 	return []Panel{
-		panel("table", "Discussions", 8, 8, 0, 16, []Target{sqlT(disc)}, &P{
+		panel("table", "Discussions", box{W: 8, H: 8, X: 0, Y: 16}, []Target{sqlT(disc)}, &P{
 			Prom: []Target{
 				promTbl(fmt.Sprintf("sum by (category, has_answer) (increase(github_discussions_total{%s}[$__range]))", PF), "A"),
 				promTbl(fmt.Sprintf("avg by (category, has_answer) (github_discussions_comments_mean{%s})", PF), "B"),
 				promTbl(fmt.Sprintf("avg by (category, has_answer) (github_discussions_upvotes_mean{%s})", PF), "C"),
 			},
 			PromTF: merged(map[string]string{
-				"category": "Category", "has_answer": "Answered", "Value #A": "Discussions",
-				"Value #B": "Comments each", "Value #C": "Upvotes each",
+				"category": "Category", "has_answer": "Answered", panelValueA: "Discussions",
+				panelValueB: "Comments each", panelValueC: "Upvotes each",
 			}, nil, map[string]int{"category": 0, "has_answer": 1}),
 			Opts:     Opts{"sort": "Discussions"},
 			Desc:     "Discussions opened in the range, by category and whether they were answered.",
@@ -295,7 +305,7 @@ func discussionAndComments(b *builder) []Panel {
 				"an answer. " + grRows,
 			ES: discES, ESTF: discEStf,
 		}),
-		panel("table", "Latest discussions", 16, 8, 8, 16, []Target{sqlT(latest)}, &P{
+		panel("table", "Latest discussions", box{W: 16, H: 8, X: 8, Y: 16}, []Target{sqlT(latest)}, &P{
 			PromNote: cannot("the newest fifty discussions one by one, with their category, "+
 				"comment count, whether they were answered, and a link to each.", perItem),
 			GRDesc: "Graphite names each row repository, number and category from the path " +
@@ -316,7 +326,7 @@ func discussionAndComments(b *builder) []Panel {
 		}),
 		// The eight commonest transitions of the range and the rest as
 		// `other`: the legend listed eighty one series.
-		panel("timeseries", "Transitions over time", 12, 8, 0, 24, []Target{sqlTS(
+		panel("timeseries", "Transitions over time", box{W: 12, H: 8, X: 0, Y: 24}, []Target{sqlTS(
 			topSeries("gh_issue_event", "event", "events", "n", RF),
 		)}, &P{
 			Prom: []Target{daily(fmt.Sprintf(
@@ -333,7 +343,7 @@ func discussionAndComments(b *builder) []Panel {
 				gn("gh_issue_event", "event")))},
 			ES: []Target{b.esDaily("gh_issue_event", b.mCount(), "event", "", []string{ESF}, "")},
 		}),
-		panel("table", "Comments left", 12, 8, 12, 24, []Target{sqlT(
+		panel("table", "Comments left", box{W: 12, H: 8, X: 12, Y: 24}, []Target{sqlT(
 			`SELECT repo AS "Repository", COUNT(*) AS "Comments",` +
 				` MAX(CASE WHEN own = 'false' THEN 1 ELSE 0 END) AS "Elsewhere"` +
 				" FROM gh_issue_comment WHERE $__timeFilter(time)" +
@@ -349,7 +359,7 @@ func discussionAndComments(b *builder) []Panel {
 			GR:        commentsGR, GRTF: commentsGRtf, GRDesc: grSlot,
 			ES: commentsES, ESTF: commentsEStf,
 		}),
-		panel("table", "Discussion answers", 8, 8, 0, 32, []Target{sqlT(
+		panel("table", "Discussion answers", box{W: 8, H: 8, X: 0, Y: 32}, []Target{sqlT(
 			`SELECT repo AS "Repository", SUM(answers) AS "Accepted answers",` +
 				` COUNT(*) AS "Comments", SUM(upvotes) AS "Upvotes"` +
 				" FROM gh_discussion_comment WHERE $__timeFilter(time)" +
@@ -366,7 +376,7 @@ func discussionAndComments(b *builder) []Panel {
 			GR:        answersGR, GRTF: answersGRtf, GRDesc: grSlot,
 			ES: answersES, ESTF: answersEStf,
 		}),
-		panel("table", "Answers elsewhere", 16, 8, 8, 32, []Target{sqlT(elsewhere)}, &P{
+		panel("table", "Answers elsewhere", box{W: 16, H: 8, X: 8, Y: 32}, []Target{sqlT(elsewhere)}, &P{
 			PromNote: cannot("the newest fifty comments this account left in other people's "+
 				"discussions, whether each was accepted as the answer, and a link to each.",
 				perItem),

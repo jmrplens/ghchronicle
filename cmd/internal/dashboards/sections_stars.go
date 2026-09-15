@@ -77,7 +77,7 @@ func stars(b *builder) []Panel {
 	}, []string{ESF})
 
 	return []Panel{
-		panel("timeseries", "Stars gained over time", 12, 8, 0, 0, []Target{sqlTS(perDay)}, &P{
+		panel("timeseries", "Stars gained over time", box{W: 12, H: 8, X: 0, Y: 0}, []Target{sqlTS(perDay)}, &P{
 			Prom: []Target{daily(fmt.Sprintf(
 				"sum by (repo) (increase(github_stars_gained_total{%s}[1d]))", PF,
 			), "{{repo}}")},
@@ -91,7 +91,7 @@ func stars(b *builder) []Panel {
 			GR:       []Target{grq(perBucket("isNonNull("+starPath+")", gn("gh_star", "repo")))},
 			ES:       []Target{b.esDaily("gh_star", b.mCount(), "repo", "", []string{ESF}, "")},
 		}),
-		panel("timeseries", "Stars over time", 12, 8, 12, 0, []Target{sqlTS(curve)}, &P{
+		panel("timeseries", "Stars over time", box{W: 12, H: 8, X: 12, Y: 0}, []Target{sqlTS(curve)}, &P{
 			Prom: []Target{promq(fmt.Sprintf("sum(github_repo_stars{%s})", PF), legend("Stars"))},
 			Desc: "The star count as it climbed. The rows go all the way back to the first " +
 				"star, so widening the range shows more of the curve, and it holds its " +
@@ -104,7 +104,7 @@ func stars(b *builder) []Panel {
 			ES:     []Target{b.esSnapshotStack("gh_repo", "stars")},
 			ESOpts: esStacked, ESDesc: esSnapshot,
 		}),
-		panel("barchart", "Stars by repository", 12, 8, 0, 8, []Target{sqlT(byRepo)}, &P{
+		panel("barchart", "Stars by repository", box{W: 12, H: 8, X: 0, Y: 8}, []Target{sqlT(byRepo)}, &P{
 			Prom:     []Target{promTbl(fmt.Sprintf("topk(12, sum by (repo) (github_repo_stars{%s}) > 0)", PF))},
 			Desc:     "The twelve most starred; the rest are one bar called other.",
 			PromDesc: "Prometheus shows the twelve and folds nothing.",
@@ -112,7 +112,7 @@ func stars(b *builder) []Panel {
 			GR:       byRepoGR, GRTF: byRepoGRtf,
 			ES: byRepoES, ESTF: byRepoEStf,
 		}),
-		panel("table", "Recent stars", 12, 8, 12, 8, []Target{sqlT(newest)}, &P{
+		panel("table", "Recent stars", box{W: 12, H: 8, X: 12, Y: 8}, []Target{sqlT(newest)}, &P{
 			Prom: []Target{promTbl(fmt.Sprintf(
 				"sum by (repo) (increase(github_stars_gained_total{%s}[$__range])) > 0", PF,
 			))},
@@ -128,7 +128,7 @@ func stars(b *builder) []Panel {
 			GROver: []any{barCell("Stars", "short", 200)},
 			ES:     newestES, ESTF: newestEStf,
 		}),
-		panel("timeseries", "Forks over time", 24, 7, 0, 16, []Target{sqlTS(forksTS)}, &P{
+		panel("timeseries", "Forks over time", box{W: 24, H: 7, X: 0, Y: 16}, []Target{sqlTS(forksTS)}, &P{
 			Prom: []Target{promq(fmt.Sprintf("sum(github_repo_forks{%s})", PF), legend("Forks"))},
 			Desc: "The fork count as it climbed, rebuilt from each fork's own date the way " +
 				"the star curve is, so it reaches back to the first fork rather than to " +

@@ -10,13 +10,17 @@ import "fmt"
 // Both halves of the section need all four.
 const pr = "gh_pull_request"
 
+// flowMergedFilter is that same "merged" as Elasticsearch takes it, spelled
+// beside a different set of filters by each panel that asks for it.
+const flowMergedFilter = "state:MERGED"
+
 func mergedPath(field string) string { return rp(pr, field, "state", "MERGED") }
 
 func anyPath(field string) string { return rp(pr, field) }
 
 var (
 	promMerged = `state="MERGED",` + PF
-	esMerged   = []string{"state:MERGED", ESF, esIdentified}
+	esMerged   = []string{flowMergedFilter, ESF, esIdentified}
 )
 
 // stateWord is the legend a per-day panel gives each state of a pull request
@@ -39,6 +43,41 @@ var stateOverrides = []any{
 		map[string]any{"id": "color", "value": map[string]any{"mode": "fixed", "fixedColor": "orange"}},
 	}),
 }
+
+// The pieces every query in this section is assembled from: the head of a
+// SELECT, the alias that names the column a timeseries splits its series on,
+// the range-bounded pull requests each panel reads, and the grouping those two
+// ask for. The CI section builds its queries from the same head.
+const (
+	flowSelect            = "SELECT "
+	flowSeriesAlias       = " AS series,"
+	flowFromPulls         = " FROM gh_pull_request WHERE $__timeFilter(time) AND "
+	flowByBucketAndSeries = " GROUP BY 1, 2 ORDER BY 1"
+)
+
+// What the panels call the same number wherever it appears. A stat, its
+// Prometheus query, its Graphite one and its Elasticsearch frame have to agree
+// on the name or the value lands in a field nothing describes, and the tables
+// below repeat several of them as column titles.
+const (
+	flowMergedCount     = "Pull requests merged"
+	flowMergeTime       = "Time to merge"
+	flowFirstReviewTime = "Time to first review"
+	flowIssuesClosed    = "Issues closed"
+	flowIssueCloseTime  = "Time to close an issue"
+	flowLinesPerPull    = "Lines per pull request"
+	flowChurn           = "Lines changed"
+	flowPullColumn      = "Pull request"
+	flowOpenAge         = "Open for"
+)
+
+// flowNonNull is how a Graphite panel counts rows: every point that exists
+// becomes a 1, and the bucket adds them up.
+const flowNonNull = "isNonNull("
+
+// flowNumberTerm is the pull request or issue number as Elasticsearch keeps
+// it, which is a term to group by rather than a number to measure.
+const flowNumberTerm = "number.keyword"
 
 // flow is how much moved and how fast, and then which pull requests and
 // which people moved it.
@@ -69,21 +108,21 @@ func flowRates(b *builder) []Panel {
 	// bucket and reads "open that day", and it is drawn as a line beside the
 	// stack of what actually happened rather than stacked on top of it: the
 	// stack read 45 open pull requests in a week that had 28.
-	perDay := "SELECT " + timeBin + ", " + stateWord + " AS series," +
+	perDay := flowSelect + timeBin + ", " + stateWord + flowSeriesAlias +
 		" COUNT(DISTINCT number) AS pulls FROM gh_pull_request WHERE $__timeFilter(time) AND " + RF +
-		" AND " + identified + " GROUP BY 1, 2 ORDER BY 1"
-	mergeTime := "SELECT " + timeBin + "," +
+		" AND " + identified + flowByBucketAndSeries
+	mergeTime := flowSelect + timeBin + "," +
 		` approx_percentile_cont(seconds_to_merge, 0.5) AS "Median",` +
 		` approx_percentile_cont(seconds_to_merge, 0.9) AS "90th percentile"` +
-		" FROM gh_pull_request WHERE $__timeFilter(time) AND " + RF +
+		flowFromPulls + RF +
 		" AND state = 'MERGED' GROUP BY 1 ORDER BY 1"
-	sizeTime := "SELECT " + timeBin + "," +
+	sizeTime := flowSelect + timeBin + "," +
 		` approx_percentile_cont(churn, 0.5) AS "Median lines changed"` +
-		" FROM gh_pull_request WHERE $__timeFilter(time) AND " + RF +
+		flowFromPulls + RF +
 		" AND state = 'MERGED' GROUP BY 1 ORDER BY 1"
-	issuesDay := "SELECT " + timeBin + ", " + stateWord + " AS series," +
+	issuesDay := flowSelect + timeBin + ", " + stateWord + flowSeriesAlias +
 		" COUNT(DISTINCT number) AS issues FROM gh_issue WHERE $__timeFilter(time) AND " + RF +
-		" AND " + identified + " GROUP BY 1, 2 ORDER BY 1"
+		" AND " + identified + flowByBucketAndSeries
 	issuePath := func(field string) string { return rp("gh_issue", field) }
 
 	return []Panel{
@@ -91,31 +130,31 @@ func flowRates(b *builder) []Panel {
 		// own 144 pixel panel on a phone and the six opened the section with
 		// nothing else on the screen. Three of them are durations, so those
 		// name their unit on their own field.
-		statGroup("Merged and closed in range", 24, 5, 0, 0, []Target{
-			sqlT(namedValue(mergedPRs, "Pull requests merged")),
-			{Kind: "sql", Format: "table", Ref: "B", SQL: namedValue(mergeTime50, "Time to merge")},
-			{Kind: "sql", Format: "table", Ref: "C", SQL: namedValue(reviewTime50, "Time to first review")},
-			{Kind: "sql", Format: "table", Ref: "D", SQL: namedValue(closedIssues, "Issues closed")},
-			{Kind: "sql", Format: "table", Ref: "E", SQL: namedValue(issueClose, "Time to close an issue")},
-			{Kind: "sql", Format: "table", Ref: "F", SQL: namedValue(prSize50, "Lines per pull request")},
+		statGroup("Merged and closed in range", box{W: 24, H: 5, X: 0, Y: 0}, []Target{
+			sqlT(namedValue(mergedPRs, flowMergedCount)),
+			{Kind: "sql", Format: "table", Ref: "B", SQL: namedValue(mergeTime50, flowMergeTime)},
+			{Kind: "sql", Format: "table", Ref: "C", SQL: namedValue(reviewTime50, flowFirstReviewTime)},
+			{Kind: "sql", Format: "table", Ref: "D", SQL: namedValue(closedIssues, flowIssuesClosed)},
+			{Kind: "sql", Format: "table", Ref: "E", SQL: namedValue(issueClose, flowIssueCloseTime)},
+			{Kind: "sql", Format: "table", Ref: "F", SQL: namedValue(prSize50, flowLinesPerPull)},
 		}, &P{
 			Prom: []Target{
-				promNamed("A", "Pull requests merged", fmt.Sprintf(
+				promNamed("A", flowMergedCount, fmt.Sprintf(
 					"sum(increase(github_pull_requests_total{%s}[$__range]))", promMerged,
 				)),
-				promNamed("B", "Time to merge", fmt.Sprintf(
+				promNamed("B", flowMergeTime, fmt.Sprintf(
 					"avg(github_pull_requests_seconds_to_merge_mean{%s})", promMerged,
 				)),
-				promNamed("C", "Time to first review", fmt.Sprintf(
+				promNamed("C", flowFirstReviewTime, fmt.Sprintf(
 					"avg(github_pull_requests_seconds_to_first_human_review_mean{%s})", PF,
 				)),
-				promNamed("D", "Issues closed", fmt.Sprintf(
+				promNamed("D", flowIssuesClosed, fmt.Sprintf(
 					`sum(increase(github_issues_total{state="CLOSED",%s}[$__range]))`, PF,
 				)),
-				promNamed("E", "Time to close an issue", fmt.Sprintf(
+				promNamed("E", flowIssueCloseTime, fmt.Sprintf(
 					`avg(github_issues_seconds_to_close_mean{state="CLOSED",%s})`, PF,
 				)),
-				promNamed("F", "Lines per pull request", fmt.Sprintf(
+				promNamed("F", flowLinesPerPull, fmt.Sprintf(
 					"avg(github_pull_requests_churn_mean{%s})", promMerged,
 				)),
 			},
@@ -128,37 +167,37 @@ func flowRates(b *builder) []Panel {
 				"pull request is the median of added plus removed by a merged one.",
 			PromDesc: sinceStart + " " + lastSweep,
 			GR: []Target{
-				grNamed("A", "Pull requests merged", total(countOf(mergedPath("churn")))),
-				grNamed("B", "Time to merge", medianTotal(mergedPath("seconds_to_merge"))),
-				grNamed("C", "Time to first review",
+				grNamed("A", flowMergedCount, total(countOf(mergedPath("churn")))),
+				grNamed("B", flowMergeTime, medianTotal(mergedPath("seconds_to_merge"))),
+				grNamed("C", flowFirstReviewTime,
 					medianTotal(anyPath("seconds_to_first_human_review"))),
-				grNamed("D", "Issues closed",
+				grNamed("D", flowIssuesClosed,
 					total(countOf(rp("gh_issue", "comments", "state", "CLOSED")))),
-				grNamed("E", "Time to close an issue",
+				grNamed("E", flowIssueCloseTime,
 					medianTotal(rp("gh_issue", "seconds_to_close", "state", "CLOSED"))),
-				grNamed("F", "Lines per pull request", medianTotal(mergedPath("churn"))),
+				grNamed("F", flowLinesPerPull, medianTotal(mergedPath("churn"))),
 			},
 			GRDesc: grSlot,
 			ES: []Target{
 				esRef("A", b.esTotal(pr, b.mCount(), esMerged...)),
-				esRef("B", b.esTotal(pr, b.mPct("seconds_to_merge", 50), ESF, "state:MERGED")),
+				esRef("B", b.esTotal(pr, b.mPct("seconds_to_merge", 50), ESF, flowMergedFilter)),
 				esRef("C", b.esTotal(pr, b.mPct("seconds_to_first_human_review", 50), ESF,
 					"_exists_:seconds_to_first_human_review")),
 				esRef("D", b.esTotal("gh_issue", b.mCount(), "state:CLOSED", ESF, esIdentified)),
 				esRef("E", b.esTotal("gh_issue", b.mPct("seconds_to_close", 50), "state:CLOSED", ESF)),
-				esRef("F", b.esTotal(pr, b.mPct("churn", 50), "state:MERGED", ESF)),
+				esRef("F", b.esTotal(pr, b.mPct("churn", 50), flowMergedFilter, ESF)),
 			},
 			ESOver: []any{
-				frameName("A", "Pull requests merged"), frameName("B", "Time to merge"),
-				frameName("C", "Time to first review"), frameName("D", "Issues closed"),
-				frameName("E", "Time to close an issue"), frameName("F", "Lines per pull request"),
+				frameName("A", flowMergedCount), frameName("B", flowMergeTime),
+				frameName("C", flowFirstReviewTime), frameName("D", flowIssuesClosed),
+				frameName("E", flowIssueCloseTime), frameName("F", flowLinesPerPull),
 			},
 			Overrides: []any{
-				unitOf("Time to merge", "s", 0), unitOf("Time to first review", "s", 0),
-				unitOf("Time to close an issue", "s", 0),
+				unitOf(flowMergeTime, "s", 0), unitOf(flowFirstReviewTime, "s", 0),
+				unitOf(flowIssueCloseTime, "s", 0),
 			},
 		}),
-		panel("timeseries", "Pull requests over time", 12, 8, 0, 5, []Target{sqlTS(perDay)}, &P{
+		panel("timeseries", "Pull requests over time", box{W: 12, H: 8, X: 0, Y: 5}, []Target{sqlTS(perDay)}, &P{
 			Prom: []Target{daily(fmt.Sprintf(
 				"sum by (state) (increase(github_pull_requests_total{%s}[1d]))", PF,
 			), "{{state}}")},
@@ -169,10 +208,10 @@ func flowRates(b *builder) []Panel {
 			Opts:     mergeOpts(Opts{"bars": true, "stack": true}, dayBins),
 			SQLOpts:  seriesOpts,
 			SQLOver:  stateOverrides,
-			GR:       []Target{grq(perBucket("isNonNull("+anyPath("churn")+")", gn(pr, "state")))},
+			GR:       []Target{grq(perBucket(flowNonNull+anyPath("churn")+")", gn(pr, "state")))},
 			ES:       []Target{b.esDaily(pr, b.mCount(), "state", "", []string{ESF, esIdentified}, "")},
 		}),
-		panel("timeseries", "Time to merge over time", 12, 8, 12, 5, []Target{sqlTS(mergeTime)}, &P{
+		panel("timeseries", "Time to merge over time", box{W: 12, H: 8, X: 12, Y: 5}, []Target{sqlTS(mergeTime)}, &P{
 			Prom: []Target{promq(fmt.Sprintf("avg(github_pull_requests_seconds_to_merge_mean{%s})", promMerged),
 				legend("Mean of the sweep"))},
 			Opts:     mergeOpts(Opts{"unit": "s"}, dayBins),
@@ -183,10 +222,10 @@ func flowRates(b *builder) []Panel {
 			},
 			GRDesc: grWorst + " " + grSlot,
 			ES: []Target{esq(pr, []any{b.mPct("seconds_to_merge", 50, 90)}, []any{b.dh()}, "A",
-				[]string{"state:MERGED", ESF}, "")},
+				[]string{flowMergedFilter, ESF}, "")},
 			Desc: bucketFollowsRange,
 		}),
-		panel("timeseries", "Issues over time", 12, 7, 0, 13, []Target{sqlTS(issuesDay)}, &P{
+		panel("timeseries", "Issues over time", box{W: 12, H: 7, X: 0, Y: 13}, []Target{sqlTS(issuesDay)}, &P{
 			Prom: []Target{daily(fmt.Sprintf(
 				"sum by (state) (increase(github_issues_total{%s}[1d]))", PF,
 			), "{{state}}")},
@@ -197,11 +236,11 @@ func flowRates(b *builder) []Panel {
 			Opts:     mergeOpts(Opts{"bars": true, "stack": true}, dayBins),
 			SQLOpts:  seriesOpts,
 			SQLOver:  stateOverrides,
-			GR: []Target{grq(perBucket("isNonNull("+issuePath("comments")+")",
+			GR: []Target{grq(perBucket(flowNonNull+issuePath("comments")+")",
 				gn("gh_issue", "state")))},
 			ES: []Target{b.esDaily("gh_issue", b.mCount(), "state", "", []string{ESF, esIdentified}, "")},
 		}),
-		panel("timeseries", "Pull request size", 12, 7, 12, 13, []Target{sqlTS(sizeTime)}, &P{
+		panel("timeseries", "Pull request size", box{W: 12, H: 7, X: 12, Y: 13}, []Target{sqlTS(sizeTime)}, &P{
 			Prom: []Target{promq(fmt.Sprintf("avg(github_pull_requests_churn_mean{%s})", promMerged),
 				legend("Mean lines changed"))},
 			Desc:     "Lines added plus removed per merged pull request. " + bucketFollowsRange,
@@ -211,7 +250,7 @@ func flowRates(b *builder) []Panel {
 				medianBucket(mergedPath("churn"))))},
 			GRDesc: grSlot,
 			ES: []Target{esq(pr, []any{b.mPct("churn", 50)}, []any{b.dh()}, "A",
-				[]string{"state:MERGED", ESF}, "Median lines changed")},
+				[]string{flowMergedFilter, ESF}, "Median lines changed")},
 		}),
 	}
 }
@@ -227,15 +266,15 @@ func pullsAndReviewers(b *builder) []Panel {
 		` author_association AS "Association", label_names AS "Labels",` +
 		` changed_files AS "Files", reviews AS "Reviews", seconds_to_merge AS "Time to merge",` +
 		` url AS "Link"` +
-		" FROM gh_pull_request WHERE $__timeFilter(time) AND " + RF + " AND " + identified +
+		flowFromPulls + RF + " AND " + identified +
 		" AND state = 'MERGED' ORDER BY churn DESC LIMIT 25"
 	authors := `SELECT author AS "Author", COUNT(*) AS "Pull requests"` +
-		" FROM gh_pull_request WHERE $__timeFilter(time) AND " + RF + " AND " + identified +
+		flowFromPulls + RF + " AND " + identified +
 		" GROUP BY 1 ORDER BY 2 DESC LIMIT 15"
 	byRepo := `SELECT repo AS "Repository", COUNT(*) AS "Merged",` +
 		` approx_percentile_cont(seconds_to_merge, 0.5) AS "Time to merge",` +
 		` approx_percentile_cont(churn, 0.5) AS "Lines changed"` +
-		" FROM gh_pull_request WHERE $__timeFilter(time) AND " + RF + " AND " + identified +
+		flowFromPulls + RF + " AND " + identified +
 		" AND state = 'MERGED' GROUP BY 1 ORDER BY 2 DESC"
 	// Who is a reviewer: a bot is named as one, and an author answering a
 	// review on their own pull request is not reviewing it, so those rows
@@ -247,14 +286,14 @@ func pullsAndReviewers(b *builder) []Panel {
 		` approx_percentile_cont(seconds_to_review, 0.5) AS "Wait"` +
 		" FROM gh_pull_request_review WHERE $__timeFilter(time) AND " + RF +
 		" GROUP BY 1 ORDER BY 2 DESC LIMIT 20"
-	reviewsDay := "SELECT " + timeBin + ", " + who + " AS series," +
+	reviewsDay := flowSelect + timeBin + ", " + who + flowSeriesAlias +
 		" COUNT(*) AS reviews FROM gh_pull_request_review WHERE $__timeFilter(time)" +
-		" AND " + RF + " GROUP BY 1, 2 ORDER BY 1"
+		" AND " + RF + flowByBucketAndSeries
 	reviewPath := rp("gh_pull_request_review", "seconds_to_review")
 
 	biggestGR, biggestGRtf := gTbl(topRows(mergedPath("churn"), 25,
 		gn(pr, "repo"), gn(pr, "number"), gn(pr, "author")),
-		"Pull request", []col{{"max", "Lines changed"}})
+		flowPullColumn, []col{{"max", flowChurn}})
 	biggestES, biggestEStf := b.esRaw(pr, 500, []named{
 		{"@timestamp", "Closed"},
 		{"repo", "Repository"},
@@ -263,10 +302,10 @@ func pullsAndReviewers(b *builder) []Panel {
 		{"author", "Author"},
 		{"author_association", "Association"},
 		{"label_names", "Labels"},
-		{"churn", "Lines changed"},
+		{"churn", flowChurn},
 		{"changed_files", "Files"},
 		{"reviews", "Reviews"},
-		{"seconds_to_merge", "Time to merge"},
+		{"seconds_to_merge", flowMergeTime},
 		{"url", "Link"},
 	}, esMerged)
 
@@ -280,14 +319,14 @@ func pullsAndReviewers(b *builder) []Panel {
 
 	byRepoGR, byRepoGRtf := gTbl(fmt.Sprintf(`groupByNode(%s, %d, "avg")`,
 		mergedPath("seconds_to_merge"), gn(pr, "repo")), "Repository",
-		[]col{{"count", "Merged"}, {"median", "Time to merge"}})
+		[]col{{"count", "Merged"}, {"median", flowMergeTime}})
 	byRepoES, byRepoEStf := esTbl(pr, []any{b.tm("repo", 50)},
 		[]any{b.mCount(), b.mPct("seconds_to_merge", 50), b.mPct("churn", 50)},
 		[]named{
-			{"repo.keyword", "Repository"},
+			{inventoryRepoTerm, "Repository"},
 			{"n", "Merged"},
-			{"t", "Time to merge"},
-			{"c", "Lines changed"},
+			{"t", flowMergeTime},
+			{"c", flowChurn},
 		}, esMerged)
 
 	reviewersGR, reviewersGRtf := gTbl(fmt.Sprintf(
@@ -301,57 +340,57 @@ func pullsAndReviewers(b *builder) []Panel {
 		[]string{ESF})
 
 	return append([]Panel{
-		panel("table", "Largest merged pull requests", 16, 9, 0, 20, []Target{sqlT(biggest)}, &P{
+		panel("table", "Largest merged pull requests", box{W: 16, H: 9, X: 0, Y: 20}, []Target{sqlT(biggest)}, &P{
 			PromNote: cannot("the twenty-five largest merged pull requests, with author, "+
 				"files, reviews and time to merge.",
 				"The exporter reduces pull requests to a count and means per "+
 					"repository and state; no individual pull request survives."),
-			Opts: Opts{"sort": "Lines changed"},
+			Opts: Opts{"sort": flowChurn},
 			Overrides: []any{
 				when("Closed"), repoColumn(), width("Number", 80),
 				width("Author", 120), width("Association", 110),
-				barCell("Lines changed", "short", 120),
+				barCell(flowChurn, "short", 120),
 				width("Files", 70), width("Reviews", 85),
-				unitOf("Time to merge", "s", 130), linkOn("Number"),
+				unitOf(flowMergeTime, "s", 130), linkOn("Number"),
 			},
 			GR: biggestGR, GRTF: biggestGRtf,
 			GRDesc: "Graphite names each row repository, number and author from the path. " + grRows,
 			ES:     biggestES, ESTF: biggestEStf, ESDesc: esNewest,
 		}),
-		panel("barchart", "Pull requests by author", 8, 9, 16, 20, []Target{sqlT(authors)}, &P{
+		panel("barchart", "Pull requests by author", box{W: 8, H: 9, X: 16, Y: 20}, []Target{sqlT(authors)}, &P{
 			PromNote: cannot("pull requests per author over the range.",
 				"The exporter keeps only `repo` and `state` on pull requests: "+
 					"an author label would be a series per contributor per state."),
 			GR: authorsGR, GRTF: authorsGRtf,
 			ES: authorsES, ESTF: authorsEStf,
 		}),
-		panel("table", "Pull requests by repository", 12, 8, 0, 29, []Target{sqlT(byRepo)}, &P{
+		panel("table", "Pull requests by repository", box{W: 12, H: 8, X: 0, Y: 29}, []Target{sqlT(byRepo)}, &P{
 			Prom: []Target{
 				promTbl(fmt.Sprintf("sum by (repo) (increase(github_pull_requests_total{%s}[$__range]))", promMerged), "A"),
 				promTbl(fmt.Sprintf("avg by (repo) (github_pull_requests_seconds_to_merge_mean{%s})", promMerged), "B"),
 				promTbl(fmt.Sprintf("avg by (repo) (github_pull_requests_churn_mean{%s})", promMerged), "C"),
 			},
 			PromTF: merged(map[string]string{
-				"repo": "Repository", "Value #A": "Merged",
-				"Value #B": "Time to merge", "Value #C": "Lines changed",
+				"repo": "Repository", inventoryValueCol + "A": "Merged",
+				inventoryValueCol + "B": flowMergeTime, inventoryValueCol + "C": flowChurn,
 			}, nil, nil),
 			Opts:     Opts{"sort": "Merged"},
 			PromDesc: sinceStart + " " + lastSweep,
 			Overrides: []any{
-				barCell("Merged", "short", 120), unitOf("Time to merge", "s", 140),
-				width("Lines changed", 120),
+				barCell("Merged", "short", 120), unitOf(flowMergeTime, "s", 140),
+				width(flowChurn, 120),
 			},
 			GR: byRepoGR, GRTF: byRepoGRtf,
 			GRDesc: "Graphite reduces the merge times of each repository: how many, and their median. " + grRows,
 			ES:     byRepoES, ESTF: byRepoEStf,
 		}),
-		panel("table", "Reviewers", 12, 8, 12, 29, []Target{sqlT(reviewers)}, &P{
+		panel("table", "Reviewers", box{W: 12, H: 8, X: 12, Y: 29}, []Target{sqlT(reviewers)}, &P{
 			Prom: []Target{
 				promTbl(fmt.Sprintf("sum by (reviewer) (increase(github_reviews_total{%s}[$__range]))", PF), "A"),
 				promTbl(fmt.Sprintf("avg by (reviewer) (github_reviews_seconds_to_review_mean{%s})", PF), "B"),
 			},
 			PromTF: merged(map[string]string{
-				"reviewer": "Reviewer", "Value #A": "Reviews", "Value #B": "Wait",
+				"reviewer": "Reviewer", inventoryValueCol + "A": "Reviews", inventoryValueCol + "B": "Wait",
 			}, nil, nil),
 			Opts: Opts{"sort": "Reviews"},
 			Desc: "Who actually reviews, and how long a review waited. The count on a pull " +
@@ -365,14 +404,14 @@ func pullsAndReviewers(b *builder) []Panel {
 			GR:        reviewersGR, GRTF: reviewersGRtf, GRDesc: grSlot,
 			ES: reviewersES, ESTF: reviewersEStf,
 		}),
-		panel("timeseries", "Reviews over time", 24, 8, 0, 37, []Target{sqlTS(reviewsDay)}, &P{
+		panel("timeseries", "Reviews over time", box{W: 24, H: 8, X: 0, Y: 37}, []Target{sqlTS(reviewsDay)}, &P{
 			Prom: []Target{daily(fmt.Sprintf(
 				"sum by (reviewer) (increase(github_reviews_total{%s}[1d]))", PF,
 			), "{{reviewer}}")},
 			PromDesc: sinceStart,
 			Opts:     mergeOpts(Opts{"bars": true, "stack": true}, dayBins),
 			SQLOpts:  seriesOpts,
-			GR: []Target{grq(perBucket("isNonNull("+reviewPath+")",
+			GR: []Target{grq(perBucket(flowNonNull+reviewPath+")",
 				gn("gh_pull_request_review", "reviewer")))},
 			ES: []Target{b.esDaily("gh_pull_request_review", b.mCount(), "reviewer", "",
 				[]string{ESF}, "")},
@@ -406,9 +445,9 @@ const reviewThread = "gh_review_thread"
 // The identity that makes the convergence work is the `thread` tag, so no
 // query drops it from the row it counts, only from the grouping it reports.
 func reviewDebt(b *builder) []Panel {
-	openedDay := "SELECT " + timeBin + ", CASE WHEN bot = 'true' THEN 'Bot' ELSE 'Human' END AS series," +
+	openedDay := flowSelect + timeBin + ", CASE WHEN bot = 'true' THEN 'Bot' ELSE 'Human' END AS series," +
 		" COUNT(*) AS threads FROM gh_review_thread WHERE $__timeFilter(time)" +
-		" AND " + RF + " GROUP BY 1, 2 ORDER BY 1"
+		" AND " + RF + flowByBucketAndSeries
 	// Every column after Threads is multiplied by the same `1 - resolved`,
 	// which is what makes the row read as one sentence: of this many threads,
 	// this many are still owed, this much of that is outdated and this many
@@ -464,8 +503,8 @@ func reviewDebt(b *builder) []Panel {
 	debtES, debtEStf := esTbl(reviewThread, []any{b.tm("repo", 50), b.tm("number", 25)},
 		[]any{b.mCount(), b.mSum("outdated"), b.mSum("comments")},
 		[]named{
-			{"repo.keyword", "Repository"},
-			{"number.keyword", "Pull request"},
+			{inventoryRepoTerm, "Repository"},
+			{flowNumberTerm, flowPullColumn},
 			{"n", "Unresolved"},
 			{"o", "Outdated"},
 			{"c", "Comments"},
@@ -473,7 +512,7 @@ func reviewDebt(b *builder) []Panel {
 		[]string{ESF, "resolved:0"})
 
 	return []Panel{
-		panel("timeseries", "Review threads over time", 12, 7, 0, 53,
+		panel("timeseries", "Review threads over time", box{W: 12, H: 7, X: 0, Y: 53},
 			[]Target{sqlTS(openedDay)}, &P{
 				Prom: []Target{daily(fmt.Sprintf(
 					"sum by (bot) (increase(github_review_threads_total{%s}[1d]))", PF,
@@ -485,11 +524,11 @@ func reviewDebt(b *builder) []Panel {
 				PromDesc: sinceStart,
 				Opts:     mergeOpts(Opts{"bars": true, "stack": true}, dayBins),
 				SQLOpts:  seriesOpts,
-				GR: []Target{grq(perBucket("isNonNull("+openedPath+")",
+				GR: []Target{grq(perBucket(flowNonNull+openedPath+")",
 					gn(reviewThread, "bot")))},
 				ES: []Target{b.esDaily(reviewThread, b.mCount(), "bot", "", []string{ESF}, "")},
 			}),
-		panel("table", "The review debt", 12, 7, 12, 53, []Target{sqlT(debt)}, &P{
+		panel("table", "The review debt", box{W: 12, H: 7, X: 12, Y: 53}, []Target{sqlT(debt)}, &P{
 			Desc: "A review thread is one objection, which GitHub keeps open until somebody " +
 				"resolves it. Threads is the whole conversation on that pull request; " +
 				"Unresolved, Outdated and Comments describe only what is still owed on it. " +
@@ -502,7 +541,7 @@ func reviewDebt(b *builder) []Panel {
 					"request survives the reduction to be a row here."),
 			Opts: Opts{"sort": "Unresolved"},
 			Overrides: []any{
-				repoColumn(), width("Pull request", 100), width("Threads", 90),
+				repoColumn(), width(flowPullColumn, 100), width("Threads", 90),
 				barCell("Unresolved", "short", 120), width("Outdated", 100),
 				width("Comments", 110),
 			},
@@ -536,7 +575,7 @@ func stillOpen(b *builder) []Panel {
 		` title AS "Title", author AS "Author", label_names AS "Labels",` +
 		` comments AS "Comments", reviews AS "Reviews", url AS "Link" FROM (` +
 		"SELECT *, ROW_NUMBER() OVER (PARTITION BY repo, number ORDER BY time DESC) AS rn" +
-		" FROM gh_pull_request WHERE $__timeFilter(time) AND " + RF + " AND " + identified +
+		flowFromPulls + RF + " AND " + identified +
 		") x WHERE rn = 1 AND state = 'OPEN' ORDER BY seconds_open DESC LIMIT 25"
 	// The twin for issues, read the same way: until this table no issue was
 	// reachable by unit from any panel, only counted. `label_names` is the
@@ -552,16 +591,16 @@ func stillOpen(b *builder) []Panel {
 	openGR, openGRtf := gTbl(fmt.Sprintf(`limit(sortBy(groupByNodes(%s, "max", %d, %d), "max", true), 25)`,
 		rp("gh_pull_request", "seconds_open", "state", "OPEN"),
 		gn("gh_pull_request", "repo"), gn("gh_pull_request", "number")),
-		"Repository, number", []col{{"max", "Open for"}})
+		"Repository, number", []col{{"max", flowOpenAge}})
 	// The url as a bucket, never as a metric: a top_metrics over a string
 	// panics the plugin, and a pull request has exactly one url.
 	openES, openEStf := esTbl("gh_pull_request", []any{b.tm("repo", 50), b.tm("number", 25), b.tm("url", 1)},
 		[]any{b.mMax("seconds_open"), b.mMax("comments"), b.mMax("reviews")},
 		[]named{
-			{"repo.keyword", "Repository"},
-			{"number.keyword", "Number"},
+			{inventoryRepoTerm, "Repository"},
+			{flowNumberTerm, "Number"},
 			{"url.keyword", "Link"},
-			{"s", "Open for"},
+			{"s", flowOpenAge},
 			{"c", "Comments"},
 			{"r", "Reviews"},
 		},
@@ -570,28 +609,28 @@ func stillOpen(b *builder) []Panel {
 	openIssuesGR, openIssuesGRtf := gTbl(fmt.Sprintf(`limit(sortBy(groupByNodes(%s, "max", %d, %d), "max", true), 25)`,
 		rp("gh_issue", "seconds_open", "state", "OPEN"),
 		gn("gh_issue", "repo"), gn("gh_issue", "number")),
-		"Repository, number", []col{{"max", "Open for"}})
+		"Repository, number", []col{{"max", flowOpenAge}})
 	openIssuesES, openIssuesEStf := esTbl("gh_issue", []any{b.tm("repo", 50), b.tm("number", 25), b.tm("url", 1)},
 		[]any{b.mMax("seconds_open"), b.mMax("comments")},
 		[]named{
-			{"repo.keyword", "Repository"},
-			{"number.keyword", "Number"},
+			{inventoryRepoTerm, "Repository"},
+			{flowNumberTerm, "Number"},
 			{"url.keyword", "Link"},
-			{"s", "Open for"},
+			{"s", flowOpenAge},
 			{"c", "Comments"},
 		},
 		[]string{ESF, "state:OPEN"})
 	return []Panel{
-		panel("table", "Open the longest", 12, 8, 0, 45, []Target{sqlT(openest)}, &P{
+		panel("table", "Open the longest", box{W: 12, H: 8, X: 0, Y: 45}, []Target{sqlT(openest)}, &P{
 			Prom: []Target{
 				promTbl(fmt.Sprintf(`topk(25, max by (repo, number, author) (github_pull_requests_seconds_open_mean{state="OPEN",%s}))`, PF), "A"),
 				promTbl(fmt.Sprintf(`max by (repo, number, author) (github_pull_requests_comments_mean{state="OPEN",%s})`, PF), "B"),
 			},
 			PromTF: merged(map[string]string{
 				"repo": "Repository", "number": "Number", "author": "Author",
-				"Value #A": "Open for", "Value #B": "Comments",
+				inventoryValueCol + "A": flowOpenAge, inventoryValueCol + "B": "Comments",
 			}, nil, map[string]int{"repo": 0, "number": 1, "author": 2}),
-			Opts: Opts{"sort": "Open for"},
+			Opts: Opts{"sort": flowOpenAge},
 			Desc: "Time to merge only counts what merged. This is the other half: what is " +
 				"still open and how long it has been, which is the number that decides what " +
 				"to do next rather than describing what already happened. Each pull request " +
@@ -600,24 +639,24 @@ func stillOpen(b *builder) []Panel {
 			PromDesc: lastSweep,
 			Overrides: []any{
 				repoColumn(), width("Number", 80), width("Author", 120),
-				unitOf("Open for", "s", 130),
+				unitOf(flowOpenAge, "s", 130),
 				width("Comments", 100), width("Reviews", 90), linkOn("Number"),
 			},
 			GR: openGR, GRTF: openGRtf, GRDesc: grSlot + " " + stillOpenNote,
 			ES: openES, ESTF: openEStf, ESDesc: stillOpenNote,
 		}),
-		panel("table", "Open issues the longest", 12, 8, 12, 45, []Target{sqlT(openIssues)}, &P{
+		panel("table", "Open issues the longest", box{W: 12, H: 8, X: 12, Y: 45}, []Target{sqlT(openIssues)}, &P{
 			PromNote: cannot("the twenty-five open issues that have waited longest, with "+
 				"their labels and comment counts.",
 				"The exporter reduces issues to a count and means per repository and "+
 					"state; no individual issue survives."),
-			Opts: Opts{"sort": "Open for"},
+			Opts: Opts{"sort": flowOpenAge},
 			Desc: "The same question for issues: what is still open and for how long. Labels " +
 				"is what the issue was filed as, so an old one reads as a bug nobody fixed " +
 				"or a wish nobody granted. Each issue is read from its newest row, so one " +
 				"closed inside the range is not here any more.",
 			Overrides: []any{
-				unitOf("Open for", "s", 130), width("Number", 80),
+				unitOf(flowOpenAge, "s", 130), width("Number", 80),
 				width("Comments", 110), width("Labels", 160), linkOn("Number"),
 			},
 			GR: openIssuesGR, GRTF: openIssuesGRtf, GRDesc: grSlot + " " + stillOpenNote,

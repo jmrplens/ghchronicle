@@ -1,6 +1,8 @@
 package dashboards
 
 import (
+	// The //go:embed directive below inlines mark-dark.svg, which only works
+	// in a file that imports embed. Nothing here calls it.
 	_ "embed"
 	"encoding/base64"
 	"fmt"
@@ -156,7 +158,7 @@ func buttonWidth(svg string) int {
 // saying the same word. Transparent, so there is no box: on the page it is
 // a masthead over the numbers, not one more panel among them.
 func brandPanel() Panel {
-	return panel("text", "", 24, brandHeight, 0, 0, nil, &P{Opts: Opts{
+	return panel("text", "", box{W: 24, H: brandHeight, X: 0, Y: 0}, nil, &P{Opts: Opts{
 		"content": brandHeader(), "mode": "html", "transparent": true,
 	}})
 }

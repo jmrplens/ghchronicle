@@ -65,7 +65,23 @@ runs:
         # A release binary rather than `go install`, so the Action needs no Go
         # toolchain on the runner and starts in seconds.
         if [ "$VERSION" = "latest" ]; then
-          VERSION=$(curl -fsSL https://api.github.com/repos/jmrplens/ghchronicle/releases/latest | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p')
+          # The newest release whose tag names a version in three parts, which
+          # is not the question `releases/latest` answers: that one reports
+          # whichever release carries GitHub's own "latest" flag, and
+          # publishing this Action to the Marketplace creates a second release
+          # for the moving major tag. That release holds no binaries and took
+          # the flag by date, so the download below asked for
+          # ghchronicle_1_linux_amd64.tar.gz and every run of this Action
+          # failed on its first step. grep rather than sed because the list
+          # arrives as one line and a greedy expression would read the last
+          # tag on it rather than the first.
+          VERSION=$(curl -fsSL "https://api.github.com/repos/jmrplens/ghchronicle/releases?per_page=100" \
+            | grep -o '"tag_name": *"v[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*"' \
+            | sed 's/.*"\(v[^"]*\)"$/\1/' | head -1)
+          if [ -z "$VERSION" ]; then
+            echo "no ghchronicle release with a three part tag was found" >&2
+            exit 1
+          fi
         fi
         os=$(uname -s | tr '[:upper:]' '[:lower:]')
         arch=$(uname -m); case "$arch" in x86_64) arch=amd64;; aarch64|arm64) arch=arm64;; esac

@@ -2,6 +2,11 @@ package dashboards
 
 import "fmt"
 
+// activityItsStars is how many stars the starred repository itself carries,
+// as against the star this account gave it; the Elasticsearch, Graphite and
+// Prometheus twins rename their value column to the same words.
+const activityItsStars = "Its stars"
+
 // ── Activity ────────────────────────────────────────────────────────────────
 
 func activity(b *builder) []Panel {
@@ -77,7 +82,7 @@ func activity(b *builder) []Panel {
 		}, nil)
 
 	latestES, latestEStf := b.esRaw(nt, 25, []named{
-		{"@timestamp", "Updated"},
+		{panelESTime, "Updated"},
 		{"repo", "Repository"},
 		{"subject_type", "Kind"},
 		{"reason", "Reason"},
@@ -90,7 +95,7 @@ func activity(b *builder) []Panel {
 		gn(ec, "number"), gn(ec, "state")),
 		"Repository, kind, number, state", []col{{"lastNotNull", "Comments"}})
 	extES, extEStf := b.esRaw(ec, 40, []named{
-		{"@timestamp", "Seen"},
+		{panelESTime, "Seen"},
 		{"repo", "Repository"},
 		{"kind", "Kind"},
 		{"state", "State"},
@@ -100,7 +105,7 @@ func activity(b *builder) []Panel {
 	}, nil)
 
 	return append([]Panel{
-		panel("timeseries", "Events over time", 16, 8, 0, 0, []Target{sqlTS(perHour)}, &P{
+		panel("timeseries", "Events over time", box{W: 16, H: 8, X: 0, Y: 0}, []Target{sqlTS(perHour)}, &P{
 			Prom: []Target{hourly("sum by (type) (increase(github_events_total[1h]))", "{{type}}")},
 			Opts: mergeOpts(Opts{"bars": true, "stack": true}, hourBins), SQLOpts: seriesOpts,
 			Desc: "GitHub keeps only the last 300 events and drops the rest whatever their " +
@@ -121,7 +126,7 @@ func activity(b *builder) []Panel {
 		// showed seven and scrolled. At 1920 the donut is 400 pixels over
 		// three lines of legend, which reads; a legend beside it did not
 		// survive the phone.
-		panel("piechart", "Events by type", 8, 16, 16, 0, []Target{sqlT(byType)}, &P{
+		panel("piechart", "Events by type", box{W: 8, H: 16, X: 16, Y: 0}, []Target{sqlT(byType)}, &P{
 			Prom: []Target{promTbl("sum by (type) (increase(github_events_total[$__range]))")},
 			// No rename: a displayName on the value column would name every
 			// slice "Events"; without it the pie names each slice by its row.
@@ -132,7 +137,7 @@ func activity(b *builder) []Panel {
 			GR:   typeGR, GRTF: typeGRtf,
 			ES: typeES, ESTF: typeEStf,
 		}),
-		panel("barchart", "Events by repository", 8, 8, 0, 8, []Target{sqlT(byRepo)}, &P{
+		panel("barchart", "Events by repository", box{W: 8, H: 8, X: 0, Y: 8}, []Target{sqlT(byRepo)}, &P{
 			Desc: "The ten repositories with the most events; the rest are one bar called other.",
 			PromNote: cannot("the ten repositories with the most events in the range.",
 				"The exporter keeps only `type` on events: a repository label "+
@@ -141,7 +146,7 @@ func activity(b *builder) []Panel {
 			GR: repoGR, GRTF: repoGRtf,
 			ES: repoES, ESTF: repoEStf,
 		}),
-		panel("table", "Notifications", 8, 8, 8, 8, []Target{sqlT(notifTbl)}, &P{
+		panel("table", "Notifications", box{W: 8, H: 8, X: 8, Y: 8}, []Target{sqlT(notifTbl)}, &P{
 			Prom: []Target{promTbl(
 				"sum by (reason, subject_type) (increase(github_notifications_total[$__range]))",
 			)},
@@ -153,7 +158,7 @@ func activity(b *builder) []Panel {
 			GR:        notifGR, GRTF: notifGRtf,
 			ES: notifES, ESTF: notifEStf,
 		}),
-		panel("timeseries", "Notifications over time", 24, 8, 0, 16, []Target{sqlTS(notif)}, &P{
+		panel("timeseries", "Notifications over time", box{W: 24, H: 8, X: 0, Y: 16}, []Target{sqlTS(notif)}, &P{
 			Prom: []Target{daily("sum by (reason) (increase(github_notifications_total[1d]))",
 				"{{reason}}")},
 			Opts: mergeOpts(Opts{"bars": true, "stack": true}, dayBins), SQLOpts: seriesOpts, PromDesc: sinceStart,
@@ -161,7 +166,7 @@ func activity(b *builder) []Panel {
 			ES:   []Target{b.esDaily(nt, b.mSum("notifications"), "reason", "", nil, "")},
 			Desc: bucketFollowsRange,
 		}),
-		panel("table", "Latest notifications", 24, 7, 0, 24, []Target{sqlT(latest)}, &P{
+		panel("table", "Latest notifications", box{W: 24, H: 7, X: 0, Y: 24}, []Target{sqlT(latest)}, &P{
 			PromNote: cannot("the newest notification threads, with their titles and a link "+
 				"to each.",
 				"The exporter reduces notifications to a count per reason and subject "+
@@ -178,7 +183,7 @@ func activity(b *builder) []Panel {
 			},
 			ES: latestES, ESTF: latestEStf, ESDesc: esNewest,
 		}),
-		panel("table", "Work elsewhere", 24, 9, 0, 31,
+		panel("table", "Work elsewhere", box{W: 24, H: 9, X: 0, Y: 31},
 			[]Target{sqlT(external)}, &P{
 				Prom: []Target{
 					promTbl("sum by (repo) (increase(github_external_contributions_total[$__range]))", "A"),
@@ -186,8 +191,8 @@ func activity(b *builder) []Panel {
 					promTbl("avg by (repo) (github_external_contributions_comments_mean)", "C"),
 				},
 				PromTF: merged(map[string]string{
-					"repo": "Repository", "Value #A": "Contributions", "Value #B": "Merged",
-					"Value #C": "Comments",
+					"repo": "Repository", panelValueA: "Contributions", panelValueB: "Merged",
+					panelValueC: "Comments",
 				}, nil, nil),
 				Desc: "Pull requests and issues opened in repositories this account does not own, " +
 					"with the state each ended in. Nothing else sees them: they are not in these " +
@@ -219,21 +224,21 @@ func starsGiven(b *builder) []Panel {
 		`limit(sortByMaxima(groupByNode(%s, %d, "sum")), 12)`,
 		countOf(gp("gh_star_given", "stars")), gn("gh_star_given", "language"),
 	),
-		"Language", []col{{"sum", "Stars given"}})
+		"Language", []col{{"sum", overviewStarsGiven}})
 	langES, langEStf := esTbl("gh_star_given", []any{b.tm("language", 12)}, []any{b.mCount()},
-		[]named{{"language.keyword", "Language"}, {"n", "Stars given"}}, nil)
+		[]named{{"language.keyword", "Language"}, {"n", overviewStarsGiven}}, nil)
 
 	starGR, starGRtf := gTbl(rowsOf("keepLastValue("+gp("gh_star_given", "repo_stars")+")",
-		gn("gh_star_given", "repo")), "Repository", []col{{"lastNotNull", "Its stars"}})
+		gn("gh_star_given", "repo")), "Repository", []col{{"lastNotNull", activityItsStars}})
 	starES, starEStf := b.esRaw("gh_star_given", 25, []named{
-		{"@timestamp", "When"},
+		{panelESTime, "When"},
 		{"repo", "Repository"},
 		{"language", "Language"},
-		{"repo_stars", "Its stars"},
+		{"repo_stars", activityItsStars},
 		{"url", "Link"},
 	}, nil)
 	return []Panel{
-		panel("barchart", "Languages starred", 12, 8, 0, 40, []Target{sqlT(
+		panel("barchart", "Languages starred", box{W: 12, H: 8, X: 0, Y: 40}, []Target{sqlT(
 			`SELECT language AS "Language", COUNT(*) AS "Stars given"` +
 				" FROM gh_star_given WHERE $__timeFilter(time) AND language <> ''" +
 				" GROUP BY 1 ORDER BY 2 DESC LIMIT 12",
@@ -242,7 +247,7 @@ func starsGiven(b *builder) []Panel {
 				"topk(12, sum by (language) (increase(github_stars_given_total[$__range])))",
 			)},
 			PromTF: []any{organize(map[string]string{
-				"language": "Language", "Value": "Stars given",
+				"language": "Language", "Value": overviewStarsGiven,
 			}, nil, nil)},
 			Desc: "The mirror of the stars received: what this account was reading, dated when " +
 				"it starred it. The only measurement here about somebody else's work.",
@@ -250,7 +255,7 @@ func starsGiven(b *builder) []Panel {
 			GR:       langGR, GRTF: langGRtf,
 			ES: langES, ESTF: langEStf,
 		}),
-		panel("table", "Recently starred", 12, 8, 12, 40, []Target{sqlT(
+		panel("table", "Recently starred", box{W: 12, H: 8, X: 12, Y: 40}, []Target{sqlT(
 			`SELECT repo AS "Repository", time AS "When",` +
 				` language AS "Language", repo_stars AS "Its stars",` +
 				` url AS "Link"` +
@@ -259,14 +264,14 @@ func starsGiven(b *builder) []Panel {
 		)}, &P{
 			Prom: []Target{promTbl("topk(25, github_stars_given_repo_stars_mean)")},
 			PromTF: []any{organize(map[string]string{
-				"repo": "Repository", "language": "Language", "Value": "Its stars",
+				"repo": "Repository", "language": "Language", "Value": activityItsStars,
 			}, []string{"user", "instance", "job", "__name__"}, nil)},
 			Desc: "Whether the account stars small projects or famous ones, which the language " +
 				"breakdown cannot say.",
 			PromDesc: lastSweep,
 			Overrides: []any{
 				when("When"), width("Language", 120),
-				barCell("Its stars", "short", 120), linkOn("Repository"),
+				barCell(activityItsStars, "short", 120), linkOn("Repository"),
 			},
 			GR: starGR, GRTF: starGRtf, GRDesc: grSlot,
 			ES: starES, ESTF: starEStf,

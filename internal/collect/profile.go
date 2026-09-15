@@ -300,6 +300,14 @@ func isReferrerTag(tag string) bool {
 	return true
 }
 
+// packageMetadata is the ecosystem specific half of a package version. Only
+// the container tags are read: a version with no tag is one nothing points at.
+type packageMetadata struct {
+	Container struct {
+		Tags []string `json:"tags"`
+	} `json:"container"`
+}
+
 // versions walks a package's version list.
 //
 // Each tagged version becomes a point stamped when it was published, which is
@@ -314,14 +322,10 @@ func (p Profile) versions(ctx context.Context, c *ghapi.Client, kind, name strin
 	most := p.Walk.limit(5)
 	for page := 1; page <= most; page++ {
 		var vs []struct {
-			Name      string    `json:"name"`
-			CreatedAt time.Time `json:"created_at"`
-			HTMLURL   string    `json:"html_url"`
-			Metadata  struct {
-				Container struct {
-					Tags []string `json:"tags"`
-				} `json:"container"`
-			} `json:"metadata"`
+			Name      string          `json:"name"`
+			CreatedAt time.Time       `json:"created_at"`
+			HTMLURL   string          `json:"html_url"`
+			Metadata  packageMetadata `json:"metadata"`
 		}
 		path := fmt.Sprintf("/user/packages/%s/%s/versions?per_page=100&page=%d",
 			kind, url.PathEscape(name), page)

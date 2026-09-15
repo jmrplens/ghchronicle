@@ -16,6 +16,8 @@
 package ghchronicle
 
 import (
+	// The //go:embed directive below reads VERSION at compile time, which
+	// only works in a file that imports embed. Nothing here calls it.
 	_ "embed"
 	"strings"
 )

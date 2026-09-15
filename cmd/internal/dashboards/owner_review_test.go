@@ -212,11 +212,11 @@ func TestEveryDashboardReadsInUTC(t *testing.T) {
 // calendar shapes its cell, and every other status history keeps the default.
 func TestStatusHistoryCellFractionsAreOptional(t *testing.T) {
 	t.Parallel()
-	plain, _ := statusHistory(1, "t", nil, nil, 24, 7, 0, 0, "", nil)["options"].(map[string]any)
+	plain, _ := statusHistory(panelArgs{ID: 1, Title: "t", Box: box{W: 24, H: 7}}, nil)["options"].(map[string]any)
 	if plain["colWidth"] != 0.8 || plain["rowHeight"] != 0.8 {
 		t.Errorf("the default cell is %v by %v of its slot, want 0.8 by 0.8", plain["colWidth"], plain["rowHeight"])
 	}
-	sized, _ := statusHistory(1, "t", nil, nil, 10, 5, 0, 0, "",
+	sized, _ := statusHistory(panelArgs{ID: 1, Title: "t", Box: box{W: 10, H: 5}},
 		Opts{"col_width": 0.77, "row_height": 0.66})["options"].(map[string]any)
 	if sized["colWidth"] != 0.77 || sized["rowHeight"] != 0.66 {
 		t.Errorf("the fractions given were drawn as %v by %v", sized["colWidth"], sized["rowHeight"])

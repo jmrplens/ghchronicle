@@ -90,7 +90,7 @@ func TestSVGIsByteIdenticalBetweenRuns(t *testing.T) {
 			o := &Options{Theme: theme, Layout: layout, Fields: Fields()}
 			first := mustRender(t, c, o)
 			for range 20 {
-				if again := mustRender(t, c, o); again != first {
+				if mustRender(t, c, o) != first {
 					t.Fatal("the same card rendered twice must produce the same bytes, or a workflow that commits it writes a diff a day out of nothing")
 				}
 			}

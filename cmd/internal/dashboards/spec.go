@@ -238,7 +238,7 @@ type P struct {
 
 // panel builds one panel for every store. PostgreSQL defaults to the InfluxDB
 // SQL translated, since both hold the same rows.
-func panel(kind, title string, w, h, x, y int, sql []Target, p *P) Panel {
+func panel(kind, title string, at box, sql []Target, p *P) Panel {
 	pg, pgOpts := p.PG, p.PGOpts
 	if pg == nil && sql != nil {
 		pg = pgOf(sql)
@@ -292,7 +292,7 @@ func panel(kind, title string, w, h, x, y int, sql []Target, p *P) Panel {
 	}
 	shared := placeLinks(title, p.Overrides, stores)
 	return Panel{
-		Kind: kind, Title: title, W: w, H: h, X: x, Y: y, Desc: p.Desc,
+		Kind: kind, Title: title, W: at.W, H: at.H, X: at.X, Y: at.Y, Desc: p.Desc,
 		Stores: stores, Overrides: shared, Opts: orEmpty(p.Opts),
 		PromTitle: p.PromTitle, Logs: p.Logs,
 	}
@@ -335,12 +335,16 @@ const lokiOneLine = ` | line_format "{{.repo}} {{.job_name}}: {{.line}}"`
 // dashboard is built with a log store.
 func logsPanel(id int, p *Panel, storeName string, logs any, y int) map[string]any {
 	stage, note := lokiRepoStage(storeName)
-	out := base(id, "logs", p.Title, logs, []any{map[string]any{
-		"datasource": logs, "refId": "A", "queryType": "range",
-		// logfmt before both: the repository filter reads the tail and so
-		// does the line the panel draws.
-		"expr": p.Logs.Selector + " | logfmt" + stage + lokiOneLine, "maxLines": 1000,
-	}}, p.W, p.H, p.X, y, strings.TrimSpace(p.Logs.Desc+note))
+	out := base("logs", panelArgs{
+		ID: id, Title: p.Title, DS: logs,
+		Targets: []any{map[string]any{
+			"datasource": logs, "refId": "A", "queryType": "range",
+			// logfmt before both: the repository filter reads the tail and so
+			// does the line the panel draws.
+			"expr": p.Logs.Selector + " | logfmt" + stage + lokiOneLine, "maxLines": 1000,
+		}},
+		Box: box{W: p.W, H: p.H, X: p.X, Y: y}, Desc: strings.TrimSpace(p.Logs.Desc + note),
+	})
 	// Newest first, the moment beside each line, and the line wrapped: a
 	// job's last lines are read top down from the failure, and a compiler
 	// error is longer than the panel is wide.
@@ -529,7 +533,10 @@ func materialize(id *ids, p *Panel, storeName string, ds, logs any, y0 int) map[
 		if p.Logs != nil && logs != nil {
 			return logsPanel(id.next(), p, storeName, logs, y)
 		}
-		return textPanel(id.next(), p.Title, optString(p.Opts, "content", ""), p.W, p.H, p.X, y, p.Opts)
+		return textPanel(
+			panelArgs{ID: id.next(), Title: p.Title, Box: box{W: p.W, H: p.H, X: p.X, Y: y}},
+			optString(p.Opts, "content", ""), p.Opts,
+		)
 	}
 	st := p.Stores[storeName]
 	title := p.Title
@@ -537,7 +544,10 @@ func materialize(id *ids, p *Panel, storeName string, ds, logs any, y0 int) map[
 		title = p.PromTitle
 	}
 	if st.Q == nil {
-		return textPanel(id.next(), title, st.Note, p.W, p.H, p.X, y, nil)
+		return textPanel(
+			panelArgs{ID: id.next(), Title: title, Box: box{W: p.W, H: p.H, X: p.X, Y: y}},
+			st.Note, nil,
+		)
 	}
 
 	targets := make([]any, len(st.Q))
@@ -550,24 +560,30 @@ func materialize(id *ids, p *Panel, storeName string, ds, logs any, y0 int) map[
 	// several values names them through overrides as much as a table does.
 	opts["overrides"] = append(append([]any{}, p.Overrides...), st.Overrides...)
 
+	// Every kind is placed and identified the same way, so the arguments are
+	// built once and the switch chooses nothing but the builder.
+	a := panelArgs{
+		ID: id.next(), Title: title, DS: ds, Targets: targets,
+		Box: box{W: p.W, H: p.H, X: p.X, Y: y}, Desc: desc,
+	}
 	var out map[string]any
 	switch p.Kind {
 	case "stat":
-		out = stat(id.next(), title, ds, targets, p.W, p.H, p.X, y, desc, opts)
+		out = stat(a, opts)
 	case "gauge":
-		out = gauge(id.next(), title, ds, targets, p.W, p.H, p.X, y, desc, opts)
+		out = gauge(a, opts)
 	case "timeseries":
-		out = timeseries(id.next(), title, ds, targets, p.W, p.H, p.X, y, desc, opts)
+		out = timeseries(a, opts)
 	case "barchart":
-		out = barchart(id.next(), title, ds, targets, p.W, p.H, p.X, y, desc, opts)
+		out = barchart(a, opts)
 	case "table":
-		out = table(id.next(), title, ds, targets, p.W, p.H, p.X, y, desc, opts)
+		out = table(a, opts)
 	case "piechart":
-		out = piechart(id.next(), title, ds, targets, p.W, p.H, p.X, y, desc, opts)
+		out = piechart(a, opts)
 	case "status-history":
-		out = statusHistory(id.next(), title, ds, targets, p.W, p.H, p.X, y, desc, opts)
+		out = statusHistory(a, opts)
 	case "bargauge":
-		out = barGauge(id.next(), title, ds, targets, p.W, p.H, p.X, y, desc, opts)
+		out = barGauge(a, opts)
 	default:
 		panic("unknown panel kind " + p.Kind)
 	}
@@ -743,16 +759,18 @@ func asList(v any) []any {
 }
 
 // Dashboard is the whole document, in Grafana's shareable export format.
-// `logs` is the log store datasource or nil, as for Render.
-func Dashboard(storeName string, ds, logs any, uid, title, description string,
-	inputs, requires []any, variable map[string]any,
-) map[string]any {
+// `logs` is the log store datasource or nil, as for Render. Everything the
+// document says about itself already differs per store and no further, so it
+// is read off the store rather than handed over field by field; `variable` is
+// the one part that cannot be, since it is the store's own repository
+// variable with the datasource of this build filled in.
+func Dashboard(s *Store, ds, logs any, variable map[string]any) map[string]any {
 	return map[string]any{
-		"__inputs":    inputs,
-		"__requires":  requires,
-		"uid":         uid,
-		"title":       title,
-		"description": description,
+		"__inputs":    s.Inputs,
+		"__requires":  s.Requires,
+		"uid":         s.UID,
+		"title":       s.Title,
+		"description": s.Description,
 		"tags":        []any{"github", "ghchronicle"},
 		// UTC, because every bucket in every query is: a point is stamped at
 		// the moment GitHub says the thing happened, a day bin cuts at
@@ -766,7 +784,7 @@ func Dashboard(storeName string, ds, logs any, uid, title, description string,
 		"refresh":       "5m",
 		"time":          map[string]any{"from": "now-30d", "to": "now"},
 		"templating":    map[string]any{"list": []any{variable}},
-		"panels":        Render(storeName, ds, logs),
+		"panels":        Render(s.Name, ds, logs),
 	}
 }
 

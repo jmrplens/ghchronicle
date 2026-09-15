@@ -7,6 +7,37 @@ import (
 
 // ── Inventory ───────────────────────────────────────────────────────────────
 
+// How the stores name what they hand back, which these sections address rather
+// than spell out: Elasticsearch keeps a tag as a keyword sub-field, and Grafana
+// names the value column of a table query after the query's own ref id, so a
+// rename asks for "Value #A" and the panels that build their queries in a loop
+// append the ref themselves. The sibling sections address the same three names.
+const (
+	inventoryRepoTerm = "repo.keyword"
+	inventoryURLTerm  = "url.keyword"
+	inventoryValueCol = "Value #"
+)
+
+// inventoryKeepLast carries a snapshot forward in Graphite. These measurements
+// have a point only where a sweep wrote one, and a gap between two sweeps is
+// not the repository losing the setting.
+const inventoryKeepLast = "keepLastValue("
+
+// What the columns of this section are called wherever they are read: the
+// community score and its two template counts, the four repository settings,
+// and the age of a key. Each one has to carry the same name in all five
+// stores, since the overrides and the sorts below match a column by it.
+const (
+	inventoryCommunityScore  = "Community profile"
+	inventoryIssueTemplates  = "Issue templates"
+	inventoryPRTemplate      = "PR template"
+	inventorySecurityPolicy  = "Security policy"
+	inventoryDeleteOnMerge   = "Delete on merge"
+	inventoryAutoMerge       = "Auto merge"
+	inventoryProtectionRules = "Protection rules"
+	inventoryKeyIdle         = "Days since use"
+)
+
 // inventory is the standing list of what the account holds: first the
 // repositories and what they publish, then how they are configured, and last
 // the files that configuration lives in and the dependency graph they govern.
@@ -84,20 +115,20 @@ func repositoryList(b *builder) []Panel {
 	), "Language", []col{{"lastNotNull", "Bytes"}})
 	langsES, langsEStf := esTbl(rl, []any{b.tm("language", 12), b.tm("repo", 500)},
 		[]any{b.mNewest("bytes")},
-		[]named{{"language.keyword", "Language"}, {"repo.keyword", "Repository"}, {"b", "Bytes"}},
+		[]named{{"language.keyword", "Language"}, {inventoryRepoTerm, "Repository"}, {"b", "Bytes"}},
 		[]string{ESF}, groupSum("Language", "Bytes", "Language", "Bytes")...)
 
 	var healthProm []Target
 	healthProm = append(healthProm, promTbl(fmt.Sprintf(
 		"sum by (repo) (github_repo_community_health_percentage{%s})", PF,
 	), "A"))
-	healthRename := map[string]string{"repo": "Repository", "Value #A": "Community profile"}
+	healthRename := map[string]string{"repo": "Repository", inventoryValueCol + "A": inventoryCommunityScore}
 	for i, f := range healthFiles {
 		ref := string(rune('B' + i))
 		healthProm = append(healthProm, promTbl(fmt.Sprintf(
 			"max by (repo) (github_repo_community_has_%s{%s})", f, PF,
 		), ref))
-		healthRename["Value #"+ref] = healthNames[i]
+		healthRename[inventoryValueCol+ref] = healthNames[i]
 	}
 	// The join Prometheus makes: the merge transformation lines the two
 	// families up on the repo label, so the count sits beside the flags.
@@ -105,18 +136,18 @@ func repositoryList(b *builder) []Panel {
 		promTbl(fmt.Sprintf("max by (repo) (github_repo_policy_issue_templates{%s})", PF), "F"),
 		promTbl(fmt.Sprintf("max by (repo) (github_repo_community_has_pull_request_template{%s})", PF), "G"),
 	)
-	healthRename["Value #F"] = "Issue templates"
-	healthRename["Value #G"] = "PR template"
-	healthOver := []any{barCell("Community profile", "percent", 120)}
+	healthRename[inventoryValueCol+"F"] = inventoryIssueTemplates
+	healthRename[inventoryValueCol+"G"] = inventoryPRTemplate
+	healthOver := []any{barCell(inventoryCommunityScore, "percent", 120)}
 	for _, n := range healthNames {
 		healthOver = append(healthOver, profileBool(n, 90))
 	}
 	// The count where a store can join it, the flag where it cannot: each
 	// override matches its own column by name and is inert on the other.
-	healthOver = append(healthOver, width("Issue templates", 135),
-		profileBool("Issue template", 110), profileBool("PR template", 100), linkOn("Repository"))
+	healthOver = append(healthOver, width(inventoryIssueTemplates, 135),
+		profileBool("Issue template", 110), profileBool(inventoryPRTemplate, 100), linkOn("Repository"))
 	healthGR, healthGRtf := gTbl(rowsOf(rp(rc, "health_percentage"), gn(rc, "repo")),
-		"Repository", []col{{"lastNotNull", "Community profile"}})
+		"Repository", []col{{"lastNotNull", inventoryCommunityScore}})
 	// One `max` per column and no top_metrics anywhere, which is what the six
 	// boxes cost here. The sink writes them as booleans, Elasticsearch maps
 	// them as `boolean`, and a top_metrics hands a boolean back as the string
@@ -131,8 +162,8 @@ func repositoryList(b *builder) []Panel {
 	// largest value inside the range, so the description says so.
 	healthESMetrics := []any{b.mMax("health_percentage")}
 	healthESNames := []named{
-		{"repo.keyword", "Repository"},
-		{"health_percentage", "Community profile"},
+		{inventoryRepoTerm, "Repository"},
+		{"health_percentage", inventoryCommunityScore},
 	}
 	for i, f := range hasFields {
 		healthESMetrics = append(healthESMetrics, b.mMax(f))
@@ -140,7 +171,7 @@ func repositoryList(b *builder) []Panel {
 	}
 	healthESMetrics = append(healthESMetrics, b.mMax("has_issue_template"), b.mMax("has_pull_request_template"))
 	healthESNames = append(healthESNames, named{"has_issue_template", "Issue template"},
-		named{"has_pull_request_template", "PR template"}, named{"url.keyword", "Link"})
+		named{"has_pull_request_template", inventoryPRTemplate}, named{inventoryURLTerm, "Link"})
 	healthES, healthEStf := esTbl(rc, []any{b.tm("repo", 500), b.tmURL()}, healthESMetrics,
 		healthESNames, []string{ESF})
 
@@ -155,8 +186,8 @@ func repositoryList(b *builder) []Panel {
 		reposProm = append(reposProm, promTbl(fmt.Sprintf(
 			"sum by (%s) (github_repo_%s{%s})", repoBy, c.From, PF,
 		), ref))
-		reposRename["Value #"+ref] = c.To
-		reposOrder["Value #"+ref] = 2 + i
+		reposRename[inventoryValueCol+ref] = c.To
+		reposOrder[inventoryValueCol+ref] = 2 + i
 	}
 	reposOrder["visibility"] = 2 + len(repoCols)
 	reposOrder["license"] = 3 + len(repoCols)
@@ -172,16 +203,16 @@ func repositoryList(b *builder) []Panel {
 		b.tm("visibility", 1), b.tm("license", 1), b.tmURL(),
 	}, []any{b.mNewest(repoFieldNames...)},
 		append([]named{
-			{"repo.keyword", "Repository"},
+			{inventoryRepoTerm, "Repository"},
 			{"language.keyword", "Language"},
 			{"visibility.keyword", "Visibility"},
 			{"license.keyword", "License"},
-			{"url.keyword", "Link"},
+			{inventoryURLTerm, "Link"},
 		}, repoCols...),
 		[]string{ESF})
 
 	return []Panel{
-		panel("barchart", "Code by language", 12, 8, 0, 0, []Target{sqlT(langs)}, &P{
+		panel("barchart", "Code by language", box{W: 12, H: 8, X: 0, Y: 0}, []Target{sqlT(langs)}, &P{
 			Prom: []Target{promTbl(fmt.Sprintf(
 				"topk(12, sum by (language) (github_repo_language_bytes{%s}))", PF,
 			))},
@@ -192,10 +223,10 @@ func repositoryList(b *builder) []Panel {
 			GR:   langsGR, GRTF: langsGRtf,
 			ES: langsES, ESTF: langsEStf,
 		}),
-		panel("table", "Community profile", 12, 8, 12, 0, []Target{sqlT(health)}, &P{
+		panel("table", inventoryCommunityScore, box{W: 12, H: 8, X: 12, Y: 0}, []Target{sqlT(health)}, &P{
 			Prom:      healthProm,
 			PromTF:    merged(healthRename, nil, map[string]int{"repo": 0}),
-			Opts:      Opts{"sort": "Community profile"},
+			Opts:      Opts{"sort": inventoryCommunityScore},
 			Overrides: healthOver,
 			// Shared by the five stores, so it names the column only where it
 			// exists: Graphite has no such column and Elasticsearch has the flag.
@@ -220,7 +251,7 @@ func repositoryList(b *builder) []Panel {
 				"templates directory the page and the score count: " +
 				"one panel cannot join the count in gh_repo_policy to this row.",
 		}),
-		panel("table", "Repositories", 24, 11, 0, 8, []Target{sqlT(repos)}, &P{
+		panel("table", "Repositories", box{W: 24, H: 11, X: 0, Y: 8}, []Target{sqlT(repos)}, &P{
 			Prom:   reposProm,
 			PromTF: merged(reposRename, nil, reposOrder),
 			Opts:   Opts{"sort": "Stars"},
@@ -270,7 +301,7 @@ func whatTheyPublish(b *builder) []Panel {
 		rp(rt, "present"), gn(rt, "topic"),
 	), "Topic", []col{{"lastNotNull", "Repositories"}})
 	topicsES, topicsEStf := esTbl(rt, []any{b.tm("topic", 30, "1"), b.tmURL()}, []any{b.mUniq("repo")},
-		[]named{{"topic.keyword", "Topic"}, {"url.keyword", "Link"}, {"r", "Repositories"}}, []string{ESF})
+		[]named{{"topic.keyword", "Topic"}, {inventoryURLTerm, "Link"}, {"r", "Repositories"}}, []string{ESF})
 
 	pkgGR, pkgGRtf := gTbl(rowsOf(gp(pk, "versions"), gn(pk, "package"), gn(pk, "type")),
 		"Package", []col{{"lastNotNull", "Versions"}})
@@ -279,7 +310,7 @@ func whatTheyPublish(b *builder) []Panel {
 		[]named{
 			{"package.keyword", "Package"},
 			{"type.keyword", "Type"},
-			{"url.keyword", "Link"},
+			{inventoryURLTerm, "Link"},
 			{"versions", "Versions"},
 			{"tagged_versions", "Tagged"},
 			{"days_since_update", "Idle"},
@@ -291,7 +322,7 @@ func whatTheyPublish(b *builder) []Panel {
 		[]any{b.mNewest("files", "comments", "size_bytes", "days_since_update")},
 		[]named{
 			{"gist.keyword", "Gist"},
-			{"url.keyword", "Link"},
+			{inventoryURLTerm, "Link"},
 			{"files", "Files"},
 			{"comments", "Comments"},
 			{"size_bytes", "Size"},
@@ -309,7 +340,7 @@ func whatTheyPublish(b *builder) []Panel {
 	}, nil)
 
 	return []Panel{
-		panel("table", "Topics", 6, 8, 0, 19, []Target{sqlT(topics)}, &P{
+		panel("table", "Topics", box{W: 6, H: 8, X: 0, Y: 19}, []Target{sqlT(topics)}, &P{
 			Prom: []Target{promTbl(fmt.Sprintf(
 				"count by (topic) (github_repo_topic_present{%s})", PF,
 			))},
@@ -321,15 +352,15 @@ func whatTheyPublish(b *builder) []Panel {
 			GR:        topicsGR, GRTF: topicsGRtf,
 			ES: topicsES, ESTF: topicsEStf,
 		}),
-		panel("table", "Packages", 9, 8, 6, 19, []Target{sqlT(packages)}, &P{
+		panel("table", "Packages", box{W: 9, H: 8, X: 6, Y: 19}, []Target{sqlT(packages)}, &P{
 			Prom: []Target{
 				promTbl("sum by (package, type) (github_package_versions)", "A"),
 				promTbl("sum by (package, type) (github_package_tagged_versions)", "B"),
 				promTbl("sum by (package, type) (github_package_days_since_update)", "C"),
 			},
 			PromTF: merged(map[string]string{
-				"package": "Package", "type": "Type", "Value #A": "Versions",
-				"Value #B": "Tagged", "Value #C": "Idle",
+				"package": "Package", "type": "Type", inventoryValueCol + "A": "Versions",
+				inventoryValueCol + "B": "Tagged", inventoryValueCol + "C": "Idle",
 			}, nil, nil),
 			Opts: Opts{"sort": "Versions"},
 			Desc: "Version counts come from walking the version list: the documented " +
@@ -342,7 +373,7 @@ func whatTheyPublish(b *builder) []Panel {
 			GRDesc: "Graphite names each row package and type from the path. " + grRows,
 			ES:     pkgES, ESTF: pkgEStf,
 		}),
-		panel("table", "Gists", 9, 8, 15, 19, []Target{sqlT(gists)}, &P{
+		panel("table", "Gists", box{W: 9, H: 8, X: 15, Y: 19}, []Target{sqlT(gists)}, &P{
 			Prom: []Target{
 				promTbl("sum by (gist) (github_gist_files)", "A"),
 				promTbl("sum by (gist) (github_gist_comments)", "B"),
@@ -350,8 +381,8 @@ func whatTheyPublish(b *builder) []Panel {
 				promTbl("sum by (gist) (github_gist_days_since_update)", "D"),
 			},
 			PromTF: merged(map[string]string{
-				"gist": "Gist", "Value #A": "Files", "Value #B": "Comments",
-				"Value #C": "Size", "Value #D": "Idle",
+				"gist": "Gist", inventoryValueCol + "A": "Files", inventoryValueCol + "B": "Comments",
+				inventoryValueCol + "C": "Size", inventoryValueCol + "D": "Idle",
 			}, nil, nil),
 			PromDesc: "Prometheus carries no description: it is text.",
 			Overrides: []any{
@@ -367,7 +398,7 @@ func whatTheyPublish(b *builder) []Panel {
 			ESDesc: "Elasticsearch keeps the description as text, which a bucket cannot show.",
 			ESOver: []any{width("Gist", 300)},
 		}),
-		panel("table", "Container tags published", 24, 8, 0, 27, []Target{sqlT(tags)}, &P{
+		panel("table", "Container tags published", box{W: 24, H: 8, X: 0, Y: 27}, []Target{sqlT(tags)}, &P{
 			PromNote: cannot("every tagged package version, dated when it was published.",
 				"The exporter skips `gh_package_version`: a publication date is "+
 					"history, and the count of versions is already a field on "+
@@ -392,8 +423,8 @@ func whatTheyPublish(b *builder) []Panel {
 // keys on the account, the licenses the dependencies carry, the social
 // accounts on the profile, and whatever changed inside the range.
 func settingsAndKeys(b *builder) []Panel {
-	polGR, polGRtf := gTbl(rowsOf("keepLastValue("+rp("gh_repo_policy", "branch_protection_rules")+")",
-		gn("gh_repo_policy", "repo")), "Repository", []col{{"lastNotNull", "Protection rules"}})
+	polGR, polGRtf := gTbl(rowsOf(inventoryKeepLast+rp("gh_repo_policy", "branch_protection_rules")+")",
+		gn("gh_repo_policy", "repo")), "Repository", []col{{"lastNotNull", inventoryProtectionRules}})
 	// A `max` per column for the same reason the community profile above has
 	// one: the first three of these are booleans, and a top_metrics reads a
 	// boolean back as the string "true", which panics Grafana's Elasticsearch
@@ -409,26 +440,26 @@ func settingsAndKeys(b *builder) []Panel {
 			b.mMax("codeowners_errors"),
 		},
 		[]named{
-			{"repo.keyword", "Repository"},
-			{"url.keyword", "Link"},
-			{"security_policy", "Security policy"},
-			{"delete_branch_on_merge", "Delete on merge"},
-			{"auto_merge", "Auto merge"},
-			{"branch_protection_rules", "Protection rules"},
-			{"issue_templates", "Issue templates"},
+			{inventoryRepoTerm, "Repository"},
+			{inventoryURLTerm, "Link"},
+			{"security_policy", inventorySecurityPolicy},
+			{"delete_branch_on_merge", inventoryDeleteOnMerge},
+			{"auto_merge", inventoryAutoMerge},
+			{"branch_protection_rules", inventoryProtectionRules},
+			{"issue_templates", inventoryIssueTemplates},
 			{"codeowners_errors", "CODEOWNERS errors"},
 		}, []string{ESF})
 
-	keysGR, keysGRtf := gTbl(rowsOf("keepLastValue("+gp("gh_key", "days_since_use")+")",
+	keysGR, keysGRtf := gTbl(rowsOf(inventoryKeepLast+gp("gh_key", "days_since_use")+")",
 		gn("gh_key", "key"), gn("gh_key", "kind")), "Key, kind",
-		[]col{{"lastNotNull", "Days since use"}})
+		[]col{{"lastNotNull", inventoryKeyIdle}})
 	keysES, keysEStf := esTbl("gh_key", []any{b.tm("key", 50), b.tm("kind", 5), b.tmURL()},
 		[]any{b.mNewest("days_since_use", "never_used", "days_to_expiry")},
 		[]named{
 			{"key.keyword", "Key"},
 			{"kind.keyword", "Kind"},
-			{"url.keyword", "Link"},
-			{"days_since_use", "Days since use"},
+			{inventoryURLTerm, "Link"},
+			{"days_since_use", inventoryKeyIdle},
 			{"never_used", "Never used"},
 			{"days_to_expiry", "Days to expiry"},
 		}, nil)
@@ -443,7 +474,7 @@ func settingsAndKeys(b *builder) []Panel {
 		[]named{{"license.keyword", "License"}, {"packages", "Packages"}}, []string{ESF},
 		groupSum("License", "Packages", "License", "Packages")...)
 
-	socGR, socGRtf := gTbl(rowsOf("keepLastValue("+gp("gh_social_account", "present")+")",
+	socGR, socGRtf := gTbl(rowsOf(inventoryKeepLast+gp("gh_social_account", "present")+")",
 		gn("gh_social_account", "provider")), "Provider", []col{{"lastNotNull", "Present"}})
 	// The url as a bucket and never as a metric. An end to end run against a
 	// real cluster found this panel returning nothing: `url` is a plain
@@ -460,12 +491,12 @@ func settingsAndKeys(b *builder) []Panel {
 		[]any{b.mMax("present")},
 		[]named{
 			{"provider.keyword", "Provider"},
-			{"url.keyword", "URL"},
+			{inventoryURLTerm, "URL"},
 			{"m", "Present"},
 		}, nil)
 
 	return []Panel{
-		panel("table", "Repository settings", 24, 8, 0, 35, []Target{sqlT(
+		panel("table", "Repository settings", box{W: 24, H: 8, X: 0, Y: 35}, []Target{sqlT(
 			`SELECT repo AS "Repository",` +
 				` MAX(CAST(security_policy AS INT)) AS "Security policy",` +
 				` MAX(CAST(delete_branch_on_merge AS INT)) AS "Delete on merge",` +
@@ -486,23 +517,23 @@ func settingsAndKeys(b *builder) []Panel {
 				promTbl(fmt.Sprintf("max by (repo) (github_repo_policy_codeowners_errors{%s})", PF), "F"),
 			},
 			PromTF: merged(map[string]string{
-				"repo": "Repository", "Value #A": "Security policy",
-				"Value #B": "Delete on merge", "Value #C": "Auto merge",
-				"Value #D": "Protection rules", "Value #E": "Issue templates",
-				"Value #F": "CODEOWNERS errors",
+				"repo": "Repository", inventoryValueCol + "A": inventorySecurityPolicy,
+				inventoryValueCol + "B": inventoryDeleteOnMerge, inventoryValueCol + "C": inventoryAutoMerge,
+				inventoryValueCol + "D": inventoryProtectionRules, inventoryValueCol + "E": inventoryIssueTemplates,
+				inventoryValueCol + "F": "CODEOWNERS errors",
 			}, []string{"owner", "full_name", "instance", "job", "__name__"},
 				map[string]int{"repo": 0}),
 			Desc: "What each repository allows, in the batch that already costs one point of " +
 				"GraphQL. CODEOWNERS errors is the one that fails silently: a broken file " +
 				"stops requesting reviews and says nothing.",
 			Overrides: []any{
-				profileBool("Security policy", 120), profileBool("Delete on merge", 120),
-				profileBool("Auto merge", 100), ownerLinkOn("Repository", "the repository settings"),
+				profileBool(inventorySecurityPolicy, 120), profileBool(inventoryDeleteOnMerge, 120),
+				profileBool(inventoryAutoMerge, 100), ownerLinkOn("Repository", "the repository settings"),
 			},
 			GR: polGR, GRTF: polGRtf, GRDesc: grSlot,
 			ES: polES, ESTF: polEStf,
 		}),
-		panel("table", "Account keys", 12, 7, 0, 43, []Target{sqlT(
+		panel("table", "Account keys", box{W: 12, H: 7, X: 0, Y: 43}, []Target{sqlT(
 			`SELECT key AS "Key", kind AS "Kind",` +
 				` MIN(days_since_use) AS "Days since use",` +
 				` MAX(never_used) AS "Never used",` +
@@ -515,8 +546,8 @@ func settingsAndKeys(b *builder) []Panel {
 				promTbl("min by (key, kind) (github_key_days_to_expiry)", "C"),
 			},
 			PromTF: merged(map[string]string{
-				"key": "Key", "kind": "Kind", "Value #A": "Days since use",
-				"Value #B": "Never used", "Value #C": "Days to expiry",
+				"key": "Key", "kind": "Kind", inventoryValueCol + "A": inventoryKeyIdle,
+				inventoryValueCol + "B": "Never used", inventoryValueCol + "C": "Days to expiry",
 			}, nil, map[string]int{"key": 0, "kind": 1}),
 			Desc: "The keys that sign and open everything. Two of the SSH keys here have never " +
 				"been used at all, and the expiry of the GPG key is the kind of date nobody " +
@@ -528,12 +559,12 @@ func settingsAndKeys(b *builder) []Panel {
 		}),
 		// Eight bars and the rest folded: a license name can be a whole SPDX
 		// expression, and twelve of them in seven units of height were cut off.
-		panel("barchart", "Dependencies by license", 12, 7, 12, 43, []Target{sqlT(
+		panel("barchart", "Dependencies by license", box{W: 12, H: 7, X: 12, Y: 43}, []Target{sqlT(
 			otherRows(`SELECT license AS "License", SUM(packages) AS "Packages",`+
 				" ROW_NUMBER() OVER (ORDER BY SUM(packages) DESC) AS rn FROM ("+
 				"SELECT license, packages, ROW_NUMBER() OVER (PARTITION BY repo, license"+
 				" ORDER BY time DESC) AS rn FROM gh_dependency_license"+
-				" WHERE $__timeFilter(time) AND "+RF+") x WHERE rn = 1"+
+				ciInRange+RF+") x WHERE rn = 1"+
 				" GROUP BY 1", "License", "Packages", 8),
 		)}, &P{
 			Prom: []Target{promTbl(fmt.Sprintf(
@@ -550,7 +581,7 @@ func settingsAndKeys(b *builder) []Panel {
 			GR: licGR, GRTF: licGRtf,
 			ES: licES, ESTF: licEStf,
 		}),
-		panel("table", "Social accounts", 12, 7, 0, 50, []Target{sqlT(
+		panel("table", "Social accounts", box{W: 12, H: 7, X: 0, Y: 50}, []Target{sqlT(
 			`SELECT provider AS "Provider", url AS "URL" FROM (` +
 				"SELECT provider, url, ROW_NUMBER() OVER (PARTITION BY provider" +
 				" ORDER BY time DESC) AS rn FROM gh_social_account" +
@@ -569,7 +600,7 @@ func settingsAndKeys(b *builder) []Panel {
 			GRDesc: "Graphite has no strings either, so this is presence by provider.",
 			ES:     socES, ESTF: socEStf,
 		}),
-		panel("table", "Configuration changes", 12, 7, 12, 50, []Target{sqlT(
+		panel("table", "Configuration changes", box{W: 12, H: 7, X: 12, Y: 50}, []Target{sqlT(
 			`SELECT repo AS "Repository",` +
 				` COUNT(DISTINCT visibility) AS "Visibility",` +
 				` COUNT(DISTINCT archived) AS "Archived",` +
@@ -668,20 +699,20 @@ func policyAndDependencies(b *builder) []Panel {
 	packages := `SELECT ecosystem AS "Ecosystem", SUM(packages) AS "Packages" FROM (` +
 		"SELECT ecosystem, packages, ROW_NUMBER() OVER (PARTITION BY repo, ecosystem" +
 		" ORDER BY time DESC) AS rn FROM " + dep +
-		" WHERE $__timeFilter(time) AND " + RF + ") x WHERE rn = 1" +
+		ciInRange + RF + ") x WHERE rn = 1" +
 		" GROUP BY 1 ORDER BY 2 DESC LIMIT 12"
 	// Summed, not deduplicated: see the note on the function.
 	changes := "SELECT " + timeBin + ", change AS series," +
 		" SUM(packages) AS packages FROM " + dc +
-		" WHERE $__timeFilter(time) AND " + RF + " AND change <> '(none)' GROUP BY 1, 2 UNION ALL" +
+		ciInRange + RF + " AND change <> '(none)' GROUP BY 1, 2 UNION ALL" +
 		" SELECT " + timeBin + ", 'vulnerable' AS series," +
 		" SUM(vulnerable) AS packages FROM " + dc +
-		" WHERE $__timeFilter(time) AND " + RF + " GROUP BY 1 ORDER BY 1"
+		ciInRange + RF + " GROUP BY 1 ORDER BY 1"
 
 	// One column, because gTbl reduces one series list and the second reducer
 	// would only reduce the same numbers twice. `present` is the one the panel
 	// is read for, so that is the one Graphite keeps.
-	policyGR, policyGRtf := gTbl(rowsOf("keepLastValue("+rp(pf, "present")+")",
+	policyGR, policyGRtf := gTbl(rowsOf(inventoryKeepLast+rp(pf, "present")+")",
 		gn(pf, "repo"), gn(pf, "file")), "Repository, file",
 		[]col{{"lastNotNull", "Present"}})
 	// `present` is a boolean, so max and never top_metrics: the sink writes a
@@ -694,22 +725,22 @@ func policyAndDependencies(b *builder) []Panel {
 		[]any{b.tm("repo", 500), b.tm("file", 10), b.tm("path", 50), b.tmURL()},
 		[]any{b.mMax("present"), b.mMax("changes")},
 		[]named{
-			{"repo.keyword", "Repository"},
+			{inventoryRepoTerm, "Repository"},
 			{"file.keyword", "File"},
 			{"path.keyword", "Path"},
-			{"url.keyword", "Link"},
+			{inventoryURLTerm, "Link"},
 			{"present", "Present"},
 			{"changes", "Changes"},
 		}, []string{ESF})
 
-	ecoGR, ecoGRtf := gTbl(rowsOf("keepLastValue("+rp(de, "blocks")+")",
+	ecoGR, ecoGRtf := gTbl(rowsOf(inventoryKeepLast+rp(de, "blocks")+")",
 		gn(de, "repo"), gn(de, "ecosystem"), gn(de, "interval")),
 		"Repository, ecosystem, interval", []col{{"lastNotNull", "Blocks"}})
 	ecoES, ecoEStf := esTbl(de,
 		[]any{b.tm("repo", 500), b.tm("ecosystem", 20), b.tm("interval", 10)},
 		[]any{b.mMax("blocks")},
 		[]named{
-			{"repo.keyword", "Repository"},
+			{inventoryRepoTerm, "Repository"},
 			{"ecosystem.keyword", "Ecosystem"},
 			{"interval.keyword", "Interval"},
 			{"blocks", "Blocks"},
@@ -747,14 +778,14 @@ func policyAndDependencies(b *builder) []Panel {
 	})
 
 	return []Panel{
-		panel("table", "Policy files", 12, 12, 0, 57, []Target{sqlT(policy)}, &P{
+		panel("table", "Policy files", box{W: 12, H: 12, X: 0, Y: 57}, []Target{sqlT(policy)}, &P{
 			Prom: []Target{
 				promTbl(fmt.Sprintf("max by (repo, file) (github_policy_file_present{%s})", PF), "A"),
 				promTbl(fmt.Sprintf("max by (repo, file) (github_policy_file_changes{%s})", PF), "B"),
 			},
 			PromTF: merged(map[string]string{
 				"repo": "Repository", "file": "File",
-				"Value #A": "Present", "Value #B": "Changes",
+				inventoryValueCol + "A": "Present", inventoryValueCol + "B": "Changes",
 			}, nil, map[string]int{"repo": 0, "file": 1}),
 			Desc: "Four rows per repository: dependabot, codeowners, security and funding. " +
 				"Path is the one in force, or where the file would go if it existed, because " +
@@ -782,7 +813,7 @@ func policyAndDependencies(b *builder) []Panel {
 				"A url is written only for a file that is there, so the absent rows are " +
 				"kept by bucketing them under an empty one. " + esRange,
 		}),
-		panel("table", "Dependabot ecosystems", 12, 12, 12, 57, []Target{sqlT(ecosystems)}, &P{
+		panel("table", "Dependabot ecosystems", box{W: 12, H: 12, X: 12, Y: 57}, []Target{sqlT(ecosystems)}, &P{
 			Prom: []Target{promTbl(fmt.Sprintf(
 				"max by (repo, ecosystem, interval) (github_dependabot_ecosystem_blocks{%s})", PF,
 			))},
@@ -814,7 +845,7 @@ func policyAndDependencies(b *builder) []Panel {
 				"has a document in it, where the SQL twin reads only the newest version of " +
 				"the file and drops it.",
 		}),
-		panel("barchart", "Dependencies by ecosystem", 12, 7, 0, 69,
+		panel("barchart", "Dependencies by ecosystem", box{W: 12, H: 7, X: 0, Y: 69},
 			[]Target{sqlT(packages)}, &P{
 				Prom: []Target{promTbl(fmt.Sprintf(
 					"topk(12, sum by (ecosystem) (github_dependency_packages{%s}))", PF,
@@ -829,7 +860,7 @@ func policyAndDependencies(b *builder) []Panel {
 				GR: packGR, GRTF: packGRtf,
 				ES: packES, ESTF: packEStf,
 			}),
-		panel("timeseries", "Dependency changes", 12, 7, 12, 69,
+		panel("timeseries", "Dependency changes", box{W: 12, H: 7, X: 12, Y: 69},
 			[]Target{sqlTS(changes)}, &P{
 				Prom: []Target{
 					promq(fmt.Sprintf(`sum by (change) (github_dependency_change_packages{%s, change!="(none)"})`, PF),

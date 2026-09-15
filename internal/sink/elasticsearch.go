@@ -178,15 +178,19 @@ func esDocument(p Point) map[string]any {
 type esBulkResponse struct {
 	Errors bool `json:"errors"`
 	Items  []struct {
-		Index struct {
-			Index  string `json:"_index"`
-			Status int    `json:"status"`
-			Error  *struct {
-				Type   string `json:"type"`
-				Reason string `json:"reason"`
-			} `json:"error"`
-		} `json:"index"`
+		Index esBulkIndex `json:"index"`
 	} `json:"items"`
+}
+
+// esBulkIndex is how one indexing action of a batch ended: where it went, the
+// status it came back with, and the error naming why it was refused.
+type esBulkIndex struct {
+	Index  string `json:"_index"`
+	Status int    `json:"status"`
+	Error  *struct {
+		Type   string `json:"type"`
+		Reason string `json:"reason"`
+	} `json:"error"`
 }
 
 // post sends one bulk request and returns how many of its items were refused.

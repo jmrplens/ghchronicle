@@ -87,7 +87,7 @@ func TestProbeDumpsTheFamilyAsked(t *testing.T) {
 	}
 	for i, line := range lines {
 		dumped := strings.HasPrefix(line, "gh_")
-		if want := i > 0 && i < summary; dumped != want {
+		if dumped != (i > 0 && i < summary) {
 			t.Errorf("line %d = %q, want only the repo family's points dumped, right before its summary", i, line)
 		}
 	}
