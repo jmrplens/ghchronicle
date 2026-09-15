@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="405" height="20" viewBox="0 0 405 20" role="img" aria-labelledby="ghcTitle ghcDesc">
+<svg xmlns="http://www.w3.org/2000/svg" width="406" height="20" viewBox="0 0 406 20" role="img" aria-labelledby="ghcTitle ghcDesc">
 <title id="ghcTitle">octocat</title>
-<desc id="ghcDesc">GitHub summary for octocat: 80 stars, 9 forks, 1200 followers, 42 public repositories, 1105 contributions in the last year.</desc>
+<desc id="ghcDesc">GitHub summary for octocat: 614 stars, 80 forks, 1200 followers, 42 public repositories, 1663 contributions in the last year.</desc>
 <style>
 .bg{fill:#ffffff;stroke:#d0d7de}
 .panel{fill:#f6f8fa}
@@ -51,32 +51,32 @@ text{font-family:Verdana,Geneva,'DejaVu Sans',sans-serif;font-size:11px}
 </style>
 <rect class="track" x="0" y="0" width="40" height="20" rx="3"/>
 <rect class="track" x="3" y="0" width="37" height="20"/>
-<rect class="pill-v" x="37" y="0" width="30" height="20" rx="3"/>
-<rect class="pill-v" x="37" y="0" width="27" height="20"/>
+<rect class="pill-v" x="37" y="0" width="31" height="20" rx="3"/>
+<rect class="pill-v" x="37" y="0" width="28" height="20"/>
 <text class="pl t" x="18.5" y="14" text-anchor="middle">stars</text>
-<text class="pl on-accent" x="52" y="14" text-anchor="middle">80</text>
-<rect class="track" x="73" y="0" width="40" height="20" rx="3"/>
-<rect class="track" x="76" y="0" width="37" height="20"/>
-<rect class="pill-v" x="110" y="0" width="30" height="20" rx="3"/>
-<rect class="pill-v" x="110" y="0" width="27" height="20"/>
-<text class="pl t" x="91.5" y="14" text-anchor="middle">forks</text>
-<text class="pl on-accent" x="125" y="14" text-anchor="middle">9</text>
-<rect class="track" x="146" y="0" width="59" height="20" rx="3"/>
-<rect class="track" x="149" y="0" width="56" height="20"/>
-<rect class="pill-v" x="202" y="0" width="34" height="20" rx="3"/>
-<rect class="pill-v" x="202" y="0" width="31" height="20"/>
-<text class="pl t" x="174" y="14" text-anchor="middle">followers</text>
-<text class="pl on-accent" x="219" y="14" text-anchor="middle">1.2k</text>
-<rect class="track" x="242" y="0" width="43" height="20" rx="3"/>
-<rect class="track" x="245" y="0" width="40" height="20"/>
-<rect class="pill-v" x="282" y="0" width="30" height="20" rx="3"/>
-<rect class="pill-v" x="282" y="0" width="27" height="20"/>
-<text class="pl t" x="262" y="14" text-anchor="middle">repos</text>
-<text class="pl on-accent" x="297" y="14" text-anchor="middle">42</text>
-<rect class="track" x="318" y="0" width="56" height="20" rx="3"/>
-<rect class="track" x="321" y="0" width="53" height="20"/>
-<rect class="pill-v" x="371" y="0" width="34" height="20" rx="3"/>
-<rect class="pill-v" x="371" y="0" width="31" height="20"/>
-<text class="pl t" x="344.5" y="14" text-anchor="middle">contribs</text>
-<text class="pl on-accent" x="388" y="14" text-anchor="middle">1.1k</text>
+<text class="pl on-accent" x="52.5" y="14" text-anchor="middle">614</text>
+<rect class="track" x="74" y="0" width="40" height="20" rx="3"/>
+<rect class="track" x="77" y="0" width="37" height="20"/>
+<rect class="pill-v" x="111" y="0" width="30" height="20" rx="3"/>
+<rect class="pill-v" x="111" y="0" width="27" height="20"/>
+<text class="pl t" x="92.5" y="14" text-anchor="middle">forks</text>
+<text class="pl on-accent" x="126" y="14" text-anchor="middle">80</text>
+<rect class="track" x="147" y="0" width="59" height="20" rx="3"/>
+<rect class="track" x="150" y="0" width="56" height="20"/>
+<rect class="pill-v" x="203" y="0" width="34" height="20" rx="3"/>
+<rect class="pill-v" x="203" y="0" width="31" height="20"/>
+<text class="pl t" x="175" y="14" text-anchor="middle">followers</text>
+<text class="pl on-accent" x="220" y="14" text-anchor="middle">1.2k</text>
+<rect class="track" x="243" y="0" width="43" height="20" rx="3"/>
+<rect class="track" x="246" y="0" width="40" height="20"/>
+<rect class="pill-v" x="283" y="0" width="30" height="20" rx="3"/>
+<rect class="pill-v" x="283" y="0" width="27" height="20"/>
+<text class="pl t" x="263" y="14" text-anchor="middle">repos</text>
+<text class="pl on-accent" x="298" y="14" text-anchor="middle">42</text>
+<rect class="track" x="319" y="0" width="56" height="20" rx="3"/>
+<rect class="track" x="322" y="0" width="53" height="20"/>
+<rect class="pill-v" x="372" y="0" width="34" height="20" rx="3"/>
+<rect class="pill-v" x="372" y="0" width="31" height="20"/>
+<text class="pl t" x="345.5" y="14" text-anchor="middle">contribs</text>
+<text class="pl on-accent" x="389" y="14" text-anchor="middle">1.7k</text>
 </svg>

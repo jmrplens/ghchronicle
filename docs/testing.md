@@ -151,7 +151,13 @@ GHC_DUMP=actions go run ./cmd/probe owner/name
 and `TestCardGallery` renders one card per layout into it, from the fake
 GitHub rather than from anybody's account. That is where the pictures on
 [the layouts page](https://jmrp.io/docs/ghchronicle/card/layouts/) come from, and a layout that
-changes shape is one command away from a set that agrees with it.
+changes shape is one command away from a set that agrees with it. The account
+is the base fixtures with `test/e2e/testdata/gallery/` laid over them: a year
+of contributions, GitHub's whole fourteen days of traffic, five repositories to
+rank and one of them in six languages, which the smaller account every other
+suite asserts on cannot give a picture. A fixture named `<repo>~<fixture>`
+there answers for that one repository, and any other repository borrows
+hello-world's.
 `GHC_CARD_THEME` picks dark, light or `auto`, which puts both themes in one
 file behind a `prefers-color-scheme` query.
 

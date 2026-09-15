@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="495" height="122" viewBox="0 0 495 122" role="img" aria-labelledby="ghcTitle ghcDesc">
+<svg xmlns="http://www.w3.org/2000/svg" width="495" height="266" viewBox="0 0 495 266" role="img" aria-labelledby="ghcTitle ghcDesc">
 <title id="ghcTitle">Top repositories</title>
-<desc id="ghcDesc">GitHub summary for octocat: 80 stars, 9 forks, 42 public repositories. Most starred repositories: hello-world with 80 stars in Go.</desc>
+<desc id="ghcDesc">GitHub summary for octocat: 614 stars, 80 forks, 42 public repositories. Most starred repositories: chronicle-cli with 240 stars in Go, pixel-garden with 156 stars in TypeScript, tide-tables with 97 stars in Python, hello-world with 80 stars in Go, dotfiles with 41 stars in Shell.</desc>
 <style>
 .bg{fill:#0d1117;stroke:#3d444d}
 .panel{fill:#151b23}
@@ -32,18 +32,46 @@ text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans',Helveti
 .axis{stroke-width:1}
 .edge{fill:none;stroke-width:1}
 </style>
-<rect class="bg" x="0.5" y="0.5" width="494" height="121" rx="6"/>
+<rect class="bg" x="0.5" y="0.5" width="494" height="265" rx="6"/>
 <path class="panel" d="M0.5,44 V6.5 A6,6 0 0 1 6.5,0.5 H488.5 A6,6 0 0 1 494.5,6.5 V44 Z"/>
 <line class="axis" x1="0.5" y1="44.5" x2="494.5" y2="44.5"/>
-<rect class="edge" x="0.5" y="0.5" width="494" height="121" rx="6"/>
+<rect class="edge" x="0.5" y="0.5" width="494" height="265" rx="6"/>
 <text class="t" x="22" y="28" text-anchor="start">Top repositories</text>
 <text class="d mono" x="473" y="28" text-anchor="end">@octocat</text>
 <circle cx="27" cy="66" r="5" fill="#00add8"/>
-<text class="n" x="38" y="70" text-anchor="start">hello-world</text>
+<text class="n" x="38" y="70" text-anchor="start">chronicle-cli</text>
 <text class="s" x="403" y="70" text-anchor="end">Go</text>
 <path class="star" transform="translate(417 60) scale(0.7)" d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z"/>
-<text class="c" x="473" y="70" text-anchor="end">80</text>
+<text class="c" x="473" y="70" text-anchor="end">240</text>
 <rect class="track" x="22" y="78" width="451" height="4" rx="2"/>
 <rect x="22" y="78" width="451" height="4" rx="2" fill="#00add8"/>
-<text class="d mono" x="22" y="106" text-anchor="start">80 stars  ·  9 forks  ·  42 repos</text>
+<circle cx="27" cy="102" r="5" fill="#3178c6"/>
+<text class="n" x="38" y="106" text-anchor="start">pixel-garden</text>
+<text class="s" x="403" y="106" text-anchor="end">TypeScript</text>
+<path class="star" transform="translate(417 96) scale(0.7)" d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z"/>
+<text class="c" x="473" y="106" text-anchor="end">156</text>
+<rect class="track" x="22" y="114" width="451" height="4" rx="2"/>
+<rect x="22" y="114" width="293.15" height="4" rx="2" fill="#3178c6"/>
+<circle cx="27" cy="138" r="5" fill="#3572a5"/>
+<text class="n" x="38" y="142" text-anchor="start">tide-tables</text>
+<text class="s" x="403" y="142" text-anchor="end">Python</text>
+<path class="star" transform="translate(417 132) scale(0.7)" d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z"/>
+<text class="c" x="473" y="142" text-anchor="end">97</text>
+<rect class="track" x="22" y="150" width="451" height="4" rx="2"/>
+<rect x="22" y="150" width="182.28" height="4" rx="2" fill="#3572a5"/>
+<circle cx="27" cy="174" r="5" fill="#00add8"/>
+<text class="n" x="38" y="178" text-anchor="start">hello-world</text>
+<text class="s" x="403" y="178" text-anchor="end">Go</text>
+<path class="star" transform="translate(417 168) scale(0.7)" d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z"/>
+<text class="c" x="473" y="178" text-anchor="end">80</text>
+<rect class="track" x="22" y="186" width="451" height="4" rx="2"/>
+<rect x="22" y="186" width="150.33" height="4" rx="2" fill="#00add8"/>
+<circle cx="27" cy="210" r="5" fill="#89e051"/>
+<text class="n" x="38" y="214" text-anchor="start">dotfiles</text>
+<text class="s" x="403" y="214" text-anchor="end">Shell</text>
+<path class="star" transform="translate(417 204) scale(0.7)" d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z"/>
+<text class="c" x="473" y="214" text-anchor="end">41</text>
+<rect class="track" x="22" y="222" width="451" height="4" rx="2"/>
+<rect x="22" y="222" width="77.05" height="4" rx="2" fill="#89e051"/>
+<text class="d mono" x="22" y="250" text-anchor="start">614 stars  ·  80 forks  ·  42 repos</text>
 </svg>

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/jmrplens/ghchronicle/internal/render"
+	"github.com/jmrplens/ghchronicle/test/e2e/fakegh"
 )
 
 // TestCardGallery renders one card per registered layout, from the fake
@@ -63,7 +64,12 @@ func TestCardGallery(t *testing.T) {
 	default:
 		t.Fatalf("GHC_CARD_THEME=%q: dark, light or auto", os.Getenv("GHC_CARD_THEME"))
 	}
-	gh := newFakeGitHub(t)
+	// The base fixtures plus the gallery's own, which give the account a whole
+	// year of contributions, GitHub's full fourteen days of traffic, five
+	// repositories to rank and one of them in six languages. On the base
+	// account alone the heatmap was five cells out of eighty-four, the lists of
+	// repositories had one row and the language ring was one color.
+	gh := fakegh.New(t, "testdata", "testdata/gallery")
 
 	for _, layout := range render.Layouts() {
 		// A directory per layout, because the second sweep of the same state

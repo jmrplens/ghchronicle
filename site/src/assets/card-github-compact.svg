@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="495" height="96" viewBox="0 0 495 96" role="img" aria-labelledby="ghcTitle ghcDesc">
 <title id="ghcTitle">GitHub</title>
-<desc id="ghcDesc">GitHub summary for octocat: 80 stars, 9 forks, 1200 followers, 42 public repositories, 812 commits in the last year.</desc>
+<desc id="ghcDesc">GitHub summary for octocat: 614 stars, 80 forks, 1200 followers, 42 public repositories, 812 commits in the last year.</desc>
 <style>
 .bg{fill:#0d1117;stroke:#3d444d}
 .panel{fill:#151b23}
@@ -39,9 +39,9 @@ text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans',Helveti
 <rect class="edge" x="0.5" y="0.5" width="494" height="95" rx="6"/>
 <text class="t" x="16" y="24" text-anchor="start">GitHub</text>
 <text class="d mono" x="479" y="24" text-anchor="end">@octocat</text>
-<text class="big" x="16" y="66" text-anchor="start">80</text>
+<text class="big" x="16" y="66" text-anchor="start">614</text>
 <text class="l" x="16" y="82" text-anchor="start">Stars</text>
-<text class="big" x="108.6" y="66" text-anchor="start">9</text>
+<text class="big" x="108.6" y="66" text-anchor="start">80</text>
 <text class="l" x="108.6" y="82" text-anchor="start">Forks</text>
 <text class="big" x="201.2" y="66" text-anchor="start">1,200</text>
 <text class="l" x="201.2" y="82" text-anchor="start">Followers</text>

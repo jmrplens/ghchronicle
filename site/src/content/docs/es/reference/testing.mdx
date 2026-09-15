@@ -154,7 +154,13 @@ GHC_DUMP=actions go run ./cmd/probe owner/name
 existe y `TestCardGallery` dibuja en él una tarjeta por diseño, desde el GitHub
 falso y no desde la cuenta de nadie. De ahí salen las imágenes de
 [la página de diseños](/ghchronicle/es/card/layouts/), y un diseño que cambia
-de forma queda a un comando de tener unas imágenes que concuerden con él.
+de forma queda a un comando de tener unas imágenes que concuerden con él. La
+cuenta son los fixtures base con `test/e2e/testdata/gallery/` superpuesto: un
+año de contribuciones, los catorce días completos de tráfico de GitHub, cinco
+repositorios que ordenar y uno de ellos en seis lenguajes, que la cuenta más
+pequeña sobre la que afirma el resto de suites no puede dar a una imagen. Un
+fixture llamado `<repo>~<fixture>` responde solo por ese repositorio, y
+cualquier otro toma prestado el de hello-world.
 `GHC_CARD_THEME` elige `dark`, `light` o `auto`, que mete los dos temas en un
 solo fichero detrás de una consulta `prefers-color-scheme`.
 

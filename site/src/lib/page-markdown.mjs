@@ -233,6 +233,20 @@ function renderSelfClosing(name, attributes, context) {
 		}
 		return `\n\n${figure[context.locale].markdown}\n\n`;
 	}
+	// A picture of the card reduces to the markdown image it replaced, with the
+	// same path relative to the page, so the twin and the files gen-docs.mjs
+	// writes from it say exactly what they said before the component existed.
+	// A markdown image cannot replay an animation, so the flag has no reduction.
+	if (name === "Card") {
+		if (!attributes.name || !attributes.alt) {
+			throw new Error(
+				`${context.file}: <Card /> needs both a name and an alt.`,
+			);
+		}
+		const depth = context.file.replace(/^.*?\bsrc\//, "").split("/").length - 1;
+		const assets = `${"../".repeat(depth)}assets`;
+		return `\n\n![${attributes.alt}](${assets}/card-${attributes.name}.svg)\n\n`;
+	}
 	if (name === "LinkCard") {
 		const title = attributes.title ?? attributes.href ?? "";
 		const link = attributes.href ? `[${title}](${attributes.href})` : title;

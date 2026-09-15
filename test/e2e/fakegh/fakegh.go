@@ -38,6 +38,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"io"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -194,6 +195,9 @@ type Server struct {
 	// name. Nothing here opens a file named by a request: the names come from
 	// the directory, and a request only ever looks one up.
 	bodies map[string][]byte
+	// perRepo answers for repositories other than hello-world; New sets it
+	// only when it is given an overlay.
+	perRepo bool
 
 	mu       sync.Mutex
 	requests []Request
@@ -210,9 +214,27 @@ var budgets = map[string]int{"core": 5000, "graphql": 5000, "search": 30}
 
 // New starts a fake serving the fixtures in dir, which is testdata relative to
 // the calling suite's own directory. It stops when the test ends.
-func New(tb testing.TB, dir string) *Server {
+//
+// Each overlay is a directory whose fixtures replace the ones of the same name
+// in dir, and nothing else. It exists for the pictures of the card: they want
+// an account with a year of contributions and a repository in several
+// languages, and every other suite here asserts on the smaller account the
+// base fixtures describe, so the richer one cannot simply replace it.
+//
+// With an overlay, the fake also answers for repositories other than
+// hello-world. A request under /repos/octocat/<name>/ is routed as if it named
+// hello-world, and answered with the fixture "<name>~<fixture>" when the
+// overlay has one, which is how each repository of the gallery gets its own
+// stars and language, and with hello-world's otherwise. Without an overlay
+// such a request is a 404, exactly as before, so no base suite can come to
+// depend on a repository it never listed.
+func New(tb testing.TB, dir string, overlays ...string) *Server {
 	tb.Helper()
-	s := &Server{tb: tb, bodies: readFixtures(tb, dir), used: map[string]int{}}
+	bodies := readFixtures(tb, dir)
+	for _, overlay := range overlays {
+		maps.Copy(bodies, readFixtures(tb, overlay))
+	}
+	s := &Server{tb: tb, bodies: bodies, used: map[string]int{}, perRepo: len(overlays) > 0}
 	s.srv = httptest.NewServer(http.HandlerFunc(s.serve))
 	tb.Cleanup(s.srv.Close)
 	return s
@@ -355,7 +377,11 @@ func (s *Server) answer(r *http.Request, body []byte) answer {
 	if r.URL.Path == "/graphql" {
 		query = graphQLQuery(body)
 	}
-	switch name := route(r, body); name {
+	routed, repo := r, ""
+	if s.perRepo {
+		routed, repo = asHelloWorld(r)
+	}
+	switch name := route(routed, body); name {
 	case "":
 		return answer{
 			status: http.StatusNotFound, contentType: jsonType, cost: 1,
@@ -366,6 +392,9 @@ func (s *Server) answer(r *http.Request, body []byte) answer {
 	case graphQLUnknown:
 		return answer{status: http.StatusOK, contentType: jsonType, body: []byte(graphQLNoFixture), cost: 1, graphQL: query}
 	default:
+		if _, own := s.bodies[repo+"~"+name]; repo != "" && own {
+			name = repo + "~" + name
+		}
 		a := s.render(name)
 		a.graphQL = query
 		switch {
@@ -515,6 +544,26 @@ func (s *Server) render(name string) answer {
 	rendered = strings.ReplaceAll(rendered, "@SOON@", soon.Format(time.RFC3339))
 	a.body = []byte(rendered)
 	return a
+}
+
+// asHelloWorld reads a request for another of octocat's repositories as the
+// same request for hello-world, and returns the name it replaced. A request
+// that names hello-world, or no repository, comes back as it went in.
+func asHelloWorld(r *http.Request) (routed *http.Request, repo string) {
+	rest, ok := strings.CutPrefix(r.URL.Path, "/repos/"+Login+"/")
+	if !ok {
+		return r, ""
+	}
+	name, suffix, _ := strings.Cut(rest, "/")
+	if name == "" || repoPath == "/repos/"+Login+"/"+name {
+		return r, ""
+	}
+	routed = r.Clone(r.Context())
+	routed.URL.Path = repoPath
+	if suffix != "" {
+		routed.URL.Path += "/" + suffix
+	}
+	return routed, name
 }
 
 // today is what "@TODAY@" becomes: the start of the current UTC day.

@@ -1,0 +1,174 @@
+---
+/**
+ * One picture of the card, and for the layouts that animate, a way to see the
+ * animation again.
+ *
+ * The pictures are the SVG the tool writes, loaded as images rather than
+ * inlined: ten of them on one page would put ten `<style>` blocks into one
+ * document, and they share class and keyframe names (`draw`, `fade`, `k0`),
+ * so the last one would restyle the other nine. An image is a document of its
+ * own, which is what keeps each card's animation to itself.
+ *
+ * The same isolation is why replaying takes a new image rather than a class:
+ * nothing on the page can reach inside an image to restart its animations. So
+ * the button swaps the image for itself under a different query, which the
+ * browser treats as a new picture and animates from the start. Two queries are
+ * alternated rather than a new one on every press, so a reader who presses it
+ * twenty times costs two downloads of a few kilobytes, not twenty.
+ *
+ * The button is present only where there is something to replay. On a card
+ * that does not move it would be a control that does nothing, and it starts
+ * hidden so a reader without JavaScript never meets one either.
+ *
+ * The twins invoke this component identically, which is what
+ * `scripts/check-i18n-parity.mjs` compares, so the label's language is read off
+ * the URL rather than passed in, the way `Figure.astro` reads it.
+ */
+import { BASE, localeOf } from "../lib/site.mjs";
+
+interface Props {
+	/** The layout's name, which is the stem of its picture: card-<name>.svg. */
+	name: string;
+	/** What the picture shows, for a reader who cannot see it. */
+	alt: string;
+	/** Whether the layout animates, and so whether a replay button is offered. */
+	animated?: boolean;
+}
+
+const { name, alt, animated = false } = Astro.props;
+
+const route = Astro.url.pathname
+	.slice(BASE.length)
+	.replace(/^\/+/, "")
+	.replace(/\/+$/, "");
+const locale = localeOf(route);
+
+const urls = import.meta.glob<string>("../assets/card-*.svg", {
+	query: "?url",
+	import: "default",
+	eager: true,
+});
+const sources = import.meta.glob<string>("../assets/card-*.svg", {
+	query: "?raw",
+	import: "default",
+	eager: true,
+});
+
+const key = `../assets/card-${name}.svg`;
+const src = urls[key];
+const raw = sources[key];
+if (!src || !raw) {
+	throw new Error(
+		`<Card name="${name}" /> has no picture at src/assets/card-${name}.svg. ` +
+			"Render the gallery with TestCardGallery (see the testing page) and copy it in.",
+	);
+}
+
+// The card's own size, read off its root element, so the page reserves the box
+// before the image arrives and nothing below it moves when it does.
+const root = raw.match(/<svg\b[^>]*>/)?.[0] ?? "";
+const width = Number(root.match(/\bwidth="(\d+)"/)?.[1]);
+const height = Number(root.match(/\bheight="(\d+)"/)?.[1]);
+if (!width || !height) {
+	throw new Error(`src/assets/card-${name}.svg declares no width and height on its root.`);
+}
+
+const LABELS = {
+	en: "Replay the animation",
+	es: "Repetir la animación",
+};
+const label = LABELS[locale];
+---
+
+<figure class="rb-card" data-card>
+	<img
+		src={src}
+		alt={alt}
+		width={width}
+		height={height}
+		loading="lazy"
+		decoding="async"
+	/>
+	{
+		animated && (
+			<button
+				type="button"
+				class="rb-card__replay"
+				data-card-replay
+				hidden
+			>
+				<svg
+					aria-hidden="true"
+					viewBox="0 0 24 24"
+					width="16"
+					height="16"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+				>
+					<path d="M3 12a9 9 0 1 0 3-6.7" />
+					<path d="M3 4v5h5" />
+				</svg>
+				<span>{label}</span>
+			</button>
+		)
+	}
+</figure>
+
+<script>
+	// One module however many cards the page holds: Astro bundles a component's
+	// script once.
+	for (const button of document.querySelectorAll<HTMLButtonElement>("[data-card-replay]")) {
+		const image = button.closest("[data-card]")?.querySelector("img");
+		if (!image) continue;
+		let turn = 0;
+		button.addEventListener("click", () => {
+			const url = new URL(image.currentSrc || image.src, location.href);
+			turn = 1 - turn;
+			url.searchParams.set("replay", String(turn));
+			image.src = url.href;
+		});
+		button.hidden = false;
+	}
+</script>
+
+<style>
+	.rb-card {
+		margin-block: 1rem;
+	}
+	.rb-card img {
+		display: block;
+		max-width: 100%;
+		height: auto;
+	}
+	.rb-card__replay {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		margin-block-start: 0.5rem;
+		padding: 0.3rem 0.7rem;
+		border: 1px solid var(--sl-color-gray-5);
+		border-radius: 999px;
+		background: transparent;
+		color: var(--sl-color-text);
+		font: inherit;
+		font-size: var(--sl-text-sm);
+		cursor: pointer;
+	}
+	.rb-card__replay:hover {
+		border-color: var(--sl-color-text-accent);
+		color: var(--sl-color-white);
+	}
+	.rb-card__replay[hidden] {
+		display: none;
+	}
+	/* The cards themselves stop animating under this preference, so a button
+	 * that replays nothing would be a control with no effect. */
+	@media (prefers-reduced-motion: reduce) {
+		.rb-card__replay {
+			display: none;
+		}
+	}
+</style>

@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="495" height="266" viewBox="0 0 495 266" role="img" aria-labelledby="ghcTitle ghcDesc">
 <title id="ghcTitle">Languages</title>
-<desc id="ghcDesc">GitHub summary for octocat: 80 stars, 42 public repositories. Languages by bytes: Go 96%, Shell 4%.</desc>
+<desc id="ghcDesc">GitHub summary for octocat: 614 stars, 42 public repositories. Languages by bytes: Go 73%, TypeScript 18%, Shell 5%, CSS 3%, Dockerfile 1%, Makefile 1%.</desc>
 <style>
 .bg{fill:#0d1117;stroke:#3d444d}
 .panel{fill:#151b23}
@@ -39,18 +39,34 @@ text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans',Helveti
 <text class="t" x="22" y="28" text-anchor="start">Languages</text>
 <text class="d mono" x="473" y="28" text-anchor="end">@octocat</text>
 <circle class="edge" cx="84" cy="124" r="54" stroke-width="16"/>
-<circle cx="84" cy="124" r="54" fill="none" stroke="#00add8" stroke-width="16" stroke-dasharray="324.21 15.08" stroke-dashoffset="-0" transform="rotate(-90 84 124)"/>
-<circle cx="84" cy="124" r="54" fill="none" stroke="#89e051" stroke-width="16" stroke-dasharray="9.08 330.21" stroke-dashoffset="-327.21" transform="rotate(-90 84 124)"/>
-<text class="big t" x="84" y="128" text-anchor="middle">96%</text>
+<circle cx="84" cy="124" r="54" fill="none" stroke="#00add8" stroke-width="16" stroke-dasharray="243.65 95.64" stroke-dashoffset="-0" transform="rotate(-90 84 124)"/>
+<circle cx="84" cy="124" r="54" fill="none" stroke="#3178c6" stroke-width="16" stroke-dasharray="56.7 282.59" stroke-dashoffset="-246.65" transform="rotate(-90 84 124)"/>
+<circle cx="84" cy="124" r="54" fill="none" stroke="#89e051" stroke-width="16" stroke-dasharray="12.35 326.94" stroke-dashoffset="-306.36" transform="rotate(-90 84 124)"/>
+<circle cx="84" cy="124" r="54" fill="none" stroke="#563d7c" stroke-width="16" stroke-dasharray="5.64 333.65" stroke-dashoffset="-321.71" transform="rotate(-90 84 124)"/>
+<circle cx="84" cy="124" r="54" fill="none" stroke="#384d54" stroke-width="16" stroke-dasharray="4.99 334.3" stroke-dashoffset="-330.35" transform="rotate(-90 84 124)"/>
+<circle cx="84" cy="124" r="54" fill="none" stroke="#427819" stroke-width="16" stroke-dasharray="3.95 335.34" stroke-dashoffset="-335.34" transform="rotate(-90 84 124)"/>
+<text class="big t" x="84" y="128" text-anchor="middle">73%</text>
 <text class="s" x="84" y="144" text-anchor="middle">Go</text>
 <circle cx="175" cy="72" r="5" fill="#00add8"/>
 <text class="n" x="186" y="76" text-anchor="start">Go</text>
-<text class="c" x="473" y="76" text-anchor="end">96%</text>
-<circle cx="175" cy="94" r="5" fill="#89e051"/>
-<text class="n" x="186" y="98" text-anchor="start">Shell</text>
-<text class="c" x="473" y="98" text-anchor="end">4%</text>
+<text class="c" x="473" y="76" text-anchor="end">73%</text>
+<circle cx="175" cy="94" r="5" fill="#3178c6"/>
+<text class="n" x="186" y="98" text-anchor="start">TypeScript</text>
+<text class="c" x="473" y="98" text-anchor="end">18%</text>
+<circle cx="175" cy="116" r="5" fill="#89e051"/>
+<text class="n" x="186" y="120" text-anchor="start">Shell</text>
+<text class="c" x="473" y="120" text-anchor="end">5%</text>
+<circle cx="175" cy="138" r="5" fill="#563d7c"/>
+<text class="n" x="186" y="142" text-anchor="start">CSS</text>
+<text class="c" x="473" y="142" text-anchor="end">3%</text>
+<circle cx="175" cy="160" r="5" fill="#384d54"/>
+<text class="n" x="186" y="164" text-anchor="start">Dockerfile</text>
+<text class="c" x="473" y="164" text-anchor="end">1%</text>
+<circle cx="175" cy="182" r="5" fill="#427819"/>
+<text class="n" x="186" y="186" text-anchor="start">Makefile</text>
+<text class="c" x="473" y="186" text-anchor="end">1%</text>
 <line class="axis" x1="22" y1="198.5" x2="473" y2="198.5"/>
-<text class="big" x="22" y="232" text-anchor="start">80</text>
+<text class="big" x="22" y="232" text-anchor="start">614</text>
 <text class="l" x="22" y="248" text-anchor="start">Stars</text>
 <text class="big" x="247.5" y="232" text-anchor="start">42</text>
 <text class="l" x="247.5" y="248" text-anchor="start">Repositories</text>
