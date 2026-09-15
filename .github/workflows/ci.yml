@@ -532,15 +532,19 @@ jobs:
         working-directory: site
 
       # The build-independent gates: type check, palette contrast, i18n parity,
-      # the Person snapshot, eslint and prettier. The gates that read the built
-      # site (html-validate, htmlhint, pa11y, the structured data, the markdown
-      # twins and llms.txt) stay in docs.yml, which is the workflow that builds
-      # it.
+      # the card pictures the pages show, the Person snapshot, eslint and
+      # prettier. The gates that read the built site (html-validate, htmlhint,
+      # pa11y, the structured data, the markdown twins and llms.txt) stay in
+      # docs.yml, which is the workflow that builds it.
       - name: Static site gates
         run: |
           pnpm run check
           pnpm run contrast:check
           pnpm run i18n:check
+          # Every card picture the gallery writes into src/assets/ is shown on
+          # a page in each language. Two looping cards were generated, copied
+          # in and shown nowhere, and nothing failed.
+          pnpm run cards:check
           # The landing page's counts are generated from the repository. The
           # generator existed and nothing ran it, so the landing advertised
           # 68 measurements and 28 families for six days while both the build

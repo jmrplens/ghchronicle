@@ -136,8 +136,10 @@ import { isMap, isSeq, parseDocument } from "yaml";
 const DOCS_DIR = fileURLToPath(new URL("../src/content/docs", import.meta.url));
 // Every mirror locale directly under DOCS_DIR. Anything NOT under one of these
 // is treated as an English source page that must have a twin in each locale.
-// Adding a locale here is the only change needed when astro.config.mjs grows one;
-// leaving it out would classify the new locale's pages as untranslated English.
+// Leaving a locale out would classify its pages as untranslated English. This
+// list is not the only place that decides what a locale is, `localeOf` in
+// src/lib/site.mjs answers the same question for the rendered site and for the
+// gates that import it, so a locale astro.config.mjs grows is added in both.
 const LOCALES = ["es"];
 
 const PAGE_EXTENSIONS = new Set([".md", ".mdx"]);

@@ -26,7 +26,19 @@
  * seconds for as long as the page is open, and a movement that lasts that long
  * needs a way to stop it (WCAG 2.2.2). So a `loop` card shows the picture that
  * plays once, and a toggle swaps both palettes to the looping picture and back,
- * which is the control: pressed again, the card is the one that settles.
+ * which is the control: pressed again, the card is the one that settles. The
+ * toggle alternates between two pictures by its nature, which is exactly what
+ * broke replaying in Safari, so every swap, to the loop and back to once, loads
+ * its picture under a query it has never used, the way a replay does.
+ *
+ * A layout can take both: `animated` and `loop` on one card. A replay while
+ * the loop is on restarts the looping picture, and a swap made while a replay
+ * is still loading wins over it, because both controls go through one swap
+ * that remembers what each palette was last asked to show. That swap is also
+ * what the toggle takes its pressed state from, once the picture the reader is
+ * looking at is on the page: a picture that never loads leaves the card as it
+ * was, and a control that said "looping" over the settled card would be
+ * claiming something nobody can see.
  *
  * The twins invoke this component identically, which is what
  * `scripts/check-i18n-parity.mjs` compares, so the label's language is read off
@@ -185,37 +197,121 @@ const loopLabel = LOOP_LABELS[locale];
 <script>
 	// One module however many cards the page holds: Astro bundles a component's
 	// script once.
+
+	// A query value this page has never used. The time sets it apart from every
+	// value a previous visit used, and the counter from every value this one
+	// has, so a repeat is impossible rather than unlikely. Not
+	// crypto.randomUUID, which exists only in a secure context: the site is
+	// also read over plain HTTP from a development server on the LAN, where it
+	// is undefined and the buttons would throw.
+	let minted = 0;
+	const unused = () => `${Date.now().toString(36)}-${(minted++).toString(36)}`;
+
+	// The address each palette of each card was last asked to show, by the
+	// replay button or the loop toggle. A swap finishes only once its picture
+	// has loaded, so until then the element on the page still shows the old
+	// address, and a second press before the first has landed has to start
+	// from what was asked for, not from what is on screen.
+	const wanted = new WeakMap<Element, Map<string, string>>();
+
+	/**
+	 * Shows `address` in one palette of a card, as a picture the browser has
+	 * never seen, so it plays from the start. It answers with what became of
+	 * the swap, which is how a control that claims a state, the loop toggle,
+	 * learns whether the reader can actually see it: `shown` once the picture
+	 * is on the page, `failed` if it never loaded, `superseded` if another
+	 * press asked for a different picture in the meantime.
+	 */
+	function show(
+		figure: Element,
+		selector: string,
+		address: string,
+	): Promise<"shown" | "failed" | "superseded"> {
+		const current = figure.querySelector<HTMLImageElement>(selector);
+		if (!current) return Promise.resolve("failed");
+		const url = new URL(address, location.href);
+		url.searchParams.set("replay", unused());
+		const next = url.href;
+		const asked = wanted.get(figure) ?? new Map<string, string>();
+		wanted.set(figure, asked);
+		const previous = asked.get(selector);
+		asked.set(selector, next);
+		// The palette out of sight is display:none, and a lazy image there is not
+		// fetched until its palette is shown. Setting its address costs nothing,
+		// and the picture arrives, from the start, when the theme changes.
+		if (getComputedStyle(current).display === "none") {
+			current.src = next;
+			return Promise.resolve("shown");
+		}
+		// A new element as well as a new address. An engine that keeps an
+		// animation's state with the element, rather than with the picture it
+		// shows, would otherwise go on showing the last frame. It is swapped in
+		// once the picture has loaded, so the card never blanks, and loads
+		// eagerly because a lazy image outside the document may never load. It
+		// replaces whatever holds the palette by then, which a later swap may
+		// have replaced already, and not at all if a later press asked for
+		// another picture.
+		const fresh = current.cloneNode() as HTMLImageElement;
+		fresh.loading = "eager";
+		const settled = new Promise<"shown" | "failed" | "superseded">((resolve) => {
+			fresh.addEventListener(
+				"load",
+				() => {
+					if (asked.get(selector) !== next) {
+						resolve("superseded");
+						return;
+					}
+					figure.querySelector(selector)?.replaceWith(fresh);
+					resolve("shown");
+				},
+				{ once: true },
+			);
+			// A picture that never arrives leaves the card showing what it showed
+			// before, so what was asked for is taken back: the next press starts
+			// from the address on screen rather than from one that failed.
+			fresh.addEventListener(
+				"error",
+				() => {
+					if (asked.get(selector) !== next) {
+						resolve("superseded");
+						return;
+					}
+					if (previous === undefined) asked.delete(selector);
+					else asked.set(selector, previous);
+					resolve("failed");
+				},
+				{ once: true },
+			);
+		});
+		fresh.src = next;
+		return settled;
+	}
+
+	const PALETTES = ["img.light-only", "img.dark-only"];
+
+	/** The palette on screen. The other one is display:none. */
+	const visiblePalette = (figure: Element) =>
+		PALETTES.find((candidate) => {
+			const image = figure.querySelector(candidate);
+			return image && getComputedStyle(image).display !== "none";
+		});
+
 	for (const button of document.querySelectorAll<HTMLButtonElement>("[data-card-replay]")) {
 		const figure = button.closest("[data-card]");
 		if (!figure?.querySelector("img")) continue;
 		button.addEventListener("click", () => {
-			// The palette on screen. The other one is display:none, and a lazy
-			// image there has usually never been fetched, so reloading it would
-			// cost a download and replay nothing anyone can see.
-			const current = [...figure.querySelectorAll("img")].find(
-				(image) => getComputedStyle(image).display !== "none",
+			// Reloading the palette out of sight would cost a download and replay
+			// nothing anyone can see.
+			const selector = visiblePalette(figure);
+			const current = selector && figure.querySelector<HTMLImageElement>(selector);
+			if (!selector || !current) return;
+			// The picture this palette is meant to show, which is the looping one
+			// while the toggle below is pressed, even before it has loaded.
+			show(
+				figure,
+				selector,
+				wanted.get(figure)?.get(selector) ?? (current.currentSrc || current.src),
 			);
-			if (!current) return;
-			const url = new URL(current.currentSrc || current.src, location.href);
-			// Never a value this page has used, and not crypto.randomUUID, which
-			// exists only in a secure context: the site is also read over plain
-			// HTTP from a development server on the LAN, where it is undefined
-			// and the button would throw. The time makes a repeat impossible.
-			url.searchParams.set(
-				"replay",
-				`${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`,
-			);
-			// A new element as well as a new address. An engine that keeps an
-			// animation's state with the element, rather than with the picture it
-			// shows, would otherwise go on showing the last frame. It is swapped
-			// in once the picture has loaded, so the card never blanks, and loads
-			// eagerly because a lazy image outside the document may never load.
-			const fresh = current.cloneNode() as HTMLImageElement;
-			fresh.loading = "eager";
-			fresh.addEventListener("load", () => current.replaceWith(fresh), {
-				once: true,
-			});
-			fresh.src = url.href;
 		});
 		button.hidden = false;
 	}
@@ -224,23 +320,33 @@ const loopLabel = LOOP_LABELS[locale];
 		const figure = button.closest("[data-card]");
 		const { onceLight, onceDark, loopLight, loopDark } = button.dataset;
 		if (!figure || !onceLight || !onceDark || !loopLight || !loopDark) continue;
-		button.addEventListener("click", () => {
-			const looping = button.getAttribute("aria-pressed") !== "true";
+		// What the reader asked for, kept here rather than read back off
+		// aria-pressed: the attribute now follows the picture, which arrives a
+		// moment later, and two quick presses would otherwise both read the state
+		// before either had changed it and ask for the same thing twice.
+		let looping = false;
+		button.addEventListener("click", async () => {
+			looping = !looping;
+			const wantsLoop = looping;
 			// Both palettes, so switching the page's theme while the card loops
-			// shows the loop in the other palette too. The images are looked up
-			// on every press rather than kept, because the replay button above
-			// replaces an image with a new element. A hidden image under a lazy
-			// load is not fetched until its palette is shown, so the one out of
-			// sight costs nothing here.
-			const pictures: [string, string][] = [
-				["img.light-only", looping ? loopLight : onceLight],
-				["img.dark-only", looping ? loopDark : onceDark],
-			];
-			for (const [selector, next] of pictures) {
-				const image = figure.querySelector<HTMLImageElement>(selector);
-				if (image) image.src = next;
-			}
-			button.setAttribute("aria-pressed", String(looping));
+			// shows the loop in the other palette too, and each under a new query
+			// in both directions: the toggle alternates between two pictures, which
+			// is the alternation that stopped Safari replaying (see the top of this
+			// file), so the picture that plays once would come back already settled
+			// the second time it was shown.
+			const onScreen = visiblePalette(figure) ?? PALETTES[0];
+			const swaps = await Promise.all([
+				show(figure, PALETTES[0], wantsLoop ? loopLight : onceLight),
+				show(figure, PALETTES[1], wantsLoop ? loopDark : onceDark),
+			]);
+			// The state is claimed from the palette the reader is looking at, and
+			// only once its picture is on the page. A picture that never loads
+			// leaves the card as it was, so the toggle says what it said before and
+			// the next press tries the same swap again; a press that another press
+			// has overtaken leaves the state to that one.
+			const outcome = swaps[PALETTES.indexOf(onScreen)];
+			if (outcome === "shown") button.setAttribute("aria-pressed", String(wantsLoop));
+			else if (outcome === "failed" && looping === wantsLoop) looping = !wantsLoop;
 		});
 		button.hidden = false;
 	}
@@ -268,6 +374,13 @@ const loopLabel = LOOP_LABELS[locale];
 		font: inherit;
 		font-size: var(--sl-text-sm);
 		cursor: pointer;
+	}
+	/* A card with both controls puts them side by side, and the markup has no
+	 * space between the two, so the second one carries it. Only the second: a
+	 * margin on every button would hang off the end of the row and off a card
+	 * that offers a single control. */
+	.rb-card__replay + .rb-card__replay {
+		margin-inline-start: 0.5rem;
 	}
 	.rb-card__replay:hover {
 		border-color: var(--sl-color-text-accent);
