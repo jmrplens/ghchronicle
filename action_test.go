@@ -1,0 +1,56 @@
+package ghchronicle
+
+import (
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+// TestTheActionsDefaultConfigLeavesPrivateRepositoriesOut runs the script the
+// Action uses when it is given no configuration. That configuration only ever
+// feeds a card, which is published, and a card that counts private
+// repositories puts their names in a profile README. So private repositories
+// stay out unless the caller says true, and anything that is not exactly true
+// or false is refused rather than read as one of them.
+func TestTheActionsDefaultConfigLeavesPrivateRepositoriesOut(t *testing.T) {
+	bash, err := exec.LookPath("bash")
+	if err != nil {
+		t.Skip("the Action's steps run in bash, and there is none here")
+	}
+	for _, tc := range []struct {
+		name, include string
+		status        int
+		want          string
+	}{
+		{"not given", "false", 0, "include_private: false"},
+		{"asked for", "true", 0, "include_private: true"},
+		{"a word that is neither", "yes", 2, "include-private must be true or false"},
+		{"a line break", "false\nsinks: {x: 1}", 2, "include-private must be true or false"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			out := filepath.Join(dir, "ghchronicle.yaml")
+			cmd := exec.Command(bash, filepath.Join("scripts", "action-config.sh"))
+			cmd.Env = append(os.Environ(),
+				"USER_LOGIN=octocat", "INCLUDE_PRIVATE="+tc.include,
+				"OUT="+out, "STATE="+filepath.Join(dir, "state.json"))
+			output, _ := cmd.CombinedOutput()
+			if cmd.ProcessState.ExitCode() != tc.status {
+				t.Fatalf("exit %d, want %d:\n%s", cmd.ProcessState.ExitCode(), tc.status, output)
+			}
+			got := string(output)
+			if tc.status == 0 {
+				body, readErr := os.ReadFile(out)
+				if readErr != nil {
+					t.Fatal(readErr)
+				}
+				got = string(body)
+			}
+			if !strings.Contains(got, tc.want) {
+				t.Errorf("want %q in:\n%s", tc.want, got)
+			}
+		})
+	}
+}

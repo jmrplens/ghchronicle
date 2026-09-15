@@ -41,13 +41,23 @@ inputs:
     required: false
     default: summary
   card-theme:
-    description: dark, light or auto.
+    description: dark, light, auto, or both to write the light card at `card` and the dark one beside it with _dark before the extension.
     required: false
     default: auto
   card-fields:
     description: Comma-separated field identifiers to show. Empty means the layout's default.
     required: false
     default: ""
+  card-motion:
+    description: How an animated layout moves. `once` plays and settles, `loop` plays again after a still pause, `off` draws the finished card with no animation.
+    required: false
+    default: once
+  include-private:
+    description: >
+      `true` counts private repositories in the card, when no config file is given.
+      Off by default because a layout that lists repositories would publish their names.
+    required: false
+    default: "false"
   version:
     description: The ghchronicle release to install. `latest` resolves the newest tag.
     required: false
@@ -93,28 +103,13 @@ runs:
       shell: bash
       env:
         USER_LOGIN: ${{ inputs.user }}
+        INCLUDE_PRIVATE: ${{ inputs.include-private }}
+        OUT: ${{ runner.temp }}/ghchronicle.yaml
+        STATE: ${{ runner.temp }}/ghchronicle-state.json
       run: |
         set -euo pipefail
-        # A GitHub login, and nothing else. The value is written into a YAML
-        # document below, where a line break would let it add keys of its own
-        # to the configuration this Action then runs.
-        case $USER_LOGIN in
-          "" | *[!A-Za-z0-9-]* | -* | *-)
-            echo "user must be a GitHub login, got '$USER_LOGIN'" >&2; exit 2 ;;
-        esac
-        # Every family on, nothing written anywhere: the card is the only
-        # output of a default run. A user who wants a database supplies a
-        # config file of their own.
-        cat > "$RUNNER_TEMP/ghchronicle.yaml" <<YAML
-        github:
-          token: \${GITHUB_TOKEN}
-        targets:
-          user: ${USER_LOGIN}
-          include_private: true
-        sinks: {}
-        state_file: ${RUNNER_TEMP}/ghchronicle-state.json
-        YAML
-        echo "GHC_CONFIG=$RUNNER_TEMP/ghchronicle.yaml" >> "$GITHUB_ENV"
+        bash "$GITHUB_ACTION_PATH/scripts/action-config.sh"
+        echo "GHC_CONFIG=$OUT" >> "$GITHUB_ENV"
 
     - name: Use the given configuration
       if: inputs.config != ''
@@ -146,6 +141,7 @@ runs:
         LAYOUT: ${{ inputs.card-layout }}
         THEME: ${{ inputs.card-theme }}
         FIELDS: ${{ inputs.card-fields }}
+        MOTION: ${{ inputs.card-motion }}
       run: |
         set -euo pipefail
         args=(-config "$GHC_CONFIG")
@@ -158,6 +154,9 @@ runs:
         if [ -n "$CARD" ]; then
           args+=(-card "$CARD" -card-layout "$LAYOUT" -card-theme "$THEME")
           [ -n "$FIELDS" ] && args+=(-card-fields "$FIELDS")
+          # Passed only when it is not the default, so a workflow that pins
+          # `version` to a release older than the flag keeps working.
+          [ "$MOTION" != once ] && args+=(-card-motion "$MOTION")
           [ "$MODE" = card ] && args+=(-card-only)
         elif [ "$MODE" = card ]; then
           echo "mode card needs a card path" >&2; exit 2
