@@ -158,11 +158,12 @@ runs:
           *) echo "mode must be once, backfill or card, got '$MODE'" >&2; exit 2 ;;
         esac
         if [ -n "$CARD" ]; then
-          # The binary does not create the card's directory: a path whose
-          # directory is not there is an error it reports before the sweep.
-          # Here the path is the workflow author's own input, in their own
-          # checkout, and the first run in a fresh profile repository has no
-          # generated/ yet, so the Action makes the directory itself.
+          # The binary refuses to create directories: it sweeps, and then the
+          # write fails when the card's directory is not there. Here the path
+          # is the workflow author's own input, in their own checkout, and the
+          # first run in a fresh profile repository has no generated/ yet, so
+          # the Action creates the directory itself rather than fail after
+          # spending the sweep.
           mkdir -p -- "$(dirname -- "$CARD")"
           args+=(-card "$CARD" -card-layout "$LAYOUT" -card-theme "$THEME")
           [ -n "$FIELDS" ] && args+=(-card-fields "$FIELDS")
