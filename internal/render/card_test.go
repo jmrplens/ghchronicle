@@ -430,6 +430,15 @@ func TestRankLanguagesKeepsOnlyWhatHasBytes(t *testing.T) {
 	}
 }
 
+// A limit of zero folds every language into "Other": there is no room for a
+// kept entry, so the whole total rests on the fold.
+func TestRankLanguagesWithZeroLimitFoldsEverythingIntoOther(t *testing.T) {
+	got := rankLanguages([]Language{{Name: "Go", Bytes: 10}, {Name: "Rust", Bytes: 5}}, 0)
+	if len(got) != 1 || got[0].Name != "Other" || got[0].Bytes != 15 {
+		t.Fatalf("rankLanguages with limit 0 = %+v, want everything folded into Other", got)
+	}
+}
+
 // Two entries the ranking cannot tell apart keep the order they came in: the
 // sort is stable, and a comparison that called equals "less" would swap them
 // on every run.
