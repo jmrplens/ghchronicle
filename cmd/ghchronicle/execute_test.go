@@ -359,6 +359,7 @@ func TestExecuteCardDrawsTheSweep(t *testing.T) {
 		{"a theme there is none of", []string{"-card", svg, "-card-theme", "neon"}, `"neon"`},
 		{"a field there is none of", []string{"-card", svg, "-card-fields", "stars,karma"}, "karma"},
 		{"a directory that is not there", []string{"-card", unreachable}, notFoundText(t, unreachable)},
+		{"a motion there is none of", []string{"-card", svg, "-card-motion", "bounce"}, `"bounce"`},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			failed := runCommand(t, append([]string{"-config", cfg, "-card-only"}, tc.args...)...)
@@ -367,6 +368,58 @@ func TestExecuteCardDrawsTheSweep(t *testing.T) {
 				t.Errorf("status %d, want 1 and %q in:\n%s", failed.status, tc.stderr, failed.stderr)
 			}
 		})
+	}
+}
+
+// TestExecuteBothThemesComeFromOneSweep writes the light and the dark card of
+// one sweep, so the two pictures of a <picture> element can never show numbers
+// from different moments, and passes the motion through to both.
+func TestExecuteBothThemesComeFromOneSweep(t *testing.T) {
+	gh := fakegh.New(t, fixtures)
+	dir := t.TempDir()
+	cfg := writeConfig(t, dir, gh.URL(), "")
+	light := filepath.Join(dir, "card.svg")
+	dark := filepath.Join(dir, "card_dark.svg")
+
+	got := runCommand(t, "-config", cfg, "-card", light, "-card-only",
+		"-card-layout", "sparkline-hero", "-card-theme", "both", "-card-motion", "loop")
+	if got.status != notExited {
+		t.Fatalf("-card-theme both = %d:\n%s", got.status, got.stderr)
+	}
+	lightSVG, err := os.ReadFile(light)
+	if err != nil {
+		t.Fatal(err)
+	}
+	darkSVG, err := os.ReadFile(dark)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(lightSVG), "#ffffff") || !strings.Contains(string(darkSVG), "#0d1117") {
+		t.Error("the light card must carry the light palette and the dark card the dark one")
+	}
+	for name, body := range map[string][]byte{light: lightSVG, dark: darkSVG} {
+		if !strings.Contains(string(body), "infinite") {
+			t.Errorf("%s does not loop", name)
+		}
+	}
+	if strings.Count(got.stderr, "card written") != 2 {
+		t.Errorf("the log must say each card was written:\n%s", got.stderr)
+	}
+}
+
+// TestExecuteRefusesACardItCannotDrawBeforeItSweeps checks the options before
+// the sweep spends any of the rate limit on a card that was never going to be
+// written.
+func TestExecuteRefusesACardItCannotDrawBeforeItSweeps(t *testing.T) {
+	gh := fakegh.New(t, fixtures)
+	dir := t.TempDir()
+	cfg := writeConfig(t, dir, gh.URL(), "")
+	got := runCommand(t, "-config", cfg, "-card", filepath.Join(dir, "card.svg"), "-card-only", "-card-motion", "bounce")
+	if got.status != 1 || !strings.Contains(got.stderr, `"bounce"`) {
+		t.Fatalf("status %d, want 1 naming the motion:\n%s", got.status, got.stderr)
+	}
+	if strings.Contains(got.stderr, "sweep") {
+		t.Errorf("the run swept before it refused the card:\n%s", got.stderr)
 	}
 }
 

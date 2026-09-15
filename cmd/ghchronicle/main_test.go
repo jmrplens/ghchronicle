@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"path/filepath"
 	"runtime/debug"
+	"slices"
 	"strings"
 	"testing"
 
@@ -217,5 +218,25 @@ func TestTheStartUpLineCountsTheFamiliesThatRun(t *testing.T) {
 	}
 	if !strings.Contains(line, want) {
 		t.Errorf("the start-up line lacks %s:\n%s", want, line)
+	}
+}
+
+// TestBothThemesNameTheDarkCardTheWayAPictureElementReadsIt pins the file
+// names -card-theme both writes: the path as given for the light card and the
+// same name with _dark before the extension for the dark one, which is the
+// pair the <picture> in the documentation points at.
+func TestBothThemesNameTheDarkCardTheWayAPictureElementReadsIt(t *testing.T) {
+	for _, tc := range []struct {
+		path, theme string
+		want        []cardFile
+	}{
+		{"card.svg", "dark", []cardFile{{"card.svg", "dark"}}},
+		{"out/card.svg", "both", []cardFile{{"out/card.svg", "light"}, {"out/card_dark.svg", "dark"}}},
+		{"profile", "both", []cardFile{{"profile", "light"}, {"profile_dark", "dark"}}},
+		{"a.b/card.v2.svg", "both", []cardFile{{"a.b/card.v2.svg", "light"}, {"a.b/card.v2_dark.svg", "dark"}}},
+	} {
+		if got := cardFiles(tc.path, tc.theme); !slices.Equal(got, tc.want) {
+			t.Errorf("cardFiles(%q, %q) = %v, want %v", tc.path, tc.theme, got, tc.want)
+		}
 	}
 }
