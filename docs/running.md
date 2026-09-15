@@ -589,7 +589,9 @@ another `card` path and layout, and paste one `<picture>` per card. Each step is
 a sweep of its own, and each draws every number again: a run that writes a card
 collects every family whatever its cadence says, and one in `card` mode writes
 nothing back to the state file. Several card steps can therefore share one
-`config`, and so one `state_file`, and each card is the whole account.
+`config`, and so one `state_file`, and each card is the whole account. That is
+also what each one costs: a card is a cold sweep of every family, so N cards
+are N sweeps of [the per-family price](https://jmrp.io/docs/ghchronicle/api/cost/).
 
 **A README that is not at the root.** This is for other repositories, since
 GitHub shows a profile's README only from the root of `<you>/<you>`. The paths

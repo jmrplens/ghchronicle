@@ -276,9 +276,11 @@ func newRunner(cfg *config.Config, api *ghapi.Client, sinks []sink.Sink,
 	return &run.Runner{
 		Cfg: cfg, API: api, Sinks: sinks,
 		State: run.LoadState(cfg.StateFile), Log: logger,
-		// Only the in-memory exporter needs it. A push sink has already
-		// delivered what it collected, and a one-shot run is a full sweep by
-		// definition.
+		// Only the in-memory exporter needs it, and only when it will serve:
+		// a push sink has already delivered what it collected, and -once
+		// starts no exporter to fill. What -once does not do is collect every
+		// family: a family that is not due is skipped there as in any sweep,
+		// which is why a card asks for Card below rather than riding on this.
 		Prime: cfg.Sinks.Prometheus != nil && !cfg.Sinks.Prometheus.NoPrime && !o.once && o.card == "",
 		// A backfill runs every family whatever the state says, because that
 		// is the whole point of asking for one.

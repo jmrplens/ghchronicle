@@ -83,8 +83,10 @@ func TestCardGallery(t *testing.T) {
 	// file at all, so one directory draws the same card as twenty.
 	work := t.TempDir()
 	cfg := writeConfig(t, work, gh.URL(), "e2e-token", login, "")
-	card := filepath.Join(work, "card.svg")
 	for _, v := range variants {
+		// A path per variant, so a run that writes nothing is a missing file
+		// and not the previous variant's card copied out under a new name.
+		card := filepath.Join(work, v.name+".svg")
 		logs, runErr := run(t, 2*time.Minute, "-config", cfg,
 			"-card", card, "-card-only", "-card-layout", v.layout,
 			"-card-theme", "both", "-card-motion", v.motion)
@@ -94,7 +96,7 @@ func TestCardGallery(t *testing.T) {
 		// A slice and not a map, so the log lists light before dark every time.
 		copies := []struct{ src, dst string }{
 			{card, v.name + ".svg"},
-			{filepath.Join(work, "card_dark.svg"), v.name + "_dark.svg"},
+			{filepath.Join(work, v.name+"_dark.svg"), v.name + "_dark.svg"},
 		}
 		for _, c := range copies {
 			svg, readErr := os.ReadFile(c.src)

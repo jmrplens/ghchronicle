@@ -109,20 +109,26 @@ level=WARN msg="family failed everywhere, not marking it as run" family=security
 
 ## El fichero de estado
 
-`state_file` guarda dos cosas y nada más: cuándo corrió cada familia por última
-vez, y cuándo se vio cada repositorio por primera vez.
+`state_file` guarda [seis cosas](/ghchronicle/es/configuration/#state_file), y
+las dos por las que se juzga una pasada son cuándo corrió cada familia por
+última vez y cuándo se vio cada repositorio por primera vez.
 
 Lo segundo es lo que hace que el recorrido completo de la historia de estrellas
 ocurra una vez y no en cada pasada. Se escribe a través de un fichero temporal
 y se renombra, así que una caída a mitad de escritura no puede dejar un estado
 truncado que provocaría una recolección completa.
 
-<Aside type="note" title="La primera pasada tras un reinicio lo corre todo">
+<Aside type="note" title="Tres pasadas recogen todas las familias diga lo que diga el estado">
   Un exportador guarda sus muestras en memoria, así que un reinicio lo vacía y
   sigue vacío hasta que llega la cadencia de cada familia, lo que para las de
   doce horas es medio día de dashboard a cero. Pagar una pasada completa es el error
   más barato, así que la primera pasada tras el arranque corre todas las
-  familias activas diga lo que diga el fichero de estado.
+  familias activas diga lo que diga el fichero de estado. Un
+  [relleno](/ghchronicle/es/how/backfill/) hace lo mismo, porque llegar tan
+  atrás como permita GitHub es justo lo que se le pide, y también una pasada que
+  dibuja [una tarjeta](/ghchronicle/es/card/), porque cada número de la tarjeta
+  sale de esa única pasada y una familia saltada por no tocarle sería un cero en
+  la imagen.
 </Aside>
 
 ## El freno

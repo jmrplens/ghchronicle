@@ -405,7 +405,8 @@ func (r *Runner) collectFamily(ctx context.Context, family string, now time.Time
 	return points, failed, nil
 }
 
-// finish saves what the sweep learned and says what it spent.
+// finish saves what the sweep learned, unless it was a card-only sweep, which
+// has nothing it may claim to have delivered, and says what it spent.
 func (r *Runner) finish() {
 	// Nothing a card-only sweep collected reached a store, so nothing it
 	// learned may tell the next collection that it did. See CardOnly.

@@ -18,7 +18,7 @@ ghchronicle -config /etc/ghchronicle/config.yaml
 | Flag              | Default       | What it does                                                                                                                               |
 | ----------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
 | `-config`         | `config.yaml` | Path to the configuration file                                                                                                             |
-| `-once`           | off           | Run one sweep and exit, whatever the cadences say                                                                                          |
+| `-once`           | off           | Run one sweep and exit instead of scheduling; a family that is not due by its cadence is still skipped                                     |
 | `-list`           | off           | Print the repositories that would be collected, and which are set aside, then exit                                                         |
 | `-version`        | off           | Print the version, the commit and the build date, then exit                                                                                |
 | `-groups`         | off           | Print the groups with the families in each, then exit                                                                                      |
