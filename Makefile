@@ -15,6 +15,7 @@
 	test test-short test-race test-e2e coverage cover-check \
 	coverage-conditions coverage-mutants \
 	test-e2e-docker test-e2e-docker-race e2e-docker-up e2e-docker-down e2e-docker-logs \
+	gallery check-gallery \
 	fmt fmt-check vet tidy lint golangci-lint govulncheck analyze analyze-fix sonar \
 	mdlint mdlint-fix check-doc-links docs check-docs \
 	probe gen-dashboards check-dashboards check-dashboards-live \
@@ -282,6 +283,18 @@ e2e-docker-down: ## Stop the containerized stores and remove their volumes
 e2e-docker-logs: ## Show the containerized stores' logs (SERVICE=name for one)
 	$(E2E_DOCKER_COMPOSE) logs --no-color --tail 200 $(SERVICE)
 
+# The gallery under site/src/assets/ is what TestCardGallery
+# (test/e2e/card_gallery_test.go) renders: one committed SVG pair per layout,
+# plus a loop pair for the animated ones, which the layouts page and the
+# README's own pictures read directly. GHC_CARD_GALLERY has to be absolute:
+# `go test` runs with the package directory as its working directory, so a
+# relative path would be read against test/e2e/, not the repository root.
+gallery: ## Regenerate the card gallery into site/src/assets (test/e2e/card_gallery_test.go)
+	GHC_CARD_GALLERY=$(CURDIR)/site/src/assets go test -count=1 ./test/e2e/ -run TestCardGallery
+
+check-gallery: ## Fail if the committed card gallery no longer matches the renderer (offline)
+	scripts/check-gallery.sh
+
 coverage: test ## Write the HTML coverage report to coverage.html
 	go tool cover -html=coverage.out -o coverage.html
 
@@ -385,9 +398,10 @@ check-docs: ## Fail if docs/ no longer matches the pages it is generated from
 # of one thing per pass. There is no separate gofmt or go vet step: gofumpt is
 # gofmt with more rules, and golangci-lint's govet runs every analyzer go vet
 # runs and more, so both would repeat a question the linter already answered.
-# check-dashboards and check-docs are in the list because a dashboard that no
-# longer matches its specification, or a file under docs/ that no longer
-# matches the page it is generated from, is the same kind of defect as a lint
+# check-dashboards, check-gallery and check-docs are in the list because a
+# dashboard that no longer matches its specification, a card picture that no
+# longer matches the renderer, or a file under docs/ that no longer matches
+# the page it is generated from, is the same kind of defect as a lint
 # finding: something committed that the source no longer produces.
 analyze: ## Run the whole static-analysis suite and report every failure at once
 	@analysis_status=0; \
@@ -413,14 +427,15 @@ analyze: ## Run the whole static-analysis suite and report every failure at once
 	echo "Go analysis packages: $(PKGS)"; \
 	echo "Go analysis build tags: $(E2E_DOCKER_TAG)"; \
 	echo ""; \
-	run_check "[1/8] golangci-lint config verify" golangci-lint config verify; \
-	run_check "[2/8] golangci-lint fmt" golangci-lint fmt --diff $(FMT_PATHS); \
-	run_check "[3/8] golangci-lint run" golangci-lint run $(PKGS); \
-	run_check "[4/8] govulncheck" $(MAKE) --no-print-directory govulncheck; \
-	run_check "[5/8] markdownlint" $(MAKE) --no-print-directory mdlint; \
-	run_check "[6/8] documentation local links" $(MAKE) --no-print-directory check-doc-links; \
-	run_check "[7/8] dashboards up to date" $(MAKE) --no-print-directory check-dashboards; \
-	run_check "[8/8] docs/ up to date" $(MAKE) --no-print-directory check-docs; \
+	run_check "[1/9] golangci-lint config verify" golangci-lint config verify; \
+	run_check "[2/9] golangci-lint fmt" golangci-lint fmt --diff $(FMT_PATHS); \
+	run_check "[3/9] golangci-lint run" golangci-lint run $(PKGS); \
+	run_check "[4/9] govulncheck" $(MAKE) --no-print-directory govulncheck; \
+	run_check "[5/9] markdownlint" $(MAKE) --no-print-directory mdlint; \
+	run_check "[6/9] documentation local links" $(MAKE) --no-print-directory check-doc-links; \
+	run_check "[7/9] dashboards up to date" $(MAKE) --no-print-directory check-dashboards; \
+	run_check "[8/9] card gallery up to date" $(MAKE) --no-print-directory check-gallery; \
+	run_check "[9/9] docs/ up to date" $(MAKE) --no-print-directory check-docs; \
 	echo "============================================================"; \
 	if [ "$$analysis_status" -ne 0 ]; then \
 		echo "Analysis failed. Review the findings above."; \
