@@ -219,3 +219,74 @@ func TestIssueEventsWindowFollowsTheCadence(t *testing.T) {
 		t.Errorf("backfill = %+v, want the walk back to BackfillSince", got)
 	}
 }
+
+// TestAnEmptyOrFailedFeedKeepsTheLastEventSeen: the event a sweep stops at
+// moves only when the feed was read and had a newest event. An empty feed
+// has none to offer, and a feed that failed on a later page has not been
+// read down to the old mark, so moving it would leave a gap for good.
+func TestAnEmptyOrFailedFeedKeepsTheLastEventSeen(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name   string
+		answer func(w http.ResponseWriter, page int)
+	}{
+		{"an empty feed", func(w http.ResponseWriter, _ int) { _, _ = w.Write([]byte(`[]`)) }},
+		{"a feed that fails on its second page", func(w http.ResponseWriter, page int) {
+			if page > 1 {
+				http.Error(w, `{"message":"boom"}`, http.StatusInternalServerError)
+				return
+			}
+			rows := make([]string, 0, 100)
+			for i := range 100 {
+				rows = append(rows, `{"id":"`+strconv.Itoa(4900-i)+`","type":"WatchEvent","public":true,`+
+					`"created_at":"2026-09-07T09:14:53Z","actor":{"login":"o"},"repo":{"name":"o/n"},"payload":{}}`)
+			}
+			_, _ = w.Write([]byte("[" + strings.Join(rows, ",") + "]"))
+		}},
+	} {
+		r := sweepRunner(t, func(w http.ResponseWriter, req *http.Request) {
+			page, _ := strconv.Atoi(req.URL.Query().Get("page"))
+			tc.answer(w, page)
+		})
+		r.State.LastEvent = "4242"
+		_, _ = r.events(context.Background(), "o", time.Date(2026, 9, 8, 15, 0, 0, 0, time.UTC))
+		if r.State.LastEvent != "4242" {
+			t.Errorf("%s moved the last event seen to %q, want 4242 kept", tc.name, r.State.LastEvent)
+		}
+	}
+}
+
+// TestIssueEventsReadTwoCadencesBackAfterARecentSweep: when the last run is
+// within the window, the window is two cadences back from now and not a
+// cadence back from the last run, which would read half an hour less.
+func TestIssueEventsReadTwoCadencesBackAfterARecentSweep(t *testing.T) {
+	t.Parallel()
+	r := pullsRunner(t)
+	every, _ := r.Cfg.Interval("issueevents")
+	now := time.Date(2026, 9, 8, 15, 0, 0, 0, time.UTC)
+	r.State.Mark("issueevents", now.Add(-every/2))
+	if got := r.issueEvents(now); !got.Since.Equal(now.Add(-2 * every)) {
+		t.Errorf("a sweep half a cadence after the last reads from %s, want %s", got.Since, now.Add(-2*every))
+	}
+}
+
+// TestAFailedInboxReadKeepsItsWindowAndItsDailyPassDue: an inbox that did
+// not answer moves neither the window nor the record of the whole read, so
+// the next sweep asks for the same thing again.
+func TestAFailedInboxReadKeepsItsWindowAndItsDailyPassDue(t *testing.T) {
+	t.Parallel()
+	r := sweepRunner(t, func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, `{"message":"boom"}`, http.StatusInternalServerError)
+	})
+	cut := time.Date(2026, 9, 7, 12, 0, 0, 0, time.UTC)
+	r.State.LastNotified = cut
+	if _, err := r.notifications(context.Background(), time.Date(2026, 9, 8, 15, 0, 0, 0, time.UTC)); err == nil {
+		t.Fatal("the inbox failed and notifications returned no error")
+	}
+	if !r.State.LastNotified.Equal(cut) {
+		t.Errorf("a failed read moved the window to %s", r.State.LastNotified)
+	}
+	if when, full := r.State.LastFull["notifs"]; full {
+		t.Errorf("a failed whole read was put on record at %s", when)
+	}
+}

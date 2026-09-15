@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -260,19 +261,77 @@ func TestRunReadsItsArguments(t *testing.T) {
 	if err := os.WriteFile(bad, []byte("{not json"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	stdout, status, err := checkRun(t, "--help")
-	if stdout != usage+"\n" || status != 0 || err != nil {
-		t.Errorf("--help = %q, %d, %v, want the usage and a clean exit", stdout, status, err)
-	}
-	for name, args := range map[string][]string{
-		"no schema file":            nil,
-		"--dump without a file":     {"--dump", "uid"},
-		"a schema that is absent":   {filepath.Join(t.TempDir(), "absent.json")},
-		"a schema that is not JSON": {bad},
-	} {
-		if _, _, err = checkRun(t, args...); err == nil {
-			t.Errorf("%s: run accepted it", name)
+	for _, flag := range []string{"-h", "--help", "-help"} {
+		stdout, status, err := checkRun(t, flag)
+		if stdout != usage+"\n" || status != 0 || err != nil {
+			t.Errorf("%s = %q, %d, %v, want the usage and a clean exit", flag, stdout, status, err)
 		}
+	}
+	absent := filepath.Join(t.TempDir(), "absent.json")
+	// Each refusal is matched on what it says and not only on its being an
+	// error: a -dump the command did not recognize would be read as the name
+	// of a schema file, which is absent, and fail all the same.
+	for name, tc := range map[string]struct {
+		args []string
+		want string
+	}{
+		"no schema file":            {nil, "no schema file given"},
+		"--dump without a file":     {[]string{"--dump", "uid"}, "--dump needs a datasource uid and a file to write"},
+		"-dump without a file":      {[]string{"-dump", "uid"}, "--dump needs a datasource uid and a file to write"},
+		"a schema that is absent":   {[]string{absent}, absent},
+		"a schema that is not JSON": {[]string{bad}, bad + ": "},
+	} {
+		if _, _, err := checkRun(t, tc.args...); err == nil || !strings.Contains(err.Error(), tc.want) {
+			t.Errorf("%s: run = %v, want an error saying %q", name, err, tc.want)
+		}
+	}
+}
+
+// TestMainExitsWithWhatRunAnswers runs main in a process of its own, because
+// main is where an error turns into a message on stderr and an exit status of
+// one, and a status into the exit itself: a usage asked for leaves cleanly
+// with nothing on stderr, and a missing schema file says why and fails.
+//
+// The process is this package built as the program it is, found on PATH by its
+// own name the way the stand-in for sudo is, and built before PATH is narrowed
+// to it because the build needs the go command.
+func TestMainExitsWithWhatRunAnswers(t *testing.T) {
+	dir := t.TempDir()
+	program := filepath.Join(dir, "check_postgres")
+	if runtime.GOOS == "windows" {
+		program += ".exe"
+	}
+	build := exec.CommandContext(t.Context(), "go", "build", "-o", program, ".")
+	if out, err := build.CombinedOutput(); err != nil {
+		t.Fatalf("build the command: %v\n%s", err, out)
+	}
+	t.Setenv("PATH", dir)
+	for _, tc := range []struct {
+		name           string
+		args           []string
+		status         int
+		stdout, stderr string
+	}{
+		{"the usage", []string{"--help"}, 0, usage + "\n", ""},
+		{"no schema file", nil, 1, "", "no schema file given\n" + usage + "\n"},
+	} {
+		args := tc.args
+		t.Run(tc.name, func(t *testing.T) {
+			cmd := exec.CommandContext(t.Context(), "check_postgres", args...)
+			var stdout, stderr strings.Builder
+			cmd.Stdout, cmd.Stderr = &stdout, &stderr
+			err := cmd.Run()
+			status := 0
+			if exitErr, ok := errors.AsType[*exec.ExitError](err); ok {
+				status = exitErr.ExitCode()
+			} else if err != nil {
+				t.Fatal(err)
+			}
+			if status != tc.status || stdout.String() != tc.stdout || stderr.String() != tc.stderr {
+				t.Errorf("main = %d, stdout %q, stderr %q, want %d, %q, %q",
+					status, stdout.String(), stderr.String(), tc.status, tc.stdout, tc.stderr)
+			}
+		})
 	}
 }
 
@@ -425,14 +484,21 @@ func TestSplitReadsTheFirstErrorOfEachBlock(t *testing.T) {
 
 // TestColumnsOfOrdersASharedNameByType keeps two columns of one name in the
 // order their types give, rather than in whatever order the dump listed them.
+// The dump is tried in both orders, because a dump that already lists them the
+// way the types sort proves nothing about the sort.
 func TestColumnsOfOrdersASharedNameByType(t *testing.T) {
 	t.Parallel()
-	_, fields, err := columnsOf("gh_repo", [][]string{{"size", "Int64"}, {"size", "Float64"}, {"age", "Int64"}})
-	if err != nil {
-		t.Fatal(err)
-	}
 	want := [][2]string{{"age", "BIGINT"}, {"size", "BIGINT"}, {"size", "DOUBLE PRECISION"}}
-	if !slices.Equal(fields, want) {
-		t.Errorf("columnsOf = %v, want %v", fields, want)
+	for _, cols := range [][][]string{
+		{{"size", "Int64"}, {"size", "Float64"}, {"age", "Int64"}},
+		{{"size", "Float64"}, {"size", "Int64"}, {"age", "Int64"}},
+	} {
+		_, fields, err := columnsOf("gh_repo", cols)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !slices.Equal(fields, want) {
+			t.Errorf("columnsOf(%v) = %v, want %v", cols, fields, want)
+		}
 	}
 }

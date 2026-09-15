@@ -1,0 +1,138 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="495" height="204" viewBox="0 0 495 204" role="img" aria-labelledby="ghcTitle ghcDesc">
+<title id="ghcTitle">Contributions, last 12 weeks</title>
+<desc id="ghcDesc">GitHub summary for octo: 1234567 stars, 0 forks, 999950 followers, 3 public repositories, 1049950000 contributions in the last year, -12 repository views over the traffic window, 7 unique visitors over the traffic window, 1000 clones over the traffic window, 100 commits in the last year, 10 pull requests in the last year, 1 reviews in the last year, 0 issues in the last year. Contributions per day over the last 120 days, peaking at 10.</desc>
+<style>
+.bg{fill:#0d1117;stroke:#3d444d}
+.panel{fill:#151b23}
+.t,.v,.big{fill:#f0f6fc}
+.d,.l,.h,.s{fill:#9198a1}
+.n,.c{fill:#f0f6fc}
+.star,.pill-v{fill:#4493f8}
+.on-accent{fill:#0d1117}
+.line{stroke:#4493f8}
+.area{fill:#4493f8}
+.axis,.edge{stroke:#3d444d}
+.track{fill:#3d444d}
+.ok{fill:#3fb950}
+.fg{fill:#f0f6fc}
+.h0{fill:#151b23}.h1{fill:#033a16}.h2{fill:#196c2e}.h3{fill:#2ea043}.h4{fill:#56d364}
+text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans',Helvetica,Arial,sans-serif}
+.mono{font-family:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace}
+.t{font-size:15px;font-weight:600}
+.d{font-size:11px}
+.v{font-size:22px;font-weight:600;font-family:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace}
+.big{font-size:20px;font-weight:600;font-family:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace}
+.l{font-size:11px}
+.h{font-size:14px;font-weight:600}
+.n{font-size:13px}
+.s{font-size:11px}
+.c{font-size:13px;font-weight:500;font-family:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace}
+.line{fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.area{opacity:0.12;stroke:none}
+.axis{stroke-width:1}
+.edge{fill:none;stroke-width:1}
+</style>
+<rect class="bg" x="0.5" y="0.5" width="494" height="203" rx="6"/>
+<path class="panel" d="M0.5,44 V6.5 A6,6 0 0 1 6.5,0.5 H488.5 A6,6 0 0 1 494.5,6.5 V44 Z"/>
+<line class="axis" x1="0.5" y1="44.5" x2="494.5" y2="44.5"/>
+<rect class="edge" x="0.5" y="0.5" width="494" height="203" rx="6"/>
+<text class="t" x="22" y="28" text-anchor="start">Contributions, last 12 weeks</text>
+<text class="d mono" x="473" y="28" text-anchor="end">@octo</text>
+<rect class="h4" x="22" y="62" width="11" height="11" rx="2"/>
+<rect class="h3" x="22" y="76" width="11" height="11" rx="2"/>
+<rect class="h1" x="22" y="90" width="11" height="11" rx="2"/>
+<rect class="h4" x="22" y="104" width="11" height="11" rx="2"/>
+<rect class="h0" x="22" y="118" width="11" height="11" rx="2"/>
+<rect class="h1" x="22" y="132" width="11" height="11" rx="2"/>
+<rect class="h4" x="22" y="146" width="11" height="11" rx="2"/>
+<rect class="h2" x="36" y="62" width="11" height="11" rx="2"/>
+<rect class="h0" x="36" y="76" width="11" height="11" rx="2"/>
+<rect class="h3" x="36" y="90" width="11" height="11" rx="2"/>
+<rect class="h2" x="36" y="104" width="11" height="11" rx="2"/>
+<rect class="h4" x="36" y="118" width="11" height="11" rx="2"/>
+<rect class="h3" x="36" y="132" width="11" height="11" rx="2"/>
+<rect class="h1" x="36" y="146" width="11" height="11" rx="2"/>
+<rect class="h4" x="50" y="62" width="11" height="11" rx="2"/>
+<rect class="h2" x="50" y="76" width="11" height="11" rx="2"/>
+<rect class="h1" x="50" y="90" width="11" height="11" rx="2"/>
+<rect class="h4" x="50" y="104" width="11" height="11" rx="2"/>
+<rect class="h2" x="50" y="118" width="11" height="11" rx="2"/>
+<rect class="h0" x="50" y="132" width="11" height="11" rx="2"/>
+<rect class="h3" x="50" y="146" width="11" height="11" rx="2"/>
+<rect class="h2" x="64" y="62" width="11" height="11" rx="2"/>
+<rect class="h4" x="64" y="76" width="11" height="11" rx="2"/>
+<rect class="h3" x="64" y="90" width="11" height="11" rx="2"/>
+<rect class="h1" x="64" y="104" width="11" height="11" rx="2"/>
+<rect class="h4" x="64" y="118" width="11" height="11" rx="2"/>
+<rect class="h2" x="64" y="132" width="11" height="11" rx="2"/>
+<rect class="h1" x="64" y="146" width="11" height="11" rx="2"/>
+<rect class="h4" x="78" y="62" width="11" height="11" rx="2"/>
+<rect class="h2" x="78" y="76" width="11" height="11" rx="2"/>
+<rect class="h0" x="78" y="90" width="11" height="11" rx="2"/>
+<rect class="h3" x="78" y="104" width="11" height="11" rx="2"/>
+<rect class="h2" x="78" y="118" width="11" height="11" rx="2"/>
+<rect class="h4" x="78" y="132" width="11" height="11" rx="2"/>
+<rect class="h3" x="78" y="146" width="11" height="11" rx="2"/>
+<rect class="h1" x="92" y="62" width="11" height="11" rx="2"/>
+<rect class="h4" x="92" y="76" width="11" height="11" rx="2"/>
+<rect class="h2" x="92" y="90" width="11" height="11" rx="2"/>
+<rect class="h1" x="92" y="104" width="11" height="11" rx="2"/>
+<rect class="h4" x="92" y="118" width="11" height="11" rx="2"/>
+<rect class="h2" x="92" y="132" width="11" height="11" rx="2"/>
+<rect class="h0" x="92" y="146" width="11" height="11" rx="2"/>
+<rect class="h3" x="106" y="62" width="11" height="11" rx="2"/>
+<rect class="h2" x="106" y="76" width="11" height="11" rx="2"/>
+<rect class="h4" x="106" y="90" width="11" height="11" rx="2"/>
+<rect class="h3" x="106" y="104" width="11" height="11" rx="2"/>
+<rect class="h1" x="106" y="118" width="11" height="11" rx="2"/>
+<rect class="h4" x="106" y="132" width="11" height="11" rx="2"/>
+<rect class="h2" x="106" y="146" width="11" height="11" rx="2"/>
+<rect class="h1" x="120" y="62" width="11" height="11" rx="2"/>
+<rect class="h4" x="120" y="76" width="11" height="11" rx="2"/>
+<rect class="h2" x="120" y="90" width="11" height="11" rx="2"/>
+<rect class="h0" x="120" y="104" width="11" height="11" rx="2"/>
+<rect class="h3" x="120" y="118" width="11" height="11" rx="2"/>
+<rect class="h2" x="120" y="132" width="11" height="11" rx="2"/>
+<rect class="h4" x="120" y="146" width="11" height="11" rx="2"/>
+<rect class="h3" x="134" y="62" width="11" height="11" rx="2"/>
+<rect class="h1" x="134" y="76" width="11" height="11" rx="2"/>
+<rect class="h4" x="134" y="90" width="11" height="11" rx="2"/>
+<rect class="h2" x="134" y="104" width="11" height="11" rx="2"/>
+<rect class="h1" x="134" y="118" width="11" height="11" rx="2"/>
+<rect class="h4" x="134" y="132" width="11" height="11" rx="2"/>
+<rect class="h2" x="134" y="146" width="11" height="11" rx="2"/>
+<rect class="h0" x="148" y="62" width="11" height="11" rx="2"/>
+<rect class="h3" x="148" y="76" width="11" height="11" rx="2"/>
+<rect class="h2" x="148" y="90" width="11" height="11" rx="2"/>
+<rect class="h4" x="148" y="104" width="11" height="11" rx="2"/>
+<rect class="h3" x="148" y="118" width="11" height="11" rx="2"/>
+<rect class="h1" x="148" y="132" width="11" height="11" rx="2"/>
+<rect class="h4" x="148" y="146" width="11" height="11" rx="2"/>
+<rect class="h2" x="162" y="62" width="11" height="11" rx="2"/>
+<rect class="h1" x="162" y="76" width="11" height="11" rx="2"/>
+<rect class="h4" x="162" y="90" width="11" height="11" rx="2"/>
+<rect class="h2" x="162" y="104" width="11" height="11" rx="2"/>
+<rect class="h0" x="162" y="118" width="11" height="11" rx="2"/>
+<rect class="h3" x="162" y="132" width="11" height="11" rx="2"/>
+<rect class="h2" x="162" y="146" width="11" height="11" rx="2"/>
+<rect class="h4" x="176" y="62" width="11" height="11" rx="2"/>
+<rect class="h3" x="176" y="76" width="11" height="11" rx="2"/>
+<rect class="h1" x="176" y="90" width="11" height="11" rx="2"/>
+<rect class="h4" x="176" y="104" width="11" height="11" rx="2"/>
+<rect class="h2" x="176" y="118" width="11" height="11" rx="2"/>
+<rect class="h1" x="176" y="132" width="11" height="11" rx="2"/>
+<rect class="h4" x="176" y="146" width="11" height="11" rx="2"/>
+<text class="s" x="22" y="182" text-anchor="start">Less</text>
+<rect class="h0" x="52" y="173" width="11" height="11" rx="2"/>
+<rect class="h1" x="66" y="173" width="11" height="11" rx="2"/>
+<rect class="h2" x="80" y="173" width="11" height="11" rx="2"/>
+<rect class="h3" x="94" y="173" width="11" height="11" rx="2"/>
+<rect class="h4" x="108" y="173" width="11" height="11" rx="2"/>
+<text class="s" x="124" y="182" text-anchor="start">More</text>
+<text class="big" x="221" y="80" text-anchor="start">1,234,567</text>
+<text class="l" x="221" y="96" text-anchor="start">Stars</text>
+<text class="big" x="221" y="124" text-anchor="start">0</text>
+<text class="l" x="221" y="140" text-anchor="start">Forks</text>
+<text class="big" x="221" y="168" text-anchor="start">999,950</text>
+<text class="l" x="221" y="184" text-anchor="start">Followers</text>
+</svg>

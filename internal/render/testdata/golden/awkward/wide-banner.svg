@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="60" viewBox="0 0 800 60" role="img" aria-labelledby="ghcTitle ghcDesc">
+<title id="ghcTitle">octo</title>
+<desc id="ghcDesc">GitHub summary for octo: 1234567 stars, 0 forks, 999950 followers, 3 public repositories, 1049950000 contributions in the last year, -12 repository views over the traffic window, 7 unique visitors over the traffic window, 1000 clones over the traffic window, 100 commits in the last year, 10 pull requests in the last year, 1 reviews in the last year, 0 issues in the last year. Contributions per day over the last 120 days, peaking at 10.</desc>
+<style>
+.bg{fill:#0d1117;stroke:#30363d}
+.panel{fill:#161b22}
+.t,.v,.big{fill:#e6edf3}
+.d,.l,.h,.s{fill:#8b949e}
+.n,.c{fill:#c9d1d9}
+.star,.pill-v{fill:#e3b341}
+.on-accent{fill:#0d1117}
+.line{stroke:#58a6ff}
+.area{fill:#58a6ff}
+.axis,.edge{stroke:#30363d}
+.track{fill:#30363d}
+.ok{fill:#3fb950}
+.fg{fill:#e6edf3}
+.h0{fill:#151b23}.h1{fill:#033a16}.h2{fill:#196c2e}.h3{fill:#2ea043}.h4{fill:#56d364}
+text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif}
+.mono{font-family:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace}
+.t{font-size:18px;font-weight:600}
+.d{font-size:11px}
+.v{font-size:16px;font-weight:600}
+.big{font-size:24px;font-weight:700}
+.l{font-size:11px}
+.h{font-size:10px;font-weight:600;letter-spacing:0.08em}
+.n{font-size:12px}
+.s{font-size:11px}
+.c{font-size:12px}
+.line{fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.area{opacity:0.14;stroke:none}
+.axis{stroke-width:1}
+.edge{fill:none;stroke-width:1}
+.line{stroke-width:1.25;opacity:0.35}
+.area{opacity:0.07}
+.t2{font-size:15px;font-weight:600}
+.draw{animation:draw 1.6s ease-out 1}
+.fade{animation:fade 1.6s ease-out 1}
+@keyframes draw{from{stroke-dasharray:1;stroke-dashoffset:1}to{stroke-dasharray:1;stroke-dashoffset:0}}
+@keyframes fade{from{opacity:0}}
+@media (prefers-reduced-motion:reduce){.draw,.fade,.cu{animation:none}}
+</style>
+<rect class="bg" x="0.5" y="0.5" width="799" height="59" rx="6"/>
+<path class="area fade" d="M1,58 L1,58 L7.71,31.4 L14.41,46.6 L21.12,20 L27.82,35.2 L34.53,50.4 L41.24,23.8 L47.94,39 L54.65,54.2 L61.35,27.6 L68.06,42.8 L74.76,58 L81.47,31.4 L88.18,46.6 L94.88,20 L101.59,35.2 L108.29,50.4 L115,23.8 L121.71,39 L128.41,54.2 L135.12,27.6 L141.82,42.8 L148.53,58 L155.24,31.4 L161.94,46.6 L168.65,20 L175.35,35.2 L182.06,50.4 L188.76,23.8 L195.47,39 L202.18,54.2 L208.88,27.6 L215.59,42.8 L222.29,58 L229,31.4 L235.71,46.6 L242.41,20 L249.12,35.2 L255.82,50.4 L262.53,23.8 L269.24,58 L275.94,54.2 L282.65,27.6 L289.35,42.8 L296.06,58 L302.76,31.4 L309.47,46.6 L316.18,20 L322.88,35.2 L329.59,50.4 L336.29,23.8 L343,39 L349.71,54.2 L356.41,27.6 L363.12,42.8 L369.82,58 L376.53,31.4 L383.24,46.6 L389.94,20 L396.65,35.2 L403.35,50.4 L410.06,23.8 L416.76,39 L423.47,54.2 L430.18,27.6 L436.88,42.8 L443.59,58 L450.29,31.4 L457,46.6 L463.71,20 L470.41,35.2 L477.12,50.4 L483.82,23.8 L490.53,39 L497.24,54.2 L503.94,27.6 L510.65,42.8 L517.35,58 L524.06,31.4 L530.76,46.6 L537.47,20 L544.18,35.2 L550.88,50.4 L557.59,23.8 L564.29,39 L571,54.2 L577.71,27.6 L584.41,42.8 L591.12,58 L597.82,31.4 L604.53,46.6 L611.24,20 L617.94,35.2 L624.65,50.4 L631.35,23.8 L638.06,39 L644.76,54.2 L651.47,27.6 L658.18,42.8 L664.88,58 L671.59,31.4 L678.29,46.6 L685,20 L691.71,35.2 L698.41,50.4 L705.12,23.8 L711.82,39 L718.53,54.2 L725.24,27.6 L731.94,42.8 L738.65,58 L745.35,31.4 L752.06,46.6 L758.76,20 L765.47,35.2 L772.18,50.4 L778.88,23.8 L785.59,39 L792.29,54.2 L799,27.6 L799,58Z"/>
+<polyline class="line draw" pathLength="1" points="1,58 7.71,31.4 14.41,46.6 21.12,20 27.82,35.2 34.53,50.4 41.24,23.8 47.94,39 54.65,54.2 61.35,27.6 68.06,42.8 74.76,58 81.47,31.4 88.18,46.6 94.88,20 101.59,35.2 108.29,50.4 115,23.8 121.71,39 128.41,54.2 135.12,27.6 141.82,42.8 148.53,58 155.24,31.4 161.94,46.6 168.65,20 175.35,35.2 182.06,50.4 188.76,23.8 195.47,39 202.18,54.2 208.88,27.6 215.59,42.8 222.29,58 229,31.4 235.71,46.6 242.41,20 249.12,35.2 255.82,50.4 262.53,23.8 269.24,58 275.94,54.2 282.65,27.6 289.35,42.8 296.06,58 302.76,31.4 309.47,46.6 316.18,20 322.88,35.2 329.59,50.4 336.29,23.8 343,39 349.71,54.2 356.41,27.6 363.12,42.8 369.82,58 376.53,31.4 383.24,46.6 389.94,20 396.65,35.2 403.35,50.4 410.06,23.8 416.76,39 423.47,54.2 430.18,27.6 436.88,42.8 443.59,58 450.29,31.4 457,46.6 463.71,20 470.41,35.2 477.12,50.4 483.82,23.8 490.53,39 497.24,54.2 503.94,27.6 510.65,42.8 517.35,58 524.06,31.4 530.76,46.6 537.47,20 544.18,35.2 550.88,50.4 557.59,23.8 564.29,39 571,54.2 577.71,27.6 584.41,42.8 591.12,58 597.82,31.4 604.53,46.6 611.24,20 617.94,35.2 624.65,50.4 631.35,23.8 638.06,39 644.76,54.2 651.47,27.6 658.18,42.8 664.88,58 671.59,31.4 678.29,46.6 685,20 691.71,35.2 698.41,50.4 705.12,23.8 711.82,39 718.53,54.2 725.24,27.6 731.94,42.8 738.65,58 745.35,31.4 752.06,46.6 758.76,20 765.47,35.2 772.18,50.4 778.88,23.8 785.59,39 792.29,54.2 799,27.6"/>
+<text class="t2 t" x="20" y="36" text-anchor="start">octo</text>
+<text class="v" x="220" y="30" text-anchor="start">1.2M</text>
+<text class="l" x="220" y="45" text-anchor="start">stars</text>
+<text class="v" x="266.67" y="30" text-anchor="start">0</text>
+<text class="l" x="266.67" y="45" text-anchor="start">forks</text>
+<text class="v" x="313.33" y="30" text-anchor="start">1M</text>
+<text class="l" x="313.33" y="45" text-anchor="start">follow…</text>
+<text class="v" x="360" y="30" text-anchor="start">3</text>
+<text class="l" x="360" y="45" text-anchor="start">repos</text>
+<text class="v" x="406.67" y="30" text-anchor="start">1B</text>
+<text class="l" x="406.67" y="45" text-anchor="start">contri…</text>
+<text class="v" x="453.33" y="30" text-anchor="start">-12</text>
+<text class="l" x="453.33" y="45" text-anchor="start">views</text>
+<text class="v" x="500" y="30" text-anchor="start">7</text>
+<text class="l" x="500" y="45" text-anchor="start">visitors</text>
+<text class="v" x="546.67" y="30" text-anchor="start">1k</text>
+<text class="l" x="546.67" y="45" text-anchor="start">clones</text>
+<text class="v" x="593.33" y="30" text-anchor="start">100</text>
+<text class="l" x="593.33" y="45" text-anchor="start">comm…</text>
+<text class="v" x="640" y="30" text-anchor="start">10</text>
+<text class="l" x="640" y="45" text-anchor="start">PRs</text>
+<text class="v" x="686.67" y="30" text-anchor="start">1</text>
+<text class="l" x="686.67" y="45" text-anchor="start">reviews</text>
+<text class="v" x="733.33" y="30" text-anchor="start">0</text>
+<text class="l" x="733.33" y="45" text-anchor="start">issues</text>
+</svg>

@@ -233,6 +233,40 @@ func TestEmitSaysWhatReachedEachSink(t *testing.T) {
 	}
 }
 
+// TestASkippingSinkCountsOnlyWhatThisWriteSpared: the sink's counter runs
+// for the life of the process, so what one write left out is how far the
+// counter moved during that write. A write after others that already spared
+// points must not count their points again, which would also take them off
+// the figure of what reached the store.
+func TestASkippingSinkCountsOnlyWhatThisWriteSpared(t *testing.T) {
+	t.Parallel()
+	ledger := sink.LoadLedger(filepath.Join(t.TempDir(), "ledger.json"), 0, 0)
+	inner := &captured{name: "skipping"}
+	log, buf := debugLog()
+	r := &Runner{Sinks: []sink.Sink{sink.OnlyChanged(inner, ledger)}, Log: log}
+	star := func(repo string) sink.Point {
+		return sink.Point{
+			Measurement: "gh_star", Tags: map[string]string{"repo": repo},
+			Fields: map[string]any{"starred": 1}, Time: time.Unix(1700000000, 0),
+		}
+	}
+	r.emit(t.Context(), "stars", []sink.Point{star("a"), star("b")})
+	r.emit(t.Context(), "stars", []sink.Point{star("a"), star("b")})
+	r.emit(t.Context(), "stars", []sink.Point{star("a"), star("b"), star("c")})
+	for _, line := range []string{
+		`msg=written sink=skipping family=stars points=2 unchanged=0`,
+		`msg=written sink=skipping family=stars points=0 unchanged=2`,
+		`msg=written sink=skipping family=stars points=1 unchanged=2`,
+	} {
+		if !strings.Contains(buf.String(), line) {
+			t.Errorf("the log does not say\n%s\nin\n%s", line, buf)
+		}
+	}
+	if got := inner.measured("gh_star"); got != 3 {
+		t.Errorf("the store received %d points, want the two new ones and then c", got)
+	}
+}
+
 // TestServeSweepsUntilCanceled runs the first sweep at once and another on each
 // tick, and returns the cancellation when the context ends.
 //

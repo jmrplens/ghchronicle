@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/jmrplens/ghchronicle/internal/collect"
+	"github.com/jmrplens/ghchronicle/internal/config"
 	"github.com/jmrplens/ghchronicle/test/e2e/fakegh"
 )
 
@@ -121,5 +122,32 @@ func TestTheFirstSweepRemembersEveryRepositorysRuns(t *testing.T) {
 	}
 	if _, ok := ordinary.Expanded[seen]; !ok {
 		t.Error("an ordinary sweep forgot what the first sweep expanded")
+	}
+}
+
+// TestTheActionsWindowIsTwiceTheCadenceAndNeverUnderTwoHours: a quick
+// cadence still reads two hours, so the exporter does not go empty between
+// builds; a slow one reads two of its own cadences, so a late sweep still
+// overlaps; and the first sweep of a fresh install reads a month.
+func TestTheActionsWindowIsTwiceTheCadenceAndNeverUnderTwoHours(t *testing.T) {
+	t.Parallel()
+	r := pullsRunner(t)
+	now := time.Date(2026, 9, 12, 10, 0, 0, 0, time.UTC)
+	if got := r.actions(now); !got.Since.Equal(now.AddDate(0, 0, -30)) {
+		t.Errorf("the first sweep reads from %s, want a month back", got.Since)
+	}
+	r.State.Mark("actions", now.Add(-15*time.Minute))
+	if every, _ := r.Cfg.Interval("actions"); every != 15*time.Minute {
+		t.Fatalf("actions cadence = %s, want the fifteen minute default", every)
+	}
+	if got := r.actions(now); !got.Since.Equal(now.Add(-2 * time.Hour)) {
+		t.Errorf("a fifteen minute cadence reads from %s, want two hours back", got.Since)
+	}
+	r.Cfg.Every = config.Every{Families: map[string]string{"actions": "3h"}}
+	if err := r.Cfg.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	if got := r.actions(now); !got.Since.Equal(now.Add(-6 * time.Hour)) {
+		t.Errorf("a three hour cadence reads from %s, want two cadences back", got.Since)
 	}
 }

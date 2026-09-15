@@ -100,3 +100,82 @@ func TestTelegrafNamesItselfOnFailure(t *testing.T) {
 		t.Errorf("err = %v", err)
 	}
 }
+
+// TestNewTelegrafFillsInOnlyWhatWasLeftOut gives a zero batch and timeout their
+// documented values and keeps the ones that were set.
+func TestNewTelegrafFillsInOnlyWhatWasLeftOut(t *testing.T) {
+	tg := NewTelegraf("http://telegraf.test:8186/ingest", "", "", 0, 0)
+	if tg.Batch != 5000 || tg.client.Timeout != 60*time.Second || tg.Name() != "telegraf" || tg.Close() != nil {
+		t.Errorf("defaults = batch %d, timeout %v, name %q", tg.Batch, tg.client.Timeout, tg.Name())
+	}
+	tg = NewTelegraf("http://telegraf.test:8186/ingest", "", "", 3, 2*time.Second)
+	if tg.Batch != 3 || tg.client.Timeout != 2*time.Second {
+		t.Errorf("given = batch %d, timeout %v, want 3 and 2s kept", tg.Batch, tg.client.Timeout)
+	}
+}
+
+// TestTelegrafDefaultPathFillsOnlyAnEmptyPath treats a lone slash as no path,
+// keeps any other, and leaves a value that is not a URL for the push to
+// refuse by name.
+func TestTelegrafDefaultPathFillsOnlyAnEmptyPath(t *testing.T) {
+	for raw, want := range map[string]string{
+		"http://telegraf.test:8186":         "http://telegraf.test:8186/telegraf",
+		"http://telegraf.test:8186/":        "http://telegraf.test:8186/telegraf",
+		"http://telegraf.test:8186/ingest":  "http://telegraf.test:8186/ingest",
+		"http://telegraf.test:8186/\x7fbad": "http://telegraf.test:8186/\x7fbad",
+	} {
+		if got := withDefaultPath(raw, "/telegraf"); got != want {
+			t.Errorf("withDefaultPath(%q) = %q, want %q", raw, got, want)
+		}
+	}
+}
+
+// TestTelegrafSendsNothingWhenNothingRenders makes no request for a batch with
+// no line, and none past the last line when the batch divides exactly.
+func TestTelegrafSendsNothingWhenNothingRenders(t *testing.T) {
+	requests := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		requests++
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+	tg := NewTelegraf(srv.URL, "", "", 2, 0)
+	if err := tg.Write(context.Background(), []Point{{Measurement: "m", Fields: map[string]any{"none": nil}}}); err != nil {
+		t.Fatal(err)
+	}
+	if requests != 0 {
+		t.Errorf("%d requests for a batch with no line, want none", requests)
+	}
+	if err := tg.Write(context.Background(), []Point{
+		{Measurement: "m", Fields: map[string]any{"v": 1}, Time: time.Unix(0, 1)},
+		{Measurement: "m", Fields: map[string]any{"v": 2}, Time: time.Unix(0, 2)},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if requests != 1 {
+		t.Errorf("%d requests for two lines in batches of two, want one", requests)
+	}
+}
+
+// TestTelegrafTreatsAnyNonSuccessStatusAsAFailure includes 300, and reports an
+// unusable endpoint and a listener that is not there.
+func TestTelegrafTreatsAnyNonSuccessStatusAsAFailure(t *testing.T) {
+	point := []Point{{Measurement: "m", Fields: map[string]any{"v": 1}, Time: time.Unix(0, 1)}}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusMultipleChoices)
+	}))
+	defer srv.Close()
+	if err := NewTelegraf(srv.URL, "", "", 0, 0).Write(context.Background(), point); err == nil ||
+		!strings.HasPrefix(err.Error(), "telegraf write: 300") {
+		t.Errorf("Write = %v, want the 300 reported", err)
+	}
+	if err := NewTelegraf("telegraf:8186", "", "", 0, 0).Write(context.Background(), point); err == nil ||
+		!strings.HasPrefix(err.Error(), "telegraf write: endpoint ") {
+		t.Errorf("Write = %v, want the endpoint refused", err)
+	}
+	closed := httptest.NewServer(http.NotFoundHandler())
+	closed.Close()
+	if err := NewTelegraf(closed.URL, "", "", 0, 0).Write(context.Background(), point); err == nil {
+		t.Error("Write reported success to a listener that is not there")
+	}
+}

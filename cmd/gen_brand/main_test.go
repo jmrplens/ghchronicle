@@ -107,6 +107,28 @@ func TestMarkReproducesTheCommittedFiles(t *testing.T) {
 	}
 }
 
+// TestMarkTakesTheOutDirectoryInEverySpelling writes into the directory given
+// whichever of the four spellings of the flag names it. A spelling the reader
+// did not know would not fall back to the working directory quietly: it is an
+// unexpected argument, so the run would fail and write nothing.
+func TestMarkTakesTheOutDirectoryInEverySpelling(t *testing.T) {
+	t.Parallel()
+	for _, spelling := range []func(dir string) []string{
+		func(dir string) []string { return []string{"-out", dir} },
+		func(dir string) []string { return []string{"--out", dir} },
+		func(dir string) []string { return []string{"-out=" + dir} },
+		func(dir string) []string { return []string{"--out=" + dir} },
+	} {
+		dir := t.TempDir()
+		args := append([]string{"mark"}, spelling(dir)...)
+		if status, _, stderr := genBrand(t, args...); status != 0 || stderr != "" {
+			t.Errorf("gen_brand %s = %d, %q, want a clean run", strings.Join(args, " "), status, stderr)
+			continue
+		}
+		sameAsCommitted(t, dir, "mark-dark.svg", "mark-light.svg", "favicon-dark.svg", "favicon-light.svg")
+	}
+}
+
 // withBackgrounds is a fresh output directory holding the committed background
 // rasters, with the stand-in first and alone on PATH.
 func withBackgrounds(t *testing.T) string {
@@ -232,8 +254,13 @@ func TestRunReadsItsArguments(t *testing.T) {
 	}{
 		{"no command", nil, 2, "", "usage: gen_brand"},
 		{"help", []string{"help"}, 0, "usage: gen_brand", ""},
+		{"-h", []string{"-h"}, 0, "usage: gen_brand", ""},
+		{"-help", []string{"-help"}, 0, "usage: gen_brand", ""},
+		{"--help", []string{"--help"}, 0, "usage: gen_brand", ""},
 		{"an unknown command", []string{"paint"}, 2, "", "gen_brand: unknown command \"paint\"\nusage: gen_brand"},
 		{"help for a command", []string{"mark", "-h"}, 0, "usage: gen_brand", ""},
+		{"-help for a command", []string{"mark", "-help"}, 0, "usage: gen_brand", ""},
+		{"--help for a command", []string{"compose", "--help"}, 0, "usage: gen_brand", ""},
 		{"-out with no directory", []string{"compose", "-out"}, 2, "", "gen_brand: -out needs a directory\n"},
 		{"an unexpected argument", []string{"mark", "brand"}, 2, "", "gen_brand: unexpected argument \"brand\"\nusage: gen_brand"},
 	} {

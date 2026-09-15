@@ -2,8 +2,11 @@ package sink
 
 import (
 	"context"
+	"errors"
+	"math"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -306,5 +309,241 @@ func rotateOntoReadOnly(t *testing.T, keep int, occupied string) {
 	}
 	if string(b) == "stale\n" {
 		t.Errorf("%s still holds what was there before the rotation", occupied)
+	}
+}
+
+// TestNewFileFillsInOnlyWhatWasLeftOut gives a zero format, size and count
+// their documented values. A keep of zero left as zero would delete the one
+// rotated file a rotation had just made, since the name one past the count is
+// the one a rotation removes.
+func TestNewFileFillsInOnlyWhatWasLeftOut(t *testing.T) {
+	f := NewFile("out.lp", "", 0, 0)
+	if f.Format != "influx" || f.MaxBytes != 64<<20 || f.Keep != 5 || f.Name() != "file" {
+		t.Errorf("defaults = format %q, max %d, keep %d, name %q, want influx, 64 MiB, 5 and file",
+			f.Format, f.MaxBytes, f.Keep, f.Name())
+	}
+	f = NewFile("out.lp", "json", 10, 1)
+	if f.Format != "json" || f.MaxBytes != 10 || f.Keep != 1 {
+		t.Errorf("given = format %q, max %d, keep %d, want json, 10 and 1 kept", f.Format, f.MaxBytes, f.Keep)
+	}
+	if err := f.Close(); err != nil {
+		t.Errorf("Close of a file never opened = %v, want nil", err)
+	}
+}
+
+// TestFileWritesEveryPointOfABatch appends each point that renders and skips
+// the one that does not, rather than stopping after the first line.
+func TestFileWritesEveryPointOfABatch(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "out.lp")
+	f := NewFile(path, "influx", 0, 0)
+	at := time.Unix(0, 1700000000000000000)
+	if err := f.Write(context.Background(), []Point{
+		{Measurement: "m", Tags: map[string]string{"a": "b"}, Fields: map[string]any{"v": 1}, Time: at},
+		{Measurement: "m", Fields: map[string]any{"none": nil}, Time: at},
+		{Measurement: "m", Tags: map[string]string{"a": "c"}, Fields: map[string]any{"v": 2}, Time: at},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "m,a=b v=1i 1700000000000000000\nm,a=c v=2i 1700000000000000000\n"
+	if string(b) != want {
+		t.Errorf("file = %q, want %q", b, want)
+	}
+}
+
+// TestFileRotatesWhenALineReachesTheLimitExactly treats MaxBytes as the size
+// a file may reach and no more: a file that is exactly at the limit rotates.
+func TestFileRotatesWhenALineReachesTheLimitExactly(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "out.lp")
+	p := Point{Measurement: "m", Fields: map[string]any{"v": 1}, Time: time.Unix(0, 1)}
+	line := LineProtocol(p) + "\n"
+	f := NewFile(path, "influx", int64(len(line)), 2)
+	if err := f.Write(context.Background(), []Point{p}); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if b, err := os.ReadFile(path + ".1"); err != nil || string(b) != line {
+		t.Errorf("rotated file = %q, %v, want the line that filled the file", b, err)
+	}
+}
+
+// TestFileJSONLeavesOutAnEmptyTag writes the same tag set the line protocol
+// does, so the two dumps of one point describe the same series.
+func TestFileJSONLeavesOutAnEmptyTag(t *testing.T) {
+	line, err := (&File{Format: "json"}).render(Point{
+		Measurement: "m", Tags: map[string]string{"repo": "a", "license": ""},
+		Fields: map[string]any{"v": 1}, Time: time.Unix(0, 0),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := `{"time":"1970-01-01T00:00:00Z","measurement":"m","tags":{"repo":"a"},"fields":{"v":1}}`
+	if line != want {
+		t.Errorf("json = %s\nwant   %s", line, want)
+	}
+}
+
+// TestFileReportsAPointItCannotRender returns the encoder's refusal of a NaN
+// rather than leaving the point out in silence.
+func TestFileReportsAPointItCannotRender(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "out.json")
+	f := NewFile(path, "json", 0, 0)
+	t.Cleanup(func() { _ = f.Close() })
+	err := f.Write(context.Background(), []Point{{Measurement: "m", Fields: map[string]any{"v": math.NaN()}, Time: time.Unix(0, 0)}})
+	if err == nil {
+		t.Fatal("Write accepted a field JSON cannot hold")
+	}
+	if b, readErr := os.ReadFile(path); readErr != nil || len(b) != 0 {
+		t.Errorf("file = %q, %v, want nothing written", b, readErr)
+	}
+}
+
+// TestFileCreatesTheDumpInTheWorkingDirectory handles a bare file name, whose
+// directory is "." and needs no creating.
+func TestFileCreatesTheDumpInTheWorkingDirectory(t *testing.T) {
+	t.Chdir(t.TempDir())
+	f := NewFile("out.lp", "influx", 0, 0)
+	if err := f.Write(context.Background(), []Point{{Measurement: "m", Fields: map[string]any{"v": 1}, Time: time.Unix(0, 1)}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if b, err := os.ReadFile("out.lp"); err != nil || string(b) != "m v=1i 1\n" {
+		t.Errorf("out.lp = %q, %v, want the line", b, err)
+	}
+}
+
+// TestFileReportsADumpItCannotOpen fails the write when the name cannot be
+// created, rather than dropping the batch.
+func TestFileReportsADumpItCannotOpen(t *testing.T) {
+	path := filepath.Join(t.TempDir(), strings.Repeat("x", 300))
+	err := NewFile(path, "influx", 0, 0).Write(context.Background(), []Point{{Measurement: "m", Fields: map[string]any{"v": 1}, Time: time.Unix(0, 1)}})
+	if err == nil {
+		t.Error("Write reported success for a file name no file system accepts")
+	}
+}
+
+// TestFileReportsAWriteToAClosedDump returns the write error, and reports the
+// close error of a rotation that finds the file already gone from under it.
+func TestFileReportsAWriteToAClosedDump(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "out.lp")
+	f := NewFile(path, "influx", 0, 0)
+	p := Point{Measurement: "m", Fields: map[string]any{"v": 1}, Time: time.Unix(0, 1)}
+	if err := f.Write(context.Background(), []Point{p}); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.fh.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Write(context.Background(), []Point{p}); !errors.Is(err, os.ErrClosed) {
+		t.Errorf("Write to a closed descriptor = %v, want os.ErrClosed", err)
+	}
+	if err := f.rotate(); !errors.Is(err, os.ErrClosed) {
+		t.Errorf("rotate of a closed descriptor = %v, want os.ErrClosed", err)
+	}
+}
+
+// TestFileReportsARotationThatCannotRename returns the rename that failed,
+// both for the chain moving up and for the dump itself, and reports no
+// rotation to a caller that would otherwise forget what the new file declares.
+func TestFileReportsARotationThatCannotRename(t *testing.T) {
+	for _, tc := range []struct {
+		name, blocked string
+		keep          int
+	}{
+		{"the chain onto a directory", ".2", 2},
+		{"the dump onto a directory", ".1", 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "out.lp")
+			if err := os.WriteFile(path+".1", []byte("previous\n"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			// A directory with something in it, which no rename replaces.
+			if err := os.RemoveAll(path + tc.blocked); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.MkdirAll(filepath.Join(path+tc.blocked, "inside"), 0o750); err != nil {
+				t.Fatal(err)
+			}
+			f := NewFile(path, "influx", 1, tc.keep)
+			if err := f.open(); err != nil {
+				t.Fatal(err)
+			}
+			rotated, err := f.appendLine("m v=1i 1")
+			if err == nil || rotated {
+				t.Errorf("appendLine = %v, %v, want the failed rename and no rotation", rotated, err)
+			}
+		})
+	}
+}
+
+// TestFileRotatesADumpDeletedFromUnderIt carries on when the dump was removed
+// while open: there is nothing to rename, and the rotation starts a new file.
+func TestFileRotatesADumpDeletedFromUnderIt(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "out.lp")
+	f := NewFile(path, "influx", 1<<20, 2)
+	p := Point{Measurement: "m", Fields: map[string]any{"v": 1}, Time: time.Unix(0, 1)}
+	if err := f.Write(context.Background(), []Point{p}); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+	f.MaxBytes = 1
+	if err := f.Write(context.Background(), []Point{p}); err != nil {
+		t.Fatalf("rotating a deleted dump: %v", err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(path); err != nil {
+		t.Errorf("no fresh dump after the rotation: %v", err)
+	}
+	if _, err := os.Stat(path + ".1"); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("a rotated file appeared for a dump that was gone (%v)", err)
+	}
+}
+
+// TestFileRotationLeavesNothingPastTheCount removes a rotated file one past the
+// count, as happens when Keep is lowered across a restart, rather than moving
+// it further up where nothing would ever delete it.
+func TestFileRotationLeavesNothingPastTheCount(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "out.lp")
+	for _, suffix := range []string{".1", ".2", ".3"} {
+		if err := os.WriteFile(path+suffix, []byte(suffix+"\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	f := NewFile(path, "influx", 1, 2)
+	if err := f.Write(context.Background(), []Point{{Measurement: "m", Fields: map[string]any{"v": 1}, Time: time.Unix(0, 1)}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var names []string
+	for _, e := range entries {
+		names = append(names, e.Name())
+	}
+	if want := []string{"out.lp", "out.lp.1", "out.lp.2"}; !slices.Equal(names, want) {
+		t.Errorf("directory = %v, want %v", names, want)
+	}
+	if b, _ := os.ReadFile(path + ".2"); string(b) != ".1\n" {
+		t.Errorf(".2 = %q, want what .1 held", b)
 	}
 }

@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="500" height="60" viewBox="0 0 500 60" role="img" aria-labelledby="ghcTitle ghcDesc">
+<title id="ghcTitle">A heading far too long for any band A heading far too long for any band A heading far too long for any band A heading far too long for any band </title>
+<desc id="ghcDesc">GitHub summary for an-account-login-long-enough-to-crowd-its-band: -1099511627776 repository views in the last 12345678901234567 days, -1099511627776 unique visitors in the last 12345678901234567 days, -1099511627776 clones in the last 12345678901234567 days, -1099511627776 pull requests in the last year, -1099511627776 contributions in the last year, -1099511627776 stars, -1099511627776 forks, -1099511627776 followers, -1099511627776 public repositories, -1099511627776 commits in the last year, -1099511627776 reviews in the last year, -1099511627776 issues in the last year. Contributions per day over the last 3 days, peaking at 5.</desc>
+<style>
+.bg{fill:#0d1117;stroke:#30363d}
+.panel{fill:#161b22}
+.t,.v,.big{fill:#e6edf3}
+.d,.l,.h,.s{fill:#8b949e}
+.n,.c{fill:#c9d1d9}
+.star,.pill-v{fill:#e3b341}
+.on-accent{fill:#0d1117}
+.line{stroke:#58a6ff}
+.area{fill:#58a6ff}
+.axis,.edge{stroke:#30363d}
+.track{fill:#30363d}
+.ok{fill:#3fb950}
+.fg{fill:#e6edf3}
+.h0{fill:#151b23}.h1{fill:#033a16}.h2{fill:#196c2e}.h3{fill:#2ea043}.h4{fill:#56d364}
+text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif}
+.mono{font-family:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace}
+.t{font-size:18px;font-weight:600}
+.d{font-size:11px}
+.v{font-size:16px;font-weight:600}
+.big{font-size:24px;font-weight:700}
+.l{font-size:11px}
+.h{font-size:10px;font-weight:600;letter-spacing:0.08em}
+.n{font-size:12px}
+.s{font-size:11px}
+.c{font-size:12px}
+.line{fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.area{opacity:0.14;stroke:none}
+.axis{stroke-width:1}
+.edge{fill:none;stroke-width:1}
+.line{stroke-width:1.25;opacity:0.35}
+.area{opacity:0.07}
+.t2{font-size:15px;font-weight:600}
+.draw{animation:draw 1.6s ease-out 1}
+.fade{animation:fade 1.6s ease-out 1}
+@keyframes draw{from{stroke-dasharray:1;stroke-dashoffset:1}to{stroke-dasharray:1;stroke-dashoffset:0}}
+@keyframes fade{from{opacity:0}}
+@media (prefers-reduced-motion:reduce){.draw,.fade,.cu{animation:none}}
+</style>
+<rect class="bg" x="0.5" y="0.5" width="499" height="59" rx="6"/>
+<path class="area fade" d="M1,58 L1,50.4 L250,20 L499,42.8 L499,58Z"/>
+<polyline class="line draw" pathLength="1" points="1,50.4 250,20 499,42.8"/>
+<text class="t2 t" x="20" y="27" text-anchor="start">an-account-login-long-…</text>
+<text class="d" x="20" y="44" text-anchor="start">A display name A display name A…</text>
+<text class="l" x="220" y="45" text-anchor="start">v…</text>
+<text class="l" x="241.67" y="45" text-anchor="start">v…</text>
+<text class="l" x="263.33" y="45" text-anchor="start">c…</text>
+<text class="l" x="285" y="45" text-anchor="start">P…</text>
+<text class="l" x="306.67" y="45" text-anchor="start">c…</text>
+<text class="l" x="328.33" y="45" text-anchor="start">s…</text>
+<text class="l" x="350" y="45" text-anchor="start">f…</text>
+<text class="l" x="371.67" y="45" text-anchor="start">f…</text>
+<text class="l" x="393.33" y="45" text-anchor="start">r…</text>
+<text class="l" x="415" y="45" text-anchor="start">c…</text>
+<text class="l" x="436.67" y="45" text-anchor="start">r…</text>
+<text class="l" x="458.33" y="45" text-anchor="start">i…</text>
+</svg>

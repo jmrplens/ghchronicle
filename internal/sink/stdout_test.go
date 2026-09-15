@@ -111,3 +111,55 @@ func TestTeeWritesToBoth(t *testing.T) {
 		t.Errorf("Tee wrote %q and %q (%v), want the line in both", a.String(), b.String(), err)
 	}
 }
+
+// TestLogWriterReportsARotationThatFails keeps the line it already wrote and
+// reports the rotation that failed, and when the write itself failed first it
+// reports that write rather than the rotation it led to: the first error is
+// the one that says what went wrong.
+func TestLogWriterReportsARotationThatFails(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "ghchronicle.log")
+	// A directory with something in it where the rotated file must go.
+	if err := os.MkdirAll(filepath.Join(path+".1", "inside"), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	w := NewLogWriter(path, 4, 1)
+	t.Cleanup(func() { _ = w.Close() })
+	n, err := w.Write([]byte("line\n"))
+	if n != 5 || err == nil {
+		t.Errorf("Write = %d, %v, want the line counted and the rotation failure", n, err)
+	}
+	if b, readErr := os.ReadFile(path); readErr != nil || string(b) != "line\n" {
+		t.Errorf("log = %q, %v, want the line kept", b, readErr)
+	}
+
+	closed := NewLogWriter(filepath.Join(t.TempDir(), "ghchronicle.log"), 1<<20, 1)
+	if _, err = closed.Write([]byte("first\n")); err != nil {
+		t.Fatal(err)
+	}
+	if err = closed.f.fh.Close(); err != nil {
+		t.Fatal(err)
+	}
+	closed.f.MaxBytes = 1
+	_, err = closed.Write([]byte("second\n"))
+	var pathErr *os.PathError
+	if !errors.As(err, &pathErr) || pathErr.Op != "write" {
+		t.Errorf("Write = %v, want the failed write reported, not the rotation after it", err)
+	}
+}
+
+// TestLogWriterDoesNotRotateBelowItsLimit leaves a log that has room alone.
+func TestLogWriterDoesNotRotateBelowItsLimit(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "ghchronicle.log")
+	w := NewLogWriter(path, 1<<20, 1)
+	if _, err := w.Write([]byte("line\n")); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(path + ".1"); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("a log with room was rotated (%v)", err)
+	}
+}

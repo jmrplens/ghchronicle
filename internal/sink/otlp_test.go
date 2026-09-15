@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -132,5 +133,192 @@ func TestOTLPRepublishesTheCurrentState(t *testing.T) {
 			t.Fatalf("only %d pushes, the repeat is not running", n)
 		}
 		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+// otlpCollector is a metrics endpoint that counts requests, keeps the service
+// name each one reported, and answers every request with status.
+type otlpCollector struct {
+	mu       sync.Mutex
+	requests int
+	services []string
+	status   int
+}
+
+func newOTLPCollector(t *testing.T, status int) (*otlpCollector, string) {
+	t.Helper()
+	c := &otlpCollector{status: status}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body otlpRequest
+		raw, _ := io.ReadAll(r.Body)
+		if err := json.Unmarshal(raw, &body); err != nil {
+			t.Errorf("body is not JSON: %v", err)
+		}
+		c.mu.Lock()
+		c.requests++
+		for _, rm := range body.ResourceMetrics {
+			for _, a := range rm.Resource.Attributes {
+				if a.Key == "service.name" && a.Value.StringValue != nil {
+					c.services = append(c.services, *a.Value.StringValue)
+				}
+			}
+		}
+		c.mu.Unlock()
+		w.WriteHeader(c.status)
+		_, _ = io.WriteString(w, " refused ")
+	}))
+	t.Cleanup(srv.Close)
+	return c, srv.URL
+}
+
+func (c *otlpCollector) count() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.requests
+}
+
+// twoMetrics is one raw point carrying two numeric fields, which is two
+// metrics on the wire.
+func twoMetrics() []Point {
+	return []Point{{
+		Measurement: "gh_repo", Tags: map[string]string{"repo": "a"},
+		Fields: map[string]any{"stars": 1, "forks": 2}, Time: time.Unix(1700000000, 0),
+	}}
+}
+
+// TestNewOTLPFillsInOnlyWhatWasLeftOut gives a zero batch, timeout and service
+// their documented values, keeps what was set, and reports the service name
+// the backend files the metrics under.
+func TestNewOTLPFillsInOnlyWhatWasLeftOut(t *testing.T) {
+	o := NewOTLP("http://collector.test/v1/metrics", "", nil, false, 0, 0)
+	if o.Batch != 2000 || o.client.Timeout != 60*time.Second || o.Service != "ghchronicle" || o.Name() != "otlp" {
+		t.Errorf("defaults = batch %d, timeout %v, service %q, name %q", o.Batch, o.client.Timeout, o.Service, o.Name())
+	}
+	o = NewOTLP("http://collector.test/v1/metrics", "mine", nil, false, 3, time.Second)
+	if o.Batch != 3 || o.client.Timeout != time.Second || o.Service != "mine" {
+		t.Errorf("given = batch %d, timeout %v, service %q, want 3, 1s and mine kept", o.Batch, o.client.Timeout, o.Service)
+	}
+
+	c, url := newOTLPCollector(t, http.StatusOK)
+	if err := NewOTLP(url, "", nil, true, 0, 0).Write(context.Background(), twoMetrics()); err != nil {
+		t.Fatal(err)
+	}
+	c.mu.Lock()
+	services := c.services
+	c.mu.Unlock()
+	if len(services) != 1 || services[0] != "ghchronicle" {
+		t.Errorf("service names = %q, want ghchronicle", services)
+	}
+}
+
+// TestOTLPBatchesByDataPoint sends every metric in one request while the batch
+// has room, one request per metric when each fills it, and stops at the first
+// request that fails.
+func TestOTLPBatchesByDataPoint(t *testing.T) {
+	c, url := newOTLPCollector(t, http.StatusOK)
+	if err := NewOTLP(url, "", nil, true, 0, 0).Write(context.Background(), twoMetrics()); err != nil {
+		t.Fatal(err)
+	}
+	if n := c.count(); n != 1 {
+		t.Errorf("%d requests for two metrics with room to spare, want one", n)
+	}
+
+	c, url = newOTLPCollector(t, http.StatusOK)
+	if err := NewOTLP(url, "", nil, true, 1, 0).Write(context.Background(), twoMetrics()); err != nil {
+		t.Fatal(err)
+	}
+	if n := c.count(); n != 2 {
+		t.Errorf("%d requests for two metrics in batches of one, want two", n)
+	}
+
+	c, url = newOTLPCollector(t, http.StatusServiceUnavailable)
+	err := NewOTLP(url, "", nil, true, 1, 0).Write(context.Background(), twoMetrics())
+	if err == nil || err.Error() != "otlp write: 503 Service Unavailable: refused" || c.count() != 1 {
+		t.Errorf("Write = %v after %d requests, want the 503 and nothing after it", err, c.count())
+	}
+}
+
+// TestOTLPSendsNothingWithoutANumber makes no request for a batch whose fields
+// are all text.
+func TestOTLPSendsNothingWithoutANumber(t *testing.T) {
+	c, url := newOTLPCollector(t, http.StatusOK)
+	if err := NewOTLP(url, "", nil, true, 0, 0).Write(context.Background(), []Point{{
+		Measurement: "gh_gist", Fields: map[string]any{"description": "text"}, Time: time.Unix(1, 0),
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	if n := c.count(); n != 0 {
+		t.Errorf("%d requests for a batch with no number, want none", n)
+	}
+}
+
+// TestOTLPReportsAFailedWrite treats 300 as a failure like any other status
+// that is not a success, and reports an unusable endpoint and a collector that
+// is not there.
+func TestOTLPReportsAFailedWrite(t *testing.T) {
+	_, url := newOTLPCollector(t, http.StatusMultipleChoices)
+	if err := NewOTLP(url, "", nil, true, 0, 0).Write(context.Background(), twoMetrics()); err == nil ||
+		!strings.HasPrefix(err.Error(), "otlp write: 300") {
+		t.Errorf("Write = %v, want the 300 reported", err)
+	}
+	if err := NewOTLP("collector:4318", "", nil, true, 0, 0).Write(context.Background(), twoMetrics()); err == nil ||
+		!strings.HasPrefix(err.Error(), "otlp write: endpoint ") {
+		t.Errorf("Write = %v, want the endpoint refused", err)
+	}
+	closed := httptest.NewServer(http.NotFoundHandler())
+	closed.Close()
+	if err := NewOTLP(closed.URL, "", nil, true, 0, 0).Write(context.Background(), twoMetrics()); err == nil {
+		t.Error("Write reported success to a collector that is not there")
+	}
+}
+
+// TestOTLPStartsARepeatOnlyWhenOneCanHelp starts no loop without an interval
+// or for raw points, which are dated and so cannot be republished as now, and
+// starts one loop however often Start is called. Close is safe whether or not
+// a loop was ever started.
+func TestOTLPStartsARepeatOnlyWhenOneCanHelp(t *testing.T) {
+	o := NewOTLP("http://collector.test/v1/metrics", "", nil, false, 0, 0)
+	o.Start()
+	if o.stop != nil {
+		t.Error("a loop started with no interval")
+	}
+	if err := o.Close(); err != nil {
+		t.Errorf("Close with no loop = %v", err)
+	}
+
+	raw := NewOTLP("http://collector.test/v1/metrics", "", nil, true, 0, 0)
+	raw.Repeat = time.Hour
+	raw.Start()
+	if raw.stop != nil {
+		t.Error("a loop started for raw points")
+	}
+
+	o.Repeat = time.Hour
+	o.Start()
+	first := o.stop
+	o.Start()
+	if first == nil || o.stop != first {
+		t.Error("Start did not start exactly one loop")
+	}
+	if err := o.Close(); err != nil || o.stop != nil {
+		t.Errorf("Close = %v with the loop still recorded, want it stopped", err)
+	}
+}
+
+// TestOTLPRepublishSendsTheStateItHasAndNothingWithout sends the known series
+// again, and makes no request before anything has been written.
+func TestOTLPRepublishSendsTheStateItHasAndNothingWithout(t *testing.T) {
+	c, url := newOTLPCollector(t, http.StatusOK)
+	o := NewOTLP(url, "", nil, false, 0, 0)
+	o.republish()
+	if n := c.count(); n != 0 {
+		t.Errorf("%d requests republishing an empty state, want none", n)
+	}
+	if err := o.Write(context.Background(), []Point{account("octocat", 3)}); err != nil {
+		t.Fatal(err)
+	}
+	o.republish()
+	if n := c.count(); n != 2 {
+		t.Errorf("%d requests after a write and a republish, want two", n)
 	}
 }

@@ -411,6 +411,7 @@ func TestStatusMapping(t *testing.T) {
 		{
 			name: "202 is NotReadyError", status: http.StatusAccepted,
 			want: kindNotReady, detail: "/repos/o/n/stats/participation",
+			says: []string{"/repos/o/n/stats/participation", "202"},
 		},
 		{
 			name: "403 is UnavailableError with the message", status: http.StatusForbidden,
@@ -426,6 +427,13 @@ func TestStatusMapping(t *testing.T) {
 			name: "403 with a non-JSON body keeps the text", status: http.StatusForbidden,
 			body: "forbidden by policy\n",
 			want: kindUnavailable, detail: "forbidden by policy",
+		},
+		{
+			// The lowest status that is not a success. Go does not follow a 300,
+			// so it arrives here, and read as a 200 its body would be decoded
+			// and cached as the answer.
+			name: "300 is a plain error", status: http.StatusMultipleChoices, body: `{"message":"pick one"}`,
+			want: kindPlain, says: []string{"300", "pick one"},
 		},
 		{
 			name: "422 is a plain error carrying the body", status: http.StatusUnprocessableEntity,
@@ -745,7 +753,8 @@ func TestGetTextStatusMapping(t *testing.T) {
 		status      int
 		unavailable bool
 	}{
-		{http.StatusGone, true}, // GitHub deletes logs after ninety days
+		{http.StatusMultipleChoices, false}, // not followed, and not a log either
+		{http.StatusGone, true},             // GitHub deletes logs after ninety days
 		{http.StatusNotFound, true},
 		{http.StatusForbidden, true},
 		{http.StatusInternalServerError, false},
@@ -785,6 +794,12 @@ func TestGetTextTooManyRedirects(t *testing.T) {
 	_, err := c.GetText(context.Background(), "/loop")
 	if err == nil || !strings.Contains(err.Error(), "too many redirects") {
 		t.Errorf("err = %v", err)
+	}
+	// Five requests and not a sixth: the first plus four hops, the fifth hop
+	// refused before it is sent. Every hop of a log fetch is a request, and
+	// the ones to the API are charged.
+	if n := hop.Load(); n != 5 {
+		t.Errorf("the server saw %d requests, want 5", n)
 	}
 }
 
@@ -1814,5 +1829,750 @@ func TestOneURLDecodedIntoTwoTypesReplaysEachItsOwnValue(t *testing.T) {
 	}
 	if calls.Load() != 4 {
 		t.Errorf("the server saw %d requests, want the four the callers made", calls.Load())
+	}
+}
+
+// TestAnEntryIsChargedWhatItHoldsPlusTheOverhead pins the arithmetic the
+// bound is enforced with. The other cache tests compare the running total
+// against the sum of the entries' own sizes, which agree with each other
+// however size is computed; this one says what that size is.
+func TestAnEntryIsChargedWhatItHoldsPlusTheOverhead(t *testing.T) {
+	t.Parallel()
+	k := newCache(1 << 20)
+	k.put(cacheKey{url: "/repos/o/n"}, `"v1"`, []byte(`{"n":1}`))
+	want := len("/repos/o/n") + len(`"v1"`) + len(`{"n":1}`) + cacheEntryOverhead
+	if k.bytes != want {
+		t.Errorf("one entry is charged %d bytes, want %d: the URL, the ETag, the body and the overhead", k.bytes, want)
+	}
+}
+
+// TestTheLimitIsInclusive: a cache is full when it holds its limit, not when
+// it holds one byte less. An entry the size of the whole limit is kept, two
+// entries that add up to it exactly are both kept, and only the byte past it
+// evicts, exactly once.
+func TestTheLimitIsInclusive(t *testing.T) {
+	t.Parallel()
+	body := []byte(`{"n":1}`)
+	a, b, c := cacheKey{url: "/a"}, cacheKey{url: "/b"}, cacheKey{url: "/c"}
+	one := (&conditional{key: a, etag: `"1"`, body: body}).size()
+
+	whole := newCache(one)
+	whole.put(a, `"1"`, body)
+	if etag, _ := whole.get(a); etag != `"1"` {
+		t.Errorf("an entry exactly the size of the limit was not stored: %+v", whole)
+	}
+
+	k := newCache(2 * one)
+	k.put(a, `"1"`, body)
+	k.put(b, `"1"`, body)
+	if len(k.entries) != 2 || k.bytes != 2*one || k.evicted != 0 {
+		t.Errorf("two entries filling the limit exactly left %d entries, %d bytes and %d evictions, want 2, %d and 0",
+			len(k.entries), k.bytes, k.evicted, 2*one)
+	}
+	k.put(c, `"1"`, body)
+	if len(k.entries) != 2 || k.evicted != 1 {
+		t.Errorf("a third entry left %d entries after %d evictions, want 2 after exactly 1", len(k.entries), k.evicted)
+	}
+	if etag, _ := k.get(a); etag != "" {
+		t.Error("the entry evicted must be the least recently used, /a")
+	}
+}
+
+// TestSetCacheLimitKeepsWhatStillFits: a new limit evicts only what no longer
+// fits under it. A limit the cache already sits exactly at, or one above what
+// it holds, costs nothing, and a limit one byte short of it costs exactly the
+// least recently used entry. Evicting more would throw away pages the next
+// sweep asks for and pay for each of them again.
+func TestSetCacheLimitKeepsWhatStillFits(t *testing.T) {
+	t.Parallel()
+	body := []byte(`{"n":1}`)
+	a, b := cacheKey{url: "/a"}, cacheKey{url: "/b"}
+	one := (&conditional{key: a, etag: `"1"`, body: body}).size()
+
+	k := newCache(1 << 20)
+	k.put(a, `"1"`, body)
+	k.put(b, `"1"`, body)
+	for _, limit := range []int{4 * one, 2 * one} {
+		k.setLimit(limit)
+		if len(k.entries) != 2 || k.bytes != 2*one || k.evicted != 0 {
+			t.Errorf("a limit of %d over %d bytes held left %d entries, %d bytes and %d evictions, want 2, %d and 0",
+				limit, 2*one, len(k.entries), k.bytes, k.evicted, 2*one)
+		}
+	}
+	k.setLimit(2*one - 1)
+	if len(k.entries) != 1 || k.bytes != one || k.evicted != 1 {
+		t.Errorf("a limit one byte short left %d entries, %d bytes and %d evictions, want 1, %d and exactly 1",
+			len(k.entries), k.bytes, k.evicted, one)
+	}
+	if etag, _ := k.get(a); etag != "" {
+		t.Error("the entry evicted must be the least recently used, /a")
+	}
+	if etag, _ := k.get(b); etag != `"1"` {
+		t.Error("the entry that still fits, /b, must be kept")
+	}
+}
+
+// TestANewCacheHonorsItsLimitAndDefaultsZero: a positive limit is the limit,
+// and zero or less is the default, the same rule SetCacheLimit documents.
+func TestANewCacheHonorsItsLimitAndDefaultsZero(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct{ limit, want int }{
+		{4 << 10, 4 << 10},
+		{1, 1},
+		{0, DefaultCacheBytes},
+		{-1, DefaultCacheBytes},
+	} {
+		if got := newCache(tc.limit).limit; got != tc.want {
+			t.Errorf("newCache(%d) has a limit of %d, want %d", tc.limit, got, tc.want)
+		}
+	}
+}
+
+// TestHalfAPairForgetsTheWholeEntry: put refuses an ETag with no body and a
+// body with no ETag, and drops what was stored for the key, because the old
+// pair describes an answer the URL no longer gives. Every caller in the
+// client checks the ETag before it puts, so this is the cache's own promise
+// and not one the client happens to keep for it.
+func TestHalfAPairForgetsTheWholeEntry(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name string
+		etag string
+		body []byte
+	}{
+		{"no ETag", "", []byte(`{"n":2}`)},
+		{"no body", `"v2"`, nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			k := newCache(1 << 20)
+			key := cacheKey{url: "/a"}
+			k.put(key, `"v1"`, []byte(`{"n":1}`))
+			k.put(key, tc.etag, tc.body)
+			if etag, body := k.get(key); etag != "" || body != nil {
+				t.Errorf("get = %q, %q, want the old pair forgotten", etag, body)
+			}
+			if len(k.entries) != 0 || k.order.Len() != 0 || k.bytes != 0 {
+				t.Errorf("the cache still holds %d entries, %d in the order and %d bytes", len(k.entries), k.order.Len(), k.bytes)
+			}
+		})
+	}
+}
+
+// TestAnUncachedRequestCarriesNoIfNoneMatchAtAll: with nothing stored the
+// header must be absent, not present and empty. An empty validator is still
+// a conditional request on the wire, and what a server makes of it is not
+// this client's to guess.
+func TestAnUncachedRequestCarriesNoIfNoneMatchAtAll(t *testing.T) {
+	t.Parallel()
+	var mu sync.Mutex
+	present := map[string]bool{}
+	c, _ := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		_, present[r.URL.Path] = r.Header["If-None-Match"]
+		mu.Unlock()
+		_, _ = w.Write([]byte(`{}`))
+	})
+	var out map[string]any
+	if _, _, err := c.GetJSON(context.Background(), "/json", &out, ""); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.GetText(context.Background(), "/text"); err != nil {
+		t.Fatal(err)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	for _, p := range []string{"/json", "/text"} {
+		if present[p] {
+			t.Errorf("%s was asked with an If-None-Match header and nothing stored to answer it", p)
+		}
+	}
+}
+
+// TestGraphQLMapsA500ToTooLargeWhateverItsBody: the gateway's failure is
+// recognized by the status as well as by the content type, so a 5xx is a
+// query to shrink even when it arrives dressed as JSON. The boundary is the
+// first 5xx.
+func TestGraphQLMapsA500ToTooLargeWhateverItsBody(t *testing.T) {
+	t.Parallel()
+	c, _ := newTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(`{"data":{"viewer":{"login":"octocat"}}}`))
+	})
+	var out map[string]any
+	err := c.GraphQL(context.Background(), "{ viewer { login } }", nil, &out)
+	if tl, ok := errors.AsType[*TooLargeError](err); !ok || tl.Status != http.StatusInternalServerError {
+		t.Errorf("err = %v, want TooLargeError 500", err)
+	}
+	if out != nil {
+		t.Errorf("the body of a 500 was decoded: %v", out)
+	}
+}
+
+// TestRateLimitedReadsTheEvidenceInTheHeaders covers every way GitHub says a
+// budget is spent, and what the client makes of each: which bucket to blame
+// and when to try again. The reset instant is what a waiting sweep sleeps
+// until, so a header it cannot use must fall back to a pause, never to the
+// epoch, which reads as a window that turned over half a century ago.
+func TestRateLimitedReadsTheEvidenceInTheHeaders(t *testing.T) {
+	t.Parallel()
+	const resetAt = 1_800_000_000
+	cases := []struct {
+		name     string
+		status   int
+		headers  map[string]string
+		resource string
+		// reset is the exact instant, or the zero time when the client must
+		// pick one itself, pause after the moment it was asked.
+		reset time.Time
+		pause time.Duration
+	}{
+		{
+			name: "a spent bucket names itself and its reset", status: http.StatusForbidden,
+			headers:  map[string]string{"x-ratelimit-remaining": "0", "x-ratelimit-resource": "search", "x-ratelimit-reset": strconv.Itoa(resetAt)},
+			resource: "search", reset: time.Unix(resetAt, 0),
+		},
+		{
+			name: "a spent bucket that names none is core", status: http.StatusForbidden,
+			headers:  map[string]string{"x-ratelimit-remaining": "0", "x-ratelimit-reset": strconv.Itoa(resetAt)},
+			resource: "core", reset: time.Unix(resetAt, 0),
+		},
+		{
+			name: "no reset waits a minute", status: http.StatusForbidden,
+			headers:  map[string]string{"x-ratelimit-remaining": "0"},
+			resource: "core", pause: time.Minute,
+		},
+		{
+			name: "a zero reset waits a minute", status: http.StatusForbidden,
+			headers:  map[string]string{"x-ratelimit-remaining": "0", "x-ratelimit-reset": "0"},
+			resource: "core", pause: time.Minute,
+		},
+		{
+			name: "a negative reset waits a minute", status: http.StatusForbidden,
+			headers:  map[string]string{"x-ratelimit-remaining": "0", "x-ratelimit-reset": "-5"},
+			resource: "core", pause: time.Minute,
+		},
+		{
+			name: "an unreadable reset waits a minute", status: http.StatusForbidden,
+			headers:  map[string]string{"x-ratelimit-remaining": "0", "x-ratelimit-reset": "soon"},
+			resource: "core", pause: time.Minute,
+		},
+		{
+			name: "a secondary limit waits what Retry-After says", status: http.StatusForbidden,
+			headers:  map[string]string{"retry-after": "30"},
+			resource: "secondary", pause: 30 * time.Second,
+		},
+		{
+			name: "a 429 is a secondary limit too", status: http.StatusTooManyRequests,
+			headers:  map[string]string{"retry-after": "30"},
+			resource: "secondary", pause: 30 * time.Second,
+		},
+		{
+			name: "a zero Retry-After waits a minute", status: http.StatusForbidden,
+			headers:  map[string]string{"retry-after": "0"},
+			resource: "secondary", pause: time.Minute,
+		},
+		{
+			name: "a negative Retry-After waits a minute", status: http.StatusForbidden,
+			headers:  map[string]string{"retry-after": "-1"},
+			resource: "secondary", pause: time.Minute,
+		},
+		{
+			// Retry-After may also be an HTTP date, which this does not parse.
+			name: "an unreadable Retry-After waits a minute", status: http.StatusForbidden,
+			headers:  map[string]string{"retry-after": "Wed, 21 Oct 2015 07:28:00 GMT"},
+			resource: "secondary", pause: time.Minute,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			c, _ := newTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
+				for k, v := range tc.headers {
+					w.Header().Set(k, v)
+				}
+				w.WriteHeader(tc.status)
+				_, _ = w.Write([]byte(`{"message":"slow down"}`))
+			})
+			before := time.Now()
+			_, _, err := c.GetJSON(context.Background(), "/repos/o/n", &struct{}{}, "")
+			after := time.Now()
+			limited, ok := errors.AsType[*RateLimitedError](err)
+			if !ok {
+				t.Fatalf("err = %v, want a RateLimitedError", err)
+			}
+			if limited.Resource != tc.resource || limited.Path != "/repos/o/n" {
+				t.Errorf("RateLimitedError = %+v, want resource %q on /repos/o/n", limited, tc.resource)
+			}
+			if tc.pause == 0 {
+				if !limited.Reset.Equal(tc.reset) {
+					t.Errorf("reset = %v, want %v", limited.Reset, tc.reset)
+				}
+				return
+			}
+			if limited.Reset.Before(before.Add(tc.pause)) || limited.Reset.After(after.Add(tc.pause)) {
+				t.Errorf("reset = %v, want %v after the request, between %v and %v",
+					limited.Reset, tc.pause, before.Add(tc.pause), after.Add(tc.pause))
+			}
+		})
+	}
+}
+
+// TestGetTextReportsASpentBudgetAsRateLimited: a log fetch refused for
+// budget must not read as a log that is gone, or a sweep records every failed
+// job of the window as having no log.
+func TestGetTextReportsASpentBudgetAsRateLimited(t *testing.T) {
+	t.Parallel()
+	for _, status := range []int{http.StatusForbidden, http.StatusTooManyRequests} {
+		t.Run(strconv.Itoa(status), func(t *testing.T) {
+			t.Parallel()
+			c, _ := newTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
+				rateHeaders(w, "core", 5000, 0, time.Unix(1_800_000_000, 0))
+				w.WriteHeader(status)
+			})
+			_, err := c.GetText(context.Background(), "/repos/o/n/actions/jobs/1/logs")
+			if _, ok := errors.AsType[*RateLimitedError](err); !ok {
+				t.Errorf("err = %v, want a RateLimitedError", err)
+			}
+			if _, ok := errors.AsType[*UnavailableError](err); ok {
+				t.Error("a spent budget must not also read as a missing log")
+			}
+		})
+	}
+}
+
+// spentCore answers every request with a core budget of limit and remaining,
+// resetting at reset, and counts the requests that got through the brake.
+func spentCore(t *testing.T, limit, remaining int, reset time.Time) (*Client, *atomic.Int32) {
+	t.Helper()
+	var calls atomic.Int32
+	c, _ := newTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
+		calls.Add(1)
+		rateHeaders(w, "core", limit, remaining, reset)
+		_, _ = w.Write([]byte(`{}`))
+	})
+	return c, &calls
+}
+
+// TestAZeroReserveNeverBrakes: SetReserve(0, ...) is how a caller turns the
+// brake off, so a bucket reported empty still goes out and GitHub is the one
+// to refuse it.
+func TestAZeroReserveNeverBrakes(t *testing.T) {
+	t.Parallel()
+	c, calls := spentCore(t, 5000, 0, time.Now().Add(time.Hour))
+	c.SetReserve(0, false)
+	for i := range 2 {
+		if _, _, err := c.GetJSON(context.Background(), "/a", &struct{}{}, ""); err != nil {
+			t.Fatalf("request %d: %v", i, err)
+		}
+	}
+	if n := calls.Load(); n != 2 {
+		t.Errorf("the server saw %d requests, want both", n)
+	}
+}
+
+// TestABucketWithNoLimitIsNotBraked: a budget that reports a limit of zero
+// is one the client knows nothing about, and a fifth of nothing would refuse
+// every request against it.
+func TestABucketWithNoLimitIsNotBraked(t *testing.T) {
+	t.Parallel()
+	c, calls := spentCore(t, 0, 0, time.Now().Add(time.Hour))
+	c.SetReserve(500, false)
+	for i := range 2 {
+		if _, _, err := c.GetJSON(context.Background(), "/a", &struct{}{}, ""); err != nil {
+			t.Fatalf("request %d: %v", i, err)
+		}
+	}
+	if n := calls.Load(); n != 2 {
+		t.Errorf("the server saw %d requests, want both", n)
+	}
+}
+
+// TestTheReserveItselfIsNeverSpent: remaining equal to the reserve is the
+// reserve, so the brake refuses there and not one request later.
+func TestTheReserveItselfIsNeverSpent(t *testing.T) {
+	t.Parallel()
+	c, calls := spentCore(t, 5000, 100, time.Now().Add(time.Hour))
+	c.SetReserve(100, false)
+	if _, _, err := c.GetJSON(context.Background(), "/a", &struct{}{}, ""); err != nil {
+		t.Fatalf("first request: %v", err)
+	}
+	_, _, err := c.GetJSON(context.Background(), "/b", &struct{}{}, "")
+	if _, ok := errors.AsType[*RateLimitedError](err); !ok {
+		t.Errorf("with 100 left and a reserve of 100: err = %v, want a RateLimitedError", err)
+	}
+	if n := calls.Load(); n != 1 {
+		t.Errorf("the server saw %d requests, want the brake to stop the second", n)
+	}
+}
+
+// TestAWindowThatTurnedOverReleasesTheBrake: an empty bucket whose reset has
+// passed is full again, whatever the last response said. The client assumes
+// so rather than refusing until some response says it, which no refused
+// request would ever produce.
+func TestAWindowThatTurnedOverReleasesTheBrake(t *testing.T) {
+	t.Parallel()
+	var calls atomic.Int32
+	c, _ := newTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
+		// Only the first answer reports a budget, so what the client holds
+		// afterwards is what the brake wrote and not a later reading.
+		if calls.Add(1) == 1 {
+			rateHeaders(w, "core", 5000, 0, time.Unix(1_000_000_000, 0))
+		}
+		_, _ = w.Write([]byte(`{}`))
+	})
+	c.SetReserve(500, false)
+	for i := range 2 {
+		if _, _, err := c.GetJSON(context.Background(), "/a", &struct{}{}, ""); err != nil {
+			t.Fatalf("request %d: %v", i, err)
+		}
+	}
+	if n := calls.Load(); n != 2 {
+		t.Errorf("the server saw %d requests, want both", n)
+	}
+	if st, _ := c.RateFor("core"); st.Remaining != 5000 {
+		t.Errorf("core = %+v, want the bucket assumed full again", st)
+	}
+}
+
+// TestAWaitingBrakeSaysSoAndStopsWithTheContext: with wait on, a spent
+// bucket blocks instead of refusing, tells OnWait which bucket and for how
+// long first, and gives up when the caller's context does. The context is
+// canceled before the call, which makes that deterministic: OnWait comes
+// before the wait, and the wait is an hour that is never slept.
+func TestAWaitingBrakeSaysSoAndStopsWithTheContext(t *testing.T) {
+	t.Parallel()
+	c, calls := spentCore(t, 5000, 10, time.Now().Add(time.Hour))
+	c.SetReserve(500, true)
+	if _, _, err := c.GetJSON(context.Background(), "/a", &struct{}{}, ""); err != nil {
+		t.Fatalf("first request: %v", err)
+	}
+
+	canceled, cancel := context.WithCancel(context.Background())
+	cancel()
+	var told int
+	var bucket string
+	var waited time.Duration
+	c.OnWait = func(b string, d time.Duration) {
+		told++
+		bucket, waited = b, d
+	}
+	_, _, err := c.GetJSON(canceled, "/b", &struct{}{}, "")
+	if !errors.Is(err, context.Canceled) {
+		t.Errorf("err = %v, want the context's cancellation", err)
+	}
+	if told != 1 || bucket != "core" || waited <= 0 || waited > time.Hour {
+		t.Errorf("OnWait was called %d times, last with (%q, %v), want once with core and the time left until the reset", told, bucket, waited)
+	}
+
+	// With no OnWait the brake still waits, silently.
+	c.OnWait = nil
+	if _, _, silent := c.GetJSON(canceled, "/c", &struct{}{}, ""); !errors.Is(silent, context.Canceled) {
+		t.Errorf("err = %v, want the context's cancellation", silent)
+	}
+	if n := calls.Load(); n != 1 {
+		t.Errorf("the server saw %d requests, want only the first", n)
+	}
+}
+
+// TestABudgetWithNoResetReportsNoResetInstant: a response that carries the
+// counts and no reset leaves the instant unknown, the zero time, rather than
+// the epoch a missing header parses to.
+func TestABudgetWithNoResetReportsNoResetInstant(t *testing.T) {
+	t.Parallel()
+	c, _ := newTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("x-ratelimit-limit", "5000")
+		w.Header().Set("x-ratelimit-remaining", "4000")
+		w.Header().Set("x-ratelimit-reset", "0")
+		_, _ = w.Write([]byte(`{}`))
+	})
+	if _, _, err := c.GetJSON(context.Background(), "/a", &struct{}{}, ""); err != nil {
+		t.Fatal(err)
+	}
+	if st, ok := c.RateFor("core"); !ok || st.Remaining != 4000 || !st.Reset.IsZero() {
+		t.Errorf("core = %+v %v, want the counts and no reset instant", st, ok)
+	}
+}
+
+// TestARequestThatCannotBeBuiltFailsBeforeAnythingIsSent covers the three
+// requests the client builds, each from a URL that does not parse.
+func TestARequestThatCannotBeBuiltFailsBeforeAnythingIsSent(t *testing.T) {
+	t.Parallel()
+	var calls atomic.Int32
+	c, srv := newTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
+		calls.Add(1)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":{}}`))
+	})
+	const bad = "/repos/o/n\x7f"
+	// The parser's own complaint, so a failure that comes from somewhere
+	// later, after a request went out, does not pass for this one.
+	const unparsable = "invalid control character in URL"
+	if _, _, err := c.GetJSON(context.Background(), bad, &struct{}{}, ""); err == nil || !strings.Contains(err.Error(), unparsable) {
+		t.Errorf("GetJSON: err = %v, want the URL refused", err)
+	}
+	if _, err := c.GetText(context.Background(), bad); err == nil || !strings.Contains(err.Error(), unparsable) {
+		t.Errorf("GetText: err = %v, want the URL refused", err)
+	}
+	c.SetBaseURL(srv.URL + "\x7f")
+	if err := c.GraphQL(context.Background(), "{ viewer { login } }", nil, nil); err == nil || !strings.Contains(err.Error(), unparsable) {
+		t.Errorf("GraphQL: err = %v, want the base URL refused", err)
+	}
+	if n := calls.Load(); n != 0 {
+		t.Errorf("the server saw %d requests, want none", n)
+	}
+}
+
+// TestGraphQLVariablesThatCannotBeEncodedFailBeforeSending: the payload is
+// JSON, and a variable json cannot encode is the caller's mistake to hear
+// about, not a request to send half built.
+func TestGraphQLVariablesThatCannotBeEncodedFailBeforeSending(t *testing.T) {
+	t.Parallel()
+	var calls atomic.Int32
+	c, _ := newTestClient(t, func(http.ResponseWriter, *http.Request) { calls.Add(1) })
+	err := c.GraphQL(context.Background(), "{ viewer { login } }", map[string]any{"wake": make(chan int)}, nil)
+	if _, ok := errors.AsType[*json.UnsupportedTypeError](err); !ok {
+		t.Errorf("err = %v, want the encoder's refusal of the channel", err)
+	}
+	if n := calls.Load(); n != 0 {
+		t.Errorf("the server saw %d requests, want none", n)
+	}
+}
+
+// truncated declares a longer body than it writes, so the client's read
+// fails partway, the way a connection dropped mid-answer does.
+func truncated(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("ETag", `"cut"`)
+	w.Header().Set("Content-Length", "100")
+	_, _ = w.Write([]byte(`{"n":1`))
+}
+
+// TestABodyCutShortIsAnErrorAndIsNotCached: half an answer is not an empty
+// one. Returned as success it would publish nothing, and cached beside its
+// ETag it would be replayed on every 304 from then on.
+func TestABodyCutShortIsAnErrorAndIsNotCached(t *testing.T) {
+	t.Parallel()
+	c, _ := newTestClient(t, truncated)
+	var out map[string]any
+	// The read's own error and not the decoder's: half an object is also bad
+	// JSON, and that would fail GetJSON even if the read error were dropped.
+	if _, _, err := c.GetJSON(context.Background(), "/json", &out, ""); !errors.Is(err, io.ErrUnexpectedEOF) {
+		t.Errorf("GetJSON: err = %v, want the body reported cut short", err)
+	}
+	if _, err := c.GetText(context.Background(), "/text"); !errors.Is(err, io.ErrUnexpectedEOF) {
+		t.Errorf("GetText: err = %v, want the body reported cut short", err)
+	}
+	if st := c.CacheStats(); st.Entries != 0 {
+		t.Errorf("a truncated body was cached: %+v", st)
+	}
+}
+
+// TestGraphQLRateReportsAFailureRatherThanAnEmptyBudget: a zero budget is a
+// reading, and a sweep that took a failed probe for one would believe the
+// bucket spent.
+func TestGraphQLRateReportsAFailureRatherThanAnEmptyBudget(t *testing.T) {
+	t.Parallel()
+	c, _ := newTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		w.WriteHeader(http.StatusBadGateway)
+	})
+	st, err := c.GraphQLRate(context.Background())
+	if _, ok := errors.AsType[*TooLargeError](err); !ok {
+		t.Errorf("err = %v, want the gateway's failure", err)
+	}
+	if st != (RateState{}) {
+		t.Errorf("state = %+v, want nothing alongside the error", st)
+	}
+}
+
+// TestGraphQLAnswersThatCarryNoBudget covers the answers the block is not
+// read from, and what the client records instead: the headers, and no spend.
+func TestGraphQLAnswersThatCarryNoBudget(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name, query, body string
+		// wantErr is a substring of the error, empty for none.
+		wantErr string
+	}{
+		{
+			// Mutations are never given the block, so there is none to read.
+			name: "a mutation", query: `mutation { addStar(input: {starrableId: "x"}) { clientMutationId } }`,
+			body: `{"data":{"addStar":{"clientMutationId":null}}}`,
+		},
+		{
+			// The end-to-end fake GitHub answers every request with a block,
+			// asked for or not. A document the client could not give one is
+			// not priced by whatever comes back under that key: the headers
+			// stay the reading, and nothing is counted as spent.
+			name: "a block the document never asked for", query: `mutation { addStar(input: {starrableId: "x"}) { clientMutationId } }`,
+			body: `{"data":{"ghcRateLimit":{"limit":5000,"cost":3,"used":10,"remaining":4990,"resetAt":"2026-01-01T00:00:00Z"},"addStar":{"clientMutationId":null}}}`,
+		},
+		{
+			name: "errors and no data", query: "query { viewer { login } }",
+			body:    `{"errors":[{"type":"INTERNAL","message":"Something went wrong"}]}`,
+			wantErr: "Something went wrong",
+		},
+		{
+			// A block of the wrong shape is ignored rather than failing an
+			// answer whose data the caller can still use.
+			name: "a block that does not decode", query: "query { viewer { login } }",
+			body: `{"data":{"ghcRateLimit":"spent","viewer":{"login":"octocat"}}}`,
+		},
+		{
+			name: "neither data nor errors", query: "query { viewer { login } }",
+			body:    `{}`,
+			wantErr: "no data in the response",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			c, _ := newTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				rateHeaders(w, "graphql", 5000, 4321, time.Time{})
+				_, _ = w.Write([]byte(tc.body))
+			})
+			var out map[string]any
+			err := c.GraphQL(context.Background(), tc.query, nil, &out)
+			switch {
+			case tc.wantErr == "" && err != nil:
+				t.Errorf("err = %v, want none", err)
+			case tc.wantErr != "" && (err == nil || !strings.Contains(err.Error(), tc.wantErr)):
+				t.Errorf("err = %v, want one saying %q", err, tc.wantErr)
+			}
+			if st, ok := c.RateFor("graphql"); !ok || st.Remaining != 4321 {
+				t.Errorf("graphql = %+v %v, want the headers' reading", st, ok)
+			}
+			if spend := c.GraphQLSpend(); spend != (GraphQLSpend{}) {
+				t.Errorf("spend = %+v, want nothing counted without a block to price it", spend)
+			}
+		})
+	}
+}
+
+// TestWithRateLimitReadsNamesStringsAndCommentsAsTheSpecDoes: the root brace
+// is found by walking the document, and each case here is a token the walk
+// has to step over correctly before it gets there. A parenthesis hidden in a
+// string, or a string end missed, leaves the walk inside the variable list,
+// where no brace is structure, and the block is never placed.
+func TestWithRateLimitReadsNamesStringsAndCommentsAsTheSpecDoes(t *testing.T) {
+	t.Parallel()
+	const body = ` { viewer { login } }`
+	placed := func(head string) string { return head + ` { ` + rateLimitBlock + ` viewer { login } }` }
+	cases := []struct{ name, head string }{
+		{"a named operation", "query Viewer"},
+		{"a named operation with a list type and an underscore", "query Viewer($ids: [ID!]!, $first_page: Int)"},
+		{"an empty comment line", "#\nquery"},
+		{"a string holding a parenthesis", `query($q: String = "(")`},
+		{"a string holding an escaped quote", `query($q: String = "\"(")`},
+		{"a block string holding a quote", `query($q: String = """a"b(""")`},
+		{"a longer block string", `query($q: String = """((((a"b(""")`},
+		{"an empty block string", `query($q: String = """""")`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got, ok := withRateLimit(tc.head + body)
+			if want := placed(tc.head); !ok || got != want {
+				t.Errorf("withRateLimit(%q)\n got %q %v\nwant %q", tc.head+body, got, ok, want)
+			}
+		})
+	}
+}
+
+// TestWithRateLimitSendsADocumentItCannotFinishReadingUnchanged: a document
+// that ends inside a comment, a string or right after a name has no root
+// brace to find. It goes out as it came, and the walk must not read past its
+// end to learn that.
+func TestWithRateLimitSendsADocumentItCannotFinishReadingUnchanged(t *testing.T) {
+	t.Parallel()
+	for _, q := range []string{
+		"# nothing but a comment",
+		"query Viewer",
+		`query($q: String = "(`,
+		`query($q: String = "\`,
+		`query($q: String = """(`,
+	} {
+		got, ok := withRateLimit(q)
+		if ok || got != q {
+			t.Errorf("withRateLimit(%q) = %q %v, want it unchanged", q, got, ok)
+		}
+	}
+}
+
+// TestWithRateLimitReadsTheKeywordAsAWholeName: a definition is a query
+// when its first name is query, not when its first name has query in it.
+// Each document here puts one of the bytes at the edge of a name's ranges
+// against the keyword, so a walk that stopped a name one byte early would
+// read the rest as the keyword and put the block where no query is.
+func TestWithRateLimitReadsTheKeywordAsAWholeName(t *testing.T) {
+	t.Parallel()
+	for _, word := range []string{"_query", "aquery", "queryz", "Aquery", "queryZ", "query0", "query9"} {
+		q := word + " { viewer { login } }"
+		if got, ok := withRateLimit(q); ok || got != q {
+			t.Errorf("withRateLimit(%q) = %q %v, want it unchanged: %s is not the query keyword", q, got, ok, word)
+		}
+	}
+}
+
+// TestWithRateLimitSkipsADefinitionOnlyAtItsOwnClosingBrace: the braces of a
+// fragment or a mutation are counted as they nest, so the brace that closes
+// its first inner selection does not end it. Ended early, the rest of its
+// selections reads as a new definition, and an inline fragment with no type
+// condition, `... { }`, is then exactly the anonymous query shorthand: the
+// block would land inside the fragment, or inside a mutation, where
+// rateLimit does not exist.
+func TestWithRateLimitSkipsADefinitionOnlyAtItsOwnClosingBrace(t *testing.T) {
+	t.Parallel()
+	const fragment = `fragment F on Repository { owner { login } ... { name } } `
+	const query = `query { r0: repository { ...F } }`
+	got, ok := withRateLimit(fragment + query)
+	if want := fragment + `query { ` + rateLimitBlock + ` r0: repository { ...F } }`; !ok || got != want {
+		t.Errorf("withRateLimit(%q)\n got %q %v\nwant %q", fragment+query, got, ok, want)
+	}
+	const m = `mutation { addStar(input: {starrableId: "x"}) { starrable { id } ... { clientMutationId } } }`
+	if kept, touched := withRateLimit(m); touched || kept != m {
+		t.Errorf("withRateLimit(%q) = %q %v, want the mutation untouched", m, kept, touched)
+	}
+}
+
+// TestGetTextAbsoluteURLIsUsedAsIs: the log a job points at can be a full
+// URL, and it is fetched where it points rather than under the API base.
+func TestGetTextAbsoluteURLIsUsedAsIs(t *testing.T) {
+	t.Parallel()
+	c, srv := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/absolute" {
+			http.NotFound(w, r)
+			return
+		}
+		_, _ = w.Write([]byte("the log"))
+	})
+	c.SetBaseURL("http://127.0.0.1:1") // nothing listens here
+	got, err := c.GetText(context.Background(), srv.URL+"/absolute")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "the log" {
+		t.Errorf("text = %q", got)
+	}
+}
+
+// TestGetTextIsBrakedLikeGetJSON: a failed job's log is a core request like
+// any other, and a sweep with a thousand failed jobs spends the reserve on
+// logs as readily as on anything else.
+func TestGetTextIsBrakedLikeGetJSON(t *testing.T) {
+	t.Parallel()
+	c, calls := spentCore(t, 5000, 10, time.Now().Add(time.Hour))
+	c.SetReserve(500, false)
+	if _, err := c.GetText(context.Background(), "/repos/o/n/actions/jobs/1/logs"); err != nil {
+		t.Fatalf("first request: %v", err)
+	}
+	_, err := c.GetText(context.Background(), "/repos/o/n/actions/jobs/2/logs")
+	if limited, ok := errors.AsType[*RateLimitedError](err); !ok || limited.Resource != "core" {
+		t.Errorf("err = %v, want the core budget refused before sending", err)
+	}
+	if n := calls.Load(); n != 1 {
+		t.Errorf("the server saw %d requests, want the brake to stop the second", n)
 	}
 }

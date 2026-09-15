@@ -108,3 +108,43 @@ func TestLineProtocolNeverUsesOneNameForBothATagAndAField(t *testing.T) {
 		}
 	}
 }
+
+func TestLineProtocolKeepsAFieldWhoseTagNameIsEmpty(t *testing.T) {
+	// An empty tag is no tag, so a field of the same name has nothing to
+	// clash with and must be written; otherwise the point loses a value to
+	// a tag the line never carries.
+	line := LineProtocol(Point{
+		Measurement: "m",
+		Tags:        map[string]string{"state": ""},
+		Fields:      map[string]any{"state": "open"},
+		Time:        time.Unix(0, 1),
+	})
+	if line != `m state="open" 1` {
+		t.Errorf("line = %q, want the field written", line)
+	}
+}
+
+func TestLineProtocolWritesEveryFieldType(t *testing.T) {
+	// Each type has its own syntax, and one written in another's makes
+	// InfluxDB refuse the batch or store the wrong column type.
+	line := LineProtocol(Point{
+		Measurement: "m",
+		Fields: map[string]any{
+			"a_int": 3, "b_int64": int64(-4), "c_float": 2.5, "d_bool": false,
+			"e_time": time.Unix(1600000000, 0), "f_text": "say \"hi\" \\ bye", "g_slice": []int{1},
+		},
+		Time: time.Unix(0, 7),
+	})
+	want := `m a_int=3i,b_int64=-4i,c_float=2.5,d_bool=false,e_time=1600000000i,f_text="say \"hi\" \\ bye" 7`
+	if line != want {
+		t.Errorf("\n got: %s\nwant: %s", line, want)
+	}
+}
+
+func TestOneLineFoldsEveryControlCharacterItNames(t *testing.T) {
+	// Each of the five splits a record or a column in some reader, so each
+	// one has to become a space, not only the line feed the others resemble.
+	if got := oneLine("a\nb\rc\td\ve\ff"); got != "a b c d e f" {
+		t.Errorf("oneLine = %q", got)
+	}
+}

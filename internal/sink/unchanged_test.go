@@ -3,6 +3,7 @@ package sink
 import (
 	"context"
 	"errors"
+	"math"
 	"os"
 	"path/filepath"
 	"testing"
@@ -267,5 +268,295 @@ func TestTheLedgerIsForThisProcessAlone(t *testing.T) {
 	}
 	if got, want := st.Mode().Perm(), storedPerm(0o600); got != want {
 		t.Errorf("a resaved ledger is mode %04o, want %04o", got, want)
+	}
+}
+
+// TestDayNumberCountsWholeDaysAndStaysInItsField divides by the length of a
+// day, and clamps a clock before 1970 to day zero and one past the four-byte
+// field to its largest value, rather than wrapping either.
+func TestDayNumberCountsWholeDaysAndStaysInItsField(t *testing.T) {
+	for _, tc := range []struct {
+		at   time.Time
+		want uint32
+	}{
+		{time.Unix(0, 0), 0},
+		{time.Unix(3*86400+86399, 0), 3},
+		{time.Date(2026, 9, 15, 23, 59, 59, 0, time.UTC), 20711},
+		{time.Unix(-86400*10, 0), 0},
+		{time.Unix(86400*(math.MaxUint32+10), 0), math.MaxUint32},
+	} {
+		if got := dayNumber(tc.at); got != tc.want {
+			t.Errorf("dayNumber(%v) = %d, want %d", tc.at, got, tc.want)
+		}
+	}
+}
+
+// TestLoadLedgerFillsInOnlyWhatWasLeftOut gives a zero horizon and size their
+// documented values and keeps the ones that were set.
+func TestLoadLedgerFillsInOnlyWhatWasLeftOut(t *testing.T) {
+	l := LoadLedger("", 0, 0)
+	if l.horizon != 30*24*time.Hour || l.maxEntries != defaultMaxLen {
+		t.Errorf("defaults = horizon %v, max %d, want thirty days and %d", l.horizon, l.maxEntries, defaultMaxLen)
+	}
+	l = LoadLedger("", time.Hour, 7)
+	if l.horizon != time.Hour || l.maxEntries != 7 {
+		t.Errorf("given = horizon %v, max %d, want 1h and 7 kept", l.horizon, l.maxEntries)
+	}
+}
+
+// TestALedgerWithTheWrongHeaderIsAFirstRun reads nothing from a file that is
+// long enough to hold records but does not start with the ledger's magic, nor
+// from one too short to hold the magic at all.
+func TestALedgerWithTheWrongHeaderIsAFirstRun(t *testing.T) {
+	dir := t.TempDir()
+	for name, content := range map[string][]byte{
+		"foreign": append([]byte("NOTLDG1\n"), make([]byte, 3*ledgerRecord)...),
+		"short":   []byte("GHC"),
+	} {
+		path := filepath.Join(dir, name)
+		if err := os.WriteFile(path, content, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if n := LoadLedger(path, 0, 0).Len(); n != 0 {
+			t.Errorf("%s: read %d points, want none", name, n)
+		}
+	}
+}
+
+// TestANilLedgerRemembersNothingAndSavesNothing lets a caller with no ledger
+// call Reserve, commit and Save without branching.
+func TestANilLedgerRemembersNothingAndSavesNothing(t *testing.T) {
+	var l *Ledger
+	batch := []Point{point("gh_star", "a", 1, time.Unix(1, 0))}
+	keep, commit := l.Reserve("influxdb", batch)
+	commit()
+	if len(keep) != 1 {
+		t.Errorf("Reserve on no ledger kept %d points, want all of them", len(keep))
+	}
+	if err := l.Save(); err != nil {
+		t.Errorf("Save on no ledger = %v", err)
+	}
+	if err := LoadLedger("", 0, 0).Save(); err != nil {
+		t.Errorf("Save on a ledger with no path = %v", err)
+	}
+}
+
+// TestAnUnchangedPointStillOfferedIsNotPruned moves the day of an entry that is
+// offered again with the same value, so an item the collectors still produce
+// survives the horizon even though it is never written again.
+func TestAnUnchangedPointStillOfferedIsNotPruned(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "written.bin")
+	l := LoadLedger(path, time.Hour, 0)
+	inner := &recorder{name: "influxdb"}
+	s := OnlyChanged(inner, l)
+	batch := []Point{point("gh_star", "a", 1, time.Date(2026, 5, 5, 0, 0, 0, 0, time.UTC))}
+	if err := s.Write(context.Background(), batch); err != nil {
+		t.Fatal(err)
+	}
+	l.mu.Lock()
+	for id, e := range l.seen {
+		l.seen[id] = entry{value: e.value, day: e.day - 2}
+	}
+	l.mu.Unlock()
+	if err := s.Write(context.Background(), batch); err != nil {
+		t.Fatal(err)
+	}
+	if err := l.Save(); err != nil {
+		t.Fatal(err)
+	}
+	if l.Len() != 1 || len(inner.writes) != 1 {
+		t.Errorf("ledger holds %d entries after %d writes, want the offered entry kept and written once", l.Len(), len(inner.writes))
+	}
+}
+
+// TestSaveKeepsAnEntryOnTheCutoffDay prunes what is older than the horizon and
+// nothing on its last day. The cutoff is read before and after the save, and
+// the check is repeated if midnight fell in between.
+func TestSaveKeepsAnEntryOnTheCutoffDay(t *testing.T) {
+	const horizon = 48 * time.Hour
+	for range 3 {
+		l := LoadLedger(filepath.Join(t.TempDir(), "written.bin"), horizon, 0)
+		cutoff := dayNumber(time.Now().Add(-horizon))
+		l.seen[1] = entry{value: 1, day: cutoff}
+		l.seen[2] = entry{value: 2, day: cutoff - 1}
+		if err := l.Save(); err != nil {
+			t.Fatal(err)
+		}
+		if dayNumber(time.Now().Add(-horizon)) != cutoff {
+			continue
+		}
+		if _, kept := l.seen[1]; !kept || l.Len() != 1 {
+			t.Errorf("ledger = %v, want only the entry on the cutoff day", l.seen)
+		}
+		return
+	}
+	t.Fatal("the day changed during every attempt")
+}
+
+// TestSaveTrimsTheLedgerToItsMostRecentEntries keeps the entries offered most
+// recently once there are more than the limit, and none of the older ones.
+func TestSaveTrimsTheLedgerToItsMostRecentEntries(t *testing.T) {
+	l := LoadLedger(filepath.Join(t.TempDir(), "written.bin"), 0, 2)
+	today := dayNumber(time.Now())
+	for i := range uint32(4) {
+		l.seen[uint64(i)] = entry{value: 1, day: today - 3 + i}
+	}
+	if err := l.Save(); err != nil {
+		t.Fatal(err)
+	}
+	_, second := l.seen[2]
+	_, newest := l.seen[3]
+	if l.Len() != 2 || !second || !newest {
+		t.Errorf("ledger = %v, want the two most recent days kept", l.seen)
+	}
+}
+
+// TestSaveCreatesTheDirectoryTheLedgerLivesIn makes a missing parent directory,
+// and writes a bare file name into the working directory.
+func TestSaveCreatesTheDirectoryTheLedgerLivesIn(t *testing.T) {
+	dir := t.TempDir()
+	nested := filepath.Join(dir, "state", "written.bin")
+	if err := LoadLedger(nested, 0, 0).Save(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(nested); err != nil {
+		t.Errorf("no ledger in a directory that had to be made: %v", err)
+	}
+	t.Chdir(dir)
+	if err := LoadLedger("written.bin", 0, 0).Save(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "written.bin")); err != nil {
+		t.Errorf("no ledger in the working directory: %v", err)
+	}
+}
+
+// TestSaveReportsWhereItCannotWrite fails when the directory is a file, and
+// when the temporary name is taken by a directory.
+func TestSaveReportsWhereItCannotWrite(t *testing.T) {
+	dir := t.TempDir()
+	blocker := filepath.Join(dir, "a-file")
+	if err := os.WriteFile(blocker, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := LoadLedger(filepath.Join(blocker, "written.bin"), 0, 0).Save(); err == nil {
+		t.Error("Save succeeded under a path that is a file")
+	}
+	path := filepath.Join(dir, "written.bin")
+	if err := os.Mkdir(path+".tmp", 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := LoadLedger(path, 0, 0).Save(); err == nil {
+		t.Error("Save succeeded with its temporary name taken by a directory")
+	}
+}
+
+// TestTheLedgerSavesOnlyWhenSomethingChangedAndAWhileHasPassed writes the file
+// from a commit only once five minutes have gone by since the last save and
+// the commit had something to record, so a sweep does not rewrite eighty
+// megabytes per family.
+func TestTheLedgerSavesOnlyWhenSomethingChangedAndAWhileHasPassed(t *testing.T) {
+	at := time.Date(2026, 8, 8, 0, 0, 0, 0, time.UTC)
+	saved := func(l *Ledger) bool {
+		_, err := os.Stat(l.path)
+		return err == nil
+	}
+
+	recent := LoadLedger(filepath.Join(t.TempDir(), "written.bin"), 0, 0)
+	_, commit := recent.Reserve("influxdb", []Point{point("gh_star", "a", 1, at)})
+	commit()
+	if saved(recent) {
+		t.Error("a commit saved the ledger a moment after it was loaded")
+	}
+
+	due := LoadLedger(filepath.Join(t.TempDir(), "written.bin"), 0, 0)
+	due.saved = due.saved.Add(-6 * time.Minute)
+	_, commit = due.Reserve("influxdb", []Point{point("gh_star", "a", 1, at)})
+	commit()
+	if !saved(due) {
+		t.Error("a commit with a change did not save a ledger last saved six minutes ago")
+	}
+
+	idle := LoadLedger(filepath.Join(t.TempDir(), "written.bin"), 0, 0)
+	_, commit = idle.Reserve("influxdb", []Point{point("gh_star", "a", 1, at)})
+	commit()
+	if err := idle.Save(); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(idle.path); err != nil {
+		t.Fatal(err)
+	}
+	idle.saved = idle.saved.Add(-6 * time.Minute)
+	keep, commit := idle.Reserve("influxdb", []Point{point("gh_star", "a", 1, at)})
+	commit()
+	if len(keep) != 0 || saved(idle) {
+		t.Errorf("a commit with nothing new kept %d points and saved %v, want neither", len(keep), saved(idle))
+	}
+}
+
+// TestAFieldTheLineProtocolDropsIsNotAChange hashes the value the way the line
+// protocol writes it, so a nil field added to a point does not make it new.
+func TestAFieldTheLineProtocolDropsIsNotAChange(t *testing.T) {
+	at := time.Date(2026, 7, 7, 0, 0, 0, 0, time.UTC)
+	a := point("gh_repo", "a", 1, at)
+	b := point("gh_repo", "a", 1, at)
+	b.Fields["note"] = nil
+	inner := &recorder{name: "influxdb"}
+	s := OnlyChanged(inner, LoadLedger("", 0, 0))
+	for _, p := range []Point{a, b} {
+		if err := s.Write(context.Background(), []Point{p}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if len(inner.writes) != 1 {
+		t.Errorf("a nil field made the point new: %v", inner.writes)
+	}
+}
+
+// TestUnchangedCountsThePointsItSpared reports nothing spared for a batch that
+// was all new, and every point of a batch offered again.
+func TestUnchangedCountsThePointsItSpared(t *testing.T) {
+	at := time.Date(2026, 7, 7, 0, 0, 0, 0, time.UTC)
+	u := &Unchanged{inner: &recorder{name: "influxdb"}, ledger: LoadLedger("", 0, 0)}
+	if u.Name() != "influxdb" {
+		t.Errorf("Name = %q, want the wrapped sink's", u.Name())
+	}
+	batch := []Point{point("gh_star", "a", 1, at), point("gh_star", "b", 1, at)}
+	if err := u.Write(context.Background(), batch); err != nil {
+		t.Fatal(err)
+	}
+	if n := u.Dropped(); n != 0 {
+		t.Errorf("Dropped = %d after a new batch, want 0", n)
+	}
+	if err := u.Write(context.Background(), batch); err != nil {
+		t.Fatal(err)
+	}
+	if n := u.Dropped(); n != 2 {
+		t.Errorf("Dropped = %d after the same batch again, want 2", n)
+	}
+	if err := u.Close(); err != nil {
+		t.Errorf("Close = %v", err)
+	}
+}
+
+// TestAPartlyRefusedWriteIsRemembered commits a batch the store answered with
+// a RejectedError or a DroppedError, which both mean every writable point was
+// written, so the refused line is not offered again on every sweep.
+func TestAPartlyRefusedWriteIsRemembered(t *testing.T) {
+	at := time.Date(2026, 3, 3, 0, 0, 0, 0, time.UTC)
+	for _, partial := range []error{&RejectedError{N: 1}, &DroppedError{N: 1, Older: time.Hour}} {
+		inner := &recorder{name: "influxdb", fail: partial}
+		s := OnlyChanged(inner, LoadLedger("", 0, 0))
+		batch := []Point{point("gh_repo", "a", 1, at)}
+		if err := s.Write(context.Background(), batch); !errors.Is(err, partial) {
+			t.Fatalf("Write = %v, want %v passed on", err, partial)
+		}
+		inner.fail = nil
+		if err := s.Write(context.Background(), batch); err != nil {
+			t.Fatal(err)
+		}
+		if len(inner.writes) != 0 {
+			t.Errorf("after %T the same batch was written again: %v", partial, inner.writes)
+		}
 	}
 }

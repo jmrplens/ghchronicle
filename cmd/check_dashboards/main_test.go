@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -221,6 +222,20 @@ func TestCheckReportsFailingAndEmptyPanels(t *testing.T) {
 	if !strings.Contains(stdout, "\nEMPTY ") {
 		t.Errorf("stdout does not report the empty panels:\n%s", stdout)
 	}
+	// The count at the end is the one line a reader of a long run looks at,
+	// so it has to agree with the panels reported above it.
+	failing, empty := 0, 0
+	for line := range strings.Lines(stdout) {
+		switch {
+		case strings.HasPrefix(line, "FAIL "):
+			failing++
+		case strings.HasPrefix(line, "EMPTY "):
+			empty++
+		}
+	}
+	if want := fmt.Sprintf("\n%d failing, %d empty\n", failing, empty); !strings.HasSuffix(stdout, want) {
+		t.Errorf("stdout ends %q, want the count %q", stdout[max(0, len(stdout)-40):], want)
+	}
 	if len(s.sent(repoListSQL)) != 0 {
 		t.Error("the repository list was asked for a dashboard whose variable has an allValue")
 	}
@@ -366,6 +381,9 @@ func TestCheckRefusesBeforeAskingAnything(t *testing.T) {
 		stdout, stderr string
 	}{
 		{"the usage asked for", []string{"--help"}, "t", 0, usage + "\n", ""},
+		{"the usage asked for with -h", []string{"-h"}, "t", 0, usage + "\n", ""},
+		{"the usage asked for with -help", []string{"-help"}, "t", 0, usage + "\n", ""},
+		{"no arguments at all", nil, "t", 1, "", usage + "\n"},
 		{"no uid", []string{"influxdb"}, "t", 1, "", usage + "\n"},
 		{
 			"a store it does not know",
@@ -385,6 +403,59 @@ func TestCheckRefusesBeforeAskingAnything(t *testing.T) {
 			}
 			if len(s.sent("")) != 0 {
 				t.Error("a query was posted anyway")
+			}
+		})
+	}
+}
+
+// TestVarsAsksForTheListWhenTheAllValueIsEmpty treats an empty allValue as
+// none, the way Grafana does: All then expands to every repository the
+// database knows about, so the list is asked for rather than every panel
+// being handed an empty string in place of the variable.
+func TestVarsAsksForTheListWhenTheAllValueIsEmpty(t *testing.T) {
+	s := serve(t, func(q map[string]any) ([]column, string) {
+		if q["rawSql"] == repoListSQL {
+			return one("octocat/hello-world"), ""
+		}
+		return nil, "only the repository list is expected"
+	})
+	store := &dashboards.Store{Variable: map[string]any{"name": "repo", "allValue": ""}}
+	ds := map[string]any{"type": "prometheus", "uid": "uid"}
+	v, err := vars(t.Context(), grafana.New(), store, ds, "prometheus", "now-7d")
+	if err != nil {
+		t.Fatalf("vars = %v, want the list read", err)
+	}
+	if v.AllValue != "" || len(v.Repos) != 1 || v.Repos[0] != "octocat/hello-world" {
+		t.Errorf("vars = allValue %q, repos %q, want the repository list in place of the empty allValue", v.AllValue, v.Repos)
+	}
+	if len(s.sent(repoListSQL)) != 1 {
+		t.Error("the repository list was not asked for exactly once")
+	}
+}
+
+// TestVarsExpandsTheTimeMacroOnlyForInfluxDB fills the macro in for the one
+// store whose plugin cannot, and only out of a range that names a duration
+// after now-. Any other store's plugin expands its own macros, and a range
+// with nothing after now- would become an INTERVAL of an empty string,
+// which no database reads.
+func TestVarsExpandsTheTimeMacroOnlyForInfluxDB(t *testing.T) {
+	store := &dashboards.Store{Variable: map[string]any{"name": "repo", "allValue": ".*"}}
+	for _, tc := range []struct {
+		name, store, rng     string
+		filter, filterFormat string
+	}{
+		{"influxdb over a week", "influxdb", "now-7d", "time >= now() - INTERVAL '7d'", "time >= now() - INTERVAL '%s'"},
+		{"prometheus over a week", "prometheus", "now-7d", "", ""},
+		{"influxdb over a range with no duration", "influxdb", "now-", "", ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			v, err := vars(t.Context(), grafana.Client{}, store, nil, tc.store, tc.rng)
+			if err != nil {
+				t.Fatalf("vars = %v, want nothing asked of a variable with an allValue", err)
+			}
+			if v.AllValue != ".*" || v.TimeFilter != tc.filter || v.TimeFilterFormat != tc.filterFormat {
+				t.Errorf("vars = allValue %q, filter %q, format %q, want %q, %q and %q",
+					v.AllValue, v.TimeFilter, v.TimeFilterFormat, ".*", tc.filter, tc.filterFormat)
 			}
 		})
 	}

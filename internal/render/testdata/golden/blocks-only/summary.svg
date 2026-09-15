@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="495" height="284" viewBox="0 0 495 284" role="img" aria-labelledby="ghcTitle ghcDesc">
+<title id="ghcTitle">José M. Requena Plens</title>
+<desc id="ghcDesc">GitHub summary for jmrplens. Languages by bytes: Go 46%, Python 28%, C++ 26%. Most starred repositories: phonometry with 112 stars in Python, TFG-TFM_EPS with 84 stars in TeX, gitlab-mcp-server with 33 stars in Go. Contributions per day over the last 10 days, peaking at 20.</desc>
+<style>
+.bg{fill:#0d1117;stroke:#30363d}
+.panel{fill:#161b22}
+.t,.v,.big{fill:#e6edf3}
+.d,.l,.h,.s{fill:#8b949e}
+.n,.c{fill:#c9d1d9}
+.star,.pill-v{fill:#e3b341}
+.on-accent{fill:#0d1117}
+.line{stroke:#58a6ff}
+.area{fill:#58a6ff}
+.axis,.edge{stroke:#30363d}
+.track{fill:#30363d}
+.ok{fill:#3fb950}
+.fg{fill:#e6edf3}
+.h0{fill:#151b23}.h1{fill:#033a16}.h2{fill:#196c2e}.h3{fill:#2ea043}.h4{fill:#56d364}
+text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif}
+.mono{font-family:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace}
+.t{font-size:18px;font-weight:600}
+.d{font-size:11px}
+.v{font-size:16px;font-weight:600}
+.big{font-size:24px;font-weight:700}
+.l{font-size:11px}
+.h{font-size:10px;font-weight:600;letter-spacing:0.08em}
+.n{font-size:12px}
+.s{font-size:11px}
+.c{font-size:12px}
+.line{fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.area{opacity:0.14;stroke:none}
+.axis{stroke-width:1}
+.edge{fill:none;stroke-width:1}
+</style>
+<rect class="bg" x="0.5" y="0.5" width="494" height="283" rx="6"/>
+<text class="t" x="25" y="34" text-anchor="start">José M. Requena Plens</text>
+<text class="d" x="25" y="52" text-anchor="start">Embedded firmware and acoustics</text>
+<text class="h" x="25" y="76" text-anchor="start">LANGUAGES</text>
+<rect x="25" y="82" width="202.71" height="8" rx="3" fill="#00add8"/>
+<rect x="229.71" y="82" width="122.23" height="8" rx="3" fill="#3572a5"/>
+<rect x="353.94" y="82" width="114.06" height="8" rx="3" fill="#f34b7d"/>
+<circle cx="29" cy="100" r="4" fill="#00add8"/>
+<text class="s" x="38" y="104" text-anchor="start">Go 46%</text>
+<circle cx="89.98" cy="100" r="4" fill="#3572a5"/>
+<text class="s" x="98.98" y="104" text-anchor="start">Python 28%</text>
+<circle cx="172.41" cy="100" r="4" fill="#f34b7d"/>
+<text class="s" x="181.41" y="104" text-anchor="start">C++ 26%</text>
+<text class="h" x="25" y="128" text-anchor="start">TOP REPOSITORIES BY STARS</text>
+<circle cx="29" cy="144" r="4" fill="#3572a5"/>
+<text class="n" x="39" y="148" text-anchor="start">phonometry</text>
+<text class="s" x="412" y="148" text-anchor="end">Python</text>
+<path class="star" transform="translate(426 138.5) scale(0.6)" d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z"/>
+<text class="c" x="470" y="148" text-anchor="end">112</text>
+<circle cx="29" cy="166" r="4" fill="#3d6117"/>
+<text class="n" x="39" y="170" text-anchor="start">TFG-TFM_EPS</text>
+<text class="s" x="412" y="170" text-anchor="end">TeX</text>
+<path class="star" transform="translate(426 160.5) scale(0.6)" d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z"/>
+<text class="c" x="470" y="170" text-anchor="end">84</text>
+<circle cx="29" cy="188" r="4" fill="#00add8"/>
+<text class="n" x="39" y="192" text-anchor="start">gitlab-mcp-server</text>
+<text class="s" x="412" y="192" text-anchor="end">Go</text>
+<path class="star" transform="translate(426 182.5) scale(0.6)" d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z"/>
+<text class="c" x="470" y="192" text-anchor="end">33</text>
+<text class="h" x="25" y="218" text-anchor="start">CONTRIBUTIONS PER DAY</text>
+<line class="axis" x1="25" y1="268" x2="470" y2="268"/>
+<path class="area" d="M25,268 L25,268 L74.44,261.4 L123.89,241.6 L173.33,252.6 L222.78,268 L272.22,265.8 L321.67,224 L371.11,235 L420.56,259.2 L470,248.2 L470,268Z"/>
+<polyline class="line" points="25,268 74.44,261.4 123.89,241.6 173.33,252.6 222.78,268 272.22,265.8 321.67,224 371.11,235 420.56,259.2 470,248.2"/>
+</svg>

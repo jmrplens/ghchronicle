@@ -160,3 +160,46 @@ func TestARepositoryWithMoreForksThanTheBatchReadsIsStillWalked(t *testing.T) {
 		}
 	}
 }
+
+// TestABatchThatFailsLeavesUnmarkedOnlyTheFamiliesItWas: a failed batch is
+// the whole of branches, which collects nowhere else, and the whole of stars
+// for a repository already walked, so both are left unmarked the way a family
+// that failed on every repository is. It is none of repo, whose per-repository
+// read asks the same thing again, and that family is still marked.
+func TestABatchThatFailsLeavesUnmarkedOnlyTheFamiliesItWas(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		family string
+		marked bool
+	}{{"stars", false}, {"branches", false}, {"repo", true}} {
+		r := sweepRunner(t, func(w http.ResponseWriter, req *http.Request) {
+			if req.URL.Path == "/graphql" {
+				// An error GraphQL answers with a 200, which no batch skips:
+				// a 5xx reads as a query too large, and some batches shrink
+				// and carry on from that.
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"errors":[{"type":"INTERNAL","message":"boom"}]}`))
+				return
+			}
+			http.Error(w, `{"message":"Not Found"}`, http.StatusNotFound)
+		})
+		r.Cfg.Every = everyOnly(tc.family)
+		if err := r.Cfg.Validate(); err != nil {
+			t.Fatal(err)
+		}
+		log, buf := debugLog()
+		r.Log = log
+		r.State.LastRun[tc.family] = time.Now().Add(-time.Hour)
+		r.State.FirstSaw["o/n"] = time.Now().Add(-time.Hour)
+		before := r.State.LastRun[tc.family]
+		if err := r.repoFamilies(context.Background(), time.Now()); err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(buf.String(), `msg="batched collector failed" family=`+tc.family) {
+			t.Fatalf("%s: the batch did not fail, so this case proves nothing:\n%s", tc.family, buf)
+		}
+		if marked := !r.State.LastRun[tc.family].Equal(before); marked != tc.marked {
+			t.Errorf("%s: a sweep whose batch failed was marked %v, want %v", tc.family, marked, tc.marked)
+		}
+	}
+}

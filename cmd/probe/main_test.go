@@ -2,8 +2,15 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -154,5 +161,153 @@ func TestProbeReportsAFailingCollectorAndGoesOn(t *testing.T) {
 		if !strings.Contains(out.String(), fmt.Sprintf("%-9s ERROR ", family)) {
 			t.Errorf("no ERROR line for %s:\n%s", family, out.String())
 		}
+	}
+}
+
+// TestTruncateLeavesALineOfExactlyTheLimit keeps a line that fills the limit
+// whole: nothing was cut, so nothing may be marked as cut.
+func TestTruncateLeavesALineOfExactlyTheLimit(t *testing.T) {
+	t.Parallel()
+	if got := truncate("0123", 4); got != "0123" {
+		t.Errorf("truncate = %q, want a line of exactly the limit unchanged", got)
+	}
+}
+
+// ghRequest is one call the windowed stand-in was asked, body and all.
+type ghRequest struct {
+	method, path string
+	query        url.Values
+	body         []byte
+}
+
+// probeWindows runs the probe against a GitHub that answers only the run
+// listing, with a full first page of runs every one of which finished at
+// finished, and a Not Found for anything else. It returns every request with
+// the moments just before and just after the run, which is as close as a test
+// can pin the probe's own clock: the windows it looks back over are counted
+// back from a time.Now the test cannot hand it.
+func probeWindows(t *testing.T, finished func(start time.Time) time.Time) (asked []ghRequest, start, end time.Time) {
+	t.Helper()
+	var mu sync.Mutex
+	start = time.Now()
+	stamp := finished(start).UTC().Format(time.RFC3339)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Errorf("reading the request: %v", err)
+		}
+		mu.Lock()
+		asked = append(asked, ghRequest{method: r.Method, path: r.URL.Path, query: r.URL.Query(), body: body})
+		mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		if r.URL.Path != "/repos/"+fakegh.Login+"/hello-world/actions/runs" || r.URL.Query().Get("status") != "" {
+			w.WriteHeader(http.StatusNotFound)
+			_, _ = io.WriteString(w, `{"message":"Not Found"}`)
+			return
+		}
+		runs := []map[string]any{}
+		if r.URL.Query().Get("page") == "1" {
+			for i := range 100 {
+				runs = append(runs, map[string]any{
+					"id": 5000 + i, "run_attempt": 1, "status": "in_progress", "updated_at": stamp,
+				})
+			}
+		}
+		out, err := json.Marshal(map[string]any{"total_count": 100, "workflow_runs": runs})
+		if err != nil {
+			t.Errorf("encoding the runs: %v", err)
+		}
+		_, _ = w.Write(out)
+	}))
+	t.Cleanup(srv.Close)
+	c := ghapi.New("test-token", 10*time.Second)
+	c.SetBaseURL(srv.URL)
+	var out, errOut strings.Builder
+	if status := run(t.Context(), c, []string{fakegh.Login + "/hello-world"}, "", &out, &errOut); status != 0 {
+		t.Fatalf("probe = %d, %q, want a run that reports its failures and goes on", status, errOut.String())
+	}
+	end = time.Now()
+	mu.Lock()
+	defer mu.Unlock()
+	return slices.Clone(asked), start, end
+}
+
+// TestProbeWalksTheRunsOfTheLastWeek pages on past a full page of runs that
+// finished yesterday, because the probe's actions window is the last seven
+// days and a run from yesterday sits inside it. A window counted forward from
+// now would call every run older than the bound and stop after one page.
+func TestProbeWalksTheRunsOfTheLastWeek(t *testing.T) {
+	t.Parallel()
+	asked, _, _ := probeWindows(t, func(start time.Time) time.Time { return start.Add(-24 * time.Hour) })
+	pages := map[string]bool{}
+	for _, r := range asked {
+		if strings.HasSuffix(r.path, "/actions/runs") && r.query.Get("status") == "" {
+			pages[r.query.Get("page")] = true
+		}
+	}
+	if !pages["1"] || !pages["2"] {
+		t.Errorf("the run listing was asked for pages %v, want the second one too for runs inside the week", pages)
+	}
+}
+
+// TestProbeAsksForTheCommitsOfTheLastThirtyDays sends the commit history the
+// bound thirty days back from the run, not thirty days ahead of it, which
+// would ask for a history that has not happened yet and get none.
+func TestProbeAsksForTheCommitsOfTheLastThirtyDays(t *testing.T) {
+	t.Parallel()
+	asked, start, end := probeWindows(t, func(start time.Time) time.Time { return start })
+	var since []string
+	for _, r := range asked {
+		var env struct {
+			Query     string         `json:"query"`
+			Variables map[string]any `json:"variables"`
+		}
+		if r.path != "/graphql" || json.Unmarshal(r.body, &env) != nil || !strings.Contains(env.Query, "history(") {
+			continue
+		}
+		s, _ := env.Variables["since"].(string)
+		since = append(since, s)
+	}
+	if len(since) == 0 {
+		t.Fatal("the commit history was never asked for")
+	}
+	earliest := start.AddDate(0, 0, -30).Truncate(time.Second)
+	latest := end.AddDate(0, 0, -30)
+	for _, s := range since {
+		got, err := time.Parse(time.RFC3339, s)
+		if err != nil || got.Before(earliest) || got.After(latest) {
+			t.Errorf("the commit history was asked since %q, want thirty days before the run, between %s and %s",
+				s, earliest.UTC().Format(time.RFC3339), latest.UTC().Format(time.RFC3339))
+		}
+	}
+}
+
+// TestProbeAsksForTheFailuresOfTheLastThirtyDays filters the failed runs from
+// a creation date counted back from thirty days ago, re-run reach included.
+// Counted forward, the filter would start yesterday and every failure of the
+// month before it would go unfetched.
+func TestProbeAsksForTheFailuresOfTheLastThirtyDays(t *testing.T) {
+	t.Parallel()
+	asked, start, end := probeWindows(t, func(start time.Time) time.Time { return start })
+	day := 24 * time.Hour
+	// The thirty one days a failure may have been created before it
+	// finished, which the collector reaches back on top of the window.
+	reach := 31 * day
+	want := map[string]bool{
+		">=" + start.AddDate(0, 0, -30).Add(-reach).UTC().Truncate(day).Format(time.RFC3339): true,
+		">=" + end.AddDate(0, 0, -30).Add(-reach).UTC().Truncate(day).Format(time.RFC3339):   true,
+	}
+	listed := 0
+	for _, r := range asked {
+		if !strings.HasSuffix(r.path, "/actions/runs") || r.query.Get("status") != "failure" {
+			continue
+		}
+		listed++
+		if created := r.query.Get("created"); !want[created] {
+			t.Errorf("the failed runs were asked created %q, want one of %v", created, want)
+		}
+	}
+	if listed == 0 {
+		t.Fatal("the failed runs were never asked for")
 	}
 }

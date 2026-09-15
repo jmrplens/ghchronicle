@@ -498,6 +498,40 @@ func TestExecuteRefusesAPortAlreadyHeld(t *testing.T) {
 	}
 }
 
+// TestExecuteOneShotRunsLeaveTheExportersPortAlone runs each of the three
+// one-shot shapes with the exporter configured on a port a long-running
+// instance already holds, which is the ordinary case of a scheduled -card
+// beside a serving ghchronicle. Each is a one-shot on its own, not only in
+// company, so each must finish without trying to take the port.
+func TestExecuteOneShotRunsLeaveTheExportersPortAlone(t *testing.T) {
+	held, err := (&net.ListenConfig{}).Listen(t.Context(), "tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = held.Close() })
+	gh := fakegh.New(t, fixtures)
+
+	for _, tc := range []struct {
+		name string
+		args func(dir string) []string
+	}{
+		{"-once", func(string) []string { return []string{"-once"} }},
+		{"-backfill", func(string) []string { return []string{"-backfill"} }},
+		{"-card", func(dir string) []string { return []string{"-card", filepath.Join(dir, "card.svg")} }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			cfg := writeConfig(t, dir, gh.URL(), collectorOnly+
+				"sinks:\n  prometheus:\n    listen: "+held.Addr().String()+"\n")
+			got := runCommand(t, append([]string{"-config", cfg}, tc.args(dir)...)...)
+			if got.status != notExited || strings.Contains(got.stderr, "prometheus exporter") {
+				t.Errorf("%s beside a held exporter port = %d, want a clean return:\n%s",
+					tc.name, got.status, got.stderr)
+			}
+		})
+	}
+}
+
 // freeAddr is a loopback address nothing listens on right now, for a sink
 // that is configured with an address rather than handed a listener.
 func freeAddr(t *testing.T) string {
@@ -687,6 +721,76 @@ func TestBuildSinksWithTheLedgerOff(t *testing.T) {
 	}
 	if strings.Contains(logs.String(), "ledger") {
 		t.Errorf("a ledger switched off was loaded:\n%s", logs.String())
+	}
+}
+
+// TestBuildSinksWritesJSONToStdoutOnlyWhenAskedFor tells the two stdout sinks
+// apart by what they are, because both are named "stdout": a count or a name
+// passes whichever of the two was built, and a pipeline reading JSON lines
+// that is handed line protocol breaks on the first point.
+func TestBuildSinksWritesJSONToStdoutOnlyWhenAskedFor(t *testing.T) {
+	logger, _ := newLogger(config.Log{Level: "error"}, io.Discard)
+	for _, tc := range []struct {
+		format string
+		json   bool
+	}{
+		{"json", true},
+		{"influx", false},
+		{"", false},
+	} {
+		t.Run("stdout_format "+tc.format, func(t *testing.T) {
+			cfg := &config.Config{Sinks: config.Sinks{Stdout: true, StdoutFormat: tc.format, DedupeFile: "off"}}
+			built, err := buildSinks(cfg, logger, true)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer closeAll(t, built)
+			if len(built) != 1 {
+				t.Fatalf("built %s, want stdout alone", sinkNames(built))
+			}
+			_, isJSON := built[0].(*sink.StdoutJSON)
+			_, isLines := built[0].(*sink.Stdout)
+			if isJSON != tc.json || isLines == tc.json {
+				t.Errorf("stdout_format %q built %T, want JSON %v", tc.format, built[0], tc.json)
+			}
+		})
+	}
+}
+
+// TestBuildSinksSkipsTheLedgerOnlyForASinkThatRefusesIt holds each store's
+// own dedupe key to the ledger: absent and true both mean the ledger decides
+// what is written again, and only false hands the store every point. A sink
+// wrapped when it asked not to be would silently drop what it asked to get.
+func TestBuildSinksSkipsTheLedgerOnlyForASinkThatRefusesIt(t *testing.T) {
+	on, off := true, false
+	logger, _ := newLogger(config.Log{Level: "error"}, io.Discard)
+	url := stores(t)
+	for _, tc := range []struct {
+		name   string
+		dedupe *bool
+		ledger bool
+	}{
+		{"the key absent", nil, true},
+		{"dedupe: true", &on, true},
+		{"dedupe: false", &off, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := &config.Config{Sinks: config.Sinks{
+				Telegraf:   &config.TelegrafSink{URL: url + "/telegraf", Batch: 10, Dedupe: tc.dedupe},
+				DedupeFile: filepath.Join(t.TempDir(), "written.bin"),
+			}}
+			built, err := buildSinks(cfg, logger, false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer closeAll(t, built)
+			if len(built) != 1 {
+				t.Fatalf("built %s, want telegraf alone", sinkNames(built))
+			}
+			if _, wrapped := built[0].(*sink.Unchanged); wrapped != tc.ledger {
+				t.Errorf("%s built %T, want it behind the ledger: %v", tc.name, built[0], tc.ledger)
+			}
+		})
 	}
 }
 

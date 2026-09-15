@@ -464,6 +464,29 @@ func TestCheckPanelsHoldsALinkColumnToItsValues(t *testing.T) {
 			"",
 		},
 		{
+			"a number is not a url", panel("Link", nil),
+			[]string{"Link"},
+			[][]any{{42}},
+			`the Link column holds "42", which is not an absolute url`,
+		},
+		{
+			// A rename to some other column says nothing about this one, so
+			// the field it renames is not read as the link column.
+			"a rename to another column is not the column", panel("Link",
+				map[string]string{"url.keyword": "Link", "user.keyword": "Owner"}),
+			[]string{"user.keyword", "url.keyword"},
+			[][]any{{"octocat"}, {"https://github.com/octocat"}},
+			"",
+		},
+		{
+			// A frame whose data stops short of its schema is read as far as
+			// it goes: the column is there and holds nothing to check.
+			"a field with no data is found and holds nothing", panel("Link", nil),
+			[]string{"Repository", "Link"},
+			[][]any{{"a"}},
+			"",
+		},
+		{
 			"an empty answer is not held to it", panel("Link", nil),
 			[]string{"Repository"},
 			[][]any{{}},
@@ -507,5 +530,159 @@ func TestAPanelsOwnRangeIsRead(t *testing.T) {
 	}
 	if panels[1].From != "" {
 		t.Errorf("the free panel reports %q as its own range, want none", panels[1].From)
+	}
+}
+
+// TestLinkColumnsReadOnlyTheLinksOfAByNameOverride keeps the column list to
+// what can be checked. An override matched by a pattern, or by a name left
+// empty, names no column a frame could be searched for; a property that is
+// not the links property carries no data link even when its value looks like
+// one; and a column two overrides link from is still one column to hold.
+func TestLinkColumnsReadOnlyTheLinksOfAByNameOverride(t *testing.T) {
+	t.Parallel()
+	ownValue := []any{map[string]any{"url": LinkHref}}
+	links := func(url string) any {
+		return map[string]any{"id": "links", "value": []any{map[string]any{"url": url}}}
+	}
+	panel := map[string]any{"fieldConfig": map[string]any{"overrides": []any{
+		"not an override",
+		map[string]any{
+			"matcher":    map[string]any{"id": "byRegexp", "options": "Link.*"},
+			"properties": []any{links(LinkHref)},
+		},
+		map[string]any{
+			"matcher":    map[string]any{"id": "byName", "options": ""},
+			"properties": []any{links(LinkHref)},
+		},
+		map[string]any{
+			"matcher": map[string]any{"id": "byName", "options": "Downloads"},
+			"properties": []any{
+				"not a property",
+				map[string]any{"id": "custom.cellOptions", "value": ownValue},
+				links("${__data.fields.Page}"),
+			},
+		},
+		map[string]any{
+			"matcher":    map[string]any{"id": "byName", "options": "Views"},
+			"properties": []any{links("${__data.fields.Page}")},
+		},
+	}}}
+	if got := LinkColumns(panel); !slices.Equal(got, []string{"Page"}) {
+		t.Errorf("LinkColumns = %q, want the Page column once and nothing the pattern, "+
+			"the empty name or the cell options could have added", got)
+	}
+}
+
+// TestRenamesReadOnlyTheOrganizeTransformation takes a rename from the one
+// transformation that renames by name, and only the renames that are names:
+// another transformation's options are not a rename even when they are
+// spelled like one, and a value that is not a string names no column.
+func TestRenamesReadOnlyTheOrganizeTransformation(t *testing.T) {
+	t.Parallel()
+	panel := map[string]any{"transformations": []any{
+		"not a transformation",
+		map[string]any{"id": "merge", "options": map[string]any{
+			"renameByName": map[string]any{"a": "B"},
+		}},
+		map[string]any{"id": "organize", "options": map[string]any{
+			"renameByName": map[string]any{"n": "Count", "x": float64(3), "y": nil},
+		}},
+	}}
+	got := Renames(panel)
+	if len(got) != 1 || got["n"] != "Count" {
+		t.Errorf("Renames = %v, want only the organize rename that is a name", got)
+	}
+}
+
+// TestApplyPointsAStoreReferenceAtTheStore replaces a datasource reference
+// that is an object but not an expression, which is the shape a dashboard
+// built for one store carries when it is rendered for another.
+func TestApplyPointsAStoreReferenceAtTheStore(t *testing.T) {
+	t.Parallel()
+	ds := map[string]any{"type": "influxdb", "uid": "elsewhere"}
+	got := Vars{Datasource: "store"}.Apply(map[string]any{"datasource": ds})
+	if got["datasource"] != "store" {
+		t.Errorf("datasource = %v, want the store the target is rendered for", got["datasource"])
+	}
+}
+
+// TestUnrenderedNamesALeftoverOnce reports a variable left in two strings of
+// the target a single time, since the report is a list of what to fix and not
+// a count of where.
+func TestUnrenderedNamesALeftoverOnce(t *testing.T) {
+	t.Parallel()
+	target := map[string]any{"a": "x{repo=~\"$repo\"}", "b": []any{"y{repo=~\"$repo\"}"}}
+	if got := Unrendered(target); !slices.Equal(got, []string{"$repo"}) {
+		t.Errorf("Unrendered = %v, want $repo named once", got)
+	}
+}
+
+// TestAPanelsOwnRangeIsWhatItIsAskedOver follows timeFrom into the request. A
+// pinned panel is posted from now minus its own range, and where the store
+// needs the time filter written out it gets one opened over that range; a
+// store whose plugin expands the macro keeps the dashboard's substitution,
+// since the request's from already carries the range. A panel without a range
+// of its own is asked over the dashboard's, even when it follows a pinned one
+// through the same run.
+func TestAPanelsOwnRangeIsWhatItIsAskedOver(t *testing.T) {
+	t.Parallel()
+	target := func(ref string) []map[string]any {
+		return []map[string]any{{"refId": ref, "rawSql": "WHERE $__timeFilter(time)"}}
+	}
+	panels := []PanelQuery{
+		{Title: "Pinned", From: "90d", Targets: target("A")},
+		{Title: "Free", Targets: target("B")},
+	}
+	for _, tc := range []struct {
+		name   string
+		format string
+		pinned string
+	}{
+		{"a store that needs the filter written", "time >= now() - INTERVAL '%s'", "WHERE time >= now() - INTERVAL '90d'"},
+		{"a store whose plugin expands it", "", "WHERE time >= $dashboard"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			c, seen := fakeGrafana(t, http.StatusOK, `{"results":{}}`)
+			vars := Vars{Datasource: "ds", TimeFilter: "time >= $dashboard", TimeFilterFormat: tc.format}
+			results := c.CheckPanels(t.Context(), "now-2y", "now", panels, vars,
+				Options{Timeout: 5 * time.Second, Workers: 1})
+			for _, r := range results {
+				if r.Err != "" {
+					t.Errorf("%s: Err = %q, want a clean answer", r.Panel.Title, r.Err)
+				}
+			}
+			for range panels {
+				req := <-seen
+				queries, _ := req.body["queries"].([]any)
+				q, _ := queries[0].(map[string]any)
+				wantFrom, wantSQL := "now-2y", "WHERE time >= $dashboard"
+				if q["refId"] == "A" {
+					wantFrom, wantSQL = "now-90d", tc.pinned
+				}
+				if req.body["from"] != wantFrom || req.body["to"] != "now" {
+					t.Errorf("%v was asked from %v to %v, want from %s to now",
+						q["refId"], req.body["from"], req.body["to"], wantFrom)
+				}
+				if q["rawSql"] != wantSQL {
+					t.Errorf("%v was sent %q, want %q", q["refId"], q["rawSql"], wantSQL)
+				}
+			}
+		})
+	}
+}
+
+// TestCheckPanelsKeepsAQueryErrorOverItsLinks reports the error Grafana gave
+// when a panel both failed and returned rows, rather than a complaint about a
+// link column: the failure is the cause, and a missing column is what it
+// looks like from the table.
+func TestCheckPanelsKeepsAQueryErrorOverItsLinks(t *testing.T) {
+	t.Parallel()
+	c, _ := fakeGrafana(t, http.StatusOK, `{"results":{"A":{"error":"too many files",`+
+		`"frames":[{"schema":{"fields":[{"name":"Repository"}]},"data":{"values":[["a"]]}}]}}}`)
+	panels := []PanelQuery{{Title: "Rows", Links: []string{"Link"}, Targets: []map[string]any{{"refId": "A"}}}}
+	results := c.CheckPanels(t.Context(), "now-1h", "now", panels, Vars{}, Options{Timeout: 5 * time.Second})
+	if results[0].Rows != 1 || results[0].Err != "A: too many files" {
+		t.Errorf("result = %d rows, Err %q, want 1 row and the query's own error", results[0].Rows, results[0].Err)
 	}
 }

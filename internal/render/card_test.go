@@ -397,3 +397,196 @@ func TestNumKeepsIntegerZeros(t *testing.T) {
 		}
 	}
 }
+
+// Every character next to a hex digit range is one an attacker could use,
+// so the boundaries of all three ranges are pinned, and so is the leading #.
+func TestSafeColorAcceptsEveryHexDigitAndNothingBesideThem(t *testing.T) {
+	for _, good := range []string{"#09afAF", "#000000", "#FFFFFF", "#a0f9A0"} {
+		if got := safeColor(good, "Python"); got != strings.ToLower(good) {
+			t.Errorf("safeColor(%q) = %q, want it through, lower-cased", good, got)
+		}
+	}
+	for _, bad := range []string{"#/00000", "#:00000", "#`00000", "#g00000", "#@00000", "#G00000", "000add8", "#00add/"} {
+		if got := safeColor(bad, "Python"); got != languageColor("Python") {
+			t.Errorf("safeColor(%q) = %q, want the Linguist fallback", bad, got)
+		}
+	}
+}
+
+// A language with no bytes is not a slice of the bar, and when everything
+// fits there is no "Other" at all. When there is one, its share is of the
+// same total as the others, so the bar still adds up to the whole.
+func TestRankLanguagesKeepsOnlyWhatHasBytes(t *testing.T) {
+	got := rankLanguages([]Language{{Name: "Go", Bytes: 30}, {Name: "Empty", Bytes: 0}, {Name: "C", Bytes: 10}}, 8)
+	if len(got) != 2 || got[0].Name != "Go" || got[1].Name != "C" {
+		t.Fatalf("ranked %+v, want Go and C and nothing else", got)
+	}
+	if got[0].Share != 75 || got[1].Share != 25 {
+		t.Errorf("shares = %v and %v, want 75 and 25", got[0].Share, got[1].Share)
+	}
+	folded := rankLanguages([]Language{{Name: "a", Bytes: 60}, {Name: "b", Bytes: 30}, {Name: "c", Bytes: 10}}, 1)
+	if len(folded) != 2 || folded[1].Name != "Other" || folded[1].Share != 40 {
+		t.Errorf("folded %+v, want a then Other at 40%%", folded)
+	}
+}
+
+// Two entries the ranking cannot tell apart keep the order they came in: the
+// sort is stable, and a comparison that called equals "less" would swap them
+// on every run.
+func TestRankingKeepsTheOrderOfEntriesItCannotTellApart(t *testing.T) {
+	repos := rank([]TopRepo{{Name: "x", Language: "Go", Stars: 3}, {Name: "x", Language: "C", Stars: 3}}, 5)
+	if repos[0].Language != "Go" || repos[1].Language != "C" {
+		t.Errorf("rank = %+v, want the caller's order for identical keys", repos)
+	}
+	langs := rankLanguages([]Language{{Name: "Go", Bytes: 5, Color: "#111111"}, {Name: "Go", Bytes: 5, Color: "#222222"}}, 8)
+	if langs[0].Color != "#111111" || langs[1].Color != "#222222" {
+		t.Errorf("rankLanguages = %+v, want the caller's order for identical keys", langs)
+	}
+}
+
+func TestHeadingPrefersTheTitleThenTheNameThenTheLogin(t *testing.T) {
+	c := &Card{Login: "octo", Name: "Octo Cat"}
+	if got := heading(c, &Options{Title: "Mine"}); got != "Mine" {
+		t.Errorf("heading = %q, want the title", got)
+	}
+	if got := heading(c, &Options{}); got != "Octo Cat" {
+		t.Errorf("heading = %q, want the name", got)
+	}
+	c.Name = ""
+	if got := heading(c, &Options{}); got != "octo" {
+		t.Errorf("heading = %q, want the login", got)
+	}
+}
+
+// The description is what a screen reader says instead of the drawing, so
+// its punctuation is part of what it says. Pinned whole, with a repository
+// that has no language and a sparkline whose highest day is not its last.
+func TestDescribeSpellsTheCardOutSentenceBySentence(t *testing.T) {
+	c := &Card{
+		Login: "octo", Stars: 1810, Forks: 3,
+		Sparkline: []int{3, 9, 2},
+		Languages: []Language{{Name: "Go", Bytes: 2}, {Name: "C", Bytes: 1}},
+		TopRepos:  []TopRepo{{Name: "one", Language: "Go", Stars: 9}, {Name: "two", Stars: 4}},
+	}
+	fields := []string{fieldStars, fieldForks, fieldLanguages, fieldTopRepos, fieldSparkline}
+	s := &spec{
+		fields: fields, nums: metricsOf(c, fields),
+		repos: rank(c.TopRepos, 5), langs: rankLanguages(c.Languages, maxLanguages),
+	}
+	want := "GitHub summary for octo: 1810 stars, 3 forks." +
+		" Languages by bytes: Go 67%, C 33%." +
+		" Most starred repositories: one with 9 stars in Go, two with 4 stars." +
+		" Contributions per day over the last 3 days, peaking at 9."
+	if got := describe(c, s); got != want {
+		t.Errorf("describe =\n%q\nwant\n%q", got, want)
+	}
+
+	if got := describe(&Card{Login: "octo"}, &spec{fields: []string{fieldSparkline}}); got != "GitHub summary for octo." {
+		t.Errorf("an empty card is described as %q", got)
+	}
+}
+
+// The area is closed along the baseline at both ends of the box, and the
+// line visits the same points in order, separated by single spaces.
+func TestDrawSparklineClosesTheAreaAlongTheBaseline(t *testing.T) {
+	var b strings.Builder
+	drawSparkline(&b, []int{0, 2, 1}, 10, 20, 100, 40, false)
+	want := `<path class="area" d="M10,60 L10,60 L60,20 L110,40 L110,60Z"/>` + "\n" +
+		`<polyline class="line" points="10,60 60,20 110,40"/>` + "\n"
+	if b.String() != want {
+		t.Errorf("drawSparkline =\n%s\nwant\n%s", b.String(), want)
+	}
+	b.Reset()
+	drawSparkline(&b, []int{0, 2, 1}, 10, 20, 100, 40, true)
+	want = `<path class="area fade" d="M10,60 L10,60 L60,20 L110,40 L110,60Z"/>` + "\n" +
+		`<polyline class="line draw" pathLength="1" points="10,60 60,20 110,40"/>` + "\n"
+	if b.String() != want {
+		t.Errorf("animated drawSparkline =\n%s\nwant\n%s", b.String(), want)
+	}
+}
+
+// The points are spread evenly across the width and scaled against the
+// highest day; a negative count, which no calendar has but a caller can
+// pass, sits on the baseline instead of below the box.
+func TestSparkPointsScaleAgainstThePeakAndClampBelowZero(t *testing.T) {
+	got := sparkPoints([]int{-5, 4, 2}, 10, 20, 100, 40)
+	want := []point{{10, 60}, {60, 20}, {110, 40}}
+	if len(got) != len(want) {
+		t.Fatalf("points = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("point %d = %v, want %v", i, got[i], want[i])
+		}
+	}
+}
+
+func TestCardBackgroundSitsHalfAPixelInsideTheDocument(t *testing.T) {
+	var b strings.Builder
+	cardBG(&b, 100, 50)
+	if want := `<rect class="bg" x="0.5" y="0.5" width="99" height="49" rx="6"/>` + "\n"; b.String() != want {
+		t.Errorf("cardBG = %q, want %q", b.String(), want)
+	}
+}
+
+// The three edges of fit: a text exactly as wide as its column is left
+// whole, a cut keeps the longest prefix that fits together with its
+// ellipsis even when that is an exact fit, and a column with room for the
+// ellipsis but not for one letter holds nothing rather than a lone "…".
+func TestFitHandlesExactFitsAndColumnsTooNarrowForALetter(t *testing.T) {
+	const size = 10.0
+	if got := fit("abc", size, textWidth("abc", size)); got != "abc" {
+		t.Errorf("an exact fit was cut: %q", got)
+	}
+	if got := fit("abcd", size, textWidth("ab", size)+textWidth("…", size)); got != "ab…" {
+		t.Errorf("fit = %q, want ab…", got)
+	}
+	if got := fit("WWW", size, textWidth("…", size)+1); got != "" {
+		t.Errorf("fit = %q, want nothing", got)
+	}
+}
+
+func TestMonoWidthIsSixTenthsOfTheSizePerGlyph(t *testing.T) {
+	if got := monoWidth("héllo", 10); got != 30 {
+		t.Errorf("monoWidth = %v, want 30: five glyphs, not six bytes", got)
+	}
+}
+
+// runeWidth is the whole of the text measurement, and every class boundary
+// is a character that sits on it.
+func TestRuneWidthClassifiesEveryBoundaryCharacter(t *testing.T) {
+	cases := []struct {
+		want  float64
+		runes string
+	}{
+		{0.28, " "},
+		{0.30, "i.}:["},
+		{0.90, "WMm@"},
+		{0.68, "AZQ"},
+		{0.56, "09"},
+		{0.55, "/\\az?\u2e7f"},
+		{1.00, "\u2e80漢"},
+	}
+	for _, tc := range cases {
+		for _, r := range tc.runes {
+			if got := runeWidth(r); got != tc.want {
+				t.Errorf("runeWidth(%q) = %v, want %v", r, got, tc.want)
+			}
+		}
+	}
+}
+
+// badge-row sizes itself from its content, so it has no minimum to enforce
+// and whatever Width says, even a negative one, changes nothing.
+func TestBadgeRowIgnoresTheWidthItWasGiven(t *testing.T) {
+	want := mustRender(t, sample(), &Options{Layout: "badge-row"})
+	for _, w := range []int{-1, 1, 5000} {
+		got, err := SVG(sample(), &Options{Layout: "badge-row", Width: w})
+		if err != nil {
+			t.Fatalf("width %d: %v", w, err)
+		}
+		if string(got) != want {
+			t.Errorf("width %d changed the badge row", w)
+		}
+	}
+}

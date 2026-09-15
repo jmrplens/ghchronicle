@@ -2,7 +2,10 @@ package render
 
 import (
 	"errors"
+	"flag"
 	"fmt"
+	"os"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strconv"
@@ -388,4 +391,214 @@ func TestTheHeatRampIsGitHubsOwn(t *testing.T) {
 			}
 		}
 	}
+}
+
+// A traffic number without its window means nothing, and a card whose window
+// is unknown says so in words rather than printing "0d".
+func TestTrafficLabelsNameTheWindowOrAdmitItIsUnknown(t *testing.T) {
+	fields := []string{fieldViews, fieldVisitors, fieldClones}
+	for _, tc := range []struct {
+		days                int
+		label, long, spoken string
+	}{
+		{14, "Views (14d)", "Repo views / 14d", "repository views in the last 14 days"},
+		{0, "Views (traffic)", "Repo views / traffic", "repository views over the traffic window"},
+	} {
+		m := metricsOf(&Card{TrafficWindowDays: tc.days}, fields)
+		if m[0].label != tc.label || m[0].long != tc.long || m[0].spoken != tc.spoken {
+			t.Errorf("window %d: views read %q, %q, %q", tc.days, m[0].label, m[0].long, m[0].spoken)
+		}
+		if tc.days == 0 && (m[1].label != "Visitors (traffic)" || m[2].spoken != "clones over the traffic window") {
+			t.Errorf("window 0: visitors and clones read %+v and %+v", m[1], m[2])
+		}
+	}
+}
+
+// A negative day is no activity, not a level below the empty square, and a
+// zero day stays empty however busy the rest of the calendar was.
+func TestHeatLevelsTreatNegativeAndZeroDaysAsEmpty(t *testing.T) {
+	levels := heatLevels([]int{-3, 0, 1, 2, 8})
+	if got := levels[79:]; !slices.Equal(got, []int{0, 0, 1, 1, 4}) {
+		t.Errorf("levels = %v, want 0 0 1 1 4", got)
+	}
+}
+
+// updateGolden rewrites the committed cards instead of comparing against
+// them: go test ./internal/render -run TestEveryLayoutDrawsTheCommittedCards -update.
+// A change to the geometry is then a diff of testdata/golden to be read,
+// not a regeneration nobody looked at.
+var updateGolden = flag.Bool("update", false, "rewrite testdata/golden from the renderer")
+
+// goldenCase is one card drawn by every layout. fields nil means each
+// layout's full supported set.
+type goldenCase struct {
+	name      string
+	card      func() *Card
+	fields    []string
+	narrowest bool   // drawn at the layout's minimum width, where every column truncates
+	title     string // Options.Title, empty for each layout's own heading
+}
+
+// goldenCases are chosen for the branches they reach rather than for looking
+// like an account: the full sample, a card with nothing but a login, a
+// request for only the three blocks so no layout has a number to draw, a
+// request without the sparkline over repositories nobody starred, the sample
+// squeezed to each layout's minimum width, the same squeeze over texts and
+// numbers too long for any column, and a card of awkward values (a name equal to the login, a repository without
+// stars or language, a sliver of a language, more languages than fit, names
+// too long for their column and a negative day).
+func goldenCases() []goldenCase {
+	return []goldenCase{
+		{name: "sample", card: sample},
+		{name: "bare", card: func() *Card { return &Card{Login: "someone"} }},
+		{name: "blocks-only", card: sample, fields: []string{fieldLanguages, fieldTopRepos, fieldSparkline}},
+		{name: "awkward", card: awkward},
+		{name: "unstarred", card: unstarred, fields: join(numericFields, fieldLanguages, fieldTopRepos)},
+		{name: "narrowest", card: sample, narrowest: true},
+		{
+			name: "extremes", card: extremes, narrowest: true,
+			title: strings.Repeat("A heading far too long for any band ", 4),
+			// The traffic numbers first, because their labels carry the window
+			// and so are the longest labels there are.
+			fields: join([]string{fieldViews, fieldVisitors, fieldClones, fieldPullRequests}, fieldContributions,
+				fieldStars, fieldForks, fieldFollowers, fieldRepos, fieldCommits, fieldReviews, fieldIssues,
+				fieldLanguages, fieldTopRepos, fieldSparkline),
+		},
+	}
+}
+
+// extremes is every text as long as it gets and every number as wide as it
+// gets, drawn at the minimum width: nothing fits, so every column's limit
+// decides where its text is cut, and a limit that moves by a few pixels moves
+// the cut.
+func extremes() *Card {
+	const huge = -1099511627776
+	long := func(s string) string { return strings.Repeat(s+" ", 8) }
+	c := &Card{
+		Login:       "an-account-login-long-enough-to-crowd-its-band",
+		Name:        long("A display name"),
+		Description: long("A biography"),
+		Stars:       huge, Forks: huge, Followers: huge, Repos: huge, Contributions: huge,
+		Views: huge, UniqueVisitors: huge, Clones: huge, Commits: huge, PullRequests: huge,
+		Reviews: huge, Issues: huge,
+		TrafficWindowDays: 12345678901234567,
+		Sparkline:         []int{1, 5, 2},
+	}
+	for i, name := range []string{"Go", "Python", "TypeScript", "Shell"} {
+		c.Languages = append(c.Languages, Language{Name: long(name), Bytes: int64(40 - 8*i)})
+		c.TopRepos = append(c.TopRepos, TopRepo{Name: long("repository-" + name), Language: long(name), Stars: huge - i})
+	}
+	return c
+}
+
+// unstarred is the sample with no sparkline asked for and no repository
+// holding a star, so the bars of repo-list have nothing to be relative to.
+func unstarred() *Card {
+	c := sample()
+	for i := range c.TopRepos {
+		c.TopRepos[i].Stars = 0
+	}
+	return c
+}
+
+func awkward() *Card {
+	days := make([]int, 120)
+	for i := range days {
+		days[i] = (i * 7) % 11
+	}
+	days[40] = -4
+	return &Card{
+		Login:             "octo",
+		Name:              "octo",
+		Description:       "A description long enough that no layout has the room to print all of it on one line without cutting",
+		Stars:             1234567,
+		Forks:             0,
+		Followers:         999950,
+		Repos:             3,
+		Contributions:     1049950000,
+		Views:             -12,
+		UniqueVisitors:    7,
+		Clones:            1000,
+		TrafficWindowDays: 0,
+		Commits:           100,
+		PullRequests:      10,
+		Reviews:           1,
+		Issues:            0,
+		Sparkline:         days,
+		Languages: []Language{
+			{Name: "JavaScript with a very long qualifier", Bytes: 900000},
+			{Name: "TypeScript also rather long", Bytes: 800000, Color: "#ABCDEF"},
+			{Name: "Dockerfile", Bytes: 700000, Color: "not a color"},
+			{Name: "Makefile and friends", Bytes: 600000},
+			{Name: "Some language nobody has heard of", Bytes: 500000},
+			{Name: "Kotlin", Bytes: 400000},
+			{Name: "MATLAB", Bytes: 300000},
+			{Name: "Assembly", Bytes: 200000},
+			{Name: "Lua", Bytes: 1000},
+			{Name: "Sliver", Bytes: 1},
+		},
+		TopRepos: []TopRepo{
+			{Name: "a-repository-name-far-wider-than-any-column-it-could-be-given", Language: "Go", Stars: 50},
+			{Name: "no-language", Stars: 50},
+			{Name: "unstarred", Language: "Rust", Stars: 0},
+			{Name: "unknown", Language: "Brainfuck", Stars: 3},
+		},
+	}
+}
+
+// TestEveryLayoutDrawsTheCommittedCards pins the geometry. The other tests
+// here assert properties of a card; this one asserts the card, byte for
+// byte, so an offset that moves a number onto its label or a height that
+// clips the last row is a failure rather than a picture nobody opened.
+func TestEveryLayoutDrawsTheCommittedCards(t *testing.T) {
+	for _, gc := range goldenCases() {
+		for _, l := range Layouts() {
+			t.Run(gc.name+"/"+l.Name, func(t *testing.T) {
+				fields := gc.fields
+				if fields == nil {
+					fields = l.Supports
+				}
+				o := &Options{Theme: "dark", Layout: l.Name, Fields: fields, Title: gc.title}
+				if def, _ := findLayout(l.Name); gc.narrowest {
+					o.Width = def.minWidth
+				}
+				got := mustRender(t, gc.card(), o)
+				sameAsGolden(t, filepath.Join("testdata", "golden", gc.name, l.Name+".svg"), got)
+			})
+		}
+	}
+}
+
+// sameAsGolden compares a card with the committed one at path, or writes it
+// there under -update.
+func sameAsGolden(t *testing.T, path, got string) {
+	t.Helper()
+	if *updateGolden {
+		if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(got), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		return
+	}
+	want, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("the committed card: %v", err)
+	}
+	if got != string(want) {
+		t.Errorf("%s differs from the committed card: %s", path, firstDifference(got, string(want)))
+	}
+}
+
+// firstDifference names the first line that differs, which is where a
+// geometry change shows up and all a reader needs to find it.
+func firstDifference(got, want string) string {
+	g, w := strings.Split(got, "\n"), strings.Split(want, "\n")
+	for i := range min(len(g), len(w)) {
+		if g[i] != w[i] {
+			return fmt.Sprintf("line %d is\n%s\nwant\n%s", i+1, g[i], w[i])
+		}
+	}
+	return fmt.Sprintf("%d lines, want %d", len(g), len(w))
 }

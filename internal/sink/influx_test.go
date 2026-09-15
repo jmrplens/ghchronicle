@@ -216,3 +216,100 @@ func TestNewInfluxFillsInTheDefaults(t *testing.T) {
 		t.Errorf("Name = %q, want influxdb, and a Close with nothing to close", i.Name())
 	}
 }
+
+// TestInfluxSendsNothingWhenNothingRenders makes no request for a batch that
+// renders no line, and none for a batch that fills its last request exactly:
+// an empty write is still a request InfluxDB 3 answers with a file.
+func TestInfluxSendsNothingWhenNothingRenders(t *testing.T) {
+	t.Parallel()
+	s, url := newInfluxServer(t, 0)
+	i := NewInflux(url, "tok", "acme", "gh", 2, 0)
+	if err := i.Write(t.Context(), []Point{{Measurement: "gh_star", Tags: map[string]string{"repo": "a"}}}); err != nil {
+		t.Fatal(err)
+	}
+	if n := len(s.sent()); n != 0 {
+		t.Errorf("%d requests for a batch with no line, want none", n)
+	}
+	if err := i.Write(t.Context(), []Point{star("a"), star("b")}); err != nil {
+		t.Fatal(err)
+	}
+	if n := len(s.sent()); n != 1 {
+		t.Errorf("%d requests for two lines in batches of two, want one", n)
+	}
+}
+
+// TestInfluxReportsARejectedLineAtItsLimitWhole cuts a rejected line only
+// when it is longer than 300 characters.
+func TestInfluxReportsARejectedLineAtItsLimitWhole(t *testing.T) {
+	t.Parallel()
+	var got []string
+	i := &Influx{OnReject: func(line string) { got = append(got, line) }}
+	exact := strings.Repeat("x", 300)
+	i.reject(exact)
+	i.reject("short")
+	if len(got) != 2 || got[0] != exact || got[1] != "short" {
+		t.Errorf("rejected = %q, want both lines as they were", got)
+	}
+}
+
+// TestInfluxTreatsAnyNonSuccessStatusAsAFailure includes 300, the first status
+// that is not a success.
+func TestInfluxTreatsAnyNonSuccessStatusAsAFailure(t *testing.T) {
+	t.Parallel()
+	_, url := newInfluxServer(t, http.StatusMultipleChoices)
+	err := NewInflux(url, "tok", "acme", "gh", 0, 0).Write(t.Context(), []Point{star("a")})
+	if err == nil || !strings.HasPrefix(err.Error(), "influx write: 300") {
+		t.Errorf("Write = %v, want the 300 reported", err)
+	}
+}
+
+// TestInfluxStopsBisectingAtAFailureDeepInside returns a server failure met
+// two halvings down, without writing the rest of the batch.
+func TestInfluxStopsBisectingAtAFailureDeepInside(t *testing.T) {
+	t.Parallel()
+	var calls int
+	var mu sync.Mutex
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		mu.Lock()
+		calls++
+		n := calls
+		mu.Unlock()
+		if n <= 2 {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = io.WriteString(w, "parse failed")
+			return
+		}
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	t.Cleanup(srv.Close)
+	err := NewInflux(srv.URL, "tok", "acme", "gh", 0, 0).Write(t.Context(), []Point{star("a"), star("b"), star("c"), star("d")})
+	mu.Lock()
+	defer mu.Unlock()
+	if err == nil || !strings.Contains(err.Error(), "503") || calls != 3 {
+		t.Errorf("Write = %v after %d requests, want the 503 from the third and nothing after it", err, calls)
+	}
+}
+
+// TestInfluxCannotBuildAWriteForAnOrgWithAControlCharacter reports the request
+// it could not build rather than sending something else.
+func TestInfluxCannotBuildAWriteForAnOrgWithAControlCharacter(t *testing.T) {
+	t.Parallel()
+	s, url := newInfluxServer(t, 0)
+	if err := NewInflux(url, "tok", "ac\x7fme", "gh", 0, 0).Write(t.Context(), []Point{star("a")}); err == nil {
+		t.Error("Write accepted an org no request can carry")
+	}
+	if n := len(s.sent()); n != 0 {
+		t.Errorf("%d requests sent, want none", n)
+	}
+}
+
+// TestIsParseRejectionNeedsAnError answers no for a write that did not fail.
+func TestIsParseRejectionNeedsAnError(t *testing.T) {
+	t.Parallel()
+	if isParseRejection(nil) {
+		t.Error("a nil error was read as a parse rejection")
+	}
+	if isParseRejection(errors.New("503 Service Unavailable")) {
+		t.Error("a server failure was read as a parse rejection")
+	}
+}

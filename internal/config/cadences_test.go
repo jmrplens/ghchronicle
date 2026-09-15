@@ -330,3 +330,65 @@ func TestEveryFamilyCarriesItsReason(t *testing.T) {
 		}
 	}
 }
+
+// TestCompactQuotesADurationInTheUnitsAConfigFileWrites: a warning quotes a
+// cadence back at the reader, so 24h reads as 24h and not as 24h0m0s, and a
+// value that is not a whole number of either unit keeps Go's own spelling
+// rather than being rounded into a number he never typed.
+func TestCompactQuotesADurationInTheUnitsAConfigFileWrites(t *testing.T) {
+	cases := map[time.Duration]string{
+		0:                      "0s",
+		-time.Minute:           "-1m0s",
+		15 * time.Minute:       "15m",
+		90 * time.Minute:       "90m",
+		24 * time.Hour:         "24h",
+		90 * time.Second:       "1m30s",
+		200 * time.Millisecond: "200ms",
+	}
+	for d, want := range cases {
+		if got := compact(d); got != want {
+			t.Errorf("compact(%v) = %q, want %q", d, got, want)
+		}
+	}
+}
+
+// TestAnAbsurdlySlowCadenceNeverWarnsAsTooFast is the overflow the order of
+// the comparison guards against: a cadence of centuries times four wraps
+// int64 to a negative number, and a check that multiplied first would call it
+// too fast and report it as zero times more often.
+func TestAnAbsurdlySlowCadenceNeverWarnsAsTooFast(t *testing.T) {
+	if got := loadEvery(t, "every: {families: {keys: 2500000h}}\n").Warnings(); len(got) != 0 {
+		t.Errorf("a cadence of centuries must not warn, got %v", got)
+	}
+}
+
+// TestAHeartbeatEqualToTheFastestCadenceDoesNotWarn: a tick exactly as long
+// as the shortest cadence holds nothing back, so only a slower one is worth a
+// line.
+func TestAHeartbeatEqualToTheFastestCadenceDoesNotWarn(t *testing.T) {
+	if got := loadEvery(t, "heartbeat: 15m\n").Warnings(); len(got) != 0 {
+		t.Errorf("a heartbeat equal to the 15m of actions must not warn, got %v", got)
+	}
+}
+
+// TestAHeartbeatOverAnEmptyScheduleSaysOnlyThatItIsEmpty: with nothing
+// collected there is no fastest cadence to compare against, and the one
+// warning worth giving is that the run collects nothing.
+func TestAHeartbeatOverAnEmptyScheduleSaysOnlyThatItIsEmpty(t *testing.T) {
+	got := loadEvery(t, "heartbeat: 1h\nevery: {default: 0}\n").Warnings()
+	if len(got) != 1 || !strings.Contains(got[0], "collects nothing") {
+		t.Errorf("warnings = %v, want exactly the one saying the run collects nothing", got)
+	}
+}
+
+// TestAnUnknownNameUnderGroupsListsTheGroups: a name that is neither a group
+// nor a family has no other key to point at, so the message lists the groups
+// there are.
+func TestAnUnknownNameUnderGroupsListsTheGroups(t *testing.T) {
+	msg := loadGroupsErr(t, "every: {groups: {sekurity: 1h}}\n")
+	for _, want := range []string{"every.groups.sekurity", "unknown group", strings.Join(Groups(), ", ")} {
+		if !strings.Contains(msg, want) {
+			t.Errorf("message %q does not carry %q", msg, want)
+		}
+	}
+}

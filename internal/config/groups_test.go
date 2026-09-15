@@ -5,6 +5,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 )
 
 // loadGroups writes a minimal config with the given body appended and loads it.
@@ -292,5 +293,23 @@ func TestTheKnownNamesAreSorted(t *testing.T) {
 	names := strings.Split(strings.TrimSuffix(list, ")"), ", ")
 	if !slices.IsSorted(names) {
 		t.Errorf("the known collectors are listed as %v, which is not sorted", names)
+	}
+}
+
+// TestAGroupCadenceOutsideTheSelectionWarns is the every.groups half of
+// TestEveryOutsideTheSelectionWarnsRatherThanFailing: a cadence for a group
+// the selection leaves out sets nothing, and a cadence for a selected group
+// is simply in effect and says nothing.
+func TestAGroupCadenceOutsideTheSelectionWarns(t *testing.T) {
+	outside := loadGroups(t, "groups: [audience, collector]\nevery: {groups: {ci: 30m}}\n").Warnings()
+	if len(outside) != 1 || !strings.Contains(outside[0], "every.groups.ci sets a cadence for a group that groups does not select") {
+		t.Errorf("warnings = %v, want exactly one about every.groups.ci", outside)
+	}
+	c := loadGroups(t, "groups: [ci, collector]\nevery: {groups: {ci: 30m}}\n")
+	if got := c.Warnings(); len(got) != 0 {
+		t.Errorf("a cadence for a selected group must not warn, got %v", got)
+	}
+	if got := mustInterval(t, c, "artifacts"); got != 30*time.Minute {
+		t.Errorf("artifacts = %v, want the 30m of every.groups.ci", got)
 	}
 }

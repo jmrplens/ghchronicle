@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -532,5 +534,202 @@ func TestLokiReadsTheDemotedStatesFromFields(t *testing.T) {
 		if !strings.Contains(joined, want) {
 			t.Errorf("no line reads %q in:\n%s", want, joined)
 		}
+	}
+}
+
+// lokiRecorder is a push endpoint that keeps every push and answers each with
+// status, or 204 when status is zero.
+type lokiRecorder struct {
+	pushes  []lokiPush
+	tenants []string
+	status  int
+}
+
+func newLokiRecorder(t *testing.T, status int) (*lokiRecorder, string) {
+	t.Helper()
+	rec := &lokiRecorder{status: status}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		raw, _ := io.ReadAll(r.Body)
+		var p lokiPush
+		if err := json.Unmarshal(raw, &p); err != nil {
+			t.Errorf("body: %v", err)
+		}
+		rec.pushes = append(rec.pushes, p)
+		rec.tenants = append(rec.tenants, r.Header.Get("X-Scope-OrgID"))
+		if rec.status != 0 {
+			w.WriteHeader(rec.status)
+			_, _ = io.WriteString(w, " too many streams ")
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	t.Cleanup(srv.Close)
+	return rec, srv.URL
+}
+
+// starAt is one star event by user at the given time.
+func starAt(user string, at time.Time) Point {
+	return Point{
+		Measurement: "gh_star", Tags: map[string]string{"user": user, "full_name": "o/r"},
+		Fields: map[string]any{"starred": 1}, Time: at,
+	}
+}
+
+// TestNewLokiFillsInOnlyWhatWasLeftOut gives a zero batch, horizon and timeout
+// their documented values, adds the job label only when none was given, and
+// keeps everything that was set.
+func TestNewLokiFillsInOnlyWhatWasLeftOut(t *testing.T) {
+	l := NewLoki("http://loki.test/loki/api/v1/push", "", nil, 0, 0, 0)
+	if l.Batch != 1000 || l.MaxAge != time.Hour || l.client.Timeout != 30*time.Second || l.Labels["job"] != "ghchronicle" {
+		t.Errorf("defaults = batch %d, max age %v, timeout %v, labels %v", l.Batch, l.MaxAge, l.client.Timeout, l.Labels)
+	}
+	if l.Name() != "loki" || l.Close() != nil {
+		t.Errorf("Name = %q, want loki, and a Close with nothing to close", l.Name())
+	}
+	l = NewLoki("http://loki.test/loki/api/v1/push", "", map[string]string{"job": "github", "env": "prod"}, 5, time.Minute, time.Second)
+	if l.Batch != 5 || l.MaxAge != time.Minute || l.client.Timeout != time.Second || l.Labels["job"] != "github" || l.Labels["env"] != "prod" {
+		t.Errorf("given = batch %d, max age %v, timeout %v, labels %v, want all of them kept", l.Batch, l.MaxAge, l.client.Timeout, l.Labels)
+	}
+}
+
+// TestLokiRendersAnAbsentFieldAsNothing leaves the gap a missing field makes
+// visible in the sentence rather than printing Go's <nil>.
+func TestLokiRendersAnAbsentFieldAsNothing(t *testing.T) {
+	p := Point{Measurement: "gh_release", Tags: map[string]string{"tag": "v1", "full_name": "o/r"}}
+	if got := lokiEvents["gh_release"].message(p); got != "release v1 of o/r,  downloads" {
+		t.Errorf("message = %q", got)
+	}
+}
+
+// TestLokiSendsTheTenantOnlyWhenOneIsSet puts X-Scope-OrgID on a push for a
+// multi-tenant Loki and leaves it off otherwise, since a single-tenant Loki
+// given one files the data under a tenant nobody queries.
+func TestLokiSendsTheTenantOnlyWhenOneIsSet(t *testing.T) {
+	rec, url := newLokiRecorder(t, 0)
+	now := time.Now()
+	if err := NewLoki(url, "team-a", nil, 0, 0, 0).Write(context.Background(), []Point{starAt("a", now)}); err != nil {
+		t.Fatal(err)
+	}
+	if err := NewLoki(url, "", nil, 0, 0, 0).Write(context.Background(), []Point{starAt("a", now)}); err != nil {
+		t.Fatal(err)
+	}
+	if len(rec.tenants) != 2 || rec.tenants[0] != "team-a" || rec.tenants[1] != "" {
+		t.Errorf("tenants = %q, want team-a and then none", rec.tenants)
+	}
+}
+
+// TestLokiReportsAFailedPush returns the status and the trimmed body, for 300
+// as for any other status that is not a success, and reports a Loki that is
+// not there.
+func TestLokiReportsAFailedPush(t *testing.T) {
+	now := time.Now()
+	for _, status := range []int{http.StatusMultipleChoices, http.StatusTooManyRequests} {
+		_, url := newLokiRecorder(t, status)
+		err := NewLoki(url, "", nil, 0, 0, 0).Write(context.Background(), []Point{starAt("a", now)})
+		want := fmt.Sprintf("loki push: %d %s: too many streams", status, http.StatusText(status))
+		if err == nil || err.Error() != want {
+			t.Errorf("Write = %v, want %q", err, want)
+		}
+	}
+	closed := httptest.NewServer(http.NotFoundHandler())
+	closed.Close()
+	if err := NewLoki(closed.URL, "", nil, 0, 0, 0).Write(context.Background(), []Point{starAt("a", now)}); err == nil {
+		t.Error("Write reported success to a Loki that is not there")
+	}
+}
+
+// TestLokiFlushesAStreamThatFillsTheBatch sends a push as soon as the streams
+// in hand reach the batch size, and stops at the first push that fails.
+func TestLokiFlushesAStreamThatFillsTheBatch(t *testing.T) {
+	now := time.Now()
+	fork := func(by string, at time.Time) Point {
+		return Point{Measurement: "gh_fork", Tags: map[string]string{"by": by, "full_name": "o/r"}, Fields: map[string]any{"forks": 1}, Time: at}
+	}
+	// Streams go in name order, so the two forks fill a batch of two on their
+	// own and the star follows in a push of its own.
+	points := []Point{starAt("a", now), fork("b", now), fork("c", now.Add(time.Second))}
+	rec, url := newLokiRecorder(t, 0)
+	if err := NewLoki(url, "", nil, 2, 0, 0).Write(context.Background(), points); err != nil {
+		t.Fatal(err)
+	}
+	if len(rec.pushes) != 2 || len(rec.pushes[0].Streams) != 1 || rec.pushes[0].Streams[0].Stream["kind"] != "fork" ||
+		len(rec.pushes[1].Streams) != 1 || rec.pushes[1].Streams[0].Stream["kind"] != "star" {
+		t.Errorf("pushes = %+v, want the two forks and then the star", rec.pushes)
+	}
+
+	// A batch of one flushes every stream as it comes, so the push after the
+	// loop has nothing left and must not be sent as an empty one.
+	rec, url = newLokiRecorder(t, 0)
+	if err := NewLoki(url, "", nil, 1, 0, 0).Write(context.Background(), points); err != nil {
+		t.Fatal(err)
+	}
+	if len(rec.pushes) != 2 || len(rec.pushes[0].Streams) != 1 || len(rec.pushes[1].Streams) != 1 {
+		t.Errorf("pushes = %+v, want one push per stream and no empty one", rec.pushes)
+	}
+
+	rec, url = newLokiRecorder(t, http.StatusInternalServerError)
+	if err := NewLoki(url, "", nil, 1, 0, 0).Write(context.Background(), points); err == nil || len(rec.pushes) != 1 {
+		t.Errorf("Write = %v after %d pushes, want the first failure and nothing after it", err, len(rec.pushes))
+	}
+}
+
+// TestLokiSortsEachStreamWhateverOrderItArrivedIn keeps an ascending stream
+// ascending as well as putting a descending one right.
+func TestLokiSortsEachStreamWhateverOrderItArrivedIn(t *testing.T) {
+	rec, url := newLokiRecorder(t, 0)
+	now := time.Now()
+	err := NewLoki(url, "", nil, 0, 0, 0).Write(context.Background(), []Point{
+		starAt("a", now.Add(-2*time.Second)), starAt("b", now.Add(-time.Second)), starAt("c", now),
+		starAt("d", now.Add(-3*time.Second)),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var users []string
+	for _, v := range rec.pushes[0].Streams[0].Values {
+		users = append(users, strings.Fields(v[1])[0])
+	}
+	if want := []string{"d", "a", "b", "c"}; !slices.Equal(users, want) {
+		t.Errorf("stream order = %v, want %v", users, want)
+	}
+}
+
+// TestLokiJudgesAPushByTheNewestEntryAlreadySent drops an entry that is inside
+// the wall-clock horizon but more than MaxAge behind what an earlier push
+// already put in the stream, which is the rule Loki's out-of-order window
+// applies. The earlier entry is dated ahead of this machine's clock, the way a
+// collector on a clock running fast would date it.
+func TestLokiJudgesAPushByTheNewestEntryAlreadySent(t *testing.T) {
+	rec, url := newLokiRecorder(t, 0)
+	now := time.Now()
+	l := NewLoki(url, "", nil, 0, time.Hour, 0)
+	if err := l.Write(context.Background(), []Point{starAt("ahead", now.Add(30*time.Minute))}); err != nil {
+		t.Fatal(err)
+	}
+	err := l.Write(context.Background(), []Point{starAt("behind", now.Add(-45*time.Minute)), starAt("close", now.Add(-10*time.Minute))})
+	var dropped *DroppedError
+	if !errors.As(err, &dropped) || dropped.N != 1 {
+		t.Fatalf("Write = %v, want one entry dropped behind the watermark", err)
+	}
+	if len(rec.pushes) != 2 || len(rec.pushes[1].Streams[0].Values) != 1 ||
+		!strings.HasPrefix(rec.pushes[1].Streams[0].Values[0][1], "close starred") {
+		t.Errorf("pushes = %+v, want the second to carry only the close entry", rec.pushes)
+	}
+}
+
+// TestLokiCountsBothKindsOfDroppedEntryTogether adds the entries past the wall
+// clock to the ones behind their stream, so the warning names every entry
+// that was not sent.
+func TestLokiCountsBothKindsOfDroppedEntryTogether(t *testing.T) {
+	_, url := newLokiRecorder(t, 0)
+	now := time.Now()
+	err := NewLoki(url, "", nil, 0, time.Hour, 0).Write(context.Background(), []Point{
+		starAt("ahead", now.Add(90*time.Minute)),
+		starAt("behind", now.Add(-10*time.Minute)),
+		starAt("old", now.AddDate(0, 0, -2)),
+	})
+	var dropped *DroppedError
+	if !errors.As(err, &dropped) || dropped.N != 2 || dropped.Older != time.Hour {
+		t.Errorf("Write = %v, want two entries dropped older than an hour", err)
 	}
 }

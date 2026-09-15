@@ -1,0 +1,129 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="708" viewBox="0 0 800 708" role="img" aria-labelledby="ghcTitle ghcDesc">
+<title id="ghcTitle">GitHub Statistics</title>
+<desc id="ghcDesc">GitHub summary for octo: 1234567 stars, 0 forks, 999950 followers, 3 public repositories, 1049950000 contributions in the last year, -12 repository views over the traffic window, 7 unique visitors over the traffic window, 1000 clones over the traffic window, 100 commits in the last year, 10 pull requests in the last year, 1 reviews in the last year, 0 issues in the last year. Languages by bytes: JavaScript with a very long qualifier 20%, TypeScript also rather long 18%, Dockerfile 16%, Makefile and friends 14%, Some language nobody has heard of 11%, Kotlin 9%, MATLAB 7%, Assembly 5%, Other 0%. Most starred repositories: a-repository-name-far-wider-than-any-column-it-could-be-given with 50 stars in Go, no-language with 50 stars, unknown with 3 stars in Brainfuck, unstarred with 0 stars in Rust. Contributions per day over the last 120 days, peaking at 10.</desc>
+<style>
+.bg{fill:#0d1117;stroke:#3d444d}
+.panel{fill:#151b23}
+.t,.v,.big{fill:#f0f6fc}
+.d,.l,.h,.s{fill:#9198a1}
+.n,.c{fill:#f0f6fc}
+.star,.pill-v{fill:#4493f8}
+.on-accent{fill:#0d1117}
+.line{stroke:#4493f8}
+.area{fill:#4493f8}
+.axis,.edge{stroke:#3d444d}
+.track{fill:#3d444d}
+.ok{fill:#3fb950}
+.fg{fill:#f0f6fc}
+.h0{fill:#151b23}.h1{fill:#033a16}.h2{fill:#196c2e}.h3{fill:#2ea043}.h4{fill:#56d364}
+text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans',Helvetica,Arial,sans-serif}
+.mono{font-family:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace}
+.t{font-size:15px;font-weight:600}
+.d{font-size:11px}
+.v{font-size:22px;font-weight:600;font-family:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace}
+.big{font-size:20px;font-weight:600;font-family:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace}
+.l{font-size:11px}
+.h{font-size:14px;font-weight:600}
+.n{font-size:13px}
+.s{font-size:11px}
+.c{font-size:13px;font-weight:500;font-family:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace}
+.line{fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.area{opacity:0.12;stroke:none}
+.axis{stroke-width:1}
+.edge{fill:none;stroke-width:1}
+</style>
+<rect class="bg" x="0.5" y="0.5" width="799" height="707" rx="6"/>
+<path class="panel" d="M0.5,50 V6.5 A6,6 0 0 1 6.5,0.5 H793.5 A6,6 0 0 1 799.5,6.5 V50 Z"/>
+<line class="axis" x1="0.5" y1="50.5" x2="799.5" y2="50.5"/>
+<rect class="edge" x="0.5" y="0.5" width="799" height="707" rx="6"/>
+<text class="t" x="22" y="31" text-anchor="start">GitHub Statistics</text>
+<text class="d mono" x="778" y="31" text-anchor="end">@octo</text>
+<text class="v" x="22" y="82" text-anchor="start">1,234,567</text>
+<text class="l" x="22" y="100" text-anchor="start">Stars</text>
+<text class="v" x="211" y="82" text-anchor="start">0</text>
+<text class="l" x="211" y="100" text-anchor="start">Forks</text>
+<text class="v" x="400" y="82" text-anchor="start">999,950</text>
+<text class="l" x="400" y="100" text-anchor="start">Followers</text>
+<text class="v" x="589" y="82" text-anchor="start">3</text>
+<text class="l" x="589" y="100" text-anchor="start">Repositories</text>
+<text class="v" x="22" y="128" text-anchor="start">1,049,950,000</text>
+<text class="l" x="22" y="146" text-anchor="start">Contributions / yr</text>
+<text class="v" x="211" y="128" text-anchor="start">-12</text>
+<text class="l" x="211" y="146" text-anchor="start">Repo views / traffic</text>
+<text class="v" x="400" y="128" text-anchor="start">7</text>
+<text class="l" x="400" y="146" text-anchor="start">Visitors / traffic</text>
+<text class="v" x="589" y="128" text-anchor="start">1,000</text>
+<text class="l" x="589" y="146" text-anchor="start">Clones / traffic</text>
+<text class="v" x="22" y="174" text-anchor="start">100</text>
+<text class="l" x="22" y="192" text-anchor="start">Commits / yr</text>
+<text class="v" x="211" y="174" text-anchor="start">10</text>
+<text class="l" x="211" y="192" text-anchor="start">Pull requests / yr</text>
+<text class="v" x="400" y="174" text-anchor="start">1</text>
+<text class="l" x="400" y="192" text-anchor="start">Reviews / yr</text>
+<text class="v" x="589" y="174" text-anchor="start">0</text>
+<text class="l" x="589" y="192" text-anchor="start">Issues / yr</text>
+<text class="h fg" x="22" y="228" text-anchor="start">Most Used Languages</text>
+<text class="d" x="22" y="245" text-anchor="start">Share of bytes across public repositories</text>
+<rect x="22" y="262" width="152.6" height="14" rx="3" fill="#8b949e"/>
+<rect x="176.6" y="262" width="135.42" height="14" rx="3" fill="#abcdef"/>
+<rect x="314.02" y="262" width="118.25" height="14" rx="3" fill="#384d54"/>
+<rect x="434.27" y="262" width="101.07" height="14" rx="3" fill="#8b949e"/>
+<rect x="537.34" y="262" width="83.89" height="14" rx="3" fill="#8b949e"/>
+<rect x="623.23" y="262" width="66.71" height="14" rx="3" fill="#a97bff"/>
+<rect x="691.94" y="262" width="49.53" height="14" rx="3" fill="#e16737"/>
+<rect x="743.47" y="262" width="32.36" height="14" rx="3" fill="#8b949e"/>
+<rect x="777.83" y="262" width="1" height="14" rx="3" fill="#8b949e"/>
+<circle cx="28" cy="298" r="6" fill="#8b949e"/>
+<text class="n" x="42" y="302" text-anchor="start">JavaScript with a very long qualifier</text>
+<text class="c" x="380" y="302" text-anchor="end">20%</text>
+<circle cx="28" cy="323" r="6" fill="#abcdef"/>
+<text class="n" x="42" y="327" text-anchor="start">TypeScript also rather long</text>
+<text class="c" x="380" y="327" text-anchor="end">18%</text>
+<circle cx="28" cy="348" r="6" fill="#384d54"/>
+<text class="n" x="42" y="352" text-anchor="start">Dockerfile</text>
+<text class="c" x="380" y="352" text-anchor="end">16%</text>
+<circle cx="28" cy="373" r="6" fill="#8b949e"/>
+<text class="n" x="42" y="377" text-anchor="start">Makefile and friends</text>
+<text class="c" x="380" y="377" text-anchor="end">14%</text>
+<circle cx="28" cy="398" r="6" fill="#8b949e"/>
+<text class="n" x="42" y="402" text-anchor="start">Some language nobody has heard of</text>
+<text class="c" x="380" y="402" text-anchor="end">11%</text>
+<circle cx="406" cy="298" r="6" fill="#a97bff"/>
+<text class="n" x="420" y="302" text-anchor="start">Kotlin</text>
+<text class="c" x="758" y="302" text-anchor="end">9%</text>
+<circle cx="406" cy="323" r="6" fill="#e16737"/>
+<text class="n" x="420" y="327" text-anchor="start">MATLAB</text>
+<text class="c" x="758" y="327" text-anchor="end">7%</text>
+<circle cx="406" cy="348" r="6" fill="#8b949e"/>
+<text class="n" x="420" y="352" text-anchor="start">Assembly</text>
+<text class="c" x="758" y="352" text-anchor="end">5%</text>
+<circle cx="406" cy="373" r="6" fill="#8b949e"/>
+<text class="n" x="420" y="377" text-anchor="start">Other</text>
+<text class="c" x="758" y="377" text-anchor="end">0%</text>
+<text class="h fg" x="22" y="444" text-anchor="start">Top repositories</text>
+<text class="d" x="22" y="461" text-anchor="start">By stars</text>
+<circle cx="27" cy="482" r="5" fill="#00add8"/>
+<text class="n" x="40" y="486" text-anchor="start">a-repository-name-far-wider-than-any-column-it-could-be-given</text>
+<text class="s" x="708" y="486" text-anchor="end">Go</text>
+<path class="star" transform="translate(722 476) scale(0.7)" d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z"/>
+<text class="c" x="778" y="486" text-anchor="end">50</text>
+<circle cx="27" cy="506" r="5" fill="#8b949e"/>
+<text class="n" x="40" y="510" text-anchor="start">no-language</text>
+<path class="star" transform="translate(722 500) scale(0.7)" d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z"/>
+<text class="c" x="778" y="510" text-anchor="end">50</text>
+<circle cx="27" cy="530" r="5" fill="#8b949e"/>
+<text class="n" x="40" y="534" text-anchor="start">unknown</text>
+<text class="s" x="708" y="534" text-anchor="end">Brainfuck</text>
+<path class="star" transform="translate(722 524) scale(0.7)" d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z"/>
+<text class="c" x="778" y="534" text-anchor="end">3</text>
+<circle cx="27" cy="554" r="5" fill="#dea584"/>
+<text class="n" x="40" y="558" text-anchor="start">unstarred</text>
+<text class="s" x="708" y="558" text-anchor="end">Rust</text>
+<path class="star" transform="translate(722 548) scale(0.7)" d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z"/>
+<text class="c" x="778" y="558" text-anchor="end">0</text>
+<text class="h fg" x="22" y="600" text-anchor="start">Contributions per day</text>
+<text class="d" x="22" y="617" text-anchor="start">Last 120 days</text>
+<line class="axis" x1="22" y1="682" x2="778" y2="682"/>
+<path class="area" d="M22,682 L22,682 L28.35,645.6 L34.71,666.4 L41.06,630 L47.41,650.8 L53.76,671.6 L60.12,635.2 L66.47,656 L72.82,676.8 L79.18,640.4 L85.53,661.2 L91.88,682 L98.24,645.6 L104.59,666.4 L110.94,630 L117.29,650.8 L123.65,671.6 L130,635.2 L136.35,656 L142.71,676.8 L149.06,640.4 L155.41,661.2 L161.76,682 L168.12,645.6 L174.47,666.4 L180.82,630 L187.18,650.8 L193.53,671.6 L199.88,635.2 L206.24,656 L212.59,676.8 L218.94,640.4 L225.29,661.2 L231.65,682 L238,645.6 L244.35,666.4 L250.71,630 L257.06,650.8 L263.41,671.6 L269.76,635.2 L276.12,682 L282.47,676.8 L288.82,640.4 L295.18,661.2 L301.53,682 L307.88,645.6 L314.24,666.4 L320.59,630 L326.94,650.8 L333.29,671.6 L339.65,635.2 L346,656 L352.35,676.8 L358.71,640.4 L365.06,661.2 L371.41,682 L377.76,645.6 L384.12,666.4 L390.47,630 L396.82,650.8 L403.18,671.6 L409.53,635.2 L415.88,656 L422.24,676.8 L428.59,640.4 L434.94,661.2 L441.29,682 L447.65,645.6 L454,666.4 L460.35,630 L466.71,650.8 L473.06,671.6 L479.41,635.2 L485.76,656 L492.12,676.8 L498.47,640.4 L504.82,661.2 L511.18,682 L517.53,645.6 L523.88,666.4 L530.24,630 L536.59,650.8 L542.94,671.6 L549.29,635.2 L555.65,656 L562,676.8 L568.35,640.4 L574.71,661.2 L581.06,682 L587.41,645.6 L593.76,666.4 L600.12,630 L606.47,650.8 L612.82,671.6 L619.18,635.2 L625.53,656 L631.88,676.8 L638.24,640.4 L644.59,661.2 L650.94,682 L657.29,645.6 L663.65,666.4 L670,630 L676.35,650.8 L682.71,671.6 L689.06,635.2 L695.41,656 L701.76,676.8 L708.12,640.4 L714.47,661.2 L720.82,682 L727.18,645.6 L733.53,666.4 L739.88,630 L746.24,650.8 L752.59,671.6 L758.94,635.2 L765.29,656 L771.65,676.8 L778,640.4 L778,682Z"/>
+<polyline class="line" points="22,682 28.35,645.6 34.71,666.4 41.06,630 47.41,650.8 53.76,671.6 60.12,635.2 66.47,656 72.82,676.8 79.18,640.4 85.53,661.2 91.88,682 98.24,645.6 104.59,666.4 110.94,630 117.29,650.8 123.65,671.6 130,635.2 136.35,656 142.71,676.8 149.06,640.4 155.41,661.2 161.76,682 168.12,645.6 174.47,666.4 180.82,630 187.18,650.8 193.53,671.6 199.88,635.2 206.24,656 212.59,676.8 218.94,640.4 225.29,661.2 231.65,682 238,645.6 244.35,666.4 250.71,630 257.06,650.8 263.41,671.6 269.76,635.2 276.12,682 282.47,676.8 288.82,640.4 295.18,661.2 301.53,682 307.88,645.6 314.24,666.4 320.59,630 326.94,650.8 333.29,671.6 339.65,635.2 346,656 352.35,676.8 358.71,640.4 365.06,661.2 371.41,682 377.76,645.6 384.12,666.4 390.47,630 396.82,650.8 403.18,671.6 409.53,635.2 415.88,656 422.24,676.8 428.59,640.4 434.94,661.2 441.29,682 447.65,645.6 454,666.4 460.35,630 466.71,650.8 473.06,671.6 479.41,635.2 485.76,656 492.12,676.8 498.47,640.4 504.82,661.2 511.18,682 517.53,645.6 523.88,666.4 530.24,630 536.59,650.8 542.94,671.6 549.29,635.2 555.65,656 562,676.8 568.35,640.4 574.71,661.2 581.06,682 587.41,645.6 593.76,666.4 600.12,630 606.47,650.8 612.82,671.6 619.18,635.2 625.53,656 631.88,676.8 638.24,640.4 644.59,661.2 650.94,682 657.29,645.6 663.65,666.4 670,630 676.35,650.8 682.71,671.6 689.06,635.2 695.41,656 701.76,676.8 708.12,640.4 714.47,661.2 720.82,682 727.18,645.6 733.53,666.4 739.88,630 746.24,650.8 752.59,671.6 758.94,635.2 765.29,656 771.65,676.8 778,640.4"/>
+</svg>

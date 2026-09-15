@@ -178,3 +178,78 @@ func TestGraphiteNamesItselfWhenUnreachable(t *testing.T) {
 		t.Errorf("err = %v", err)
 	}
 }
+
+// TestGraphiteNodeKeepsExactlyTheCharactersAPathAllows checks every edge of
+// the allowed ranges and the character just outside each one, since a range
+// off by one either splits a node or renames a series.
+func TestGraphiteNodeKeepsExactlyTheCharactersAPathAllows(t *testing.T) {
+	if got := graphiteNode("azAZ09_-:"); got != "azAZ09_-:" {
+		t.Errorf("node = %q, want every allowed character kept", got)
+	}
+	// Just before and after a-z, A-Z and 0-9 (the colon after 9 is allowed on
+	// its own), then a dot, a slash, a space and a letter outside ASCII.
+	if got := graphiteNode("`{@[/;. é"); got != "_________" {
+		t.Errorf("node = %q, want every other character replaced", got)
+	}
+}
+
+// TestNewGraphiteFillsInOnlyWhatWasLeftOut gives a zero prefix, batch and
+// timeout their documented values and keeps the ones that were set.
+func TestNewGraphiteFillsInOnlyWhatWasLeftOut(t *testing.T) {
+	g := NewGraphite("graphite:2003", "", 0, 0)
+	if g.Prefix != "github" || g.Batch != 1000 || g.Timeout != 30*time.Second || g.Name() != "graphite" {
+		t.Errorf("defaults = prefix %q, batch %d, timeout %v, name %q", g.Prefix, g.Batch, g.Timeout, g.Name())
+	}
+	g = NewGraphite("graphite:2003", "gh", 2, time.Second)
+	if g.Prefix != "gh" || g.Batch != 2 || g.Timeout != time.Second {
+		t.Errorf("given = prefix %q, batch %d, timeout %v, want gh, 2 and 1s kept", g.Prefix, g.Batch, g.Timeout)
+	}
+	if err := g.Close(); err != nil {
+		t.Errorf("Close before any write = %v, want nil", err)
+	}
+}
+
+// TestGraphiteDoesNotDialForABatchWithNoNumber sends nothing when no field is
+// a number, so a batch of text does not even need the server to be up.
+func TestGraphiteDoesNotDialForABatchWithNoNumber(t *testing.T) {
+	var lc net.ListenConfig
+	ln, err := lc.Listen(t.Context(), "tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	addr := ln.Addr().String()
+	if err = ln.Close(); err != nil {
+		t.Fatal(err)
+	}
+	g := NewGraphite(addr, "", 0, time.Second)
+	if err = g.Write(context.Background(), []Point{{
+		Measurement: "m", Fields: map[string]any{"note": "text"}, Time: time.Unix(1, 0),
+	}}); err != nil {
+		t.Errorf("Write = %v, want nothing to send and so nothing to fail", err)
+	}
+}
+
+// TestGraphiteWritesADateAsSecondsAndSkipsAnUnsetOne sends a time field as its
+// Unix seconds, the one number the line protocol also writes for it, and
+// leaves out a time that was never set.
+func TestGraphiteWritesADateAsSecondsAndSkipsAnUnsetOne(t *testing.T) {
+	srv := newGraphiteServer(t)
+	g := NewGraphite(srv.ln.Addr().String(), "", 1, 0)
+	err := g.Write(context.Background(), []Point{{
+		Measurement: "gh_repo",
+		Fields:      map[string]any{"pushed_at": time.Unix(1600000000, 0), "never": time.Time{}, "stars": 2},
+		Time:        time.Unix(1700000000, 0),
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = g.Close(); err != nil {
+		t.Fatal(err)
+	}
+	got := srv.received(t, 1)
+	// Carbon parses a value as a float, so the exponent form is a number to it.
+	want := "github.repo.pushed_at 1.6e+09 1700000000\ngithub.repo.stars 2 1700000000\n"
+	if len(got) != 1 || got[0] != want {
+		t.Errorf("wire = %q, want %q in batches of one over one connection", got, want)
+	}
+}

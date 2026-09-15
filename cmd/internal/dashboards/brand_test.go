@@ -148,3 +148,18 @@ func TestBrandHeaderIsAColumnThatFitsItsPanel(t *testing.T) {
 		t.Errorf("the buttons open %s and %s", buttons[0][1], buttons[1][1])
 	}
 }
+
+// TestButtonWidthReadsOnlyWhatButtonDrew: the <img> is sized from the
+// drawing, so a drawing whose viewBox does not open with the two numbers
+// button() writes is a programming error and stops the generator rather
+// than sizing the image to zero.
+func TestButtonWidthReadsOnlyWhatButtonDrew(t *testing.T) {
+	t.Parallel()
+	if got := buttonWidth(docsButton()); got != 104 {
+		t.Errorf("the docs button is %d wide, want 104", got)
+	}
+	msg := panicOf(t, func() { buttonWidth(svgOpen + `wide tall">`) })
+	if !strings.HasPrefix(msg, "a button was not drawn by button(): ") {
+		t.Errorf("a drawing without a viewBox size panicked with %q", msg)
+	}
+}

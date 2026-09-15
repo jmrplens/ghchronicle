@@ -5,6 +5,7 @@ import (
 	"go/parser"
 	"go/token"
 	"io/fs"
+	"maps"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -655,5 +656,77 @@ func TestPromotedFieldsBecomeLabels(t *testing.T) {
 	}
 	if discussion.Fields["has_answer_mean"] != 1.0 {
 		t.Errorf("the boolean still averages into the share answered: got %v", discussion.Fields["has_answer_mean"])
+	}
+}
+
+// TestSummarizeKeepsTheNewestSnapshotWhateverTheOrder keeps the newest reading
+// when it comes first in the batch, and keeps a reading that carries no time
+// rather than losing the series.
+func TestSummarizeKeepsTheNewestSnapshotWhateverTheOrder(t *testing.T) {
+	base := time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC)
+	tags := map[string]string{"repo": "a"}
+	out := Summarize([]Point{
+		{Measurement: "gh_repo", Tags: tags, Fields: map[string]any{"stars": 9}, Time: base.Add(time.Hour)},
+		{Measurement: "gh_repo", Tags: tags, Fields: map[string]any{"stars": 5}, Time: base},
+	})
+	if len(out) != 1 || out[0].Fields["stars"] != 9 {
+		t.Errorf("an older reading after the newest replaced it: %+v", out)
+	}
+	out = Summarize([]Point{{Measurement: "gh_repo", Tags: tags, Fields: map[string]any{"stars": 4}}})
+	if len(out) != 1 || out[0].Fields["stars"] != 4 {
+		t.Errorf("a reading with no time was lost: %+v", out)
+	}
+}
+
+// TestKeptTagsLeavesOutAnEmptyValue treats an empty tag the way the line
+// protocol does, as no tag, so it does not open a series of its own.
+func TestKeptTagsLeavesOutAnEmptyValue(t *testing.T) {
+	got := keptTags(map[string]string{"repo": "a", "language": "", "owner": "o"}, []string{"repo", "language", "license"})
+	if len(got) != 1 || got["repo"] != "a" {
+		t.Errorf("keptTags = %v, want repo alone", got)
+	}
+}
+
+// TestPromoteWritesEachKindOfFieldAsItsText writes a number in full decimal,
+// never rounded to one digit, and adds no label for an empty string, a missing
+// field or a value that is not a number.
+func TestPromoteWritesEachKindOfFieldAsItsText(t *testing.T) {
+	tags := map[string]string{}
+	promote(tags, map[string]any{
+		"parent": 12345, "share": 0.25, "answered": false, "state": "open",
+		"empty": "", "when": time.Unix(1, 0),
+	}, []string{"parent", "share", "answered", "state", "empty", "when", "absent"})
+	want := map[string]string{"parent": "12345", "share": "0.25", "answered": "false", "state": "open"}
+	if !maps.Equal(tags, want) {
+		t.Errorf("labels = %v, want %v", tags, want)
+	}
+}
+
+// TestReducerCountsARowWithoutAPositiveEventCountAsOne treats events of zero
+// or less as the collector saying nothing, which is one item, since a weight
+// of zero would make a counted item vanish from the total.
+func TestReducerCountsARowWithoutAPositiveEventCountAsOne(t *testing.T) {
+	at := time.Date(2026, 9, 12, 7, 23, 54, 0, time.UTC)
+	for _, events := range []any{0, -2} {
+		out := NewReducer().Reduce([]Point{{
+			Measurement: "gh_repo_activity",
+			Tags:        map[string]string{"repo": "a", "activity": "push"},
+			Fields:      map[string]any{"events": events}, Time: at,
+		}})
+		if len(out) != 1 || out[0].Fields["total"] != 1 {
+			t.Errorf("events %v: %+v, want a total of one", events, out)
+		}
+	}
+}
+
+// TestSummarizeLeavesOutAWindowWithNothingToAdd publishes no gauge for a summed
+// measurement whose points carry no number.
+func TestSummarizeLeavesOutAWindowWithNothingToAdd(t *testing.T) {
+	out := Summarize([]Point{{
+		Measurement: "gh_traffic", Tags: map[string]string{"repo": "a", "kind": "views"},
+		Fields: map[string]any{"note": "text"}, Time: time.Unix(1, 0),
+	}})
+	if len(out) != 0 {
+		t.Errorf("a window with no number became %+v", out)
 	}
 }

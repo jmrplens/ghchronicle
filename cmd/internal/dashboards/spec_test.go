@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -303,4 +304,223 @@ func sqlTargets(t *testing.T, panels any) []map[string]any {
 		t.Fatal("walked a SQL dashboard and found no targets, so this checks nothing")
 	}
 	return out
+}
+
+// notes is the P of a panel whose three non-SQL stores answer with a text
+// panel, so a test can build one from a SQL query alone.
+func notes(p P) *P {
+	p.PromNote, p.GRNote, p.ESNote = "no prom", "no graphite", "no es"
+	return &p
+}
+
+// TestPctThresholdsScalesFloatsAndWholeNumbersAlike: the Elasticsearch
+// side of a rate is a fraction, so every step of a percentage is divided by
+// a hundred whether the specification wrote it as 80 or as 90.5, and the
+// open step stays open.
+func TestPctThresholdsScalesFloatsAndWholeNumbersAlike(t *testing.T) {
+	t.Parallel()
+	got := pctThresholds([]any{
+		map[string]any{"color": "red", "value": nil},
+		map[string]any{"color": "orange", "value": 80},
+		map[string]any{"color": "green", "value": 90.5},
+	})
+	want := Opts{"unit": "percentunit", "maxv": 1.0, "thresholds": []any{
+		map[string]any{"color": "red", "value": nil},
+		map[string]any{"color": "orange", "value": 0.8},
+		map[string]any{"color": "green", "value": 0.905},
+	}}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("pctThresholds =\n%v\nwant\n%v", got, want)
+	}
+	msg := panicOf(t, func() { pctThresholds([]any{map[string]any{"color": "red"}, "green"}) })
+	if msg != "threshold step 1 is not a color and a value" {
+		t.Errorf("a step that is not a map panicked with %q", msg)
+	}
+}
+
+// TestPanelKeepsThePostgreSQLArgumentsItIsGiven: PostgreSQL defaults to the
+// InfluxDB side translated, and a panel that has to say something else there
+// says it through the PG fields, each of which must win over the default.
+func TestPanelKeepsThePostgreSQLArgumentsItIsGiven(t *testing.T) {
+	t.Parallel()
+	sql := []Target{sqlT(`SELECT COUNT(*) AS "Runs" FROM gh_workflow_run`)}
+	own := panel("stat", "Own", box{W: 6, H: 4}, sql, notes(P{
+		PG: []Target{sqlT("SELECT 1")}, PGOpts: Opts{"unit": "s"},
+		PGTF: []any{"pg tf"}, PGOver: []any{"pg over"},
+		SQLTF: []any{"sql tf"}, SQLOver: []any{"sql over"}, SQLOpts: Opts{"unit": "short"},
+	})).Stores["postgres"]
+	if len(own.Q) != 1 || own.Q[0].SQL != "SELECT 1" {
+		t.Errorf("PostgreSQL queries are %v, want the PG one", own.Q)
+	}
+	if !reflect.DeepEqual(own.Opts, Opts{"unit": "s"}) {
+		t.Errorf("PostgreSQL options are %v, want the PG ones", own.Opts)
+	}
+	if !reflect.DeepEqual(own.TF, []any{"pg tf"}) || !reflect.DeepEqual(own.Overrides, []any{"pg over"}) {
+		t.Errorf("PostgreSQL transformations %v and overrides %v, want the PG ones", own.TF, own.Overrides)
+	}
+
+	derived := panel("stat", "Derived", box{W: 6, H: 4}, sql, notes(P{
+		SQLTF: []any{"sql tf"}, SQLOver: []any{"sql over"},
+		SQLOpts: Opts{"display": "${__field.labels.series}", "decimals": 2},
+	})).Stores["postgres"]
+	if len(derived.Q) != 1 || derived.Q[0].SQL != sql[0].SQL {
+		t.Errorf("derived PostgreSQL queries are %v, want the InfluxDB one translated", derived.Q)
+	}
+	wantOpts := Opts{"display": "${__field.labels.metric}", "decimals": 2}
+	if !reflect.DeepEqual(derived.Opts, wantOpts) {
+		t.Errorf("derived PostgreSQL options are %v, want %v", derived.Opts, wantOpts)
+	}
+	if !reflect.DeepEqual(derived.TF, []any{"sql tf"}) || !reflect.DeepEqual(derived.Overrides, []any{"sql over"}) {
+		t.Errorf("derived transformations %v and overrides %v, want the InfluxDB ones", derived.TF, derived.Overrides)
+	}
+}
+
+// TestAPanelWithoutAQueryOrANoteStopsTheGenerator: a store with no query
+// draws its note in the panel's place, so a missing note would be an empty
+// box; and only prose may give way to the log store, since the log panel
+// replaces the panel whole.
+func TestAPanelWithoutAQueryOrANoteStopsTheGenerator(t *testing.T) {
+	t.Parallel()
+	sql := []Target{sqlT("SELECT 1")}
+	msg := panicOf(t, func() {
+		panel("stat", "Runs", box{}, sql, &P{GRNote: "g", ESNote: "e"})
+	})
+	if msg != "Runs: a panel without a Prometheus query needs a note" {
+		t.Errorf("a store with neither panicked with %q", msg)
+	}
+	msg = panicOf(t, func() {
+		panel("stat", "Logs", box{}, sql, notes(P{Logs: &Logs{Selector: "{}"}}))
+	})
+	if msg != "Logs: only a text panel can give way to the log store" {
+		t.Errorf("a stat with a log store panicked with %q", msg)
+	}
+	text := panel("text", "Prose", box{}, nil, &P{Logs: &Logs{Selector: "{}"}})
+	if text.Logs == nil || text.Stores["prometheus"].Note != "" {
+		t.Errorf("a text panel without notes is %+v, want it built with its log store", text)
+	}
+}
+
+// TestLokiRepoStageFiltersUnlessTheAllValueIsAGlob: the repository filter is
+// a regular expression, so it is applied wherever All is not the glob star,
+// including a store the lookup does not know.
+func TestLokiRepoStageFiltersUnlessTheAllValueIsAGlob(t *testing.T) {
+	t.Parallel()
+	for _, name := range []string{"influxdb", "postgres", "prometheus", "no such store"} {
+		stage, note := lokiRepoStage(name)
+		if stage != ` | repo=~"$repo"` || note != "" {
+			t.Errorf("%s: stage %q and note %q, want the filter and no note", name, stage, note)
+		}
+	}
+	for _, name := range []string{"graphite", "elasticsearch"} {
+		stage, note := lokiRepoStage(name)
+		if stage != "" || !strings.Contains(note, "glob star") {
+			t.Errorf("%s: stage %q and note %q, want no filter and the note", name, stage, note)
+		}
+	}
+}
+
+// TestLinkColumnsGoWhereTheColumnIs: a store whose query cannot return the
+// url says so, in its note when it answers with prose and in its description
+// when it answers with a query; a SQL store that does not select the column
+// has a mistake in its statement, and the generator stops.
+func TestLinkColumnsGoWhereTheColumnIs(t *testing.T) {
+	t.Parallel()
+	selects := []Target{sqlT(`SELECT repo AS "Repository", url AS "Link" FROM gh_repo`)}
+	p := panel("table", "Repos", box{}, selects, &P{
+		Prom:      []Target{{Kind: "prom", Ref: "A", Expr: "github_repo_stars"}},
+		GRNote:    "no graphite",
+		ESNote:    "no es",
+		Overrides: []any{linkOn("Repository"), width("Repository", 200)},
+	})
+	if !reflect.DeepEqual(p.Overrides, []any{width("Repository", 200)}) {
+		t.Errorf("shared overrides are %v, want the width alone", p.Overrides)
+	}
+	for _, name := range []string{"influxdb", "postgres"} {
+		if st := p.Stores[name]; len(st.Overrides) != 1 || st.Desc != "" {
+			t.Errorf("%s keeps overrides %v and description %q, want the link and nothing said", name, st.Overrides, st.Desc)
+		}
+	}
+	if st := p.Stores["prometheus"]; st.Desc != promNoLink || st.Note != "" || len(st.Overrides) != 0 {
+		t.Errorf("prometheus has description %q, note %q, overrides %v; want the no-link sentence in the description", st.Desc, st.Note, st.Overrides)
+	}
+	if st := p.Stores["graphite"]; st.Note != "no graphite\n\n"+noteLink || st.Desc != "" {
+		t.Errorf("graphite has note %q and description %q, want the link sentence on the note", st.Note, st.Desc)
+	}
+
+	msg := panicOf(t, func() {
+		panel("table", "Unselected", box{}, []Target{sqlT(`SELECT repo AS "Repository" FROM gh_repo`)},
+			notes(P{Overrides: []any{linkOn("Repository")}}))
+	})
+	if msg != "Unselected: a link column InfluxDB does not select" && msg != "Unselected: a link column PostgreSQL does not select" {
+		t.Errorf("a SQL store without the column panicked with %q", msg)
+	}
+}
+
+// TestMaterializeRefusesAnUnknownPanelKind: a kind the renderer has no
+// builder for would be a panel Grafana cannot draw.
+func TestMaterializeRefusesAnUnknownPanelKind(t *testing.T) {
+	t.Parallel()
+	p := Panel{Kind: "sparkline", Title: "Odd", Stores: map[string]*store{
+		"influxdb": {Q: []Target{sqlT("SELECT 1")}},
+	}}
+	if msg := panicOf(t, func() { materialize(&ids{}, &p, "influxdb", "ds", nil, 0) }); msg != "unknown panel kind sparkline" {
+		t.Errorf("an unknown kind panicked with %q", msg)
+	}
+}
+
+// TestRenumberingSkipsWhatIsNotAnAggregation: the Elasticsearch ids are one
+// sequence in the order the specification handed them out, across the
+// metrics and the buckets of a target, and an entry that is not an
+// aggregation takes no number; an aggregation without an id stops the
+// generator.
+func TestRenumberingSkipsWhatIsNotAnAggregation(t *testing.T) {
+	t.Parallel()
+	metric := map[string]any{"type": "count", "id": "7"}
+	bucket := map[string]any{"type": "terms", "id": "3"}
+	later := map[string]any{"type": "sum", "id": "2"}
+	inner := map[string]any{"type": "max", "id": "1"}
+	panels := []map[string]any{
+		{"panels": []map[string]any{{"targets": []any{map[string]any{"metrics": []any{inner}}}}}},
+		{"targets": []any{"junk", map[string]any{
+			"metrics": []any{"junk", metric}, "bucketAggs": []any{bucket},
+		}}},
+		{"targets": []any{map[string]any{"metrics": []any{later}}}},
+	}
+	renumberES(panels)
+	for _, c := range []struct {
+		name string
+		agg  map[string]any
+		want string
+	}{{"collapsed row", inner, "1"}, {"bucket", bucket, "2"}, {"metric", metric, "3"}, {"next panel", later, "4"}} {
+		if c.agg["id"] != c.want {
+			t.Errorf("the %s aggregation is numbered %v, want %s", c.name, c.agg["id"], c.want)
+		}
+	}
+	if msg := panicOf(t, func() { idNumber(map[string]any{"type": "count", "id": 1}) }); msg != "a count aggregation has no string id" {
+		t.Errorf("an aggregation without a string id panicked with %q", msg)
+	}
+}
+
+// TestRenumberingKeepsTheOrderOfAggregationsWithTheSameNumber: an id that is
+// not a number reads as zero, so two of them tie, and a tie keeps the order
+// the aggregations sit in. Swapping them would renumber the same target
+// differently from one generation to the next.
+func TestRenumberingKeepsTheOrderOfAggregationsWithTheSameNumber(t *testing.T) {
+	t.Parallel()
+	first := map[string]any{"type": "count", "id": "count"}
+	second := map[string]any{"type": "sum", "id": "sum"}
+	bucket := map[string]any{"type": "terms", "id": "1"}
+	panels := []map[string]any{{"targets": []any{map[string]any{
+		"metrics": []any{first, second}, "bucketAggs": []any{bucket},
+	}}}}
+	renumberES(panels)
+	for _, c := range []struct {
+		name string
+		agg  map[string]any
+		want string
+	}{{"first unnumbered", first, "1"}, {"second unnumbered", second, "2"}, {"numbered bucket", bucket, "3"}} {
+		if c.agg["id"] != c.want {
+			t.Errorf("the %s aggregation is numbered %v, want %s", c.name, c.agg["id"], c.want)
+		}
+	}
 }

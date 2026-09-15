@@ -1,0 +1,101 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="609" viewBox="0 0 600 609" role="img" aria-labelledby="ghcTitle ghcDesc">
+<title id="ghcTitle">GitHub Statistics</title>
+<desc id="ghcDesc">GitHub summary for jmrplens: 283 stars, 70 forks, 41 followers, 42 public repositories, 6210 contributions in the last year, 1810 repository views in the last 14 days, 878 unique visitors in the last 14 days, 117000 clones in the last 14 days, 3387 commits in the last year, 1179 pull requests in the last year, 389 reviews in the last year, 64 issues in the last year. Languages by bytes: Go 46%, Python 28%, C++ 26%. Most starred repositories: phonometry with 112 stars in Python, TFG-TFM_EPS with 84 stars in TeX, gitlab-mcp-server with 33 stars in Go. Contributions per day over the last 10 days, peaking at 20.</desc>
+<style>
+.bg{fill:#0d1117;stroke:#3d444d}
+.panel{fill:#151b23}
+.t,.v,.big{fill:#f0f6fc}
+.d,.l,.h,.s{fill:#9198a1}
+.n,.c{fill:#f0f6fc}
+.star,.pill-v{fill:#4493f8}
+.on-accent{fill:#0d1117}
+.line{stroke:#4493f8}
+.area{fill:#4493f8}
+.axis,.edge{stroke:#3d444d}
+.track{fill:#3d444d}
+.ok{fill:#3fb950}
+.fg{fill:#f0f6fc}
+.h0{fill:#151b23}.h1{fill:#033a16}.h2{fill:#196c2e}.h3{fill:#2ea043}.h4{fill:#56d364}
+text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans',Helvetica,Arial,sans-serif}
+.mono{font-family:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace}
+.t{font-size:15px;font-weight:600}
+.d{font-size:11px}
+.v{font-size:22px;font-weight:600;font-family:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace}
+.big{font-size:20px;font-weight:600;font-family:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace}
+.l{font-size:11px}
+.h{font-size:14px;font-weight:600}
+.n{font-size:13px}
+.s{font-size:11px}
+.c{font-size:13px;font-weight:500;font-family:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace}
+.line{fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.area{opacity:0.12;stroke:none}
+.axis{stroke-width:1}
+.edge{fill:none;stroke-width:1}
+</style>
+<rect class="bg" x="0.5" y="0.5" width="599" height="608" rx="6"/>
+<path class="panel" d="M0.5,50 V6.5 A6,6 0 0 1 6.5,0.5 H593.5 A6,6 0 0 1 599.5,6.5 V50 Z"/>
+<line class="axis" x1="0.5" y1="50.5" x2="599.5" y2="50.5"/>
+<rect class="edge" x="0.5" y="0.5" width="599" height="608" rx="6"/>
+<text class="t" x="22" y="31" text-anchor="start">GitHub Statistics</text>
+<text class="d mono" x="578" y="31" text-anchor="end">@jmrplens</text>
+<text class="v" x="22" y="82" text-anchor="start">283</text>
+<text class="l" x="22" y="100" text-anchor="start">Stars</text>
+<text class="v" x="161" y="82" text-anchor="start">70</text>
+<text class="l" x="161" y="100" text-anchor="start">Forks</text>
+<text class="v" x="300" y="82" text-anchor="start">41</text>
+<text class="l" x="300" y="100" text-anchor="start">Followers</text>
+<text class="v" x="439" y="82" text-anchor="start">42</text>
+<text class="l" x="439" y="100" text-anchor="start">Repositories</text>
+<text class="v" x="22" y="128" text-anchor="start">6,210</text>
+<text class="l" x="22" y="146" text-anchor="start">Contributions / yr</text>
+<text class="v" x="161" y="128" text-anchor="start">1,810</text>
+<text class="l" x="161" y="146" text-anchor="start">Repo views / 14d</text>
+<text class="v" x="300" y="128" text-anchor="start">878</text>
+<text class="l" x="300" y="146" text-anchor="start">Visitors / 14d</text>
+<text class="v" x="439" y="128" text-anchor="start">117,000</text>
+<text class="l" x="439" y="146" text-anchor="start">Clones / 14d</text>
+<text class="v" x="22" y="174" text-anchor="start">3,387</text>
+<text class="l" x="22" y="192" text-anchor="start">Commits / yr</text>
+<text class="v" x="161" y="174" text-anchor="start">1,179</text>
+<text class="l" x="161" y="192" text-anchor="start">Pull requests / yr</text>
+<text class="v" x="300" y="174" text-anchor="start">389</text>
+<text class="l" x="300" y="192" text-anchor="start">Reviews / yr</text>
+<text class="v" x="439" y="174" text-anchor="start">64</text>
+<text class="l" x="439" y="192" text-anchor="start">Issues / yr</text>
+<text class="h fg" x="22" y="228" text-anchor="start">Most Used Languages</text>
+<text class="d" x="22" y="245" text-anchor="start">Share of bytes across public repositories</text>
+<rect x="22" y="262" width="253.77" height="14" rx="3" fill="#00add8"/>
+<rect x="277.77" y="262" width="153.21" height="14" rx="3" fill="#3572a5"/>
+<rect x="432.99" y="262" width="143.01" height="14" rx="3" fill="#f34b7d"/>
+<circle cx="28" cy="298" r="6" fill="#00add8"/>
+<text class="n" x="42" y="302" text-anchor="start">Go</text>
+<text class="c" x="280" y="302" text-anchor="end">46%</text>
+<circle cx="28" cy="323" r="6" fill="#3572a5"/>
+<text class="n" x="42" y="327" text-anchor="start">Python</text>
+<text class="c" x="280" y="327" text-anchor="end">28%</text>
+<circle cx="306" cy="298" r="6" fill="#f34b7d"/>
+<text class="n" x="320" y="302" text-anchor="start">C++</text>
+<text class="c" x="558" y="302" text-anchor="end">26%</text>
+<text class="h fg" x="22" y="369" text-anchor="start">Top repositories</text>
+<text class="d" x="22" y="386" text-anchor="start">By stars</text>
+<circle cx="27" cy="407" r="5" fill="#3572a5"/>
+<text class="n" x="40" y="411" text-anchor="start">phonometry</text>
+<text class="s" x="508" y="411" text-anchor="end">Python</text>
+<path class="star" transform="translate(522 401) scale(0.7)" d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z"/>
+<text class="c" x="578" y="411" text-anchor="end">112</text>
+<circle cx="27" cy="431" r="5" fill="#3d6117"/>
+<text class="n" x="40" y="435" text-anchor="start">TFG-TFM_EPS</text>
+<text class="s" x="508" y="435" text-anchor="end">TeX</text>
+<path class="star" transform="translate(522 425) scale(0.7)" d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z"/>
+<text class="c" x="578" y="435" text-anchor="end">84</text>
+<circle cx="27" cy="455" r="5" fill="#00add8"/>
+<text class="n" x="40" y="459" text-anchor="start">gitlab-mcp-server</text>
+<text class="s" x="508" y="459" text-anchor="end">Go</text>
+<path class="star" transform="translate(522 449) scale(0.7)" d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z"/>
+<text class="c" x="578" y="459" text-anchor="end">33</text>
+<text class="h fg" x="22" y="501" text-anchor="start">Contributions per day</text>
+<text class="d" x="22" y="518" text-anchor="start">Last 10 days</text>
+<line class="axis" x1="22" y1="583" x2="578" y2="583"/>
+<path class="area" d="M22,583 L22,583 L83.78,575.2 L145.56,551.8 L207.33,564.8 L269.11,583 L330.89,580.4 L392.67,531 L454.44,544 L516.22,572.6 L578,559.6 L578,583Z"/>
+<polyline class="line" points="22,583 83.78,575.2 145.56,551.8 207.33,564.8 269.11,583 330.89,580.4 392.67,531 454.44,544 516.22,572.6 578,559.6"/>
+</svg>

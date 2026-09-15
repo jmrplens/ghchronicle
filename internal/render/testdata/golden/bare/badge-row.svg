@@ -1,0 +1,109 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="971" height="20" viewBox="0 0 971 20" role="img" aria-labelledby="ghcTitle ghcDesc">
+<title id="ghcTitle">someone</title>
+<desc id="ghcDesc">GitHub summary for someone: 0 stars, 0 forks, 0 followers, 0 public repositories, 0 contributions in the last year, 0 repository views over the traffic window, 0 unique visitors over the traffic window, 0 clones over the traffic window, 0 commits in the last year, 0 pull requests in the last year, 0 reviews in the last year, 0 issues in the last year.</desc>
+<style>
+.bg{fill:#0d1117;stroke:#30363d}
+.panel{fill:#161b22}
+.t,.v,.big{fill:#e6edf3}
+.d,.l,.h,.s{fill:#8b949e}
+.n,.c{fill:#c9d1d9}
+.star,.pill-v{fill:#e3b341}
+.on-accent{fill:#0d1117}
+.line{stroke:#58a6ff}
+.area{fill:#58a6ff}
+.axis,.edge{stroke:#30363d}
+.track{fill:#30363d}
+.ok{fill:#3fb950}
+.fg{fill:#e6edf3}
+.h0{fill:#151b23}.h1{fill:#033a16}.h2{fill:#196c2e}.h3{fill:#2ea043}.h4{fill:#56d364}
+text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif}
+.mono{font-family:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace}
+.t{font-size:18px;font-weight:600}
+.d{font-size:11px}
+.v{font-size:16px;font-weight:600}
+.big{font-size:24px;font-weight:700}
+.l{font-size:11px}
+.h{font-size:10px;font-weight:600;letter-spacing:0.08em}
+.n{font-size:12px}
+.s{font-size:11px}
+.c{font-size:12px}
+.line{fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.area{opacity:0.14;stroke:none}
+.axis{stroke-width:1}
+.edge{fill:none;stroke-width:1}
+text{font-family:Verdana,Geneva,'DejaVu Sans',sans-serif;font-size:11px}
+.pl{font-size:11px}
+</style>
+<rect class="track" x="0" y="0" width="40" height="20" rx="3"/>
+<rect class="track" x="3" y="0" width="37" height="20"/>
+<rect class="pill-v" x="37" y="0" width="30" height="20" rx="3"/>
+<rect class="pill-v" x="37" y="0" width="27" height="20"/>
+<text class="pl t" x="18.5" y="14" text-anchor="middle">stars</text>
+<text class="pl on-accent" x="52" y="14" text-anchor="middle">0</text>
+<rect class="track" x="73" y="0" width="40" height="20" rx="3"/>
+<rect class="track" x="76" y="0" width="37" height="20"/>
+<rect class="pill-v" x="110" y="0" width="30" height="20" rx="3"/>
+<rect class="pill-v" x="110" y="0" width="27" height="20"/>
+<text class="pl t" x="91.5" y="14" text-anchor="middle">forks</text>
+<text class="pl on-accent" x="125" y="14" text-anchor="middle">0</text>
+<rect class="track" x="146" y="0" width="59" height="20" rx="3"/>
+<rect class="track" x="149" y="0" width="56" height="20"/>
+<rect class="pill-v" x="202" y="0" width="30" height="20" rx="3"/>
+<rect class="pill-v" x="202" y="0" width="27" height="20"/>
+<text class="pl t" x="174" y="14" text-anchor="middle">followers</text>
+<text class="pl on-accent" x="217" y="14" text-anchor="middle">0</text>
+<rect class="track" x="238" y="0" width="43" height="20" rx="3"/>
+<rect class="track" x="241" y="0" width="40" height="20"/>
+<rect class="pill-v" x="278" y="0" width="30" height="20" rx="3"/>
+<rect class="pill-v" x="278" y="0" width="27" height="20"/>
+<text class="pl t" x="258" y="14" text-anchor="middle">repos</text>
+<text class="pl on-accent" x="293" y="14" text-anchor="middle">0</text>
+<rect class="track" x="314" y="0" width="56" height="20" rx="3"/>
+<rect class="track" x="317" y="0" width="53" height="20"/>
+<rect class="pill-v" x="367" y="0" width="30" height="20" rx="3"/>
+<rect class="pill-v" x="367" y="0" width="27" height="20"/>
+<text class="pl t" x="340.5" y="14" text-anchor="middle">contribs</text>
+<text class="pl on-accent" x="382" y="14" text-anchor="middle">0</text>
+<rect class="track" x="403" y="0" width="43" height="20" rx="3"/>
+<rect class="track" x="406" y="0" width="40" height="20"/>
+<rect class="pill-v" x="443" y="0" width="30" height="20" rx="3"/>
+<rect class="pill-v" x="443" y="0" width="27" height="20"/>
+<text class="pl t" x="423" y="14" text-anchor="middle">views</text>
+<text class="pl on-accent" x="458" y="14" text-anchor="middle">0</text>
+<rect class="track" x="479" y="0" width="53" height="20" rx="3"/>
+<rect class="track" x="482" y="0" width="50" height="20"/>
+<rect class="pill-v" x="529" y="0" width="30" height="20" rx="3"/>
+<rect class="pill-v" x="529" y="0" width="27" height="20"/>
+<text class="pl t" x="504" y="14" text-anchor="middle">visitors</text>
+<text class="pl on-accent" x="544" y="14" text-anchor="middle">0</text>
+<rect class="track" x="565" y="0" width="49" height="20" rx="3"/>
+<rect class="track" x="568" y="0" width="46" height="20"/>
+<rect class="pill-v" x="611" y="0" width="30" height="20" rx="3"/>
+<rect class="pill-v" x="611" y="0" width="27" height="20"/>
+<text class="pl t" x="588" y="14" text-anchor="middle">clones</text>
+<text class="pl on-accent" x="626" y="14" text-anchor="middle">0</text>
+<rect class="track" x="647" y="0" width="60" height="20" rx="3"/>
+<rect class="track" x="650" y="0" width="57" height="20"/>
+<rect class="pill-v" x="704" y="0" width="30" height="20" rx="3"/>
+<rect class="pill-v" x="704" y="0" width="27" height="20"/>
+<text class="pl t" x="675.5" y="14" text-anchor="middle">commits</text>
+<text class="pl on-accent" x="719" y="14" text-anchor="middle">0</text>
+<rect class="track" x="740" y="0" width="37" height="20" rx="3"/>
+<rect class="track" x="743" y="0" width="34" height="20"/>
+<rect class="pill-v" x="774" y="0" width="30" height="20" rx="3"/>
+<rect class="pill-v" x="774" y="0" width="27" height="20"/>
+<text class="pl t" x="757" y="14" text-anchor="middle">PRs</text>
+<text class="pl on-accent" x="789" y="14" text-anchor="middle">0</text>
+<rect class="track" x="810" y="0" width="52" height="20" rx="3"/>
+<rect class="track" x="813" y="0" width="49" height="20"/>
+<rect class="pill-v" x="859" y="0" width="30" height="20" rx="3"/>
+<rect class="pill-v" x="859" y="0" width="27" height="20"/>
+<text class="pl t" x="834.5" y="14" text-anchor="middle">reviews</text>
+<text class="pl on-accent" x="874" y="14" text-anchor="middle">0</text>
+<rect class="track" x="895" y="0" width="49" height="20" rx="3"/>
+<rect class="track" x="898" y="0" width="46" height="20"/>
+<rect class="pill-v" x="941" y="0" width="30" height="20" rx="3"/>
+<rect class="pill-v" x="941" y="0" width="27" height="20"/>
+<text class="pl t" x="918" y="14" text-anchor="middle">issues</text>
+<text class="pl on-accent" x="956" y="14" text-anchor="middle">0</text>
+</svg>

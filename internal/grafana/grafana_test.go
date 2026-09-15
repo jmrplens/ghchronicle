@@ -360,3 +360,14 @@ func TestTrimCountsCharacters(t *testing.T) {
 		t.Errorf("Trim = %q, want a short string unchanged", got)
 	}
 }
+
+// TestTrimReturnsAMessageThatFitsByteForByte hands back a message exactly as
+// long as the limit untouched. Going through runes rewrites a byte that is not
+// UTF-8 as the replacement character, so a body that already fits would be
+// reported as something Grafana never said.
+func TestTrimReturnsAMessageThatFitsByteForByte(t *testing.T) {
+	t.Parallel()
+	if got := Trim("ok\xff", 3); got != "ok\xff" {
+		t.Errorf("Trim = %q, want the three bytes that fit unchanged", got)
+	}
+}

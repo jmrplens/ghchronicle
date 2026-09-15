@@ -265,6 +265,7 @@ func TestRunRefusesWhatItCannotStart(t *testing.T) {
 		stdout, stderr string
 	}{
 		{"the usage asked for", []string{"-h"}, "t", 0, usage + "\n", ""},
+		{"the usage asked for with --help", []string{"--help"}, "t", 0, usage + "\n", ""},
 		{"no dump", nil, "t", 1, "", usage + "\n"},
 		{"a dump that is not there", []string{absent}, "t", 1, "", notFoundText(t, absent)},
 		{"a line too long to scan", []string{long}, "t", 1, "", "token too long"},
@@ -289,11 +290,13 @@ func TestRunRefusesWhatItCannotStart(t *testing.T) {
 
 // TestExportedNamesReadsOnlyTypeLines takes a name from its TYPE line and
 // never from a sample or a HELP line, which carry names that are not declared.
+// A TYPE line cut off right after the keyword declares nothing and is passed
+// over rather than read past its end.
 func TestExportedNamesReadsOnlyTypeLines(t *testing.T) {
 	t.Parallel()
 	path := filepath.Join(t.TempDir(), "metrics.txt")
 	dump := "# HELP github_help_only text\n# TYPE github_declared counter\n" +
-		"github_sample_only{repo=\"x\"} 3\n# TYPE\n"
+		"github_sample_only{repo=\"x\"} 3\n# TYPE\n# TYPE \n"
 	if err := os.WriteFile(path, []byte(dump), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -313,5 +316,22 @@ func TestUniqueNamesKeepsTheFirstMention(t *testing.T) {
 	got := uniqueNames(`sum(github_b{repo=~"$repo"}) / sum(github_a) + github_b`)
 	if !slices.Equal(got, []string{"github_b", "github_a"}) {
 		t.Errorf("uniqueNames = %v, want each name once in order", got)
+	}
+}
+
+// TestExportedNamesReadsPastALongSample keeps reading after a sample line
+// longer than the scanner's first buffer. A metric with many label sets can
+// write one, and the dump is allowed up to a mebibyte a line so that such a
+// line does not end the read with every name declared after it unseen.
+func TestExportedNamesReadsPastALongSample(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "metrics.txt")
+	dump := "github_wide{repo=\"" + strings.Repeat("x", 200<<10) + "\"} 1\n# TYPE github_after gauge\n"
+	if err := os.WriteFile(path, []byte(dump), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	got, err := exportedNames(path)
+	if err != nil || len(got) != 1 || !got["github_after"] {
+		t.Errorf("exportedNames = %v, %v, want the name declared after the long line", got, err)
 	}
 }

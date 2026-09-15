@@ -206,3 +206,19 @@ func TestASweepDatesTheArchiveFromTheListing(t *testing.T) {
 		t.Errorf("unarchived, o/old is not in the lifetime batch: %d gh_repo_total rows in all, want 3", got.measured("gh_repo_total"))
 	}
 }
+
+// TestASweepConfiguredForArchivedRepositoriesCollectsThem: include_archived
+// makes an ordinary sweep treat an archived repository as a live one, with
+// nothing set aside, the way a backfill does on its own.
+func TestASweepConfiguredForArchivedRepositoriesCollectsThem(t *testing.T) {
+	gh := &archivedGitHub{archived: true}
+	r := sweepRunner(t, gh.handler)
+	r.Cfg.Targets.IncludeArchived = true
+	r.repos, r.reposAt = nil, time.Time{}
+	if err := r.discoverRepos(t.Context(), time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if collected, aside := names(r.repos), names(r.archived); collected != "o/n,o/old" || aside != "" {
+		t.Errorf("include_archived collects %q and sets aside %q; want o/n,o/old and nothing", collected, aside)
+	}
+}

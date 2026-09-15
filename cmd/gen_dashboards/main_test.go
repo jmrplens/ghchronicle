@@ -198,4 +198,9 @@ func TestSameJSONComparesMeaning(t *testing.T) {
 	if sameJSON([]byte(`{`), []byte(`{`)) {
 		t.Error("sameJSON called a document that does not parse the same as itself")
 	}
+	// A file holding null reads as nothing, and so does a body that does not
+	// parse, so only refusing the body itself keeps the two apart.
+	if sameJSON([]byte(`null`), []byte(`{`)) {
+		t.Error("sameJSON called a document that does not parse the same as null")
+	}
 }

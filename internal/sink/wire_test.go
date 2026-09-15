@@ -55,3 +55,31 @@ func TestASinkNamesItselfAndTheEndpointItWasGiven(t *testing.T) {
 		t.Errorf("err = %v, want it to name the sink and the value", err)
 	}
 }
+
+func TestScalarReadsATimeAsUnixSecondsAndAnUnsetOneAsNothing(t *testing.T) {
+	// A store that takes only numbers still gets a "created at", and a time
+	// that was never set is not the year 1.
+	if v, ok := scalar(time.Unix(1600000000, 0)); !ok || v != 1600000000 {
+		t.Errorf("scalar(time) = %v, %v, want its Unix seconds", v, ok)
+	}
+	if _, ok := scalar(time.Time{}); ok {
+		t.Error("scalar read an unset time as a number")
+	}
+	if v, ok := scalar(7); !ok || v != 7 {
+		t.Errorf("scalar(7) = %v, %v", v, ok)
+	}
+}
+
+func TestAnUndatedPointIsStampedNow(t *testing.T) {
+	// A point with no time must not be written at the Unix epoch, where every
+	// store would file it decades before anything else.
+	before := time.Now()
+	got := stampOf(Point{})
+	if got.Before(before) {
+		t.Errorf("stampOf(undated) = %v, want a time no earlier than %v", got, before)
+	}
+	at := time.Unix(5, 0)
+	if dated := stampOf(Point{Time: at}); !dated.Equal(at) {
+		t.Errorf("stampOf(dated) = %v, want %v", dated, at)
+	}
+}

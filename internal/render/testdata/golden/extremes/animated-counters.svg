@@ -1,0 +1,298 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="348" viewBox="0 0 300 348" role="img" aria-labelledby="ghcTitle ghcDesc">
+<title id="ghcTitle">A heading far too long for any band A heading far too long for any band A heading far too long for any band A heading far too long for any band </title>
+<desc id="ghcDesc">GitHub summary for an-account-login-long-enough-to-crowd-its-band: -1099511627776 repository views in the last 12345678901234567 days, -1099511627776 unique visitors in the last 12345678901234567 days, -1099511627776 clones in the last 12345678901234567 days, -1099511627776 pull requests in the last year, -1099511627776 contributions in the last year, -1099511627776 stars, -1099511627776 forks, -1099511627776 followers, -1099511627776 public repositories, -1099511627776 commits in the last year, -1099511627776 reviews in the last year, -1099511627776 issues in the last year. Contributions per day over the last 3 days, peaking at 5.</desc>
+<style>
+.bg{fill:#0d1117;stroke:#30363d}
+.panel{fill:#161b22}
+.t,.v,.big{fill:#e6edf3}
+.d,.l,.h,.s{fill:#8b949e}
+.n,.c{fill:#c9d1d9}
+.star,.pill-v{fill:#e3b341}
+.on-accent{fill:#0d1117}
+.line{stroke:#58a6ff}
+.area{fill:#58a6ff}
+.axis,.edge{stroke:#30363d}
+.track{fill:#30363d}
+.ok{fill:#3fb950}
+.fg{fill:#e6edf3}
+.h0{fill:#151b23}.h1{fill:#033a16}.h2{fill:#196c2e}.h3{fill:#2ea043}.h4{fill:#56d364}
+text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif}
+.mono{font-family:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace}
+.t{font-size:18px;font-weight:600}
+.d{font-size:11px}
+.v{font-size:16px;font-weight:600}
+.big{font-size:24px;font-weight:700}
+.l{font-size:11px}
+.h{font-size:10px;font-weight:600;letter-spacing:0.08em}
+.n{font-size:12px}
+.s{font-size:11px}
+.c{font-size:12px}
+.line{fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.area{opacity:0.14;stroke:none}
+.axis{stroke-width:1}
+.edge{fill:none;stroke-width:1}
+.cu{animation-duration:1.4s;animation-timing-function:linear;animation-iteration-count:1}
+.cu0{opacity:0;animation-name:k0}
+@keyframes k0{0%,6.24%{opacity:1}6.25%,100%{opacity:0}}
+.cu1{opacity:0;animation-name:k1}
+@keyframes k1{0%,6.24%{opacity:0}6.25%,12.49%{opacity:1}12.5%,100%{opacity:0}}
+.cu2{opacity:0;animation-name:k2}
+@keyframes k2{0%,12.49%{opacity:0}12.5%,18.74%{opacity:1}18.75%,100%{opacity:0}}
+.cu3{opacity:0;animation-name:k3}
+@keyframes k3{0%,18.74%{opacity:0}18.75%,24.99%{opacity:1}25%,100%{opacity:0}}
+.cu4{opacity:0;animation-name:k4}
+@keyframes k4{0%,24.99%{opacity:0}25%,31.24%{opacity:1}31.25%,100%{opacity:0}}
+.cu5{opacity:0;animation-name:k5}
+@keyframes k5{0%,31.24%{opacity:0}31.25%,37.49%{opacity:1}37.5%,100%{opacity:0}}
+.cu6{opacity:0;animation-name:k6}
+@keyframes k6{0%,37.49%{opacity:0}37.5%,43.74%{opacity:1}43.75%,100%{opacity:0}}
+.cu7{opacity:0;animation-name:k7}
+@keyframes k7{0%,43.74%{opacity:0}43.75%,49.99%{opacity:1}50%,100%{opacity:0}}
+.cu8{opacity:0;animation-name:k8}
+@keyframes k8{0%,49.99%{opacity:0}50%,56.24%{opacity:1}56.25%,100%{opacity:0}}
+.cu9{opacity:0;animation-name:k9}
+@keyframes k9{0%,56.24%{opacity:0}56.25%,62.49%{opacity:1}62.5%,100%{opacity:0}}
+.cu10{opacity:0;animation-name:k10}
+@keyframes k10{0%,62.49%{opacity:0}62.5%,68.74%{opacity:1}68.75%,100%{opacity:0}}
+.cu11{opacity:0;animation-name:k11}
+@keyframes k11{0%,68.74%{opacity:0}68.75%,74.99%{opacity:1}75%,100%{opacity:0}}
+.cu12{opacity:0;animation-name:k12}
+@keyframes k12{0%,74.99%{opacity:0}75%,81.24%{opacity:1}81.25%,100%{opacity:0}}
+.cu13{opacity:0;animation-name:k13}
+@keyframes k13{0%,81.24%{opacity:0}81.25%,87.49%{opacity:1}87.5%,100%{opacity:0}}
+.cu14{opacity:0;animation-name:k14}
+@keyframes k14{0%,87.49%{opacity:0}87.5%,93.74%{opacity:1}93.75%,100%{opacity:0}}
+.cu15{opacity:0;animation-name:k15}
+@keyframes k15{0%,93.74%{opacity:0}93.75%,99.99%{opacity:1}100%,100%{opacity:0}}
+.cuz{animation-name:kz}
+@keyframes kz{0%,99.99%{opacity:0}}
+.draw{animation:draw 1.6s ease-out 1}
+.fade{animation:fade 1.6s ease-out 1}
+@keyframes draw{from{stroke-dasharray:1;stroke-dashoffset:1}to{stroke-dasharray:1;stroke-dashoffset:0}}
+@keyframes fade{from{opacity:0}}
+@media (prefers-reduced-motion:reduce){.draw,.fade,.cu{animation:none}}
+</style>
+<rect class="bg" x="0.5" y="0.5" width="299" height="347" rx="6"/>
+<text class="t" x="25" y="34" text-anchor="start">A heading far too long for any…</text>
+<text class="d" x="25" y="52" text-anchor="start">A biography A biography A biography A biograph…</text>
+<text class="big cu cu0" x="25" y="92" text-anchor="start">0</text>
+<text class="big cu cu1" x="25" y="92" text-anchor="start">-193…</text>
+<text class="big cu cu2" x="25" y="92" text-anchor="start">-362…</text>
+<text class="big cu cu3" x="25" y="92" text-anchor="start">-509…</text>
+<text class="big cu cu4" x="25" y="92" text-anchor="start">-635…</text>
+<text class="big cu cu5" x="25" y="92" text-anchor="start">-742…</text>
+<text class="big cu cu6" x="25" y="92" text-anchor="start">-831…</text>
+<text class="big cu cu7" x="25" y="92" text-anchor="start">-903…</text>
+<text class="big cu cu8" x="25" y="92" text-anchor="start">-962…</text>
+<text class="big cu cu9" x="25" y="92" text-anchor="start">-100…</text>
+<text class="big cu cu10" x="25" y="92" text-anchor="start">-104…</text>
+<text class="big cu cu11" x="25" y="92" text-anchor="start">-106…</text>
+<text class="big cu cu12" x="25" y="92" text-anchor="start">-108…</text>
+<text class="big cu cu13" x="25" y="92" text-anchor="start">-109…</text>
+<text class="big cu cu14" x="25" y="92" text-anchor="start">-109…</text>
+<text class="big cu cu15" x="25" y="92" text-anchor="start">-109…</text>
+<text class="big cu cuz" x="25" y="92" text-anchor="start">-109…</text>
+<text class="l" x="25" y="108" text-anchor="start">Views (12345…</text>
+<text class="big cu cu0" x="108.33" y="92" text-anchor="start">0</text>
+<text class="big cu cu1" x="108.33" y="92" text-anchor="start">-193…</text>
+<text class="big cu cu2" x="108.33" y="92" text-anchor="start">-362…</text>
+<text class="big cu cu3" x="108.33" y="92" text-anchor="start">-509…</text>
+<text class="big cu cu4" x="108.33" y="92" text-anchor="start">-635…</text>
+<text class="big cu cu5" x="108.33" y="92" text-anchor="start">-742…</text>
+<text class="big cu cu6" x="108.33" y="92" text-anchor="start">-831…</text>
+<text class="big cu cu7" x="108.33" y="92" text-anchor="start">-903…</text>
+<text class="big cu cu8" x="108.33" y="92" text-anchor="start">-962…</text>
+<text class="big cu cu9" x="108.33" y="92" text-anchor="start">-100…</text>
+<text class="big cu cu10" x="108.33" y="92" text-anchor="start">-104…</text>
+<text class="big cu cu11" x="108.33" y="92" text-anchor="start">-106…</text>
+<text class="big cu cu12" x="108.33" y="92" text-anchor="start">-108…</text>
+<text class="big cu cu13" x="108.33" y="92" text-anchor="start">-109…</text>
+<text class="big cu cu14" x="108.33" y="92" text-anchor="start">-109…</text>
+<text class="big cu cu15" x="108.33" y="92" text-anchor="start">-109…</text>
+<text class="big cu cuz" x="108.33" y="92" text-anchor="start">-109…</text>
+<text class="l" x="108.33" y="108" text-anchor="start">Visitors (123…</text>
+<text class="big cu cu0" x="191.67" y="92" text-anchor="start">0</text>
+<text class="big cu cu1" x="191.67" y="92" text-anchor="start">-193…</text>
+<text class="big cu cu2" x="191.67" y="92" text-anchor="start">-362…</text>
+<text class="big cu cu3" x="191.67" y="92" text-anchor="start">-509…</text>
+<text class="big cu cu4" x="191.67" y="92" text-anchor="start">-635…</text>
+<text class="big cu cu5" x="191.67" y="92" text-anchor="start">-742…</text>
+<text class="big cu cu6" x="191.67" y="92" text-anchor="start">-831…</text>
+<text class="big cu cu7" x="191.67" y="92" text-anchor="start">-903…</text>
+<text class="big cu cu8" x="191.67" y="92" text-anchor="start">-962…</text>
+<text class="big cu cu9" x="191.67" y="92" text-anchor="start">-100…</text>
+<text class="big cu cu10" x="191.67" y="92" text-anchor="start">-104…</text>
+<text class="big cu cu11" x="191.67" y="92" text-anchor="start">-106…</text>
+<text class="big cu cu12" x="191.67" y="92" text-anchor="start">-108…</text>
+<text class="big cu cu13" x="191.67" y="92" text-anchor="start">-109…</text>
+<text class="big cu cu14" x="191.67" y="92" text-anchor="start">-109…</text>
+<text class="big cu cu15" x="191.67" y="92" text-anchor="start">-109…</text>
+<text class="big cu cuz" x="191.67" y="92" text-anchor="start">-109…</text>
+<text class="l" x="191.67" y="108" text-anchor="start">Clones (1234…</text>
+<text class="big cu cu0" x="25" y="142" text-anchor="start">0</text>
+<text class="big cu cu1" x="25" y="142" text-anchor="start">-193…</text>
+<text class="big cu cu2" x="25" y="142" text-anchor="start">-362…</text>
+<text class="big cu cu3" x="25" y="142" text-anchor="start">-509…</text>
+<text class="big cu cu4" x="25" y="142" text-anchor="start">-635…</text>
+<text class="big cu cu5" x="25" y="142" text-anchor="start">-742…</text>
+<text class="big cu cu6" x="25" y="142" text-anchor="start">-831…</text>
+<text class="big cu cu7" x="25" y="142" text-anchor="start">-903…</text>
+<text class="big cu cu8" x="25" y="142" text-anchor="start">-962…</text>
+<text class="big cu cu9" x="25" y="142" text-anchor="start">-100…</text>
+<text class="big cu cu10" x="25" y="142" text-anchor="start">-104…</text>
+<text class="big cu cu11" x="25" y="142" text-anchor="start">-106…</text>
+<text class="big cu cu12" x="25" y="142" text-anchor="start">-108…</text>
+<text class="big cu cu13" x="25" y="142" text-anchor="start">-109…</text>
+<text class="big cu cu14" x="25" y="142" text-anchor="start">-109…</text>
+<text class="big cu cu15" x="25" y="142" text-anchor="start">-109…</text>
+<text class="big cu cuz" x="25" y="142" text-anchor="start">-109…</text>
+<text class="l" x="25" y="158" text-anchor="start">Pull requests…</text>
+<text class="big cu cu0" x="108.33" y="142" text-anchor="start">0</text>
+<text class="big cu cu1" x="108.33" y="142" text-anchor="start">-193…</text>
+<text class="big cu cu2" x="108.33" y="142" text-anchor="start">-362…</text>
+<text class="big cu cu3" x="108.33" y="142" text-anchor="start">-509…</text>
+<text class="big cu cu4" x="108.33" y="142" text-anchor="start">-635…</text>
+<text class="big cu cu5" x="108.33" y="142" text-anchor="start">-742…</text>
+<text class="big cu cu6" x="108.33" y="142" text-anchor="start">-831…</text>
+<text class="big cu cu7" x="108.33" y="142" text-anchor="start">-903…</text>
+<text class="big cu cu8" x="108.33" y="142" text-anchor="start">-962…</text>
+<text class="big cu cu9" x="108.33" y="142" text-anchor="start">-100…</text>
+<text class="big cu cu10" x="108.33" y="142" text-anchor="start">-104…</text>
+<text class="big cu cu11" x="108.33" y="142" text-anchor="start">-106…</text>
+<text class="big cu cu12" x="108.33" y="142" text-anchor="start">-108…</text>
+<text class="big cu cu13" x="108.33" y="142" text-anchor="start">-109…</text>
+<text class="big cu cu14" x="108.33" y="142" text-anchor="start">-109…</text>
+<text class="big cu cu15" x="108.33" y="142" text-anchor="start">-109…</text>
+<text class="big cu cuz" x="108.33" y="142" text-anchor="start">-109…</text>
+<text class="l" x="108.33" y="158" text-anchor="start">Contributions…</text>
+<text class="big cu cu0" x="191.67" y="142" text-anchor="start">0</text>
+<text class="big cu cu1" x="191.67" y="142" text-anchor="start">-193…</text>
+<text class="big cu cu2" x="191.67" y="142" text-anchor="start">-362…</text>
+<text class="big cu cu3" x="191.67" y="142" text-anchor="start">-509…</text>
+<text class="big cu cu4" x="191.67" y="142" text-anchor="start">-635…</text>
+<text class="big cu cu5" x="191.67" y="142" text-anchor="start">-742…</text>
+<text class="big cu cu6" x="191.67" y="142" text-anchor="start">-831…</text>
+<text class="big cu cu7" x="191.67" y="142" text-anchor="start">-903…</text>
+<text class="big cu cu8" x="191.67" y="142" text-anchor="start">-962…</text>
+<text class="big cu cu9" x="191.67" y="142" text-anchor="start">-100…</text>
+<text class="big cu cu10" x="191.67" y="142" text-anchor="start">-104…</text>
+<text class="big cu cu11" x="191.67" y="142" text-anchor="start">-106…</text>
+<text class="big cu cu12" x="191.67" y="142" text-anchor="start">-108…</text>
+<text class="big cu cu13" x="191.67" y="142" text-anchor="start">-109…</text>
+<text class="big cu cu14" x="191.67" y="142" text-anchor="start">-109…</text>
+<text class="big cu cu15" x="191.67" y="142" text-anchor="start">-109…</text>
+<text class="big cu cuz" x="191.67" y="142" text-anchor="start">-109…</text>
+<text class="l" x="191.67" y="158" text-anchor="start">Stars</text>
+<text class="big cu cu0" x="25" y="192" text-anchor="start">0</text>
+<text class="big cu cu1" x="25" y="192" text-anchor="start">-193…</text>
+<text class="big cu cu2" x="25" y="192" text-anchor="start">-362…</text>
+<text class="big cu cu3" x="25" y="192" text-anchor="start">-509…</text>
+<text class="big cu cu4" x="25" y="192" text-anchor="start">-635…</text>
+<text class="big cu cu5" x="25" y="192" text-anchor="start">-742…</text>
+<text class="big cu cu6" x="25" y="192" text-anchor="start">-831…</text>
+<text class="big cu cu7" x="25" y="192" text-anchor="start">-903…</text>
+<text class="big cu cu8" x="25" y="192" text-anchor="start">-962…</text>
+<text class="big cu cu9" x="25" y="192" text-anchor="start">-100…</text>
+<text class="big cu cu10" x="25" y="192" text-anchor="start">-104…</text>
+<text class="big cu cu11" x="25" y="192" text-anchor="start">-106…</text>
+<text class="big cu cu12" x="25" y="192" text-anchor="start">-108…</text>
+<text class="big cu cu13" x="25" y="192" text-anchor="start">-109…</text>
+<text class="big cu cu14" x="25" y="192" text-anchor="start">-109…</text>
+<text class="big cu cu15" x="25" y="192" text-anchor="start">-109…</text>
+<text class="big cu cuz" x="25" y="192" text-anchor="start">-109…</text>
+<text class="l" x="25" y="208" text-anchor="start">Forks</text>
+<text class="big cu cu0" x="108.33" y="192" text-anchor="start">0</text>
+<text class="big cu cu1" x="108.33" y="192" text-anchor="start">-193…</text>
+<text class="big cu cu2" x="108.33" y="192" text-anchor="start">-362…</text>
+<text class="big cu cu3" x="108.33" y="192" text-anchor="start">-509…</text>
+<text class="big cu cu4" x="108.33" y="192" text-anchor="start">-635…</text>
+<text class="big cu cu5" x="108.33" y="192" text-anchor="start">-742…</text>
+<text class="big cu cu6" x="108.33" y="192" text-anchor="start">-831…</text>
+<text class="big cu cu7" x="108.33" y="192" text-anchor="start">-903…</text>
+<text class="big cu cu8" x="108.33" y="192" text-anchor="start">-962…</text>
+<text class="big cu cu9" x="108.33" y="192" text-anchor="start">-100…</text>
+<text class="big cu cu10" x="108.33" y="192" text-anchor="start">-104…</text>
+<text class="big cu cu11" x="108.33" y="192" text-anchor="start">-106…</text>
+<text class="big cu cu12" x="108.33" y="192" text-anchor="start">-108…</text>
+<text class="big cu cu13" x="108.33" y="192" text-anchor="start">-109…</text>
+<text class="big cu cu14" x="108.33" y="192" text-anchor="start">-109…</text>
+<text class="big cu cu15" x="108.33" y="192" text-anchor="start">-109…</text>
+<text class="big cu cuz" x="108.33" y="192" text-anchor="start">-109…</text>
+<text class="l" x="108.33" y="208" text-anchor="start">Followers</text>
+<text class="big cu cu0" x="191.67" y="192" text-anchor="start">0</text>
+<text class="big cu cu1" x="191.67" y="192" text-anchor="start">-193…</text>
+<text class="big cu cu2" x="191.67" y="192" text-anchor="start">-362…</text>
+<text class="big cu cu3" x="191.67" y="192" text-anchor="start">-509…</text>
+<text class="big cu cu4" x="191.67" y="192" text-anchor="start">-635…</text>
+<text class="big cu cu5" x="191.67" y="192" text-anchor="start">-742…</text>
+<text class="big cu cu6" x="191.67" y="192" text-anchor="start">-831…</text>
+<text class="big cu cu7" x="191.67" y="192" text-anchor="start">-903…</text>
+<text class="big cu cu8" x="191.67" y="192" text-anchor="start">-962…</text>
+<text class="big cu cu9" x="191.67" y="192" text-anchor="start">-100…</text>
+<text class="big cu cu10" x="191.67" y="192" text-anchor="start">-104…</text>
+<text class="big cu cu11" x="191.67" y="192" text-anchor="start">-106…</text>
+<text class="big cu cu12" x="191.67" y="192" text-anchor="start">-108…</text>
+<text class="big cu cu13" x="191.67" y="192" text-anchor="start">-109…</text>
+<text class="big cu cu14" x="191.67" y="192" text-anchor="start">-109…</text>
+<text class="big cu cu15" x="191.67" y="192" text-anchor="start">-109…</text>
+<text class="big cu cuz" x="191.67" y="192" text-anchor="start">-109…</text>
+<text class="l" x="191.67" y="208" text-anchor="start">Repositories</text>
+<text class="big cu cu0" x="25" y="242" text-anchor="start">0</text>
+<text class="big cu cu1" x="25" y="242" text-anchor="start">-193…</text>
+<text class="big cu cu2" x="25" y="242" text-anchor="start">-362…</text>
+<text class="big cu cu3" x="25" y="242" text-anchor="start">-509…</text>
+<text class="big cu cu4" x="25" y="242" text-anchor="start">-635…</text>
+<text class="big cu cu5" x="25" y="242" text-anchor="start">-742…</text>
+<text class="big cu cu6" x="25" y="242" text-anchor="start">-831…</text>
+<text class="big cu cu7" x="25" y="242" text-anchor="start">-903…</text>
+<text class="big cu cu8" x="25" y="242" text-anchor="start">-962…</text>
+<text class="big cu cu9" x="25" y="242" text-anchor="start">-100…</text>
+<text class="big cu cu10" x="25" y="242" text-anchor="start">-104…</text>
+<text class="big cu cu11" x="25" y="242" text-anchor="start">-106…</text>
+<text class="big cu cu12" x="25" y="242" text-anchor="start">-108…</text>
+<text class="big cu cu13" x="25" y="242" text-anchor="start">-109…</text>
+<text class="big cu cu14" x="25" y="242" text-anchor="start">-109…</text>
+<text class="big cu cu15" x="25" y="242" text-anchor="start">-109…</text>
+<text class="big cu cuz" x="25" y="242" text-anchor="start">-109…</text>
+<text class="l" x="25" y="258" text-anchor="start">Commits (1y)</text>
+<text class="big cu cu0" x="108.33" y="242" text-anchor="start">0</text>
+<text class="big cu cu1" x="108.33" y="242" text-anchor="start">-193…</text>
+<text class="big cu cu2" x="108.33" y="242" text-anchor="start">-362…</text>
+<text class="big cu cu3" x="108.33" y="242" text-anchor="start">-509…</text>
+<text class="big cu cu4" x="108.33" y="242" text-anchor="start">-635…</text>
+<text class="big cu cu5" x="108.33" y="242" text-anchor="start">-742…</text>
+<text class="big cu cu6" x="108.33" y="242" text-anchor="start">-831…</text>
+<text class="big cu cu7" x="108.33" y="242" text-anchor="start">-903…</text>
+<text class="big cu cu8" x="108.33" y="242" text-anchor="start">-962…</text>
+<text class="big cu cu9" x="108.33" y="242" text-anchor="start">-100…</text>
+<text class="big cu cu10" x="108.33" y="242" text-anchor="start">-104…</text>
+<text class="big cu cu11" x="108.33" y="242" text-anchor="start">-106…</text>
+<text class="big cu cu12" x="108.33" y="242" text-anchor="start">-108…</text>
+<text class="big cu cu13" x="108.33" y="242" text-anchor="start">-109…</text>
+<text class="big cu cu14" x="108.33" y="242" text-anchor="start">-109…</text>
+<text class="big cu cu15" x="108.33" y="242" text-anchor="start">-109…</text>
+<text class="big cu cuz" x="108.33" y="242" text-anchor="start">-109…</text>
+<text class="l" x="108.33" y="258" text-anchor="start">Reviews (1y)</text>
+<text class="big cu cu0" x="191.67" y="242" text-anchor="start">0</text>
+<text class="big cu cu1" x="191.67" y="242" text-anchor="start">-193…</text>
+<text class="big cu cu2" x="191.67" y="242" text-anchor="start">-362…</text>
+<text class="big cu cu3" x="191.67" y="242" text-anchor="start">-509…</text>
+<text class="big cu cu4" x="191.67" y="242" text-anchor="start">-635…</text>
+<text class="big cu cu5" x="191.67" y="242" text-anchor="start">-742…</text>
+<text class="big cu cu6" x="191.67" y="242" text-anchor="start">-831…</text>
+<text class="big cu cu7" x="191.67" y="242" text-anchor="start">-903…</text>
+<text class="big cu cu8" x="191.67" y="242" text-anchor="start">-962…</text>
+<text class="big cu cu9" x="191.67" y="242" text-anchor="start">-100…</text>
+<text class="big cu cu10" x="191.67" y="242" text-anchor="start">-104…</text>
+<text class="big cu cu11" x="191.67" y="242" text-anchor="start">-106…</text>
+<text class="big cu cu12" x="191.67" y="242" text-anchor="start">-108…</text>
+<text class="big cu cu13" x="191.67" y="242" text-anchor="start">-109…</text>
+<text class="big cu cu14" x="191.67" y="242" text-anchor="start">-109…</text>
+<text class="big cu cu15" x="191.67" y="242" text-anchor="start">-109…</text>
+<text class="big cu cuz" x="191.67" y="242" text-anchor="start">-109…</text>
+<text class="l" x="191.67" y="258" text-anchor="start">Issues (1y)</text>
+<text class="h" x="25" y="282" text-anchor="start">CONTRIBUTIONS PER DAY</text>
+<line class="axis" x1="25" y1="332" x2="275" y2="332"/>
+<path class="area fade" d="M25,332 L25,323.2 L150,288 L275,314.4 L275,332Z"/>
+<polyline class="line draw" pathLength="1" points="25,323.2 150,288 275,314.4"/>
+</svg>

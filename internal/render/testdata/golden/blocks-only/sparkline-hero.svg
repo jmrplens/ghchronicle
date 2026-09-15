@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="495" height="170" viewBox="0 0 495 170" role="img" aria-labelledby="ghcTitle ghcDesc">
+<title id="ghcTitle">José M. Requena Plens</title>
+<desc id="ghcDesc">GitHub summary for jmrplens. Contributions per day over the last 10 days, peaking at 20.</desc>
+<style>
+.bg{fill:#0d1117;stroke:#30363d}
+.panel{fill:#161b22}
+.t,.v,.big{fill:#e6edf3}
+.d,.l,.h,.s{fill:#8b949e}
+.n,.c{fill:#c9d1d9}
+.star,.pill-v{fill:#e3b341}
+.on-accent{fill:#0d1117}
+.line{stroke:#58a6ff}
+.area{fill:#58a6ff}
+.axis,.edge{stroke:#30363d}
+.track{fill:#30363d}
+.ok{fill:#3fb950}
+.fg{fill:#e6edf3}
+.h0{fill:#151b23}.h1{fill:#033a16}.h2{fill:#196c2e}.h3{fill:#2ea043}.h4{fill:#56d364}
+text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif}
+.mono{font-family:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace}
+.t{font-size:18px;font-weight:600}
+.d{font-size:11px}
+.v{font-size:16px;font-weight:600}
+.big{font-size:24px;font-weight:700}
+.l{font-size:11px}
+.h{font-size:10px;font-weight:600;letter-spacing:0.08em}
+.n{font-size:12px}
+.s{font-size:11px}
+.c{font-size:12px}
+.line{fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.area{opacity:0.14;stroke:none}
+.axis{stroke-width:1}
+.edge{fill:none;stroke-width:1}
+.line{stroke-width:2.5}
+.area{opacity:0.18}
+.draw{animation:draw 1.6s ease-out 1}
+.fade{animation:fade 1.6s ease-out 1}
+@keyframes draw{from{stroke-dasharray:1;stroke-dashoffset:1}to{stroke-dasharray:1;stroke-dashoffset:0}}
+@keyframes fade{from{opacity:0}}
+@media (prefers-reduced-motion:reduce){.draw,.fade,.cu{animation:none}}
+</style>
+<rect class="bg" x="0.5" y="0.5" width="494" height="169" rx="6"/>
+<path class="area fade" d="M1,148 L1,148 L55.78,135.7 L110.56,98.8 L165.33,119.3 L220.11,148 L274.89,143.9 L329.67,66 L384.44,86.5 L439.22,131.6 L494,111.1 L494,148Z"/>
+<polyline class="line draw" pathLength="1" points="1,148 55.78,135.7 110.56,98.8 165.33,119.3 220.11,148 274.89,143.9 329.67,66 384.44,86.5 439.22,131.6 494,111.1"/>
+<text class="s" x="470" y="34" text-anchor="end">@jmrplens</text>
+<text class="h" x="25" y="160" text-anchor="start">CONTRIBUTIONS PER DAY, LAST 10 DAYS</text>
+<text class="s" x="470" y="160" text-anchor="end">peak 20</text>
+</svg>

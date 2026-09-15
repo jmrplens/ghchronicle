@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="60" viewBox="0 0 800 60" role="img" aria-labelledby="ghcTitle ghcDesc">
+<title id="ghcTitle">someone</title>
+<desc id="ghcDesc">GitHub summary for someone: 0 stars, 0 forks, 0 followers, 0 public repositories, 0 contributions in the last year, 0 repository views over the traffic window, 0 unique visitors over the traffic window, 0 clones over the traffic window, 0 commits in the last year, 0 pull requests in the last year, 0 reviews in the last year, 0 issues in the last year.</desc>
+<style>
+.bg{fill:#0d1117;stroke:#30363d}
+.panel{fill:#161b22}
+.t,.v,.big{fill:#e6edf3}
+.d,.l,.h,.s{fill:#8b949e}
+.n,.c{fill:#c9d1d9}
+.star,.pill-v{fill:#e3b341}
+.on-accent{fill:#0d1117}
+.line{stroke:#58a6ff}
+.area{fill:#58a6ff}
+.axis,.edge{stroke:#30363d}
+.track{fill:#30363d}
+.ok{fill:#3fb950}
+.fg{fill:#e6edf3}
+.h0{fill:#151b23}.h1{fill:#033a16}.h2{fill:#196c2e}.h3{fill:#2ea043}.h4{fill:#56d364}
+text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif}
+.mono{font-family:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace}
+.t{font-size:18px;font-weight:600}
+.d{font-size:11px}
+.v{font-size:16px;font-weight:600}
+.big{font-size:24px;font-weight:700}
+.l{font-size:11px}
+.h{font-size:10px;font-weight:600;letter-spacing:0.08em}
+.n{font-size:12px}
+.s{font-size:11px}
+.c{font-size:12px}
+.line{fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.area{opacity:0.14;stroke:none}
+.axis{stroke-width:1}
+.edge{fill:none;stroke-width:1}
+.line{stroke-width:1.25;opacity:0.35}
+.area{opacity:0.07}
+.t2{font-size:15px;font-weight:600}
+.draw{animation:draw 1.6s ease-out 1}
+.fade{animation:fade 1.6s ease-out 1}
+@keyframes draw{from{stroke-dasharray:1;stroke-dashoffset:1}to{stroke-dasharray:1;stroke-dashoffset:0}}
+@keyframes fade{from{opacity:0}}
+@media (prefers-reduced-motion:reduce){.draw,.fade,.cu{animation:none}}
+</style>
+<rect class="bg" x="0.5" y="0.5" width="799" height="59" rx="6"/>
+<path class="area fade" d="M1,58 L1,58 L799,58 L799,58Z"/>
+<polyline class="line draw" pathLength="1" points="1,58 799,58"/>
+<text class="t2 t" x="20" y="36" text-anchor="start">someone</text>
+<text class="v" x="220" y="30" text-anchor="start">0</text>
+<text class="l" x="220" y="45" text-anchor="start">stars</text>
+<text class="v" x="266.67" y="30" text-anchor="start">0</text>
+<text class="l" x="266.67" y="45" text-anchor="start">forks</text>
+<text class="v" x="313.33" y="30" text-anchor="start">0</text>
+<text class="l" x="313.33" y="45" text-anchor="start">follow…</text>
+<text class="v" x="360" y="30" text-anchor="start">0</text>
+<text class="l" x="360" y="45" text-anchor="start">repos</text>
+<text class="v" x="406.67" y="30" text-anchor="start">0</text>
+<text class="l" x="406.67" y="45" text-anchor="start">contri…</text>
+<text class="v" x="453.33" y="30" text-anchor="start">0</text>
+<text class="l" x="453.33" y="45" text-anchor="start">views</text>
+<text class="v" x="500" y="30" text-anchor="start">0</text>
+<text class="l" x="500" y="45" text-anchor="start">visitors</text>
+<text class="v" x="546.67" y="30" text-anchor="start">0</text>
+<text class="l" x="546.67" y="45" text-anchor="start">clones</text>
+<text class="v" x="593.33" y="30" text-anchor="start">0</text>
+<text class="l" x="593.33" y="45" text-anchor="start">comm…</text>
+<text class="v" x="640" y="30" text-anchor="start">0</text>
+<text class="l" x="640" y="45" text-anchor="start">PRs</text>
+<text class="v" x="686.67" y="30" text-anchor="start">0</text>
+<text class="l" x="686.67" y="45" text-anchor="start">reviews</text>
+<text class="v" x="733.33" y="30" text-anchor="start">0</text>
+<text class="l" x="733.33" y="45" text-anchor="start">issues</text>
+</svg>

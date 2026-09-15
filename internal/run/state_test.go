@@ -4,8 +4,11 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // TestTheStateCommentAccountsForEveryFieldItKeeps reads this package's own
@@ -77,4 +80,120 @@ func stateStruct(t *testing.T) (string, *ast.StructType) {
 	}
 	t.Fatal("state.go declares no State struct, so this test proves nothing")
 	return "", nil
+}
+
+// TestAStateFileThatNullsItsMapsStillLoadsUsable: a hand-edited or truncated
+// state can say null where a map was, and the sweep that loads it writes to
+// every one of those maps, which on a nil map is a panic at start-up.
+func TestAStateFileThatNullsItsMapsStillLoadsUsable(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "state.json")
+	nulled := `{"last_run":null,"first_saw":null,"last_head":null,"last_full":null,"last_event":"42"}`
+	if err := os.WriteFile(path, []byte(nulled), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	s := LoadState(path)
+	now := time.Date(2026, 9, 12, 10, 0, 0, 0, time.UTC)
+	s.Mark("traffic", now)
+	s.MarkFull("issues", now)
+	s.LastHead["o/n"] = "aaa"
+	if !s.FirstSight("o/n", now) || s.FirstSight("o/n", now) {
+		t.Error("a repository was not first seen exactly once")
+	}
+	if s.LastEvent != "42" {
+		t.Errorf("LastEvent = %q, want what the file said beside the nulls", s.LastEvent)
+	}
+	if err := s.Save(); err != nil {
+		t.Fatal(err)
+	}
+	if saved := LoadState(path); !saved.LastRun["traffic"].Equal(now) || saved.LastHead["o/n"] != "aaa" {
+		t.Errorf("the state written after the nulls = %+v", saved)
+	}
+}
+
+// TestAStateWithoutAPathIsNeverWritten: the tests and the one-shot probe
+// keep their state in memory, and Save must not drop a file named after
+// nothing into whatever directory the process runs in.
+func TestAStateWithoutAPathIsNeverWritten(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	s := LoadState("")
+	s.Mark("traffic", time.Now())
+	if err := s.Save(); err != nil {
+		t.Fatalf("Save of a state with no path = %v", err)
+	}
+	if left, err := os.ReadDir(dir); err != nil || len(left) != 0 {
+		t.Errorf("a state with no path wrote %v (%v)", left, err)
+	}
+}
+
+// TestAStateNamedWithoutADirectoryIsSavedInTheWorkingOne: a bare file name
+// has no directory to create, and asking for "." must not stand in the way.
+func TestAStateNamedWithoutADirectoryIsSavedInTheWorkingOne(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	now := time.Date(2026, 9, 12, 10, 0, 0, 0, time.UTC)
+	s := LoadState("state.json")
+	s.Mark("traffic", now)
+	if err := s.Save(); err != nil {
+		t.Fatal(err)
+	}
+	if saved := LoadState(filepath.Join(dir, "state.json")); !saved.LastRun["traffic"].Equal(now) {
+		t.Errorf("the state saved beside the process = %+v", saved)
+	}
+}
+
+// TestAStateThatCannotBeWrittenSaysWhy: each of the three steps of a save
+// can fail, and each failure is returned, so the sweep can say the state was
+// not kept instead of believing it was.
+func TestAStateThatCannotBeWrittenSaysWhy(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	file := filepath.Join(dir, "file")
+	if err := os.WriteFile(file, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	// A directory where the temporary file goes, and a non-empty directory
+	// where the state itself goes.
+	for _, blocked := range []string{filepath.Join(dir, "tmp", "state.json.tmp"), filepath.Join(dir, "over", "state.json", "x")} {
+		if err := os.MkdirAll(blocked, 0o750); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for name, path := range map[string]string{
+		"a parent directory that is a file":      filepath.Join(file, "state.json"),
+		"a directory in the way of the new file": filepath.Join(dir, "tmp", "state.json"),
+		"a directory in the way of the state":    filepath.Join(dir, "over", "state.json"),
+	} {
+		if err := LoadState(path).Save(); err == nil {
+			t.Errorf("%s: Save reported success", name)
+		}
+	}
+}
+
+// TestAWholeReadIsDueTheMomentItsIntervalHasPassed: the inbox is read whole
+// once a day, and a sweep landing exactly a day after the last whole read is
+// that day's read. Putting it off to the sweep after would let the daily read
+// slip a cadence further every day it lands on the mark.
+func TestAWholeReadIsDueTheMomentItsIntervalHasPassed(t *testing.T) {
+	t.Parallel()
+	last := time.Date(2026, 9, 12, 10, 0, 0, 0, time.UTC)
+	s := LoadState("")
+	if !s.FullDue("notifs", fullInboxEvery, last) {
+		t.Error("a whole read never done is not due")
+	}
+	s.MarkFull("notifs", last)
+	for _, tc := range []struct {
+		name string
+		at   time.Time
+		due  bool
+	}{
+		{"a moment short of a day", last.Add(fullInboxEvery - time.Nanosecond), false},
+		{"exactly a day", last.Add(fullInboxEvery), true},
+		{"past a day", last.Add(fullInboxEvery + time.Minute), true},
+	} {
+		if got := s.FullDue("notifs", fullInboxEvery, tc.at); got != tc.due {
+			t.Errorf("%s after the last whole read: due = %t, want %t", tc.name, got, tc.due)
+		}
+	}
 }
