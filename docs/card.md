@@ -34,6 +34,22 @@ Without `-card-only` the card is written **as well as** everything the sinks
 would normally get, which is the arrangement for a host that is already
 collecting and wants a picture too.
 
+### The card run and the state file
+
+A run given `-card` collects **every family**, whatever the cadences say,
+because every number on the card comes from the points of that one sweep and a
+family skipped as not due would be a zero on the picture.
+
+With `-card-only` it also leaves the [state
+file](https://jmrp.io/docs/ghchronicle/configuration/#state_file) exactly as it found it. Nothing
+that run collected reached a store, so nothing it learned may tell the next
+collection that a family is already done. It still reads the file, which is
+what lets it skip the one-off walk of the star history: what the state
+remembers makes the sweep cheaper, never the card smaller.
+
+So a card, a second card and a collection can all share one `state_file`, and
+each of them is the whole account.
+
 ### What it draws
 
 Stars, forks, followers and repository count; contributions over the last year;

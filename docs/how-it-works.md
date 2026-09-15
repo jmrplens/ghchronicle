@@ -111,21 +111,26 @@ level=WARN msg="family failed everywhere, not marking it as run" family=security
 
 ### The state file
 
-`state_file` holds two things and nothing else: when each family last ran, and
-when each repository was first seen.
+`state_file` holds [six things](https://jmrp.io/docs/ghchronicle/configuration/#state_file), and
+the two a sweep is judged by are when each family last ran and when each
+repository was first seen.
 
 The second is what makes the one-off full walk of the star history happen once
 instead of on every sweep. It is written through a temporary file and renamed,
 so a crash mid-write cannot leave a truncated state that would trigger a full
 re-collection.
 
-> **The first sweep after a restart runs everything**
+> **Three runs collect every family whatever the state says**
 >
 > An exporter holds its samples in memory, so a restart empties it and it stays
 > empty until each family's cadence comes round, which for the twelve-hour ones
 > is half a day of a dashboard reading zero. Paying for one full sweep is the
 > cheaper mistake, so the first sweep after start-up runs every enabled family
-> whatever the state file says.
+> whatever the state file says. A [backfill](https://jmrp.io/docs/ghchronicle/how/backfill/) does
+> the same, because reaching as far back as GitHub allows is the whole point of
+> asking for one, and so does a run drawing [a card](https://jmrp.io/docs/ghchronicle/card/),
+> because every number on the card comes from that one sweep and a family
+> skipped as not due would be a zero on the picture.
 
 ### The brake
 

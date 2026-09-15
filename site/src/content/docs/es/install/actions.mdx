@@ -200,11 +200,13 @@ El README no se reescribe nunca.
 
 **Más de una tarjeta.** Repite el paso `uses: jmrplens/ghchronicle@v1` con otra
 ruta en `card` y otro diseño, y pega un `<picture>` por tarjeta. Cada paso es una
-pasada propia. Eso vale tal cual cuando la Action escribe su propia
-configuración, porque entonces cada uso tiene su propio fichero de estado. Con un
-fichero en `config`, da a cada paso su propio fichero con un `state_file`
-distinto: una segunda pasada que lee el estado de la primera recibe "no
-modificado" para todo y dibuja una tarjeta de ceros.
+pasada propia, y cada una vuelve a pedir todos los números: una pasada que
+escribe una tarjeta recoge todas las familias diga lo que diga su cadencia, y
+una en modo `card` no escribe nada en el fichero de estado. Así que varios pasos
+de tarjeta pueden compartir un `config`, y por tanto un `state_file`, y cada
+tarjeta es la cuenta entera. Eso es también lo que cuesta cada una: una tarjeta
+es una pasada en frío de todas las familias, así que N tarjetas son N pasadas
+[al precio por familia](/ghchronicle/es/api/cost/).
 
 **Un README que no está en la raíz.** Esto es para otros repositorios, porque
 GitHub muestra el README de un perfil solo desde la raíz de `<tú>/<tú>`. Las
@@ -248,7 +250,12 @@ puñado de llamadas; en una cuenta con muchas estrellas, guárdalo en caché:
     restore-keys: ghchronicle-state-
 ```
 
-y apunta `state_file` a `~/.ghchronicle/state.json` en la configuración.
+y apunta `state_file` a `~/.ghchronicle/state.json` en la configuración. Una
+pasada en modo `card` lee el estado restaurado, que es lo que le permite
+saltarse el recorrido, y nunca lo vuelve a escribir: entrega sus puntos a la
+tarjeta y a ningún almacén, así que nada de lo que aprendió puede decirle a la
+siguiente recogida que una familia ya está hecha. Quien llena la caché es un
+paso `once` o `backfill`.
 
 ## Sin la Action
 

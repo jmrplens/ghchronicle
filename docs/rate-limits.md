@@ -292,6 +292,11 @@ workflow runs, and (with `every.history` set) every past year's contribution
 calendar. After that, multiply the per-repository rows above by the number of
 repositories `-list` prints, and divide the hourly budget by the cadence.
 
+A [card](https://jmrp.io/docs/ghchronicle/card/) is priced as a cold sweep whatever the cadences
+say: the run collects every family, because every number it draws comes from
+that one sweep, and its process starts with an empty ETag cache. So N cards are
+N sweeps, and a workflow drawing three of them pays three.
+
 The signal that the sum came out wrong is a warning, not a guess:
 
 ```text

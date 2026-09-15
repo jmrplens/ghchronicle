@@ -969,3 +969,43 @@ func TestAnAccountWithNoRepositoriesStillMarksItsFamilies(t *testing.T) {
 		t.Errorf("a family over no repositories was said to have failed:\n%s", buf)
 	}
 }
+
+// TestACardOnlySweepLeavesTheStateFileAsItFoundIt: the sweep that feeds
+// nothing but a card writes none of what it learned, and the same sweep
+// feeding a store writes it. Every field in the state file is a claim that
+// something was delivered somewhere, and a card-only sweep delivers to
+// nobody, so a claim it left behind would make the next collection skip a
+// family whose data went into a picture and nowhere else.
+func TestACardOnlySweepLeavesTheStateFileAsItFoundIt(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, 9, 16, 10, 0, 0, 0, time.UTC)
+	for _, tc := range []struct {
+		name     string
+		cardOnly bool
+		saved    bool
+	}{
+		{name: "a card-only sweep saves nothing", cardOnly: true},
+		{name: "a sweep that feeds a store saves what it learned", saved: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			path := filepath.Join(t.TempDir(), "state.json")
+			log, _ := debugLog()
+			r := &Runner{
+				Cfg: &config.Config{}, API: ghapi.New("token", time.Second),
+				State: LoadState(path), Log: log, CardOnly: tc.cardOnly,
+			}
+			r.State.Mark("traffic", now)
+			r.State.LastEvent = "42"
+			r.finish()
+
+			written := LoadState(path)
+			if got := written.LastRun["traffic"].Equal(now); got != tc.saved {
+				t.Errorf("the state file remembers the family that ran = %v, want %v", got, tc.saved)
+			}
+			if got := written.LastEvent == "42"; got != tc.saved {
+				t.Errorf("the state file remembers the newest event = %v, want %v", got, tc.saved)
+			}
+		})
+	}
+}

@@ -18,14 +18,14 @@ ghchronicle -config /etc/ghchronicle/config.yaml
 | Flag              | Default       | What it does                                                                                                                               |
 | ----------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
 | `-config`         | `config.yaml` | Path to the configuration file                                                                                                             |
-| `-once`           | off           | Run one sweep and exit, whatever the cadences say                                                                                          |
+| `-once`           | off           | Run one sweep and exit instead of scheduling; a family that is not due by its cadence is still skipped                                     |
 | `-list`           | off           | Print the repositories that would be collected, and which are set aside, then exit                                                         |
 | `-version`        | off           | Print the version, the commit and the build date, then exit                                                                                |
 | `-groups`         | off           | Print the groups with the families in each, then exit                                                                                      |
 | `-backfill`       | off           | Reach as far back as each surface allows, waiting for the rate limit to reset rather than stopping                                         |
 | `-backfill-since` | none          | Bound the backfill: a date (`2024-01-01`), a duration (`720h`), days (`90d`) or years (`2y`)                                               |
-| `-card`           | none          | Run one sweep and write a summary SVG to this path                                                                                         |
-| `-card-only`      | off           | With `-card`, write the SVG and nothing else: no sink is needed and none is written to                                                     |
+| `-card`           | none          | Run one sweep and write a summary SVG to this path; that sweep runs every family, whatever the cadences say                                |
+| `-card-only`      | off           | With `-card`, write the SVG and nothing else: no sink is needed, none is written to, and the state file is left as it was                  |
 | `-card-theme`     | `auto`        | `dark`, `light`, `auto`, or `both`: the light card at `-card` and the dark one beside it with `_dark` before the extension, from one sweep |
 | `-card-motion`    | `once`        | `once`, `loop` or `off`; a layout that does not move ignores it                                                                            |
 | `-card-layout`    | `summary`     | Which of the ten layouts to draw                                                                                                           |

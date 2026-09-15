@@ -164,13 +164,23 @@ func TestGroupsFlagListsEveryGroupAndItsFamilies(t *testing.T) {
 	}
 }
 
-// TestTheFirstSweepIsPrimedOnlyForAServingExporter keeps the priming sweep to
-// the one run that needs it. An exporter holds nothing until a sweep fills it,
-// so a serving run with one primes unless told not to; a store that is pushed
-// to already has what it collected, and -once or -card is a full sweep anyway.
+// TestTheRunTheFlagsAskForIsTheRunnerTheyBuild holds every field newRunner
+// decides from the command line.
+//
+// Prime is for the one run that needs it: an exporter holds nothing until a
+// sweep fills it, so a serving run with one primes unless told not to; a store
+// that is pushed to already has what it collected, and -once starts no
+// exporter to fill. Card is what makes a card's sweep collect every family,
+// whatever the cadences say, since every number on the card comes from that
+// sweep alone; -once has no such claim on the families and does not prime.
+// CardOnly is the run whose points reach the card and no store, which is the
+// one that may write nothing to the state file.
+//
 // Each clause is its own case, because any one of them read the other way
-// primes a run that should not be, or leaves an exporter empty for a cadence.
-func TestTheFirstSweepIsPrimedOnlyForAServingExporter(t *testing.T) {
+// primes a run that should not be, leaves an exporter empty for a cadence,
+// draws a card of zeros, or lets a run that delivered nothing tell the next
+// collection that a family is done.
+func TestTheRunTheFlagsAskForIsTheRunnerTheyBuild(t *testing.T) {
 	exporter := func(noPrime bool) *config.Config {
 		return &config.Config{
 			StateFile: filepath.Join(t.TempDir(), "state.json"),
@@ -184,22 +194,45 @@ func TestTheFirstSweepIsPrimedOnlyForAServingExporter(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
 	for _, tc := range []struct {
-		name  string
-		cfg   *config.Config
-		o     options
-		prime bool
+		name                  string
+		cfg                   *config.Config
+		o                     options
+		prime, card, cardOnly bool
 	}{
-		{"a serving exporter", exporter(false), options{}, true},
-		{"a serving exporter told not to prime", exporter(true), options{}, false},
-		{"a serving run with no exporter", pushOnly, options{}, false},
-		{"an exporter under -once", exporter(false), options{once: true}, false},
-		{"an exporter under -card", exporter(false), options{card: "card.svg"}, false},
-		{"no exporter under -once", pushOnly, options{once: true}, false},
+		{name: "a serving exporter", cfg: exporter(false), prime: true},
+		{name: "a serving exporter told not to prime", cfg: exporter(true)},
+		{name: "a serving run with no exporter", cfg: pushOnly},
+		{name: "an exporter under -once", cfg: exporter(false), o: options{once: true}},
+		{
+			name: "an exporter under -card", cfg: exporter(false),
+			o: options{card: "card.svg"}, card: true,
+		},
+		{name: "no exporter under -once", cfg: pushOnly, o: options{once: true}},
+		{
+			name: "-card with the sinks", cfg: pushOnly,
+			o: options{card: "card.svg"}, card: true,
+		},
+		{
+			name: "-card -card-only", cfg: pushOnly,
+			o: options{card: "card.svg", cardOnly: true}, card: true, cardOnly: true,
+		},
+		{
+			// -card-only without -card writes no card and is not a card run:
+			// the flag alone must not stop the state file being saved.
+			name: "-once, and -card-only without a card", cfg: pushOnly,
+			o: options{once: true, cardOnly: true},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			r := newRunner(tc.cfg, nil, nil, logger, &tc.o)
 			if r.Prime != tc.prime {
 				t.Errorf("Prime = %v, want %v", r.Prime, tc.prime)
+			}
+			if r.Card != tc.card {
+				t.Errorf("Card = %v, want %v", r.Card, tc.card)
+			}
+			if r.CardOnly != tc.cardOnly {
+				t.Errorf("CardOnly = %v, want %v", r.CardOnly, tc.cardOnly)
 			}
 		})
 	}
