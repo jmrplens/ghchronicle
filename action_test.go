@@ -15,10 +15,10 @@ import (
 // stay out unless the caller says true, and anything that is not exactly true
 // or false is refused rather than read as one of them.
 func TestTheActionsDefaultConfigLeavesPrivateRepositoriesOut(t *testing.T) {
-	bash, err := exec.LookPath("bash")
-	if err != nil {
+	if _, err := exec.LookPath("bash"); err != nil {
 		t.Skip("the Action's steps run in bash, and there is none here")
 	}
+	script := filepath.Join("scripts", "action-config.sh")
 	for _, tc := range []struct {
 		name, include string
 		status        int
@@ -32,7 +32,7 @@ func TestTheActionsDefaultConfigLeavesPrivateRepositoriesOut(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := t.TempDir()
 			out := filepath.Join(dir, "ghchronicle.yaml")
-			cmd := exec.Command(bash, filepath.Join("scripts", "action-config.sh"))
+			cmd := exec.CommandContext(t.Context(), "bash", script)
 			cmd.Env = append(os.Environ(),
 				"USER_LOGIN=octocat", "INCLUDE_PRIVATE="+tc.include,
 				"OUT="+out, "STATE="+filepath.Join(dir, "state.json"))
