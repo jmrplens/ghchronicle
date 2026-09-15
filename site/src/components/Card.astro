@@ -11,10 +11,12 @@
  *
  * The same isolation is why replaying takes a new image rather than a class:
  * nothing on the page can reach inside an image to restart its animations. So
- * the button swaps the image for itself under a different query, which the
- * browser treats as a new picture and animates from the start. Two queries are
- * alternated rather than a new one on every press, so a reader who presses it
- * twenty times costs two downloads of a few kilobytes, not twenty.
+ * the button swaps the image for a new one under a query it has never used,
+ * which the browser treats as a new picture and animates from the start. A new
+ * query on every press, and not two alternated: once both of two URLs had been
+ * shown, Safari kept each decoded picture and handed the same one back already
+ * at its last frame, so only the first press replayed anything. The cost of a
+ * press is one download of a few kilobytes.
  *
  * The button is present only where there is something to replay. On a card
  * that does not move it would be a control that does nothing, and it starts
@@ -121,14 +123,31 @@ const label = LABELS[locale];
 	// One module however many cards the page holds: Astro bundles a component's
 	// script once.
 	for (const button of document.querySelectorAll<HTMLButtonElement>("[data-card-replay]")) {
-		const image = button.closest("[data-card]")?.querySelector("img");
-		if (!image) continue;
-		let turn = 0;
+		const figure = button.closest("[data-card]");
+		if (!figure?.querySelector("img")) continue;
 		button.addEventListener("click", () => {
-			const url = new URL(image.currentSrc || image.src, location.href);
-			turn = 1 - turn;
-			url.searchParams.set("replay", String(turn));
-			image.src = url.href;
+			const current = figure.querySelector("img");
+			if (!current) return;
+			const url = new URL(current.currentSrc || current.src, location.href);
+			// Never a value this page has used, and not crypto.randomUUID, which
+			// exists only in a secure context: the site is also read over plain
+			// HTTP from a development server on the LAN, where it is undefined
+			// and the button would throw. The time makes a repeat impossible.
+			url.searchParams.set(
+				"replay",
+				`${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`,
+			);
+			// A new element as well as a new address. An engine that keeps an
+			// animation's state with the element, rather than with the picture it
+			// shows, would otherwise go on showing the last frame. It is swapped
+			// in once the picture has loaded, so the card never blanks, and loads
+			// eagerly because a lazy image outside the document may never load.
+			const fresh = current.cloneNode() as HTMLImageElement;
+			fresh.loading = "eager";
+			fresh.addEventListener("load", () => current.replaceWith(fresh), {
+				once: true,
+			});
+			fresh.src = url.href;
 		});
 		button.hidden = false;
 	}
