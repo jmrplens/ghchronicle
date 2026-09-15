@@ -79,6 +79,31 @@ func TestRevealAndFlashAreTheTwoHalvesOfACounter(t *testing.T) {
 	}
 }
 
+// TestARevealAtTheStartOfTheCycleWritesACleanFirstStop covers the from == 0
+// branch of keyframes: a reveal beat that starts exactly when the cycle does
+// must not subtract 0.01% from zero and emit a negative percent stop.
+func TestARevealAtTheStartOfTheCycleWritesACleanFirstStop(t *testing.T) {
+	tl := newTimeline(MotionOnce)
+	tl.add(effectReveal, 0, 1, "linear")
+	css := tl.css()
+	if strings.Contains(css, "-0.01%") {
+		t.Errorf("a reveal starting at 0 must not write a negative stop:\n%s", css)
+	}
+	if !strings.Contains(css, "@keyframes m0{0%,100%{opacity:1}}") {
+		t.Errorf("css lacks the two-stop reveal at 0:\n%s", css)
+	}
+}
+
+// TestANilTimelineDoesNotMove exercises the nil receiver moving() checks
+// before dereferencing: a layout that never got a timeline must still be
+// askable whether it moves, and the answer is no.
+func TestANilTimelineDoesNotMove(t *testing.T) {
+	var tl *timeline
+	if tl.moving() {
+		t.Error("a nil timeline must not report moving")
+	}
+}
+
 // TestACardThatDoesNotMoveCarriesNoMotion keeps off honest: no class on any
 // element and not one byte of stylesheet.
 func TestACardThatDoesNotMoveCarriesNoMotion(t *testing.T) {

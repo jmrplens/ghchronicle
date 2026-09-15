@@ -4,6 +4,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -497,6 +498,40 @@ func TestHeatLevelsTreatNegativeAndZeroDaysAsEmpty(t *testing.T) {
 	levels := heatLevels([]int{-3, 0, 1, 2, 8})
 	if got := levels[79:]; !slices.Equal(got, []int{0, 0, 1, 1, 4}) {
 		t.Errorf("levels = %v, want 0 0 1 1 4", got)
+	}
+}
+
+// A ring segment exactly six units of arc long sits right on the no-gap
+// threshold: the gap must close rather than leave a sliver's dash shorter
+// than its own gap.
+func TestLanguageRingLeavesNoGapForAnArcExactlyAtTheThreshold(t *testing.T) {
+	const r = 54.0
+	circ := 2 * math.Pi * r
+	share := 6.0 / circ * 100 // chosen so share/100*circ lands on exactly 6
+	arc := share / 100 * circ
+	if arc != 6 {
+		t.Fatalf("test setup: arc = %v, want exactly 6", arc)
+	}
+	s := &spec{width: defaultWidth, langs: []langShare{{Name: "X", Color: "#111111", Share: share}}}
+	var b strings.Builder
+	drawLanguageRing(&b, &Card{}, s)
+	want := fmt.Sprintf(`stroke-dasharray="%s %s"`, num(arc), num(circ-arc))
+	if !strings.Contains(b.String(), want) {
+		t.Errorf("an arc of exactly 6 must have no gap, want %q in:\n%s", want, b.String())
+	}
+}
+
+// A language legend label that fits the row exactly, down to the last unit,
+// must still be drawn: the cutoff is for what does not fit, not for what
+// fits exactly.
+func TestSummaryLanguagesLegendKeepsALabelThatFitsExactly(t *testing.T) {
+	label := "A 50%"
+	w := 14 + textWidth(label, 11)
+	s := &spec{width: 2*pad + w, langs: []langShare{{Name: "A", Color: "#111111", Share: 50}}}
+	var b strings.Builder
+	summaryLanguages(&b, s, 0)
+	if !strings.Contains(b.String(), label) {
+		t.Errorf("a label that fits exactly must still be drawn:\n%s", b.String())
 	}
 }
 
