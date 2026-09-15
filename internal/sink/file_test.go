@@ -6,6 +6,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -489,7 +490,16 @@ func TestFileReportsARotationThatCannotRename(t *testing.T) {
 
 // TestFileRotatesADumpDeletedFromUnderIt carries on when the dump was removed
 // while open: there is nothing to rename, and the rotation starts a new file.
+//
+// Not on Windows, where the situation cannot arise: a file another handle
+// holds open cannot be removed unless that handle was opened with
+// FILE_SHARE_DELETE, which os.OpenFile does not ask for, so the removal below
+// fails with "The process cannot access the file because it is being used by
+// another process" instead of setting the test up.
 func TestFileRotatesADumpDeletedFromUnderIt(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("a dump cannot be removed while the sink holds it open on Windows")
+	}
 	path := filepath.Join(t.TempDir(), "out.lp")
 	f := NewFile(path, "influx", 1<<20, 2)
 	p := Point{Measurement: "m", Fields: map[string]any{"v": 1}, Time: time.Unix(0, 1)}
