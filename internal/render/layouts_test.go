@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
-	"strconv"
 	"strings"
 	"testing"
 )
@@ -246,41 +245,65 @@ func TestAnimatedCardsAreByteIdenticalInEveryMotion(t *testing.T) {
 	}
 }
 
+// TestAnimatedCountersEndOnTheRealValues reads the frames a renderer that
+// ignores animation paints: the final frame of every number carries its real
+// value and rests visible, the intermediate ones rest hidden, and under off
+// the intermediate frames are not drawn at all.
 func TestAnimatedCountersEndOnTheRealValues(t *testing.T) {
 	c := sample()
 	doc := mustRender(t, c, &Options{Theme: "dark", Layout: "animated-counters"})
-	for _, m := range metricsOf(c, layouts[9].Fields) {
-		final := `class="big cu cuz" x="`
-		if !strings.Contains(doc, final) {
-			t.Fatal("no final frame")
-		}
-		if !strings.Contains(doc, `cuz" x="`) || !strings.Contains(doc, `>`+compact(m.value)+`</text>`) {
-			t.Errorf("the final frame for %s must show %s", m.key, compact(m.value))
-		}
-	}
-	// Every final frame carries the static value; intermediate frames rest
-	// hidden and the final one rests visible, which is what a renderer that
-	// ignores animation paints.
-	finals := regexp.MustCompile(`class="big cu cuz"[^>]*>([^<]+)<`).FindAllStringSubmatch(doc, -1)
-	if len(finals) != 6 {
-		t.Fatalf("found %d final frames, want 6", len(finals))
-	}
+	finals := regexp.MustCompile(`class="big cuz m\d+"[^>]*>([^<]+)<`).FindAllStringSubmatch(doc, -1)
 	want := []string{"283", "70", "41", "42", "6.2k", "1.8k"}
+	if len(finals) != len(want) {
+		t.Fatalf("found %d final frames, want %d", len(finals), len(want))
+	}
 	for i, w := range want {
 		if finals[i][1] != w {
 			t.Errorf("final frame %d = %q, want %q", i, finals[i][1], w)
 		}
 	}
-	for i := range counterFrames {
-		if !strings.Contains(doc, ".cu"+strconv.Itoa(i)+"{opacity:0;") {
-			t.Errorf("intermediate frame %d does not rest hidden", i)
-		}
+	if !strings.Contains(doc, ".cuf{opacity:0}") || strings.Contains(doc, ".cuz{opacity:0") {
+		t.Error("intermediate frames must rest hidden and final frames visible")
 	}
-	if strings.Contains(doc, ".cuz{opacity:0") || !strings.Contains(doc, "@keyframes kz{0%,99.99%{opacity:0}}") {
-		t.Error("the final frame must rest visible and only hide while the count runs")
+	if got := strings.Count(doc, `class="big cuf m`); got != counterFrames*len(want) {
+		t.Errorf("drew %d intermediate frames, want %d", got, counterFrames*len(want))
+	}
+
+	still := mustRender(t, c, &Options{Theme: "dark", Layout: "animated-counters", Motion: MotionOff})
+	if strings.Contains(still, "cuf") {
+		t.Error("under off the intermediate frames are dead weight and must not be drawn")
+	}
+	if got := len(regexp.MustCompile(`class="big cuz"[^>]*>`).FindAllString(still, -1)); got != len(want) {
+		t.Errorf("under off drew %d final frames, want %d", got, len(want))
 	}
 	if counterValue(1000, 0, 16) != 0 || counterValue(1000, 16, 16) != 1000 {
 		t.Error("a counter starts at zero and lands exactly on its value")
+	}
+}
+
+// TestAnimatedCountersHonourReducedMotion checks the property the shared
+// motionCSS used to guarantee for the counters before Task 2: every class
+// that carries an animation is one the timeline named in its
+// prefers-reduced-motion block, under both once and loop. Before this task
+// the counters wrote their own CSS by hand and were not covered by that
+// block at all.
+func TestAnimatedCountersHonourReducedMotion(t *testing.T) {
+	c := sample()
+	for _, motion := range []string{MotionOnce, MotionLoop} {
+		doc := mustRender(t, c, &Options{Theme: "dark", Layout: "animated-counters", Motion: motion})
+		m := regexp.MustCompile(`@media \(prefers-reduced-motion:reduce\)\{([^}]+)\{animation:none\}\}`).FindStringSubmatch(doc)
+		if m == nil {
+			t.Fatalf("under %s: no prefers-reduced-motion block", motion)
+		}
+		named := map[string]bool{}
+		for cls := range strings.SplitSeq(m[1], ",") {
+			named[strings.TrimPrefix(cls, ".")] = true
+		}
+		for _, am := range regexp.MustCompile(`\.(m\d+)\{animation:`).FindAllStringSubmatch(doc, -1) {
+			if !named[am[1]] {
+				t.Errorf("under %s: class %q animates but is not named in the reduced-motion block", motion, am[1])
+			}
+		}
 	}
 }
 
