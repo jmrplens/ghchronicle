@@ -28,7 +28,14 @@
  * `check-i18n-parity.mjs` does, so a `<Card>` quoted in a code block or an
  * inline code span is text, not a card, and cannot count as one. A `name`
  * written as an expression is refused, because the files it names cannot be
- * known without evaluating the page.
+ * known without evaluating the page, and a `<Card>` written in a `.md` page is
+ * a hard error for the reason the same gate gives: markdown is not MDX, Astro
+ * emits the tag as raw HTML and it renders nothing, so a page that looks like a
+ * showcase shows no card at all.
+ *
+ * A missing directory, an empty one and a corpus with no pages are all
+ * failures, not passes. "Every one of the 0 card pictures is shown" is exactly
+ * how a path drift or a wrong working directory would read as success.
  *
  * The fixtures at the bottom run on every invocation.
  *
@@ -45,23 +52,18 @@ import { fromMarkdown } from "mdast-util-from-markdown";
 import { mdxFromMarkdown } from "mdast-util-mdx";
 import { mdxjs } from "micromark-extension-mdxjs";
 
+import { localeOf } from "../src/lib/site.mjs";
+
 const DOCS_DIR = fileURLToPath(new URL("../src/content/docs", import.meta.url));
 const ASSETS_DIR = fileURLToPath(new URL("../src/assets", import.meta.url));
 const CARD_FILE = /^card-.+\.svg$/;
-// The mirror locales directly under DOCS_DIR, as in check-i18n-parity.mjs; a
-// page under none of them is English.
-const LOCALES = { en: "English", es: "Spanish" };
-
-/**
- * The locale a page belongs to, by its first directory.
- *
- * @param {string} page a path relative to DOCS_DIR
- * @returns {string} a key of LOCALES
- */
-const localeOf = (page) => {
-	const first = page.split("/")[0];
-	return first !== "en" && first in LOCALES ? first : "en";
-};
+// How each locale is named in a failure. `localeOf` decides which one a page is
+// in, and it is the site's own, imported rather than restated: a fourth copy of
+// "a path under es/ is Spanish" is a fourth place to forget when a locale is
+// added. Which locales are gated is not stated here either, it is read off the
+// corpus, so a locale the site grows is gated the moment it has a page. A name
+// missing from this map falls back to the locale's own code.
+const LANGUAGES = { en: "English", es: "Spanish" };
 
 /**
  * Every content page under `dir`, as paths relative to it.
@@ -92,12 +94,34 @@ function cardsIn(source, file) {
 	const body = source.replace(/^---\n[\s\S]*?\n---(?=\n|$)/, (block) =>
 		block.replaceAll(/[^\n]/g, ""),
 	);
+	// `.mdx` gets the MDX extensions and `.md` does not, which mirrors how Astro
+	// treats the two.
+	const mdx = file.endsWith(".mdx");
 	const tree = fromMarkdown(body, {
-		extensions: file.endsWith(".mdx") ? [mdxjs()] : [],
-		mdastExtensions: file.endsWith(".mdx") ? [mdxFromMarkdown()] : [],
+		extensions: mdx ? [mdxjs()] : [],
+		mdastExtensions: mdx ? [mdxFromMarkdown()] : [],
 	});
 	const cards = [];
 	const visit = (node) => {
+		// A `.md` page is markdown, not MDX: Astro passes `<Card … />` through as
+		// raw HTML, the browser makes an unknown element of it and nothing
+		// renders. It therefore cannot be counted as showing a picture, and it
+		// must not be ignored either, or the page would look like a showcase and
+		// the gate would stay green on a card nobody can see. The same case is a
+		// hard error in check-i18n-parity.mjs, and the two gates say the same
+		// thing about it. Only `html` nodes are read, so a tag in a code fence or
+		// a code span cannot reach here, and comment spans are blanked first,
+		// because markdown has no comment node.
+		if (!mdx && node.type === "html" && typeof node.value === "string") {
+			const visible = node.value.replace(/<!--[\s\S]*?(?:-->|$)/g, " ");
+			if (/<\/?Card\b/.test(visible)) {
+				throw new Error(
+					`${file}:${node.position?.start.line ?? 0}: <Card> is written in a ` +
+						".md page, where it renders nothing. Rename the page to .mdx and " +
+						"import the component, or remove the tag.",
+				);
+			}
+		}
 		if (
 			(node.type === "mdxJsxFlowElement" ||
 				node.type === "mdxJsxTextElement") &&
@@ -156,9 +180,11 @@ function explain(file, pagesByName) {
 	if (loop) {
 		const pages = pagesByName.get(name);
 		if (pages) {
+			const one = pages.length === 1;
 			return (
-				`${file}: <Card name="${name}"> is on ${pages.join(", ")}, but none of them ` +
-				`passes loop, which is what shows this picture. Add loop to one of them.`
+				`${file}: <Card name="${name}"> is on ${pages.join(", ")}, ` +
+				`but ${one ? "it does not pass" : "none of them passes"} loop, which is ` +
+				`what shows this picture. Add loop to ${one ? "it" : "one of them"}.`
 			);
 		}
 		return `${file}: no page has <Card name="${name}" loop>, which is what shows this picture.`;
@@ -212,7 +238,7 @@ const SELF_TESTS = [
 			);
 			if (
 				failures.length !== 2 ||
-				!failures.every((f) => f.includes("passes loop"))
+				!failures.every((f) => f.includes("does not pass loop"))
 			) {
 				throw new Error(
 					`expected the two loop pictures to fail, got ${JSON.stringify(failures)}`,
@@ -285,6 +311,47 @@ const SELF_TESTS = [
 		},
 	],
 	[
+		"the message says which pages hold the name, in the number it finds them",
+		() => {
+			const card = cardsIn('<Card name="x" alt="X" />\n', "a.mdx");
+			const one = unshown(PAIR("card-x-loop"), [
+				{ page: "a.mdx", cards: card },
+			]);
+			const two = unshown(PAIR("card-x-loop"), [
+				{ page: "a.mdx", cards: card },
+				{ page: "b.mdx", cards: card },
+			]);
+			if (
+				!one[0].includes("it does not pass loop") ||
+				!one[0].endsWith("Add loop to it.")
+			) {
+				throw new Error(one[0]);
+			}
+			if (!two[0].includes("a.mdx, b.mdx, but none of them passes loop")) {
+				throw new Error(two[0]);
+			}
+		},
+	],
+	[
+		"a card written in a .md page renders nothing, and is a hard error",
+		() => {
+			try {
+				cardsIn('<Card name="x" alt="X" />\n', "a.md");
+			} catch (error) {
+				if (!error.message.includes("renders nothing")) throw error;
+				return;
+			}
+			throw new Error("a component tag in a .md page was accepted");
+		},
+	],
+	[
+		"a card commented out in a .md page is not one",
+		() => {
+			const cards = cardsIn('<!-- <Card name="x" alt="X" /> -->\n', "a.md");
+			if (cards.length > 0) throw new Error(JSON.stringify(cards));
+		},
+	],
+	[
 		"files that are not card pictures are not gated",
 		() => {
 			const failures = unshown(["logo.svg", "card-x.png"], []);
@@ -317,20 +384,63 @@ if (process.argv.includes("--self-test")) {
  * The corpus
  * ------------------------------------------------------------------ */
 
-const assets = readdirSync(ASSETS_DIR).filter((file) => CARD_FILE.test(file));
+let assets;
 let pages;
+// A missing directory is the failure this gate is least able to survive and the
+// one it must not narrate with a stack trace: both reads are here, so a wrong
+// path, a wrong working directory or a partial checkout is reported in the same
+// voice as a card nobody shows.
 try {
+	assets = readdirSync(ASSETS_DIR).filter((file) => CARD_FILE.test(file));
 	pages = listPages(DOCS_DIR).map((page) => ({
 		page,
 		cards: cardsIn(readFileSync(path.join(DOCS_DIR, page), "utf8"), page),
 	}));
 } catch (error) {
-	console.error(`✗ ${error.message}`);
+	console.error(`✗ card assets: ${error.message}`);
+	// A directory that is not there reads the same as one that is empty: the
+	// gate examined nothing, and the reason is almost always where it was told
+	// to look.
+	if (error.code === "ENOENT") {
+		console.error(
+			"  Check the path and the working directory; this is not a pass.",
+		);
+	}
 	process.exit(1);
 }
 
+// A gate that reports success on an empty corpus is worse than no gate: a path
+// drift, a partial checkout or a wrong cwd would turn it permanently green, and
+// this one would say so in words, "every one of the 0 card pictures is shown".
+// Both floors are needed: no pictures means nothing was gated, and no pages
+// means nothing could show them.
+if (assets.length === 0) {
+	console.error(
+		`✗ card assets: no card-*.svg found in ${ASSETS_DIR}, nothing was gated.`,
+	);
+	console.error(
+		"  Check the path and the working directory; this is not a pass.",
+	);
+	process.exit(1);
+}
+if (pages.length === 0) {
+	console.error(
+		`✗ card assets: no pages found under ${DOCS_DIR}, nothing shows anything.`,
+	);
+	console.error(
+		"  Check the path and the working directory; this is not a pass.",
+	);
+	process.exit(1);
+}
+
+// The locales to gate are the ones the corpus has pages in, so a locale the
+// site grows needs no edit here, and one that loses every page fails rather
+// than disappearing from the report.
+const locales = [...new Set(pages.map(({ page }) => localeOf(page)))].sort();
+
 let failed = false;
-for (const [locale, language] of Object.entries(LOCALES)) {
+for (const locale of locales) {
+	const language = LANGUAGES[locale] ?? locale;
 	const own = pages.filter(({ page }) => localeOf(page) === locale);
 	const failures = unshown(assets, own);
 	const count = own.reduce((sum, { cards }) => sum + cards.length, 0);

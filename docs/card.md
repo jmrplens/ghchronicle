@@ -205,14 +205,14 @@ follows the content rather than being set.
 A full-width 60 pixel banner: login on the left, numbers spread across, the
 sparkline drawing itself behind them.
 
-![The wide-banner layout: a wide, short banner with the login on the left, numbers spread across and a sparkline behind them](../site/src/assets/card-wide-banner.svg)
+![The wide-banner layout played once: a wide, short banner with the login on the left, numbers spread across and a sparkline drawing itself behind them, and the page can also play it in a loop](../site/src/assets/card-wide-banner.svg)
 
 ### sparkline-hero
 
 The contribution sparkline is the whole card, with up to three numbers
 overlaid. The line draws itself on load.
 
-![The sparkline-hero layout: a large contribution sparkline filling the card with three numbers overlaid](../site/src/assets/card-sparkline-hero.svg)
+![The sparkline-hero layout played once: a large contribution sparkline drawing itself across the card with three numbers overlaid, and the page can also play it in a loop](../site/src/assets/card-sparkline-hero.svg)
 
 ### language-ring
 
@@ -240,7 +240,7 @@ with up to three numbers beside it.
 Numbers that count up on load over a sparkline that draws itself, settling to
 the static card.
 
-![The animated-counters layout: a grid of large numbers over a contribution sparkline](../site/src/assets/card-animated-counters.svg)
+![The animated-counters layout played once: a grid of large numbers counting up over a contribution sparkline that draws itself, and the page can also play it in a loop](../site/src/assets/card-animated-counters.svg)
 
 > **The settled frame is the whole card**
 >
