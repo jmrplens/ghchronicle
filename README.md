@@ -41,20 +41,19 @@ account's own figures](site/src/assets/dashboards/overview.png)
 ## What it renders
 
 A profile card, from the same sweep, in ten layouts and two families. The
-three animated ones animate where the reader's browser lets them, and `auto`
-puts both themes in one file, which is what these are:
+three animated ones animate where the reader's browser lets them. Each card
+here is drawn twice, one per palette, and GitHub shows the one that matches
+the theme you read it in:
 
-![The animated-counters layout: a grid of large numbers over a contribution
-sparkline](.github/readme/card-animated-counters.svg)
+<picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/jmrplens/ghchronicle/main/site/src/assets/card-animated-counters_dark.svg"><img src="https://raw.githubusercontent.com/jmrplens/ghchronicle/main/site/src/assets/card-animated-counters.svg" alt="The animated-counters layout: a grid of large numbers over a contribution sparkline"></picture>
 
-![The github-stats layout: a header band, rows of four monospace numbers and a
-language share bar with its legend](.github/readme/card-github-stats.svg)
+<picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/jmrplens/ghchronicle/main/site/src/assets/card-github-stats_dark.svg"><img src="https://raw.githubusercontent.com/jmrplens/ghchronicle/main/site/src/assets/card-github-stats.svg" alt="The github-stats layout: a header band, rows of four monospace numbers and a language share bar with its legend"></picture>
 
-![The badge-row layout: a horizontal row of small pill badges, each with a
-label and a number](.github/readme/card-badge-row.svg)
+<picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/jmrplens/ghchronicle/main/site/src/assets/card-badge-row_dark.svg"><img src="https://raw.githubusercontent.com/jmrplens/ghchronicle/main/site/src/assets/card-badge-row.svg" alt="The badge-row layout: a horizontal row of small pill badges, each with a label and a number"></picture>
 
 ```sh
-ghchronicle -config config.yaml -card card.svg -card-layout animated-counters -card-theme auto
+ghchronicle -config config.yaml -card card.svg -card-layout animated-counters -card-theme light
+ghchronicle -config config.yaml -card card_dark.svg -card-layout animated-counters -card-theme dark
 ```
 
 [The ten layouts](https://jmrp.io/docs/ghchronicle/card/layouts/), with what

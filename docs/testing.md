@@ -157,9 +157,9 @@ of contributions, GitHub's whole fourteen days of traffic, five repositories to
 rank and one of them in six languages, which the smaller account every other
 suite asserts on cannot give a picture. A fixture named `<repo>~<fixture>`
 there answers for that one repository, and any other repository borrows
-hello-world's.
-`GHC_CARD_THEME` picks dark, light or `auto`, which puts both themes in one
-file behind a `prefers-color-scheme` query.
+hello-world's. Each layout comes out twice, `card-<layout>.svg` in the light
+palette and `card-<layout>_dark.svg` in the dark one, which is what the site's
+`ThemeImage` and the README's `<picture>` read.
 
 ```sh
 mkdir -p /tmp/cards

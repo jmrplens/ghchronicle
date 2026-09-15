@@ -2,20 +2,20 @@
 <title id="ghcTitle">octocat</title>
 <desc id="ghcDesc">GitHub summary for octocat: 1663 contributions in the last year, 614 stars, 1200 followers. Contributions per day over the last 366 days, peaking at 26.</desc>
 <style>
-.bg{fill:#ffffff;stroke:#d0d7de}
-.panel{fill:#f6f8fa}
-.t,.v,.big{fill:#1f2328}
-.d,.l,.h,.s{fill:#57606a}
-.n,.c{fill:#24292f}
-.star,.pill-v{fill:#9a6700}
-.on-accent{fill:#ffffff}
-.line{stroke:#0969da}
-.area{fill:#0969da}
-.axis,.edge{stroke:#d0d7de}
-.track{fill:#d0d7de}
-.ok{fill:#1a7f37}
-.fg{fill:#1f2328}
-.h0{fill:#eff2f5}.h1{fill:#aceebb}.h2{fill:#4ac26b}.h3{fill:#2da44e}.h4{fill:#116329}
+.bg{fill:#0d1117;stroke:#30363d}
+.panel{fill:#161b22}
+.t,.v,.big{fill:#e6edf3}
+.d,.l,.h,.s{fill:#8b949e}
+.n,.c{fill:#c9d1d9}
+.star,.pill-v{fill:#e3b341}
+.on-accent{fill:#0d1117}
+.line{stroke:#58a6ff}
+.area{fill:#58a6ff}
+.axis,.edge{stroke:#30363d}
+.track{fill:#30363d}
+.ok{fill:#3fb950}
+.fg{fill:#e6edf3}
+.h0{fill:#151b23}.h1{fill:#033a16}.h2{fill:#196c2e}.h3{fill:#2ea043}.h4{fill:#56d364}
 text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif}
 .mono{font-family:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace}
 .t{font-size:18px;font-weight:600}

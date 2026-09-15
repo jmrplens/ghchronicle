@@ -227,6 +227,7 @@ export default defineConfig({
 				"./src/styles/code.css",
 				"./src/styles/tables.css",
 				"./src/styles/diagram.css",
+				"./src/styles/theme-images.css",
 				// Last: focus rings and the skip link must win.
 				"./src/styles/a11y.css",
 			],

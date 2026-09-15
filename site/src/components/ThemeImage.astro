@@ -1,0 +1,59 @@
+---
+/**
+ * A picture in the palette the page is in.
+ *
+ * A picture drawn for a theme ships twice, <name>.svg in the light palette and
+ * <name>_dark.svg in the dark one. This takes the light one and derives the
+ * dark, emits both, and styles/theme-images.css hides whichever does not belong
+ * to the theme on <html>. The same convention and the same class names as
+ * jmrplens/phonometry, so a picture moves between the two sites unchanged.
+ *
+ * The switch follows the page's own theme toggle, not the operating system,
+ * which is the difference from a single picture carrying both palettes behind
+ * a prefers-color-scheme query: that follows the system whatever the reader
+ * chose on the page, so a dark page could show a light card.
+ *
+ * Both images are lazy. A lazy image under display:none is never fetched, so
+ * the reader downloads only the palette they are looking at, and the other
+ * arrives the first time they switch.
+ */
+interface Props {
+	/** The light picture's URL. The dark one is the same with `_dark` before the extension. */
+	light: string;
+	/** The dark picture's URL, when it cannot be derived from the light one. */
+	dark?: string;
+	/** What the picture shows, shared by both palettes. */
+	alt: string;
+	/** Intrinsic size, so the page reserves the box before the picture arrives. */
+	width: number;
+	height: number;
+}
+
+const { light, alt, width, height } = Astro.props;
+const dark = Astro.props.dark ?? light.replace(/(\.[A-Za-z0-9]+)(\?.*)?$/, "_dark$1$2");
+
+if (!alt.trim()) {
+	throw new Error(`<ThemeImage light="${light}" /> needs an alt.`);
+}
+if (dark === light) {
+	throw new Error(`<ThemeImage /> could not derive the dark picture of "${light}".`);
+}
+---
+
+<img
+	class="light-only"
+	src={light}
+	alt={alt}
+	width={width}
+	height={height}
+	loading="lazy"
+	decoding="async"
+/><img
+	class="dark-only"
+	src={dark}
+	alt={alt}
+	width={width}
+	height={height}
+	loading="lazy"
+	decoding="async"
+/>

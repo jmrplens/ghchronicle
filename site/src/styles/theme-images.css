@@ -1,0 +1,17 @@
+/* ============================================================
+ * theme-images.css, one picture in the palette the page is in.
+ * ============================================================
+ *
+ * A picture drawn for a theme ships twice, <name>.svg in the light palette
+ * and <name>_dark.svg in the dark one, and ThemeImage.astro emits both. This
+ * hides the one that does not belong to the theme on <html>, which the theme
+ * toggle sets, so the picture follows the page and not the operating system.
+ * The same convention and the same class names as jmrplens/phonometry.
+ *
+ * Both images are lazy, and a lazy image under display:none is never
+ * fetched, so a reader downloads only the palette they are looking at.
+ */
+[data-theme="light"] img.dark-only,
+[data-theme="dark"] img.light-only {
+	display: none;
+}

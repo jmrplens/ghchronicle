@@ -2,20 +2,20 @@
 <title id="ghcTitle">Top repositories</title>
 <desc id="ghcDesc">GitHub summary for octocat: 614 stars, 80 forks, 42 public repositories. Most starred repositories: chronicle-cli with 240 stars in Go, pixel-garden with 156 stars in TypeScript, tide-tables with 97 stars in Python, hello-world with 80 stars in Go, dotfiles with 41 stars in Shell.</desc>
 <style>
-.bg{fill:#ffffff;stroke:#d1d9e0}
-.panel{fill:#f6f8fa}
-.t,.v,.big{fill:#1f2328}
-.d,.l,.h,.s{fill:#59636e}
-.n,.c{fill:#1f2328}
-.star,.pill-v{fill:#0969da}
-.on-accent{fill:#ffffff}
-.line{stroke:#0969da}
-.area{fill:#0969da}
-.axis,.edge{stroke:#d1d9e0}
-.track{fill:#d1d9e0}
-.ok{fill:#1a7f37}
-.fg{fill:#1f2328}
-.h0{fill:#eff2f5}.h1{fill:#aceebb}.h2{fill:#4ac26b}.h3{fill:#2da44e}.h4{fill:#116329}
+.bg{fill:#0d1117;stroke:#3d444d}
+.panel{fill:#151b23}
+.t,.v,.big{fill:#f0f6fc}
+.d,.l,.h,.s{fill:#9198a1}
+.n,.c{fill:#f0f6fc}
+.star,.pill-v{fill:#4493f8}
+.on-accent{fill:#0d1117}
+.line{stroke:#4493f8}
+.area{fill:#4493f8}
+.axis,.edge{stroke:#3d444d}
+.track{fill:#3d444d}
+.ok{fill:#3fb950}
+.fg{fill:#f0f6fc}
+.h0{fill:#151b23}.h1{fill:#033a16}.h2{fill:#196c2e}.h3{fill:#2ea043}.h4{fill:#56d364}
 text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans',Helvetica,Arial,sans-serif}
 .mono{font-family:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace}
 .t{font-size:15px;font-weight:600}

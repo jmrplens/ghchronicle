@@ -56,7 +56,7 @@ number and nobody would notice until the card was already committed.
 
 ```sh
 ghchronicle -config config.yaml -card profile.svg -card-only \
-  -card-layout github-stats -card-theme auto \
+  -card-layout github-stats -card-theme dark \
   -card-fields repos,stars,forks,followers,commits,pull_requests,languages
 ```
 
@@ -65,14 +65,25 @@ Empty means the layout's default set.
 ## Themes
 
 <Tabs syncKey="card-theme">
-  <TabItem label="auto">
-    Both palettes in one file, behind a `prefers-color-scheme` media query,
-    which GitHub honours. One file works in a README on either setting.
-  </TabItem>
   <TabItem label="dark and light">
-    One palette each. For a README that switches with `#gh-dark-mode-only` and
-    `#gh-light-mode-only`, render the card twice: from the Action, that is two
-    calls, one with `card-theme: dark` and one with `card-theme: light`.
+    One palette each, and the choice for a README. Render the card twice, which
+    from the Action is two calls, one with `card-theme: light` and one with
+    `card-theme: dark`, and put both in a `<picture>`, the way GitHub documents
+    showing a different picture per theme:
+
+    ```html
+    <picture><source media="(prefers-color-scheme: dark)" srcset="card_dark.svg"><img src="card.svg" alt="My GitHub card"></picture>
+    ```
+
+    This project's own README does exactly that with its cards.
+  </TabItem>
+  <TabItem label="auto">
+    Both palettes in one file, behind a `prefers-color-scheme` query inside the
+    picture. The query follows the reader's operating system rather than the
+    theme they chose on the page, and a browser does not reliably evaluate it
+    again inside an image: on GitHub, auto cards were seen switching palettes on
+    a dark page after the tab was left and come back to. It suits a page with no
+    theme of its own. For a README, use the two files.
   </TabItem>
 </Tabs>
 

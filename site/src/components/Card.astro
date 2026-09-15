@@ -27,6 +27,7 @@
  * the URL rather than passed in, the way `Figure.astro` reads it.
  */
 import { BASE, localeOf } from "../lib/site.mjs";
+import ThemeImage from "./ThemeImage.astro";
 
 interface Props {
 	/** The layout's name, which is the stem of its picture: card-<name>.svg. */
@@ -56,13 +57,18 @@ const sources = import.meta.glob<string>("../assets/card-*.svg", {
 	eager: true,
 });
 
+// Both palettes, light as the plain name and dark with the `_dark` suffix. The
+// dark URL is looked up rather than derived, because Vite puts a content hash
+// into every asset URL and a suffix added after it names no file.
 const key = `../assets/card-${name}.svg`;
+const darkKey = `../assets/card-${name}_dark.svg`;
 const src = urls[key];
+const darkSrc = urls[darkKey];
 const raw = sources[key];
-if (!src || !raw) {
+if (!src || !darkSrc || !raw) {
 	throw new Error(
-		`<Card name="${name}" /> has no picture at src/assets/card-${name}.svg. ` +
-			"Render the gallery with TestCardGallery (see the testing page) and copy it in.",
+		`<Card name="${name}" /> needs both src/assets/card-${name}.svg and card-${name}_dark.svg. ` +
+			"Render the gallery with TestCardGallery (see the testing page) and copy them in.",
 	);
 }
 
@@ -83,13 +89,12 @@ const label = LABELS[locale];
 ---
 
 <figure class="rb-card" data-card>
-	<img
-		src={src}
+	<ThemeImage
+		light={src}
+		dark={darkSrc}
 		alt={alt}
 		width={width}
 		height={height}
-		loading="lazy"
-		decoding="async"
 	/>
 	{
 		animated && (
@@ -126,7 +131,12 @@ const label = LABELS[locale];
 		const figure = button.closest("[data-card]");
 		if (!figure?.querySelector("img")) continue;
 		button.addEventListener("click", () => {
-			const current = figure.querySelector("img");
+			// The palette on screen. The other one is display:none, and a lazy
+			// image there has usually never been fetched, so reloading it would
+			// cost a download and replay nothing anyone can see.
+			const current = [...figure.querySelectorAll("img")].find(
+				(image) => getComputedStyle(image).display !== "none",
+			);
 			if (!current) return;
 			const url = new URL(current.currentSrc || current.src, location.href);
 			// Never a value this page has used, and not crypto.randomUUID, which

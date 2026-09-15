@@ -25,13 +25,15 @@ import (
 //	mkdir -p /tmp/cards
 //	GHC_CARD_GALLERY=/tmp/cards go test ./test/e2e/ -run TestCardGallery
 //
-// GHC_CARD_THEME picks the theme, dark unless it says otherwise. `auto` puts
-// both themes in one file behind a prefers-color-scheme query, which is what
-// a card in a README wants.
-//
-// The files are SVG, which is what the tool writes. The documentation shows
-// PNG, so `rsvg-convert -w <width> card.svg -o card.png` is the second step;
-// the site's images were made at twice the layout's own width.
+// Every layout is drawn twice, card-<layout>.svg in the light palette and
+// card-<layout>_dark.svg in the dark one: the names the site's ThemeImage and
+// the README's <picture> read, and the convention jmrplens/phonometry already
+// uses for its own figures. Two files and not one "auto" file, because auto decides its
+// palette with a prefers-color-scheme query inside the picture: that follows
+// the reader's operating system rather than the theme they picked on the page,
+// and a browser does not reliably evaluate it again inside an image. On GitHub
+// the README's auto cards were seen switching palettes on a dark page when the
+// tab was left and came back to.
 func TestCardGallery(t *testing.T) {
 	t.Parallel()
 	dir := os.Getenv("GHC_CARD_GALLERY")
@@ -50,20 +52,6 @@ func TestCardGallery(t *testing.T) {
 	}
 	defer func() { _ = out.Close() }()
 
-	// Matched against the three the renderer knows rather than passed
-	// through: a value out of the environment that reaches a command line is
-	// how a flag ends up carrying something nobody meant, and a typo here
-	// would otherwise surface as a card that is silently the wrong theme.
-	theme := "dark"
-	switch os.Getenv("GHC_CARD_THEME") {
-	case "", "dark":
-	case "light":
-		theme = "light"
-	case "auto":
-		theme = "auto"
-	default:
-		t.Fatalf("GHC_CARD_THEME=%q: dark, light or auto", os.Getenv("GHC_CARD_THEME"))
-	}
 	// The base fixtures plus the gallery's own, which give the account a whole
 	// year of contributions, GitHub's full fourteen days of traffic, five
 	// repositories to rank and one of them in six languages. On the base
@@ -71,28 +59,31 @@ func TestCardGallery(t *testing.T) {
 	// repositories had one row and the language ring was one color.
 	gh := fakegh.New(t, "testdata", "testdata/gallery")
 
+	themes := []struct{ flag, suffix string }{{"light", ".svg"}, {"dark", "_dark.svg"}}
 	for _, layout := range render.Layouts() {
-		// A directory per layout, because the second sweep of the same state
-		// file is answered 304 for everything and accumulates nothing: every
-		// card after the first came out with a zero in each number, which is
-		// a picture of a bug rather than of a layout.
-		work := t.TempDir()
-		cfg := writeConfig(t, work, gh.URL(), "e2e-token", login, "")
-		card := filepath.Join(work, "card.svg")
-		logs, runErr := run(t, 2*time.Minute, "-config", cfg,
-			"-card", card, "-card-only",
-			"-card-layout", layout.Name, "-card-theme", theme)
-		if runErr != nil {
-			t.Fatalf("%s: %v\n%s", layout.Name, runErr, logs)
+		for _, theme := range themes {
+			// A directory per card, because the second sweep of the same state
+			// file is answered 304 for everything and accumulates nothing:
+			// every card after the first came out with a zero in each number,
+			// which is a picture of a bug rather than of a layout.
+			work := t.TempDir()
+			cfg := writeConfig(t, work, gh.URL(), "e2e-token", login, "")
+			card := filepath.Join(work, "card.svg")
+			logs, runErr := run(t, 2*time.Minute, "-config", cfg,
+				"-card", card, "-card-only",
+				"-card-layout", layout.Name, "-card-theme", theme.flag)
+			if runErr != nil {
+				t.Fatalf("%s %s: %v\n%s", layout.Name, theme.flag, runErr, logs)
+			}
+			svg, readErr := os.ReadFile(card)
+			if readErr != nil {
+				t.Fatalf("%s %s: card not written: %v\n%s", layout.Name, theme.flag, readErr, logs)
+			}
+			name := "card-" + layout.Name + theme.suffix
+			if writeErr := out.WriteFile(name, svg, 0o600); writeErr != nil {
+				t.Fatalf("%s: %v", name, writeErr)
+			}
+			t.Logf("%-32s %6d bytes", name, len(svg))
 		}
-		svg, readErr := os.ReadFile(card)
-		if readErr != nil {
-			t.Fatalf("%s: card not written: %v\n%s", layout.Name, readErr, logs)
-		}
-		name := "card-" + layout.Name + ".svg"
-		if writeErr := out.WriteFile(name, svg, 0o600); writeErr != nil {
-			t.Fatalf("%s: %v", name, writeErr)
-		}
-		t.Logf("%-20s %6d bytes", layout.Name, len(svg))
 	}
 }

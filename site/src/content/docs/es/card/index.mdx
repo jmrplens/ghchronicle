@@ -57,7 +57,7 @@ subida.
 
 ```sh
 ghchronicle -config config.yaml -card profile.svg -card-only \
-  -card-layout github-stats -card-theme auto \
+  -card-layout github-stats -card-theme dark \
   -card-fields repos,stars,forks,followers,commits,pull_requests,languages
 ```
 
@@ -66,15 +66,25 @@ Vacío significa el conjunto por defecto del diseño.
 ## Temas
 
 <Tabs syncKey="card-theme">
-  <TabItem label="auto">
-    Ambas paletas en un fichero, tras una media query `prefers-color-scheme`,
-    que GitHub respeta. Un solo fichero funciona en un README con cualquier
-    ajuste.
-  </TabItem>
   <TabItem label="dark y light">
-    Una paleta cada uno. Para un README que cambia con `#gh-dark-mode-only` y
-    `#gh-light-mode-only`, dibuja la tarjeta dos veces: desde la Action son dos
-    llamadas, una con `card-theme: dark` y otra con `card-theme: light`.
+    Una paleta cada uno, y la opción para un README. Dibuja la tarjeta dos
+    veces, que desde la Action son dos llamadas, una con `card-theme: light` y
+    otra con `card-theme: dark`, y pon las dos en un `<picture>`, que es como
+    GitHub documenta mostrar una imagen distinta según el tema:
+
+    ```html
+    <picture><source media="(prefers-color-scheme: dark)" srcset="card_dark.svg"><img src="card.svg" alt="Mi tarjeta de GitHub"></picture>
+    ```
+
+    El README de este mismo proyecto lo hace así con sus tarjetas.
+  </TabItem>
+  <TabItem label="auto">
+    Ambas paletas en un fichero, tras una consulta `prefers-color-scheme`
+    dentro de la imagen. Esa consulta sigue al sistema operativo de quien lee y
+    no al tema que eligió en la página, y un navegador no la vuelve a evaluar de
+    forma fiable dentro de una imagen: en GitHub se vieron tarjetas auto cambiar
+    de paleta en una página oscura al salir de la pestaña y volver. Sirve en una
+    página sin tema propio. Para un README, usa los dos ficheros.
   </TabItem>
 </Tabs>
 
