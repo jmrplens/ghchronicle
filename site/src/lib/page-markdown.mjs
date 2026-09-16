@@ -15,6 +15,7 @@
 import figures from "../data/figures.json" with { type: "json" };
 import stats from "../data/stats.json" with { type: "json" };
 
+import { CARD_COMMAND_TEXT, cardCommand, cardStep } from "./card-command.mjs";
 import { localeOf, pageUrl } from "./site.mjs";
 
 // Starlight's own default titles for an untitled aside, in the two locales the
@@ -237,10 +238,11 @@ function renderWrapper(name, attributes, children, context) {
  *
  * @param {string} name component name
  * @param {Record<string, string>} attributes its double-quoted props
+ * @param {string} raw the text between the tag name and the closing bracket
  * @param {{ file: string, locale: "en" | "es" }} context page being rendered
  * @returns {string} markdown
  */
-function renderSelfClosing(name, attributes, context) {
+function renderSelfClosing(name, attributes, raw, context) {
 	// A figure is a drawing, and a drawing reduces to the words it draws. Both
 	// the description and the table below are generated beside the SVG by
 	// scripts/gen-figures.mjs from the same values, so the twin cannot come to
@@ -259,8 +261,7 @@ function renderSelfClosing(name, attributes, context) {
 		return `\n\n${figure[context.locale].markdown}\n\n`;
 	}
 	// A picture of the card reduces to the markdown image it replaced, with the
-	// same path relative to the page, so the twin and the files gen-docs.mjs
-	// writes from it say exactly what they said before the component existed.
+	// same path relative to the page, followed by the command that draws it.
 	// A markdown image cannot replay an animation, so the flag has no reduction,
 	// and it cannot offer a loop either: a `loop` card reduces to the picture
 	// it shows until the toggle is pressed, the one that plays once.
@@ -272,7 +273,28 @@ function renderSelfClosing(name, attributes, context) {
 		}
 		const depth = context.file.replace(/^.*?\bsrc\//, "").split("/").length - 1;
 		const assets = `${"../".repeat(depth)}assets`;
-		return `\n\n![${attributes.alt}](${assets}/card-${attributes.name}.svg)\n\n`;
+		// The command is the part a reader acts on, so the twin keeps it, as the
+		// same two alternatives the page offers in tabs and reduced the way a
+		// <TabItem> is. It is the command for the picture above it, the one that
+		// plays once; a `loop` card says in a sentence what the toggle changes,
+		// rather than printing both commands again with one flag between them.
+		const text = CARD_COMMAND_TEXT[context.locale];
+		const alternatives = [
+			[text.binary, "sh", cardCommand(attributes.name, false)],
+			[text.action, "yaml", cardStep(attributes.name, false)],
+		]
+			.map(
+				([label, lang, code]) =>
+					`- **${label}**\n\n${indentBy(`\`\`\`${lang}\n${code}\n\`\`\``, "  ")}`,
+			)
+			.join("\n\n");
+		// `loop` is a bare boolean prop, which the attribute reader above skips,
+		// so it is read off the tag with the quoted values blanked out first: an
+		// alt that says "in a loop" is not the prop.
+		const looping = /(?:^|\s)loop(?=\s|\/|$)/.test(
+			raw.replaceAll(/"[^"]*"/g, '""'),
+		);
+		return `\n\n![${attributes.alt}](${assets}/card-${attributes.name}.svg)\n\n${alternatives}\n\n${looping ? `${text.loop}\n\n` : ""}`;
 	}
 	if (name === "LinkCard") {
 		const title = attributes.title ?? attributes.href ?? "";
@@ -306,7 +328,7 @@ function reduce(source, context) {
 		}
 		const attributes = parseAttributes(raw);
 		if (selfClosing) {
-			out += renderSelfClosing(name, attributes, context);
+			out += renderSelfClosing(name, attributes, raw, context);
 			continue;
 		}
 		// Scan to the matching close, counting nested tags of the same name so a

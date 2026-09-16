@@ -44,6 +44,9 @@
  * `scripts/check-i18n-parity.mjs` compares, so the label's language is read off
  * the URL rather than passed in, the way `Figure.astro` reads it.
  */
+import { Code, TabItem, Tabs } from "@astrojs/starlight/components";
+
+import { CARD_COMMAND_TEXT, cardCommand, cardStep } from "../lib/card-command.mjs";
 import { BASE, localeOf } from "../lib/site.mjs";
 import ThemeImage from "./ThemeImage.astro";
 
@@ -123,6 +126,10 @@ const LOOP_LABELS = {
 	es: "Reproducir en bucle",
 };
 const loopLabel = LOOP_LABELS[locale];
+const text = CARD_COMMAND_TEXT[locale];
+// The pictures and their commands in the order the toggle below swaps them:
+// the one that plays once, and, on a card that offers it, the looping one.
+const variants = loop ? [false, true] : [false];
 ---
 
 <figure class="rb-card" data-card>
@@ -133,6 +140,7 @@ const loopLabel = LOOP_LABELS[locale];
 		width={width}
 		height={height}
 	/>
+	<div class="rb-card__controls not-content">
 	{
 		animated && (
 			<button
@@ -192,6 +200,87 @@ const loopLabel = LOOP_LABELS[locale];
 			</button>
 		)
 	}
+	<a
+		class="rb-card__replay rb-card__open rb-card__open--light"
+		href={src}
+		data-card-open="light"
+	>
+		<svg
+			aria-hidden="true"
+			viewBox="0 0 24 24"
+			width="16"
+			height="16"
+			fill="none"
+			stroke="currentColor"
+			stroke-width="2"
+			stroke-linecap="round"
+			stroke-linejoin="round"
+		>
+			<path d="M15 3h6v6" />
+			<path d="M9 21H3v-6" />
+			<path d="M21 3l-7 7" />
+			<path d="M3 21l7-7" />
+		</svg>
+		<span>{text.fullSize}<span class="sr-only">{text.fullSizeOf(name)}</span></span>
+	</a>
+	<a
+		class="rb-card__replay rb-card__open rb-card__open--dark"
+		href={darkSrc}
+		data-card-open="dark"
+	>
+		<svg
+			aria-hidden="true"
+			viewBox="0 0 24 24"
+			width="16"
+			height="16"
+			fill="none"
+			stroke="currentColor"
+			stroke-width="2"
+			stroke-linecap="round"
+			stroke-linejoin="round"
+		>
+			<path d="M15 3h6v6" />
+			<path d="M9 21H3v-6" />
+			<path d="M21 3l-7 7" />
+			<path d="M3 21l7-7" />
+		</svg>
+		<span>{text.fullSize}<span class="sr-only">{text.fullSizeOf(name)}</span></span>
+	</a>
+	</div>
+	<div class="rb-card__command">
+		<Tabs syncKey="card-command">
+			<TabItem label={text.binary}>
+				{
+					variants.map((looping) => (
+						<div
+							data-card-command={looping ? "loop" : "once"}
+							hidden={looping}
+						>
+							<Code
+								code={cardCommand(name, looping)}
+								lang="sh"
+							/>
+						</div>
+					))
+				}
+			</TabItem>
+			<TabItem label={text.action}>
+				{
+					variants.map((looping) => (
+						<div
+							data-card-command={looping ? "loop" : "once"}
+							hidden={looping}
+						>
+							<Code
+								code={cardStep(name, looping)}
+								lang="yaml"
+							/>
+						</div>
+					))
+				}
+			</TabItem>
+		</Tabs>
+	</div>
 </figure>
 
 <script>
@@ -345,7 +434,20 @@ const loopLabel = LOOP_LABELS[locale];
 			// the next press tries the same swap again; a press that another press
 			// has overtaken leaves the state to that one.
 			const outcome = swaps[PALETTES.indexOf(onScreen)];
-			if (outcome === "shown") button.setAttribute("aria-pressed", String(wantsLoop));
+			if (outcome === "shown") {
+				button.setAttribute("aria-pressed", String(wantsLoop));
+				// The command under the card and the full-size link follow the
+				// picture, at the moment the picture changes: a command that says
+				// `-card-motion loop` under a card that settled would be a line
+				// that draws something other than what the reader is looking at.
+				for (const block of figure.querySelectorAll<HTMLElement>("[data-card-command]")) {
+					block.hidden = (block.dataset.cardCommand === "loop") !== wantsLoop;
+				}
+				for (const link of figure.querySelectorAll<HTMLAnchorElement>("[data-card-open]")) {
+					const dark = link.dataset.cardOpen === "dark";
+					link.href = wantsLoop ? (dark ? loopDark : loopLight) : dark ? onceDark : onceLight;
+				}
+			}
 			else if (outcome === "failed" && looping === wantsLoop) looping = !wantsLoop;
 		});
 		button.hidden = false;
@@ -361,11 +463,20 @@ const loopLabel = LOOP_LABELS[locale];
 		max-width: 100%;
 		height: auto;
 	}
+	/* The controls in one row that wraps, spaced by the row rather than by a
+	 * margin on each control: which of them is on screen depends on JavaScript,
+	 * the reader's motion preference and the page's theme, and a gap is only
+	 * ever put between the ones that are. */
+	.rb-card__controls {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem;
+		margin-block-start: 0.5rem;
+	}
 	.rb-card__replay {
 		display: inline-flex;
 		align-items: center;
 		gap: 0.4rem;
-		margin-block-start: 0.5rem;
 		padding: 0.3rem 0.7rem;
 		border: 1px solid var(--sl-color-gray-5);
 		border-radius: 999px;
@@ -374,13 +485,6 @@ const loopLabel = LOOP_LABELS[locale];
 		font: inherit;
 		font-size: var(--sl-text-sm);
 		cursor: pointer;
-	}
-	/* A card with both controls puts them side by side, and the markup has no
-	 * space between the two, so the second one carries it. Only the second: a
-	 * margin on every button would hang off the end of the row and off a card
-	 * that offers a single control. */
-	.rb-card__replay + .rb-card__replay {
-		margin-inline-start: 0.5rem;
 	}
 	.rb-card__replay:hover {
 		border-color: var(--sl-color-text-accent);
@@ -394,11 +498,35 @@ const loopLabel = LOOP_LABELS[locale];
 	.rb-card__replay[hidden] {
 		display: none;
 	}
+	/* A link, not a button, so it takes the pill's look and loses the link
+	 * underline. It is there with or without JavaScript and whatever the
+	 * reader's motion preference, because opening a picture at its own size
+	 * plays nothing. One per palette, and the one that does not belong to the
+	 * page's theme is hidden the way theme-images.css hides its picture. */
+	.rb-card__open {
+		text-decoration: none;
+	}
+	:global([data-theme="light"]) .rb-card__open--dark,
+	:global([data-theme="dark"]) .rb-card__open--light {
+		display: none;
+	}
+	/* Under every one of a dozen pictures, the snippet is kept to what it
+	 * says: the tab row close above the block, and a block two lines tall
+	 * rather than padded the way a page's standalone example is. */
+	.rb-card__command {
+		margin-block-start: 0.75rem;
+	}
+	.rb-card__command :global(.expressive-code) {
+		margin-block-start: 0.5rem;
+	}
+	.rb-card__command :global(.expressive-code pre) {
+		padding-block: 0.25rem;
+	}
 	/* The cards themselves stop animating under this preference, so a button
 	 * that replays nothing, or loops a picture that does not move, would be a
 	 * control with no effect. The loop toggle carries this class too. */
 	@media (prefers-reduced-motion: reduce) {
-		.rb-card__replay {
+		.rb-card__replay:not(.rb-card__open) {
 			display: none;
 		}
 	}
