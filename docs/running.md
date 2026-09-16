@@ -73,8 +73,10 @@ keep it running once you are done watching it.
 The collector pushes to every store it supports, so it does not need to be
 reachable from anywhere. It needs to reach GitHub and to reach its databases.
 That is the only constraint, and it is what makes all four of these viable.
-The first two need a host of their own; the last two do not, and the system
-pages above are about the first two.
+Three of the four want a host you own: systemd, Docker and cron. GitHub Actions
+is the one that does not. The system pages above are where the scheduler lives,
+one per system: systemd or cron on Linux, launchd on macOS, a scheduled task on
+Windows.
 
 - [systemd](https://jmrp.io/docs/ghchronicle/install/systemd/): A long-running service on a host you own. The default choice: the state file persists, the schedule is the tool's own, and the unit can be locked down hard.
 
@@ -133,9 +135,9 @@ curl -fsSLO "$base/ghchronicle_${VERSION}_linux_${arch}.tar.gz"
 >
 > The repository publishes a moving `v1` tag beside the numbered releases,
 > because the Action is listed on the Marketplace and that listing needs one.
-> The `v1` release carries **no files at all**, so a download URL built from
-> whichever release GitHub currently flags can resolve to a release with
-> nothing in it. Take the version from the
+> The `v1` release carries **no files at all**, so never build a download URL
+> from the major tag: there is nothing behind it to download. Take the version
+> from the
 > [releases page](https://github.com/jmrplens/ghchronicle/releases) and write
 > it down, as above.
 
@@ -243,8 +245,9 @@ a single line, at the cost of giving every family the same cadence.
 
 ### Build it from source
 
-Go 1.27 or newer is what the module declares. Nothing else is needed: the build
-sets `CGO_ENABLED=0`, so there is no compiler and no header package to find.
+Go 1.27.1 or newer is what the module declares. Nothing else is needed: the
+build sets `CGO_ENABLED=0`, so there is no compiler and no header package to
+find.
 
 - **go install**
 
@@ -331,9 +334,9 @@ curl -fsSLO "$base/ghchronicle_${VERSION}_darwin_${arch}.tar.gz"
 >
 > The repository publishes a moving `v1` tag beside the numbered releases,
 > because the Action is listed on the Marketplace and that listing needs one.
-> The `v1` release carries **no files at all**, so a download URL built from
-> whichever release GitHub currently flags can resolve to a release with
-> nothing in it. Take the version from the
+> The `v1` release carries **no files at all**, so never build a download URL
+> from the major tag: there is nothing behind it to download. Take the version
+> from the
 > [releases page](https://github.com/jmrplens/ghchronicle/releases) and write
 > it down, as above.
 
@@ -418,14 +421,24 @@ The archive holds three files and no directory.
 >
 > The binary carries no Developer ID signature and is not notarized, so a copy
 > that arrives with the quarantine attribute is refused with "cannot be opened
-> because the developer cannot be verified". `curl` does not set that
-> attribute and a browser does, which is why the download above is a `curl`.
-> If yours came from a browser, clear it and check that it is gone:
+> because the developer cannot be verified". The attribute is not carried
+> inside the archive: it is set by whatever process writes a file, and
+> inherited by the processes that one starts. A browser writes the `.tar.gz` it
+> downloads with the mark on it, `curl` does not, and `tar -xzf` run from
+> Terminal writes an unmarked binary either way. The case that bites is opening
+> the archive in Finder, because Archive Utility passes the mark on to what it
+> extracts. So look before you clear anything:
 >
 > ```sh
-> xattr -d com.apple.quarantine ghchronicle
-> xattr -l ghchronicle
+> xattr -l ghchronicle_1.0.0_darwin_arm64.tar.gz   # what a browser marked
+> xattr -l ghchronicle                             # the extracted binary
+> xattr -c ghchronicle                             # clear it
 > ```
+>
+> `xattr -c` clears every extended attribute and succeeds when there are none.
+> `xattr -d com.apple.quarantine` does not: on a binary extracted from Terminal
+> it stops with `No such xattr: com.apple.quarantine`, which looks like a
+> broken instruction and is only the attribute never having been there.
 
 ### Run it once
 
@@ -531,7 +544,7 @@ happening again on every run.
 
 ### Build it from source
 
-Go 1.27 or newer is what the module declares. The build sets `CGO_ENABLED=0`,
+Go 1.27.1 or newer is what the module declares. The build sets `CGO_ENABLED=0`,
 so the Xcode command line tools are not needed for it.
 
 - **go install**
@@ -610,21 +623,39 @@ Windows archives are `zip` rather than `tar.gz`, and they are named
 | `AMD64`                       | `windows_amd64`     |
 | `ARM64`                       | `windows_arm64`     |
 
+That variable describes the **process**, not the machine. A 32-bit PowerShell
+on a 64-bit machine reports `x86` and leaves the machine's own architecture in
+`$env:PROCESSOR_ARCHITEW6432`; an x64 PowerShell running under emulation on an
+ARM64 machine reports `AMD64` and sets nothing else, which is the case that
+quietly hands you the wrong archive. If either could be you, ask the machine
+rather than the shell:
+
+```powershell
+(Get-CimInstance Win32_Processor).Architecture   # 9 is x64, 12 is ARM64
+```
+
 ```powershell
 $version = "1.0.0"
 $arch = if ($env:PROCESSOR_ARCHITECTURE -eq "ARM64") { "arm64" } else { "amd64" }
 $base = "https://github.com/jmrplens/ghchronicle/releases/download/v$version"
 $zip = "ghchronicle_${version}_windows_${arch}.zip"
-Invoke-WebRequest -Uri "$base/$zip" -OutFile $zip
+Invoke-WebRequest -UseBasicParsing -Uri "$base/$zip" -OutFile $zip
 ```
+
+`-UseBasicParsing` is not decoration. On Windows PowerShell 5.1
+`Invoke-WebRequest` builds its result through the Internet Explorer engine
+unless told not to, and fails outright on a host where Internet Explorer was
+removed or never went through its first-run configuration, which covers Server
+Core and most hardened images. On PowerShell 7 the switch is accepted and does
+nothing.
 
 > **Name the version rather than asking for the newest**
 >
 > The repository publishes a moving `v1` tag beside the numbered releases,
 > because the Action is listed on the Marketplace and that listing needs one.
-> The `v1` release carries **no files at all**, so a download URL built from
-> whichever release GitHub currently flags can resolve to a release with
-> nothing in it. Take the version from the
+> The `v1` release carries **no files at all**, so never build a download URL
+> from the major tag: there is nothing behind it to download. Take the version
+> from the
 > [releases page](https://github.com/jmrplens/ghchronicle/releases) and write
 > it down, as above.
 
@@ -636,7 +667,7 @@ Invoke-WebRequest -Uri "$base/$zip" -OutFile $zip
 1. Take the checksum file and compare the one line that is yours.
 
     ```powershell
-    Invoke-WebRequest -Uri "$base/checksums.txt" -OutFile checksums.txt
+    Invoke-WebRequest -UseBasicParsing -Uri "$base/checksums.txt" -OutFile checksums.txt
     $expected = (Select-String -Path checksums.txt -Pattern ([regex]::Escape($zip) + '$')).Line.Split(" ")[0]
     $actual = (Get-FileHash -Algorithm SHA256 -Path $zip).Hash
     if ($actual -eq $expected) { "OK" } else { "MISMATCH" }
@@ -696,13 +727,24 @@ you made.
   [Environment]::SetEnvironmentVariable("Path", "$user;$dir", "User")
   ```
 
-> **Read the Path back from where you are writing it**
+> **Two traps in writing Path back**
 >
 > Both snippets read `Path` from the scope they write to, never from
 > `$env:Path`. `$env:Path` is the process's own copy, which Windows built by
 > joining the machine list and the user list: write that back into either scope
 > and you have copied the other one into it, permanently, and it grows again
 > every time somebody repeats the command.
+>
+> The second trap belongs to the machine scope alone.
+> `[Environment]::GetEnvironmentVariable` expands `%SystemRoot%` and its
+> relatives while it reads, and `SetEnvironmentVariable` writes the result back
+> as a plain string, so a machine `Path` that held such entries comes back with
+> them baked in and its registry value changes kind from `REG_EXPAND_SZ` to
+> `REG_SZ`, for good. You cannot spot it in `$machine`, because the expansion
+> has already happened by then. Open System Properties, Environment Variables,
+> which shows the value unexpanded: if there is a `%VAR%` anywhere in the
+> machine `Path`, add the directory from that dialog rather than from the
+> snippet above.
 
 A new `Path` reaches only processes started afterwards, so open a new terminal
 before the check below. The current one keeps the environment it was given.
@@ -783,7 +825,7 @@ an ordinary character everywhere else. So a Windows path in double quotes is
 not the path you wrote, and usually not valid YAML either:
 
 ```yaml
-state_file: "C:\ghchronicle\state.json" # ghchronicle: yaml: line 5: found unknown escape character
+state_file: "C:\ghchronicle\state.json" # ghchronicle: config.yaml: yaml: line N: found unknown escape character
 state_file: C:\ghchronicle\state.json # correct, plain scalar
 state_file: 'C:\ghchronicle\state.json' # correct, single quoted
 state_file: C:/ghchronicle/state.json # correct, and the one to prefer
@@ -794,14 +836,21 @@ they survive being quoted whichever way.
 
 #### The file itself has to be UTF-8
 
-Windows PowerShell 5.1, the one that ships in the box, writes UTF-16 from `>`
-and from `Set-Content` unless it is told otherwise. A YAML parser reads that as
-binary. PowerShell 7 defaults to UTF-8 without a byte order mark and has no
-such problem; on 5.1, be explicit:
+Windows PowerShell 5.1, the one that ships in the box, writes neither of the
+things a YAML parser wants, and it writes a different wrong thing depending on
+how you ask. `>` and `Out-File` produce UTF-16LE, which the parser reads as
+binary. `Set-Content` produces the system's active code page, usually ANSI,
+which parses while the file is pure ASCII and mangles the first accented
+character in it. PowerShell 7 defaults to UTF-8 without a byte order mark and
+has neither problem; on 5.1, be explicit:
 
 ```powershell
 Set-Content -Path config.yaml -Value $text -Encoding utf8
 ```
+
+`utf8` on 5.1 means UTF-8 **with** a byte order mark, which the value cannot
+express and the cmdlet does not warn about. The collector's parser reads past
+one, so the file works; a tool that reads the first bytes for itself may not.
 
 ### Keep it running
 
@@ -824,13 +873,26 @@ and there are two shapes of it.
     -Execute "C:\Program Files\ghchronicle\ghchronicle.exe" `
     -Argument '-config "C:\ProgramData\ghchronicle\config.yaml" -once'
   $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) `
-    -RepetitionInterval (New-TimeSpan -Hours 1)
+    -RepetitionInterval (New-TimeSpan -Hours 1) `
+    -RepetitionDuration ([TimeSpan]::MaxValue)
   Register-ScheduledTask -TaskName ghchronicle -Action $action -Trigger $trigger
   ```
 
-  An hourly task gives every family an hourly cadence at best, so the
-  fifteen-minute rhythm of `actions` is lost. That is the same trade
+  `-RepetitionDuration ([TimeSpan]::MaxValue)` is what spells out "for ever".
+  Task Scheduler's own rule is that a repetition with no duration repeats
+  indefinitely, so leaving it out is not a bug, but the cmdlet has no default
+  of its own and the task is then registered carrying no duration at all.
+
+  Two conditions come with this shape, and neither is cron's. An hourly task
+  gives every family an hourly cadence at best, so the fifteen-minute rhythm
+  of `actions` is lost, which is the same trade
   [cron makes on Linux](https://jmrp.io/docs/ghchronicle/install/systemd/#cron-instead-of-a-service).
+  And `Register-ScheduledTask` here names no `-User` and no `-Principal`, so
+  the task is registered under the calling account with the default logon
+  type and runs **only while that account is logged on**. A cron job does
+  not stop when you log out. For one that behaves the same way, register the
+  task with a principal that has "run whether user is logged on or not" set,
+  which is `New-ScheduledTaskPrincipal`.
 
 - **Running all the time**
 
@@ -870,7 +932,8 @@ is nothing to stop, which is most of why it is the better default.
 
 ### Build it from source
 
-Go 1.27 or newer. `CGO_ENABLED=0` means no MSVC, no MinGW and no Windows SDK.
+Go 1.27.1 or newer, which is the version `go.mod` declares. `CGO_ENABLED=0`
+means no MSVC, no MinGW and no Windows SDK.
 
 - **go install**
 
@@ -905,9 +968,16 @@ rely on, so give every path in the file absolutely.
 
 | File             | For a machine-wide task          | For one account                     |
 | ---------------- | -------------------------------- | ----------------------------------- |
-| Configuration    | `C:/ProgramData/ghchronicle/`    | `%LOCALAPPDATA%/ghchronicle/`       |
-| State and ledger | `C:/ProgramData/ghchronicle/`    | `%LOCALAPPDATA%/ghchronicle/`       |
-| Log              | `C:/ProgramData/ghchronicle/`    | `%LOCALAPPDATA%/ghchronicle/`       |
+| Configuration    | `C:/ProgramData/ghchronicle/`    | `${LOCALAPPDATA}/ghchronicle/`      |
+| State and ledger | `C:/ProgramData/ghchronicle/`    | `${LOCALAPPDATA}/ghchronicle/`      |
+| Log              | `C:/ProgramData/ghchronicle/`    | `${LOCALAPPDATA}/ghchronicle/`      |
+
+`${LOCALAPPDATA}` is written that way because `${VAR}` is the one form the
+collector expands, from the environment, as the process starts. `%VAR%` is a
+shell notation and means nothing to the file: a `%LOCALAPPDATA%` copied into
+the YAML gives you a directory literally named `%LOCALAPPDATA%`, next to
+wherever the task happened to be working. It is `%LOCALAPPDATA%` in `cmd` and
+`$env:LOCALAPPDATA` in PowerShell that create the directory in the first place.
 
 A directory under `C:\ProgramData` is writable by its creator and readable by
 everyone, so create it elevated and then grant write to the account the task

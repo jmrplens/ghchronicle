@@ -31,9 +31,9 @@ curl -fsSLO "$base/ghchronicle_${VERSION}_darwin_${arch}.tar.gz"
 <Aside type="caution" title="Nombra la versión en vez de pedir la más nueva">
   El repositorio publica una etiqueta móvil `v1` junto a las releases
   numeradas, porque la Action está listada en el Marketplace y ese listado
-  necesita una. La release `v1` **no lleva ningún fichero**, así que una URL de
-  descarga construida a partir de la release que GitHub marque en ese momento
-  puede acabar en una release vacía. Coge la versión de la
+  necesita una. La release `v1` **no lleva ningún fichero**, así que nunca
+  construyas una URL de descarga a partir de la etiqueta mayor: detrás no hay
+  nada que descargar. Coge la versión de la
   [página de releases](https://github.com/jmrplens/ghchronicle/releases) y
   escríbela, como arriba.
 </Aside>
@@ -129,14 +129,24 @@ El archivo lleva tres ficheros y ningún directorio.
 <Aside type="caution" title="Si macOS se niega a ejecutarlo">
   El binario no lleva firma de Developer ID ni está notarizado, así que una
   copia que llegue con el atributo de cuarentena se rechaza con «no se puede
-  abrir porque no se puede verificar el desarrollador». `curl` no pone ese
-  atributo y un navegador sí, que es por lo que la descarga de arriba es un
-  `curl`. Si la tuya vino de un navegador, quítalo y comprueba que ya no está:
+  abrir porque no se puede verificar el desarrollador». El atributo no viaja
+  dentro del archivo: lo pone el proceso que escribe cada fichero, y lo heredan
+  los procesos que ese arranca. Un navegador escribe con la marca el `.tar.gz`
+  que descarga, `curl` no, y `tar -xzf` lanzado desde el Terminal escribe un
+  binario sin marca en cualquiera de los dos casos. El caso que muerde es abrir
+  el archivo en el Finder, porque Utilidad de Archivos pasa la marca a lo que
+  extrae. Así que mira antes de borrar nada:
 
   ```sh
-  xattr -d com.apple.quarantine ghchronicle
-  xattr -l ghchronicle
+  xattr -l ghchronicle_1.0.0_darwin_arm64.tar.gz   # lo que marcó el navegador
+  xattr -l ghchronicle                             # el binario extraído
+  xattr -c ghchronicle                             # quitarlo
   ```
+
+  `xattr -c` quita todos los atributos extendidos y termina bien cuando no hay
+  ninguno. `xattr -d com.apple.quarantine` no: en un binario extraído desde el
+  Terminal se para con `No such xattr: com.apple.quarantine`, que parece una
+  instrucción rota y es solo que el atributo nunca estuvo ahí.
 
 </Aside>
 
@@ -248,7 +258,7 @@ calendario de contribuciones vuelvan a ocurrir en cada ejecución.
 
 ## Compilarlo desde fuente
 
-Go 1.27 o más nuevo es lo que declara el módulo. La compilación fija
+Go 1.27.1 o más nuevo es lo que declara el módulo. La compilación fija
 `CGO_ENABLED=0`, así que las herramientas de línea de órdenes de Xcode no hacen
 falta para ella.
 

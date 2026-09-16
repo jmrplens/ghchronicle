@@ -93,8 +93,10 @@ El colector envía por push a todos los almacenes que soporta, así que no hace
 falta que sea alcanzable desde ningún sitio. Necesita alcanzar GitHub y alcanzar
 sus bases de datos. Esa es la única restricción, y es lo que hace viables las
 cuatro opciones.
-Las dos primeras necesitan una máquina propia; las dos últimas no, y las
-páginas por sistema de arriba van de las dos primeras.
+Tres de las cuatro quieren una máquina propia: systemd, Docker y cron. GitHub
+Actions es la que no. Las páginas por sistema de arriba son donde vive el
+planificador, uno por sistema: systemd o cron en Linux, launchd en macOS y una
+tarea programada en Windows.
 
 <CardGrid>
   <LinkCard

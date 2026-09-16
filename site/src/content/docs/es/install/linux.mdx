@@ -31,9 +31,9 @@ curl -fsSLO "$base/ghchronicle_${VERSION}_linux_${arch}.tar.gz"
 <Aside type="caution" title="Nombra la versión en vez de pedir la más nueva">
   El repositorio publica una etiqueta móvil `v1` junto a las releases
   numeradas, porque la Action está listada en el Marketplace y ese listado
-  necesita una. La release `v1` **no lleva ningún fichero**, así que una URL de
-  descarga construida a partir de la release que GitHub marque en ese momento
-  puede acabar en una release vacía. Coge la versión de la
+  necesita una. La release `v1` **no lleva ningún fichero**, así que nunca
+  construyas una URL de descarga a partir de la etiqueta mayor: detrás no hay
+  nada que descargar. Coge la versión de la
   [página de releases](https://github.com/jmrplens/ghchronicle/releases) y
   escríbela, como arriba.
 </Aside>
@@ -155,7 +155,7 @@ es una sola línea, a cambio de dar a todas las familias la misma cadencia.
 
 ## Compilarlo desde fuente
 
-Go 1.27 o más nuevo es lo que declara el módulo. No hace falta nada más: la
+Go 1.27.1 o más nuevo es lo que declara el módulo. No hace falta nada más: la
 compilación fija `CGO_ENABLED=0`, así que no hay compilador ni paquete de
 cabeceras que encontrar.
 

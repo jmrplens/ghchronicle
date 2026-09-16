@@ -31,9 +31,9 @@ curl -fsSLO "$base/ghchronicle_${VERSION}_darwin_${arch}.tar.gz"
 <Aside type="caution" title="Name the version rather than asking for the newest">
   The repository publishes a moving `v1` tag beside the numbered releases,
   because the Action is listed on the Marketplace and that listing needs one.
-  The `v1` release carries **no files at all**, so a download URL built from
-  whichever release GitHub currently flags can resolve to a release with
-  nothing in it. Take the version from the
+  The `v1` release carries **no files at all**, so never build a download URL
+  from the major tag: there is nothing behind it to download. Take the version
+  from the
   [releases page](https://github.com/jmrplens/ghchronicle/releases) and write
   it down, as above.
 </Aside>
@@ -129,14 +129,24 @@ The archive holds three files and no directory.
 <Aside type="caution" title="If macOS refuses to run it">
   The binary carries no Developer ID signature and is not notarized, so a copy
   that arrives with the quarantine attribute is refused with "cannot be opened
-  because the developer cannot be verified". `curl` does not set that
-  attribute and a browser does, which is why the download above is a `curl`.
-  If yours came from a browser, clear it and check that it is gone:
+  because the developer cannot be verified". The attribute is not carried
+  inside the archive: it is set by whatever process writes a file, and
+  inherited by the processes that one starts. A browser writes the `.tar.gz` it
+  downloads with the mark on it, `curl` does not, and `tar -xzf` run from
+  Terminal writes an unmarked binary either way. The case that bites is opening
+  the archive in Finder, because Archive Utility passes the mark on to what it
+  extracts. So look before you clear anything:
 
   ```sh
-  xattr -d com.apple.quarantine ghchronicle
-  xattr -l ghchronicle
+  xattr -l ghchronicle_1.0.0_darwin_arm64.tar.gz   # what a browser marked
+  xattr -l ghchronicle                             # the extracted binary
+  xattr -c ghchronicle                             # clear it
   ```
+
+  `xattr -c` clears every extended attribute and succeeds when there are none.
+  `xattr -d com.apple.quarantine` does not: on a binary extracted from Terminal
+  it stops with `No such xattr: com.apple.quarantine`, which looks like a
+  broken instruction and is only the attribute never having been there.
 
 </Aside>
 
@@ -248,7 +258,7 @@ happening again on every run.
 
 ## Build it from source
 
-Go 1.27 or newer is what the module declares. The build sets `CGO_ENABLED=0`,
+Go 1.27.1 or newer is what the module declares. The build sets `CGO_ENABLED=0`,
 so the Xcode command line tools are not needed for it.
 
 <Tabs syncKey="macos-source">

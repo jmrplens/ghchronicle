@@ -34,20 +34,38 @@ Los archivos de Windows son `zip` y no `tar.gz`, y se llaman
 | `AMD64`                       | `windows_amd64`     |
 | `ARM64`                       | `windows_arm64`     |
 
+Esa variable describe el **proceso**, no la máquina. Un PowerShell de 32 bits
+en una máquina de 64 informa de `x86` y deja la arquitectura real de la
+máquina en `$env:PROCESSOR_ARCHITEW6432`; un PowerShell x64 emulado en una
+máquina ARM64 informa de `AMD64` y no pone nada más, que es el caso que te
+entrega sin ruido el archivo equivocado. Si alguno de los dos puedes ser tú,
+pregúntale a la máquina y no al intérprete:
+
+```powershell
+(Get-CimInstance Win32_Processor).Architecture   # 9 es x64, 12 es ARM64
+```
+
 ```powershell
 $version = "1.0.0"
 $arch = if ($env:PROCESSOR_ARCHITECTURE -eq "ARM64") { "arm64" } else { "amd64" }
 $base = "https://github.com/jmrplens/ghchronicle/releases/download/v$version"
 $zip = "ghchronicle_${version}_windows_${arch}.zip"
-Invoke-WebRequest -Uri "$base/$zip" -OutFile $zip
+Invoke-WebRequest -UseBasicParsing -Uri "$base/$zip" -OutFile $zip
 ```
+
+`-UseBasicParsing` no es adorno. En Windows PowerShell 5.1 `Invoke-WebRequest`
+arma su resultado a través del motor de Internet Explorer salvo que se le diga
+que no, y falla del todo en una máquina donde Internet Explorer se haya quitado
+o nunca haya pasado su configuración de primer arranque, que es el caso de
+Server Core y de casi cualquier imagen endurecida. En PowerShell 7 el
+modificador se acepta y no hace nada.
 
 <Aside type="caution" title="Nombra la versión en vez de pedir la más nueva">
   El repositorio publica una etiqueta móvil `v1` junto a las releases
   numeradas, porque la Action está listada en el Marketplace y ese listado
-  necesita una. La release `v1` **no lleva ningún fichero**, así que una URL de
-  descarga construida a partir de la release que GitHub marque en ese momento
-  puede acabar en una release vacía. Coge la versión de la
+  necesita una. La release `v1` **no lleva ningún fichero**, así que nunca
+  construyas una URL de descarga a partir de la etiqueta mayor: detrás no hay
+  nada que descargar. Coge la versión de la
   [página de releases](https://github.com/jmrplens/ghchronicle/releases) y
   escríbela, como arriba.
 </Aside>
@@ -62,7 +80,7 @@ Invoke-WebRequest -Uri "$base/$zip" -OutFile $zip
 1. Coge el fichero de sumas y compara la única línea que es tuya.
 
     ```powershell
-    Invoke-WebRequest -Uri "$base/checksums.txt" -OutFile checksums.txt
+    Invoke-WebRequest -UseBasicParsing -Uri "$base/checksums.txt" -OutFile checksums.txt
     $expected = (Select-String -Path checksums.txt -Pattern ([regex]::Escape($zip) + '$')).Line.Split(" ")[0]
     $actual = (Get-FileHash -Algorithm SHA256 -Path $zip).Hash
     if ($actual -eq $expected) { "OK" } else { "MISMATCH" }
@@ -130,12 +148,23 @@ directorio que hayas hecho.
   </TabItem>
 </Tabs>
 
-<Aside type="caution" title="Lee el Path del mismo sitio en el que lo escribes">
+<Aside type="caution" title="Dos trampas al escribir Path de vuelta">
   Los dos fragmentos leen `Path` del ámbito en el que escriben, nunca de
   `$env:Path`. `$env:Path` es la copia propia del proceso, que Windows armó
   juntando la lista de máquina y la de usuario: escribe eso de vuelta en
   cualquiera de los dos ámbitos y habrás copiado el otro dentro, para siempre,
   y vuelve a crecer cada vez que alguien repita la orden.
+
+  La segunda trampa es solo del ámbito de máquina.
+  `[Environment]::GetEnvironmentVariable` expande `%SystemRoot%` y sus parientes
+  al leer, y `SetEnvironmentVariable` escribe el resultado de vuelta como una
+  cadena llana, así que un `Path` de máquina que llevara esas entradas vuelve
+  con ellas ya resueltas y su valor del registro cambia de tipo, de
+  `REG_EXPAND_SZ` a `REG_SZ`, para siempre. En `$machine` no se ve, porque la
+  expansión ya ocurrió antes. Abre Propiedades del sistema, Variables de
+  entorno, que muestra el valor sin expandir: si hay algún `%VAR%` en el `Path`
+  de máquina, añade el directorio desde ese cuadro de diálogo y no desde el
+  fragmento de arriba.
 </Aside>
 
 Un `Path` nuevo solo llega a los procesos que arranquen después, así que abre
@@ -222,7 +251,7 @@ que una ruta de Windows entre comillas dobles no es la ruta que escribiste, y
 normalmente tampoco es YAML válido:
 
 ```yaml
-state_file: "C:\ghchronicle\state.json" # ghchronicle: yaml: line 5: found unknown escape character
+state_file: "C:\ghchronicle\state.json" # ghchronicle: config.yaml: yaml: line N: found unknown escape character
 state_file: C:\ghchronicle\state.json # correcto, escalar simple
 state_file: 'C:\ghchronicle\state.json' # correcto, comillas simples
 state_file: C:/ghchronicle/state.json # correcto, y el que conviene
@@ -233,14 +262,23 @@ ruta, y sobreviven a entrecomillarlas de cualquiera de las maneras.
 
 ### El fichero tiene que ser UTF-8
 
-Windows PowerShell 5.1, el que viene de serie, escribe UTF-16 con `>` y con
-`Set-Content` salvo que se le diga otra cosa. Un analizador de YAML lee eso
-como binario. PowerShell 7 usa UTF-8 sin marca de orden de bytes por omisión y
-no tiene ese problema; en 5.1, sé explícito:
+Windows PowerShell 5.1, el que viene de serie, no escribe ninguna de las dos
+cosas que quiere un analizador de YAML, y escribe una cosa equivocada distinta
+según cómo se lo pidas. `>` y `Out-File` producen UTF-16LE, que el analizador
+lee como binario. `Set-Content` produce la página de códigos activa del
+sistema, normalmente ANSI, que se analiza bien mientras el fichero sea ASCII
+puro y destroza el primer carácter acentuado que aparezca. PowerShell 7 usa
+UTF-8 sin marca de orden de bytes por omisión y no tiene ninguno de los dos
+problemas; en 5.1, sé explícito:
 
 ```powershell
 Set-Content -Path config.yaml -Value $text -Encoding utf8
 ```
+
+`utf8` en 5.1 quiere decir UTF-8 **con** marca de orden de bytes, cosa que el
+valor no sabe expresar y de la que el cmdlet no avisa. El analizador del
+colector la salta, así que el fichero funciona; una herramienta que lea los
+primeros bytes por su cuenta puede que no.
 
 ## Dejarlo corriendo
 
@@ -264,14 +302,28 @@ programada, y tiene dos formas.
       -Execute "C:\Program Files\ghchronicle\ghchronicle.exe" `
       -Argument '-config "C:\ProgramData\ghchronicle\config.yaml" -once'
     $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) `
-      -RepetitionInterval (New-TimeSpan -Hours 1)
+      -RepetitionInterval (New-TimeSpan -Hours 1) `
+      -RepetitionDuration ([TimeSpan]::MaxValue)
     Register-ScheduledTask -TaskName ghchronicle -Action $action -Trigger $trigger
     ```
 
-    Una tarea horaria da a todas las familias una cadencia horaria como mucho,
-    así que el ritmo de quince minutos de `actions` se pierde. Es el mismo
-    cambio que
+    `-RepetitionDuration ([TimeSpan]::MaxValue)` es lo que deja escrito «para
+    siempre». La regla del propio Programador de tareas es que una repetición
+    sin duración se repite indefinidamente, así que omitirlo no es un error,
+    pero el cmdlet no tiene valor propio por omisión y la tarea queda
+    registrada sin ninguna duración.
+
+    Esta forma trae dos condiciones, y ninguna es la de cron. Una tarea horaria
+    da a todas las familias una cadencia horaria como mucho, así que el ritmo
+    de quince minutos de `actions` se pierde, que es el mismo cambio que
     [hace cron en Linux](/ghchronicle/es/install/systemd/#cron-en-vez-de-un-servicio).
+    Y aquí `Register-ScheduledTask` no nombra ni `-User` ni `-Principal`, así
+    que la tarea queda registrada con la cuenta que la crea y con el tipo de
+    inicio de sesión por omisión, y corre **solo mientras esa cuenta tenga la
+    sesión iniciada**. Un trabajo de cron no se para al cerrar sesión. Para
+    que esta se comporte igual, regístrala con una entidad de seguridad con
+    «ejecutar tanto si el usuario inició sesión como si no» marcado, que es
+    `New-ScheduledTaskPrincipal`.
 
   </TabItem>
   <TabItem label="Corriendo todo el rato">
@@ -291,8 +343,8 @@ programada, y tiene dos formas.
     ```
 
     `-ExecutionTimeLimit ([TimeSpan]::Zero)` es el que importa: el valor por
-    omisión para una tarea a los tres días, que para un proceso pensado para no
-    terminar es un reinicio que nadie pidió.
+    omisión detiene la tarea a los tres días, que para un proceso pensado para
+    no terminar es un reinicio que nadie pidió.
 
   </TabItem>
 </Tabs>
@@ -315,8 +367,8 @@ opción por omisión.
 
 ## Compilarlo desde fuente
 
-Go 1.27 o más nuevo. `CGO_ENABLED=0` quiere decir sin MSVC, sin MinGW y sin SDK
-de Windows.
+Go 1.27.1 o más nuevo, que es la versión que declara `go.mod`. `CGO_ENABLED=0`
+quiere decir sin MSVC, sin MinGW y sin SDK de Windows.
 
 <Tabs syncKey="windows-source">
   <TabItem label="go install">
@@ -355,9 +407,17 @@ fichero en absoluto.
 
 | Fichero           | Para una tarea de máquina     | Para una cuenta                |
 | ----------------- | ----------------------------- | ------------------------------ |
-| Configuración     | `C:/ProgramData/ghchronicle/` | `%LOCALAPPDATA%/ghchronicle/`  |
-| Estado y registro | `C:/ProgramData/ghchronicle/` | `%LOCALAPPDATA%/ghchronicle/`  |
-| Log               | `C:/ProgramData/ghchronicle/` | `%LOCALAPPDATA%/ghchronicle/`  |
+| Configuración     | `C:/ProgramData/ghchronicle/` | `${LOCALAPPDATA}/ghchronicle/` |
+| Estado y registro | `C:/ProgramData/ghchronicle/` | `${LOCALAPPDATA}/ghchronicle/` |
+| Log               | `C:/ProgramData/ghchronicle/` | `${LOCALAPPDATA}/ghchronicle/` |
+
+`${LOCALAPPDATA}` se escribe así porque `${VAR}` es la única forma que el
+colector expande, desde el entorno, al arrancar el proceso. `%VAR%` es una
+notación del intérprete y para el fichero no significa nada: un
+`%LOCALAPPDATA%` copiado dentro del YAML te da un directorio llamado
+literalmente `%LOCALAPPDATA%`, al lado de donde la tarea estuviera trabajando.
+Son `%LOCALAPPDATA%` en `cmd` y `$env:LOCALAPPDATA` en PowerShell los que crean
+el directorio en primer lugar.
 
 Un directorio bajo `C:\ProgramData` lo puede escribir quien lo creó y lo puede
 leer todo el mundo, así que créalo elevado y luego concede escritura a la

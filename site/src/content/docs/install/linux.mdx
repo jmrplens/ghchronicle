@@ -30,9 +30,9 @@ curl -fsSLO "$base/ghchronicle_${VERSION}_linux_${arch}.tar.gz"
 <Aside type="caution" title="Name the version rather than asking for the newest">
   The repository publishes a moving `v1` tag beside the numbered releases,
   because the Action is listed on the Marketplace and that listing needs one.
-  The `v1` release carries **no files at all**, so a download URL built from
-  whichever release GitHub currently flags can resolve to a release with
-  nothing in it. Take the version from the
+  The `v1` release carries **no files at all**, so never build a download URL
+  from the major tag: there is nothing behind it to download. Take the version
+  from the
   [releases page](https://github.com/jmrplens/ghchronicle/releases) and write
   it down, as above.
 </Aside>
@@ -151,8 +151,9 @@ a single line, at the cost of giving every family the same cadence.
 
 ## Build it from source
 
-Go 1.27 or newer is what the module declares. Nothing else is needed: the build
-sets `CGO_ENABLED=0`, so there is no compiler and no header package to find.
+Go 1.27.1 or newer is what the module declares. Nothing else is needed: the
+build sets `CGO_ENABLED=0`, so there is no compiler and no header package to
+find.
 
 <Tabs syncKey="linux-source">
   <TabItem label="go install">

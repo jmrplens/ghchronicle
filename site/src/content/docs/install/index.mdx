@@ -91,8 +91,10 @@ keep it running once you are done watching it.
 The collector pushes to every store it supports, so it does not need to be
 reachable from anywhere. It needs to reach GitHub and to reach its databases.
 That is the only constraint, and it is what makes all four of these viable.
-The first two need a host of their own; the last two do not, and the system
-pages above are about the first two.
+Three of the four want a host you own: systemd, Docker and cron. GitHub Actions
+is the one that does not. The system pages above are where the scheduler lives,
+one per system: systemd or cron on Linux, launchd on macOS, a scheduled task on
+Windows.
 
 <CardGrid>
   <LinkCard
