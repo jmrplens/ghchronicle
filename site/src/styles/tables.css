@@ -25,17 +25,24 @@
  *            each value after its heading. See "The compact form"
  *            at the end of this file for which tables and why.
  *
- * The switch between the first two is the twelve `--table-*`
- * properties.
+ * The switch between the first two is the thirteen `--table-*`
+ * properties, one of which, `--table-key-size`, exists so that the
+ * first cell of a stacked block reads as the block's title rather
+ * than as one more value: it is the row's whole identity once the
+ * columns are gone (the key, the flag, the layer, the rule), so its
+ * size is set apart from the table's own compressed 0.85rem instead
+ * of only its colour. The compact form below reuses the same
+ * property at the same size, so an index row's name and a stacked
+ * block's key read at one weight across the site rather than two.
  * The WIDE form is the fallback written into each `var()` below, so
  * it is stated once, at the declaration that uses it; the stacked
- * form is those twelve properties declared together. The compact
+ * form is those thirteen properties declared together. The compact
  * form is a set of `--table-compact-*` overrides that only take
- * effect where those twelve are declared.
+ * effect where those thirteen are declared.
  *
  * What that buys, exactly, because it is less than it looks: the
- * twelve declarations ARE still repeated, once per breakpoint and
- * once for the spec sheet, five blocks of the same twelve lines. A
+ * thirteen declarations ARE still repeated, once per breakpoint and
+ * once for the spec sheet, five blocks of the same thirteen lines. A
  * container query cannot read a length out of a custom property, so
  * a per-column-count threshold needs a block per count whatever this
  * file does. What the indirection removes is the other half: the
@@ -160,14 +167,17 @@
 
 /* The first cell of a row says what the row is about, in every table of this
  * corpus: the family, the flag, the key, the measurement. Stacked, it is the
- * whole of a row's identity, so it takes the heading colour; wide, the column
- * it heads is identity enough and the cell is left as it was, since changing
- * the wide form is not what this treatment is for. `currentcolor` on `color`
- * is the inherited colour, which is exactly what the declaration said before
- * the switch reached it. */
+ * whole of a row's identity, so it takes the heading colour AND a size the
+ * eye finds before the small label above it: a card of facts with no columns
+ * left needs its name to read like a title, not like one more value the same
+ * size as `code`. Wide, the column it heads is identity enough and the cell
+ * is left as it was, since changing the wide form is not what this treatment
+ * is for: `currentcolor` on `color` and `1em` on `font-size` are the
+ * inherited values, exactly what the declaration said before the switch
+ * reached it. */
 .sl-markdown-content td:first-child {
 	color: var(--table-first, currentcolor);
-	font-size: var(--table-compact-name-size, 1em);
+	font-size: var(--table-key-size, 1em);
 }
 
 /* Every cell after the first. Only the compact form tells them apart from the
@@ -300,7 +310,7 @@
 }
 
 /* ------------------------------------------------------------
- * The breakpoints: the same twelve declarations, once per column
+ * The breakpoints: the same thirteen declarations, once per column
  * count, each at the floor that column count needs. The last one
  * is written as an exclusion rather than as `[data-columns="5"]`
  * so that a table grown to six columns stacks too, instead of
@@ -320,6 +330,7 @@
 		--table-pad: 0.3rem;
 		--table-floor: 0px;
 		--table-first: var(--sl-color-white);
+		--table-key-size: 1rem;
 	}
 }
 
@@ -337,6 +348,7 @@
 		--table-pad: 0.3rem;
 		--table-floor: 0px;
 		--table-first: var(--sl-color-white);
+		--table-key-size: 1rem;
 	}
 }
 
@@ -354,6 +366,7 @@
 		--table-pad: 0.3rem;
 		--table-floor: 0px;
 		--table-first: var(--sl-color-white);
+		--table-key-size: 1rem;
 	}
 }
 
@@ -379,13 +392,14 @@
 		--table-pad: 0.3rem;
 		--table-floor: 0px;
 		--table-first: var(--sl-color-white);
+		--table-key-size: 1rem;
 	}
 }
 
 /* ------------------------------------------------------------
  * The spec sheet: a table that is stacked at every width.
  *
- * components/SpecSheet.astro says which table and why. The twelve
+ * components/SpecSheet.astro says which table and why. The thirteen
  * declarations are the ones above, with no query around them.
  * ------------------------------------------------------------ */
 .sl-markdown-content .spec-sheet .table-scroll > table {
@@ -401,6 +415,7 @@
 	--table-pad: 0.3rem;
 	--table-floor: 0px;
 	--table-first: var(--sl-color-white);
+	--table-key-size: 1rem;
 }
 
 /* ------------------------------------------------------------
@@ -435,7 +450,8 @@
  *
  * WHAT. The row loses its box and its stripe and becomes a line
  * between hairlines. The first cell, the item's name, loses its
- * label and keeps its size; the rest run on as one smaller line,
+ * label and keeps its size, the same `--table-key-size` a plain
+ * stacked block's key reads at; the rest run on as one smaller line,
  * each value after its heading and a dot between them, which is
  * what keeps "Animated no · Loops no" meaning something without
  * the columns. When the name is a link, the link is stretched
@@ -449,7 +465,7 @@
 	--table-compact-rest: var(--table-stacked) inline;
 	--table-compact-rest-size: var(--table-stacked) 0.8rem;
 	--table-compact-leading: var(--table-stacked) 1.55;
-	--table-compact-name-size: var(--table-stacked) 1rem;
+	--table-key-size: var(--table-stacked) 1rem;
 	--table-compact-label: var(--table-stacked) inline;
 	--table-compact-label-wrap: var(--table-stacked) nowrap;
 	--table-compact-name-label: var(--table-stacked) none;
