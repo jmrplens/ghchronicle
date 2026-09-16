@@ -92,10 +92,37 @@ every: {default: 15m, families: {traffic: 6h}, nosuchlayer: 1h}
 	}
 }
 
+// TestNoSinkIsAnError also holds the message to naming the one run that is
+// allowed no destination. A reader who wanted exactly that, a card and nothing
+// else, was told to add a sink, which is the opposite of what they asked for.
 func TestNoSinkIsAnError(t *testing.T) {
 	t.Setenv("GITHUB_TOKEN", "x")
-	if _, err := Load(write(t, "targets: {user: jmrplens}\n")); err == nil {
+	_, err := Load(write(t, "targets: {user: jmrplens}\n"))
+	if err == nil {
 		t.Fatal("a run with nowhere to write should not start")
+	}
+	// Both flags, because -card-only on its own draws nothing: it is the
+	// waiver, and -card is the path it writes to.
+	for _, flag := range []string{"-card ", "-card-only"} {
+		if !strings.Contains(err.Error(), flag) {
+			t.Errorf("err = %q, want it to name %s, without which the run that needs no destination cannot be spelled", err, flag)
+		}
+	}
+}
+
+// TestAnEmptyConfigurationFileSaysItIsEmpty: a file with nothing in it ends
+// where it starts, and the decoder calls that the end of the file. "EOF" names
+// neither the problem nor anything to do about it, and the configuration
+// builder can write an empty file from an empty form.
+func TestAnEmptyConfigurationFileSaysItIsEmpty(t *testing.T) {
+	t.Setenv("GITHUB_TOKEN", "x")
+	path := write(t, "")
+	_, err := Load(path)
+	if err == nil {
+		t.Fatal("a configuration with nothing in it should not start")
+	}
+	if msg := err.Error(); !strings.HasPrefix(msg, path+": ") || !strings.Contains(msg, "the file is empty") {
+		t.Errorf("err = %q, want the path and that the file is empty", msg)
 	}
 }
 

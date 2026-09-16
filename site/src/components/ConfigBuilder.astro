@@ -1,0 +1,489 @@
+---
+/**
+ * The form that writes a configuration, and the two things it writes.
+ *
+ * Nothing on this page is typed. Every control below is one entry of
+ * `src/data/config-options.json`, which `cmd/gen_config` writes out of
+ * `internal/config`'s own types and out of `action.yml`, and
+ * `make check-config-options` fails when that file is no longer what they
+ * produce. So the form cannot offer a setting the binary does not have, and
+ * cannot miss one it does, which is the whole reason the author wanted this
+ * rather than a hand-written page of inputs.
+ *
+ * The two outputs are written by `src/lib/config-build.mjs`, and by nothing
+ * else: the script below drives it in the browser, this file runs it at build
+ * time so a reader without JavaScript still meets a configuration that runs
+ * rather than an empty box, `page-markdown.mjs` reduces the page through it,
+ * and `scripts/gen-config-cases.mjs` runs it to produce the cases
+ * `internal/config/builder_test.go` loads with the real parser. What a reader
+ * copies here is a file that has been through `config.Load`.
+ *
+ * A credential is never written. A secret setting asks for the NAME of an
+ * environment variable and the file gets `${NAME}`, which is the expansion the
+ * binary performs at start-up and the arrangement the configuration page
+ * already recommends; the Action's token is a repository secret.
+ *
+ * On a phone it is a form of eighty nine controls, so it is grouped the way the
+ * documentation is grouped, each group a disclosure, and only the three that
+ * matter open. Nothing here depends on hover: every control has a visible
+ * label, the state of a sink is a checkbox and not a colour, and the copy
+ * buttons are ordinary buttons that appear only once there is something to
+ * copy them with.
+ *
+ * The locale is read off the URL, the way `Card.astro` and `LayoutFacts.astro`
+ * read it, rather than passed in: the twins invoke this component identically,
+ * which is what `scripts/check-i18n-parity.mjs` compares.
+ */
+import {
+	answerProblems,
+	BUILDER_GROUPS,
+	buildConfig,
+	buildStep,
+	CONFIG_BUILD_TEXT,
+	namesADestination,
+	OPTIONS,
+	optionsIn,
+	runCommand,
+	STARTING_ANSWERS,
+} from "../lib/config-build.mjs";
+import { BASE, localeOf } from "../lib/site.mjs";
+import Control from "./ConfigField.astro";
+
+const route = Astro.url.pathname
+	.slice(BASE.length)
+	.replace(/^\/+/, "")
+	.replace(/\/+$/, "");
+const locale = localeOf(route);
+const text = CONFIG_BUILD_TEXT[locale];
+
+/** One entry of the generated file, as the controls below read it. */
+type Option = (typeof OPTIONS)[number];
+
+/** A documentation link in the page's own language. */
+const docLink = (path: string) => `${BASE}${locale === "es" ? "/es" : ""}${path}`;
+
+/** The last segment of a dotted key, which is what the file writes on the line. */
+const leafName = (key: string) => key.slice(key.lastIndexOf(".") + 1);
+
+/** The value the form starts a control at. */
+const starting = (key: string): string =>
+	(STARTING_ANSWERS as Record<string, string>)[key] ?? "";
+
+// The sinks are blocks nested inside `sinks`, which is what tells them apart
+// from `sinks.stdout` and the two ledger settings.
+const isSink = (option: Option) =>
+	option.kind === "block" && /^sinks\.[^.]+$/.test(option.key);
+
+// The settings of one sink, and the ones of `sinks` that belong to no sink.
+const under = (prefix: string) =>
+	optionsIn("sinks").filter(
+		(o) => o.key.startsWith(`${prefix}.`) && o.kind !== "block",
+	);
+const looseSinkSettings = optionsIn("sinks").filter(
+	(o) => o.kind !== "block" && o.key.split(".").length === 2,
+);
+const sinks = optionsIn("sinks").filter(isSink);
+
+// The three outputs as a reader without JavaScript sees them: the answers the
+// form starts in, through the same module the script below runs.
+const startingConfig = buildConfig(STARTING_ANSWERS);
+const startingRun = runCommand(STARTING_ANSWERS);
+const startingStep = buildStep(STARTING_ANSWERS);
+const startingProblems = answerProblems(STARTING_ANSWERS, locale);
+// The command changes with the answers, so the note above the file has to: a
+// configuration that names no destination is refused by -once and started by
+// -card-only, and a page that printed one command for both would be telling
+// half its readers to run something the parser rejects.
+const startingFileNote = namesADestination(STARTING_ANSWERS)
+	? text.fileNote
+	: text.fileCardNote;
+
+/** The controls of one group, minus the sinks, which have a shape of their own. */
+const plainOptions = (group: string) =>
+	optionsIn(group).filter(
+		(o) => o.kind !== "block" && !(group === "sinks" && o.sink),
+	);
+---
+
+{/* A group of controls and not a <form>: there is nothing to submit. The two
+	outputs are rewritten as the reader types, and a form with no submit button
+	is an H32 failure (html-validate reports it), while a form with one would
+	offer a button that reloads the page and loses every answer. */}
+<div
+	class="cb not-content"
+	role="group"
+	data-config-builder
+	data-locale={locale}
+	aria-label={text.legend}
+>
+	<noscript>
+		<p class="cb-noscript">{text.noscript}</p>
+	</noscript>
+
+	{
+		BUILDER_GROUPS.map((group) => (
+			<details
+				class="cb-group"
+				open={group.open}
+			>
+				<summary>
+					{text.groups[group.name]}
+					<span class="cb-count">
+						{optionsIn(group.name).filter((o) => o.kind !== "block").length}
+					</span>
+				</summary>
+				<p class="cb-doc">
+					<a href={docLink(group.doc)}>{text.reference}</a>
+				</p>
+				{group.name === "sinks" ? (
+					<Fragment>
+						{looseSinkSettings.map((option) => (
+							<Control
+								option={option}
+								text={text}
+								value={starting(option.key)}
+							/>
+						))}
+						{sinks.map((sink) => (
+							<details class="cb-sink">
+								<summary>{leafName(sink.key)}</summary>
+								<label class="cb-use">
+									<input
+										type="checkbox"
+										data-key={sink.key}
+										checked={starting(sink.key) === "true"}
+									/>
+									<span>{text.useSink}</span>
+								</label>
+								{under(sink.key).map((option) => (
+									<Control
+										option={option}
+										text={text}
+										value={starting(option.key)}
+									/>
+								))}
+							</details>
+						))}
+					</Fragment>
+				) : (
+					plainOptions(group.name).map((option) => (
+						<Control
+							option={option}
+							text={text}
+							value={starting(option.key)}
+						/>
+					))
+				)}
+			</details>
+		))
+	}
+</div>
+
+{/* What the answers get wrong, above the outputs rather than beside each
+	control: the reader is looking at the file, and the point is that the file
+	is not the one they think they are copying. Polite, because it is rewritten
+	on every keystroke and an assertive region would interrupt a reader typing
+	a URL. */}
+<div
+	class="cb-problems"
+	data-problems
+	role="status"
+	aria-live="polite"
+	hidden={startingProblems.length === 0}
+>
+	<p class="cb-problems__head">{text.problemsLabel}</p>
+	<ul data-problem-list>
+		{startingProblems.map((problem) => (
+			<li>
+				{problem.key && <code>{problem.key}</code>} {problem.message}
+			</li>
+		))}
+	</ul>
+</div>
+
+<div class="cb-outputs not-content">
+	{
+		[
+			{
+				id: "config",
+				label: text.fileLabel,
+				note: startingFileNote,
+				body: startingConfig,
+			},
+			{
+				id: "run",
+				label: text.runLabel,
+				note: undefined,
+				body: startingRun,
+			},
+			{
+				id: "step",
+				label: text.stepLabel,
+				note: text.stepNote,
+				body: startingStep,
+			},
+		].map(({ id, label, note, body }) => (
+			<div class="cb-out">
+				<p class="cb-out__head">
+					<span class="cb-out__label">{label}</span>
+					<button
+						type="button"
+						class="cb-copy"
+						data-copy={id}
+						data-copied={text.copied}
+						hidden
+					>
+						{text.copy}
+					</button>
+				</p>
+				{note !== undefined && (
+					<p
+						class="cb-out__note"
+						data-note={id}
+						data-file-note={id === "step" ? text.stepFileNote : undefined}
+						data-card-note={id === "config" ? text.fileCardNote : undefined}
+						data-sink-note={id === "config" ? text.fileNote : undefined}
+					>
+						{note}
+					</p>
+				)}
+				<pre
+					class="cb-out__body"
+					data-output={id}
+					tabindex="0"
+				>{body}</pre>
+			</div>
+		))
+	}
+	<p class="cb-out__note">{text.secretNote}</p>
+</div>
+
+<script>
+	// The form, the two outputs, and nothing else. One module however many
+	// controls the page holds: Astro bundles a component's script once.
+	import {
+		answerProblems,
+		buildConfig,
+		buildStep,
+		keysOnlyAFileCanSay,
+		namesADestination,
+		runCommand,
+	} from "../lib/config-build.mjs";
+
+	const form = document.querySelector<HTMLElement>("[data-config-builder]");
+	const locale = form?.dataset.locale === "es" ? "es" : "en";
+	const outputs = {
+		config: document.querySelector<HTMLElement>('[data-output="config"]'),
+		run: document.querySelector<HTMLElement>('[data-output="run"]'),
+		step: document.querySelector<HTMLElement>('[data-output="step"]'),
+	};
+	const stepNote = document.querySelector<HTMLElement>('[data-note="step"]');
+	const stepNotes = {
+		file: stepNote?.dataset.fileNote ?? "",
+		inputs: stepNote?.textContent ?? "",
+	};
+	const fileNote = document.querySelector<HTMLElement>('[data-note="config"]');
+	const fileNotes = {
+		card: fileNote?.dataset.cardNote ?? "",
+		sink: fileNote?.dataset.sinkNote ?? "",
+	};
+	const problems = document.querySelector<HTMLElement>("[data-problems]");
+	const problemList = document.querySelector<HTMLElement>("[data-problem-list]");
+
+	/** Every answered control, as the emitter takes them. */
+	function answers(): Record<string, string> {
+		const out: Record<string, string> = {};
+		if (!form) return out;
+		for (const control of form.querySelectorAll<
+			HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+		>("[data-key]")) {
+			const key = control.dataset.key;
+			if (!key) continue;
+			if (control instanceof HTMLInputElement && control.type === "checkbox") {
+				if (control.checked) out[key] = "true";
+				continue;
+			}
+			if (control.value.trim()) out[key] = control.value;
+		}
+		return out;
+	}
+
+	/** What the answers get wrong, as a list, or nothing at all. */
+	function showProblems(found: { key: string; message: string }[]) {
+		if (!problems || !problemList) return;
+		problemList.replaceChildren();
+		for (const problem of found) {
+			const item = document.createElement("li");
+			if (problem.key) {
+				const key = document.createElement("code");
+				key.textContent = problem.key;
+				item.append(key, " ");
+			}
+			item.append(problem.message);
+			problemList.append(item);
+		}
+		problems.hidden = found.length === 0;
+	}
+
+	function refresh() {
+		const given = answers();
+		if (outputs.config) outputs.config.textContent = buildConfig(given);
+		if (outputs.run) outputs.run.textContent = runCommand(given);
+		if (outputs.step) outputs.step.textContent = buildStep(given);
+		// The step says what to do with it, and what to do with it changes:
+		// answers an input cannot carry make the step read the file above, and
+		// answers that name no destination make the run a card run.
+		if (stepNote) {
+			stepNote.textContent =
+				keysOnlyAFileCanSay(given).length > 0
+					? stepNotes.file
+					: stepNotes.inputs;
+		}
+		if (fileNote) {
+			fileNote.textContent = namesADestination(given)
+				? fileNotes.sink
+				: fileNotes.card;
+		}
+		showProblems(answerProblems(given, locale));
+	}
+
+	form?.addEventListener("input", refresh);
+	form?.addEventListener("change", refresh);
+
+	for (const button of document.querySelectorAll<HTMLButtonElement>(
+		"[data-copy]",
+	)) {
+		const target = outputs[button.dataset.copy as "config" | "run" | "step"];
+		if (!target) continue;
+		const label = button.textContent ?? "";
+		button.addEventListener("click", async () => {
+			try {
+				await navigator.clipboard.writeText(target.textContent ?? "");
+				button.textContent = button.dataset.copied ?? label;
+				setTimeout(() => {
+					button.textContent = label;
+				}, 2000);
+			} catch {
+				// A browser that refuses the clipboard leaves the text on the
+				// page, which is selectable and is what the button copies.
+				button.textContent = label;
+			}
+		});
+		button.hidden = false;
+	}
+
+	refresh();
+</script>
+
+<style>
+	.cb {
+		margin-block: 1rem;
+	}
+	.cb-noscript {
+		margin-block: 0 1rem;
+		border-inline-start: 3px solid var(--sl-color-text-accent);
+		padding-inline-start: 0.75rem;
+		font-size: var(--sl-text-sm);
+	}
+	.cb-group,
+	.cb-sink {
+		margin-block-end: 0.5rem;
+		border: 1px solid var(--sl-color-gray-5);
+		border-radius: 0.4rem;
+		padding: 0.5rem 0.75rem;
+	}
+	.cb-group > summary,
+	.cb-sink > summary {
+		font-weight: 600;
+		cursor: pointer;
+	}
+	.cb-count {
+		margin-inline-start: 0.4rem;
+		color: var(--sl-color-gray-3);
+		font-weight: 400;
+		font-size: var(--sl-text-xs);
+	}
+	.cb-doc {
+		margin-block: 0.4rem 0.8rem;
+		font-size: var(--sl-text-xs);
+	}
+	.cb-sink {
+		margin-block-start: 0.75rem;
+		background: var(--sl-color-gray-7, transparent);
+	}
+	.cb-use {
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+		margin-block: 0.5rem;
+		font-size: var(--sl-text-sm);
+	}
+	.cb-problems {
+		margin-block: 1.25rem 0;
+		border-inline-start: 3px solid var(--sl-color-orange);
+		padding-inline-start: 0.75rem;
+		font-size: var(--sl-text-sm);
+	}
+	.cb-problems[hidden] {
+		display: none;
+	}
+	.cb-problems__head {
+		margin-block: 0 0.35rem;
+		font-weight: 600;
+	}
+	.cb-problems ul {
+		margin-block: 0;
+		padding-inline-start: 1.1rem;
+	}
+	.cb-problems code {
+		border: 0;
+		padding: 0;
+		background: none;
+		font-size: 1em;
+	}
+	.cb-outputs {
+		margin-block: 1.5rem;
+	}
+	.cb-out {
+		margin-block-end: 1.25rem;
+	}
+	.cb-out__head {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.5rem;
+		margin-block: 0 0.35rem;
+	}
+	.cb-out__label {
+		font-weight: 600;
+		font-family: var(--__sl-font-mono, monospace);
+		font-size: var(--sl-text-sm);
+	}
+	.cb-out__note {
+		margin-block: 0 0.4rem;
+		color: var(--sl-color-gray-2);
+		font-size: var(--sl-text-sm);
+	}
+	.cb-out__body {
+		overflow-x: auto;
+		margin: 0;
+		border: 1px solid var(--sl-color-gray-5);
+		border-radius: 0.3rem;
+		padding: 0.6rem 0.75rem;
+		font-size: var(--sl-text-sm);
+		tab-size: 2;
+	}
+	.cb-copy {
+		border: 1px solid var(--sl-color-gray-5);
+		border-radius: 999px;
+		background: transparent;
+		padding: 0.15rem 0.7rem;
+		color: var(--sl-color-text);
+		font: inherit;
+		font-size: var(--sl-text-xs);
+		cursor: pointer;
+	}
+	.cb-copy[hidden] {
+		display: none;
+	}
+</style>

@@ -124,6 +124,19 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      # check-config-cases runs the site's own emitter under node, and it is
+      # the gate the whole round trip hangs from. Without this the job ran on
+      # whatever node the runner image happened to ship, and the module it
+      # loads reads JSON with an import attribute, so an image bump would have
+      # failed this job with a parse error about syntax rather than anything
+      # about a configuration. Pinned to the version every other node job here
+      # pins to. No pnpm and no install: the script reads one committed JSON
+      # file and writes another.
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+        with:
+          node-version-file: site/.node-version
+
       - run: go mod download
 
       # The five dashboards under dashboards/ are generated from
@@ -149,6 +162,22 @@ jobs:
       # default fields, which is what the hand-written table before it did.
       - name: The committed layout facts match the registry
         run: make check-layouts
+
+      # site/src/data/config-options.json is every setting a configuration file
+      # may carry, as the builder on the documentation site offers it. A
+      # setting added to internal/config and never exported would leave the
+      # builder unable to configure it, and one removed would leave the builder
+      # writing a key the loader refuses with KnownFields.
+      - name: The committed configuration surface matches the code
+        run: make check-config-options
+
+      # internal/config/testdata/config-cases.json is what the builder writes
+      # for a set of answers, produced by the module the page itself runs. The
+      # round-trip test in internal/config loads each one with the real parser,
+      # so a change to the emitter that is never regenerated would leave that
+      # test proving something about output nobody is served any more.
+      - name: The committed builder cases match what the page writes
+        run: make check-config-cases
 
   sonarcloud:
     name: SonarCloud

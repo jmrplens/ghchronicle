@@ -4,6 +4,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"maps"
 	"os"
 	"regexp"
@@ -24,16 +25,16 @@ type Config struct {
 	// compared against the built-in table. Empty means the runner derives it
 	// from the shortest cadence, which is what production wants; a test run
 	// that needs the loop to turn faster than any cadence sets it here.
-	Heartbeat string `yaml:"heartbeat"`
+	Heartbeat string `yaml:"heartbeat" ghc:"example=15s"`
 	// Groups narrows a sweep to the named groups of families. Absent means
 	// every group, which is what "collects every metric GitHub exposes" has
 	// always meant. A pointer, because `groups: []` and no key at all mean
 	// opposite things and a nil slice cannot tell them apart.
-	Groups *[]string `yaml:"groups"`
+	Groups *[]string `yaml:"groups" ghc:"example=audience, account, repos"`
 	Log    Log       `yaml:"log"`
 	// StateFile remembers when each family last ran and which repositories
 	// have already had their one-off full star walk.
-	StateFile string `yaml:"state_file"`
+	StateFile string `yaml:"state_file" ghc:"example=/var/lib/ghchronicle/state.json"`
 
 	// Backfill settings. They only apply to a run started with -backfill.
 	Backfill Backfill `yaml:"backfill"`
@@ -63,7 +64,7 @@ type Backfill struct {
 	// Since is a date (2024-01-01), a duration (720h, 90d, 2y) or empty for
 	// no bound at all. No bound means the walk stops only when the API does,
 	// however many hours that takes.
-	Since string `yaml:"since"`
+	Since string `yaml:"since" ghc:"example=2y"`
 }
 
 // SinceTime resolves Since against now. Zero means unbounded.
@@ -101,44 +102,54 @@ func parseSince(s string, now time.Time) (time.Time, error) {
 
 type GitHub struct {
 	// Token may be given inline or, preferably, as ${GITHUB_TOKEN}.
-	Token string `yaml:"token"`
+	Token string `yaml:"token" ghc:"secret,required,example=${GITHUB_TOKEN}"`
 	// BaseURL is the API root. Empty means api.github.com; a GitHub Enterprise
 	// instance uses https://<host>/api/v3.
-	BaseURL string `yaml:"base_url"`
+	BaseURL string `yaml:"base_url" ghc:"example=https://github.example.com/api/v3"`
 	// WebURL is the site the profile page is on, for the one family that
 	// reads a page rather than the API. Empty means it is derived from
 	// BaseURL, which is right for api.github.com and for GitHub Enterprise
 	// and wrong for a proxy in front of the API, whose root says nothing
 	// about where the site is.
-	WebURL  string `yaml:"web_url"`
-	Timeout string `yaml:"timeout"`
+	WebURL  string `yaml:"web_url" ghc:"example=https://github.example.com"`
+	Timeout string `yaml:"timeout" ghc:"example=30s"`
 
 	// ReserveRate is the number of API calls never spent. The collector stops
 	// early rather than exhausting the budget, so anything else using the same
 	// token keeps working.
-	ReserveRate int `yaml:"reserve_rate"`
+	ReserveRate int `yaml:"reserve_rate" ghc:"example=500"`
 }
 
 type Targets struct {
-	User            string   `yaml:"user"`
-	Orgs            []string `yaml:"orgs"`
-	Repos           []string `yaml:"repos"`
-	Exclude         []string `yaml:"exclude"`
-	IncludeForks    bool     `yaml:"include_forks"`
-	IncludeArchived bool     `yaml:"include_archived"`
+	User            string   `yaml:"user" ghc:"example=your-github-login"`
+	Orgs            []string `yaml:"orgs" ghc:"example=some-org, another-org"`
+	Repos           []string `yaml:"repos" ghc:"example=someone/one-repo"`
+	Exclude         []string `yaml:"exclude" ghc:"example=someone/experiment-*"`
+	IncludeForks    bool     `yaml:"include_forks" ghc:"example=false"`
+	IncludeArchived bool     `yaml:"include_archived" ghc:"example=false"`
 	// IncludePrivate collects the account's private repositories as well as
 	// its public ones. A pointer, because the absent key has to mean on: the
 	// token already reaches them, they are most of what an account with any
 	// private work has, and a plain bool made the default the opposite of
 	// what every document promised. Nil means on. See sinks.dedupe for the
 	// same shape.
-	IncludePrivate *bool `yaml:"include_private"`
+	IncludePrivate *bool `yaml:"include_private" ghc:"example=true"`
 }
 
 // PrivateIncluded resolves IncludePrivate: on unless the config refuses it.
-func (t Targets) PrivateIncluded() bool {
-	return t.IncludePrivate == nil || *t.IncludePrivate
-}
+func (t Targets) PrivateIncluded() bool { return Enabled(t.IncludePrivate) }
+
+// Enabled resolves a tri-state setting: absent means on.
+//
+// Every *bool this package declares has that shape, and each of them was
+// written as a pointer for the same reason: a plain bool cannot tell "the key
+// says false" from "there is no key", and for all of them the absent key has
+// to mean on. The rule lived in as many places as there were readers, one of
+// them a closure in cmd/ghchronicle, so the options the site offers would have
+// had to restate it a fourth time to say what an unset checkbox means. Here it
+// is one function, and the default the builder publishes is Enabled(nil)
+// rather than a true typed into a table.
+func Enabled(v *bool) bool { return v == nil || *v }
 
 type Sinks struct {
 	Influx     *InfluxSink     `yaml:"influxdb"`
@@ -146,10 +157,10 @@ type Sinks struct {
 	OTLP       *OTLPSink       `yaml:"otlp"`
 	Loki       *LokiSink       `yaml:"loki"`
 	File       *FileSink       `yaml:"file"`
-	Stdout     bool            `yaml:"stdout"`
+	Stdout     bool            `yaml:"stdout" ghc:"example=false"`
 	// StdoutFormat is "influx" for line protocol or "json" for one object
 	// per line, the shape the file sink writes.
-	StdoutFormat  string             `yaml:"stdout_format"`
+	StdoutFormat  string             `yaml:"stdout_format" ghc:"example=influx"`
 	Telegraf      *TelegrafSink      `yaml:"telegraf"`
 	Graphite      *GraphiteSink      `yaml:"graphite"`
 	SQL           *SQLSink           `yaml:"sql"`
@@ -158,10 +169,10 @@ type Sinks struct {
 	// DedupeFile is where the ledger of what has already been written lives.
 	// Empty means beside the state file. "off" disables the ledger for every
 	// sink, which is what a store that has been wiped wants for one run.
-	DedupeFile string `yaml:"dedupe_file"`
+	DedupeFile string `yaml:"dedupe_file" ghc:"example=/var/lib/ghchronicle/state-written.bin"`
 	// DedupeHorizon is how long the ledger remembers a point nothing offers
 	// any more. Empty means 720h.
-	DedupeHorizon string `yaml:"dedupe_horizon"`
+	DedupeHorizon string `yaml:"dedupe_horizon" ghc:"example=720h"`
 }
 
 // DedupeAge resolves DedupeHorizon. An unparseable value falls back to the
@@ -179,52 +190,52 @@ func (s *Sinks) DedupeAge() time.Duration {
 }
 
 type InfluxSink struct {
-	URL    string `yaml:"url"`
-	Token  string `yaml:"token"`
-	Org    string `yaml:"org"`
-	Bucket string `yaml:"bucket"`
-	Batch  int    `yaml:"batch"`
+	URL    string `yaml:"url" ghc:"required,example=http://localhost:8181"`
+	Token  string `yaml:"token" ghc:"secret,example=${INFLUX_TOKEN}"`
+	Org    string `yaml:"org" ghc:"example=default"`
+	Bucket string `yaml:"bucket" ghc:"required,example=github"`
+	Batch  int    `yaml:"batch" ghc:"example=5000"`
 	// Exclude names measurements this sink should not receive. It defaults to
 	// the job log, which is text meant for a log store: writing thousands of
 	// lines of build output into a metrics database is a lot of storage for
 	// something nobody will query as a number.
-	Exclude []string `yaml:"exclude"`
+	Exclude []string `yaml:"exclude" ghc:"example=gh_job_log"`
 
 	// Dedupe skips writing a point whose fields have not changed since the
 	// last time this sink was given it. A store that keys a row by series and
 	// timestamp overwrites, so rewriting unchanged history changes nothing it
 	// holds and costs a file per partition per write in a store that never
 	// compacts. Nil means on. See sinks.dedupe_file.
-	Dedupe *bool `yaml:"dedupe"`
+	Dedupe *bool `yaml:"dedupe" ghc:"example=true"`
 }
 
 type PrometheusSink struct {
-	Listen string `yaml:"listen"`
-	Path   string `yaml:"path"`
+	Listen string `yaml:"listen" ghc:"example=127.0.0.1:9605"`
+	Path   string `yaml:"path" ghc:"example=/metrics"`
 	// NoPrime keeps the first sweep after start-up on the normal schedule.
 	//
 	// By default it runs every family instead, because an exporter keeps its
 	// samples in memory: a restart empties it, and without this it stays empty
 	// until each cadence comes round, which for the twelve hour families is
 	// half a day of a dashboard reading zero.
-	NoPrime bool `yaml:"no_prime"`
+	NoPrime bool `yaml:"no_prime" ghc:"example=false"`
 }
 
 // OTLPSink pushes metrics to an OpenTelemetry collector over HTTP.
 type OTLPSink struct {
-	Endpoint string            `yaml:"endpoint"`
-	Headers  map[string]string `yaml:"headers"`
-	Service  string            `yaml:"service"`
+	Endpoint string            `yaml:"endpoint" ghc:"required,example=http://collector:4318/v1/metrics"`
+	Headers  map[string]string `yaml:"headers" ghc:"secret,example=Authorization: Bearer ${OTLP_TOKEN}"`
+	Service  string            `yaml:"service" ghc:"example=ghchronicle"`
 	// Raw sends the dated points instead of the reduced current values. Only
 	// set it when the backend accepts old timestamps: Prometheus's OTLP
 	// receiver rejects a sample dated two days back with HTTP 400.
-	Raw   bool `yaml:"raw"`
-	Batch int  `yaml:"batch"`
+	Raw   bool `yaml:"raw" ghc:"example=false"`
+	Batch int  `yaml:"batch" ghc:"example=2000"`
 	// Repeat republishes the current state at this interval, so a Prometheus
 	// fed by push keeps answering instant queries between sweeps. Its lookback
 	// is five minutes; "1m" is a safe value. Empty means no repeat, which is
 	// right for a backend that keeps history on its own.
-	Repeat string `yaml:"repeat"`
+	Repeat string `yaml:"repeat" ghc:"example=1m"`
 }
 
 // RepeatEvery parses Repeat. Empty or invalid means zero.
@@ -238,17 +249,17 @@ func (o *OTLPSink) RepeatEvery() time.Duration {
 
 // LokiSink pushes the events, not the numbers.
 type LokiSink struct {
-	URL      string            `yaml:"url"`
-	TenantID string            `yaml:"tenant_id"`
-	Labels   map[string]string `yaml:"labels"`
-	Batch    int               `yaml:"batch"`
+	URL      string            `yaml:"url" ghc:"required,example=http://loki:3100/loki/api/v1/push"`
+	TenantID string            `yaml:"tenant_id" ghc:"example=tenant-one"`
+	Labels   map[string]string `yaml:"labels" ghc:"example=job: ghchronicle"`
+	Batch    int               `yaml:"batch" ghc:"example=1000"`
 	// MaxAge drops entries older than this. Loki refuses a whole push when one
 	// entry predates its reject_old_samples_max_age, a week by default, and
 	// much of what this collects is older than that on purpose. The tighter
 	// limit is the out-of-order window, about two hours, which is why the
 	// sink settles on an hour rather than a day. Match it to your Loki.
 	// Empty means the sink's own default, one hour.
-	MaxAge string `yaml:"max_age"`
+	MaxAge string `yaml:"max_age" ghc:"example=1h"`
 }
 
 // Age parses MaxAge. Zero says the key was not set, or was set to something
@@ -266,90 +277,129 @@ func (l *LokiSink) Age() time.Duration {
 // FileSink appends to a rotating file, for the setups that already run a log
 // shipper.
 type FileSink struct {
-	Path     string `yaml:"path"`
-	Format   string `yaml:"format"`
-	MaxBytes int64  `yaml:"max_bytes"`
-	Keep     int    `yaml:"keep"`
+	Path     string `yaml:"path" ghc:"required,example=/var/log/ghchronicle/points.lp"`
+	Format   string `yaml:"format" ghc:"example=influx"`
+	MaxBytes int64  `yaml:"max_bytes" ghc:"example=67108864"`
+	Keep     int    `yaml:"keep" ghc:"example=5"`
 }
 
 // TelegrafSink posts line protocol to Telegraf's http_listener_v2 input, the
 // door to every output Telegraf has.
 type TelegrafSink struct {
 	// URL is the listener, path included. A bare host gets /telegraf.
-	URL      string `yaml:"url"`
-	Username string `yaml:"username"`
-	Password string `yaml:"password"`
-	Batch    int    `yaml:"batch"`
+	URL      string `yaml:"url" ghc:"required,example=http://telegraf:8186/telegraf"`
+	Username string `yaml:"username" ghc:"example=telegraf"`
+	Password string `yaml:"password" ghc:"secret,example=${TELEGRAF_PASSWORD}"`
+	Batch    int    `yaml:"batch" ghc:"example=5000"`
 
 	// Dedupe skips writing a point whose fields have not changed since the
 	// last time this sink was given it. A store that keys a row by series and
 	// timestamp overwrites, so rewriting unchanged history changes nothing it
 	// holds and costs a file per partition per write in a store that never
 	// compacts. Nil means on. See sinks.dedupe_file.
-	Dedupe *bool `yaml:"dedupe"`
+	Dedupe *bool `yaml:"dedupe" ghc:"example=true"`
 }
 
 // GraphiteSink writes the plaintext protocol over TCP.
 type GraphiteSink struct {
-	Addr string `yaml:"addr"`
+	Addr string `yaml:"addr" ghc:"required,example=graphite:2003"`
 	// Prefix starts every metric path. Empty means "github".
-	Prefix string `yaml:"prefix"`
-	Batch  int    `yaml:"batch"`
+	Prefix string `yaml:"prefix" ghc:"example=github"`
+	Batch  int    `yaml:"batch" ghc:"example=1000"`
 
 	// Dedupe skips writing a point whose fields have not changed since the
 	// last time this sink was given it. A store that keys a row by series and
 	// timestamp overwrites, so rewriting unchanged history changes nothing it
 	// holds and costs a file per partition per write in a store that never
 	// compacts. Nil means on. See sinks.dedupe_file.
-	Dedupe *bool `yaml:"dedupe"`
+	Dedupe *bool `yaml:"dedupe" ghc:"example=true"`
 }
 
 // SQLSink writes INSERT statements to pipe into psql.
 type SQLSink struct {
 	// Dialect is "postgres", the only one so far.
-	Dialect string `yaml:"dialect"`
+	Dialect string `yaml:"dialect" ghc:"example=postgres"`
 	// Path is a rotating file, or "-" for standard output.
-	Path     string `yaml:"path"`
-	MaxBytes int64  `yaml:"max_bytes"`
-	Keep     int    `yaml:"keep"`
+	Path     string `yaml:"path" ghc:"required,example=/var/lib/ghchronicle/points.sql"`
+	MaxBytes int64  `yaml:"max_bytes" ghc:"example=67108864"`
+	Keep     int    `yaml:"keep" ghc:"example=5"`
 
 	// Dedupe skips writing a point whose fields have not changed since the
 	// last time this sink was given it. A store that keys a row by series and
 	// timestamp overwrites, so rewriting unchanged history changes nothing it
 	// holds and costs a file per partition per write in a store that never
 	// compacts. Nil means on. See sinks.dedupe_file.
-	Dedupe *bool `yaml:"dedupe"`
+	Dedupe *bool `yaml:"dedupe" ghc:"example=true"`
 }
 
 // ElasticsearchSink writes documents through the _bulk API, to Elasticsearch
 // or OpenSearch.
 type ElasticsearchSink struct {
-	URL string `yaml:"url"`
+	URL string `yaml:"url" ghc:"required,example=http://elasticsearch:9200"`
 	// Prefix starts every index name: <prefix>-<measurement>. Empty means
 	// "ghchronicle".
-	Prefix   string `yaml:"prefix"`
-	Username string `yaml:"username"`
-	Password string `yaml:"password"`
-	APIKey   string `yaml:"api_key"`
-	Batch    int    `yaml:"batch"`
+	Prefix   string `yaml:"prefix" ghc:"example=ghchronicle"`
+	Username string `yaml:"username" ghc:"example=elastic"`
+	Password string `yaml:"password" ghc:"secret,example=${ES_PASSWORD}"`
+	APIKey   string `yaml:"api_key" ghc:"secret,example=${ES_API_KEY}"`
+	Batch    int    `yaml:"batch" ghc:"example=1000"`
 
 	// Dedupe skips writing a point whose fields have not changed since the
 	// last time this sink was given it. A store that keys a row by series and
 	// timestamp overwrites, so rewriting unchanged history changes nothing it
 	// holds and costs a file per partition per write in a store that never
 	// compacts. Nil means on. See sinks.dedupe_file.
-	Dedupe *bool `yaml:"dedupe"`
+	Dedupe *bool `yaml:"dedupe" ghc:"example=true"`
 }
 
 type Log struct {
-	Level  string `yaml:"level"`
-	Format string `yaml:"format"`
+	Level  string `yaml:"level" ghc:"example=info"`
+	Format string `yaml:"format" ghc:"example=text"`
 	// File sends the tool's own log to a rotating file as well as to standard
 	// error. Empty means standard error only.
-	File     string `yaml:"file"`
-	MaxBytes int64  `yaml:"max_bytes"`
-	Keep     int    `yaml:"keep"`
+	File     string `yaml:"file" ghc:"example=/var/log/ghchronicle/ghchronicle.log"`
+	MaxBytes int64  `yaml:"max_bytes" ghc:"example=67108864"`
+	Keep     int    `yaml:"keep" ghc:"example=5"`
 }
+
+// logLevels is what log.level accepts, and the threshold each name means.
+// The command reads the level through SlogLevel below rather than switching on
+// the string itself, so this map is the only place the vocabulary is written
+// and the builder on the documentation site offers exactly these four.
+var logLevels = map[string]slog.Level{
+	"debug": slog.LevelDebug,
+	"info":  slog.LevelInfo,
+	"warn":  slog.LevelWarn,
+	"error": slog.LevelError,
+}
+
+// LogLevels are the accepted levels, quietest last, which is the order they
+// are documented in and the order a reader chooses from.
+func LogLevels() []string {
+	out := slices.Collect(maps.Keys(logLevels))
+	slices.SortFunc(out, func(a, b string) int { return int(logLevels[a] - logLevels[b]) })
+	return out
+}
+
+// SlogLevel resolves log.level. An unknown name is info, which is what the
+// command has always done: a misspelled level is not worth refusing to start
+// over, and the level is not validated at load time for that reason.
+func (l Log) SlogLevel() slog.Level {
+	if level, known := logLevels[l.Level]; known {
+		return level
+	}
+	return slog.LevelInfo
+}
+
+// logFormats is what log.format accepts. The first is what an empty value
+// means, and the second is the one UsesJSON answers to.
+var logFormats = []string{"text", "json"}
+
+// LogFormats are the accepted log formats, the default first.
+func LogFormats() []string { return slices.Clone(logFormats) }
+
+// UsesJSON reports whether the run's own log is written as JSON objects.
+func (l Log) UsesJSON() bool { return l.Format == logFormats[1] }
 
 // Every is the cadence table, in three layers. Most specific wins: a family's
 // own entry, then its group's, then default, then the built-in value below.
@@ -365,14 +415,14 @@ type Every struct {
 	// Default is the cadence of every family the two layers below leave
 	// alone. It does not reach a family whose built-in cadence is zero: see
 	// the note on layers, below.
-	Default string `yaml:"default"`
+	Default string `yaml:"default" ghc:"example=15m"`
 	// Groups is a cadence per group of families, keyed by the group names
 	// Groups() lists. Same reach as Default.
-	Groups map[string]string `yaml:"groups"`
+	Groups map[string]string `yaml:"groups" ghc:"example=ci: 1m"`
 	// Families is a cadence per family, keyed by the names Families() lists.
 	// It is the only layer that can give a duration to a family that ships
 	// switched off.
-	Families map[string]string `yaml:"families"`
+	Families map[string]string `yaml:"families" ghc:"example=deps: 24h"`
 }
 
 // layers is Every with every duration parsed and every name checked, so
@@ -461,9 +511,14 @@ func (l layers) resolve(name string, f family) (every time.Duration, source stri
 	return f.every, builtinSource
 }
 
-// compact prints a duration the way a config file writes one: 15m and 24h
+// Compact prints a duration the way a config file writes one: 15m and 24h
 // rather than 15m0s and 24h0m0s. A warning that quotes a value back at the
-// reader should quote it in the units he typed.
+// reader should quote it in the units he typed, and so should a page that
+// offers the built-in cadences as the values a reader would override.
+func Compact(d time.Duration) string { return compact(d) }
+
+// compact is Compact's own name inside this package, where it is quoted into
+// half the warnings.
 func compact(d time.Duration) string {
 	switch {
 	case d <= 0:
@@ -815,6 +870,24 @@ func (l *LokiSink) resolve() error {
 	return nil
 }
 
+// PointFormats are the two renderings of a point the file sink and the
+// standard-output sink accept, in the order they are documented. Empty means
+// the first of them.
+//
+// A list rather than a case arm in each of the two resolvers below, because
+// the builder on the documentation site offers these as a choice and a choice
+// typed there is a choice that can come to offer a third format, or to stop
+// offering one of these, while both resolvers still refuse it.
+func PointFormats() []string { return slices.Clone(pointFormats) }
+
+var pointFormats = []string{"influx", "json"}
+
+// SQLDialects are the dialects sinks.sql.dialect accepts. One so far, and the
+// list is what makes that a fact the site reads rather than one it states.
+func SQLDialects() []string { return slices.Clone(sqlDialects) }
+
+var sqlDialects = []string{"postgres"}
+
 func (f *FileSink) resolve() error {
 	if f == nil {
 		return nil
@@ -822,22 +895,18 @@ func (f *FileSink) resolve() error {
 	if f.Path == "" {
 		return errors.New("sinks.file: path is required")
 	}
-	switch f.Format {
-	case "", "influx", "json":
-		return nil
-	default:
-		return fmt.Errorf("sinks.file.format: %q is not influx or json", f.Format)
+	if f.Format != "" && !slices.Contains(pointFormats, f.Format) {
+		return fmt.Errorf("sinks.file.format: %q is not %s", f.Format, strings.Join(pointFormats, " or "))
 	}
+	return nil
 }
 
 // resolveStdout checks the one sink that is a bool rather than a struct.
 func (s *Sinks) resolveStdout() error {
-	switch s.StdoutFormat {
-	case "", "influx", "json":
-		return nil
-	default:
-		return fmt.Errorf("sinks.stdout_format: %q is not influx or json", s.StdoutFormat)
+	if s.StdoutFormat != "" && !slices.Contains(pointFormats, s.StdoutFormat) {
+		return fmt.Errorf("sinks.stdout_format: %q is not %s", s.StdoutFormat, strings.Join(pointFormats, " or "))
 	}
+	return nil
 }
 
 func (t *TelegrafSink) resolve() error {
@@ -872,12 +941,12 @@ func (s *SQLSink) resolve() error {
 	if s.Path == "" {
 		return errors.New("sinks.sql: path is required, a file or - for standard output")
 	}
-	switch s.Dialect {
-	case "":
-		s.Dialect = "postgres"
-	case "postgres":
-	default:
-		return fmt.Errorf("sinks.sql.dialect: %q is not postgres, the only dialect so far", s.Dialect)
+	if s.Dialect == "" {
+		s.Dialect = sqlDialects[0]
+	}
+	if !slices.Contains(sqlDialects, s.Dialect) {
+		return fmt.Errorf("sinks.sql.dialect: %q is not %s, the only dialect so far",
+			s.Dialect, strings.Join(sqlDialects, " or "))
 	}
 	return nil
 }
@@ -902,7 +971,7 @@ func (e *ElasticsearchSink) resolve() error {
 
 // requireOneSink refuses a config that would collect and then throw the
 // result away. AllowNoSinks waives it for a caller that supplies its own
-// destination, which is what -card-only does.
+// destination, which is what -card <path> -card-only does.
 func (c *Config) requireOneSink() error {
 	if c.AllowNoSinks {
 		return nil
@@ -911,7 +980,8 @@ func (c *Config) requireOneSink() error {
 	if s.Influx == nil && s.Prometheus == nil && s.OTLP == nil && s.Loki == nil &&
 		s.File == nil && !s.Stdout && s.Telegraf == nil && s.Graphite == nil &&
 		s.SQL == nil && s.Elasticsearch == nil {
-		return errors.New("sinks: enable at least one of influxdb, prometheus, otlp, loki, file, stdout, telegraf, graphite, sql or elasticsearch")
+		return errors.New("sinks: enable at least one of influxdb, prometheus, otlp, loki, file, stdout, telegraf, graphite, sql or elasticsearch, " +
+			"or run with -card <path> -card-only to draw a card and write the points nowhere")
 	}
 	return nil
 }

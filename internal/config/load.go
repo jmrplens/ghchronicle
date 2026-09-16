@@ -1,7 +1,9 @@
 package config
 
 import (
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"slices"
 	"strings"
@@ -30,6 +32,14 @@ func LoadWith(path string, allowNoSinks bool) (*Config, error) {
 	if err = dec.Decode(&c); err != nil {
 		if hint := flatEveryHint(raw); hint != "" {
 			return nil, fmt.Errorf("%s: %s", path, hint)
+		}
+		// A document with nothing in it ends where it starts, and the decoder
+		// reports that as the end of the file. "EOF" on its own says the file
+		// was read and nothing about what is missing from it, which is the
+		// whole of what a reader who cleared every field is told.
+		if errors.Is(err, io.EOF) {
+			return nil, fmt.Errorf("%s: the file is empty. A configuration needs at least an account under targets "+
+				"and a destination under sinks; see config.example.yaml", path)
 		}
 		return nil, fmt.Errorf("%s: %w", path, err)
 	}

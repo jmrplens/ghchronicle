@@ -1,0 +1,117 @@
+---
+title: Generar la configuración
+description: Un formulario que escribe el config.yaml de una ejecución normal y el paso de workflow de la Action, a partir de la lista de ajustes del propio binario.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+import ConfigBuilder from "../../../../components/ConfigBuilder.astro";
+
+Responde cómo es tu despliegue y esto escribe las tres cosas que lo ponen en
+marcha: el `config.yaml` que lee una ejecución normal, el comando que lo
+ejecuta y el paso que un workflow le da a la Action compuesta. Las tres salen
+de un mismo conjunto de respuestas, y ninguna pide una credencial.
+
+## Por qué no puede desviarse
+
+Los controles no son una copia de los ajustes. `cmd/gen_config` exporta los
+propios tipos de `internal/config` a un fichero que la página lee, incluido el
+valor por omisión al que se resuelve cada clave, que mide validando una sonda en
+vez de repetir un número. `make check-config-options` falla cuando ese fichero
+deja de ser lo que produce el código, en la suite de análisis y en CI, así que
+el formulario no puede ofrecer un ajuste que el binario no tiene ni perderse uno
+que sí tiene.
+
+La dirección contraria también se comprueba, y su límite conviene decirlo en voz
+alta. Las configuraciones que este formulario escribe para los conjuntos de
+respuestas de `internal/config/testdata/config-cases.json` pasan por el parser
+real en las propias pruebas de `internal/config`, incluidas las formas que han
+hecho tropezar a alguien: una cadencia por familia bajo `every.families`, un
+`include_private` desactivado, un destino cuyas credenciales son referencias
+`${VAR}`, una ejecución de solo tarjeta sin ningún destino y respuestas que se
+espera que el parser rechace. Esos casos los genera el módulo que ejecuta esta
+página, así que no pueden ser una copia suya, y cada rama de ese módulo que
+puede cambiar lo que escribe tiene uno. Lo que el corpus no demuestra es el
+comportamiento que ningún conjunto de respuestas produce, y por eso el fichero
+que lo define enumera lo que no puede cubrir y por qué.
+
+## Qué permite el formulario y rechaza el parser
+
+Un formulario es un formulario: un destino es una casilla y las claves sin las
+que no se resuelve no lo son, así que unos pocos clics bastan para escribir un
+fichero que muere al arrancar. La página avisa de aquellas que su propia lista
+generada de ajustes puede ver, encima de las salidas, y nombra el resto aquí.
+Rechazar el resto en el formulario obligaría a guardar en esta página una
+segunda copia de una regla del parser, que es justo la desviación que todo este
+montaje existe para evitar.
+
+- Un destino activado con una clave obligatoria vacía se rechaza con nombre y
+  ejemplo: `sinks.loki: url is required, for example http://loki:3100`. De esta
+  avisa el formulario.
+- Un campo de credencial respondido con la credencial en vez de con el nombre de
+  una variable de entorno se queda fuera del fichero. De esta avisa el
+  formulario.
+- Un fichero sin nada dentro se rechaza: `the file is empty`.
+- No indicar ninguna cuenta se rechaza: `targets: set at least one of user, orgs
+  or repos`.
+- `heartbeat: 0` se rechaza: tiene que ser positivo, y dejar la clave fuera es
+  la forma de que el tic del bucle se derive solo.
+- Una cadencia que no es una duración se rechaza donde se usa:
+  `every.families.repo: time: invalid duration "soon"`.
+- `sinks.elasticsearch.api_key` rellenado a la vez que
+  `sinks.elasticsearch.username` se rechaza: `sinks.elasticsearch: set either
+  api_key or username and password, not both`.
+- Escribir `-` en `sinks.sql.path` con `sinks.stdout` activado se acepta y deja
+  dos escritores sobre el mismo flujo; elige uno.
+
+<Aside type="caution" title="Qué hace el formulario con una credencial">
+  Donde un ajuste es una credencial, el formulario pide el NOMBRE de una
+  variable de entorno y escribe `${NOMBRE}` en el fichero. Esa es la expansión
+  que hace el binario al arrancar, y es lo que permite publicar el fichero. Una
+  respuesta que no es un nombre de variable no se escribe: el formulario lo dice
+  y deja la clave fuera, en vez de convertir un token pegado en una referencia a
+  una variable que no va a existir nunca. Hay un campo que eso no cubre,
+  `sinks.otlp.headers`, que es texto libre porque una cabecera no siempre es una
+  credencial: lo que escribas ahí se escribe tal cual, así que pon una
+  referencia `${VAR}`. El token de la Action es un secreto del repositorio, que
+  es lo que referencia el paso.
+</Aside>
+
+## El formulario
+
+<ConfigBuilder />
+
+## Qué hacer con cada salida
+
+No hay un único comando, y por eso el formulario lo escribe. Una configuración
+que nombra un destino se ejecuta con `-once`. Una que no nombra ninguno la
+rechaza `-once`, con el parser pidiendo un destino que no querías, así que se
+ejecuta con `-card-only` y una ruta para la tarjeta. El comando de arriba cambia
+con las respuestas, y el paso también.
+
+El paso va en los `steps:` de un job de workflow. Las respuestas que ningún
+input transporta hacen que el paso lea el fichero, y el fichero hay que
+publicarlo en la ruta que nombra el paso; las respuestas que los cuatro inputs
+sí transportan se escriben en el propio paso, y entonces no hace falta fichero
+ninguno. Un paso sin fichero que no nombra destino es una ejecución de tarjeta,
+`mode: card` con una ruta en `card:`, porque eso es lo único que la Action
+convierte en `-card-only`.
+
+Las dos salidas tienen valores por omisión opuestos en un ajuste, y el paso se
+escribe de forma que diga cuál te toca. `include-private` está desactivado salvo
+que lo pidas, porque una tarjeta que cuenta repositorios privados publica sus
+nombres en un README público; `targets.include_private` está activado salvo que
+digas lo contrario, porque el token ya llega a ellos. Por eso un paso sin
+fichero siempre escribe el input en vez de dejarlo en un valor por omisión que
+significa lo contrario que el fichero de al lado. Mira
+[GitHub Actions](/ghchronicle/es/install/actions/) para el workflow que lo
+rodea, y [el token](/ghchronicle/es/start/token/) para lo que el secreto tiene
+que poder hacer.
+
+## Lo demás
+
+- [El fichero](/ghchronicle/es/configuration/): para qué sirve cada bloque y qué
+  pasa cuando un valor está mal.
+- [Objetivos](/ghchronicle/es/configuration/targets/): qué repositorios.
+- [Cadencias](/ghchronicle/es/configuration/cadences/): cada familia, su grupo y
+  su intervalo de fábrica.
+- [Elegir almacén](/ghchronicle/es/sinks/): una página por destino.

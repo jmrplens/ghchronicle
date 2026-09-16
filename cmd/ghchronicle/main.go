@@ -565,7 +565,7 @@ func buildSinks(cfg *config.Config, log *slog.Logger, oneShot bool) ([]sink.Sink
 	// dedupe returns the ledger a sink should use: its own setting, defaulting
 	// to on, and nil when the ledger is off altogether.
 	dedupe := func(enabled *bool) *sink.Ledger {
-		if enabled != nil && !*enabled {
+		if !config.Enabled(enabled) {
 			return nil
 		}
 		return ledger
@@ -665,16 +665,6 @@ func replaceFile(path string, data []byte) error {
 // newLogger is the run's logger, writing to stderr and, when the config names
 // a file, to that as well.
 func newLogger(l config.Log, stderr io.Writer) (*slog.Logger, io.Closer) {
-	level := slog.LevelInfo
-	switch l.Level {
-	case "debug":
-		level = slog.LevelDebug
-	case "warn":
-		level = slog.LevelWarn
-	case "error":
-		level = slog.LevelError
-	}
-
 	out := stderr
 	var closer io.Closer
 	if l.File != "" {
@@ -684,8 +674,8 @@ func newLogger(l config.Log, stderr io.Writer) (*slog.Logger, io.Closer) {
 		out, closer = sink.Tee(stderr, w), w
 	}
 
-	opts := &slog.HandlerOptions{Level: level}
-	if l.Format == "json" {
+	opts := &slog.HandlerOptions{Level: l.SlogLevel()}
+	if l.UsesJSON() {
 		return slog.New(slog.NewJSONHandler(out, opts)), closer
 	}
 	return slog.New(slog.NewTextHandler(out, opts)), closer

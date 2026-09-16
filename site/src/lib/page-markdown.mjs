@@ -16,6 +16,7 @@ import figures from "../data/figures.json" with { type: "json" };
 import stats from "../data/stats.json" with { type: "json" };
 
 import { CARD_COMMAND_TEXT, cardCommand, cardStep } from "./card-command.mjs";
+import { builderMarkdown } from "./config-build.mjs";
 import { factsOf } from "./layout-facts.mjs";
 import { localeOf, pageUrl } from "./site.mjs";
 
@@ -315,6 +316,15 @@ function renderSelfClosing(name, attributes, raw, context) {
 				`- **${label}**: ${values.map((value) => (code ? `\`${value}\`` : value)).join(", ")}`,
 		);
 		return `\n\n${rows.join("\n")}\n\n`;
+	}
+	// The builder is a form, and a form reduces to nothing a reader of text can
+	// use. What it offers does reduce: the inventory of settings it is
+	// generated from, with each one's kind, default and example, and the two
+	// outputs it starts in. Both come from the module the page itself runs, so
+	// docs/ and llms-full.txt carry the same list and the same starting
+	// configuration the page shows.
+	if (name === "ConfigBuilder") {
+		return `\n\n${builderMarkdown(context.locale)}\n\n`;
 	}
 	if (name === "LinkCard") {
 		const title = attributes.title ?? attributes.href ?? "";

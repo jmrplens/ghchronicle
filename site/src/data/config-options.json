@@ -1,0 +1,1013 @@
+{
+  "options": [
+    {
+      "key": "github",
+      "kind": "block",
+      "group": "github"
+    },
+    {
+      "key": "github.token",
+      "kind": "string",
+      "group": "github",
+      "secret": true,
+      "required": true,
+      "example": "${GITHUB_TOKEN}"
+    },
+    {
+      "key": "github.base_url",
+      "kind": "string",
+      "group": "github",
+      "example": "https://github.example.com/api/v3"
+    },
+    {
+      "key": "github.web_url",
+      "kind": "string",
+      "group": "github",
+      "example": "https://github.example.com"
+    },
+    {
+      "key": "github.timeout",
+      "kind": "string",
+      "group": "github",
+      "default": "30s",
+      "example": "30s"
+    },
+    {
+      "key": "github.reserve_rate",
+      "kind": "int",
+      "group": "github",
+      "default": "500",
+      "example": "500"
+    },
+    {
+      "key": "targets",
+      "kind": "block",
+      "group": "targets"
+    },
+    {
+      "key": "targets.user",
+      "kind": "string",
+      "group": "targets",
+      "example": "your-github-login"
+    },
+    {
+      "key": "targets.orgs",
+      "kind": "list",
+      "group": "targets",
+      "example": "some-org, another-org"
+    },
+    {
+      "key": "targets.repos",
+      "kind": "list",
+      "group": "targets",
+      "example": "someone/one-repo"
+    },
+    {
+      "key": "targets.exclude",
+      "kind": "list",
+      "group": "targets",
+      "example": "someone/experiment-*"
+    },
+    {
+      "key": "targets.include_forks",
+      "kind": "bool",
+      "group": "targets",
+      "default": "false",
+      "example": "false"
+    },
+    {
+      "key": "targets.include_archived",
+      "kind": "bool",
+      "group": "targets",
+      "default": "false",
+      "example": "false"
+    },
+    {
+      "key": "targets.include_private",
+      "kind": "bool",
+      "group": "targets",
+      "default": "true",
+      "example": "true"
+    },
+    {
+      "key": "sinks",
+      "kind": "block",
+      "group": "sinks"
+    },
+    {
+      "key": "sinks.influxdb",
+      "kind": "block",
+      "group": "sinks"
+    },
+    {
+      "key": "sinks.influxdb.url",
+      "kind": "string",
+      "group": "sinks",
+      "sink": "influxdb",
+      "required": true,
+      "example": "http://localhost:8181"
+    },
+    {
+      "key": "sinks.influxdb.token",
+      "kind": "string",
+      "group": "sinks",
+      "sink": "influxdb",
+      "secret": true,
+      "example": "${INFLUX_TOKEN}"
+    },
+    {
+      "key": "sinks.influxdb.org",
+      "kind": "string",
+      "group": "sinks",
+      "sink": "influxdb",
+      "default": "default",
+      "example": "default"
+    },
+    {
+      "key": "sinks.influxdb.bucket",
+      "kind": "string",
+      "group": "sinks",
+      "sink": "influxdb",
+      "required": true,
+      "example": "github"
+    },
+    {
+      "key": "sinks.influxdb.batch",
+      "kind": "int",
+      "group": "sinks",
+      "sink": "influxdb",
+      "example": "5000"
+    },
+    {
+      "key": "sinks.influxdb.exclude",
+      "kind": "list",
+      "group": "sinks",
+      "sink": "influxdb",
+      "default": "gh_job_log",
+      "example": "gh_job_log"
+    },
+    {
+      "key": "sinks.influxdb.dedupe",
+      "kind": "bool",
+      "group": "sinks",
+      "sink": "influxdb",
+      "default": "true",
+      "example": "true"
+    },
+    {
+      "key": "sinks.prometheus",
+      "kind": "block",
+      "group": "sinks"
+    },
+    {
+      "key": "sinks.prometheus.listen",
+      "kind": "string",
+      "group": "sinks",
+      "sink": "prometheus",
+      "default": ":9605",
+      "example": "127.0.0.1:9605"
+    },
+    {
+      "key": "sinks.prometheus.path",
+      "kind": "string",
+      "group": "sinks",
+      "sink": "prometheus",
+      "default": "/metrics",
+      "example": "/metrics"
+    },
+    {
+      "key": "sinks.prometheus.no_prime",
+      "kind": "bool",
+      "group": "sinks",
+      "sink": "prometheus",
+      "default": "false",
+      "example": "false"
+    },
+    {
+      "key": "sinks.otlp",
+      "kind": "block",
+      "group": "sinks"
+    },
+    {
+      "key": "sinks.otlp.endpoint",
+      "kind": "string",
+      "group": "sinks",
+      "sink": "otlp",
+      "required": true,
+      "example": "http://collector:4318/v1/metrics"
+    },
+    {
+      "key": "sinks.otlp.headers",
+      "kind": "map",
+      "group": "sinks",
+      "sink": "otlp",
+      "secret": true,
+      "example": "Authorization: Bearer ${OTLP_TOKEN}"
+    },
+    {
+      "key": "sinks.otlp.service",
+      "kind": "string",
+      "group": "sinks",
+      "sink": "otlp",
+      "example": "ghchronicle"
+    },
+    {
+      "key": "sinks.otlp.raw",
+      "kind": "bool",
+      "group": "sinks",
+      "sink": "otlp",
+      "default": "false",
+      "example": "false"
+    },
+    {
+      "key": "sinks.otlp.batch",
+      "kind": "int",
+      "group": "sinks",
+      "sink": "otlp",
+      "example": "2000"
+    },
+    {
+      "key": "sinks.otlp.repeat",
+      "kind": "string",
+      "group": "sinks",
+      "sink": "otlp",
+      "example": "1m"
+    },
+    {
+      "key": "sinks.loki",
+      "kind": "block",
+      "group": "sinks"
+    },
+    {
+      "key": "sinks.loki.url",
+      "kind": "string",
+      "group": "sinks",
+      "sink": "loki",
+      "required": true,
+      "example": "http://loki:3100/loki/api/v1/push"
+    },
+    {
+      "key": "sinks.loki.tenant_id",
+      "kind": "string",
+      "group": "sinks",
+      "sink": "loki",
+      "example": "tenant-one"
+    },
+    {
+      "key": "sinks.loki.labels",
+      "kind": "map",
+      "group": "sinks",
+      "sink": "loki",
+      "example": "job: ghchronicle"
+    },
+    {
+      "key": "sinks.loki.batch",
+      "kind": "int",
+      "group": "sinks",
+      "sink": "loki",
+      "example": "1000"
+    },
+    {
+      "key": "sinks.loki.max_age",
+      "kind": "string",
+      "group": "sinks",
+      "sink": "loki",
+      "example": "1h"
+    },
+    {
+      "key": "sinks.file",
+      "kind": "block",
+      "group": "sinks"
+    },
+    {
+      "key": "sinks.file.path",
+      "kind": "string",
+      "group": "sinks",
+      "sink": "file",
+      "required": true,
+      "example": "/var/log/ghchronicle/points.lp"
+    },
+    {
+      "key": "sinks.file.format",
+      "kind": "string",
+      "group": "sinks",
+      "sink": "file",
+      "example": "influx",
+      "choices": [
+        "influx",
+        "json"
+      ]
+    },
+    {
+      "key": "sinks.file.max_bytes",
+      "kind": "int",
+      "group": "sinks",
+      "sink": "file",
+      "example": "67108864"
+    },
+    {
+      "key": "sinks.file.keep",
+      "kind": "int",
+      "group": "sinks",
+      "sink": "file",
+      "example": "5"
+    },
+    {
+      "key": "sinks.stdout",
+      "kind": "bool",
+      "group": "sinks",
+      "default": "false",
+      "example": "false"
+    },
+    {
+      "key": "sinks.stdout_format",
+      "kind": "string",
+      "group": "sinks",
+      "example": "influx",
+      "choices": [
+        "influx",
+        "json"
+      ]
+    },
+    {
+      "key": "sinks.telegraf",
+      "kind": "block",
+      "group": "sinks"
+    },
+    {
+      "key": "sinks.telegraf.url",
+      "kind": "string",
+      "group": "sinks",
+      "sink": "telegraf",
+      "required": true,
+      "example": "http://telegraf:8186/telegraf"
+    },
+    {
+      "key": "sinks.telegraf.username",
+      "kind": "string",
+      "group": "sinks",
+      "sink": "telegraf",
+      "example": "telegraf"
+    },
+    {
+      "key": "sinks.telegraf.password",
+      "kind": "string",
+      "group": "sinks",
+      "sink": "telegraf",
+      "secret": true,
+      "example": "${TELEGRAF_PASSWORD}"
+    },
+    {
+      "key": "sinks.telegraf.batch",
+      "kind": "int",
+      "group": "sinks",
+      "sink": "telegraf",
+      "example": "5000"
+    },
+    {
+      "key": "sinks.telegraf.dedupe",
+      "kind": "bool",
+      "group": "sinks",
+      "sink": "telegraf",
+      "default": "true",
+      "example": "true"
+    },
+    {
+      "key": "sinks.graphite",
+      "kind": "block",
+      "group": "sinks"
+    },
+    {
+      "key": "sinks.graphite.addr",
+      "kind": "string",
+      "group": "sinks",
+      "sink": "graphite",
+      "required": true,
+      "example": "graphite:2003"
+    },
+    {
+      "key": "sinks.graphite.prefix",
+      "kind": "string",
+      "group": "sinks",
+      "sink": "graphite",
+      "default": "github",
+      "example": "github"
+    },
+    {
+      "key": "sinks.graphite.batch",
+      "kind": "int",
+      "group": "sinks",
+      "sink": "graphite",
+      "example": "1000"
+    },
+    {
+      "key": "sinks.graphite.dedupe",
+      "kind": "bool",
+      "group": "sinks",
+      "sink": "graphite",
+      "default": "true",
+      "example": "true"
+    },
+    {
+      "key": "sinks.sql",
+      "kind": "block",
+      "group": "sinks"
+    },
+    {
+      "key": "sinks.sql.dialect",
+      "kind": "string",
+      "group": "sinks",
+      "sink": "sql",
+      "default": "postgres",
+      "example": "postgres",
+      "choices": [
+        "postgres"
+      ]
+    },
+    {
+      "key": "sinks.sql.path",
+      "kind": "string",
+      "group": "sinks",
+      "sink": "sql",
+      "required": true,
+      "example": "/var/lib/ghchronicle/points.sql"
+    },
+    {
+      "key": "sinks.sql.max_bytes",
+      "kind": "int",
+      "group": "sinks",
+      "sink": "sql",
+      "example": "67108864"
+    },
+    {
+      "key": "sinks.sql.keep",
+      "kind": "int",
+      "group": "sinks",
+      "sink": "sql",
+      "example": "5"
+    },
+    {
+      "key": "sinks.sql.dedupe",
+      "kind": "bool",
+      "group": "sinks",
+      "sink": "sql",
+      "default": "true",
+      "example": "true"
+    },
+    {
+      "key": "sinks.elasticsearch",
+      "kind": "block",
+      "group": "sinks"
+    },
+    {
+      "key": "sinks.elasticsearch.url",
+      "kind": "string",
+      "group": "sinks",
+      "sink": "elasticsearch",
+      "required": true,
+      "example": "http://elasticsearch:9200"
+    },
+    {
+      "key": "sinks.elasticsearch.prefix",
+      "kind": "string",
+      "group": "sinks",
+      "sink": "elasticsearch",
+      "default": "ghchronicle",
+      "example": "ghchronicle"
+    },
+    {
+      "key": "sinks.elasticsearch.username",
+      "kind": "string",
+      "group": "sinks",
+      "sink": "elasticsearch",
+      "example": "elastic"
+    },
+    {
+      "key": "sinks.elasticsearch.password",
+      "kind": "string",
+      "group": "sinks",
+      "sink": "elasticsearch",
+      "secret": true,
+      "example": "${ES_PASSWORD}"
+    },
+    {
+      "key": "sinks.elasticsearch.api_key",
+      "kind": "string",
+      "group": "sinks",
+      "sink": "elasticsearch",
+      "secret": true,
+      "example": "${ES_API_KEY}"
+    },
+    {
+      "key": "sinks.elasticsearch.batch",
+      "kind": "int",
+      "group": "sinks",
+      "sink": "elasticsearch",
+      "example": "1000"
+    },
+    {
+      "key": "sinks.elasticsearch.dedupe",
+      "kind": "bool",
+      "group": "sinks",
+      "sink": "elasticsearch",
+      "default": "true",
+      "example": "true"
+    },
+    {
+      "key": "sinks.dedupe_file",
+      "kind": "string",
+      "group": "sinks",
+      "default": "ghchronicle-state-written.bin",
+      "example": "/var/lib/ghchronicle/state-written.bin"
+    },
+    {
+      "key": "sinks.dedupe_horizon",
+      "kind": "string",
+      "group": "sinks",
+      "default": "720h",
+      "example": "720h"
+    },
+    {
+      "key": "every",
+      "kind": "block",
+      "group": "cadences"
+    },
+    {
+      "key": "every.default",
+      "kind": "string",
+      "group": "cadences",
+      "example": "15m"
+    },
+    {
+      "key": "every.groups",
+      "kind": "map",
+      "group": "cadences",
+      "example": "ci: 1m",
+      "keys": [
+        "account",
+        "audience",
+        "ci",
+        "collector",
+        "feeds",
+        "repos",
+        "security",
+        "work"
+      ]
+    },
+    {
+      "key": "every.families",
+      "kind": "map",
+      "group": "cadences",
+      "example": "deps: 24h",
+      "keys": [
+        "account",
+        "achievements",
+        "actions",
+        "activity",
+        "analyses",
+        "artifacts",
+        "billing",
+        "branches",
+        "commits",
+        "deployments",
+        "deps",
+        "discussions",
+        "events",
+        "forks",
+        "history",
+        "inventory",
+        "issueevents",
+        "issues",
+        "joblogs",
+        "keys",
+        "notifs",
+        "outbound",
+        "planning",
+        "policyfiles",
+        "profile",
+        "ratelimit",
+        "repo",
+        "rulesets",
+        "security",
+        "settings",
+        "stars",
+        "stats",
+        "totals",
+        "traffic"
+      ]
+    },
+    {
+      "key": "heartbeat",
+      "kind": "string",
+      "group": "run",
+      "example": "15s"
+    },
+    {
+      "key": "groups",
+      "kind": "list",
+      "group": "run",
+      "example": "audience, account, repos",
+      "keys": [
+        "account",
+        "audience",
+        "ci",
+        "collector",
+        "feeds",
+        "repos",
+        "security",
+        "work"
+      ]
+    },
+    {
+      "key": "log",
+      "kind": "block",
+      "group": "log"
+    },
+    {
+      "key": "log.level",
+      "kind": "string",
+      "group": "log",
+      "default": "info",
+      "example": "info",
+      "choices": [
+        "debug",
+        "info",
+        "warn",
+        "error"
+      ]
+    },
+    {
+      "key": "log.format",
+      "kind": "string",
+      "group": "log",
+      "default": "text",
+      "example": "text",
+      "choices": [
+        "text",
+        "json"
+      ]
+    },
+    {
+      "key": "log.file",
+      "kind": "string",
+      "group": "log",
+      "example": "/var/log/ghchronicle/ghchronicle.log"
+    },
+    {
+      "key": "log.max_bytes",
+      "kind": "int",
+      "group": "log",
+      "example": "67108864"
+    },
+    {
+      "key": "log.keep",
+      "kind": "int",
+      "group": "log",
+      "example": "5"
+    },
+    {
+      "key": "state_file",
+      "kind": "string",
+      "group": "run",
+      "default": "ghchronicle-state.json",
+      "example": "/var/lib/ghchronicle/state.json"
+    },
+    {
+      "key": "backfill",
+      "kind": "block",
+      "group": "run"
+    },
+    {
+      "key": "backfill.since",
+      "kind": "string",
+      "group": "run",
+      "example": "2y"
+    }
+  ],
+  "groups": [
+    {
+      "name": "account",
+      "description": "the account itself: its lifetime numbers, its profile, its keys, its spending and what it does in other people's repositories",
+      "families": [
+        "account",
+        "achievements",
+        "billing",
+        "history",
+        "keys",
+        "outbound",
+        "profile",
+        "totals"
+      ]
+    },
+    {
+      "name": "audience",
+      "description": "who is looking at the projects, who starred them and who copied them",
+      "families": [
+        "forks",
+        "stars",
+        "traffic"
+      ]
+    },
+    {
+      "name": "ci",
+      "description": "continuous integration and deployment: runs, jobs, steps, artifacts, caches and deployments",
+      "families": [
+        "actions",
+        "artifacts",
+        "deployments",
+        "joblogs"
+      ]
+    },
+    {
+      "name": "collector",
+      "description": "what the collector has left to spend",
+      "families": [
+        "ratelimit"
+      ]
+    },
+    {
+      "name": "feeds",
+      "description": "the three feeds GitHub keeps only briefly: the event feed, notifications and each repository's log",
+      "families": [
+        "activity",
+        "events",
+        "notifs"
+      ]
+    },
+    {
+      "name": "repos",
+      "description": "what each repository is: metadata and releases, live branches, webhooks and environments, governance files, dependencies",
+      "families": [
+        "branches",
+        "deps",
+        "inventory",
+        "policyfiles",
+        "repo",
+        "rulesets",
+        "settings"
+      ]
+    },
+    {
+      "name": "security",
+      "description": "Dependabot alerts and code scanning",
+      "families": [
+        "analyses",
+        "security"
+      ]
+    },
+    {
+      "name": "work",
+      "description": "the work done in them: pull requests, issues and their transitions, commits, discussions, labels and milestones",
+      "families": [
+        "commits",
+        "discussions",
+        "issueevents",
+        "issues",
+        "planning",
+        "stats"
+      ]
+    }
+  ],
+  "families": [
+    {
+      "name": "account",
+      "group": "account",
+      "every": "12h"
+    },
+    {
+      "name": "achievements",
+      "group": "account",
+      "every": "24h"
+    },
+    {
+      "name": "actions",
+      "group": "ci",
+      "every": "15m"
+    },
+    {
+      "name": "activity",
+      "group": "feeds",
+      "every": "30m"
+    },
+    {
+      "name": "analyses",
+      "group": "security",
+      "every": "6h"
+    },
+    {
+      "name": "artifacts",
+      "group": "ci",
+      "every": "1h"
+    },
+    {
+      "name": "billing",
+      "group": "account",
+      "every": "6h"
+    },
+    {
+      "name": "branches",
+      "group": "repos",
+      "every": "24h"
+    },
+    {
+      "name": "commits",
+      "group": "work",
+      "every": "1h"
+    },
+    {
+      "name": "deployments",
+      "group": "ci",
+      "every": "1h"
+    },
+    {
+      "name": "deps",
+      "group": "repos",
+      "every": "0"
+    },
+    {
+      "name": "discussions",
+      "group": "work",
+      "every": "2h"
+    },
+    {
+      "name": "events",
+      "group": "feeds",
+      "every": "30m"
+    },
+    {
+      "name": "forks",
+      "group": "audience",
+      "every": "12h"
+    },
+    {
+      "name": "history",
+      "group": "account",
+      "every": "0"
+    },
+    {
+      "name": "inventory",
+      "group": "repos",
+      "every": "24h"
+    },
+    {
+      "name": "issueevents",
+      "group": "work",
+      "every": "1h"
+    },
+    {
+      "name": "issues",
+      "group": "work",
+      "every": "1h"
+    },
+    {
+      "name": "joblogs",
+      "group": "ci",
+      "every": "0"
+    },
+    {
+      "name": "keys",
+      "group": "account",
+      "every": "24h"
+    },
+    {
+      "name": "notifs",
+      "group": "feeds",
+      "every": "30m"
+    },
+    {
+      "name": "outbound",
+      "group": "account",
+      "every": "12h"
+    },
+    {
+      "name": "planning",
+      "group": "work",
+      "every": "6h"
+    },
+    {
+      "name": "policyfiles",
+      "group": "repos",
+      "every": "24h"
+    },
+    {
+      "name": "profile",
+      "group": "account",
+      "every": "12h"
+    },
+    {
+      "name": "ratelimit",
+      "group": "collector",
+      "every": "15m"
+    },
+    {
+      "name": "repo",
+      "group": "repos",
+      "every": "1h"
+    },
+    {
+      "name": "rulesets",
+      "group": "repos",
+      "every": "24h"
+    },
+    {
+      "name": "security",
+      "group": "security",
+      "every": "1h"
+    },
+    {
+      "name": "settings",
+      "group": "repos",
+      "every": "6h"
+    },
+    {
+      "name": "stars",
+      "group": "audience",
+      "every": "6h"
+    },
+    {
+      "name": "stats",
+      "group": "work",
+      "every": "12h"
+    },
+    {
+      "name": "totals",
+      "group": "account",
+      "every": "12h"
+    },
+    {
+      "name": "traffic",
+      "group": "audience",
+      "every": "6h"
+    }
+  ],
+  "action": {
+    "inputs": [
+      {
+        "name": "token",
+        "required": true,
+        "default": ""
+      },
+      {
+        "name": "config",
+        "required": false,
+        "default": ""
+      },
+      {
+        "name": "user",
+        "required": false,
+        "default": "${{ github.repository_owner }}"
+      },
+      {
+        "name": "mode",
+        "required": false,
+        "default": "once"
+      },
+      {
+        "name": "backfill-since",
+        "required": false,
+        "default": ""
+      },
+      {
+        "name": "card",
+        "required": false,
+        "default": ""
+      },
+      {
+        "name": "card-layout",
+        "required": false,
+        "default": "summary"
+      },
+      {
+        "name": "card-theme",
+        "required": false,
+        "default": "auto"
+      },
+      {
+        "name": "card-fields",
+        "required": false,
+        "default": ""
+      },
+      {
+        "name": "card-motion",
+        "required": false,
+        "default": "once"
+      },
+      {
+        "name": "include-private",
+        "required": false,
+        "default": "false"
+      },
+      {
+        "name": "version",
+        "required": false,
+        "default": "latest"
+      }
+    ],
+    "map": {
+      "backfill.since": "backfill-since",
+      "github.token": "token",
+      "targets.include_private": "include-private",
+      "targets.user": "user"
+    }
+  }
+}

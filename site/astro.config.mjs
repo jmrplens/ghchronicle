@@ -305,6 +305,11 @@ export default defineConfig({
 							slug: "configuration",
 						},
 						{
+							label: "Build the configuration",
+							translations: { es: "Generar la configuración" },
+							slug: "configuration/builder",
+						},
+						{
 							label: "Targets",
 							translations: { es: "Objetivos" },
 							slug: "configuration/targets",

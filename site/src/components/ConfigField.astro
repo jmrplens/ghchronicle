@@ -1,0 +1,237 @@
+---
+/**
+ * One control of the configuration builder, by the kind its setting has.
+ *
+ * The kinds are the ones `cmd/gen_config` exports, which are the Go types read
+ * through `internal/config`'s own yaml tags, so the control a reader meets is
+ * decided by the type the binary decodes into and by nothing typed here. A
+ * type the generator has no kind for fails the generator rather than reaching
+ * this file as a control that guesses.
+ *
+ * Every control carries a visible `<label for>`, because a placeholder is not
+ * a name and disappears the moment anything is typed, and the key is the name:
+ * it is what a reader writes in the file and what an error message at start-up
+ * quotes back.
+ *
+ * A secret never takes a value here. It takes the NAME of an environment
+ * variable, and `config-build.mjs` writes `${NAME}` into the file, which is
+ * the expansion the binary performs at start-up.
+ */
+import {
+	CONFIG_BUILD_TEXT,
+	FAMILIES,
+	GROUPS,
+} from "../lib/config-build.mjs";
+
+interface Props {
+	/** One entry of src/data/config-options.json. */
+	option: {
+		key: string;
+		kind: string;
+		secret?: boolean;
+		required?: boolean;
+		default?: string;
+		example?: string;
+		choices?: string[];
+		keys?: string[];
+	};
+	/** The words of the page's own language. */
+	text: (typeof CONFIG_BUILD_TEXT)["en"];
+	/** The answer the form starts this control at. */
+	value?: string;
+}
+
+const { option, text, value = "" } = Astro.props;
+
+const id = `cb-${option.key.replaceAll(".", "-")}`;
+const name = option.key.slice(option.key.lastIndexOf(".") + 1);
+// The value the binary fills in when the file is silent, and failing that the
+// example the setting carries. Both are generated, so neither can promise
+// something the code does not do.
+const hint = option.default || option.example || "";
+const variable = /^\$\{([A-Z0-9_]+)\}$/.exec(option.example ?? "")?.[1] ?? "";
+
+// The marks beside a name, as words rather than as colour: required, a
+// credential, and the value the binary uses when nothing is said.
+const marks = [
+	option.required ? text.required : "",
+	option.secret ? text.secret : "",
+	option.default ? `${text.defaultsTo} ${option.default}` : "",
+]
+	.filter(Boolean)
+	.join(" · ");
+
+// The vocabulary a keyed setting draws its entries from, with the one fact
+// worth stating beside each: a family's built-in cadence, a group's own line.
+const rows =
+	option.key === "every.families"
+		? FAMILIES.map((f) => ({
+				entry: f.name,
+				note: `${f.group} · ${text.builtIn} ${f.every}`,
+				hint: f.every,
+			}))
+		: GROUPS.map((g) => ({ entry: g.name, note: g.description, hint: "" }));
+
+const keyed = option.keys && option.keys.length > 0;
+---
+
+{
+	option.kind === "map" && keyed ? (
+		<fieldset class="cb-rows">
+			<legend>
+				<code>{option.key}</code>
+			</legend>
+			{rows.map((row) => (
+				<div class="cb-field">
+					<label for={`${id}-${row.entry}`}>
+						<code>{row.entry}</code>
+						<span class="cb-mark">{row.note}</span>
+					</label>
+					<input
+						id={`${id}-${row.entry}`}
+						type="text"
+						inputmode="text"
+						autocomplete="off"
+						spellcheck="false"
+						data-key={`${option.key}.${row.entry}`}
+						placeholder={row.hint}
+					/>
+				</div>
+			))}
+		</fieldset>
+	) : option.kind === "list" && keyed ? (
+		<fieldset class="cb-rows">
+			<legend>
+				<code>{option.key}</code>
+			</legend>
+			<div class="cb-choices">
+				{rows.map((row) => (
+					/* The label wraps its own control, so it names it without a
+					 * `for`: an id repeated in both is what html-validate
+					 * reports as a redundant for. */
+					<label>
+						<input
+							type="checkbox"
+							data-key={`${option.key}.${row.entry}`}
+						/>
+						<code>{row.entry}</code>
+					</label>
+				))}
+			</div>
+		</fieldset>
+	) : (
+		<div class="cb-field">
+			<label for={id}>
+				<code>{option.secret ? `${name} (${text.secretField})` : name}</code>
+				{marks && <span class="cb-mark">{marks}</span>}
+			</label>
+			{option.kind === "bool" || (option.choices?.length ?? 0) > 0 ? (
+				<select
+					id={id}
+					data-key={option.key}
+				>
+					<option value="">{text.leaveDefault}</option>
+					{(option.kind === "bool"
+						? ["true", "false"]
+						: (option.choices ?? [])
+					).map((choice) => (
+						<option
+							value={choice}
+							selected={value === choice}
+						>
+							{choice}
+						</option>
+					))}
+				</select>
+			) : option.kind === "map" ? (
+				<textarea
+					id={id}
+					data-key={option.key}
+					spellcheck="false"
+					placeholder={option.example}
+				/>
+			) : (
+				<input
+					id={id}
+					type={option.kind === "int" ? "number" : "text"}
+					inputmode={option.kind === "int" ? "numeric" : "text"}
+					autocomplete="off"
+					spellcheck="false"
+					data-key={option.key}
+					value={value}
+					placeholder={option.secret ? variable : hint}
+				/>
+			)}
+		</div>
+	)
+}
+
+<style>
+	/* Label above control, always: at 360 px a label beside a field leaves the
+	 * field too narrow to read a URL in, and a two-column layout that collapses
+	 * is two layouts to maintain for one form. */
+	.cb-field {
+		display: flex;
+		flex-direction: column;
+		gap: 0.2rem;
+		margin-block: 0.6rem;
+	}
+	.cb-field > label {
+		font-size: var(--sl-text-sm);
+	}
+	.cb-field code {
+		border: 0;
+		padding: 0;
+		background: none;
+		font-size: 1em;
+	}
+	.cb-mark {
+		margin-inline-start: 0.4rem;
+		color: var(--sl-color-gray-2);
+		font-size: var(--sl-text-xs);
+	}
+	.cb-field input,
+	.cb-field select,
+	.cb-field textarea {
+		width: 100%;
+		max-width: 36rem;
+		border: 1px solid var(--sl-color-gray-5);
+		border-radius: 0.3rem;
+		background: var(--sl-color-black);
+		padding: 0.35rem 0.5rem;
+		color: var(--sl-color-white);
+		font: inherit;
+		font-size: var(--sl-text-sm);
+	}
+	.cb-field textarea {
+		min-height: 4.5rem;
+		font-family: var(--__sl-font-mono, monospace);
+	}
+	.cb-choices {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.25rem 1rem;
+	}
+	.cb-choices label {
+		display: flex;
+		align-items: center;
+		gap: 0.35rem;
+		font-size: var(--sl-text-sm);
+	}
+	.cb-rows {
+		margin-block: 0.75rem;
+		border: 1px solid var(--sl-color-gray-5);
+		border-radius: 0.3rem;
+		padding: 0.25rem 0.75rem 0.75rem;
+	}
+	.cb-rows > legend {
+		padding-inline: 0.35rem;
+		font-size: var(--sl-text-sm);
+	}
+	.cb-rows code {
+		border: 0;
+		padding: 0;
+		background: none;
+		font-size: 1em;
+	}
+</style>

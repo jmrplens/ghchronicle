@@ -19,3 +19,8 @@ src/content/docs/**/*.mdx
 # check-layouts would call it stale: two authorities over one file, and
 # whichever ran last wins. The generator is the one that can be right.
 src/data/layouts.json
+# Generated from internal/config and action.yml by cmd/gen_config, byte for
+# byte, and held to them by `make check-config-options`. Same reason as the
+# layouts above: prettier and the generator would be two authorities over one
+# file, and only one of them can read the Go types.
+src/data/config-options.json

@@ -16,6 +16,7 @@
 	coverage-conditions coverage-mutants \
 	test-e2e-docker test-e2e-docker-race e2e-docker-up e2e-docker-down e2e-docker-logs \
 	gallery check-gallery layouts check-layouts \
+	config-options check-config-options config-cases check-config-cases \
 	fmt fmt-check vet tidy lint golangci-lint govulncheck analyze analyze-fix sonar \
 	mdlint mdlint-fix check-doc-links docs check-docs \
 	probe gen-dashboards check-dashboards check-dashboards-live \
@@ -306,6 +307,31 @@ check-layouts: ## Fail if the committed layout facts no longer match the registr
 	@echo "=== site/src/data/layouts.json up to date ==="
 	go run ./cmd/gen_layouts -check
 
+# site/src/data/config-options.json is every setting a configuration file may
+# carry, as the builder on the documentation site offers it: the key, the kind,
+# whether it is required or a credential, an example, and the default the
+# resolver fills in. It is generated from internal/config's own types and from
+# action.yml's inputs, so the form cannot offer a setting the binary does not
+# have and cannot miss one it does.
+config-options: ## Regenerate site/src/data/config-options.json from internal/config (cmd/gen_config)
+	go run ./cmd/gen_config
+
+check-config-options: ## Fail if the committed configuration surface no longer matches the code (offline)
+	@echo "=== site/src/data/config-options.json up to date ==="
+	go run ./cmd/gen_config -check
+
+# internal/config/testdata/config-cases.json is what the builder writes for a
+# set of answers, produced by the module the page itself runs
+# (site/src/lib/config-build.mjs) and loaded by the real parser in
+# internal/config/builder_test.go. Node only, no site dependencies: it reads
+# one committed JSON file and writes another.
+config-cases: ## Regenerate the builder's cases for internal/config's round-trip test
+	node site/scripts/gen-config-cases.mjs
+
+check-config-cases: ## Fail if the committed builder cases are no longer what the page writes (offline)
+	@echo "=== internal/config/testdata/config-cases.json up to date ==="
+	node site/scripts/gen-config-cases.mjs --check
+
 coverage: test ## Write the HTML coverage report to coverage.html
 	go tool cover -html=coverage.out -o coverage.html
 
@@ -409,12 +435,15 @@ check-docs: ## Fail if docs/ no longer matches the pages it is generated from
 # of one thing per pass. There is no separate gofmt or go vet step: gofumpt is
 # gofmt with more rules, and golangci-lint's govet runs every analyzer go vet
 # runs and more, so both would repeat a question the linter already answered.
-# check-dashboards, check-gallery, check-layouts and check-docs are in the
-# list because a dashboard that no longer matches its specification, a card
-# picture that no longer matches the renderer, a layout fact the site states
-# that the registry no longer holds, or a file under docs/ that no longer
-# matches the page it is generated from, is the same kind of defect as a lint
-# finding: something committed that the source no longer produces.
+# check-dashboards, check-gallery, check-layouts, check-config-options,
+# check-config-cases and check-docs are in the list because a dashboard that no
+# longer matches its specification, a card picture that no longer matches the
+# renderer, a layout fact the site states that the registry no longer holds, a
+# configuration setting the builder offers that the binary no longer has, a
+# configuration the builder writes that the round-trip test no longer loads, or
+# a file under docs/ that no longer matches the page it is generated from, is
+# the same kind of defect as a lint finding: something committed that the
+# source no longer produces.
 analyze: ## Run the whole static-analysis suite and report every failure at once
 	@analysis_status=0; \
 	run_check() { \
@@ -439,16 +468,18 @@ analyze: ## Run the whole static-analysis suite and report every failure at once
 	echo "Go analysis packages: $(PKGS)"; \
 	echo "Go analysis build tags: $(E2E_DOCKER_TAG)"; \
 	echo ""; \
-	run_check "[1/10] golangci-lint config verify" golangci-lint config verify; \
-	run_check "[2/10] golangci-lint fmt" golangci-lint fmt --diff $(FMT_PATHS); \
-	run_check "[3/10] golangci-lint run" golangci-lint run $(PKGS); \
-	run_check "[4/10] govulncheck" $(MAKE) --no-print-directory govulncheck; \
-	run_check "[5/10] markdownlint" $(MAKE) --no-print-directory mdlint; \
-	run_check "[6/10] documentation local links" $(MAKE) --no-print-directory check-doc-links; \
-	run_check "[7/10] dashboards up to date" $(MAKE) --no-print-directory check-dashboards; \
-	run_check "[8/10] card gallery up to date" $(MAKE) --no-print-directory check-gallery; \
-	run_check "[9/10] layout facts up to date" $(MAKE) --no-print-directory check-layouts; \
-	run_check "[10/10] docs/ up to date" $(MAKE) --no-print-directory check-docs; \
+	run_check "[1/12] golangci-lint config verify" golangci-lint config verify; \
+	run_check "[2/12] golangci-lint fmt" golangci-lint fmt --diff $(FMT_PATHS); \
+	run_check "[3/12] golangci-lint run" golangci-lint run $(PKGS); \
+	run_check "[4/12] govulncheck" $(MAKE) --no-print-directory govulncheck; \
+	run_check "[5/12] markdownlint" $(MAKE) --no-print-directory mdlint; \
+	run_check "[6/12] documentation local links" $(MAKE) --no-print-directory check-doc-links; \
+	run_check "[7/12] dashboards up to date" $(MAKE) --no-print-directory check-dashboards; \
+	run_check "[8/12] card gallery up to date" $(MAKE) --no-print-directory check-gallery; \
+	run_check "[9/12] layout facts up to date" $(MAKE) --no-print-directory check-layouts; \
+	run_check "[10/12] configuration surface up to date" $(MAKE) --no-print-directory check-config-options; \
+	run_check "[11/12] builder cases up to date" $(MAKE) --no-print-directory check-config-cases; \
+	run_check "[12/12] docs/ up to date" $(MAKE) --no-print-directory check-docs; \
 	echo "============================================================"; \
 	if [ "$$analysis_status" -ne 0 ]; then \
 		echo "Analysis failed. Review the findings above."; \

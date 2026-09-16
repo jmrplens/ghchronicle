@@ -126,6 +126,7 @@ const MANIFEST = [
 		title: "Configuration",
 		routes: [
 			"configuration",
+			"configuration/builder",
 			"configuration/targets",
 			"configuration/cadences",
 			"configuration/logging",

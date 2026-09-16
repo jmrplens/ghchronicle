@@ -157,7 +157,15 @@ function readSinks() {
 	const settings = new Set(["stdout_format", "dedupe_file", "dedupe_horizon"]);
 	const fields = [
 		...blockAfter(configSource, "type Sinks struct {").matchAll(
-			/^\t([A-Za-z]+)\s+\S+\s+`yaml:"([a-z_]+)"`/gm,
+			// The tag may carry more than the yaml key: the settings also
+			// declare a `ghc` tag, which is what the configuration builder
+			// reads for its examples. Anchoring on the closing backtick made
+			// this skip every field that had one, and stdout dropped out of
+			// the diagram below. Not silently: `pnpm run figures:check`
+			// compares the generated figure with the committed one and fails,
+			// which is how this was found. The expression was fragile, and
+			// adding the second tag is what broke it.
+			/^\t([A-Za-z]+)\s+\S+\s+`yaml:"([a-z_]+)"[^`]*`/gm,
 		),
 	]
 		.map((match) => ({ field: match[1], key: match[2] }))
