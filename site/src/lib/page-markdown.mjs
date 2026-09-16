@@ -274,27 +274,31 @@ function renderSelfClosing(name, attributes, raw, context) {
 		const depth = context.file.replace(/^.*?\bsrc\//, "").split("/").length - 1;
 		const assets = `${"../".repeat(depth)}assets`;
 		// The command is the part a reader acts on, so the twin keeps it, as the
-		// same two alternatives the page offers in tabs and reduced the way a
-		// <TabItem> is. It is the command for the picture above it, the one that
-		// plays once; a `loop` card says in a sentence what the toggle changes,
-		// rather than printing both commands again with one flag between them.
-		const text = CARD_COMMAND_TEXT[context.locale];
-		const alternatives = [
-			[text.binary, "sh", cardCommand(attributes.name, false)],
-			[text.action, "yaml", cardStep(attributes.name, false)],
-		]
-			.map(
-				([label, lang, code]) =>
-					`- **${label}**\n\n${indentBy(`\`\`\`${lang}\n${code}\n\`\`\``, "  ")}`,
-			)
-			.join("\n\n");
+		// same two forms the page offers, each a list item the way a <TabItem>
+		// reduces. A `loop` card gives the looping form of each as well, whole,
+		// because a command a reader has to assemble from a sentence is not one
+		// they can copy, and test/e2e runs every block here against the pictures.
 		// `loop` is a bare boolean prop, which the attribute reader above skips,
 		// so it is read off the tag with the quoted values blanked out first: an
 		// alt that says "in a loop" is not the prop.
 		const looping = /(?:^|\s)loop(?=\s|\/|$)/.test(
 			raw.replaceAll(/"[^"]*"/g, '""'),
 		);
-		return `\n\n![${attributes.alt}](${assets}/card-${attributes.name}.svg)\n\n${alternatives}\n\n${looping ? `${text.loop}\n\n` : ""}`;
+		const text = CARD_COMMAND_TEXT[context.locale];
+		const fence = (lang, code) => `\`\`\`${lang}\n${code}\n\`\`\``;
+		const alternatives = [
+			[text.binary, "sh", cardCommand],
+			[text.action, "yaml", cardStep],
+		]
+			.map(([label, lang, build]) => {
+				const body = [fence(lang, build(attributes.name, false))];
+				if (looping) {
+					body.push(text.loop, fence(lang, build(attributes.name, true)));
+				}
+				return `- **${label}**\n\n${indentBy(body.join("\n\n"), "  ")}`;
+			})
+			.join("\n\n");
+		return `\n\n![${attributes.alt}](${assets}/card-${attributes.name}.svg)\n\n${alternatives}\n\n`;
 	}
 	if (name === "LinkCard") {
 		const title = attributes.title ?? attributes.href ?? "";

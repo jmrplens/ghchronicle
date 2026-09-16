@@ -97,6 +97,14 @@ pre {
 	content: "$";
 	font-weight: 700;
 }
+/* A line that goes on with the command above it (that line ends with a
+ * backslash) is not a new command and gets no prompt. The glyph keeps its
+ * room, so the continuation stays aligned under the command it continues.
+ * The class comes from src/lib/ec-continuation.mjs, which reads the text a
+ * stylesheet cannot. */
+.expressive-code .frame.is-terminal .ec-line.continues .code::before {
+	visibility: hidden;
+}
 
 /* ------------------------------------------------------------------
  * COPY BUTTON

@@ -22,18 +22,21 @@
 // README snippet that shows them (see the card overview) needs both.
 
 /**
- * The binary's command line, broken where a reader would change it: the run
- * on the first line, the picture on the second.
+ * The binary's command line, on one line and with the part that changes
+ * first. One line, because a shell block on this site draws a prompt at the
+ * start of every line that does not continue the one before it, and a
+ * reader on a phone never sees the backslash that would say so once it has
+ * scrolled out of the block; the part that changes first, because at 400
+ * pixels that is all of the line there is room for, and the layout's name is
+ * what tells two cards' commands apart. Flags are order-free, so the order is
+ * the reader's, not the binary's.
  *
  * @param {string} name the layout
  * @param {boolean} loop whether the picture shown is the looping one
  * @returns {string} a shell command
  */
 export function cardCommand(name, loop) {
-	return [
-		"ghchronicle -config config.yaml -card card.svg -card-only \\",
-		`  -card-layout ${name} -card-theme both${loop ? " -card-motion loop" : ""}`,
-	].join("\n");
+	return `ghchronicle -card-layout ${name} -card-theme both -card-only -card card.svg -config config.yaml${loop ? " -card-motion loop" : ""}`;
 }
 
 /**
@@ -66,13 +69,15 @@ export const CARD_COMMAND_TEXT = {
 		action: "GitHub Action",
 		fullSize: "Full size",
 		fullSizeOf: (name) => ` of the ${name} card`,
-		loop: "The looping picture is the same command with `-card-motion loop`, or the same step with `card-motion: loop`.",
+		summary: "Command for",
+		loop: "The looping picture:",
 	},
 	es: {
 		binary: "Binario",
 		action: "GitHub Action",
 		fullSize: "Tamaño real",
 		fullSizeOf: (name) => ` de la tarjeta ${name}`,
-		loop: "La imagen en bucle es la misma orden con `-card-motion loop`, o el mismo paso con `card-motion: loop`.",
+		summary: "Orden para",
+		loop: "La imagen en bucle:",
 	},
 };

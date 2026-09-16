@@ -40,11 +40,20 @@
  * was, and a control that said "looping" over the settled card would be
  * claiming something nobody can see.
  *
+ * Under the controls, a closed disclosure named after the layout holds the
+ * command that draws the card and the same card as a step of the Action, one
+ * above the other. Both are generated from the props by
+ * src/lib/card-command.mjs, which the markdown twin reads too, and a `loop`
+ * card carries both forms of each: the toggle swaps them with the picture, so
+ * what the disclosure says always draws what is above it. Beside the
+ * controls, a link opens the picture on its own at its own width, which on a
+ * phone is the only way to read a card drawn for 800 pixels.
+ *
  * The twins invoke this component identically, which is what
  * `scripts/check-i18n-parity.mjs` compares, so the label's language is read off
  * the URL rather than passed in, the way `Figure.astro` reads it.
  */
-import { Code, TabItem, Tabs } from "@astrojs/starlight/components";
+import { Code } from "@astrojs/starlight/components";
 
 import { CARD_COMMAND_TEXT, cardCommand, cardStep } from "../lib/card-command.mjs";
 import { BASE, localeOf } from "../lib/site.mjs";
@@ -130,6 +139,18 @@ const text = CARD_COMMAND_TEXT[locale];
 // The pictures and their commands in the order the toggle below swaps them:
 // the one that plays once, and, on a card that offers it, the looping one.
 const variants = loop ? [false, true] : [false];
+// One full-size link per palette, each shown only in its own theme.
+const opens = [
+	{ palette: "light", href: src },
+	{ palette: "dark", href: darkSrc },
+];
+// The two ways to draw the card, one above the other rather than in tabs:
+// tabs show only their first panel to a reader without JavaScript, and the
+// Action is how most readers deploy.
+const forms = [
+	{ label: text.binary, lang: "sh", build: cardCommand },
+	{ label: text.action, lang: "yaml", build: cardStep },
+];
 ---
 
 <figure class="rb-card" data-card>
@@ -200,87 +221,60 @@ const variants = loop ? [false, true] : [false];
 			</button>
 		)
 	}
-	<a
-		class="rb-card__replay rb-card__open rb-card__open--light"
-		href={src}
-		data-card-open="light"
-	>
-		<svg
-			aria-hidden="true"
-			viewBox="0 0 24 24"
-			width="16"
-			height="16"
-			fill="none"
-			stroke="currentColor"
-			stroke-width="2"
-			stroke-linecap="round"
-			stroke-linejoin="round"
-		>
-			<path d="M15 3h6v6" />
-			<path d="M9 21H3v-6" />
-			<path d="M21 3l-7 7" />
-			<path d="M3 21l7-7" />
-		</svg>
-		<span>{text.fullSize}<span class="sr-only">{text.fullSizeOf(name)}</span></span>
-	</a>
-	<a
-		class="rb-card__replay rb-card__open rb-card__open--dark"
-		href={darkSrc}
-		data-card-open="dark"
-	>
-		<svg
-			aria-hidden="true"
-			viewBox="0 0 24 24"
-			width="16"
-			height="16"
-			fill="none"
-			stroke="currentColor"
-			stroke-width="2"
-			stroke-linecap="round"
-			stroke-linejoin="round"
-		>
-			<path d="M15 3h6v6" />
-			<path d="M9 21H3v-6" />
-			<path d="M21 3l-7 7" />
-			<path d="M3 21l7-7" />
-		</svg>
-		<span>{text.fullSize}<span class="sr-only">{text.fullSizeOf(name)}</span></span>
-	</a>
+	{
+		opens.map(({ palette, href }) => (
+			<a
+				class={`rb-card__replay rb-card__open rb-card__open--${palette}`}
+				href={href}
+				data-card-open={palette}
+			>
+				<svg
+					aria-hidden="true"
+					viewBox="0 0 24 24"
+					width="16"
+					height="16"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+				>
+					<path d="M15 3h6v6" />
+					<path d="M9 21H3v-6" />
+					<path d="M21 3l-7 7" />
+					<path d="M3 21l7-7" />
+				</svg>
+				<span>
+					{text.fullSize}
+					<span class="sr-only">{text.fullSizeOf(name)}</span>
+				</span>
+			</a>
+		))
+	}
 	</div>
-	<div class="rb-card__command">
-		<Tabs syncKey="card-command">
-			<TabItem label={text.binary}>
-				{
-					variants.map((looping) => (
+	<details class="rb-card__command">
+		<summary>
+			{text.summary} <code>{name}</code>
+		</summary>
+		{
+			forms.map(({ label, lang, build }) => (
+				<div class="rb-card__form">
+					<p class="rb-card__form-label">{label}</p>
+					{variants.map((looping) => (
 						<div
 							data-card-command={looping ? "loop" : "once"}
 							hidden={looping}
 						>
 							<Code
-								code={cardCommand(name, looping)}
-								lang="sh"
+								code={build(name, looping)}
+								lang={lang}
 							/>
 						</div>
-					))
-				}
-			</TabItem>
-			<TabItem label={text.action}>
-				{
-					variants.map((looping) => (
-						<div
-							data-card-command={looping ? "loop" : "once"}
-							hidden={looping}
-						>
-							<Code
-								code={cardStep(name, looping)}
-								lang="yaml"
-							/>
-						</div>
-					))
-				}
-			</TabItem>
-		</Tabs>
-	</div>
+					))}
+				</div>
+			))
+		}
+	</details>
 </figure>
 
 <script>
@@ -510,14 +504,27 @@ const variants = loop ? [false, true] : [false];
 	:global([data-theme="dark"]) .rb-card__open--light {
 		display: none;
 	}
-	/* Under every one of a dozen pictures, the snippet is kept to what it
-	 * says: the tab row close above the block, and a block two lines tall
-	 * rather than padded the way a page's standalone example is. */
+	/* Under every one of a dozen pictures the commands wait behind a closed
+	 * disclosure, so the page reads as pictures, and its summary names the
+	 * layout, so thirteen of them can be told apart by ear. Inside, each form
+	 * is a label over a block padded less than a page's standalone example. */
 	.rb-card__command {
-		margin-block-start: 0.75rem;
+		margin-block-start: 0.5rem;
+	}
+	.rb-card__command > summary {
+		width: fit-content;
+		color: var(--sl-color-text);
+		font-size: var(--sl-text-sm);
+		cursor: pointer;
+	}
+	.rb-card__form-label {
+		margin-block: 0.75rem 0;
+		color: var(--sl-color-gray-2);
+		font-size: var(--sl-text-sm);
+		font-weight: 600;
 	}
 	.rb-card__command :global(.expressive-code) {
-		margin-block-start: 0.5rem;
+		margin-block-start: 0.35rem;
 	}
 	.rb-card__command :global(.expressive-code pre) {
 		padding-block: 0.25rem;

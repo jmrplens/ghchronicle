@@ -60,13 +60,6 @@ func TestCardGallery(t *testing.T) {
 	}
 	defer func() { _ = out.Close() }()
 
-	// The base fixtures plus the gallery's own, which give the account a whole
-	// year of contributions, GitHub's full fourteen days of traffic, five
-	// repositories to rank and one of them in six languages. On the base
-	// account alone the heatmap was five cells out of eighty-four, the lists of
-	// repositories had one row and the language ring was one color.
-	gh := fakegh.New(t, "testdata", "testdata/gallery")
-
 	type variant struct{ layout, motion, name string }
 	var variants []variant
 	for _, layout := range render.Layouts() {
@@ -84,8 +77,7 @@ func TestCardGallery(t *testing.T) {
 	// state file found none of them due. A card run now collects every family
 	// whatever the cadence says, and -card-only writes nothing to the state
 	// file at all, so one directory draws the same card as twenty.
-	work := t.TempDir()
-	cfg := writeConfig(t, work, gh.URL(), "e2e-token", login, "")
+	work, cfg := galleryAccount(t)
 	for _, v := range variants {
 		// A path per variant, so a run that writes nothing is a missing file
 		// and not the previous variant's card copied out under a new name.
@@ -112,4 +104,22 @@ func TestCardGallery(t *testing.T) {
 			t.Logf("%-36s %6d bytes", c.dst, len(svg))
 		}
 	}
+}
+
+// galleryAccount is the account the gallery is drawn from, and the config
+// that collects it, written as config.yaml in a directory of the test's own.
+// It is the fake GitHub on the base fixtures plus the gallery's own, which
+// give the account a whole year of contributions, GitHub's full fourteen days
+// of traffic, five repositories to rank and one of them in six languages. On
+// the base account alone the heatmap was five cells out of eighty-four, the
+// lists of repositories had one row and the language ring was one color.
+//
+// Shared with TestEveryCardCommandInTheDocsDrawsThePictureTheDocsShow, which
+// has to draw from exactly this account for its pictures to be comparable
+// with the gallery's.
+func galleryAccount(t *testing.T) (work, cfg string) {
+	t.Helper()
+	gh := fakegh.New(t, "testdata", "testdata/gallery")
+	work = t.TempDir()
+	return work, writeConfig(t, work, gh.URL(), "e2e-token", login, "")
 }

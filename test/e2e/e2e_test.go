@@ -147,9 +147,18 @@ func writeConfigFile(t *testing.T, dir, body string) string {
 // that output fails the test here, whatever the caller goes on to assert.
 func run(t *testing.T, timeout time.Duration, args ...string) ([]byte, error) {
 	t.Helper()
+	return runIn(t, "", timeout, args...)
+}
+
+// runIn is run from the directory dir, so a command line with relative paths
+// in it, as a reader would type one, reads and writes where they would. An
+// empty dir is the test's own working directory.
+func runIn(t *testing.T, dir string, timeout time.Duration, args ...string) ([]byte, error) {
+	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, binary, args...)
+	cmd.Dir = dir
 	cmd.Env = collectorEnviron()
 	var out bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &out
