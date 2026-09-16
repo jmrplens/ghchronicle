@@ -248,10 +248,10 @@ func SVG(c *Card, o *Options) ([]byte, error) {
 	}
 	width := float64(o.Width)
 	if o.Width == 0 {
-		width = float64(def.width)
+		width = float64(def.Width)
 	}
-	if def.minWidth > 0 && width < float64(def.minWidth) {
-		return nil, fmt.Errorf("render: width %d is below the %d minimum of layout %q", o.Width, def.minWidth, def.Name)
+	if def.MinWidth > 0 && width < float64(def.MinWidth) {
+		return nil, fmt.Errorf("render: width %d is below the %d minimum of layout %q", o.Width, def.MinWidth, def.Name)
 	}
 	maxRepos := o.MaxRepos
 	if maxRepos <= 0 {

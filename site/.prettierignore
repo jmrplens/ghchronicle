@@ -13,3 +13,9 @@ pnpm-lock.yaml
 # empty code block; keeping both authorities on the same files made each
 # formatter dirty the other.
 src/content/docs/**/*.mdx
+# Generated from the card registry by cmd/gen_layouts, byte for byte, and held
+# to it by `make check-layouts`. Prettier puts a short array of fields back on
+# one line, which means `pnpm run format` would rewrite this file and the next
+# check-layouts would call it stale: two authorities over one file, and
+# whichever ran last wins. The generator is the one that can be right.
+src/data/layouts.json

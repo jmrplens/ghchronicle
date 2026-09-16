@@ -63,11 +63,16 @@ type Layout struct {
 	Loops    bool
 	Fields   []string // the default set, in drawing order
 	Supports []string // every field the layout can show
+	// Width is what the layout is drawn at, and MinWidth the width it refuses
+	// to go below. Both are zero on a layout whose width follows its content.
+	// They are part of the public Layout rather than of the definition below
+	// because the site states them per layout, and it reads them from here
+	// through cmd/gen_layouts.
+	Width, MinWidth int
 }
 
 type layoutDef struct {
 	Layout
-	width, minWidth int // minWidth 0 means Options.Width is ignored
 	// draw writes the whole document. It is handed the spec by pointer and
 	// may finish it: the github layouts supply their own heading when the
 	// caller set none, and badge-row derives the width from its content.
@@ -94,104 +99,117 @@ var layouts = []layoutDef{
 		Description: "The original card: title, two rows of numbers, a sparkline and the most starred repositories.",
 		Fields:      []string{fieldStars, fieldForks, fieldFollowers, fieldRepos, fieldContributions, fieldViews, fieldVisitors, fieldSparkline, fieldTopRepos},
 		Supports:    join(allNumeric, fieldLanguages, fieldSparkline, fieldTopRepos),
+		Width:       defaultWidth, MinWidth: minWidth,
 
-		width: defaultWidth, minWidth: minWidth, draw: drawSummary,
+		draw: drawSummary,
 	},
 	{
 		Name: "github-stats", Family: "github", Animated: true,
 		Description: "GitHub's own box: a header band, rows of four monospace numbers that count up and a language share bar that grows in beside its legend.",
 		Fields:      []string{fieldRepos, fieldStars, fieldForks, fieldFollowers, fieldCommits, fieldPullRequests, fieldViews, fieldClones, fieldLanguages},
 		Supports:    join(allNumeric, fieldLanguages, fieldTopRepos, fieldSparkline),
+		Width:       800, MinWidth: 600,
 
-		width: 800, minWidth: 600, draw: drawGithubStats,
+		draw: drawGithubStats,
 	},
 	{
 		Name: "github-compact", Family: "github",
 		Description: "One row of monospace numbers under a thin header band.",
 		Fields:      []string{fieldStars, fieldForks, fieldFollowers, fieldRepos, fieldCommits},
 		Supports:    allNumeric,
+		Width:       defaultWidth, MinWidth: minWidth,
 
-		width: defaultWidth, minWidth: minWidth, draw: drawGithubCompact,
+		draw: drawGithubCompact,
 	},
 	{
 		Name: "badge-row", Family: "chronicle",
 		Description: "A row of 20px pill badges, one per number, for a README line; the width follows the content.",
 		Fields:      []string{fieldStars, fieldForks, fieldFollowers, fieldRepos, fieldContributions},
 		Supports:    allNumeric,
+		Width:       0, MinWidth: 0,
 
-		width: 0, minWidth: 0, draw: drawBadgeRow,
+		draw: drawBadgeRow,
 	},
 	{
 		Name: "wide-banner", Family: "chronicle", Animated: true,
 		Description: "A full-width 60px banner: login on the left, numbers spread across, the sparkline drawing itself behind them.",
 		Fields:      []string{fieldStars, fieldForks, fieldFollowers, fieldContributions, fieldSparkline},
 		Supports:    join(allNumeric, fieldSparkline),
+		Width:       800, MinWidth: 500,
 
-		width: 800, minWidth: 500, draw: drawWideBanner,
+		draw: drawWideBanner,
 	},
 	{
 		Name: "sparkline-hero", Family: "chronicle", Animated: true,
 		Description: "The contribution sparkline is the whole card, with up to three numbers overlaid; the line draws itself.",
 		Fields:      []string{fieldContributions, fieldStars, fieldFollowers, fieldSparkline},
 		Supports:    join(allNumeric, fieldSparkline),
+		Width:       defaultWidth, MinWidth: minWidth,
 
-		width: defaultWidth, minWidth: minWidth, draw: drawSparklineHero,
+		draw: drawSparklineHero,
 	},
 	{
 		Name: "language-ring", Family: "github", Animated: true,
 		Description: "A donut of language shares with the legend beside it and a row of headline numbers; each slice draws itself and the legend follows.",
 		Fields:      []string{fieldLanguages, fieldStars, fieldRepos},
 		Supports:    join(allNumeric, fieldLanguages),
+		Width:       defaultWidth, MinWidth: 400,
 
-		width: defaultWidth, minWidth: 400, draw: drawLanguageRing,
+		draw: drawLanguageRing,
 	},
 	{
 		Name: "repo-list", Family: "github",
 		Description: "The most starred repositories as the main content: language dot, stars and a bar per row, totals underneath.",
 		Fields:      []string{fieldTopRepos, fieldStars, fieldForks, fieldRepos},
 		Supports:    join(allNumeric, fieldTopRepos),
+		Width:       defaultWidth, MinWidth: minWidth,
 
-		width: defaultWidth, minWidth: minWidth, draw: drawRepoList,
+		draw: drawRepoList,
 	},
 	{
 		Name: "activity-heatmap", Family: "github", Animated: true,
 		Description: "The last twelve weeks of the contribution calendar as GitHub's green squares, week by week from the left, with up to three numbers beside it.",
 		Fields:      []string{fieldSparkline, fieldContributions, fieldCommits, fieldPullRequests},
 		Supports:    join(allNumeric, fieldSparkline),
+		Width:       defaultWidth, MinWidth: 400,
 
-		width: defaultWidth, minWidth: 400, draw: drawActivityHeatmap,
+		draw: drawActivityHeatmap,
 	},
 	{
 		Name: "animated-counters", Family: "chronicle", Animated: true,
 		Description: "Numbers that count up on load over a sparkline that draws itself; settles to the static card.",
 		Fields:      []string{fieldStars, fieldForks, fieldFollowers, fieldRepos, fieldContributions, fieldViews, fieldSparkline},
 		Supports:    join(allNumeric, fieldSparkline),
+		Width:       defaultWidth, MinWidth: minWidth,
 
-		width: defaultWidth, minWidth: minWidth, draw: drawAnimatedCounters,
+		draw: drawAnimatedCounters,
 	},
 	{
 		Name: "terminal", Family: "chronicle", Animated: true, Loops: true,
 		Description: "A terminal window with the project's mark: one line of output per number, each number typed in, and a cursor at the prompt that blinks when the last of them lands, or from the start and for ever under loop.",
 		Fields:      []string{fieldStars, fieldForks, fieldFollowers, fieldRepos, fieldContributions, fieldTopRepos},
 		Supports:    join(allNumeric, fieldTopRepos),
+		Width:       defaultWidth, MinWidth: 360,
 
-		width: defaultWidth, minWidth: 360, draw: drawTerminal,
+		draw: drawTerminal,
 	},
 	{
 		Name: "ticker", Family: "chronicle", Animated: true, Loops: true,
 		Description: "A band of pills, one per number and one per repository, scrolling from right to left without a seam, at a fixed speed, so a pass takes as long as the content is wide.",
 		Fields:      []string{fieldStars, fieldForks, fieldFollowers, fieldRepos, fieldContributions, fieldCommits, fieldViews, fieldTopRepos},
 		Supports:    join(allNumeric, fieldTopRepos),
+		Width:       800, MinWidth: 400,
 
-		width: 800, minWidth: 400, draw: drawTicker,
+		draw: drawTicker,
 	},
 	{
 		Name: "language-bars", Family: "github", Animated: true,
 		Description: "One bar per language, each growing from its own left edge after the one above it, with the name and the share arriving behind it.",
 		Fields:      []string{fieldLanguages},
 		Supports:    join(allNumeric, fieldLanguages),
+		Width:       defaultWidth, MinWidth: 360,
 
-		width: defaultWidth, minWidth: 360, draw: drawLanguageBars,
+		draw: drawLanguageBars,
 	},
 }
 

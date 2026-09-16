@@ -142,6 +142,14 @@ jobs:
       - name: The committed card gallery matches the renderer
         run: make check-gallery
 
+      # site/src/data/layouts.json is the layout registry as the site reads
+      # it, and the layouts page states its facts from that file rather than
+      # from anything typed into the page. A registry change that was never
+      # exported would leave the page stating the old width or the old set of
+      # default fields, which is what the hand-written table before it did.
+      - name: The committed layout facts match the registry
+        run: make check-layouts
+
   sonarcloud:
     name: SonarCloud
     runs-on: ubuntu-latest

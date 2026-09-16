@@ -1,0 +1,202 @@
+[
+  {
+    "name": "summary",
+    "family": "chronicle",
+    "animated": false,
+    "loops": false,
+    "width": 495,
+    "minWidth": 300,
+    "fields": [
+      "stars",
+      "forks",
+      "followers",
+      "repos",
+      "contributions",
+      "views",
+      "visitors",
+      "sparkline",
+      "top_repos"
+    ]
+  },
+  {
+    "name": "github-stats",
+    "family": "github",
+    "animated": true,
+    "loops": false,
+    "width": 800,
+    "minWidth": 600,
+    "fields": [
+      "repos",
+      "stars",
+      "forks",
+      "followers",
+      "commits",
+      "pull_requests",
+      "views",
+      "clones",
+      "languages"
+    ]
+  },
+  {
+    "name": "github-compact",
+    "family": "github",
+    "animated": false,
+    "loops": false,
+    "width": 495,
+    "minWidth": 300,
+    "fields": [
+      "stars",
+      "forks",
+      "followers",
+      "repos",
+      "commits"
+    ]
+  },
+  {
+    "name": "badge-row",
+    "family": "chronicle",
+    "animated": false,
+    "loops": false,
+    "width": 0,
+    "minWidth": 0,
+    "fields": [
+      "stars",
+      "forks",
+      "followers",
+      "repos",
+      "contributions"
+    ]
+  },
+  {
+    "name": "wide-banner",
+    "family": "chronicle",
+    "animated": true,
+    "loops": false,
+    "width": 800,
+    "minWidth": 500,
+    "fields": [
+      "stars",
+      "forks",
+      "followers",
+      "contributions",
+      "sparkline"
+    ]
+  },
+  {
+    "name": "sparkline-hero",
+    "family": "chronicle",
+    "animated": true,
+    "loops": false,
+    "width": 495,
+    "minWidth": 300,
+    "fields": [
+      "contributions",
+      "stars",
+      "followers",
+      "sparkline"
+    ]
+  },
+  {
+    "name": "language-ring",
+    "family": "github",
+    "animated": true,
+    "loops": false,
+    "width": 495,
+    "minWidth": 400,
+    "fields": [
+      "languages",
+      "stars",
+      "repos"
+    ]
+  },
+  {
+    "name": "repo-list",
+    "family": "github",
+    "animated": false,
+    "loops": false,
+    "width": 495,
+    "minWidth": 300,
+    "fields": [
+      "top_repos",
+      "stars",
+      "forks",
+      "repos"
+    ]
+  },
+  {
+    "name": "activity-heatmap",
+    "family": "github",
+    "animated": true,
+    "loops": false,
+    "width": 495,
+    "minWidth": 400,
+    "fields": [
+      "sparkline",
+      "contributions",
+      "commits",
+      "pull_requests"
+    ]
+  },
+  {
+    "name": "animated-counters",
+    "family": "chronicle",
+    "animated": true,
+    "loops": false,
+    "width": 495,
+    "minWidth": 300,
+    "fields": [
+      "stars",
+      "forks",
+      "followers",
+      "repos",
+      "contributions",
+      "views",
+      "sparkline"
+    ]
+  },
+  {
+    "name": "terminal",
+    "family": "chronicle",
+    "animated": true,
+    "loops": true,
+    "width": 495,
+    "minWidth": 360,
+    "fields": [
+      "stars",
+      "forks",
+      "followers",
+      "repos",
+      "contributions",
+      "top_repos"
+    ]
+  },
+  {
+    "name": "ticker",
+    "family": "chronicle",
+    "animated": true,
+    "loops": true,
+    "width": 800,
+    "minWidth": 400,
+    "fields": [
+      "stars",
+      "forks",
+      "followers",
+      "repos",
+      "contributions",
+      "commits",
+      "views",
+      "top_repos"
+    ]
+  },
+  {
+    "name": "language-bars",
+    "family": "github",
+    "animated": true,
+    "loops": false,
+    "width": 495,
+    "minWidth": 360,
+    "fields": [
+      "languages"
+    ]
+  }
+]

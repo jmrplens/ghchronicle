@@ -702,7 +702,7 @@ func TestTheTerminalTypesEveryNumberAndSettlesOnACursor(t *testing.T) {
 // at its narrowest, where the constraint bites first.
 func TestTheTerminalKeepsHalfOfEveryLineClearForTheCoverThatTypesIt(t *testing.T) {
 	def, _ := findLayout("terminal")
-	for _, width := range []float64{float64(def.minWidth), defaultWidth, 900} {
+	for _, width := range []float64{float64(def.MinWidth), defaultWidth, 900} {
 		col := termLayout(width)
 		right := col.valueX + 2*col.valueRoom + 3*termSlop
 		if right > width-termPad {
@@ -829,11 +829,11 @@ func TestATickerShorterThanItsBandStillRestsOnOneCopy(t *testing.T) {
 		width  int
 		fields []string
 	}{
-		{"five metrics at the default width", def.width, []string{fieldStars, fieldForks, fieldFollowers, fieldRepos, fieldContributions}},
-		{"five metrics at the narrowest", def.minWidth, []string{fieldStars, fieldForks, fieldFollowers, fieldRepos, fieldContributions}},
-		{"one pill at the default width", def.width, []string{fieldStars}},
-		{"one pill at the narrowest", def.minWidth, []string{fieldStars}},
-		{"repositories and no numbers", def.width, []string{fieldTopRepos}},
+		{"five metrics at the default width", def.Width, []string{fieldStars, fieldForks, fieldFollowers, fieldRepos, fieldContributions}},
+		{"five metrics at the narrowest", def.MinWidth, []string{fieldStars, fieldForks, fieldFollowers, fieldRepos, fieldContributions}},
+		{"one pill at the default width", def.Width, []string{fieldStars}},
+		{"one pill at the narrowest", def.MinWidth, []string{fieldStars}},
+		{"repositories and no numbers", def.Width, []string{fieldTopRepos}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			c := sample()
@@ -1122,13 +1122,13 @@ func TestOverlaysCapTheirNumbers(t *testing.T) {
 
 func TestEachLayoutRefusesAWidthBelowItsMinimum(t *testing.T) {
 	for _, def := range layouts {
-		if def.minWidth == 0 {
+		if def.MinWidth == 0 {
 			continue
 		}
-		if _, err := SVG(sample(), &Options{Layout: def.Name, Width: def.minWidth - 1}); err == nil {
-			t.Errorf("%s accepted a width below %d", def.Name, def.minWidth)
+		if _, err := SVG(sample(), &Options{Layout: def.Name, Width: def.MinWidth - 1}); err == nil {
+			t.Errorf("%s accepted a width below %d", def.Name, def.MinWidth)
 		}
-		if _, err := SVG(sample(), &Options{Layout: def.Name, Width: def.minWidth}); err != nil {
+		if _, err := SVG(sample(), &Options{Layout: def.Name, Width: def.MinWidth}); err != nil {
 			t.Errorf("%s refused its own minimum: %v", def.Name, err)
 		}
 	}
@@ -1365,7 +1365,7 @@ func TestEveryLayoutDrawsTheCommittedCards(t *testing.T) {
 				}
 				o := &Options{Theme: "dark", Layout: l.Name, Fields: fields, Title: gc.title}
 				if def, _ := findLayout(l.Name); gc.narrowest {
-					o.Width = def.minWidth
+					o.Width = def.MinWidth
 				}
 				got := mustRender(t, gc.card(), o)
 				sameAsGolden(t, filepath.Join("testdata", "golden", gc.name, l.Name+".svg"), got)
