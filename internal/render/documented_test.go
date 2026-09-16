@@ -85,47 +85,37 @@ func TestDocumentedNumericFieldCountMatchesTheCode(t *testing.T) {
 	}
 }
 
-// TestDocumentedLayoutTableMatchesTheRegistry reads the layouts table on both
-// pages and checks the two columns that are a copy of a registry field:
-// whether a layout animates at all, and whether it has something continuous
-// that may run for ever. Four hand-written copies of two booleans, and until
-// this nothing read any of them; a row that said a layout loops when it does
-// not is a reader pressing a toggle for a picture that is not generated.
+// TestEveryLayoutHasItsFactsOnBothPages fails when a layout has no section on
+// a page, in either direction: one the pages never present, or one they present
+// that the registry no longer holds.
 //
-// The yes and no of each language is part of the table, so the two spellings
-// are the test's business too: a twin that answered in English would be a twin
-// nobody had read.
-func TestDocumentedLayoutTableMatchesTheRegistry(t *testing.T) {
-	rows := regexp.MustCompile("(?m)^\\| `([a-z-]+)` +\\| (?:chronicle|github) +\\| (yes|no|sí) +\\| (yes|no|sí) +\\|")
-	for i, path := range layoutFieldTables {
+// What the pages used to carry was the registry itself, as a table of thirteen
+// rows, and the test here read two of its columns back and compared them with
+// the code. Four hand-written copies of two booleans, and before this file
+// existed nothing read any of them. The facts now come out of
+// site/src/data/layouts.json, which cmd/gen_layouts writes from this registry
+// and `make check-layouts` holds to it, so there is nothing left to compare:
+// a page cannot state a wrong family, width or default field, only leave a
+// layout out. That is what this checks, and it checks it in registry order,
+// which is the order -card-layouts prints and the order a reader meets them
+// in everywhere else.
+func TestEveryLayoutHasItsFactsOnBothPages(t *testing.T) {
+	invocation := regexp.MustCompile(`<LayoutFacts name="([a-z-]+)" */>`)
+	var want []string
+	for _, l := range Layouts() {
+		want = append(want, l.Name)
+	}
+	for _, path := range layoutFieldTables {
 		body, err := os.ReadFile(path)
 		if err != nil {
 			t.Fatalf("%s: %v", path, err)
 		}
-		yes := "yes"
-		if i == 1 {
-			yes = "sí"
+		var documented []string
+		for _, m := range invocation.FindAllStringSubmatch(string(body), -1) {
+			documented = append(documented, m[1])
 		}
-		documented := map[string][2]bool{}
-		for _, r := range rows.FindAllStringSubmatch(string(body), -1) {
-			documented[r[1]] = [2]bool{r[2] == yes, r[3] == yes}
-		}
-		layouts := Layouts()
-		if len(documented) != len(layouts) {
-			t.Fatalf("%s has %d layout rows, want %d", path, len(documented), len(layouts))
-		}
-		for _, l := range layouts {
-			got, ok := documented[l.Name]
-			if !ok {
-				t.Errorf("%s has no row for %s", path, l.Name)
-				continue
-			}
-			if got[0] != l.Animated {
-				t.Errorf("%s says %s animates = %v, the code says %v", path, l.Name, got[0], l.Animated)
-			}
-			if got[1] != l.Loops {
-				t.Errorf("%s says %s loops = %v, the code says %v", path, l.Name, got[1], l.Loops)
-			}
+		if !slices.Equal(documented, want) {
+			t.Errorf("%s states the facts of %v, the registry holds %v", path, documented, want)
 		}
 	}
 }

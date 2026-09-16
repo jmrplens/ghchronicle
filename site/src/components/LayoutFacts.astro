@@ -1,0 +1,98 @@
+---
+/**
+ * The four facts a reader choosing a layout wants, under that layout's own
+ * heading: its family, its motion, the width it is drawn at with the minimum
+ * it refuses to go below, and the fields it draws when nothing is asked for.
+ *
+ * They used to be a table of thirteen rows at the top of the page, which on a
+ * phone meant scrolling past the whole registry before meeting a single card.
+ * A property belongs to the thing it is a property of, so each row is now four
+ * short lines in its own section, above the picture and the command that were
+ * already there.
+ *
+ * Nothing here is typed. `src/data/layouts.json` is `internal/render`'s
+ * registry, exported by `cmd/gen_layouts`, and `make check-layouts` fails when
+ * the file no longer matches it; `src/lib/layout-facts.mjs` turns one entry
+ * into these rows and is shared with the reduction that writes the markdown
+ * twin, so the twin cannot come to state another width. Every hand-copied fact
+ * this page ever kept needed a test written to stop it drifting, and one of
+ * them had drifted before the test existed.
+ *
+ * The locale is read off the URL, the way `Card.astro` and `Figure.astro` read
+ * it, rather than passed in: the twins invoke this component identically, which
+ * is what `scripts/check-i18n-parity.mjs` compares.
+ *
+ * A description list and not a table. Four pairs are what a `<dl>` is for, they
+ * need no header row, and a table here would be a thirteenth, fourteenth and
+ * fifteenth table on a page whose tables all have to be measured on a phone.
+ */
+import { factsOf } from "../lib/layout-facts.mjs";
+import { BASE, localeOf } from "../lib/site.mjs";
+
+interface Props {
+	/** The layout's name, as the registry spells it. */
+	name: string;
+}
+
+const { name } = Astro.props;
+
+const route = Astro.url.pathname
+	.slice(BASE.length)
+	.replace(/^\/+/, "")
+	.replace(/\/+$/, "");
+const locale = localeOf(route);
+
+// factsOf throws on a name the registry does not hold, which fails the build
+// here rather than publishing a section with no facts under it.
+const rows = factsOf(name, locale);
+---
+
+<dl class="rb-facts not-content">
+	{
+		rows.map(({ label, values, code }) => (
+			<Fragment>
+				<dt>{label}</dt>
+				<dd>
+					{code
+						? values.map((value, index) => (
+								<Fragment>
+									{index > 0 ? ", " : ""}
+									<code>{value}</code>
+								</Fragment>
+							))
+						: values.join(", ")}
+				</dd>
+			</Fragment>
+		))
+	}
+</dl>
+
+<style>
+	/* Label and value in two columns, so the four labels line up and each value
+	 * starts at the same place. The label column is as wide as its widest label
+	 * and no wider, which at 400 px leaves the fields the rest of the line to
+	 * wrap into, and at 1280 px leaves every row one line tall. */
+	.rb-facts {
+		display: grid;
+		grid-template-columns: max-content minmax(0, 1fr);
+		gap: 0.15rem 0.75rem;
+		margin-block: 0.75rem;
+		font-size: var(--sl-text-sm);
+	}
+	.rb-facts dt {
+		color: var(--sl-color-gray-2);
+	}
+	.rb-facts dd {
+		margin: 0;
+		color: var(--sl-color-text);
+	}
+	/* The identifiers a reader types after -card-fields, set as code but
+	 * without the box a standalone code span gets: eight of them in one line
+	 * would be eight boxes, and the line reads as a list. */
+	.rb-facts code {
+		border: 0;
+		padding: 0;
+		background: none;
+		font-size: 1em;
+	}
+</style>

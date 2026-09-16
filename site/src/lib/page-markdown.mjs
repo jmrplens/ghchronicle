@@ -16,6 +16,7 @@ import figures from "../data/figures.json" with { type: "json" };
 import stats from "../data/stats.json" with { type: "json" };
 
 import { CARD_COMMAND_TEXT, cardCommand, cardStep } from "./card-command.mjs";
+import { factsOf } from "./layout-facts.mjs";
 import { localeOf, pageUrl } from "./site.mjs";
 
 // Starlight's own default titles for an untitled aside, in the two locales the
@@ -299,6 +300,21 @@ function renderSelfClosing(name, attributes, raw, context) {
 			})
 			.join("\n\n");
 		return `\n\n![${attributes.alt}](${assets}/card-${attributes.name}.svg)\n\n${alternatives}\n\n`;
+	}
+	// The facts under a layout's heading reduce to the list they read as. They
+	// are generated from the card registry by cmd/gen_layouts, and this shares
+	// the module the component renders them with, so a reader of docs/ or of
+	// llms-full.txt is told the same family, motion, width and default fields
+	// the page states, in the page's own language.
+	if (name === "LayoutFacts") {
+		if (!attributes.name) {
+			throw new Error(`${context.file}: <LayoutFacts /> needs a name.`);
+		}
+		const rows = factsOf(attributes.name, context.locale).map(
+			({ label, values, code }) =>
+				`- **${label}**: ${values.map((value) => (code ? `\`${value}\`` : value)).join(", ")}`,
+		);
+		return `\n\n${rows.join("\n")}\n\n`;
 	}
 	if (name === "LinkCard") {
 		const title = attributes.title ?? attributes.href ?? "";

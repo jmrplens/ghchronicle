@@ -37,9 +37,16 @@
  * frontmatter away from where src/lib/rehype-tables.mjs reads it, say) would
  * have printed "0 compact indexes" and passed with every index back in stacked
  * boxes. For the same reason a corpus that declares no index at all is a
- * failure, and the layouts pages, whose rows each have a section, must carry
- * a link on every row: a link check with no links passes silently too. Every
- * `#` link in a table must also land on something on its page.
+ * failure. Every `#` link in a table must also land on something on its page.
+ *
+ * There used to be one more rule here: the layouts pages declared an index of
+ * thirteen rows, each linking to that layout's own section, and a row without
+ * its link was a failure. Those pages carry no index any more. Each layout's
+ * family, motion, width and default fields are stated in its own section, from
+ * the registry (src/components/LayoutFacts.astro), because reaching the first
+ * card meant scrolling past all thirteen of them on a phone. A set of routes
+ * that matches no page is a gate that passes over nothing, so the rule went
+ * with the table rather than staying behind, empty, to be believed.
  *
  * The compact form is switched on by an empty custom property,
  * `--table-stacked: ;`, and a minifier that decided an empty value was a
@@ -79,14 +86,6 @@ const DOCS = resolve(
 	"content",
 	"docs",
 );
-
-/**
- * The pages whose index table must link every row. Each layout has a section
- * of its own on these pages, so a row without a link is a row the plugin
- * failed to link, and requiring the count is what keeps the dead-link check
- * from passing on a table that carries no link at all.
- */
-const LINK_EVERY_ROW = new Set(["card/layouts/", "es/card/layouts/"]);
 
 /** What the plugin wraps every prose table in, and what a page is scanned for. */
 const WRAPPER = "table-scroll";
@@ -166,12 +165,11 @@ function declaredCorpus(dir = DOCS) {
  *
  * @param {{
  *   declared: string[],
- *   tables: { firstHeading: string, compact: boolean, rows: number, linkedRows: number }[],
- *   linkEveryRow: boolean,
+ *   tables: { firstHeading: string, compact: boolean }[],
  * }} page
  * @returns {string[]} one sentence per problem, none when the page is right
  */
-export function indexProblems({ declared, tables, linkEveryRow }) {
+export function indexProblems({ declared, tables }) {
 	const problems = [];
 	for (const heading of declared) {
 		const matching = tables.filter((table) => table.firstHeading === heading);
@@ -186,12 +184,6 @@ export function indexProblems({ declared, tables, linkEveryRow }) {
 					`"${heading}" is declared an index and did not render compact: ` +
 						"either src/lib/rehype-tables.mjs did not mark it or the " +
 						"compact form in src/styles/tables.css did not switch on",
-				);
-			}
-			if (linkEveryRow && table.linkedRows !== table.rows) {
-				problems.push(
-					`"${heading}" links ${table.linkedRows} of its ${table.rows} rows ` +
-						"to their sections, and every row here has one",
 				);
 			}
 		}
@@ -232,10 +224,6 @@ function measureTables() {
 				columns: heads.length,
 				stacked: getComputedStyle(table).display !== "table",
 				firstHeading: heads.length ? heads[0].textContent.trim() : "",
-				rows: table.querySelectorAll("tbody tr").length,
-				linkedRows: [...table.querySelectorAll("tbody tr")].filter((row) =>
-					row.querySelector('td:first-child a[href^="#"]'),
-				).length,
 				// Compact is the stacked table whose second cell runs inline.
 				compact:
 					getComputedStyle(table).display !== "table" &&
@@ -321,7 +309,6 @@ async function walk(dist) {
 					for (const problem of indexProblems({
 						declared: declared.get(route),
 						tables: measuredTables,
-						linkEveryRow: LINK_EVERY_ROW.has(route),
 					})) {
 						failures.push({ width, route, index: "index", problem });
 					}
@@ -431,51 +418,30 @@ function selfTest() {
 		declaredIndexTables("---\ntitle: x\n---\n"),
 		[],
 	);
-	const layouts = {
-		firstHeading: "Layout",
-		compact: true,
-		rows: 13,
-		linkedRows: 13,
-	};
+	const index = { firstHeading: "Store", compact: true };
 	is(
-		"a compact index with every row linked is right",
-		indexProblems({
-			declared: ["Layout"],
-			tables: [layouts],
-			linkEveryRow: true,
-		}),
+		"a compact index is right",
+		indexProblems({ declared: ["Store"], tables: [index] }),
 		[],
 	);
 	is(
 		"an index the plugin stopped marking is caught from its source",
 		indexProblems({
-			declared: ["Layout"],
-			tables: [{ ...layouts, compact: false }],
-			linkEveryRow: false,
+			declared: ["Store"],
+			tables: [{ ...index, compact: false }],
 		}).length,
 		1,
 	);
 	is(
 		"a declared index with no table of that name is caught",
-		indexProblems({ declared: ["Layout"], tables: [], linkEveryRow: false })
-			.length,
+		indexProblems({ declared: ["Store"], tables: [] }).length,
 		1,
 	);
 	is(
-		"a layouts table that lost its links is caught",
+		"a table that is not the declared index is not asked to be compact",
 		indexProblems({
-			declared: ["Layout"],
-			tables: [{ ...layouts, linkedRows: 0 }],
-			linkEveryRow: true,
-		}).length,
-		1,
-	);
-	is(
-		"an index whose rows have no sections is not asked for links",
-		indexProblems({
-			declared: ["Family"],
-			tables: [{ ...layouts, firstHeading: "Family", linkedRows: 0 }],
-			linkEveryRow: false,
+			declared: ["Store"],
+			tables: [index, { firstHeading: "Field", compact: false }],
 		}),
 		[],
 	);
@@ -520,8 +486,9 @@ try {
 				"on a phone is how the documentation stopped being readable. Either " +
 				"the breakpoint in src/styles/tables.css no longer covers this " +
 				"shape, or something in the cell cannot wrap. An index in stacked " +
-				"boxes, or a row linking nowhere, is the compact form of the same " +
-				"file and of src/lib/rehype-tables.mjs.",
+				"boxes is the compact form of the same file and of " +
+				"src/lib/rehype-tables.mjs; a link that lands nowhere is the " +
+				"page's own.",
 		);
 		process.exit(1);
 	}
@@ -530,8 +497,8 @@ try {
 			`${WIDTHS.join(" and ")} px: every table fits its column ` +
 			`(${stacked - compact} stacked, ${compact} compact indexes, ` +
 			`${tables - stacked} still tables); all ${indexes} measurements of ` +
-			"the index tables the sources declare rendered compact, every " +
-			"layouts row is linked, and every row link lands.",
+			"the index tables the sources declare rendered compact, and every " +
+			"row link lands.",
 	);
 } catch (error) {
 	console.error(`[table-fit] ${error.message}`);

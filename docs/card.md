@@ -229,25 +229,11 @@ Source: <https://jmrp.io/docs/ghchronicle/card/layouts/>
 ghchronicle -card-layouts
 ```
 
-Prints them with the fields each shows by default. Each card below is shown in
-the palette this page is in, light or dark; every layout draws both, and `auto`
-puts both in one file.
-
-| Layout              | Family    | Animated | Loops | Default fields                                                                       |
-| ------------------- | --------- | -------- | ----- | ------------------------------------------------------------------------------------ |
-| `summary`           | chronicle | no       | no    | stars, forks, followers, repos, contributions, views, visitors, sparkline, top_repos |
-| `github-stats`      | github    | yes      | no    | repos, stars, forks, followers, commits, pull_requests, views, clones, languages     |
-| `github-compact`    | github    | no       | no    | stars, forks, followers, repos, commits                                              |
-| `badge-row`         | chronicle | no       | no    | stars, forks, followers, repos, contributions                                        |
-| `wide-banner`       | chronicle | yes      | no    | stars, forks, followers, contributions, sparkline                                    |
-| `sparkline-hero`    | chronicle | yes      | no    | contributions, stars, followers, sparkline                                           |
-| `language-ring`     | github    | yes      | no    | languages, stars, repos                                                              |
-| `repo-list`         | github    | no       | no    | top_repos, stars, forks, repos                                                       |
-| `activity-heatmap`  | github    | yes      | no    | sparkline, contributions, commits, pull_requests                                     |
-| `animated-counters` | chronicle | yes      | no    | stars, forks, followers, repos, contributions, views, sparkline                      |
-| `terminal`          | chronicle | yes      | yes   | stars, forks, followers, repos, contributions, top_repos                             |
-| `ticker`            | chronicle | yes      | yes   | stars, forks, followers, repos, contributions, commits, views, top_repos             |
-| `language-bars`     | github    | yes      | no    | languages                                                                            |
+Prints them with the fields each shows by default. Every layout below has a
+section of its own, stating its family, its motion, the width it is drawn at
+and those fields, over a picture of the card. Each card is shown in the palette
+this page is in, light or dark; every layout draws both, and `auto` puts both
+in one file.
 
 ### The two families
 
@@ -270,6 +256,11 @@ README as if GitHub had drawn it.
 
 The original card: title, two rows of numbers, a sparkline and the most starred
 repositories.
+
+- **Family**: chronicle
+- **Motion**: still
+- **Width**: 495 px, minimum 300
+- **Default fields**: `stars`, `forks`, `followers`, `repos`, `contributions`, `views`, `visitors`, `sparkline`, `top_repos`
 
 ![The summary layout: a title, two rows of large numbers, a contribution sparkline and a list of the most starred repositories](../site/src/assets/card-summary.svg)
 
@@ -294,9 +285,14 @@ repositories.
 ### github-stats
 
 GitHub's own box: a header band, rows of four monospace numbers and a language
-share bar with its legend. The widest layout at 800 pixels, and the one that
-looks most native in a profile README. The numbers count up, and the bar grows
-in from its left edge once they have landed.
+share bar with its legend. The widest of them, and the one that looks most
+native in a profile README. The numbers count up, and the bar grows in from its
+left edge once they have landed.
+
+- **Family**: github
+- **Motion**: plays once
+- **Width**: 800 px, minimum 600
+- **Default fields**: `repos`, `stars`, `forks`, `followers`, `commits`, `pull_requests`, `views`, `clones`, `languages`
 
 ![The github-stats layout played once: a header band over rows of four monospace numbers counting up, and a horizontal language share bar growing in from the left beside its legend](../site/src/assets/card-github-stats.svg)
 
@@ -322,6 +318,11 @@ in from its left edge once they have landed.
 
 One row of monospace numbers under a thin header band.
 
+- **Family**: github
+- **Motion**: still
+- **Width**: 495 px, minimum 300
+- **Default fields**: `stars`, `forks`, `followers`, `repos`, `commits`
+
 ![The github-compact layout: a thin header band above a single row of monospace numbers](../site/src/assets/card-github-compact.svg)
 
 - **Binary**
@@ -344,8 +345,12 @@ One row of monospace numbers under a thin header band.
 
 ### badge-row
 
-A row of 20 pixel pill badges, one per number, for a README line. The width
-follows the content rather than being set.
+A row of 20 pixel pill badges, one per number, for a README line.
+
+- **Family**: chronicle
+- **Motion**: still
+- **Width**: follows its content
+- **Default fields**: `stars`, `forks`, `followers`, `repos`, `contributions`
 
 ![The badge-row layout: a horizontal row of small pill badges, each with a label and a number](../site/src/assets/card-badge-row.svg)
 
@@ -372,6 +377,11 @@ follows the content rather than being set.
 A full-width 60 pixel banner: login on the left, numbers spread across, the
 sparkline drawing itself behind them.
 
+- **Family**: chronicle
+- **Motion**: plays once
+- **Width**: 800 px, minimum 500
+- **Default fields**: `stars`, `forks`, `followers`, `contributions`, `sparkline`
+
 ![The wide-banner layout played once: a wide, short banner with the login on the left, numbers spread across and a sparkline drawing itself behind them](../site/src/assets/card-wide-banner.svg)
 
 - **Binary**
@@ -396,6 +406,11 @@ sparkline drawing itself behind them.
 
 The contribution sparkline is the whole card, with up to three numbers
 overlaid. The line draws itself on load.
+
+- **Family**: chronicle
+- **Motion**: plays once
+- **Width**: 495 px, minimum 300
+- **Default fields**: `contributions`, `stars`, `followers`, `sparkline`
 
 ![The sparkline-hero layout played once: a large contribution sparkline drawing itself across the card with three numbers overlaid](../site/src/assets/card-sparkline-hero.svg)
 
@@ -423,6 +438,11 @@ A donut of language shares with the legend beside it and a row of headline
 numbers. Each slice draws itself around the ring after the one before it, and
 the legend appears when the donut is whole.
 
+- **Family**: github
+- **Motion**: plays once
+- **Width**: 495 px, minimum 400
+- **Default fields**: `languages`, `stars`, `repos`
+
 ![The language-ring layout played once: a donut chart whose language slices draw themselves one after another, with a legend appearing beside it and a row of headline numbers](../site/src/assets/card-language-ring.svg)
 
 - **Binary**
@@ -447,6 +467,11 @@ the legend appears when the donut is whole.
 
 The most starred repositories as the main content: language dot, stars and a
 bar per row, totals underneath.
+
+- **Family**: github
+- **Motion**: still
+- **Width**: 495 px, minimum 300
+- **Default fields**: `top_repos`, `stars`, `forks`, `repos`
 
 ![The repo-list layout: one row per repository with a language dot, the star count and a proportional bar, with totals underneath](../site/src/assets/card-repo-list.svg)
 
@@ -474,6 +499,11 @@ The last twelve weeks of the contribution calendar as GitHub's green squares,
 with up to three numbers beside it. The weeks fade in from the left, a week
 every twenty milliseconds, so the calendar fills in as a wave.
 
+- **Family**: github
+- **Motion**: plays once
+- **Width**: 495 px, minimum 400
+- **Default fields**: `sparkline`, `contributions`, `commits`, `pull_requests`
+
 ![The activity-heatmap layout played once: twelve weeks of contribution squares in GitHub's green scale fading in from the left, with three numbers beside them](../site/src/assets/card-activity-heatmap.svg)
 
 - **Binary**
@@ -498,6 +528,11 @@ every twenty milliseconds, so the calendar fills in as a wave.
 
 Numbers that count up on load over a sparkline that draws itself, settling to
 the static card.
+
+- **Family**: chronicle
+- **Motion**: plays once
+- **Width**: 495 px, minimum 300
+- **Default fields**: `stars`, `forks`, `followers`, `repos`, `contributions`, `views`, `sparkline`
 
 ![The animated-counters layout played once: a grid of large numbers counting up over a contribution sparkline that draws itself](../site/src/assets/card-animated-counters.svg)
 
@@ -532,6 +567,11 @@ is the state the finished card rests in. Under `loop` it blinks from the moment
 the window is drawn and never stops, because a cursor blinks for the reason a
 terminal is open and not for the reason a card is finished. The typing itself
 happens once either way.
+
+- **Family**: chronicle
+- **Motion**: plays once, or in a loop
+- **Width**: 495 px, minimum 360
+- **Default fields**: `stars`, `forks`, `followers`, `repos`, `contributions`, `top_repos`
 
 ![The terminal layout played once: a terminal window with the project's mark in its title bar, whose lines of output each have a number typing itself in under a lit block cursor that begins blinking when the last number lands, and the page can also play it in a loop, where the typing still happens once and the cursor blinks from the start and never stops](../site/src/assets/card-terminal.svg)
 
@@ -581,6 +621,11 @@ no seam. Played once, it makes a single pass and comes back to the beginning.
 The band scrolls at a fixed speed, so a card with more in it takes longer to come
 round than any other layout takes to settle.
 
+- **Family**: chronicle
+- **Motion**: plays once, or in a loop
+- **Width**: 800 px, minimum 400
+- **Default fields**: `stars`, `forks`, `followers`, `repos`, `contributions`, `commits`, `views`, `top_repos`
+
 ![The ticker layout played once: a wide band of rounded pills, one per number and one per repository, scrolling from right to left under the account name, and the page can also play it in a loop](../site/src/assets/card-ticker.svg)
 
 - **Binary**
@@ -627,6 +672,11 @@ one above it, with the name and the share arriving once their own bar has
 stopped. The layout that shows the share of a language as its own line, where
 `language-ring` shows all of them in one donut and `github-stats` in one bar.
 
+- **Family**: github
+- **Motion**: plays once
+- **Width**: 495 px, minimum 360
+- **Default fields**: `languages`
+
 ![The language-bars layout played once: one full-width bar per language growing from its left edge, one after another, with the language name and its percentage arriving behind each bar](../site/src/assets/card-language-bars.svg)
 
 - **Binary**
@@ -669,8 +719,8 @@ stopped. The layout that shows the share of a language as its own line, where
 
 ### Width
 
-Each layout declares its own width, and a minimum it would refuse to go below.
-Nothing asks for a different one: `render.Options` carries a `Width`, the
+Each layout declares its own width, and a minimum it would refuse to go below,
+and its own section above states both. Nothing asks for a different one: `render.Options` carries a `Width`, the
 binary leaves it at zero, and there is no way to set it from outside, so every
 card comes out at its layout's own width. `badge-row` declares neither, because
 a pill row stretched to a fixed width would have gaps in it; its width follows
