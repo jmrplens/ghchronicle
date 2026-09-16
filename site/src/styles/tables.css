@@ -25,13 +25,20 @@
  *            each value after its heading. See "The compact form"
  *            at the end of this file for which tables and why.
  *
+ * A table that stays STACKED can additionally have one column marked
+ * DEFAULT (`defaultColumns` in the frontmatter): its value moves onto
+ * the first cell's own line, top right, instead of spending a block
+ * of its own below. See "Default columns" at the end of this file.
+ *
  * The switch between the first two is the thirteen `--table-*`
  * properties, one of which, `--table-key-size`, exists so that the
  * first cell of a stacked block reads as the block's title rather
- * than as one more value: it is the row's whole identity once the
- * columns are gone (the key, the flag, the layer, the rule), so its
- * size is set apart from the table's own compressed 0.85rem instead
- * of only its colour. The compact form below reuses the same
+ * than as one more value where it holds a value at all: it is the
+ * row's whole identity once the columns are gone (the key, the flag,
+ * the rule), so its size is set apart from the table's own compressed
+ * 0.85rem instead of only its colour. Where the first cell holds
+ * prose rather than a value, a nearby rule cancels the size back down;
+ * see the comment beside it. The compact form below reuses the same
  * property at the same size, so an index row's name and a stacked
  * block's key read at one weight across the site rather than two.
  * The WIDE form is the fallback written into each `var()` below, so
@@ -129,7 +136,12 @@
 }
 
 .sl-markdown-content tr {
-	display: var(--table-row, table-row);
+	display: var(--table-default-row, var(--table-row, table-row));
+	/* The three that only matter once the row above is grid: harmless on a
+	 * `table-row` or a `block`, since neither reads a grid property. */
+	grid-template-columns: var(--table-default-columns, none);
+	column-gap: var(--table-default-gap, 0);
+	align-items: var(--table-default-align, normal);
 }
 
 .sl-markdown-content th {
@@ -180,11 +192,59 @@
 	font-size: var(--table-key-size, 1em);
 }
 
+/* One row of this corpus is not a value: the built-in-cadence row of
+ * configuration/cadences.mdx's three-layer table shares its first column with
+ * three real identifiers (`every.families`, `every.groups`, `every.default`)
+ * and is itself the prose "the built-in table", because there is no key to
+ * write for the layer nothing names. Sized and coloured like the others, a
+ * sentence reads as a heading floating over its row rather than as a title,
+ * which is the opposite of what the size was for. A first cell with no `code`
+ * in it is that case, on this table and on any future one shaped the same
+ * way, so its size falls back to the plain value it always was; its colour is
+ * left alone, since a plain-language row still benefits from being told apart
+ * from its own body text. The compact form is excluded on purpose: its own
+ * review already wanted a link-only name (InfluxDB, PostgreSQL, neither a
+ * `code` span) at this size, and undoing that here would be the regression,
+ * not the fix. */
+.sl-markdown-content
+	.table-scroll:not([data-form="index"])
+	td:first-child:not(:has(code)) {
+	--table-key-size: initial;
+}
+
 /* Every cell after the first. Only the compact form tells them apart from the
  * first: inline, so the rest of a row runs on as one line of facts. */
 .sl-markdown-content td:not(:first-child) {
 	display: var(--table-compact-rest, var(--table-cell, table-cell));
 	font-size: var(--table-compact-rest-size, 1em);
+}
+
+/* The default column, wherever it sits in the markup: grid-placed beside the
+ * first cell rather than left to fall in after it. See "Default columns"
+ * below for when these are set; everywhere else the four are unset and the
+ * cell renders exactly as any other. */
+.sl-markdown-content td[data-role="default"] {
+	position: var(--table-default-value-anchor, static);
+	grid-column: var(--table-default-value-column, auto);
+	grid-row: var(--table-default-value-row, auto);
+	align-self: var(--table-default-value-align, auto);
+	/* Every cell after the first inherits a 1em auto top margin from
+	 * Starlight's own markdown spacing (it never showed while cells simply
+	 * stacked, one block after another; row 1 of the grid is where two
+	 * items are asked to share a start edge, and only one of them carried
+	 * it). Zeroed here rather than investigated further upstream: it is
+	 * Starlight's rule to keep, and this cell is the only one asked to
+	 * align with a sibling rather than just follow it. */
+	margin-block-start: var(--table-stacked) 0;
+	min-width: var(--table-default-value-minw, auto);
+	max-width: var(--table-default-value-maxw, none);
+	text-align: var(--table-default-value-text-align, inherit);
+}
+
+/* Every cell that is neither the first nor the default: the row's remaining
+ * facts, given the whole width back under the pair the line above shares. */
+.sl-markdown-content td:not(:first-child):not([data-role="default"]) {
+	grid-column: var(--table-default-rest-column, auto);
 }
 
 .sl-markdown-content th code {
@@ -287,9 +347,26 @@
 /* The heading the cell sat under, carried down with it.
  * src/lib/rehype-tables.mjs writes it into `data-label`, so the text is in
  * the document rather than in this file and a column renamed in the markdown
- * renames its labels with it. */
+ * renames its labels with it.
+ *
+ * `display` carries one more tier than the other two: `--table-default-
+ * label`, for exactly one cell, `td[data-role="default"]`'s own label once it
+ * sits beside the first cell's instead of above its own value (see "Default
+ * columns"). It has to live IN this declaration rather than in a separate,
+ * more specific rule: a var() that resolves to nothing does not fall through
+ * to a lower-specificity rule, it falls through to the property's own initial
+ * value. A second rule competing for `display` here would have WON the
+ * cascade outside a stacked breakpoint too, on the strength of its extra
+ * selector, and then resolved its own unset var() to `display`'s initial
+ * value, `inline`, not to `none`: the label was showing, and reaching the
+ * accessible name, on the wide form this whole mechanism is supposed to leave
+ * alone. Margin and white-space need no such tier: once display is right,
+ * what either one is set to on a box nothing renders does not matter. */
 .sl-markdown-content td[data-label]::before {
-	display: var(--table-compact-label, var(--table-label, none));
+	display: var(
+		--table-default-label,
+		var(--table-compact-label, var(--table-label, none))
+	);
 	margin-bottom: 0.15rem;
 	color: var(--sl-color-gray-3);
 	font-size: 0.72rem;
@@ -307,6 +384,26 @@
 	 * 328 px column as a single run. */
 	white-space: var(--table-compact-label-wrap, normal);
 	content: attr(data-label) " ";
+}
+
+/* The rest of the default label's visually-hidden treatment: properties the
+ * rule above never sets, so there is nothing here for an unset
+ * `--table-stacked` to out-rank. Outside a stacked breakpoint each falls to
+ * its own harmless initial value (`static`, `auto`, `auto`, `visible`,
+ * `none`), which only matters once `display` above is already `none` there.
+ * Clipped, not `display: none`, in the stacked case: the latter is not
+ * generated at all, so nothing would reach the accessibility tree either, and
+ * a screen reader would lose the column this figure came from along with the
+ * word. */
+.sl-markdown-content
+	.table-scroll[data-form="default"]
+	> table
+	td[data-role="default"][data-label]::before {
+	position: var(--table-stacked) absolute;
+	width: var(--table-stacked) 1px;
+	height: var(--table-stacked) 1px;
+	overflow: var(--table-stacked) hidden;
+	clip-path: var(--table-stacked) inset(50%);
 }
 
 /* ------------------------------------------------------------
@@ -517,4 +614,95 @@
 	position: var(--table-compact-stretch, static);
 	inset: 0;
 	content: "";
+}
+
+/* ------------------------------------------------------------
+ * Default columns: a reference table that keeps its stacked form,
+ * except that one row spends one block fewer.
+ *
+ * WHICH TABLES, AND WHICH COLUMN. A page names them in its frontmatter
+ * (`defaultColumns`, a list of `{table, default}` pairs, the first
+ * column's heading and the heading of the column to hoist) and
+ * src/lib/rehype-tables.mjs marks the container `data-form="default"`
+ * and the resolved cell of every row `data-role="default"`. This is
+ * still a reference, unlike an index: the rows are not short and the
+ * reader is not finding one among many, so everything below only
+ * touches the row's first line, never its shape.
+ *
+ * WHEN. The same rule as the compact form's: exactly the widths the
+ * table would otherwise stack, and no other, through the same
+ * `--table-stacked` indirection every value below is written with.
+ *
+ * WHAT. The row becomes a two-column grid for one line: the first
+ * cell (its label above its key, unchanged, at `--table-key-size`)
+ * on the left, the default's value on the right, top-aligned with
+ * it. Every other cell keeps the full row's width below that line,
+ * in its original order, because grid auto-placement fills a
+ * partially-explicit item (`grid-column: 1 / -1`, no row given) into
+ * the next row that fits it whole, which is the row the default cell
+ * did not claim. The default's own label is generated exactly as
+ * before and then visually hidden (see the rule beside
+ * `[data-label]::before` above): the position is the cue once every
+ * row of the table reads the same way, so the word is not needed
+ * twice.
+ *
+ * THE COLUMN WIDTHS, three attempts before this one.
+ *
+ * A flat share (`minmax(0, 1fr) minmax(0, 60%)`) reserves that share
+ * of the row for the default column WHATEVER the content is: measured
+ * on `reserve_rate` (a two-character default, `500`), the key column
+ * was still cut to the same width a much longer default would have
+ * left it, and `reserve_rate` broke into `reserve_ra` / `te`. Grid
+ * gives a fixed-maximum track its whole ceiling during "maximise
+ * tracks", the phase that runs before a `fr` track gets anything, so
+ * a generous cap is spent whether or not the content asked for it.
+ *
+ * Letting the track track its own content (`minmax(0, 1fr)
+ * max-content`, no cap at all) fixed every short default, because a
+ * track's max-content ceiling IS its content's width, nothing spare
+ * to hand out. It broke on the one long one: `sinks.dedupe_file`'s
+ * default is a sentence with two code fragments in it, its
+ * max-content is its full unwrapped width, and a track is still a
+ * track first, over three hundred pixels of a 328 px row, leaving the
+ * key `sinks.dedupe_file` 28 px, its own padding and nothing else.
+ *
+ * What holds both ends is capping the ITEM instead of the TRACK:
+ * `max-width: 8rem` on `td[data-role="default"]`, with the column
+ * still `max-content`. A grid track's max-content contribution is the
+ * item's own max-content clamped by whatever width the item is
+ * allowed, so a short value (`config.yaml`, under 8rem already) is
+ * untouched, and a long one is clamped before the track ever measures
+ * it: the track asks for 8rem of the row, not the sentence's real
+ * width, and the sentence wraps inside that 8rem instead of the track
+ * demanding room nothing is left to give the key. `sinks.dedupe_file`
+ * is the measurement in scripts/check-table-fit.mjs's fixtures for
+ * this rule, both for the key staying whole and for the default
+ * wrapping rather than pushing it aside.
+ * ------------------------------------------------------------ */
+.sl-markdown-content .table-scroll[data-form="default"] > table tr {
+	--table-default-row: var(--table-stacked) grid;
+	--table-default-columns: var(--table-stacked) minmax(0, 1fr) max-content;
+	--table-default-gap: var(--table-stacked) 0.75rem;
+	--table-default-align: var(--table-stacked) start;
+}
+
+.sl-markdown-content
+	.table-scroll[data-form="default"]
+	> table
+	td[data-role="default"] {
+	--table-default-value-anchor: var(--table-stacked) relative;
+	--table-default-value-column: var(--table-stacked) 2;
+	--table-default-value-row: var(--table-stacked) 1;
+	--table-default-value-align: var(--table-stacked) start;
+	--table-default-value-minw: var(--table-stacked) 0;
+	--table-default-value-maxw: var(--table-stacked) 8rem;
+	--table-default-value-text-align: var(--table-stacked) right;
+	--table-default-label: var(--table-stacked) block;
+}
+
+.sl-markdown-content
+	.table-scroll[data-form="default"]
+	> table
+	td:not(:first-child):not([data-role="default"]) {
+	--table-default-rest-column: var(--table-stacked) 1 / -1;
 }

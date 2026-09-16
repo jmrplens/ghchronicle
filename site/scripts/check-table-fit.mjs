@@ -140,23 +140,58 @@ export function declaredIndexTables(source) {
 	return Array.isArray(declared) ? declared.map(String) : [];
 }
 
-/** Every page under src/content/docs that declares an index, by route. */
-function declaredCorpus(dir = DOCS) {
+/**
+ * The `{table, default}` pairs a page's frontmatter declares.
+ *
+ * @param {string} source the whole page, frontmatter included
+ * @returns {{ table: string, default: string }[]}
+ */
+export function declaredDefaultColumns(source) {
+	const match = /^---\r?\n([\s\S]*?)\r?\n---/.exec(source);
+	if (!match) return [];
+	const declared = parse(match[1])?.defaultColumns;
+	return Array.isArray(declared)
+		? declared.map((entry) => ({
+				table: String(entry.table),
+				default: String(entry.default),
+			}))
+		: [];
+}
+
+/**
+ * Every page under `dir` that declares at least one entry of `frontmatterKey`
+ * (`indexTables` or `defaultColumns`), by route, read with `reader`.
+ *
+ * @param {(source: string) => unknown[]} reader
+ * @param {string} dir
+ * @returns {Map<string, unknown[]>}
+ */
+function declaredBy(reader, dir = DOCS) {
 	const declared = new Map();
 	const visit = (folder) => {
 		for (const entry of readdirSync(folder, { withFileTypes: true })) {
 			const path = join(folder, entry.name);
 			if (entry.isDirectory()) visit(path);
 			else if (/\.mdx?$/.test(entry.name)) {
-				const headings = declaredIndexTables(readFileSync(path, "utf8"));
-				if (headings.length > 0) {
-					declared.set(routeOfSource(relative(dir, path)), headings);
+				const values = reader(readFileSync(path, "utf8"));
+				if (values.length > 0) {
+					declared.set(routeOfSource(relative(dir, path)), values);
 				}
 			}
 		}
 	};
 	visit(dir);
 	return declared;
+}
+
+/** Every page under src/content/docs that declares an index, by route. */
+function declaredCorpus(dir = DOCS) {
+	return declaredBy(declaredIndexTables, dir);
+}
+
+/** Every page under src/content/docs that declares a default column, by route. */
+function declaredDefaultCorpus(dir = DOCS) {
+	return declaredBy(declaredDefaultColumns, dir);
 }
 
 /**
@@ -192,6 +227,46 @@ export function indexProblems({ declared, tables }) {
 }
 
 /**
+ * What is wrong with one page's default-column tables at one width, read
+ * against what its source declared rather than against what the markup says.
+ *
+ * @param {{
+ *   declared: { table: string, default: string }[],
+ *   tables: { firstHeading: string, defaultForm: boolean, hasDefaultCell: boolean }[],
+ * }} page
+ * @returns {string[]} one sentence per problem, none when the page is right
+ */
+export function defaultColumnProblems({ declared, tables }) {
+	const problems = [];
+	for (const { table: heading, default: defaultHeading } of declared) {
+		const matching = tables.filter((table) => table.firstHeading === heading);
+		if (matching.length === 0) {
+			problems.push(
+				`declares "${heading}" a default-column table (default "${defaultHeading}") ` +
+					"and renders no table with that first column",
+			);
+		}
+		for (const table of matching) {
+			if (!table.hasDefaultCell) {
+				problems.push(
+					`"${heading}" declares "${defaultHeading}" as its default column, and ` +
+						'no cell of it carries data-role="default": either ' +
+						"src/lib/rehype-tables.mjs did not mark it or the column heading " +
+						"changed without the frontmatter following it",
+				);
+			} else if (!table.defaultForm) {
+				problems.push(
+					`"${heading}"'s default column did not render beside the label: ` +
+						"either src/lib/rehype-tables.mjs did not mark the cell or the " +
+						"default form in src/styles/tables.css did not switch on",
+				);
+			}
+		}
+	}
+	return problems;
+}
+
+/**
  * Whether one measurement is an overflow, and by how much.
  *
  * @param {{ container: number, content: number }} measured
@@ -214,6 +289,14 @@ function measureTables() {
 			const widths = heads.map((th) =>
 				Math.round(th.getBoundingClientRect().width),
 			);
+			const bodyRows = [...table.querySelectorAll("tbody tr")];
+			const defaultCells = bodyRows
+				.map((row) => ({
+					row,
+					key: row.querySelector("td:first-child"),
+					value: row.querySelector('td[data-role="default"]'),
+				}))
+				.filter((entry) => entry.value);
 			return {
 				index,
 				container: Math.round(wrapper.clientWidth),
@@ -229,6 +312,25 @@ function measureTables() {
 					getComputedStyle(table).display !== "table" &&
 					[...table.querySelectorAll("tbody td:nth-child(2)")].every(
 						(cell) => getComputedStyle(cell).display === "inline",
+					),
+				// A default column exists on this table when at least one body cell
+				// carries the role. It is IN FORM when every one of those cells sits
+				// beside its row's key rather than below it: top edge within a couple
+				// of pixels of the key's own top edge, which is only true once the
+				// row is the grid src/styles/tables.css switches it into. Below that
+				// breakpoint, or if the switch never fired, the cell falls back into
+				// normal stacked flow, well below the key.
+				hasDefaultCell: defaultCells.length > 0,
+				defaultForm:
+					getComputedStyle(table).display !== "table" &&
+					defaultCells.length > 0 &&
+					defaultCells.every(
+						({ key, value }) =>
+							key &&
+							Math.abs(
+								value.getBoundingClientRect().top -
+									key.getBoundingClientRect().top,
+							) <= 2,
 					),
 				deadLinks: [...table.querySelectorAll('a[href^="#"]')]
 					.filter(
@@ -279,6 +381,24 @@ async function walk(dist) {
 		);
 	}
 
+	const declaredDefaults = declaredDefaultCorpus();
+	if (declaredDefaults.size === 0) {
+		throw new Error(
+			`no page under ${DOCS} declares defaultColumns, so the default form ` +
+				"would go unchecked. Either the frontmatter key was renamed or " +
+				"this file reads the wrong directory.",
+		);
+	}
+	const undeclaredDefaultRoutes = [...declaredDefaults.keys()].filter(
+		(route) => !routes.includes(route),
+	);
+	if (undeclaredDefaultRoutes.length > 0) {
+		throw new Error(
+			`${undeclaredDefaultRoutes.map((route) => `/${route}`).join(", ")} ` +
+				"declare defaultColumns and render no table at all.",
+		);
+	}
+
 	const { chromium } = await import("playwright");
 	const preview = startPreview(await freePort());
 	const failures = [];
@@ -286,6 +406,7 @@ async function walk(dist) {
 	let stacked = 0;
 	let compact = 0;
 	let indexes = 0;
+	let defaultColumnsChecked = 0;
 	let browser;
 	try {
 		const base = await preview.announced;
@@ -311,6 +432,15 @@ async function walk(dist) {
 						tables: measuredTables,
 					})) {
 						failures.push({ width, route, index: "index", problem });
+					}
+				}
+				if (declaredDefaults.has(route)) {
+					defaultColumnsChecked += declaredDefaults.get(route).length;
+					for (const problem of defaultColumnProblems({
+						declared: declaredDefaults.get(route),
+						tables: measuredTables,
+					})) {
+						failures.push({ width, route, index: "default", problem });
 					}
 				}
 				for (const measured of measuredTables) {
@@ -346,7 +476,15 @@ async function walk(dist) {
 			`the ${routes.length} pages scanned rendered no table at all.`,
 		);
 	}
-	return { failures, tables, stacked, compact, indexes, routes: routes.length };
+	return {
+		failures,
+		tables,
+		stacked,
+		compact,
+		indexes,
+		defaultColumnsChecked,
+		routes: routes.length,
+	};
 }
 
 /* ------------------------------------------------------------------
@@ -446,6 +584,56 @@ function selfTest() {
 		[],
 	);
 
+	is(
+		"a block list of pairs in the frontmatter is read",
+		declaredDefaultColumns(
+			"---\ntitle: x\ndefaultColumns:\n  - table: Key\n    default: Default\n---\n\nbody",
+		),
+		[{ table: "Key", default: "Default" }],
+	);
+	is(
+		"a page without the key declares no default columns",
+		declaredDefaultColumns("---\ntitle: x\n---\n"),
+		[],
+	);
+	const github = {
+		firstHeading: "Key",
+		hasDefaultCell: true,
+		defaultForm: true,
+	};
+	is(
+		"a default column beside its label is right",
+		defaultColumnProblems({
+			declared: [{ table: "Key", default: "Default" }],
+			tables: [github],
+		}),
+		[],
+	);
+	is(
+		"a default column the plugin stopped marking is caught from its source",
+		defaultColumnProblems({
+			declared: [{ table: "Key", default: "Default" }],
+			tables: [{ ...github, hasDefaultCell: false, defaultForm: false }],
+		}).length,
+		1,
+	);
+	is(
+		"a default column the CSS stopped switching on is caught",
+		defaultColumnProblems({
+			declared: [{ table: "Key", default: "Default" }],
+			tables: [{ ...github, defaultForm: false }],
+		}).length,
+		1,
+	);
+	is(
+		"a declared default column with no table of that name is caught",
+		defaultColumnProblems({
+			declared: [{ table: "Key", default: "Default" }],
+			tables: [],
+		}).length,
+		1,
+	);
+
 	if (failed.length > 0) {
 		console.error("[table-fit] fixtures failed:");
 		for (const line of failed) console.error(`  ${line}`);
@@ -470,8 +658,15 @@ const DIST = resolve(
 );
 
 try {
-	const { failures, tables, stacked, compact, indexes, routes } =
-		await walk(DIST);
+	const {
+		failures,
+		tables,
+		stacked,
+		compact,
+		indexes,
+		defaultColumnsChecked,
+		routes,
+	} = await walk(DIST);
 	if (failures.length > 0) {
 		console.error(
 			`[table-fit] ${failures.length} problems over ${tables} measurements:`,
@@ -486,9 +681,9 @@ try {
 				"on a phone is how the documentation stopped being readable. Either " +
 				"the breakpoint in src/styles/tables.css no longer covers this " +
 				"shape, or something in the cell cannot wrap. An index in stacked " +
-				"boxes is the compact form of the same file and of " +
-				"src/lib/rehype-tables.mjs; a link that lands nowhere is the " +
-				"page's own.",
+				"boxes, or a default not beside its label, is the compact or " +
+				"default form of the same file and of src/lib/rehype-tables.mjs; " +
+				"a link that lands nowhere is the page's own.",
 		);
 		process.exit(1);
 	}
@@ -497,8 +692,9 @@ try {
 			`${WIDTHS.join(" and ")} px: every table fits its column ` +
 			`(${stacked - compact} stacked, ${compact} compact indexes, ` +
 			`${tables - stacked} still tables); all ${indexes} measurements of ` +
-			"the index tables the sources declare rendered compact, and every " +
-			"row link lands.",
+			"the index tables the sources declare rendered compact, every row " +
+			`link lands, and all ${defaultColumnsChecked} measurements of the ` +
+			"default columns the sources declare rendered beside their label.",
 	);
 } catch (error) {
 	console.error(`[table-fit] ${error.message}`);

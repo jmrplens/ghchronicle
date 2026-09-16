@@ -1,6 +1,9 @@
 ---
 title: El fichero
 description: Un fichero YAML, todos los valores expandibles desde el entorno, y para qué sirve cada bloque de primer nivel.
+defaultColumns:
+  - table: Clave
+    default: Por omisión
 ---
 
 import { Aside, FileTree } from "@astrojs/starlight/components";
@@ -73,8 +76,8 @@ github:
 | Clave          | Por omisión         | Significado                                                                                                                                              |
 | -------------- | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `token`        | obligatoria         | Un token personal clásico o fine-grained                                                                                                                 |
-| `reserve_rate` | `500`               | Llamadas que no se gastan nunca, para que lo demás que use el token siga funcionando                                                                     |
-| `timeout`      | `30s`               | Por petición. GraphQL sobre una cuenta grande puede ser lento                                                                                            |
+| `reserve_rate` | `500`               | Llamadas que no se gastan nunca, para que lo demás que use el token siga funcionando. Un valor no positivo cae al valor por defecto                      |
+| `timeout`      | `30s`               | Por petición. GraphQL sobre una cuenta grande puede ser lento. Una duración de Go; lo que no se pueda interpretar o no sea positivo cae al valor por defecto |
 | `base_url`     | api.github.com      | Una instancia de GitHub Enterprise usa `https://<host>/api/v3`                                                                                           |
 | `web_url`      | derivada de la API  | El sitio donde está la página de perfil, que `achievements` lee sin el token. Solo hace falta cuando `base_url` es un proxy delante de la API |
 
@@ -120,7 +123,7 @@ sinks:
 | Clave                  | Por omisión                                     | Significado                                                                        |
 | ---------------------- | ----------------------------------------------- | ----------------------------------------------------------------------------------- |
 | `sinks.dedupe_file`    | junto a `state_file`, como `<nombre>-written.bin` | El registro de lo que ya se ha escrito. `off` lo desactiva para todos los destinos |
-| `sinks.dedupe_horizon` | `720h`                                          | Cuánto recuerda el registro un punto que ya nadie ofrece                           |
+| `sinks.dedupe_horizon` | `720h`                                          | Cuánto recuerda el registro un punto que ya nadie ofrece. Una duración de Go; lo que no se pueda interpretar o no sea positivo cae al valor por defecto |
 
 Perderlo cuesta una pasada de reescritura y nada más, que es justo lo que quiere
 un almacén que se ha vaciado y hay que volver a llenar. Los dos ficheros quieren

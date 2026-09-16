@@ -1,6 +1,9 @@
 ---
 title: Logging
 description: Level, format, the rotating file that never replaces standard error, and the two lines worth alerting on.
+defaultColumns:
+  - table: Key
+    default: Default
 ---
 
 import { Aside } from "@astrojs/starlight/components";
@@ -18,11 +21,11 @@ log:
 
 | Key         | Default    | Meaning                                       |
 | ----------- | ---------- | --------------------------------------------- |
-| `level`     | `info`     | `debug`, `info`, `warn` or `error`            |
-| `format`    | `text`     | `text` for a human, `json` for a shipper      |
+| `level`     | `info`     | `debug`, `info`, `warn` or `error`; anything else behaves as `info` |
+| `format`    | `text`     | `text` for a human, `json` for a shipper; anything else is `text` |
 | `file`      | none       | A rotating file **as well as** standard error |
-| `max_bytes` | `67108864` | Rotate at 64 MiB                              |
-| `keep`      | `5`        | How many rotated files to keep                |
+| `max_bytes` | `67108864` | Rotate at 64 MiB. Anything not positive falls back to the default |
+| `keep`      | `5`        | How many rotated files to keep. Anything not positive falls back to the default |
 
 ## Both, never instead
 

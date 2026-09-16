@@ -71,8 +71,8 @@ github:
 | Key            | Default              | Meaning                                                                                                                                     |
 | -------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
 | `token`        | required             | A classic or fine-grained personal access token                                                                                             |
-| `reserve_rate` | `500`                | Calls never spent, so whatever else uses the token keeps working                                                                            |
-| `timeout`      | `30s`                | Per request. GraphQL over a large account can be slow                                                                                       |
+| `reserve_rate` | `500`                | Calls never spent, so whatever else uses the token keeps working. A non-positive value falls back to the default                            |
+| `timeout`      | `30s`                | Per request. GraphQL over a large account can be slow. A Go duration; anything unparseable or not positive falls back to the default        |
 | `base_url`     | api.github.com       | A GitHub Enterprise instance uses `https://<host>/api/v3`                                                                                   |
 | `web_url`      | derived from the API | The site the profile page is on, read by `achievements` without the token. Needed only when `base_url` is a proxy in front of the API |
 
@@ -117,7 +117,7 @@ sinks:
 | Key                    | Default                                     | Meaning                                                                    |
 | ---------------------- | ------------------------------------------- | -------------------------------------------------------------------------- |
 | `sinks.dedupe_file`    | beside `state_file`, as `<name>-written.bin` | The ledger of what has already been written. `off` disables it for every sink |
-| `sinks.dedupe_horizon` | `720h`                                      | How long the ledger remembers a point nothing offers any more              |
+| `sinks.dedupe_horizon` | `720h`                                      | How long the ledger remembers a point nothing offers any more. A Go duration; anything unparseable or not positive falls back to the default |
 
 Losing it costs one sweep of rewriting and nothing else, which is exactly what a
 store that has been wiped and needs filling again wants. Both files want a
@@ -845,11 +845,11 @@ log:
 
 | Key         | Default    | Meaning                                       |
 | ----------- | ---------- | --------------------------------------------- |
-| `level`     | `info`     | `debug`, `info`, `warn` or `error`            |
-| `format`    | `text`     | `text` for a human, `json` for a shipper      |
+| `level`     | `info`     | `debug`, `info`, `warn` or `error`; anything else behaves as `info` |
+| `format`    | `text`     | `text` for a human, `json` for a shipper; anything else is `text` |
 | `file`      | none       | A rotating file **as well as** standard error |
-| `max_bytes` | `67108864` | Rotate at 64 MiB                              |
-| `keep`      | `5`        | How many rotated files to keep                |
+| `max_bytes` | `67108864` | Rotate at 64 MiB. Anything not positive falls back to the default |
+| `keep`      | `5`        | How many rotated files to keep. Anything not positive falls back to the default |
 
 ### Both, never instead
 

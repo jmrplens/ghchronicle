@@ -1,6 +1,9 @@
 ---
 title: Registro
 description: Nivel, formato, el fichero rotatorio que nunca sustituye a la salida de error, y las dos líneas que merecen alerta.
+defaultColumns:
+  - table: Clave
+    default: Por omisión
 ---
 
 import { Aside } from "@astrojs/starlight/components";
@@ -18,11 +21,11 @@ log:
 
 | Clave       | Por omisión | Significado                                           |
 | ----------- | ----------- | ----------------------------------------------------- |
-| `level`     | `info`      | `debug`, `info`, `warn` o `error`                     |
-| `format`    | `text`      | `text` para una persona, `json` para un agente de envío    |
+| `level`     | `info`      | `debug`, `info`, `warn` o `error`; cualquier otro valor se comporta como `info` |
+| `format`    | `text`      | `text` para una persona, `json` para un agente de envío; cualquier otro valor es `text` |
 | `file`      | ninguno     | Un fichero rotatorio **además de** la salida de error |
-| `max_bytes` | `67108864`  | Rota a los 64 MiB                                     |
-| `keep`      | `5`         | Cuántos ficheros rotados conservar                    |
+| `max_bytes` | `67108864`  | Rota a los 64 MiB. Un valor no positivo cae al valor por defecto |
+| `keep`      | `5`         | Cuántos ficheros rotados conservar. Un valor no positivo cae al valor por defecto |
 
 ## Los dos, nunca en lugar de
 

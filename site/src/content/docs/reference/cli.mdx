@@ -1,6 +1,9 @@
 ---
 title: The command line
 description: The flags, what each one does, and which of them print something and exit.
+defaultColumns:
+  - table: Flag
+    default: Default
 ---
 
 The binary takes these flags and no subcommands. Everything else is in the
@@ -25,8 +28,8 @@ ghchronicle -config /etc/ghchronicle/config.yaml
 | `-card-only`      | off           | With `-card`, write the SVG and nothing else: no sink is needed, none is written to, and the state file is left as it was                  |
 | `-card-theme`     | `auto`        | `dark`, `light`, `auto`, or `both`: the light card at `-card` and the dark one beside it with `_dark` before the extension, from one sweep |
 | `-card-motion`    | `once`        | `once`, `loop` or `off`; `loop` changes only `terminal` and `ticker`                                                                            |
-| `-card-layout`    | `summary`     | Which of the thirteen layouts to draw                                                                                                           |
-| `-card-fields`    | none          | Comma-separated fields the card shows; empty means the layout's own default                                                                |
+| `-card-layout`    | `summary`     | Which of the thirteen [layouts](/ghchronicle/card/layouts/) to draw                                                                             |
+| `-card-fields`    | none          | Comma-separated fields the card shows, from [the fields](/ghchronicle/card/#the-fields); empty means the layout's own default              |
 | `-card-layouts`   | off           | Print the layouts with the fields each draws, then exit                                                                                    |
 
 ## The four that print and exit

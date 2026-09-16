@@ -35,6 +35,10 @@
  *  - on a table its page names as an INDEX, `data-form="index"` on the
  *    container. See "Index tables" below.
  *
+ *  - on a table its page names in `defaultColumns`, `data-form="default"` on
+ *    the container and `data-role="default"` on the cell that holds the row's
+ *    default, wherever that column sits. See "Default columns" below.
+ *
  * Why the stacked form exists at all, measured on the built site before it
  * did: all 98 tables of the corpus, in both languages, overflowed the column
  * they sit in at a 360 px and at a 400 px viewport, by 176 px to 417 px.
@@ -79,6 +83,31 @@ import { localeOf, routeOf } from "./site.mjs";
  *
  * The markdown is not touched, so the twin, docs/ and llms-full.txt read the
  * table exactly as written.
+ *
+ * DEFAULT COLUMNS. A reference table (a key, a flag, a rule) stays a
+ * reference: stacking is still right for it, its rows are not an index. But
+ * its first cell used to spend a whole labelled block on the row's default,
+ * one KEY/FLAG card followed by a whole DEFAULT card for one short value, and
+ * the author read that on a phone and asked for the value beside the label
+ * instead: same line, right-hand side, one block fewer per row.
+ *
+ * Which column that is is again the page's judgement, named in its
+ * frontmatter as pairs of headings,
+ *
+ *     defaultColumns:
+ *       - table: Key
+ *         default: Default
+ *
+ * `table` is the heading that picks the table (every one whose first column
+ * has that heading, so two tables sharing a heading, as configuration/'s two
+ * `Key` tables do, both get it from one entry), `default` is the heading of
+ * the column to hoist. A `table` naming no table on the page, or a `default`
+ * naming no column of the table it did find, is an error for the same reason
+ * a bad indexTables entry is: a column renamed in the markdown must not put
+ * the default back in its own box without a word. A table named in both
+ * `indexTables` and `defaultColumns` is also an error: the compact form
+ * already runs every column but the first inline, so the two treatments have
+ * nothing to agree on.
  */
 
 /** What the region is called, per locale. */
@@ -186,10 +215,52 @@ function indexTablesOf(file) {
 	return Array.isArray(declared) ? declared.map(String) : [];
 }
 
+/**
+ * The `{table, default}` pairs a page declared, read off the frontmatter
+ * Astro hands every plugin.
+ *
+ * @param {any} file the vfile rehype passes through
+ * @returns {{ table: string, default: string }[]}
+ */
+function defaultColumnsOf(file) {
+	const declared = file?.data?.astro?.frontmatter?.defaultColumns;
+	return Array.isArray(declared)
+		? declared.map((entry) => ({
+				table: String(entry.table),
+				default: String(entry.default),
+			}))
+		: [];
+}
+
+/**
+ * Marks the cell at `columnIndex` of every body row with `data-role="default"`,
+ * so styles/tables.css can grid-place it beside the first cell's label
+ * whatever DOM position it started at.
+ *
+ * @param {any} table
+ * @param {number} columnIndex
+ */
+function markDefaultColumn(table, columnIndex) {
+	for (const group of childrenNamed(table, ROW_GROUPS)) {
+		if (group.tagName === "thead") continue;
+		for (const row of childrenNamed(group, ROWS)) {
+			const cell = childrenNamed(row, CELLS)[columnIndex];
+			if (cell) cell.properties["data-role"] = "default";
+		}
+	}
+}
+
 export default function rehypeTables() {
 	/**
 	 * @param {any} node
-	 * @param {{ label: string, indexes: Set<string>, found: Set<string> }} page
+	 * @param {{
+	 *   label: string,
+	 *   indexes: Set<string>,
+	 *   found: Set<string>,
+	 *   defaults: Map<string, string>,
+	 *   defaultsFound: Set<string>,
+	 *   path: string,
+	 * }} page
 	 */
 	const walk = (node, page) => {
 		if (!node || !Array.isArray(node.children)) return;
@@ -200,13 +271,41 @@ export default function rehypeTables() {
 			prepare(child, columns);
 			const index = columns.length > 0 && page.indexes.has(columns[0]);
 			if (index) page.found.add(columns[0]);
+			const defaultHeading =
+				columns.length > 0 ? page.defaults.get(columns[0]) : undefined;
+			let defaultColumn = false;
+			if (defaultHeading !== undefined) {
+				if (index) {
+					throw new Error(
+						`${page.path}: "${columns[0]}" is named in both indexTables and ` +
+							"defaultColumns. A table cannot be both: the compact form " +
+							"already runs every column but the first inline.",
+					);
+				}
+				page.defaultsFound.add(columns[0]);
+				const columnIndex = columns.indexOf(defaultHeading);
+				if (columnIndex === -1) {
+					throw new Error(
+						`${page.path}: defaultColumns names "${defaultHeading}" as the ` +
+							`default column of the "${columns[0]}" table, and that table ` +
+							`has no column with that heading. Its columns are: ` +
+							`${columns.map((name) => `"${name}"`).join(", ")}.`,
+					);
+				}
+				markDefaultColumn(child, columnIndex);
+				defaultColumn = true;
+			}
 			return {
 				type: "element",
 				tagName: "div",
 				properties: {
 					className: ["table-scroll"],
 					"data-columns": String(columns.length),
-					...(index ? { "data-form": "index" } : {}),
+					...(index
+						? { "data-form": "index" }
+						: defaultColumn
+							? { "data-form": "default" }
+							: {}),
 					// Focusable, because a region that scrolls has to be
 					// reachable without a pointer. The role and the label are
 					// what make that focus stop announce itself.
@@ -222,16 +321,33 @@ export default function rehypeTables() {
 	// is present transitively, and depending on a transitive package is how a
 	// build breaks on a machine whose resolution differs.
 	return (tree, file) => {
+		const defaultEntries = defaultColumnsOf(file);
 		const page = {
 			label: REGION_LABEL[localeOfFile(file)],
 			indexes: new Set(indexTablesOf(file)),
 			found: new Set(),
+			defaults: new Map(
+				defaultEntries.map((entry) => [entry.table, entry.default]),
+			),
+			defaultsFound: new Set(),
+			path: file?.path ?? "a page",
 		};
 		walk(tree, page);
 		const missing = [...page.indexes].filter((name) => !page.found.has(name));
 		if (missing.length) {
 			throw new Error(
-				`${file?.path ?? "a page"}: indexTables names ${missing
+				`${page.path}: indexTables names ${missing
+					.map((name) => `"${name}"`)
+					.join(", ")}, and no table on the page has that first column. ` +
+					"Rename the entry to the table's first heading, or remove it.",
+			);
+		}
+		const missingDefaults = [...page.defaults.keys()].filter(
+			(name) => !page.defaultsFound.has(name),
+		);
+		if (missingDefaults.length) {
+			throw new Error(
+				`${page.path}: defaultColumns names ${missingDefaults
 					.map((name) => `"${name}"`)
 					.join(", ")}, and no table on the page has that first column. ` +
 					"Rename the entry to the table's first heading, or remove it.",

@@ -1,6 +1,9 @@
 ---
 title: La línea de órdenes
 description: Las opciones, qué hace cada una y cuáles imprimen algo y salen.
+defaultColumns:
+  - table: Opción
+    default: Por omisión
 ---
 
 El binario acepta estas opciones y ningún subcomando. Todo lo demás está en el
@@ -25,8 +28,8 @@ ghchronicle -config /etc/ghchronicle/config.yaml
 | `-card-only`      | apagada       | Con `-card`, escribe el SVG y nada más: no hace falta ningún destino, no se escribe en ninguno y el fichero de estado se queda como estaba |
 | `-card-theme`     | `auto`        | `dark`, `light`, `auto` o `both`: la tarjeta clara en `-card` y la oscura a su lado con `_dark` antes de la extensión, en una sola pasada |
 | `-card-motion`    | `once`        | `once`, `loop` u `off`; `loop` solo cambia `terminal` y `ticker`                                                                               |
-| `-card-layout`    | `summary`     | Cuál de los trece diseños dibujar                                                                                                          |
-| `-card-fields`    | ninguno       | Campos que muestra la tarjeta, separados por comas; vacío significa el valor por omisión del diseño                                       |
+| `-card-layout`    | `summary`     | Cuál de los trece [diseños](/ghchronicle/es/card/layouts/) dibujar                                                                        |
+| `-card-fields`    | ninguno       | Campos que muestra la tarjeta, separados por comas, de entre [los campos](/ghchronicle/es/card/#los-campos); vacío significa el valor por omisión del diseño |
 | `-card-layouts`   | apagada       | Imprime los diseños con los campos que dibuja cada uno, y sale                                                                            |
 
 ## Las cuatro que imprimen y salen
