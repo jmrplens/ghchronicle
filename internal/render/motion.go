@@ -229,17 +229,35 @@ func (t *timeline) css() string {
 	return b.String()
 }
 
+// What a keyframe says, at the two stops every effect writes. A keyframe block
+// is assembled here as a string, so a fragment spelled out wherever it is
+// wanted is one chance per spelling to get it wrong, and a brace or a colon out
+// of place is a rule the browser drops and an animation nobody ever sees.
+//
+// They read as the state an element is left in, because that is what a keyframe
+// is: hidden and shown are the two ends of every effect that works on opacity,
+// drawing and drawn the two ends of the one that dashes a stroke.
+const (
+	hidden  = "{opacity:0}"
+	shown   = "{opacity:1}"
+	drawing = "{stroke-dasharray:1;stroke-dashoffset:1}"
+	drawn   = "{stroke-dasharray:1;stroke-dashoffset:0}"
+)
+
+// transformed is the state an effect that moves an element leaves it in. It
+// sets the whole transform property, which is why an element that carries a
+// transform of its own cannot wear one of these classes: see effectGrowX.
+func transformed(to string) string { return "{transform:" + to + "}" }
+
 // keyframes places one beat inside the cycle. A step effect ends its hidden
 // stretch a hundredth of a percent before the visible one starts, so the
 // change is a cut rather than a fade between two stops.
 func keyframes(bt beat, cycle float64) string {
 	from := 100 * bt.start / cycle
 	to := 100 * (bt.start + bt.dur) / cycle
-	const hidden, shown = "{opacity:0}", "{opacity:1}"
 	switch bt.effect {
 	case effectDraw:
-		return stops(0, from) + "{stroke-dasharray:1;stroke-dashoffset:1}" +
-			stops(to, 100) + "{stroke-dasharray:1;stroke-dashoffset:0}"
+		return stops(0, from) + drawing + stops(to, 100) + drawn
 	case effectReveal:
 		if from == 0 {
 			return stops(0, 100) + shown
@@ -252,13 +270,13 @@ func keyframes(bt beat, cycle float64) string {
 		}
 		return s + stops(from, to-0.01) + shown + stops(to, 100) + hidden
 	case effectGrowX:
-		return stops(0, from) + "{transform:scaleX(0)}" + stops(to, 100) + "{transform:scaleX(1)}"
+		return stops(0, from) + transformed("scaleX(0)") + stops(to, 100) + transformed("scaleX(1)")
 	case effectType:
-		return stops(0, from) + "{transform:" + shiftedBy(-bt.shift) + "}" +
-			stops(to, 100) + "{transform:" + shiftedBy(0) + "}"
+		return stops(0, from) + transformed(shiftedBy(-bt.shift)) +
+			stops(to, 100) + transformed(shiftedBy(0))
 	case effectSlide:
-		return stops(0, from) + "{transform:" + shiftedBy(0) + "}" +
-			stops(to, 100) + "{transform:" + shiftedBy(-bt.shift) + "}"
+		return stops(0, from) + transformed(shiftedBy(0)) +
+			stops(to, 100) + transformed(shiftedBy(-bt.shift))
 	case effectBlink:
 		return blinkFrames(from, to, bt.dur)
 	default: // effectFade
@@ -276,9 +294,9 @@ func perpetual(bt beat) string {
 		// straight back to lit. The base style is the lit cursor either way,
 		// so a still renderer and a reader under prefers-reduced-motion get
 		// the cursor this one is blinking.
-		return stops(0, 50-0.01) + "{opacity:1}" + stops(50, 100) + "{opacity:0}"
+		return stops(0, 50-0.01) + shown + stops(50, 100) + hidden
 	}
-	return "0%{transform:" + shiftedBy(0) + "}100%{transform:" + shiftedBy(-bt.shift) + "}"
+	return "0%" + transformed(shiftedBy(0)) + "100%" + transformed(shiftedBy(-bt.shift))
 }
 
 // shiftedBy writes one horizontal translation. The unit is px because a CSS
@@ -302,11 +320,10 @@ const blinkPeriod = 0.5
 // one function over the whole animation, including the stretches where the
 // cursor only waits.
 func blinkFrames(from, to, dur float64) string {
-	const dark, lit = "{opacity:0}", "{opacity:1}"
 	blinks := max(int(math.Round(dur/blinkPeriod)), 1)
 	period := (to - from) / float64(blinks)
 	var b strings.Builder
-	b.WriteString(stops(0, from+period/2-0.01) + lit)
+	b.WriteString(stops(0, from+period/2-0.01) + shown)
 	for i := range blinks {
 		off := from + float64(i)*period + period/2
 		on := off + period/2
@@ -314,8 +331,8 @@ func blinkFrames(from, to, dur float64) string {
 		if i == blinks-1 {
 			end = 100
 		}
-		b.WriteString(stops(off, on-0.01) + dark)
-		b.WriteString(stops(on, end) + lit)
+		b.WriteString(stops(off, on-0.01) + hidden)
+		b.WriteString(stops(on, end) + shown)
 	}
 	return b.String()
 }
