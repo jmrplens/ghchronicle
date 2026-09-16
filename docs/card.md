@@ -334,6 +334,8 @@ stopped. The layout that shows the share of a language as its own line, where
 > `prefers-reduced-motion` switches it off. The captures above are those settled
 > frames.
 
+<!-- -->
+
 > **Only two layouts loop, and neither of them replays**
 >
 > An animation that reveals content is never played again: doing so would take

@@ -160,8 +160,29 @@ function resolveData(source, context) {
 	return resolved;
 }
 
-/** @param {string} text @returns {string} the text with its blank lines collapsed. */
-const tidy = (text) => text.replace(/[ \t]+$/gm, "").replace(/\n{3,}/g, "\n\n");
+/**
+ * Collapses the blank lines the reduction leaves behind, and keeps two
+ * blockquotes that follow each other apart.
+ *
+ * Two blockquotes separated by one blank line are one blockquote with a blank
+ * line inside it, to a markdown parser and to markdownlint (MD028), which is
+ * what two <Aside> components in a row reduce to. The remedy markdownlint
+ * prescribes is something between them that is not blank, and an empty HTML
+ * comment is the one thing that separates them without adding a word: it
+ * renders as nothing and reads as nothing.
+ *
+ * It belongs here rather than in the pages. The reduction owns the shape of
+ * its own output, the way it already does for a tab's label (see TabItem and
+ * MD036), and a page that puts two asides in a row is doing nothing wrong.
+ *
+ * @param {string} text
+ * @returns {string} the text with its blank lines collapsed
+ */
+const tidy = (text) =>
+	text
+		.replace(/[ \t]+$/gm, "")
+		.replace(/\n{3,}/g, "\n\n")
+		.replace(/(^>.*)\n\n(?=>)/gm, "$1\n\n<!-- -->\n\n");
 
 /**
  * Renders one component that wraps content.
