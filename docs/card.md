@@ -158,7 +158,7 @@ calling into this one. A program that wants an SVG runs the binary with
 
 ## Layouts
 
-Ten layouts in two visual families, three of them animated, with what each one draws by default.
+Ten layouts in two visual families, with what each one draws by default and which of them animate.
 
 Source: <https://jmrp.io/docs/ghchronicle/card/layouts/>
 
@@ -172,14 +172,14 @@ dark theme; every layout also renders light, and `auto` puts both in one file.
 | Layout              | Family    | Animated | Default fields                                                                       |
 | ------------------- | --------- | -------- | ------------------------------------------------------------------------------------ |
 | `summary`           | chronicle | no       | stars, forks, followers, repos, contributions, views, visitors, sparkline, top_repos |
-| `github-stats`      | github    | no       | repos, stars, forks, followers, commits, pull_requests, views, clones, languages     |
+| `github-stats`      | github    | yes      | repos, stars, forks, followers, commits, pull_requests, views, clones, languages     |
 | `github-compact`    | github    | no       | stars, forks, followers, repos, commits                                              |
 | `badge-row`         | chronicle | no       | stars, forks, followers, repos, contributions                                        |
 | `wide-banner`       | chronicle | yes      | stars, forks, followers, contributions, sparkline                                    |
 | `sparkline-hero`    | chronicle | yes      | contributions, stars, followers, sparkline                                           |
-| `language-ring`     | github    | no       | languages, stars, repos                                                              |
+| `language-ring`     | github    | yes      | languages, stars, repos                                                              |
 | `repo-list`         | github    | no       | top_repos, stars, forks, repos                                                       |
-| `activity-heatmap`  | github    | no       | sparkline, contributions, commits, pull_requests                                     |
+| `activity-heatmap`  | github    | yes      | sparkline, contributions, commits, pull_requests                                     |
 | `animated-counters` | chronicle | yes      | stars, forks, followers, repos, contributions, views, sparkline                      |
 
 ### The two families
@@ -199,9 +199,10 @@ repositories.
 
 GitHub's own box: a header band, rows of four monospace numbers and a language
 share bar with its legend. The widest layout at 800 pixels, and the one that
-looks most native in a profile README.
+looks most native in a profile README. The numbers count up, and the bar grows
+in from its left edge once they have landed.
 
-![The github-stats layout: a header band, rows of four monospace numbers and a horizontal language share bar with its legend](../site/src/assets/card-github-stats.svg)
+![The github-stats layout played once: a header band over rows of four monospace numbers counting up, and a horizontal language share bar growing in from the left beside its legend, and the page can also play it in a loop](../site/src/assets/card-github-stats.svg)
 
 ### github-compact
 
@@ -233,9 +234,10 @@ overlaid. The line draws itself on load.
 ### language-ring
 
 A donut of language shares with the legend beside it and a row of headline
-numbers.
+numbers. Each slice draws itself around the ring after the one before it, and
+the legend appears when the donut is whole.
 
-![The language-ring layout: a donut chart of language shares with a legend beside it and a row of headline numbers](../site/src/assets/card-language-ring.svg)
+![The language-ring layout played once: a donut chart whose language slices draw themselves one after another, with a legend appearing beside it and a row of headline numbers, and the page can also play it in a loop](../site/src/assets/card-language-ring.svg)
 
 ### repo-list
 
@@ -247,9 +249,10 @@ bar per row, totals underneath.
 ### activity-heatmap
 
 The last twelve weeks of the contribution calendar as GitHub's green squares,
-with up to three numbers beside it.
+with up to three numbers beside it. The weeks fade in from the left, a week
+every twenty milliseconds, so the calendar fills in as a wave.
 
-![The activity-heatmap layout: twelve weeks of contribution squares in GitHub's green scale with three numbers beside them](../site/src/assets/card-activity-heatmap.svg)
+![The activity-heatmap layout played once: twelve weeks of contribution squares in GitHub's green scale fading in from the left, with three numbers beside them, and the page can also play it in a loop](../site/src/assets/card-activity-heatmap.svg)
 
 ### animated-counters
 

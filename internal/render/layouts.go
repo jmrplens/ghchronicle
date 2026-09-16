@@ -91,8 +91,8 @@ var layouts = []layoutDef{
 		width: defaultWidth, minWidth: minWidth, draw: drawSummary,
 	},
 	{
-		Name: "github-stats", Family: "github",
-		Description: "GitHub's own box: a header band, rows of four monospace numbers and a language share bar with its legend.",
+		Name: "github-stats", Family: "github", Animated: true,
+		Description: "GitHub's own box: a header band, rows of four monospace numbers that count up and a language share bar that grows in beside its legend.",
 		Fields:      []string{fieldRepos, fieldStars, fieldForks, fieldFollowers, fieldCommits, fieldPullRequests, fieldViews, fieldClones, fieldLanguages},
 		Supports:    join(allNumeric, fieldLanguages, fieldTopRepos, fieldSparkline),
 
@@ -131,8 +131,8 @@ var layouts = []layoutDef{
 		width: defaultWidth, minWidth: minWidth, draw: drawSparklineHero,
 	},
 	{
-		Name: "language-ring", Family: "github",
-		Description: "A donut of language shares with the legend beside it and a row of headline numbers.",
+		Name: "language-ring", Family: "github", Animated: true,
+		Description: "A donut of language shares with the legend beside it and a row of headline numbers; each slice draws itself and the legend follows.",
 		Fields:      []string{fieldLanguages, fieldStars, fieldRepos},
 		Supports:    join(allNumeric, fieldLanguages),
 
@@ -147,8 +147,8 @@ var layouts = []layoutDef{
 		width: defaultWidth, minWidth: minWidth, draw: drawRepoList,
 	},
 	{
-		Name: "activity-heatmap", Family: "github",
-		Description: "The last twelve weeks of the contribution calendar as GitHub's green squares, with up to three numbers beside it.",
+		Name: "activity-heatmap", Family: "github", Animated: true,
+		Description: "The last twelve weeks of the contribution calendar as GitHub's green squares, week by week from the left, with up to three numbers beside it.",
 		Fields:      []string{fieldSparkline, fieldContributions, fieldCommits, fieldPullRequests},
 		Supports:    join(allNumeric, fieldSparkline),
 

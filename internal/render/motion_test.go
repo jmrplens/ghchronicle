@@ -119,9 +119,45 @@ func TestACardThatDoesNotMoveCarriesNoMotion(t *testing.T) {
 	}
 }
 
+// TestABarGrowsFromNothingAndSettlesUntransformed covers the effect nothing
+// else here uses: a grow places the box and the edge it scales from on the
+// class, as static declarations, and leaves the element untransformed at the
+// end of the cycle, which is the element's own style.
+func TestABarGrowsFromNothingAndSettlesUntransformed(t *testing.T) {
+	tl := newTimeline(MotionOnce)
+	tl.add(effectFade, 0, 1, "linear")
+	tl.add(effectGrowX, 1, 1, "ease-out")
+	css := tl.css()
+	for _, want := range []string{
+		".m1{animation:m1 2s ease-out 1;transform-box:fill-box;transform-origin:left}",
+		"@keyframes m1{0%,50%{transform:scaleX(0)}100%{transform:scaleX(1)}}",
+	} {
+		if !strings.Contains(css, want) {
+			t.Errorf("css lacks %q:\n%s", want, css)
+		}
+	}
+	// Only the effect that needs them carries them. A fade that anchored a
+	// transform would be saying something about a property it never touches.
+	if strings.Contains(css, ".m0{animation:m0 2s linear 1;transform-box") {
+		t.Errorf("a fade must not carry a transform box:\n%s", css)
+	}
+}
+
 func TestClassesSkipsTheEmptyParts(t *testing.T) {
 	if got := classes("big", "", "cuz", ""); got != "big cuz" {
 		t.Errorf("classes = %q, want %q", got, "big cuz")
+	}
+}
+
+// TestAClassAttributeIsWrittenOnlyWhenThereIsAClass keeps a card that does not
+// move free of the attributes a card that does needs: an element the motion
+// named nothing on is written exactly as it was before there was motion.
+func TestAClassAttributeIsWrittenOnlyWhenThereIsAClass(t *testing.T) {
+	if got := classAttr("n", "m3"); got != ` class="n m3"` {
+		t.Errorf("classAttr = %q", got)
+	}
+	if got := classAttr("", ""); got != "" {
+		t.Errorf("classAttr with nothing to say = %q, want no attribute", got)
 	}
 }
 

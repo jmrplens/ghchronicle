@@ -3,6 +3,7 @@ package render
 import (
 	"fmt"
 	"math"
+	"strconv"
 	"strings"
 )
 
@@ -10,7 +11,28 @@ const (
 	heatWeeks = 12
 	heatCell  = 11.0
 	heatPitch = 14.0
+
+	// heatWave is how long one week's squares take to fade in, and heatStagger
+	// is how far behind the week to its left a week starts. Twenty milliseconds
+	// apart, the wave crosses twelve weeks in under a quarter of a second and
+	// still reads as a wave rather than as one fade of the whole grid.
+	heatWave    = 0.5
+	heatStagger = 0.02
 )
+
+// heatWeekBeats places the wave: one fade per week, left to right. One class
+// per week and not one per cell, because eighty-four classes would be
+// eighty-four keyframe blocks in a document that has to stay small enough to
+// serve from a README, and the seven squares of a week have nothing to say to
+// each other anyway. Under off every class comes back empty and no beat is
+// placed.
+func heatWeekBeats(tl *timeline) []string {
+	weeks := make([]string, heatWeeks)
+	for w := range weeks {
+		weeks[w] = tl.add(effectFade, float64(w)*heatStagger, heatWave, "ease-out")
+	}
+	return weeks
+}
 
 // heatLevels buckets the last twelve weeks of daily counts into GitHub's
 // five levels. The sparkline is taken as daily counts ending today, so the
@@ -40,9 +62,21 @@ func heatLevels(values []int) []int {
 	return levels
 }
 
+// heatLevelClass is the class that paints one level of the calendar ramp.
+func heatLevelClass(level int) string {
+	return "h" + strconv.Itoa(level)
+}
+
 func drawActivityHeatmap(b *strings.Builder, c *Card, s *spec) {
 	ghTitled(s, fmt.Sprintf("Contributions, last %d weeks", heatWeeks))
 	const band = 44.0
+	tl := newTimeline(s.motion)
+	// The grid is the only thing that moves, so a card asked for no sparkline
+	// places no beat: the wave has nothing to cross.
+	weeks := make([]string, heatWeeks)
+	if s.has(fieldSparkline) {
+		weeks = heatWeekBeats(tl)
+	}
 	var body strings.Builder
 
 	gridW := heatWeeks*heatPitch - (heatPitch - heatCell)
@@ -53,16 +87,19 @@ func drawActivityHeatmap(b *strings.Builder, c *Card, s *spec) {
 		levels := heatLevels(c.Sparkline)
 		for w := range heatWeeks {
 			for d := range 7 {
-				fmt.Fprintf(&body, `<rect class="h%d" x="%s" y="%s" width="%s" height="%s" rx="2"/>`+"\n",
-					levels[w*7+d], num(gx+float64(w)*heatPitch), num(gy+float64(d)*heatPitch), num(heatCell), num(heatCell))
+				fmt.Fprintf(&body, `<rect class="%s" x="%s" y="%s" width="%s" height="%s" rx="2"/>`+"\n",
+					classes(heatLevelClass(levels[w*7+d]), weeks[w]),
+					num(gx+float64(w)*heatPitch), num(gy+float64(d)*heatPitch), num(heatCell), num(heatCell))
 			}
 		}
 		ly := bottom + 16
 		text(&body, gx, ly+9, "s", "start", "Less")
 		lx := gx + 30
+		// The key stands still. It is a legend for the ramp, not a week of the
+		// calendar, and a key that faded in with the wave would read as data.
 		for i := range 5 {
-			fmt.Fprintf(&body, `<rect class="h%d" x="%s" y="%s" width="%s" height="%s" rx="2"/>`+"\n",
-				i, num(lx+float64(i)*heatPitch), num(ly), num(heatCell), num(heatCell))
+			fmt.Fprintf(&body, `<rect class="%s" x="%s" y="%s" width="%s" height="%s" rx="2"/>`+"\n",
+				heatLevelClass(i), num(lx+float64(i)*heatPitch), num(ly), num(heatCell), num(heatCell))
 		}
 		text(&body, lx+5*heatPitch+2, ly+9, "s", "start", "More")
 		bottom = ly + heatCell
@@ -86,7 +123,7 @@ func drawActivityHeatmap(b *strings.Builder, c *Card, s *spec) {
 	}
 	height := math.Ceil(bottom + 20)
 
-	openDoc(b, &githubFamily, s, height, describe(c, s), "")
+	openDoc(b, &githubFamily, s, height, describe(c, s), tl.css())
 	githubFrame(b, s.width, height, band)
 	githubHeader(b, s, c.Login, band, ghPad)
 	b.WriteString(body.String())

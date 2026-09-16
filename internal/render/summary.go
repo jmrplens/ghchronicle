@@ -13,12 +13,17 @@ type gridStyle struct {
 	labelDY, rowH          float64
 	format                 func(int) string
 	label                  func(metric) string
+	// count is the classes the numbers count up with, from counterBeats. The
+	// zero value writes each number once, which is every grid that stands
+	// still; a layout that counts takes a copy of one of the styles below and
+	// fills it in.
+	count counterMotion
 }
 
 var (
-	chronicleGrid = gridStyle{"v", "l", 16, 15, 42, compact, func(m metric) string { return m.label }}
-	githubGrid    = gridStyle{"v", "l", 22, 18, 46, grouped, func(m metric) string { return m.long }}
-	bigGrid       = gridStyle{"big", "l", 20, 16, 44, grouped, func(m metric) string { return m.long }}
+	chronicleGrid = gridStyle{valueClass: "v", labelClass: "l", valueSize: 16, labelDY: 15, rowH: 42, format: compact, label: func(m metric) string { return m.label }}
+	githubGrid    = gridStyle{valueClass: "v", labelClass: "l", valueSize: 22, labelDY: 18, rowH: 46, format: grouped, label: func(m metric) string { return m.long }}
+	bigGrid       = gridStyle{valueClass: "big", labelClass: "l", valueSize: 20, labelDY: 16, rowH: 44, format: grouped, label: func(m metric) string { return m.long }}
 )
 
 // statGrid lays the numbers out in rows of perRow, the last row taking the
@@ -31,7 +36,7 @@ func statGrid(b *strings.Builder, nums []metric, x, baseline, inner float64, per
 		cell := inner / float64(end-start)
 		for i, m := range nums[start:end] {
 			cx := x + float64(i)*cell
-			text(b, cx, y, st.valueClass, "start", fit(st.format(m.value), st.valueSize, cell-6))
+			countUp(b, cx, y, st.valueClass, "start", st.count, m.value, st.format, st.valueSize, cell-6)
 			text(b, cx, y+st.labelDY, st.labelClass, "start", fit(st.label(m), 11, cell-6))
 		}
 		if end < len(nums) {
@@ -87,7 +92,7 @@ func summaryLanguages(b *strings.Builder, s *spec, y float64) float64 {
 	inner := s.width - 2*pad
 	top := y + 16
 	text(b, pad, top+8, "h", "start", "LANGUAGES")
-	langBar(b, s.langs, pad, top+14, inner, 8)
+	langBar(b, s.langs, pad, top+14, inner, 8, "")
 	x := pad
 	ly := top + 36
 	for _, l := range s.langs {
@@ -131,7 +136,17 @@ func summaryRepos(b *strings.Builder, s *spec, y float64) float64 {
 
 // langBar is the segmented share bar, two pixel gaps between segments and a
 // floor of one pixel so a tiny language is still a visible sliver.
-func langBar(b *strings.Builder, langs []langShare, x, y, w, h float64) {
+//
+// grow names the beat that grows the bar, or is empty on a bar that does not
+// move. It goes on a group around the whole bar rather than on each segment:
+// a segment scaled from its own left edge would take the gap to its right with
+// it, and what the card means to show growing is one bar, not a race between
+// one segment per language.
+func langBar(b *strings.Builder, langs []langShare, x, y, w, h float64, grow string) {
+	if grow != "" {
+		fmt.Fprintf(b, `<g%s>`+"\n", classAttr(grow))
+		defer b.WriteString("</g>\n")
+	}
 	if len(langs) == 0 {
 		fmt.Fprintf(b, `<rect class="track" x="%s" y="%s" width="%s" height="%s" rx="3"/>`+"\n",
 			num(x), num(y), num(w), num(h))

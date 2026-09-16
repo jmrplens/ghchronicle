@@ -31,6 +31,27 @@ text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans',Helveti
 .area{fill-opacity:0.12;stroke:none}
 .axis{stroke-width:1}
 .edge{fill:none;stroke-width:1}
+.m0{animation:m0 1.85s linear 1}
+@keyframes m0{0%{stroke-dasharray:1;stroke-dashoffset:1}15.48%,100%{stroke-dasharray:1;stroke-dashoffset:0}}
+.m1{animation:m1 1.85s linear 1}
+@keyframes m1{0%,15.48%{stroke-dasharray:1;stroke-dashoffset:1}29.24%,100%{stroke-dasharray:1;stroke-dashoffset:0}}
+.m2{animation:m2 1.85s linear 1}
+@keyframes m2{0%,29.24%{stroke-dasharray:1;stroke-dashoffset:1}41.28%,100%{stroke-dasharray:1;stroke-dashoffset:0}}
+.m3{animation:m3 1.85s linear 1}
+@keyframes m3{0%,41.28%{stroke-dasharray:1;stroke-dashoffset:1}51.59%,100%{stroke-dasharray:1;stroke-dashoffset:0}}
+.m4{animation:m4 1.85s linear 1}
+@keyframes m4{0%,51.59%{stroke-dasharray:1;stroke-dashoffset:1}60.19%,100%{stroke-dasharray:1;stroke-dashoffset:0}}
+.m5{animation:m5 1.85s linear 1}
+@keyframes m5{0%,60.19%{stroke-dasharray:1;stroke-dashoffset:1}67.07%,100%{stroke-dasharray:1;stroke-dashoffset:0}}
+.m6{animation:m6 1.85s linear 1}
+@keyframes m6{0%,67.07%{stroke-dasharray:1;stroke-dashoffset:1}72.23%,100%{stroke-dasharray:1;stroke-dashoffset:0}}
+.m7{animation:m7 1.85s linear 1}
+@keyframes m7{0%,72.23%{stroke-dasharray:1;stroke-dashoffset:1}75.67%,100%{stroke-dasharray:1;stroke-dashoffset:0}}
+.m8{animation:m8 1.85s linear 1}
+@keyframes m8{0%,75.67%{stroke-dasharray:1;stroke-dashoffset:1}78.37%,100%{stroke-dasharray:1;stroke-dashoffset:0}}
+.m9{animation:m9 1.85s ease-out 1}
+@keyframes m9{0%,78.37%{opacity:0}100%{opacity:1}}
+@media (prefers-reduced-motion:reduce){.m0,.m1,.m2,.m3,.m4,.m5,.m6,.m7,.m8,.m9{animation:none}}
 </style>
 <rect class="bg" x="0.5" y="0.5" width="494" height="419" rx="6"/>
 <path class="panel" d="M0.5,44 V6.5 A6,6 0 0 1 6.5,0.5 H488.5 A6,6 0 0 1 494.5,6.5 V44 Z"/>
@@ -39,44 +60,44 @@ text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans',Helveti
 <text class="t" x="22" y="28" text-anchor="start">Languages</text>
 <text class="d mono" x="473" y="28" text-anchor="end">@octo</text>
 <circle class="edge" cx="84" cy="124" r="54" stroke-width="16"/>
-<circle cx="84" cy="124" r="54" fill="none" stroke="#8b949e" stroke-width="16" stroke-dasharray="66.38 272.91" stroke-dashoffset="-0" transform="rotate(-90 84 124)"/>
-<circle cx="84" cy="124" r="54" fill="none" stroke="#abcdef" stroke-width="16" stroke-dasharray="58.68 280.62" stroke-dashoffset="-69.38" transform="rotate(-90 84 124)"/>
-<circle cx="84" cy="124" r="54" fill="none" stroke="#384d54" stroke-width="16" stroke-dasharray="50.97 288.33" stroke-dashoffset="-131.06" transform="rotate(-90 84 124)"/>
-<circle cx="84" cy="124" r="54" fill="none" stroke="#8b949e" stroke-width="16" stroke-dasharray="43.26 296.04" stroke-dashoffset="-185.03" transform="rotate(-90 84 124)"/>
-<circle cx="84" cy="124" r="54" fill="none" stroke="#8b949e" stroke-width="16" stroke-dasharray="35.55 303.74" stroke-dashoffset="-231.28" transform="rotate(-90 84 124)"/>
-<circle cx="84" cy="124" r="54" fill="none" stroke="#a97bff" stroke-width="16" stroke-dasharray="27.84 311.45" stroke-dashoffset="-269.83" transform="rotate(-90 84 124)"/>
-<circle cx="84" cy="124" r="54" fill="none" stroke="#e16737" stroke-width="16" stroke-dasharray="20.13 319.16" stroke-dashoffset="-300.67" transform="rotate(-90 84 124)"/>
-<circle cx="84" cy="124" r="54" fill="none" stroke="#8b949e" stroke-width="16" stroke-dasharray="12.42 326.87" stroke-dashoffset="-323.8" transform="rotate(-90 84 124)"/>
-<circle cx="84" cy="124" r="54" fill="none" stroke="#8b949e" stroke-width="16" stroke-dasharray="0.08 339.21" stroke-dashoffset="-339.21" transform="rotate(-90 84 124)"/>
+<path class="m0" pathLength="1" d="M84,70 A54,54 0 0 1 134.88,105.92" fill="none" stroke="#8b949e" stroke-width="16"/>
+<path class="m1" pathLength="1" d="M135.81,108.77 A54,54 0 0 1 121.6,162.76" fill="none" stroke="#abcdef" stroke-width="16"/>
+<path class="m2" pathLength="1" d="M119.39,164.79 A54,54 0 0 1 71.73,176.59" fill="none" stroke="#384d54" stroke-width="16"/>
+<path class="m3" pathLength="1" d="M68.83,175.82 A54,54 0 0 1 36.23,149.17" fill="none" stroke="#8b949e" stroke-width="16"/>
+<path class="m4" pathLength="1" d="M34.9,146.48 A54,54 0 0 1 31.41,111.75" fill="none" stroke="#8b949e" stroke-width="16"/>
+<path class="m5" pathLength="1" d="M32.17,108.85 A54,54 0 0 1 46.38,85.26" fill="none" stroke="#a97bff" stroke-width="16"/>
+<path class="m6" pathLength="1" d="M48.59,83.23 A54,54 0 0 1 65.86,73.14" fill="none" stroke="#e16737" stroke-width="16"/>
+<path class="m7" pathLength="1" d="M68.72,72.21 A54,54 0 0 1 80.92,70.09" fill="none" stroke="#8b949e" stroke-width="16"/>
+<path class="m8" pathLength="1" d="M83.92,70 A54,54 0 0 1 84,70" fill="none" stroke="#8b949e" stroke-width="16"/>
 <text class="big t" x="84" y="128" text-anchor="middle">20%</text>
 <text class="s" x="84" y="144" text-anchor="middle">JavaScript wit…</text>
-<circle cx="175" cy="72" r="5" fill="#8b949e"/>
-<text class="n" x="186" y="76" text-anchor="start">JavaScript with a very long qualifier</text>
-<text class="c" x="473" y="76" text-anchor="end">20%</text>
-<circle cx="175" cy="94" r="5" fill="#abcdef"/>
-<text class="n" x="186" y="98" text-anchor="start">TypeScript also rather long</text>
-<text class="c" x="473" y="98" text-anchor="end">18%</text>
-<circle cx="175" cy="116" r="5" fill="#384d54"/>
-<text class="n" x="186" y="120" text-anchor="start">Dockerfile</text>
-<text class="c" x="473" y="120" text-anchor="end">16%</text>
-<circle cx="175" cy="138" r="5" fill="#8b949e"/>
-<text class="n" x="186" y="142" text-anchor="start">Makefile and friends</text>
-<text class="c" x="473" y="142" text-anchor="end">14%</text>
-<circle cx="175" cy="160" r="5" fill="#8b949e"/>
-<text class="n" x="186" y="164" text-anchor="start">Some language nobody has heard of</text>
-<text class="c" x="473" y="164" text-anchor="end">11%</text>
-<circle cx="175" cy="182" r="5" fill="#a97bff"/>
-<text class="n" x="186" y="186" text-anchor="start">Kotlin</text>
-<text class="c" x="473" y="186" text-anchor="end">9%</text>
-<circle cx="175" cy="204" r="5" fill="#e16737"/>
-<text class="n" x="186" y="208" text-anchor="start">MATLAB</text>
-<text class="c" x="473" y="208" text-anchor="end">7%</text>
-<circle cx="175" cy="226" r="5" fill="#8b949e"/>
-<text class="n" x="186" y="230" text-anchor="start">Assembly</text>
-<text class="c" x="473" y="230" text-anchor="end">5%</text>
-<circle cx="175" cy="248" r="5" fill="#8b949e"/>
-<text class="n" x="186" y="252" text-anchor="start">Other</text>
-<text class="c" x="473" y="252" text-anchor="end">0%</text>
+<circle class="m9" cx="175" cy="72" r="5" fill="#8b949e"/>
+<text class="n m9" x="186" y="76" text-anchor="start">JavaScript with a very long qualifier</text>
+<text class="c m9" x="473" y="76" text-anchor="end">20%</text>
+<circle class="m9" cx="175" cy="94" r="5" fill="#abcdef"/>
+<text class="n m9" x="186" y="98" text-anchor="start">TypeScript also rather long</text>
+<text class="c m9" x="473" y="98" text-anchor="end">18%</text>
+<circle class="m9" cx="175" cy="116" r="5" fill="#384d54"/>
+<text class="n m9" x="186" y="120" text-anchor="start">Dockerfile</text>
+<text class="c m9" x="473" y="120" text-anchor="end">16%</text>
+<circle class="m9" cx="175" cy="138" r="5" fill="#8b949e"/>
+<text class="n m9" x="186" y="142" text-anchor="start">Makefile and friends</text>
+<text class="c m9" x="473" y="142" text-anchor="end">14%</text>
+<circle class="m9" cx="175" cy="160" r="5" fill="#8b949e"/>
+<text class="n m9" x="186" y="164" text-anchor="start">Some language nobody has heard of</text>
+<text class="c m9" x="473" y="164" text-anchor="end">11%</text>
+<circle class="m9" cx="175" cy="182" r="5" fill="#a97bff"/>
+<text class="n m9" x="186" y="186" text-anchor="start">Kotlin</text>
+<text class="c m9" x="473" y="186" text-anchor="end">9%</text>
+<circle class="m9" cx="175" cy="204" r="5" fill="#e16737"/>
+<text class="n m9" x="186" y="208" text-anchor="start">MATLAB</text>
+<text class="c m9" x="473" y="208" text-anchor="end">7%</text>
+<circle class="m9" cx="175" cy="226" r="5" fill="#8b949e"/>
+<text class="n m9" x="186" y="230" text-anchor="start">Assembly</text>
+<text class="c m9" x="473" y="230" text-anchor="end">5%</text>
+<circle class="m9" cx="175" cy="248" r="5" fill="#8b949e"/>
+<text class="n m9" x="186" y="252" text-anchor="start">Other</text>
+<text class="c m9" x="473" y="252" text-anchor="end">0%</text>
 <line class="axis" x1="22" y1="264.5" x2="473" y2="264.5"/>
 <text class="big" x="22" y="298" text-anchor="start">1,234,567</text>
 <text class="l" x="22" y="314" text-anchor="start">Stars</text>

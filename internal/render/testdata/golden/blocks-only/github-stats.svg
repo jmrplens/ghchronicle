@@ -31,6 +31,9 @@ text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans',Helveti
 .area{fill-opacity:0.12;stroke:none}
 .axis{stroke-width:1}
 .edge{fill:none;stroke-width:1}
+.m0{animation:m0 0.9s ease-out 1;transform-box:fill-box;transform-origin:left}
+@keyframes m0{0%{transform:scaleX(0)}100%{transform:scaleX(1)}}
+@media (prefers-reduced-motion:reduce){.m0{animation:none}}
 </style>
 <rect class="bg" x="0.5" y="0.5" width="799" height="480" rx="6"/>
 <path class="panel" d="M0.5,50 V6.5 A6,6 0 0 1 6.5,0.5 H793.5 A6,6 0 0 1 799.5,6.5 V50 Z"/>
@@ -40,9 +43,11 @@ text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans',Helveti
 <text class="d mono" x="778" y="31" text-anchor="end">@jmrplens</text>
 <text class="h fg" x="22" y="100" text-anchor="start">Most Used Languages</text>
 <text class="d" x="22" y="117" text-anchor="start">Share of bytes across public repositories</text>
+<g class="m0">
 <rect x="22" y="134" width="345.78" height="14" rx="3" fill="#00add8"/>
 <rect x="369.78" y="134" width="209.05" height="14" rx="3" fill="#3572a5"/>
 <rect x="580.83" y="134" width="195.17" height="14" rx="3" fill="#f34b7d"/>
+</g>
 <circle cx="28" cy="170" r="6" fill="#00add8"/>
 <text class="n" x="42" y="174" text-anchor="start">Go</text>
 <text class="c" x="380" y="174" text-anchor="end">46%</text>

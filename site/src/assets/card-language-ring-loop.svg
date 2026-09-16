@@ -31,20 +31,20 @@ text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans',Helveti
 .area{fill-opacity:0.12;stroke:none}
 .axis{stroke-width:1}
 .edge{fill:none;stroke-width:1}
-.m0{animation:m0 1.88s linear 1}
-@keyframes m0{0%{stroke-dasharray:1;stroke-dashoffset:1}54.21%,100%{stroke-dasharray:1;stroke-dashoffset:0}}
-.m1{animation:m1 1.88s linear 1}
-@keyframes m1{0%,54.21%{stroke-dasharray:1;stroke-dashoffset:1}67.33%,100%{stroke-dasharray:1;stroke-dashoffset:0}}
-.m2{animation:m2 1.88s linear 1}
-@keyframes m2{0%,67.33%{stroke-dasharray:1;stroke-dashoffset:1}70.7%,100%{stroke-dasharray:1;stroke-dashoffset:0}}
-.m3{animation:m3 1.88s linear 1}
-@keyframes m3{0%,70.7%{stroke-dasharray:1;stroke-dashoffset:1}73.37%,100%{stroke-dasharray:1;stroke-dashoffset:0}}
-.m4{animation:m4 1.88s linear 1}
-@keyframes m4{0%,73.37%{stroke-dasharray:1;stroke-dashoffset:1}76.03%,100%{stroke-dasharray:1;stroke-dashoffset:0}}
-.m5{animation:m5 1.88s linear 1}
-@keyframes m5{0%,76.03%{stroke-dasharray:1;stroke-dashoffset:1}78.69%,100%{stroke-dasharray:1;stroke-dashoffset:0}}
-.m6{animation:m6 1.88s ease-out 1}
-@keyframes m6{0%,78.69%{opacity:0}100%{opacity:1}}
+.m0{animation:m0 8.88s linear infinite}
+@keyframes m0{0%{stroke-dasharray:1;stroke-dashoffset:1}11.46%,100%{stroke-dasharray:1;stroke-dashoffset:0}}
+.m1{animation:m1 8.88s linear infinite}
+@keyframes m1{0%,11.46%{stroke-dasharray:1;stroke-dashoffset:1}14.24%,100%{stroke-dasharray:1;stroke-dashoffset:0}}
+.m2{animation:m2 8.88s linear infinite}
+@keyframes m2{0%,14.24%{stroke-dasharray:1;stroke-dashoffset:1}14.95%,100%{stroke-dasharray:1;stroke-dashoffset:0}}
+.m3{animation:m3 8.88s linear infinite}
+@keyframes m3{0%,14.95%{stroke-dasharray:1;stroke-dashoffset:1}15.52%,100%{stroke-dasharray:1;stroke-dashoffset:0}}
+.m4{animation:m4 8.88s linear infinite}
+@keyframes m4{0%,15.52%{stroke-dasharray:1;stroke-dashoffset:1}16.08%,100%{stroke-dasharray:1;stroke-dashoffset:0}}
+.m5{animation:m5 8.88s linear infinite}
+@keyframes m5{0%,16.08%{stroke-dasharray:1;stroke-dashoffset:1}16.64%,100%{stroke-dasharray:1;stroke-dashoffset:0}}
+.m6{animation:m6 8.88s ease-out infinite}
+@keyframes m6{0%,16.64%{opacity:0}21.15%,100%{opacity:1}}
 @media (prefers-reduced-motion:reduce){.m0,.m1,.m2,.m3,.m4,.m5,.m6{animation:none}}
 </style>
 <rect class="bg" x="0.5" y="0.5" width="494" height="265" rx="6"/>

@@ -44,19 +44,42 @@ func ghTitled(s *spec, def string) {
 	}
 }
 
+// langBarGrow is how long the share bar takes to reach its full width, in
+// seconds.
+const langBarGrow = 0.9
+
 func drawGithubStats(b *strings.Builder, c *Card, s *spec) {
 	ghTitled(s, "GitHub Statistics")
 	inner := s.width - 2*ghPad
+	tl := newTimeline(s.motion)
+
+	// The count opens the card and the bar grows once the numbers have landed.
+	// The counters are placed first because a beat is named as it is added, so
+	// this is also what keeps the counter classes at the front of the
+	// stylesheet, where the layout they are shared with has them. A card with
+	// no numbers has nothing to wait for and starts the bar at once rather
+	// than after a second and a half of a card standing still, and a card
+	// asked for neither places no beat at all.
+	grid := githubGrid
+	start := 0.0
+	if len(s.nums) > 0 {
+		grid.count = counterBeats(tl)
+		start = counterDuration
+	}
+	var bar string
+	if s.has(fieldLanguages) {
+		bar = tl.add(effectGrowX, start, langBarGrow, "ease-out")
+	}
 	var body strings.Builder
 
 	y := ghBand + 14
 	if len(s.nums) > 0 {
-		y = statGrid(&body, s.nums, ghPad, ghBand+32, inner, 4, githubGrid)
+		y = statGrid(&body, s.nums, ghPad, ghBand+32, inner, 4, grid)
 	}
 	for _, f := range s.fields {
 		switch f {
 		case fieldLanguages:
-			y = githubLanguages(&body, s, y)
+			y = githubLanguages(&body, s, y, bar)
 		case fieldTopRepos:
 			if len(s.repos) > 0 {
 				y = githubRepos(&body, s, y)
@@ -72,21 +95,22 @@ func drawGithubStats(b *strings.Builder, c *Card, s *spec) {
 	}
 	height := math.Ceil(y + 22)
 
-	openDoc(b, &githubFamily, s, height, describe(c, s), "")
+	openDoc(b, &githubFamily, s, height, describe(c, s), counterCSS(grid.count)+tl.css())
 	githubFrame(b, s.width, height, ghBand)
 	githubHeader(b, s, c.Login, ghBand, ghPad)
 	b.WriteString(body.String())
 }
 
 // githubLanguages is the "Most Used Languages" section: title, subtitle, the
-// full-width bar and a two column legend.
-func githubLanguages(b *strings.Builder, s *spec, y float64) float64 {
+// full-width bar and a two column legend. grow is the beat that grows the bar,
+// empty on a card that does not move.
+func githubLanguages(b *strings.Builder, s *spec, y float64, grow string) float64 {
 	inner := s.width - 2*ghPad
 	titleY := y + 36
 	text(b, ghPad, titleY, "h fg", "start", "Most Used Languages")
 	text(b, ghPad, titleY+17, "d", "start", "Share of bytes across public repositories")
 	barY := titleY + 34
-	langBar(b, s.langs, ghPad, barY, inner, 14)
+	langBar(b, s.langs, ghPad, barY, inner, 14, grow)
 	if len(s.langs) == 0 {
 		return barY + 14
 	}

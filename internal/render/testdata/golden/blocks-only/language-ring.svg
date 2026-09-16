@@ -31,6 +31,15 @@ text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans',Helveti
 .area{fill-opacity:0.12;stroke:none}
 .axis{stroke-width:1}
 .edge{fill:none;stroke-width:1}
+.m0{animation:m0 1.8s linear 1}
+@keyframes m0{0%{stroke-dasharray:1;stroke-dashoffset:1}35.78%,100%{stroke-dasharray:1;stroke-dashoffset:0}}
+.m1{animation:m1 1.8s linear 1}
+@keyframes m1{0%,35.78%{stroke-dasharray:1;stroke-dashoffset:1}57.49%,100%{stroke-dasharray:1;stroke-dashoffset:0}}
+.m2{animation:m2 1.8s linear 1}
+@keyframes m2{0%,57.49%{stroke-dasharray:1;stroke-dashoffset:1}77.78%,100%{stroke-dasharray:1;stroke-dashoffset:0}}
+.m3{animation:m3 1.8s ease-out 1}
+@keyframes m3{0%,77.78%{opacity:0}100%{opacity:1}}
+@media (prefers-reduced-motion:reduce){.m0,.m1,.m2,.m3{animation:none}}
 </style>
 <rect class="bg" x="0.5" y="0.5" width="494" height="215" rx="6"/>
 <path class="panel" d="M0.5,44 V6.5 A6,6 0 0 1 6.5,0.5 H488.5 A6,6 0 0 1 494.5,6.5 V44 Z"/>
@@ -39,18 +48,18 @@ text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans',Helveti
 <text class="t" x="22" y="28" text-anchor="start">Languages</text>
 <text class="d mono" x="473" y="28" text-anchor="end">@jmrplens</text>
 <circle class="edge" cx="84" cy="124" r="54" stroke-width="16"/>
-<circle cx="84" cy="124" r="54" fill="none" stroke="#00add8" stroke-width="16" stroke-dasharray="153.08 186.21" stroke-dashoffset="-0" transform="rotate(-90 84 124)"/>
-<circle cx="84" cy="124" r="54" fill="none" stroke="#3572a5" stroke-width="16" stroke-dasharray="91.72 247.57" stroke-dashoffset="-156.08" transform="rotate(-90 84 124)"/>
-<circle cx="84" cy="124" r="54" fill="none" stroke="#f34b7d" stroke-width="16" stroke-dasharray="85.49 253.8" stroke-dashoffset="-250.8" transform="rotate(-90 84 124)"/>
+<path class="m0" pathLength="1" d="M84,70 A54,54 0 0 1 100.3,175.48" fill="none" stroke="#00add8" stroke-width="16"/>
+<path class="m1" pathLength="1" d="M97.42,176.31 A54,54 0 0 1 30.41,130.65" fill="none" stroke="#3572a5" stroke-width="16"/>
+<path class="m2" pathLength="1" d="M30.12,127.67 A54,54 0 0 1 81,70.08" fill="none" stroke="#f34b7d" stroke-width="16"/>
 <text class="big t" x="84" y="128" text-anchor="middle">46%</text>
 <text class="s" x="84" y="144" text-anchor="middle">Go</text>
-<circle cx="175" cy="72" r="5" fill="#00add8"/>
-<text class="n" x="186" y="76" text-anchor="start">Go</text>
-<text class="c" x="473" y="76" text-anchor="end">46%</text>
-<circle cx="175" cy="94" r="5" fill="#3572a5"/>
-<text class="n" x="186" y="98" text-anchor="start">Python</text>
-<text class="c" x="473" y="98" text-anchor="end">28%</text>
-<circle cx="175" cy="116" r="5" fill="#f34b7d"/>
-<text class="n" x="186" y="120" text-anchor="start">C++</text>
-<text class="c" x="473" y="120" text-anchor="end">26%</text>
+<circle class="m3" cx="175" cy="72" r="5" fill="#00add8"/>
+<text class="n m3" x="186" y="76" text-anchor="start">Go</text>
+<text class="c m3" x="473" y="76" text-anchor="end">46%</text>
+<circle class="m3" cx="175" cy="94" r="5" fill="#3572a5"/>
+<text class="n m3" x="186" y="98" text-anchor="start">Python</text>
+<text class="c m3" x="473" y="98" text-anchor="end">28%</text>
+<circle class="m3" cx="175" cy="116" r="5" fill="#f34b7d"/>
+<text class="n m3" x="186" y="120" text-anchor="start">C++</text>
+<text class="c m3" x="473" y="120" text-anchor="end">26%</text>
 </svg>

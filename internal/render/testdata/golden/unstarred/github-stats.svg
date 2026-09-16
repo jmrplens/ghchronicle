@@ -31,6 +31,44 @@ text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans',Helveti
 .area{fill-opacity:0.12;stroke:none}
 .axis{stroke-width:1}
 .edge{fill:none;stroke-width:1}
+.cuf{opacity:0}
+.m0{animation:m0 2.3s linear 1}
+@keyframes m0{0%,3.79%{opacity:1}3.8%,100%{opacity:0}}
+.m1{animation:m1 2.3s linear 1}
+@keyframes m1{0%,3.79%{opacity:0}3.8%,7.6%{opacity:1}7.61%,100%{opacity:0}}
+.m2{animation:m2 2.3s linear 1}
+@keyframes m2{0%,7.6%{opacity:0}7.61%,11.4%{opacity:1}11.41%,100%{opacity:0}}
+.m3{animation:m3 2.3s linear 1}
+@keyframes m3{0%,11.4%{opacity:0}11.41%,15.21%{opacity:1}15.22%,100%{opacity:0}}
+.m4{animation:m4 2.3s linear 1}
+@keyframes m4{0%,15.21%{opacity:0}15.22%,19.01%{opacity:1}19.02%,100%{opacity:0}}
+.m5{animation:m5 2.3s linear 1}
+@keyframes m5{0%,19.01%{opacity:0}19.02%,22.82%{opacity:1}22.83%,100%{opacity:0}}
+.m6{animation:m6 2.3s linear 1}
+@keyframes m6{0%,22.82%{opacity:0}22.83%,26.62%{opacity:1}26.63%,100%{opacity:0}}
+.m7{animation:m7 2.3s linear 1}
+@keyframes m7{0%,26.62%{opacity:0}26.63%,30.42%{opacity:1}30.43%,100%{opacity:0}}
+.m8{animation:m8 2.3s linear 1}
+@keyframes m8{0%,30.42%{opacity:0}30.43%,34.23%{opacity:1}34.24%,100%{opacity:0}}
+.m9{animation:m9 2.3s linear 1}
+@keyframes m9{0%,34.23%{opacity:0}34.24%,38.03%{opacity:1}38.04%,100%{opacity:0}}
+.m10{animation:m10 2.3s linear 1}
+@keyframes m10{0%,38.03%{opacity:0}38.04%,41.84%{opacity:1}41.85%,100%{opacity:0}}
+.m11{animation:m11 2.3s linear 1}
+@keyframes m11{0%,41.84%{opacity:0}41.85%,45.64%{opacity:1}45.65%,100%{opacity:0}}
+.m12{animation:m12 2.3s linear 1}
+@keyframes m12{0%,45.64%{opacity:0}45.65%,49.45%{opacity:1}49.46%,100%{opacity:0}}
+.m13{animation:m13 2.3s linear 1}
+@keyframes m13{0%,49.45%{opacity:0}49.46%,53.25%{opacity:1}53.26%,100%{opacity:0}}
+.m14{animation:m14 2.3s linear 1}
+@keyframes m14{0%,53.25%{opacity:0}53.26%,57.06%{opacity:1}57.07%,100%{opacity:0}}
+.m15{animation:m15 2.3s linear 1}
+@keyframes m15{0%,57.06%{opacity:0}57.07%,60.86%{opacity:1}60.87%,100%{opacity:0}}
+.m16{animation:m16 2.3s linear 1}
+@keyframes m16{0%,60.86%{opacity:0}60.87%,100%{opacity:1}}
+.m17{animation:m17 2.3s ease-out 1;transform-box:fill-box;transform-origin:left}
+@keyframes m17{0%,60.87%{transform:scaleX(0)}100%{transform:scaleX(1)}}
+@media (prefers-reduced-motion:reduce){.m0,.m1,.m2,.m3,.m4,.m5,.m6,.m7,.m8,.m9,.m10,.m11,.m12,.m13,.m14,.m15,.m16,.m17{animation:none}}
 </style>
 <rect class="bg" x="0.5" y="0.5" width="799" height="486" rx="6"/>
 <path class="panel" d="M0.5,50 V6.5 A6,6 0 0 1 6.5,0.5 H793.5 A6,6 0 0 1 799.5,6.5 V50 Z"/>
@@ -38,35 +76,229 @@ text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans',Helveti
 <rect class="edge" x="0.5" y="0.5" width="799" height="486" rx="6"/>
 <text class="t" x="22" y="31" text-anchor="start">GitHub Statistics</text>
 <text class="d mono" x="778" y="31" text-anchor="end">@jmrplens</text>
-<text class="v" x="22" y="82" text-anchor="start">283</text>
+<text class="v cuf m0" x="22" y="82" text-anchor="start">0</text>
+<text class="v cuf m1" x="22" y="82" text-anchor="start">50</text>
+<text class="v cuf m2" x="22" y="82" text-anchor="start">93</text>
+<text class="v cuf m3" x="22" y="82" text-anchor="start">131</text>
+<text class="v cuf m4" x="22" y="82" text-anchor="start">164</text>
+<text class="v cuf m5" x="22" y="82" text-anchor="start">191</text>
+<text class="v cuf m6" x="22" y="82" text-anchor="start">214</text>
+<text class="v cuf m7" x="22" y="82" text-anchor="start">233</text>
+<text class="v cuf m8" x="22" y="82" text-anchor="start">248</text>
+<text class="v cuf m9" x="22" y="82" text-anchor="start">259</text>
+<text class="v cuf m10" x="22" y="82" text-anchor="start">268</text>
+<text class="v cuf m11" x="22" y="82" text-anchor="start">274</text>
+<text class="v cuf m12" x="22" y="82" text-anchor="start">279</text>
+<text class="v cuf m13" x="22" y="82" text-anchor="start">281</text>
+<text class="v cuf m14" x="22" y="82" text-anchor="start">282</text>
+<text class="v cuf m15" x="22" y="82" text-anchor="start">283</text>
+<text class="v cuz m16" x="22" y="82" text-anchor="start">283</text>
 <text class="l" x="22" y="100" text-anchor="start">Stars</text>
-<text class="v" x="211" y="82" text-anchor="start">70</text>
+<text class="v cuf m0" x="211" y="82" text-anchor="start">0</text>
+<text class="v cuf m1" x="211" y="82" text-anchor="start">12</text>
+<text class="v cuf m2" x="211" y="82" text-anchor="start">23</text>
+<text class="v cuf m3" x="211" y="82" text-anchor="start">32</text>
+<text class="v cuf m4" x="211" y="82" text-anchor="start">40</text>
+<text class="v cuf m5" x="211" y="82" text-anchor="start">47</text>
+<text class="v cuf m6" x="211" y="82" text-anchor="start">53</text>
+<text class="v cuf m7" x="211" y="82" text-anchor="start">58</text>
+<text class="v cuf m8" x="211" y="82" text-anchor="start">61</text>
+<text class="v cuf m9" x="211" y="82" text-anchor="start">64</text>
+<text class="v cuf m10" x="211" y="82" text-anchor="start">66</text>
+<text class="v cuf m11" x="211" y="82" text-anchor="start">68</text>
+<text class="v cuf m12" x="211" y="82" text-anchor="start">69</text>
+<text class="v cuf m13" x="211" y="82" text-anchor="start">70</text>
+<text class="v cuf m14" x="211" y="82" text-anchor="start">70</text>
+<text class="v cuf m15" x="211" y="82" text-anchor="start">70</text>
+<text class="v cuz m16" x="211" y="82" text-anchor="start">70</text>
 <text class="l" x="211" y="100" text-anchor="start">Forks</text>
-<text class="v" x="400" y="82" text-anchor="start">41</text>
+<text class="v cuf m0" x="400" y="82" text-anchor="start">0</text>
+<text class="v cuf m1" x="400" y="82" text-anchor="start">7</text>
+<text class="v cuf m2" x="400" y="82" text-anchor="start">14</text>
+<text class="v cuf m3" x="400" y="82" text-anchor="start">19</text>
+<text class="v cuf m4" x="400" y="82" text-anchor="start">24</text>
+<text class="v cuf m5" x="400" y="82" text-anchor="start">28</text>
+<text class="v cuf m6" x="400" y="82" text-anchor="start">31</text>
+<text class="v cuf m7" x="400" y="82" text-anchor="start">34</text>
+<text class="v cuf m8" x="400" y="82" text-anchor="start">36</text>
+<text class="v cuf m9" x="400" y="82" text-anchor="start">38</text>
+<text class="v cuf m10" x="400" y="82" text-anchor="start">39</text>
+<text class="v cuf m11" x="400" y="82" text-anchor="start">40</text>
+<text class="v cuf m12" x="400" y="82" text-anchor="start">40</text>
+<text class="v cuf m13" x="400" y="82" text-anchor="start">41</text>
+<text class="v cuf m14" x="400" y="82" text-anchor="start">41</text>
+<text class="v cuf m15" x="400" y="82" text-anchor="start">41</text>
+<text class="v cuz m16" x="400" y="82" text-anchor="start">41</text>
 <text class="l" x="400" y="100" text-anchor="start">Followers</text>
-<text class="v" x="589" y="82" text-anchor="start">42</text>
+<text class="v cuf m0" x="589" y="82" text-anchor="start">0</text>
+<text class="v cuf m1" x="589" y="82" text-anchor="start">7</text>
+<text class="v cuf m2" x="589" y="82" text-anchor="start">14</text>
+<text class="v cuf m3" x="589" y="82" text-anchor="start">19</text>
+<text class="v cuf m4" x="589" y="82" text-anchor="start">24</text>
+<text class="v cuf m5" x="589" y="82" text-anchor="start">28</text>
+<text class="v cuf m6" x="589" y="82" text-anchor="start">32</text>
+<text class="v cuf m7" x="589" y="82" text-anchor="start">35</text>
+<text class="v cuf m8" x="589" y="82" text-anchor="start">37</text>
+<text class="v cuf m9" x="589" y="82" text-anchor="start">38</text>
+<text class="v cuf m10" x="589" y="82" text-anchor="start">40</text>
+<text class="v cuf m11" x="589" y="82" text-anchor="start">41</text>
+<text class="v cuf m12" x="589" y="82" text-anchor="start">41</text>
+<text class="v cuf m13" x="589" y="82" text-anchor="start">42</text>
+<text class="v cuf m14" x="589" y="82" text-anchor="start">42</text>
+<text class="v cuf m15" x="589" y="82" text-anchor="start">42</text>
+<text class="v cuz m16" x="589" y="82" text-anchor="start">42</text>
 <text class="l" x="589" y="100" text-anchor="start">Repositories</text>
-<text class="v" x="22" y="128" text-anchor="start">6,210</text>
+<text class="v cuf m0" x="22" y="128" text-anchor="start">0</text>
+<text class="v cuf m1" x="22" y="128" text-anchor="start">1,093</text>
+<text class="v cuf m2" x="22" y="128" text-anchor="start">2,050</text>
+<text class="v cuf m3" x="22" y="128" text-anchor="start">2,879</text>
+<text class="v cuf m4" x="22" y="128" text-anchor="start">3,590</text>
+<text class="v cuf m5" x="22" y="128" text-anchor="start">4,192</text>
+<text class="v cuf m6" x="22" y="128" text-anchor="start">4,694</text>
+<text class="v cuf m7" x="22" y="128" text-anchor="start">5,105</text>
+<text class="v cuf m8" x="22" y="128" text-anchor="start">5,434</text>
+<text class="v cuf m9" x="22" y="128" text-anchor="start">5,690</text>
+<text class="v cuf m10" x="22" y="128" text-anchor="start">5,883</text>
+<text class="v cuf m11" x="22" y="128" text-anchor="start">6,020</text>
+<text class="v cuf m12" x="22" y="128" text-anchor="start">6,113</text>
+<text class="v cuf m13" x="22" y="128" text-anchor="start">6,169</text>
+<text class="v cuf m14" x="22" y="128" text-anchor="start">6,198</text>
+<text class="v cuf m15" x="22" y="128" text-anchor="start">6,208</text>
+<text class="v cuz m16" x="22" y="128" text-anchor="start">6,210</text>
 <text class="l" x="22" y="146" text-anchor="start">Contributions / yr</text>
-<text class="v" x="211" y="128" text-anchor="start">1,810</text>
+<text class="v cuf m0" x="211" y="128" text-anchor="start">0</text>
+<text class="v cuf m1" x="211" y="128" text-anchor="start">319</text>
+<text class="v cuf m2" x="211" y="128" text-anchor="start">597</text>
+<text class="v cuf m3" x="211" y="128" text-anchor="start">839</text>
+<text class="v cuf m4" x="211" y="128" text-anchor="start">1,046</text>
+<text class="v cuf m5" x="211" y="128" text-anchor="start">1,222</text>
+<text class="v cuf m6" x="211" y="128" text-anchor="start">1,368</text>
+<text class="v cuf m7" x="211" y="128" text-anchor="start">1,488</text>
+<text class="v cuf m8" x="211" y="128" text-anchor="start">1,584</text>
+<text class="v cuf m9" x="211" y="128" text-anchor="start">1,658</text>
+<text class="v cuf m10" x="211" y="128" text-anchor="start">1,715</text>
+<text class="v cuf m11" x="211" y="128" text-anchor="start">1,755</text>
+<text class="v cuf m12" x="211" y="128" text-anchor="start">1,782</text>
+<text class="v cuf m13" x="211" y="128" text-anchor="start">1,798</text>
+<text class="v cuf m14" x="211" y="128" text-anchor="start">1,806</text>
+<text class="v cuf m15" x="211" y="128" text-anchor="start">1,810</text>
+<text class="v cuz m16" x="211" y="128" text-anchor="start">1,810</text>
 <text class="l" x="211" y="146" text-anchor="start">Repo views / 14d</text>
-<text class="v" x="400" y="128" text-anchor="start">878</text>
+<text class="v cuf m0" x="400" y="128" text-anchor="start">0</text>
+<text class="v cuf m1" x="400" y="128" text-anchor="start">155</text>
+<text class="v cuf m2" x="400" y="128" text-anchor="start">290</text>
+<text class="v cuf m3" x="400" y="128" text-anchor="start">407</text>
+<text class="v cuf m4" x="400" y="128" text-anchor="start">508</text>
+<text class="v cuf m5" x="400" y="128" text-anchor="start">593</text>
+<text class="v cuf m6" x="400" y="128" text-anchor="start">664</text>
+<text class="v cuf m7" x="400" y="128" text-anchor="start">722</text>
+<text class="v cuf m8" x="400" y="128" text-anchor="start">768</text>
+<text class="v cuf m9" x="400" y="128" text-anchor="start">804</text>
+<text class="v cuf m10" x="400" y="128" text-anchor="start">832</text>
+<text class="v cuf m11" x="400" y="128" text-anchor="start">851</text>
+<text class="v cuf m12" x="400" y="128" text-anchor="start">864</text>
+<text class="v cuf m13" x="400" y="128" text-anchor="start">872</text>
+<text class="v cuf m14" x="400" y="128" text-anchor="start">876</text>
+<text class="v cuf m15" x="400" y="128" text-anchor="start">878</text>
+<text class="v cuz m16" x="400" y="128" text-anchor="start">878</text>
 <text class="l" x="400" y="146" text-anchor="start">Visitors / 14d</text>
-<text class="v" x="589" y="128" text-anchor="start">117,000</text>
+<text class="v cuf m0" x="589" y="128" text-anchor="start">0</text>
+<text class="v cuf m1" x="589" y="128" text-anchor="start">20,595</text>
+<text class="v cuf m2" x="589" y="128" text-anchor="start">38,619</text>
+<text class="v cuf m3" x="589" y="128" text-anchor="start">54,244</text>
+<text class="v cuf m4" x="589" y="128" text-anchor="start">67,641</text>
+<text class="v cuf m5" x="589" y="128" text-anchor="start">78,981</text>
+<text class="v cuf m6" x="589" y="128" text-anchor="start">88,436</text>
+<text class="v cuf m7" x="589" y="128" text-anchor="start">96,177</text>
+<text class="v cuf m8" x="589" y="128" text-anchor="start">102,375</text>
+<text class="v cuf m9" x="589" y="128" text-anchor="start">107,202</text>
+<text class="v cuf m10" x="589" y="128" text-anchor="start">110,830</text>
+<text class="v cuf m11" x="589" y="128" text-anchor="start">113,429</text>
+<text class="v cuf m12" x="589" y="128" text-anchor="start">115,172</text>
+<text class="v cuf m13" x="589" y="128" text-anchor="start">116,229</text>
+<text class="v cuf m14" x="589" y="128" text-anchor="start">116,771</text>
+<text class="v cuf m15" x="589" y="128" text-anchor="start">116,971</text>
+<text class="v cuz m16" x="589" y="128" text-anchor="start">117,000</text>
 <text class="l" x="589" y="146" text-anchor="start">Clones / 14d</text>
-<text class="v" x="22" y="174" text-anchor="start">3,387</text>
+<text class="v cuf m0" x="22" y="174" text-anchor="start">0</text>
+<text class="v cuf m1" x="22" y="174" text-anchor="start">596</text>
+<text class="v cuf m2" x="22" y="174" text-anchor="start">1,118</text>
+<text class="v cuf m3" x="22" y="174" text-anchor="start">1,570</text>
+<text class="v cuf m4" x="22" y="174" text-anchor="start">1,958</text>
+<text class="v cuf m5" x="22" y="174" text-anchor="start">2,286</text>
+<text class="v cuf m6" x="22" y="174" text-anchor="start">2,560</text>
+<text class="v cuf m7" x="22" y="174" text-anchor="start">2,784</text>
+<text class="v cuf m8" x="22" y="174" text-anchor="start">2,964</text>
+<text class="v cuf m9" x="22" y="174" text-anchor="start">3,103</text>
+<text class="v cuf m10" x="22" y="174" text-anchor="start">3,208</text>
+<text class="v cuf m11" x="22" y="174" text-anchor="start">3,284</text>
+<text class="v cuf m12" x="22" y="174" text-anchor="start">3,334</text>
+<text class="v cuf m13" x="22" y="174" text-anchor="start">3,365</text>
+<text class="v cuf m14" x="22" y="174" text-anchor="start">3,380</text>
+<text class="v cuf m15" x="22" y="174" text-anchor="start">3,386</text>
+<text class="v cuz m16" x="22" y="174" text-anchor="start">3,387</text>
 <text class="l" x="22" y="192" text-anchor="start">Commits / yr</text>
-<text class="v" x="211" y="174" text-anchor="start">1,179</text>
+<text class="v cuf m0" x="211" y="174" text-anchor="start">0</text>
+<text class="v cuf m1" x="211" y="174" text-anchor="start">208</text>
+<text class="v cuf m2" x="211" y="174" text-anchor="start">389</text>
+<text class="v cuf m3" x="211" y="174" text-anchor="start">547</text>
+<text class="v cuf m4" x="211" y="174" text-anchor="start">682</text>
+<text class="v cuf m5" x="211" y="174" text-anchor="start">796</text>
+<text class="v cuf m6" x="211" y="174" text-anchor="start">891</text>
+<text class="v cuf m7" x="211" y="174" text-anchor="start">969</text>
+<text class="v cuf m8" x="211" y="174" text-anchor="start">1,032</text>
+<text class="v cuf m9" x="211" y="174" text-anchor="start">1,080</text>
+<text class="v cuf m10" x="211" y="174" text-anchor="start">1,117</text>
+<text class="v cuf m11" x="211" y="174" text-anchor="start">1,143</text>
+<text class="v cuf m12" x="211" y="174" text-anchor="start">1,161</text>
+<text class="v cuf m13" x="211" y="174" text-anchor="start">1,171</text>
+<text class="v cuf m14" x="211" y="174" text-anchor="start">1,177</text>
+<text class="v cuf m15" x="211" y="174" text-anchor="start">1,179</text>
+<text class="v cuz m16" x="211" y="174" text-anchor="start">1,179</text>
 <text class="l" x="211" y="192" text-anchor="start">Pull requests / yr</text>
-<text class="v" x="400" y="174" text-anchor="start">389</text>
+<text class="v cuf m0" x="400" y="174" text-anchor="start">0</text>
+<text class="v cuf m1" x="400" y="174" text-anchor="start">68</text>
+<text class="v cuf m2" x="400" y="174" text-anchor="start">128</text>
+<text class="v cuf m3" x="400" y="174" text-anchor="start">180</text>
+<text class="v cuf m4" x="400" y="174" text-anchor="start">225</text>
+<text class="v cuf m5" x="400" y="174" text-anchor="start">263</text>
+<text class="v cuf m6" x="400" y="174" text-anchor="start">294</text>
+<text class="v cuf m7" x="400" y="174" text-anchor="start">320</text>
+<text class="v cuf m8" x="400" y="174" text-anchor="start">340</text>
+<text class="v cuf m9" x="400" y="174" text-anchor="start">356</text>
+<text class="v cuf m10" x="400" y="174" text-anchor="start">368</text>
+<text class="v cuf m11" x="400" y="174" text-anchor="start">377</text>
+<text class="v cuf m12" x="400" y="174" text-anchor="start">383</text>
+<text class="v cuf m13" x="400" y="174" text-anchor="start">386</text>
+<text class="v cuf m14" x="400" y="174" text-anchor="start">388</text>
+<text class="v cuf m15" x="400" y="174" text-anchor="start">389</text>
+<text class="v cuz m16" x="400" y="174" text-anchor="start">389</text>
 <text class="l" x="400" y="192" text-anchor="start">Reviews / yr</text>
-<text class="v" x="589" y="174" text-anchor="start">64</text>
+<text class="v cuf m0" x="589" y="174" text-anchor="start">0</text>
+<text class="v cuf m1" x="589" y="174" text-anchor="start">11</text>
+<text class="v cuf m2" x="589" y="174" text-anchor="start">21</text>
+<text class="v cuf m3" x="589" y="174" text-anchor="start">30</text>
+<text class="v cuf m4" x="589" y="174" text-anchor="start">37</text>
+<text class="v cuf m5" x="589" y="174" text-anchor="start">43</text>
+<text class="v cuf m6" x="589" y="174" text-anchor="start">48</text>
+<text class="v cuf m7" x="589" y="174" text-anchor="start">53</text>
+<text class="v cuf m8" x="589" y="174" text-anchor="start">56</text>
+<text class="v cuf m9" x="589" y="174" text-anchor="start">59</text>
+<text class="v cuf m10" x="589" y="174" text-anchor="start">61</text>
+<text class="v cuf m11" x="589" y="174" text-anchor="start">62</text>
+<text class="v cuf m12" x="589" y="174" text-anchor="start">63</text>
+<text class="v cuf m13" x="589" y="174" text-anchor="start">64</text>
+<text class="v cuf m14" x="589" y="174" text-anchor="start">64</text>
+<text class="v cuf m15" x="589" y="174" text-anchor="start">64</text>
+<text class="v cuz m16" x="589" y="174" text-anchor="start">64</text>
 <text class="l" x="589" y="192" text-anchor="start">Issues / yr</text>
 <text class="h fg" x="22" y="228" text-anchor="start">Most Used Languages</text>
 <text class="d" x="22" y="245" text-anchor="start">Share of bytes across public repositories</text>
+<g class="m17">
 <rect x="22" y="262" width="345.78" height="14" rx="3" fill="#00add8"/>
 <rect x="369.78" y="262" width="209.05" height="14" rx="3" fill="#3572a5"/>
 <rect x="580.83" y="262" width="195.17" height="14" rx="3" fill="#f34b7d"/>
+</g>
 <circle cx="28" cy="298" r="6" fill="#00add8"/>
 <text class="n" x="42" y="302" text-anchor="start">Go</text>
 <text class="c" x="380" y="302" text-anchor="end">46%</text>

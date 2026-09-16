@@ -44,6 +44,12 @@ const (
 	effectReveal
 	// effectFlash shows an element only while its beat lasts. Base: hidden.
 	effectFlash
+	// effectGrowX scales an element up from nothing along its own x axis,
+	// with its left edge fixed. Its base is the element untransformed, which
+	// is what the last keyframe leaves it on; the scaling exists only inside
+	// the keyframes. The class carries the two properties that give the
+	// transform a box and an edge to work from, see anchorCSS.
+	effectGrowX
 )
 
 // beat is one effect placed on the card's clock, in seconds.
@@ -114,7 +120,7 @@ func (t *timeline) css() string {
 	for i, bt := range t.beats {
 		name := "m" + strconv.Itoa(i)
 		names[i] = "." + name
-		fmt.Fprintf(&b, ".%s{animation:%s %ss %s %s}\n", name, name, num(cycle), bt.ease, count)
+		fmt.Fprintf(&b, ".%s{animation:%s %ss %s %s%s}\n", name, name, num(cycle), bt.ease, count, anchorCSS(bt.effect))
 		fmt.Fprintf(&b, "@keyframes %s{%s}\n", name, keyframes(bt, cycle))
 	}
 	fmt.Fprintf(&b, "@media (prefers-reduced-motion:reduce){%s{animation:none}}\n", strings.Join(names, ","))
@@ -143,9 +149,26 @@ func keyframes(bt beat, cycle float64) string {
 			s = stops(0, from-0.01) + hidden
 		}
 		return s + stops(from, to-0.01) + shown + stops(to, 100) + hidden
+	case effectGrowX:
+		return stops(0, from) + "{transform:scaleX(0)}" + stops(to, 100) + "{transform:scaleX(1)}"
 	default: // effectFade
 		return stops(0, from) + hidden + stops(to, 100) + shown
 	}
+}
+
+// anchorCSS is what a class needs beyond its animation before its effect has
+// anything to work from. Only effectGrowX has one: a transform on an SVG
+// element is measured against the user space origin unless transform-box says
+// otherwise, so without these two a bar would grow from the left edge of the
+// document rather than from its own. They are static declarations and not
+// keyframes on purpose: they say where a transform applies, not that there is
+// one, so they leave an element with no transform exactly where it was and
+// cost nothing under prefers-reduced-motion.
+func anchorCSS(e effect) string {
+	if e == effectGrowX {
+		return ";transform-box:fill-box;transform-origin:left"
+	}
+	return ""
 }
 
 // stops is the selector for a stretch of keyframes: "18.6%,100%", or a single
@@ -167,4 +190,15 @@ func classes(parts ...string) string {
 		}
 	}
 	return strings.Join(kept, " ")
+}
+
+// classAttr is a class attribute holding the non-empty parts, or nothing at
+// all when there are none, so an element a card does not move carries no empty
+// attribute it had no reason to grow.
+func classAttr(parts ...string) string {
+	c := classes(parts...)
+	if c == "" {
+		return ""
+	}
+	return ` class="` + c + `"`
 }

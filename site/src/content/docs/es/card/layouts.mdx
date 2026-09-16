@@ -1,6 +1,6 @@
 ---
 title: Diseños
-description: Diez diseños en dos familias visuales, tres de ellos animados, con lo que dibuja cada uno por omisión.
+description: Diez diseños en dos familias visuales, con lo que dibuja cada uno por omisión y cuáles se animan.
 ---
 
 import { Aside } from "@astrojs/starlight/components";
@@ -18,14 +18,14 @@ abajo son del tema oscuro; todos los diseños se dibujan también en claro, y
 | Diseño              | Familia   | Animado | Campos por omisión                                                                   |
 | ------------------- | --------- | ------- | ------------------------------------------------------------------------------------ |
 | `summary`           | chronicle | no      | stars, forks, followers, repos, contributions, views, visitors, sparkline, top_repos |
-| `github-stats`      | github    | no      | repos, stars, forks, followers, commits, pull_requests, views, clones, languages     |
+| `github-stats`      | github    | sí      | repos, stars, forks, followers, commits, pull_requests, views, clones, languages     |
 | `github-compact`    | github    | no      | stars, forks, followers, repos, commits                                              |
 | `badge-row`         | chronicle | no      | stars, forks, followers, repos, contributions                                        |
 | `wide-banner`       | chronicle | sí      | stars, forks, followers, contributions, sparkline                                    |
 | `sparkline-hero`    | chronicle | sí      | contributions, stars, followers, sparkline                                           |
-| `language-ring`     | github    | no      | languages, stars, repos                                                              |
+| `language-ring`     | github    | sí      | languages, stars, repos                                                              |
 | `repo-list`         | github    | no      | top_repos, stars, forks, repos                                                       |
-| `activity-heatmap`  | github    | no      | sparkline, contributions, commits, pull_requests                                     |
+| `activity-heatmap`  | github    | sí      | sparkline, contributions, commits, pull_requests                                     |
 | `animated-counters` | chronicle | sí      | stars, forks, followers, repos, contributions, views, sparkline                      |
 
 ## Las dos familias
@@ -45,9 +45,11 @@ repositorios con más estrellas.
 
 La caja propia de GitHub: una banda de cabecera, filas de cuatro números
 monoespaciados y una barra de reparto de lenguajes con su leyenda. El diseño más
-ancho, con 800 píxeles, y el que parece más nativo en un README de perfil.
+ancho, con 800 píxeles, y el que parece más nativo en un README de perfil. Los
+números cuentan hacia arriba, y la barra crece desde su borde izquierdo en
+cuanto se asientan.
 
-<Card name="github-stats" alt="El diseño github-stats: una banda de cabecera, filas de cuatro números monoespaciados y una barra horizontal de reparto de lenguajes con su leyenda" />
+<Card name="github-stats" alt="El diseño github-stats reproducido una vez: una banda de cabecera sobre filas de cuatro números monoespaciados que cuentan, y una barra horizontal de reparto de lenguajes que crece desde la izquierda junto a su leyenda, y la página también puede reproducirlo en bucle" animated loop />
 
 ## github-compact
 
@@ -79,9 +81,10 @@ superpuestos. La línea se dibuja sola al cargar.
 ## language-ring
 
 Un donut de reparto de lenguajes con la leyenda al lado y una fila de números
-destacados.
+destacados. Cada porción se dibuja alrededor del anillo detrás de la anterior, y
+la leyenda aparece cuando el donut está completo.
 
-<Card name="language-ring" alt="El diseño language-ring: un gráfico de donut de reparto de lenguajes con una leyenda al lado y una fila de números destacados" />
+<Card name="language-ring" alt="El diseño language-ring reproducido una vez: un gráfico de donut cuyas porciones de lenguaje se dibujan una detrás de otra, con una leyenda que aparece al lado y una fila de números destacados, y la página también puede reproducirlo en bucle" animated loop />
 
 ## repo-list
 
@@ -93,9 +96,11 @@ estrellas y una barra por fila, con los totales debajo.
 ## activity-heatmap
 
 Las últimas doce semanas del calendario de contribuciones como los cuadrados
-verdes de GitHub, con hasta tres números al lado.
+verdes de GitHub, con hasta tres números al lado. Las semanas aparecen desde la
+izquierda, una cada veinte milisegundos, así que el calendario se llena como una
+ola.
 
-<Card name="activity-heatmap" alt="El diseño activity-heatmap: doce semanas de cuadrados de contribución en la escala verde de GitHub con tres números al lado" />
+<Card name="activity-heatmap" alt="El diseño activity-heatmap reproducido una vez: doce semanas de cuadrados de contribución en la escala verde de GitHub que aparecen desde la izquierda, con tres números al lado, y la página también puede reproducirlo en bucle" animated loop />
 
 ## animated-counters
 

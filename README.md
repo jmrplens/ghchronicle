@@ -41,7 +41,7 @@ account's own figures](site/src/assets/dashboards/overview.png)
 ## What it renders
 
 A profile card, from the same sweep, in ten layouts and two families. The
-three animated ones animate where the reader's browser lets them. Each card
+animated ones animate where the reader's browser lets them. Each card
 here is two files from one sweep, one per palette, and GitHub shows the one
 that matches the theme you read it in:
 
@@ -223,7 +223,7 @@ ghchronicle -config config.yaml -card profile.svg -card-only
 One sweep, one self-contained SVG: no webfont, no external stylesheet, no
 script, and byte-identical output for the same input so a scheduled job that
 commits it does not produce a diff on every run. Ten layouts in two visual
-families, one of them GitHub's own look, three of them animated, once or in a
+families, one of them GitHub's own look, the animated ones playing once or in a
 loop, all with a choosable set of fields. The repository ships as a composite
 Action:
 

@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -22,7 +23,10 @@ func TestLayoutsRegistryHoldsTheTenConcepts(t *testing.T) {
 	if len(got) != len(want) {
 		t.Fatalf("Layouts() has %d entries, want %d", len(got), len(want))
 	}
-	animated := map[string]bool{"wide-banner": true, "sparkline-hero": true, "animated-counters": true}
+	animated := map[string]bool{
+		"github-stats": true, "wide-banner": true, "sparkline-hero": true,
+		"language-ring": true, "activity-heatmap": true, "animated-counters": true,
+	}
 	for i, l := range got {
 		if l.Name != want[i] {
 			t.Errorf("layout %d = %q, want %q", i, l.Name, want[i])
@@ -184,10 +188,42 @@ func checkLayoutMoves(t *testing.T, l Layout, motion, doc string) {
 	for _, name := range animationsWithoutKeyframes(doc) {
 		t.Errorf("%s under %s: animation %q has no @keyframes", l.Name, motion, name)
 	}
-	if strings.Contains(doc, "<polyline") {
+	// Any stroke that draws itself, the sparkline's polyline and the ring's
+	// arcs alike: the dash belongs to the keyframes and the last of them
+	// leaves the stroke whole.
+	if strings.Contains(doc, "stroke-dasharray:1") {
 		checkLineDrawSettles(t, l.Name, doc)
 	}
+	checkReducedMotionNamesEveryClass(t, l.Name, motion, doc)
 }
+
+// checkReducedMotionNamesEveryClass is the promise the engine makes for every
+// card: a class that animates is a class the prefers-reduced-motion block
+// switches off. A layout cannot forget one, because it does not write the
+// block; this is what proves the engine has not either.
+func checkReducedMotionNamesEveryClass(t *testing.T, layout, motion, doc string) {
+	t.Helper()
+	m := reducedMotionBlock.FindStringSubmatch(doc)
+	if m == nil {
+		t.Errorf("%s under %s: no prefers-reduced-motion block", layout, motion)
+		return
+	}
+	named := map[string]bool{}
+	for cls := range strings.SplitSeq(m[1], ",") {
+		named[strings.TrimPrefix(cls, ".")] = true
+	}
+	for _, am := range animatingClass.FindAllStringSubmatch(doc, -1) {
+		if !named[am[1]] {
+			t.Errorf("%s under %s: class %q animates but is not named in the reduced-motion block",
+				layout, motion, am[1])
+		}
+	}
+}
+
+var (
+	reducedMotionBlock = regexp.MustCompile(`@media \(prefers-reduced-motion:reduce\)\{([^}]+)\{animation:none\}\}`)
+	animatingClass     = regexp.MustCompile(`\.(m\d+)\{animation:`)
+)
 
 // animationsWithoutKeyframes lists every animation the document names that
 // no @keyframes in it defines.
@@ -274,8 +310,15 @@ func TestAnimatedCountersEndOnTheRealValues(t *testing.T) {
 	if strings.Contains(still, "cuf") {
 		t.Error("under off the intermediate frames are dead weight and must not be drawn")
 	}
-	if got := len(regexp.MustCompile(`class="big cuz"[^>]*>`).FindAllString(still, -1)); got != len(want) {
-		t.Errorf("under off drew %d final frames, want %d", got, len(want))
+	// And neither is the marker on the number they would have sat above: cuz
+	// says "this is the value a count lands on", and under off no count runs.
+	// It used to be written whatever the motion, which is a class off promised
+	// not to write.
+	if strings.Contains(still, "cuz") {
+		t.Error("under off there is no count to mark the end of")
+	}
+	if got := len(regexp.MustCompile(`class="big"[^>]*>`).FindAllString(still, -1)); got != len(want) {
+		t.Errorf("under off drew %d numbers, want %d", got, len(want))
 	}
 	if counterValue(1000, 0, 16) != 0 || counterValue(1000, 16, 16) != 1000 {
 		t.Error("a counter starts at zero and lands exactly on its value")
@@ -292,20 +335,146 @@ func TestAnimatedCountersHonourReducedMotion(t *testing.T) {
 	c := sample()
 	for _, motion := range []string{MotionOnce, MotionLoop} {
 		doc := mustRender(t, c, &Options{Theme: "dark", Layout: "animated-counters", Motion: motion})
-		m := regexp.MustCompile(`@media \(prefers-reduced-motion:reduce\)\{([^}]+)\{animation:none\}\}`).FindStringSubmatch(doc)
-		if m == nil {
-			t.Fatalf("under %s: no prefers-reduced-motion block", motion)
-		}
-		named := map[string]bool{}
-		for cls := range strings.SplitSeq(m[1], ",") {
-			named[strings.TrimPrefix(cls, ".")] = true
-		}
-		for _, am := range regexp.MustCompile(`\.(m\d+)\{animation:`).FindAllStringSubmatch(doc, -1) {
-			if !named[am[1]] {
-				t.Errorf("under %s: class %q animates but is not named in the reduced-motion block", motion, am[1])
-			}
+		checkReducedMotionNamesEveryClass(t, "animated-counters", motion, doc)
+	}
+}
+
+// TestTheHeatmapWaveIsOneClassPerWeek pins the shape of the wave: twelve
+// beats and not eighty-four, the seven squares of a week sharing one, and the
+// key beside the grid left out of it, because it is a legend for the ramp and
+// not a week of the calendar.
+func TestTheHeatmapWaveIsOneClassPerWeek(t *testing.T) {
+	doc := mustRender(t, sample(), &Options{Theme: "dark", Layout: "activity-heatmap"})
+	if got := strings.Count(doc, "@keyframes m"); got != heatWeeks {
+		t.Errorf("the grid animates %d classes, want one per week, %d", got, heatWeeks)
+	}
+	for w := range heatWeeks {
+		cls := "m" + strconv.Itoa(w)
+		if got := len(regexp.MustCompile(`<rect class="h\d `+cls+`"`).FindAllString(doc, -1)); got != 7 {
+			t.Errorf("week %d is on %d squares, want the seven days of a week", w, got)
 		}
 	}
+	// The key is the five squares after the grid's eighty-four, and it stands
+	// still.
+	keys := regexp.MustCompile(`<rect class="h\d" `).FindAllString(doc, -1)
+	if len(keys) != 5 {
+		t.Errorf("%d squares carry a level and no week, want the five of the key", len(keys))
+	}
+	// Under off the squares are written exactly as they were before the wave
+	// existed: a level and nothing else.
+	still := mustRender(t, sample(), &Options{Theme: "dark", Layout: "activity-heatmap", Motion: MotionOff})
+	if n := len(regexp.MustCompile(`<rect class="h\d" `).FindAllString(still, -1)); n != heatWeeks*7+5 {
+		t.Errorf("under off %d squares carry a bare level, want %d", n, heatWeeks*7+5)
+	}
+}
+
+// TestTheRingDrawsSliceBySliceAndSettlesWhole is the ring's half of the rule
+// every animated card obeys: each slice is its own arc, so its base style is
+// the finished slice, the dash that draws it exists only in the keyframes, and
+// the slices take the clock in the order they are drawn with the legend last.
+func TestTheRingDrawsSliceBySliceAndSettlesWhole(t *testing.T) {
+	c := sample()
+	doc := mustRender(t, c, &Options{Theme: "dark", Layout: "language-ring"})
+	slices := regexp.MustCompile(`<path class="(m\d+)" pathLength="1"`).FindAllStringSubmatch(doc, -1)
+	langs := rankLanguages(c.Languages, maxLanguages)
+	if len(slices) != len(langs) {
+		t.Fatalf("%d slices draw themselves, want one per language, %d", len(slices), len(langs))
+	}
+	for i, m := range slices {
+		if want := "m" + strconv.Itoa(i); m[1] != want {
+			t.Errorf("slice %d plays %q, want %q: the slices take the clock in order", i, m[1], want)
+		}
+	}
+	// The legend follows the last slice, which is the last beat there is.
+	legend := "m" + strconv.Itoa(len(langs))
+	if !strings.Contains(doc, ` class="n `+legend+`"`) || !strings.Contains(doc, ` class="`+legend+`" cx=`) {
+		t.Errorf("the legend's names and dots must all play %s:\n%s", legend, doc)
+	}
+	if strings.Contains(doc, "stroke-dasharray=") {
+		t.Error("a slice's base style is the finished arc, with no dash in it")
+	}
+	// Under off a slice is an arc and nothing else: no class, and no
+	// pathLength placed for an animation that is not there.
+	still := mustRender(t, c, &Options{Theme: "dark", Layout: "language-ring", Motion: MotionOff})
+	if strings.Contains(still, "pathLength") {
+		t.Error("under off the ring carries no pathLength, placed for an animation that is not there")
+	}
+	// An arc is the only path here that starts with a move; the frame's band
+	// is the other one, and it carries a class.
+	if n := strings.Count(still, `<path d="M`); n != len(langs) {
+		t.Errorf("under off drew %d arcs, want %d, each with no class of its own", n, len(langs))
+	}
+}
+
+// TestTheShareBarGrowsAsOneAndSettlesAtItsFullWidth pins what the new effect
+// is for: the whole bar scales from its own left edge, not each segment from
+// its own, and a card that does not move is written without the group.
+func TestTheShareBarGrowsAsOneAndSettlesAtItsFullWidth(t *testing.T) {
+	doc := mustRender(t, sample(), &Options{Theme: "dark", Layout: "github-stats"})
+	grow := regexp.MustCompile(`<g class="(m\d+)">`).FindStringSubmatch(doc)
+	if grow == nil {
+		t.Fatalf("the share bar is not wrapped in a group that grows:\n%s", doc)
+	}
+	for _, want := range []string{
+		"." + grow[1] + "{animation:" + grow[1],
+		"transform-box:fill-box;transform-origin:left",
+		"@keyframes " + grow[1] + "{",
+		"100%{transform:scaleX(1)}",
+	} {
+		if !strings.Contains(doc, want) {
+			t.Errorf("the bar's growth lacks %q", want)
+		}
+	}
+	if strings.Contains(doc, `<rect class="m`) {
+		t.Error("the segments must not scale one by one: the gaps would grow with them")
+	}
+	still := mustRender(t, sample(), &Options{Theme: "dark", Layout: "github-stats", Motion: MotionOff})
+	if strings.Contains(still, "<g ") || strings.Contains(still, "</g>") {
+		t.Error("under off the bar needs no group to grow")
+	}
+	// The other layout that draws a share bar draws it as it always did.
+	summary := mustRender(t, sample(), &Options{Theme: "dark", Layout: "summary"})
+	if strings.Contains(summary, "<g ") {
+		t.Error("summary does not move, and its bar carries no group")
+	}
+}
+
+// TestGithubStatsCountsItsNumbersWithTheCountersOwnFrames is the reuse the
+// two counting layouts were meant to share: the same frame count, the same
+// eased values and the same two marker classes, from one implementation.
+func TestGithubStatsCountsItsNumbersWithTheCountersOwnFrames(t *testing.T) {
+	c := sample()
+	doc := mustRender(t, c, &Options{Theme: "dark", Layout: "github-stats"})
+	nums := metricsOf(c, mustLayout(t, "github-stats").Fields)
+	if got := strings.Count(doc, `class="v cuf m`); got != counterFrames*len(nums) {
+		t.Errorf("drew %d intermediate frames, want %d", got, counterFrames*len(nums))
+	}
+	// The github family writes its numbers in full, so the frames do too.
+	if !strings.Contains(doc, ".cuf{opacity:0}") {
+		t.Error("the intermediate frames must rest hidden")
+	}
+	if !strings.Contains(doc, `class="v cuz m`) || !strings.Contains(doc, ">"+grouped(nums[0].value)+"<") {
+		t.Error("the settled number is the real value, grouped as the github family writes it")
+	}
+	still := mustRender(t, c, &Options{Theme: "dark", Layout: "github-stats", Motion: MotionOff})
+	if strings.Contains(still, "cuf") || strings.Contains(still, "cuz") {
+		t.Error("under off there are no frames and nothing marks the end of a count")
+	}
+	if got := strings.Count(still, `class="v"`); got != len(nums) {
+		t.Errorf("under off drew %d numbers, want %d", got, len(nums))
+	}
+}
+
+// mustLayout is one registered layout, by name.
+func mustLayout(t *testing.T, name string) Layout {
+	t.Helper()
+	for _, l := range Layouts() {
+		if l.Name == name {
+			return l
+		}
+	}
+	t.Fatalf("no layout %q", name)
+	return Layout{}
 }
 
 func TestHeatLevelsEndTodayAndPadTheFront(t *testing.T) {
@@ -512,10 +681,14 @@ func TestLanguageRingLeavesNoGapForAnArcExactlyAtTheThreshold(t *testing.T) {
 	if arc != 6 {
 		t.Fatalf("test setup: arc = %v, want exactly 6", arc)
 	}
-	s := &spec{width: defaultWidth, langs: []langShare{{Name: "X", Color: "#111111", Share: share}}}
+	s := &spec{width: defaultWidth, motion: MotionOff, langs: []langShare{{Name: "X", Color: "#111111", Share: share}}}
 	var b strings.Builder
 	drawLanguageRing(&b, &Card{}, s)
-	want := fmt.Sprintf(`stroke-dasharray="%s %s"`, num(arc), num(circ-arc))
+	// No gap means the slice ends where its own arc ends, six units along the
+	// ring from twelve o'clock, rather than three units short of it.
+	const band, stroke = 44.0, 16.0
+	x1, y1 := ringPoint(ghPad+r+stroke/2, band+18+r+stroke/2, r, arc)
+	want := fmt.Sprintf(`1 %s,%s"`, num(x1), num(y1))
 	if !strings.Contains(b.String(), want) {
 		t.Errorf("an arc of exactly 6 must have no gap, want %q in:\n%s", want, b.String())
 	}
