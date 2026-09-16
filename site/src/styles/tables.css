@@ -247,14 +247,6 @@
 	grid-column: var(--table-default-value-column, auto);
 	grid-row: var(--table-default-value-row, auto);
 	align-self: var(--table-default-value-align, auto);
-	/* Every cell after the first inherits a 1em auto top margin from
-	 * Starlight's own markdown spacing (it never showed while cells simply
-	 * stacked, one block after another; row 1 of the grid is where two
-	 * items are asked to share a start edge, and only one of them carried
-	 * it). Zeroed here rather than investigated further upstream: it is
-	 * Starlight's rule to keep, and this cell is the only one asked to
-	 * align with a sibling rather than just follow it. */
-	margin-block-start: var(--table-stacked) 0;
 	min-width: var(--table-default-value-minw, auto);
 	max-width: var(--table-default-value-maxw, none);
 	text-align: var(--table-default-value-text-align, inherit);
@@ -415,12 +407,12 @@
  * a screen reader would lose the column this figure came from along with the
  * word.
  *
- * Inside the same 17rem guard the grid itself is written behind (see "Default
+ * Inside the same 18rem guard the grid itself is written behind (see "Default
  * columns" at the end of this file): the word is only redundant while the
  * value sits beside the label. Where the row is too narrow to hoist, the cell
  * is an ordinary stacked block again and has to print its own heading, so the
  * two have to switch on and off together. */
-@container (min-width: 17rem) {
+@container (min-width: 18rem) {
 	.sl-markdown-content
 		.table-scroll[data-form="default"]
 		> table
@@ -664,19 +656,28 @@
  * table would otherwise stack, and no other, through the same
  * `--table-stacked` indirection every value below is written with,
  * AND only while the row is wide enough in text units to hold both
- * halves of the line, which is the `@container (min-width: 17rem)`
+ * halves of the line, which is the `@container (min-width: 18rem)`
  * around them. Everything on that line is sized in rem, so what
- * matters is not the pixel width but the width in text: the tightest
- * pair of this corpus, `sinks.dedupe_horizon` against `720h`, needs
- * 12.3rem for the key and its padding, 3.75rem for the value and
- * 0.75rem of gap, so under about 17rem it cannot fit and the key
- * would break mid-word. At a 16 px root that is a container under
- * 272 px, which no phone gives this column; with the browser's text
- * size at 125 % it is the 360 px phone, and there the row simply
- * keeps the labelled block it had before, whole key and whole
- * sentence. Measured: at a 16 and an 18 px root no key wraps at
- * 360 px; at 20, 24 and 32 px the form switches itself off instead
- * of breaking a name.
+ * matters is not the pixel width but the width in text, and the sum
+ * is of BOXES, not of text. The tightest pair of this corpus is
+ * `sinks.dedupe_horizon` against `720h`: the key's code span is
+ * 178 px and its cell adds 28 px of padding, so 206 px; the value
+ * cell is 65 px; the gap is 12 px. That is 283 px, and the first
+ * break measures between a 286 px container (the key splits) and a
+ * 288 px one (it does not), so the threshold is about 17.9rem.
+ * 17rem, this guard's first value, was summed from the code span's
+ * TEXT width instead and was a rem too low: between 17 and 17.9rem
+ * the row still hoisted and still broke the key, which is a 390 or a
+ * 393 px phone at 125 % text, a 375 px phone at a 19 px root, and
+ * 360 px between an 18.2 and an 18.9 px root. 18rem is the smallest
+ * value that closes that band while a 320 px phone still hoists, its
+ * container being 288 px exactly. Measured at 18rem: 390/20, 393/20,
+ * 375/19, 400/21 and 360/18.5 all fall back to the labelled block,
+ * whole key and whole sentence; 360/16 and 320/16 hoist with every
+ * key and every value on one line. The gate runs at a 16 px root, so
+ * it measures the 320 px end of this and never the band; the guard
+ * is what holds the band, and the numbers above are what say where
+ * it is.
  *
  * WHAT. The row becomes a two-column grid for one line: the first
  * cell (its label above its key, unchanged, at `--table-key-size`)
@@ -735,18 +736,32 @@
  * WHAT 8rem IS, now that only values hoist. It is the widest value
  * the corpus puts in that corner: `api.github.com`, 96 px of text in
  * a 124 px cell at a 360 px viewport, against the 128 px the cap
- * allows. It is a ceiling on the VALUE, not a share of the row, and
- * it can only ever make that column narrower, so no value of it can
- * starve the key: with the sentence gone from the corner the
- * tightest key in the corpus, `sinks.dedupe_horizon` against `720h`,
- * has 50 px of room at 360 px where `sinks.dedupe_file` against its
- * hoisted sentence had 13. Lowering the cap is what would break
- * something now: at 6.5rem `api.github.com` no longer fits its line.
- * Both ends are measured by scripts/check-table-fit.mjs, which fails
- * when a key's `code` or a hoisted value takes more than one line
- * box at either phone width.
+ * allows. It is a ceiling on the VALUE and not a share of the row,
+ * which is why a SHORT value costs the key nothing. It does not
+ * follow, and it is not true, that no value of the cap can starve a
+ * key: the value track is `max-content` clamped by the cap, so the
+ * cap is exactly the floor under the key track, and raising it
+ * lowers that floor. Forcing the value to the width the cap licenses
+ * at a 360 px viewport: at 8rem the key cell is 184 px and
+ * `sinks.dedupe_horizon` takes two line boxes, at 7.75rem and at
+ * 7rem still two, and only at 6.5rem one. So the two ends of this
+ * corpus have no common cap. `api.github.com` needs at least about
+ * 7.75rem (at 6.5rem the build fails with 8 problems, and
+ * backticking the hostname is worse: as a code span it reaches the
+ * cap and splits inside itself); the widest key needs at most about
+ * 6.6rem to survive a value that uses the cap. 8rem sits above that
+ * window, and what keeps the pair from ever meeting is the corpus:
+ * no row of it puts a near-cap value beside the widest key. That is
+ * a fact about the content, not a property of this design, and the
+ * row that would break it is a key as long as `sinks.dedupe_horizon`
+ * whose default is as wide as `api.github.com`. Writing that row is
+ * what scripts/check-table-fit.mjs is for: it fails when a key's
+ * `code` or a hoisted value takes more than one line box at either
+ * phone width, and its message names both remedies, the cap and
+ * leaving that one default in its own labelled block. The second is
+ * the right one, because the first cannot be had.
  * ------------------------------------------------------------ */
-@container (min-width: 17rem) {
+@container (min-width: 18rem) {
 	.sl-markdown-content .table-scroll[data-form="default"] > table tr {
 		--table-default-row: var(--table-stacked) grid;
 		--table-default-columns: var(--table-stacked) minmax(0, 1fr) max-content;
@@ -766,6 +781,26 @@
 		--table-default-value-maxw: var(--table-stacked) 8rem;
 		--table-default-value-text-align: var(--table-stacked) right;
 		--table-default-label: var(--table-stacked) block;
+
+		/* Every cell after the first inherits a 1em auto top margin from
+		 * Starlight's own markdown spacing (it never showed while cells
+		 * simply stacked, one block after another; row 1 of the grid is
+		 * where two items are asked to share a start edge, and only one of
+		 * them carried it). Zeroed here rather than investigated further
+		 * upstream: it is Starlight's rule to keep, and this cell is the
+		 * only one asked to align with a sibling rather than just follow
+		 * it. Written here, inside the guard, and not on the base rule
+		 * with the other four: the four are custom properties, which fall
+		 * back to a harmless initial when the guard does not match, while
+		 * this one is the real property and its initial value is 0, not
+		 * Starlight's 1em. On the base rule it therefore zeroed the gap on
+		 * a row that had fallen back to the labelled block too, which sat
+		 * flush under its key while its unmarked siblings in the same
+		 * table kept 1em. Inside the guard the declaration simply does not
+		 * exist there, so the fallback really is the block it was before.
+		 * In the wide form the cell is a table-cell and margins do not
+		 * apply to it at all. */
+		margin-block-start: var(--table-stacked) 0;
 	}
 
 	.sl-markdown-content

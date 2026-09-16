@@ -227,12 +227,85 @@ export function indexProblems({ declared, tables }) {
 }
 
 /**
+ * The share of a declared column's rows that has to reach the reader beside
+ * its key. Below this the entry is not describing the table any more.
+ *
+ * Half, because half is the tightest floor this corpus allows: the smallest
+ * legitimate ratio in it is exactly one of two, `configuration/`'s dedupe
+ * table, where `sinks.dedupe_horizon`'s `720h` hoists and
+ * `sinks.dedupe_file`'s sentence keeps its own labelled block. A column most
+ * of whose rows print a labelled block is not a default column, it is an
+ * ordinary column with some defaults in it, and the declaration should go
+ * rather than render half a table one way and half the other.
+ */
+const HOIST_FLOOR = 0.5;
+
+/**
+ * Whether a cell's text is a VALUE rather than a sentence: one unbroken run of
+ * characters with no space in it.
+ *
+ * Deliberately a second implementation of `isValue()` in
+ * src/lib/rehype-tables.mjs rather than an import of it: what this gate has to
+ * notice is the plugin marking something OTHER than what the rule says, and a
+ * checker that asks the plugin what it marked can only ever agree with it.
+ *
+ * @param {string} text
+ * @returns {boolean}
+ */
+export function isValueText(text) {
+	const trimmed = text.trim();
+	return trimmed.length > 0 && !/\s/.test(trimmed);
+}
+
+/**
+ * How much of one declared column actually hoisted, counted in CELLS.
+ *
+ * `hasDefaultCell` only says that the column was not lost entirely, which is
+ * what a per-cell rule made too weak to gate on: thirteen of fourteen defaults
+ * can stop hoisting and the last one still answers it. This recounts the whole
+ * column from the rendered page: how many rows it has, how many of them hold a
+ * value by the rule above, and how many carry the mark.
+ *
+ * @param {{ headings?: string[], columnCells?: { text: string, marked: boolean }[][] }} table
+ * @param {string} defaultHeading the column heading the page declared
+ * @returns {{
+ *   rows: number,
+ *   values: number,
+ *   hoisted: number,
+ *   unmarked: string[],
+ *   sentences: string[],
+ * } | null} null when this table was not measured cell by cell
+ */
+export function hoistCensus(table, defaultHeading) {
+	const column = (table.headings ?? []).indexOf(defaultHeading);
+	const cells = column === -1 ? undefined : table.columnCells?.[column];
+	if (!cells) return null;
+	return {
+		rows: cells.length,
+		values: cells.filter((cell) => isValueText(cell.text)).length,
+		hoisted: cells.filter((cell) => cell.marked).length,
+		unmarked: cells
+			.filter((cell) => isValueText(cell.text) && !cell.marked)
+			.map((cell) => cell.text),
+		sentences: cells
+			.filter((cell) => cell.marked && !isValueText(cell.text))
+			.map((cell) => cell.text),
+	};
+}
+
+/**
  * What is wrong with one page's default-column tables at one width, read
  * against what its source declared rather than against what the markup says.
  *
- * Three things can be wrong: the cell was never marked, it was marked and did
- * not land beside the key, or it landed there and the line does not fit, which
- * is either half of that line taking a second line box.
+ * Five things can be wrong: the cell was never marked, it was marked and did
+ * not land beside the key, it landed there and the line does not fit (which is
+ * either half of that line taking a second line box), the column marked
+ * something other than what the rule says, or too little of the column reached
+ * the reader beside its key at all.
+ *
+ * The last two are counted in cells, not in declarations. A declared column
+ * that hoists one row of fourteen satisfies every per-table question that can
+ * be asked of it, which is how a column can quietly stop working.
  *
  * @param {{
  *   declared: { table: string, default: string }[],
@@ -240,6 +313,8 @@ export function indexProblems({ declared, tables }) {
  *     firstHeading: string,
  *     defaultForm: boolean,
  *     hasDefaultCell: boolean,
+ *     headings?: string[],
+ *     columnCells?: { text: string, marked: boolean }[][],
  *     keyWraps?: { text: string, lines: number }[],
  *     valueWraps?: { text: string, lines: number }[],
  *   }[],
@@ -290,9 +365,64 @@ export function defaultColumnProblems({ declared, tables }) {
 						"its own labelled block",
 				);
 			}
+			const census = hoistCensus(table, defaultHeading);
+			if (!census) continue;
+			if (census.unmarked.length > 0) {
+				problems.push(
+					`"${heading}" hoisted ${census.hoisted} of the ${census.values} ` +
+						`cells of "${defaultHeading}" that are values: ` +
+						`${quoted(census.unmarked)} ` +
+						`${
+							census.unmarked.length === 1
+								? "is a value and carries"
+								: "are values and carry"
+						} no ` +
+						'data-role="default". Either isValue() in ' +
+						"src/lib/rehype-tables.mjs stopped accepting what it accepted " +
+						"(a non-breaking space inside a value reads as a space), or " +
+						"something after it dropped the attribute. Every value of a " +
+						"declared column has to reach the reader beside its key",
+				);
+			}
+			if (census.sentences.length > 0) {
+				problems.push(
+					`"${heading}" hoisted ${quoted(census.sentences)}, which ` +
+						`${census.sentences.length === 1 ? "has" : "have"} a space in ` +
+						`${census.sentences.length === 1 ? "it" : "them"}: a sentence ` +
+						"unlabelled in the corner of a card stops reading as a " +
+						"default. src/lib/rehype-tables.mjs marks values only, so " +
+						"either its rule changed or this mark was not put there by it",
+				);
+			}
+			if (census.rows > 0 && census.hoisted < census.rows * HOIST_FLOOR) {
+				problems.push(
+					`"${heading}" hoists ${census.hoisted} of its ${census.rows} rows, ` +
+						`under the ${Math.ceil(census.rows * HOIST_FLOOR)} this gate ` +
+						"asks of a declared column: a column most of whose rows print " +
+						"their own labelled block is not a default column. Either " +
+						"write those defaults as values (one unbroken run, no space), " +
+						`or drop "${heading}" from defaultColumns in the page's ` +
+						"frontmatter and let the table stack as any other reference " +
+						"table does",
+				);
+			}
 		}
 	}
 	return problems;
+}
+
+/**
+ * A few cell texts for a message, quoted, with the tail counted rather than
+ * printed: a fourteen-row column that lost every mark should name the shape of
+ * the problem, not recite the column.
+ *
+ * @param {string[]} texts
+ * @returns {string}
+ */
+function quoted(texts) {
+	const shown = texts.slice(0, 3).map((text) => `"${text}"`);
+	const rest = texts.length - shown.length;
+	return rest > 0 ? `${shown.join(", ")} and ${rest} more` : shown.join(", ");
 }
 
 /**
@@ -361,6 +491,23 @@ function measureTables() {
 						lines: lineBoxes(node),
 					}))
 					.filter((measured) => measured.lines > 1);
+			// Every cell of every column of a declared table, in markup order,
+			// with whether it carries the hoist mark. Collected only for the
+			// tables a page declared (the wrapper says so), because this is
+			// the only place a cell-by-cell census is worth its bytes, and
+			// read back in node against the checker's own copy of the rule.
+			const columnCells =
+				wrapper.dataset && wrapper.dataset.form === "default"
+					? heads.map((_, column) =>
+							bodyRows
+								.map((row) => row.querySelectorAll("td")[column])
+								.filter(Boolean)
+								.map((cell) => ({
+									text: cell.textContent.trim(),
+									marked: cell.dataset.role === "default",
+								})),
+						)
+					: [];
 			return {
 				index,
 				container: Math.round(wrapper.clientWidth),
@@ -371,6 +518,8 @@ function measureTables() {
 				columns: heads.length,
 				stacked: getComputedStyle(table).display !== "table",
 				firstHeading: heads.length ? heads[0].textContent.trim() : "",
+				headings: heads.map((th) => th.textContent.trim()),
+				columnCells,
 				// Compact is the stacked table whose second cell runs inline.
 				compact:
 					getComputedStyle(table).display !== "table" &&
@@ -480,6 +629,8 @@ async function walk(dist) {
 	let compact = 0;
 	let indexes = 0;
 	let defaultColumnsChecked = 0;
+	let defaultCellsChecked = 0;
+	let defaultRowsChecked = 0;
 	let browser;
 	try {
 		const base = await preview.announced;
@@ -508,9 +659,22 @@ async function walk(dist) {
 					}
 				}
 				if (declaredDefaults.has(route)) {
-					defaultColumnsChecked += declaredDefaults.get(route).length;
+					const declaredHere = declaredDefaults.get(route);
+					defaultColumnsChecked += declaredHere.length;
+					// Counted in cells, so that the success line states how much
+					// of each declared column reached the reader rather than how
+					// many columns were named in a frontmatter.
+					for (const { table: heading, default: column } of declaredHere) {
+						for (const table of measuredTables) {
+							if (table.firstHeading !== heading) continue;
+							const census = hoistCensus(table, column);
+							if (!census) continue;
+							defaultCellsChecked += census.hoisted;
+							defaultRowsChecked += census.rows;
+						}
+					}
 					for (const problem of defaultColumnProblems({
-						declared: declaredDefaults.get(route),
+						declared: declaredHere,
 						tables: measuredTables,
 					})) {
 						failures.push({ width, route, index: "default", problem });
@@ -556,6 +720,8 @@ async function walk(dist) {
 		compact,
 		indexes,
 		defaultColumnsChecked,
+		defaultCellsChecked,
+		defaultRowsChecked,
 		routes: routes.length,
 	};
 }
@@ -735,6 +901,116 @@ function selfTest() {
 		[],
 	);
 
+	is(
+		"a single run of characters is a value",
+		isValueText(" api.github.com "),
+		true,
+	);
+	is("a sentence is not a value", isValueText("derived from the API"), false);
+	is("an empty cell is not a value", isValueText("  "), false);
+
+	// The shape the census reads: one declared column of five rows, four of
+	// them values and marked, the fifth a sentence left in its own block.
+	const column = (cells) => ({
+		...github,
+		headings: ["Key", "Default"],
+		columnCells: [
+			cells.map(([key]) => ({ text: key, marked: false })),
+			cells.map(([, text, marked]) => ({ text, marked })),
+		],
+	});
+	const shipped = [
+		["token", "required", true],
+		["reserve_rate", "500", true],
+		["timeout", "30s", true],
+		["base_url", "api.github.com", true],
+		["web_url", "derived from the API", false],
+	];
+	is(
+		"a column that hoists every value it holds is counted, not just asked about",
+		hoistCensus(column(shipped), "Default"),
+		{ rows: 5, values: 4, hoisted: 4, unmarked: [], sentences: [] },
+	);
+	is(
+		"a column that hoists every value it holds is right",
+		defaultColumnProblems({
+			declared: [{ table: "Key", default: "Default" }],
+			tables: [column(shipped)],
+		}),
+		[],
+	);
+	is(
+		"a value that stopped being marked is caught even though other rows still hoist",
+		defaultColumnProblems({
+			declared: [{ table: "Key", default: "Default" }],
+			tables: [
+				column([
+					["token", "required", false],
+					["reserve_rate", "500", true],
+					["timeout", "30s", true],
+					["base_url", "api.github.com", true],
+					["web_url", "derived from the API", false],
+				]),
+			],
+		}).length,
+		1,
+	);
+	is(
+		"a column reduced to one hoist of five is caught by the floor as well",
+		defaultColumnProblems({
+			declared: [{ table: "Key", default: "Default" }],
+			tables: [
+				column([
+					["token", "required", false],
+					["reserve_rate", "500", false],
+					["timeout", "30s", false],
+					["base_url", "api.github.com", true],
+					["web_url", "derived from the API", false],
+				]),
+			],
+		}).length,
+		2,
+	);
+	is(
+		"a table of two rows that hoists one of them is at the floor, not under it",
+		defaultColumnProblems({
+			declared: [{ table: "Key", default: "Default" }],
+			tables: [
+				column([
+					["sinks.dedupe_horizon", "720h", true],
+					["sinks.dedupe_file", "beside state_file", false],
+				]),
+			],
+		}),
+		[],
+	);
+	is(
+		"a sentence hoisted into the corner is caught",
+		defaultColumnProblems({
+			declared: [{ table: "Key", default: "Default" }],
+			tables: [
+				column([
+					["token", "required", true],
+					["web_url", "derived from the API", true],
+				]),
+			],
+		}).length,
+		1,
+	);
+	is(
+		"a column whose heading the frontmatter no longer names is not censused",
+		hoistCensus(column(shipped), "Por omisión"),
+		null,
+	);
+	is(
+		"a table measured without a census is left to the other four checks",
+		defaultColumnProblems({
+			declared: [{ table: "Key", default: "Default" }],
+			tables: [github],
+		}),
+		[],
+	);
+
 	if (failed.length > 0) {
 		console.error("[table-fit] fixtures failed:");
 		for (const line of failed) console.error(`  ${line}`);
@@ -766,6 +1042,8 @@ try {
 		compact,
 		indexes,
 		defaultColumnsChecked,
+		defaultCellsChecked,
+		defaultRowsChecked,
 		routes,
 	} = await walk(DIST);
 	if (failures.length > 0) {
@@ -785,8 +1063,9 @@ try {
 				"boxes, or a default not beside its label, is the compact or " +
 				"default form of the same file and of src/lib/rehype-tables.mjs; " +
 				"a key or a hoisted value that took two line boxes is that form's " +
-				"column cap, in the same file; a link that lands nowhere is the " +
-				"page's own.",
+				"column cap, in the same file; a declared column that stopped " +
+				"hoisting the cells it holds is isValue() in that plugin, or the " +
+				"words in the table; a link that lands nowhere is the page's own.",
 		);
 		process.exit(1);
 	}
@@ -796,9 +1075,11 @@ try {
 			`(${stacked - compact} stacked, ${compact} compact indexes, ` +
 			`${tables - stacked} still tables); all ${indexes} measurements of ` +
 			"the index tables the sources declare rendered compact, every row " +
-			`link lands, and all ${defaultColumnsChecked} measurements of the ` +
-			"default columns the sources declare rendered beside their label, " +
-			"each key and each hoisted value on one line.",
+			`link lands, and the ${defaultColumnsChecked} measurements of the ` +
+			"default columns the sources declare hoisted " +
+			`${defaultCellsChecked} of their ${defaultRowsChecked} rows beside ` +
+			"their key, which is every cell of them that is a value and no cell " +
+			"that is not, each key and each hoisted value on one line.",
 	);
 } catch (error) {
 	console.error(`[table-fit] ${error.message}`);
