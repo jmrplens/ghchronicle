@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -31,7 +32,8 @@ func TestWritingTheFileThenCheckingItPasses(t *testing.T) {
 	t.Parallel()
 	path := filepath.Join(t.TempDir(), "layouts.json")
 	status, stdout, stderr := generate(t, "-out", path)
-	if status != 0 || stderr != "" || !strings.Contains(stdout, "13 layouts") {
+	count := fmt.Sprintf("%d layouts", len(render.Layouts()))
+	if status != 0 || stderr != "" || !strings.Contains(stdout, count) {
 		t.Fatalf("write = %d, %q, %q, want a clean run naming the count", status, stdout, stderr)
 	}
 
@@ -63,7 +65,7 @@ func TestWritingTheFileThenCheckingItPasses(t *testing.T) {
 // file, and this file is the registry.
 func TestTheFileCarriesEveryRegisteredLayoutInOrder(t *testing.T) {
 	t.Parallel()
-	body, err := layoutsJSON()
+	body, err := layoutsJSON(render.Layouts())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +102,7 @@ func TestTheFileCarriesEveryRegisteredLayoutInOrder(t *testing.T) {
 // file like any other: two-space indentation and a trailing newline.
 func TestTheFileIsWrittenAsTheSitesFormatterLeavesIt(t *testing.T) {
 	t.Parallel()
-	body, err := layoutsJSON()
+	body, err := layoutsJSON(render.Layouts())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -109,6 +111,17 @@ func TestTheFileIsWrittenAsTheSitesFormatterLeavesIt(t *testing.T) {
 	}
 	if !strings.Contains(string(body), "\n  {\n    \"name\": ") {
 		t.Error("the file is not indented with two spaces a level")
+	}
+}
+
+// TestAnEmptyRegistryIsRefused covers the one thing -check cannot catch on its
+// own: a committed `[]` and a generated `[]` are equal, so the gate would pass
+// while stating the facts of no layout at all.
+func TestAnEmptyRegistryIsRefused(t *testing.T) {
+	t.Parallel()
+	body, err := layoutsJSON(nil)
+	if body != nil || err == nil || !strings.Contains(err.Error(), "layouts.go") {
+		t.Fatalf("layoutsJSON(nil) = %q, %v, want no bytes and the registry named", body, err)
 	}
 }
 

@@ -64,10 +64,12 @@ type Layout struct {
 	Fields   []string // the default set, in drawing order
 	Supports []string // every field the layout can show
 	// Width is what the layout is drawn at, and MinWidth the width it refuses
-	// to go below. Both are zero on a layout whose width follows its content.
-	// They are part of the public Layout rather than of the definition below
-	// because the site states them per layout, and it reads them from here
-	// through cmd/gen_layouts.
+	// to go below. Both are zero on a layout whose width follows its content,
+	// badge-row being the one, and on such a layout Options.Width is ignored:
+	// no minimum can reject it and the drawing overwrites it with the width of
+	// the pills it laid out. They are part of the public Layout rather than of
+	// the definition below because the site states them per layout, and it
+	// reads them from here through cmd/gen_layouts.
 	Width, MinWidth int
 }
 

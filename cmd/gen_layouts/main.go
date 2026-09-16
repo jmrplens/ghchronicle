@@ -77,7 +77,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return 2
 	}
 
-	body, err := layoutsJSON()
+	body, err := layoutsJSON(render.Layouts())
 	if err != nil {
 		fmt.Fprintln(stderr, err)
 		return 1
@@ -109,8 +109,17 @@ func run(args []string, stdout, stderr io.Writer) int {
 // which is what prettier asks of a JSON file in the site. A generator whose
 // output the site's own formatter then rejects is a gate that cannot be
 // satisfied.
-func layoutsJSON() ([]byte, error) {
-	registered := render.Layouts()
+//
+// An empty registry is refused rather than exported, so that -check cannot pass
+// over nothing: a committed `[]` compared with a generated `[]` is a gate that
+// agrees with itself and says nothing about any layout. The same refusal the
+// site's check-table-fit.mjs makes of an empty corpus. The registry is passed
+// in rather than read here so that the refusal is reachable from a test.
+func layoutsJSON(registered []render.Layout) ([]byte, error) {
+	if len(registered) == 0 {
+		return nil, errors.New("the layout registry is empty, so there is nothing to export " +
+			"and -check would pass over nothing. Look at internal/render/layouts.go")
+	}
 	out := make([]layout, 0, len(registered))
 	for _, l := range registered {
 		out = append(out, layout{

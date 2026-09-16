@@ -720,11 +720,11 @@ stopped. The layout that shows the share of a language as its own line, where
 ### Width
 
 Each layout declares its own width, and a minimum it would refuse to go below,
-and its own section above states both. Nothing asks for a different one: `render.Options` carries a `Width`, the
-binary leaves it at zero, and there is no way to set it from outside, so every
-card comes out at its layout's own width. `badge-row` declares neither, because
-a pill row stretched to a fixed width would have gaps in it; its width follows
-its content.
+and its own section above states both. Nothing asks for a different one:
+`render.Options` carries a `Width`, the binary leaves it at zero, and there is
+no way to set it from outside, so every card comes out at its layout's own
+width. `badge-row` declares neither, because a pill row stretched to a fixed
+width would have gaps in it; its width follows its content.
 
 ### Fields a layout cannot draw
 

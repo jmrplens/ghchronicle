@@ -33,8 +33,7 @@
  *    and they are the whole of the semantics once it is not.
  *
  *  - on a table its page names as an INDEX, `data-form="index"` on the
- *    container, and a link from each row's first cell to the section of the
- *    page that cell names, when there is one. See "Index tables" below.
+ *    container. See "Index tables" below.
  *
  * Why the stacked form exists at all, measured on the built site before it
  * did: all 98 tables of the corpus, in both languages, overflowed the column
@@ -53,26 +52,33 @@ import { localeOf, routeOf } from "./site.mjs";
  * INDEX TABLES. Stacking is right for a reference table, whose cells are
  * clauses a reader reads, and wrong for an index, whose rows are short and
  * whose job is to let the reader find an item. Measured on the layouts page
- * before this existed: its thirteen-row summary took 4,691 px stacked at a
- * 360 px viewport, 337 px a row, nearly six screens of labelled boxes before
- * the first card, where the same table is one glance on a desktop. An index
- * gets a compact form instead (styles/tables.css): one line per row naming the
- * item, a smaller line under it with the rest of the row.
+ * before this existed, back when that page still carried an index: its
+ * thirteen-row summary took 4,691 px stacked at a 360 px viewport, 337 px a
+ * row, nearly six screens of labelled boxes before the first card, where the
+ * same table is one glance on a desktop. An index gets a compact form instead
+ * (styles/tables.css): one line per row naming the item, a smaller line under
+ * it with the rest of the row.
  *
  * Which tables are indexes is the page's judgement, not this plugin's guess:
  * a page lists them in its frontmatter by the heading of their first column,
  *
  *     indexTables:
- *       - Layout
+ *       - Family
  *
  * which reads the same in the source as in the rendered page, and survives a
  * table being added above it where a position would not. A name that matches
  * no table on the page is an error: a column renamed in the markdown would
  * otherwise put its table back into the stacked form without a word.
  *
+ * An index row used to be linked here to the section of the page its first
+ * cell named. The two pages that declare an index today, how/index.mdx and
+ * sinks/index.mdx, cannot use it: the first names families that have no
+ * section of their own, the second already writes its own links. The pass ran
+ * over nothing, so it is gone rather than kept as a promise this file makes
+ * and never keeps. A page that wants an index row to link writes the link.
+ *
  * The markdown is not touched, so the twin, docs/ and llms-full.txt read the
- * table exactly as written, and so does internal/render/documented_test.go,
- * which parses the layouts table's rows as markdown.
+ * table exactly as written.
  */
 
 /** What the region is called, per locale. */
@@ -180,75 +186,10 @@ function indexTablesOf(file) {
 	return Array.isArray(declared) ? declared.map(String) : [];
 }
 
-/**
- * The anchor each section heading of the page carries, by its text.
- *
- * The ids are read, never derived here. Astro's own `rehypeHeadingIds` runs
- * after every configured plugin, so astro.config.mjs also places it directly
- * before this one: the ids exist by the time this reads them, they are made by
- * the one slugger that makes them for the page (duplicates suffixed in
- * document order), and the later built-in pass keeps an id it finds. A
- * second derivation here could disagree with that slugger on two headings
- * that slug alike and send a row to the wrong section with nothing to notice.
- * A heading without an id is not linked, and neither is a heading text that
- * appears twice, which has two anchors and no single answer.
- *
- * @param {any} tree
- * @returns {Map<string, string | null>} heading text to id
- */
-function sectionAnchors(tree) {
-	const anchors = new Map();
-	const visit = (node) => {
-		if (node?.type === "element" && /^h[1-6]$/.test(node.tagName)) {
-			const id = node.properties?.id;
-			if (typeof id !== "string" || id === "") return;
-			const text = textOf(node).trim();
-			anchors.set(text, anchors.has(text) ? null : id);
-			return;
-		}
-		for (const child of node?.children ?? []) visit(child);
-	};
-	visit(tree);
-	return anchors;
-}
-
-/**
- * Links each row's first cell to the section named after it, when the page
- * has exactly one. The cell's own content, a code span in this corpus, becomes
- * the link's content, so the row reads as it did and the link's accessible
- * name is the item's name.
- *
- * @param {any} table
- * @param {Map<string, string>} anchors
- */
-function linkRows(table, anchors) {
-	for (const group of childrenNamed(table, ROW_GROUPS)) {
-		if (group.tagName === "thead") continue;
-		for (const row of childrenNamed(group, ROWS)) {
-			const first = childrenNamed(row, CELLS)[0];
-			if (!first) continue;
-			const alreadyLinked = (node) =>
-				node.type === "element" &&
-				(node.tagName === "a" || (node.children ?? []).some(alreadyLinked));
-			if (first.children.some(alreadyLinked)) continue;
-			const id = anchors.get(textOf(first).trim());
-			if (!id) continue;
-			first.children = [
-				{
-					type: "element",
-					tagName: "a",
-					properties: { href: `#${id}` },
-					children: first.children,
-				},
-			];
-		}
-	}
-}
-
 export default function rehypeTables() {
 	/**
 	 * @param {any} node
-	 * @param {{ label: string, indexes: Set<string>, found: Set<string>, anchors: Map<string, string> }} page
+	 * @param {{ label: string, indexes: Set<string>, found: Set<string> }} page
 	 */
 	const walk = (node, page) => {
 		if (!node || !Array.isArray(node.children)) return;
@@ -258,10 +199,7 @@ export default function rehypeTables() {
 			const columns = headings(child);
 			prepare(child, columns);
 			const index = columns.length > 0 && page.indexes.has(columns[0]);
-			if (index) {
-				page.found.add(columns[0]);
-				linkRows(child, page.anchors);
-			}
+			if (index) page.found.add(columns[0]);
 			return {
 				type: "element",
 				tagName: "div",
@@ -284,15 +222,13 @@ export default function rehypeTables() {
 	// is present transitively, and depending on a transitive package is how a
 	// build breaks on a machine whose resolution differs.
 	return (tree, file) => {
-		const indexes = new Set(indexTablesOf(file));
 		const page = {
 			label: REGION_LABEL[localeOfFile(file)],
-			indexes,
+			indexes: new Set(indexTablesOf(file)),
 			found: new Set(),
-			anchors: indexes.size ? sectionAnchors(tree) : new Map(),
 		};
 		walk(tree, page);
-		const missing = [...indexes].filter((name) => !page.found.has(name));
+		const missing = [...page.indexes].filter((name) => !page.found.has(name));
 		if (missing.length) {
 			throw new Error(
 				`${file?.path ?? "a page"}: indexTables names ${missing
