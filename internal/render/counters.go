@@ -48,6 +48,24 @@ func counterCSS(m counterMotion) string {
 	return ".cuf{opacity:0}\n"
 }
 
+// countedNumber is one number on its way into the document: its value, where
+// it sits, how it is set and how much room it has. A struct and not a
+// parameter list, the way gridStyle and spec are: countUp took ten positional
+// arguments, six of them a float64 or a string, which is the shape where a
+// caller passes the right type in the wrong place and nothing notices. Named
+// fields make a call site say which is the size and which is the limit.
+type countedNumber struct {
+	value         int
+	x, y          float64
+	class, anchor string
+	// size is the type size the text is measured at, limit the width it must
+	// fit into; both are handed to fit, which truncates to an ellipsis.
+	size, limit float64
+	// format writes the value out the way the layout's family does: compact
+	// for chronicle, grouped for github.
+	format func(int) string
+}
+
 // countUp writes one number as the stack a count is made of: an intermediate
 // value per frame, each shown only during its own beat, and the real value on
 // top of them, revealed when the count lands. The marker classes go on only
@@ -56,15 +74,18 @@ func counterCSS(m counterMotion) string {
 //
 // It is shared rather than copied because two layouts count now: animated-counters
 // draws its own grid and statGrid draws the github family's.
-func countUp(b *strings.Builder, x, y float64, class, anchor string, m counterMotion, value int, format func(int) string, size, limit float64) {
-	if len(m.frames) == 0 {
-		text(b, x, y, class, anchor, fit(format(value), size, limit))
+func countUp(b *strings.Builder, n countedNumber, motion counterMotion) {
+	at := func(class string, value int) {
+		text(b, n.x, n.y, class, n.anchor, fit(n.format(value), n.size, n.limit))
+	}
+	if len(motion.frames) == 0 {
+		at(n.class, n.value)
 		return
 	}
-	for i, cls := range m.frames {
-		text(b, x, y, classes(class, "cuf", cls), anchor, fit(format(counterValue(value, i, counterFrames)), size, limit))
+	for i, cls := range motion.frames {
+		at(classes(n.class, "cuf", cls), counterValue(n.value, i, counterFrames))
 	}
-	text(b, x, y, classes(class, "cuz", m.final), anchor, fit(format(value), size, limit))
+	at(classes(n.class, "cuz", motion.final), n.value)
 }
 
 // counterValue is the value shown at frame i of n, eased so the count
@@ -99,7 +120,11 @@ func drawAnimatedCounters(b *strings.Builder, c *Card, s *spec) {
 				y += rowH
 			}
 			x := pad + float64(i%perRow)*cell
-			countUp(&body, x, y+24, "big", "start", count, m.value, compact, 24, cell-10)
+			countUp(&body, countedNumber{
+				value: m.value, x: x, y: y + 24,
+				class: "big", anchor: "start",
+				size: 24, limit: cell - 10, format: compact,
+			}, count)
 			text(&body, x, y+40, "l", "start", fit(m.label, 11, cell-10))
 		}
 		y += 40

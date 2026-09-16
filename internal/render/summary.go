@@ -36,7 +36,11 @@ func statGrid(b *strings.Builder, nums []metric, x, baseline, inner float64, per
 		cell := inner / float64(end-start)
 		for i, m := range nums[start:end] {
 			cx := x + float64(i)*cell
-			countUp(b, cx, y, st.valueClass, "start", st.count, m.value, st.format, st.valueSize, cell-6)
+			countUp(b, countedNumber{
+				value: m.value, x: cx, y: y,
+				class: st.valueClass, anchor: "start",
+				size: st.valueSize, limit: cell - 6, format: st.format,
+			}, st.count)
 			text(b, cx, y+st.labelDY, st.labelClass, "start", fit(st.label(m), 11, cell-6))
 		}
 		if end < len(nums) {
