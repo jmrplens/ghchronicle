@@ -525,6 +525,28 @@ const PAIRS = [
 		minimum: NORMAL_TEXT,
 	},
 	{
+		// The column heading a cell carries with it once the rows are stacked.
+		// It is small (0.72rem) and it is the only thing left saying which
+		// column a value came from, so it is measured as normal text rather
+		// than waved through as decoration. Two backgrounds, because a stacked
+		// row still lights on hover.
+		label: "stacked cell label",
+		where: "tables.css, .sl-markdown-content td[data-label]::before",
+		fg: sourced(".sl-markdown-content td[data-label]::before", "color"),
+		bg: [PAGE_BG, sourced(".sl-markdown-content tr:hover td", "background")],
+		minimum: NORMAL_TEXT,
+	},
+	{
+		// The first cell of a stacked row, which is the whole of the row's
+		// identity there. Only the stacked form sets it, through --table-first;
+		// wide, the cell inherits the body colour the pair above measures.
+		label: "stacked row identity",
+		where: "tables.css, .sl-markdown-content td:first-child (--table-first)",
+		fg: HEADING,
+		bg: [PAGE_BG, sourced(".sl-markdown-content tr:hover td", "background")],
+		minimum: NORMAL_TEXT,
+	},
+	{
 		label: "current sidebar entry label on its filled pill",
 		where:
 			"starlight/components/SidebarSublist.astro, text-invert on text-accent",

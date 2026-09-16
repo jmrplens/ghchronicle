@@ -13,15 +13,30 @@
  *   WIDE     the table, sized as a table, in a wrapper that
  *            scrolls when the column cannot hold it.
  *   STACKED  one block per row, each cell under the heading of the
- *            column it came from. What a phone gets.
+ *            column it came from. What a phone gets. Laid out as
+ *            blocks, so it is a table only to the reader and to the
+ *            accessibility tree: the roles that keep it one are
+ *            written into the markup by src/lib/rehype-tables.mjs,
+ *            because the browser stops inferring them the moment
+ *            `display` changes.
  *
- * The switch between the two is the ten `--table-*` properties.
+ * The switch between the two is the eleven `--table-*` properties.
  * The WIDE form is the fallback written into each `var()` below, so
  * it is stated once, at the declaration that uses it; the stacked
- * form is those ten properties declared together, and the only
- * thing a breakpoint or the spec sheet does is declare them. Two
- * full sets of rules instead would repeat the stacked half once per
- * breakpoint, and it would drift the first time one of them moved.
+ * form is those eleven properties declared together.
+ *
+ * What that buys, exactly, because it is less than it looks: the
+ * eleven declarations ARE still repeated, once per breakpoint and
+ * once for the spec sheet, five blocks of the same eleven lines. A
+ * container query cannot read a length out of a custom property, so
+ * a per-column-count threshold needs a block per count whatever this
+ * file does. What the indirection removes is the other half: the
+ * RULES that consume the switch, one per element and each with its
+ * own selector, are written once here instead of once per
+ * breakpoint. So a change to what stacking means is one edit, and
+ * only a change to WHICH tables stack is five. Five identical value
+ * blocks also read as identical, which five near-identical rule sets
+ * would not.
  *
  * WHY STACKING, rather than a narrower table. Measured on the built
  * site: all 98 tables of the corpus, both languages, overflowed
@@ -135,12 +150,14 @@
 }
 
 /* The first cell of a row says what the row is about, in every table of this
- * corpus: the family, the flag, the key, the measurement. It takes the
- * heading colour in both forms, which is what lets the eye find the start of
- * a row without counting columns, and which is the whole of a row's identity
- * once the rows are stacked. */
+ * corpus: the family, the flag, the key, the measurement. Stacked, it is the
+ * whole of a row's identity, so it takes the heading colour; wide, the column
+ * it heads is identity enough and the cell is left as it was, since changing
+ * the wide form is not what this treatment is for. `currentcolor` on `color`
+ * is the inherited colour, which is exactly what the declaration said before
+ * the switch reached it. */
 .sl-markdown-content td:first-child {
-	color: var(--sl-color-white);
+	color: var(--table-first, currentcolor);
 }
 
 .sl-markdown-content th code {
@@ -165,11 +182,18 @@
  * compressed columns above rows twice as wide.
  *
  * src/lib/rehype-tables.mjs wraps every prose table in
- * `.table-scroll` at build time. The table keeps `display: table`
- * and sizes its columns as one; the wrapper scrolls, and the fade
- * on its trailing edge is the only cue a reader on a phone has
- * that there is more to the right. The wrapper is also the query
- * container the stacked form is decided against.
+ * `.table-scroll` at build time. While the table is wide it keeps
+ * `display: table` and sizes its columns as one; the wrapper
+ * scrolls, and the fade on its trailing edge is the only cue a
+ * reader has that there is more to the right. The wrapper is also
+ * the query container the stacked form is decided against, and the
+ * named region a keyboard lands on.
+ *
+ * Stacked, the table is no longer a table to the layout engine, and
+ * a browser reads table semantics off the computed `display`. That
+ * is why the same plugin writes the implicit ARIA roles out: they
+ * are inert here, where the display says the same thing, and they
+ * are the only thing saying it below the breakpoints.
  * ------------------------------------------------------------ */
 .sl-markdown-content .table-scroll {
 	container-type: inline-size;
@@ -232,7 +256,7 @@
 }
 
 /* ------------------------------------------------------------
- * The breakpoints: the same ten declarations, once per column
+ * The breakpoints: the same eleven declarations, once per column
  * count, each at the floor that column count needs. The last one
  * is written as an exclusion rather than as `[data-columns="5"]`
  * so that a table grown to six columns stacks too, instead of
@@ -250,6 +274,7 @@
 		--table-rule: 0;
 		--table-pad: 0.3rem;
 		--table-floor: 0px;
+		--table-first: var(--sl-color-white);
 	}
 }
 
@@ -265,6 +290,7 @@
 		--table-rule: 0;
 		--table-pad: 0.3rem;
 		--table-floor: 0px;
+		--table-first: var(--sl-color-white);
 	}
 }
 
@@ -280,12 +306,15 @@
 		--table-rule: 0;
 		--table-pad: 0.3rem;
 		--table-floor: 0px;
+		--table-first: var(--sl-color-white);
 	}
 }
 
 @container (max-width: 36rem) {
 	.sl-markdown-content
 		.table-scroll:not(
+			[data-columns="0"],
+			[data-columns="1"],
 			[data-columns="2"],
 			[data-columns="3"],
 			[data-columns="4"]
@@ -301,13 +330,14 @@
 		--table-rule: 0;
 		--table-pad: 0.3rem;
 		--table-floor: 0px;
+		--table-first: var(--sl-color-white);
 	}
 }
 
 /* ------------------------------------------------------------
  * The spec sheet: a table that is stacked at every width.
  *
- * components/SpecSheet.astro says which table and why. The ten
+ * components/SpecSheet.astro says which table and why. The eleven
  * declarations are the ones above, with no query around them.
  * ------------------------------------------------------------ */
 .sl-markdown-content .spec-sheet .table-scroll > table {
@@ -321,4 +351,5 @@
 	--table-rule: 0;
 	--table-pad: 0.3rem;
 	--table-floor: 0px;
+	--table-first: var(--sl-color-white);
 }
