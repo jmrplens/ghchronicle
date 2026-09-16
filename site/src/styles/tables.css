@@ -5,19 +5,101 @@
  * Tables used to be styled twice, under two section numbers: bare
  * `table`/`th`/`td` in one place and `.sl-markdown-content table` in
  * another, with the second silently winning on specificity. This is
- * the merged rule set. Prose tables scroll horizontally rather than
- * forcing the page to.
+ * the merged rule set.
+ *
+ * A prose table here has TWO forms, and every rule below belongs to
+ * one of them:
+ *
+ *   WIDE     the table, sized as a table, in a wrapper that
+ *            scrolls when the column cannot hold it.
+ *   STACKED  one block per row, each cell under the heading of the
+ *            column it came from. What a phone gets.
+ *
+ * The switch between the two is the ten `--table-*` properties.
+ * The WIDE form is the fallback written into each `var()` below, so
+ * it is stated once, at the declaration that uses it; the stacked
+ * form is those ten properties declared together, and the only
+ * thing a breakpoint or the spec sheet does is declare them. Two
+ * full sets of rules instead would repeat the stacked half once per
+ * breakpoint, and it would drift the first time one of them moved.
+ *
+ * WHY STACKING, rather than a narrower table. Measured on the built
+ * site: all 98 tables of the corpus, both languages, overflowed
+ * their column at a 360 px and at a 400 px viewport, by 176 px to
+ * 417 px. The floor was not the whole cause. With the floor removed
+ * and the content as it renders, the narrowest these tables can be
+ * AS TABLES still ran to 745 px, because a heading cell and a code
+ * span are both `white-space: nowrap`. The same tables with
+ * wrapping allowed need 83 px to 204 px: the content fits a phone,
+ * the table shape does not.
+ *
+ * WHY A CONTAINER QUERY, not a media query. What has to hold the
+ * table is the prose column, and on this site that is not a
+ * function of the window: measured on /api/cost/, a 1024 px window
+ * gives the column 663 px and a 1200 px window gives it 536 px,
+ * because the table of contents arrives at 72rem and takes its
+ * share. A viewport breakpoint would have left a laptop scrolling a
+ * table sideways while a phone got the stacked form. Same reasoning
+ * and same mechanism as the figures in diagram.css.
  * ============================================================ */
 
+/* ------------------------------------------------------------
+ * The floor.
+ *
+ * A floor, not a width. `max-content` alone leaves the browser free
+ * to wrap a four-column table into the viewport, which on a phone
+ * turned "dated, one point per day" into five lines of one word.
+ * The floor makes the wrapper scroll instead, which is the
+ * behaviour the fade advertises.
+ *
+ * It is per column count because a two-column table and a
+ * five-column one do not need the same room. Each value sits just
+ * above the median width its shape needs at its narrowest,
+ * measured over the corpus: 16.6rem at two columns, 23.6rem at
+ * three, 31.3rem at four, 42.1rem at five.
+ *
+ * The same number is the breakpoint further down. A table whose
+ * floor its column cannot pay is a table that would scroll, and a
+ * table that would scroll is the one that should be stacked.
+ * ------------------------------------------------------------ */
+.sl-markdown-content .table-scroll[data-columns="2"] > table {
+	--table-floor: 26rem;
+}
+
+.sl-markdown-content .table-scroll[data-columns="3"] > table {
+	--table-floor: 28rem;
+}
+
+.sl-markdown-content .table-scroll[data-columns="4"] > table {
+	--table-floor: 34rem;
+}
+
+/* ------------------------------------------------------------
+ * The table itself.
+ * ------------------------------------------------------------ */
 .sl-markdown-content table {
 	/* No `display: block` and no overflow here: the wrapper owns the scroll,
 	 * and this rule owning it too is what made the head and the body size
 	 * their columns apart. */
+	display: var(--table-display, table);
 	width: 100%;
+	min-width: max(100%, var(--table-floor, 36rem));
 	border-collapse: separate;
 	border-spacing: 0;
 	border-radius: var(--rb-radius);
 	font-size: 0.85rem;
+}
+
+.sl-markdown-content thead {
+	display: var(--table-head, table-header-group);
+}
+
+.sl-markdown-content tbody {
+	display: var(--table-row-group, table-row-group);
+}
+
+.sl-markdown-content tr {
+	display: var(--table-row, table-row);
 }
 
 .sl-markdown-content th {
@@ -33,12 +115,44 @@
 	border-bottom: 1px solid var(--rb-border);
 }
 
+.sl-markdown-content td {
+	display: var(--table-cell, table-cell);
+	/* Stacked, consecutive cells lay their vertical padding end to end, and a
+	 * row of five fields runs most of a screen on the padding alone. */
+	padding-block: var(--table-pad, 0.625rem);
+	border-bottom-width: var(--table-rule, 1px);
+	vertical-align: top;
+}
+
 .sl-markdown-content tr:last-child td {
 	border-bottom: none;
 }
 
+/* The cells tile the row in both forms, so hovering one still lights the
+ * whole row once the row is a block. */
 .sl-markdown-content tr:hover td {
 	background: var(--rb-surface);
+}
+
+/* The first cell of a row says what the row is about, in every table of this
+ * corpus: the family, the flag, the key, the measurement. It takes the
+ * heading colour in both forms, which is what lets the eye find the start of
+ * a row without counting columns, and which is the whole of a row's identity
+ * once the rows are stacked. */
+.sl-markdown-content td:first-child {
+	color: var(--sl-color-white);
+}
+
+.sl-markdown-content th code {
+	white-space: nowrap;
+}
+
+.sl-markdown-content td code {
+	white-space: var(--table-code, nowrap);
+	/* Inert while the span may not break, which is the wide form: a line that
+	 * cannot wrap takes no break opportunity. Stacked, this is what keeps a
+	 * sixty-character path inside a 328 px screen. */
+	overflow-wrap: anywhere;
 }
 
 /* ------------------------------------------------------------
@@ -50,13 +164,15 @@
  * columns independently and a narrow screen shows a header of four
  * compressed columns above rows twice as wide.
  *
- * src/lib/rehype-scrollable-tables.mjs wraps every prose table in
+ * src/lib/rehype-tables.mjs wraps every prose table in
  * `.table-scroll` at build time. The table keeps `display: table`
  * and sizes its columns as one; the wrapper scrolls, and the fade
  * on its trailing edge is the only cue a reader on a phone has
- * that there is more to the right.
+ * that there is more to the right. The wrapper is also the query
+ * container the stacked form is decided against.
  * ------------------------------------------------------------ */
 .sl-markdown-content .table-scroll {
+	container-type: inline-size;
 	overflow-x: auto;
 	border-radius: var(--rb-radius);
 	/* The fade rides the scroll: painted against the page, pinned to
@@ -82,22 +198,127 @@
 	outline-offset: 2px;
 }
 
-.sl-markdown-content .table-scroll > table {
-	display: table;
-	/* A floor, not a width. `max-content` alone leaves the browser free to
-	 * wrap a four-column table into the viewport, which on a phone turns
-	 * "dated, one point per day" into five lines of one word. The floor makes
-	 * the wrapper scroll instead, which is the behaviour the fade advertises.
-	 * 34rem is the narrowest a four-column reference table stays readable at. */
-	width: 100%;
-	min-width: max(100%, 34rem);
+/* ------------------------------------------------------------
+ * The stacked form: the parts of it that cost nothing while the
+ * table is still a table.
+ *
+ * A row's own border and margin are not painted while it is a
+ * `table-row` under `border-collapse: separate`, so the block the
+ * row becomes can be described once here rather than inside every
+ * breakpoint below. The label is the same: its text is always in
+ * the markup, and only its `display` is switched.
+ * ------------------------------------------------------------ */
+.sl-markdown-content .table-scroll tr {
+	margin-block: 0.75rem;
+	padding-block: 0.35rem;
+	border: 1px solid var(--rb-border);
+	border-inline-start: 3px solid var(--rb-accent);
+	border-radius: var(--rb-radius);
 }
 
-.sl-markdown-content td {
-	vertical-align: top;
+/* The heading the cell sat under, carried down with it.
+ * src/lib/rehype-tables.mjs writes it into `data-label`, so the text is in
+ * the document rather than in this file and a column renamed in the markdown
+ * renames its labels with it. */
+.sl-markdown-content td[data-label]::before {
+	display: var(--table-label, none);
+	margin-bottom: 0.15rem;
+	color: var(--sl-color-gray-3);
+	font-size: 0.72rem;
+	line-height: 1.4;
+	letter-spacing: 0.05em;
+	text-transform: uppercase;
+	content: attr(data-label);
 }
 
-.sl-markdown-content td code,
-.sl-markdown-content th code {
-	white-space: nowrap;
+/* ------------------------------------------------------------
+ * The breakpoints: the same ten declarations, once per column
+ * count, each at the floor that column count needs. The last one
+ * is written as an exclusion rather than as `[data-columns="5"]`
+ * so that a table grown to six columns stacks too, instead of
+ * silently keeping the wide form on a phone.
+ * ------------------------------------------------------------ */
+@container (max-width: 26rem) {
+	.sl-markdown-content .table-scroll[data-columns="2"] > table {
+		--table-display: block;
+		--table-row-group: block;
+		--table-row: block;
+		--table-cell: block;
+		--table-head: none;
+		--table-label: block;
+		--table-code: normal;
+		--table-rule: 0;
+		--table-pad: 0.3rem;
+		--table-floor: 0px;
+	}
+}
+
+@container (max-width: 28rem) {
+	.sl-markdown-content .table-scroll[data-columns="3"] > table {
+		--table-display: block;
+		--table-row-group: block;
+		--table-row: block;
+		--table-cell: block;
+		--table-head: none;
+		--table-label: block;
+		--table-code: normal;
+		--table-rule: 0;
+		--table-pad: 0.3rem;
+		--table-floor: 0px;
+	}
+}
+
+@container (max-width: 34rem) {
+	.sl-markdown-content .table-scroll[data-columns="4"] > table {
+		--table-display: block;
+		--table-row-group: block;
+		--table-row: block;
+		--table-cell: block;
+		--table-head: none;
+		--table-label: block;
+		--table-code: normal;
+		--table-rule: 0;
+		--table-pad: 0.3rem;
+		--table-floor: 0px;
+	}
+}
+
+@container (max-width: 36rem) {
+	.sl-markdown-content
+		.table-scroll:not(
+			[data-columns="2"],
+			[data-columns="3"],
+			[data-columns="4"]
+		)
+		> table {
+		--table-display: block;
+		--table-row-group: block;
+		--table-row: block;
+		--table-cell: block;
+		--table-head: none;
+		--table-label: block;
+		--table-code: normal;
+		--table-rule: 0;
+		--table-pad: 0.3rem;
+		--table-floor: 0px;
+	}
+}
+
+/* ------------------------------------------------------------
+ * The spec sheet: a table that is stacked at every width.
+ *
+ * components/SpecSheet.astro says which table and why. The ten
+ * declarations are the ones above, with no query around them.
+ * ------------------------------------------------------------ */
+.sl-markdown-content .spec-sheet .table-scroll > table {
+	--table-display: block;
+	--table-row-group: block;
+	--table-row: block;
+	--table-cell: block;
+	--table-head: none;
+	--table-label: block;
+	--table-code: normal;
+	--table-rule: 0;
+	--table-pad: 0.3rem;
+	--table-floor: 0px;
 }

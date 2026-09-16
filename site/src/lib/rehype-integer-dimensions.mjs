@@ -36,7 +36,7 @@ export default function rehypeIntegerDimensions() {
 		}
 		if (Array.isArray(node.children)) node.children.forEach(walk);
 	};
-	// Walked by hand for the reason rehype-scrollable-tables.mjs gives: the
+	// Walked by hand for the reason rehype-tables.mjs gives: the
 	// visitor package is only present transitively.
 	return (tree) => walk(tree);
 }

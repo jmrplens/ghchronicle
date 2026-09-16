@@ -5,7 +5,7 @@ import sitemap from "@astrojs/sitemap";
 import { unified } from "@astrojs/markdown-remark";
 import starlightLinksValidator from "starlight-links-validator";
 import rehypeMermaid from "rehype-mermaid";
-import rehypeScrollableTables from "./src/lib/rehype-scrollable-tables.mjs";
+import rehypeTables from "./src/lib/rehype-tables.mjs";
 import rehypeIntegerDimensions from "./src/lib/rehype-integer-dimensions.mjs";
 import rehypeDecodedFragments from "./src/lib/rehype-decoded-fragments.mjs";
 import fs from "node:fs";
@@ -106,7 +106,7 @@ export default defineConfig({
 		syntaxHighlight: false, // expressive-code owns it
 		processor: unified({
 			rehypePlugins: [
-				rehypeScrollableTables,
+				rehypeTables,
 				[
 					rehypeMermaid,
 					{
