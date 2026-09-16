@@ -31,6 +31,12 @@ const loopRest = 7.0
 // effect is what a beat does to the elements that carry its class. Each one
 // animates a property whose base value it knows, which is what lets a beat
 // write its last keyframe explicitly and still end on the element's own style.
+//
+// effectSlide is the exception and says so again below: it ends translated by
+// a whole copy of the content it moves, not on the element's own style, and it
+// is the layout's job to make that the same picture. A layout that scrolls
+// something which is not repeated end to end would settle somewhere the base
+// style does not describe.
 type effect int
 
 const (
@@ -75,6 +81,12 @@ const (
 	// scroll: shifted by exactly one copy, the next copy stands where the
 	// last one did, so the end of the beat and its start are the same
 	// picture and the base state, untranslated, is one of them.
+	//
+	// It is the one effect here that does not end on the element's own style,
+	// and the only one whose promise the engine cannot keep on its own: the
+	// content has to repeat at exactly the beat's distance, and enough of it
+	// has to be there that the untranslated state shows one copy and no more.
+	// The layout owes both; see drawTicker.
 	effectSlide
 	// effectBlink is the terminal cursor: lit for half of each blinkPeriod,
 	// dark for the other half, for as long as the beat lasts, and lit again

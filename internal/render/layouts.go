@@ -172,7 +172,7 @@ var layouts = []layoutDef{
 	},
 	{
 		Name: "ticker", Family: "chronicle", Animated: true,
-		Description: "A band of pills, one per number and one per repository, scrolling from right to left without a seam.",
+		Description: "A band of pills, one per number and one per repository, scrolling from right to left without a seam, at a fixed speed, so a pass takes as long as the content is wide.",
 		Fields:      []string{fieldStars, fieldForks, fieldFollowers, fieldRepos, fieldContributions, fieldCommits, fieldViews, fieldTopRepos},
 		Supports:    join(allNumeric, fieldTopRepos),
 

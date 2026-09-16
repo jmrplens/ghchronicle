@@ -38,7 +38,7 @@ text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,san
 <rect class="bg" x="0.5" y="0.5" width="799" height="93" rx="6"/>
 <text class="t" x="25" y="30" text-anchor="start">octocat</text>
 <text class="s" x="775" y="30" text-anchor="end">@octocat</text>
-<svg x="1" y="46" width="798" height="34">
+<svg x="25" y="46" width="750" height="34">
 <g class="m0">
 <rect class="track" x="0" y="5" width="75.35" height="24" rx="12"/>
 <text class="c mono" x="12" y="21" text-anchor="start">614</text>

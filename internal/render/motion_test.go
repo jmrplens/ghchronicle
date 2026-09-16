@@ -200,6 +200,33 @@ func TestACoverTypesTextInAndSettlesWhereItWasDrawn(t *testing.T) {
 	}
 }
 
+// TestACoverStaysOffItsTextBetweenTheLapsOfALoop is what a loop asks of this
+// effect that a single play does not: the cover has to hold the place it was
+// drawn in for the rest of the cycle, or a looping card would put it back over
+// the number the moment the typing finished and the number would be gone for
+// the seven seconds a reader has to read it in.
+func TestACoverStaysOffItsTextBetweenTheLapsOfALoop(t *testing.T) {
+	tl := newTimeline(MotionLoop)
+	tl.addShift(effectType, 0, 0.5, "steps(3)", 21.6)
+	css := tl.css()
+	for _, want := range []string{
+		".m0{animation:m0 7.5s steps(3) infinite}",
+		"@keyframes m0{0%{transform:translateX(-21.6px)}6.67%,100%{transform:translateX(0px)}}",
+	} {
+		if !strings.Contains(css, want) {
+			t.Errorf("css lacks %q:\n%s", want, css)
+		}
+	}
+	// And a cover that starts part way into the cycle waits over its text
+	// until its own beat, rather than uncovering with the one above it.
+	staggered := newTimeline(MotionOnce)
+	staggered.addShift(effectType, 0, 0.5, "steps(2)", 10)
+	staggered.addShift(effectType, 0.5, 0.5, "steps(2)", 10)
+	if want := "@keyframes m1{0%,50%{transform:translateX(-10px)}100%{transform:translateX(0px)}}"; !strings.Contains(staggered.css(), want) {
+		t.Errorf("css lacks %q:\n%s", want, staggered.css())
+	}
+}
+
 // TestABandSlidesByOneCopyAndHoldsThere is the effect the ticker scrolls with,
 // and the half of it a loop needs: the band holds the shift it reached for the
 // rest of the cycle instead of snapping back and waiting at the start.

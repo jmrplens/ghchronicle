@@ -539,8 +539,13 @@ func TestTheTerminalTypesEveryNumberAndSettlesOnACursor(t *testing.T) {
 	// The cover is a plain fill. .bg is the only class that carries the card's
 	// own background color in both themes, and it is also the card's border,
 	// so the layout takes the border off it.
-	if !strings.Contains(doc, ".mask{stroke:none}") {
+	if !strings.Contains(doc, ".bg.mask{stroke:none}") {
 		t.Error("a cover painted with .bg would draw the card's border across the line")
+	}
+	// Two classes in the selector, so the rule wins on specificity rather than
+	// on openDoc writing the palette before a layout's own rules.
+	if strings.Contains(doc, "\n.mask{") {
+		t.Error("the rule must be .bg.mask, or it only wins by being written second")
 	}
 	// Every number is written once and in full: the cover moves, the text does
 	// not, so a renderer that ignores animation reads the whole card.
@@ -649,10 +654,17 @@ func TestTheTickerScrollsByExactlyOneCopyOfItsContent(t *testing.T) {
 	if !strings.Contains(doc, `<rect class="track" x="`+num(strip)+`" `) {
 		t.Errorf("no pill stands one copy on at %s, so the seam has a hole", num(strip))
 	}
+	// And one copy is never narrower than the band, whatever the content
+	// measures, which is what keeps the copy behind it off the resting card.
+	if by < tickerBand(800) {
+		t.Errorf("one copy is %v and the band is %v", by, tickerBand(800))
+	}
 	// The strip is cut off by a viewport of its own rather than by a clip path,
-	// which would be reached through url().
-	if !strings.Contains(doc, `<svg x="1" y="`+num(tickBandY)+`"`) {
-		t.Error("the band needs a viewport of its own, or the pills run over the card's border")
+	// which would be reached through url(), and that viewport is inset by the
+	// family's padding, so the first pill rests under the title rather than
+	// against the card's border.
+	if !strings.Contains(doc, `<svg x="`+num(pad)+`" y="`+num(tickBandY)+`" width="`+num(tickerBand(800))+`"`) {
+		t.Errorf("the band needs a viewport of its own, inset by the padding:\n%s", doc)
 	}
 
 	still := mustRender(t, c, &Options{Theme: "dark", Layout: "ticker", Motion: MotionOff})
@@ -668,6 +680,69 @@ func TestTheTickerScrollsByExactlyOneCopyOfItsContent(t *testing.T) {
 	empty := mustRender(t, &Card{Login: "someone"}, &Options{Theme: "dark", Layout: "ticker", Fields: []string{fieldTopRepos}})
 	if strings.Contains(empty, "animation") || !strings.Contains(empty, "Nothing to show") {
 		t.Errorf("an empty band must say so and place no beat:\n%s", empty)
+	}
+}
+
+// TestATickerShorterThanItsBandStillRestsOnOneCopy is the rule the whole
+// package is built on, for the one layout that can break it without anybody
+// looking: the resting card, which is what a still renderer draws and what a
+// reader under prefers-reduced-motion is left with, has to be the finished
+// card and not the content listed twice.
+//
+// The copies exist to be scrolled into view, and they are laid out one strip
+// apart. A strip narrower than the band therefore puts the second copy on
+// screen while the group is untranslated, which is exactly what five metrics
+// and no repositories used to do: fifteen pills under once, five under off.
+// One copy is padded out to the band, so the copy behind it starts at the far
+// edge or past it.
+func TestATickerShorterThanItsBandStillRestsOnOneCopy(t *testing.T) {
+	c := sample()
+	c.TopRepos = nil
+	o := func(motion string) *Options {
+		return &Options{
+			Theme: "dark", Layout: "ticker", Motion: motion,
+			Fields: []string{fieldStars, fieldForks, fieldFollowers, fieldRepos, fieldContributions},
+		}
+	}
+	moving, still := mustRender(t, c, o(MotionOnce)), mustRender(t, c, o(MotionOff))
+	pills := tickerPills(&spec{
+		width:  800,
+		fields: []string{fieldStars, fieldForks, fieldFollowers, fieldRepos, fieldContributions},
+		nums:   metricsOf(c, []string{fieldStars, fieldForks, fieldFollowers, fieldRepos, fieldContributions}),
+	})
+	strip := 0.0
+	for _, p := range pills {
+		strip += p.width + tickGap
+	}
+	if strip >= tickerBand(800) {
+		t.Fatalf("test setup: this content is %v wide and the band is %v; it has to be the narrower one", strip, tickerBand(800))
+	}
+	// Every pill the second copy holds is off the band, so what rests on
+	// screen is the one copy the still card draws.
+	onScreen := func(doc string) int {
+		n := 0
+		for _, m := range regexp.MustCompile(`<rect class="track" x="([\d.]+)"`).FindAllStringSubmatch(doc, -1) {
+			if x, _ := strconv.ParseFloat(m[1], 64); x < tickerBand(800) {
+				n++
+			}
+		}
+		return n
+	}
+	if got, want := onScreen(moving), onScreen(still); got != want {
+		t.Errorf("the band rests on %d pills and the still card draws %d: a reader who sees no animation reads the content twice", got, want)
+	}
+	if got := onScreen(moving); got != len(pills) {
+		t.Errorf("%d pills rest on the band, want the %d of one copy", got, len(pills))
+	}
+	// Which is the same thing said about the shift: a copy is never narrower
+	// than the band it has to clear.
+	shift := regexp.MustCompile(`100%\{transform:translateX\(-([\d.]+)px\)\}`).FindStringSubmatch(moving)
+	if shift == nil {
+		t.Fatalf("the band does not scroll:\n%s", moving)
+	}
+	by, _ := strconv.ParseFloat(shift[1], 64)
+	if by < tickerBand(800) {
+		t.Errorf("one copy is %v and the band is %v: the copy behind it would rest on screen", by, tickerBand(800))
 	}
 }
 

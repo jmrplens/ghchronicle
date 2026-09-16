@@ -48,7 +48,12 @@ const termCSS = ".tm{font-size:12px}\n.tv{font-weight:600}\n"
 // the reader's; .bg is the only class that carries it, and .bg is also the
 // card's border. Written only on a card that has a number to type, so a still
 // card is styled exactly as it was before this layout could move.
-const termMaskCSS = ".mask{stroke:none}\n"
+//
+// Two classes in the selector, not one: .bg{stroke:...} and .mask{stroke:none}
+// would tie on specificity and this one would win only because openDoc writes
+// the palette before a layout's own rules. .bg.mask wins on specificity, so it
+// no longer depends on the order the blocks are written in.
+const termMaskCSS = ".bg.mask{stroke:none}\n"
 
 // markRamp is the mark's opacity by the sum of a cell's row and column: one
 // diagonal ridge across a five by five grid, which is what brand/mark-dark.svg

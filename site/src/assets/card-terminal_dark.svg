@@ -33,7 +33,7 @@ text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,san
 .edge{fill:none;stroke-width:1}
 .tm{font-size:12px}
 .tv{font-weight:600}
-.mask{stroke:none}
+.bg.mask{stroke:none}
 .m0{animation:m0 2.2s steps(3) 1}
 @keyframes m0{0%{transform:translateX(-25.6px)}13.64%,100%{transform:translateX(0px)}}
 .m1{animation:m1 2.2s steps(2) 1}

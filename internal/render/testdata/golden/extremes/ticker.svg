@@ -38,7 +38,7 @@ text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,san
 <rect class="bg" x="0.5" y="0.5" width="399" height="93" rx="6"/>
 <text class="t" x="25" y="30" text-anchor="start">A head…</text>
 <text class="s" x="375" y="30" text-anchor="end">@an-account-login-long-enough-to-crowd-its-band</text>
-<svg x="1" y="46" width="398" height="34">
+<svg x="25" y="46" width="350" height="34">
 <g class="m0">
 <rect class="track" x="0" y="5" width="114.1" height="24" rx="12"/>
 <text class="c mono" x="12" y="21" text-anchor="start">-1099.5B</text>

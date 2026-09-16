@@ -85,6 +85,37 @@ func TestDocumentedNumericFieldCountMatchesTheCode(t *testing.T) {
 	}
 }
 
+// actionYAML is the Action's own manifest, whose card-layout input names every
+// layout a workflow may ask for. It is the third place the registry is written
+// out, after the two pages above, and the design asked for it to be checked
+// here: nothing read it, so a layout added to the registry was a layout the
+// Action's own documentation did not offer and nothing failed.
+var actionYAML = filepath.Join("..", "..", "action.yml")
+
+// TestTheActionOffersEveryRegisteredLayout fails when action.yml's card-layout
+// description has come to disagree with the registry, in either direction: a
+// name it does not list, or one it lists that no longer exists.
+func TestTheActionOffersEveryRegisteredLayout(t *testing.T) {
+	body, err := os.ReadFile(actionYAML)
+	if err != nil {
+		t.Fatalf("%s: %v", actionYAML, err)
+	}
+	line := regexp.MustCompile(`(?m)^ +description: One of the registered layouts \(([^)]+)\)\.$`).FindSubmatch(body)
+	if line == nil {
+		t.Fatalf("%s has no card-layout description of the shape this reads", actionYAML)
+	}
+	documented := strings.Split(string(line[1]), ", ")
+	var want []string
+	for _, l := range Layouts() {
+		want = append(want, l.Name)
+	}
+	// In registry order, which is the order -card-layouts prints and the order
+	// the pages list them in, so a reader meets them the same way everywhere.
+	if !slices.Equal(documented, want) {
+		t.Errorf("%s offers %v, the registry holds %v", actionYAML, documented, want)
+	}
+}
+
 // layoutsSupporting is every layout that can draw one field, sorted, which is
 // the order a table reads best in and the one the comparison above needs.
 func layoutsSupporting(field string) []string {

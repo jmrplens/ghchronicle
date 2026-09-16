@@ -29,6 +29,10 @@ const (
 	tickSpeed = 140.0
 )
 
+// tickerBand is how wide the strip's viewport is: the card less the family's
+// padding either side, which is where the title above it starts and ends.
+func tickerBand(width float64) float64 { return width - 2*pad }
+
 // tickPill is one pill of the band. A pill with a dot is a repository, drawn
 // as a language dot, a name, a star and a count; one without is a metric,
 // drawn as the number and what it counts.
@@ -87,6 +91,16 @@ func drawTicker(b *strings.Builder, c *Card, s *spec) {
 	// the copy behind it stands exactly where this one did and the seam is
 	// the same picture twice rather than a jump.
 	//
+	// Never narrower than the band, whatever the content measures. The copies
+	// are laid out at this pitch, so a copy narrower than the band would put
+	// the next one on screen while the group is untranslated, and the resting
+	// card, which is the card a still renderer and a reader under
+	// prefers-reduced-motion get, would list the same pills twice. Three
+	// repositories and nothing else did exactly that. Padding one copy out to
+	// the band pushes the next one to the far edge or past it, so what rests
+	// on screen is one copy and the gap after it, which is what the card would
+	// have shown with no animation at all.
+	//
 	// Rounded up to a whole user unit, and the copies laid out at that pitch,
 	// so the shift is a whole number of pixels. A fractional shift is exact in
 	// the geometry and still draws the seam wrong: the band is composited as a
@@ -100,11 +114,13 @@ func drawTicker(b *strings.Builder, c *Card, s *spec) {
 	for _, p := range pills {
 		strip += p.width + tickGap
 	}
-	strip = math.Ceil(strip)
 	// Gated on there being a pill: a band with nothing in it has nothing to
-	// scroll, and a beat for it would be keyframes moving an empty group.
+	// scroll, and a beat for it would be keyframes moving an empty group. The
+	// padding is inside the gate, because an empty band is as wide as the card
+	// and would otherwise look like content to scroll.
 	scroll := ""
-	if strip > 0 {
+	if len(pills) > 0 {
+		strip = math.Ceil(math.Max(strip, tickerBand(s.width)))
 		scroll = tl.addShift(effectSlide, 0, strip/tickSpeed, "linear", strip)
 	}
 
@@ -117,11 +133,13 @@ func drawTicker(b *strings.Builder, c *Card, s *spec) {
 	// A viewport of its own, which is what cuts the strip off at the card's
 	// edges. A nested svg clips to its own bounds by default, needs no
 	// identifier and is referenced by nothing, where a clip-path would be
-	// reached through url() and this document reaches for nothing.
-	fmt.Fprintf(b, `<svg x="1" y="%s" width="%s" height="%s">`+"\n",
-		num(tickBandY), num(s.width-2), num(tickBandH))
+	// reached through url() and this document reaches for nothing. It is inset
+	// by the family's own padding, so the first pill begins under the title
+	// rather than against the card's border.
+	fmt.Fprintf(b, `<svg x="%s" y="%s" width="%s" height="%s">`+"\n",
+		num(pad), num(tickBandY), num(tickerBand(s.width)), num(tickBandH))
 	if len(pills) == 0 {
-		text(b, pad, tickBandH/2+4, "d", "start", "Nothing to show")
+		text(b, 0, tickBandH/2+4, "d", "start", "Nothing to show")
 		b.WriteString("</svg>\n")
 		return
 	}
@@ -131,7 +149,7 @@ func drawTicker(b *strings.Builder, c *Card, s *spec) {
 	copies := 1
 	if scroll != "" {
 		fmt.Fprintf(b, `<g%s>`+"\n", classAttr(scroll))
-		copies = int(math.Ceil((s.width-2)/strip)) + 1
+		copies = int(math.Ceil(tickerBand(s.width)/strip)) + 1
 	}
 	for i := range copies {
 		x := float64(i) * strip
