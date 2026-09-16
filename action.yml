@@ -49,7 +49,7 @@ inputs:
     required: false
     default: ""
   card-motion:
-    description: How an animated layout moves. `once` plays and settles, `loop` plays again after a still pause, `off` draws the finished card with no animation.
+    description: How an animated layout moves. `once` plays and settles, `loop` does the same and lets whatever the layout has that never ends go on for ever (only `terminal` and `ticker` have one), `off` draws the finished card with no animation.
     required: false
     default: once
   include-private:

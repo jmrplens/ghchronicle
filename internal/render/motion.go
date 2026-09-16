@@ -11,10 +11,19 @@ import (
 // The values Options.Motion takes.
 //
 // once plays the animation a single time and settles, which is what every
-// animated layout did before there was a choice. loop plays it, holds the
-// finished card still for loopRest and plays it again, so a README that shows
-// the card moves for a few seconds at a time rather than all the time. off
-// writes no animation at all.
+// animated layout did before there was a choice. off writes no animation at
+// all.
+//
+// loop does not replay anything. An animation here reveals content, and
+// replaying a reveal takes content that a reader has already been shown and
+// hides it again, which is the one thing a card in a README must not do. So
+// loop means: the reveal still plays once and settles, and whatever the card
+// has that is continuous and destroys nothing keeps going for ever. Two
+// layouts have such a thing, the terminal's cursor and the ticker's band, and
+// they are the two the registry marks Loops. On every other layout loop draws
+// the same card as once, to the byte.
+//
+// The author's decision, 2026-09-16, after seeing the layouts move.
 const (
 	MotionOnce = "once"
 	MotionLoop = "loop"
@@ -23,10 +32,6 @@ const (
 
 // ErrMotion is returned for a motion this package does not know.
 var ErrMotion = errors.New("render: unknown motion")
-
-// loopRest is how long a looping card holds its finished state before it
-// plays again, in seconds.
-const loopRest = 7.0
 
 // effect is what a beat does to the elements that carry its class. Each one
 // animates a property whose base value it knows, which is what lets a beat
@@ -95,6 +100,17 @@ const (
 	effectBlink
 )
 
+// continuous reports whether an effect is motion the card can keep up for ever
+// rather than a reveal that has to land. The line between the two is what
+// loop means: a reveal shows content, so replaying it takes back something the
+// reader has already been given, while a cursor that blinks and a band that
+// scrolls put nothing on the card and take nothing off it. Only these two may
+// run for ever, and a layout is marked Loops in the registry exactly when it
+// has one of them.
+func (e effect) continuous() bool {
+	return e == effectSlide || e == effectBlink
+}
+
 // beat is one effect placed on the card's clock, in seconds. shift is how far
 // the two effects that translate move, in user units; every other effect
 // leaves it at zero.
@@ -103,6 +119,18 @@ type beat struct {
 	start, dur float64
 	ease       string
 	shift      float64
+}
+
+// period is how long one turn of a continuous beat takes, which is what it
+// repeats on under loop. A band's turn is the pass it was given; a cursor's is
+// the cadence it blinks at, and not the beat's own length, because dur is how
+// long it blinks before a card that plays once settles, which a card that
+// never settles has no use for.
+func (b beat) period() float64 {
+	if b.effect == effectBlink {
+		return blinkPeriod
+	}
+	return b.dur
 }
 
 // timeline is every beat a card plays, on one clock. All of them share the
@@ -150,13 +178,14 @@ func (t *timeline) moving() bool {
 	return t != nil && t.motion != MotionOff
 }
 
+// cycle is how long the card takes to tell its story: the end of its last
+// beat, whatever the motion. It used to grow by a rest under loop, for the
+// stillness between one replay and the next; nothing replays any more, so
+// there is nothing to rest between and once and loop measure the same.
 func (t *timeline) cycle() float64 {
 	end := 0.0
 	for _, b := range t.beats {
 		end = max(end, b.start+b.dur)
-	}
-	if t.motion == MotionLoop {
-		end += loopRest
 	}
 	return end
 }
@@ -168,16 +197,22 @@ func (t *timeline) css() string {
 		return ""
 	}
 	cycle := t.cycle()
-	count := "1"
-	if t.motion == MotionLoop {
-		count = "infinite"
-	}
 	var b strings.Builder
 	names := make([]string, len(t.beats))
 	for i, bt := range t.beats {
 		name := "m" + strconv.Itoa(i)
 		names[i] = "." + name
-		fmt.Fprintf(&b, ".%s{animation:%s %ss %s %s%s}\n", name, name, num(cycle), bt.ease, count, anchorCSS(bt.effect))
+		// A continuous beat under loop is the only thing that repeats, and it
+		// repeats on a clock of its own: it is not part of the sequence the
+		// card reveals itself in, it has no stagger to keep in step with, and
+		// its period is the one its own effect has. Everything else plays once
+		// over the cycle, under loop exactly as under once.
+		if t.motion == MotionLoop && bt.effect.continuous() {
+			fmt.Fprintf(&b, ".%s{animation:%s %ss %s infinite%s}\n", name, name, num(bt.period()), bt.ease, anchorCSS(bt.effect))
+			fmt.Fprintf(&b, "@keyframes %s{%s}\n", name, perpetual(bt))
+			continue
+		}
+		fmt.Fprintf(&b, ".%s{animation:%s %ss %s 1%s}\n", name, name, num(cycle), bt.ease, anchorCSS(bt.effect))
 		fmt.Fprintf(&b, "@keyframes %s{%s}\n", name, keyframes(bt, cycle))
 	}
 	fmt.Fprintf(&b, "@media (prefers-reduced-motion:reduce){%s{animation:none}}\n", strings.Join(names, ","))
@@ -219,6 +254,21 @@ func keyframes(bt beat, cycle float64) string {
 	default: // effectFade
 		return stops(0, from) + hidden + stops(to, 100) + shown
 	}
+}
+
+// perpetual is the keyframes of a continuous beat under loop: one turn, which
+// the browser repeats for ever. There is no waiting stretch before it and no
+// settled one after it, because there is no cycle for it to sit inside; it is
+// the whole animation.
+func perpetual(bt beat) string {
+	if bt.effect == effectBlink {
+		// Lit for the first half of the turn and dark for the second, wrapping
+		// straight back to lit. The base style is the lit cursor either way,
+		// so a still renderer and a reader under prefers-reduced-motion get
+		// the cursor this one is blinking.
+		return stops(0, 50-0.01) + "{opacity:1}" + stops(50, 100) + "{opacity:0}"
+	}
+	return "0%{transform:" + shiftedBy(0) + "}100%{transform:" + shiftedBy(-bt.shift) + "}"
 }
 
 // shiftedBy writes one horizontal translation. The unit is px because a CSS

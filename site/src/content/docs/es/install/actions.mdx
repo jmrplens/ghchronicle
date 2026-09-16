@@ -29,7 +29,7 @@ cadena de herramientas de Go: descarga un binario de release y lo llama.
 | `card-layout`     | `summary`                | Uno de los trece diseños registrados                                                                                                                   |
 | `card-theme`      | `auto`                   | `dark`, `light`, `auto`, o `both` para una tarjeta clara y su gemela `_dark`                                                                          |
 | `card-fields`     | `""`                     | Campos separados por comas. Vacío es el conjunto por defecto del diseño                                                                               |
-| `card-motion`     | `once`                   | `once`, `loop` u `off`, para los diseños animados                                                                                                     |
+| `card-motion`     | `once`                   | `once`, `loop` u `off`; `loop` solo cambia `terminal` y `ticker`                                                                                                     |
 | `include-private` | `false`                  | `true` cuenta los repositorios privados cuando no se da fichero de configuración (el comportamiento por defecto hasta v1.0.0). Ver el aviso más abajo |
 | `version`         | `latest`                 | La release que instalar                                                                                                                               |
 
@@ -179,7 +179,7 @@ El README no se reescribe nunca.
              card: generated/card.svg
              card-layout: animated-counters
              card-theme: both
-             card-motion: loop
+             card-motion: once
          - name: Commit if it changed
            run: |
              git config user.name "github-actions[bot]"

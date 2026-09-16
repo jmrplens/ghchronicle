@@ -126,18 +126,33 @@ script, ever. Every animation ends on the complete static card, so a renderer
 that ignores animation shows the finished state, and `prefers-reduced-motion`
 switches it off in every mode.
 
-| `-card-motion` | What the card does                                                      |
-| -------------- | ----------------------------------------------------------------------- |
-| `once`         | Plays when it loads and settles. The default                            |
-| `loop`         | Plays, holds the finished card still for seven seconds, and plays again |
-| `off`          | No animation at all, and a smaller file                                 |
+| `-card-motion` | What the card does                                                          |
+| -------------- | --------------------------------------------------------------------------- |
+| `once`         | Plays when it loads and settles. The default                                |
+| `loop`         | The same, and whatever the layout has that never ends goes on for ever      |
+| `off`          | No animation at all, and a smaller file                                     |
 
-A loop that rests between plays is deliberate: a README that moves all the time
-is hard to read next to it. Still, a card that loops keeps moving for everyone
-reading the README, and a README offers them no control over it, so `once` is
-the considerate choice for a profile.
+### A loop never replays
 
-<Card name="animated-counters" loop alt="The animated-counters layout played once: the numbers count up and settle, and the page can also play it in a loop" />
+An animation here reveals content: a number counts up to what it is, a bar
+grows to its share, a line draws itself. Playing that again would take back
+something the reader has already been shown, and a card that keeps hiding its
+own figures is worse than a still one.
+
+So `loop` does not mean "and again". The reveal plays once and settles in both
+modes, and the only thing that may go on for ever is motion that puts nothing on
+the card and takes nothing off it. Two layouts have such a thing:
+
+- `terminal`, whose cursor blinks at its prompt. The numbers still type
+  themselves in once.
+- `ticker`, whose band of pills keeps scrolling. Nothing disappears; the same
+  pills come round again.
+
+On every other layout `loop` draws exactly the card `once` draws, to the byte.
+It is accepted rather than refused, so a workflow can set it once and change
+`card-layout` freely.
+
+<Card name="terminal" animated loop alt="The terminal layout played once: a terminal window whose lines of output each have a number typing itself in, with a block cursor blinking at the prompt below them, and the page can also play it in a loop, where the typing still happens once and only the cursor goes on blinking" />
 
 ## In a README
 

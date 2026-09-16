@@ -381,8 +381,11 @@ func TestExecuteBothThemesComeFromOneSweep(t *testing.T) {
 	light := filepath.Join(dir, "card.svg")
 	dark := filepath.Join(dir, "card_dark.svg")
 
+	// A layout that loops, because the point here is that the motion reaches
+	// both files: sparkline-hero only reveals, and loop draws it the card once
+	// draws, so it could not tell the two motions apart.
 	got := runCommand(t, "-config", cfg, "-card", light, "-card-only",
-		"-card-layout", "sparkline-hero", "-card-theme", "both", "-card-motion", "loop")
+		"-card-layout", "terminal", "-card-theme", "both", "-card-motion", "loop")
 	if got.status != notExited {
 		t.Fatalf("-card-theme both = %d:\n%s", got.status, got.stderr)
 	}

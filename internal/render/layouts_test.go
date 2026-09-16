@@ -29,37 +29,53 @@ func TestLayoutsRegistryHoldsTheThirteenConcepts(t *testing.T) {
 		"language-ring": true, "activity-heatmap": true, "animated-counters": true,
 		"terminal": true, "ticker": true, "language-bars": true,
 	}
+	// The two with something continuous to keep going: a cursor and a band.
+	// Everything else only reveals, and a reveal is never replayed.
+	loops := map[string]bool{"terminal": true, "ticker": true}
 	for i, l := range got {
 		if l.Name != want[i] {
 			t.Errorf("layout %d = %q, want %q", i, l.Name, want[i])
 		}
-		if l.Family != "chronicle" && l.Family != "github" {
-			t.Errorf("%s: family %q is neither chronicle nor github", l.Name, l.Family)
-		}
-		if l.Description == "" || strings.Contains(l.Description, "\n") {
-			t.Errorf("%s: the description must be one line", l.Name)
-		}
-		if l.Animated != animated[l.Name] {
-			t.Errorf("%s: animated = %v", l.Name, l.Animated)
-		}
-		if len(l.Fields) == 0 {
-			t.Errorf("%s: no default fields", l.Name)
-		}
-		for _, f := range l.Fields {
-			if !slices.Contains(l.Supports, f) {
-				t.Errorf("%s: default field %q is not in its supported set", l.Name, f)
-			}
-		}
-		for _, f := range l.Supports {
-			if !slices.Contains(fieldVocabulary, f) {
-				t.Errorf("%s: supports %q, which is not in the vocabulary", l.Name, f)
-			}
-		}
+		checkRegisteredLayout(t, l, animated[l.Name], loops[l.Name])
 	}
 	// The registry must not be reachable through the copies.
 	got[0].Fields[0] = "tampered"
 	if Layouts()[0].Fields[0] == "tampered" {
 		t.Error("Layouts() handed out the registry's own slice")
+	}
+}
+
+// checkRegisteredLayout is what every entry of the registry owes, pulled out of
+// the loop that walks it so that loop stays a list of names.
+func checkRegisteredLayout(t *testing.T, l Layout, animated, loops bool) {
+	t.Helper()
+	if l.Family != "chronicle" && l.Family != "github" {
+		t.Errorf("%s: family %q is neither chronicle nor github", l.Name, l.Family)
+	}
+	if l.Description == "" || strings.Contains(l.Description, "\n") {
+		t.Errorf("%s: the description must be one line", l.Name)
+	}
+	if l.Animated != animated {
+		t.Errorf("%s: animated = %v", l.Name, l.Animated)
+	}
+	if l.Loops != loops {
+		t.Errorf("%s: loops = %v", l.Name, l.Loops)
+	}
+	if l.Loops && !l.Animated {
+		t.Errorf("%s: a layout that loops has to move at all", l.Name)
+	}
+	if len(l.Fields) == 0 {
+		t.Errorf("%s: no default fields", l.Name)
+	}
+	for _, f := range l.Fields {
+		if !slices.Contains(l.Supports, f) {
+			t.Errorf("%s: default field %q is not in its supported set", l.Name, f)
+		}
+	}
+	for _, f := range l.Supports {
+		if !slices.Contains(fieldVocabulary, f) {
+			t.Errorf("%s: supports %q, which is not in the vocabulary", l.Name, f)
+		}
 	}
 }
 
@@ -178,8 +194,11 @@ func checkLayoutMoves(t *testing.T, l Layout, motion, doc string) {
 		t.Errorf("%s under %s does not move", l.Name, motion)
 		return
 	}
-	if loops := strings.Contains(doc, "infinite"); loops != (motion == MotionLoop) {
-		t.Errorf("%s under %s: infinite = %v", l.Name, motion, loops)
+	// Only a layout the registry marks Loops has anything that repeats, and
+	// only under loop: everything else reveals content, and a reveal replayed
+	// takes back what the reader was shown.
+	if loops := strings.Contains(doc, "infinite"); loops != (motion == MotionLoop && l.Loops) {
+		t.Errorf("%s under %s: infinite = %v, want %v", l.Name, motion, loops, motion == MotionLoop && l.Loops)
 	}
 	if !strings.Contains(doc, "@media (prefers-reduced-motion:reduce)") || !strings.Contains(doc, "animation:none") {
 		t.Errorf("%s under %s must switch its animation off under prefers-reduced-motion", l.Name, motion)
@@ -288,6 +307,112 @@ func TestAnimatedCardsAreByteIdenticalInEveryMotion(t *testing.T) {
 				t.Errorf("%s under %s differs between two renders", l.Name, motion)
 			}
 		}
+	}
+}
+
+// TestOnlyContinuousMotionRunsForEver is the feature's rule, read off every
+// registered layout at once: a layout with nothing continuous draws the same
+// bytes under loop as under once, and the two that have something continuous
+// repeat exactly that one thing and nothing else.
+//
+// The author's decision, 2026-09-16: an animation that reveals content plays
+// once and settles, because replaying it makes content a reader has already
+// been shown disappear. Only motion that destroys nothing may run for ever.
+func TestOnlyContinuousMotionRunsForEver(t *testing.T) {
+	c := sample()
+	for _, l := range Layouts() {
+		once := mustRender(t, c, &Options{Theme: "dark", Layout: l.Name, Motion: MotionOnce})
+		loop := mustRender(t, c, &Options{Theme: "dark", Layout: l.Name, Motion: MotionLoop})
+		if !l.Loops {
+			if loop != once {
+				t.Errorf("%s has nothing to keep going, so loop must draw the card once draws: %s",
+					l.Name, firstDifference(loop, once))
+			}
+			continue
+		}
+		// Exactly one class repeats, and everything else plays once, which is
+		// the same "once" the other motion draws.
+		forever := regexp.MustCompile(`\.(m\d+)\{animation:m\d+ [\d.]+s [^;}]* infinite`).FindAllStringSubmatch(loop, -1)
+		if len(forever) != 1 {
+			t.Errorf("%s under loop repeats %d classes, want the one thing it has that is continuous", l.Name, len(forever))
+			continue
+		}
+		plays := len(regexp.MustCompile(`\.m\d+\{animation:m\d+ [\d.]+s [^;}]* 1[;}]`).FindAllString(loop, -1))
+		// Every rule that names a keyframe block, which is one per beat; the
+		// reduced-motion block says animation:none and names no keyframes.
+		beats := len(regexp.MustCompile(`\.m\d+\{animation:m\d+ `).FindAllString(once, -1))
+		if want := beats - 1; plays != want {
+			t.Errorf("%s under loop plays %d beats once, want %d of its %d", l.Name, plays, want, beats)
+		}
+		if err := continuousClassIsTheRightOne(l.Name, loop, forever[0][1]); err != "" {
+			t.Errorf("%s: %s", l.Name, err)
+		}
+		// And under reduced motion nothing moves, the perpetual class included.
+		checkReducedMotionNamesEveryClass(t, l.Name, MotionLoop, loop)
+		if !strings.Contains(loop, "."+forever[0][1]+",") && !strings.Contains(loop, ","+forever[0][1]+"{animation:none}") &&
+			!strings.Contains(loop, "."+forever[0][1]+"{animation:none}") {
+			t.Errorf("%s: the class that runs for ever must be switched off under prefers-reduced-motion", l.Name)
+		}
+	}
+}
+
+// continuousClassIsTheRightOne says whether the class a layout repeats is on
+// the thing that is allowed to repeat: the terminal's cursor, which is the
+// block at its prompt, and the ticker's band, which is the group holding the
+// strip. Anything else wearing it would be content kept in motion.
+func continuousClassIsTheRightOne(layout, doc, class string) string {
+	switch layout {
+	case "terminal":
+		if !strings.Contains(doc, `<rect class="ok `+class+`"`) {
+			return "the class that runs for ever is not the cursor's"
+		}
+		if strings.Count(doc, class+`"`) != 1 {
+			return "the cursor's class is on more than the cursor"
+		}
+	case "ticker":
+		if !strings.Contains(doc, `<g class="`+class+`">`) {
+			return "the class that runs for ever is not the band's"
+		}
+	default:
+		return "no layout but the terminal and the ticker has anything continuous"
+	}
+	return ""
+}
+
+// TestTheTerminalTypesOnceHoweverItIsAskedToMove is the rule at the layout
+// that shows it best: the numbers type themselves in exactly once under loop,
+// as under once, and what goes on for ever is the cursor and only the cursor.
+func TestTheTerminalTypesOnceHoweverItIsAskedToMove(t *testing.T) {
+	c := sample()
+	once := mustRender(t, c, &Options{Theme: "dark", Layout: "terminal", Motion: MotionOnce})
+	loop := mustRender(t, c, &Options{Theme: "dark", Layout: "terminal", Motion: MotionLoop})
+	covers := regexp.MustCompile(`<rect class="bg mask m\d+"[^>]*>`).FindAllString(once, -1)
+	for _, cover := range covers {
+		if !strings.Contains(loop, cover) {
+			t.Errorf("a cover moved between once and loop: %s", cover)
+		}
+	}
+	// Every beat but the cursor's is written the same in both, and the two
+	// documents differ only in the cursor's own two lines of stylesheet.
+	blink := "m" + strconv.Itoa(len(covers))
+	for line := range strings.SplitSeq(once, "\n") {
+		if strings.HasPrefix(line, "."+blink+"{") || strings.HasPrefix(line, "@keyframes "+blink+"{") {
+			continue
+		}
+		if !strings.Contains(loop, line) {
+			t.Errorf("loop changed a line that has nothing to do with the cursor:\n%s", line)
+		}
+	}
+	if !strings.Contains(loop, "."+blink+"{animation:"+blink+" "+num(blinkPeriod)+"s linear infinite}") {
+		t.Errorf("the cursor must blink for ever under loop:\n%s", loop)
+	}
+	// It blinks on its own cadence, half lit and half dark, and the card it
+	// settles to when it is not looping is the one with the cursor lit.
+	if !strings.Contains(loop, "@keyframes "+blink+"{0%,49.99%{opacity:1}50%,100%{opacity:0}}") {
+		t.Errorf("the perpetual blink is not one turn of lit and dark:\n%s", loop)
+	}
+	if !strings.Contains(once, "100%{opacity:1}}") {
+		t.Error("played once, the cursor still settles lit")
 	}
 }
 
@@ -695,55 +820,103 @@ func TestTheTickerScrollsByExactlyOneCopyOfItsContent(t *testing.T) {
 // and no repositories used to do: fifteen pills under once, five under off.
 // One copy is padded out to the band, so the copy behind it starts at the far
 // edge or past it.
+//
+// A table because the property is general in the width and in how much content
+// there is, and the bug had one shape. The rows bound it: the default width,
+// the layout's narrowest, and a band with a single pill in it.
 func TestATickerShorterThanItsBandStillRestsOnOneCopy(t *testing.T) {
-	c := sample()
-	c.TopRepos = nil
-	o := func(motion string) *Options {
-		return &Options{
-			Theme: "dark", Layout: "ticker", Motion: motion,
-			Fields: []string{fieldStars, fieldForks, fieldFollowers, fieldRepos, fieldContributions},
-		}
-	}
-	moving, still := mustRender(t, c, o(MotionOnce)), mustRender(t, c, o(MotionOff))
-	pills := tickerPills(&spec{
-		width:  800,
-		fields: []string{fieldStars, fieldForks, fieldFollowers, fieldRepos, fieldContributions},
-		nums:   metricsOf(c, []string{fieldStars, fieldForks, fieldFollowers, fieldRepos, fieldContributions}),
-	})
-	strip := 0.0
-	for _, p := range pills {
-		strip += p.width + tickGap
-	}
-	if strip >= tickerBand(800) {
-		t.Fatalf("test setup: this content is %v wide and the band is %v; it has to be the narrower one", strip, tickerBand(800))
-	}
-	// Every pill the second copy holds is off the band, so what rests on
-	// screen is the one copy the still card draws.
-	onScreen := func(doc string) int {
-		n := 0
-		for _, m := range regexp.MustCompile(`<rect class="track" x="([\d.]+)"`).FindAllStringSubmatch(doc, -1) {
-			if x, _ := strconv.ParseFloat(m[1], 64); x < tickerBand(800) {
-				n++
+	def, _ := findLayout("ticker")
+	for _, tc := range []struct {
+		name   string
+		width  int
+		fields []string
+	}{
+		{"five metrics at the default width", def.width, []string{fieldStars, fieldForks, fieldFollowers, fieldRepos, fieldContributions}},
+		{"five metrics at the narrowest", def.minWidth, []string{fieldStars, fieldForks, fieldFollowers, fieldRepos, fieldContributions}},
+		{"one pill at the default width", def.width, []string{fieldStars}},
+		{"one pill at the narrowest", def.minWidth, []string{fieldStars}},
+		{"repositories and no numbers", def.width, []string{fieldTopRepos}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			c := sample()
+			o := func(motion string) *Options {
+				return &Options{Theme: "dark", Layout: "ticker", Motion: motion, Fields: tc.fields, Width: tc.width}
 			}
+			moving, still := mustRender(t, c, o(MotionOnce)), mustRender(t, c, o(MotionOff))
+			band := tickerBand(float64(tc.width))
+			pills := tickerPills(&spec{
+				width: float64(tc.width), fields: tc.fields,
+				nums:  metricsOf(c, tc.fields),
+				repos: repoBlock(c, tc.fields),
+			})
+			// How much one copy measures, and how many of its pills begin
+			// inside the band, which is every one of them when the content is
+			// the narrower and as many as fit when it is not.
+			strip, fit := 0.0, 0
+			for _, p := range pills {
+				if strip < band {
+					fit++
+				}
+				strip += p.width + tickGap
+			}
+			// Every pill the copies behind the first hold is off the band, so
+			// what rests on screen is the one copy the still card draws.
+			if got, want := pillsOnTheBand(moving, band), pillsOnTheBand(still, band); got != want {
+				t.Errorf("the band rests on %d pills and the still card draws %d: a reader who sees no animation reads the content twice", got, want)
+			}
+			if got := pillsOnTheBand(moving, band); got != fit {
+				t.Errorf("%d pills rest on the band, want the %d of the first copy that begin inside it", got, fit)
+			}
+			// Which is the same thing said about the shift: a copy is never
+			// narrower than the band it has to clear.
+			by := shiftOf(t, moving)
+			if by < band {
+				t.Errorf("one copy is %v and the band is %v: the copy behind it would rest on screen", by, band)
+			}
+			if by != math.Ceil(math.Max(strip, band)) {
+				t.Errorf("the band shifts by %v, one copy padded to the band and rounded is %v", by, math.Ceil(math.Max(strip, band)))
+			}
+			if by != math.Trunc(by) {
+				t.Errorf("the band shifts by %v, which is not a whole pixel: a browser rasterizes the seam a pixel out", by)
+			}
+		})
+	}
+}
+
+// repoBlock is the ranked repositories a request would leave a ticker, so a
+// test can build the same pills the layout does.
+func repoBlock(c *Card, fields []string) []TopRepo {
+	if !slices.Contains(fields, fieldTopRepos) {
+		return nil
+	}
+	return rank(c.TopRepos, defaultMaxRepos)
+}
+
+// pillsOnTheBand counts the pills whose left edge is inside the viewport when
+// the strip is untranslated, which is the card a reader who sees no animation
+// is left with.
+func pillsOnTheBand(doc string, band float64) int {
+	n := 0
+	for _, m := range regexp.MustCompile(`<rect class="track" x="([\d.]+)"`).FindAllStringSubmatch(doc, -1) {
+		if x, _ := strconv.ParseFloat(m[1], 64); x < band {
+			n++
 		}
-		return n
 	}
-	if got, want := onScreen(moving), onScreen(still); got != want {
-		t.Errorf("the band rests on %d pills and the still card draws %d: a reader who sees no animation reads the content twice", got, want)
+	return n
+}
+
+// shiftOf is the distance the band's keyframes end on.
+func shiftOf(t *testing.T, doc string) float64 {
+	t.Helper()
+	m := regexp.MustCompile(`100%\{transform:translateX\(-([\d.]+)px\)\}`).FindStringSubmatch(doc)
+	if m == nil {
+		t.Fatalf("the band does not scroll:\n%s", doc)
 	}
-	if got := onScreen(moving); got != len(pills) {
-		t.Errorf("%d pills rest on the band, want the %d of one copy", got, len(pills))
+	by, err := strconv.ParseFloat(m[1], 64)
+	if err != nil {
+		t.Fatal(err)
 	}
-	// Which is the same thing said about the shift: a copy is never narrower
-	// than the band it has to clear.
-	shift := regexp.MustCompile(`100%\{transform:translateX\(-([\d.]+)px\)\}`).FindStringSubmatch(moving)
-	if shift == nil {
-		t.Fatalf("the band does not scroll:\n%s", moving)
-	}
-	by, _ := strconv.ParseFloat(shift[1], 64)
-	if by < tickerBand(800) {
-		t.Errorf("one copy is %v and the band is %v: the copy behind it would rest on screen", by, tickerBand(800))
-	}
+	return by
 }
 
 // TestLanguageBarsGrowOneAfterAnotherWithTheirLabelsBehind is the reuse of the

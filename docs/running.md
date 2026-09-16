@@ -419,7 +419,7 @@ it downloads a release binary and calls it.
 | `card-layout`     | `summary`            | One of the thirteen registered layouts                                                                                 |
 | `card-theme`      | `auto`               | `dark`, `light`, `auto`, or `both` for a light card and its `_dark` twin                                          |
 | `card-fields`     | `""`                 | Comma-separated fields. Empty means the layout's default                                                          |
-| `card-motion`     | `once`               | `once`, `loop` or `off`, for the animated layouts                                                                 |
+| `card-motion`     | `once`               | `once`, `loop` or `off`; `loop` changes only `terminal` and `ticker`                                                                 |
 | `include-private` | `false`              | `true` counts private repositories when no config file is given (the default up to v1.0.0). See the warning below |
 | `version`         | `latest`             | The release to install                                                                                            |
 
@@ -565,7 +565,7 @@ itself is never rewritten.
              card: generated/card.svg
              card-layout: animated-counters
              card-theme: both
-             card-motion: loop
+             card-motion: once
          - name: Commit if it changed
            run: |
              git config user.name "github-actions[bot]"

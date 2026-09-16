@@ -11,10 +11,23 @@ import (
 // pill is tickPillH tall with tickPadX either side of its content.
 const (
 	tickBandY = 46.0
-	tickBandH = 34.0
-	tickPillH = 24.0
-	tickPadX  = 12.0
+	// The band is taller than a row of text needs, so a pill can carry text
+	// big enough to read when the card is scaled down. An 800 pixel card in a
+	// phone's column is drawn at little more than two fifths of its size, and
+	// at the 12 px the family sets its numbers in that is five pixels of
+	// glyph. The band went from 34 to 46 and the pill from 24 to 34, which is
+	// the author's "a bit taller, not much": twelve pixels on a card that is
+	// still 800 wide, and text a sixth larger inside them.
+	tickBandH = 46.0
+	tickPillH = 34.0
+	tickPadX  = 14.0
 	tickGap   = 10.0
+
+	// tickText is the size a pill's number and repository name are set at, and
+	// tickLabel the size of the word beside them. Both a size up from the
+	// family's own, which is the whole point of the taller band.
+	tickText  = 14.0
+	tickLabel = 12.0
 
 	// tickName is the widest a repository's name is allowed to make its pill,
 	// so one long name cannot make the band take a minute to come round.
@@ -28,6 +41,10 @@ const (
 	// is as long as the content is wide.
 	tickSpeed = 140.0
 )
+
+// tickCSS is the two sizes the band sets its own text in, a size up from the
+// family's, which a taller pill has the room for.
+const tickCSS = ".tkv{font-size:14px}\n.tkl{font-size:12px}\n"
 
 // tickerBand is how wide the strip's viewport is: the card less the family's
 // padding either side, which is where the title above it starts and ends.
@@ -48,12 +65,12 @@ func tickerPills(s *spec) []tickPill {
 	pills := make([]tickPill, 0, len(s.nums)+len(s.repos))
 	for _, m := range s.nums {
 		p := tickPill{lead: compact(m.value), trail: m.short}
-		p.width = 2*tickPadX + monoWidth(p.lead, 12) + 5 + textWidth(p.trail, 11)
+		p.width = 2*tickPadX + monoWidth(p.lead, tickText) + 6 + textWidth(p.trail, tickLabel)
 		pills = append(pills, p)
 	}
 	for _, r := range s.repos {
-		p := tickPill{dot: languageColor(r.Language), lead: fit(r.Name, 12, tickName), trail: compact(r.Stars)}
-		p.width = 2*tickPadX + 14 + textWidth(p.lead, 12) + 8 + 11 + 3 + monoWidth(p.trail, 12)
+		p := tickPill{dot: languageColor(r.Language), lead: fit(r.Name, tickText, tickName), trail: compact(r.Stars)}
+		p.width = 2*tickPadX + 16 + textWidth(p.lead, tickText) + 9 + 13 + 4 + monoWidth(p.trail, tickText)
 		pills = append(pills, p)
 	}
 	return pills
@@ -66,23 +83,23 @@ func drawTickPill(b *strings.Builder, p tickPill, x, y float64) {
 	fmt.Fprintf(b, `<rect class="track" x="%s" y="%s" width="%s" height="%s" rx="%s"/>`+"\n",
 		num(x), num(top), num(p.width), num(tickPillH), num(tickPillH/2))
 	at := x + tickPadX
-	base := top + tickPillH/2 + 4
+	base := top + tickPillH/2 + 5
 	if p.dot == "" {
-		text(b, at, base, "c mono", "start", p.lead)
-		text(b, at+monoWidth(p.lead, 12)+5, base, "s", "start", p.trail)
+		text(b, at, base, "c mono tkv", "start", p.lead)
+		text(b, at+monoWidth(p.lead, tickText)+6, base, "s tkl", "start", p.trail)
 		return
 	}
-	fmt.Fprintf(b, `<circle cx="%s" cy="%s" r="4" fill="%s"/>`+"\n",
-		num(at+4), num(top+tickPillH/2), p.dot)
-	at += 14
-	text(b, at, base, "n", "start", p.lead)
-	at += textWidth(p.lead, 12) + 8
-	star(b, at, base-10, 0.7)
-	text(b, at+14, base, "c mono", "start", p.trail)
+	fmt.Fprintf(b, `<circle cx="%s" cy="%s" r="5" fill="%s"/>`+"\n",
+		num(at+5), num(top+tickPillH/2), p.dot)
+	at += 16
+	text(b, at, base, "n tkv", "start", p.lead)
+	at += textWidth(p.lead, tickText) + 9
+	star(b, at, base-11, 0.8)
+	text(b, at+17, base, "c mono tkv", "start", p.trail)
 }
 
 func drawTicker(b *strings.Builder, c *Card, s *spec) {
-	const height = 94.0
+	const height = tickBandY + tickBandH + 14
 	inner := s.width - 2*pad
 	tl := newTimeline(s.motion)
 	pills := tickerPills(s)
@@ -124,7 +141,7 @@ func drawTicker(b *strings.Builder, c *Card, s *spec) {
 		scroll = tl.addShift(effectSlide, 0, strip/tickSpeed, "linear", strip)
 	}
 
-	openDoc(b, &chronicleFamily, s, height, describe(c, s), tl.css())
+	openDoc(b, &chronicleFamily, s, height, describe(c, s), tickCSS+tl.css())
 	cardBG(b, s.width, height)
 	login := "@" + c.Login
 	text(b, pad, 30, "t", "start", fit(s.title, 18, inner-textWidth(login, 11)-16))

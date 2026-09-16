@@ -235,7 +235,7 @@ Action:
     card: generated/card.svg
     card-layout: animated-counters
     card-theme: both
-    card-motion: loop
+    card-motion: once
 ```
 
 Paste `<picture><source media="(prefers-color-scheme: dark)" srcset="generated/card_dark.svg"><img src="generated/card.svg" alt="My GitHub statistics"></picture>` into the README once; the workflow only ever replaces the files. The whole workflow, and what `include-private` would publish, is in [A card in your profile README](https://jmrp.io/docs/ghchronicle/install/actions/#a-card-in-your-profile-readme).

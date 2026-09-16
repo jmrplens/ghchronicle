@@ -36,9 +36,12 @@ import (
 // the README's auto cards were seen switching palettes on a dark page when the
 // tab was left and came back to.
 //
-// The layouts that move are drawn a second time with -card-motion loop, as
-// card-<layout>-loop.svg and its _dark twin, for the page that shows what a
-// loop looks like.
+// The layouts that have something continuous to keep going are drawn a second
+// time with -card-motion loop, as card-<layout>-loop.svg and its _dark twin,
+// for the page that shows what a loop looks like. Only those: on a layout that
+// only reveals, loop draws the same card as once, so a looping picture of it
+// would be a second copy of the first under a name that promises something
+// else.
 func TestCardGallery(t *testing.T) {
 	t.Parallel()
 	dir := os.Getenv("GHC_CARD_GALLERY")
@@ -68,7 +71,7 @@ func TestCardGallery(t *testing.T) {
 	var variants []variant
 	for _, layout := range render.Layouts() {
 		variants = append(variants, variant{layout.Name, render.MotionOnce, "card-" + layout.Name})
-		if layout.Animated {
+		if layout.Loops {
 			variants = append(variants, variant{layout.Name, render.MotionLoop, "card-" + layout.Name + "-loop"})
 		}
 	}

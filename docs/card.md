@@ -126,18 +126,33 @@ script, ever. Every animation ends on the complete static card, so a renderer
 that ignores animation shows the finished state, and `prefers-reduced-motion`
 switches it off in every mode.
 
-| `-card-motion` | What the card does                                                      |
-| -------------- | ----------------------------------------------------------------------- |
-| `once`         | Plays when it loads and settles. The default                            |
-| `loop`         | Plays, holds the finished card still for seven seconds, and plays again |
-| `off`          | No animation at all, and a smaller file                                 |
+| `-card-motion` | What the card does                                                          |
+| -------------- | --------------------------------------------------------------------------- |
+| `once`         | Plays when it loads and settles. The default                                |
+| `loop`         | The same, and whatever the layout has that never ends goes on for ever      |
+| `off`          | No animation at all, and a smaller file                                     |
 
-A loop that rests between plays is deliberate: a README that moves all the time
-is hard to read next to it. Still, a card that loops keeps moving for everyone
-reading the README, and a README offers them no control over it, so `once` is
-the considerate choice for a profile.
+#### A loop never replays
 
-![The animated-counters layout played once: the numbers count up and settle, and the page can also play it in a loop](../site/src/assets/card-animated-counters.svg)
+An animation here reveals content: a number counts up to what it is, a bar
+grows to its share, a line draws itself. Playing that again would take back
+something the reader has already been shown, and a card that keeps hiding its
+own figures is worse than a still one.
+
+So `loop` does not mean "and again". The reveal plays once and settles in both
+modes, and the only thing that may go on for ever is motion that puts nothing on
+the card and takes nothing off it. Two layouts have such a thing:
+
+- `terminal`, whose cursor blinks at its prompt. The numbers still type
+  themselves in once.
+- `ticker`, whose band of pills keeps scrolling. Nothing disappears; the same
+  pills come round again.
+
+On every other layout `loop` draws exactly the card `once` draws, to the byte.
+It is accepted rather than refused, so a workflow can set it once and change
+`card-layout` freely.
+
+![The terminal layout played once: a terminal window whose lines of output each have a number typing itself in, with a block cursor blinking at the prompt below them, and the page can also play it in a loop, where the typing still happens once and only the cursor goes on blinking](../site/src/assets/card-terminal.svg)
 
 ### In a README
 
@@ -158,7 +173,7 @@ calling into this one. A program that wants an SVG runs the binary with
 
 ## Layouts
 
-Thirteen layouts in two visual families, with what each one draws by default and which of them animate.
+Thirteen layouts in two visual families, with what each one draws by default, which of them animate and which of them can keep going.
 
 Source: <https://jmrp.io/docs/ghchronicle/card/layouts/>
 
@@ -169,21 +184,21 @@ ghchronicle -card-layouts
 Prints them with the fields each shows by default. The captures below are the
 dark theme; every layout also renders light, and `auto` puts both in one file.
 
-| Layout              | Family    | Animated | Default fields                                                                       |
-| ------------------- | --------- | -------- | ------------------------------------------------------------------------------------ |
-| `summary`           | chronicle | no       | stars, forks, followers, repos, contributions, views, visitors, sparkline, top_repos |
-| `github-stats`      | github    | yes      | repos, stars, forks, followers, commits, pull_requests, views, clones, languages     |
-| `github-compact`    | github    | no       | stars, forks, followers, repos, commits                                              |
-| `badge-row`         | chronicle | no       | stars, forks, followers, repos, contributions                                        |
-| `wide-banner`       | chronicle | yes      | stars, forks, followers, contributions, sparkline                                    |
-| `sparkline-hero`    | chronicle | yes      | contributions, stars, followers, sparkline                                           |
-| `language-ring`     | github    | yes      | languages, stars, repos                                                              |
-| `repo-list`         | github    | no       | top_repos, stars, forks, repos                                                       |
-| `activity-heatmap`  | github    | yes      | sparkline, contributions, commits, pull_requests                                     |
-| `animated-counters` | chronicle | yes      | stars, forks, followers, repos, contributions, views, sparkline                      |
-| `terminal`          | chronicle | yes      | stars, forks, followers, repos, contributions, top_repos                             |
-| `ticker`            | chronicle | yes      | stars, forks, followers, repos, contributions, commits, views, top_repos             |
-| `language-bars`     | github    | yes      | languages                                                                            |
+| Layout              | Family    | Animated | Loops | Default fields                                                                       |
+| ------------------- | --------- | -------- | ----- | ------------------------------------------------------------------------------------ |
+| `summary`           | chronicle | no       | no    | stars, forks, followers, repos, contributions, views, visitors, sparkline, top_repos |
+| `github-stats`      | github    | yes      | no    | repos, stars, forks, followers, commits, pull_requests, views, clones, languages |
+| `github-compact`    | github    | no       | no    | stars, forks, followers, repos, commits |
+| `badge-row`         | chronicle | no       | no    | stars, forks, followers, repos, contributions |
+| `wide-banner`       | chronicle | yes      | no    | stars, forks, followers, contributions, sparkline |
+| `sparkline-hero`    | chronicle | yes      | no    | contributions, stars, followers, sparkline |
+| `language-ring`     | github    | yes      | no    | languages, stars, repos |
+| `repo-list`         | github    | no       | no    | top_repos, stars, forks, repos |
+| `activity-heatmap`  | github    | yes      | no    | sparkline, contributions, commits, pull_requests |
+| `animated-counters` | chronicle | yes      | no    | stars, forks, followers, repos, contributions, views, sparkline |
+| `terminal`          | chronicle | yes      | yes   | stars, forks, followers, repos, contributions, top_repos |
+| `ticker`            | chronicle | yes      | yes   | stars, forks, followers, repos, contributions, commits, views, top_repos |
+| `language-bars`     | github    | yes      | no    | languages |
 
 ### The two families
 
@@ -205,7 +220,7 @@ share bar with its legend. The widest layout at 800 pixels, and the one that
 looks most native in a profile README. The numbers count up, and the bar grows
 in from its left edge once they have landed.
 
-![The github-stats layout played once: a header band over rows of four monospace numbers counting up, and a horizontal language share bar growing in from the left beside its legend, and the page can also play it in a loop](../site/src/assets/card-github-stats.svg)
+![The github-stats layout played once: a header band over rows of four monospace numbers counting up, and a horizontal language share bar growing in from the left beside its legend](../site/src/assets/card-github-stats.svg)
 
 ### github-compact
 
@@ -225,14 +240,14 @@ follows the content rather than being set.
 A full-width 60 pixel banner: login on the left, numbers spread across, the
 sparkline drawing itself behind them.
 
-![The wide-banner layout played once: a wide, short banner with the login on the left, numbers spread across and a sparkline drawing itself behind them, and the page can also play it in a loop](../site/src/assets/card-wide-banner.svg)
+![The wide-banner layout played once: a wide, short banner with the login on the left, numbers spread across and a sparkline drawing itself behind them](../site/src/assets/card-wide-banner.svg)
 
 ### sparkline-hero
 
 The contribution sparkline is the whole card, with up to three numbers
 overlaid. The line draws itself on load.
 
-![The sparkline-hero layout played once: a large contribution sparkline drawing itself across the card with three numbers overlaid, and the page can also play it in a loop](../site/src/assets/card-sparkline-hero.svg)
+![The sparkline-hero layout played once: a large contribution sparkline drawing itself across the card with three numbers overlaid](../site/src/assets/card-sparkline-hero.svg)
 
 ### language-ring
 
@@ -240,7 +255,7 @@ A donut of language shares with the legend beside it and a row of headline
 numbers. Each slice draws itself around the ring after the one before it, and
 the legend appears when the donut is whole.
 
-![The language-ring layout played once: a donut chart whose language slices draw themselves one after another, with a legend appearing beside it and a row of headline numbers, and the page can also play it in a loop](../site/src/assets/card-language-ring.svg)
+![The language-ring layout played once: a donut chart whose language slices draw themselves one after another, with a legend appearing beside it and a row of headline numbers](../site/src/assets/card-language-ring.svg)
 
 ### repo-list
 
@@ -255,14 +270,14 @@ The last twelve weeks of the contribution calendar as GitHub's green squares,
 with up to three numbers beside it. The weeks fade in from the left, a week
 every twenty milliseconds, so the calendar fills in as a wave.
 
-![The activity-heatmap layout played once: twelve weeks of contribution squares in GitHub's green scale fading in from the left, with three numbers beside them, and the page can also play it in a loop](../site/src/assets/card-activity-heatmap.svg)
+![The activity-heatmap layout played once: twelve weeks of contribution squares in GitHub's green scale fading in from the left, with three numbers beside them](../site/src/assets/card-activity-heatmap.svg)
 
 ### animated-counters
 
 Numbers that count up on load over a sparkline that draws itself, settling to
 the static card.
 
-![The animated-counters layout played once: a grid of large numbers counting up over a contribution sparkline that draws itself, and the page can also play it in a loop](../site/src/assets/card-animated-counters.svg)
+![The animated-counters layout played once: a grid of large numbers counting up over a contribution sparkline that draws itself](../site/src/assets/card-animated-counters.svg)
 
 ### terminal
 
@@ -292,15 +307,25 @@ one above it, with the name and the share arriving once their own bar has
 stopped. The layout that shows the share of a language as its own line, where
 `language-ring` shows all of them in one donut and `github-stats` in one bar.
 
-![The language-bars layout played once: one full-width bar per language growing from its left edge, one after another, with the language name and its percentage arriving behind each bar, and the page can also play it in a loop](../site/src/assets/card-language-bars.svg)
+![The language-bars layout played once: one full-width bar per language growing from its left edge, one after another, with the language name and its percentage arriving behind each bar](../site/src/assets/card-language-bars.svg)
 
 > **The settled frame is the whole card**
 >
-> Animation is CSS inside the SVG. By default it plays once and settles (see
+> Animation is CSS inside the SVG. It plays once and settles (see
 > [Motion](https://jmrp.io/docs/ghchronicle/card/#motion)), and the settled frame is the complete
 > static card. A renderer that ignores animation shows the finished state, and
 > `prefers-reduced-motion` switches it off. The captures above are those settled
 > frames.
+
+> **Only two layouts loop, and neither of them replays**
+>
+> An animation that reveals content is never played again: doing so would take
+> back a number, a bar or a line the reader has already been shown. `loop`
+> therefore adds nothing to eleven of these thirteen layouts, and draws exactly
+> the card `once` draws. The two it does change have something that ends
+> nothing: `terminal`'s cursor goes on blinking after the last number has been
+> typed, and `ticker`'s band goes on scrolling, bringing the same pills round
+> again. Those are the two the page offers a loop toggle on.
 
 ### Width
 

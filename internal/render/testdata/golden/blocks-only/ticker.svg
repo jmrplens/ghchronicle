@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="800" height="94" viewBox="0 0 800 94" role="img" aria-labelledby="ghcTitle ghcDesc">
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="106" viewBox="0 0 800 106" role="img" aria-labelledby="ghcTitle ghcDesc">
 <title id="ghcTitle">José M. Requena Plens</title>
 <desc id="ghcDesc">GitHub summary for jmrplens. Most starred repositories: phonometry with 112 stars in Python, TFG-TFM_EPS with 84 stars in TeX, gitlab-mcp-server with 33 stars in Go.</desc>
 <style>
@@ -31,45 +31,47 @@ text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,san
 .area{fill-opacity:0.14;stroke:none}
 .axis{stroke-width:1}
 .edge{fill:none;stroke-width:1}
+.tkv{font-size:14px}
+.tkl{font-size:12px}
 .m0{animation:m0 5.36s linear 1}
 @keyframes m0{0%{transform:translateX(0px)}100%{transform:translateX(-750px)}}
 @media (prefers-reduced-motion:reduce){.m0{animation:none}}
 </style>
-<rect class="bg" x="0.5" y="0.5" width="799" height="93" rx="6"/>
+<rect class="bg" x="0.5" y="0.5" width="799" height="105" rx="6"/>
 <text class="t" x="25" y="30" text-anchor="start">José M. Requena Plens</text>
 <text class="s" x="775" y="30" text-anchor="end">@jmrplens</text>
-<svg x="25" y="46" width="750" height="34">
+<svg x="25" y="46" width="750" height="46">
 <g class="m0">
-<rect class="track" x="0" y="5" width="145.8" height="24" rx="12"/>
-<circle cx="16" cy="17" r="4" fill="#3572a5"/>
-<text class="n" x="26" y="21" text-anchor="start">phonometry</text>
-<path class="star" transform="translate(98.2 11) scale(0.7)" d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z"/>
-<text class="c mono" x="112.2" y="21" text-anchor="start">112</text>
-<rect class="track" x="155.8" y="5" width="163.68" height="24" rx="12"/>
-<circle cx="171.8" cy="17" r="4" fill="#3d6117"/>
-<text class="n" x="181.8" y="21" text-anchor="start">TFG-TFM_EPS</text>
-<path class="star" transform="translate(279.08 11) scale(0.7)" d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z"/>
-<text class="c mono" x="293.08" y="21" text-anchor="start">84</text>
-<rect class="track" x="329.48" y="5" width="175.8" height="24" rx="12"/>
-<circle cx="345.48" cy="17" r="4" fill="#00add8"/>
-<text class="n" x="355.48" y="21" text-anchor="start">gitlab-mcp-server</text>
-<path class="star" transform="translate(464.88 11) scale(0.7)" d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z"/>
-<text class="c mono" x="478.88" y="21" text-anchor="start">33</text>
-<rect class="track" x="750" y="5" width="145.8" height="24" rx="12"/>
-<circle cx="766" cy="17" r="4" fill="#3572a5"/>
-<text class="n" x="776" y="21" text-anchor="start">phonometry</text>
-<path class="star" transform="translate(848.2 11) scale(0.7)" d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z"/>
-<text class="c mono" x="862.2" y="21" text-anchor="start">112</text>
-<rect class="track" x="905.8" y="5" width="163.68" height="24" rx="12"/>
-<circle cx="921.8" cy="17" r="4" fill="#3d6117"/>
-<text class="n" x="931.8" y="21" text-anchor="start">TFG-TFM_EPS</text>
-<path class="star" transform="translate(1029.08 11) scale(0.7)" d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z"/>
-<text class="c mono" x="1043.08" y="21" text-anchor="start">84</text>
-<rect class="track" x="1079.48" y="5" width="175.8" height="24" rx="12"/>
-<circle cx="1095.48" cy="17" r="4" fill="#00add8"/>
-<text class="n" x="1105.48" y="21" text-anchor="start">gitlab-mcp-server</text>
-<path class="star" transform="translate(1214.88 11) scale(0.7)" d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z"/>
-<text class="c mono" x="1228.88" y="21" text-anchor="start">33</text>
+<rect class="track" x="0" y="6" width="170.1" height="34" rx="17"/>
+<circle cx="19" cy="23" r="5" fill="#3572a5"/>
+<text class="n tkv" x="30" y="28" text-anchor="start">phonometry</text>
+<path class="star" transform="translate(113.9 17) scale(0.8)" d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z"/>
+<text class="c mono tkv" x="130.9" y="28" text-anchor="start">112</text>
+<rect class="track" x="180.1" y="6" width="190.96" height="34" rx="17"/>
+<circle cx="199.1" cy="23" r="5" fill="#3d6117"/>
+<text class="n tkv" x="210.1" y="28" text-anchor="start">TFG-TFM_EPS</text>
+<path class="star" transform="translate(323.26 17) scale(0.8)" d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z"/>
+<text class="c mono tkv" x="340.26" y="28" text-anchor="start">84</text>
+<rect class="track" x="381.06" y="6" width="205.1" height="34" rx="17"/>
+<circle cx="400.06" cy="23" r="5" fill="#00add8"/>
+<text class="n tkv" x="411.06" y="28" text-anchor="start">gitlab-mcp-server</text>
+<path class="star" transform="translate(538.36 17) scale(0.8)" d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z"/>
+<text class="c mono tkv" x="555.36" y="28" text-anchor="start">33</text>
+<rect class="track" x="750" y="6" width="170.1" height="34" rx="17"/>
+<circle cx="769" cy="23" r="5" fill="#3572a5"/>
+<text class="n tkv" x="780" y="28" text-anchor="start">phonometry</text>
+<path class="star" transform="translate(863.9 17) scale(0.8)" d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z"/>
+<text class="c mono tkv" x="880.9" y="28" text-anchor="start">112</text>
+<rect class="track" x="930.1" y="6" width="190.96" height="34" rx="17"/>
+<circle cx="949.1" cy="23" r="5" fill="#3d6117"/>
+<text class="n tkv" x="960.1" y="28" text-anchor="start">TFG-TFM_EPS</text>
+<path class="star" transform="translate(1073.26 17) scale(0.8)" d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z"/>
+<text class="c mono tkv" x="1090.26" y="28" text-anchor="start">84</text>
+<rect class="track" x="1131.06" y="6" width="205.1" height="34" rx="17"/>
+<circle cx="1150.06" cy="23" r="5" fill="#00add8"/>
+<text class="n tkv" x="1161.06" y="28" text-anchor="start">gitlab-mcp-server</text>
+<path class="star" transform="translate(1288.36 17) scale(0.8)" d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z"/>
+<text class="c mono tkv" x="1305.36" y="28" text-anchor="start">33</text>
 </g>
 </svg>
 </svg>
