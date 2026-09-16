@@ -72,6 +72,33 @@ import { freePort, startPreview } from "./preview.mjs";
 const WIDTHS = [360, 400];
 
 /**
+ * The root size a key's break points are checked at: 200 % text, which is the
+ * size accessibility guidance is written around and the size at which the
+ * widest names of this corpus stop fitting their card. Checked in the page the
+ * gate has already loaded, by setting the root and putting it back, so it
+ * costs one layout rather than a second pass over the corpus.
+ */
+const LARGE_ROOT = 24;
+
+/**
+ * The separators an identifier of this corpus is built from. A break after one
+ * of them is a break the name carries; the same list is in
+ * src/lib/rehype-tables.mjs, which writes a `wbr` after each.
+ */
+const KEY_SEPARATORS = new Set([
+	".",
+	"_",
+	"-",
+	":",
+	"=",
+	"/",
+	",",
+	";",
+	"@",
+	"|",
+]);
+
+/**
  * A pixel of slack. Layout reads back as fractional and the comparison is
  * between two rounded numbers, so a table exactly filling its column can
  * measure one pixel over. Two pixels is already a visible scrollbar.
@@ -426,6 +453,56 @@ function quoted(texts) {
 }
 
 /**
+ * Whether a line break inside a key landed on a boundary the key carries: a
+ * separator, a space, or a camel-case hump (`aB`, and `ABc`, so `SUIDSGID`
+ * counts as one word).
+ *
+ * @param {{ after: string, at: string }} split the character the break follows
+ *   and the one it lands on
+ * @returns {boolean}
+ */
+export function breakIsAtBoundary({ after, at }) {
+	if (KEY_SEPARATORS.has(after) || /\s/.test(after)) return true;
+	if (/[a-z0-9]/.test(after) && /[A-Z]/.test(at)) return true;
+	return /[A-Z]/.test(after) && /[A-Z]/.test(at);
+}
+
+/**
+ * What is wrong with the way a page's keys broke at a large root.
+ *
+ * Stacked, `td code` carries `overflow-wrap: anywhere`, which is what keeps a
+ * long path inside a phone and which, on a name too wide for its card, breaks
+ * wherever it runs out of room: `sinks.dedupe_horizo` / `n`.
+ * src/lib/rehype-tables.mjs answers that by writing a `wbr` at every boundary
+ * the name already carries, and a real break opportunity outranks
+ * `overflow-wrap`, so a name that carries one breaks there instead. This is
+ * what holds that: at 200 % text, every break in a key that is a whole name
+ * has to follow a boundary.
+ *
+ * @param {{ text: string, breaks: { after: string, at: string }[] }[]} keys
+ * @returns {string[]} one sentence per key that broke somewhere else
+ */
+export function keyBreakProblems(keys) {
+	const problems = [];
+	for (const { text, breaks } of keys) {
+		for (const split of breaks) {
+			if (breakIsAtBoundary(split)) continue;
+			problems.push(
+				`the key ${JSON.stringify(text)} breaks after ` +
+					`${JSON.stringify(split.after)} at a ${LARGE_ROOT}px root ` +
+					"(200 % text), which is not a boundary it carries. A name may " +
+					"break at a separator or a camel-case hump, and " +
+					"src/lib/rehype-tables.mjs writes a wbr at each of those; a " +
+					"break anywhere else is overflow-wrap: anywhere in " +
+					"src/styles/tables.css taking what it can get, which is how a " +
+					"row's name reads as sinks.dedupe_horizo / n",
+			);
+		}
+	}
+	return problems;
+}
+
+/**
  * Whether one measurement is an overflow, and by how much.
  *
  * @param {{ container: number, content: number }} measured
@@ -565,6 +642,76 @@ function measureTables() {
 	);
 }
 
+/**
+ * Where every key of the page breaks at a large root. Runs inside the browser,
+ * in the page the gate has already loaded: it sets the root font size, reads
+ * the break points, and puts the root back, so it costs one layout and no
+ * second pass over the corpus.
+ *
+ * Only a cell that IS one name is measured, which is the only cell
+ * src/lib/rehype-tables.mjs gives break opportunities to: a cell holding a
+ * list of names already breaks between them, and a cell of prose with a code
+ * span in it is a sentence whichever way it wraps.
+ *
+ * @param {number} root the root font size to measure at, in px
+ */
+function measureKeyBreaks(root) {
+	const previous = document.documentElement.style.fontSize;
+	document.documentElement.style.fontSize = `${root}px`;
+	try {
+		const measured = [];
+		let keys = 0;
+		for (const cell of document.querySelectorAll(
+			'.sl-markdown-content td[data-role="identity"]',
+		)) {
+			const spans = cell.querySelectorAll("code");
+			if (spans.length !== 1) continue;
+			const code = spans[0];
+			if (code.textContent.trim() !== cell.textContent.trim()) continue;
+			keys += 1;
+			// One client rect per line box while the element is inline, so this
+			// is the cheap question "did it wrap at all" asked of every key,
+			// before the per-character walk is asked of the few that did.
+			if (code.getClientRects().length < 2) continue;
+			const walker = document.createTreeWalker(code, NodeFilter.SHOW_TEXT);
+			const characters = [];
+			for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+				for (let at = 0; at < node.nodeValue.length; at += 1) {
+					const range = document.createRange();
+					range.setStart(node, at);
+					range.setEnd(node, at + 1);
+					const rect = range.getClientRects()[0];
+					characters.push({
+						character: node.nodeValue[at],
+						top: rect ? rect.top : null,
+					});
+				}
+			}
+			const leading =
+				Number.parseFloat(getComputedStyle(code).lineHeight) || root;
+			const breaks = [];
+			let previousTop = null;
+			for (let at = 0; at < characters.length; at += 1) {
+				const { top } = characters[at];
+				if (top === null) continue;
+				if (previousTop !== null && top - previousTop > leading / 2) {
+					let before = at - 1;
+					while (before >= 0 && characters[before].top === null) before -= 1;
+					breaks.push({
+						after: before >= 0 ? characters[before].character : "",
+						at: characters[at].character,
+					});
+				}
+				previousTop = top;
+			}
+			if (breaks.length > 0) measured.push({ text: code.textContent, breaks });
+		}
+		return { keys, measured };
+	} finally {
+		document.documentElement.style.fontSize = previous;
+	}
+}
+
 /** Walks the corpus. Returns the failures and what was looked at. */
 async function walk(dist) {
 	const files = [...pageFiles(dist)];
@@ -631,6 +778,8 @@ async function walk(dist) {
 	let defaultColumnsChecked = 0;
 	let defaultCellsChecked = 0;
 	let defaultRowsChecked = 0;
+	let keysChecked = 0;
+	let keysWrapped = 0;
 	let browser;
 	try {
 		const base = await preview.announced;
@@ -649,6 +798,21 @@ async function walk(dist) {
 					);
 				}
 				const measuredTables = await page.evaluate(measureTables);
+				// Where the keys break at 200 % text. Only at the first width:
+				// the question is the key against its own card, which the
+				// stacked form gives it at both, and one layout per page is
+				// what keeps this cheap.
+				if (width === WIDTHS[0]) {
+					const { keys, measured } = await page.evaluate(
+						measureKeyBreaks,
+						LARGE_ROOT,
+					);
+					keysChecked += keys;
+					keysWrapped += measured.length;
+					for (const problem of keyBreakProblems(measured)) {
+						failures.push({ width, route, index: "key", problem });
+					}
+				}
 				if (declared.has(route)) {
 					indexes += declared.get(route).length;
 					for (const problem of indexProblems({
@@ -722,6 +886,8 @@ async function walk(dist) {
 		defaultColumnsChecked,
 		defaultCellsChecked,
 		defaultRowsChecked,
+		keysChecked,
+		keysWrapped,
 		routes: routes.length,
 	};
 }
@@ -1011,6 +1177,55 @@ function selfTest() {
 		[],
 	);
 
+	is(
+		"a break after a separator is one the name carries",
+		breakIsAtBoundary({ after: ".", at: "d" }),
+		true,
+	);
+	is(
+		"a break after a space is one the name carries",
+		breakIsAtBoundary({ after: " ", at: "-" }),
+		true,
+	);
+	is(
+		"a camel-case hump is one the name carries",
+		breakIsAtBoundary({ after: "t", at: "H" }),
+		true,
+	);
+	is(
+		"the hump before a capitalised word is one too",
+		breakIsAtBoundary({ after: "F", at: "A" }),
+		true,
+	);
+	is(
+		"a break between two ordinary letters is not",
+		breakIsAtBoundary({ after: "z", at: "o" }),
+		false,
+	);
+	is(
+		"a key that broke at its own boundaries is right",
+		keyBreakProblems([
+			{
+				text: "sinks.dedupe_horizon",
+				breaks: [{ after: ".", at: "d" }],
+			},
+			{ text: "ProtectKernelTunables", breaks: [{ after: "t", at: "K" }] },
+		]),
+		[],
+	);
+	is(
+		"a key broken mid-token is caught, and named with the character it followed",
+		keyBreakProblems([
+			{ text: "sinks.dedupe_horizon", breaks: [{ after: "o", at: "n" }] },
+		]).length,
+		1,
+	);
+	is(
+		"a key measured as whole says nothing",
+		keyBreakProblems([{ text: "token", breaks: [] }]),
+		[],
+	);
+
 	if (failed.length > 0) {
 		console.error("[table-fit] fixtures failed:");
 		for (const line of failed) console.error(`  ${line}`);
@@ -1044,6 +1259,8 @@ try {
 		defaultColumnsChecked,
 		defaultCellsChecked,
 		defaultRowsChecked,
+		keysChecked,
+		keysWrapped,
 		routes,
 	} = await walk(DIST);
 	if (failures.length > 0) {
@@ -1065,7 +1282,9 @@ try {
 				"a key or a hoisted value that took two line boxes is that form's " +
 				"column cap, in the same file; a declared column that stopped " +
 				"hoisting the cells it holds is isValue() in that plugin, or the " +
-				"words in the table; a link that lands nowhere is the page's own.",
+				"words in the table; a key broken away from its own boundaries " +
+				"is KEY_BOUNDARY in that plugin, or overflow-wrap in the " +
+				"stylesheet; a link that lands nowhere is the page's own.",
 		);
 		process.exit(1);
 	}
@@ -1079,7 +1298,10 @@ try {
 			"default columns the sources declare hoisted " +
 			`${defaultCellsChecked} of their ${defaultRowsChecked} rows beside ` +
 			"their key, which is every cell of them that is a value and no cell " +
-			"that is not, each key and each hoisted value on one line.",
+			"that is not, each key and each hoisted value on one line. At a " +
+			`${LARGE_ROOT}px root (200 % text) ${keysWrapped} of the ` +
+			`${keysChecked} keys that are a whole name wrapped, every one of ` +
+			"them at a boundary it carries.",
 	);
 } catch (error) {
 	console.error(`[table-fit] ${error.message}`);

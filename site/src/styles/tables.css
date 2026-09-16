@@ -266,8 +266,21 @@
 	white-space: var(--table-code, nowrap);
 	/* Inert while the span may not break, which is the wide form: a line that
 	 * cannot wrap takes no break opportunity. Stacked, this is what keeps a
-	 * sixty-character path inside a 328 px screen. */
+	 * sixty-character path inside a 328 px screen, and it is also what breaks
+	 * a name mid-word once the name is wider than the card. Which is why the
+	 * name carries its own break opportunities by then: src/lib/rehype-tables.mjs
+	 * writes a `wbr` at each boundary a key already has, and a real
+	 * opportunity outranks this one, which is last-resort by definition. */
 	overflow-wrap: anywhere;
+}
+
+/* The two characters the same file holds together: the leading `-` of a flag
+ * and the letter after it. A hyphen is a break opportunity, line breaking is
+ * greedy, and the result read `ghchronicle -config config.yaml -` / `once`.
+ * Nothing else is held: every other opportunity in a key is one a reader
+ * would take. */
+.sl-markdown-content td code [data-join] {
+	white-space: nowrap;
 }
 
 /* ------------------------------------------------------------

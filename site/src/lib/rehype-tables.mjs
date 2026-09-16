@@ -162,6 +162,35 @@ import { localeOf, routeOf } from "./site.mjs";
  *    genuine names with a space in them, so the judgement is the page's, the
  *    way it already is for an index. A name matching no table on the page is
  *    an error, for the reason a bad indexTables entry is.
+ *
+ * WHERE A NAME MAY BREAK. Stacked, `td code` carries `overflow-wrap: anywhere`
+ * (styles/tables.css), which is what keeps a sixty-character path inside a
+ * 328 px screen, and which breaks wherever it runs out of room:
+ * `sinks.dedupe_horizo` / `n`. That is the worst place to break a name, and it
+ * is reachable: at a 360 px viewport with a 16 px root two keys of this corpus
+ * broke mid-token, and at a 24 px root (200 % text, the size accessibility
+ * guidance is written around) seventy-two did. The title size this file marks
+ * for is part of why: at the size those cells had before it, the same two
+ * counts are zero and twenty-four. `overflow-wrap` is not the thing to remove,
+ * because the alternative to a bad break is a card that overflows, and
+ * shrinking the key back is not it either, because a reader who asked for
+ * 200 % text is the last one who should be handed a smaller title.
+ *
+ * So the name is given the break opportunities it already carries, as a `wbr`
+ * after each one: a separator with a character of its own before it (`sinks.`
+ * `dedupe_` `horizon`, `-backfill-` `since`, `read:` `packages`, `/users/`
+ * `{login}/`, `<dark|` `light|`), and a camel-case hump (`Protect` `Kernel` `Tunables`,
+ * `Restrict` `SUIDSGID`), which is where a reader of these identifiers breaks
+ * them anyway. A real break opportunity outranks `overflow-wrap: anywhere`,
+ * which is last-resort by definition, so a key that carries a boundary now
+ * breaks at one; a key that carries none is unchanged and still breaks where
+ * it must. The one break a key carries and should not take is after the
+ * leading `-` of a flag, which is the first character of its name rather than
+ * a boundary inside it; those two characters are held together instead (see
+ * `LEADING_DASH`). `wbr` adds no character to the text, nothing to the accessibility
+ * tree and nothing to what a reader copies, and `white-space: nowrap`
+ * suppresses it, so the wide form is untouched.
+ * scripts/check-table-fit.mjs asserts it at a 24 px root.
  */
 
 /** What the region is called, per locale. */
@@ -332,6 +361,100 @@ function firstCells(table) {
 }
 
 /**
+ * Every boundary an identifier of this corpus carries, as a zero-width split
+ * point: a separator (`. _ - : = / , ; @ |`) that has a character of its own
+ * before it, so a leading `-` and the second `-` of `--dry-run` are not
+ * boundaries; and a camel-case hump, both `aB` and `ABc`, so
+ * `RestrictSUIDSGID` splits once and not five times. The pipe is there for the
+ * option lists this corpus writes as keys (`-card-theme <dark|light|auto|both>`):
+ * without it the line broke before the closing `>` and left it alone.
+ */
+const KEY_BOUNDARY =
+	/(?<=[^\s._\-:=/,;@|][._\-:=/,;@|])|(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])/g;
+
+/**
+ * A run of `-` that BEGINS a word, with the character after it. The leading
+ * `-` of a flag is the first character of its name and not a boundary, but it
+ * is a hyphen, and a hyphen is a break opportunity of its own: line breaking
+ * is greedy, so `ghchronicle -config config.yaml -once` broke after that
+ * hyphen rather than at the space in front of it and read
+ * `... config.yaml -` / `once`. Held together, the greedy fill falls back to
+ * the space and the flag arrives whole.
+ */
+const LEADING_DASH = /(^|\s)(-+\S)/g;
+
+/** Every `code` element at or under a node, in document order. */
+function codeElements(node, found = []) {
+	if (node.type === "element" && node.tagName === "code") found.push(node);
+	for (const child of node.children ?? []) codeElements(child, found);
+	return found;
+}
+
+/**
+ * Writes a `wbr` at every boundary of the text under a node, so that a name
+ * too wide for its card breaks where a reader would break it rather than
+ * wherever `overflow-wrap: anywhere` runs out of room. See "Where a name may
+ * break" above.
+ *
+ * @param {any} node
+ */
+function breakAtBoundaries(node) {
+	if (!Array.isArray(node.children)) return;
+	node.children = node.children.flatMap((child) => {
+		if (child.type === "element") {
+			breakAtBoundaries(child);
+			return [child];
+		}
+		if (child.type !== "text") return [child];
+		return child.value
+			.split(KEY_BOUNDARY)
+			.filter(Boolean)
+			.flatMap((piece, at) => [
+				...(at === 0
+					? []
+					: [
+							{
+								type: "element",
+								tagName: "wbr",
+								properties: {},
+								children: [],
+							},
+						]),
+				...holdLeadingDashes(piece),
+			]);
+	});
+}
+
+/**
+ * One piece of a key's text as hast, with every word-initial run of `-` and
+ * the character after it wrapped so that no line can break between them. See
+ * `LEADING_DASH`.
+ *
+ * @param {string} piece
+ * @returns {any[]}
+ */
+function holdLeadingDashes(piece) {
+	const nodes = [];
+	let taken = 0;
+	for (const match of piece.matchAll(LEADING_DASH)) {
+		const start = match.index + match[1].length;
+		if (start > taken)
+			nodes.push({ type: "text", value: piece.slice(taken, start) });
+		nodes.push({
+			type: "element",
+			tagName: "span",
+			properties: { "data-join": "" },
+			children: [{ type: "text", value: match[2] }],
+		});
+		taken = start + match[2].length;
+	}
+	if (taken < piece.length) {
+		nodes.push({ type: "text", value: piece.slice(taken) });
+	}
+	return nodes;
+}
+
+/**
  * Marks every first cell that is the row's NAME with `data-role="identity"`,
  * which is what styles/tables.css sizes as the stacked card's title. See "The
  * row's name" above for the three cases this does not mark.
@@ -343,7 +466,20 @@ function markIdentities(table) {
 	const names = cells.map((cell) => textOf(cell).trim());
 	if (new Set(names).size !== names.length) return;
 	for (const cell of cells) {
-		if (hasCode(cell)) cell.properties["data-role"] = "identity";
+		if (!hasCode(cell)) continue;
+		cell.properties["data-role"] = "identity";
+		// Break opportunities go only to a cell that IS one name. A cell that
+		// holds several (install/systemd.mdx's "ProtectKernelTunables,
+		// ProtectKernelModules, ..." is eight code spans and seven commas)
+		// already breaks between them, and line breaking is greedy: given an
+		// opportunity inside the last name that fits, it takes it, and the
+		// reader gets `Protect` and `Hostname` as two pills on two lines where
+		// before the whole name moved down together. Measured on that cell at
+		// a 360 px viewport: six names split that way, none of which had to.
+		const spans = codeElements(cell);
+		if (spans.length === 1 && textOf(cell).trim() === textOf(spans[0]).trim()) {
+			breakAtBoundaries(spans[0]);
+		}
 	}
 }
 
