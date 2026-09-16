@@ -2,7 +2,7 @@
 import { defineConfig } from "astro/config";
 import starlight from "@astrojs/starlight";
 import sitemap from "@astrojs/sitemap";
-import { unified } from "@astrojs/markdown-remark";
+import { rehypeHeadingIds, unified } from "@astrojs/markdown-remark";
 import starlightLinksValidator from "starlight-links-validator";
 import rehypeMermaid from "rehype-mermaid";
 import rehypeTables from "./src/lib/rehype-tables.mjs";
@@ -106,6 +106,11 @@ export default defineConfig({
 		syntaxHighlight: false, // expressive-code owns it
 		processor: unified({
 			rehypePlugins: [
+				// Also run by Astro after every plugin here, and harmless twice:
+				// it keeps an id it finds. Placed first so that rehypeTables links
+				// an index row to the id the heading really carries, read rather
+				// than derived a second way.
+				rehypeHeadingIds,
 				rehypeTables,
 				[
 					rehypeMermaid,

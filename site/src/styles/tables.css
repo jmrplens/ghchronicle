@@ -481,12 +481,23 @@
 .sl-markdown-content td:not(:first-child, :last-child)::after {
 	display: var(--table-compact-separator, none);
 	color: var(--sl-color-gray-3);
+	/* The plain declaration first, for a browser without alternative text in
+	 * `content`: it drops the second one as invalid and still prints the dot
+	 * and the space, rather than running a value into the next heading. */
+	content: "\a0· ";
 	content: "\a0· " / " ";
 }
 
-/* The whole row is the link's target. `static` in every other form, where
- * the box has no size and no position and draws nothing. */
-.sl-markdown-content .table-scroll td:first-child a::after {
+/* The whole row is the link's target, but only in a row with no other link.
+ * The stretched box lies over every cell of the row, so a link in a later cell
+ * would sit under it and could not be pressed. A row that has one keeps the
+ * name alone as its target. `static` in every other form, where the box has
+ * no size and no position and draws nothing. */
+.sl-markdown-content
+	.table-scroll
+	tr:not(:has(td:not(:first-child) a))
+	td:first-child
+	a::after {
 	position: var(--table-compact-stretch, static);
 	inset: 0;
 	content: "";

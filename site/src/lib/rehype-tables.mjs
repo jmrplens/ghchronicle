@@ -181,32 +181,29 @@ function indexTablesOf(file) {
 }
 
 /**
- * The anchor each section heading of the page will carry, by its text.
+ * The anchor each section heading of the page carries, by its text.
  *
- * The heading ids are written by a plugin that runs after this one, so an id
- * already present is used and otherwise the slug is derived the way that
- * plugin derives it for the plain names an index row carries: lower case,
- * spaces to hyphens, punctuation other than hyphens and underscores dropped.
- * A name that would slug differently is simply not linked. The table-fit gate
- * follows every link it finds in an index table and fails on one that lands
- * nowhere, so a slug this got wrong cannot ship.
+ * The ids are read, never derived here. Astro's own `rehypeHeadingIds` runs
+ * after every configured plugin, so astro.config.mjs also places it directly
+ * before this one: the ids exist by the time this reads them, they are made by
+ * the one slugger that makes them for the page (duplicates suffixed in
+ * document order), and the later built-in pass keeps an id it finds. A
+ * second derivation here could disagree with that slugger on two headings
+ * that slug alike and send a row to the wrong section with nothing to notice.
+ * A heading without an id is not linked, and neither is a heading text that
+ * appears twice, which has two anchors and no single answer.
  *
  * @param {any} tree
- * @returns {Map<string, string>} heading text to id
+ * @returns {Map<string, string | null>} heading text to id
  */
 function sectionAnchors(tree) {
 	const anchors = new Map();
 	const visit = (node) => {
-		if (node?.type === "element" && /^h[2-6]$/.test(node.tagName)) {
+		if (node?.type === "element" && /^h[1-6]$/.test(node.tagName)) {
+			const id = node.properties?.id;
+			if (typeof id !== "string" || id === "") return;
 			const text = textOf(node).trim();
-			const id =
-				node.properties?.id ??
-				text
-					.toLowerCase()
-					.replace(/[^\p{L}\p{N}\s_-]/gu, "")
-					.replace(/\s/g, "-");
-			// A heading text used twice has two anchors and no single answer.
-			anchors.set(text, anchors.has(text) ? null : String(id));
+			anchors.set(text, anchors.has(text) ? null : id);
 			return;
 		}
 		for (const child of node?.children ?? []) visit(child);
