@@ -19,15 +19,23 @@
  *            written into the markup by src/lib/rehype-tables.mjs,
  *            because the browser stops inferring them the moment
  *            `display` changes.
+ *   COMPACT  what an INDEX table gets instead of STACKED, at the
+ *            same breakpoints: one line per row naming the item,
+ *            a smaller line under it with the rest of the row,
+ *            each value after its heading. See "The compact form"
+ *            at the end of this file for which tables and why.
  *
- * The switch between the two is the eleven `--table-*` properties.
+ * The switch between the first two is the twelve `--table-*`
+ * properties.
  * The WIDE form is the fallback written into each `var()` below, so
  * it is stated once, at the declaration that uses it; the stacked
- * form is those eleven properties declared together.
+ * form is those twelve properties declared together. The compact
+ * form is a set of `--table-compact-*` overrides that only take
+ * effect where those twelve are declared.
  *
  * What that buys, exactly, because it is less than it looks: the
- * eleven declarations ARE still repeated, once per breakpoint and
- * once for the spec sheet, five blocks of the same eleven lines. A
+ * twelve declarations ARE still repeated, once per breakpoint and
+ * once for the spec sheet, five blocks of the same twelve lines. A
  * container query cannot read a length out of a custom property, so
  * a per-column-count threshold needs a block per count whatever this
  * file does. What the indirection removes is the other half: the
@@ -134,7 +142,8 @@
 	display: var(--table-cell, table-cell);
 	/* Stacked, consecutive cells lay their vertical padding end to end, and a
 	 * row of five fields runs most of a screen on the padding alone. */
-	padding-block: var(--table-pad, 0.625rem);
+	padding-block: var(--table-compact-pad, var(--table-pad, 0.625rem));
+	padding-inline: var(--table-compact-pad, 0.875rem);
 	border-bottom-width: var(--table-rule, 1px);
 	vertical-align: top;
 }
@@ -146,7 +155,7 @@
 /* The cells tile the row in both forms, so hovering one still lights the
  * whole row once the row is a block. */
 .sl-markdown-content tr:hover td {
-	background: var(--rb-surface);
+	background: var(--table-compact-hover-cell, var(--rb-surface));
 }
 
 /* The first cell of a row says what the row is about, in every table of this
@@ -158,6 +167,14 @@
  * the switch reached it. */
 .sl-markdown-content td:first-child {
 	color: var(--table-first, currentcolor);
+	font-size: var(--table-compact-name-size, 1em);
+}
+
+/* Every cell after the first. Only the compact form tells them apart from the
+ * first: inline, so the rest of a row runs on as one line of facts. */
+.sl-markdown-content td:not(:first-child) {
+	display: var(--table-compact-rest, var(--table-cell, table-cell));
+	font-size: var(--table-compact-rest-size, 1em);
 }
 
 .sl-markdown-content th code {
@@ -233,11 +250,28 @@
  * the markup, and only its `display` is switched.
  * ------------------------------------------------------------ */
 .sl-markdown-content .table-scroll tr {
-	margin-block: 0.75rem;
-	padding-block: 0.35rem;
-	border: 1px solid var(--rb-border);
-	border-inline-start: 3px solid var(--rb-accent);
-	border-radius: var(--rb-radius);
+	position: var(--table-compact-anchor, static);
+	margin-block: var(--table-compact-row-margin, 0.75rem);
+	padding-block: var(--table-compact-row-pad, 0.35rem);
+	padding-inline: var(--table-compact-row-inset, 0);
+	border: var(--table-compact-frame, 1px solid var(--rb-border));
+	border-inline-start: var(--table-compact-frame, 3px solid var(--rb-accent));
+	border-block-end: 1px solid var(--rb-border);
+	border-radius: var(--table-compact-radius, var(--rb-radius));
+	/* On the row and not on its cells: an inline cell cannot make its line
+	 * shorter than the line height of the block it sits in. No fallback, on
+	 * purpose: outside the compact form the variable is undefined, the
+	 * declaration is invalid at computed-value time, and an inherited property
+	 * left that way inherits, which is what the row did before this existed. */
+	line-height: var(--table-compact-leading);
+}
+
+/* Compact, the row is the thing hovered rather than each cell, because its
+ * cells after the first are runs of text and a background on each would
+ * paint a patchwork. An image rather than a colour, so that the wide form,
+ * which never sets one, is left with nothing declared at all. */
+.sl-markdown-content .table-scroll tr:hover {
+	background-image: var(--table-compact-hover, none);
 }
 
 /* The heading the cell sat under, carried down with it.
@@ -245,18 +279,28 @@
  * the document rather than in this file and a column renamed in the markdown
  * renames its labels with it. */
 .sl-markdown-content td[data-label]::before {
-	display: var(--table-label, none);
+	display: var(--table-compact-label, var(--table-label, none));
 	margin-bottom: 0.15rem;
 	color: var(--sl-color-gray-3);
 	font-size: 0.72rem;
 	line-height: 1.4;
 	letter-spacing: 0.05em;
 	text-transform: uppercase;
-	content: attr(data-label);
+	/* Compact, a heading and its value share a line. The trailing space is
+	 * the gap between them, and it is collapsed away at the end of a block,
+	 * which is the stacked form. The heading does not wrap there, because
+	 * "DEFAULT" at the end of one line and "FIELDS" at the start of the next
+	 * read as two headings; the row breaks instead at the space after each
+	 * separator dot, and inside the values. Without those spaces it had
+	 * nowhere to break: inline boxes with no white space between them are
+	 * one word to the line breaker, and a whole row of them overflowed a
+	 * 328 px column as a single run. */
+	white-space: var(--table-compact-label-wrap, normal);
+	content: attr(data-label) " ";
 }
 
 /* ------------------------------------------------------------
- * The breakpoints: the same eleven declarations, once per column
+ * The breakpoints: the same twelve declarations, once per column
  * count, each at the floor that column count needs. The last one
  * is written as an exclusion rather than as `[data-columns="5"]`
  * so that a table grown to six columns stacks too, instead of
@@ -264,6 +308,7 @@
  * ------------------------------------------------------------ */
 @container (max-width: 26rem) {
 	.sl-markdown-content .table-scroll[data-columns="2"] > table {
+		--table-stacked: ;
 		--table-display: block;
 		--table-row-group: block;
 		--table-row: block;
@@ -280,6 +325,7 @@
 
 @container (max-width: 28rem) {
 	.sl-markdown-content .table-scroll[data-columns="3"] > table {
+		--table-stacked: ;
 		--table-display: block;
 		--table-row-group: block;
 		--table-row: block;
@@ -296,6 +342,7 @@
 
 @container (max-width: 34rem) {
 	.sl-markdown-content .table-scroll[data-columns="4"] > table {
+		--table-stacked: ;
 		--table-display: block;
 		--table-row-group: block;
 		--table-row: block;
@@ -320,6 +367,7 @@
 			[data-columns="4"]
 		)
 		> table {
+		--table-stacked: ;
 		--table-display: block;
 		--table-row-group: block;
 		--table-row: block;
@@ -337,10 +385,11 @@
 /* ------------------------------------------------------------
  * The spec sheet: a table that is stacked at every width.
  *
- * components/SpecSheet.astro says which table and why. The eleven
+ * components/SpecSheet.astro says which table and why. The twelve
  * declarations are the ones above, with no query around them.
  * ------------------------------------------------------------ */
 .sl-markdown-content .spec-sheet .table-scroll > table {
+	--table-stacked: ;
 	--table-display: block;
 	--table-row-group: block;
 	--table-row: block;
@@ -352,4 +401,93 @@
 	--table-pad: 0.3rem;
 	--table-floor: 0px;
 	--table-first: var(--sl-color-white);
+}
+
+/* ------------------------------------------------------------
+ * The compact form: an index, one line per row.
+ *
+ * WHICH TABLES. A page names them in its frontmatter
+ * (`indexTables`, by the heading of the first column), and
+ * src/lib/rehype-tables.mjs marks their container
+ * `data-form="index"` and links each row's first cell to the
+ * section of the page it names, when there is one. The judgement
+ * is the page's: an index is a table a reader uses to FIND an
+ * item, a short row per item that is documented further on, and
+ * the stacked form serves it badly. Measured on /card/layouts/ at
+ * a 360 px viewport, stacked: 13 rows, 337 px each, 4,691 px of
+ * labelled boxes before the first card, where on a desktop the
+ * same table is one glance.
+ *
+ * WHEN. At exactly the widths the table would otherwise stack,
+ * whatever its column count, and at no other. That is the job of
+ * `--table-stacked`, which each stacked bundle above declares
+ * EMPTY and nothing else declares at all. Every value below is
+ * written as `var(--table-stacked) <value>`: inside a bundle's
+ * breakpoint that is a space and the value, which is the value;
+ * outside it, `--table-stacked` is undefined, a `var()` of an
+ * undefined property makes the whole declaration invalid, and the
+ * property it feeds falls back to the stacked or the wide value
+ * written at the rule that consumes it. So these declarations are
+ * stated once, without a breakpoint, and still cannot reach the
+ * wide form or a table that is not an index. The other way to
+ * write it was the same sixteen lines inside each of the four
+ * breakpoints.
+ *
+ * WHAT. The row loses its box and its stripe and becomes a line
+ * between hairlines. The first cell, the item's name, loses its
+ * label and keeps its size; the rest run on as one smaller line,
+ * each value after its heading and a dot between them, which is
+ * what keeps "Animated no · Loops no" meaning something without
+ * the columns. When the name is a link, the link is stretched
+ * over the whole row, so a thumb can hit the row rather than the
+ * word.
+ *
+ * It stays a table in the accessibility tree for the reason the
+ * stacked form does: the roles the plugin writes out.
+ * ------------------------------------------------------------ */
+.sl-markdown-content .table-scroll[data-form="index"] > table {
+	--table-compact-rest: var(--table-stacked) inline;
+	--table-compact-rest-size: var(--table-stacked) 0.8rem;
+	--table-compact-leading: var(--table-stacked) 1.55;
+	--table-compact-name-size: var(--table-stacked) 1rem;
+	--table-compact-label: var(--table-stacked) inline;
+	--table-compact-label-wrap: var(--table-stacked) nowrap;
+	--table-compact-name-label: var(--table-stacked) none;
+	--table-compact-pad: var(--table-stacked) 0;
+	--table-compact-row-margin: var(--table-stacked) 0;
+	--table-compact-row-pad: var(--table-stacked) 0.6rem;
+	--table-compact-row-inset: var(--table-stacked) 0.25rem;
+	--table-compact-frame: var(--table-stacked) 0 none;
+	--table-compact-radius: var(--table-stacked) 0;
+	--table-compact-anchor: var(--table-stacked) relative;
+	--table-compact-stretch: var(--table-stacked) absolute;
+	--table-compact-separator: var(--table-stacked) inline;
+	--table-compact-hover-cell: var(--table-stacked) transparent;
+	--table-compact-hover: var(--table-stacked)
+		linear-gradient(var(--rb-surface), var(--rb-surface));
+}
+
+/* The name needs no heading above it: it is what the row is. */
+.sl-markdown-content td:first-child[data-label]::before {
+	display: var(--table-compact-name-label, var(--table-label, none));
+}
+
+/* A dot between two facts on the supporting line. The space before it does
+ * not break, so a line never starts with a dot; the space after it does, for
+ * the reason the label ends in one. Its alternative text is a single space,
+ * so a screen reader, which already hears each value after its heading, hears
+ * no punctuation, and the row's name does not run one cell's value into the
+ * next cell's heading ("chronicleAnimated"), which an empty one did. */
+.sl-markdown-content td:not(:first-child, :last-child)::after {
+	display: var(--table-compact-separator, none);
+	color: var(--sl-color-gray-3);
+	content: "\a0· " / " ";
+}
+
+/* The whole row is the link's target. `static` in every other form, where
+ * the box has no size and no position and draws nothing. */
+.sl-markdown-content .table-scroll td:first-child a::after {
+	position: var(--table-compact-stretch, static);
+	inset: 0;
+	content: "";
 }

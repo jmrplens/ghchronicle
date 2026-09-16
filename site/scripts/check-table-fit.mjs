@@ -27,6 +27,16 @@
  * drift, a wrong working directory or a plugin that stopped wrapping tables
  * would read as success.
  *
+ * Two more things are read off the same walk, for the compact form an index
+ * table gets (see "The compact form" in styles/tables.css). A table its page
+ * declared an index must actually be compact wherever it is not wide: that
+ * form is switched on by an empty custom property, `--table-stacked: ;`, and
+ * a minifier that decided an empty value was a mistake would put every index
+ * back into stacked boxes while every table still fit. And every link the
+ * plugin wrote from a row to a section of its page must land on an element
+ * that exists, because the plugin derives the anchor before the heading ids
+ * are written and cannot check it itself.
+ *
  * The fixtures at the bottom run on every invocation.
  *
  * Usage:
@@ -106,6 +116,19 @@ function measureTables() {
 					: "",
 				columns: heads.length,
 				stacked: getComputedStyle(table).display !== "table",
+				declaredIndex: wrapper.dataset.form === "index",
+				// Compact is the stacked table whose second cell runs inline.
+				compact:
+					getComputedStyle(table).display !== "table" &&
+					[...table.querySelectorAll("tbody td:nth-child(2)")].every(
+						(cell) => getComputedStyle(cell).display === "inline",
+					),
+				deadLinks: [...table.querySelectorAll('a[href^="#"]')]
+					.filter(
+						(link) =>
+							!document.getElementById(decodeURIComponent(link.hash.slice(1))),
+					)
+					.map((link) => link.getAttribute("href")),
 			};
 		},
 	);
@@ -136,6 +159,7 @@ async function walk(dist) {
 	const failures = [];
 	let tables = 0;
 	let stacked = 0;
+	let compact = 0;
 	let browser;
 	try {
 		const base = await preview.announced;
@@ -156,8 +180,29 @@ async function walk(dist) {
 				for (const measured of await page.evaluate(measureTables)) {
 					tables += 1;
 					if (measured.stacked) stacked += 1;
+					if (measured.compact) compact += 1;
 					const { overflow, fits } = verdict(measured);
-					if (!fits) failures.push({ width, route, overflow, ...measured });
+					const problems = [];
+					if (!fits) {
+						problems.push(
+							`+${overflow}px (column ${measured.container}px, table ${measured.content}px), ` +
+								`${measured.columns} columns, widest "${measured.widest}"`,
+						);
+					}
+					if (!indexFormHolds(measured)) {
+						problems.push(
+							"declared an index, stacked, and not compact: the compact " +
+								"form in src/styles/tables.css did not switch on",
+						);
+					}
+					if (measured.deadLinks.length > 0) {
+						problems.push(
+							`links to ${measured.deadLinks.join(", ")}, which nothing on the page carries`,
+						);
+					}
+					for (const problem of problems) {
+						failures.push({ width, route, index: measured.index, problem });
+					}
 				}
 			}
 			await page.close();
@@ -171,7 +216,19 @@ async function walk(dist) {
 			`the ${routes.length} pages scanned rendered no table at all.`,
 		);
 	}
-	return { failures, tables, stacked, routes: routes.length };
+	return { failures, tables, stacked, compact, routes: routes.length };
+}
+
+/**
+ * Whether a table in the form it measured in is the form its page asked for:
+ * an index that is not a table any more has to be the compact index, not the
+ * stacked blocks. Every other table, and an index still wide, passes.
+ *
+ * @param {{ declaredIndex: boolean, stacked: boolean, compact: boolean }} measured
+ * @returns {boolean}
+ */
+export function indexFormHolds({ declaredIndex, stacked, compact }) {
+	return !declaredIndex || !stacked || compact;
 }
 
 /* ------------------------------------------------------------------
@@ -226,6 +283,27 @@ function selfTest() {
 		{ overflow: 346, fits: false },
 	);
 
+	is(
+		"an index still wide is what its column allows",
+		indexFormHolds({ declaredIndex: true, stacked: false, compact: false }),
+		true,
+	);
+	is(
+		"an index below its breakpoint is compact",
+		indexFormHolds({ declaredIndex: true, stacked: true, compact: true }),
+		true,
+	);
+	is(
+		"an index in stacked boxes is the failure the form exists for",
+		indexFormHolds({ declaredIndex: true, stacked: true, compact: false }),
+		false,
+	);
+	is(
+		"a reference table stacks and is not asked to be compact",
+		indexFormHolds({ declaredIndex: false, stacked: true, compact: false }),
+		true,
+	);
+
 	if (failed.length > 0) {
 		console.error("[table-fit] fixtures failed:");
 		for (const line of failed) console.error(`  ${line}`);
@@ -250,30 +328,31 @@ const DIST = resolve(
 );
 
 try {
-	const { failures, tables, stacked, routes } = await walk(DIST);
+	const { failures, tables, stacked, compact, routes } = await walk(DIST);
 	if (failures.length > 0) {
 		console.error(
-			`[table-fit] ${failures.length} of ${tables} measurements overflow their column:`,
+			`[table-fit] ${failures.length} problems over ${tables} measurements:`,
 		);
 		for (const failure of failures) {
 			console.error(
-				`  ${failure.width}px /${failure.route} table ${failure.index}: ` +
-					`+${failure.overflow}px (column ${failure.container}px, table ${failure.content}px), ` +
-					`${failure.columns} columns, widest "${failure.widest}"`,
+				`  ${failure.width}px /${failure.route} table ${failure.index}: ${failure.problem}`,
 			);
 		}
 		console.error(
 			"[table-fit] a table that does not fit has to scroll sideways, which " +
 				"on a phone is how the documentation stopped being readable. Either " +
 				"the breakpoint in src/styles/tables.css no longer covers this " +
-				"shape, or something in the cell cannot wrap.",
+				"shape, or something in the cell cannot wrap. An index in stacked " +
+				"boxes, or a row linking nowhere, is the compact form of the same " +
+				"file and of src/lib/rehype-tables.mjs.",
 		);
 		process.exit(1);
 	}
 	console.log(
 		`[table-fit] ${tables} measurements over ${routes} pages at ` +
 			`${WIDTHS.join(" and ")} px: every table fits its column ` +
-			`(${stacked} stacked, ${tables - stacked} still tables).`,
+			`(${stacked - compact} stacked, ${compact} compact indexes, ` +
+			`${tables - stacked} still tables), and every row link lands.`,
 	);
 } catch (error) {
 	console.error(`[table-fit] ${error.message}`);

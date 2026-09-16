@@ -32,6 +32,10 @@
  *    exactly the implicit ones while the table is wide, which costs nothing,
  *    and they are the whole of the semantics once it is not.
  *
+ *  - on a table its page names as an INDEX, `data-form="index"` on the
+ *    container, and a link from each row's first cell to the section of the
+ *    page that cell names, when there is one. See "Index tables" below.
+ *
  * Why the stacked form exists at all, measured on the built site before it
  * did: all 98 tables of the corpus, in both languages, overflowed the column
  * they sit in at a 360 px and at a 400 px viewport, by 176 px to 417 px.
@@ -44,6 +48,32 @@
  * scripts/check-table-fit.mjs is the gate that keeps that true.
  */
 import { localeOf, routeOf } from "./site.mjs";
+
+/*
+ * INDEX TABLES. Stacking is right for a reference table, whose cells are
+ * clauses a reader reads, and wrong for an index, whose rows are short and
+ * whose job is to let the reader find an item. Measured on the layouts page
+ * before this existed: its thirteen-row summary took 4,691 px stacked at a
+ * 360 px viewport, 337 px a row, nearly six screens of labelled boxes before
+ * the first card, where the same table is one glance on a desktop. An index
+ * gets a compact form instead (styles/tables.css): one line per row naming the
+ * item, a smaller line under it with the rest of the row.
+ *
+ * Which tables are indexes is the page's judgement, not this plugin's guess:
+ * a page lists them in its frontmatter by the heading of their first column,
+ *
+ *     indexTables:
+ *       - Layout
+ *
+ * which reads the same in the source as in the rendered page, and survives a
+ * table being added above it where a position would not. A name that matches
+ * no table on the page is an error: a column renamed in the markdown would
+ * otherwise put its table back into the stacked form without a word.
+ *
+ * The markdown is not touched, so the twin, docs/ and llms-full.txt read the
+ * table exactly as written, and so does internal/render/documented_test.go,
+ * which parses the layouts table's rows as markdown.
+ */
 
 /** What the region is called, per locale. */
 const REGION_LABEL = { en: "Table", es: "Tabla" };
@@ -138,27 +168,116 @@ function localeOfFile(file) {
 	return match ? localeOf(routeOf(match[1])) : "en";
 }
 
+/**
+ * The first-column headings of the tables a page declared as indexes, read
+ * off the frontmatter Astro hands every plugin.
+ *
+ * @param {any} file the vfile rehype passes through
+ * @returns {string[]}
+ */
+function indexTablesOf(file) {
+	const declared = file?.data?.astro?.frontmatter?.indexTables;
+	return Array.isArray(declared) ? declared.map(String) : [];
+}
+
+/**
+ * The anchor each section heading of the page will carry, by its text.
+ *
+ * The heading ids are written by a plugin that runs after this one, so an id
+ * already present is used and otherwise the slug is derived the way that
+ * plugin derives it for the plain names an index row carries: lower case,
+ * spaces to hyphens, punctuation other than hyphens and underscores dropped.
+ * A name that would slug differently is simply not linked. The table-fit gate
+ * follows every link it finds in an index table and fails on one that lands
+ * nowhere, so a slug this got wrong cannot ship.
+ *
+ * @param {any} tree
+ * @returns {Map<string, string>} heading text to id
+ */
+function sectionAnchors(tree) {
+	const anchors = new Map();
+	const visit = (node) => {
+		if (node?.type === "element" && /^h[2-6]$/.test(node.tagName)) {
+			const text = textOf(node).trim();
+			const id =
+				node.properties?.id ??
+				text
+					.toLowerCase()
+					.replace(/[^\p{L}\p{N}\s_-]/gu, "")
+					.replace(/\s/g, "-");
+			// A heading text used twice has two anchors and no single answer.
+			anchors.set(text, anchors.has(text) ? null : String(id));
+			return;
+		}
+		for (const child of node?.children ?? []) visit(child);
+	};
+	visit(tree);
+	return anchors;
+}
+
+/**
+ * Links each row's first cell to the section named after it, when the page
+ * has exactly one. The cell's own content, a code span in this corpus, becomes
+ * the link's content, so the row reads as it did and the link's accessible
+ * name is the item's name.
+ *
+ * @param {any} table
+ * @param {Map<string, string>} anchors
+ */
+function linkRows(table, anchors) {
+	for (const group of childrenNamed(table, ROW_GROUPS)) {
+		if (group.tagName === "thead") continue;
+		for (const row of childrenNamed(group, ROWS)) {
+			const first = childrenNamed(row, CELLS)[0];
+			if (!first) continue;
+			const alreadyLinked = (node) =>
+				node.type === "element" &&
+				(node.tagName === "a" || (node.children ?? []).some(alreadyLinked));
+			if (first.children.some(alreadyLinked)) continue;
+			const id = anchors.get(textOf(first).trim());
+			if (!id) continue;
+			first.children = [
+				{
+					type: "element",
+					tagName: "a",
+					properties: { href: `#${id}` },
+					children: first.children,
+				},
+			];
+		}
+	}
+}
+
 export default function rehypeTables() {
-	/** @param {any} node @param {string} label */
-	const walk = (node, label) => {
+	/**
+	 * @param {any} node
+	 * @param {{ label: string, indexes: Set<string>, found: Set<string>, anchors: Map<string, string> }} page
+	 */
+	const walk = (node, page) => {
 		if (!node || !Array.isArray(node.children)) return;
 		node.children = node.children.map((child) => {
-			walk(child, label);
+			walk(child, page);
 			if (child.type !== "element" || child.tagName !== "table") return child;
 			const columns = headings(child);
 			prepare(child, columns);
+			const index = columns.length > 0 && page.indexes.has(columns[0]);
+			if (index) {
+				page.found.add(columns[0]);
+				linkRows(child, page.anchors);
+			}
 			return {
 				type: "element",
 				tagName: "div",
 				properties: {
 					className: ["table-scroll"],
 					"data-columns": String(columns.length),
+					...(index ? { "data-form": "index" } : {}),
 					// Focusable, because a region that scrolls has to be
 					// reachable without a pointer. The role and the label are
 					// what make that focus stop announce itself.
 					tabindex: "0",
 					role: "region",
-					"aria-label": label,
+					"aria-label": page.label,
 				},
 				children: [child],
 			};
@@ -167,5 +286,23 @@ export default function rehypeTables() {
 	// The tree is walked here rather than with unist-util-visit: that package
 	// is present transitively, and depending on a transitive package is how a
 	// build breaks on a machine whose resolution differs.
-	return (tree, file) => walk(tree, REGION_LABEL[localeOfFile(file)]);
+	return (tree, file) => {
+		const indexes = new Set(indexTablesOf(file));
+		const page = {
+			label: REGION_LABEL[localeOfFile(file)],
+			indexes,
+			found: new Set(),
+			anchors: indexes.size ? sectionAnchors(tree) : new Map(),
+		};
+		walk(tree, page);
+		const missing = [...indexes].filter((name) => !page.found.has(name));
+		if (missing.length) {
+			throw new Error(
+				`${file?.path ?? "a page"}: indexTables names ${missing
+					.map((name) => `"${name}"`)
+					.join(", ")}, and no table on the page has that first column. ` +
+					"Rename the entry to the table's first heading, or remove it.",
+			);
+		}
+	};
 }
