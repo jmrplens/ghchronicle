@@ -230,9 +230,19 @@ export function indexProblems({ declared, tables }) {
  * What is wrong with one page's default-column tables at one width, read
  * against what its source declared rather than against what the markup says.
  *
+ * Three things can be wrong: the cell was never marked, it was marked and did
+ * not land beside the key, or it landed there and the line does not fit, which
+ * is either half of that line taking a second line box.
+ *
  * @param {{
  *   declared: { table: string, default: string }[],
- *   tables: { firstHeading: string, defaultForm: boolean, hasDefaultCell: boolean }[],
+ *   tables: {
+ *     firstHeading: string,
+ *     defaultForm: boolean,
+ *     hasDefaultCell: boolean,
+ *     keyWraps?: { text: string, lines: number }[],
+ *     valueWraps?: { text: string, lines: number }[],
+ *   }[],
  * }} page
  * @returns {string[]} one sentence per problem, none when the page is right
  */
@@ -259,6 +269,25 @@ export function defaultColumnProblems({ declared, tables }) {
 					`"${heading}"'s default column did not render beside the label: ` +
 						"either src/lib/rehype-tables.mjs did not mark the cell or the " +
 						"default form in src/styles/tables.css did not switch on",
+				);
+			}
+			for (const { text, lines } of table.keyWraps ?? []) {
+				problems.push(
+					`"${heading}"'s key ${text} took ${lines} line boxes: a row's ` +
+						"name broken mid-word is what this form has to keep from " +
+						"happening. The hoisted default beside it is taking room the " +
+						"key needs, so lower --table-default-value-maxw in " +
+						"src/styles/tables.css, or leave that default in its own block",
+				);
+			}
+			for (const { text, lines } of table.valueWraps ?? []) {
+				problems.push(
+					`"${heading}"'s hoisted default "${text}" took ${lines} line ` +
+						"boxes: a value beside the label has to read as one value on " +
+						"one line. Either --table-default-value-maxw in " +
+						"src/styles/tables.css is tighter than the widest value this " +
+						"corpus hoists, or this default is long enough to belong in " +
+						"its own labelled block",
 				);
 			}
 		}
@@ -297,6 +326,41 @@ function measureTables() {
 					value: row.querySelector('td[data-role="default"]'),
 				}))
 				.filter((entry) => entry.value);
+			// How many lines a node's text occupies. Measured over the TEXT
+			// nodes under it, because a range over an element's contents also
+			// returns the element's own box (a code span's padded box sits a
+			// couple of pixels above the text inside it, and counting rects
+			// would read one line as two). Tops within half a line of each
+			// other are the same line: on one line a code span's 0.875em text
+			// and the prose around it do not share a top edge.
+			const lineBoxes = (node) => {
+				const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT);
+				const tops = [];
+				for (let text = walker.nextNode(); text; text = walker.nextNode()) {
+					if (!text.nodeValue.trim()) continue;
+					const range = document.createRange();
+					range.selectNodeContents(text);
+					for (const rect of range.getClientRects()) {
+						if (rect.width > 0 && rect.height > 0) tops.push(rect.top);
+					}
+				}
+				const leading =
+					Number.parseFloat(getComputedStyle(node).lineHeight) || 16;
+				return tops
+					.sort((a, b) => a - b)
+					.filter(
+						(top, at, sorted) => at === 0 || top - sorted[at - 1] > leading / 2,
+					).length;
+			};
+			const stackedTable = getComputedStyle(table).display !== "table";
+			const wrapped = (nodes) =>
+				nodes
+					.filter(Boolean)
+					.map((node) => ({
+						text: node.textContent.trim(),
+						lines: lineBoxes(node),
+					}))
+					.filter((measured) => measured.lines > 1);
 			return {
 				index,
 				container: Math.round(wrapper.clientWidth),
@@ -332,6 +396,15 @@ function measureTables() {
 									key.getBoundingClientRect().top,
 							) <= 2,
 					),
+				// The two halves of the line the default form makes: the key on
+				// the left and the hoisted value on the right. Only measured
+				// stacked, the only form in which they share a line.
+				keyWraps: stackedTable
+					? wrapped(defaultCells.map(({ key }) => key?.querySelector("code")))
+					: [],
+				valueWraps: stackedTable
+					? wrapped(defaultCells.map(({ value }) => value))
+					: [],
 				deadLinks: [...table.querySelectorAll('a[href^="#"]')]
 					.filter(
 						(link) =>
@@ -633,6 +706,34 @@ function selfTest() {
 		}).length,
 		1,
 	);
+	is(
+		"a key broken onto a second line box is caught",
+		defaultColumnProblems({
+			declared: [{ table: "Key", default: "Default" }],
+			tables: [
+				{ ...github, keyWraps: [{ text: "sinks.dedupe_file", lines: 2 }] },
+			],
+		}).length,
+		1,
+	);
+	is(
+		"a hoisted default that wrapped is caught",
+		defaultColumnProblems({
+			declared: [{ table: "Key", default: "Default" }],
+			tables: [
+				{ ...github, valueWraps: [{ text: "api.github.com", lines: 2 }] },
+			],
+		}).length,
+		1,
+	);
+	is(
+		"a table with neither half wrapped is right",
+		defaultColumnProblems({
+			declared: [{ table: "Key", default: "Default" }],
+			tables: [{ ...github, keyWraps: [], valueWraps: [] }],
+		}),
+		[],
+	);
 
 	if (failed.length > 0) {
 		console.error("[table-fit] fixtures failed:");
@@ -683,7 +784,9 @@ try {
 				"shape, or something in the cell cannot wrap. An index in stacked " +
 				"boxes, or a default not beside its label, is the compact or " +
 				"default form of the same file and of src/lib/rehype-tables.mjs; " +
-				"a link that lands nowhere is the page's own.",
+				"a key or a hoisted value that took two line boxes is that form's " +
+				"column cap, in the same file; a link that lands nowhere is the " +
+				"page's own.",
 		);
 		process.exit(1);
 	}
@@ -694,7 +797,8 @@ try {
 			`${tables - stacked} still tables); all ${indexes} measurements of ` +
 			"the index tables the sources declare rendered compact, every row " +
 			`link lands, and all ${defaultColumnsChecked} measurements of the ` +
-			"default columns the sources declare rendered beside their label.",
+			"default columns the sources declare rendered beside their label, " +
+			"each key and each hoisted value on one line.",
 	);
 } catch (error) {
 	console.error(`[table-fit] ${error.message}`);
