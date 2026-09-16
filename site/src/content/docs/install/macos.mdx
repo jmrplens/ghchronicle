@@ -1,0 +1,296 @@
+---
+title: macOS
+description: "The whole path on macOS: the darwin archive, quarantine, a launchd agent or daemon, and building it yourself."
+---
+
+import { Steps, Tabs, TabItem, Aside, FileTree } from "@astrojs/starlight/components";
+
+The same static binary as everywhere else, built for `darwin` on both Apple
+silicon and Intel. macOS is not a build target that is merely compiled and
+hoped for: every change runs the whole unit suite and the end-to-end suite on a
+macOS runner, beside Linux and Windows.
+
+## Pick the archive
+
+Release archives say `darwin`, which is the name of the system the Go toolchain
+uses; macOS is the name Apple uses for the same thing. `uname -m` answers which
+architecture.
+
+| `uname -m` reports | The machine        | The archive to take |
+| ------------------ | ------------------ | ------------------- |
+| `arm64`            | Apple silicon      | `darwin_arm64`      |
+| `x86_64`           | Intel              | `darwin_amd64`      |
+
+```sh
+VERSION=1.0.0
+arch=$(uname -m); case "$arch" in x86_64) arch=amd64 ;; esac
+base=https://github.com/jmrplens/ghchronicle/releases/download/v$VERSION
+curl -fsSLO "$base/ghchronicle_${VERSION}_darwin_${arch}.tar.gz"
+```
+
+<Aside type="caution" title="Name the version rather than asking for the newest">
+  The repository publishes a moving `v1` tag beside the numbered releases,
+  because the Action is listed on the Marketplace and that listing needs one.
+  The `v1` release carries **no files at all**, so a download URL built from
+  whichever release GitHub currently flags can resolve to a release with
+  nothing in it. Take the version from the
+  [releases page](https://github.com/jmrplens/ghchronicle/releases) and write
+  it down, as above.
+</Aside>
+
+## Check what you downloaded
+
+Two files are published beside the archives: `checksums.txt`, which holds the
+SHA-256 of every archive, and `checksums.txt.sigstore.json`, which is a
+signature over that file.
+
+<Steps>
+
+1. Take the checksum file and its signature.
+
+    ```sh
+    curl -fsSLO "$base/checksums.txt"
+    curl -fsSLO "$base/checksums.txt.sigstore.json"
+    ```
+
+2. Check the archive against it. macOS ships `shasum` rather than the
+   `sha256sum` of a Linux box, so the line for your archive is selected and
+   piped in, which works whatever version of `shasum` the system has.
+
+    ```sh
+    grep "darwin_${arch}.tar.gz$" checksums.txt | shasum -a 256 -c -
+    ```
+
+    ```text
+    ghchronicle_1.0.0_darwin_arm64.tar.gz: OK
+    ```
+
+3. Check the checksum file itself, if you have
+   [cosign](https://docs.sigstore.dev/cosign/system_config/installation/).
+
+    ```sh
+    cosign verify-blob \
+      --certificate-identity-regexp 'https://github.com/jmrplens/ghchronicle/.github/workflows/release.yml@refs/tags/.*' \
+      --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+      --bundle checksums.txt.sigstore.json \
+      checksums.txt
+    ```
+
+    ```text
+    Verified OK
+    ```
+
+</Steps>
+
+The signing is keyless: the identity being verified is the workflow that ran,
+recorded in a public transparency log, which is why the two `--certificate`
+flags are not optional. Without them cosign would confirm that somebody signed
+the file, which is not the question.
+
+## Put it on the PATH
+
+The archive holds three files and no directory.
+
+<FileTree>
+
+- ghchronicle_1.0.0_darwin_arm64.tar.gz
+  - ghchronicle the binary
+  - LICENSE
+  - README.md
+
+</FileTree>
+
+<Tabs syncKey="macos-scope">
+  <TabItem label="For everyone">
+    ```sh
+    tar -xzf ghchronicle_1.0.0_darwin_arm64.tar.gz ghchronicle
+    sudo install -m 755 ghchronicle /usr/local/bin/
+    ghchronicle -version
+    ```
+
+    `/usr/local/bin` is on the default `PATH` of every macOS install, on both
+    architectures, because `/etc/paths` lists it first.
+
+  </TabItem>
+  <TabItem label="For one account">
+    ```sh
+    mkdir -p ~/bin
+    tar -xzf ghchronicle_1.0.0_darwin_arm64.tar.gz -C ~/bin ghchronicle
+    chmod 755 ~/bin/ghchronicle
+    echo 'export PATH="$HOME/bin:$PATH"' >> ~/.zprofile
+    ```
+
+    `~/bin` is not on the `PATH` by default, hence the last line. `zsh` is the
+    login shell on every supported macOS.
+
+  </TabItem>
+</Tabs>
+
+<Aside type="caution" title="If macOS refuses to run it">
+  The binary carries no Developer ID signature and is not notarized, so a copy
+  that arrives with the quarantine attribute is refused with "cannot be opened
+  because the developer cannot be verified". `curl` does not set that
+  attribute and a browser does, which is why the download above is a `curl`.
+  If yours came from a browser, clear it and check that it is gone:
+
+  ```sh
+  xattr -d com.apple.quarantine ghchronicle
+  xattr -l ghchronicle
+  ```
+
+</Aside>
+
+## Run it once
+
+The binary needs a configuration file and a token, and
+[the quickstart](/ghchronicle/start/quickstart/) writes both in six steps. With
+those in place:
+
+```sh
+ghchronicle -config config.yaml -list   # what would be collected
+ghchronicle -config config.yaml -once   # one sweep, then exit
+```
+
+## Keep it running with launchd
+
+launchd is what macOS has instead of systemd, and the choice it asks you to
+make first is agent or daemon.
+
+|            | A LaunchAgent             | A LaunchDaemon             |
+| ---------- | ------------------------- | -------------------------- |
+| Lives in   | `~/Library/LaunchAgents/` | `/Library/LaunchDaemons/`  |
+| Runs as | you | `root`, or the `UserName` you give it |
+| Runs when | you are logged in | the machine is up, from boot |
+| Good for | a laptop you use | a Mac that stays on |
+
+The agent is the one to start with. It needs no `sudo`, and a collector that
+stops while the laptop's owner is logged out loses nothing that the next sweep
+does not pick up.
+
+```xml title="~/Library/LaunchAgents/io.jmrp.ghchronicle.plist"
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>io.jmrp.ghchronicle</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/local/bin/ghchronicle</string>
+    <string>-config</string>
+    <string>/Users/you/Library/Application Support/ghchronicle/config.yaml</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>GITHUB_TOKEN</key>
+    <string>github_pat_...</string>
+  </dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>/Users/you/Library/Logs/ghchronicle.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/you/Library/Logs/ghchronicle.log</string>
+</dict>
+</plist>
+```
+
+<Steps>
+
+1. Protect the file before it holds a token, then load it.
+
+    ```sh
+    chmod 600 ~/Library/LaunchAgents/io.jmrp.ghchronicle.plist
+    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/io.jmrp.ghchronicle.plist
+    ```
+
+2. See that it is up, and read what it says.
+
+    ```sh
+    launchctl print gui/$(id -u)/io.jmrp.ghchronicle
+    tail -f ~/Library/Logs/ghchronicle.log
+    ```
+
+3. After editing the file, unload it and load it again. launchd reads the
+   property list once, when it is bootstrapped.
+
+    ```sh
+    launchctl bootout gui/$(id -u)/io.jmrp.ghchronicle
+    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/io.jmrp.ghchronicle.plist
+    ```
+
+</Steps>
+
+<Aside type="caution" title="The token sits in the property list">
+  A launchd job does not read your shell profile, so `EnvironmentVariables` is
+  where the token has to be. That file is then the macOS equivalent of the
+  systemd environment file, and it deserves the same treatment: mode `600`,
+  never in a repository, and remembered when the token is rotated. `launchctl
+  setenv` is the alternative, and it is worse: it puts the token in every
+  process of the session.
+</Aside>
+
+### Or one sweep on a timer
+
+`StartInterval` is launchd's cron, in seconds, and `-once` is the mode that
+suits it. Replace `KeepAlive` with it and add `-once` to `ProgramArguments`:
+
+```xml
+  <key>StartInterval</key>
+  <integer>3600</integer>
+```
+
+Keep `state_file` on a path that survives, in this mode above all: it is what
+stops the whole stargazer walk and the year by year contribution backfill
+happening again on every run.
+
+## Build it from source
+
+Go 1.27 or newer is what the module declares. The build sets `CGO_ENABLED=0`,
+so the Xcode command line tools are not needed for it.
+
+<Tabs syncKey="macos-source">
+  <TabItem label="go install">
+    ```sh
+    go install github.com/jmrplens/ghchronicle/cmd/ghchronicle@latest
+    ```
+
+    Lands in `$(go env GOPATH)/bin`, which is `~/go/bin` unless you moved it,
+    and that directory has to be on your `PATH`. A binary built this way
+    reports its version but not its commit or its build date, because those
+    two are stamped by the release build and a module downloaded through the
+    proxy carries no checkout to read them from.
+
+  </TabItem>
+  <TabItem label="make">
+    ```sh
+    git clone https://github.com/jmrplens/ghchronicle
+    cd ghchronicle
+    make build      # into bin/ghchronicle
+    make install    # into GOBIN, stamped like a release build
+    ```
+
+    The Makefile is written for GNU Make 3.81, which is the version macOS
+    ships, so the stock `make` runs it.
+
+  </TabItem>
+</Tabs>
+
+## Where the files go
+
+The collector looks for a configuration file in no particular place: `-config`
+defaults to `config.yaml` **relative to the working directory**, and there is
+no search path behind it. macOS has no `/etc/ghchronicle` habit, so these are
+the conventional places rather than ones the tool knows:
+
+| File             | For an agent                                        | For a daemon                     |
+| ---------------- | --------------------------------------------------- | -------------------------------- |
+| Configuration    | `~/Library/Application Support/ghchronicle/`        | `/usr/local/etc/ghchronicle/`    |
+| State and ledger | `~/Library/Application Support/ghchronicle/`        | `/usr/local/var/ghchronicle/`    |
+| Log              | `~/Library/Logs/ghchronicle.log`                    | `/usr/local/var/log/`            |
+
+`state_file` has a default of its own, `ghchronicle-state.json` in the working
+directory, with the write ledger beside it as `ghchronicle-state-written.bin`.
+A launchd job's working directory is not something to rely on. Set it.

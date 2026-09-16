@@ -269,6 +269,21 @@ export default defineConfig({
 							slug: "install",
 						},
 						{
+							label: "Linux",
+							translations: { es: "Linux" },
+							slug: "install/linux",
+						},
+						{
+							label: "macOS",
+							translations: { es: "macOS" },
+							slug: "install/macos",
+						},
+						{
+							label: "Windows",
+							translations: { es: "Windows" },
+							slug: "install/windows",
+						},
+						{
 							label: "systemd",
 							translations: { es: "systemd" },
 							slug: "install/systemd",
@@ -417,6 +432,22 @@ export default defineConfig({
 					],
 				},
 				{
+					label: "The card",
+					translations: { es: "La tarjeta" },
+					items: [
+						{
+							label: "Overview",
+							translations: { es: "Resumen" },
+							slug: "card",
+						},
+						{
+							label: "Layouts",
+							translations: { es: "Diseños" },
+							slug: "card/layouts",
+						},
+					],
+				},
+				{
 					label: "API usage",
 					translations: { es: "Uso de la API" },
 					items: [
@@ -434,22 +465,6 @@ export default defineConfig({
 							label: "What GitHub will not give",
 							translations: { es: "Lo que GitHub no da" },
 							slug: "api/limits",
-						},
-					],
-				},
-				{
-					label: "The card",
-					translations: { es: "La tarjeta" },
-					items: [
-						{
-							label: "Overview",
-							translations: { es: "Resumen" },
-							slug: "card",
-						},
-						{
-							label: "Layouts",
-							translations: { es: "Diseños" },
-							slug: "card/layouts",
 						},
 					],
 				},

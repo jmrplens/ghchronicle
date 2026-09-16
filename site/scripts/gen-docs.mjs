@@ -111,7 +111,15 @@ const MANIFEST = [
 	{
 		file: "running.md",
 		title: "Running it",
-		routes: ["install", "install/systemd", "install/docker", "install/actions"],
+		routes: [
+			"install",
+			"install/linux",
+			"install/macos",
+			"install/windows",
+			"install/systemd",
+			"install/docker",
+			"install/actions",
+		],
 	},
 	{
 		file: "configuration.md",

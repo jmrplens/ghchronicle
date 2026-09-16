@@ -1,0 +1,369 @@
+---
+title: Windows
+description: "El camino completo en Windows: el zip, PowerShell y cmd, una tarea programada y lo que de verdad cambia allí."
+---
+
+import { Steps, Tabs, TabItem, Aside, FileTree } from "@astrojs/starlight/components";
+
+Windows es una plataforma publicada, no algo añadido después: cada cambio
+ejecuta la suite unitaria entera y la de extremo a extremo en un runner de
+Windows, y el código fuente lleva partes solo de Windows allí donde el sistema
+se comporta distinto. Lo que sigue está escrito para PowerShell, con la forma
+de `cmd` al lado siempre que las dos difieran.
+
+## Lo que cambia aquí
+
+Lee esto primero. Cuatro de las cinco líneas de abajo son la razón de que una
+orden copiada de una página de Linux no funcione.
+
+| | En Windows |
+| --- | --- |
+| El programa | `ghchronicle.exe`. Escribir `ghchronicle` lo encuentra, porque `PATHEXT` lista `.EXE` |
+| Dependencias en ejecución | Ninguna. El binario se compila con `CGO_ENABLED=0`, así que no hay runtime de C que instalar |
+| Pararlo | Ctrl+C en su consola. No hay señal que enviarle, y `taskkill /F` lo termina sin cerrar sus destinos |
+| Rutas en la configuración | Una barra invertida dentro de un escalar YAML entre comillas dobles es un escape. Usa barras normales |
+| Ejecución desatendida | Una tarea programada. El binario no es un servicio del Administrador de control de servicios |
+
+## Elegir el archivo
+
+Los archivos de Windows son `zip` y no `tar.gz`, y se llaman
+`ghchronicle_<versión>_windows_<arq>.zip`, donde `<arq>` es `amd64` o `arm64`.
+
+| `$env:PROCESSOR_ARCHITECTURE` | El archivo que toca |
+| ----------------------------- | ------------------- |
+| `AMD64`                       | `windows_amd64`     |
+| `ARM64`                       | `windows_arm64`     |
+
+```powershell
+$version = "1.0.0"
+$arch = if ($env:PROCESSOR_ARCHITECTURE -eq "ARM64") { "arm64" } else { "amd64" }
+$base = "https://github.com/jmrplens/ghchronicle/releases/download/v$version"
+$zip = "ghchronicle_${version}_windows_${arch}.zip"
+Invoke-WebRequest -Uri "$base/$zip" -OutFile $zip
+```
+
+<Aside type="caution" title="Nombra la versión en vez de pedir la más nueva">
+  El repositorio publica una etiqueta móvil `v1` junto a las releases
+  numeradas, porque la Action está listada en el Marketplace y ese listado
+  necesita una. La release `v1` **no lleva ningún fichero**, así que una URL de
+  descarga construida a partir de la release que GitHub marque en ese momento
+  puede acabar en una release vacía. Coge la versión de la
+  [página de releases](https://github.com/jmrplens/ghchronicle/releases) y
+  escríbela, como arriba.
+</Aside>
+
+## Comprobar lo que has descargado
+
+`checksums.txt` lleva el SHA-256 de cada archivo, y
+`checksums.txt.sigstore.json` es una firma sobre ese fichero.
+
+<Steps>
+
+1. Coge el fichero de sumas y compara la única línea que es tuya.
+
+    ```powershell
+    Invoke-WebRequest -Uri "$base/checksums.txt" -OutFile checksums.txt
+    $expected = (Select-String -Path checksums.txt -Pattern ([regex]::Escape($zip) + '$')).Line.Split(" ")[0]
+    $actual = (Get-FileHash -Algorithm SHA256 -Path $zip).Hash
+    if ($actual -eq $expected) { "OK" } else { "MISMATCH" }
+    ```
+
+    `Get-FileHash` devuelve el resumen en mayúsculas y `checksums.txt` lo
+    guarda en minúsculas. Aun así comparan igual porque el `-eq` de PowerShell
+    entre dos cadenas ignora las mayúsculas, que es el único sitio de esta
+    página donde ese comportamiento por omisión resulta cómodo en vez de una
+    trampa.
+
+2. Comprueba el propio fichero de sumas, si tienes
+   [cosign](https://docs.sigstore.dev/cosign/system_config/installation/). La
+   orden es la misma que imprimen las notas de la release, y la misma que
+   ejecuta quien lea la página de Linux o la de macOS.
+
+    ```powershell
+    cosign verify-blob `
+      --certificate-identity-regexp 'https://github.com/jmrplens/ghchronicle/.github/workflows/release.yml@refs/tags/.*' `
+      --certificate-oidc-issuer https://token.actions.githubusercontent.com `
+      --bundle checksums.txt.sigstore.json `
+      checksums.txt
+    ```
+
+    El acento grave es la continuación de línea de PowerShell, donde un guion
+    de intérprete usa la barra invertida.
+
+</Steps>
+
+## Ponerlo en un sitio y en el PATH
+
+El archivo lleva tres ficheros y ningún directorio, así que descomprímelo en un
+directorio que hayas hecho.
+
+<FileTree>
+
+- ghchronicle_1.0.0_windows_amd64.zip
+  - ghchronicle.exe el binario
+  - LICENSE
+  - README.md
+
+</FileTree>
+
+<Tabs syncKey="windows-scope">
+  <TabItem label="Para todos">
+    Un PowerShell elevado, porque tanto el directorio como el `Path` de máquina
+    piden permisos de administrador.
+
+    ```powershell
+    $dir = "C:\Program Files\ghchronicle"
+    Expand-Archive -Path $zip -DestinationPath $dir -Force
+    $machine = [Environment]::GetEnvironmentVariable("Path", "Machine")
+    [Environment]::SetEnvironmentVariable("Path", "$machine;$dir", "Machine")
+    ```
+  </TabItem>
+  <TabItem label="Para una cuenta">
+    Sin elevación, y sin tocar nada fuera de tu perfil.
+
+    ```powershell
+    $dir = "$env:LOCALAPPDATA\Programs\ghchronicle"
+    Expand-Archive -Path $zip -DestinationPath $dir -Force
+    $user = [Environment]::GetEnvironmentVariable("Path", "User")
+    [Environment]::SetEnvironmentVariable("Path", "$user;$dir", "User")
+    ```
+  </TabItem>
+</Tabs>
+
+<Aside type="caution" title="Lee el Path del mismo sitio en el que lo escribes">
+  Los dos fragmentos leen `Path` del ámbito en el que escriben, nunca de
+  `$env:Path`. `$env:Path` es la copia propia del proceso, que Windows armó
+  juntando la lista de máquina y la de usuario: escribe eso de vuelta en
+  cualquiera de los dos ámbitos y habrás copiado el otro dentro, para siempre,
+  y vuelve a crecer cada vez que alguien repita la orden.
+</Aside>
+
+Un `Path` nuevo solo llega a los procesos que arranquen después, así que abre
+una terminal nueva antes de la comprobación de abajo. La actual se queda con el
+entorno que le dieron.
+
+```powershell
+ghchronicle -version
+```
+
+```text
+ghchronicle 1.0.0 (commit 4e5dfc2, built 2026-09-14T23:04:02Z)
+```
+
+<Aside type="note" title="Si Windows avisa sobre el fichero">
+  El binario no lleva firma Authenticode: la release firma el fichero de sumas
+  y los SBOM, y nada más. SmartScreen y Defender tratan un ejecutable sin
+  firmar descargado de internet con sus propios criterios, que varían por
+  versión y por directiva y que esta página no va a adivinar. Si Windows se
+  niega a arrancarlo, el atributo que hay que quitar es la marca de la web:
+
+  ```powershell
+  Unblock-File -Path "$dir\ghchronicle.exe"
+  ```
+
+</Aside>
+
+## El token, y el resto del entorno
+
+Cada `${VAR}` del fichero de configuración se lee del entorno cuando arranca el
+proceso, así que el token nunca tiene que estar en el fichero.
+
+<Tabs syncKey="windows-shell">
+  <TabItem label="PowerShell">
+    ```powershell
+    # Solo esta ventana
+    $env:GITHUB_TOKEN = "github_pat_..."
+
+    # Persistido para esta cuenta
+    [Environment]::SetEnvironmentVariable("GITHUB_TOKEN", "github_pat_...", "User")
+    ```
+  </TabItem>
+  <TabItem label="cmd">
+    ```bat
+    rem Solo esta ventana
+    set GITHUB_TOKEN=github_pat_...
+
+    rem Persistido para esta cuenta, y NO visible en esta ventana
+    setx GITHUB_TOKEN "github_pat_..."
+    ```
+  </TabItem>
+</Tabs>
+
+<Aside type="caution" title="Una variable persistida es un token en el registro">
+  `SetEnvironmentVariable` con `User` o `Machine`, y `setx`, escriben en el
+  registro en claro, donde puede leerlas cualquier cosa que corra con esa
+  cuenta. Es el mismo trato que un fichero de entorno de systemd, sin el modo
+  del fichero en el que apoyarse. Una tarea programada que corra como `SYSTEM`
+  lee el ámbito de máquina, así que un token puesto ahí lo puede leer cualquier
+  servicio de la máquina: prefiere el ámbito de usuario y una tarea que corra
+  como ese usuario.
+</Aside>
+
+## Ejecutarlo una vez
+
+El binario necesita un fichero de configuración, y
+[el inicio rápido](/ghchronicle/es/start/quickstart/) escribe uno en seis
+pasos. Guárdalo en UTF-8, y atención a los dos detalles de Windows de debajo.
+
+```powershell
+ghchronicle -config config.yaml -list   # qué se recogería
+ghchronicle -config config.yaml -once   # una pasada y termina
+```
+
+Si el binario está en el directorio actual y no en el `PATH`, PowerShell
+necesita que se le nombre como ruta: `.\ghchronicle.exe`. Un nombre a secas es
+una orden, y el directorio actual no se busca para órdenes.
+
+### Rutas en el fichero de configuración
+
+YAML trata la barra invertida como un escape dentro de un escalar entre
+**comillas dobles** y como un carácter corriente en cualquier otro sitio. Así
+que una ruta de Windows entre comillas dobles no es la ruta que escribiste, y
+normalmente tampoco es YAML válido:
+
+```yaml
+state_file: "C:\ghchronicle\state.json" # ghchronicle: yaml: line 5: found unknown escape character
+state_file: C:\ghchronicle\state.json # correcto, escalar simple
+state_file: 'C:\ghchronicle\state.json' # correcto, comillas simples
+state_file: C:/ghchronicle/state.json # correcto, y el que conviene
+```
+
+Las barras normales son la respuesta más simple: Windows las acepta en una
+ruta, y sobreviven a entrecomillarlas de cualquiera de las maneras.
+
+### El fichero tiene que ser UTF-8
+
+Windows PowerShell 5.1, el que viene de serie, escribe UTF-16 con `>` y con
+`Set-Content` salvo que se le diga otra cosa. Un analizador de YAML lee eso
+como binario. PowerShell 7 usa UTF-8 sin marca de orden de bytes por omisión y
+no tiene ese problema; en 5.1, sé explícito:
+
+```powershell
+Set-Content -Path config.yaml -Value $text -Encoding utf8
+```
+
+## Dejarlo corriendo
+
+No hay modo servicio. El colector es un programa de consola: no habla con el
+Administrador de control de servicios, así que registrarlo con `sc.exe create`
+produce un servicio que Windows arranca y luego abandona, informando de que «no
+respondió a la petición de inicio o control de manera oportuna». Existen
+envoltorios de servicio de terceros y este proyecto ni distribuye ni prueba
+ninguno.
+
+La forma corriente de ejecutar algo desatendido en Windows es una tarea
+programada, y tiene dos formas.
+
+<Tabs syncKey="windows-task">
+  <TabItem label="Una pasada con temporizador">
+    El equivalente de cron en Windows, y el que conviene: no hay nada que
+    parar, y una ejecución perdida cuesta una pasada.
+
+    ```powershell
+    $action = New-ScheduledTaskAction `
+      -Execute "C:\Program Files\ghchronicle\ghchronicle.exe" `
+      -Argument '-config "C:\ProgramData\ghchronicle\config.yaml" -once'
+    $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) `
+      -RepetitionInterval (New-TimeSpan -Hours 1)
+    Register-ScheduledTask -TaskName ghchronicle -Action $action -Trigger $trigger
+    ```
+
+    Una tarea horaria da a todas las familias una cadencia horaria como mucho,
+    así que el ritmo de quince minutos de `actions` se pierde. Es el mismo
+    cambio que
+    [hace cron en Linux](/ghchronicle/es/install/systemd/#cron-en-vez-de-un-servicio).
+
+  </TabItem>
+  <TabItem label="Corriendo todo el rato">
+    Una tarea disparada al iniciar sesión o al arrancar, con el colector en su
+    modo permanente para que cada familia conserve su cadencia.
+
+    ```powershell
+    $action = New-ScheduledTaskAction `
+      -Execute "C:\Program Files\ghchronicle\ghchronicle.exe" `
+      -Argument '-config "C:\ProgramData\ghchronicle\config.yaml"'
+    $trigger = New-ScheduledTaskTrigger -AtLogOn
+    $settings = New-ScheduledTaskSettingsSet `
+      -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1) `
+      -ExecutionTimeLimit ([TimeSpan]::Zero)
+    Register-ScheduledTask -TaskName ghchronicle -Action $action `
+      -Trigger $trigger -Settings $settings
+    ```
+
+    `-ExecutionTimeLimit ([TimeSpan]::Zero)` es el que importa: el valor por
+    omisión para una tarea a los tres días, que para un proceso pensado para no
+    terminar es un reinicio que nadie pidió.
+
+  </TabItem>
+</Tabs>
+
+```powershell
+Start-ScheduledTask -TaskName ghchronicle
+Get-ScheduledTaskInfo -TaskName ghchronicle   # última ejecución, último resultado
+```
+
+`Stop-ScheduledTask` termina el proceso en vez de pedirle que acabe, que es el
+`taskkill /F` de la primera tabla con otro nombre. En la forma con
+temporizador no hay nada que parar, que es buena parte de por qué es la mejor
+opción por omisión.
+
+<Aside type="note" title="Dónde va el log">
+  Una tarea no tiene consola, así que el log tiene que ser un fichero: pon
+  `log.file` en la configuración. La salida estándar de una tarea programada se
+  descarta, y `Get-ScheduledTaskInfo` informa solo del código de salida.
+</Aside>
+
+## Compilarlo desde fuente
+
+Go 1.27 o más nuevo. `CGO_ENABLED=0` quiere decir sin MSVC, sin MinGW y sin SDK
+de Windows.
+
+<Tabs syncKey="windows-source">
+  <TabItem label="go install">
+    ```powershell
+    go install github.com/jmrplens/ghchronicle/cmd/ghchronicle@latest
+    ```
+
+    Cae en `$(go env GOPATH)\bin`, que es `%USERPROFILE%\go\bin` salvo que lo
+    hayas movido, y ese directorio tiene que estar en tu `Path`. Un binario
+    hecho así informa de su versión pero no de su commit ni de su fecha de
+    compilación, porque esas dos las sella la compilación de release y un
+    módulo descargado por el proxy no lleva copia de trabajo de donde leerlas.
+
+  </TabItem>
+  <TabItem label="Desde una copia de trabajo">
+    ```powershell
+    git clone https://github.com/jmrplens/ghchronicle
+    cd ghchronicle
+    go build -o ghchronicle.exe .\cmd\ghchronicle
+    ```
+
+    `go build` y no `make`: el Makefile es un Makefile de GNU cuyas recetas son
+    intérprete POSIX, así que quiere Git Bash, MSYS2 o WSL. Esta línea es lo
+    que hace `make build`, menos el sellado de la versión.
+
+  </TabItem>
+</Tabs>
+
+## Dónde van los ficheros
+
+El colector no busca el fichero de configuración en ningún sitio concreto:
+`-config` vale por omisión `config.yaml` **relativo al directorio de trabajo**,
+y detrás no hay ninguna ruta de búsqueda. El directorio de trabajo de una tarea
+programada no es algo en lo que apoyarse, así que da todas las rutas del
+fichero en absoluto.
+
+| Fichero           | Para una tarea de máquina     | Para una cuenta                |
+| ----------------- | ----------------------------- | ------------------------------ |
+| Configuración     | `C:/ProgramData/ghchronicle/` | `%LOCALAPPDATA%/ghchronicle/`  |
+| Estado y registro | `C:/ProgramData/ghchronicle/` | `%LOCALAPPDATA%/ghchronicle/`  |
+| Log               | `C:/ProgramData/ghchronicle/` | `%LOCALAPPDATA%/ghchronicle/`  |
+
+Un directorio bajo `C:\ProgramData` lo puede escribir quien lo creó y lo puede
+leer todo el mundo, así que créalo elevado y luego concede escritura a la
+cuenta con la que corre la tarea. El fichero de estado y su registro de
+escrituras son los dos que el colector reescribe en cada pasada; si uno de
+ellos está marcado como de solo lectura el colector quita ese atributo él
+mismo, porque NTFS se niega a reemplazar un fichero de solo lectura incluso
+cuando se le pide reemplazarlo, y una pasada no debería fallar por una
+propiedad de fichero.

@@ -1,0 +1,216 @@
+---
+title: Linux
+description: "El camino completo en Linux: el archivo correcto, la firma, el PATH, un servicio y compilarlo tú mismo."
+---
+
+import { Steps, Tabs, TabItem, Aside, FileTree } from "@astrojs/starlight/components";
+
+Un único binario estático, `CGO_ENABLED=0`, así que no hay librería de C que
+instalar ni distribución con la que cuadrar. Un archivo de release y una
+entrada en el `PATH` es toda la instalación; lo que hay debajo va de hacerlo a
+conciencia.
+
+## Elegir el archivo
+
+Los archivos de release se llaman
+`ghchronicle_<versión>_linux_<arq>.tar.gz`, donde `<arq>` es `amd64` o
+`arm64`. `uname -m` dice cuál.
+
+| Lo que dice `uname -m` | El archivo que toca |
+| ---------------------- | ------------------- |
+| `x86_64`               | `linux_amd64`       |
+| `aarch64`              | `linux_arm64`       |
+
+```sh
+VERSION=1.0.0
+arch=$(uname -m); case "$arch" in x86_64) arch=amd64 ;; aarch64) arch=arm64 ;; esac
+base=https://github.com/jmrplens/ghchronicle/releases/download/v$VERSION
+curl -fsSLO "$base/ghchronicle_${VERSION}_linux_${arch}.tar.gz"
+```
+
+<Aside type="caution" title="Nombra la versión en vez de pedir la más nueva">
+  El repositorio publica una etiqueta móvil `v1` junto a las releases
+  numeradas, porque la Action está listada en el Marketplace y ese listado
+  necesita una. La release `v1` **no lleva ningún fichero**, así que una URL de
+  descarga construida a partir de la release que GitHub marque en ese momento
+  puede acabar en una release vacía. Coge la versión de la
+  [página de releases](https://github.com/jmrplens/ghchronicle/releases) y
+  escríbela, como arriba.
+</Aside>
+
+## Comprobar lo que has descargado
+
+Junto a los archivos se publican dos ficheros: `checksums.txt`, que lleva el
+SHA-256 de cada archivo, y `checksums.txt.sigstore.json`, que es una firma
+sobre ese fichero. La cadena es entonces una firma y un resumen: verifica el
+fichero y luego verifica el archivo contra el fichero.
+
+<Steps>
+
+1. Coge el fichero de sumas y su firma.
+
+    ```sh
+    curl -fsSLO "$base/checksums.txt"
+    curl -fsSLO "$base/checksums.txt.sigstore.json"
+    ```
+
+2. Comprueba el archivo contra él. `--ignore-missing` es lo que permite
+   comprobar una línea de un fichero de doce sin tener los otros once
+   archivos.
+
+    ```sh
+    sha256sum --ignore-missing -c checksums.txt
+    ```
+
+    ```text
+    ghchronicle_1.0.0_linux_amd64.tar.gz: OK
+    ```
+
+3. Comprueba el propio fichero de sumas, si tienes
+   [cosign](https://docs.sigstore.dev/cosign/system_config/installation/).
+
+    ```sh
+    cosign verify-blob \
+      --certificate-identity-regexp 'https://github.com/jmrplens/ghchronicle/.github/workflows/release.yml@refs/tags/.*' \
+      --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+      --bundle checksums.txt.sigstore.json \
+      checksums.txt
+    ```
+
+    ```text
+    Verified OK
+    ```
+
+</Steps>
+
+La firma es sin claves: no hay clave pública que buscar ni clave privada que
+nadie pueda perder, porque la identidad que se verifica es el workflow que se
+ejecutó, anotado en un registro público de transparencia. Eso es lo que dicen
+las dos opciones `--certificate`, y por eso no son opcionales: sin ellas cosign
+confirmaría que alguien firmó el fichero, que no es la pregunta.
+
+## Ponerlo en el PATH
+
+El archivo lleva tres ficheros y ningún directorio, así que descomprímelo donde
+quieras de verdad.
+
+<FileTree>
+
+- ghchronicle_1.0.0_linux_amd64.tar.gz
+  - ghchronicle el binario
+  - LICENSE
+  - README.md
+
+</FileTree>
+
+<Tabs syncKey="linux-scope">
+  <TabItem label="Para todos">
+    ```sh
+    tar -xzf ghchronicle_1.0.0_linux_amd64.tar.gz ghchronicle
+    sudo install -m 755 ghchronicle /usr/local/bin/
+    ghchronicle -version
+    ```
+  </TabItem>
+  <TabItem label="Para una cuenta">
+    ```sh
+    mkdir -p ~/.local/bin
+    tar -xzf ghchronicle_1.0.0_linux_amd64.tar.gz -C ~/.local/bin ghchronicle
+    chmod 755 ~/.local/bin/ghchronicle
+    ghchronicle -version
+    ```
+
+    `~/.local/bin` ya está en el `PATH` de la mayoría de distribuciones. Si
+    `ghchronicle -version` responde «orden no encontrada», en la tuya no lo
+    está.
+
+  </TabItem>
+</Tabs>
+
+```text
+ghchronicle 1.0.0 (commit 4e5dfc2, built 2026-09-14T23:04:02Z)
+```
+
+## Ejecutarlo una vez
+
+El binario necesita un fichero de configuración y un token, y
+[el inicio rápido](/ghchronicle/es/start/quickstart/) escribe los dos en seis
+pasos. Con eso hecho:
+
+```sh
+ghchronicle -config config.yaml -list   # qué se recogería
+ghchronicle -config config.yaml -once   # una pasada y termina
+```
+
+## Dejarlo corriendo
+
+[systemd](/ghchronicle/es/install/systemd/) es el montaje que esta
+documentación toma por omisión en Linux, y la unidad de ahí está blindada en
+vez de ser mínima, porque este es con mucha probabilidad el único proceso de la
+máquina que guarda un token de GitHub con acceso de lectura a todos los
+repositorios de una cuenta.
+
+Un planificador también vale:
+[cron con `-once`](/ghchronicle/es/install/systemd/#cron-en-vez-de-un-servicio)
+es una sola línea, a cambio de dar a todas las familias la misma cadencia.
+
+## Compilarlo desde fuente
+
+Go 1.27 o más nuevo es lo que declara el módulo. No hace falta nada más: la
+compilación fija `CGO_ENABLED=0`, así que no hay compilador ni paquete de
+cabeceras que encontrar.
+
+<Tabs syncKey="linux-source">
+  <TabItem label="go install">
+    ```sh
+    go install github.com/jmrplens/ghchronicle/cmd/ghchronicle@latest
+    ```
+
+    Cae en `$(go env GOPATH)/bin`, que es `~/go/bin` salvo que lo hayas
+    movido, y ese directorio tiene que estar en tu `PATH`.
+
+    Un binario hecho así informa de su versión pero no de su commit ni de su
+    fecha de compilación:
+
+    ```text
+    ghchronicle 1.0.0 (commit unknown, built unknown)
+    ```
+
+    La versión sale del fichero `VERSION` que el módulo incrusta; las otras dos
+    las sella la compilación de release y nada más, y un módulo descargado por
+    el proxy no lleva copia de trabajo de donde leerlas.
+
+  </TabItem>
+  <TabItem label="make">
+    ```sh
+    git clone https://github.com/jmrplens/ghchronicle
+    cd ghchronicle
+    make build      # a bin/ghchronicle
+    make install    # a GOBIN, sellado como una compilación de release
+    ```
+
+    `make build` sella la versión, el commit corto y la fecha del commit, así
+    que `-version` dice exactamente de qué árbol viene. `make` sin objetivo
+    lista todos los que hay.
+
+  </TabItem>
+</Tabs>
+
+## Dónde van los ficheros
+
+El colector no busca el fichero de configuración en ningún sitio concreto:
+`-config` vale por omisión `config.yaml` **relativo al directorio de trabajo**,
+y detrás no hay ninguna ruta de búsqueda. Así que la ruta es una decisión que
+tomas una vez y luego pasas en cada invocación. Lo que asume el resto de esta
+documentación:
+
+| Fichero            | Ruta                               | Modo                              |
+| ------------------ | ---------------------------------- | --------------------------------- |
+| Configuración      | `/etc/ghchronicle/config.yaml`     | legible por todos, sin secretos   |
+| Tokens             | `/etc/ghchronicle/ghchronicle.env` | `600`                             |
+| Estado y registro  | `/var/lib/ghchronicle/`            | lo escribe el usuario del servicio |
+
+`state_file` tiene un valor por omisión propio, `ghchronicle-state.json` en el
+directorio de trabajo, con el registro de escrituras al lado como
+`ghchronicle-state-written.bin`. Ese valor está bien para una primera prueba en
+un directorio que hayas hecho tú, y mal para un servicio, cuyo directorio de
+trabajo no es algo en lo que apoyarse. Ponlo.

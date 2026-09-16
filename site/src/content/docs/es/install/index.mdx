@@ -1,6 +1,6 @@
 ---
 title: Formas de instalar
-description: Cuatro maneras de poner el binario en marcha, y para qué sirve cada una.
+description: Una página por sistema operativo, cuatro maneras de poner el binario en marcha, y para qué sirve cada una.
 ---
 
 import {
@@ -13,6 +13,31 @@ import {
 
 Un único binario estático sin dependencias en tiempo de ejecución. Cómo llega a
 la máquina es la única decisión, y se deriva de dónde quieras que corra.
+
+## Tu sistema, de la descarga al servicio
+
+Las releases llevan binarios para Linux, macOS y Windows, en amd64 y arm64. Las
+tres páginas de abajo son el mismo recorrido para cada sistema, hasta el final:
+qué archivo, cómo comprobarlo, dónde va el binario, cómo ejecutarlo una vez y
+cómo dejarlo corriendo cuando termines de mirarlo.
+
+<CardGrid>
+  <LinkCard
+    title="Linux"
+    description="Un tar.gz, /usr/local/bin y una unidad de systemd blindada."
+    href="/ghchronicle/es/install/linux/"
+  />
+  <LinkCard
+    title="macOS"
+    description="El archivo darwin, el atributo de cuarentena y un agente o demonio de launchd."
+    href="/ghchronicle/es/install/macos/"
+  />
+  <LinkCard
+    title="Windows"
+    description="Un zip, PowerShell y cmd, una tarea programada y lo que de verdad cambia allí."
+    href="/ghchronicle/es/install/windows/"
+  />
+</CardGrid>
 
 ## Conseguir el binario
 
@@ -68,6 +93,8 @@ El colector envía por push a todos los almacenes que soporta, así que no hace
 falta que sea alcanzable desde ningún sitio. Necesita alcanzar GitHub y alcanzar
 sus bases de datos. Esa es la única restricción, y es lo que hace viables las
 cuatro opciones.
+Las dos primeras necesitan una máquina propia; las dos últimas no, y las
+páginas por sistema de arriba van de las dos primeras.
 
 <CardGrid>
   <LinkCard

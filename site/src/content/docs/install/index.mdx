@@ -1,6 +1,6 @@
 ---
 title: Ways to install
-description: Four ways to get the binary running, and what each one is good for.
+description: A page per operating system, four ways to get the binary running, and what each one is good for.
 ---
 
 import {
@@ -13,6 +13,31 @@ import {
 
 One static binary with no runtime dependencies. How it gets onto the machine is
 the only decision, and it follows from where you want it to run.
+
+## Your system, from download to service
+
+Releases carry binaries for Linux, macOS and Windows, on amd64 and arm64. The
+three pages below are the same walk for each system, taken all the way: which
+archive, how to check it, where the binary goes, how to run it once, and how to
+keep it running once you are done watching it.
+
+<CardGrid>
+  <LinkCard
+    title="Linux"
+    description="A tar.gz, /usr/local/bin, and a hardened systemd unit."
+    href="/ghchronicle/install/linux/"
+  />
+  <LinkCard
+    title="macOS"
+    description="The darwin archive, the quarantine attribute, and a launchd agent or daemon."
+    href="/ghchronicle/install/macos/"
+  />
+  <LinkCard
+    title="Windows"
+    description="A zip, PowerShell and cmd, a scheduled task, and what is genuinely different there."
+    href="/ghchronicle/install/windows/"
+  />
+</CardGrid>
 
 ## Getting the binary
 
@@ -66,6 +91,8 @@ the only decision, and it follows from where you want it to run.
 The collector pushes to every store it supports, so it does not need to be
 reachable from anywhere. It needs to reach GitHub and to reach its databases.
 That is the only constraint, and it is what makes all four of these viable.
+The first two need a host of their own; the last two do not, and the system
+pages above are about the first two.
 
 <CardGrid>
   <LinkCard
