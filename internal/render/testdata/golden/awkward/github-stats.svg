@@ -68,7 +68,9 @@ text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans',Helveti
 @keyframes m16{0%,60.86%{opacity:0}60.87%,100%{opacity:1}}
 .m17{animation:m17 2.3s ease-out 1;transform-box:fill-box;transform-origin:left}
 @keyframes m17{0%,60.87%{transform:scaleX(0)}100%{transform:scaleX(1)}}
-@media (prefers-reduced-motion:reduce){.m0,.m1,.m2,.m3,.m4,.m5,.m6,.m7,.m8,.m9,.m10,.m11,.m12,.m13,.m14,.m15,.m16,.m17{animation:none}}
+.m18{animation:m18 2.3s ease-out 1}
+@keyframes m18{0%,60.87%{opacity:0}100%{opacity:1}}
+@media (prefers-reduced-motion:reduce){.m0,.m1,.m2,.m3,.m4,.m5,.m6,.m7,.m8,.m9,.m10,.m11,.m12,.m13,.m14,.m15,.m16,.m17,.m18{animation:none}}
 </style>
 <rect class="bg" x="0.5" y="0.5" width="799" height="707" rx="6"/>
 <path class="panel" d="M0.5,50 V6.5 A6,6 0 0 1 6.5,0.5 H793.5 A6,6 0 0 1 799.5,6.5 V50 Z"/>
@@ -305,33 +307,33 @@ text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans',Helveti
 <rect x="743.47" y="262" width="32.36" height="14" rx="3" fill="#8b949e"/>
 <rect x="777.83" y="262" width="1" height="14" rx="3" fill="#8b949e"/>
 </g>
-<circle cx="28" cy="298" r="6" fill="#8b949e"/>
-<text class="n" x="42" y="302" text-anchor="start">JavaScript with a very long qualifier</text>
-<text class="c" x="380" y="302" text-anchor="end">20%</text>
-<circle cx="28" cy="323" r="6" fill="#abcdef"/>
-<text class="n" x="42" y="327" text-anchor="start">TypeScript also rather long</text>
-<text class="c" x="380" y="327" text-anchor="end">18%</text>
-<circle cx="28" cy="348" r="6" fill="#384d54"/>
-<text class="n" x="42" y="352" text-anchor="start">Dockerfile</text>
-<text class="c" x="380" y="352" text-anchor="end">16%</text>
-<circle cx="28" cy="373" r="6" fill="#8b949e"/>
-<text class="n" x="42" y="377" text-anchor="start">Makefile and friends</text>
-<text class="c" x="380" y="377" text-anchor="end">14%</text>
-<circle cx="28" cy="398" r="6" fill="#8b949e"/>
-<text class="n" x="42" y="402" text-anchor="start">Some language nobody has heard of</text>
-<text class="c" x="380" y="402" text-anchor="end">11%</text>
-<circle cx="406" cy="298" r="6" fill="#a97bff"/>
-<text class="n" x="420" y="302" text-anchor="start">Kotlin</text>
-<text class="c" x="758" y="302" text-anchor="end">9%</text>
-<circle cx="406" cy="323" r="6" fill="#e16737"/>
-<text class="n" x="420" y="327" text-anchor="start">MATLAB</text>
-<text class="c" x="758" y="327" text-anchor="end">7%</text>
-<circle cx="406" cy="348" r="6" fill="#8b949e"/>
-<text class="n" x="420" y="352" text-anchor="start">Assembly</text>
-<text class="c" x="758" y="352" text-anchor="end">5%</text>
-<circle cx="406" cy="373" r="6" fill="#8b949e"/>
-<text class="n" x="420" y="377" text-anchor="start">Other</text>
-<text class="c" x="758" y="377" text-anchor="end">0%</text>
+<circle class="m18" cx="28" cy="298" r="6" fill="#8b949e"/>
+<text class="n m18" x="42" y="302" text-anchor="start">JavaScript with a very long qualifier</text>
+<text class="c m18" x="380" y="302" text-anchor="end">20%</text>
+<circle class="m18" cx="28" cy="323" r="6" fill="#abcdef"/>
+<text class="n m18" x="42" y="327" text-anchor="start">TypeScript also rather long</text>
+<text class="c m18" x="380" y="327" text-anchor="end">18%</text>
+<circle class="m18" cx="28" cy="348" r="6" fill="#384d54"/>
+<text class="n m18" x="42" y="352" text-anchor="start">Dockerfile</text>
+<text class="c m18" x="380" y="352" text-anchor="end">16%</text>
+<circle class="m18" cx="28" cy="373" r="6" fill="#8b949e"/>
+<text class="n m18" x="42" y="377" text-anchor="start">Makefile and friends</text>
+<text class="c m18" x="380" y="377" text-anchor="end">14%</text>
+<circle class="m18" cx="28" cy="398" r="6" fill="#8b949e"/>
+<text class="n m18" x="42" y="402" text-anchor="start">Some language nobody has heard of</text>
+<text class="c m18" x="380" y="402" text-anchor="end">11%</text>
+<circle class="m18" cx="406" cy="298" r="6" fill="#a97bff"/>
+<text class="n m18" x="420" y="302" text-anchor="start">Kotlin</text>
+<text class="c m18" x="758" y="302" text-anchor="end">9%</text>
+<circle class="m18" cx="406" cy="323" r="6" fill="#e16737"/>
+<text class="n m18" x="420" y="327" text-anchor="start">MATLAB</text>
+<text class="c m18" x="758" y="327" text-anchor="end">7%</text>
+<circle class="m18" cx="406" cy="348" r="6" fill="#8b949e"/>
+<text class="n m18" x="420" y="352" text-anchor="start">Assembly</text>
+<text class="c m18" x="758" y="352" text-anchor="end">5%</text>
+<circle class="m18" cx="406" cy="373" r="6" fill="#8b949e"/>
+<text class="n m18" x="420" y="377" text-anchor="start">Other</text>
+<text class="c m18" x="758" y="377" text-anchor="end">0%</text>
 <text class="h fg" x="22" y="444" text-anchor="start">Top repositories</text>
 <text class="d" x="22" y="461" text-anchor="start">By stars</text>
 <circle cx="27" cy="482" r="5" fill="#00add8"/>

@@ -14,9 +14,14 @@ const (
 
 	// heatWave is how long one week's squares take to fade in, and heatStagger
 	// is how far behind the week to its left a week starts. Twenty milliseconds
-	// apart, the wave crosses twelve weeks in under a quarter of a second and
-	// still reads as a wave rather than as one fade of the whole grid.
-	heatWave    = 0.5
+	// is the design's figure and it is what makes the grid fill from the left
+	// rather than all at once; the fade is the free knob, and it sets how long
+	// the card moves. At half a second the whole thing was over in 0.72 s,
+	// which beside the ring's 1.88 s and the statistics box's 2.3 s read as a
+	// flicker rather than as a card animating, so the fade carries the cycle
+	// instead: 0.22 s of lead plus 1.6 s of fade is 1.82 s, the same range as
+	// the two layouts it sits between.
+	heatWave    = 1.6
 	heatStagger = 0.02
 )
 

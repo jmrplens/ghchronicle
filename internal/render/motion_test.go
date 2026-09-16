@@ -143,6 +143,39 @@ func TestABarGrowsFromNothingAndSettlesUntransformed(t *testing.T) {
 	}
 }
 
+// TestAGrowAtTheStartOfTheCycleWritesACleanFirstStop is the grow's half of the
+// from == 0 case the reveal has its own test for: a beat that starts exactly
+// when the cycle does writes one stop and not a range from zero to zero.
+func TestAGrowAtTheStartOfTheCycleWritesACleanFirstStop(t *testing.T) {
+	tl := newTimeline(MotionOnce)
+	tl.add(effectGrowX, 0, 1, "ease-out")
+	css := tl.css()
+	if !strings.Contains(css, "@keyframes m0{0%{transform:scaleX(0)}100%{transform:scaleX(1)}}") {
+		t.Errorf("css lacks the two-stop grow at 0:\n%s", css)
+	}
+	if strings.Contains(css, "0%,0%") {
+		t.Errorf("a grow starting at 0 must not write a range of no length:\n%s", css)
+	}
+}
+
+// TestAGrowingBarRestsAtFullWidthBetweenTheLapsOfALoop is what a loop asks of
+// this effect that a single play does not: the bar has to hold the width it
+// grew to for the rest of the cycle, or a looping card would show it snap back
+// and sit at nothing until the next lap.
+func TestAGrowingBarRestsAtFullWidthBetweenTheLapsOfALoop(t *testing.T) {
+	tl := newTimeline(MotionLoop)
+	tl.add(effectGrowX, 0, 1.6, "ease-out")
+	css := tl.css()
+	for _, want := range []string{
+		".m0{animation:m0 8.6s ease-out infinite;transform-box:fill-box;transform-origin:left}",
+		"@keyframes m0{0%{transform:scaleX(0)}18.6%,100%{transform:scaleX(1)}}",
+	} {
+		if !strings.Contains(css, want) {
+			t.Errorf("css lacks %q:\n%s", want, css)
+		}
+	}
+}
+
 func TestClassesSkipsTheEmptyParts(t *testing.T) {
 	if got := classes("big", "", "cuz", ""); got != "big cuz" {
 		t.Errorf("classes = %q, want %q", got, "big cuz")

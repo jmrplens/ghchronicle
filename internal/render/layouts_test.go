@@ -189,9 +189,10 @@ func checkLayoutMoves(t *testing.T, l Layout, motion, doc string) {
 		t.Errorf("%s under %s: animation %q has no @keyframes", l.Name, motion, name)
 	}
 	// Any stroke that draws itself, the sparkline's polyline and the ring's
-	// arcs alike: the dash belongs to the keyframes and the last of them
-	// leaves the stroke whole.
-	if strings.Contains(doc, "stroke-dasharray:1") {
+	// arcs alike. The trigger is the markup and not the stylesheet it is about
+	// to assert: a draw effect that stopped writing that last keyframe would
+	// otherwise stop being checked instead of failing.
+	if strings.Contains(doc, `pathLength="1"`) {
 		checkLineDrawSettles(t, l.Name, doc)
 	}
 	checkReducedMotionNamesEveryClass(t, l.Name, motion, doc)
@@ -241,13 +242,19 @@ func animationsWithoutKeyframes(doc string) []string {
 	return missing
 }
 
-// checkLineDrawSettles checks that the line's dash exists only inside the
-// keyframes and that the last of them leaves it fully drawn: the base style is
-// a solid line, which is what a renderer without animation shows.
+// checkLineDrawSettles checks that every stroke that draws itself has its dash
+// only inside the keyframes and that the last of them leaves it fully drawn:
+// the base style is a solid stroke, which is what a renderer without animation
+// shows. Every one of them, not one of them: the ring draws a stroke per
+// language, and a check that passed on the first would have nothing to say
+// about the other five.
 func checkLineDrawSettles(t *testing.T, layout, doc string) {
 	t.Helper()
-	if !strings.Contains(doc, "100%{stroke-dasharray:1;stroke-dashoffset:0}}") {
-		t.Errorf("%s: the draw animation must end fully drawn", layout)
+	strokes := strings.Count(doc, `pathLength="1"`)
+	settled := strings.Count(doc, "100%{stroke-dasharray:1;stroke-dashoffset:0}}")
+	if settled != strokes {
+		t.Errorf("%s: %d of the %d strokes that draw themselves end fully drawn",
+			layout, settled, strokes)
 	}
 	if regexp.MustCompile(`\.m\d+\{stroke-dasharray`).MatchString(doc) {
 		t.Errorf("%s: the dash must not be a base style", layout)
@@ -408,13 +415,16 @@ func TestTheRingDrawsSliceBySliceAndSettlesWhole(t *testing.T) {
 
 // TestTheShareBarGrowsAsOneAndSettlesAtItsFullWidth pins what the new effect
 // is for: the whole bar scales from its own left edge, not each segment from
-// its own, and a card that does not move is written without the group.
+// its own, its legend arrives with it rather than standing beside a bar that
+// is not there yet, and a card that does not move is written without the
+// group.
 func TestTheShareBarGrowsAsOneAndSettlesAtItsFullWidth(t *testing.T) {
 	doc := mustRender(t, sample(), &Options{Theme: "dark", Layout: "github-stats"})
 	grow := regexp.MustCompile(`<g class="(m\d+)">`).FindStringSubmatch(doc)
 	if grow == nil {
 		t.Fatalf("the share bar is not wrapped in a group that grows:\n%s", doc)
 	}
+	checkTheLegendWaitsForItsBar(t, doc, grow[1])
 	for _, want := range []string{
 		"." + grow[1] + "{animation:" + grow[1],
 		"transform-box:fill-box;transform-origin:left",
@@ -436,6 +446,44 @@ func TestTheShareBarGrowsAsOneAndSettlesAtItsFullWidth(t *testing.T) {
 	summary := mustRender(t, sample(), &Options{Theme: "dark", Layout: "summary"})
 	if strings.Contains(summary, "<g ") {
 		t.Error("summary does not move, and its bar carries no group")
+	}
+	// Asked for languages it has none of, the card draws the empty placeholder
+	// track, which has no width to grow into. A beat for it would style a bar
+	// nobody can see grow, and a legend of no entries.
+	empty := mustRender(t, &Card{Login: "someone"}, &Options{Theme: "dark", Layout: "github-stats", Fields: []string{fieldLanguages}})
+	if strings.Contains(empty, "<g ") || strings.Contains(empty, "animation") {
+		t.Errorf("a card with no language to show must place no beat for its bar:\n%s", empty)
+	}
+}
+
+// checkTheLegendWaitsForItsBar is the timing the two share one beat window
+// for: the legend's dots, names and percentages fade in over exactly the
+// stretch the bar grows across.
+func checkTheLegendWaitsForItsBar(t *testing.T, doc, grow string) {
+	t.Helper()
+	legend := regexp.MustCompile(` class="n (m\d+)"`).FindStringSubmatch(doc)
+	if legend == nil {
+		t.Fatalf("the language legend does not fade in with the bar:\n%s", doc)
+	}
+	for _, want := range []string{
+		` class="` + legend[1] + `" cx=`,
+		` class="c ` + legend[1] + `"`,
+	} {
+		if !strings.Contains(doc, want) {
+			t.Errorf("the legend plays %s on its names but not on %q", legend[1], want)
+		}
+	}
+	// Same stretch of the cycle: the two keyframe blocks open and close on the
+	// same percentages, which is what "with the bar" means.
+	stops := func(name string) string {
+		m := regexp.MustCompile(`@keyframes ` + name + `\{([0-9.%,]+)\{[a-z-]+:[^}]*\}([0-9.%,]+)\{`).FindStringSubmatch(doc)
+		if m == nil {
+			t.Fatalf("no readable keyframes for %s in:\n%s", name, doc)
+		}
+		return m[1] + " -> " + m[2]
+	}
+	if got, want := stops(legend[1]), stops(grow); got != want {
+		t.Errorf("the legend fades over %s, the bar grows over %s", got, want)
 	}
 }
 

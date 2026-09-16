@@ -49,6 +49,12 @@ const (
 	// is what the last keyframe leaves it on; the scaling exists only inside
 	// the keyframes. The class carries the two properties that give the
 	// transform a box and an edge to work from, see anchorCSS.
+	//
+	// The element it goes on must carry no transform of its own: the
+	// keyframes set the whole transform property, so a translate that placed
+	// the element would be dropped for as long as the beat lasts and the
+	// element would grow from the wrong place. An element that has to be
+	// placed goes inside a group, and the class goes on the group.
 	effectGrowX
 )
 

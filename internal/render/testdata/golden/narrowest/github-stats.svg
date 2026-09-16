@@ -68,7 +68,9 @@ text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans',Helveti
 @keyframes m16{0%,60.86%{opacity:0}60.87%,100%{opacity:1}}
 .m17{animation:m17 2.3s ease-out 1;transform-box:fill-box;transform-origin:left}
 @keyframes m17{0%,60.87%{transform:scaleX(0)}100%{transform:scaleX(1)}}
-@media (prefers-reduced-motion:reduce){.m0,.m1,.m2,.m3,.m4,.m5,.m6,.m7,.m8,.m9,.m10,.m11,.m12,.m13,.m14,.m15,.m16,.m17{animation:none}}
+.m18{animation:m18 2.3s ease-out 1}
+@keyframes m18{0%,60.87%{opacity:0}100%{opacity:1}}
+@media (prefers-reduced-motion:reduce){.m0,.m1,.m2,.m3,.m4,.m5,.m6,.m7,.m8,.m9,.m10,.m11,.m12,.m13,.m14,.m15,.m16,.m17,.m18{animation:none}}
 </style>
 <rect class="bg" x="0.5" y="0.5" width="599" height="608" rx="6"/>
 <path class="panel" d="M0.5,50 V6.5 A6,6 0 0 1 6.5,0.5 H593.5 A6,6 0 0 1 599.5,6.5 V50 Z"/>
@@ -299,15 +301,15 @@ text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans',Helveti
 <rect x="277.77" y="262" width="153.21" height="14" rx="3" fill="#3572a5"/>
 <rect x="432.99" y="262" width="143.01" height="14" rx="3" fill="#f34b7d"/>
 </g>
-<circle cx="28" cy="298" r="6" fill="#00add8"/>
-<text class="n" x="42" y="302" text-anchor="start">Go</text>
-<text class="c" x="280" y="302" text-anchor="end">46%</text>
-<circle cx="28" cy="323" r="6" fill="#3572a5"/>
-<text class="n" x="42" y="327" text-anchor="start">Python</text>
-<text class="c" x="280" y="327" text-anchor="end">28%</text>
-<circle cx="306" cy="298" r="6" fill="#f34b7d"/>
-<text class="n" x="320" y="302" text-anchor="start">C++</text>
-<text class="c" x="558" y="302" text-anchor="end">26%</text>
+<circle class="m18" cx="28" cy="298" r="6" fill="#00add8"/>
+<text class="n m18" x="42" y="302" text-anchor="start">Go</text>
+<text class="c m18" x="280" y="302" text-anchor="end">46%</text>
+<circle class="m18" cx="28" cy="323" r="6" fill="#3572a5"/>
+<text class="n m18" x="42" y="327" text-anchor="start">Python</text>
+<text class="c m18" x="280" y="327" text-anchor="end">28%</text>
+<circle class="m18" cx="306" cy="298" r="6" fill="#f34b7d"/>
+<text class="n m18" x="320" y="302" text-anchor="start">C++</text>
+<text class="c m18" x="558" y="302" text-anchor="end">26%</text>
 <text class="h fg" x="22" y="369" text-anchor="start">Top repositories</text>
 <text class="d" x="22" y="386" text-anchor="start">By stars</text>
 <circle cx="27" cy="407" r="5" fill="#3572a5"/>
