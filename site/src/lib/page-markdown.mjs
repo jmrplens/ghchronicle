@@ -192,12 +192,16 @@ function renderWrapper(name, attributes, children, context) {
 		case "TabItem":
 			return `\n\n- **${attributes.label ?? ""}**\n\n${indentBy(children.trim(), "  ")}\n\n`;
 		// Pure layout around content that is already markdown: an ordered list for
-		// <Steps>, a list of files for <FileTree>, a grid of cards. Unwrapping them
-		// leaves exactly what the page shows.
+		// <Steps>, a list of files for <FileTree>, a grid of cards, and for
+		// <SpecSheet> a markdown table the page publishes as stacked blocks
+		// rather than as a table. Unwrapping them leaves exactly what the page
+		// shows, and in the sheet's case exactly the table the author wrote,
+		// which is why that component is a wrapper and not a data module.
 		case "Tabs":
 		case "Steps":
 		case "CardGrid":
 		case "FileTree":
+		case "SpecSheet":
 			return `\n\n${children.trim()}\n\n`;
 		default:
 			throw new Error(

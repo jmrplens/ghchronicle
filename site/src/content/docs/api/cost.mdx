@@ -5,6 +5,8 @@ description: The measured price of one sweep, per family, and which families to 
 
 import { Aside } from "@astrojs/starlight/components";
 
+import SpecSheet from "../../../components/SpecSheet.astro";
+
 Measured on 2026-09-11 with the real binary against the live API, every family
 switched on and every request logged with the `x-ratelimit-resource` and
 `x-ratelimit-used` headers of its own response. **Cold** is the first sweep of
@@ -26,6 +28,8 @@ total belongs to one account and ages with it, so multiply the per-repository
 rows by the number of repositories `-list` prints and you have your own.
 
 ## Per family
+
+<SpecSheet>
 
 | Family      | Cadence | Cold                                                | Steady                            | Notes |
 | ----------- | ------- | --------------------------------------------------- | --------------------------------- | ----- |
@@ -63,6 +67,8 @@ rows by the number of repositories `-list` prints and you have your own.
 | deployments | 1h      | 1 pt per 5 repos | 1 pt per 5 repos | one query per five repositories, the newest hundred deployments each |
 | policyfiles | 24h     | 1 pt per 5 repos | 1 pt per 5 repos | one query per five repositories, the history of four paths each |
 | deps        | off     | 1 core and 1 dependency_sbom per repo | 0 core, 1 dependency_sbom per repo that received a commit | one commit read and one SBOM per repository; the SBOM has its own bucket and most were 404, now remembered for a day. GitHub regenerates a SBOM on every read and its ETag never matches, so the photograph is taken only when the head moved since the last sweep (the head itself is a free 304 when it did not): 0 dependency_sbom on a repository without a commit, one per repository that received one, and one of the SBOM reads timed out on GitHub's side on each of the three sweeps measured |
+
+</SpecSheet>
 
 What weighed before the round was not REST but GraphQL: `issues` and
 `discussions` were 88 % of the points, because both queries were sized for a

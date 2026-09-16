@@ -5,6 +5,8 @@ description: El precio medido de una pasada, por familia, y qué familias alarga
 
 import { Aside } from "@astrojs/starlight/components";
 
+import SpecSheet from "../../../../components/SpecSheet.astro";
+
 Medido el 2026-09-11 con el binario real contra la API viva, con todas las
 familias encendidas y cada petición registrada con las cabeceras
 `x-ratelimit-resource` y `x-ratelimit-used` de su propia respuesta. **Frío** es
@@ -28,6 +30,8 @@ multiplica las filas por repositorio por los repositorios que imprime `-list` y
 tendrás el tuyo.
 
 ## Por familia
+
+<SpecSheet>
 
 | Familia     | Cadencia | Frío                                                | Estable                           | Notas |
 | ----------- | -------- | --------------------------------------------------- | --------------------------------- | ----- |
@@ -65,6 +69,8 @@ tendrás el tuyo.
 | deployments | 1h       | 1 pt por cada 5 repos | 1 pt por cada 5 repos | una consulta por cada cinco repositorios, los cien despliegues más recientes de cada uno |
 | policyfiles | 24h      | 1 pt por cada 5 repos | 1 pt por cada 5 repos | una consulta por cada cinco repositorios, el historial de cuatro rutas de cada uno |
 | deps        | apagada  | 1 core y 1 dependency_sbom por repo | 0 core, 1 dependency_sbom por repo que recibió un commit | una lectura de commit y un SBOM por repositorio; el SBOM tiene su propio cubo y la mayoría fueron 404, ahora recordados un día. GitHub regenera el SBOM en cada lectura y su ETag nunca acierta, así que la fotografía solo se toma cuando la cabeza se movió desde la última pasada (la cabeza en sí es un 304 gratis cuando no lo hizo): 0 dependency_sbom en un repositorio sin commit, uno por repositorio que lo recibió, y una de las lecturas de SBOM expiró en el lado de GitHub en cada uno de las tres pasadas medidas |
+
+</SpecSheet>
 
 Lo que pesaba antes de la ronda no era REST sino GraphQL: `issues` y
 `discussions` eran el 88 % de los puntos, porque las dos consultas estaban
