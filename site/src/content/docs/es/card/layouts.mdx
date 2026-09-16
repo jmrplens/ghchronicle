@@ -18,18 +18,18 @@ abajo son del tema oscuro; todos los diseños se dibujan también en claro, y
 | Diseño              | Familia   | Animado | Bucle | Campos por omisión                                                                   |
 | ------------------- | --------- | ------- | ----- | ------------------------------------------------------------------------------------ |
 | `summary`           | chronicle | no      | no    | stars, forks, followers, repos, contributions, views, visitors, sparkline, top_repos |
-| `github-stats`      | github    | sí      | no    | repos, stars, forks, followers, commits, pull_requests, views, clones, languages |
-| `github-compact`    | github    | no      | no    | stars, forks, followers, repos, commits |
-| `badge-row`         | chronicle | no      | no    | stars, forks, followers, repos, contributions |
-| `wide-banner`       | chronicle | sí      | no    | stars, forks, followers, contributions, sparkline |
-| `sparkline-hero`    | chronicle | sí      | no    | contributions, stars, followers, sparkline |
-| `language-ring`     | github    | sí      | no    | languages, stars, repos |
-| `repo-list`         | github    | no      | no    | top_repos, stars, forks, repos |
-| `activity-heatmap`  | github    | sí      | no    | sparkline, contributions, commits, pull_requests |
-| `animated-counters` | chronicle | sí      | no    | stars, forks, followers, repos, contributions, views, sparkline |
-| `terminal`          | chronicle | sí      | sí    | stars, forks, followers, repos, contributions, top_repos |
-| `ticker`            | chronicle | sí      | sí    | stars, forks, followers, repos, contributions, commits, views, top_repos |
-| `language-bars`     | github    | sí      | no    | languages |
+| `github-stats`      | github    | sí      | no    | repos, stars, forks, followers, commits, pull_requests, views, clones, languages     |
+| `github-compact`    | github    | no      | no    | stars, forks, followers, repos, commits                                              |
+| `badge-row`         | chronicle | no      | no    | stars, forks, followers, repos, contributions                                        |
+| `wide-banner`       | chronicle | sí      | no    | stars, forks, followers, contributions, sparkline                                    |
+| `sparkline-hero`    | chronicle | sí      | no    | contributions, stars, followers, sparkline                                           |
+| `language-ring`     | github    | sí      | no    | languages, stars, repos                                                              |
+| `repo-list`         | github    | no      | no    | top_repos, stars, forks, repos                                                       |
+| `activity-heatmap`  | github    | sí      | no    | sparkline, contributions, commits, pull_requests                                     |
+| `animated-counters` | chronicle | sí      | no    | stars, forks, followers, repos, contributions, views, sparkline                      |
+| `terminal`          | chronicle | sí      | sí    | stars, forks, followers, repos, contributions, top_repos                             |
+| `ticker`            | chronicle | sí      | sí    | stars, forks, followers, repos, contributions, commits, views, top_repos             |
+| `language-bars`     | github    | sí      | no    | languages                                                                            |
 
 ## Las dos familias
 
@@ -116,11 +116,17 @@ solo, asentándose en la tarjeta estática.
 
 Una ventana de terminal con la marca del proyecto en su barra de título, una
 línea de salida por número y otra por repositorio. Los números se teclean solos,
-línea a línea, bajo una tapa pintada del color de fondo de la propia tarjeta. El
-cursor del prompt parpadea mientras eso ocurre y se queda encendido, que es el
-estado en el que descansa la tarjeta terminada.
+línea a línea, bajo una tapa pintada del color de fondo de la propia tarjeta.
 
-<Card name="terminal" alt="El diseño terminal reproducido una vez: una ventana de terminal con la marca del proyecto en su barra de título, cuyas líneas de salida tienen cada una un número que se teclea solo y un cursor de bloque que parpadea en el prompt de abajo, y la página también puede reproducirlo en bucle" animated loop />
+El cursor del prompt es el único movimiento sin final de la tarjeta, y hace algo
+distinto en cada modo. Con `once` se queda encendido mientras llegan las cifras,
+parpadea un par de veces cuando aterriza la última y se queda encendido, que es
+el estado en el que descansa la tarjeta terminada. Con `loop` parpadea desde que
+se dibuja la ventana y no para, porque un cursor parpadea por la razón por la
+que una terminal está abierta, no por la razón por la que una tarjeta ha
+terminado. El tecleo ocurre una sola vez en los dos casos.
+
+<Card name="terminal" alt="El diseño terminal reproducido una vez: una ventana de terminal con la marca del proyecto en su barra de título, cuyas líneas de salida tienen cada una un número que se teclea solo bajo un cursor de bloque encendido que empieza a parpadear cuando aterriza la última cifra, y la página también puede reproducirlo en bucle, donde el tecleo sigue ocurriendo una vez y el cursor parpadea desde el principio y no para" animated loop />
 
 ## ticker
 

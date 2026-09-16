@@ -143,8 +143,9 @@ So `loop` does not mean "and again". The reveal plays once and settles in both
 modes, and the only thing that may go on for ever is motion that puts nothing on
 the card and takes nothing off it. Two layouts have such a thing:
 
-- `terminal`, whose cursor blinks at its prompt. The numbers still type
-  themselves in once.
+- `terminal`, whose cursor blinks at its prompt from the moment the window is
+  drawn. The numbers still type themselves in once. Played `once` instead, the
+  cursor waits for the last of them, blinks a couple of times and settles lit.
 - `ticker`, whose band of pills keeps scrolling. Nothing disappears; the same
   pills come round again.
 
@@ -152,7 +153,17 @@ On every other layout `loop` draws exactly the card `once` draws, to the byte.
 It is accepted rather than refused, so a workflow can set it once and change
 `card-layout` freely.
 
-![The terminal layout played once: a terminal window whose lines of output each have a number typing itself in, with a block cursor blinking at the prompt below them, and the page can also play it in a loop, where the typing still happens once and only the cursor goes on blinking](../site/src/assets/card-terminal.svg)
+`once` is still the considerate default for a profile, and more so than before.
+A card that loops moves for everyone who opens the README, and neither of the
+two that can is paced: the cursor blinks and the band scrolls with no pause
+between passes, where the looping cards this replaced held still for seven
+seconds between plays. A README gives a reader no way to stop it. Their only
+escape is `prefers-reduced-motion`, which switches the animation off for them
+but is a setting for their whole machine, not a control over your card. That is
+the same reason the layouts page never shows a card looping until the reader
+presses the toggle (WCAG 2.2.2, Pause, Stop, Hide).
+
+![The terminal layout played once: a terminal window whose lines of output each have a number typing itself in, with a lit block cursor at the prompt below them that blinks once the last number lands, and the page can also play it in a loop, where the typing still happens once and only the cursor goes on, blinking from the start](../site/src/assets/card-terminal.svg)
 
 ### In a README
 
@@ -187,18 +198,18 @@ dark theme; every layout also renders light, and `auto` puts both in one file.
 | Layout              | Family    | Animated | Loops | Default fields                                                                       |
 | ------------------- | --------- | -------- | ----- | ------------------------------------------------------------------------------------ |
 | `summary`           | chronicle | no       | no    | stars, forks, followers, repos, contributions, views, visitors, sparkline, top_repos |
-| `github-stats`      | github    | yes      | no    | repos, stars, forks, followers, commits, pull_requests, views, clones, languages |
-| `github-compact`    | github    | no       | no    | stars, forks, followers, repos, commits |
-| `badge-row`         | chronicle | no       | no    | stars, forks, followers, repos, contributions |
-| `wide-banner`       | chronicle | yes      | no    | stars, forks, followers, contributions, sparkline |
-| `sparkline-hero`    | chronicle | yes      | no    | contributions, stars, followers, sparkline |
-| `language-ring`     | github    | yes      | no    | languages, stars, repos |
-| `repo-list`         | github    | no       | no    | top_repos, stars, forks, repos |
-| `activity-heatmap`  | github    | yes      | no    | sparkline, contributions, commits, pull_requests |
-| `animated-counters` | chronicle | yes      | no    | stars, forks, followers, repos, contributions, views, sparkline |
-| `terminal`          | chronicle | yes      | yes   | stars, forks, followers, repos, contributions, top_repos |
-| `ticker`            | chronicle | yes      | yes   | stars, forks, followers, repos, contributions, commits, views, top_repos |
-| `language-bars`     | github    | yes      | no    | languages |
+| `github-stats`      | github    | yes      | no    | repos, stars, forks, followers, commits, pull_requests, views, clones, languages     |
+| `github-compact`    | github    | no       | no    | stars, forks, followers, repos, commits                                              |
+| `badge-row`         | chronicle | no       | no    | stars, forks, followers, repos, contributions                                        |
+| `wide-banner`       | chronicle | yes      | no    | stars, forks, followers, contributions, sparkline                                    |
+| `sparkline-hero`    | chronicle | yes      | no    | contributions, stars, followers, sparkline                                           |
+| `language-ring`     | github    | yes      | no    | languages, stars, repos                                                              |
+| `repo-list`         | github    | no       | no    | top_repos, stars, forks, repos                                                       |
+| `activity-heatmap`  | github    | yes      | no    | sparkline, contributions, commits, pull_requests                                     |
+| `animated-counters` | chronicle | yes      | no    | stars, forks, followers, repos, contributions, views, sparkline                      |
+| `terminal`          | chronicle | yes      | yes   | stars, forks, followers, repos, contributions, top_repos                             |
+| `ticker`            | chronicle | yes      | yes   | stars, forks, followers, repos, contributions, commits, views, top_repos             |
+| `language-bars`     | github    | yes      | no    | languages                                                                            |
 
 ### The two families
 
@@ -283,11 +294,17 @@ the static card.
 
 A terminal window with the project's mark in its title bar, one line of output
 per number and one per repository. The numbers type themselves in, a line at a
-time, under a cover painted in the card's own background colour. The cursor at
-the prompt blinks while that is happening and settles lit, which is the state
-the finished card rests in.
+time, under a cover painted in the card's own background colour.
 
-![The terminal layout played once: a terminal window with the project's mark in its title bar, whose lines of output each have a number typing itself in and a block cursor blinking at the prompt below them, and the page can also play it in a loop](../site/src/assets/card-terminal.svg)
+The cursor at the prompt is the card's one piece of endless motion, and it does
+a different thing in each motion. Played `once` it sits lit while the numbers
+arrive, blinks a couple of times when the last one lands and settles lit, which
+is the state the finished card rests in. Under `loop` it blinks from the moment
+the window is drawn and never stops, because a cursor blinks for the reason a
+terminal is open and not for the reason a card is finished. The typing itself
+happens once either way.
+
+![The terminal layout played once: a terminal window with the project's mark in its title bar, whose lines of output each have a number typing itself in under a lit block cursor that begins blinking when the last number lands, and the page can also play it in a loop, where the typing still happens once and the cursor blinks from the start and never stops](../site/src/assets/card-terminal.svg)
 
 ### ticker
 

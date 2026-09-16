@@ -148,8 +148,9 @@ vez y se asienta en los dos modos, y lo único que puede seguir para siempre es
 el movimiento que no pone nada en la tarjeta ni se lo lleva. Dos diseños tienen
 algo así:
 
-- `terminal`, cuyo cursor parpadea en el prompt. Las cifras se siguen tecleando
-  una sola vez.
+- `terminal`, cuyo cursor parpadea en el prompt desde que se dibuja la ventana.
+  Las cifras se siguen tecleando una sola vez. Con `once`, en cambio, el cursor
+  espera a la última, parpadea un par de veces y se queda encendido.
 - `ticker`, cuya banda de píldoras sigue desplazándose. No desaparece nada; las
   mismas píldoras vuelven a pasar.
 
@@ -157,7 +158,18 @@ En cualquier otro diseño `loop` dibuja exactamente la tarjeta que dibuja `once`
 byte a byte. Se acepta en vez de rechazarse, así que un workflow puede fijarlo
 una vez y cambiar `card-layout` con libertad.
 
-<Card name="terminal" animated loop alt="El diseño terminal reproducido una vez: una ventana de terminal cuyas líneas de salida tienen cada una un número que se teclea solo, con un cursor de bloque que parpadea en el prompt de abajo, y la página también puede reproducirlo en bucle, donde el tecleo sigue ocurriendo una vez y solo el cursor sigue parpadeando" />
+`once` sigue siendo la opción respetuosa para un perfil, y más que antes. Una
+tarjeta en bucle se mueve para todo el que abre el README, y ninguno de los dos
+que pueden hacerlo tiene pausa: el cursor parpadea y la banda se desplaza sin
+descanso entre pasadas, donde las tarjetas en bucle que esto sustituye se
+quedaban quietas siete segundos entre reproducciones. Un README no le da a quien
+lee ninguna forma de pararla. Su única salida es `prefers-reduced-motion`, que
+se la desactiva, pero que es un ajuste de toda su máquina y no un control sobre
+tu tarjeta. Es la misma razón por la que la página de diseños nunca muestra una
+tarjeta en bucle hasta que se pulsa el botón (WCAG 2.2.2, Pausar, detener,
+ocultar).
+
+<Card name="terminal" animated loop alt="El diseño terminal reproducido una vez: una ventana de terminal cuyas líneas de salida tienen cada una un número que se teclea solo, con un cursor de bloque encendido en el prompt de abajo que parpadea cuando aterriza la última cifra, y la página también puede reproducirlo en bucle, donde el tecleo sigue ocurriendo una vez y solo sigue el cursor, parpadeando desde el principio" />
 
 ## En un README
 

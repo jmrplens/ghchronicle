@@ -308,6 +308,16 @@ func TestACursorBlinksThroughItsBeatAndEndsLit(t *testing.T) {
 			t.Errorf("css lacks %q:\n%s", want, forever.css())
 		}
 	}
+	// The beat above was placed at 1.4 seconds and the one below at zero, and
+	// they write the same thing: a beat that repeats for ever begins at once,
+	// because waiting once before the first turn would take an
+	// animation-delay and this engine writes none. A layout that needs a
+	// continuous beat to wait needs that rule relaxed first; see period.
+	fromTheStart := newTimeline(MotionLoop)
+	fromTheStart.add(effectBlink, 0, 1, "linear")
+	if forever.css() != fromTheStart.css() {
+		t.Errorf("a continuous beat's start reached its keyframes:\n%s\nagainst\n%s", forever.css(), fromTheStart.css())
+	}
 }
 
 func TestClassesSkipsTheEmptyParts(t *testing.T) {

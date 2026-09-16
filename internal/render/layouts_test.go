@@ -347,12 +347,10 @@ func TestOnlyContinuousMotionRunsForEver(t *testing.T) {
 		if err := continuousClassIsTheRightOne(l.Name, loop, forever[0][1]); err != "" {
 			t.Errorf("%s: %s", l.Name, err)
 		}
-		// And under reduced motion nothing moves, the perpetual class included.
+		// And under reduced motion nothing moves, the perpetual class
+		// included: it is one of the classes the engine names in that block,
+		// and this is the check that every one of them is there.
 		checkReducedMotionNamesEveryClass(t, l.Name, MotionLoop, loop)
-		if !strings.Contains(loop, "."+forever[0][1]+",") && !strings.Contains(loop, ","+forever[0][1]+"{animation:none}") &&
-			!strings.Contains(loop, "."+forever[0][1]+"{animation:none}") {
-			t.Errorf("%s: the class that runs for ever must be switched off under prefers-reduced-motion", l.Name)
-		}
 	}
 }
 

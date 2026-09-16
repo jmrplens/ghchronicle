@@ -160,8 +160,12 @@ there answers for that one repository, and any other repository borrows
 hello-world's. Each layout comes out of one sweep under `-card-theme both` as
 two files, `card-<layout>.svg` in the light palette and `card-<layout>_dark.svg`
 in the dark one, which is what the site's `ThemeImage` and the README's
-`<picture>` read. The animated layouts come out a second time under
-`-card-motion loop`, as `card-<layout>-loop.svg` and its `_dark` twin.
+`<picture>` read. The two layouts that loop come out a second time under
+`-card-motion loop`, as `card-<layout>-loop.svg` and its `_dark` twin. Only
+those two: on every other layout `loop` draws the same card as `once`, so a
+looping picture of one would be a second copy of the first under a name that
+promises something else. Which layouts they are is the registry's `Loops`, and
+the gallery reads it rather than keeping its own list.
 
 ```sh
 mkdir -p /tmp/cards

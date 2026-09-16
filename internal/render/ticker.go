@@ -43,8 +43,10 @@ const (
 )
 
 // tickCSS is the two sizes the band sets its own text in, a size up from the
-// family's, which a taller pill has the room for.
-const tickCSS = ".tkv{font-size:14px}\n.tkl{font-size:12px}\n"
+// family's, which a taller pill has the room for. Built from the constants the
+// pill widths are measured with, so a size cannot be changed in one place and
+// left behind in the other.
+var tickCSS = ".tkv{font-size:" + num(tickText) + "px}\n.tkl{font-size:" + num(tickLabel) + "px}\n"
 
 // tickerBand is how wide the strip's viewport is: the card less the family's
 // padding either side, which is where the title above it starts and ends.

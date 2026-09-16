@@ -171,7 +171,7 @@ var layouts = []layoutDef{
 	},
 	{
 		Name: "terminal", Family: "chronicle", Animated: true, Loops: true,
-		Description: "A terminal window with the project's mark: one line of output per number, each number typed in, and a cursor at the prompt that blinks on and can go on blinking for ever.",
+		Description: "A terminal window with the project's mark: one line of output per number, each number typed in, and a cursor at the prompt that blinks when the last of them lands, or from the start and for ever under loop.",
 		Fields:      []string{fieldStars, fieldForks, fieldFollowers, fieldRepos, fieldContributions, fieldTopRepos},
 		Supports:    join(allNumeric, fieldTopRepos),
 

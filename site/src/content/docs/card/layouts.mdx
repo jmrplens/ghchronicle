@@ -17,18 +17,18 @@ dark theme; every layout also renders light, and `auto` puts both in one file.
 | Layout              | Family    | Animated | Loops | Default fields                                                                       |
 | ------------------- | --------- | -------- | ----- | ------------------------------------------------------------------------------------ |
 | `summary`           | chronicle | no       | no    | stars, forks, followers, repos, contributions, views, visitors, sparkline, top_repos |
-| `github-stats`      | github    | yes      | no    | repos, stars, forks, followers, commits, pull_requests, views, clones, languages |
-| `github-compact`    | github    | no       | no    | stars, forks, followers, repos, commits |
-| `badge-row`         | chronicle | no       | no    | stars, forks, followers, repos, contributions |
-| `wide-banner`       | chronicle | yes      | no    | stars, forks, followers, contributions, sparkline |
-| `sparkline-hero`    | chronicle | yes      | no    | contributions, stars, followers, sparkline |
-| `language-ring`     | github    | yes      | no    | languages, stars, repos |
-| `repo-list`         | github    | no       | no    | top_repos, stars, forks, repos |
-| `activity-heatmap`  | github    | yes      | no    | sparkline, contributions, commits, pull_requests |
-| `animated-counters` | chronicle | yes      | no    | stars, forks, followers, repos, contributions, views, sparkline |
-| `terminal`          | chronicle | yes      | yes   | stars, forks, followers, repos, contributions, top_repos |
-| `ticker`            | chronicle | yes      | yes   | stars, forks, followers, repos, contributions, commits, views, top_repos |
-| `language-bars`     | github    | yes      | no    | languages |
+| `github-stats`      | github    | yes      | no    | repos, stars, forks, followers, commits, pull_requests, views, clones, languages     |
+| `github-compact`    | github    | no       | no    | stars, forks, followers, repos, commits                                              |
+| `badge-row`         | chronicle | no       | no    | stars, forks, followers, repos, contributions                                        |
+| `wide-banner`       | chronicle | yes      | no    | stars, forks, followers, contributions, sparkline                                    |
+| `sparkline-hero`    | chronicle | yes      | no    | contributions, stars, followers, sparkline                                           |
+| `language-ring`     | github    | yes      | no    | languages, stars, repos                                                              |
+| `repo-list`         | github    | no       | no    | top_repos, stars, forks, repos                                                       |
+| `activity-heatmap`  | github    | yes      | no    | sparkline, contributions, commits, pull_requests                                     |
+| `animated-counters` | chronicle | yes      | no    | stars, forks, followers, repos, contributions, views, sparkline                      |
+| `terminal`          | chronicle | yes      | yes   | stars, forks, followers, repos, contributions, top_repos                             |
+| `ticker`            | chronicle | yes      | yes   | stars, forks, followers, repos, contributions, commits, views, top_repos             |
+| `language-bars`     | github    | yes      | no    | languages                                                                            |
 
 ## The two families
 
@@ -113,11 +113,17 @@ the static card.
 
 A terminal window with the project's mark in its title bar, one line of output
 per number and one per repository. The numbers type themselves in, a line at a
-time, under a cover painted in the card's own background colour. The cursor at
-the prompt blinks while that is happening and settles lit, which is the state
-the finished card rests in.
+time, under a cover painted in the card's own background colour.
 
-<Card name="terminal" alt="The terminal layout played once: a terminal window with the project's mark in its title bar, whose lines of output each have a number typing itself in and a block cursor blinking at the prompt below them, and the page can also play it in a loop" animated loop />
+The cursor at the prompt is the card's one piece of endless motion, and it does
+a different thing in each motion. Played `once` it sits lit while the numbers
+arrive, blinks a couple of times when the last one lands and settles lit, which
+is the state the finished card rests in. Under `loop` it blinks from the moment
+the window is drawn and never stops, because a cursor blinks for the reason a
+terminal is open and not for the reason a card is finished. The typing itself
+happens once either way.
+
+<Card name="terminal" alt="The terminal layout played once: a terminal window with the project's mark in its title bar, whose lines of output each have a number typing itself in under a lit block cursor that begins blinking when the last number lands, and the page can also play it in a loop, where the typing still happens once and the cursor blinks from the start and never stops" animated loop />
 
 ## ticker
 

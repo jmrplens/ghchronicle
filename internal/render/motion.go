@@ -126,6 +126,16 @@ type beat struct {
 // the cadence it blinks at, and not the beat's own length, because dur is how
 // long it blinks before a card that plays once settles, which a card that
 // never settles has no use for.
+//
+// The beat's start is not used here and is not used by perpetual either: an
+// animation that repeats for ever cannot wait once before the first turn
+// unless it is given an animation-delay, and this engine writes none. A
+// continuous beat placed at a non-zero start therefore begins at once under
+// loop, and waits for its start only under once. Today's two are the terminal's
+// cursor, which is meant to blink from the moment the window is drawn, and the
+// ticker's band, which starts at zero anyway. A third one that has to wait
+// needs the delay, and the rule against delays relaxed for continuous beats
+// alone, where a delay means exactly what it says.
 func (b beat) period() float64 {
 	if b.effect == effectBlink {
 		return blinkPeriod
@@ -259,7 +269,7 @@ func keyframes(bt beat, cycle float64) string {
 // perpetual is the keyframes of a continuous beat under loop: one turn, which
 // the browser repeats for ever. There is no waiting stretch before it and no
 // settled one after it, because there is no cycle for it to sit inside; it is
-// the whole animation.
+// the whole animation, and the beat's start is no part of it. See period.
 func perpetual(bt beat) string {
 	if bt.effect == effectBlink {
 		// Lit for the first half of the turn and dark for the second, wrapping

@@ -143,8 +143,9 @@ So `loop` does not mean "and again". The reveal plays once and settles in both
 modes, and the only thing that may go on for ever is motion that puts nothing on
 the card and takes nothing off it. Two layouts have such a thing:
 
-- `terminal`, whose cursor blinks at its prompt. The numbers still type
-  themselves in once.
+- `terminal`, whose cursor blinks at its prompt from the moment the window is
+  drawn. The numbers still type themselves in once. Played `once` instead, the
+  cursor waits for the last of them, blinks a couple of times and settles lit.
 - `ticker`, whose band of pills keeps scrolling. Nothing disappears; the same
   pills come round again.
 
@@ -152,7 +153,17 @@ On every other layout `loop` draws exactly the card `once` draws, to the byte.
 It is accepted rather than refused, so a workflow can set it once and change
 `card-layout` freely.
 
-<Card name="terminal" animated loop alt="The terminal layout played once: a terminal window whose lines of output each have a number typing itself in, with a block cursor blinking at the prompt below them, and the page can also play it in a loop, where the typing still happens once and only the cursor goes on blinking" />
+`once` is still the considerate default for a profile, and more so than before.
+A card that loops moves for everyone who opens the README, and neither of the
+two that can is paced: the cursor blinks and the band scrolls with no pause
+between passes, where the looping cards this replaced held still for seven
+seconds between plays. A README gives a reader no way to stop it. Their only
+escape is `prefers-reduced-motion`, which switches the animation off for them
+but is a setting for their whole machine, not a control over your card. That is
+the same reason the layouts page never shows a card looping until the reader
+presses the toggle (WCAG 2.2.2, Pause, Stop, Hide).
+
+<Card name="terminal" animated loop alt="The terminal layout played once: a terminal window whose lines of output each have a number typing itself in, with a lit block cursor at the prompt below them that blinks once the last number lands, and the page can also play it in a loop, where the typing still happens once and only the cursor goes on, blinking from the start" />
 
 ## In a README
 

@@ -163,9 +163,13 @@ fixture llamado `<repo>~<fixture>` responde solo por ese repositorio, y
 cualquier otro toma prestado el de hello-world. Cada diseño sale de una sola
 pasada con `-card-theme both` como dos ficheros, `card-<diseño>.svg` en la
 paleta clara y `card-<diseño>_dark.svg` en la oscura, que es lo que leen el
-`ThemeImage` del sitio y el `<picture>` del README. Los diseños animados salen
-una segunda vez con `-card-motion loop`, como `card-<diseño>-loop.svg` y su
-gemela `_dark`.
+`ThemeImage` del sitio y el `<picture>` del README. Los dos diseños que hacen
+bucle salen una segunda vez con `-card-motion loop`, como
+`card-<diseño>-loop.svg` y su gemela `_dark`. Solo esos dos: en cualquier otro
+diseño `loop` dibuja la misma tarjeta que `once`, así que una imagen en bucle
+suya sería una segunda copia de la primera con un nombre que promete otra cosa.
+Cuáles son lo dice `Loops` en el registro, y la galería lo lee en vez de
+mantener su propia lista.
 
 ```sh
 mkdir -p /tmp/cards
