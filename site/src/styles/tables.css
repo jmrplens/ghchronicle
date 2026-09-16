@@ -192,23 +192,42 @@
 	font-size: var(--table-key-size, 1em);
 }
 
-/* One row of this corpus is not a value: the built-in-cadence row of
- * configuration/cadences.mdx's three-layer table shares its first column with
- * three real identifiers (`every.families`, `every.groups`, `every.default`)
- * and is itself the prose "the built-in table", because there is no key to
- * write for the layer nothing names. Sized and coloured like the others, a
- * sentence reads as a heading floating over its row rather than as a title,
- * which is the opposite of what the size was for. A first cell with no `code`
- * in it is that case, on this table and on any future one shaped the same
- * way, so its size falls back to the plain value it always was; its colour is
- * left alone, since a plain-language row still benefits from being told apart
- * from its own body text. The compact form is excluded on purpose: its own
- * review already wanted a link-only name (InfluxDB, PostgreSQL, neither a
- * `code` span) at this size, and undoing that here would be the regression,
- * not the fix. */
+/* Not every first cell names its row, and the ones that do not read as a
+ * heading floating over the row rather than as a title, which is the opposite
+ * of what the size is for. Which cells those are is decided at build time and
+ * written out: src/lib/rehype-tables.mjs marks `data-role="identity"` on a
+ * first cell that holds a `code` span, in a table whose first column repeats
+ * no value and that its page has not named in `plainTables`. Everything else
+ * falls back here to the plain size it always had; the colour is left alone,
+ * since a prose row still benefits from being told apart from its own body
+ * text.
+ *
+ * What the three conditions exclude, measured on the built corpus at 360 px:
+ *
+ *  - NO CODE SPAN: 168 of the 718 first cells of the stacked tables. It is the
+ *    prose row of configuration/cadences.mdx's three-layer table ("the
+ *    built-in table", the layer nothing names), and it is also every identity
+ *    column the markdown left unbackticked, /api/cost/'s thirty-four family
+ *    names among them. Those stay at body size on purpose: the treatment
+ *    follows the markdown, so a page that wants the title writes the name as
+ *    a value. Turning the size on for bare text instead would take every
+ *    prose first cell with it, which is the case this rule exists to keep out.
+ *  - A COLUMN THAT REPEATS: configuration/cadences.mdx's 34-row `Group` table,
+ *    where `account` names eight consecutive rows, so eight cards carried the
+ *    same title while the cell that tells them apart sat below it in body
+ *    type. Its eight-row twin, whose groups are unique, keeps the title.
+ *  - `plainTables`: a first cell that is a sentence with a code span inside
+ *    it, which no selector can tell from a genuine name with a space in it
+ *    (`-card <path>`, an install command). configuration/index.mdx's
+ *    `Remembers` and `Message` tables are the two, twelve rows a language of
+ *    whole sentences that were being typeset as titles.
+ *
+ * The compact form is excluded on purpose: its own review already wanted a
+ * link-only name (InfluxDB, PostgreSQL, neither a `code` span) at this size,
+ * and undoing that here would be the regression, not the fix. */
 .sl-markdown-content
 	.table-scroll:not([data-form="index"])
-	td:first-child:not(:has(code)) {
+	td:first-child:not([data-role="identity"]) {
 	--table-key-size: initial;
 }
 
@@ -394,16 +413,24 @@
  * Clipped, not `display: none`, in the stacked case: the latter is not
  * generated at all, so nothing would reach the accessibility tree either, and
  * a screen reader would lose the column this figure came from along with the
- * word. */
-.sl-markdown-content
-	.table-scroll[data-form="default"]
-	> table
-	td[data-role="default"][data-label]::before {
-	position: var(--table-stacked) absolute;
-	width: var(--table-stacked) 1px;
-	height: var(--table-stacked) 1px;
-	overflow: var(--table-stacked) hidden;
-	clip-path: var(--table-stacked) inset(50%);
+ * word.
+ *
+ * Inside the same 17rem guard the grid itself is written behind (see "Default
+ * columns" at the end of this file): the word is only redundant while the
+ * value sits beside the label. Where the row is too narrow to hoist, the cell
+ * is an ordinary stacked block again and has to print its own heading, so the
+ * two have to switch on and off together. */
+@container (min-width: 17rem) {
+	.sl-markdown-content
+		.table-scroll[data-form="default"]
+		> table
+		td[data-role="default"][data-label]::before {
+		position: var(--table-stacked) absolute;
+		width: var(--table-stacked) 1px;
+		height: var(--table-stacked) 1px;
+		overflow: var(--table-stacked) hidden;
+		clip-path: var(--table-stacked) inset(50%);
+	}
 }
 
 /* ------------------------------------------------------------
@@ -521,14 +548,18 @@
  * WHICH TABLES. A page names them in its frontmatter
  * (`indexTables`, by the heading of the first column), and
  * src/lib/rehype-tables.mjs marks their container
- * `data-form="index"` and links each row's first cell to the
- * section of the page it names, when there is one. The judgement
- * is the page's: an index is a table a reader uses to FIND an
- * item, a short row per item that is documented further on, and
- * the stacked form serves it badly. Measured on /card/layouts/ at
- * a 360 px viewport, stacked: 13 rows, 337 px each, 4,691 px of
- * labelled boxes before the first card, where on a desktop the
- * same table is one glance.
+ * `data-form="index"`. It used to link each row's first cell to
+ * the section of the page it names as well; that pass was removed
+ * in 2dd55a6, when the layouts page stopped carrying an index and
+ * the rule ran over nothing, so a row is a link only where the
+ * markdown made it one, which is what the stretch rule below is
+ * for. The judgement is the page's: an index is a table a reader
+ * uses to FIND an item, a short row per item that is documented
+ * further on, and the stacked form serves it badly. Measured on
+ * /card/layouts/ while it still carried an index, at a 360 px
+ * viewport, stacked: 13 rows, 337 px each, 4,691 px of labelled
+ * boxes before the first card, where on a desktop the same table
+ * is one glance.
  *
  * WHEN. At exactly the widths the table would otherwise stack,
  * whatever its column count, and at no other. That is the job of
@@ -631,7 +662,21 @@
  *
  * WHEN. The same rule as the compact form's: exactly the widths the
  * table would otherwise stack, and no other, through the same
- * `--table-stacked` indirection every value below is written with.
+ * `--table-stacked` indirection every value below is written with,
+ * AND only while the row is wide enough in text units to hold both
+ * halves of the line, which is the `@container (min-width: 17rem)`
+ * around them. Everything on that line is sized in rem, so what
+ * matters is not the pixel width but the width in text: the tightest
+ * pair of this corpus, `sinks.dedupe_horizon` against `720h`, needs
+ * 12.3rem for the key and its padding, 3.75rem for the value and
+ * 0.75rem of gap, so under about 17rem it cannot fit and the key
+ * would break mid-word. At a 16 px root that is a container under
+ * 272 px, which no phone gives this column; with the browser's text
+ * size at 125 % it is the 360 px phone, and there the row simply
+ * keeps the labelled block it had before, whole key and whole
+ * sentence. Measured: at a 16 and an 18 px root no key wraps at
+ * 360 px; at 20, 24 and 32 px the form switches itself off instead
+ * of breaking a name.
  *
  * WHAT. The row becomes a two-column grid for one line: the first
  * cell (its label above its key, unchanged, at `--table-key-size`)
@@ -645,6 +690,20 @@
  * `[data-label]::before` above): the position is the cue once every
  * row of the table reads the same way, so the word is not needed
  * twice.
+ *
+ * WHICH ROWS. Only the ones whose default is a VALUE, which the
+ * plugin decides per cell rather than per table (see "Default
+ * columns" there). A row whose default is a sentence keeps the
+ * labelled block it always had, at the full width of the row, and
+ * none of the declarations below reach it: the cell carries no
+ * `data-role`, so it is not grid-placed, its label is not hidden,
+ * and its own `margin-block-start` is Starlight's again. A table can
+ * therefore mix the two, and configuration/'s `Key` tables do: four
+ * of the five github rows hoist and `web_url`'s "derived from the
+ * API" does not, `sinks.dedupe_horizon` hoists and
+ * `sinks.dedupe_file`'s sentence does not. What the reader sees is
+ * a value in the corner of a card, or a labelled sentence under the
+ * key, and never a sentence in the corner.
  *
  * THE COLUMN WIDTHS, three attempts before this one.
  *
@@ -671,38 +730,48 @@
  * still `max-content`. A grid track's max-content contribution is the
  * item's own max-content clamped by whatever width the item is
  * allowed, so a short value (`config.yaml`, under 8rem already) is
- * untouched, and a long one is clamped before the track ever measures
- * it: the track asks for 8rem of the row, not the sentence's real
- * width, and the sentence wraps inside that 8rem instead of the track
- * demanding room nothing is left to give the key. `sinks.dedupe_file`
- * is the measurement in scripts/check-table-fit.mjs's fixtures for
- * this rule, both for the key staying whole and for the default
- * wrapping rather than pushing it aside.
+ * untouched and nothing longer can take the row.
+ *
+ * WHAT 8rem IS, now that only values hoist. It is the widest value
+ * the corpus puts in that corner: `api.github.com`, 96 px of text in
+ * a 124 px cell at a 360 px viewport, against the 128 px the cap
+ * allows. It is a ceiling on the VALUE, not a share of the row, and
+ * it can only ever make that column narrower, so no value of it can
+ * starve the key: with the sentence gone from the corner the
+ * tightest key in the corpus, `sinks.dedupe_horizon` against `720h`,
+ * has 50 px of room at 360 px where `sinks.dedupe_file` against its
+ * hoisted sentence had 13. Lowering the cap is what would break
+ * something now: at 6.5rem `api.github.com` no longer fits its line.
+ * Both ends are measured by scripts/check-table-fit.mjs, which fails
+ * when a key's `code` or a hoisted value takes more than one line
+ * box at either phone width.
  * ------------------------------------------------------------ */
-.sl-markdown-content .table-scroll[data-form="default"] > table tr {
-	--table-default-row: var(--table-stacked) grid;
-	--table-default-columns: var(--table-stacked) minmax(0, 1fr) max-content;
-	--table-default-gap: var(--table-stacked) 0.75rem;
-	--table-default-align: var(--table-stacked) start;
-}
+@container (min-width: 17rem) {
+	.sl-markdown-content .table-scroll[data-form="default"] > table tr {
+		--table-default-row: var(--table-stacked) grid;
+		--table-default-columns: var(--table-stacked) minmax(0, 1fr) max-content;
+		--table-default-gap: var(--table-stacked) 0.75rem;
+		--table-default-align: var(--table-stacked) start;
+	}
 
-.sl-markdown-content
-	.table-scroll[data-form="default"]
-	> table
-	td[data-role="default"] {
-	--table-default-value-anchor: var(--table-stacked) relative;
-	--table-default-value-column: var(--table-stacked) 2;
-	--table-default-value-row: var(--table-stacked) 1;
-	--table-default-value-align: var(--table-stacked) start;
-	--table-default-value-minw: var(--table-stacked) 0;
-	--table-default-value-maxw: var(--table-stacked) 8rem;
-	--table-default-value-text-align: var(--table-stacked) right;
-	--table-default-label: var(--table-stacked) block;
-}
+	.sl-markdown-content
+		.table-scroll[data-form="default"]
+		> table
+		td[data-role="default"] {
+		--table-default-value-anchor: var(--table-stacked) relative;
+		--table-default-value-column: var(--table-stacked) 2;
+		--table-default-value-row: var(--table-stacked) 1;
+		--table-default-value-align: var(--table-stacked) start;
+		--table-default-value-minw: var(--table-stacked) 0;
+		--table-default-value-maxw: var(--table-stacked) 8rem;
+		--table-default-value-text-align: var(--table-stacked) right;
+		--table-default-label: var(--table-stacked) block;
+	}
 
-.sl-markdown-content
-	.table-scroll[data-form="default"]
-	> table
-	td:not(:first-child):not([data-role="default"]) {
-	--table-default-rest-column: var(--table-stacked) 1 / -1;
+	.sl-markdown-content
+		.table-scroll[data-form="default"]
+		> table
+		td:not(:first-child):not([data-role="default"]) {
+		--table-default-rest-column: var(--table-stacked) 1 / -1;
+	}
 }

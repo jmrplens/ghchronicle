@@ -21,6 +21,14 @@ export const collections = {
 	// frontmatter shapes. Both `table` and `default` are fixed field names
 	// here, identical in every locale; only their values, which nobody
 	// compares, are the translation.
+	//
+	// `plainTables` names, again by the heading of their first column, the
+	// tables whose first cell is not the row's name: a sentence that happens to
+	// hold a code span, as configuration/index.mdx's `Remembers` and `Message`
+	// tables do. src/lib/rehype-tables.mjs leaves those cells unmarked, so
+	// styles/tables.css sizes them as the body text they are instead of as a
+	// card title. A list of scalars like `indexTables`, and translated the same
+	// way: only the values differ between the twins.
 	docs: defineCollection({
 		loader: docsLoader(),
 		schema: docsSchema({
@@ -29,6 +37,7 @@ export const collections = {
 				defaultColumns: z
 					.array(z.object({ table: z.string(), default: z.string() }))
 					.optional(),
+				plainTables: z.array(z.string()).optional(),
 			}),
 		}),
 	}),
