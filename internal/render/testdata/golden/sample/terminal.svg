@@ -1,0 +1,168 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="495" height="370" viewBox="0 0 495 370" role="img" aria-labelledby="ghcTitle ghcDesc">
+<title id="ghcTitle">José M. Requena Plens</title>
+<desc id="ghcDesc">GitHub summary for jmrplens: 283 stars, 70 forks, 41 followers, 42 public repositories, 6210 contributions in the last year, 1810 repository views in the last 14 days, 878 unique visitors in the last 14 days, 117000 clones in the last 14 days, 3387 commits in the last year, 1179 pull requests in the last year, 389 reviews in the last year, 64 issues in the last year. Most starred repositories: phonometry with 112 stars in Python, TFG-TFM_EPS with 84 stars in TeX, gitlab-mcp-server with 33 stars in Go.</desc>
+<style>
+.bg{fill:#0d1117;stroke:#30363d}
+.panel{fill:#161b22}
+.t,.v,.big{fill:#e6edf3}
+.d,.l,.h,.s{fill:#8b949e}
+.n,.c{fill:#c9d1d9}
+.star,.pill-v{fill:#e3b341}
+.on-accent{fill:#0d1117}
+.line{stroke:#58a6ff}
+.area{fill:#58a6ff}
+.axis,.edge{stroke:#30363d}
+.track{fill:#30363d}
+.ok{fill:#3fb950}
+.fg{fill:#e6edf3}
+.h0{fill:#151b23}.h1{fill:#033a16}.h2{fill:#196c2e}.h3{fill:#2ea043}.h4{fill:#56d364}
+text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif}
+.mono{font-family:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace}
+.t{font-size:18px;font-weight:600}
+.d{font-size:11px}
+.v{font-size:16px;font-weight:600}
+.big{font-size:24px;font-weight:700}
+.l{font-size:11px}
+.h{font-size:10px;font-weight:600;letter-spacing:0.08em}
+.n{font-size:12px}
+.s{font-size:11px}
+.c{font-size:12px}
+.line{fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.area{fill-opacity:0.14;stroke:none}
+.axis{stroke-width:1}
+.edge{fill:none;stroke-width:1}
+.tm{font-size:12px}
+.tv{font-weight:600}
+.mask{stroke:none}
+.m0{animation:m0 2.7s steps(3) 1}
+@keyframes m0{0%{transform:translateX(-25.6px)}11.11%,100%{transform:translateX(0px)}}
+.m1{animation:m1 2.7s steps(2) 1}
+@keyframes m1{0%,3.7%{transform:translateX(-18.4px)}14.81%,100%{transform:translateX(0px)}}
+.m2{animation:m2 2.7s steps(2) 1}
+@keyframes m2{0%,7.41%{transform:translateX(-18.4px)}18.52%,100%{transform:translateX(0px)}}
+.m3{animation:m3 2.7s steps(2) 1}
+@keyframes m3{0%,11.11%{transform:translateX(-18.4px)}22.22%,100%{transform:translateX(0px)}}
+.m4{animation:m4 2.7s steps(5) 1}
+@keyframes m4{0%,14.81%{transform:translateX(-40px)}25.93%,100%{transform:translateX(0px)}}
+.m5{animation:m5 2.7s steps(5) 1}
+@keyframes m5{0%,18.52%{transform:translateX(-40px)}29.63%,100%{transform:translateX(0px)}}
+.m6{animation:m6 2.7s steps(3) 1}
+@keyframes m6{0%,22.22%{transform:translateX(-25.6px)}33.33%,100%{transform:translateX(0px)}}
+.m7{animation:m7 2.7s steps(7) 1}
+@keyframes m7{0%,25.93%{transform:translateX(-54.4px)}37.04%,100%{transform:translateX(0px)}}
+.m8{animation:m8 2.7s steps(5) 1}
+@keyframes m8{0%,29.63%{transform:translateX(-40px)}40.74%,100%{transform:translateX(0px)}}
+.m9{animation:m9 2.7s steps(5) 1}
+@keyframes m9{0%,33.33%{transform:translateX(-40px)}44.44%,100%{transform:translateX(0px)}}
+.m10{animation:m10 2.7s steps(3) 1}
+@keyframes m10{0%,37.04%{transform:translateX(-25.6px)}48.15%,100%{transform:translateX(0px)}}
+.m11{animation:m11 2.7s steps(2) 1}
+@keyframes m11{0%,40.74%{transform:translateX(-18.4px)}51.85%,100%{transform:translateX(0px)}}
+.m12{animation:m12 2.7s steps(3) 1}
+@keyframes m12{0%,44.44%{transform:translateX(-25.6px)}55.56%,100%{transform:translateX(0px)}}
+.m13{animation:m13 2.7s steps(2) 1}
+@keyframes m13{0%,48.15%{transform:translateX(-18.4px)}59.26%,100%{transform:translateX(0px)}}
+.m14{animation:m14 2.7s steps(2) 1}
+@keyframes m14{0%,51.85%{transform:translateX(-18.4px)}62.96%,100%{transform:translateX(0px)}}
+.m15{animation:m15 2.7s linear 1}
+@keyframes m15{0%,72.21%{opacity:1}72.22%,81.47%{opacity:0}81.48%,90.73%{opacity:1}90.74%,99.99%{opacity:0}100%{opacity:1}}
+@media (prefers-reduced-motion:reduce){.m0,.m1,.m2,.m3,.m4,.m5,.m6,.m7,.m8,.m9,.m10,.m11,.m12,.m13,.m14,.m15{animation:none}}
+</style>
+<rect class="bg" x="0.5" y="0.5" width="494" height="369" rx="6"/>
+<path class="panel" d="M0.5,34 V6.5 A6,6 0 0 1 6.5,0.5 H488.5 A6,6 0 0 1 494.5,6.5 V34 Z"/>
+<line class="axis" x1="0.5" y1="34.5" x2="494.5" y2="34.5"/>
+<g class="ok">
+<rect x="16" y="9" width="2.53" height="2.53" rx="0.76" opacity="0.18"/>
+<rect x="19.2" y="9" width="2.53" height="2.53" rx="0.76" opacity="0.18"/>
+<rect x="22.4" y="9" width="2.53" height="2.53" rx="0.76" opacity="0.32"/>
+<rect x="25.6" y="9" width="2.53" height="2.53" rx="0.76" opacity="0.55"/>
+<rect x="28.8" y="9" width="2.53" height="2.53" rx="0.76" opacity="1"/>
+<rect x="16" y="12.2" width="2.53" height="2.53" rx="0.76" opacity="0.18"/>
+<rect x="19.2" y="12.2" width="2.53" height="2.53" rx="0.76" opacity="0.32"/>
+<rect x="22.4" y="12.2" width="2.53" height="2.53" rx="0.76" opacity="0.55"/>
+<rect x="25.6" y="12.2" width="2.53" height="2.53" rx="0.76" opacity="1"/>
+<rect x="28.8" y="12.2" width="2.53" height="2.53" rx="0.76" opacity="0.55"/>
+<rect x="16" y="15.4" width="2.53" height="2.53" rx="0.76" opacity="0.32"/>
+<rect x="19.2" y="15.4" width="2.53" height="2.53" rx="0.76" opacity="0.55"/>
+<rect x="22.4" y="15.4" width="2.53" height="2.53" rx="0.76" opacity="1"/>
+<rect x="25.6" y="15.4" width="2.53" height="2.53" rx="0.76" opacity="0.55"/>
+<rect x="28.8" y="15.4" width="2.53" height="2.53" rx="0.76" opacity="0.32"/>
+<rect x="16" y="18.6" width="2.53" height="2.53" rx="0.76" opacity="0.55"/>
+<rect x="19.2" y="18.6" width="2.53" height="2.53" rx="0.76" opacity="1"/>
+<rect x="22.4" y="18.6" width="2.53" height="2.53" rx="0.76" opacity="0.55"/>
+<rect x="25.6" y="18.6" width="2.53" height="2.53" rx="0.76" opacity="0.32"/>
+<rect x="28.8" y="18.6" width="2.53" height="2.53" rx="0.76" opacity="0.18"/>
+<rect x="16" y="21.8" width="2.53" height="2.53" rx="0.76" opacity="1"/>
+<rect x="19.2" y="21.8" width="2.53" height="2.53" rx="0.76" opacity="0.55"/>
+<rect x="22.4" y="21.8" width="2.53" height="2.53" rx="0.76" opacity="0.32"/>
+<rect x="25.6" y="21.8" width="2.53" height="2.53" rx="0.76" opacity="0.18"/>
+<rect x="28.8" y="21.8" width="2.53" height="2.53" rx="0.76" opacity="0.18"/>
+</g>
+<text class="s" x="42" y="21" text-anchor="start">José M. Requena Plens</text>
+<text class="c mono ok tm" x="16" y="56" text-anchor="start">$</text>
+<text class="c mono tm" x="30.4" y="56" text-anchor="start">ghchronicle --user jmrplens</text>
+<text class="s mono tm" x="16" y="73" text-anchor="start">stars</text>
+<text class="s mono tm" x="55" y="73" text-anchor="start">...........................</text>
+<text class="c mono tv tm" x="257" y="73" text-anchor="start">283</text>
+<rect class="bg mask m0" x="280.6" y="64" width="25.6" height="13"/>
+<text class="s mono tm" x="16" y="90" text-anchor="start">forks</text>
+<text class="s mono tm" x="55" y="90" text-anchor="start">...........................</text>
+<text class="c mono tv tm" x="257" y="90" text-anchor="start">70</text>
+<rect class="bg mask m1" x="273.4" y="81" width="18.4" height="13"/>
+<text class="s mono tm" x="16" y="107" text-anchor="start">followers</text>
+<text class="s mono tm" x="81.4" y="107" text-anchor="start">.......................</text>
+<text class="c mono tv tm" x="257" y="107" text-anchor="start">41</text>
+<rect class="bg mask m2" x="273.4" y="98" width="18.4" height="13"/>
+<text class="s mono tm" x="16" y="124" text-anchor="start">repos</text>
+<text class="s mono tm" x="55" y="124" text-anchor="start">...........................</text>
+<text class="c mono tv tm" x="257" y="124" text-anchor="start">42</text>
+<rect class="bg mask m3" x="273.4" y="115" width="18.4" height="13"/>
+<text class="s mono tm" x="16" y="141" text-anchor="start">contributions</text>
+<text class="s mono tm" x="107.8" y="141" text-anchor="start">...................</text>
+<text class="c mono tv tm" x="257" y="141" text-anchor="start">6,210</text>
+<rect class="bg mask m4" x="295" y="132" width="40" height="13"/>
+<text class="s mono tm" x="16" y="158" text-anchor="start">views</text>
+<text class="s mono tm" x="55" y="158" text-anchor="start">...........................</text>
+<text class="c mono tv tm" x="257" y="158" text-anchor="start">1,810</text>
+<rect class="bg mask m5" x="295" y="149" width="40" height="13"/>
+<text class="s mono tm" x="16" y="175" text-anchor="start">visitors</text>
+<text class="s mono tm" x="74.8" y="175" text-anchor="start">........................</text>
+<text class="c mono tv tm" x="257" y="175" text-anchor="start">878</text>
+<rect class="bg mask m6" x="280.6" y="166" width="25.6" height="13"/>
+<text class="s mono tm" x="16" y="192" text-anchor="start">clones</text>
+<text class="s mono tm" x="61.6" y="192" text-anchor="start">..........................</text>
+<text class="c mono tv tm" x="257" y="192" text-anchor="start">117,000</text>
+<rect class="bg mask m7" x="309.4" y="183" width="54.4" height="13"/>
+<text class="s mono tm" x="16" y="209" text-anchor="start">commits</text>
+<text class="s mono tm" x="68.2" y="209" text-anchor="start">.........................</text>
+<text class="c mono tv tm" x="257" y="209" text-anchor="start">3,387</text>
+<rect class="bg mask m8" x="295" y="200" width="40" height="13"/>
+<text class="s mono tm" x="16" y="226" text-anchor="start">pull_requests</text>
+<text class="s mono tm" x="107.8" y="226" text-anchor="start">...................</text>
+<text class="c mono tv tm" x="257" y="226" text-anchor="start">1,179</text>
+<rect class="bg mask m9" x="295" y="217" width="40" height="13"/>
+<text class="s mono tm" x="16" y="243" text-anchor="start">reviews</text>
+<text class="s mono tm" x="68.2" y="243" text-anchor="start">.........................</text>
+<text class="c mono tv tm" x="257" y="243" text-anchor="start">389</text>
+<rect class="bg mask m10" x="280.6" y="234" width="25.6" height="13"/>
+<text class="s mono tm" x="16" y="260" text-anchor="start">issues</text>
+<text class="s mono tm" x="61.6" y="260" text-anchor="start">..........................</text>
+<text class="c mono tv tm" x="257" y="260" text-anchor="start">64</text>
+<rect class="bg mask m11" x="273.4" y="251" width="18.4" height="13"/>
+<text class="c mono ok tm" x="16" y="283" text-anchor="start">$</text>
+<text class="c mono tm" x="30.4" y="283" text-anchor="start">ghchronicle --top-repos</text>
+<text class="s mono tm" x="16" y="300" text-anchor="start">phonometry</text>
+<text class="s mono tm" x="88" y="300" text-anchor="start">......................</text>
+<text class="c mono tv tm" x="257" y="300" text-anchor="start">112</text>
+<rect class="bg mask m12" x="280.6" y="291" width="25.6" height="13"/>
+<text class="s mono tm" x="16" y="317" text-anchor="start">TFG-TFM_EPS</text>
+<text class="s mono tm" x="94.6" y="317" text-anchor="start">.....................</text>
+<text class="c mono tv tm" x="257" y="317" text-anchor="start">84</text>
+<rect class="bg mask m13" x="273.4" y="308" width="18.4" height="13"/>
+<text class="s mono tm" x="16" y="334" text-anchor="start">gitlab-mcp-server</text>
+<text class="s mono tm" x="134.2" y="334" text-anchor="start">................</text>
+<text class="c mono tv tm" x="257" y="334" text-anchor="start">33</text>
+<rect class="bg mask m14" x="273.4" y="325" width="18.4" height="13"/>
+<text class="c mono ok tm" x="16" y="357" text-anchor="start">$</text>
+<rect class="ok m15" x="30.4" y="348" width="7.2" height="12"/>
+</svg>

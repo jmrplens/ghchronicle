@@ -1,0 +1,138 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="495" height="285" viewBox="0 0 495 285" role="img" aria-labelledby="ghcTitle ghcDesc">
+<title id="ghcTitle">octocat</title>
+<desc id="ghcDesc">GitHub summary for octocat: 614 stars, 80 forks, 1200 followers, 42 public repositories, 1663 contributions in the last year. Most starred repositories: chronicle-cli with 240 stars in Go, pixel-garden with 156 stars in TypeScript, tide-tables with 97 stars in Python, hello-world with 80 stars in Go, dotfiles with 41 stars in Shell.</desc>
+<style>
+.bg{fill:#0d1117;stroke:#30363d}
+.panel{fill:#161b22}
+.t,.v,.big{fill:#e6edf3}
+.d,.l,.h,.s{fill:#8b949e}
+.n,.c{fill:#c9d1d9}
+.star,.pill-v{fill:#e3b341}
+.on-accent{fill:#0d1117}
+.line{stroke:#58a6ff}
+.area{fill:#58a6ff}
+.axis,.edge{stroke:#30363d}
+.track{fill:#30363d}
+.ok{fill:#3fb950}
+.fg{fill:#e6edf3}
+.h0{fill:#151b23}.h1{fill:#033a16}.h2{fill:#196c2e}.h3{fill:#2ea043}.h4{fill:#56d364}
+text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif}
+.mono{font-family:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace}
+.t{font-size:18px;font-weight:600}
+.d{font-size:11px}
+.v{font-size:16px;font-weight:600}
+.big{font-size:24px;font-weight:700}
+.l{font-size:11px}
+.h{font-size:10px;font-weight:600;letter-spacing:0.08em}
+.n{font-size:12px}
+.s{font-size:11px}
+.c{font-size:12px}
+.line{fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.area{fill-opacity:0.14;stroke:none}
+.axis{stroke-width:1}
+.edge{fill:none;stroke-width:1}
+.tm{font-size:12px}
+.tv{font-weight:600}
+.mask{stroke:none}
+.m0{animation:m0 9.2s steps(3) infinite}
+@keyframes m0{0%{transform:translateX(-25.6px)}3.26%,100%{transform:translateX(0px)}}
+.m1{animation:m1 9.2s steps(2) infinite}
+@keyframes m1{0%,1.09%{transform:translateX(-18.4px)}4.35%,100%{transform:translateX(0px)}}
+.m2{animation:m2 9.2s steps(5) infinite}
+@keyframes m2{0%,2.17%{transform:translateX(-40px)}5.43%,100%{transform:translateX(0px)}}
+.m3{animation:m3 9.2s steps(2) infinite}
+@keyframes m3{0%,3.26%{transform:translateX(-18.4px)}6.52%,100%{transform:translateX(0px)}}
+.m4{animation:m4 9.2s steps(5) infinite}
+@keyframes m4{0%,4.35%{transform:translateX(-40px)}7.61%,100%{transform:translateX(0px)}}
+.m5{animation:m5 9.2s steps(3) infinite}
+@keyframes m5{0%,5.43%{transform:translateX(-25.6px)}8.7%,100%{transform:translateX(0px)}}
+.m6{animation:m6 9.2s steps(3) infinite}
+@keyframes m6{0%,6.52%{transform:translateX(-25.6px)}9.78%,100%{transform:translateX(0px)}}
+.m7{animation:m7 9.2s steps(2) infinite}
+@keyframes m7{0%,7.61%{transform:translateX(-18.4px)}10.87%,100%{transform:translateX(0px)}}
+.m8{animation:m8 9.2s steps(2) infinite}
+@keyframes m8{0%,8.7%{transform:translateX(-18.4px)}11.96%,100%{transform:translateX(0px)}}
+.m9{animation:m9 9.2s steps(2) infinite}
+@keyframes m9{0%,9.78%{transform:translateX(-18.4px)}13.04%,100%{transform:translateX(0px)}}
+.m10{animation:m10 9.2s linear infinite}
+@keyframes m10{0%,15.75%{opacity:1}15.76%,18.47%{opacity:0}18.48%,21.19%{opacity:1}21.2%,23.9%{opacity:0}23.91%,100%{opacity:1}}
+@media (prefers-reduced-motion:reduce){.m0,.m1,.m2,.m3,.m4,.m5,.m6,.m7,.m8,.m9,.m10{animation:none}}
+</style>
+<rect class="bg" x="0.5" y="0.5" width="494" height="284" rx="6"/>
+<path class="panel" d="M0.5,34 V6.5 A6,6 0 0 1 6.5,0.5 H488.5 A6,6 0 0 1 494.5,6.5 V34 Z"/>
+<line class="axis" x1="0.5" y1="34.5" x2="494.5" y2="34.5"/>
+<g class="ok">
+<rect x="16" y="9" width="2.53" height="2.53" rx="0.76" opacity="0.18"/>
+<rect x="19.2" y="9" width="2.53" height="2.53" rx="0.76" opacity="0.18"/>
+<rect x="22.4" y="9" width="2.53" height="2.53" rx="0.76" opacity="0.32"/>
+<rect x="25.6" y="9" width="2.53" height="2.53" rx="0.76" opacity="0.55"/>
+<rect x="28.8" y="9" width="2.53" height="2.53" rx="0.76" opacity="1"/>
+<rect x="16" y="12.2" width="2.53" height="2.53" rx="0.76" opacity="0.18"/>
+<rect x="19.2" y="12.2" width="2.53" height="2.53" rx="0.76" opacity="0.32"/>
+<rect x="22.4" y="12.2" width="2.53" height="2.53" rx="0.76" opacity="0.55"/>
+<rect x="25.6" y="12.2" width="2.53" height="2.53" rx="0.76" opacity="1"/>
+<rect x="28.8" y="12.2" width="2.53" height="2.53" rx="0.76" opacity="0.55"/>
+<rect x="16" y="15.4" width="2.53" height="2.53" rx="0.76" opacity="0.32"/>
+<rect x="19.2" y="15.4" width="2.53" height="2.53" rx="0.76" opacity="0.55"/>
+<rect x="22.4" y="15.4" width="2.53" height="2.53" rx="0.76" opacity="1"/>
+<rect x="25.6" y="15.4" width="2.53" height="2.53" rx="0.76" opacity="0.55"/>
+<rect x="28.8" y="15.4" width="2.53" height="2.53" rx="0.76" opacity="0.32"/>
+<rect x="16" y="18.6" width="2.53" height="2.53" rx="0.76" opacity="0.55"/>
+<rect x="19.2" y="18.6" width="2.53" height="2.53" rx="0.76" opacity="1"/>
+<rect x="22.4" y="18.6" width="2.53" height="2.53" rx="0.76" opacity="0.55"/>
+<rect x="25.6" y="18.6" width="2.53" height="2.53" rx="0.76" opacity="0.32"/>
+<rect x="28.8" y="18.6" width="2.53" height="2.53" rx="0.76" opacity="0.18"/>
+<rect x="16" y="21.8" width="2.53" height="2.53" rx="0.76" opacity="1"/>
+<rect x="19.2" y="21.8" width="2.53" height="2.53" rx="0.76" opacity="0.55"/>
+<rect x="22.4" y="21.8" width="2.53" height="2.53" rx="0.76" opacity="0.32"/>
+<rect x="25.6" y="21.8" width="2.53" height="2.53" rx="0.76" opacity="0.18"/>
+<rect x="28.8" y="21.8" width="2.53" height="2.53" rx="0.76" opacity="0.18"/>
+</g>
+<text class="s" x="42" y="21" text-anchor="start">octocat</text>
+<text class="c mono ok tm" x="16" y="56" text-anchor="start">$</text>
+<text class="c mono tm" x="30.4" y="56" text-anchor="start">ghchronicle --user octocat</text>
+<text class="s mono tm" x="16" y="73" text-anchor="start">stars</text>
+<text class="s mono tm" x="55" y="73" text-anchor="start">...........................</text>
+<text class="c mono tv tm" x="257" y="73" text-anchor="start">614</text>
+<rect class="bg mask m0" x="280.6" y="64" width="25.6" height="13"/>
+<text class="s mono tm" x="16" y="90" text-anchor="start">forks</text>
+<text class="s mono tm" x="55" y="90" text-anchor="start">...........................</text>
+<text class="c mono tv tm" x="257" y="90" text-anchor="start">80</text>
+<rect class="bg mask m1" x="273.4" y="81" width="18.4" height="13"/>
+<text class="s mono tm" x="16" y="107" text-anchor="start">followers</text>
+<text class="s mono tm" x="81.4" y="107" text-anchor="start">.......................</text>
+<text class="c mono tv tm" x="257" y="107" text-anchor="start">1,200</text>
+<rect class="bg mask m2" x="295" y="98" width="40" height="13"/>
+<text class="s mono tm" x="16" y="124" text-anchor="start">repos</text>
+<text class="s mono tm" x="55" y="124" text-anchor="start">...........................</text>
+<text class="c mono tv tm" x="257" y="124" text-anchor="start">42</text>
+<rect class="bg mask m3" x="273.4" y="115" width="18.4" height="13"/>
+<text class="s mono tm" x="16" y="141" text-anchor="start">contributions</text>
+<text class="s mono tm" x="107.8" y="141" text-anchor="start">...................</text>
+<text class="c mono tv tm" x="257" y="141" text-anchor="start">1,663</text>
+<rect class="bg mask m4" x="295" y="132" width="40" height="13"/>
+<text class="c mono ok tm" x="16" y="164" text-anchor="start">$</text>
+<text class="c mono tm" x="30.4" y="164" text-anchor="start">ghchronicle --top-repos</text>
+<text class="s mono tm" x="16" y="181" text-anchor="start">chronicle-cli</text>
+<text class="s mono tm" x="107.8" y="181" text-anchor="start">...................</text>
+<text class="c mono tv tm" x="257" y="181" text-anchor="start">240</text>
+<rect class="bg mask m5" x="280.6" y="172" width="25.6" height="13"/>
+<text class="s mono tm" x="16" y="198" text-anchor="start">pixel-garden</text>
+<text class="s mono tm" x="101.2" y="198" text-anchor="start">....................</text>
+<text class="c mono tv tm" x="257" y="198" text-anchor="start">156</text>
+<rect class="bg mask m6" x="280.6" y="189" width="25.6" height="13"/>
+<text class="s mono tm" x="16" y="215" text-anchor="start">tide-tables</text>
+<text class="s mono tm" x="94.6" y="215" text-anchor="start">.....................</text>
+<text class="c mono tv tm" x="257" y="215" text-anchor="start">97</text>
+<rect class="bg mask m7" x="273.4" y="206" width="18.4" height="13"/>
+<text class="s mono tm" x="16" y="232" text-anchor="start">hello-world</text>
+<text class="s mono tm" x="94.6" y="232" text-anchor="start">.....................</text>
+<text class="c mono tv tm" x="257" y="232" text-anchor="start">80</text>
+<rect class="bg mask m8" x="273.4" y="223" width="18.4" height="13"/>
+<text class="s mono tm" x="16" y="249" text-anchor="start">dotfiles</text>
+<text class="s mono tm" x="74.8" y="249" text-anchor="start">........................</text>
+<text class="c mono tv tm" x="257" y="249" text-anchor="start">41</text>
+<rect class="bg mask m9" x="273.4" y="240" width="18.4" height="13"/>
+<text class="c mono ok tm" x="16" y="272" text-anchor="start">$</text>
+<rect class="ok m10" x="30.4" y="263" width="7.2" height="12"/>
+</svg>

@@ -1,0 +1,99 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="360" height="382" viewBox="0 0 360 382" role="img" aria-labelledby="ghcTitle ghcDesc">
+<title id="ghcTitle">A heading far too long for any band A heading far too long for any band A heading far too long for any band A heading far too long for any band </title>
+<desc id="ghcDesc">GitHub summary for an-account-login-long-enough-to-crowd-its-band: -1099511627776 repository views in the last 12345678901234567 days, -1099511627776 unique visitors in the last 12345678901234567 days, -1099511627776 clones in the last 12345678901234567 days, -1099511627776 pull requests in the last year, -1099511627776 contributions in the last year, -1099511627776 stars, -1099511627776 forks, -1099511627776 followers, -1099511627776 public repositories, -1099511627776 commits in the last year, -1099511627776 reviews in the last year, -1099511627776 issues in the last year. Languages by bytes: Go Go Go Go Go Go Go Go  36%, Python Python Python Python Python Python Python Python  29%, TypeScript TypeScript TypeScript TypeScript TypeScript TypeScript TypeScript TypeScript  21%, Shell Shell Shell Shell Shell Shell Shell Shell  14%.</desc>
+<style>
+.bg{fill:#0d1117;stroke:#3d444d}
+.panel{fill:#151b23}
+.t,.v,.big{fill:#f0f6fc}
+.d,.l,.h,.s{fill:#9198a1}
+.n,.c{fill:#f0f6fc}
+.star,.pill-v{fill:#4493f8}
+.on-accent{fill:#0d1117}
+.line{stroke:#4493f8}
+.area{fill:#4493f8}
+.axis,.edge{stroke:#3d444d}
+.track{fill:#3d444d}
+.ok{fill:#3fb950}
+.fg{fill:#f0f6fc}
+.h0{fill:#151b23}.h1{fill:#033a16}.h2{fill:#196c2e}.h3{fill:#2ea043}.h4{fill:#56d364}
+text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans',Helvetica,Arial,sans-serif}
+.mono{font-family:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace}
+.t{font-size:15px;font-weight:600}
+.d{font-size:11px}
+.v{font-size:22px;font-weight:600;font-family:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace}
+.big{font-size:20px;font-weight:600;font-family:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace}
+.l{font-size:11px}
+.h{font-size:14px;font-weight:600}
+.n{font-size:13px}
+.s{font-size:11px}
+.c{font-size:13px;font-weight:500;font-family:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace}
+.line{fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.area{fill-opacity:0.12;stroke:none}
+.axis{stroke-width:1}
+.edge{fill:none;stroke-width:1}
+.m0{animation:m0 1.28s ease-out 1;transform-box:fill-box;transform-origin:left}
+@keyframes m0{0%{transform:scaleX(0)}39.06%,100%{transform:scaleX(1)}}
+.m1{animation:m1 1.28s ease-out 1}
+@keyframes m1{0%,39.06%{opacity:0}62.5%,100%{opacity:1}}
+.m2{animation:m2 1.28s ease-out 1;transform-box:fill-box;transform-origin:left}
+@keyframes m2{0%,12.5%{transform:scaleX(0)}51.56%,100%{transform:scaleX(1)}}
+.m3{animation:m3 1.28s ease-out 1}
+@keyframes m3{0%,51.56%{opacity:0}75%,100%{opacity:1}}
+.m4{animation:m4 1.28s ease-out 1;transform-box:fill-box;transform-origin:left}
+@keyframes m4{0%,25%{transform:scaleX(0)}64.06%,100%{transform:scaleX(1)}}
+.m5{animation:m5 1.28s ease-out 1}
+@keyframes m5{0%,64.06%{opacity:0}87.5%,100%{opacity:1}}
+.m6{animation:m6 1.28s ease-out 1;transform-box:fill-box;transform-origin:left}
+@keyframes m6{0%,37.5%{transform:scaleX(0)}76.56%,100%{transform:scaleX(1)}}
+.m7{animation:m7 1.28s ease-out 1}
+@keyframes m7{0%,76.56%{opacity:0}100%{opacity:1}}
+@media (prefers-reduced-motion:reduce){.m0,.m1,.m2,.m3,.m4,.m5,.m6,.m7{animation:none}}
+</style>
+<rect class="bg" x="0.5" y="0.5" width="359" height="381" rx="6"/>
+<path class="panel" d="M0.5,44 V6.5 A6,6 0 0 1 6.5,0.5 H353.5 A6,6 0 0 1 359.5,6.5 V44 Z"/>
+<line class="axis" x1="0.5" y1="44.5" x2="359.5" y2="44.5"/>
+<rect class="edge" x="0.5" y="0.5" width="359" height="381" rx="6"/>
+<text class="d mono" x="338" y="28" text-anchor="end">@an-account-login-long-enough-to-crowd-its-band</text>
+<text class="d" x="22" y="74" text-anchor="start">Share of bytes across public repositories</text>
+<text class="n m1" x="22" y="96" text-anchor="start">Go Go Go Go Go Go Go Go </text>
+<text class="c m1" x="338" y="96" text-anchor="end">36%</text>
+<rect class="track" x="22" y="106" width="316" height="8" rx="4"/>
+<rect class="m0" x="22" y="106" width="112.86" height="8" rx="4" fill="#8b949e"/>
+<text class="n m3" x="22" y="130" text-anchor="start">Python Python Python Python Python Python…</text>
+<text class="c m3" x="338" y="130" text-anchor="end">29%</text>
+<rect class="track" x="22" y="140" width="316" height="8" rx="4"/>
+<rect class="m2" x="22" y="140" width="90.29" height="8" rx="4" fill="#8b949e"/>
+<text class="n m5" x="22" y="164" text-anchor="start">TypeScript TypeScript TypeScript TypeScrip…</text>
+<text class="c m5" x="338" y="164" text-anchor="end">21%</text>
+<rect class="track" x="22" y="174" width="316" height="8" rx="4"/>
+<rect class="m4" x="22" y="174" width="67.71" height="8" rx="4" fill="#8b949e"/>
+<text class="n m7" x="22" y="198" text-anchor="start">Shell Shell Shell Shell Shell Shell Shell Shell </text>
+<text class="c m7" x="338" y="198" text-anchor="end">14%</text>
+<rect class="track" x="22" y="208" width="316" height="8" rx="4"/>
+<rect class="m6" x="22" y="208" width="45.14" height="8" rx="4" fill="#8b949e"/>
+<line class="axis" x1="22" y1="226.5" x2="338" y2="226.5"/>
+<text class="big" x="22" y="260" text-anchor="start">-1,099…</text>
+<text class="l" x="22" y="276" text-anchor="start">Repo views /…</text>
+<text class="big" x="101" y="260" text-anchor="start">-1,099…</text>
+<text class="l" x="101" y="276" text-anchor="start">Visitors / 12…</text>
+<text class="big" x="180" y="260" text-anchor="start">-1,099…</text>
+<text class="l" x="180" y="276" text-anchor="start">Clones / 123…</text>
+<text class="big" x="259" y="260" text-anchor="start">-1,099…</text>
+<text class="l" x="259" y="276" text-anchor="start">Pull requests…</text>
+<text class="big" x="22" y="304" text-anchor="start">-1,099…</text>
+<text class="l" x="22" y="320" text-anchor="start">Contributions…</text>
+<text class="big" x="101" y="304" text-anchor="start">-1,099…</text>
+<text class="l" x="101" y="320" text-anchor="start">Stars</text>
+<text class="big" x="180" y="304" text-anchor="start">-1,099…</text>
+<text class="l" x="180" y="320" text-anchor="start">Forks</text>
+<text class="big" x="259" y="304" text-anchor="start">-1,099…</text>
+<text class="l" x="259" y="320" text-anchor="start">Followers</text>
+<text class="big" x="22" y="348" text-anchor="start">-1,099…</text>
+<text class="l" x="22" y="364" text-anchor="start">Repositories</text>
+<text class="big" x="101" y="348" text-anchor="start">-1,099…</text>
+<text class="l" x="101" y="364" text-anchor="start">Commits / yr</text>
+<text class="big" x="180" y="348" text-anchor="start">-1,099…</text>
+<text class="l" x="180" y="364" text-anchor="start">Reviews / yr</text>
+<text class="big" x="259" y="348" text-anchor="start">-1,099…</text>
+<text class="l" x="259" y="364" text-anchor="start">Issues / yr</text>
+</svg>

@@ -37,7 +37,7 @@ inputs:
     required: false
     default: ""
   card-layout:
-    description: One of the registered layouts (summary, github-stats, github-compact, badge-row, wide-banner, sparkline-hero, language-ring, repo-list, activity-heatmap, animated-counters).
+    description: One of the registered layouts (summary, github-stats, github-compact, badge-row, wide-banner, sparkline-hero, language-ring, repo-list, activity-heatmap, animated-counters, terminal, ticker, language-bars).
     required: false
     default: summary
   card-theme:

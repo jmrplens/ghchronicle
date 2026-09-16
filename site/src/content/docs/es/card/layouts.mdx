@@ -1,6 +1,6 @@
 ---
 title: Diseños
-description: Diez diseños en dos familias visuales, con lo que dibuja cada uno por omisión y cuáles se animan.
+description: Trece diseños en dos familias visuales, con lo que dibuja cada uno por omisión y cuáles se animan.
 ---
 
 import { Aside } from "@astrojs/starlight/components";
@@ -27,6 +27,9 @@ abajo son del tema oscuro; todos los diseños se dibujan también en claro, y
 | `repo-list`         | github    | no      | top_repos, stars, forks, repos                                                       |
 | `activity-heatmap`  | github    | sí      | sparkline, contributions, commits, pull_requests                                     |
 | `animated-counters` | chronicle | sí      | stars, forks, followers, repos, contributions, views, sparkline                      |
+| `terminal`          | chronicle | sí      | stars, forks, followers, repos, contributions, top_repos                             |
+| `ticker`            | chronicle | sí      | stars, forks, followers, repos, contributions, commits, views, top_repos             |
+| `language-bars`     | github    | sí      | languages                                                                            |
 
 ## Las dos familias
 
@@ -109,6 +112,38 @@ solo, asentándose en la tarjeta estática.
 
 <Card name="animated-counters" alt="El diseño animated-counters reproducido una vez: una rejilla de números grandes que cuentan sobre un sparkline de contribuciones que se dibuja, y la página también puede reproducirlo en bucle" animated loop />
 
+## terminal
+
+Una ventana de terminal con la marca del proyecto en su barra de título, una
+línea de salida por número y otra por repositorio. Los números se teclean solos,
+línea a línea, bajo una tapa pintada del color de fondo de la propia tarjeta. El
+cursor del prompt parpadea mientras eso ocurre y se queda encendido, que es el
+estado en el que descansa la tarjeta terminada.
+
+<Card name="terminal" alt="El diseño terminal reproducido una vez: una ventana de terminal con la marca del proyecto en su barra de título, cuyas líneas de salida tienen cada una un número que se teclea solo y un cursor de bloque que parpadea en el prompt de abajo, y la página también puede reproducirlo en bucle" animated loop />
+
+## ticker
+
+Una banda de píldoras, una por número y otra por repositorio, que se desplaza de
+derecha a izquierda. El contenido se repite de punta a punta y la banda avanza
+exactamente una copia, así que la imagen al final de una pasada es la imagen de
+su comienzo y el bucle no tiene salto. Reproducido una vez, hace una sola pasada
+y vuelve al inicio. La banda se desplaza a velocidad fija, así que una tarjeta
+con más contenido tarda en dar la vuelta más de lo que cualquier otro diseño
+tarda en asentarse.
+
+<Card name="ticker" alt="El diseño ticker reproducido una vez: una banda ancha de píldoras redondeadas, una por número y otra por repositorio, que se desplaza de derecha a izquierda bajo el nombre de la cuenta, y la página también puede reproducirlo en bucle" animated loop />
+
+## language-bars
+
+Una barra de ancho completo por lenguaje, cada una creciendo desde su propio
+borde izquierdo detrás de la anterior, con el nombre y el porcentaje llegando en
+cuanto su barra se detiene. Es el diseño que da a cada lenguaje una línea propia,
+donde `language-ring` los muestra todos en un donut y `github-stats` en una sola
+barra.
+
+<Card name="language-bars" alt="El diseño language-bars reproducido una vez: una barra de ancho completo por lenguaje que crece desde su borde izquierdo, una detrás de otra, con el nombre del lenguaje y su porcentaje llegando detrás de cada barra, y la página también puede reproducirlo en bucle" animated loop />
+
 <Aside type="note" title="El fotograma final es toda la tarjeta">
   La animación es CSS dentro del SVG. Por defecto se reproduce una vez y se
   asienta (ver [Movimiento](/ghchronicle/es/card/#movimiento)), y el fotograma
@@ -137,8 +172,8 @@ Solo están restringidos los tres que necesitan sitio propio:
 
 | Campo        | Lo dibujan                                                         |
 | ------------ | ------------------------------------------------------------------ |
-| `languages`  | `summary`, `github-stats`, `language-ring`                         |
-| `top_repos`  | `summary`, `github-stats`, `repo-list`                             |
+| `languages`  | `summary`, `github-stats`, `language-ring`, `language-bars`        |
+| `top_repos`  | `summary`, `github-stats`, `repo-list`, `terminal`, `ticker`       |
 | `sparkline`  | `summary`, `github-stats`, `wide-banner`, `sparkline-hero`, `activity-heatmap`, `animated-counters` |
 
 `ghchronicle -card-layouts` imprime los diseños con los campos que dibuja cada

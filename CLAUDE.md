@@ -23,7 +23,7 @@ internal/sink       Point, line protocol, eleven sink implementations, the
                     Reducer that makes gauges. The published count is ten:
                     stdout in two formats is one destination to configure,
                     which is what site/scripts/gen-stats.mjs counts
-internal/render     the SVG card: ten layouts in two families, and the accumulator sink
+internal/render     the SVG card: thirteen layouts in two families, and the accumulator sink
 internal/config     YAML with ${VAR} expansion, per-family cadences, backfill bound
 internal/run        the sweep scheduler, its state file, the backfill cooldown
 internal/grafana    the little Grafana client, and the panel run both the

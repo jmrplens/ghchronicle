@@ -162,6 +162,30 @@ var layouts = []layoutDef{
 
 		width: defaultWidth, minWidth: minWidth, draw: drawAnimatedCounters,
 	},
+	{
+		Name: "terminal", Family: "chronicle", Animated: true,
+		Description: "A terminal window with the project's mark: one line of output per number, each number typed in, and a cursor blinking at the prompt.",
+		Fields:      []string{fieldStars, fieldForks, fieldFollowers, fieldRepos, fieldContributions, fieldTopRepos},
+		Supports:    join(allNumeric, fieldTopRepos),
+
+		width: defaultWidth, minWidth: 360, draw: drawTerminal,
+	},
+	{
+		Name: "ticker", Family: "chronicle", Animated: true,
+		Description: "A band of pills, one per number and one per repository, scrolling from right to left without a seam.",
+		Fields:      []string{fieldStars, fieldForks, fieldFollowers, fieldRepos, fieldContributions, fieldCommits, fieldViews, fieldTopRepos},
+		Supports:    join(allNumeric, fieldTopRepos),
+
+		width: 800, minWidth: 400, draw: drawTicker,
+	},
+	{
+		Name: "language-bars", Family: "github", Animated: true,
+		Description: "One bar per language, each growing from its own left edge after the one above it, with the name and the share arriving behind it.",
+		Fields:      []string{fieldLanguages},
+		Supports:    join(allNumeric, fieldLanguages),
+
+		width: defaultWidth, minWidth: 360, draw: drawLanguageBars,
+	},
 }
 
 func join(base []string, more ...string) []string {

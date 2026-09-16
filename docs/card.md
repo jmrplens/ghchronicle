@@ -158,7 +158,7 @@ calling into this one. A program that wants an SVG runs the binary with
 
 ## Layouts
 
-Ten layouts in two visual families, with what each one draws by default and which of them animate.
+Thirteen layouts in two visual families, with what each one draws by default and which of them animate.
 
 Source: <https://jmrp.io/docs/ghchronicle/card/layouts/>
 
@@ -181,6 +181,9 @@ dark theme; every layout also renders light, and `auto` puts both in one file.
 | `repo-list`         | github    | no       | top_repos, stars, forks, repos                                                       |
 | `activity-heatmap`  | github    | yes      | sparkline, contributions, commits, pull_requests                                     |
 | `animated-counters` | chronicle | yes      | stars, forks, followers, repos, contributions, views, sparkline                      |
+| `terminal`          | chronicle | yes      | stars, forks, followers, repos, contributions, top_repos                             |
+| `ticker`            | chronicle | yes      | stars, forks, followers, repos, contributions, commits, views, top_repos             |
+| `language-bars`     | github    | yes      | languages                                                                            |
 
 ### The two families
 
@@ -261,6 +264,36 @@ the static card.
 
 ![The animated-counters layout played once: a grid of large numbers counting up over a contribution sparkline that draws itself, and the page can also play it in a loop](../site/src/assets/card-animated-counters.svg)
 
+### terminal
+
+A terminal window with the project's mark in its title bar, one line of output
+per number and one per repository. The numbers type themselves in, a line at a
+time, under a cover painted in the card's own background colour. The cursor at
+the prompt blinks while that is happening and settles lit, which is the state
+the finished card rests in.
+
+![The terminal layout played once: a terminal window with the project's mark in its title bar, whose lines of output each have a number typing itself in and a block cursor blinking at the prompt below them, and the page can also play it in a loop](../site/src/assets/card-terminal.svg)
+
+### ticker
+
+A band of pills, one per number and one per repository, scrolling from right to
+left. The content is repeated end to end and the band moves by exactly one copy,
+so the picture at the end of a pass is the picture at its start and the loop has
+no seam. Played once, it makes a single pass and comes back to the beginning.
+The band scrolls at a fixed speed, so a card with more in it takes longer to come
+round than any other layout takes to settle.
+
+![The ticker layout played once: a wide band of rounded pills, one per number and one per repository, scrolling from right to left under the account name, and the page can also play it in a loop](../site/src/assets/card-ticker.svg)
+
+### language-bars
+
+One full-width bar per language, each growing from its own left edge after the
+one above it, with the name and the share arriving once their own bar has
+stopped. The layout that shows the share of a language as its own line, where
+`language-ring` shows all of them in one donut and `github-stats` in one bar.
+
+![The language-bars layout played once: one full-width bar per language growing from its left edge, one after another, with the language name and its percentage arriving behind each bar, and the page can also play it in a loop](../site/src/assets/card-language-bars.svg)
+
 > **The settled frame is the whole card**
 >
 > Animation is CSS inside the SVG. By default it plays once and settles (see
@@ -289,8 +322,8 @@ Only the three that need room of their own are restricted:
 
 | Field        | Drawn by                                                          |
 | ------------ | ----------------------------------------------------------------- |
-| `languages`  | `summary`, `github-stats`, `language-ring`                        |
-| `top_repos`  | `summary`, `github-stats`, `repo-list`                            |
+| `languages`  | `summary`, `github-stats`, `language-ring`, `language-bars`       |
+| `top_repos`  | `summary`, `github-stats`, `repo-list`, `terminal`, `ticker`      |
 | `sparkline`  | `summary`, `github-stats`, `wide-banner`, `sparkline-hero`, `activity-heatmap`, `animated-counters` |
 
 `ghchronicle -card-layouts` prints the layouts with the fields each one draws

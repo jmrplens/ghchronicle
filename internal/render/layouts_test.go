@@ -14,10 +14,11 @@ import (
 	"testing"
 )
 
-func TestLayoutsRegistryHoldsTheTenConcepts(t *testing.T) {
+func TestLayoutsRegistryHoldsTheThirteenConcepts(t *testing.T) {
 	want := []string{
 		"summary", "github-stats", "github-compact", "badge-row", "wide-banner",
 		"sparkline-hero", "language-ring", "repo-list", "activity-heatmap", "animated-counters",
+		"terminal", "ticker", "language-bars",
 	}
 	got := Layouts()
 	if len(got) != len(want) {
@@ -26,6 +27,7 @@ func TestLayoutsRegistryHoldsTheTenConcepts(t *testing.T) {
 	animated := map[string]bool{
 		"github-stats": true, "wide-banner": true, "sparkline-hero": true,
 		"language-ring": true, "activity-heatmap": true, "animated-counters": true,
+		"terminal": true, "ticker": true, "language-bars": true,
 	}
 	for i, l := range got {
 		if l.Name != want[i] {
@@ -511,6 +513,225 @@ func TestGithubStatsCountsItsNumbersWithTheCountersOwnFrames(t *testing.T) {
 	if got := strings.Count(still, `class="v"`); got != len(nums) {
 		t.Errorf("under off drew %d numbers, want %d", got, len(nums))
 	}
+}
+
+// TestTheTerminalTypesEveryNumberAndSettlesOnACursor is the window's half of
+// the rule every animated card obeys. The number is written once, whole, and
+// what moves is the rectangle over it: a cover in the card's own background
+// color, resting past the end of the text where it hides nothing, so the
+// settled card is the finished line. The cursor is a block that is there
+// whatever the motion, because a card has to settle on a cursor in a state
+// somebody could point at, and blinking is a beat over it rather than the
+// thing that draws it.
+func TestTheTerminalTypesEveryNumberAndSettlesOnACursor(t *testing.T) {
+	c := sample()
+	doc := mustRender(t, c, &Options{Theme: "dark", Layout: "terminal"})
+	nums := metricsOf(c, mustLayout(t, "terminal").Fields)
+	covers := regexp.MustCompile(`<rect class="bg mask (m\d+)" `).FindAllStringSubmatch(doc, -1)
+	if want := len(nums) + len(rank(c.TopRepos, defaultMaxRepos)); len(covers) != want {
+		t.Fatalf("%d numbers type themselves in, want one per line of output, %d", len(covers), want)
+	}
+	for i, m := range covers {
+		if got := "m" + strconv.Itoa(i); m[1] != got {
+			t.Errorf("line %d types with %q, want %q: the lines take the clock in order", i, m[1], got)
+		}
+	}
+	// The cover is a plain fill. .bg is the only class that carries the card's
+	// own background color in both themes, and it is also the card's border,
+	// so the layout takes the border off it.
+	if !strings.Contains(doc, ".mask{stroke:none}") {
+		t.Error("a cover painted with .bg would draw the card's border across the line")
+	}
+	// Every number is written once and in full: the cover moves, the text does
+	// not, so a renderer that ignores animation reads the whole card.
+	for _, m := range nums {
+		if got := strings.Count(doc, ">"+grouped(m.value)+"<"); got != 1 {
+			t.Errorf("%s is written %d times, want once", m.key, got)
+		}
+	}
+	// The cursor blinks last of all, and its keyframes end lit.
+	blink := "m" + strconv.Itoa(len(covers))
+	if !strings.Contains(doc, `<rect class="ok `+blink+`"`) {
+		t.Errorf("the cursor does not play %s, the last beat there is:\n%s", blink, doc)
+	}
+	if !strings.Contains(doc, "@keyframes "+blink+"{") || !strings.Contains(doc, "100%{opacity:1}}") {
+		t.Error("the cursor must end its blink lit, which is the state the card settles in")
+	}
+
+	still := mustRender(t, c, &Options{Theme: "dark", Layout: "terminal", Motion: MotionOff})
+	if strings.Contains(still, "mask") {
+		t.Error("under off nothing types, so no cover and no rule for one is written")
+	}
+	if !strings.Contains(still, `<rect class="ok" `) {
+		t.Error("a card that does not move still rests at a prompt with a cursor on it")
+	}
+}
+
+// TestTheTerminalKeepsHalfOfEveryLineClearForTheCoverThatTypesIt pins the one
+// geometric constraint the typing puts on the layout: a cover is slid off the
+// text it hides, so a number needs as much clear room to its right as it takes
+// itself, or it would still be covered when its beat ended. The card is drawn
+// at its narrowest, where the constraint bites first.
+func TestTheTerminalKeepsHalfOfEveryLineClearForTheCoverThatTypesIt(t *testing.T) {
+	def, _ := findLayout("terminal")
+	for _, width := range []float64{float64(def.minWidth), defaultWidth, 900} {
+		col := termLayout(width)
+		right := col.valueX + 2*col.valueRoom + 3*termSlop
+		if right > width-termPad {
+			t.Errorf("at %v the cover rests at %v, past the window's own margin at %v",
+				width, right, width-termPad)
+		}
+		if col.valueRoom < monoWidth("000,000", termFont) {
+			t.Errorf("at %v a number has room for %v, less than six digits and a separator",
+				width, col.valueRoom)
+		}
+	}
+	// And the cover really is wider than the text it has to hide.
+	doc := mustRender(t, sample(), &Options{Theme: "dark", Layout: "terminal"})
+	cover := regexp.MustCompile(`<rect class="bg mask m0" x="([\d.]+)" y="[\d.]+" width="([\d.]+)"`).FindStringSubmatch(doc)
+	if cover == nil {
+		t.Fatalf("no cover on the first line:\n%s", doc)
+	}
+	x, _ := strconv.ParseFloat(cover[1], 64)
+	w, _ := strconv.ParseFloat(cover[2], 64)
+	col := termLayout(defaultWidth)
+	text := monoWidth(grouped(sample().Stars), termFont)
+	// Where the keyframes put the cover at the start of the beat, one whole
+	// width to the left of where it was drawn. It has to reach past both ends
+	// of the number by the slop the layout allows for a font it cannot measure.
+	const near = 0.01
+	if start := x - w; start > col.valueX-termSlop+near || start+w < col.valueX+text+termSlop-near {
+		t.Errorf("a cover %v wide starting at %v does not hide %v of text from %v",
+			w, start, text, col.valueX)
+	}
+}
+
+// TestTheTickerScrollsByExactlyOneCopyOfItsContent is what makes the band's
+// loop have no seam: the strip holds the same pills over and over, and the
+// beat shifts it by exactly one copy, so the picture at the end of a pass is
+// the picture at its start. It also covers what a still card is left with,
+// which is one copy and no group to move it.
+func TestTheTickerScrollsByExactlyOneCopyOfItsContent(t *testing.T) {
+	c := sample()
+	doc := mustRender(t, c, &Options{Theme: "dark", Layout: "ticker"})
+	scroll := regexp.MustCompile(`<g class="(m\d+)">`).FindStringSubmatch(doc)
+	if scroll == nil {
+		t.Fatalf("the strip is not wrapped in a group that scrolls:\n%s", doc)
+	}
+	shift := regexp.MustCompile(`100%\{transform:translateX\(-([\d.]+)px\)\}`).FindStringSubmatch(doc)
+	if shift == nil {
+		t.Fatalf("the band's keyframes do not end shifted:\n%s", doc)
+	}
+	by, _ := strconv.ParseFloat(shift[1], 64)
+	// The pills of one copy, measured the way the layout measures them.
+	var s spec
+	s.width, s.fields = 800, mustLayout(t, "ticker").Fields
+	s.nums, s.repos = metricsOf(c, s.fields), rank(c.TopRepos, defaultMaxRepos)
+	strip := 0.0
+	for _, p := range tickerPills(&s) {
+		strip += p.width + tickGap
+	}
+	// A whole number of user units, which is what keeps the seam on the pixel
+	// grid, and never less than the content it has to carry past the edge.
+	if by != math.Ceil(strip) {
+		t.Errorf("the band shifts by %v, one copy of its content rounds to %v: the seam would jump by the difference", by, math.Ceil(strip))
+	}
+	if by != math.Trunc(by) {
+		t.Errorf("the band shifts by %v, which is not a whole pixel: a browser rasterizes the seam a pixel out", by)
+	}
+	strip = math.Ceil(strip)
+	// Every pill of the first copy appears again exactly one copy further on,
+	// which is what standing in for it at the seam means.
+	first := regexp.MustCompile(`<rect class="track" x="0" `)
+	if !first.MatchString(doc) {
+		t.Errorf("the first pill does not start the strip:\n%s", doc)
+	}
+	if !strings.Contains(doc, `<rect class="track" x="`+num(strip)+`" `) {
+		t.Errorf("no pill stands one copy on at %s, so the seam has a hole", num(strip))
+	}
+	// The strip is cut off by a viewport of its own rather than by a clip path,
+	// which would be reached through url().
+	if !strings.Contains(doc, `<svg x="1" y="`+num(tickBandY)+`"`) {
+		t.Error("the band needs a viewport of its own, or the pills run over the card's border")
+	}
+
+	still := mustRender(t, c, &Options{Theme: "dark", Layout: "ticker", Motion: MotionOff})
+	if strings.Contains(still, "<g ") {
+		t.Error("under off there is no group, because there is nothing to move")
+	}
+	if got := strings.Count(still, `<rect class="track"`); got != len(tickerPills(&s)) {
+		t.Errorf("under off the band draws %d pills, want one copy of %d: the rest would never scroll in",
+			got, len(tickerPills(&s)))
+	}
+	// A band asked for nothing it has says so, and places no beat: there is
+	// no content to scroll past the edge.
+	empty := mustRender(t, &Card{Login: "someone"}, &Options{Theme: "dark", Layout: "ticker", Fields: []string{fieldTopRepos}})
+	if strings.Contains(empty, "animation") || !strings.Contains(empty, "Nothing to show") {
+		t.Errorf("an empty band must say so and place no beat:\n%s", empty)
+	}
+}
+
+// TestLanguageBarsGrowOneAfterAnotherWithTheirLabelsBehind is the reuse of the
+// growth effect this layout was added for: one bar per language, each on its
+// own beat, each growing from its own left edge, and the name and the share
+// arriving once their bar has stopped rather than standing over one that has
+// not started.
+func TestLanguageBarsGrowOneAfterAnotherWithTheirLabelsBehind(t *testing.T) {
+	c := sample()
+	doc := mustRender(t, c, &Options{Theme: "dark", Layout: "language-bars"})
+	langs := rankLanguages(c.Languages, maxLanguages)
+	bars := regexp.MustCompile(`<rect class="(m\d+)" x="22" y="[\d.]+" width=`).FindAllStringSubmatch(doc, -1)
+	if len(bars) != len(langs) {
+		t.Fatalf("%d bars grow, want one per language, %d", len(bars), len(langs))
+	}
+	for i, m := range bars {
+		// A bar and its label take two beats, so the bars are every other one.
+		want := "m" + strconv.Itoa(2*i)
+		if m[1] != want {
+			t.Errorf("bar %d plays %q, want %q: the bars take the clock in order", i, m[1], want)
+		}
+		label := "m" + strconv.Itoa(2*i+1)
+		if !strings.Contains(doc, ` class="n `+label+`"`) || !strings.Contains(doc, ` class="c `+label+`"`) {
+			t.Errorf("the name and the share of language %d do not both play %s", i, label)
+		}
+		if !strings.Contains(doc, "."+want+"{animation:"+want) ||
+			!strings.Contains(doc, "transform-box:fill-box;transform-origin:left") {
+			t.Errorf("bar %d does not grow from its own left edge", i)
+		}
+	}
+	// The label waits for its own bar: its stretch of the cycle starts where
+	// the bar's ends.
+	for i := range langs {
+		bar := keyframeStops(t, doc, "m"+strconv.Itoa(2*i))
+		label := keyframeStops(t, doc, "m"+strconv.Itoa(2*i+1))
+		if bar[1] != label[0] {
+			t.Errorf("bar %d stops growing at %s and its label started at %s", i, bar[1], label[0])
+		}
+	}
+	if strings.Contains(doc, "<g ") {
+		t.Error("a bar is one rectangle placed with x and y, so it needs no group to grow from its own edge")
+	}
+	still := mustRender(t, c, &Options{Theme: "dark", Layout: "language-bars", Motion: MotionOff})
+	if strings.Contains(still, "animation") || strings.Contains(still, `class="n m`) {
+		t.Error("under off nothing grows and nothing waits for it")
+	}
+	// A card asked for languages it has none of draws the empty track and
+	// places no beat: there is no width to grow into.
+	empty := mustRender(t, &Card{Login: "someone"}, &Options{Theme: "dark", Layout: "language-bars", Fields: []string{fieldLanguages}})
+	if strings.Contains(empty, "animation") {
+		t.Errorf("a card with no language to show must place no beat:\n%s", empty)
+	}
+}
+
+// keyframeStops is the percentage a class's effect starts and ends at, read
+// off the two stops of its keyframe block.
+func keyframeStops(t *testing.T, doc, name string) [2]string {
+	t.Helper()
+	m := regexp.MustCompile(`@keyframes ` + name + `\{[\d.]*%?,?([\d.]+)%\{[a-z-]+:[^}]*\}([\d.]+)%`).FindStringSubmatch(doc)
+	if m == nil {
+		t.Fatalf("no readable keyframes for %s in:\n%s", name, doc)
+	}
+	return [2]string{m[1], m[2]}
 }
 
 // mustLayout is one registered layout, by name.

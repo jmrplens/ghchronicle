@@ -40,7 +40,7 @@ account's own figures](site/src/assets/dashboards/overview.png)
 
 ## What it renders
 
-A profile card, from the same sweep, in ten layouts and two families. The
+A profile card, from the same sweep, in thirteen layouts and two families. The
 animated ones animate where the reader's browser lets them. Each card
 here is two files from one sweep, one per palette, and GitHub shows the one
 that matches the theme you read it in:
@@ -55,7 +55,7 @@ that matches the theme you read it in:
 ghchronicle -config config.yaml -card card.svg -card-layout animated-counters -card-theme both
 ```
 
-[The ten layouts](https://jmrp.io/docs/ghchronicle/card/layouts/), with what
+[The thirteen layouts](https://jmrp.io/docs/ghchronicle/card/layouts/), with what
 each one draws and how to put one in a profile README.
 
 ## Documentation
@@ -222,7 +222,7 @@ ghchronicle -config config.yaml -card profile.svg -card-only
 
 One sweep, one self-contained SVG: no webfont, no external stylesheet, no
 script, and byte-identical output for the same input so a scheduled job that
-commits it does not produce a diff on every run. Ten layouts in two visual
+commits it does not produce a diff on every run. Thirteen layouts in two visual
 families, one of them GitHub's own look, the animated ones playing once or in a
 loop, all with a choosable set of fields. The repository ships as a composite
 Action:

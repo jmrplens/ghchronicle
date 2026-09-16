@@ -28,7 +28,7 @@ ghchronicle -config /etc/ghchronicle/config.yaml
 | `-card-only`      | off           | With `-card`, write the SVG and nothing else: no sink is needed, none is written to, and the state file is left as it was                  |
 | `-card-theme`     | `auto`        | `dark`, `light`, `auto`, or `both`: the light card at `-card` and the dark one beside it with `_dark` before the extension, from one sweep |
 | `-card-motion`    | `once`        | `once`, `loop` or `off`; a layout that does not move ignores it                                                                            |
-| `-card-layout`    | `summary`     | Which of the ten layouts to draw                                                                                                           |
+| `-card-layout`    | `summary`     | Which of the thirteen layouts to draw                                                                                                           |
 | `-card-fields`    | none          | Comma-separated fields the card shows; empty means the layout's own default                                                                |
 | `-card-layouts`   | off           | Print the layouts with the fields each draws, then exit                                                                                    |
 

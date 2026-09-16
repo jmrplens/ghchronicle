@@ -802,6 +802,27 @@ func fit(s string, size, limit float64) string {
 	return ""
 }
 
+// monoFit is fit for text set in the monospace stack, measured at the one
+// advance every glyph of it has. A number is mostly digits and separators,
+// which runeWidth puts at 0.56 and 0.30 of the size, so measuring it the
+// proportional way makes it up to a sixth narrower than it is drawn, and a
+// column sized from that measurement is a column the text runs out of.
+func monoFit(s string, size, limit float64) string {
+	if limit <= 0 {
+		return ""
+	}
+	if monoWidth(s, size) <= limit {
+		return s
+	}
+	runes := []rune(s)
+	for i := len(runes); i > 0; i-- {
+		if monoWidth(string(runes[:i])+"…", size) <= limit {
+			return strings.TrimRight(string(runes[:i]), " ") + "…"
+		}
+	}
+	return ""
+}
+
 // textWidth approximates a rendered width. There is no font here to measure
 // against, and the alternative to an approximation is text that overlaps the
 // column next to it.

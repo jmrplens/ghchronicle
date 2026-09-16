@@ -416,7 +416,7 @@ it downloads a release binary and calls it.
 | `mode`            | `once`               | `once`, `backfill` or `card`                                                                                      |
 | `backfill-since`  | `""`                 | Bound for `backfill`: a date, `90d`, `2y` or a Go duration. Empty means no bound                                  |
 | `card`            | `""`                 | Path of the SVG to write. Empty means no card                                                                     |
-| `card-layout`     | `summary`            | One of the ten registered layouts                                                                                 |
+| `card-layout`     | `summary`            | One of the thirteen registered layouts                                                                                 |
 | `card-theme`      | `auto`               | `dark`, `light`, `auto`, or `both` for a light card and its `_dark` twin                                          |
 | `card-fields`     | `""`                 | Comma-separated fields. Empty means the layout's default                                                          |
 | `card-motion`     | `once`               | `once`, `loop` or `off`, for the animated layouts                                                                 |

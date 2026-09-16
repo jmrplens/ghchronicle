@@ -176,6 +176,82 @@ func TestAGrowingBarRestsAtFullWidthBetweenTheLapsOfALoop(t *testing.T) {
 	}
 }
 
+// TestACoverTypesTextInAndSettlesWhereItWasDrawn covers the effect the
+// terminal window is built on: the cover starts one width to the left, over
+// the text, and ends untranslated, where the layout drew it and where it hides
+// nothing. The steps are the beat's easing, one per character, which is what
+// makes the text arrive a character at a time.
+func TestACoverTypesTextInAndSettlesWhereItWasDrawn(t *testing.T) {
+	tl := newTimeline(MotionOnce)
+	tl.addShift(effectType, 0, 0.5, "steps(3)", 21.6)
+	css := tl.css()
+	for _, want := range []string{
+		".m0{animation:m0 0.5s steps(3) 1}",
+		"@keyframes m0{0%{transform:translateX(-21.6px)}100%{transform:translateX(0px)}}",
+	} {
+		if !strings.Contains(css, want) {
+			t.Errorf("css lacks %q:\n%s", want, css)
+		}
+	}
+	// It translates, so it needs neither a box to measure against nor an edge
+	// to work from: a px on an SVG element is a user unit wherever it sits.
+	if strings.Contains(css, "transform-box") {
+		t.Errorf("a translation needs no transform box:\n%s", css)
+	}
+}
+
+// TestABandSlidesByOneCopyAndHoldsThere is the effect the ticker scrolls with,
+// and the half of it a loop needs: the band holds the shift it reached for the
+// rest of the cycle instead of snapping back and waiting at the start.
+func TestABandSlidesByOneCopyAndHoldsThere(t *testing.T) {
+	once := newTimeline(MotionOnce)
+	once.addShift(effectSlide, 0, 4, "linear", 500)
+	if want := "@keyframes m0{0%{transform:translateX(0px)}100%{transform:translateX(-500px)}}"; !strings.Contains(once.css(), want) {
+		t.Errorf("css lacks %q:\n%s", want, once.css())
+	}
+	loop := newTimeline(MotionLoop)
+	loop.addShift(effectSlide, 0, 4, "linear", 500)
+	for _, want := range []string{
+		".m0{animation:m0 11s linear infinite}",
+		"@keyframes m0{0%{transform:translateX(0px)}36.36%,100%{transform:translateX(-500px)}}",
+	} {
+		if !strings.Contains(loop.css(), want) {
+			t.Errorf("css lacks %q:\n%s", want, loop.css())
+		}
+	}
+}
+
+// TestACursorBlinksThroughItsBeatAndEndsLit is what makes the terminal a card
+// that settles: the one effect here with no natural end blinks a whole number
+// of times inside its beat, is lit before it and is lit from its end to the
+// end of the cycle, so the still card has a cursor in a state a reader could
+// point at rather than half a one.
+func TestACursorBlinksThroughItsBeatAndEndsLit(t *testing.T) {
+	tl := newTimeline(MotionOnce)
+	tl.add(effectBlink, 0, 1, "linear")
+	css := tl.css()
+	// One second is two blinks at blinkPeriod: lit, dark, lit, dark, lit.
+	want := "@keyframes m0{0%,24.99%{opacity:1}25%,49.99%{opacity:0}50%,74.99%{opacity:1}75%,99.99%{opacity:0}100%{opacity:1}}"
+	if !strings.Contains(css, want) {
+		t.Errorf("css lacks %q:\n%s", want, css)
+	}
+	if !strings.HasSuffix(strings.TrimSpace(strings.Split(css, "@media")[0]), "100%{opacity:1}}") {
+		t.Errorf("a blink must end lit:\n%s", css)
+	}
+	// A beat shorter than one blink still blinks once rather than not at all.
+	short := newTimeline(MotionOnce)
+	short.add(effectBlink, 0, 0.1, "linear")
+	if got := strings.Count(short.css(), "{opacity:0}"); got != 1 {
+		t.Errorf("a beat too short for a whole blink went dark %d times, want once:\n%s", got, short.css())
+	}
+	// And under a loop the cursor is lit through the rest between laps.
+	rest := newTimeline(MotionLoop)
+	rest.add(effectBlink, 0, 1, "linear")
+	if !strings.Contains(rest.css(), "12.5%,100%{opacity:1}") {
+		t.Errorf("the cursor must stay lit through a loop's rest:\n%s", rest.css())
+	}
+}
+
 func TestClassesSkipsTheEmptyParts(t *testing.T) {
 	if got := classes("big", "", "cuz", ""); got != "big cuz" {
 		t.Errorf("classes = %q, want %q", got, "big cuz")

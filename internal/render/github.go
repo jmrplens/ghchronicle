@@ -14,17 +14,26 @@ const (
 	ghBand = 50.0
 )
 
-// githubFrame paints the card, the band and the border. The band is a path
-// with rounded top corners rather than a clipped rectangle: a clip-path is
-// referenced by url(), and this document references nothing.
+// githubFrame paints the card, the band and the border.
 func githubFrame(b *strings.Builder, width, height, band float64) {
 	cardBG(b, width, height)
+	topBand(b, width, band)
+	fmt.Fprintf(b, `<rect class="edge" x="0.5" y="0.5" width="%s" height="%s" rx="6"/>`+"\n",
+		num(width-1), num(height-1))
+}
+
+// topBand is the tinted strip across the top of a card, with a hairline under
+// it. Its top corners are rounded to the card's own radius, and it is a path
+// rather than a clipped rectangle: a clip-path is referenced by url(), and
+// this document references nothing.
+//
+// The github family frames every card with one. The terminal layout, which is
+// not of that family, uses the same shape for a window's title bar.
+func topBand(b *strings.Builder, width, band float64) {
 	fmt.Fprintf(b, `<path class="panel" d="M0.5,%s V6.5 A6,6 0 0 1 6.5,0.5 H%s A6,6 0 0 1 %s,6.5 V%s Z"/>`+"\n",
 		num(band), num(width-6.5), num(width-0.5), num(band))
 	fmt.Fprintf(b, `<line class="axis" x1="0.5" y1="%s" x2="%s" y2="%s"/>`+"\n",
 		num(band+0.5), num(width-0.5), num(band+0.5))
-	fmt.Fprintf(b, `<rect class="edge" x="0.5" y="0.5" width="%s" height="%s" rx="6"/>`+"\n",
-		num(width-1), num(height-1))
 }
 
 // githubHeader writes the band's title on the left and the login on the

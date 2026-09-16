@@ -3,6 +3,7 @@ package render
 import (
 	"errors"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 )
@@ -56,13 +57,40 @@ const (
 	// element would grow from the wrong place. An element that has to be
 	// placed goes inside a group, and the class goes on the group.
 	effectGrowX
+	// effectType reveals text left to right, the way a terminal types it. It
+	// goes not on the text but on a rectangle painted in the color of
+	// whatever is behind it, drawn just past the end of the text and covering
+	// nothing at all: that is the base state, the finished line. The
+	// keyframes start the rectangle one shift to the left, where it covers
+	// the text whole, and walk it back to where it was drawn.
+	//
+	// A rectangle that moves rather than a clipPath that grows, because the
+	// width of a clipPath is not animatable by CSS in every engine, and
+	// because a clip-path is referenced by url() and this document
+	// references nothing. The steps are the beat's easing, steps(n), so the
+	// text arrives a character at a time instead of sliding out.
+	effectType
+	// effectSlide moves an element left by the distance the beat carries and
+	// leaves it there. A band whose content is repeated end to end uses it to
+	// scroll: shifted by exactly one copy, the next copy stands where the
+	// last one did, so the end of the beat and its start are the same
+	// picture and the base state, untranslated, is one of them.
+	effectSlide
+	// effectBlink is the terminal cursor: lit for half of each blinkPeriod,
+	// dark for the other half, for as long as the beat lasts, and lit again
+	// when it ends. Base: lit, which is what a still card shows and the one
+	// state a cursor can settle in.
+	effectBlink
 )
 
-// beat is one effect placed on the card's clock, in seconds.
+// beat is one effect placed on the card's clock, in seconds. shift is how far
+// the two effects that translate move, in user units; every other effect
+// leaves it at zero.
 type beat struct {
 	effect     effect
 	start, dur float64
 	ease       string
+	shift      float64
 }
 
 // timeline is every beat a card plays, on one clock. All of them share the
@@ -85,10 +113,21 @@ func newTimeline(motion string) *timeline {
 // The class is "" when the card does not move, so a layout can pass it
 // through classes() without asking.
 func (t *timeline) add(e effect, start, dur float64, ease string) string {
+	return t.addShift(e, start, dur, ease, 0)
+}
+
+// addShift is add for the two effects that translate, which need a distance
+// the engine cannot work out for itself: how wide the number a rectangle
+// types is, how wide one copy of a band that repeats. In user units, and
+// always leftwards, which is the only direction either effect moves.
+//
+// A second constructor rather than a fifth argument on add, so the twelve
+// calls that move nothing are not all made to say so.
+func (t *timeline) addShift(e effect, start, dur float64, ease string, shift float64) string {
 	if !t.moving() {
 		return ""
 	}
-	t.beats = append(t.beats, beat{effect: e, start: start, dur: dur, ease: ease})
+	t.beats = append(t.beats, beat{effect: e, start: start, dur: dur, ease: ease, shift: shift})
 	return "m" + strconv.Itoa(len(t.beats)-1)
 }
 
@@ -157,9 +196,56 @@ func keyframes(bt beat, cycle float64) string {
 		return s + stops(from, to-0.01) + shown + stops(to, 100) + hidden
 	case effectGrowX:
 		return stops(0, from) + "{transform:scaleX(0)}" + stops(to, 100) + "{transform:scaleX(1)}"
+	case effectType:
+		return stops(0, from) + "{transform:" + shiftedBy(-bt.shift) + "}" +
+			stops(to, 100) + "{transform:" + shiftedBy(0) + "}"
+	case effectSlide:
+		return stops(0, from) + "{transform:" + shiftedBy(0) + "}" +
+			stops(to, 100) + "{transform:" + shiftedBy(-bt.shift) + "}"
+	case effectBlink:
+		return blinkFrames(from, to, bt.dur)
 	default: // effectFade
 		return stops(0, from) + hidden + stops(to, 100) + shown
 	}
+}
+
+// shiftedBy writes one horizontal translation. The unit is px because a CSS
+// transform takes no bare number, and px on an SVG element is one user unit,
+// which is what every other coordinate in this document is written in.
+func shiftedBy(by float64) string {
+	return "translateX(" + num(by) + "px)"
+}
+
+// blinkPeriod is one blink of the cursor, in seconds: lit for the first half
+// of it and dark for the second, which is the cadence a terminal has.
+const blinkPeriod = 0.5
+
+// blinkFrames is the square wave between two percentages of the cycle: the
+// cursor lit before the beat, blinking through the beat's dur seconds and lit
+// from its end to the end of the cycle, so the card settles on a cursor that
+// is there. A beat too short for one whole blink still gets one.
+//
+// Written stop by stop rather than with a steps() easing, because the effect
+// has to end lit whatever the beat's length works out to, and an easing is
+// one function over the whole animation, including the stretches where the
+// cursor only waits.
+func blinkFrames(from, to, dur float64) string {
+	const dark, lit = "{opacity:0}", "{opacity:1}"
+	blinks := max(int(math.Round(dur/blinkPeriod)), 1)
+	period := (to - from) / float64(blinks)
+	var b strings.Builder
+	b.WriteString(stops(0, from+period/2-0.01) + lit)
+	for i := range blinks {
+		off := from + float64(i)*period + period/2
+		on := off + period/2
+		end := on + period/2 - 0.01
+		if i == blinks-1 {
+			end = 100
+		}
+		b.WriteString(stops(off, on-0.01) + dark)
+		b.WriteString(stops(on, end) + lit)
+	}
+	return b.String()
 }
 
 // anchorCSS is what a class needs beyond its animation before its effect has

@@ -1,0 +1,147 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="94" viewBox="0 0 400 94" role="img" aria-labelledby="ghcTitle ghcDesc">
+<title id="ghcTitle">José M. Requena Plens</title>
+<desc id="ghcDesc">GitHub summary for jmrplens: 283 stars, 70 forks, 41 followers, 42 public repositories, 6210 contributions in the last year, 1810 repository views in the last 14 days, 878 unique visitors in the last 14 days, 117000 clones in the last 14 days, 3387 commits in the last year, 1179 pull requests in the last year, 389 reviews in the last year, 64 issues in the last year. Most starred repositories: phonometry with 112 stars in Python, TFG-TFM_EPS with 84 stars in TeX, gitlab-mcp-server with 33 stars in Go.</desc>
+<style>
+.bg{fill:#0d1117;stroke:#30363d}
+.panel{fill:#161b22}
+.t,.v,.big{fill:#e6edf3}
+.d,.l,.h,.s{fill:#8b949e}
+.n,.c{fill:#c9d1d9}
+.star,.pill-v{fill:#e3b341}
+.on-accent{fill:#0d1117}
+.line{stroke:#58a6ff}
+.area{fill:#58a6ff}
+.axis,.edge{stroke:#30363d}
+.track{fill:#30363d}
+.ok{fill:#3fb950}
+.fg{fill:#e6edf3}
+.h0{fill:#151b23}.h1{fill:#033a16}.h2{fill:#196c2e}.h3{fill:#2ea043}.h4{fill:#56d364}
+text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif}
+.mono{font-family:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace}
+.t{font-size:18px;font-weight:600}
+.d{font-size:11px}
+.v{font-size:16px;font-weight:600}
+.big{font-size:24px;font-weight:700}
+.l{font-size:11px}
+.h{font-size:10px;font-weight:600;letter-spacing:0.08em}
+.n{font-size:12px}
+.s{font-size:11px}
+.c{font-size:12px}
+.line{fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.area{fill-opacity:0.14;stroke:none}
+.axis{stroke-width:1}
+.edge{fill:none;stroke-width:1}
+.m0{animation:m0 11.75s linear 1}
+@keyframes m0{0%{transform:translateX(0px)}100%{transform:translateX(-1645px)}}
+@media (prefers-reduced-motion:reduce){.m0{animation:none}}
+</style>
+<rect class="bg" x="0.5" y="0.5" width="399" height="93" rx="6"/>
+<text class="t" x="25" y="30" text-anchor="start">José M. Requena Plens</text>
+<text class="s" x="375" y="30" text-anchor="end">@jmrplens</text>
+<svg x="1" y="46" width="398" height="34">
+<g class="m0">
+<rect class="track" x="0" y="5" width="75.35" height="24" rx="12"/>
+<text class="c mono" x="12" y="21" text-anchor="start">283</text>
+<text class="s" x="38.6" y="21" text-anchor="start">stars</text>
+<rect class="track" x="85.35" y="5" width="68.15" height="24" rx="12"/>
+<text class="c mono" x="97.35" y="21" text-anchor="start">70</text>
+<text class="s" x="116.75" y="21" text-anchor="start">forks</text>
+<rect class="track" x="163.5" y="5" width="86.85" height="24" rx="12"/>
+<text class="c mono" x="175.5" y="21" text-anchor="start">41</text>
+<text class="s" x="194.9" y="21" text-anchor="start">followers</text>
+<rect class="track" x="260.35" y="5" width="70.9" height="24" rx="12"/>
+<text class="c mono" x="272.35" y="21" text-anchor="start">42</text>
+<text class="s" x="291.75" y="21" text-anchor="start">repos</text>
+<rect class="track" x="341.25" y="5" width="97.95" height="24" rx="12"/>
+<text class="c mono" x="353.25" y="21" text-anchor="start">6.2k</text>
+<text class="s" x="387.05" y="21" text-anchor="start">contribs</text>
+<rect class="track" x="449.2" y="5" width="85.3" height="24" rx="12"/>
+<text class="c mono" x="461.2" y="21" text-anchor="start">1.8k</text>
+<text class="s" x="495" y="21" text-anchor="start">views</text>
+<rect class="track" x="544.5" y="5" width="88" height="24" rx="12"/>
+<text class="c mono" x="556.5" y="21" text-anchor="start">878</text>
+<text class="s" x="583.1" y="21" text-anchor="start">visitors</text>
+<rect class="track" x="642.5" y="5" width="91.35" height="24" rx="12"/>
+<text class="c mono" x="654.5" y="21" text-anchor="start">117k</text>
+<text class="s" x="688.3" y="21" text-anchor="start">clones</text>
+<rect class="track" x="743.85" y="5" width="102.35" height="24" rx="12"/>
+<text class="c mono" x="755.85" y="21" text-anchor="start">3.4k</text>
+<text class="s" x="789.65" y="21" text-anchor="start">commits</text>
+<rect class="track" x="856.2" y="5" width="78.81" height="24" rx="12"/>
+<text class="c mono" x="868.2" y="21" text-anchor="start">1.2k</text>
+<text class="s" x="902" y="21" text-anchor="start">PRs</text>
+<rect class="track" x="945.01" y="5" width="87.45" height="24" rx="12"/>
+<text class="c mono" x="957.01" y="21" text-anchor="start">389</text>
+<text class="s" x="983.61" y="21" text-anchor="start">reviews</text>
+<rect class="track" x="1042.46" y="5" width="76.95" height="24" rx="12"/>
+<text class="c mono" x="1054.46" y="21" text-anchor="start">64</text>
+<text class="s" x="1073.86" y="21" text-anchor="start">issues</text>
+<rect class="track" x="1129.41" y="5" width="145.8" height="24" rx="12"/>
+<circle cx="1145.41" cy="17" r="4" fill="#3572a5"/>
+<text class="n" x="1155.41" y="21" text-anchor="start">phonometry</text>
+<path class="star" transform="translate(1227.61 11) scale(0.7)" d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z"/>
+<text class="c mono" x="1241.61" y="21" text-anchor="start">112</text>
+<rect class="track" x="1285.21" y="5" width="163.68" height="24" rx="12"/>
+<circle cx="1301.21" cy="17" r="4" fill="#3d6117"/>
+<text class="n" x="1311.21" y="21" text-anchor="start">TFG-TFM_EPS</text>
+<path class="star" transform="translate(1408.49 11) scale(0.7)" d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z"/>
+<text class="c mono" x="1422.49" y="21" text-anchor="start">84</text>
+<rect class="track" x="1458.89" y="5" width="175.8" height="24" rx="12"/>
+<circle cx="1474.89" cy="17" r="4" fill="#00add8"/>
+<text class="n" x="1484.89" y="21" text-anchor="start">gitlab-mcp-server</text>
+<path class="star" transform="translate(1594.29 11) scale(0.7)" d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z"/>
+<text class="c mono" x="1608.29" y="21" text-anchor="start">33</text>
+<rect class="track" x="1645" y="5" width="75.35" height="24" rx="12"/>
+<text class="c mono" x="1657" y="21" text-anchor="start">283</text>
+<text class="s" x="1683.6" y="21" text-anchor="start">stars</text>
+<rect class="track" x="1730.35" y="5" width="68.15" height="24" rx="12"/>
+<text class="c mono" x="1742.35" y="21" text-anchor="start">70</text>
+<text class="s" x="1761.75" y="21" text-anchor="start">forks</text>
+<rect class="track" x="1808.5" y="5" width="86.85" height="24" rx="12"/>
+<text class="c mono" x="1820.5" y="21" text-anchor="start">41</text>
+<text class="s" x="1839.9" y="21" text-anchor="start">followers</text>
+<rect class="track" x="1905.35" y="5" width="70.9" height="24" rx="12"/>
+<text class="c mono" x="1917.35" y="21" text-anchor="start">42</text>
+<text class="s" x="1936.75" y="21" text-anchor="start">repos</text>
+<rect class="track" x="1986.25" y="5" width="97.95" height="24" rx="12"/>
+<text class="c mono" x="1998.25" y="21" text-anchor="start">6.2k</text>
+<text class="s" x="2032.05" y="21" text-anchor="start">contribs</text>
+<rect class="track" x="2094.2" y="5" width="85.3" height="24" rx="12"/>
+<text class="c mono" x="2106.2" y="21" text-anchor="start">1.8k</text>
+<text class="s" x="2140" y="21" text-anchor="start">views</text>
+<rect class="track" x="2189.5" y="5" width="88" height="24" rx="12"/>
+<text class="c mono" x="2201.5" y="21" text-anchor="start">878</text>
+<text class="s" x="2228.1" y="21" text-anchor="start">visitors</text>
+<rect class="track" x="2287.5" y="5" width="91.35" height="24" rx="12"/>
+<text class="c mono" x="2299.5" y="21" text-anchor="start">117k</text>
+<text class="s" x="2333.3" y="21" text-anchor="start">clones</text>
+<rect class="track" x="2388.85" y="5" width="102.35" height="24" rx="12"/>
+<text class="c mono" x="2400.85" y="21" text-anchor="start">3.4k</text>
+<text class="s" x="2434.65" y="21" text-anchor="start">commits</text>
+<rect class="track" x="2501.2" y="5" width="78.81" height="24" rx="12"/>
+<text class="c mono" x="2513.2" y="21" text-anchor="start">1.2k</text>
+<text class="s" x="2547" y="21" text-anchor="start">PRs</text>
+<rect class="track" x="2590.01" y="5" width="87.45" height="24" rx="12"/>
+<text class="c mono" x="2602.01" y="21" text-anchor="start">389</text>
+<text class="s" x="2628.61" y="21" text-anchor="start">reviews</text>
+<rect class="track" x="2687.46" y="5" width="76.95" height="24" rx="12"/>
+<text class="c mono" x="2699.46" y="21" text-anchor="start">64</text>
+<text class="s" x="2718.86" y="21" text-anchor="start">issues</text>
+<rect class="track" x="2774.41" y="5" width="145.8" height="24" rx="12"/>
+<circle cx="2790.41" cy="17" r="4" fill="#3572a5"/>
+<text class="n" x="2800.41" y="21" text-anchor="start">phonometry</text>
+<path class="star" transform="translate(2872.61 11) scale(0.7)" d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z"/>
+<text class="c mono" x="2886.61" y="21" text-anchor="start">112</text>
+<rect class="track" x="2930.21" y="5" width="163.68" height="24" rx="12"/>
+<circle cx="2946.21" cy="17" r="4" fill="#3d6117"/>
+<text class="n" x="2956.21" y="21" text-anchor="start">TFG-TFM_EPS</text>
+<path class="star" transform="translate(3053.49 11) scale(0.7)" d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z"/>
+<text class="c mono" x="3067.49" y="21" text-anchor="start">84</text>
+<rect class="track" x="3103.89" y="5" width="175.8" height="24" rx="12"/>
+<circle cx="3119.89" cy="17" r="4" fill="#00add8"/>
+<text class="n" x="3129.89" y="21" text-anchor="start">gitlab-mcp-server</text>
+<path class="star" transform="translate(3239.29 11) scale(0.7)" d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z"/>
+<text class="c mono" x="3253.29" y="21" text-anchor="start">33</text>
+</g>
+</svg>
+</svg>
