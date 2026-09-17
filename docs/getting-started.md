@@ -156,11 +156,15 @@ printing the points to the terminal first.
 
 Three things happen once, and they are why the first run is the expensive one.
 
-| Once                                                                                                        | Then                                                      |
-| ----------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
-| The whole stargazer list is walked, page by page, so every star carries the date it was given               | The newest hundred of every repository ride in one GraphQL query per ten of them |
-| A month of workflow runs, so a fresh install does not chart a CI history that begins fifteen minutes ago    | Twice the cadence, and never less than two hours          |
-| Every year's contribution calendar, if `every.history` is set, back to the day the account was created      | Only the year in progress, rewritten at its cadence       |
+- The whole stargazer list is walked, page by page, so every star carries the
+  date it was given. After that, the newest hundred of every repository ride in
+  one GraphQL query per ten of them.
+- A month of workflow runs, so a fresh install does not chart a CI history that
+  begins fifteen minutes ago. After that, twice the cadence, and never less
+  than two hours.
+- Every year's contribution calendar, if `every.history` is set, back to the
+  day the account was created. After that, only the year in progress, rewritten
+  at its cadence.
 
 Expect a few thousand points from a first sweep of twenty repositories, and a
 few hundred from each one after.

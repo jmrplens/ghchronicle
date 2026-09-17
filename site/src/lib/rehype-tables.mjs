@@ -165,15 +165,18 @@ import { localeOf, routeOf } from "./site.mjs";
  *    cards would carry the same title while the cell that tells them apart,
  *    the family, sat below it in body type. A column with a duplicate in it
  *    is not an identifier, and no cell of that table is marked.
- *  - a page can also say so itself, in `plainTables`, by the heading of the
- *    first column, for a table whose first cell is a sentence that happens to
- *    contain a code span: configuration/index.mdx's `Remembers` and `Message`
- *    tables, whose first cells are "`last_head`, the commit each repository
- *    was on ..." and a whole validation message. `:has(code)` cannot tell
- *    those from `-card <path>` or from an install command, both of which are
- *    genuine names with a space in them, so the judgement is the page's, the
- *    way it already is for an index. A name matching no table on the page is
- *    an error, for the reason a bad compactTables entry is.
+ *
+ * There used to be a third case, `plainTables`: a page could name a table
+ * whose first cell is a sentence that happens to contain a code span, which
+ * `:has(code)` cannot tell from `-card <path>` or from an install command,
+ * both of which are genuine names with a space in them. Its only two subjects
+ * were configuration/index.mdx's `Remembers` and `Message` tables. `Remembers`
+ * is prose now, its rows being remarks rather than data, and `Message` is
+ * declared compact, a form that gives every first cell the title size on
+ * purpose and never asks this function. The key was left declared by nothing,
+ * which is a judgement channel with no judgements in it, so it went the way
+ * the index row linking went before it rather than staying behind, empty, to
+ * be believed. A page that needs it again brings it back with its subject.
  *
  * WHERE A NAME MAY BREAK. Stacked, `td code` carries `overflow-wrap: anywhere`
  * (styles/tables.css), which is what keeps a sixty-character path inside a
@@ -325,18 +328,6 @@ function defaultColumnsOf(file) {
 				default: String(entry.default),
 			}))
 		: [];
-}
-
-/**
- * The first-column headings a page declared as plain: tables whose first cell
- * is not the row's name.
- *
- * @param {any} file the vfile rehype passes through
- * @returns {string[]}
- */
-function plainTablesOf(file) {
-	const declared = file?.data?.astro?.frontmatter?.plainTables;
-	return Array.isArray(declared) ? declared.map(String) : [];
 }
 
 /**
@@ -529,8 +520,6 @@ export default function rehypeTables() {
 	 *   compactFound: Set<string>,
 	 *   defaults: Map<string, string>,
 	 *   defaultsFound: Set<string>,
-	 *   plain: Set<string>,
-	 *   plainFound: Set<string>,
 	 *   path: string,
 	 * }} page
 	 */
@@ -543,9 +532,7 @@ export default function rehypeTables() {
 			prepare(child, columns);
 			const compact = columns.length > 0 && page.compact.has(columns[0]);
 			if (compact) page.compactFound.add(columns[0]);
-			const plain = columns.length > 0 && page.plain.has(columns[0]);
-			if (plain) page.plainFound.add(columns[0]);
-			else markIdentities(child);
+			markIdentities(child);
 			const defaultHeading =
 				columns.length > 0 ? page.defaults.get(columns[0]) : undefined;
 			let defaultColumn = false;
@@ -622,8 +609,6 @@ export default function rehypeTables() {
 				defaultEntries.map((entry) => [entry.table, entry.default]),
 			),
 			defaultsFound: new Set(),
-			plain: new Set(plainTablesOf(file)),
-			plainFound: new Set(),
 			path: file?.path ?? "a page",
 		};
 		walk(tree, page);
@@ -644,17 +629,6 @@ export default function rehypeTables() {
 		if (missingDefaults.length) {
 			throw new Error(
 				`${page.path}: defaultColumns names ${missingDefaults
-					.map((name) => `"${name}"`)
-					.join(", ")}, and no table on the page has that first column. ` +
-					"Rename the entry to the table's first heading, or remove it.",
-			);
-		}
-		const missingPlain = [...page.plain].filter(
-			(name) => !page.plainFound.has(name),
-		);
-		if (missingPlain.length) {
-			throw new Error(
-				`${page.path}: plainTables names ${missingPlain
 					.map((name) => `"${name}"`)
 					.join(", ")}, and no table on the page has that first column. ` +
 					"Rename the entry to the table's first heading, or remove it.",

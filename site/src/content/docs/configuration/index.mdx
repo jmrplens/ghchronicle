@@ -4,8 +4,7 @@ description: One YAML file, every value expandable from the environment, and wha
 defaultColumns:
   - table: Key
     default: Default
-plainTables:
-  - Remembers
+compactTables:
   - Message
 ---
 
@@ -93,14 +92,20 @@ state_file: /var/lib/ghchronicle/state.json
 
 Six things, and deleting the file costs a different one for each:
 
-| Remembers                                                                              | Deleting it costs                                                              |
-| -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| `last_run`, when each family last ran                                                  | every family is due at once, so the next sweep is a full one                    |
-| `first_saw`, when each repository was first seen                                       | the one-off full walk of the star history is done again                         |
-| `last_head`, the commit each repository was on when the dependency diff last ran       | the dependency changes in the gap: the next sweep has the photograph and no diff |
-| `last_full`, when each family that normally reads what changed last read a whole page  | absent reads as due, so the next sweep reads them all whole                     |
-| `last_notified`, where the inbox window was cut                                        | zero asks for the whole inbox                                                   |
-| `last_event`, the newest event the feed had                                            | empty reads the whole feed                                                      |
+- `last_run`, when each family last ran. Without it every family is due at once,
+  so the next sweep is a full one.
+- `first_saw`, when each repository was first seen. Without it the one-off full
+  walk of the star history is done again.
+- `last_head`, the commit each repository was on when the dependency diff last
+  ran. Without it the dependency changes in the gap are gone: the next sweep
+  has the photograph and no diff.
+- `last_full`, when each family that normally reads what changed last read a
+  whole page. Without it a family reads as due, so the next sweep reads them
+  all whole.
+- `last_notified`, where the inbox window was cut. Without it zero asks for the
+  whole inbox.
+- `last_event`, the newest event the feed had. Without it empty reads the whole
+  feed.
 
 Five of the six cost only quota, because what is collected again is keyed by
 measurement, tags and timestamp and overwrites what is already stored.

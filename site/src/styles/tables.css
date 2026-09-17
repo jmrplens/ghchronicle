@@ -198,12 +198,11 @@
  * of what the size is for. Which cells those are is decided at build time and
  * written out: src/lib/rehype-tables.mjs marks `data-role="identity"` on a
  * first cell that holds a `code` span, in a table whose first column repeats
- * no value and that its page has not named in `plainTables`. Everything else
- * falls back here to the plain size it always had; the colour is left alone,
- * since a prose row still benefits from being told apart from its own body
- * text.
+ * no value. Everything else falls back here to the plain size it always had;
+ * the colour is left alone, since a prose row still benefits from being told
+ * apart from its own body text.
  *
- * What the three conditions exclude, measured on the built corpus at 360 px:
+ * What the two conditions exclude, measured on the built corpus at 360 px:
  *
  *  - NO CODE SPAN: 168 of the 718 first cells of the stacked tables. It is the
  *    prose row of configuration/cadences.mdx's three-layer table ("the
@@ -217,12 +216,6 @@
  *    where `account` names eight consecutive rows, so eight cards carried the
  *    same title while the cell that tells them apart sat below it in body
  *    type. Its eight-row twin, whose groups are unique, keeps the title.
- *  - `plainTables`: a first cell that is a sentence with a code span inside
- *    it, which no selector can tell from a genuine name with a space in it
- *    (`-card <path>`, an install command). configuration/index.mdx's
- *    `Remembers` and `Message` tables are the two, twelve rows a language of
- *    whole sentences that were being typeset as titles.
- *
  * The compact form is excluded on purpose: its own review already wanted a
  * link-only name (InfluxDB, PostgreSQL, neither a `code` span) at this size,
  * and undoing that here would be the regression, not the fix. */

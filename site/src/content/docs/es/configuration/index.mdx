@@ -4,8 +4,7 @@ description: Un fichero YAML, todos los valores expandibles desde el entorno, y 
 defaultColumns:
   - table: Clave
     default: Por omisión
-plainTables:
-  - Recuerda
+compactTables:
   - Mensaje
 ---
 
@@ -94,14 +93,20 @@ state_file: /var/lib/ghchronicle/state.json
 
 Seis cosas, y borrar el fichero cuesta una distinta por cada una:
 
-| Recuerda                                                                                          | Borrarlo cuesta                                                                        |
-| ------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| `last_run`, cuándo corrió cada familia por última vez                                             | todas las familias vencen a la vez, así que la pasada siguiente es completa             |
-| `first_saw`, cuándo se vio cada repositorio por primera vez                                       | el recorrido completo de la historia de estrellas se vuelve a hacer                     |
-| `last_head`, el commit en que estaba cada repositorio cuando corrió el diff de dependencias       | los cambios de dependencias del hueco: la pasada siguiente tiene la fotografía y no el diff |
-| `last_full`, cuándo leyó una página entera cada familia que normalmente lee solo lo que ha cambiado | ausente se lee como vencida, así que la pasada siguiente las lee todas enteras          |
-| `last_notified`, por dónde se cortó la ventana del buzón                                          | a cero pide el buzón entero                                                             |
-| `last_event`, el evento más reciente que tenía el feed                                            | vacío lee el feed entero                                                                |
+- `last_run`, cuándo corrió cada familia por última vez. Sin él todas las
+  familias vencen a la vez, así que la pasada siguiente es completa.
+- `first_saw`, cuándo se vio cada repositorio por primera vez. Sin él el
+  recorrido completo de la historia de estrellas se vuelve a hacer.
+- `last_head`, el commit en que estaba cada repositorio cuando corrió el diff
+  de dependencias. Sin él los cambios de dependencias del hueco se pierden: la
+  pasada siguiente tiene la fotografía y no el diff.
+- `last_full`, cuándo leyó una página entera cada familia que normalmente lee
+  solo lo que ha cambiado. Sin él una familia se lee como vencida, así que la
+  pasada siguiente las lee todas enteras.
+- `last_notified`, por dónde se cortó la ventana del buzón. Sin él a cero pide
+  el buzón entero.
+- `last_event`, el evento más reciente que tenía el feed. Sin él vacío lee el
+  feed entero.
 
 Cinco de las seis cuestan solo cuota, porque lo que se vuelve a recoger se
 indexa por medida, etiquetas y marca de tiempo y sobrescribe lo que ya está
