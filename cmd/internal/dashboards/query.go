@@ -592,6 +592,25 @@ func (b *builder) tmURL(field ...string) any {
 // query, and a `filters` bucket is not rendered as a table.
 func (b *builder) one() any { return b.tm("measurement", 1) }
 
+// noneValue is the sentinel a collector writes for a tag GitHub gives nothing
+// for, spelled here exactly as internal/collect writes it, and the three
+// shapes a query needs to exclude it in.
+//
+// All three were wrong at once, each in its own way, and none of them excluded
+// anything: SQL compared against the empty string, which the collector never
+// writes; Graphite excluded a node named `none`, where the parentheses are not
+// path characters and the node is `_none_`; and Elasticsearch asked whether
+// the field exists, which it does on every document. So a charge that belongs
+// to no repository was listed as a repository called (none) in all five
+// stores. TestEveryStoreExcludesTheSentinelTheSameWay holds the three
+// together.
+const (
+	noneValue         = "(none)"
+	noneSQL           = "'" + noneValue + "'"
+	noneGraphiteNode  = "_none_"
+	noneElasticsearch = `"` + noneValue + `"`
+)
+
 var esNames = map[string]string{
 	"count": "Count", "avg": "Average", "sum": "Sum", "max": "Max", "min": "Min",
 	"percentiles": "Percentiles", "top_metrics": "Top Metrics", "cardinality": "Unique Count",

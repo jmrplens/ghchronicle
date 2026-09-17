@@ -343,19 +343,25 @@ func scanningAndResolution(b *builder) []Panel {
 	// alerts carry no url still gets its rows: a document without the field
 	// lands in the empty bucket, where a raw listing would have no column.
 	// The advisory text is a string and stays out, as every ES table's do.
-	// The score rather than the wait: how long an alert has been open is
-	// now() less the row's own date, which a terms bucket cannot subtract,
-	// and the CVSS is a number every Dependabot alert carries.
+	// The date rather than the wait. How long an alert has been open is now()
+	// less the row's own date, and a terms bucket cannot subtract; the date
+	// itself it can, as the smallest @timestamp of the bucket, which for one
+	// alert is the instant it was raised. That is what the panel's title is
+	// about, and the shared override formats it as a date in every store.
+	//
+	// The order stays by document count. Ordering a terms bucket by a metric
+	// requires the metric to be its own direct child, and this one sits four
+	// buckets deeper, so Elasticsearch would refuse the order path outright.
 	oldestES, oldestEStf := esTbl(di,
 		[]any{b.tm("repo", 50), b.tm("number", 25), b.tm("severity", 5), b.tm("package", 5), b.tmURL()},
-		[]any{b.mMax("cvss")},
+		[]any{b.metric("min", "@timestamp", nil)},
 		[]named{
 			{inventoryRepoTerm, "Repository"},
 			{"number.keyword", "Number"},
 			{"severity.keyword", "Severity"},
 			{"package.keyword", "What"},
 			{"url.keyword", "Link"},
-			{"c", securityCVSS},
+			{"m", "Raised"},
 		}, []string{ESF, "alert_state:open"})
 
 	toolGR, toolGRtf := gTbl(fmt.Sprintf(
@@ -486,10 +492,12 @@ func scanningAndResolution(b *builder) []Panel {
 			},
 			ES: oldestES, ESTF: oldestEStf,
 			ESDesc: "Elasticsearch lists the Dependabot alerts alone, the two families " +
-				"being two indices, and by number rather than by date: the advisory is " +
-				"text, which a bucket cannot show. It carries the CVSS score in place of " +
-				"how long the alert has been open, which is the row's own date subtracted " +
-				"from now and not something a bucket can compute. It also lists only the " +
+				"being two indices, and the advisory is text, which a bucket cannot show. " +
+				"It gives the date each alert was raised rather than how long it has been " +
+				"open, that being the row's own date subtracted from now and not something " +
+				"a bucket can compute, and it is not sorted by that date: ordering a bucket " +
+				"by a metric needs the metric to be its own child, and this one is four " +
+				"buckets deeper. It also lists only the " +
 				"ones raised inside the dashboard range, since every Elasticsearch query " +
 				"is bounded by it.",
 		}),

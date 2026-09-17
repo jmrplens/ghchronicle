@@ -33,7 +33,7 @@ func cost(b *builder) []Panel {
 	byRepo := `SELECT repo AS "Repository", SUM(gross) AS "Gross", sku AS "SKU",` +
 		` SUM(quantity) AS "Quantity", MAX(unit) AS "Unit",` +
 		` MAX(price_per_unit) AS "Price", SUM(net) AS "Net"` +
-		" FROM gh_billing_usage WHERE $__timeFilter(time) AND repo <> '(none)'" +
+		" FROM gh_billing_usage WHERE $__timeFilter(time) AND repo <> " + noneSQL +
 		" GROUP BY 1, 3 ORDER BY 2 DESC LIMIT 40"
 	minutes := "SELECT " + timeBin + ", sku AS series," +
 		" SUM(quantity) AS quantity FROM gh_billing_usage" +
@@ -45,7 +45,7 @@ func cost(b *builder) []Panel {
 	// and become underscores, so a pattern written for a bare `none` matched
 	// nothing and listed the charge as a repository.
 	byRepoGR, byRepoGRtf := gTbl(fmt.Sprintf(
-		`limit(sortByTotal(exclude(%s, "^_none_\.")), 40)`,
+		`limit(sortByTotal(exclude(%s, "^`+noneGraphiteNode+`\.")), 40)`,
 		rowsOf(gp(bu, "gross"), gn(bu, "repo"), gn(bu, "sku")),
 	),
 		"Repository, SKU", []col{{"sum", "Gross"}})
@@ -60,7 +60,7 @@ func cost(b *builder) []Panel {
 			{"g", "Gross"},
 			{"n", "Net"},
 		},
-		[]string{`NOT repo.keyword:"(none)"`})
+		[]string{"NOT repo.keyword:" + noneElasticsearch})
 
 	entryGR, entryGRtf := gTbl(rowsOf("keepLastValue("+rp("gh_actions_cache_entry", "size_bytes")+")",
 		gn("gh_actions_cache_entry", "repo"), gn("gh_actions_cache_entry", "cache")),

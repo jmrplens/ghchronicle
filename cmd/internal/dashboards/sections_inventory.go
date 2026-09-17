@@ -704,7 +704,7 @@ func policyAndDependencies(b *builder) []Panel {
 	// Summed, not deduplicated: see the note on the function.
 	changes := "SELECT " + timeBin + ", change AS series," +
 		" SUM(packages) AS packages FROM " + dc +
-		ciInRange + RF + " AND change <> '(none)' GROUP BY 1, 2 UNION ALL" +
+		ciInRange + RF + " AND change <> " + noneSQL + " GROUP BY 1, 2 UNION ALL" +
 		" SELECT " + timeBin + ", 'vulnerable' AS series," +
 		" SUM(vulnerable) AS packages FROM " + dc +
 		ciInRange + RF + " GROUP BY 1 ORDER BY 1"
@@ -863,7 +863,7 @@ func policyAndDependencies(b *builder) []Panel {
 		panel("timeseries", "Dependency changes", box{W: 12, H: 7, X: 12, Y: 69},
 			[]Target{sqlTS(changes)}, &P{
 				Prom: []Target{
-					promq(fmt.Sprintf(`sum by (change) (github_dependency_change_packages{%s, change!="(none)"})`, PF),
+					promq(fmt.Sprintf(`sum by (change) (github_dependency_change_packages{%s, change!=%q})`, PF, noneValue),
 						withRef("A"), legend("{{change}}")),
 					promq(fmt.Sprintf("sum(github_dependency_change_vulnerable{%s})", PF),
 						withRef("B"), legend("vulnerable")),
@@ -889,14 +889,14 @@ func policyAndDependencies(b *builder) []Panel {
 				PromDesc: sweepCount,
 				// The zero row's (none) is the node `_none_` in a Graphite path.
 				GR: []Target{
-					grq(perBucket(fmt.Sprintf(`exclude(%s, "\._none_\.")`, rp(dc, "packages")), gn(dc, "change")), "A"),
+					grq(perBucket(fmt.Sprintf(`exclude(%s, "\.`+noneGraphiteNode+`\.")`, rp(dc, "packages")), gn(dc, "change")), "A"),
 					grq(fmt.Sprintf(
 						`alias(consolidateBy(summarize(sumSeries(%s), "1d", "sum"), "sum"), "vulnerable")`,
 						rp(dc, "vulnerable"),
 					), "B"),
 				},
 				ES: []Target{
-					b.esDaily(dc, b.mSum("packages"), "change", "", []string{ESF, `NOT change.keyword:"(none)"`}, "A"),
+					b.esDaily(dc, b.mSum("packages"), "change", "", []string{ESF, "NOT change.keyword:" + noneElasticsearch}, "A"),
 					esq(dc, []any{b.mSum("vulnerable")}, []any{b.dh()}, "B", []string{ESF}, "vulnerable"),
 				},
 			}),

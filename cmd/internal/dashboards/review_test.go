@@ -784,3 +784,52 @@ func allSQL(p map[string]any) string {
 	}
 	return strings.Join(out, "\n")
 }
+
+// TestEveryStoreExcludesTheSentinelTheSameWay holds the three spellings of one
+// exclusion together.
+//
+// A charge that belongs to no repository, which is what a Copilot seat is,
+// carries the `(none)` a collector writes for a tag GitHub gives nothing for.
+// A table of repositories leaves it out, and each store spells that
+// differently: the SQL stores compare the value, Graphite matches the path
+// node, where the parentheses are not path characters and become underscores,
+// and Elasticsearch negates a term. All three were written from a guess and
+// all three were wrong, so the seat was listed as a repository called (none)
+// in all five stores, and nothing failed: the generated files match the
+// specification whether the string in it is right or not.
+//
+// Every expectation below is written out rather than built from the constants
+// the specification uses. Derived from them it would pass whatever they said,
+// which is the whole of what went wrong here. The same three shapes are used
+// by the dependency changes panel, which is why the specification keeps one
+// constant each.
+func TestEveryStoreExcludesTheSentinelTheSameWay(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		store, want string
+		sql         bool
+	}{
+		{store: "influxdb", want: `repo <> '(none)'`, sql: true},
+		{store: "postgres", want: `repo <> '(none)'`, sql: true},
+		// Inside the JSON the pattern's backslash is escaped once more.
+		{store: "graphite", want: `exclude(aliasByNode(github.billing_usage.*.*.*.*.*.gross, 3, 4), \"^_none_\\.\")`},
+		{store: "elasticsearch", want: `NOT repo.keyword:\"(none)\"`},
+	} {
+		panel := mustPanel(t, rendered(t, tc.store), "Usage by repository")
+		// The SQL is read as SQL: inside the JSON its comparison operator is
+		// escaped and the test would be asserting on the escaping.
+		got := asJSON(t, panel["targets"])
+		if tc.sql {
+			got = allSQL(panel)
+		}
+		if !strings.Contains(got, tc.want) {
+			t.Errorf("%s: the cost table does not exclude the unattributed charge with %s:\n%s",
+				tc.store, tc.want, got)
+		}
+	}
+	// And the value the collectors write, in the one place the specification
+	// keeps it: everything above is that value in three disguises.
+	if noneValue != "(none)" {
+		t.Errorf("the sentinel is %q; internal/collect writes (none)", noneValue)
+	}
+}
