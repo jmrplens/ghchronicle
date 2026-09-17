@@ -28,19 +28,23 @@ func newStdoutJSON(w io.Writer) *StdoutJSON {
 
 func (s *StdoutJSON) Name() string { return "stdout" }
 
-func (s *StdoutJSON) Write(_ context.Context, points []Point) error {
+// Write prints one JSON object per point. Every point renders, so the count is
+// the whole batch unless the writer failed partway.
+func (s *StdoutJSON) Write(_ context.Context, points []Point) (int, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	written := 0
 	for _, p := range points {
 		line, err := s.render.render(p)
 		if err != nil {
-			return err
+			return written, err
 		}
 		if _, err = s.w.WriteString(line + "\n"); err != nil {
-			return err
+			return written, err
 		}
+		written++
 	}
-	return s.w.Flush()
+	return written, s.w.Flush()
 }
 
 func (s *StdoutJSON) Close() error {

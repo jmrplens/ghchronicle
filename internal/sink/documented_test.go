@@ -145,7 +145,7 @@ func TestTheDocumentedSQLSampleIsTheSinksOwnOutput(t *testing.T) {
 		},
 		Time: time.Date(2026, 9, 7, 0, 0, 0, 0, time.UTC),
 	}
-	if err := s.Write(context.Background(), []Point{point}); err != nil {
+	if _, err := s.Write(context.Background(), []Point{point}); err != nil {
 		t.Fatalf("write: %v", err)
 	}
 	if err := s.Close(); err != nil {
@@ -194,7 +194,7 @@ func TestTheDocumentedJSONSampleIsTheSinksOwnOutput(t *testing.T) {
 		Fields: map[string]any{"count": 220, "uniques": 131},
 		Time:   time.Date(2026, 9, 7, 0, 0, 0, 0, time.UTC),
 	}
-	if err := f.Write(context.Background(), []Point{point}); err != nil {
+	if _, err := f.Write(context.Background(), []Point{point}); err != nil {
 		t.Fatalf("write: %v", err)
 	}
 	if err := f.Close(); err != nil {
@@ -220,7 +220,7 @@ func TestTheDocumentedJSONSampleIsTheSinksOwnOutput(t *testing.T) {
 	// had drifted a year away from the JSON twin's.
 	lpPath := filepath.Join(t.TempDir(), "sample.lp")
 	lp := NewFile(lpPath, "influx", 1<<20, 2)
-	if writeErr := lp.Write(context.Background(), []Point{point}); writeErr != nil {
+	if _, writeErr := lp.Write(context.Background(), []Point{point}); writeErr != nil {
 		t.Fatalf("write line protocol: %v", writeErr)
 	}
 	if closeErr := lp.Close(); closeErr != nil {

@@ -74,13 +74,11 @@ entregó:
 level=INFO msg=written sink=influxdb family=joblogs points=0 unchanged=0 filtered=440
 ```
 
-`points` es lo que se escribió, `unchanged` lo que el registro de escrituras ya
-había enviado, y `filtered` lo que este destino descartó: una medida nombrada
-aquí, y cualquier punto que no lleve ningún campo que el protocolo de línea
-pueda representar. La clave solo aparece cuando hay algo que contar, y el total
-de la pasada se imprime una vez al final. Hasta que se contó, la línea decía
-`points=440` de una medida de la que la base de datos no ha tenido nunca una
-fila.
+Aquí `filtered` es una medida nombrada arriba, o un punto que no lleva ningún
+campo que el protocolo de línea pueda representar. Es [la misma clave que usan
+todos los destinos](/ghchronicle/es/sinks/#qué-cuenta-la-línea-de-escritura).
+Hasta que se contó, la línea decía `points=440` de una medida de la que la base
+de datos no ha tenido nunca una fila.
 
 ## Los tipos de columna se fijan al primer contacto
 

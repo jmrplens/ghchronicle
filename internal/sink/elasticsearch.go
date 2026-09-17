@@ -68,15 +68,20 @@ type esAction struct {
 	} `json:"index"`
 }
 
-func (e *Elasticsearch) Write(ctx context.Context, points []Point) error {
+// Write sends the batch through the bulk API. A point that flattens to no
+// document is not counted as written, and neither is one the server refused.
+func (e *Elasticsearch) Write(ctx context.Context, points []Point) (int, error) {
 	var body bytes.Buffer
-	n, rejected := 0, 0
+	n, rejected, written := 0, 0, 0
 	flush := func() error {
 		if n == 0 {
 			return nil
 		}
 		r, err := e.post(ctx, body.Bytes())
 		body.Reset()
+		if err == nil {
+			written += n - r
+		}
 		n = 0
 		rejected += r
 		return err
@@ -91,11 +96,11 @@ func (e *Elasticsearch) Write(ctx context.Context, points []Point) error {
 		action.Index.ID = esID(p)
 		a, err := json.Marshal(action)
 		if err != nil {
-			return err
+			return written, err
 		}
 		d, err := json.Marshal(doc)
 		if err != nil {
-			return err
+			return written, err
 		}
 		body.Write(a)
 		body.WriteByte('\n')
@@ -104,17 +109,17 @@ func (e *Elasticsearch) Write(ctx context.Context, points []Point) error {
 		n++
 		if n >= e.Batch {
 			if flushErr := flush(); flushErr != nil {
-				return flushErr
+				return written, flushErr
 			}
 		}
 	}
 	if err := flush(); err != nil {
-		return err
+		return written, err
 	}
 	if rejected > 0 {
-		return &RejectedError{N: rejected}
+		return written, &RejectedError{N: rejected}
 	}
-	return nil
+	return written, nil
 }
 
 // indexFor lowercases, because an index name may not carry an upper-case

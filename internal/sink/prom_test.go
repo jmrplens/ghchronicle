@@ -41,7 +41,7 @@ func TestPromServesTheCurrentValueOfEachSeries(t *testing.T) {
 	if p.Name() != "prometheus" || p.Path != "/metrics" {
 		t.Errorf("NewProm = %q at %q, want the prometheus sink at /metrics", p.Name(), p.Path)
 	}
-	if err := p.Write(t.Context(), []Point{account("octocat", 12), account("hubot", 3)}); err != nil {
+	if _, err := p.Write(t.Context(), []Point{account("octocat", 12), account("hubot", 3)}); err != nil {
 		t.Fatal(err)
 	}
 	want := "# TYPE github_account_followers gauge\n" +
@@ -62,7 +62,7 @@ func TestPromServesTheCurrentValueOfEachSeries(t *testing.T) {
 func TestPromEscapesALabelOnce(t *testing.T) {
 	t.Parallel()
 	p := NewProm("127.0.0.1:0", "")
-	if err := p.Write(t.Context(), []Point{account("say \"hi\"\\\nbye é", 1)}); err != nil {
+	if _, err := p.Write(t.Context(), []Point{account("say \"hi\"\\\nbye é", 1)}); err != nil {
 		t.Fatal(err)
 	}
 	want := `github_account_followers{user="say \"hi\"\\\nbye é"} 1`
@@ -77,7 +77,7 @@ func TestPromEscapesALabelOnce(t *testing.T) {
 func TestPromForgetsASeriesNobodyWrites(t *testing.T) {
 	t.Parallel()
 	p := NewProm("127.0.0.1:0", "")
-	if err := p.Write(t.Context(), []Point{account("gone", 1)}); err != nil {
+	if _, err := p.Write(t.Context(), []Point{account("gone", 1)}); err != nil {
 		t.Fatal(err)
 	}
 	p.mu.Lock()
@@ -86,7 +86,7 @@ func TestPromForgetsASeriesNobodyWrites(t *testing.T) {
 		p.samples[key] = s
 	}
 	p.mu.Unlock()
-	if err := p.Write(t.Context(), []Point{account("here", 1)}); err != nil {
+	if _, err := p.Write(t.Context(), []Point{account("here", 1)}); err != nil {
 		t.Fatal(err)
 	}
 	got := exposition(t, p)
@@ -122,7 +122,7 @@ func TestPromServesOverHTTP(t *testing.T) {
 			t.Errorf("Close: %v", closeErr)
 		}
 	})
-	if err = p.Write(t.Context(), []Point{account("octocat", 7)}); err != nil {
+	if _, err = p.Write(t.Context(), []Point{account("octocat", 7)}); err != nil {
 		t.Fatal(err)
 	}
 	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "http://"+addr+"/anything", http.NoBody)
@@ -200,7 +200,7 @@ func TestPromNeverExpiresTheSeriesItHasJustWritten(t *testing.T) {
 	t.Parallel()
 	p := NewProm("127.0.0.1:0", "")
 	p.Stale = 0
-	if err := p.Write(t.Context(), []Point{account("octocat", 1)}); err != nil {
+	if _, err := p.Write(t.Context(), []Point{account("octocat", 1)}); err != nil {
 		t.Fatal(err)
 	}
 	if got := exposition(t, p); !strings.Contains(got, `github_account_followers{user="octocat"} 1`) {
@@ -251,7 +251,7 @@ func TestPromServesNoSeriesForAText(t *testing.T) {
 	p := NewProm("127.0.0.1:0", "")
 	pt := account("octocat", 5)
 	pt.Fields["company"] = "acme"
-	if err := p.Write(t.Context(), []Point{pt}); err != nil {
+	if _, err := p.Write(t.Context(), []Point{pt}); err != nil {
 		t.Fatal(err)
 	}
 	got := exposition(t, p)

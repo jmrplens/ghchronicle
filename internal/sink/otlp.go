@@ -186,16 +186,26 @@ func attr(k, v string) otlpKeyValue {
 	return otlpKeyValue{Key: k, Value: otlpAnyValue{StringValue: &v}}
 }
 
-func (o *OTLP) Write(ctx context.Context, points []Point) error {
+// Write sends the batch as OTLP metrics.
+//
+// In the reduced mode the count is what the reducer took, since a measurement
+// with no rule is not exported at all; raw, it is the whole batch, because
+// send encodes every point it is given and a point with no numeric field
+// contributes no data point either way.
+func (o *OTLP) Write(ctx context.Context, points []Point) (int, error) {
+	taken := len(points)
 	if !o.Raw {
-		points = o.reducer.Reduce(points)
+		points, taken = o.reducer.Reduce(points)
 		o.mu.Lock()
 		for _, p := range points {
 			o.state[p.Measurement+"|"+tagKey(p.Tags)] = p
 		}
 		o.mu.Unlock()
 	}
-	return o.send(ctx, points)
+	if err := o.send(ctx, points); err != nil {
+		return 0, err
+	}
+	return taken, nil
 }
 
 // send encodes and posts one batch.

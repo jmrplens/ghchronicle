@@ -22,17 +22,21 @@ func newStdout(w io.Writer) *Stdout { return &Stdout{w: bufio.NewWriter(w)} }
 
 func (s *Stdout) Name() string { return "stdout" }
 
-func (s *Stdout) Write(_ context.Context, points []Point) error {
+// Write prints one line per point. A point carrying no field the line protocol
+// can render produces no line and is not counted as written.
+func (s *Stdout) Write(_ context.Context, points []Point) (int, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	written := 0
 	for _, p := range points {
 		if l := LineProtocol(p); l != "" {
 			if _, err := s.w.WriteString(l + "\n"); err != nil {
-				return err
+				return written, err
 			}
+			written++
 		}
 	}
-	return s.w.Flush()
+	return written, s.w.Flush()
 }
 
 func (s *Stdout) Close() error {

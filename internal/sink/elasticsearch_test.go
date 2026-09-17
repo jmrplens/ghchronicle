@@ -31,7 +31,7 @@ func captureES(t *testing.T, reply string, mk func(url string) *Elasticsearch, p
 		_, _ = io.WriteString(w, reply)
 	}))
 	defer srv.Close()
-	err := mk(srv.URL).Write(context.Background(), points)
+	_, err := mk(srv.URL).Write(context.Background(), points)
 	return c, err
 }
 
@@ -92,7 +92,7 @@ func TestElasticsearchBasicAuthAndBatching(t *testing.T) {
 			Fields: map[string]any{"starred": 1}, Time: time.Unix(int64(i), 0),
 		})
 	}
-	if err := e.Write(context.Background(), points); err != nil {
+	if _, err := e.Write(context.Background(), points); err != nil {
 		t.Fatal(err)
 	}
 	if requests != 3 {
@@ -131,7 +131,7 @@ func TestElasticsearchNamesItselfOnFailure(t *testing.T) {
 		http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
 	}))
 	defer srv.Close()
-	err := NewElasticsearch(srv.URL, "", "", "", "", 0, 0).Write(context.Background(), []Point{{
+	_, err := NewElasticsearch(srv.URL, "", "", "", "", 0, 0).Write(context.Background(), []Point{{
 		Measurement: "m", Fields: map[string]any{"v": 1}, Time: time.Now(),
 	}})
 	if err == nil || !strings.HasPrefix(err.Error(), "elasticsearch write: 401") {
@@ -170,7 +170,7 @@ func TestElasticsearchSendsNothingForAPointWithoutAField(t *testing.T) {
 		_, _ = io.WriteString(w, `{"errors":false,"items":[]}`)
 	}))
 	defer srv.Close()
-	err := NewElasticsearch(srv.URL, "", "", "", "", 0, 0).Write(context.Background(), []Point{{
+	_, err := NewElasticsearch(srv.URL, "", "", "", "", 0, 0).Write(context.Background(), []Point{{
 		Measurement: "gh_repo", Tags: map[string]string{"repo": "a"},
 		Fields: map[string]any{"none": nil, "blank": "", "never": time.Time{}, "list": []int{1}},
 		Time:   time.Unix(1700000000, 0),
@@ -227,7 +227,7 @@ func TestElasticsearchStopsAtTheFirstBatchThatFails(t *testing.T) {
 	for i := range 3 {
 		points = append(points, Point{Measurement: "m", Fields: map[string]any{"v": i}, Time: time.Unix(int64(i), 0)})
 	}
-	err := NewElasticsearch(srv.URL, "", "", "", "", 1, 0).Write(context.Background(), points)
+	_, err := NewElasticsearch(srv.URL, "", "", "", "", 1, 0).Write(context.Background(), points)
 	if err == nil || !strings.HasPrefix(err.Error(), "elasticsearch write: 503") || requests != 1 {
 		t.Errorf("Write = %v after %d requests, want the 503 from the first batch alone", err, requests)
 	}
@@ -241,7 +241,7 @@ func TestElasticsearchTreatsAnyNonSuccessStatusAsAFailure(t *testing.T) {
 		_, _ = io.WriteString(w, "choose")
 	}))
 	defer srv.Close()
-	err := NewElasticsearch(srv.URL, "", "", "", "", 0, 0).Write(context.Background(), []Point{{
+	_, err := NewElasticsearch(srv.URL, "", "", "", "", 0, 0).Write(context.Background(), []Point{{
 		Measurement: "m", Fields: map[string]any{"v": 1}, Time: time.Unix(1, 0),
 	}})
 	if err == nil || !strings.HasPrefix(err.Error(), "elasticsearch write: 300") {
@@ -282,13 +282,13 @@ func TestElasticsearchReadsTheVerdictOfTheBulkResponse(t *testing.T) {
 // posting, and reports a cluster that is not there.
 func TestElasticsearchRefusesAnEndpointItCannotUse(t *testing.T) {
 	point := []Point{{Measurement: "m", Fields: map[string]any{"v": 1}, Time: time.Unix(1, 0)}}
-	if err := NewElasticsearch("es:9200", "", "", "", "", 0, 0).Write(context.Background(), point); err == nil ||
+	if _, err := NewElasticsearch("es:9200", "", "", "", "", 0, 0).Write(context.Background(), point); err == nil ||
 		!strings.HasPrefix(err.Error(), "elasticsearch write: endpoint ") {
 		t.Errorf("Write = %v, want the endpoint refused", err)
 	}
 	closed := httptest.NewServer(http.NotFoundHandler())
 	closed.Close()
-	if err := NewElasticsearch(closed.URL, "", "", "", "", 0, 0).Write(context.Background(), point); err == nil {
+	if _, err := NewElasticsearch(closed.URL, "", "", "", "", 0, 0).Write(context.Background(), point); err == nil {
 		t.Error("Write reported success to a cluster that is not there")
 	}
 }

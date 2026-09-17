@@ -339,7 +339,11 @@ func OnlyChanged(s Sink, l *Ledger) Sink {
 
 func (u *Unchanged) Name() string { return u.inner.Name() }
 
-func (u *Unchanged) Write(ctx context.Context, points []Point) error {
+// Write passes on what the ledger has not already sent and reports what the
+// sink behind it took. The points the ledger held back are not accepted here:
+// they were accepted by an earlier write, and the caller counts them
+// separately as unchanged.
+func (u *Unchanged) Write(ctx context.Context, points []Point) (int, error) {
 	keep, commit := u.ledger.Reserve(u.inner.Name(), points)
 	if spared := len(points) - len(keep); spared > 0 {
 		u.mu.Lock()
@@ -348,9 +352,10 @@ func (u *Unchanged) Write(ctx context.Context, points []Point) error {
 	}
 	if len(keep) == 0 {
 		commit()
-		return nil
+		return 0, nil
 	}
-	if err := u.inner.Write(ctx, keep); err != nil {
+	accepted, err := u.inner.Write(ctx, keep)
+	if err != nil {
 		// RejectedError and DroppedError both mean everything writable was written, so
 		// the batch counts as delivered. Not committing here would offer the
 		// same points again on every sweep for as long as the store kept
@@ -360,22 +365,10 @@ func (u *Unchanged) Write(ctx context.Context, points []Point) error {
 		if errors.As(err, &rejected) || errors.As(err, &dropped) {
 			commit()
 		}
-		return err
+		return accepted, err
 	}
 	commit()
-	return nil
-}
-
-// Filtered reports what the wrapped sink dropped rather than wrote. The
-// ledger sits in front of that sink, so without this the wrapper would hide
-// the wrapped sink's own filtering from anything counting the pair: see
-// Filtering. A wrapped sink that writes everything it is given reports
-// nothing.
-func (u *Unchanged) Filtered() uint64 {
-	if f, ok := u.inner.(Filtering); ok {
-		return f.Filtered()
-	}
-	return 0
+	return accepted, nil
 }
 
 // Dropped reports how many points this sink was spared since it started.

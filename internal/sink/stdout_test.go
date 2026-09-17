@@ -24,7 +24,7 @@ func TestStdoutPrintsLineProtocol(t *testing.T) {
 		t.Errorf("Name = %q, want stdout", s.Name())
 	}
 	points := []Point{star("a"), {Measurement: "gh_star", Tags: map[string]string{"repo": "empty"}}, star("b")}
-	if err := s.Write(t.Context(), points); err != nil {
+	if _, err := s.Write(t.Context(), points); err != nil {
 		t.Fatal(err)
 	}
 	want := "gh_star,repo=a starred=1i 1700000000000000000\ngh_star,repo=b starred=1i 1700000000000000000\n"
@@ -41,11 +41,11 @@ func TestStdoutPrintsLineProtocol(t *testing.T) {
 // too long to buffer.
 func TestStdoutReportsAWriteThatFails(t *testing.T) {
 	t.Parallel()
-	if err := newStdout(failingWriter{}).Write(t.Context(), []Point{star("a")}); err == nil {
+	if _, err := newStdout(failingWriter{}).Write(t.Context(), []Point{star("a")}); err == nil {
 		t.Error("Write reported success through a writer that refused the flush")
 	}
 	long := star(strings.Repeat("r", 8192))
-	if err := newStdout(failingWriter{}).Write(t.Context(), []Point{long}); err == nil {
+	if _, err := newStdout(failingWriter{}).Write(t.Context(), []Point{long}); err == nil {
 		t.Error("Write reported success through a writer that refused a line too long to buffer")
 	}
 }

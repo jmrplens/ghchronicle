@@ -28,7 +28,7 @@ func captureOTLP(t *testing.T, s func(url string) *OTLP, points []Point) []map[s
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer srv.Close()
-	if err := s(srv.URL).Write(context.Background(), points); err != nil {
+	if _, err := s(srv.URL).Write(context.Background(), points); err != nil {
 		t.Fatalf("write: %v", err)
 	}
 	return bodies
@@ -112,7 +112,7 @@ func TestOTLPRepublishesTheCurrentState(t *testing.T) {
 	o.Repeat = 20 * time.Millisecond
 	o.Start()
 	defer o.Close()
-	if err := o.Write(context.Background(), []Point{{
+	if _, err := o.Write(context.Background(), []Point{{
 		Measurement: "gh_repo",
 		Tags:        map[string]string{"repo": "a"}, Fields: map[string]any{"stars": 1}, Time: time.Now(),
 	}}); err != nil {
@@ -200,7 +200,7 @@ func TestNewOTLPFillsInOnlyWhatWasLeftOut(t *testing.T) {
 	}
 
 	c, url := newOTLPCollector(t, http.StatusOK)
-	if err := NewOTLP(url, "", nil, true, 0, 0).Write(context.Background(), twoMetrics()); err != nil {
+	if _, err := NewOTLP(url, "", nil, true, 0, 0).Write(context.Background(), twoMetrics()); err != nil {
 		t.Fatal(err)
 	}
 	c.mu.Lock()
@@ -216,7 +216,7 @@ func TestNewOTLPFillsInOnlyWhatWasLeftOut(t *testing.T) {
 // request that fails.
 func TestOTLPBatchesByDataPoint(t *testing.T) {
 	c, url := newOTLPCollector(t, http.StatusOK)
-	if err := NewOTLP(url, "", nil, true, 0, 0).Write(context.Background(), twoMetrics()); err != nil {
+	if _, err := NewOTLP(url, "", nil, true, 0, 0).Write(context.Background(), twoMetrics()); err != nil {
 		t.Fatal(err)
 	}
 	if n := c.count(); n != 1 {
@@ -224,7 +224,7 @@ func TestOTLPBatchesByDataPoint(t *testing.T) {
 	}
 
 	c, url = newOTLPCollector(t, http.StatusOK)
-	if err := NewOTLP(url, "", nil, true, 1, 0).Write(context.Background(), twoMetrics()); err != nil {
+	if _, err := NewOTLP(url, "", nil, true, 1, 0).Write(context.Background(), twoMetrics()); err != nil {
 		t.Fatal(err)
 	}
 	if n := c.count(); n != 2 {
@@ -232,7 +232,7 @@ func TestOTLPBatchesByDataPoint(t *testing.T) {
 	}
 
 	c, url = newOTLPCollector(t, http.StatusServiceUnavailable)
-	err := NewOTLP(url, "", nil, true, 1, 0).Write(context.Background(), twoMetrics())
+	_, err := NewOTLP(url, "", nil, true, 1, 0).Write(context.Background(), twoMetrics())
 	if err == nil || err.Error() != "otlp write: 503 Service Unavailable: refused" || c.count() != 1 {
 		t.Errorf("Write = %v after %d requests, want the 503 and nothing after it", err, c.count())
 	}
@@ -242,7 +242,7 @@ func TestOTLPBatchesByDataPoint(t *testing.T) {
 // are all text.
 func TestOTLPSendsNothingWithoutANumber(t *testing.T) {
 	c, url := newOTLPCollector(t, http.StatusOK)
-	if err := NewOTLP(url, "", nil, true, 0, 0).Write(context.Background(), []Point{{
+	if _, err := NewOTLP(url, "", nil, true, 0, 0).Write(context.Background(), []Point{{
 		Measurement: "gh_gist", Fields: map[string]any{"description": "text"}, Time: time.Unix(1, 0),
 	}}); err != nil {
 		t.Fatal(err)
@@ -257,17 +257,17 @@ func TestOTLPSendsNothingWithoutANumber(t *testing.T) {
 // is not there.
 func TestOTLPReportsAFailedWrite(t *testing.T) {
 	_, url := newOTLPCollector(t, http.StatusMultipleChoices)
-	if err := NewOTLP(url, "", nil, true, 0, 0).Write(context.Background(), twoMetrics()); err == nil ||
+	if _, err := NewOTLP(url, "", nil, true, 0, 0).Write(context.Background(), twoMetrics()); err == nil ||
 		!strings.HasPrefix(err.Error(), "otlp write: 300") {
 		t.Errorf("Write = %v, want the 300 reported", err)
 	}
-	if err := NewOTLP("collector:4318", "", nil, true, 0, 0).Write(context.Background(), twoMetrics()); err == nil ||
+	if _, err := NewOTLP("collector:4318", "", nil, true, 0, 0).Write(context.Background(), twoMetrics()); err == nil ||
 		!strings.HasPrefix(err.Error(), "otlp write: endpoint ") {
 		t.Errorf("Write = %v, want the endpoint refused", err)
 	}
 	closed := httptest.NewServer(http.NotFoundHandler())
 	closed.Close()
-	if err := NewOTLP(closed.URL, "", nil, true, 0, 0).Write(context.Background(), twoMetrics()); err == nil {
+	if _, err := NewOTLP(closed.URL, "", nil, true, 0, 0).Write(context.Background(), twoMetrics()); err == nil {
 		t.Error("Write reported success to a collector that is not there")
 	}
 }
@@ -314,7 +314,7 @@ func TestOTLPRepublishSendsTheStateItHasAndNothingWithout(t *testing.T) {
 	if n := c.count(); n != 0 {
 		t.Errorf("%d requests republishing an empty state, want none", n)
 	}
-	if err := o.Write(context.Background(), []Point{account("octocat", 3)}); err != nil {
+	if _, err := o.Write(context.Background(), []Point{account("octocat", 3)}); err != nil {
 		t.Fatal(err)
 	}
 	o.republish()

@@ -100,6 +100,15 @@ type Runner struct {
 	// above: see refusalsFor.
 	refusals map[string]*collect.Refusals
 
+	// Now is the clock the sweep reads, for the one test that needs two of
+	// them. Nil is time.Now, which is what everything but that test uses.
+	Now func() time.Time
+
+	// filtered counts, per sink name, the points that sink was offered and
+	// did not write. A sweep prints its own total at the end, beside the
+	// ledger's: the per-family lines say where, and this says how much.
+	filtered map[string]uint64
+
 	// markupWarned is whether the achievements page has already been
 	// reported as changed, so a redesign is one line in the log and not one
 	// per sweep for as long as the parser lags.
@@ -138,7 +147,7 @@ const discoverInterval = time.Hour
 // canceled context and a failed discovery stop it, and both return without
 // marking anything as run.
 func (r *Runner) Once(ctx context.Context) error {
-	now := time.Now()
+	now := r.clock()
 	r.prime = (r.Prime || r.Card) && !r.primed
 	r.primed = true
 	if r.prime {
@@ -160,6 +169,17 @@ func (r *Runner) Once(ctx context.Context) error {
 	}
 	r.finish()
 	return nil
+}
+
+// clock is the instant a sweep dates itself by. It is the wall clock, and it
+// is a field so that one test can run the same sweep twice under two clocks
+// and hold every row dated in the past to saying the same thing both times.
+// Nothing in production sets it.
+func (r *Runner) clock() time.Time {
+	if r.Now != nil {
+		return r.Now()
+	}
+	return time.Now()
 }
 
 // discoverRepos rebuilds the repository list when it has gone stale, and
@@ -423,9 +443,8 @@ func (r *Runner) finish() {
 			r.Log.Info("points already written and not sent again",
 				"sink", u.Name(), "skipped", u.Dropped())
 		}
-		if f, ok := s.(sink.Filtering); ok && f.Filtered() > 0 {
-			r.Log.Info("points the sink did not write",
-				"sink", s.Name(), "filtered", f.Filtered())
+		if n := r.filtered[s.Name()]; n > 0 {
+			r.Log.Info("points the sink did not write", "sink", s.Name(), "filtered", n)
 		}
 	}
 	r.Log.Info("sweep finished")
@@ -868,16 +887,7 @@ func (r *Runner) emit(ctx context.Context, family string, points []sink.Point) {
 		if u, ok := s.(*sink.Unchanged); ok {
 			filter, before = u, u.Dropped()
 		}
-		// And a sink that drops points of its own reports those too, for the
-		// same reason and one step further in: InfluxDB excludes gh_job_log by
-		// default, and until this was read the line said 440 points written to
-		// a database that has never held one.
-		var selective sink.Filtering
-		filteredBefore := uint64(0)
-		if f, ok := s.(sink.Filtering); ok {
-			selective, filteredBefore = f, f.Filtered()
-		}
-		err := s.Write(ctx, points)
+		accepted, err := s.Write(ctx, points)
 		if rejected, ok := errors.AsType[*sink.RejectedError](err); ok {
 			// Everything parseable was written. The lines themselves are
 			// reported by the sink through OnReject.
@@ -899,22 +909,22 @@ func (r *Runner) emit(ctx context.Context, family string, points []sink.Point) {
 		// Counted in the sink's own unsigned type rather than converted into
 		// an int, so neither figure in the line below can come from a
 		// conversion that wraps.
-		written, skipped := uint64(len(points)), uint64(0)
+		offered, skipped := uint64(len(points)), uint64(0)
 		if filter != nil {
 			// The counter is cumulative, so the delta is what this write
 			// skipped, and one write can skip no more points than it was
 			// given. Bounding it there keeps a counter that ever ran backwards
 			// out of the log line instead of reporting a negative total.
-			skipped = min(filter.Dropped()-before, written)
-			written -= skipped
+			skipped = min(filter.Dropped()-before, offered)
 		}
-		filtered := uint64(0)
-		if selective != nil {
-			// The same cumulative counter and the same bound, over what is
-			// left after the ledger: the sink only ever saw those.
-			filtered = min(selective.Filtered()-filteredBefore, written)
-			written -= filtered
+		// What the sink says it took, bounded by what it was given: a sink
+		// that over-reports is a bug, and it is not one this line will carry.
+		written := min(nonNegative(accepted), offered-skipped)
+		filtered := offered - skipped - written
+		if r.filtered == nil {
+			r.filtered = map[string]uint64{}
 		}
+		r.filtered[s.Name()] += filtered
 		if filtered > 0 {
 			// Said only when there is something to say, so the key appears
 			// exactly where the question "where did the rest go" arises.
@@ -925,6 +935,16 @@ func (r *Runner) emit(ctx context.Context, family string, points []sink.Point) {
 		r.Log.Info("written", "sink", s.Name(), "family", family,
 			"points", written, "unchanged", skipped)
 	}
+}
+
+// nonNegative is a sink's own count as an unsigned one. A negative is a sink
+// returning nonsense, and it becomes zero rather than a number near the top of
+// the unsigned range.
+func nonNegative(n int) uint64 {
+	if n < 0 {
+		return 0
+	}
+	return uint64(n)
 }
 
 // Serve runs sweeps until the context is canceled.

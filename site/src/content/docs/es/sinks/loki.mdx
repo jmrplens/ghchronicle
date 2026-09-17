@@ -40,6 +40,14 @@ tablas de `internal/sink/loki.go`, la de representaciones o la de rechazos, y
 cada rechazo lleva el motivo por el que no es una línea de log. Una prueba falla
 ante una medida fechada que no aparezca en ninguna de las dos.
 
+En el registro de la pasada ya no se descarta en silencio. Este destino escribe
+una fracción de lo que se le ofrece, así que la mayoría de sus líneas llevan
+[`filtered`](/ghchronicle/es/sinks/#qué-cuenta-la-línea-de-escritura) y
+`points=0`, que es lo que guardó y no lo que se le dio. Una entrada más vieja
+que `max_age`, o demasiado atrasada respecto a la más reciente de su propio
+flujo para que Loki la acepte, también se cuenta ahí y se informa en una línea
+de entradas descartadas.
+
 ## El formato de línea
 
 Cada línea se lee primero como una frase y lleva detrás cada etiqueta y cada

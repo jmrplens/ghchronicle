@@ -47,7 +47,7 @@ func TestASinkNamesItselfAndTheEndpointItWasGiven(t *testing.T) {
 		Measurement: "gh_star", Tags: map[string]string{"user": "a"},
 		Fields: map[string]any{"starred": 1}, Time: time.Now(),
 	}}
-	err := NewLoki("loki:3100", "", nil, 0, 0, 0).Write(context.Background(), point)
+	_, err := NewLoki("loki:3100", "", nil, 0, 0, 0).Write(context.Background(), point)
 	if err == nil {
 		t.Fatal("a sink posted to an endpoint that is not an http URL")
 	}

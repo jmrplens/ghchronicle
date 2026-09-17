@@ -16,7 +16,7 @@ type Point = sink.Point
 func TestAccumulatorBuildsACardFromPoints(t *testing.T) {
 	now := time.Date(2026, 9, 7, 12, 0, 0, 0, time.UTC)
 	a := NewAccumulator("someone")
-	err := a.Write(context.Background(), points(now))
+	_, err := a.Write(context.Background(), points(now))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -48,7 +48,7 @@ func TestAccumulatorBuildsACardFromPoints(t *testing.T) {
 func TestAccumulatorKeepsTheNewestRepositorySnapshot(t *testing.T) {
 	now := time.Date(2026, 9, 7, 12, 0, 0, 0, time.UTC)
 	a := NewAccumulator("someone")
-	_ = a.Write(context.Background(), []Point{
+	_, _ = a.Write(context.Background(), []Point{
 		{
 			Measurement: "gh_repo", Tags: map[string]string{"repo": "a", "language": "Go"},
 			Fields: map[string]any{"stars": 1, "forks": 0}, Time: now,
@@ -68,7 +68,7 @@ func TestAccumulatorDoesNotAddACalendarDayTwice(t *testing.T) {
 	a := NewAccumulator("someone")
 	// The same day arriving twice is a re-read of the calendar, not two days
 	// of work.
-	_ = a.Write(context.Background(), []Point{
+	_, _ = a.Write(context.Background(), []Point{
 		{Measurement: "gh_contribution_day", Fields: map[string]any{"contributions": 5}, Time: day},
 		{Measurement: "gh_contribution_day", Fields: map[string]any{"contributions": 5}, Time: day},
 	})
@@ -90,7 +90,7 @@ func TestAccumulatorKeepsOnlyTheLastYearOfCalendar(t *testing.T) {
 			Fields:      map[string]any{"contributions": 1}, Time: d,
 		})
 	}
-	_ = a.Write(context.Background(), pts)
+	_, _ = a.Write(context.Background(), pts)
 	if n := len(a.Card().Sparkline); n > 370 || n < 360 {
 		t.Errorf("sparkline has %d days, want about a year", n)
 	}
@@ -109,7 +109,7 @@ func TestAccumulatorSumsLanguagesAcrossRepositoriesAndRanksThem(t *testing.T) {
 		}
 	}
 	a := NewAccumulator("someone")
-	_ = a.Write(context.Background(), []Point{
+	_, _ = a.Write(context.Background(), []Point{
 		lang("a", "Python", 50),
 		lang("a", "Go", 30),
 		lang("b", "Go", 20),
@@ -140,7 +140,7 @@ func TestAccumulatorSumsLanguagesAcrossRepositoriesAndRanksThem(t *testing.T) {
 func TestAccumulatorFoldsTheSameDayReadAtDifferentHours(t *testing.T) {
 	day := time.Date(2026, 9, 7, 0, 0, 0, 0, time.UTC)
 	a := NewAccumulator("someone")
-	_ = a.Write(context.Background(), []Point{
+	_, _ = a.Write(context.Background(), []Point{
 		{Measurement: "gh_contribution_day", Fields: map[string]any{"contributions": 3}, Time: day.Add(8 * time.Hour)},
 		{Measurement: "gh_contribution_day", Fields: map[string]any{"contributions": 5}, Time: day.Add(20 * time.Hour)},
 		{Measurement: "gh_contribution_day", Fields: map[string]any{"contributions": "many"}, Time: day.Add(-24 * time.Hour)},
@@ -164,7 +164,7 @@ func TestAccumulatorKeepsTheNewestAccountSnapshot(t *testing.T) {
 		}
 	}
 	a := NewAccumulator("someone")
-	_ = a.Write(context.Background(), []Point{
+	_, _ = a.Write(context.Background(), []Point{
 		account(10, now),
 		account(int64(20), now.Add(time.Hour)),
 		account(5.0, now.Add(-time.Hour)),
@@ -184,7 +184,7 @@ func TestAccumulatorKeepsTheNewestAccountSnapshot(t *testing.T) {
 func TestAccumulatorIgnoresStaleAndNamelessRepositoryRows(t *testing.T) {
 	now := time.Date(2026, 9, 7, 12, 0, 0, 0, time.UTC)
 	a := NewAccumulator("someone")
-	_ = a.Write(context.Background(), []Point{
+	_, _ = a.Write(context.Background(), []Point{
 		{
 			Measurement: "gh_repo", Tags: map[string]string{"repo": "a", "language": "Go"},
 			Fields: map[string]any{"stars": 4, "forks": 2}, Time: now,
@@ -224,7 +224,7 @@ func TestAccumulatorBreaksAStarTieByName(t *testing.T) {
 			Fields: map[string]any{"stars": stars}, Time: now,
 		})
 	}
-	_ = a.Write(context.Background(), pts)
+	_, _ = a.Write(context.Background(), pts)
 	var got []string
 	for _, r := range a.Card().TopRepos {
 		got = append(got, r.Name)
@@ -239,7 +239,7 @@ func TestAccumulatorBreaksAStarTieByName(t *testing.T) {
 func TestAccumulatorSumsTrafficPerKind(t *testing.T) {
 	now := time.Date(2026, 9, 7, 12, 0, 0, 0, time.UTC)
 	a := NewAccumulator("someone")
-	_ = a.Write(context.Background(), []Point{
+	_, _ = a.Write(context.Background(), []Point{
 		{Measurement: "gh_traffic", Tags: map[string]string{"kind": "clones"}, Fields: map[string]any{"count": 6}, Time: now},
 		{Measurement: "gh_traffic", Tags: map[string]string{"kind": "clones"}, Fields: map[string]any{"count": 1.0, "uniques": 1}, Time: now},
 		{Measurement: "gh_traffic", Tags: map[string]string{"kind": "views"}, Fields: map[string]any{"uniques": 9}, Time: now},
@@ -284,7 +284,7 @@ func TestTheAccumulatorIsTheCardSinkAndClosingKeepsTheCard(t *testing.T) {
 	if got := a.Name(); got != "card" {
 		t.Errorf("name = %q, want card", got)
 	}
-	if err := a.Write(context.Background(), points(time.Date(2026, 9, 7, 12, 0, 0, 0, time.UTC))); err != nil {
+	if _, err := a.Write(context.Background(), points(time.Date(2026, 9, 7, 12, 0, 0, 0, time.UTC))); err != nil {
 		t.Fatal(err)
 	}
 	if err := a.Close(); err != nil {

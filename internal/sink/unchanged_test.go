@@ -20,14 +20,14 @@ type recorder struct {
 
 func (r *recorder) Name() string { return r.name }
 func (r *recorder) Close() error { return nil }
-func (r *recorder) Write(_ context.Context, points []Point) error {
+func (r *recorder) Write(_ context.Context, points []Point) (int, error) {
 	if r.fail != nil {
-		return r.fail
+		return 0, r.fail
 	}
 	batch := make([]Point, len(points))
 	copy(batch, points)
 	r.writes = append(r.writes, batch)
-	return nil
+	return len(points), nil
 }
 
 func point(measurement, repo string, value int, at time.Time) Point {
@@ -46,10 +46,10 @@ func TestUnchangedPointsAreWrittenOnceAndChangedOnesAgain(t *testing.T) {
 	ctx := context.Background()
 
 	batch := []Point{point("gh_star", "a", 1, at), point("gh_star", "b", 2, at)}
-	if err := s.Write(ctx, batch); err != nil {
+	if _, err := s.Write(ctx, batch); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.Write(ctx, batch); err != nil {
+	if _, err := s.Write(ctx, batch); err != nil {
 		t.Fatal(err)
 	}
 	if len(inner.writes) != 1 || len(inner.writes[0]) != 2 {
@@ -58,7 +58,7 @@ func TestUnchangedPointsAreWrittenOnceAndChangedOnesAgain(t *testing.T) {
 
 	// A field that moved is a new observation, even at the same timestamp.
 	moved := []Point{point("gh_star", "a", 1, at), point("gh_star", "b", 3, at)}
-	if err := s.Write(ctx, moved); err != nil {
+	if _, err := s.Write(ctx, moved); err != nil {
 		t.Fatal(err)
 	}
 	if len(inner.writes) != 2 || len(inner.writes[1]) != 1 {
@@ -75,7 +75,7 @@ func TestADifferentTimestampIsADifferentPoint(t *testing.T) {
 	day := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 
 	for i := range 3 {
-		if err := s.Write(context.Background(), []Point{point("gh_traffic", "a", 7, day.AddDate(0, 0, i))}); err != nil {
+		if _, err := s.Write(context.Background(), []Point{point("gh_traffic", "a", 7, day.AddDate(0, 0, i))}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -93,7 +93,7 @@ func TestEachSinkGetsItsOwnAnswer(t *testing.T) {
 
 	batch := []Point{point("gh_repo", "a", 1, at)}
 	for _, s := range []Sink{a, b, a, b} {
-		if err := s.Write(context.Background(), batch); err != nil {
+		if _, err := s.Write(context.Background(), batch); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -108,11 +108,11 @@ func TestAFailedWriteIsNotRemembered(t *testing.T) {
 	s := OnlyChanged(inner, LoadLedger("", 0, 0))
 	batch := []Point{point("gh_repo", "a", 1, at)}
 
-	if err := s.Write(context.Background(), batch); err == nil {
+	if _, err := s.Write(context.Background(), batch); err == nil {
 		t.Fatal("a failing sink reported success")
 	}
 	inner.fail = nil
-	if err := s.Write(context.Background(), batch); err != nil {
+	if _, err := s.Write(context.Background(), batch); err != nil {
 		t.Fatal(err)
 	}
 	if len(inner.writes) != 1 {
@@ -128,7 +128,7 @@ func TestTheLedgerSurvivesARestart(t *testing.T) {
 
 	first := LoadLedger(path, 0, 0)
 	one := &recorder{name: "influxdb"}
-	if err := OnlyChanged(one, first).Write(context.Background(), batch); err != nil {
+	if _, err := OnlyChanged(one, first).Write(context.Background(), batch); err != nil {
 		t.Fatal(err)
 	}
 	if err := first.Save(); err != nil {
@@ -143,7 +143,7 @@ func TestTheLedgerSurvivesARestart(t *testing.T) {
 		t.Fatalf("read back %d points, wrote 2", second.Len())
 	}
 	two := &recorder{name: "influxdb"}
-	if err := OnlyChanged(two, second).Write(context.Background(), batch); err != nil {
+	if _, err := OnlyChanged(two, second).Write(context.Background(), batch); err != nil {
 		t.Fatal(err)
 	}
 	if len(two.writes) != 0 {
@@ -166,7 +166,7 @@ func TestSaveForgetsWhatNothingOffersAnyMore(t *testing.T) {
 	l := LoadLedger(path, time.Hour, 0) // a one hour horizon, so a day is stale
 	at := time.Date(2026, 5, 5, 0, 0, 0, 0, time.UTC)
 	inner := &recorder{name: "influxdb"}
-	if err := OnlyChanged(inner, l).Write(context.Background(), []Point{point("gh_star", "a", 1, at)}); err != nil {
+	if _, err := OnlyChanged(inner, l).Write(context.Background(), []Point{point("gh_star", "a", 1, at)}); err != nil {
 		t.Fatal(err)
 	}
 	// Backdate the entry, which is what a collector that stopped producing it
@@ -190,7 +190,7 @@ func TestANilLedgerWritesEverything(t *testing.T) {
 	at := time.Date(2026, 6, 6, 0, 0, 0, 0, time.UTC)
 	batch := []Point{point("gh_star", "a", 1, at)}
 	for range 3 {
-		if err := s.Write(context.Background(), batch); err != nil {
+		if _, err := s.Write(context.Background(), batch); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -208,10 +208,10 @@ func TestAnEmptyTagIsNotPartOfIdentity(t *testing.T) {
 	b.Tags["branch"] = ""
 	inner := &recorder{name: "influxdb"}
 	s := OnlyChanged(inner, LoadLedger("", 0, 0))
-	if err := s.Write(context.Background(), []Point{a}); err != nil {
+	if _, err := s.Write(context.Background(), []Point{a}); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.Write(context.Background(), []Point{b}); err != nil {
+	if _, err := s.Write(context.Background(), []Point{b}); err != nil {
 		t.Fatal(err)
 	}
 	if len(inner.writes) != 1 {
@@ -239,7 +239,7 @@ func TestTheLedgerIsForThisProcessAlone(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "written.bin")
 	l := LoadLedger(path, 0, 0)
 	at := time.Date(2026, 6, 6, 0, 0, 0, 0, time.UTC)
-	if err := OnlyChanged(&recorder{name: "influxdb"}, l).Write(
+	if _, err := OnlyChanged(&recorder{name: "influxdb"}, l).Write(
 		context.Background(), []Point{point("gh_star", "a", 1, at)},
 	); err != nil {
 		t.Fatal(err)
@@ -350,7 +350,7 @@ func TestAnUnchangedPointStillOfferedIsNotPruned(t *testing.T) {
 	inner := &recorder{name: "influxdb"}
 	s := OnlyChanged(inner, l)
 	batch := []Point{point("gh_star", "a", 1, time.Date(2026, 5, 5, 0, 0, 0, 0, time.UTC))}
-	if err := s.Write(context.Background(), batch); err != nil {
+	if _, err := s.Write(context.Background(), batch); err != nil {
 		t.Fatal(err)
 	}
 	l.mu.Lock()
@@ -358,7 +358,7 @@ func TestAnUnchangedPointStillOfferedIsNotPruned(t *testing.T) {
 		l.seen[id] = entry{value: e.value, day: e.day - 2}
 	}
 	l.mu.Unlock()
-	if err := s.Write(context.Background(), batch); err != nil {
+	if _, err := s.Write(context.Background(), batch); err != nil {
 		t.Fatal(err)
 	}
 	if err := l.Save(); err != nil {
@@ -504,7 +504,7 @@ func TestAFieldTheLineProtocolDropsIsNotAChange(t *testing.T) {
 	inner := &recorder{name: "influxdb"}
 	s := OnlyChanged(inner, LoadLedger("", 0, 0))
 	for _, p := range []Point{a, b} {
-		if err := s.Write(context.Background(), []Point{p}); err != nil {
+		if _, err := s.Write(context.Background(), []Point{p}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -522,13 +522,13 @@ func TestUnchangedCountsThePointsItSpared(t *testing.T) {
 		t.Errorf("Name = %q, want the wrapped sink's", u.Name())
 	}
 	batch := []Point{point("gh_star", "a", 1, at), point("gh_star", "b", 1, at)}
-	if err := u.Write(context.Background(), batch); err != nil {
+	if _, err := u.Write(context.Background(), batch); err != nil {
 		t.Fatal(err)
 	}
 	if n := u.Dropped(); n != 0 {
 		t.Errorf("Dropped = %d after a new batch, want 0", n)
 	}
-	if err := u.Write(context.Background(), batch); err != nil {
+	if _, err := u.Write(context.Background(), batch); err != nil {
 		t.Fatal(err)
 	}
 	if n := u.Dropped(); n != 2 {
@@ -548,11 +548,11 @@ func TestAPartlyRefusedWriteIsRemembered(t *testing.T) {
 		inner := &recorder{name: "influxdb", fail: partial}
 		s := OnlyChanged(inner, LoadLedger("", 0, 0))
 		batch := []Point{point("gh_repo", "a", 1, at)}
-		if err := s.Write(context.Background(), batch); !errors.Is(err, partial) {
+		if _, err := s.Write(context.Background(), batch); !errors.Is(err, partial) {
 			t.Fatalf("Write = %v, want %v passed on", err, partial)
 		}
 		inner.fail = nil
-		if err := s.Write(context.Background(), batch); err != nil {
+		if _, err := s.Write(context.Background(), batch); err != nil {
 			t.Fatal(err)
 		}
 		if len(inner.writes) != 0 {

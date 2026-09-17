@@ -284,20 +284,33 @@ type lokiEntry struct {
 // A write is three steps, and the middle one is the reason this is not a
 // single loop: what Loki accepts depends on the newest entry in each stream,
 // which is not known until every point has been read.
-func (l *Loki) Write(ctx context.Context, points []Point) error {
+// Write pushes the points that have an event rendering and are recent enough
+// for the stream they belong to.
+//
+// Most of a sweep is not counted as written here, and that is the point of the
+// count. This sink renders about a dozen measurements of the ninety the
+// collectors produce, and it says so nowhere else: a measurement with no rule
+// is dropped inside eventsByStream without a word. A caller that counted what
+// it handed over would credit Loki with storing every point of every family,
+// which is what the runner used to do.
+func (l *Loki) Write(ctx context.Context, points []Point) (int, error) {
 	grouped, newest, old := l.eventsByStream(points)
 	values, behind := l.admit(grouped, newest)
 	dropped := old + behind
 
+	written := 0
+	for _, entries := range values {
+		written += len(entries)
+	}
 	if len(values) > 0 {
 		if err := l.push(ctx, values); err != nil {
-			return err
+			return 0, err
 		}
 	}
 	if dropped > 0 {
-		return &DroppedError{N: dropped, Older: l.MaxAge}
+		return written, &DroppedError{N: dropped, Older: l.MaxAge}
 	}
-	return nil
+	return written, nil
 }
 
 // eventsByStream turns the points that have an event rule into log lines,

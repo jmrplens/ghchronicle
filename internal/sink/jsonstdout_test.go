@@ -17,7 +17,7 @@ func TestStdoutJSONMatchesTheFileSink(t *testing.T) {
 	}
 	var buf bytes.Buffer
 	s := newStdoutJSON(&buf)
-	if err := s.Write(context.Background(), []Point{p}); err != nil {
+	if _, err := s.Write(context.Background(), []Point{p}); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.Close(); err != nil {
@@ -44,7 +44,7 @@ func TestStdoutJSONFlushesEveryBatchAndReportsFailures(t *testing.T) {
 	var buf bytes.Buffer
 	s := newStdoutJSON(&buf)
 	at := time.Unix(0, 0)
-	if err := s.Write(context.Background(), []Point{
+	if _, err := s.Write(context.Background(), []Point{
 		{Measurement: "a", Fields: map[string]any{"v": 1}, Time: at},
 		{Measurement: "b", Fields: map[string]any{"v": 2}, Time: at},
 	}); err != nil {
@@ -56,11 +56,11 @@ func TestStdoutJSONFlushesEveryBatchAndReportsFailures(t *testing.T) {
 		t.Errorf("stdout before Close = %q, want %q", buf.String(), want)
 	}
 
-	if err := newStdoutJSON(&buf).Write(context.Background(), []Point{{Measurement: "m", Fields: map[string]any{"v": math.NaN()}, Time: at}}); err == nil {
+	if _, err := newStdoutJSON(&buf).Write(context.Background(), []Point{{Measurement: "m", Fields: map[string]any{"v": math.NaN()}, Time: at}}); err == nil {
 		t.Error("Write accepted a field JSON cannot hold")
 	}
 	long := Point{Measurement: strings.Repeat("m", 8192), Fields: map[string]any{"v": 1}, Time: at}
-	if err := newStdoutJSON(failingWriter{}).Write(context.Background(), []Point{long, long}); err == nil {
+	if _, err := newStdoutJSON(failingWriter{}).Write(context.Background(), []Point{long, long}); err == nil {
 		t.Error("Write reported success through a writer that refused a line too long to buffer")
 	}
 }

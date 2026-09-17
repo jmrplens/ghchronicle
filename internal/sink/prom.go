@@ -82,11 +82,17 @@ func (p *Prom) Close() error {
 	return p.srv.Shutdown(ctx)
 }
 
-func (p *Prom) Write(_ context.Context, points []Point) error {
+// Write folds the batch into the exposition page.
+//
+// The count is what the reducer took, not what the page gained: the exporter
+// holds current state, so a point that updates a series it already had is
+// accepted without adding one. What it does not take is a measurement with no
+// rule, which the exporter skips on purpose, and that is most of a sweep.
+func (p *Prom) Write(_ context.Context, points []Point) (int, error) {
 	// Reduced first: the collectors emit one row per fact, and Prometheus
 	// wants one series per thing that has a current value. Summarize is where
 	// that difference is decided, measurement by measurement.
-	points = p.reducer.Reduce(points)
+	points, taken := p.reducer.Reduce(points)
 	now := time.Now()
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -107,7 +113,7 @@ func (p *Prom) Write(_ context.Context, points []Point) error {
 			delete(p.samples, key)
 		}
 	}
-	return nil
+	return taken, nil
 }
 
 func (p *Prom) handle(w http.ResponseWriter, _ *http.Request) {

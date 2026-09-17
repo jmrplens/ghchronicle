@@ -27,7 +27,7 @@ func TestLokiSendsOnlyEvents(t *testing.T) {
 	defer srv.Close()
 
 	now := time.Now()
-	err := NewLoki(srv.URL, "", nil, 0, 0, 0).Write(context.Background(), []Point{
+	_, err := NewLoki(srv.URL, "", nil, 0, 0, 0).Write(context.Background(), []Point{
 		{
 			Measurement: "gh_star", Tags: map[string]string{"user": "someone", "full_name": "o/r"},
 			Fields: map[string]any{"starred": 1}, Time: now,
@@ -68,7 +68,7 @@ func TestLokiOrdersEntriesInEachStream(t *testing.T) {
 
 	now := time.Now()
 	// Deliberately out of order: Loki rejects a stream whose entries descend.
-	err := NewLoki(srv.URL, "", nil, 0, 0, 0).Write(context.Background(), []Point{
+	_, err := NewLoki(srv.URL, "", nil, 0, 0, 0).Write(context.Background(), []Point{
 		{Measurement: "gh_star", Tags: map[string]string{"user": "b"}, Fields: map[string]any{"starred": 1}, Time: now},
 		{Measurement: "gh_star", Tags: map[string]string{"user": "a"}, Fields: map[string]any{"starred": 1}, Time: now.Add(-time.Minute)},
 	})
@@ -94,7 +94,7 @@ func TestLokiDropsEntriesLokiWouldReject(t *testing.T) {
 	// A star from years ago is normal here: the collector recovers the whole
 	// history. Loki refuses the entire push for one such line, so the sink has
 	// to leave it out rather than lose the batch.
-	err := NewLoki(srv.URL, "", nil, 0, 24*time.Hour, 0).Write(context.Background(), []Point{
+	_, err := NewLoki(srv.URL, "", nil, 0, 24*time.Hour, 0).Write(context.Background(), []Point{
 		{
 			Measurement: "gh_star", Tags: map[string]string{"user": "old"},
 			Fields: map[string]any{"starred": 1}, Time: now.AddDate(-3, 0, 0),
@@ -121,7 +121,7 @@ func TestLokiReportsWhenEverythingWasTooOld(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	err := NewLoki(srv.URL, "", nil, 0, time.Hour, 0).Write(context.Background(), []Point{
+	_, err := NewLoki(srv.URL, "", nil, 0, time.Hour, 0).Write(context.Background(), []Point{
 		{
 			Measurement: "gh_star", Tags: map[string]string{"user": "old"},
 			Fields: map[string]any{"starred": 1}, Time: time.Now().AddDate(-1, 0, 0),
@@ -150,7 +150,7 @@ func TestLokiRefusesToFallBehindItsOwnStream(t *testing.T) {
 	l := NewLoki(srv.URL, "", nil, 0, 30*time.Minute, 0)
 
 	// A recent entry establishes the stream's high-water mark.
-	if err := l.Write(context.Background(), []Point{
+	if _, err := l.Write(context.Background(), []Point{
 		{
 			Measurement: "gh_star", Tags: map[string]string{"user": "new"},
 			Fields: map[string]any{"starred": 1}, Time: now,
@@ -163,7 +163,7 @@ func TestLokiRefusesToFallBehindItsOwnStream(t *testing.T) {
 	// newest one already in that stream, even when the entry is well inside
 	// reject_old_samples_max_age. Measured against a real Loki 3: a stream
 	// holding 19:14 rejected 00:35 of the same day.
-	err := l.Write(context.Background(), []Point{
+	_, err := l.Write(context.Background(), []Point{
 		{
 			Measurement: "gh_star", Tags: map[string]string{"user": "behind"},
 			Fields: map[string]any{"starred": 1}, Time: now.Add(-45 * time.Minute),
@@ -191,7 +191,7 @@ func TestLokiKeepsTheSpreadInsideOneBatch(t *testing.T) {
 	// The rule has to be applied within the batch as well. Loki takes the
 	// newest entry of the push and judges the rest against it, so a batch
 	// spanning a day fails on its own first push without this.
-	err := NewLoki(srv.URL, "", nil, 0, 20*time.Minute, 0).Write(context.Background(), []Point{
+	_, err := NewLoki(srv.URL, "", nil, 0, 20*time.Minute, 0).Write(context.Background(), []Point{
 		{
 			Measurement: "gh_star", Tags: map[string]string{"user": "new"},
 			Fields: map[string]any{"starred": 1}, Time: now,
@@ -221,7 +221,7 @@ func TestLokiNamesTheWorkflowByItsPath(t *testing.T) {
 
 	// A dynamic run, where the two candidates disagree the most: the path
 	// identifies CodeQL and the name is whatever the pull request is called.
-	err := NewLoki(srv.URL, "", nil, 0, 0, 0).Write(context.Background(), []Point{
+	_, err := NewLoki(srv.URL, "", nil, 0, 0, 0).Write(context.Background(), []Point{
 		{
 			Measurement: "gh_workflow_run",
 			Tags: map[string]string{
@@ -339,7 +339,7 @@ func TestLokiRendersTheTwoDatedEventsThatHadNoLine(t *testing.T) {
 	defer srv.Close()
 
 	now := time.Now()
-	err := NewLoki(srv.URL, "", nil, 0, 0, 0).Write(context.Background(), []Point{
+	_, err := NewLoki(srv.URL, "", nil, 0, 0, 0).Write(context.Background(), []Point{
 		{
 			Measurement: "gh_deployment",
 			Tags: map[string]string{
@@ -404,7 +404,7 @@ func TestLokiRendersACodeScanningAnalysis(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	err := NewLoki(srv.URL, "", nil, 0, 0, 0).Write(context.Background(), []Point{
+	_, err := NewLoki(srv.URL, "", nil, 0, 0, 0).Write(context.Background(), []Point{
 		{
 			Measurement: "gh_code_scanning_analysis",
 			Tags: map[string]string{
@@ -442,7 +442,7 @@ func TestLokiRendersARulesetVersion(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	err := NewLoki(srv.URL, "", nil, 0, 0, 0).Write(context.Background(), []Point{
+	_, err := NewLoki(srv.URL, "", nil, 0, 0, 0).Write(context.Background(), []Point{
 		{
 			Measurement: "gh_ruleset_version",
 			Tags: map[string]string{
@@ -489,7 +489,7 @@ func TestLokiReadsTheDemotedStatesFromFields(t *testing.T) {
 	defer srv.Close()
 
 	now := time.Now()
-	err := NewLoki(srv.URL, "", nil, 0, 0, 0).Write(context.Background(), []Point{
+	_, err := NewLoki(srv.URL, "", nil, 0, 0, 0).Write(context.Background(), []Point{
 		{
 			Measurement: "gh_dependabot_alert_item",
 			Tags:        map[string]string{"severity": "high", "package": "vite", "full_name": "o/r", "ecosystem": "npm"},
@@ -607,10 +607,10 @@ func TestLokiRendersAnAbsentFieldAsNothing(t *testing.T) {
 func TestLokiSendsTheTenantOnlyWhenOneIsSet(t *testing.T) {
 	rec, url := newLokiRecorder(t, 0)
 	now := time.Now()
-	if err := NewLoki(url, "team-a", nil, 0, 0, 0).Write(context.Background(), []Point{starAt("a", now)}); err != nil {
+	if _, err := NewLoki(url, "team-a", nil, 0, 0, 0).Write(context.Background(), []Point{starAt("a", now)}); err != nil {
 		t.Fatal(err)
 	}
-	if err := NewLoki(url, "", nil, 0, 0, 0).Write(context.Background(), []Point{starAt("a", now)}); err != nil {
+	if _, err := NewLoki(url, "", nil, 0, 0, 0).Write(context.Background(), []Point{starAt("a", now)}); err != nil {
 		t.Fatal(err)
 	}
 	if len(rec.tenants) != 2 || rec.tenants[0] != "team-a" || rec.tenants[1] != "" {
@@ -625,7 +625,7 @@ func TestLokiReportsAFailedPush(t *testing.T) {
 	now := time.Now()
 	for _, status := range []int{http.StatusMultipleChoices, http.StatusTooManyRequests} {
 		_, url := newLokiRecorder(t, status)
-		err := NewLoki(url, "", nil, 0, 0, 0).Write(context.Background(), []Point{starAt("a", now)})
+		_, err := NewLoki(url, "", nil, 0, 0, 0).Write(context.Background(), []Point{starAt("a", now)})
 		want := fmt.Sprintf("loki push: %d %s: too many streams", status, http.StatusText(status))
 		if err == nil || err.Error() != want {
 			t.Errorf("Write = %v, want %q", err, want)
@@ -633,7 +633,7 @@ func TestLokiReportsAFailedPush(t *testing.T) {
 	}
 	closed := httptest.NewServer(http.NotFoundHandler())
 	closed.Close()
-	if err := NewLoki(closed.URL, "", nil, 0, 0, 0).Write(context.Background(), []Point{starAt("a", now)}); err == nil {
+	if _, err := NewLoki(closed.URL, "", nil, 0, 0, 0).Write(context.Background(), []Point{starAt("a", now)}); err == nil {
 		t.Error("Write reported success to a Loki that is not there")
 	}
 }
@@ -649,7 +649,7 @@ func TestLokiFlushesAStreamThatFillsTheBatch(t *testing.T) {
 	// own and the star follows in a push of its own.
 	points := []Point{starAt("a", now), fork("b", now), fork("c", now.Add(time.Second))}
 	rec, url := newLokiRecorder(t, 0)
-	if err := NewLoki(url, "", nil, 2, 0, 0).Write(context.Background(), points); err != nil {
+	if _, err := NewLoki(url, "", nil, 2, 0, 0).Write(context.Background(), points); err != nil {
 		t.Fatal(err)
 	}
 	if len(rec.pushes) != 2 || len(rec.pushes[0].Streams) != 1 || rec.pushes[0].Streams[0].Stream["kind"] != "fork" ||
@@ -660,7 +660,7 @@ func TestLokiFlushesAStreamThatFillsTheBatch(t *testing.T) {
 	// A batch of one flushes every stream as it comes, so the push after the
 	// loop has nothing left and must not be sent as an empty one.
 	rec, url = newLokiRecorder(t, 0)
-	if err := NewLoki(url, "", nil, 1, 0, 0).Write(context.Background(), points); err != nil {
+	if _, err := NewLoki(url, "", nil, 1, 0, 0).Write(context.Background(), points); err != nil {
 		t.Fatal(err)
 	}
 	if len(rec.pushes) != 2 || len(rec.pushes[0].Streams) != 1 || len(rec.pushes[1].Streams) != 1 {
@@ -668,7 +668,7 @@ func TestLokiFlushesAStreamThatFillsTheBatch(t *testing.T) {
 	}
 
 	rec, url = newLokiRecorder(t, http.StatusInternalServerError)
-	if err := NewLoki(url, "", nil, 1, 0, 0).Write(context.Background(), points); err == nil || len(rec.pushes) != 1 {
+	if _, err := NewLoki(url, "", nil, 1, 0, 0).Write(context.Background(), points); err == nil || len(rec.pushes) != 1 {
 		t.Errorf("Write = %v after %d pushes, want the first failure and nothing after it", err, len(rec.pushes))
 	}
 }
@@ -678,7 +678,7 @@ func TestLokiFlushesAStreamThatFillsTheBatch(t *testing.T) {
 func TestLokiSortsEachStreamWhateverOrderItArrivedIn(t *testing.T) {
 	rec, url := newLokiRecorder(t, 0)
 	now := time.Now()
-	err := NewLoki(url, "", nil, 0, 0, 0).Write(context.Background(), []Point{
+	_, err := NewLoki(url, "", nil, 0, 0, 0).Write(context.Background(), []Point{
 		starAt("a", now.Add(-2*time.Second)), starAt("b", now.Add(-time.Second)), starAt("c", now),
 		starAt("d", now.Add(-3*time.Second)),
 	})
@@ -703,10 +703,10 @@ func TestLokiJudgesAPushByTheNewestEntryAlreadySent(t *testing.T) {
 	rec, url := newLokiRecorder(t, 0)
 	now := time.Now()
 	l := NewLoki(url, "", nil, 0, time.Hour, 0)
-	if err := l.Write(context.Background(), []Point{starAt("ahead", now.Add(30*time.Minute))}); err != nil {
+	if _, err := l.Write(context.Background(), []Point{starAt("ahead", now.Add(30*time.Minute))}); err != nil {
 		t.Fatal(err)
 	}
-	err := l.Write(context.Background(), []Point{starAt("behind", now.Add(-45*time.Minute)), starAt("close", now.Add(-10*time.Minute))})
+	_, err := l.Write(context.Background(), []Point{starAt("behind", now.Add(-45*time.Minute)), starAt("close", now.Add(-10*time.Minute))})
 	var dropped *DroppedError
 	if !errors.As(err, &dropped) || dropped.N != 1 {
 		t.Fatalf("Write = %v, want one entry dropped behind the watermark", err)
@@ -723,7 +723,7 @@ func TestLokiJudgesAPushByTheNewestEntryAlreadySent(t *testing.T) {
 func TestLokiCountsBothKindsOfDroppedEntryTogether(t *testing.T) {
 	_, url := newLokiRecorder(t, 0)
 	now := time.Now()
-	err := NewLoki(url, "", nil, 0, time.Hour, 0).Write(context.Background(), []Point{
+	_, err := NewLoki(url, "", nil, 0, time.Hour, 0).Write(context.Background(), []Point{
 		starAt("ahead", now.Add(90*time.Minute)),
 		starAt("behind", now.Add(-10*time.Minute)),
 		starAt("old", now.AddDate(0, 0, -2)),

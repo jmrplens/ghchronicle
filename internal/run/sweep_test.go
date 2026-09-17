@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"path/filepath"
 	"strings"
@@ -30,7 +31,7 @@ type captured struct {
 func (c *captured) Name() string { return c.name }
 func (c *captured) Close() error { return nil }
 
-func (c *captured) Write(_ context.Context, points []sink.Point) error {
+func (c *captured) Write(_ context.Context, points []sink.Point) (int, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.measures == nil {
@@ -40,9 +41,9 @@ func (c *captured) Write(_ context.Context, points []sink.Point) error {
 		c.measures[p.Measurement]++
 	}
 	if c.fail != nil {
-		return c.fail()
+		return 0, c.fail()
 	}
-	return nil
+	return len(points), nil
 }
 
 // measured is how many points of measurement the sink received.
@@ -316,7 +317,7 @@ type excluding struct {
 	filtered uint64
 }
 
-func (e *excluding) Write(ctx context.Context, points []sink.Point) error {
+func (e *excluding) Write(ctx context.Context, points []sink.Point) (int, error) {
 	var kept []sink.Point
 	for _, p := range points {
 		if p.Measurement == e.skip {
@@ -375,5 +376,97 @@ func TestASinkThatWritesEverythingSaysNothingAboutFiltering(t *testing.T) {
 	r.finish()
 	if strings.Contains(log.String(), "filtered=") {
 		t.Errorf("a sink that wrote everything reported filtering:\n%s", log)
+	}
+}
+
+// collector is a sink that keeps every point it is given, which is how the
+// clock test below compares two sweeps line by line.
+type collector struct {
+	mu     sync.Mutex
+	points []sink.Point
+}
+
+func (c *collector) Name() string { return "collector" }
+func (c *collector) Close() error { return nil }
+
+func (c *collector) Write(_ context.Context, points []sink.Point) (int, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.points = append(c.points, points...)
+	return len(points), nil
+}
+
+// TestNoRowDatedInThePastMovesWithTheClock is the general form of the gate the
+// alert and fork collectors each carry: a row dated when the thing happened
+// must say the same thing whenever it is collected.
+//
+// A field computed from the sweep's clock and written on to such a row is
+// wrong twice. It is only true at the instant it was written, so a reader
+// asking about last week gets whatever the last sweep decided; and it changes
+// on every sweep, so every sweep rewrites a row dated in the past, which in
+// InfluxDB 3 leaves another parquet file in that old partition for ever.
+// Measured on 2026-09-17, two alert families and gh_fork were spending about
+// 260 files a day between them on nothing but the clock moving.
+//
+// This sweeps the whole fake account twice, three days apart, and compares
+// every row the two sweeps agree on the identity of. It is the version of the
+// fixture-scoped test in internal/collect that a new collector cannot slip
+// past: every family the fake answers is covered the moment it exists.
+func TestNoRowDatedInThePastMovesWithTheClock(t *testing.T) {
+	t.Parallel()
+	// A Monday, and three days is the Thursday of the same week: the weekly
+	// commit series is positional against the clock, fifty two entries ending
+	// at the current week, and a fake that answers the same array whatever the
+	// date would shift it a row if the two sweeps fell either side of a
+	// Sunday. That is the fixture standing still, not a collector reading the
+	// clock.
+	first := time.Date(2026, 9, 14, 9, 0, 0, 0, time.UTC)
+	sweep := func(at time.Time) []sink.Point {
+		got := &collector{}
+		r, _, log := fakeRunner(t, got)
+		r.Now = func() time.Time { return at }
+		if err := r.Once(t.Context()); err != nil {
+			t.Fatalf("sweep at %s: %v\n%s", at, err, log)
+		}
+		return got.points
+	}
+	// Rows dated at the current day or at the sweep itself are current state
+	// and are meant to move; everything before the start of the first sweep's
+	// day is history and is not.
+	history := first.UTC().Truncate(24 * time.Hour)
+	index := func(points []sink.Point) map[string]string {
+		out := map[string]string{}
+		for _, p := range points {
+			if !p.Time.Before(history) {
+				continue
+			}
+			line := sink.LineProtocol(p)
+			if line == "" {
+				continue
+			}
+			// The identity a store keys a row by, which is the line without
+			// its fields: two sweeps that write the same row must write the
+			// same values into it.
+			out[p.Measurement+"|"+fmt.Sprint(p.Tags)+"|"+p.Time.String()] = line
+		}
+		return out
+	}
+	before, after := index(sweep(first)), index(sweep(first.AddDate(0, 0, 3)))
+	shared := 0
+	for key, line := range before {
+		later, both := after[key]
+		if !both {
+			continue
+		}
+		shared++
+		if line != later {
+			t.Errorf("a row dated in the past moved with the clock:\n at the time %s\nthree days later %s",
+				line, later)
+		}
+	}
+	// A guard against the comparison quietly covering nothing, which is what
+	// a change to the fake or to the filter above would do first.
+	if shared < 100 {
+		t.Fatalf("only %d past-dated rows were written by both sweeps, so this checks almost nothing", shared)
 	}
 }

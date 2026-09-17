@@ -90,25 +90,29 @@ func (f *File) Close() error {
 	return err
 }
 
-func (f *File) Write(_ context.Context, points []Point) error {
+// Write appends one line per point. A point that renders no line, which in
+// line protocol is one carrying no usable field, is not counted as written.
+func (f *File) Write(_ context.Context, points []Point) (int, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if err := f.open(); err != nil {
-		return err
+		return 0, err
 	}
+	written := 0
 	for _, p := range points {
 		line, err := f.render(p)
 		if err != nil {
-			return err
+			return written, err
 		}
 		if line == "" {
 			continue
 		}
 		if _, err = f.appendLine(line); err != nil {
-			return err
+			return written, err
 		}
+		written++
 	}
-	return nil
+	return written, nil
 }
 
 // appendLine writes one line to the open file and rotates once the file has

@@ -37,12 +37,12 @@ func TestLiveSinks(t *testing.T) {
 	ctx := t.Context()
 
 	if ep := os.Getenv("GHC_LIVE_OTLP"); ep != "" {
-		if err := sink.NewOTLP(ep, "ghchronicle-smoke", nil, false, 0, 0).Write(ctx, points); err != nil {
+		if _, err := sink.NewOTLP(ep, "ghchronicle-smoke", nil, false, 0, 0).Write(ctx, points); err != nil {
 			t.Errorf("otlp: %v", err)
 		}
 	}
 	if url := os.Getenv("GHC_LIVE_LOKI"); url != "" {
-		if err := sink.NewLoki(url, "", map[string]string{"source": "smoke"}, 0, 0, 0).Write(ctx, points); err != nil {
+		if _, err := sink.NewLoki(url, "", map[string]string{"source": "smoke"}, 0, 0, 0).Write(ctx, points); err != nil {
 			t.Errorf("loki: %v", err)
 		}
 	}

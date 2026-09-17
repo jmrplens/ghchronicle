@@ -110,6 +110,30 @@ crecimiento pero no los quita: sube `--query-file-limit` en el servidor,
 reescribe las tablas afectadas, o pasa a InfluxDB 3 Enterprise, que compacta
 por su cuenta y es gratis para uso doméstico.
 
+## Qué cuenta la línea de escritura
+
+`points` es lo que aceptó ese destino, no lo que se le entregó. Todos los
+destinos descartan algo por su cuenta dentro de la escritura: InfluxDB se salta
+las medidas que nombra [`exclude`](/ghchronicle/es/sinks/influxdb/#exclude),
+Loki se queda solo con las medidas para las que tiene una representación de
+evento y tira el resto, los destinos SQL, Graphite, Telegraf, fichero y stdout
+se saltan un punto que no genera fila ni línea, y los dos exportadores se saltan
+una medida para la que no tienen regla. Cuando eso pasa aparece una tercera
+clave:
+
+```text
+level=INFO msg=written sink=loki family=repos points=0 unchanged=0 filtered=42
+```
+
+`filtered` es lo que el destino no escribió, y la pasada imprime el total de
+cada destino una vez al final. Las líneas que un almacén no supo analizar
+tampoco cuentan como escritas; esas llevan su propia línea de aviso.
+
+Hasta que se contó, la línea decía lo que el runner había entregado, así que una
+pasada leía `points=440` de una medida que InfluxDB excluye por omisión y de la
+que no ha tenido nunca una fila, y leer las líneas de Loki no decía nada de lo
+que Loki había guardado.
+
 ## Por dónde empezar
 
 <CardGrid>

@@ -71,12 +71,11 @@ the sweep log says what the database took rather than what it was handed:
 level=INFO msg=written sink=influxdb family=joblogs points=0 unchanged=0 filtered=440
 ```
 
-`points` is what was written, `unchanged` what the write ledger had already
-sent, and `filtered` what this sink dropped: a measurement named here, and any
-point carrying no field the line protocol can render. The key appears only when
-there is something to report, and the sweep's own total is printed once at the
-end. Until this was counted the line read `points=440` for a measurement the
-database has never held a row of.
+`filtered` here is a measurement named above, or a point carrying no field the
+line protocol can render. It is [the same key every sink
+uses](/ghchronicle/sinks/#what-the-written-line-counts). Until this was counted
+the line read `points=440` for a measurement the database has never held a row
+of.
 
 ## Column types are fixed on first sight
 

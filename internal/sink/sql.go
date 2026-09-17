@@ -80,7 +80,9 @@ func (s *SQL) Close() error {
 	return nil
 }
 
-func (s *SQL) Write(_ context.Context, points []Point) error {
+// Write emits one INSERT per point. A point that builds no statement, which is
+// one with no column to set, is not counted as written.
+func (s *SQL) Write(_ context.Context, points []Point) (int, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.tables == nil {
@@ -88,10 +90,11 @@ func (s *SQL) Write(_ context.Context, points []Point) error {
 	}
 	if s.file != nil {
 		if err := s.file.open(); err != nil {
-			return err
+			return 0, err
 		}
 	}
 	shapes := sqlShapes(points)
+	written := 0
 	for _, p := range points {
 		stmt := s.insert(p, shapes[p.Measurement])
 		if stmt == "" {
@@ -101,16 +104,17 @@ func (s *SQL) Write(_ context.Context, points []Point) error {
 		// the middle of the batch starts a new file that has to declare the
 		// table again before the next INSERT lands in it.
 		if err := s.declare(p.Measurement, shapes[p.Measurement]); err != nil {
-			return err
+			return written, err
 		}
 		if err := s.emit(stmt); err != nil {
-			return err
+			return written, err
 		}
+		written++
 	}
 	if s.w != nil {
-		return s.w.Flush()
+		return written, s.w.Flush()
 	}
-	return nil
+	return written, nil
 }
 
 // sqlShape is the union of what a batch carries for one measurement. The

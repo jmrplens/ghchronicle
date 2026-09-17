@@ -110,11 +110,11 @@ type kept struct {
 func (k *kept) Name() string { return "kept" }
 func (k *kept) Close() error { return nil }
 
-func (k *kept) Write(_ context.Context, points []sink.Point) error {
+func (k *kept) Write(_ context.Context, points []sink.Point) (int, error) {
 	k.mu.Lock()
 	defer k.mu.Unlock()
 	k.points = append(k.points, points...)
-	return nil
+	return len(points), nil
 }
 
 // rows is every point of the measurement, in the order they were written.

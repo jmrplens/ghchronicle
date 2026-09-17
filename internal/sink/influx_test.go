@@ -96,7 +96,7 @@ func TestInfluxPostsLineProtocolInBatches(t *testing.T) {
 		{Measurement: "gh_log", Tags: map[string]string{"repo": "a"}, Fields: map[string]any{"line": "x"}},
 		{Measurement: "gh_star", Tags: map[string]string{"repo": "no-fields"}},
 	}
-	if err := i.Write(t.Context(), points); err != nil {
+	if _, err := i.Write(t.Context(), points); err != nil {
 		t.Fatalf("Write: %v", err)
 	}
 	if got := s.written(); len(got) != 3 || !strings.HasPrefix(got[0], "gh_star,repo=a starred=1i 1700000000000000000") {
@@ -125,7 +125,7 @@ func TestInfluxBisectsOutTheLineItCannotParse(t *testing.T) {
 	i.OnReject = func(line string) { rejected = append(rejected, line) }
 	long := "unparseable" + strings.Repeat("x", 400)
 	points := []Point{star("a"), star("b"), star(long), star("c"), star("d")}
-	err := i.Write(t.Context(), points)
+	_, err := i.Write(t.Context(), points)
 	var re *RejectedError
 	if !errors.As(err, &re) || re.N != 1 {
 		t.Fatalf("Write = %v, want one line reported as rejected", err)
@@ -147,7 +147,7 @@ func TestInfluxBisectsOutTheLineItCannotParse(t *testing.T) {
 func TestInfluxWithoutARejectHookStillSkipsTheLine(t *testing.T) {
 	t.Parallel()
 	s, url := newInfluxServer(t, 0)
-	err := NewInflux(url, "tok", "acme", "gh", 0, 0).Write(t.Context(), []Point{star("unparseable"), star("a")})
+	_, err := NewInflux(url, "tok", "acme", "gh", 0, 0).Write(t.Context(), []Point{star("unparseable"), star("a")})
 	if _, ok := errors.AsType[*RejectedError](err); !ok || len(s.written()) != 1 {
 		t.Errorf("Write = %v with %q written, want the good line written and the bad one counted", err, s.written())
 	}
@@ -159,7 +159,7 @@ func TestInfluxWithoutARejectHookStillSkipsTheLine(t *testing.T) {
 func TestInfluxFailsOnAnythingButAParseRejection(t *testing.T) {
 	t.Parallel()
 	_, url := newInfluxServer(t, http.StatusInternalServerError)
-	err := NewInflux(url, "tok", "acme", "gh", 0, 0).Write(t.Context(), []Point{star("a")})
+	_, err := NewInflux(url, "tok", "acme", "gh", 0, 0).Write(t.Context(), []Point{star("a")})
 	if err == nil || err.Error() != "influx write: 500 Internal Server Error: internal error" {
 		t.Errorf("Write = %v, want the status and the trimmed body", err)
 	}
@@ -180,7 +180,7 @@ func TestInfluxFailsOnAnythingButAParseRejection(t *testing.T) {
 		w.WriteHeader(http.StatusServiceUnavailable)
 	}))
 	t.Cleanup(srv.Close)
-	err = NewInflux(srv.URL, "tok", "acme", "gh", 0, 0).Write(t.Context(), []Point{star("a"), star("b"), star("c")})
+	_, err = NewInflux(srv.URL, "tok", "acme", "gh", 0, 0).Write(t.Context(), []Point{star("a"), star("b"), star("c")})
 	if err == nil || !strings.Contains(err.Error(), "503 Service Unavailable") {
 		t.Errorf("Write = %v, want the failure met while bisecting", err)
 	}
@@ -190,16 +190,16 @@ func TestInfluxFailsOnAnythingButAParseRejection(t *testing.T) {
 // sending anything, and reports a server that is not there.
 func TestInfluxRefusesAnEndpointItCannotUse(t *testing.T) {
 	t.Parallel()
-	if err := NewInflux("ftp://influx.test", "", "o", "b", 0, 0).Write(t.Context(), []Point{star("a")}); err == nil ||
+	if _, err := NewInflux("ftp://influx.test", "", "o", "b", 0, 0).Write(t.Context(), []Point{star("a")}); err == nil ||
 		!strings.HasPrefix(err.Error(), "influx write: endpoint ") {
 		t.Errorf("Write = %v, want the endpoint refused", err)
 	}
-	if err := NewInflux("http://influx\x7f.test", "", "o", "b", 0, 0).Write(t.Context(), []Point{star("a")}); err == nil {
+	if _, err := NewInflux("http://influx\x7f.test", "", "o", "b", 0, 0).Write(t.Context(), []Point{star("a")}); err == nil {
 		t.Error("Write accepted a URL a request cannot be built from")
 	}
 	closed := httptest.NewServer(http.NotFoundHandler())
 	closed.Close()
-	if err := NewInflux(closed.URL, "", "o", "b", 0, 0).Write(t.Context(), []Point{star("a")}); err == nil {
+	if _, err := NewInflux(closed.URL, "", "o", "b", 0, 0).Write(t.Context(), []Point{star("a")}); err == nil {
 		t.Error("Write reported success to a server that is not there")
 	}
 }
@@ -225,13 +225,13 @@ func TestInfluxSendsNothingWhenNothingRenders(t *testing.T) {
 	t.Parallel()
 	s, url := newInfluxServer(t, 0)
 	i := NewInflux(url, "tok", "acme", "gh", 2, 0)
-	if err := i.Write(t.Context(), []Point{{Measurement: "gh_star", Tags: map[string]string{"repo": "a"}}}); err != nil {
+	if _, err := i.Write(t.Context(), []Point{{Measurement: "gh_star", Tags: map[string]string{"repo": "a"}}}); err != nil {
 		t.Fatal(err)
 	}
 	if n := len(s.sent()); n != 0 {
 		t.Errorf("%d requests for a batch with no line, want none", n)
 	}
-	if err := i.Write(t.Context(), []Point{star("a"), star("b")}); err != nil {
+	if _, err := i.Write(t.Context(), []Point{star("a"), star("b")}); err != nil {
 		t.Fatal(err)
 	}
 	if n := len(s.sent()); n != 1 {
@@ -258,7 +258,7 @@ func TestInfluxReportsARejectedLineAtItsLimitWhole(t *testing.T) {
 func TestInfluxTreatsAnyNonSuccessStatusAsAFailure(t *testing.T) {
 	t.Parallel()
 	_, url := newInfluxServer(t, http.StatusMultipleChoices)
-	err := NewInflux(url, "tok", "acme", "gh", 0, 0).Write(t.Context(), []Point{star("a")})
+	_, err := NewInflux(url, "tok", "acme", "gh", 0, 0).Write(t.Context(), []Point{star("a")})
 	if err == nil || !strings.HasPrefix(err.Error(), "influx write: 300") {
 		t.Errorf("Write = %v, want the 300 reported", err)
 	}
@@ -283,7 +283,7 @@ func TestInfluxStopsBisectingAtAFailureDeepInside(t *testing.T) {
 		w.WriteHeader(http.StatusServiceUnavailable)
 	}))
 	t.Cleanup(srv.Close)
-	err := NewInflux(srv.URL, "tok", "acme", "gh", 0, 0).Write(t.Context(), []Point{star("a"), star("b"), star("c"), star("d")})
+	_, err := NewInflux(srv.URL, "tok", "acme", "gh", 0, 0).Write(t.Context(), []Point{star("a"), star("b"), star("c"), star("d")})
 	mu.Lock()
 	defer mu.Unlock()
 	if err == nil || !strings.Contains(err.Error(), "503") || calls != 3 {
@@ -296,7 +296,7 @@ func TestInfluxStopsBisectingAtAFailureDeepInside(t *testing.T) {
 func TestInfluxCannotBuildAWriteForAnOrgWithAControlCharacter(t *testing.T) {
 	t.Parallel()
 	s, url := newInfluxServer(t, 0)
-	if err := NewInflux(url, "tok", "ac\x7fme", "gh", 0, 0).Write(t.Context(), []Point{star("a")}); err == nil {
+	if _, err := NewInflux(url, "tok", "ac\x7fme", "gh", 0, 0).Write(t.Context(), []Point{star("a")}); err == nil {
 		t.Error("Write accepted an org no request can carry")
 	}
 	if n := len(s.sent()); n != 0 {
@@ -330,62 +330,88 @@ func TestInfluxCountsWhatItDidNotWrite(t *testing.T) {
 		{Measurement: "gh_job_log", Tags: map[string]string{"repo": "a"}, Fields: map[string]any{"line": "x"}},
 		{Measurement: "gh_job_log", Tags: map[string]string{"repo": "b"}, Fields: map[string]any{"line": "y"}},
 		// No field the line protocol can render, so this one is not written
-		// either and is counted the same way.
+		// either and is not counted either.
 		{Measurement: "gh_star", Tags: map[string]string{"repo": "c"}},
 	}
-	if err := i.Write(t.Context(), offered); err != nil {
+	accepted, err := i.Write(t.Context(), offered)
+	if err != nil {
 		t.Fatalf("Write: %v", err)
 	}
 	if got := len(s.written()); got != 1 {
 		t.Fatalf("%d lines reached the database, want the one star", got)
 	}
-	if got := i.Filtered(); got != 3 {
-		t.Errorf("Filtered() = %d after offering 4 points and writing 1, want 3", got)
-	}
-	// Cumulative over the sink's life, which is what lets a caller read it
-	// around one write and report the difference.
-	if err := i.Write(t.Context(), []Point{star("d")}); err != nil {
-		t.Fatalf("Write: %v", err)
-	}
-	if got := i.Filtered(); got != 3 {
-		t.Errorf("Filtered() = %d after a write that dropped nothing, want it unmoved at 3", got)
+	if accepted != 1 {
+		t.Errorf("Write accepted %d of 4 points and wrote 1", accepted)
 	}
 }
 
-// TestTheLedgerDoesNotHideWhatTheSinkBehindItDropped: production wraps the
-// InfluxDB sink in the write ledger, so a caller holding the pair sees the
-// wrapper. If the wrapper answered for itself, the exclude would be invisible
-// again.
-func TestTheLedgerDoesNotHideWhatTheSinkBehindItDropped(t *testing.T) {
+// TestInfluxDoesNotCountALineTheServerRefused: a parse rejection is reported
+// on its own warning line and the rest of the batch is written, so the batch
+// is a partial success. What it is not is four points written when three
+// landed, which is what the count said while it was len(points).
+func TestInfluxDoesNotCountALineTheServerRefused(t *testing.T) {
+	t.Parallel()
+	s, url := newInfluxServer(t, 0)
+	i := NewInflux(url, "tok", "acme", "gh", 0, time.Second)
+	bad := Point{
+		Measurement: "gh_star", Tags: map[string]string{"repo": "unparseable"},
+		Fields: map[string]any{"starred": 1}, Time: time.Unix(1700000000, 0),
+	}
+	accepted, err := i.Write(t.Context(), []Point{star("a"), bad, star("b")})
+	var rejected *RejectedError
+	if !errors.As(err, &rejected) || rejected.N != 1 {
+		t.Fatalf("Write = %v, want one rejected line", err)
+	}
+	if accepted != 2 {
+		t.Errorf("Write accepted %d of 3 points, one of which the server refused", accepted)
+	}
+	if got := len(s.written()); got != 2 {
+		t.Errorf("%d lines reached the database, want the two good ones", got)
+	}
+}
+
+// TestTheLedgerReportsWhatTheSinkBehindItTook: production wraps the InfluxDB
+// sink in the write ledger, so the runner holds the pair. If the wrapper
+// answered for itself, the exclude would be invisible again.
+func TestTheLedgerReportsWhatTheSinkBehindItTook(t *testing.T) {
 	t.Parallel()
 	_, url := newInfluxServer(t, 0)
 	i := NewInflux(url, "tok", "acme", "gh", 0, time.Second)
 	i.Exclude = map[string]bool{"gh_job_log": true}
 	wrapped := OnlyChanged(i, LoadLedger(filepath.Join(t.TempDir(), "ledger.bin"), 0, 0))
-	if err := wrapped.Write(t.Context(), []Point{
+	accepted, err := wrapped.Write(t.Context(), []Point{
 		star("a"),
 		{Measurement: "gh_job_log", Tags: map[string]string{"repo": "a"}, Fields: map[string]any{"line": "x"}},
-	}); err != nil {
+	})
+	if err != nil {
 		t.Fatalf("Write: %v", err)
 	}
-	filtering, ok := wrapped.(Filtering)
-	if !ok {
-		t.Fatal("the wrapped sink does not report what it filtered")
+	if accepted != 1 {
+		t.Errorf("the ledger reported %d accepted of two points, one of them excluded", accepted)
 	}
-	if got := filtering.Filtered(); got != 1 {
-		t.Errorf("Filtered() through the ledger = %d, want the one excluded point", got)
+	// And a second write of the same points is entirely the ledger's doing:
+	// nothing reaches the sink, so nothing is accepted here either, and the
+	// caller counts those points as unchanged rather than as written.
+	again, err := wrapped.Write(t.Context(), []Point{star("a")})
+	if err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+	if again != 0 {
+		t.Errorf("a point the ledger held back was counted as accepted: %d", again)
 	}
 }
 
-// TestASinkThatWritesEverythingReportsNothingFiltered: the ledger wrapping a
-// sink with no filtering of its own must not invent a count.
-func TestASinkThatWritesEverythingReportsNothingFiltered(t *testing.T) {
+// TestASinkThatWritesEverythingAcceptsEverything: the count is not a
+// synonym for "dropped something", so a sink with nothing to drop says the
+// whole batch.
+func TestASinkThatWritesEverythingAcceptsEverything(t *testing.T) {
 	t.Parallel()
 	wrapped := OnlyChanged(newStdout(io.Discard), LoadLedger(filepath.Join(t.TempDir(), "ledger.bin"), 0, 0))
-	if err := wrapped.Write(t.Context(), []Point{star("a")}); err != nil {
+	accepted, err := wrapped.Write(t.Context(), []Point{star("a"), star("b")})
+	if err != nil {
 		t.Fatalf("Write: %v", err)
 	}
-	if got := wrapped.(Filtering).Filtered(); got != 0 {
-		t.Errorf("Filtered() = %d for a sink that writes everything, want 0", got)
+	if accepted != 2 {
+		t.Errorf("accepted %d of two points a sink drops nothing from", accepted)
 	}
 }

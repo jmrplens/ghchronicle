@@ -22,7 +22,7 @@ func TestFileWritesLineProtocolAndJSON(t *testing.T) {
 
 	lp := filepath.Join(dir, "out.lp")
 	f := NewFile(lp, "influx", 0, 0)
-	if err := f.Write(context.Background(), []Point{p}); err != nil {
+	if _, err := f.Write(context.Background(), []Point{p}); err != nil {
 		t.Fatal(err)
 	}
 	if err := f.Close(); err != nil {
@@ -35,7 +35,7 @@ func TestFileWritesLineProtocolAndJSON(t *testing.T) {
 
 	jp := filepath.Join(dir, "out.json")
 	f = NewFile(jp, "json", 0, 0)
-	if err := f.Write(context.Background(), []Point{p}); err != nil {
+	if _, err := f.Write(context.Background(), []Point{p}); err != nil {
 		t.Fatal(err)
 	}
 	if err := f.Close(); err != nil {
@@ -53,7 +53,7 @@ func TestFileRotatesAndKeepsACount(t *testing.T) {
 	// A tiny cap so every write rotates.
 	f := NewFile(path, "influx", 10, 2)
 	for i := range 5 {
-		if err := f.Write(context.Background(), []Point{{
+		if _, err := f.Write(context.Background(), []Point{{
 			Measurement: "m", Tags: map[string]string{"a": "b"},
 			Fields: map[string]any{"v": i}, Time: time.Now(),
 		}}); err != nil {
@@ -81,7 +81,7 @@ func TestFileResumesTheSizeAfterRestart(t *testing.T) {
 	f := NewFile(path, "influx", 50, 2)
 	// The very first write must rotate: the file is already over the cap, and
 	// starting the counter at zero would let it grow without bound.
-	if err := f.Write(context.Background(), []Point{{
+	if _, err := f.Write(context.Background(), []Point{{
 		Measurement: "m", Tags: map[string]string{"a": "b"},
 		Fields: map[string]any{"v": 1}, Time: time.Now(),
 	}}); err != nil {
@@ -110,7 +110,7 @@ func TestFileIsCreatedForTheOwnerAlone(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "nested", "out.lp")
 	f := NewFile(path, "influx", 0, 0)
-	if err := f.Write(context.Background(), []Point{{
+	if _, err := f.Write(context.Background(), []Point{{
 		Measurement: "m",
 		Fields:      map[string]any{"v": 1}, Time: time.Now(),
 	}}); err != nil {
@@ -167,7 +167,7 @@ func TestFileRotationKeepsTheModeAnOperatorSet(t *testing.T) {
 		Measurement: "m", Tags: map[string]string{"a": "b"},
 		Fields: map[string]any{"v": 1}, Time: time.Now(),
 	}
-	if err := f.Write(context.Background(), []Point{p}); err != nil {
+	if _, err := f.Write(context.Background(), []Point{p}); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.Chmod(path, granted); err != nil {
@@ -176,7 +176,7 @@ func TestFileRotationKeepsTheModeAnOperatorSet(t *testing.T) {
 
 	// A cap of one byte, so the next write rotates.
 	f.MaxBytes = 1
-	if err := f.Write(context.Background(), []Point{p}); err != nil {
+	if _, err := f.Write(context.Background(), []Point{p}); err != nil {
 		t.Fatal(err)
 	}
 	if err := f.Close(); err != nil {
@@ -222,7 +222,7 @@ func TestFileLeavesTheModeOfAFileItDidNotCreateAlone(t *testing.T) {
 		Measurement: "m", Tags: map[string]string{"a": "b"},
 		Fields: map[string]any{"v": 1}, Time: time.Now(),
 	}
-	if err := f.Write(context.Background(), []Point{p}); err != nil {
+	if _, err := f.Write(context.Background(), []Point{p}); err != nil {
 		t.Fatal(err)
 	}
 	st, err := os.Stat(path)
@@ -242,7 +242,7 @@ func TestFileLeavesTheModeOfAFileItDidNotCreateAlone(t *testing.T) {
 	if err = os.Remove(path); err != nil {
 		t.Fatal(err)
 	}
-	if err = f.Write(context.Background(), []Point{p}); err != nil {
+	if _, err = f.Write(context.Background(), []Point{p}); err != nil {
 		t.Fatal(err)
 	}
 	if err = f.Close(); err != nil {
@@ -295,7 +295,7 @@ func rotateOntoReadOnly(t *testing.T, keep int, occupied string) {
 
 	// A cap of one byte, so the write rotates.
 	f := NewFile(path, "influx", 1, keep)
-	if err := f.Write(context.Background(), []Point{{
+	if _, err := f.Write(context.Background(), []Point{{
 		Measurement: "m", Tags: map[string]string{"a": "b"},
 		Fields: map[string]any{"v": 1}, Time: time.Now(),
 	}}); err != nil {
@@ -338,7 +338,7 @@ func TestFileWritesEveryPointOfABatch(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "out.lp")
 	f := NewFile(path, "influx", 0, 0)
 	at := time.Unix(0, 1700000000000000000)
-	if err := f.Write(context.Background(), []Point{
+	if _, err := f.Write(context.Background(), []Point{
 		{Measurement: "m", Tags: map[string]string{"a": "b"}, Fields: map[string]any{"v": 1}, Time: at},
 		{Measurement: "m", Fields: map[string]any{"none": nil}, Time: at},
 		{Measurement: "m", Tags: map[string]string{"a": "c"}, Fields: map[string]any{"v": 2}, Time: at},
@@ -365,7 +365,7 @@ func TestFileRotatesWhenALineReachesTheLimitExactly(t *testing.T) {
 	p := Point{Measurement: "m", Fields: map[string]any{"v": 1}, Time: time.Unix(0, 1)}
 	line := LineProtocol(p) + "\n"
 	f := NewFile(path, "influx", int64(len(line)), 2)
-	if err := f.Write(context.Background(), []Point{p}); err != nil {
+	if _, err := f.Write(context.Background(), []Point{p}); err != nil {
 		t.Fatal(err)
 	}
 	if err := f.Close(); err != nil {
@@ -398,7 +398,7 @@ func TestFileReportsAPointItCannotRender(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "out.json")
 	f := NewFile(path, "json", 0, 0)
 	t.Cleanup(func() { _ = f.Close() })
-	err := f.Write(context.Background(), []Point{{Measurement: "m", Fields: map[string]any{"v": math.NaN()}, Time: time.Unix(0, 0)}})
+	_, err := f.Write(context.Background(), []Point{{Measurement: "m", Fields: map[string]any{"v": math.NaN()}, Time: time.Unix(0, 0)}})
 	if err == nil {
 		t.Fatal("Write accepted a field JSON cannot hold")
 	}
@@ -412,7 +412,7 @@ func TestFileReportsAPointItCannotRender(t *testing.T) {
 func TestFileCreatesTheDumpInTheWorkingDirectory(t *testing.T) {
 	t.Chdir(t.TempDir())
 	f := NewFile("out.lp", "influx", 0, 0)
-	if err := f.Write(context.Background(), []Point{{Measurement: "m", Fields: map[string]any{"v": 1}, Time: time.Unix(0, 1)}}); err != nil {
+	if _, err := f.Write(context.Background(), []Point{{Measurement: "m", Fields: map[string]any{"v": 1}, Time: time.Unix(0, 1)}}); err != nil {
 		t.Fatal(err)
 	}
 	if err := f.Close(); err != nil {
@@ -427,7 +427,7 @@ func TestFileCreatesTheDumpInTheWorkingDirectory(t *testing.T) {
 // created, rather than dropping the batch.
 func TestFileReportsADumpItCannotOpen(t *testing.T) {
 	path := filepath.Join(t.TempDir(), strings.Repeat("x", 300))
-	err := NewFile(path, "influx", 0, 0).Write(context.Background(), []Point{{Measurement: "m", Fields: map[string]any{"v": 1}, Time: time.Unix(0, 1)}})
+	_, err := NewFile(path, "influx", 0, 0).Write(context.Background(), []Point{{Measurement: "m", Fields: map[string]any{"v": 1}, Time: time.Unix(0, 1)}})
 	if err == nil {
 		t.Error("Write reported success for a file name no file system accepts")
 	}
@@ -439,13 +439,13 @@ func TestFileReportsAWriteToAClosedDump(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "out.lp")
 	f := NewFile(path, "influx", 0, 0)
 	p := Point{Measurement: "m", Fields: map[string]any{"v": 1}, Time: time.Unix(0, 1)}
-	if err := f.Write(context.Background(), []Point{p}); err != nil {
+	if _, err := f.Write(context.Background(), []Point{p}); err != nil {
 		t.Fatal(err)
 	}
 	if err := f.fh.Close(); err != nil {
 		t.Fatal(err)
 	}
-	if err := f.Write(context.Background(), []Point{p}); !errors.Is(err, os.ErrClosed) {
+	if _, err := f.Write(context.Background(), []Point{p}); !errors.Is(err, os.ErrClosed) {
 		t.Errorf("Write to a closed descriptor = %v, want os.ErrClosed", err)
 	}
 	if err := f.rotate(); !errors.Is(err, os.ErrClosed) {
@@ -503,14 +503,14 @@ func TestFileRotatesADumpDeletedFromUnderIt(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "out.lp")
 	f := NewFile(path, "influx", 1<<20, 2)
 	p := Point{Measurement: "m", Fields: map[string]any{"v": 1}, Time: time.Unix(0, 1)}
-	if err := f.Write(context.Background(), []Point{p}); err != nil {
+	if _, err := f.Write(context.Background(), []Point{p}); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.Remove(path); err != nil {
 		t.Fatal(err)
 	}
 	f.MaxBytes = 1
-	if err := f.Write(context.Background(), []Point{p}); err != nil {
+	if _, err := f.Write(context.Background(), []Point{p}); err != nil {
 		t.Fatalf("rotating a deleted dump: %v", err)
 	}
 	if err := f.Close(); err != nil {
@@ -536,7 +536,7 @@ func TestFileRotationLeavesNothingPastTheCount(t *testing.T) {
 		}
 	}
 	f := NewFile(path, "influx", 1, 2)
-	if err := f.Write(context.Background(), []Point{{Measurement: "m", Fields: map[string]any{"v": 1}, Time: time.Unix(0, 1)}}); err != nil {
+	if _, err := f.Write(context.Background(), []Point{{Measurement: "m", Fields: map[string]any{"v": 1}, Time: time.Unix(0, 1)}}); err != nil {
 		t.Fatal(err)
 	}
 	if err := f.Close(); err != nil {

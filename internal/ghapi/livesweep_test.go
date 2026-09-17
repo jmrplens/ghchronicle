@@ -39,9 +39,12 @@ import (
 // footprint being measured is the client's, so no store is involved.
 type discard struct{ points int }
 
-func (d *discard) Write(_ context.Context, p []sink.Point) error { d.points += len(p); return nil }
-func (d *discard) Name() string                                  { return "discard" }
-func (d *discard) Close() error                                  { return nil }
+func (d *discard) Write(_ context.Context, p []sink.Point) (int, error) {
+	d.points += len(p)
+	return len(p), nil
+}
+func (d *discard) Name() string { return "discard" }
+func (d *discard) Close() error { return nil }
 
 // sweepSummary is what one sweep did to the cache.
 type sweepSummary struct {

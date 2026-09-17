@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -91,6 +93,14 @@ func TestEverySinkReceivesOneSweep(t *testing.T) {
 		}
 	}
 
+	// And the count in the log is what the receiver holds, which is the whole
+	// point of the count. Loki is the sink this matters most for: it renders
+	// about a dozen of the ninety measurements and drops the rest inside its
+	// own Write without a word, so a log line counting what it was handed
+	// credited it with storing a sweep it never saw.
+	assertLogCountMatchesStore(t, out, "loki", lokiEntryCount(t, loki))
+	assertLogCountMatchesStore(t, out, "influxdb", len(parseLineProtocol(t, influx.Body())))
+
 	// And every receiver holds what it was sent, which is the sink's half.
 	if got := measurementsOf(parseLineProtocol(t, influx.Body()))["gh_traffic"]; got == 0 {
 		t.Errorf("the InfluxDB receiver got no traffic points")
@@ -139,5 +149,38 @@ func assertStdoutPrintedLineProtocol(t *testing.T, stdout string) {
 	}
 	if json.Valid([]byte(strings.SplitN(strings.TrimSpace(stdout), "\n", 2)[0])) {
 		t.Errorf("stdout printed JSON without stdout_format being set to it")
+	}
+}
+
+// writtenLine reads the two counts of a `written` log line: what the sink took
+// and what the ledger had already sent.
+var writtenLine = regexp.MustCompile(`msg=written sink=(\S+) family=\S+ points=(\d+) unchanged=(\d+)`)
+
+// assertLogCountMatchesStore adds up what the sweep log says one sink wrote and
+// compares it with what that sink's receiver actually holds.
+//
+// Nothing else in this suite ties the two together. A sink that dropped a
+// point and said nothing was invisible to every other assertion here, because
+// each receiver is only checked for holding something.
+func assertLogCountMatchesStore(t *testing.T, log, name string, held int) {
+	t.Helper()
+	claimed, lines := 0, 0
+	for _, m := range writtenLine.FindAllStringSubmatch(log, -1) {
+		if m[1] != name {
+			continue
+		}
+		n, err := strconv.Atoi(m[2])
+		if err != nil {
+			t.Fatalf("unreadable count in %q: %v", m[0], err)
+		}
+		claimed += n
+		lines++
+	}
+	if lines == 0 {
+		t.Fatalf("the log has no written line for the %s sink:\n%s", name, log)
+	}
+	if claimed != held {
+		t.Errorf("the log credits the %s sink with %d points over %d writes; its receiver holds %d",
+			name, claimed, lines, held)
 	}
 }

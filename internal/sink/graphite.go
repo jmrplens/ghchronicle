@@ -66,10 +66,16 @@ func (g *Graphite) Close() error {
 	return err
 }
 
-func (g *Graphite) Write(ctx context.Context, points []Point) error {
+// Write sends one metric per numeric field. A point whose fields are all
+// strings, or all shadowed by a tag of the same name, produces no line at all
+// and is not counted as written; the count is points, not lines, since a point
+// here is several metrics.
+func (g *Graphite) Write(ctx context.Context, points []Point) (int, error) {
 	var lines []string
+	sent := 0
 	for _, p := range points {
 		stamp := stampOf(p).Unix()
+		before := len(lines)
 		for _, field := range sortedKeys(p.Fields) {
 			if _, clash := p.Tags[field]; clash {
 				continue // the same rule as the line protocol: the tag wins
@@ -80,16 +86,22 @@ func (g *Graphite) Write(ctx context.Context, points []Point) error {
 			}
 			lines = append(lines, fmt.Sprintf("%s %s %d\n", graphitePath(g.Prefix, p, field), formatFloat(v), stamp))
 		}
+		if len(lines) > before {
+			sent++
+		}
 	}
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	for start := 0; start < len(lines); start += g.Batch {
 		end := min(start+g.Batch, len(lines))
 		if err := g.send(ctx, strings.Join(lines[start:end], "")); err != nil {
-			return err
+			// The points behind the batches already sent landed, but a point
+			// spans batches, so the honest count of a partial failure is the
+			// share of the lines that went out.
+			return sent * start / max(len(lines), 1), err
 		}
 	}
-	return nil
+	return sent, nil
 }
 
 // send writes one payload, reconnecting once if the socket has gone.

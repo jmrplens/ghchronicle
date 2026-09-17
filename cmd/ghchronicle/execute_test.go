@@ -832,14 +832,15 @@ func graphiteReceiver(t *testing.T) string {
 	return ln.Addr().String()
 }
 
-// TestBuildSinksBuildsEveryConfiguredSink configures all ten sinks and gets
-// ten, the exporter left out of a one-shot run, and a point written through
-// each HTTP store that refuses it logged in the command's own words.
-func TestBuildSinksBuildsEveryConfiguredSink(t *testing.T) {
-	dir := t.TempDir()
+// everySinkConfig is a configuration that turns on all ten sinks, pointed at
+// servers that accept whatever they are sent. Two tests build from it: the one
+// that counts what the builder wires up, and the one that holds every sink to
+// counting only what it stored.
+func everySinkConfig(t *testing.T, dir string) *config.Config {
+	t.Helper()
 	url := stores(t)
 	off := false
-	cfg := &config.Config{
+	return &config.Config{
 		GitHub:    config.GitHub{Timeout: "5s"},
 		StateFile: filepath.Join(dir, "state.json"),
 		Sinks: config.Sinks{
@@ -857,6 +858,70 @@ func TestBuildSinksBuildsEveryConfiguredSink(t *testing.T) {
 			DedupeFile:    filepath.Join(dir, "written.bin"),
 		},
 	}
+}
+
+// verbatimDumps are the sinks that record a point whatever it carries, because
+// recording it is all they do: the JSON file and the JSON stdout dump write
+// the object as it stands, fields or no fields. Every other sink turns a point
+// into something a store will hold, and a point it cannot turn is a point it
+// must not count.
+var verbatimDumps = map[string]bool{"file": true, "stdout": true}
+
+// TestNoSinkCountsAPointItCannotStore holds every wired sink to the rule the
+// Write signature exists for. The log line that reports a write says what the
+// store took, and it can only say that because each sink says it: production
+// read "points=440" for a measurement InfluxDB excludes by default and has
+// never held a row of, and a review spent an afternoon on the contradiction.
+//
+// The batch is one point no metrics store can hold: a measurement none of them
+// has a rule or a rendering for, and not one field. A sink that counts it is
+// reporting a write that did not happen. The two dumps are named above and
+// have to count it, so the exception cannot quietly grow: a new sink is held
+// to zero until somebody says in this list why it is a dump.
+//
+// Built through buildSinks rather than from a list here, so a sink wired into
+// the command is covered the moment it exists.
+func TestNoSinkCountsAPointItCannotStore(t *testing.T) {
+	dir := t.TempDir()
+	logger, _ := newLogger(config.Log{Level: "error"}, io.Discard)
+	built, err := buildSinks(everySinkConfig(t, dir), logger, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer closeAll(t, built)
+	if len(built) != 10 {
+		t.Fatalf("built %s, want all ten", sinkNames(built))
+	}
+	unstorable := []sink.Point{{
+		Measurement: "gh_not_a_measurement",
+		Tags:        map[string]string{"repo": "octocat/hello-world"},
+		Time:        time.Now(),
+	}}
+	for _, s := range built {
+		accepted, writeErr := s.Write(t.Context(), unstorable)
+		if writeErr != nil {
+			t.Errorf("%s: %v", s.Name(), writeErr)
+			continue
+		}
+		if verbatimDumps[s.Name()] {
+			if accepted != 1 {
+				t.Errorf("%s records every point it is given, so it must count this one, got %d",
+					s.Name(), accepted)
+			}
+			continue
+		}
+		if accepted != 0 {
+			t.Errorf("%s counted %d of a point it cannot store", s.Name(), accepted)
+		}
+	}
+}
+
+// TestBuildSinksBuildsEveryConfiguredSink configures all ten sinks and gets
+// ten, the exporter left out of a one-shot run, and a point written through
+// each HTTP store that refuses it logged in the command's own words.
+func TestBuildSinksBuildsEveryConfiguredSink(t *testing.T) {
+	dir := t.TempDir()
+	cfg := everySinkConfig(t, dir)
 	var logs syncBuffer
 	logger, _ := newLogger(config.Log{Level: "debug"}, &logs)
 
@@ -890,7 +955,7 @@ func TestBuildSinksBuildsEveryConfiguredSink(t *testing.T) {
 		if s.Name() == "influxdb" || s.Name() == "elasticsearch" {
 			// Both refuse the point, which is a partial success and returns
 			// the count; the log lines are what is checked.
-			_ = s.Write(t.Context(), point)
+			_, _ = s.Write(t.Context(), point)
 		}
 	}
 	for _, line := range []string{

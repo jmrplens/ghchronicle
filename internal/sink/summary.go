@@ -370,18 +370,26 @@ func NewReducer() *Reducer {
 
 // Summarize reduces a batch statelessly. Counters are not produced; use a
 // Reducer for those.
-func Summarize(points []Point) []Point { return NewReducer().Reduce(points) }
+func Summarize(points []Point) []Point {
+	gauges, _ := NewReducer().Reduce(points)
+	return gauges
+}
 
-// Reduce reduces a batch of points. The result is safe to expose as gauges.
-func (rd *Reducer) Reduce(points []Point) []Point {
+// Reduce reduces a batch of points to gauges, and reports how many of the
+// points it took. A measurement with no rule, or one whose rule is skip, has
+// no honest current value and is left out entirely, so an exporter can say
+// what it holds rather than what it was offered.
+func (rd *Reducer) Reduce(points []Point) (gauges []Point, taken int) {
 	rd.mu.Lock()
 	defer rd.mu.Unlock()
 
 	var s series
 	for _, p := range points {
-		rd.fold(&s, p)
+		if rd.fold(&s, p) {
+			taken++
+		}
 	}
-	return s.gauges(time.Now())
+	return s.gauges(time.Now()), taken
 }
 
 // series is the set of accumulators a reduction is building, in the order each
@@ -408,13 +416,13 @@ func (s *series) at(key, name string, mode reduce, tags map[string]string) *acc 
 	return a
 }
 
-// fold adds one point to the series its rule reduces it to. A measurement with
-// no rule, or one whose rule is skip, has no honest current value and is left
-// out entirely.
-func (rd *Reducer) fold(s *series, p Point) {
+// fold adds one point to the series its rule reduces it to, and reports
+// whether it took it. A measurement with no rule, or one whose rule is skip,
+// has no honest current value and is left out entirely.
+func (rd *Reducer) fold(s *series, p Point) bool {
 	r, known := promRules[p.Measurement]
 	if !known || r.mode == skip {
-		return
+		return false
 	}
 	name := p.Measurement
 	if r.as != "" {
@@ -437,6 +445,7 @@ func (rd *Reducer) fold(s *series, p Point) {
 	case sum:
 		a.addNumbers(p.Fields)
 	}
+	return true
 }
 
 // keptTags is the reduced label set: the tags the rule names and nothing else,

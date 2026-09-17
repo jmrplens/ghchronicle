@@ -23,7 +23,7 @@ func TestTelegrafPostsLineProtocolWithBasicAuth(t *testing.T) {
 	// A bare host: the listener's default path has to be filled in, because
 	// http_listener_v2 answers 404 to "/" without saying why.
 	tg := NewTelegraf(srv.URL, "ghc", "secret", 0, 0)
-	err := tg.Write(context.Background(), []Point{
+	_, err := tg.Write(context.Background(), []Point{
 		{
 			Measurement: "gh_repo", Tags: map[string]string{"repo": "a"},
 			Fields: map[string]any{"stars": 3}, Time: time.Unix(0, 1700000000000000000),
@@ -72,7 +72,7 @@ func TestTelegrafKeepsAnExplicitPathAndBatches(t *testing.T) {
 			Fields: map[string]any{"v": i}, Time: time.Now(),
 		})
 	}
-	if err := tg.Write(context.Background(), points); err != nil {
+	if _, err := tg.Write(context.Background(), points); err != nil {
 		t.Fatal(err)
 	}
 	if len(bodies) != 3 {
@@ -93,7 +93,7 @@ func TestTelegrafNamesItselfOnFailure(t *testing.T) {
 		http.Error(w, "unable to parse", http.StatusBadRequest)
 	}))
 	defer srv.Close()
-	err := NewTelegraf(srv.URL, "", "", 0, 0).Write(context.Background(), []Point{{
+	_, err := NewTelegraf(srv.URL, "", "", 0, 0).Write(context.Background(), []Point{{
 		Measurement: "m", Fields: map[string]any{"v": 1}, Time: time.Now(),
 	}})
 	if err == nil || !strings.HasPrefix(err.Error(), "telegraf write: 400") || !strings.Contains(err.Error(), "unable to parse") {
@@ -140,13 +140,13 @@ func TestTelegrafSendsNothingWhenNothingRenders(t *testing.T) {
 	}))
 	defer srv.Close()
 	tg := NewTelegraf(srv.URL, "", "", 2, 0)
-	if err := tg.Write(context.Background(), []Point{{Measurement: "m", Fields: map[string]any{"none": nil}}}); err != nil {
+	if _, err := tg.Write(context.Background(), []Point{{Measurement: "m", Fields: map[string]any{"none": nil}}}); err != nil {
 		t.Fatal(err)
 	}
 	if requests != 0 {
 		t.Errorf("%d requests for a batch with no line, want none", requests)
 	}
-	if err := tg.Write(context.Background(), []Point{
+	if _, err := tg.Write(context.Background(), []Point{
 		{Measurement: "m", Fields: map[string]any{"v": 1}, Time: time.Unix(0, 1)},
 		{Measurement: "m", Fields: map[string]any{"v": 2}, Time: time.Unix(0, 2)},
 	}); err != nil {
@@ -165,17 +165,17 @@ func TestTelegrafTreatsAnyNonSuccessStatusAsAFailure(t *testing.T) {
 		w.WriteHeader(http.StatusMultipleChoices)
 	}))
 	defer srv.Close()
-	if err := NewTelegraf(srv.URL, "", "", 0, 0).Write(context.Background(), point); err == nil ||
+	if _, err := NewTelegraf(srv.URL, "", "", 0, 0).Write(context.Background(), point); err == nil ||
 		!strings.HasPrefix(err.Error(), "telegraf write: 300") {
 		t.Errorf("Write = %v, want the 300 reported", err)
 	}
-	if err := NewTelegraf("telegraf:8186", "", "", 0, 0).Write(context.Background(), point); err == nil ||
+	if _, err := NewTelegraf("telegraf:8186", "", "", 0, 0).Write(context.Background(), point); err == nil ||
 		!strings.HasPrefix(err.Error(), "telegraf write: endpoint ") {
 		t.Errorf("Write = %v, want the endpoint refused", err)
 	}
 	closed := httptest.NewServer(http.NotFoundHandler())
 	closed.Close()
-	if err := NewTelegraf(closed.URL, "", "", 0, 0).Write(context.Background(), point); err == nil {
+	if _, err := NewTelegraf(closed.URL, "", "", 0, 0).Write(context.Background(), point); err == nil {
 		t.Error("Write reported success to a listener that is not there")
 	}
 }

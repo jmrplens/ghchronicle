@@ -32,7 +32,7 @@ func TestFileSetsTheModeTheUmaskWouldHaveTakenAway(t *testing.T) {
 
 	path := filepath.Join(dir, "out.lp")
 	f := NewFile(path, "influx", 0, 0)
-	if err := f.Write(context.Background(), []Point{{
+	if _, err := f.Write(context.Background(), []Point{{
 		Measurement: "m", Tags: map[string]string{"a": "b"},
 		Fields: map[string]any{"v": 1}, Time: time.Now(),
 	}}); err != nil {

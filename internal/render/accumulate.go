@@ -51,16 +51,24 @@ func NewAccumulator(login string) *Accumulator {
 func (a *Accumulator) Name() string { return "card" }
 func (a *Accumulator) Close() error { return nil }
 
-func (a *Accumulator) Write(_ context.Context, points []sink.Point) error {
+// Write folds the points a card can draw and ignores the rest, and says which
+// is which: this sink reads six measurements of the ninety the collectors
+// produce, so most of a sweep is not accepted here.
+func (a *Accumulator) Write(_ context.Context, points []sink.Point) (int, error) {
+	taken := 0
 	for _, p := range points {
 		switch p.Measurement {
 		case "gh_account":
+			taken++
 			a.takeLatest("account", p)
 		case "gh_contributions_total":
+			taken++
 			a.takeLatest("contributions", p)
 		case "gh_repo":
+			taken++
 			a.takeRepo(p)
 		case "gh_traffic":
+			taken++
 			// The whole window summed, which is what the card shows: GitHub
 			// gives fourteen days and a card has room for one number.
 			kind := p.Tags["kind"]
@@ -71,6 +79,7 @@ func (a *Accumulator) Write(_ context.Context, points []sink.Point) error {
 				a.traffic[kind+"_uniques"] += v
 			}
 		case "gh_repo_language":
+			taken++
 			repo, lang := p.Tags["repo"], p.Tags["language"]
 			if repo == "" || lang == "" {
 				break
@@ -82,6 +91,7 @@ func (a *Accumulator) Write(_ context.Context, points []sink.Point) error {
 				a.languages[repo][lang] = int(v)
 			}
 		case "gh_contribution_day":
+			taken++
 			if v, ok := numberOf(p.Fields["contributions"]); ok {
 				day := p.Time.UTC().Truncate(24 * time.Hour)
 				// Later wins rather than adding: the same day arriving twice
@@ -90,7 +100,7 @@ func (a *Accumulator) Write(_ context.Context, points []sink.Point) error {
 			}
 		}
 	}
-	return nil
+	return taken, nil
 }
 
 func (a *Accumulator) takeLatest(prefix string, p sink.Point) {

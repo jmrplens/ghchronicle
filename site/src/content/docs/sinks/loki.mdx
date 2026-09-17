@@ -39,6 +39,13 @@ every dated measurement now has to appear in one of two tables in
 carries the reason it is not a log line. A test fails on a dated measurement
 that appears in neither.
 
+It is not dropped in silence in the sweep log any more. This sink writes a
+fraction of what it is offered, so most of its lines carry
+[`filtered`](/ghchronicle/sinks/#what-the-written-line-counts) and `points=0`,
+which is what it stored rather than what it was given. An entry older than
+`max_age`, or too far behind the newest entry of its own stream for Loki to
+accept, is counted there too and reported as a dropped-entries line.
+
 ## The line format
 
 Each line reads as a sentence first and carries every tag and field after it in
