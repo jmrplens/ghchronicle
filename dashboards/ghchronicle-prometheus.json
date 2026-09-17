@@ -2780,7 +2780,7 @@
       "panels": [
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "How much closed in the range and how long each took. Every duration is a median: half of what merged or closed took less than the number shown. Time to first review is the wait before a person other than the author looked at a pull request, so review bots, which answer in seconds, and the author's own replies are left out; a range where nobody else reviewed anything reads No data, which is the honest answer. Lines per pull request is the median of added plus removed by a merged one. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date. In Prometheus this is the mean over the collector's last sweep, not a median over the dashboard range.",
+          "description": "How much closed in the range and how long each took. Every duration is a median: half of what merged or closed took less than the number shown. Time to review by someone else is the wait before a person other than the author looked at a pull request, so review bots, which answer in seconds, and the author's own replies are left out; a range where nobody else reviewed anything reads No data, which is the honest answer and not the claim that nothing was reviewed. Lines per pull request is the median of added plus removed by a merged one. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date. In Prometheus this is the mean over the collector's last sweep, not a median over the dashboard range.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -2815,7 +2815,7 @@
               {
                 "matcher": {
                   "id": "byName",
-                  "options": "Time to first review"
+                  "options": "Time to review by someone else"
                 },
                 "properties": [
                   {
@@ -2883,7 +2883,7 @@
               "editorMode": "code",
               "expr": "avg(github_pull_requests_seconds_to_first_human_review_mean{repo=~\"$repo\"})",
               "instant": true,
-              "legendFormat": "Time to first review",
+              "legendFormat": "Time to review by someone else",
               "range": false,
               "refId": "C"
             },
@@ -3889,7 +3889,7 @@
       "panels": [
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "How many runs the range holds and how they ended. The success rate is the runs that succeeded as a share of the runs that succeeded or failed: a run canceled by a newer push under a concurrency group, or skipped by its own condition, decided nothing and is counted beside it as undecided rather than as a failure. The run duration is the median over the range and the queue wait is the time a job spent waiting for a runner, which only exists at job level, the run-level number folding the wait into the duration. Over the runs whose jobs were expanded, which is the newest runs of each sweep and, after a backfill, the ninety days GitHub keeps jobs for; not every run the run count includes. Last come the bytes the runs left behind. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date. In Prometheus this is the mean over the collector's last sweep, not a median over the dashboard range.",
+          "description": "How many runs the range holds and how they ended. The success rate is the runs that succeeded as a share of the runs that succeeded or failed: a run canceled by a newer push under a concurrency group, or skipped by its own condition, decided nothing and is counted beside it as undecided rather than as a failure. The run duration is the median over the range and the queue wait is the time a job spent waiting for a runner, which only exists at job level, the run-level number folding the wait into the duration. Over the runs whose jobs were expanded, which is the newest runs of each sweep and, after a backfill, the ninety days GitHub keeps jobs for; not every run the run count includes. Last come the bytes the runs left behind, which are the artifacts the walk reached: GitHub lists thousands of them per repository and the walk stops at five hundred, so this is a floor wherever it did. \"Artifact storage counted\" below puts the two counts beside it. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date. In Prometheus this is the mean over the collector's last sweep, not a median over the dashboard range.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -3974,7 +3974,7 @@
               {
                 "matcher": {
                   "id": "byName",
-                  "options": "Artifact storage"
+                  "options": "Artifact storage walked"
                 },
                 "properties": [
                   {
@@ -4069,7 +4069,7 @@
               "editorMode": "code",
               "expr": "sum(github_artifact_total_live_bytes{repo=~\"$repo\"})",
               "instant": true,
-              "legendFormat": "Artifact storage",
+              "legendFormat": "Artifact storage walked",
               "range": false,
               "refId": "F"
             },
@@ -4379,7 +4379,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "Artifacts that have not expired. GitHub deletes them on their own schedule, which is why this falls without anyone doing anything. A reading taken at each sweep, so the curve starts the day the collector did: there is no history of it to rebuild. The eight repositories holding the most are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "Artifacts that have not expired, over the ones the walk reached, which is a floor on any repository with more than five hundred: \"Artifact storage counted\" further down has the counts that say which those are. GitHub deletes artifacts on their own schedule, which is why this falls without anyone doing anything. A reading taken at each sweep, so the curve starts the day the collector did: there is no history of it to rebuild. The eight repositories holding the most are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -5146,7 +5146,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "Artifact storage, and how much of it was counted. When Walked is lower than Declared, the live size is a floor rather than a total: the walk stopped at the page cap. Here it is short by a factor of fifty six, and without this column the tile above would say so nowhere.",
+          "description": "Artifact storage, and how much of it was counted. Three counts, because the live size is on neither of the other two: Declared is GitHub's own total and counts the artifacts it has already expired, Walked is how far the page cap let the walk go, and Live is the artifacts still held among those, which is what the live size is the size of. When Walked is lower than Declared the live size is a floor rather than a total: here it is short by a factor of fifty six, and without these columns the tile above would say so nowhere.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -5197,6 +5197,18 @@
                   {
                     "id": "custom.width",
                     "value": 100
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Live"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 90
                   }
                 ]
               }
@@ -5253,6 +5265,15 @@
               "instant": true,
               "range": false,
               "refId": "C"
+            },
+            {
+              "datasource": "${DS_PROMETHEUS}",
+              "editorMode": "code",
+              "expr": "max by (repo) (github_artifact_total_live_count{repo=~\"$repo\"})",
+              "format": "table",
+              "instant": true,
+              "range": false,
+              "refId": "D"
             }
           ],
           "title": "Artifact storage counted",
@@ -5277,6 +5298,7 @@
                   "Value #A": "Declared",
                   "Value #B": "Walked",
                   "Value #C": "Live size",
+                  "Value #D": "Live",
                   "repo": "Repository"
                 }
               }
@@ -6684,7 +6706,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "Whether a fork was ever pushed to separates a derivative from a bookmark, which most forks are. Prometheus keeps no forker, so this is per repository: forks seen over the range, the share ever pushed to, and the mean idle time. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date. The Prometheus exporter carries no url, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "Whether a fork was ever pushed to separates a derivative from a bookmark, which most forks are. Prometheus keeps no forker, so this is per repository: forks seen over the range, the share ever pushed to, and on average how long after the fork its last push came. How long a fork has been idle is the row's own date subtracted from now, which only the two SQL stores can do. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date. The Prometheus exporter carries no url, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -6734,11 +6756,11 @@
                 "properties": [
                   {
                     "id": "unit",
-                    "value": "d"
+                    "value": "s"
                   },
                   {
                     "id": "custom.width",
-                    "value": 100
+                    "value": 90
                   }
                 ]
               },
@@ -6796,6 +6818,22 @@
                     "value": 120
                   }
                 ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Pushed after"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "s"
+                  },
+                  {
+                    "id": "custom.width",
+                    "value": 110
+                  }
+                ]
               }
             ]
           },
@@ -6840,7 +6878,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "avg by (repo) (github_forks_seen_days_since_push_mean{repo=~\"$repo\"})",
+              "expr": "avg by (repo) (github_forks_seen_seconds_to_push_mean{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -6868,7 +6906,7 @@
                 "renameByName": {
                   "Value #A": "Forks",
                   "Value #B": "Pushed to",
-                  "Value #C": "Idle",
+                  "Value #C": "Pushed after",
                   "repo": "Repository"
                 }
               }

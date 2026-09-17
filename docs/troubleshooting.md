@@ -96,10 +96,10 @@ of a window with no date of their own; they are stamped at the start of the UTC
 day so a day's sweeps rewrite one row, and the dashboard takes the newest
 rather than the sum.
 
-**Median time to first review reads No data.** The panel reads
+**Median time to review by someone else reads No data.** The panel reads
 `seconds_to_first_human_review`, which leaves out review bots and the author's
 own replies; on an account where nobody else reviews, no pull request carries
-it and the tile is honestly empty. The bots' speed is in the Reviewers table,
+it and the tile is honestly empty. It does not mean nothing was reviewed. The bots' speed is in the Reviewers table,
 where each one is marked as a bot: measured, nine pull requests in ten had a
 bot review inside a minute.
 
@@ -112,9 +112,12 @@ people.
 GitHub counts pull requests as issues in it. The `gh_issue` measurement is the
 one that counts issues.
 
-**Artifact storage looks too small.** Check the `walked` field against `count`
-in `gh_artifact_total`. When they disagree, the live size is a floor: the
-repository has more artifacts than the page cap walked.
+**Artifact storage looks too small.** Read `complete` in `gh_artifact_total`,
+or `walked` against `count`. A false `complete` means the live size is a floor:
+the repository has more artifacts than the page cap walked. It can also be
+smaller than expected for a second reason, which `complete` does not cover:
+`count` is GitHub's total and includes the artifacts it has already expired,
+while the size is over the live ones alone, which `live_count` counts.
 
 **The traffic chart only goes back fourteen days.** That is a first sweep. The
 window is rewritten day by day on every sweep, so the series extends as the

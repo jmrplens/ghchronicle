@@ -4047,7 +4047,7 @@
       "panels": [
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "How much closed in the range and how long each took. Every duration is a median: half of what merged or closed took less than the number shown. Time to first review is the wait before a person other than the author looked at a pull request, so review bots, which answer in seconds, and the author's own replies are left out; a range where nobody else reviewed anything reads No data, which is the honest answer. Lines per pull request is the median of added plus removed by a merged one.",
+          "description": "How much closed in the range and how long each took. Every duration is a median: half of what merged or closed took less than the number shown. Time to review by someone else is the wait before a person other than the author looked at a pull request, so review bots, which answer in seconds, and the author's own replies are left out; a range where nobody else reviewed anything reads No data, which is the honest answer and not the claim that nothing was reviewed. Lines per pull request is the median of added plus removed by a merged one.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -4082,7 +4082,7 @@
               {
                 "matcher": {
                   "id": "byName",
-                  "options": "Time to first review"
+                  "options": "Time to review by someone else"
                 },
                 "properties": [
                   {
@@ -4135,7 +4135,7 @@
                 "properties": [
                   {
                     "id": "displayName",
-                    "value": "Time to first review"
+                    "value": "Time to review by someone else"
                   }
                 ]
               },
@@ -6260,7 +6260,7 @@
       "panels": [
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "How many runs the range holds and how they ended. The success rate is the runs that succeeded as a share of the runs that succeeded or failed: a run canceled by a newer push under a concurrency group, or skipped by its own condition, decided nothing and is counted beside it as undecided rather than as a failure. The run duration is the median over the range and the queue wait is the time a job spent waiting for a runner, which only exists at job level, the run-level number folding the wait into the duration. Over the runs whose jobs were expanded, which is the newest runs of each sweep and, after a backfill, the ninety days GitHub keeps jobs for; not every run the run count includes. Last come the bytes the runs left behind. In Elasticsearch the success rate is the mean of the boolean `success` field over those runs, as a fraction.",
+          "description": "How many runs the range holds and how they ended. The success rate is the runs that succeeded as a share of the runs that succeeded or failed: a run canceled by a newer push under a concurrency group, or skipped by its own condition, decided nothing and is counted beside it as undecided rather than as a failure. The run duration is the median over the range and the queue wait is the time a job spent waiting for a runner, which only exists at job level, the run-level number folding the wait into the duration. Over the runs whose jobs were expanded, which is the newest runs of each sweep and, after a backfill, the ninety days GitHub keeps jobs for; not every run the run count includes. Last come the bytes the runs left behind, which are the artifacts the walk reached: GitHub lists thousands of them per repository and the walk stops at five hundred, so this is a floor wherever it did. \"Artifact storage counted\" below puts the two counts beside it. In Elasticsearch the success rate is the mean of the boolean `success` field over those runs, as a fraction.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -6345,7 +6345,7 @@
               {
                 "matcher": {
                   "id": "byName",
-                  "options": "Artifact storage"
+                  "options": "Artifact storage walked"
                 },
                 "properties": [
                   {
@@ -6434,7 +6434,7 @@
                 "properties": [
                   {
                     "id": "displayName",
-                    "value": "Artifact storage"
+                    "value": "Artifact storage walked"
                   }
                 ]
               },
@@ -7098,7 +7098,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "Artifacts that have not expired. GitHub deletes them on their own schedule, which is why this falls without anyone doing anything. A reading taken at each sweep, so the curve starts the day the collector did: there is no history of it to rebuild. The eight repositories holding the most are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "Artifacts that have not expired, over the ones the walk reached, which is a floor on any repository with more than five hundred: \"Artifact storage counted\" further down has the counts that say which those are. GitHub deletes artifacts on their own schedule, which is why this falls without anyone doing anything. A reading taken at each sweep, so the curve starts the day the collector did: there is no history of it to rebuild. The eight repositories holding the most are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -8352,7 +8352,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "Artifact storage, and how much of it was counted. When Walked is lower than Declared, the live size is a floor rather than a total: the walk stopped at the page cap. Here it is short by a factor of fifty six, and without this column the tile above would say so nowhere.",
+          "description": "Artifact storage, and how much of it was counted. Three counts, because the live size is on neither of the other two: Declared is GitHub's own total and counts the artifacts it has already expired, Walked is how far the page cap let the walk go, and Live is the artifacts still held among those, which is what the live size is the size of. When Walked is lower than Declared the live size is a floor rather than a total: here it is short by a factor of fifty six, and without these columns the tile above would say so nowhere.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -8405,6 +8405,18 @@
                     "value": 100
                   }
                 ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Live"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 90
+                  }
+                ]
               }
             ]
           },
@@ -8455,6 +8467,7 @@
                     "metrics": [
                       "count",
                       "walked",
+                      "live_count",
                       "live_bytes"
                     ],
                     "order": "desc",
@@ -8478,6 +8491,7 @@
                 "renameByName": {
                   "Top Metrics count": "Declared",
                   "Top Metrics live_bytes": "Live size",
+                  "Top Metrics live_count": "Live",
                   "Top Metrics walked": "Walked",
                   "repo.keyword": "Repository"
                 }
@@ -10347,11 +10361,11 @@
                 "properties": [
                   {
                     "id": "unit",
-                    "value": "d"
+                    "value": "s"
                   },
                   {
                     "id": "custom.width",
-                    "value": 100
+                    "value": 90
                   }
                 ]
               },
@@ -10370,6 +10384,22 @@
                         "url": "${__data.fields.Link}"
                       }
                     ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Pushed after"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "s"
+                  },
+                  {
+                    "id": "custom.width",
+                    "value": 110
                   }
                 ]
               },
@@ -10436,24 +10466,24 @@
                   "@timestamp": true,
                   "advanced": true,
                   "by": true,
-                  "days_since_push": true,
                   "repo": true,
+                  "seconds_to_push": true,
                   "url": true
                 },
                 "indexByName": {
                   "@timestamp": 0,
                   "advanced": 3,
                   "by": 1,
-                  "days_since_push": 4,
                   "repo": 2,
+                  "seconds_to_push": 4,
                   "url": 5
                 },
                 "renameByName": {
                   "@timestamp": "Forked",
                   "advanced": "Pushed to",
                   "by": "By",
-                  "days_since_push": "Idle",
                   "repo": "Repository",
+                  "seconds_to_push": "Pushed after",
                   "url": "Link"
                 }
               }
@@ -15982,7 +16012,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "The two counts at the top of the section, as the rows they are made of, whatever the dashboard range: an alert is listed while it is open, however long ago it was raised. A Dependabot alert names its package and advisory, a code scanning alert its rule and tool. Open for is the newest reading, so the row moves forward every sweep until the alert is fixed or dismissed. The link opens the alert, which GitHub shows to the owner alone. Elasticsearch lists the Dependabot alerts alone, the two families being two indices, and by number rather than by date: the advisory is text, which a bucket cannot show. It also lists only the ones raised inside the dashboard range, since every Elasticsearch query is bounded by it.",
+          "description": "The two counts at the top of the section, as the rows they are made of, whatever the dashboard range: an alert is listed while it is open, however long ago it was raised. A Dependabot alert names its package and advisory, a code scanning alert its rule and tool. Open for is counted from the row's own date to now, so it is right when the panel is drawn rather than when the last sweep ran. The link opens the alert, which GitHub shows to the owner alone. Elasticsearch lists the Dependabot alerts alone, the two families being two indices, and by number rather than by date: the advisory is text, which a bucket cannot show. It carries the CVSS score in place of how long the alert has been open, which is the row's own date subtracted from now and not something a bucket can compute. It also lists only the ones raised inside the dashboard range, since every Elasticsearch query is bounded by it.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -16190,7 +16220,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "field": "seconds_open",
+                  "field": "cvss",
                   "id": "373",
                   "type": "max"
                 }
@@ -16208,7 +16238,7 @@
                 "excludeByName": {},
                 "indexByName": {},
                 "renameByName": {
-                  "Max": "Open for",
+                  "Max": "CVSS",
                   "number.keyword": "Number",
                   "package.keyword": "What",
                   "repo.keyword": "Repository",
@@ -17553,7 +17583,7 @@
                   "type": "sum"
                 }
               ],
-              "query": "_index:ghchronicle-gh_billing_usage AND _exists_:repo",
+              "query": "_index:ghchronicle-gh_billing_usage AND NOT repo.keyword:\"(none)\"",
               "refId": "A",
               "timeField": "@timestamp"
             }

@@ -330,7 +330,7 @@ Reads `gh_contribution_day`, `gh_commits_week`, `gh_contributions_total`,
 ### Pull requests and issues
 
 Fourteen panels, and the section where the per-item collection pays for itself.
-Merged count, time to merge, time to first review, issues closed, time to close
+Merged count, time to merge, time to review by someone else, issues closed, time to close
 and lines changed as one group of six values; then the same split by state over
 time, the largest merged pull requests, and the breakdowns by author, by
 repository and by reviewer. An item still open is written once per day for as
@@ -341,12 +341,15 @@ each item from its newest row.
 
 ![The Pull requests and issues section: a tile group reading 467 pull requests merged, 10.3 hours to merge, 9.81 hours to a first review, 137 issues closed, 1.75 days to close one and 75 lines per pull request, pull requests and issues per day split by state, time to merge and pull request size over time, the largest merged pull requests with their titles, associations and labels, pull requests by author, the per repository table, the reviewer table led by review-bot at 209 reviews, reviews per day, the two open the longest tables, review threads per day split into bot and human, and the review debt table](../site/src/assets/dashboards/pull-requests-and-issues.png)
 
-> **Read the time to first review carefully**
+> **Read the review wait carefully**
 >
 > The tile counts the first review by somebody other than the author and other
 > than a bot, so on an account reviewed by bots alone it reads No data rather
-> than the bots' few seconds. Measured, nine pull requests in ten had a bot
-> review inside a minute; the Reviewers table shows that, with each bot marked
+> than the bots' few seconds. It is named for that, because "Time to first
+> review" over No data read as nothing having been reviewed at all: measured
+> here, 706 of 829 pull requests in a fortnight had a first review and none of
+> them had one from anybody else. Nine pull requests in ten had a bot review
+> inside a minute; the Reviewers table shows that, with each bot marked
 > as one and the author's own replies as one row.
 
 Reads `gh_pull_request`, `gh_pull_request_review` and `gh_issue`.
@@ -377,7 +380,12 @@ that only the two SQL stores can answer.
 
 "Artifact storage counted" exists because the total is a floor. GitHub reports how many artifacts a repository has, the collector
 records how many it actually walked, and when the second is smaller the live
-size is short: on one repository here, by a factor of fifty six.
+size is short: on one repository here, by a factor of fifty six. It carries a
+third count, the live artifacts among the ones walked, because GitHub's own
+total includes the ones it has already expired and the size does not. The tile
+at the top of the section is named for what it is over, and every panel that
+shows the size either shows those counts or says in its description that it is
+a floor.
 
 Reads `gh_workflow_run`, `gh_workflow_job`, `gh_workflow_step`, `gh_workflow`,
 `gh_artifact`, `gh_artifact_total` and `gh_actions_cache`.
@@ -535,7 +543,9 @@ credit shows up. The price per unit is in the table for the same reason: it is
 what explains thirty thousand macOS minutes costing more than two hundred and
 forty thousand Linux ones. A repository can appear in that table and in no
 other panel, because the list that bills and the list that is swept are not the
-same list.
+same list. A charge that belongs to no repository, which is what a Copilot seat
+is, is left out of that table in every store: it is a row of the bill and not a
+repository called (none). The spend totals above it include it.
 
 The two cache panels are about the ceiling. GitHub caps a repository at ten
 gigabytes and evicts the least recently used entry past it, so the bar is each

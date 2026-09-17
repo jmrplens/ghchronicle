@@ -355,7 +355,7 @@ func scanningAndResolution(b *builder) []Panel {
 			{"severity.keyword", "Severity"},
 			{"package.keyword", "What"},
 			{"url.keyword", "Link"},
-			{"s", securityCVSS},
+			{"c", securityCVSS},
 		}, []string{ESF, "alert_state:open"})
 
 	toolGR, toolGRtf := gTbl(fmt.Sprintf(
