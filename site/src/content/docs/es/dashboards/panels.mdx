@@ -169,8 +169,9 @@ Lee `gh_contribution_day`, `gh_commits_week`, `gh_contributions_total`,
 ## Pull requests and issues
 
 Catorce paneles, y la sección donde la recolección por elemento se paga sola.
-Fusionados, tiempo hasta fusionar, tiempo hasta la primera revisión, issues
-cerrados, tiempo hasta cerrar y líneas cambiadas como un grupo de seis valores;
+Fusionados, tiempo hasta fusionar, tiempo hasta la revisión de otra persona,
+issues cerrados, tiempo hasta cerrar y líneas cambiadas como un grupo de seis
+valores;
 luego el mismo reparto por estado en el tiempo, las pull requests fusionadas más
 grandes y los desgloses por autor, por repositorio y por revisor. Un elemento
 que sigue abierto se escribe una vez al día mientras lo esté, y esas filas se
@@ -182,10 +183,13 @@ de su fila más reciente.
 ![La sección Pull requests and issues: un grupo de tarjetas con 467 pull requests fusionadas, 10,3 horas hasta fusionar, 9,81 horas hasta la primera revisión, 137 issues cerradas, 1,75 días hasta cerrar una y 75 líneas por pull request; pull requests e issues por día separados por estado; tiempo hasta fusionar y tamaño de la pull request en el tiempo; las fusionadas más grandes con su título, asociación y etiquetas; pull requests por autor; la tabla por repositorio; la tabla de revisores encabezada por review-bot con 209 revisiones; revisiones por día; las dos tablas de los que llevan más tiempo abiertos; hilos de revisión por día separados en bot y humano; y la tabla de deuda de revisión](../../../../assets/dashboards/pull-requests-and-issues.png)
 
 <Aside
-  type="caution" title="Cuidado al leer el tiempo hasta la primera revisión" >
+  type="caution" title="Cuidado al leer la espera de revisión" >
   El panel cuenta la primera revisión de alguien que no es el autor ni un bot,
   así que en una cuenta revisada solo por bots dice No data en vez de los pocos
-  segundos de los bots. Medido, nueve de cada diez pull requests tuvieron una
+  segundos de los bots. Se llama así por eso, porque "Time to first review"
+  sobre un No data se leía como que no se había revisado nada: medido aquí, 706
+  de 829 pull requests en quince días tuvieron una primera revisión y ninguna la
+  tuvo de otra persona. Nueve de cada diez pull requests tuvieron una
   revisión de un bot en menos de un minuto; la tabla Reviewers lo enseña, con
   cada bot marcado como tal y las respuestas del propio autor en una sola fila.
 </Aside>
@@ -219,7 +223,11 @@ aquí que solo pueden responder los dos almacenes SQL.
 
 "Artifact storage counted" existe porque el total es un suelo. GitHub dice cuántos artefactos tiene un repositorio, el colector anota
 cuántos recorrió de verdad, y cuando el segundo es menor el tamaño vivo se queda
-corto: en un repositorio de aquí, por un factor de cincuenta y seis.
+corto: en un repositorio de aquí, por un factor de cincuenta y seis. Lleva una
+tercera cuenta, los artefactos vivos entre los recorridos, porque el total del
+propio GitHub incluye los que ya ha caducado y el tamaño no. La tarjeta del
+principio de la sección se llama por aquello sobre lo que está, y todo panel que
+enseña el tamaño enseña esas cuentas o dice en su descripción que es un suelo.
 
 Lee `gh_workflow_run`, `gh_workflow_job`, `gh_workflow_step`, `gh_workflow`,
 `gh_artifact`, `gh_artifact_total` y `gh_actions_cache`.
@@ -381,7 +389,10 @@ porque el neto no siempre es cero y el descuento es donde aparece el crédito
 mensual. El precio por unidad está en la tabla por el mismo motivo: es lo que
 explica que treinta mil minutos de macOS cuesten más que doscientos cuarenta mil
 de Linux. Un repositorio puede salir en esa tabla y en ningún otro panel, porque
-la lista que factura y la que se recorre no son la misma.
+la lista que factura y la que se recorre no son la misma. Un cargo que no
+pertenece a ningún repositorio, que es lo que es un asiento de Copilot, se queda
+fuera de esa tabla en todos los almacenes: es una fila de la factura y no un
+repositorio llamado (none). Los totales de gasto de arriba sí lo incluyen.
 
 Los dos paneles de caché van del techo. GitHub limita cada repositorio a diez
 gigabytes y expulsa la entrada menos usada al pasarlo, así que la barra es cada

@@ -97,10 +97,11 @@ son instantáneas de una ventana sin fecha propia; se sellan al inicio del día
 UTC para que las pasadas de un día reescriban una fila, y el dashboard toma la más
 reciente y no la suma.
 
-**La mediana de tiempo hasta la primera revisión dice No data.** El panel lee
+**La mediana de tiempo hasta la revisión de otra persona dice No data.** El panel lee
 `seconds_to_first_human_review`, que deja fuera a los bots de revisión y las
 respuestas del propio autor; en una cuenta donde nadie más revisa, ninguna pull
-request lo lleva y la tarjeta está honestamente vacía. La velocidad de los bots
+request lo lleva y la tarjeta está honestamente vacía. No significa que no se
+haya revisado nada. La velocidad de los bots
 está en la tabla Reviewers, donde cada uno va marcado como bot: medido, nueve
 de cada diez pull requests tuvieron una revisión de un bot en menos de un
 minuto.
@@ -114,10 +115,13 @@ personas.
 GitHub cuenta las pull requests como issues dentro. La medida `gh_issue` es la
 que cuenta issues.
 
-**El almacenamiento de artefactos parece pequeño.** Compara el campo `walked`
-con `count` en `gh_artifact_total`. Cuando no coinciden, el tamaño vivo es un
-suelo: el repositorio tiene más artefactos de los que recorrió el tope de
-páginas.
+**El almacenamiento de artefactos parece pequeño.** Mira `complete` en
+`gh_artifact_total`, o `walked` frente a `count`. Un `complete` falso significa
+que el tamaño vivo es un suelo: el repositorio tiene más artefactos de los que
+recorrió el tope de páginas. También puede salir más pequeño de lo esperado por
+una segunda razón, que `complete` no cubre: `count` es el total de GitHub e
+incluye los artefactos que ya ha caducado, mientras que el tamaño es solo sobre
+los vivos, que son los que cuenta `live_count`.
 
 **La gráfica de tráfico solo llega catorce días atrás.** Eso es una primera
 pasada. La ventana se reescribe día a día en cada pasada, así que la serie se

@@ -60,9 +60,17 @@ const (
 // on the name or the value lands in a field nothing describes, and the tables
 // below repeat several of them as column titles.
 const (
-	flowMergedCount     = "Pull requests merged"
-	flowMergeTime       = "Time to merge"
-	flowFirstReviewTime = "Time to first review"
+	flowMergedCount = "Pull requests merged"
+	flowMergeTime   = "Time to merge"
+	// Named for what it measures rather than for the question it looks like
+	// it answers. It reads the wait for a review by somebody other than the
+	// author, bots excluded, and on an account whose pull requests are
+	// reviewed by their author and by review bots there is nothing to draw:
+	// called "Time to first review", a stat reading No data said that nothing
+	// had ever been reviewed, which is false. Measured on the account this was
+	// developed against, 706 of 829 pull requests in a fortnight had a first
+	// review and none of them had one from anybody else.
+	flowFirstReviewTime = "Time to review by someone else"
 	flowIssuesClosed    = "Issues closed"
 	flowIssueCloseTime  = "Time to close an issue"
 	flowLinesPerPull    = "Lines per pull request"
@@ -160,10 +168,11 @@ func flowRates(b *builder) []Panel {
 			},
 			Desc: "How much closed in the range and how long each took. Every duration is a " +
 				"median: half of what merged or closed took less than the number shown. " +
-				"Time to first review is the wait before a person other than the author " +
-				"looked at a pull request, so review bots, which answer in seconds, and " +
-				"the author's own replies are left out; a range where nobody else " +
-				"reviewed anything reads No data, which is the honest answer. Lines per " +
+				"Time to review by someone else is the wait before a person other than the " +
+				"author looked at a pull request, so review bots, which answer in seconds, " +
+				"and the author's own replies are left out; a range where nobody else " +
+				"reviewed anything reads No data, which is the honest answer and not the " +
+				"claim that nothing was reviewed. Lines per " +
 				"pull request is the median of added plus removed by a merged one.",
 			PromDesc: sinceStart + " " + lastSweep,
 			GR: []Target{
