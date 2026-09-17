@@ -116,14 +116,22 @@ estrellas y una barra por fila, con los totales debajo.
 
 ## activity-heatmap
 
-Las últimas doce semanas del calendario de contribuciones como los cuadrados
-verdes de GitHub, con hasta tres números al lado. Las semanas aparecen desde la
-izquierda, una cada veinte milisegundos, así que el calendario se llena como una
-ola.
+Todo el calendario de contribuciones que quepa en el ancho, hasta un año de él,
+como los cuadrados verdes de GitHub, con hasta tres números al lado. El número
+de semanas no es una cifra fija: la rejilla ocupa el sitio que le dejan los
+números de al lado, así que termina donde termina la tarjeta en vez de quedarse
+a un tercio del final. Con el ancho que declara este diseño son veintitrés
+semanas, con su mínimo dieciséis, y una tarjeta dibujada a unas novecientas
+unidades dibuja el año entero que guarda el recolector. Una cuenta con cifras
+de ocho dígitos o más se lleva una columna más ancha y le deja a la rejilla una
+o dos semanas menos, que es la misma regla vista del otro lado. Las semanas aparecen
+desde la izquierda, y la ola cruza la rejilla en 0,22 s tenga las semanas que
+tenga, así que el calendario se llena como una ola de la misma duración a
+cualquier ancho.
 
 <LayoutFacts name="activity-heatmap" />
 
-<Card name="activity-heatmap" alt="El diseño activity-heatmap reproducido una vez: doce semanas de cuadrados de contribución en la escala verde de GitHub que aparecen desde la izquierda, con tres números al lado" animated />
+<Card name="activity-heatmap" alt="El diseño activity-heatmap reproducido una vez: veintitrés semanas de cuadrados de contribución en la escala verde de GitHub que aparecen desde la izquierda, con tres números al lado" animated />
 
 ## animated-counters
 
@@ -198,6 +206,11 @@ a dibujar, y su propia sección de arriba dice los dos. Nada pide otro:
 forma de fijarlo desde fuera, así que cada tarjeta sale con el ancho de su
 diseño. `badge-row` no declara ninguno de los dos, porque una fila de píldoras
 estirada a un ancho fijo tendría huecos; su ancho sigue al contenido.
+
+Hay un diseño que lee el ancho en vez de limitarse a que lo dimensione:
+`activity-heatmap` calcula cuántas semanas del calendario de contribuciones
+puede dibujar con el sitio que le deja el ancho, así que la misma tarjeta son
+dieciséis semanas con su mínimo y un año entero si se le da sitio de sobra.
 
 ## Campos que un diseño no puede dibujar
 

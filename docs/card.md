@@ -500,16 +500,24 @@ bar per row, totals underneath.
 
 ### activity-heatmap
 
-The last twelve weeks of the contribution calendar as GitHub's green squares,
-with up to three numbers beside it. The weeks fade in from the left, a week
-every twenty milliseconds, so the calendar fills in as a wave.
+As much of the contribution calendar as the width holds, up to a year of it, as
+GitHub's green squares, with up to three numbers beside it. The week count is
+not a fixed number: the grid takes whatever room the numbers beside it leave, so
+it ends where the card does rather than stopping a third of the way short. At
+the width this layout declares that is twenty-three weeks, at its minimum
+sixteen, and a card rendered at about nine hundred units draws the whole year
+the collector keeps. An account whose numbers run to eight digits and more
+takes a wider column for them and leaves the grid a week or two fewer, which is
+the same rule seen from the other side. The weeks fade in from the left, the wave crossing the grid
+in 0.22 s however many weeks it holds, so the calendar fills in as a wave of the
+same length at every width.
 
 - **Family**: github
 - **Motion**: plays once
 - **Width**: 495 px, minimum 400
 - **Default fields**: `sparkline`, `contributions`, `commits`, `pull_requests`
 
-![The activity-heatmap layout played once: twelve weeks of contribution squares in GitHub's green scale fading in from the left, with three numbers beside them](../site/src/assets/card-activity-heatmap.svg)
+![The activity-heatmap layout played once: twenty-three weeks of contribution squares in GitHub's green scale fading in from the left, with three numbers beside them](../site/src/assets/card-activity-heatmap.svg)
 
 - **Binary**
 
@@ -721,6 +729,11 @@ and its own section above states both. Nothing asks for a different one:
 no way to set it from outside, so every card comes out at its layout's own
 width. `badge-row` declares neither, because a pill row stretched to a fixed
 width would have gaps in it; its width follows its content.
+
+One layout reads the width rather than only being sized by it:
+`activity-heatmap` works out how many weeks of the contribution calendar it can
+draw from the room the width leaves, so the same card is sixteen weeks at its
+minimum and a year of them if it is given enough room.
 
 ### Fields a layout cannot draw
 

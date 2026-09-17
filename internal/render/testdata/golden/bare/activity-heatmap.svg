@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="495" height="204" viewBox="0 0 495 204" role="img" aria-labelledby="ghcTitle ghcDesc">
-<title id="ghcTitle">Contributions, last 12 weeks</title>
+<title id="ghcTitle">Contributions, last 26 weeks</title>
 <desc id="ghcDesc">GitHub summary for someone: 0 stars, 0 forks, 0 followers, 0 public repositories, 0 contributions in the last year, 0 repository views over the traffic window, 0 unique visitors over the traffic window, 0 clones over the traffic window, 0 commits in the last year, 0 pull requests in the last year, 0 reviews in the last year, 0 issues in the last year.</desc>
 <style>
 .bg{fill:#0d1117;stroke:#3d444d}
@@ -34,34 +34,62 @@ text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans',Helveti
 .m0{animation:m0 1.82s ease-out 1}
 @keyframes m0{0%{opacity:0}87.91%,100%{opacity:1}}
 .m1{animation:m1 1.82s ease-out 1}
-@keyframes m1{0%,1.1%{opacity:0}89.01%,100%{opacity:1}}
+@keyframes m1{0%,0.48%{opacity:0}88.4%,100%{opacity:1}}
 .m2{animation:m2 1.82s ease-out 1}
-@keyframes m2{0%,2.2%{opacity:0}90.11%,100%{opacity:1}}
+@keyframes m2{0%,0.97%{opacity:0}88.88%,100%{opacity:1}}
 .m3{animation:m3 1.82s ease-out 1}
-@keyframes m3{0%,3.3%{opacity:0}91.21%,100%{opacity:1}}
+@keyframes m3{0%,1.45%{opacity:0}89.36%,100%{opacity:1}}
 .m4{animation:m4 1.82s ease-out 1}
-@keyframes m4{0%,4.4%{opacity:0}92.31%,100%{opacity:1}}
+@keyframes m4{0%,1.93%{opacity:0}89.85%,100%{opacity:1}}
 .m5{animation:m5 1.82s ease-out 1}
-@keyframes m5{0%,5.49%{opacity:0}93.41%,100%{opacity:1}}
+@keyframes m5{0%,2.42%{opacity:0}90.33%,100%{opacity:1}}
 .m6{animation:m6 1.82s ease-out 1}
-@keyframes m6{0%,6.59%{opacity:0}94.51%,100%{opacity:1}}
+@keyframes m6{0%,2.9%{opacity:0}90.81%,100%{opacity:1}}
 .m7{animation:m7 1.82s ease-out 1}
-@keyframes m7{0%,7.69%{opacity:0}95.6%,100%{opacity:1}}
+@keyframes m7{0%,3.38%{opacity:0}91.3%,100%{opacity:1}}
 .m8{animation:m8 1.82s ease-out 1}
-@keyframes m8{0%,8.79%{opacity:0}96.7%,100%{opacity:1}}
+@keyframes m8{0%,3.87%{opacity:0}91.78%,100%{opacity:1}}
 .m9{animation:m9 1.82s ease-out 1}
-@keyframes m9{0%,9.89%{opacity:0}97.8%,100%{opacity:1}}
+@keyframes m9{0%,4.35%{opacity:0}92.26%,100%{opacity:1}}
 .m10{animation:m10 1.82s ease-out 1}
-@keyframes m10{0%,10.99%{opacity:0}98.9%,100%{opacity:1}}
+@keyframes m10{0%,4.84%{opacity:0}92.75%,100%{opacity:1}}
 .m11{animation:m11 1.82s ease-out 1}
-@keyframes m11{0%,12.09%{opacity:0}100%{opacity:1}}
-@media (prefers-reduced-motion:reduce){.m0,.m1,.m2,.m3,.m4,.m5,.m6,.m7,.m8,.m9,.m10,.m11{animation:none}}
+@keyframes m11{0%,5.32%{opacity:0}93.23%,100%{opacity:1}}
+.m12{animation:m12 1.82s ease-out 1}
+@keyframes m12{0%,5.8%{opacity:0}93.71%,100%{opacity:1}}
+.m13{animation:m13 1.82s ease-out 1}
+@keyframes m13{0%,6.29%{opacity:0}94.2%,100%{opacity:1}}
+.m14{animation:m14 1.82s ease-out 1}
+@keyframes m14{0%,6.77%{opacity:0}94.68%,100%{opacity:1}}
+.m15{animation:m15 1.82s ease-out 1}
+@keyframes m15{0%,7.25%{opacity:0}95.16%,100%{opacity:1}}
+.m16{animation:m16 1.82s ease-out 1}
+@keyframes m16{0%,7.74%{opacity:0}95.65%,100%{opacity:1}}
+.m17{animation:m17 1.82s ease-out 1}
+@keyframes m17{0%,8.22%{opacity:0}96.13%,100%{opacity:1}}
+.m18{animation:m18 1.82s ease-out 1}
+@keyframes m18{0%,8.7%{opacity:0}96.62%,100%{opacity:1}}
+.m19{animation:m19 1.82s ease-out 1}
+@keyframes m19{0%,9.19%{opacity:0}97.1%,100%{opacity:1}}
+.m20{animation:m20 1.82s ease-out 1}
+@keyframes m20{0%,9.67%{opacity:0}97.58%,100%{opacity:1}}
+.m21{animation:m21 1.82s ease-out 1}
+@keyframes m21{0%,10.15%{opacity:0}98.07%,100%{opacity:1}}
+.m22{animation:m22 1.82s ease-out 1}
+@keyframes m22{0%,10.64%{opacity:0}98.55%,100%{opacity:1}}
+.m23{animation:m23 1.82s ease-out 1}
+@keyframes m23{0%,11.12%{opacity:0}99.03%,100%{opacity:1}}
+.m24{animation:m24 1.82s ease-out 1}
+@keyframes m24{0%,11.6%{opacity:0}99.52%,100%{opacity:1}}
+.m25{animation:m25 1.82s ease-out 1}
+@keyframes m25{0%,12.09%{opacity:0}100%{opacity:1}}
+@media (prefers-reduced-motion:reduce){.m0,.m1,.m2,.m3,.m4,.m5,.m6,.m7,.m8,.m9,.m10,.m11,.m12,.m13,.m14,.m15,.m16,.m17,.m18,.m19,.m20,.m21,.m22,.m23,.m24,.m25{animation:none}}
 </style>
 <rect class="bg" x="0.5" y="0.5" width="494" height="203" rx="6"/>
 <path class="panel" d="M0.5,44 V6.5 A6,6 0 0 1 6.5,0.5 H488.5 A6,6 0 0 1 494.5,6.5 V44 Z"/>
 <line class="axis" x1="0.5" y1="44.5" x2="494.5" y2="44.5"/>
 <rect class="edge" x="0.5" y="0.5" width="494" height="203" rx="6"/>
-<text class="t" x="22" y="28" text-anchor="start">Contributions, last 12 weeks</text>
+<text class="t" x="22" y="28" text-anchor="start">Contributions, last 26 weeks</text>
 <text class="d mono" x="473" y="28" text-anchor="end">@someone</text>
 <rect class="h0 m0" x="22" y="62" width="11" height="11" rx="2"/>
 <rect class="h0 m0" x="22" y="76" width="11" height="11" rx="2"/>
@@ -147,6 +175,104 @@ text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans',Helveti
 <rect class="h0 m11" x="176" y="118" width="11" height="11" rx="2"/>
 <rect class="h0 m11" x="176" y="132" width="11" height="11" rx="2"/>
 <rect class="h0 m11" x="176" y="146" width="11" height="11" rx="2"/>
+<rect class="h0 m12" x="190" y="62" width="11" height="11" rx="2"/>
+<rect class="h0 m12" x="190" y="76" width="11" height="11" rx="2"/>
+<rect class="h0 m12" x="190" y="90" width="11" height="11" rx="2"/>
+<rect class="h0 m12" x="190" y="104" width="11" height="11" rx="2"/>
+<rect class="h0 m12" x="190" y="118" width="11" height="11" rx="2"/>
+<rect class="h0 m12" x="190" y="132" width="11" height="11" rx="2"/>
+<rect class="h0 m12" x="190" y="146" width="11" height="11" rx="2"/>
+<rect class="h0 m13" x="204" y="62" width="11" height="11" rx="2"/>
+<rect class="h0 m13" x="204" y="76" width="11" height="11" rx="2"/>
+<rect class="h0 m13" x="204" y="90" width="11" height="11" rx="2"/>
+<rect class="h0 m13" x="204" y="104" width="11" height="11" rx="2"/>
+<rect class="h0 m13" x="204" y="118" width="11" height="11" rx="2"/>
+<rect class="h0 m13" x="204" y="132" width="11" height="11" rx="2"/>
+<rect class="h0 m13" x="204" y="146" width="11" height="11" rx="2"/>
+<rect class="h0 m14" x="218" y="62" width="11" height="11" rx="2"/>
+<rect class="h0 m14" x="218" y="76" width="11" height="11" rx="2"/>
+<rect class="h0 m14" x="218" y="90" width="11" height="11" rx="2"/>
+<rect class="h0 m14" x="218" y="104" width="11" height="11" rx="2"/>
+<rect class="h0 m14" x="218" y="118" width="11" height="11" rx="2"/>
+<rect class="h0 m14" x="218" y="132" width="11" height="11" rx="2"/>
+<rect class="h0 m14" x="218" y="146" width="11" height="11" rx="2"/>
+<rect class="h0 m15" x="232" y="62" width="11" height="11" rx="2"/>
+<rect class="h0 m15" x="232" y="76" width="11" height="11" rx="2"/>
+<rect class="h0 m15" x="232" y="90" width="11" height="11" rx="2"/>
+<rect class="h0 m15" x="232" y="104" width="11" height="11" rx="2"/>
+<rect class="h0 m15" x="232" y="118" width="11" height="11" rx="2"/>
+<rect class="h0 m15" x="232" y="132" width="11" height="11" rx="2"/>
+<rect class="h0 m15" x="232" y="146" width="11" height="11" rx="2"/>
+<rect class="h0 m16" x="246" y="62" width="11" height="11" rx="2"/>
+<rect class="h0 m16" x="246" y="76" width="11" height="11" rx="2"/>
+<rect class="h0 m16" x="246" y="90" width="11" height="11" rx="2"/>
+<rect class="h0 m16" x="246" y="104" width="11" height="11" rx="2"/>
+<rect class="h0 m16" x="246" y="118" width="11" height="11" rx="2"/>
+<rect class="h0 m16" x="246" y="132" width="11" height="11" rx="2"/>
+<rect class="h0 m16" x="246" y="146" width="11" height="11" rx="2"/>
+<rect class="h0 m17" x="260" y="62" width="11" height="11" rx="2"/>
+<rect class="h0 m17" x="260" y="76" width="11" height="11" rx="2"/>
+<rect class="h0 m17" x="260" y="90" width="11" height="11" rx="2"/>
+<rect class="h0 m17" x="260" y="104" width="11" height="11" rx="2"/>
+<rect class="h0 m17" x="260" y="118" width="11" height="11" rx="2"/>
+<rect class="h0 m17" x="260" y="132" width="11" height="11" rx="2"/>
+<rect class="h0 m17" x="260" y="146" width="11" height="11" rx="2"/>
+<rect class="h0 m18" x="274" y="62" width="11" height="11" rx="2"/>
+<rect class="h0 m18" x="274" y="76" width="11" height="11" rx="2"/>
+<rect class="h0 m18" x="274" y="90" width="11" height="11" rx="2"/>
+<rect class="h0 m18" x="274" y="104" width="11" height="11" rx="2"/>
+<rect class="h0 m18" x="274" y="118" width="11" height="11" rx="2"/>
+<rect class="h0 m18" x="274" y="132" width="11" height="11" rx="2"/>
+<rect class="h0 m18" x="274" y="146" width="11" height="11" rx="2"/>
+<rect class="h0 m19" x="288" y="62" width="11" height="11" rx="2"/>
+<rect class="h0 m19" x="288" y="76" width="11" height="11" rx="2"/>
+<rect class="h0 m19" x="288" y="90" width="11" height="11" rx="2"/>
+<rect class="h0 m19" x="288" y="104" width="11" height="11" rx="2"/>
+<rect class="h0 m19" x="288" y="118" width="11" height="11" rx="2"/>
+<rect class="h0 m19" x="288" y="132" width="11" height="11" rx="2"/>
+<rect class="h0 m19" x="288" y="146" width="11" height="11" rx="2"/>
+<rect class="h0 m20" x="302" y="62" width="11" height="11" rx="2"/>
+<rect class="h0 m20" x="302" y="76" width="11" height="11" rx="2"/>
+<rect class="h0 m20" x="302" y="90" width="11" height="11" rx="2"/>
+<rect class="h0 m20" x="302" y="104" width="11" height="11" rx="2"/>
+<rect class="h0 m20" x="302" y="118" width="11" height="11" rx="2"/>
+<rect class="h0 m20" x="302" y="132" width="11" height="11" rx="2"/>
+<rect class="h0 m20" x="302" y="146" width="11" height="11" rx="2"/>
+<rect class="h0 m21" x="316" y="62" width="11" height="11" rx="2"/>
+<rect class="h0 m21" x="316" y="76" width="11" height="11" rx="2"/>
+<rect class="h0 m21" x="316" y="90" width="11" height="11" rx="2"/>
+<rect class="h0 m21" x="316" y="104" width="11" height="11" rx="2"/>
+<rect class="h0 m21" x="316" y="118" width="11" height="11" rx="2"/>
+<rect class="h0 m21" x="316" y="132" width="11" height="11" rx="2"/>
+<rect class="h0 m21" x="316" y="146" width="11" height="11" rx="2"/>
+<rect class="h0 m22" x="330" y="62" width="11" height="11" rx="2"/>
+<rect class="h0 m22" x="330" y="76" width="11" height="11" rx="2"/>
+<rect class="h0 m22" x="330" y="90" width="11" height="11" rx="2"/>
+<rect class="h0 m22" x="330" y="104" width="11" height="11" rx="2"/>
+<rect class="h0 m22" x="330" y="118" width="11" height="11" rx="2"/>
+<rect class="h0 m22" x="330" y="132" width="11" height="11" rx="2"/>
+<rect class="h0 m22" x="330" y="146" width="11" height="11" rx="2"/>
+<rect class="h0 m23" x="344" y="62" width="11" height="11" rx="2"/>
+<rect class="h0 m23" x="344" y="76" width="11" height="11" rx="2"/>
+<rect class="h0 m23" x="344" y="90" width="11" height="11" rx="2"/>
+<rect class="h0 m23" x="344" y="104" width="11" height="11" rx="2"/>
+<rect class="h0 m23" x="344" y="118" width="11" height="11" rx="2"/>
+<rect class="h0 m23" x="344" y="132" width="11" height="11" rx="2"/>
+<rect class="h0 m23" x="344" y="146" width="11" height="11" rx="2"/>
+<rect class="h0 m24" x="358" y="62" width="11" height="11" rx="2"/>
+<rect class="h0 m24" x="358" y="76" width="11" height="11" rx="2"/>
+<rect class="h0 m24" x="358" y="90" width="11" height="11" rx="2"/>
+<rect class="h0 m24" x="358" y="104" width="11" height="11" rx="2"/>
+<rect class="h0 m24" x="358" y="118" width="11" height="11" rx="2"/>
+<rect class="h0 m24" x="358" y="132" width="11" height="11" rx="2"/>
+<rect class="h0 m24" x="358" y="146" width="11" height="11" rx="2"/>
+<rect class="h0 m25" x="372" y="62" width="11" height="11" rx="2"/>
+<rect class="h0 m25" x="372" y="76" width="11" height="11" rx="2"/>
+<rect class="h0 m25" x="372" y="90" width="11" height="11" rx="2"/>
+<rect class="h0 m25" x="372" y="104" width="11" height="11" rx="2"/>
+<rect class="h0 m25" x="372" y="118" width="11" height="11" rx="2"/>
+<rect class="h0 m25" x="372" y="132" width="11" height="11" rx="2"/>
+<rect class="h0 m25" x="372" y="146" width="11" height="11" rx="2"/>
 <text class="s" x="22" y="182" text-anchor="start">Less</text>
 <rect class="h0" x="52" y="173" width="11" height="11" rx="2"/>
 <rect class="h1" x="66" y="173" width="11" height="11" rx="2"/>
@@ -154,10 +280,10 @@ text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans',Helveti
 <rect class="h3" x="94" y="173" width="11" height="11" rx="2"/>
 <rect class="h4" x="108" y="173" width="11" height="11" rx="2"/>
 <text class="s" x="124" y="182" text-anchor="start">More</text>
-<text class="big" x="221" y="80" text-anchor="start">0</text>
-<text class="l" x="221" y="96" text-anchor="start">Stars</text>
-<text class="big" x="221" y="124" text-anchor="start">0</text>
-<text class="l" x="221" y="140" text-anchor="start">Forks</text>
-<text class="big" x="221" y="168" text-anchor="start">0</text>
-<text class="l" x="221" y="184" text-anchor="start">Followers</text>
+<text class="big" x="417" y="80" text-anchor="start">0</text>
+<text class="l" x="417" y="96" text-anchor="start">Stars</text>
+<text class="big" x="417" y="124" text-anchor="start">0</text>
+<text class="l" x="417" y="140" text-anchor="start">Forks</text>
+<text class="big" x="417" y="168" text-anchor="start">0</text>
+<text class="l" x="417" y="184" text-anchor="start">Followers</text>
 </svg>

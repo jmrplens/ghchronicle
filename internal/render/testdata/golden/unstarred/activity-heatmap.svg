@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="495" height="204" viewBox="0 0 495 204" role="img" aria-labelledby="ghcTitle ghcDesc">
-<title id="ghcTitle">Contributions, last 12 weeks</title>
+<title id="ghcTitle">Contributions</title>
 <desc id="ghcDesc">GitHub summary for jmrplens: 283 stars, 70 forks, 41 followers, 42 public repositories, 6210 contributions in the last year, 1810 repository views in the last 14 days, 878 unique visitors in the last 14 days, 117000 clones in the last 14 days, 3387 commits in the last year, 1179 pull requests in the last year, 389 reviews in the last year, 64 issues in the last year.</desc>
 <style>
 .bg{fill:#0d1117;stroke:#3d444d}
@@ -36,12 +36,12 @@ text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans',Helveti
 <path class="panel" d="M0.5,44 V6.5 A6,6 0 0 1 6.5,0.5 H488.5 A6,6 0 0 1 494.5,6.5 V44 Z"/>
 <line class="axis" x1="0.5" y1="44.5" x2="494.5" y2="44.5"/>
 <rect class="edge" x="0.5" y="0.5" width="494" height="203" rx="6"/>
-<text class="t" x="22" y="28" text-anchor="start">Contributions, last 12 weeks</text>
+<text class="t" x="22" y="28" text-anchor="start">Contributions</text>
 <text class="d mono" x="473" y="28" text-anchor="end">@jmrplens</text>
-<text class="big" x="221" y="80" text-anchor="start">283</text>
-<text class="l" x="221" y="96" text-anchor="start">Stars</text>
-<text class="big" x="221" y="124" text-anchor="start">70</text>
-<text class="l" x="221" y="140" text-anchor="start">Forks</text>
-<text class="big" x="221" y="168" text-anchor="start">41</text>
-<text class="l" x="221" y="184" text-anchor="start">Followers</text>
+<text class="big" x="22" y="80" text-anchor="start">283</text>
+<text class="l" x="22" y="96" text-anchor="start">Stars</text>
+<text class="big" x="22" y="124" text-anchor="start">70</text>
+<text class="l" x="22" y="140" text-anchor="start">Forks</text>
+<text class="big" x="22" y="168" text-anchor="start">41</text>
+<text class="l" x="22" y="184" text-anchor="start">Followers</text>
 </svg>

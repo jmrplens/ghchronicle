@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="495" height="204" viewBox="0 0 495 204" role="img" aria-labelledby="ghcTitle ghcDesc">
-<title id="ghcTitle">Contributions, last 12 weeks</title>
+<title id="ghcTitle">Contributions, last 32 weeks</title>
 <desc id="ghcDesc">GitHub summary for jmrplens. Contributions per day over the last 10 days, peaking at 20.</desc>
 <style>
 .bg{fill:#0d1117;stroke:#3d444d}
@@ -34,34 +34,74 @@ text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans',Helveti
 .m0{animation:m0 1.82s ease-out 1}
 @keyframes m0{0%{opacity:0}87.91%,100%{opacity:1}}
 .m1{animation:m1 1.82s ease-out 1}
-@keyframes m1{0%,1.1%{opacity:0}89.01%,100%{opacity:1}}
+@keyframes m1{0%,0.39%{opacity:0}88.3%,100%{opacity:1}}
 .m2{animation:m2 1.82s ease-out 1}
-@keyframes m2{0%,2.2%{opacity:0}90.11%,100%{opacity:1}}
+@keyframes m2{0%,0.78%{opacity:0}88.69%,100%{opacity:1}}
 .m3{animation:m3 1.82s ease-out 1}
-@keyframes m3{0%,3.3%{opacity:0}91.21%,100%{opacity:1}}
+@keyframes m3{0%,1.17%{opacity:0}89.08%,100%{opacity:1}}
 .m4{animation:m4 1.82s ease-out 1}
-@keyframes m4{0%,4.4%{opacity:0}92.31%,100%{opacity:1}}
+@keyframes m4{0%,1.56%{opacity:0}89.47%,100%{opacity:1}}
 .m5{animation:m5 1.82s ease-out 1}
-@keyframes m5{0%,5.49%{opacity:0}93.41%,100%{opacity:1}}
+@keyframes m5{0%,1.95%{opacity:0}89.86%,100%{opacity:1}}
 .m6{animation:m6 1.82s ease-out 1}
-@keyframes m6{0%,6.59%{opacity:0}94.51%,100%{opacity:1}}
+@keyframes m6{0%,2.34%{opacity:0}90.25%,100%{opacity:1}}
 .m7{animation:m7 1.82s ease-out 1}
-@keyframes m7{0%,7.69%{opacity:0}95.6%,100%{opacity:1}}
+@keyframes m7{0%,2.73%{opacity:0}90.64%,100%{opacity:1}}
 .m8{animation:m8 1.82s ease-out 1}
-@keyframes m8{0%,8.79%{opacity:0}96.7%,100%{opacity:1}}
+@keyframes m8{0%,3.12%{opacity:0}91.03%,100%{opacity:1}}
 .m9{animation:m9 1.82s ease-out 1}
-@keyframes m9{0%,9.89%{opacity:0}97.8%,100%{opacity:1}}
+@keyframes m9{0%,3.51%{opacity:0}91.42%,100%{opacity:1}}
 .m10{animation:m10 1.82s ease-out 1}
-@keyframes m10{0%,10.99%{opacity:0}98.9%,100%{opacity:1}}
+@keyframes m10{0%,3.9%{opacity:0}91.81%,100%{opacity:1}}
 .m11{animation:m11 1.82s ease-out 1}
-@keyframes m11{0%,12.09%{opacity:0}100%{opacity:1}}
-@media (prefers-reduced-motion:reduce){.m0,.m1,.m2,.m3,.m4,.m5,.m6,.m7,.m8,.m9,.m10,.m11{animation:none}}
+@keyframes m11{0%,4.29%{opacity:0}92.2%,100%{opacity:1}}
+.m12{animation:m12 1.82s ease-out 1}
+@keyframes m12{0%,4.68%{opacity:0}92.59%,100%{opacity:1}}
+.m13{animation:m13 1.82s ease-out 1}
+@keyframes m13{0%,5.07%{opacity:0}92.98%,100%{opacity:1}}
+.m14{animation:m14 1.82s ease-out 1}
+@keyframes m14{0%,5.46%{opacity:0}93.37%,100%{opacity:1}}
+.m15{animation:m15 1.82s ease-out 1}
+@keyframes m15{0%,5.85%{opacity:0}93.76%,100%{opacity:1}}
+.m16{animation:m16 1.82s ease-out 1}
+@keyframes m16{0%,6.24%{opacity:0}94.15%,100%{opacity:1}}
+.m17{animation:m17 1.82s ease-out 1}
+@keyframes m17{0%,6.63%{opacity:0}94.54%,100%{opacity:1}}
+.m18{animation:m18 1.82s ease-out 1}
+@keyframes m18{0%,7.02%{opacity:0}94.93%,100%{opacity:1}}
+.m19{animation:m19 1.82s ease-out 1}
+@keyframes m19{0%,7.41%{opacity:0}95.32%,100%{opacity:1}}
+.m20{animation:m20 1.82s ease-out 1}
+@keyframes m20{0%,7.8%{opacity:0}95.71%,100%{opacity:1}}
+.m21{animation:m21 1.82s ease-out 1}
+@keyframes m21{0%,8.19%{opacity:0}96.1%,100%{opacity:1}}
+.m22{animation:m22 1.82s ease-out 1}
+@keyframes m22{0%,8.58%{opacity:0}96.49%,100%{opacity:1}}
+.m23{animation:m23 1.82s ease-out 1}
+@keyframes m23{0%,8.97%{opacity:0}96.88%,100%{opacity:1}}
+.m24{animation:m24 1.82s ease-out 1}
+@keyframes m24{0%,9.36%{opacity:0}97.27%,100%{opacity:1}}
+.m25{animation:m25 1.82s ease-out 1}
+@keyframes m25{0%,9.75%{opacity:0}97.66%,100%{opacity:1}}
+.m26{animation:m26 1.82s ease-out 1}
+@keyframes m26{0%,10.14%{opacity:0}98.05%,100%{opacity:1}}
+.m27{animation:m27 1.82s ease-out 1}
+@keyframes m27{0%,10.53%{opacity:0}98.44%,100%{opacity:1}}
+.m28{animation:m28 1.82s ease-out 1}
+@keyframes m28{0%,10.92%{opacity:0}98.83%,100%{opacity:1}}
+.m29{animation:m29 1.82s ease-out 1}
+@keyframes m29{0%,11.31%{opacity:0}99.22%,100%{opacity:1}}
+.m30{animation:m30 1.82s ease-out 1}
+@keyframes m30{0%,11.7%{opacity:0}99.61%,100%{opacity:1}}
+.m31{animation:m31 1.82s ease-out 1}
+@keyframes m31{0%,12.09%{opacity:0}100%{opacity:1}}
+@media (prefers-reduced-motion:reduce){.m0,.m1,.m2,.m3,.m4,.m5,.m6,.m7,.m8,.m9,.m10,.m11,.m12,.m13,.m14,.m15,.m16,.m17,.m18,.m19,.m20,.m21,.m22,.m23,.m24,.m25,.m26,.m27,.m28,.m29,.m30,.m31{animation:none}}
 </style>
 <rect class="bg" x="0.5" y="0.5" width="494" height="203" rx="6"/>
 <path class="panel" d="M0.5,44 V6.5 A6,6 0 0 1 6.5,0.5 H488.5 A6,6 0 0 1 494.5,6.5 V44 Z"/>
 <line class="axis" x1="0.5" y1="44.5" x2="494.5" y2="44.5"/>
 <rect class="edge" x="0.5" y="0.5" width="494" height="203" rx="6"/>
-<text class="t" x="22" y="28" text-anchor="start">Contributions, last 12 weeks</text>
+<text class="t" x="22" y="28" text-anchor="start">Contributions, last 32 weeks</text>
 <text class="d mono" x="473" y="28" text-anchor="end">@jmrplens</text>
 <rect class="h0 m0" x="22" y="62" width="11" height="11" rx="2"/>
 <rect class="h0 m0" x="22" y="76" width="11" height="11" rx="2"/>
@@ -138,15 +178,155 @@ text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans',Helveti
 <rect class="h0 m10" x="162" y="90" width="11" height="11" rx="2"/>
 <rect class="h0 m10" x="162" y="104" width="11" height="11" rx="2"/>
 <rect class="h0 m10" x="162" y="118" width="11" height="11" rx="2"/>
-<rect class="h1 m10" x="162" y="132" width="11" height="11" rx="2"/>
-<rect class="h3 m10" x="162" y="146" width="11" height="11" rx="2"/>
-<rect class="h2 m11" x="176" y="62" width="11" height="11" rx="2"/>
+<rect class="h0 m10" x="162" y="132" width="11" height="11" rx="2"/>
+<rect class="h0 m10" x="162" y="146" width="11" height="11" rx="2"/>
+<rect class="h0 m11" x="176" y="62" width="11" height="11" rx="2"/>
 <rect class="h0 m11" x="176" y="76" width="11" height="11" rx="2"/>
-<rect class="h1 m11" x="176" y="90" width="11" height="11" rx="2"/>
-<rect class="h4 m11" x="176" y="104" width="11" height="11" rx="2"/>
-<rect class="h3 m11" x="176" y="118" width="11" height="11" rx="2"/>
-<rect class="h1 m11" x="176" y="132" width="11" height="11" rx="2"/>
-<rect class="h2 m11" x="176" y="146" width="11" height="11" rx="2"/>
+<rect class="h0 m11" x="176" y="90" width="11" height="11" rx="2"/>
+<rect class="h0 m11" x="176" y="104" width="11" height="11" rx="2"/>
+<rect class="h0 m11" x="176" y="118" width="11" height="11" rx="2"/>
+<rect class="h0 m11" x="176" y="132" width="11" height="11" rx="2"/>
+<rect class="h0 m11" x="176" y="146" width="11" height="11" rx="2"/>
+<rect class="h0 m12" x="190" y="62" width="11" height="11" rx="2"/>
+<rect class="h0 m12" x="190" y="76" width="11" height="11" rx="2"/>
+<rect class="h0 m12" x="190" y="90" width="11" height="11" rx="2"/>
+<rect class="h0 m12" x="190" y="104" width="11" height="11" rx="2"/>
+<rect class="h0 m12" x="190" y="118" width="11" height="11" rx="2"/>
+<rect class="h0 m12" x="190" y="132" width="11" height="11" rx="2"/>
+<rect class="h0 m12" x="190" y="146" width="11" height="11" rx="2"/>
+<rect class="h0 m13" x="204" y="62" width="11" height="11" rx="2"/>
+<rect class="h0 m13" x="204" y="76" width="11" height="11" rx="2"/>
+<rect class="h0 m13" x="204" y="90" width="11" height="11" rx="2"/>
+<rect class="h0 m13" x="204" y="104" width="11" height="11" rx="2"/>
+<rect class="h0 m13" x="204" y="118" width="11" height="11" rx="2"/>
+<rect class="h0 m13" x="204" y="132" width="11" height="11" rx="2"/>
+<rect class="h0 m13" x="204" y="146" width="11" height="11" rx="2"/>
+<rect class="h0 m14" x="218" y="62" width="11" height="11" rx="2"/>
+<rect class="h0 m14" x="218" y="76" width="11" height="11" rx="2"/>
+<rect class="h0 m14" x="218" y="90" width="11" height="11" rx="2"/>
+<rect class="h0 m14" x="218" y="104" width="11" height="11" rx="2"/>
+<rect class="h0 m14" x="218" y="118" width="11" height="11" rx="2"/>
+<rect class="h0 m14" x="218" y="132" width="11" height="11" rx="2"/>
+<rect class="h0 m14" x="218" y="146" width="11" height="11" rx="2"/>
+<rect class="h0 m15" x="232" y="62" width="11" height="11" rx="2"/>
+<rect class="h0 m15" x="232" y="76" width="11" height="11" rx="2"/>
+<rect class="h0 m15" x="232" y="90" width="11" height="11" rx="2"/>
+<rect class="h0 m15" x="232" y="104" width="11" height="11" rx="2"/>
+<rect class="h0 m15" x="232" y="118" width="11" height="11" rx="2"/>
+<rect class="h0 m15" x="232" y="132" width="11" height="11" rx="2"/>
+<rect class="h0 m15" x="232" y="146" width="11" height="11" rx="2"/>
+<rect class="h0 m16" x="246" y="62" width="11" height="11" rx="2"/>
+<rect class="h0 m16" x="246" y="76" width="11" height="11" rx="2"/>
+<rect class="h0 m16" x="246" y="90" width="11" height="11" rx="2"/>
+<rect class="h0 m16" x="246" y="104" width="11" height="11" rx="2"/>
+<rect class="h0 m16" x="246" y="118" width="11" height="11" rx="2"/>
+<rect class="h0 m16" x="246" y="132" width="11" height="11" rx="2"/>
+<rect class="h0 m16" x="246" y="146" width="11" height="11" rx="2"/>
+<rect class="h0 m17" x="260" y="62" width="11" height="11" rx="2"/>
+<rect class="h0 m17" x="260" y="76" width="11" height="11" rx="2"/>
+<rect class="h0 m17" x="260" y="90" width="11" height="11" rx="2"/>
+<rect class="h0 m17" x="260" y="104" width="11" height="11" rx="2"/>
+<rect class="h0 m17" x="260" y="118" width="11" height="11" rx="2"/>
+<rect class="h0 m17" x="260" y="132" width="11" height="11" rx="2"/>
+<rect class="h0 m17" x="260" y="146" width="11" height="11" rx="2"/>
+<rect class="h0 m18" x="274" y="62" width="11" height="11" rx="2"/>
+<rect class="h0 m18" x="274" y="76" width="11" height="11" rx="2"/>
+<rect class="h0 m18" x="274" y="90" width="11" height="11" rx="2"/>
+<rect class="h0 m18" x="274" y="104" width="11" height="11" rx="2"/>
+<rect class="h0 m18" x="274" y="118" width="11" height="11" rx="2"/>
+<rect class="h0 m18" x="274" y="132" width="11" height="11" rx="2"/>
+<rect class="h0 m18" x="274" y="146" width="11" height="11" rx="2"/>
+<rect class="h0 m19" x="288" y="62" width="11" height="11" rx="2"/>
+<rect class="h0 m19" x="288" y="76" width="11" height="11" rx="2"/>
+<rect class="h0 m19" x="288" y="90" width="11" height="11" rx="2"/>
+<rect class="h0 m19" x="288" y="104" width="11" height="11" rx="2"/>
+<rect class="h0 m19" x="288" y="118" width="11" height="11" rx="2"/>
+<rect class="h0 m19" x="288" y="132" width="11" height="11" rx="2"/>
+<rect class="h0 m19" x="288" y="146" width="11" height="11" rx="2"/>
+<rect class="h0 m20" x="302" y="62" width="11" height="11" rx="2"/>
+<rect class="h0 m20" x="302" y="76" width="11" height="11" rx="2"/>
+<rect class="h0 m20" x="302" y="90" width="11" height="11" rx="2"/>
+<rect class="h0 m20" x="302" y="104" width="11" height="11" rx="2"/>
+<rect class="h0 m20" x="302" y="118" width="11" height="11" rx="2"/>
+<rect class="h0 m20" x="302" y="132" width="11" height="11" rx="2"/>
+<rect class="h0 m20" x="302" y="146" width="11" height="11" rx="2"/>
+<rect class="h0 m21" x="316" y="62" width="11" height="11" rx="2"/>
+<rect class="h0 m21" x="316" y="76" width="11" height="11" rx="2"/>
+<rect class="h0 m21" x="316" y="90" width="11" height="11" rx="2"/>
+<rect class="h0 m21" x="316" y="104" width="11" height="11" rx="2"/>
+<rect class="h0 m21" x="316" y="118" width="11" height="11" rx="2"/>
+<rect class="h0 m21" x="316" y="132" width="11" height="11" rx="2"/>
+<rect class="h0 m21" x="316" y="146" width="11" height="11" rx="2"/>
+<rect class="h0 m22" x="330" y="62" width="11" height="11" rx="2"/>
+<rect class="h0 m22" x="330" y="76" width="11" height="11" rx="2"/>
+<rect class="h0 m22" x="330" y="90" width="11" height="11" rx="2"/>
+<rect class="h0 m22" x="330" y="104" width="11" height="11" rx="2"/>
+<rect class="h0 m22" x="330" y="118" width="11" height="11" rx="2"/>
+<rect class="h0 m22" x="330" y="132" width="11" height="11" rx="2"/>
+<rect class="h0 m22" x="330" y="146" width="11" height="11" rx="2"/>
+<rect class="h0 m23" x="344" y="62" width="11" height="11" rx="2"/>
+<rect class="h0 m23" x="344" y="76" width="11" height="11" rx="2"/>
+<rect class="h0 m23" x="344" y="90" width="11" height="11" rx="2"/>
+<rect class="h0 m23" x="344" y="104" width="11" height="11" rx="2"/>
+<rect class="h0 m23" x="344" y="118" width="11" height="11" rx="2"/>
+<rect class="h0 m23" x="344" y="132" width="11" height="11" rx="2"/>
+<rect class="h0 m23" x="344" y="146" width="11" height="11" rx="2"/>
+<rect class="h0 m24" x="358" y="62" width="11" height="11" rx="2"/>
+<rect class="h0 m24" x="358" y="76" width="11" height="11" rx="2"/>
+<rect class="h0 m24" x="358" y="90" width="11" height="11" rx="2"/>
+<rect class="h0 m24" x="358" y="104" width="11" height="11" rx="2"/>
+<rect class="h0 m24" x="358" y="118" width="11" height="11" rx="2"/>
+<rect class="h0 m24" x="358" y="132" width="11" height="11" rx="2"/>
+<rect class="h0 m24" x="358" y="146" width="11" height="11" rx="2"/>
+<rect class="h0 m25" x="372" y="62" width="11" height="11" rx="2"/>
+<rect class="h0 m25" x="372" y="76" width="11" height="11" rx="2"/>
+<rect class="h0 m25" x="372" y="90" width="11" height="11" rx="2"/>
+<rect class="h0 m25" x="372" y="104" width="11" height="11" rx="2"/>
+<rect class="h0 m25" x="372" y="118" width="11" height="11" rx="2"/>
+<rect class="h0 m25" x="372" y="132" width="11" height="11" rx="2"/>
+<rect class="h0 m25" x="372" y="146" width="11" height="11" rx="2"/>
+<rect class="h0 m26" x="386" y="62" width="11" height="11" rx="2"/>
+<rect class="h0 m26" x="386" y="76" width="11" height="11" rx="2"/>
+<rect class="h0 m26" x="386" y="90" width="11" height="11" rx="2"/>
+<rect class="h0 m26" x="386" y="104" width="11" height="11" rx="2"/>
+<rect class="h0 m26" x="386" y="118" width="11" height="11" rx="2"/>
+<rect class="h0 m26" x="386" y="132" width="11" height="11" rx="2"/>
+<rect class="h0 m26" x="386" y="146" width="11" height="11" rx="2"/>
+<rect class="h0 m27" x="400" y="62" width="11" height="11" rx="2"/>
+<rect class="h0 m27" x="400" y="76" width="11" height="11" rx="2"/>
+<rect class="h0 m27" x="400" y="90" width="11" height="11" rx="2"/>
+<rect class="h0 m27" x="400" y="104" width="11" height="11" rx="2"/>
+<rect class="h0 m27" x="400" y="118" width="11" height="11" rx="2"/>
+<rect class="h0 m27" x="400" y="132" width="11" height="11" rx="2"/>
+<rect class="h0 m27" x="400" y="146" width="11" height="11" rx="2"/>
+<rect class="h0 m28" x="414" y="62" width="11" height="11" rx="2"/>
+<rect class="h0 m28" x="414" y="76" width="11" height="11" rx="2"/>
+<rect class="h0 m28" x="414" y="90" width="11" height="11" rx="2"/>
+<rect class="h0 m28" x="414" y="104" width="11" height="11" rx="2"/>
+<rect class="h0 m28" x="414" y="118" width="11" height="11" rx="2"/>
+<rect class="h0 m28" x="414" y="132" width="11" height="11" rx="2"/>
+<rect class="h0 m28" x="414" y="146" width="11" height="11" rx="2"/>
+<rect class="h0 m29" x="428" y="62" width="11" height="11" rx="2"/>
+<rect class="h0 m29" x="428" y="76" width="11" height="11" rx="2"/>
+<rect class="h0 m29" x="428" y="90" width="11" height="11" rx="2"/>
+<rect class="h0 m29" x="428" y="104" width="11" height="11" rx="2"/>
+<rect class="h0 m29" x="428" y="118" width="11" height="11" rx="2"/>
+<rect class="h0 m29" x="428" y="132" width="11" height="11" rx="2"/>
+<rect class="h0 m29" x="428" y="146" width="11" height="11" rx="2"/>
+<rect class="h0 m30" x="442" y="62" width="11" height="11" rx="2"/>
+<rect class="h0 m30" x="442" y="76" width="11" height="11" rx="2"/>
+<rect class="h0 m30" x="442" y="90" width="11" height="11" rx="2"/>
+<rect class="h0 m30" x="442" y="104" width="11" height="11" rx="2"/>
+<rect class="h0 m30" x="442" y="118" width="11" height="11" rx="2"/>
+<rect class="h1 m30" x="442" y="132" width="11" height="11" rx="2"/>
+<rect class="h3 m30" x="442" y="146" width="11" height="11" rx="2"/>
+<rect class="h2 m31" x="456" y="62" width="11" height="11" rx="2"/>
+<rect class="h0 m31" x="456" y="76" width="11" height="11" rx="2"/>
+<rect class="h1 m31" x="456" y="90" width="11" height="11" rx="2"/>
+<rect class="h4 m31" x="456" y="104" width="11" height="11" rx="2"/>
+<rect class="h3 m31" x="456" y="118" width="11" height="11" rx="2"/>
+<rect class="h1 m31" x="456" y="132" width="11" height="11" rx="2"/>
+<rect class="h2 m31" x="456" y="146" width="11" height="11" rx="2"/>
 <text class="s" x="22" y="182" text-anchor="start">Less</text>
 <rect class="h0" x="52" y="173" width="11" height="11" rx="2"/>
 <rect class="h1" x="66" y="173" width="11" height="11" rx="2"/>

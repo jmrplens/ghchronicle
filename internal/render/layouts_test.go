@@ -471,23 +471,23 @@ func TestAnimatedCountersHonourReducedMotion(t *testing.T) {
 	}
 }
 
-// TestTheHeatmapWaveIsOneClassPerWeek pins the shape of the wave: twelve
-// beats and not eighty-four, the seven squares of a week sharing one, and the
-// key beside the grid left out of it, because it is a legend for the ramp and
-// not a week of the calendar.
+// TestTheHeatmapWaveIsOneClassPerWeek pins the shape of the wave: one beat per
+// week and not one per square, the seven squares of a week sharing one, and
+// the key beside the grid left out of it, because it is a legend for the ramp
+// and not a week of the calendar.
 func TestTheHeatmapWaveIsOneClassPerWeek(t *testing.T) {
 	doc := mustRender(t, sample(), &Options{Theme: "dark", Layout: "activity-heatmap"})
-	if got := strings.Count(doc, "@keyframes m"); got != heatWeeks {
-		t.Errorf("the grid animates %d classes, want one per week, %d", got, heatWeeks)
+	weeks := heatGridWeeks(defaultWidth, heatNumsWidth(heatNums()))
+	if got := strings.Count(doc, "@keyframes m"); got != weeks {
+		t.Errorf("the grid animates %d classes, want one per week, %d", got, weeks)
 	}
-	for w := range heatWeeks {
+	for w := range weeks {
 		cls := "m" + strconv.Itoa(w)
 		if got := len(regexp.MustCompile(`<rect class="h\d `+cls+`"`).FindAllString(doc, -1)); got != 7 {
 			t.Errorf("week %d is on %d squares, want the seven days of a week", w, got)
 		}
 	}
-	// The key is the five squares after the grid's eighty-four, and it stands
-	// still.
+	// The key is the five squares after the grid's own, and it stands still.
 	keys := regexp.MustCompile(`<rect class="h\d" `).FindAllString(doc, -1)
 	if len(keys) != 5 {
 		t.Errorf("%d squares carry a level and no week, want the five of the key", len(keys))
@@ -495,8 +495,119 @@ func TestTheHeatmapWaveIsOneClassPerWeek(t *testing.T) {
 	// Under off the squares are written exactly as they were before the wave
 	// existed: a level and nothing else.
 	still := mustRender(t, sample(), &Options{Theme: "dark", Layout: "activity-heatmap", Motion: MotionOff})
-	if n := len(regexp.MustCompile(`<rect class="h\d" `).FindAllString(still, -1)); n != heatWeeks*7+5 {
-		t.Errorf("under off %d squares carry a bare level, want %d", n, heatWeeks*7+5)
+	if n := len(regexp.MustCompile(`<rect class="h\d" `).FindAllString(still, -1)); n != weeks*7+5 {
+		t.Errorf("under off %d squares carry a bare level, want %d", n, weeks*7+5)
+	}
+}
+
+// heatNums is the numbers the activity-heatmap draws by default, taken from
+// the registry rather than typed out, because their column is what decides how
+// wide the grid beside them may be.
+func heatNums() []metric {
+	for _, l := range layouts {
+		if l.Name == "activity-heatmap" {
+			return metricsOf(sample(), l.Fields)
+		}
+	}
+	return nil
+}
+
+// TestTheHeatmapGridFillsTheWidthItIsGiven is the point of deriving the week
+// count from the width: whatever the card is drawn at, the grid and the column
+// of numbers beside it reach the far padding, leaving at most the one pitch
+// that a further week would not have fitted in. Before this, the grid was
+// twelve weeks at every width and a card wider than about four hundred units
+// ended in empty space that grew with the width.
+func TestTheHeatmapGridFillsTheWidthItIsGiven(t *testing.T) {
+	numsW := heatNumsWidth(heatNums())
+	for _, width := range []float64{400, 440, 495, 600, 700, 800, 900, 1200} {
+		weeks := heatGridWeeks(width, numsW)
+		gridW := float64(weeks)*heatPitch - (heatPitch - heatCell)
+		slack := width - ghPad - (ghPad + gridW + heatNumsGap + numsW)
+		if weeks == heatWeeksMax {
+			continue // a year is all the data there is; past that the card may have room to spare
+		}
+		if slack < 0 {
+			t.Errorf("width %v: %d weeks overrun the card by %v", width, weeks, -slack)
+		}
+		if slack >= heatPitch {
+			t.Errorf("width %v: %d weeks leave %v units empty, room for another week", width, weeks, slack)
+		}
+	}
+	if got := heatGridWeeks(400, numsW); got != 16 {
+		t.Errorf("the minimum width draws %d weeks, want 16", got)
+	}
+	if got := heatGridWeeks(defaultWidth, numsW); got != 23 {
+		t.Errorf("the default width draws %d weeks, want 23", got)
+	}
+	if got := heatGridWeeks(4000, numsW); got != heatWeeksMax {
+		t.Errorf("a very wide card draws %d weeks, want the year the data holds, %d", got, heatWeeksMax)
+	}
+}
+
+// TestTheHeatmapTitleNamesTheWeeksItDrew keeps the heading honest at every
+// width, since the width is now what decides the period.
+func TestTheHeatmapTitleNamesTheWeeksItDrew(t *testing.T) {
+	for _, width := range []int{400, defaultWidth, 900} {
+		doc := mustRender(t, sample(), &Options{Theme: "dark", Layout: "activity-heatmap", Width: width})
+		weeks := heatGridWeeks(float64(width), heatNumsWidth(heatNums()))
+		want := fmt.Sprintf("Contributions, last %d weeks", weeks)
+		if !strings.Contains(doc, ">"+want+"<") {
+			t.Errorf("width %d: the card does not say %q", width, want)
+		}
+		if n := strings.Count(doc, `<rect class="h`); n != weeks*7+5 {
+			t.Errorf("width %d: %d squares for %d weeks plus the key", width, n, weeks)
+		}
+	}
+	// A card asked for no sparkline draws no calendar, so the heading names no
+	// period rather than a period nothing on the card shows.
+	bare := mustRender(t, sample(), &Options{Theme: "dark", Layout: "activity-heatmap", Fields: numericFields})
+	if !strings.Contains(bare, ">Contributions<") {
+		t.Error("without the sparkline the heading must be Contributions and name no weeks")
+	}
+	if strings.Contains(bare, `<rect class="h`) {
+		t.Error("without the sparkline the card must draw no squares at all")
+	}
+}
+
+// TestTheHeatmapWaveTakesTheSameTimeAtEveryWidth is why heatSweep and not a
+// step per week is the constant: the cycle the file's comment defends, 0.22 s
+// of sweep plus 1.6 s of fade, has to stay 1.82 s when the grid is sixteen
+// weeks wide and when it is fifty-two. A fixed step per week would have taken
+// a year of squares to 2.62 s, outside the range that figure was chosen from.
+func TestTheHeatmapWaveTakesTheSameTimeAtEveryWidth(t *testing.T) {
+	for _, width := range []int{400, defaultWidth, 700, 900} {
+		doc := mustRender(t, sample(), &Options{Theme: "dark", Layout: "activity-heatmap", Width: width})
+		for _, m := range animatingClass.FindAllStringSubmatch(doc, -1) {
+			want := "." + m[1] + "{animation:" + m[1] + " 1.82s ease-out 1}"
+			if !strings.Contains(doc, want) {
+				t.Errorf("width %d: %q is not in the card", width, want)
+			}
+		}
+		// The last week is the one that ends the cycle, so its fade must start
+		// exactly the sweep in, and no week may start after it.
+		weeks := heatGridWeeks(float64(width), heatNumsWidth(heatNums()))
+		last := 100 * heatSweep / (heatSweep + heatWave)
+		if want := fmt.Sprintf("@keyframes m%d{0%%,%s%%", weeks-1, num(last)); !strings.Contains(doc, want) {
+			t.Errorf("width %d: the last week does not start at the end of the sweep, want %q", width, want)
+		}
+	}
+}
+
+// A grid wider than the series it has is the young account: every week before
+// the first day of data is drawn empty rather than left out, so the card is the
+// same shape whoever renders it.
+func TestTheHeatmapPadsAYoungAccountToTheFullGrid(t *testing.T) {
+	young := sample()
+	young.Sparkline = []int{0, 3, 12, 7, 0, 1, 20, 15, 4, 9}
+	doc := mustRender(t, young, &Options{Theme: "dark", Layout: "activity-heatmap", Width: 900})
+	if n := strings.Count(doc, `<rect class="h`); n != heatWeeksMax*7+5 {
+		t.Errorf("a ten day series drew %d squares, want a full year plus the key", n)
+	}
+	// Ten days of which eight are above zero: the rest of the year is empty.
+	// The key's own empty square carries no week and so is not one of these.
+	if n := strings.Count(doc, `<rect class="h0 `); n != heatWeeksMax*7-8 {
+		t.Errorf("%d squares are empty, want every day but the eight with activity", n)
 	}
 }
 
@@ -993,7 +1104,7 @@ func mustLayout(t *testing.T, name string) Layout {
 }
 
 func TestHeatLevelsEndTodayAndPadTheFront(t *testing.T) {
-	levels := heatLevels([]int{4, 0, 1})
+	levels := heatLevels([]int{4, 0, 1}, 12)
 	if len(levels) != 84 {
 		t.Fatalf("len = %d, want 84 days", len(levels))
 	}
@@ -1009,17 +1120,26 @@ func TestHeatLevelsEndTodayAndPadTheFront(t *testing.T) {
 	for i := range long {
 		long[i] = i
 	}
-	if got := heatLevels(long); got[83] != 4 || got[0] != 4 {
+	if got := heatLevels(long, 12); got[83] != 4 || got[0] != 4 {
 		t.Errorf("a long series keeps its last twelve weeks: %v", got)
 	}
-	for _, v := range heatLevels([]int{0, 0, 0}) {
+	// A grid of a year takes a year of the series, and a series shorter than
+	// the grid is still padded at the front however wide the grid is.
+	if got := heatLevels(long, heatWeeksMax); len(got) != heatWeeksMax*7 || got[len(got)-1] != 4 {
+		t.Errorf("a year of grid holds %d days ending on %d", len(got), got[len(got)-1])
+	}
+	if got := heatLevels([]int{4, 0, 1}, heatWeeksMax); got[len(got)-3] != 4 || got[0] != 0 {
+		t.Errorf("a short series in a year of grid: %v", got[:4])
+	}
+	for _, v := range heatLevels([]int{0, 0, 0}, 12) {
 		if v != 0 {
 			t.Fatal("a flat series has no level above zero")
 		}
 	}
 	doc := mustRender(t, sample(), &Options{Theme: "dark", Layout: "activity-heatmap"})
-	if n := strings.Count(doc, `<rect class="h`); n != 84+5 {
-		t.Errorf("drew %d squares, want 84 plus the five of the legend", n)
+	weeks := heatGridWeeks(defaultWidth, heatNumsWidth(heatNums()))
+	if n := strings.Count(doc, `<rect class="h`); n != weeks*7+5 {
+		t.Errorf("drew %d squares, want %d plus the five of the legend", n, weeks*7)
 	}
 }
 
@@ -1179,7 +1299,7 @@ func TestTrafficLabelsNameTheWindowOrAdmitItIsUnknown(t *testing.T) {
 // A negative day is no activity, not a level below the empty square, and a
 // zero day stays empty however busy the rest of the calendar was.
 func TestHeatLevelsTreatNegativeAndZeroDaysAsEmpty(t *testing.T) {
-	levels := heatLevels([]int{-3, 0, 1, 2, 8})
+	levels := heatLevels([]int{-3, 0, 1, 2, 8}, 12)
 	if got := levels[79:]; !slices.Equal(got, []int{0, 0, 1, 1, 4}) {
 		t.Errorf("levels = %v, want 0 0 1 1 4", got)
 	}

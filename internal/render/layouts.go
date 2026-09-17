@@ -170,7 +170,7 @@ var layouts = []layoutDef{
 	},
 	{
 		Name: "activity-heatmap", Family: "github", Animated: true,
-		Description: "The last twelve weeks of the contribution calendar as GitHub's green squares, week by week from the left, with up to three numbers beside it.",
+		Description: "As much of the contribution calendar as the width holds, up to a year of it, as GitHub's green squares, week by week from the left, with up to three numbers beside it.",
 		Fields:      []string{fieldSparkline, fieldContributions, fieldCommits, fieldPullRequests},
 		Supports:    join(allNumeric, fieldSparkline),
 		Width:       defaultWidth, MinWidth: 400,
