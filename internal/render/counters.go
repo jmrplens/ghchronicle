@@ -97,7 +97,7 @@ func counterValue(v, i, n int) int {
 
 func drawAnimatedCounters(b *strings.Builder, c *Card, s *spec) {
 	inner := s.width - 2*pad
-	tl := newTimeline(s.motion)
+	tl := newTimeline(s.motion, s.speed)
 	count := counterBeats(tl)
 	var spark sparkMotion
 	if s.has(fieldSparkline) {

@@ -8,7 +8,7 @@ import (
 func drawSparklineHero(b *strings.Builder, c *Card, s *spec) {
 	const height = 170.0
 	inner := s.width - 2*pad
-	tl := newTimeline(s.motion)
+	tl := newTimeline(s.motion, s.speed)
 	var spark sparkMotion
 	if s.has(fieldSparkline) {
 		spark = sparkBeats(tl)

@@ -110,7 +110,7 @@ func termLayout(width float64) termColumns {
 
 func drawTerminal(b *strings.Builder, c *Card, s *spec) {
 	col := termLayout(s.width)
-	tl := newTimeline(s.motion)
+	tl := newTimeline(s.motion, s.speed)
 	var body strings.Builder
 
 	lines := []termLine{{command: "ghchronicle --user " + c.Login}}

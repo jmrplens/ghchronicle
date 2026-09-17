@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"math"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -597,5 +598,90 @@ func TestBadgeRowIgnoresTheWidthItWasGiven(t *testing.T) {
 		if string(got) != want {
 			t.Errorf("width %d changed the badge row", w)
 		}
+	}
+}
+
+// TestTheDefaultSpeedDrawsTheCardThisRendererAlwaysDrew is the regression guard
+// the whole speed option hangs on, taken at the level a reader sees: the
+// complete document.
+//
+// Asking for nothing and asking for the default have to produce the same
+// bytes, on every layout, in every motion and in every theme, because the
+// gallery under site/src/assets and the pictures the README and the layouts
+// page show are rendered with no speed at all and are compared byte for byte
+// by scripts/check-gallery.sh. A default that was merely very close would move
+// thirty committed files and every picture the documentation shows.
+//
+// Held here as well as there because this one needs no binary, no fake GitHub
+// and no shell: it fails in the package that would have broken it.
+func TestTheDefaultSpeedDrawsTheCardThisRendererAlwaysDrew(t *testing.T) {
+	c := sample()
+	stated := SpeedDefault
+	for layout, theme := range everyLayout {
+		for _, motion := range []string{MotionOnce, MotionLoop, MotionOff} {
+			t.Run(layout+"/"+theme+"/"+motion, func(t *testing.T) {
+				silent := mustRender(t, c, &Options{Layout: layout, Theme: theme, Motion: motion})
+				asked := mustRender(t, c, &Options{
+					Layout: layout, Theme: theme, Motion: motion, Speed: &stated,
+				})
+				if silent != asked {
+					t.Errorf("speed %v is not what the card is drawn at when none is asked for", stated)
+				}
+			})
+		}
+	}
+}
+
+// TestASpeedOutsideTheRangeIsRefusedBeforeAnythingIsDrawn covers the check the
+// card owes a reader who types a number: both ends, a value that is not a
+// number at all, and a message that names the range, what it got, and the fact
+// a range starting at zero does not make obvious.
+func TestASpeedOutsideTheRangeIsRefusedBeforeAnythingIsDrawn(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		speed float64
+	}{
+		{"below the slow end", -0.01},
+		{"above the fast end", 1.01},
+		{"a long way past it", 100},
+		{"not a number", math.NaN()},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			out, err := SVG(sample(), &Options{Speed: &tc.speed})
+			if !errors.Is(err, ErrSpeed) {
+				t.Fatalf("SVG = %v, want ErrSpeed", err)
+			}
+			if out != nil {
+				t.Error("a refused speed drew a card anyway")
+			}
+			for _, want := range []string{"0", "1", "0.5", MotionOff} {
+				if !strings.Contains(err.Error(), want) {
+					t.Errorf("the refusal does not name %q: %v", want, err)
+				}
+			}
+		})
+	}
+}
+
+// TestBothEndsOfTheSpeedRangeDrawEveryLayout is the cheap half of looking at
+// them: whatever the speed, every layout still produces one well formed
+// document that ends on the finished card, and the two ends differ from the
+// default only in how long the animation is given.
+func TestBothEndsOfTheSpeedRangeDrawEveryLayout(t *testing.T) {
+	c := sample()
+	duration := regexp.MustCompile(`animation:m\d+ [\d.]+s`)
+	for layout, theme := range everyLayout {
+		t.Run(layout+"/"+theme, func(t *testing.T) {
+			middle := mustRender(t, c, &Options{Layout: layout, Theme: theme, Motion: MotionLoop})
+			for _, speed := range []float64{SpeedSlowest, SpeedFastest} {
+				got := mustRender(t, c, &Options{
+					Layout: layout, Theme: theme, Motion: MotionLoop, Speed: &speed,
+				})
+				parseXML(t, got)
+				if duration.ReplaceAllString(got, "") != duration.ReplaceAllString(middle, "") {
+					t.Errorf("speed %v changed more than the durations of %s", speed, layout)
+				}
+			}
+		})
 	}
 }

@@ -25,6 +25,10 @@ if [ -n "$CARD" ]; then
   # `version` to a release older than the flag keeps working.
   [ "$MOTION" != once ] && args+=(-card-motion "$MOTION")
   [ -n "${WIDTH:-}" ] && [ "$WIDTH" != 0 ] && args+=(-card-width "$WIDTH")
+  # The same gate as the width above, against this input's own default rather
+  # than zero: 0 is a speed a reader means, the slowest one, and a card drawn
+  # at 0.5 is the card the flag's absence draws anyway.
+  [ -n "${SPEED:-}" ] && [ "$SPEED" != 0.5 ] && args+=(-card-speed "$SPEED")
   [ "$MODE" = card ] && args+=(-card-only)
 elif [ "$MODE" = card ]; then
   echo "mode card needs a card path" >&2; exit 2

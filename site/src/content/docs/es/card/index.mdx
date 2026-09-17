@@ -3,6 +3,7 @@ title: Resumen
 description: Un SVG autocontenido para un README de perfil, dibujado con los mismos puntos que reciben las bases de datos.
 compactTables:
   - "-card-motion"
+  - "-card-speed"
 ---
 
 import { Aside, Tabs, TabItem } from "@astrojs/starlight/components";
@@ -30,6 +31,7 @@ ghchronicle -config config.yaml -card card.svg -card-only
 | `-card-motion <once\|loop\|off>`        | Cómo se mueve un diseño animado; los demás la ignoran                 |
 | `-card-fields <lista>`                  | Separados por comas, en orden de dibujo                               |
 | `-card-width <píxeles>`                 | Sin ella, el ancho propio del diseño; en `activity-heatmap` compra semanas |
+| `-card-speed <0 a 1>`                   | A qué velocidad se reproduce un diseño animado; `0.5`, el valor por omisión, es el ritmo de siempre |
 | `-card-layouts`                         | Imprime los diseños con sus campos y sus anchos y termina             |
 
 Sin `-card-only` la tarjeta se escribe **además de** todo lo que recibirían
@@ -173,6 +175,37 @@ tarjeta en bucle hasta que se pulsa el botón (WCAG 2.2.2, Pausar, detener,
 ocultar).
 
 <Card name="terminal" animated loop alt="El diseño terminal reproducido una vez: una ventana de terminal cuyas líneas de salida tienen cada una un número que se teclea solo, con un cursor de bloque encendido en el prompt de abajo que parpadea cuando aterriza la última cifra, y la página también puede reproducirlo en bucle, donde el tecleo sigue ocurriendo una vez y solo sigue el cursor, parpadeando desde el principio" />
+
+### A qué velocidad se reproduce
+
+`-card-speed` es un decimal de 0 a 1, y 0.5 es el valor por omisión. Es un solo
+número para toda la tarjeta: todos los diseños animados se escalan con él, los
+dos movimientos continuos junto con las revelaciones, así que una tarjeta más
+lenta tiene a la vez una banda que tarda más en dar la vuelta y un cursor que
+parpadea más despacio.
+
+| `-card-speed` | Qué hace la tarjeta                                                          |
+| ------------- | ---------------------------------------------------------------------------- |
+| `0`           | La animación más lenta, con el doble de duración que la de por omisión       |
+| `0.5`         | Exactamente la tarjeta que este renderizador dibujó siempre, byte a byte. Es el valor por omisión |
+| `1`           | La más rápida, con la mitad de duración que la de por omisión                |
+
+Hay un mando y no uno por diseño por la misma razón que hay un ancho y no uno
+por diseño: los ciclos de aquí se calibraron unos contra otros, y escalarlos
+juntos es lo que conserva el ritmo con el que se diseñó el movimiento. Una
+velocidad fuera del rango se rechaza antes de la pasada, nombrando los dos
+extremos.
+
+<Aside type="caution" title="0 es la animación más lenta, no la ausencia de animación">
+  Un rango que empieza en cero parece un interruptor, y este no lo es. Una
+  tarjeta dibujada en `0` se sigue animando, tan despacio como este renderizador
+  la dibuje. La que no dibuja animación ninguna es `-card-motion off`, que es
+  además la que hace el fichero más pequeño.
+</Aside>
+
+`prefers-reduced-motion` no se ve afectado por nada de esto: a quien le ha
+pedido a su máquina menos movimiento no le queda animación que frenar ni que
+acelerar.
 
 ## En un README
 

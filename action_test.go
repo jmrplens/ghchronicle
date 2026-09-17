@@ -8,12 +8,14 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
 	"gopkg.in/yaml.v3"
 
 	"github.com/jmrplens/ghchronicle/internal/config"
+	"github.com/jmrplens/ghchronicle/internal/render"
 )
 
 // TestTheActionsDefaultConfigLeavesPrivateRepositoriesOut runs the script the
@@ -100,6 +102,10 @@ type runInputs struct {
 	// and "0" both mean the layout's own width, and neither reaches the
 	// binary: an older pinned release would not know the flag.
 	width string
+	// speed is the card-speed input, likewise. Empty and "0.5" both mean the
+	// pace every card is drawn at anyway, so neither reaches the binary; "0"
+	// does, because it is the slowest animation and not the absence of one.
+	speed string
 }
 
 // runActionRunScript runs scripts/action-run.sh with a stand-in ghchronicle
@@ -134,6 +140,7 @@ func runActionRunScript(t *testing.T, in runInputs, configPath, dir string) (sta
 		"FIELDS="+in.fields,
 		"MOTION="+in.motion,
 		"WIDTH="+in.width,
+		"SPEED="+in.speed,
 	)
 	out, _ := cmd.CombinedOutput()
 	return cmd.ProcessState.ExitCode(), string(out), record
@@ -273,6 +280,31 @@ func TestTheActionsRunStepBuildsTheRightCommandLineForEachMode(t *testing.T) {
 		{
 			name:     "card-width is left out when it is zero",
 			in:       runInputs{mode: "card", card: "CARD", layout: "summary", theme: "auto", motion: "once", width: "0"},
+			wantArgs: []string{"-config", "CONFIG", "-card", "CARD", "-card-layout", "summary", "-card-theme", "auto", "-card-only"},
+		},
+		{
+			name:     "card-speed is passed through when given",
+			in:       runInputs{mode: "card", card: "CARD", layout: "terminal", theme: "auto", motion: "once", speed: "0.8"},
+			wantArgs: []string{"-config", "CONFIG", "-card", "CARD", "-card-layout", "terminal", "-card-theme", "auto", "-card-speed", "0.8", "-card-only"},
+		},
+		{
+			// The slow end of the range is a speed a reader means, so unlike
+			// the width's zero it reaches the binary. A card at 0 animates,
+			// slowly; a card that does not animate is card-motion off.
+			name:     "card-speed zero is passed through, being the slowest animation and not the absence of one",
+			in:       runInputs{mode: "card", card: "CARD", layout: "ticker", theme: "auto", motion: "once", speed: "0"},
+			wantArgs: []string{"-config", "CONFIG", "-card", "CARD", "-card-layout", "ticker", "-card-theme", "auto", "-card-speed", "0", "-card-only"},
+		},
+		{
+			name:     "card-speed is left out when empty",
+			in:       runInputs{mode: "card", card: "CARD", layout: "summary", theme: "auto", motion: "once"},
+			wantArgs: []string{"-config", "CONFIG", "-card", "CARD", "-card-layout", "summary", "-card-theme", "auto", "-card-only"},
+		},
+		{
+			// Its own default, which draws the same card the flag's absence
+			// draws, so it must not reach a release from before the flag.
+			name:     "card-speed is left out when it is the default",
+			in:       runInputs{mode: "card", card: "CARD", layout: "summary", theme: "auto", motion: "once", speed: "0.5"},
 			wantArgs: []string{"-config", "CONFIG", "-card", "CARD", "-card-layout", "summary", "-card-theme", "auto", "-card-only"},
 		},
 		{
@@ -559,6 +591,13 @@ func readRecord(t *testing.T, path string) string {
 // digits. A single digit still passes, which is what lets the sentence say
 // that 0 means the layout's own width.
 //
+// The rule is this input's alone and is meant to stay that way. It is not
+// "descriptions may not hold numbers": it is "a description may not copy a
+// number that belongs to a layout". card-speed's three, the two ends of its
+// range and its default, belong to no layout and are the option's own
+// definition, so the test below holds that description to them instead of
+// forbidding them.
+//
 // Digits are not the only way to write a number, and the spelled form is not
 // hypothetical here: the comment above heatGridWeeks went stale as "about nine
 // hundred units", in this same repository, in this same change. A rule that
@@ -578,6 +617,47 @@ func TestTheCardWidthInputNamesNoWidth(t *testing.T) {
 	if !strings.Contains(description, "-card-layouts") {
 		t.Errorf("the card-width input names no width, which is right, and points the reader "+
 			"at nothing that does. Name -card-layouts:\n%s", description)
+	}
+}
+
+// TestTheCardSpeedInputNamesTheRangeItsReaderHasToType is the other half of
+// the rule above, on the input that has to state its numbers rather than point
+// at them.
+//
+// A speed is not a per-layout fact. There is no registry entry to look it up
+// in, -card-layouts prints nothing about it, and the layouts page states per
+// layout only what the registry holds. The two ends and the default are the
+// option's own definition and live in internal/render as SpeedSlowest,
+// SpeedDefault and SpeedFastest, so a description that refused to name them
+// could not tell a workflow author which end is which, and could not say the
+// one thing this option most needs said: that the default is the pace every
+// card already has.
+//
+// Naming them makes them a copy, which is what the width rule is about, so
+// they are held to the constants here. The Marketplace listing is where a
+// workflow author reads this immediately before typing a number, and a range
+// that no longer matches the binary is a workflow that fails on its first run.
+func TestTheCardSpeedInputNamesTheRangeItsReaderHasToType(t *testing.T) {
+	description := actionInputDescription(t, "card-speed")
+	decimal := func(v float64) string { return strconv.FormatFloat(v, 'g', -1, 64) }
+	claims := []string{
+		"from " + decimal(render.SpeedSlowest) + " to " + decimal(render.SpeedFastest),
+		decimal(render.SpeedDefault),
+	}
+	for _, want := range claims {
+		if !strings.Contains(description, want) {
+			t.Errorf("the card-speed input does not say %q, and the renderer draws from %v to %v "+
+				"with %v as the default. Correct the description:\n%s",
+				want, render.SpeedSlowest, render.SpeedFastest, render.SpeedDefault, description)
+		}
+	}
+	// And the thing a range starting at zero does not say for itself. A reader
+	// who wants a still card and reaches for 0 gets the slowest animation
+	// there is, which is the opposite of what he asked for.
+	if !strings.Contains(description, render.MotionOff) {
+		t.Errorf("the card-speed input never says that %s is the slowest animation rather than "+
+			"none, and never names card-motion %s, which is what draws a still card:\n%s",
+			decimal(render.SpeedSlowest), render.MotionOff, description)
 	}
 }
 

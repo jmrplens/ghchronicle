@@ -998,6 +998,11 @@
         "default": ""
       },
       {
+        "name": "card-speed",
+        "required": false,
+        "default": ""
+      },
+      {
         "name": "include-private",
         "required": false,
         "default": "false"

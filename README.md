@@ -263,6 +263,12 @@ wider; `activity-heatmap` spends the room on data instead, one more week of
 the contribution calendar at a time until the whole year is drawn, and
 `badge-row` ignores it, its width following its pills.
 
+`-card-speed` is how fast that animation plays, a decimal from 0 to 1 and one
+number for the whole card: every animated layout scales by it, the cursor and
+the band with the reveals. `0.5` is the default and is exactly the card the
+renderer has always drawn, to the byte; `0` is the slowest animation and `1`
+the fastest. `0` is not a still card, `-card-motion off` is.
+
 The repository ships as a composite Action:
 
 ```yaml

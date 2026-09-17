@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -371,6 +372,16 @@ func TestExecuteCardDrawsTheSweep(t *testing.T) {
 			[]string{"-card", svg, "-card-width", "20000"},
 			`width out of range: 20000 (layout "summary" draws from 300 to 1200)`,
 		},
+		{
+			"a speed past the fast end",
+			[]string{"-card", svg, "-card-speed", "2"},
+			"speed out of range: 2 (from 0, the slowest animation, to 1, the fastest",
+		},
+		{
+			"a speed under the slow end",
+			[]string{"-card", svg, "-card-speed", "-0.5"},
+			"speed out of range: -0.5 (from 0, the slowest animation, to 1, the fastest",
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			failed := runCommand(t, append([]string{"-config", cfg, "-card-only"}, tc.args...)...)
@@ -437,6 +448,80 @@ func TestExecuteCardWidthReachesTheCardAndItsRefusal(t *testing.T) {
 	again := draw(t, "wide-again", "-card-layout", "activity-heatmap", "-card-width", far)
 	if again != wide {
 		t.Error("the same card at the same width must be written twice to the byte")
+	}
+}
+
+// TestExecuteCardSpeedReachesTheCardAndLeavesTheDefaultAlone covers the flag
+// that decides how fast an animated layout plays: the speed reaches the
+// document, the two ends move in the directions their names promise, the slow
+// end is still an animation, and asking for the default draws exactly the card
+// the flag's absence draws.
+//
+// That last one is the whole point of the check. The committed gallery, the
+// README's pictures and every picture on the layouts page are rendered with no
+// speed at all, and scripts/check-gallery.sh compares them byte for byte.
+func TestExecuteCardSpeedReachesTheCardAndLeavesTheDefaultAlone(t *testing.T) {
+	gh := fakegh.New(t, fixtures)
+	dir := t.TempDir()
+	cfg := writeConfig(t, dir, gh.URL(), "")
+
+	draw := func(t *testing.T, name string, args ...string) string {
+		t.Helper()
+		svg := filepath.Join(dir, name+".svg")
+		got := runCommand(t, append([]string{
+			"-config", cfg, "-card", svg, "-card-only",
+			"-card-layout", "animated-counters",
+		}, args...)...)
+		if got.status != notExited {
+			t.Fatalf("%s = %d:\n%s", name, got.status, got.stderr)
+		}
+		body, err := os.ReadFile(svg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(body)
+	}
+
+	// The cycle this layout is drawn at, and the two the ends of the range
+	// stretch and shrink it to. Read off the document rather than written
+	// here, so the figures follow the engine's own constants.
+	own := draw(t, "own")
+	cycle := regexp.MustCompile(`animation:m0 ([\d.]+)s`).FindStringSubmatch(own)
+	if cycle == nil {
+		t.Fatalf("the layout drew no animation to speed up:\n%.400s", own)
+	}
+	at := func(name, speed string) float64 {
+		t.Helper()
+		found := regexp.MustCompile(`animation:m0 ([\d.]+)s`).FindStringSubmatch(draw(t, name, "-card-speed", speed))
+		if found == nil {
+			t.Fatalf("speed %s drew no animation at all; the slow end is the slowest one, not none", speed)
+		}
+		seconds, err := strconv.ParseFloat(found[1], 64)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return seconds
+	}
+	middle, err := strconv.ParseFloat(cycle[1], 64)
+	if err != nil {
+		t.Fatal(err)
+	}
+	slow, fast := at("slow", "0"), at("fast", "1")
+	if slow <= middle || middle <= fast {
+		t.Errorf("the cycle is %vs at the slow end, %vs at the default and %vs at the fast end, "+
+			"which is not a speed", slow, middle, fast)
+	}
+
+	// The default, asked for and left out, is one card.
+	if stated := draw(t, "stated", "-card-speed", "0.5"); stated != own {
+		t.Error("-card-speed 0.5 must draw exactly the card no -card-speed draws, to the byte")
+	}
+
+	// Same command, same bytes: a speed is one more input, not a source of
+	// variation, or a workflow that commits the card writes a diff out of
+	// nothing.
+	if again := draw(t, "slow-again", "-card-speed", "0"); again != draw(t, "slow", "-card-speed", "0") {
+		t.Error("the same card at the same speed must be written twice to the byte")
 	}
 }
 

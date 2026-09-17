@@ -103,7 +103,7 @@ func drawTickPill(b *strings.Builder, p tickPill, x, y float64) {
 func drawTicker(b *strings.Builder, c *Card, s *spec) {
 	const height = tickBandY + tickBandH + 14
 	inner := s.width - 2*pad
-	tl := newTimeline(s.motion)
+	tl := newTimeline(s.motion, s.speed)
 	pills := tickerPills(s)
 
 	// One copy of the content is what the band scrolls by, gap included, so

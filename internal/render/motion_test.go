@@ -2,6 +2,8 @@ package render
 
 import (
 	"errors"
+	"math"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -10,7 +12,7 @@ import (
 // of the simplest case, because every layout's once mode is this output: one
 // cycle as long as the last beat, played one time.
 func TestATimelineThatPlaysOnceEndsWhenItsLastBeatDoes(t *testing.T) {
-	tl := newTimeline(MotionOnce)
+	tl := newTimeline(MotionOnce, SpeedDefault)
 	area := tl.add(effectFade, 0, 1.6, "ease-out")
 	line := tl.add(effectDraw, 0, 1.6, "ease-out")
 	if area != "m0" || line != "m1" {
@@ -37,7 +39,7 @@ func TestATimelineThatPlaysOnceEndsWhenItsLastBeatDoes(t *testing.T) {
 // to hold the card still before.
 func TestALoopNeverReplaysAReveal(t *testing.T) {
 	reveal := func(motion string) string {
-		tl := newTimeline(motion)
+		tl := newTimeline(motion, SpeedDefault)
 		tl.add(effectFade, 0, 1.6, "ease-out")
 		tl.add(effectDraw, 0.4, 1.2, "linear")
 		tl.add(effectGrowX, 1.6, 0.9, "ease-out")
@@ -59,7 +61,7 @@ func TestALoopNeverReplaysAReveal(t *testing.T) {
 // animation-delay applies to the first iteration only, so a stagger written
 // with it falls apart on the second pass of a loop.
 func TestAStaggeredBeatWaitsInsideItsKeyframes(t *testing.T) {
-	tl := newTimeline(MotionLoop)
+	tl := newTimeline(MotionLoop, SpeedDefault)
 	tl.add(effectFade, 0, 1, "ease-out")
 	tl.add(effectFade, 1, 1, "ease-out")
 	css := tl.css()
@@ -75,7 +77,7 @@ func TestAStaggeredBeatWaitsInsideItsKeyframes(t *testing.T) {
 // counter is made of: an intermediate frame shows only during its beat and
 // rests hidden, the final one rests visible and hides only until its start.
 func TestRevealAndFlashAreTheTwoHalvesOfACounter(t *testing.T) {
-	tl := newTimeline(MotionOnce)
+	tl := newTimeline(MotionOnce, SpeedDefault)
 	tl.add(effectFlash, 0, 0.5, "linear")
 	tl.add(effectFlash, 0.5, 0.5, "linear")
 	tl.add(effectReveal, 1, 1, "linear")
@@ -95,7 +97,7 @@ func TestRevealAndFlashAreTheTwoHalvesOfACounter(t *testing.T) {
 // branch of keyframes: a reveal beat that starts exactly when the cycle does
 // must not subtract 0.01% from zero and emit a negative percent stop.
 func TestARevealAtTheStartOfTheCycleWritesACleanFirstStop(t *testing.T) {
-	tl := newTimeline(MotionOnce)
+	tl := newTimeline(MotionOnce, SpeedDefault)
 	tl.add(effectReveal, 0, 1, "linear")
 	css := tl.css()
 	if strings.Contains(css, "-0.01%") {
@@ -119,14 +121,14 @@ func TestANilTimelineDoesNotMove(t *testing.T) {
 // TestACardThatDoesNotMoveCarriesNoMotion keeps off honest: no class on any
 // element and not one byte of stylesheet.
 func TestACardThatDoesNotMoveCarriesNoMotion(t *testing.T) {
-	tl := newTimeline(MotionOff)
+	tl := newTimeline(MotionOff, SpeedDefault)
 	if got := tl.add(effectFade, 0, 1, "ease-out"); got != "" {
 		t.Errorf("add under off = %q, want no class", got)
 	}
 	if tl.moving() || tl.css() != "" {
 		t.Errorf("off must not move and must write no css, got %q", tl.css())
 	}
-	if got := newTimeline(MotionOnce).css(); got != "" {
+	if got := newTimeline(MotionOnce, SpeedDefault).css(); got != "" {
 		t.Errorf("a timeline with no beats wrote %q", got)
 	}
 }
@@ -136,7 +138,7 @@ func TestACardThatDoesNotMoveCarriesNoMotion(t *testing.T) {
 // class, as static declarations, and leaves the element untransformed at the
 // end of the cycle, which is the element's own style.
 func TestABarGrowsFromNothingAndSettlesUntransformed(t *testing.T) {
-	tl := newTimeline(MotionOnce)
+	tl := newTimeline(MotionOnce, SpeedDefault)
 	tl.add(effectFade, 0, 1, "linear")
 	tl.add(effectGrowX, 1, 1, "ease-out")
 	css := tl.css()
@@ -159,7 +161,7 @@ func TestABarGrowsFromNothingAndSettlesUntransformed(t *testing.T) {
 // from == 0 case the reveal has its own test for: a beat that starts exactly
 // when the cycle does writes one stop and not a range from zero to zero.
 func TestAGrowAtTheStartOfTheCycleWritesACleanFirstStop(t *testing.T) {
-	tl := newTimeline(MotionOnce)
+	tl := newTimeline(MotionOnce, SpeedDefault)
 	tl.add(effectGrowX, 0, 1, "ease-out")
 	css := tl.css()
 	if !strings.Contains(css, "@keyframes m0{0%{transform:scaleX(0)}100%{transform:scaleX(1)}}") {
@@ -176,7 +178,7 @@ func TestAGrowAtTheStartOfTheCycleWritesACleanFirstStop(t *testing.T) {
 // seconds is exactly the card the rule forbids.
 func TestAGrowingBarStaysGrownWhateverTheMotion(t *testing.T) {
 	for _, motion := range []string{MotionOnce, MotionLoop} {
-		tl := newTimeline(motion)
+		tl := newTimeline(motion, SpeedDefault)
 		tl.add(effectGrowX, 0, 1.6, "ease-out")
 		css := tl.css()
 		for _, want := range []string{
@@ -196,7 +198,7 @@ func TestAGrowingBarStaysGrownWhateverTheMotion(t *testing.T) {
 // nothing. The steps are the beat's easing, one per character, which is what
 // makes the text arrive a character at a time.
 func TestACoverTypesTextInAndSettlesWhereItWasDrawn(t *testing.T) {
-	tl := newTimeline(MotionOnce)
+	tl := newTimeline(MotionOnce, SpeedDefault)
 	tl.addShift(effectType, 0, 0.5, "steps(3)", 21.6)
 	css := tl.css()
 	for _, want := range []string{
@@ -220,7 +222,7 @@ func TestACoverTypesTextInAndSettlesWhereItWasDrawn(t *testing.T) {
 // repeats: under loop the cover is written exactly as it is under once.
 func TestACoverNeverGoesBackOverANumberItHasTyped(t *testing.T) {
 	typed := func(motion string) string {
-		tl := newTimeline(motion)
+		tl := newTimeline(motion, SpeedDefault)
 		tl.addShift(effectType, 0, 0.5, "steps(3)", 21.6)
 		return tl.css()
 	}
@@ -238,7 +240,7 @@ func TestACoverNeverGoesBackOverANumberItHasTyped(t *testing.T) {
 	}
 	// And a cover that starts part way into the cycle waits over its text
 	// until its own beat, rather than uncovering with the one above it.
-	staggered := newTimeline(MotionOnce)
+	staggered := newTimeline(MotionOnce, SpeedDefault)
 	staggered.addShift(effectType, 0, 0.5, "steps(2)", 10)
 	staggered.addShift(effectType, 0.5, 0.5, "steps(2)", 10)
 	if want := "@keyframes m1{0%,50%{transform:translateX(-10px)}100%{transform:translateX(0px)}}"; !strings.Contains(staggered.css(), want) {
@@ -250,7 +252,7 @@ func TestACoverNeverGoesBackOverANumberItHasTyped(t *testing.T) {
 // and the half of it a loop needs: the band holds the shift it reached for the
 // rest of the cycle instead of snapping back and waiting at the start.
 func TestABandSlidesByOneCopyAndHoldsThere(t *testing.T) {
-	once := newTimeline(MotionOnce)
+	once := newTimeline(MotionOnce, SpeedDefault)
 	once.addShift(effectSlide, 0, 4, "linear", 500)
 	if want := "@keyframes m0{0%{transform:translateX(0px)}100%{transform:translateX(-500px)}}"; !strings.Contains(once.css(), want) {
 		t.Errorf("css lacks %q:\n%s", want, once.css())
@@ -258,7 +260,7 @@ func TestABandSlidesByOneCopyAndHoldsThere(t *testing.T) {
 	// A band is continuous, so under loop it is the one thing that repeats,
 	// and it repeats on its own turn with nothing added and nothing held: one
 	// pass, then the next, which is what scrolling is.
-	loop := newTimeline(MotionLoop)
+	loop := newTimeline(MotionLoop, SpeedDefault)
 	loop.addShift(effectSlide, 0, 4, "linear", 500)
 	for _, want := range []string{
 		".m0{animation:m0 4s linear infinite}",
@@ -276,7 +278,7 @@ func TestABandSlidesByOneCopyAndHoldsThere(t *testing.T) {
 // end of the cycle, so the still card has a cursor in a state a reader could
 // point at rather than half a one.
 func TestACursorBlinksThroughItsBeatAndEndsLit(t *testing.T) {
-	tl := newTimeline(MotionOnce)
+	tl := newTimeline(MotionOnce, SpeedDefault)
 	tl.add(effectBlink, 0, 1, "linear")
 	css := tl.css()
 	// One second is two blinks at blinkPeriod: lit, dark, lit, dark, lit.
@@ -288,7 +290,7 @@ func TestACursorBlinksThroughItsBeatAndEndsLit(t *testing.T) {
 		t.Errorf("a blink must end lit:\n%s", css)
 	}
 	// A beat shorter than one blink still blinks once rather than not at all.
-	short := newTimeline(MotionOnce)
+	short := newTimeline(MotionOnce, SpeedDefault)
 	short.add(effectBlink, 0, 0.1, "linear")
 	if got := strings.Count(short.css(), "{opacity:0}"); got != 1 {
 		t.Errorf("a beat too short for a whole blink went dark %d times, want once:\n%s", got, short.css())
@@ -298,7 +300,7 @@ func TestACursorBlinksThroughItsBeatAndEndsLit(t *testing.T) {
 	// lit for half of it and dark for the other half, repeated for ever. The
 	// beat's own length is how long it blinks before a card that settles
 	// settles, which a card that never settles has no use for.
-	forever := newTimeline(MotionLoop)
+	forever := newTimeline(MotionLoop, SpeedDefault)
 	forever.add(effectBlink, 1.4, 1, "linear")
 	for _, want := range []string{
 		".m0{animation:m0 0.5s linear infinite}",
@@ -313,7 +315,7 @@ func TestACursorBlinksThroughItsBeatAndEndsLit(t *testing.T) {
 	// because waiting once before the first turn would take an
 	// animation-delay and this engine writes none. A layout that needs a
 	// continuous beat to wait needs that rule relaxed first; see period.
-	fromTheStart := newTimeline(MotionLoop)
+	fromTheStart := newTimeline(MotionLoop, SpeedDefault)
 	fromTheStart.add(effectBlink, 0, 1, "linear")
 	if forever.css() != fromTheStart.css() {
 		t.Errorf("a continuous beat's start reached its keyframes:\n%s\nagainst\n%s", forever.css(), fromTheStart.css())
@@ -350,5 +352,111 @@ func TestAnUnknownMotionIsAnErrorThatListsTheValidOnes(t *testing.T) {
 		if _, err = SVG(c, &Options{Layout: "summary", Motion: m}); err != nil {
 			t.Errorf("motion %q on a layout that does not move: %v", m, err)
 		}
+	}
+}
+
+// TestTheDefaultSpeedIsExactlyTheEngineOwnDurations is the promise the whole
+// option hangs on, at the one place it can be made structurally: the scale a
+// card is drawn at is exactly one at the default, so scaled hands every beat
+// back the duration it asked for and nothing is multiplied at all.
+//
+// Checked as an exact float comparison on purpose. A scale that came out at
+// 0.9999999999999999 would draw cards that look the same and write different
+// bytes, which is the failure this is here to catch.
+func TestTheDefaultSpeedIsExactlyTheEngineOwnDurations(t *testing.T) {
+	if got := motionScale(SpeedDefault); got != 1 {
+		t.Errorf("motionScale(%v) = %v, want exactly 1", SpeedDefault, got)
+	}
+	tl := newTimeline(MotionOnce, SpeedDefault)
+	for _, d := range []float64{0.05, 0.22, 1.4, 1.82, 11.44} {
+		if got := tl.scaled(d); got != d {
+			t.Errorf("scaled(%v) = %v at the default, want the duration untouched", d, got)
+		}
+	}
+}
+
+// TestSpeedReachesTheSameDistanceEitherWayOfTheDefault holds the curve to what
+// a reader sliding a number between two ends expects: the ends are the reach
+// the engine declares, a quarter below the default is as much slower as a
+// quarter above it is faster, and nothing in between goes backwards.
+func TestSpeedReachesTheSameDistanceEitherWayOfTheDefault(t *testing.T) {
+	if got := motionScale(SpeedSlowest); got != speedReach {
+		t.Errorf("motionScale(%v) = %v, want %v", SpeedSlowest, got, speedReach)
+	}
+	if got := motionScale(SpeedFastest); got != 1/speedReach {
+		t.Errorf("motionScale(%v) = %v, want %v", SpeedFastest, got, 1/speedReach)
+	}
+	for i := range 101 {
+		speed := float64(i) / 100
+		if product := motionScale(speed) * motionScale(1-speed); math.Abs(product-1) > 1e-12 {
+			t.Errorf("motionScale(%v) * motionScale(%v) = %v, want 1: the two halves of the "+
+				"range must reach the same distance", speed, 1-speed, product)
+		}
+		if i == 0 {
+			continue
+		}
+		if motionScale(speed) >= motionScale(speed-0.01) {
+			t.Fatalf("motionScale(%v) is not shorter than motionScale(%v): a higher speed "+
+				"has to be a faster card", speed, speed-0.01)
+		}
+	}
+}
+
+// TestSpeedChangesTheDurationAndNothingElse is what makes a speed a speed.
+//
+// A beat's keyframes are percentages of the cycle, so they say the same thing
+// however long the cycle runs, and the stagger between two beats is inside
+// them. If a speed touched them, a card at one end of the range would not be
+// the same card played faster: it would be a different card.
+func TestSpeedChangesTheDurationAndNothingElse(t *testing.T) {
+	plays := func(speed float64) string {
+		tl := newTimeline(MotionLoop, speed)
+		tl.add(effectFade, 0, 1.6, "ease-out")
+		tl.add(effectDraw, 0.4, 1.2, "linear")
+		tl.addShift(effectSlide, 0, 8, "linear", 1120)
+		tl.add(effectBlink, 2.2, 1, "linear")
+		return tl.css()
+	}
+	duration := regexp.MustCompile(`animation:m\d+ [\d.]+s`)
+	want := duration.ReplaceAllString(plays(SpeedDefault), "")
+	for _, speed := range []float64{SpeedSlowest, 0.25, 0.75, SpeedFastest} {
+		if got := duration.ReplaceAllString(plays(speed), ""); got != want {
+			t.Errorf("speed %v rewrote more than the durations:\n%s\nwant\n%s", speed, got, want)
+		}
+	}
+	// And the durations themselves move, in the direction the name promises:
+	// the cycle the reveals share, the band's pass and the cursor's blink, the
+	// last two on clocks of their own under loop.
+	slow, fast := plays(SpeedSlowest), plays(SpeedFastest)
+	for _, want := range []string{
+		"animation:m0 16s ease-out 1", "animation:m2 16s linear infinite",
+		"animation:m3 1s linear infinite",
+	} {
+		if !strings.Contains(slow, want) {
+			t.Errorf("the slowest speed does not say %q:\n%s", want, slow)
+		}
+	}
+	for _, want := range []string{
+		"animation:m0 4s ease-out 1", "animation:m2 4s linear infinite",
+		"animation:m3 0.25s linear infinite",
+	} {
+		if !strings.Contains(fast, want) {
+			t.Errorf("the fastest speed does not say %q:\n%s", want, fast)
+		}
+	}
+}
+
+// TestTheSlowestSpeedStillAnimates is the misreading the option invites. Zero
+// is the slow end of a range, not an off switch, and a card drawn there still
+// carries every animation it has; MotionOff is the one that carries none.
+func TestTheSlowestSpeedStillAnimates(t *testing.T) {
+	tl := newTimeline(MotionOnce, SpeedSlowest)
+	tl.add(effectFade, 0, 1.6, "ease-out")
+	css := tl.css()
+	if !strings.Contains(css, "animation:m0 3.2s ease-out 1") {
+		t.Errorf("the slowest speed drew no animation:\n%s", css)
+	}
+	if still := newTimeline(MotionOff, SpeedSlowest); still.css() != "" {
+		t.Errorf("motion off is what draws no animation:\n%s", still.css())
 	}
 }

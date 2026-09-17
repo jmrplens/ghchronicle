@@ -59,7 +59,7 @@ func drawBadgeRow(b *strings.Builder, c *Card, s *spec) {
 
 func drawWideBanner(b *strings.Builder, c *Card, s *spec) {
 	const height = 60.0
-	tl := newTimeline(s.motion)
+	tl := newTimeline(s.motion, s.speed)
 	var spark sparkMotion
 	if s.has(fieldSparkline) {
 		spark = sparkBeats(tl)

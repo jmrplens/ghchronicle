@@ -108,6 +108,7 @@ type options struct {
 	fields   string
 	motion   string
 	width    int
+	speed    float64
 	layouts  bool
 	cardOnly bool
 	groups   bool
@@ -147,6 +148,11 @@ func parseFlags(args []string, stderr io.Writer) (options, error) {
 			"activity-heatmap turns the room into more data, one more week of the contribution calendar at "+
 			"a time until the year it holds is drawn, which is also where its far end is; every other "+
 			"layout spreads the same content wider. badge-row ignores it: its width follows its pills")
+	fs.Float64Var(&o.speed, "card-speed", render.SpeedDefault,
+		"how fast an animated layout plays, as a decimal from 0 to 1: 0 is the slowest animation and 1 the "+
+			"fastest, and 0.5 is the pace the cards have always been drawn at, to the byte. Every animated "+
+			"layout scales together, the continuous motions with the rest. 0 is not a still card: "+
+			"-card-motion off is what draws one")
 	fs.BoolVar(&o.layouts, "card-layouts", false, "list the card layouts and their fields, then exit")
 	fs.BoolVar(&o.groups, "groups", false, "list the metric groups and the families in each, then exit")
 	fs.BoolVar(&o.cardOnly, "card-only", false, "with -card, write the SVG and nothing else")
@@ -566,7 +572,7 @@ func cardFiles(path, theme string) []cardFile {
 func cardOptions(o *options, theme string) *render.Options {
 	return &render.Options{
 		Theme: theme, Layout: o.layout, Motion: o.motion,
-		Fields: splitFields(o.fields), Width: o.width,
+		Fields: splitFields(o.fields), Width: o.width, Speed: &o.speed,
 	}
 }
 

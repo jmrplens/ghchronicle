@@ -62,6 +62,16 @@ inputs:
       whole year is drawn; every other layout spreads the same content wider.
     required: false
     default: ""
+  card-speed:
+    description: >
+      How fast an animated layout plays, as a decimal from 0 to 1. Empty means 0.5, which is the
+      pace every card has been drawn at since the layouts learned to move, to the byte; below it a
+      card is slower and above it faster, and every animated layout scales together, the ticker's
+      pass and the terminal's cursor with the rest. 0 is the slowest animation and not a still
+      card: `card-motion: off` is what draws one. A value outside the range is refused before the
+      sweep runs, naming both ends.
+    required: false
+    default: ""
   include-private:
     description: >
       `true` counts private repositories in the card, when no config file is given.
@@ -161,4 +171,5 @@ runs:
         FIELDS: ${{ inputs.card-fields }}
         MOTION: ${{ inputs.card-motion }}
         WIDTH: ${{ inputs.card-width }}
+        SPEED: ${{ inputs.card-speed }}
       run: bash "$GITHUB_ACTION_PATH/scripts/action-run.sh"

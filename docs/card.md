@@ -29,6 +29,7 @@ ghchronicle -config config.yaml -card card.svg -card-only
 | `-card-motion <once\|loop\|off>`        | How an animated layout moves; the others ignore it           |
 | `-card-fields <list>`                   | Comma-separated, in drawing order                            |
 | `-card-width <pixels>`                  | The layout's own width when left out; on `activity-heatmap` it buys weeks |
+| `-card-speed <0 to 1>`                  | How fast an animated layout plays; `0.5`, the default, is the pace it always had |
 | `-card-layouts`                         | Prints the layouts with their fields and widths, then exits  |
 
 Without `-card-only` the card is written **as well as** everything the sinks
@@ -202,6 +203,34 @@ presses the toggle (WCAG 2.2.2, Pause, Stop, Hide).
       card-theme: both
       card-motion: loop
   ```
+
+#### How fast it plays
+
+`-card-speed` is a decimal from 0 to 1, and 0.5 is the default. It is one
+number for the whole card: every animated layout scales by it, the two
+continuous motions with the reveals, so a card set slower has a band that takes
+longer to come round and a cursor that blinks more slowly at the same time.
+
+| `-card-speed` | What the card does                                                     |
+| ------------- | ---------------------------------------------------------------------- |
+| `0`           | The slowest animation, twice the length of the default                 |
+| `0.5`         | Exactly the card this renderer always drew, to the byte. The default   |
+| `1`           | The fastest, half the length of the default                            |
+
+There is one knob and not one per layout for the reason there is one width and
+not one per layout: the cycles here were paced against each other, and scaling
+them together is what keeps the pacing the motion was designed with. A speed
+outside the range is refused before the sweep runs, naming both ends.
+
+> **0 is the slowest animation, not none**
+>
+> A range that starts at zero reads like a switch, and this one is not. A card
+> drawn at `0` still animates, as slowly as this renderer will draw it. The one
+> that draws no animation at all is `-card-motion off`, and it is also the one
+> that makes the file smaller.
+
+`prefers-reduced-motion` is untouched by any of this: a reader who has asked
+his machine for less motion gets no animation to slow down or speed up.
 
 ### In a README
 

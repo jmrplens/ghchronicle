@@ -33,6 +33,88 @@ const (
 // ErrMotion is returned for a motion this package does not know.
 var ErrMotion = errors.New("render: unknown motion")
 
+// The ends and the middle of Options.Speed, which is how fast an animated
+// layout plays.
+//
+// SpeedDefault is the pace every card had before there was a choice, and it
+// is exactly that pace: the engine multiplies its own durations by one there
+// and writes the same bytes it always wrote. Below it a card is slower, above
+// it faster, and every layout scales together rather than each keeping a knob
+// of its own, so the relationships this engine argues for hold at every
+// speed.
+//
+// SpeedSlowest is the slowest animation, not a still card. A reader meeting a
+// range that starts at zero will assume the opposite, so every place this is
+// documented says it, and the refusal below says it too: MotionOff is what
+// draws a card that does not move.
+//
+// The author's decision, 2026-09-17, on being shown the ticker: a speed the
+// reader sets, where the current pace is the middle of the range.
+const (
+	SpeedSlowest = 0.0
+	SpeedDefault = 0.5
+	SpeedFastest = 1.0
+)
+
+// ErrSpeed is returned for an Options.Speed outside SpeedSlowest to
+// SpeedFastest. Like ErrWidth it names both ends and what it got, because the
+// number is typed at a command line and in a workflow's `with:` block.
+var ErrSpeed = errors.New("render: speed out of range")
+
+// speedReach is how far each end of the range goes: at SpeedSlowest a card's
+// motion takes speedReach times as long as at the default, and at SpeedFastest
+// it takes a speedReach-th of it.
+//
+// Two, and not more, because both ends bind at about the same place and they
+// were measured rather than guessed. At the fast end the binding motion is the
+// terminal's cursor, whose blink is the shortest cycle on any card at half a
+// second and the one thing that runs for ever under MotionLoop: halved it is
+// a cursor at four blinks a second, and anything beyond that is a strobe on a
+// card nobody can pause. At the slow end it is the ticker, whose pass over the
+// gallery's own content is 11.44 s, by far the longest here because a pass is
+// as long as the band is wide: doubled it is the 22.87 s the card writes, and
+// the next step out would put a band on a README that takes more than half a
+// minute to come round. Everything else sits between 1.6 s and 2.3 s and has
+// room either way, so it is these two that fix the range. A card still settles
+// in 4.6 s at the slowest.
+const speedReach = 2.0
+
+// speedPivot is where the curve below is centered so that SpeedDefault lands
+// on exactly one. It is a constant expression, so what motionScale evaluates
+// is (2 - speed) / (1 + speed).
+const speedPivot = speedReach / (speedReach - 1)
+
+// motionScale is the multiple of its own durations the engine draws a card at.
+// It is applied to one thing and one thing only, the seconds an animation is
+// given, which is what makes a speed a speed: the keyframes inside it are
+// percentages of the cycle and say the same thing however long the cycle runs.
+//
+// The curve is a ratio of two straight lines rather than the power of a ratio
+// every other speed control is written as, for three reasons and in this
+// order.
+//
+// It is exactly one at the default. (2 - 0.5) and (1 + 0.5) are both 1.5, both
+// exact in binary, and a number divided by itself is one with no rounding to
+// hope for. That is the promise this whole change hangs on and it is
+// structural here rather than arithmetical: see scaled, which does not
+// multiply at all when the scale is one.
+//
+// It reaches the same distance either way. motionScale(s) * motionScale(1-s)
+// is exactly one, so a quarter below the default is as much slower as a
+// quarter above it is faster, which is what a reader sliding a number between
+// two ends expects and what a power curve also gives.
+//
+// And it is arithmetic a machine cannot disagree about. There is no exponent
+// and no logarithm, so nothing depends on a library routine that is assembly
+// on one architecture and Go on another, and there is no multiply next to an
+// add for a compiler to fuse: this repository has already been bitten by an
+// arm64 fused multiply-add giving a different last digit from the same
+// expression evaluated in two steps, and a card that renders differently on
+// two runners is a card that produces a diff out of nothing.
+func motionScale(speed float64) float64 {
+	return (speedPivot - speed) / (speedPivot - 1 + speed)
+}
+
 // effect is what a beat does to the elements that carry its class. Each one
 // animates a property whose base value it knows, which is what lets a beat
 // write its last keyframe explicitly and still end on the element's own style.
@@ -149,14 +231,39 @@ func (b beat) period() float64 {
 // written with it comes apart on the second pass of a loop.
 type timeline struct {
 	motion string
-	beats  []beat
+	// scale is what the reader's speed works out to, from motionScale: the
+	// multiple of its own durations this clock runs at. It is held rather
+	// than the speed it came from because it is settled once and asked for
+	// once per beat, and because one is the value scaled has to recognize.
+	scale float64
+	beats []beat
 }
 
 // newTimeline starts a card's clock. The classes it hands out, m0, m1 and on,
 // are unique within one document only, so a card uses exactly one timeline:
 // two in the same SVG would each start at m0 and restyle each other's beats.
-func newTimeline(motion string) *timeline {
-	return &timeline{motion: motion}
+//
+// speed is Options.Speed as SVG settled it, already inside the range.
+func newTimeline(motion string, speed float64) *timeline {
+	return &timeline{motion: motion, scale: motionScale(speed)}
+}
+
+// scaled is a duration in seconds as the stylesheet writes it: what the beat
+// asked for, at the speed the card was drawn at.
+//
+// The default returns the duration untouched, and that is the point of the
+// branch rather than an optimization. A card at the default has to be the card
+// this renderer drew before speed existed, to the byte, on every layout, in
+// every motion and on every architecture; multiplying by a one that is exactly
+// one would also do it, but only because IEEE says so about that particular
+// value, and the guarantee is worth more when nothing is multiplied at all.
+// Every other speed is one multiplication, on a value num then writes to two
+// decimals.
+func (t *timeline) scaled(d float64) float64 {
+	if t.scale == 1 {
+		return d
+	}
+	return d * t.scale
 }
 
 // add places a beat and returns the class to put on the elements it moves.
@@ -192,6 +299,10 @@ func (t *timeline) moving() bool {
 // beat, whatever the motion. It used to grow by a rest under loop, for the
 // stillness between one replay and the next; nothing replays any more, so
 // there is nothing to rest between and once and loop measure the same.
+//
+// In the engine's own seconds, which is what every beat here is placed in. The
+// reader's speed is applied once, where the stylesheet writes the duration out;
+// see scaled.
 func (t *timeline) cycle() float64 {
 	end := 0.0
 	for _, b := range t.beats {
@@ -218,11 +329,11 @@ func (t *timeline) css() string {
 		// its period is the one its own effect has. Everything else plays once
 		// over the cycle, under loop exactly as under once.
 		if t.motion == MotionLoop && bt.effect.continuous() {
-			fmt.Fprintf(&b, ".%s{animation:%s %ss %s infinite%s}\n", name, name, num(bt.period()), bt.ease, anchorCSS(bt.effect))
+			fmt.Fprintf(&b, ".%s{animation:%s %ss %s infinite%s}\n", name, name, num(t.scaled(bt.period())), bt.ease, anchorCSS(bt.effect))
 			fmt.Fprintf(&b, "@keyframes %s{%s}\n", name, perpetual(bt))
 			continue
 		}
-		fmt.Fprintf(&b, ".%s{animation:%s %ss %s 1%s}\n", name, name, num(cycle), bt.ease, anchorCSS(bt.effect))
+		fmt.Fprintf(&b, ".%s{animation:%s %ss %s 1%s}\n", name, name, num(t.scaled(cycle)), bt.ease, anchorCSS(bt.effect))
 		fmt.Fprintf(&b, "@keyframes %s{%s}\n", name, keyframes(bt, cycle))
 	}
 	fmt.Fprintf(&b, "@media (prefers-reduced-motion:reduce){%s{animation:none}}\n", strings.Join(names, ","))

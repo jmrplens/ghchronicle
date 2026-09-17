@@ -27,7 +27,7 @@ func drawLanguageBars(b *strings.Builder, c *Card, s *spec) {
 	ghTitled(s, "Most used languages")
 	const band = 44.0
 	inner := s.width - 2*ghPad
-	tl := newTimeline(s.motion)
+	tl := newTimeline(s.motion, s.speed)
 	var body strings.Builder
 
 	// One beat per bar and one per label, placed before anything is drawn so

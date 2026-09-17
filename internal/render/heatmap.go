@@ -206,7 +206,7 @@ func drawActivityHeatmap(b *strings.Builder, c *Card, s *spec) {
 	} else {
 		ghTitled(s, "Contributions")
 	}
-	tl := newTimeline(s.motion)
+	tl := newTimeline(s.motion, s.speed)
 	// The grid is the only thing that moves, so a card asked for no sparkline
 	// places no beat: the wave has nothing to cross.
 	beats := make([]string, weeks)

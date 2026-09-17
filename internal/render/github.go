@@ -62,7 +62,7 @@ const langBarGrow = 0.9
 func drawGithubStats(b *strings.Builder, c *Card, s *spec) {
 	ghTitled(s, "GitHub Statistics")
 	inner := s.width - 2*ghPad
-	tl := newTimeline(s.motion)
+	tl := newTimeline(s.motion, s.speed)
 
 	// The count opens the card and the bar grows once the numbers have landed.
 	// The counters are placed first because a beat is named as it is added, so

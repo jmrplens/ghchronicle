@@ -1325,6 +1325,7 @@ it downloads a release binary and calls it.
 | `card-fields`     | `""`                 | Comma-separated fields. Empty means the layout's default                                                          |
 | `card-motion`     | `once`               | `once`, `loop` or `off`; `loop` changes only `terminal` and `ticker`                                                                 |
 | `card-width`      | `""`                 | Card width in pixels. Empty draws the layout at its own width; each one draws between two ends of its own, stated in its [section](https://jmrp.io/docs/ghchronicle/card/layouts/). Only `activity-heatmap` spends the room on data, a whole year of the calendar at its far end |
+| `card-speed`      | `""`                 | How fast an animated layout plays, as a decimal from 0 to 1. Empty means 0.5, the pace every card has always been drawn at; below it the card is slower, above it faster, and every animated layout scales together. 0 is the slowest animation and not a still card, `card-motion: off` is |
 | `include-private` | `false`              | `true` counts private repositories when no config file is given (the default up to v1.0.0). See the warning below |
 | `version`         | `latest`             | The release to install                                                                                            |
 

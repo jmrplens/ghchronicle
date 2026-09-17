@@ -6,6 +6,8 @@ defaultColumns:
     default: Por omisión
 ---
 
+import { Aside } from "@astrojs/starlight/components";
+
 El binario acepta estas opciones y ningún subcomando. Todo lo demás está en el
 fichero de configuración, porque un horario no es algo que se reescriba a mano.
 
@@ -31,6 +33,7 @@ ghchronicle -config /etc/ghchronicle/config.yaml
 | `-card-layout`    | `summary`     | Cuál de los trece [diseños](/ghchronicle/es/card/layouts/) dibujar                                                                        |
 | `-card-fields`    | ninguno       | Campos que muestra la tarjeta, separados por comas, de entre [los campos](/ghchronicle/es/card/#los-campos); vacío significa el valor por omisión del diseño |
 | `-card-width`     | el del diseño | Ancho de la tarjeta en píxeles. Cada diseño dibuja entre dos extremos propios, que dicen tanto su [sección](/ghchronicle/es/card/layouts/) como `-card-layouts`; `badge-row` la ignora, porque su ancho lo deciden sus píldoras |
+| `-card-speed`     | `0.5`         | A qué velocidad se reproduce un diseño animado, como decimal de 0 a 1. `0` es la animación más lenta y `1` la más rápida; `0.5` es el ritmo con el que siempre se han dibujado las tarjetas. `0` no es una tarjeta quieta, eso es `-card-motion off` |
 | `-card-layouts`   | apagada       | Imprime los diseños con los campos y los anchos que dibuja cada uno, y sale                                                               |
 
 ## Las cuatro que imprimen y salen
@@ -93,6 +96,32 @@ extremos de un diseño se rechaza antes de la pasada, nombrándolos, y
 ```sh
 ghchronicle -config config.yaml -card calendar.svg -card-only \
   -card-layout activity-heatmap -card-width 700
+```
+
+## La velocidad, y lo que no es su extremo lento
+
+`-card-speed` es un solo número para toda la tarjeta. Todos los diseños
+animados se escalan juntos, los movimientos continuos con el resto: con el
+mismo ajuste, la banda del ticker tarda más en dar la vuelta y el cursor del
+terminal parpadea más despacio. Es un mando y no uno por diseño porque el
+movimiento que tiene la tarjeta se calibró contra sí mismo, el ciclo de un
+diseño elegido al lado del de otro, y a quien le parezca lenta la banda le
+parecerá lento también el tecleo.
+
+`0.5` es el centro del rango y es exactamente la tarjeta que este renderizador
+ha dibujado siempre, byte a byte, así que omitir la opción y pedir `0.5` son la
+misma orden. Cada extremo llega el doble de lejos que eso: `0` dibuja el
+movimiento con el doble de duración y `1` con la mitad.
+
+<Aside type="caution" title="0 es la animación más lenta, no la ausencia de animación">
+  Un rango que empieza en cero parece un interruptor, y este no lo es. En `0` la
+  tarjeta sigue animándose, tan despacio como este renderizador la dibuje. Lo
+  que dibuja una tarjeta sin animación ninguna es `-card-motion off`.
+</Aside>
+
+```sh
+ghchronicle -config config.yaml -card slow.svg -card-only \
+  -card-layout ticker -card-motion loop -card-speed 0.25
 ```
 
 ## Dónde está lo demás

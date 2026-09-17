@@ -30,7 +30,7 @@ func drawLanguageRing(b *strings.Builder, c *Card, s *spec) {
 	const r, stroke = 54.0, 16.0
 	inner := s.width - 2*ghPad
 	cx, cy := ghPad+r+stroke/2, band+18+r+stroke/2
-	tl := newTimeline(s.motion)
+	tl := newTimeline(s.motion, s.speed)
 	var body strings.Builder
 
 	// The ring is an arc per slice, each its own path rather than a dash of a

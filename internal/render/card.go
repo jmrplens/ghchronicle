@@ -102,6 +102,24 @@ type Options struct {
 	// MotionOff. Empty means MotionOnce. A layout that does not move accepts
 	// every valid value and draws the same card.
 	Motion string
+
+	// Speed is how fast an animated layout plays, from SpeedSlowest to
+	// SpeedFastest. nil means SpeedDefault, and so does a pointer to it: both
+	// draw the card this renderer drew before there was a speed, to the byte.
+	// Anything outside the range is ErrSpeed.
+	//
+	// A pointer, where every other option here reads its own zero value as
+	// "the caller said nothing", because zero is a value a caller means:
+	// SpeedSlowest is the slowest animation this engine draws. A card that
+	// does not move at all is Motion MotionOff, which is a different question
+	// and has its own answer.
+	//
+	// One number for the whole card rather than one per layout. The
+	// relationships the motion engine argues for are between its layouts as
+	// much as inside them, and a reader who finds the ticker slow finds the
+	// terminal's typing slow with it; the same reasoning turned down a
+	// per-layout width.
+	Speed *float64
 }
 
 const (
@@ -256,6 +274,10 @@ func SVG(c *Card, o *Options) ([]byte, error) {
 	if motion != MotionOnce && motion != MotionLoop && motion != MotionOff {
 		return nil, fmt.Errorf("%w: %q (valid: %s, %s, %s)", ErrMotion, o.Motion, MotionOnce, MotionLoop, MotionOff)
 	}
+	speed, err := resolveSpeed(o.Speed)
+	if err != nil {
+		return nil, err
+	}
 	def, err := findLayout(o.Layout)
 	if err != nil {
 		return nil, err
@@ -283,6 +305,7 @@ func SVG(c *Card, o *Options) ([]byte, error) {
 		repos:  rank(c.TopRepos, maxRepos),
 		langs:  rankLanguages(c.Languages, maxLanguages),
 		motion: motion,
+		speed:  speed,
 	}
 	if !s.has(fieldTopRepos) {
 		s.repos = nil
@@ -314,6 +337,28 @@ func resolveWidth(asked int, l Layout) (float64, error) {
 	return float64(asked), nil
 }
 
+// resolveSpeed settles how fast the card plays: the speed the caller asked
+// for, or SpeedDefault when he asked for none.
+//
+// The refusal says what a range starting at zero does not: the slow end is the
+// slowest animation and not a card standing still, so a reader who wanted
+// stillness is sent to the option that draws it rather than left with a card
+// that crawls. NaN fails the two comparisons below and is refused with the
+// rest, which is why they are written as a range the value has to be inside
+// rather than as two ends it must not be outside.
+func resolveSpeed(asked *float64) (float64, error) {
+	if asked == nil {
+		return SpeedDefault, nil
+	}
+	speed := *asked
+	if speed >= SpeedSlowest && speed <= SpeedFastest {
+		return speed, nil
+	}
+	return 0, fmt.Errorf("%w: %v (from %v, the slowest animation, to %v, the fastest; "+
+		"%v is the default, and motion %s is what draws a card that does not move)",
+		ErrSpeed, speed, SpeedSlowest, SpeedFastest, SpeedDefault, MotionOff)
+}
+
 // spec is what a layout draws from: the options already validated and the
 // data already ranked, so a layout is only geometry.
 type spec struct {
@@ -325,7 +370,8 @@ type spec struct {
 	nums   []metric
 	repos  []TopRepo
 	langs  []langShare
-	motion string // already validated
+	motion string  // already validated
+	speed  float64 // already settled and inside the range
 }
 
 func (s *spec) has(field string) bool {
