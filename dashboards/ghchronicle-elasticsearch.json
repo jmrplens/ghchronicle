@@ -24303,7 +24303,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "Every collector that ran in the range, how many repositories it was asked about, how many of them it could not collect and how many rows it produced. A family with no row here did not run at all, which is the one thing an empty panel could never say: not due, switched off, or skipped because a rate budget was spent. Failures is the sweep's own count, so a family that failed on some of its repositories and was still marked as having run says so here. No repository filter: these rows belong to the collector rather than to a repository.",
+          "description": "Every collector that ran in the range, with what stopped it where something did, how many sweeps it ran in, and how many repositories it was asked about. A family with no row here did not run at all, which is the one thing an empty panel could never say: not due, switched off, or skipped because a rate budget was spent. Why is what separates the two kinds of failure that would otherwise read alike: a search budget spent twice a day sorts apart from the 502 that cost a repository its history, and a family that had both has a row for each. Failures is the sweep's own count, so a family that failed on some of its repositories and was still marked as having run says so here; a batched query that failed names no repository and counts as one. One row here is not a family: `discover` is the repository listing, which every family depends on, and it appears only when it failed, because a listing that worked is stated by every other row of the same sweep. No repository filter: these rows belong to the collector rather than to a repository.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -24352,7 +24352,31 @@
                   },
                   {
                     "id": "custom.width",
+                    "value": 100
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Why"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
                     "value": 110
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Sweeps"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 80
                   }
                 ]
               },
@@ -24364,19 +24388,7 @@
                 "properties": [
                   {
                     "id": "custom.width",
-                    "value": 110
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byName",
-                  "options": "Rows"
-                },
-                "properties": [
-                  {
-                    "id": "custom.width",
-                    "value": 90
+                    "value": 100
                   }
                 ]
               }
@@ -24419,24 +24431,34 @@
                     "size": "40"
                   },
                   "type": "terms"
+                },
+                {
+                  "field": "reason.keyword",
+                  "id": "544",
+                  "settings": {
+                    "min_doc_count": "1",
+                    "order": "desc",
+                    "orderBy": "_count",
+                    "size": "20"
+                  },
+                  "type": "terms"
                 }
               ],
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
                   "field": "failed",
-                  "id": "544",
+                  "id": "545",
                   "type": "sum"
+                },
+                {
+                  "id": "546",
+                  "type": "count"
                 },
                 {
                   "field": "repos",
-                  "id": "545",
+                  "id": "547",
                   "type": "max"
-                },
-                {
-                  "field": "points",
-                  "id": "546",
-                  "type": "sum"
                 }
               ],
               "query": "_index:ghchronicle-gh_collector_family AND scope.keyword:\"family\"",
@@ -24452,10 +24474,11 @@
                 "excludeByName": {},
                 "indexByName": {},
                 "renameByName": {
+                  "Count": "Sweeps",
                   "Max": "Repositories",
-                  "Sum failed": "Failures",
-                  "Sum points": "Rows",
-                  "family.keyword": "Family"
+                  "Sum": "Failures",
+                  "family.keyword": "Family",
+                  "reason.keyword": "Why"
                 }
               }
             }
@@ -24545,7 +24568,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "547",
+                  "id": "548",
                   "settings": {
                     "order": "desc",
                     "size": "100",

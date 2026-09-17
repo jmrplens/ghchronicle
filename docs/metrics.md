@@ -1216,6 +1216,13 @@ they are also what makes the measurement exist on an account where nothing has
 ever failed: a table InfluxDB has never been written to is not drawn empty, it
 is refused.
 
+One value of `family` is not a family. `discover` is the repository listing,
+which is not configurable and cannot be switched off, and it is here because
+every family depends on it: a sweep that cannot list the repositories runs none
+of them, and without this the page would show sixteen families that never ran
+and no reason for any of it. It writes a row only when it failed, because a
+listing that worked is already stated by every other row of the same sweep.
+
 This exists because of one measured failure. On 2026-09-16 `gh_workflow_run` and
 `gh_workflow_job` held nothing at all for the five busiest repositories of this
 account, each because one `/repos/<repo>/actions/runs/<id>/jobs` call had

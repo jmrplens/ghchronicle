@@ -23,7 +23,7 @@ importer to choose their own.
 The five hold the same panels in the same order. What differs is how many of
 them the store behind each one can answer.
 
-Each cell is the panels that store answers with a query, out of the panels in that section. A panel a store cannot answer ships as a text panel with the same title, so every dashboard has the same 152 panels; the 2 that are prose in all five are left out here.
+Each cell is the panels that store answers with a query, out of the panels in that section. A panel a store cannot answer ships as a text panel with the same title, so every dashboard has the same 154 panels; the 2 that are prose in all five are left out here.
 
 | Section | InfluxDB | PostgreSQL | Elasticsearch | Graphite | Prometheus | Panels |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -43,8 +43,8 @@ Each cell is the panels that store answers with a query, out of the panels in th
 | Activity | 9 | 9 | 9 | 8 | 7 | 9 |
 | Inventory | 16 | 16 | 15 | 15 | 14 | 16 |
 | Profile and sponsorship | 8 | 8 | 8 | 8 | 8 | 8 |
-| The collector itself | 2 | 2 | 2 | 2 | 2 | 2 |
-| **Total** | **150** | **150** | **145** | **144** | **126** | **150** |
+| The collector itself | 4 | 4 | 4 | 4 | 4 | 4 |
+| **Total** | **152** | **152** | **147** | **146** | **128** | **152** |
 
 ![The InfluxDB dashboard over ninety days of the demonstration database: the repository picker and the range across the top, the Overview with the ghchronicle badge and four tile groups reading 5 repositories with 350 stars and 51 forks, 37.5 thousand views with 21.1 thousand unique visitors and 19.6 thousand clones, 117 followers and 58 following with 4 sponsors and 2 sponsored, and 3.22 thousand contributions over 7.78 years, then the collapsed Lifetime header and the Audience section with views, unique visitors and clones per day, the top referrers, the top paths and clone amplification](../site/src/assets/dashboard-influxdb-demo.png)
 
@@ -689,10 +689,13 @@ exactly like a family with nothing to report.
 
 "Every family" and "What failed, and where" are the two panels below them, and
 the capture above predates both. The first lists every collector that ran in
-the range, how many repositories it was asked about, how many of them it could
-not collect and how many rows it produced; a family with no row there did not
-run at all. The second is one row per repository one collector could not
-collect, newest first, with what GitHub answered. An empty second table is the
+the range, what stopped it where something did, how many sweeps it ran in and
+how many repositories it was asked about; a family with no row there did not run
+at all. The reason is a column of its own so that the two kinds of failure sort
+apart: a search budget spent twice a day is not the 502 that cost a repository
+its history, and a family that met both has a row for each. The second is one
+row per repository one collector could not collect, newest first, with what
+GitHub answered. An empty second table is the
 good case, and it is drawn empty rather than refused because the first table's
 rows are written every sweep whether or not anything failed, so the measurement
 behind both exists from the first one.

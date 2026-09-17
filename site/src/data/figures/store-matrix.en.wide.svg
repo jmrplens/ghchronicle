@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" class="gf" viewBox="-1 -1 722 606"
  role="img" aria-labelledby="gf-stores-en-wide-t gf-stores-en-wide-d">
 <title id="gf-stores-en-wide-t">What each store can answer, section by section</title>
-<desc id="gf-stores-en-wide-d">A matrix of the dashboard's 17 sections against the five stores, most capable first. Each cell gives the panels that store answers with a query out of the panels in that section, and fills in proportion. In total: InfluxDB 150, PostgreSQL 150, Elasticsearch 145, Graphite 144, Prometheus 126, out of 150. 7 sections are answered in full by all five. Prometheus answers fewest, and loses most in Contributions (6 of 11), Pull requests and issues (10 of 14), Continuous integration (10 of 14), Planning and community (8 of 10).</desc>
+<desc id="gf-stores-en-wide-d">A matrix of the dashboard's 17 sections against the five stores, most capable first. Each cell gives the panels that store answers with a query out of the panels in that section, and fills in proportion. In total: InfluxDB 152, PostgreSQL 152, Elasticsearch 147, Graphite 146, Prometheus 128, out of 152. 7 sections are answered in full by all five. Prometheus answers fewest, and loses most in Contributions (6 of 11), Pull requests and issues (10 of 14), Continuous integration (10 of 14), Planning and community (8 of 10).</desc>
 <style>.gf{font-family:var(--sl-font,ui-sans-serif,system-ui,sans-serif)}.gf text{fill:var(--rb-body,#c3ccd2);font-size:12.5px}.gf .gf-title{fill:var(--rb-heading,#f2f6f8);font-size:14.5px;font-weight:600}.gf .gf-col{fill:var(--rb-heading,#f2f6f8);font-size:12px;font-weight:600}.gf .gf-muted{fill:var(--rb-muted,#8b969d);font-size:11px}.gf .gf-small{font-size:11px}.gf .gf-count{font-size:26px;font-weight:700}.gf .gf-keep{fill:var(--rb-accent,#3fb950)}.gf .gf-add{fill:var(--rb-status-drop,#e0605c)}.gf .gf-box{fill:var(--rb-surface,#151c20);stroke:var(--rb-border,#2a333a);stroke-width:1}.gf .gf-cell-keep{fill:var(--rb-accent-soft,#0d2115);stroke:var(--rb-accent,#3fb950);stroke-width:1}.gf .gf-cell-add{fill:var(--rb-status-drop-soft,#2b1618);stroke:var(--rb-status-drop,#e0605c);stroke-width:1}.gf .gf-bar{fill:var(--rb-accent-soft,#0d2115)}.gf .gf-edge{fill:var(--rb-accent,#3fb950)}.gf .gf-rule{stroke:var(--rb-border,#2a333a);stroke-width:1}.gf .gf-line{stroke:var(--rb-muted,#8b969d);stroke-width:1;fill:none}.gf .gf-head{fill:var(--rb-muted,#8b969d)}</style>
 <text x="221" y="13" class="gf-col" text-anchor="middle">InfluxDB</text>
 <text x="333" y="13" class="gf-col" text-anchor="middle">PostgreSQL</text>
@@ -310,44 +310,44 @@
 <text x="0" y="477">The collector itself</text>
 <rect x="170" y="462" width="102" height="21" rx="2" class="gf-box" />
 <rect x="170" y="462" width="102" height="21" rx="2" class="gf-bar" />
-<text x="221" y="476" class="gf-small" text-anchor="middle">2/2</text>
+<text x="221" y="476" class="gf-small" text-anchor="middle">4/4</text>
 <rect x="282" y="462" width="102" height="21" rx="2" class="gf-box" />
 <rect x="282" y="462" width="102" height="21" rx="2" class="gf-bar" />
-<text x="333" y="476" class="gf-small" text-anchor="middle">2/2</text>
+<text x="333" y="476" class="gf-small" text-anchor="middle">4/4</text>
 <rect x="394" y="462" width="102" height="21" rx="2" class="gf-box" />
 <rect x="394" y="462" width="102" height="21" rx="2" class="gf-bar" />
-<text x="445" y="476" class="gf-small" text-anchor="middle">2/2</text>
+<text x="445" y="476" class="gf-small" text-anchor="middle">4/4</text>
 <rect x="506" y="462" width="102" height="21" rx="2" class="gf-box" />
 <rect x="506" y="462" width="102" height="21" rx="2" class="gf-bar" />
-<text x="557" y="476" class="gf-small" text-anchor="middle">2/2</text>
+<text x="557" y="476" class="gf-small" text-anchor="middle">4/4</text>
 <rect x="618" y="462" width="102" height="21" rx="2" class="gf-box" />
 <rect x="618" y="462" width="102" height="21" rx="2" class="gf-bar" />
-<text x="669" y="476" class="gf-small" text-anchor="middle">2/2</text>
+<text x="669" y="476" class="gf-small" text-anchor="middle">4/4</text>
 <line x1="0" y1="492" x2="720" y2="492" class="gf-rule" />
 <text x="0" y="515" class="gf-title">Total</text>
 <rect x="170" y="500" width="102" height="21" rx="2" class="gf-box" />
 <rect x="170" y="500" width="102" height="21" rx="2" class="gf-bar" />
-<text x="221" y="514" class="gf-title" text-anchor="middle">150/150</text>
+<text x="221" y="514" class="gf-title" text-anchor="middle">152/152</text>
 <rect x="282" y="500" width="102" height="21" rx="2" class="gf-box" />
 <rect x="282" y="500" width="102" height="21" rx="2" class="gf-bar" />
-<text x="333" y="514" class="gf-title" text-anchor="middle">150/150</text>
+<text x="333" y="514" class="gf-title" text-anchor="middle">152/152</text>
 <rect x="394" y="500" width="102" height="21" rx="2" class="gf-box" />
-<rect x="394" y="500" width="98.6" height="21" rx="2" class="gf-bar" />
-<rect x="491.1" y="500" width="1.5" height="5" rx="0" class="gf-edge" />
-<rect x="491.1" y="516" width="1.5" height="5" rx="0" class="gf-edge" />
-<text x="445" y="514" class="gf-title" text-anchor="middle">145/150</text>
+<rect x="394" y="500" width="98.64" height="21" rx="2" class="gf-bar" />
+<rect x="491.14" y="500" width="1.5" height="5" rx="0" class="gf-edge" />
+<rect x="491.14" y="516" width="1.5" height="5" rx="0" class="gf-edge" />
+<text x="445" y="514" class="gf-title" text-anchor="middle">147/152</text>
 <rect x="506" y="500" width="102" height="21" rx="2" class="gf-box" />
-<rect x="506" y="500" width="97.92" height="21" rx="2" class="gf-bar" />
-<rect x="602.42" y="500" width="1.5" height="5" rx="0" class="gf-edge" />
-<rect x="602.42" y="516" width="1.5" height="5" rx="0" class="gf-edge" />
-<text x="557" y="514" class="gf-title" text-anchor="middle">144/150</text>
+<rect x="506" y="500" width="97.97" height="21" rx="2" class="gf-bar" />
+<rect x="602.47" y="500" width="1.5" height="5" rx="0" class="gf-edge" />
+<rect x="602.47" y="516" width="1.5" height="5" rx="0" class="gf-edge" />
+<text x="557" y="514" class="gf-title" text-anchor="middle">146/152</text>
 <rect x="618" y="500" width="102" height="21" rx="2" class="gf-box" />
-<rect x="618" y="500" width="85.68" height="21" rx="2" class="gf-bar" />
-<rect x="702.18" y="500" width="1.5" height="5" rx="0" class="gf-edge" />
-<rect x="702.18" y="516" width="1.5" height="5" rx="0" class="gf-edge" />
-<text x="669" y="514" class="gf-title" text-anchor="middle">126/150</text>
+<rect x="618" y="500" width="85.89" height="21" rx="2" class="gf-bar" />
+<rect x="702.39" y="500" width="1.5" height="5" rx="0" class="gf-edge" />
+<rect x="702.39" y="516" width="1.5" height="5" rx="0" class="gf-edge" />
+<text x="669" y="514" class="gf-title" text-anchor="middle">128/152</text>
 <text x="0" y="547" class="gf-muted">A panel a store cannot answer ships as a text panel with the same title, so all five dashboards have the same shape and the same</text>
-<text x="0" y="561.5" class="gf-muted">152 panels. 2 of those are prose in every store and are left out of this count.</text>
+<text x="0" y="561.5" class="gf-muted">154 panels. 2 of those are prose in every store and are left out of this count.</text>
 <line x1="0" y1="576" x2="720" y2="576" class="gf-rule" />
 <rect x="0" y="581" width="18" height="12" rx="2" class="gf-bar" />
 <text x="24" y="591" class="gf-small">answered by a query</text>

@@ -541,10 +541,14 @@ nada que contar.
 
 "Every family" y "What failed, and where" son los dos paneles de debajo, y la
 captura de arriba es anterior a ambos. El primero lista todos los colectores
-que corrieron en el rango, cuántos repositorios se les preguntaron, cuántos de
-ellos no pudieron recoger y cuántas filas produjeron; una familia sin fila ahí
-no corrió en absoluto. El segundo es una fila por cada repositorio que un
-colector no pudo recoger, el más reciente primero, con lo que respondió GitHub.
+que corrieron en el rango, qué los detuvo cuando algo lo hizo, en cuántos
+barridos corrieron y cuántos repositorios se les preguntaron; una familia sin
+fila ahí no corrió en absoluto. El motivo es columna aparte para que los dos
+tipos de fallo se ordenen por separado: un presupuesto de búsqueda agotado dos
+veces al día no es el 502 que le costó a un repositorio su historia, y una
+familia que tuvo ambos tiene una fila de cada. El segundo es una fila por cada
+repositorio que un colector no pudo recoger, el más reciente primero, con lo
+que respondió GitHub.
 Que la segunda tabla esté vacía es el caso bueno, y se dibuja vacía en lugar de
 rechazada porque las filas de la primera se escriben en cada barrido haya
 fallado algo o no, así que la medida que hay detrás de las dos existe desde el

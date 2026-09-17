@@ -16961,7 +16961,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "Every collector that ran in the range, how many repositories it was asked about, how many of them it could not collect and how many rows it produced. A family with no row here did not run at all, which is the one thing an empty panel could never say: not due, switched off, or skipped because a rate budget was spent. Failures is the sweep's own count, so a family that failed on some of its repositories and was still marked as having run says so here. No repository filter: these rows belong to the collector rather than to a repository. In Prometheus this counts the collector's last sweep, not the dashboard range.",
+          "description": "Every collector that ran in the range, with what stopped it where something did, how many sweeps it ran in, and how many repositories it was asked about. A family with no row here did not run at all, which is the one thing an empty panel could never say: not due, switched off, or skipped because a rate budget was spent. Why is what separates the two kinds of failure that would otherwise read alike: a search budget spent twice a day sorts apart from the 502 that cost a repository its history, and a family that had both has a row for each. Failures is the sweep's own count, so a family that failed on some of its repositories and was still marked as having run says so here; a batched query that failed names no repository and counts as one. One row here is not a family: `discover` is the repository listing, which every family depends on, and it appears only when it failed, because a listing that worked is stated by every other row of the same sweep. No repository filter: these rows belong to the collector rather than to a repository. In Prometheus this counts the collector's last sweep, not the dashboard range. There is no Sweeps column here for the same reason: the exporter holds one sweep, so the count would be one on every row.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -17010,7 +17010,31 @@
                   },
                   {
                     "id": "custom.width",
+                    "value": 100
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Why"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
                     "value": 110
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Sweeps"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 80
                   }
                 ]
               },
@@ -17022,19 +17046,7 @@
                 "properties": [
                   {
                     "id": "custom.width",
-                    "value": 110
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byName",
-                  "options": "Rows"
-                },
-                "properties": [
-                  {
-                    "id": "custom.width",
-                    "value": 90
+                    "value": 100
                   }
                 ]
               }
@@ -17068,7 +17080,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (family) (github_collector_family_failed{scope=\"family\"})",
+              "expr": "sum by (family, reason) (github_collector_family_failed{scope=\"family\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -17077,20 +17089,11 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (family) (github_collector_family_repos{scope=\"family\"})",
+              "expr": "sum by (family, reason) (github_collector_family_repos{scope=\"family\"})",
               "format": "table",
               "instant": true,
               "range": false,
               "refId": "B"
-            },
-            {
-              "datasource": "${DS_PROMETHEUS}",
-              "editorMode": "code",
-              "expr": "sum by (family) (github_collector_family_points{scope=\"family\"})",
-              "format": "table",
-              "instant": true,
-              "range": false,
-              "refId": "C"
             }
           ],
           "title": "Every family",
@@ -17115,8 +17118,8 @@
                 "renameByName": {
                   "Value #A": "Failures",
                   "Value #B": "Repositories",
-                  "Value #C": "Rows",
-                  "family": "Family"
+                  "family": "Family",
+                  "reason": "Why"
                 }
               }
             }

@@ -957,7 +957,7 @@ var dashboardKnownEmpty = map[string]map[int]string{
 		// every sweep whether or not anything failed, so the measurement and
 		// every column of it exist, and a sweep that lost no repository draws
 		// an empty list instead of a planner error.
-		154: "nothing failed in the sweep, and this panel lists the repositories a collector could not collect",
+		153: "nothing failed in the sweep, and this panel lists the repositories a collector could not collect",
 	},
 	"postgres": {
 		55:  "every workflow run in the fixture succeeded, and the panel wants the ones that fail",
@@ -965,25 +965,25 @@ var dashboardKnownEmpty = map[string]map[int]string{
 		96:  "one sweep is one snapshot, and the panel is the difference between two download counts",
 		104: "the Dependabot alert inside the range is open, so it has no seconds_to_resolve",
 		137: "one sweep is one snapshot, and the panel counts the values that changed between two",
-		154: "nothing failed in the sweep, and this panel lists the repositories a collector could not collect",
+		153: "nothing failed in the sweep, and this panel lists the repositories a collector could not collect",
 	},
 	"graphite": {
 		96:  "one sweep is one snapshot, and the panel is the difference between two download counts",
 		103: "every code scanning alert here is open, so no seconds_to_resolve was ever written",
 		104: "the Dependabot alert inside the range is open, so it has no seconds_to_resolve",
-		154: "nothing failed in the sweep, and this panel lists the repositories a collector could not collect",
+		153: "nothing failed in the sweep, and this panel lists the repositories a collector could not collect",
 	},
 	// Prometheus lists only the panels that ask for something the exporter
 	// publishes right now and still get nothing. Everything else this dashboard
 	// leaves empty is derived by promNeedsHistory below, because the reason is
 	// the same for all of them and it is a property of the harness.
 	"prometheus": {
-		154: "nothing failed in the sweep, and this panel lists the repositories a collector could not collect",
+		153: "nothing failed in the sweep, and this panel lists the repositories a collector could not collect",
 	},
 	"elasticsearch": {
 		103: "every code scanning alert here is open, so no seconds_to_resolve was ever written",
 		104: "the Dependabot alert inside the range is open, so it has no seconds_to_resolve",
-		154: "nothing failed in the sweep, and this panel lists the repositories a collector could not collect",
+		153: "nothing failed in the sweep, and this panel lists the repositories a collector could not collect",
 	},
 }
 

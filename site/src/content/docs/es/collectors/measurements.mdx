@@ -961,6 +961,14 @@ panel vacío nunca podría decir, y son además lo que hace que la medida exista
 en una cuenta donde nunca ha fallado nada: una tabla en la que InfluxDB no ha
 escrito nunca no se dibuja vacía, se rechaza.
 
+Un valor de `family` no es una familia. `discover` es el listado de
+repositorios, que no se configura ni se puede apagar, y está aquí porque toda
+familia depende de él: un barrido que no puede listar los repositorios no
+ejecuta ninguna, y sin esto la página mostraría dieciséis familias que nunca
+corrieron y ningún motivo para nada de ello. Escribe fila solo cuando falló,
+porque un listado que funcionó ya lo dicen todas las demás filas del mismo
+barrido.
+
 Esto existe por un fallo medido. El 2026-09-16 `gh_workflow_run` y
 `gh_workflow_job` no tenían absolutamente nada de los cinco repositorios más
 activos de esta cuenta, cada uno porque una llamada a

@@ -326,23 +326,33 @@ func collectorSection(b *builder) []Panel {
 	// be one the variable does not list, since the variable is built from
 	// gh_repo and that is a row the same sweep may have failed to write.
 	cf := "gh_collector_family"
-	ranQ := `SELECT family AS "Family", SUM(failed) AS "Failures",` +
-		` MAX(repos) AS "Repositories", SUM(points) AS "Rows"` +
+	// Grouped by the reason as well as by the family, because the two kinds of
+	// failure a reader has to tell apart land in the same column otherwise: a
+	// search budget spent twice a day is not the 502 that cost a repository
+	// its whole history, and sorted by the same number they read the same.
+	// Sweeps is the denominator that makes Failures a proportion rather than a
+	// number that grows with the range: a family that fails on every sweep
+	// reads 2880 of 2880 over thirty days, not 2880 out of a repository count
+	// it has nothing to do with.
+	ranQ := `SELECT family AS "Family", SUM(failed) AS "Failures", reason AS "Why",` +
+		` COUNT(*) AS "Sweeps", MAX(repos) AS "Repositories"` +
 		" FROM " + cf + " WHERE $__timeFilter(time) AND scope = 'family'" +
-		" GROUP BY 1 ORDER BY 2 DESC, 1"
+		" GROUP BY 1, 3 ORDER BY 2 DESC, 1"
 	lostQ := `SELECT time AS "When", family AS "Family", repo AS "Repository",` +
 		` reason AS "Why", error AS "What GitHub said" FROM ` + cf +
 		" WHERE $__timeFilter(time) AND scope = 'repo' ORDER BY time DESC LIMIT 100"
 
-	ranGR, ranGRtf := gTbl(rowsOf(gp(cf, "failed", "scope", scopeFamilyTag), gn(cf, "family")),
-		"Family", []col{{"sum", collectorFailures}})
-	ranES, ranEStf := esTbl(cf, []any{b.tm("family", 40)},
-		[]any{b.mSum("failed"), b.mMax("repos"), b.mSum("points")},
+	ranGR, ranGRtf := gTbl(rowsOf(gp(cf, "failed", "scope", scopeFamilyTag),
+		gn(cf, "family"), gn(cf, "reason")),
+		"Family, why", []col{{"sum", collectorFailures}})
+	ranES, ranEStf := esTbl(cf, []any{b.tm("family", 40), b.tm("reason", 20)},
+		[]any{b.mSum("failed"), b.mCount(), b.mMax("repos")},
 		[]named{
 			{"family.keyword", "Family"},
+			{"reason.keyword", "Why"},
 			{"f", collectorFailures},
+			{"s", "Sweeps"},
 			{"r", "Repositories"},
-			{"p", "Rows"},
 		}, []string{`scope.keyword:"` + scopeFamilyTag + `"`})
 
 	lostGR, lostGRtf := gTbl(rowsOf(gp(cf, "failed", "scope", scopeRepoTag),
@@ -395,28 +405,35 @@ func collectorSection(b *builder) []Panel {
 		}),
 		panel("table", "Every family", box{W: 12, H: 9, X: 0, Y: 11}, []Target{sqlT(ranQ)}, &P{
 			Prom: []Target{
-				promTbl("sum by (family) (github_collector_family_failed{scope=\""+scopeFamilyTag+"\"})", "A"),
-				promTbl("sum by (family) (github_collector_family_repos{scope=\""+scopeFamilyTag+"\"})", "B"),
-				promTbl("sum by (family) (github_collector_family_points{scope=\""+scopeFamilyTag+"\"})", "C"),
+				promTbl("sum by (family, reason) (github_collector_family_failed{scope=\""+scopeFamilyTag+"\"})", "A"),
+				promTbl("sum by (family, reason) (github_collector_family_repos{scope=\""+scopeFamilyTag+"\"})", "B"),
 			},
 			PromTF: merged(map[string]string{
-				"family": "Family", panelValueA: collectorFailures,
-				panelValueB: "Repositories", panelValueC: "Rows",
+				"family": "Family", "reason": "Why",
+				panelValueA: collectorFailures, panelValueB: "Repositories",
 			}, []string{"scope"}, nil),
-			PromDesc: sweepCount,
-			Opts:     Opts{"sort": collectorFailures},
+			PromDesc: sweepCount + " There is no Sweeps column here for the same reason: " +
+				"the exporter holds one sweep, so the count would be one on every row.",
+			Opts: Opts{"sort": collectorFailures},
 			Overrides: []any{
-				barCell(collectorFailures, "short", 110),
-				width("Repositories", 110), width("Rows", 90),
+				barCell(collectorFailures, "short", 100),
+				width("Why", 110), width("Sweeps", 80), width("Repositories", 100),
 			},
-			Desc: "Every collector that ran in the range, how many repositories it was " +
-				"asked about, how many of them it could not collect and how many rows it " +
-				"produced. A family with no row here did not run at all, which is the one " +
-				"thing an empty panel could never say: not due, switched off, or skipped " +
-				"because a rate budget was spent. Failures is the sweep's own count, so a " +
-				"family that failed on some of its repositories and was still marked as " +
-				"having run says so here. No repository filter: these rows belong to the " +
-				"collector rather than to a repository.",
+			Desc: "Every collector that ran in the range, with what stopped it where " +
+				"something did, how many sweeps it ran in, and how many repositories it " +
+				"was asked about. A family with no row here did not run at all, which is " +
+				"the one thing an empty panel could never say: not due, switched off, or " +
+				"skipped because a rate budget was spent. Why is what separates the two " +
+				"kinds of failure that would otherwise read alike: a search budget spent " +
+				"twice a day sorts apart from the 502 that cost a repository its history, " +
+				"and a family that had both has a row for each. Failures is the sweep's " +
+				"own count, so a family that failed on some of its repositories and was " +
+				"still marked as having run says so here; a batched query that failed " +
+				"names no repository and counts as one. One row here is not a family: " +
+				"`discover` is the repository listing, which every family depends on, and " +
+				"it appears only when it failed, because a listing that worked is stated " +
+				"by every other row of the same sweep. No repository filter: these rows " +
+				"belong to the collector rather than to a repository.",
 			GR: ranGR, GRTF: ranGRtf, GRDesc: grRows,
 			ES: ranES, ESTF: ranEStf,
 		}),
