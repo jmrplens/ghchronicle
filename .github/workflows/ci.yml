@@ -210,10 +210,23 @@ jobs:
       # allowed to fail when it is present, because an outage at SonarCloud is
       # not a reason to block a merge. The secret is copied into the job's env
       # above because a step's `if` cannot see the step's own env.
+      # The version every other artifact of this repository is stamped with,
+      # so the analysis is filed under it too. Without this every analysis
+      # reports "not provided", which is what six analyses of main said: the
+      # project's history carries no version markers at all, so nothing can ask
+      # how a release looked, and a new-code period defined as "previous
+      # version" has no baseline to measure against and leaves the quality gate
+      # uncomputed.
+      - name: Read the version
+        id: version
+        run: echo "value=$(cat VERSION)" >> "$GITHUB_OUTPUT"
+
       - name: SonarCloud scan
         if: env.SONAR_TOKEN != ''
         uses: SonarSource/sonarqube-scan-action@22918119ff8e1ca75a623e15c8296b6ea4fbe28f  # v8.2.1
         continue-on-error: true
+        with:
+          args: -Dsonar.projectVersion=${{ steps.version.outputs.value }}
         env:
           SONAR_HOST_URL: https://sonarcloud.io
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
