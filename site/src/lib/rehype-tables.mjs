@@ -32,8 +32,8 @@
  *    exactly the implicit ones while the table is wide, which costs nothing,
  *    and they are the whole of the semantics once it is not.
  *
- *  - on a table its page names as an INDEX, `data-form="index"` on the
- *    container. See "Index tables" below.
+ *  - on a table its page names as COMPACT, `data-form="compact"` on the
+ *    container. See "Compact tables" below.
  *
  *  - on a table its page names in `defaultColumns`, `data-form="default"` on
  *    the container and `data-role="default"` on the cell that holds the row's
@@ -45,8 +45,11 @@
  *    below.
  *
  * Why the stacked form exists at all, measured on the built site before it
- * did: all 98 tables of the corpus, in both languages, overflowed the column
- * they sit in at a 360 px and at a 400 px viewport, by 176 px to 417 px.
+ * did: every table of the corpus, in both languages, overflowed the column
+ * it sits in at a 360 px and at a 400 px viewport, by 176 px to 417 px. The
+ * count is left out on purpose. It was written here as 98 and the corpus was
+ * at 112 within the month, which is the shape of comment this repository
+ * keeps finding wrong: the measurement is what matters, not the census.
  * Taking the width floor off would not have fixed it. With the floor removed
  * and the content rendered as it is, the narrowest these tables can be AS
  * TABLES still ran to 745 px, because a heading cell and a code span are both
@@ -58,39 +61,48 @@
 import { localeOf, routeOf } from "./site.mjs";
 
 /*
- * INDEX TABLES. Stacking is right for a reference table, whose cells are
- * clauses a reader reads, and wrong for an index, whose rows are short and
- * whose job is to let the reader find an item. Measured on the layouts page
- * before this existed, back when that page still carried an index: its
+ * COMPACT TABLES. The stacked card is the REFERENCE register: a row earns it
+ * when it is a name you look up carrying more than one fact about it, which
+ * is what a labelled block per cell is worth paying for. Everything shorter
+ * reads better as a line. The first case was an index, whose rows are short
+ * and whose job is to let the reader find an item: measured on the layouts
+ * page before this existed, back when that page still carried one, its
  * thirteen-row summary took 4,691 px stacked at a 360 px viewport, 337 px a
  * row, nearly six screens of labelled boxes before the first card, where the
- * same table is one glance on a desktop. An index gets a compact form instead
- * (styles/tables.css): one line per row naming the item, a smaller line under
- * it with the rest of the row.
+ * same table is one glance on a desktop. The same is true of a closed set
+ * (three exit codes, two archive names) and of a glossary, which is why the
+ * key is named for the FORM it asks for and not for that first use: reading
+ * `indexTables` on a table of exit codes said something the code had never
+ * meant. Such a table gets the compact form instead (styles/tables.css): one
+ * line per row naming the item, a smaller line under it with the rest of the
+ * row.
  *
- * Which tables are indexes is the page's judgement, not this plugin's guess:
+ * Which tables those are is the page's judgement, not this plugin's guess:
  * a page lists them in its frontmatter by the heading of their first column,
  *
- *     indexTables:
+ *     compactTables:
  *       - Family
  *
  * which reads the same in the source as in the rendered page, and survives a
  * table being added above it where a position would not. A name that matches
  * no table on the page is an error: a column renamed in the markdown would
- * otherwise put its table back into the stacked form without a word.
+ * otherwise put its table back into the stacked form without a word. A table
+ * whose first column has no heading cannot be named at all, which is a real
+ * limit and not an oversight: this corpus has three, all of them comparison
+ * matrices whose left column names itself, and none of them wants this form.
  *
- * An index row used to be linked here to the section of the page its first
- * cell named. The two pages that declare an index today, how/index.mdx and
- * sinks/index.mdx, cannot use it: the first names families that have no
- * section of their own, the second already writes its own links. The pass ran
- * over nothing, so it is gone rather than kept as a promise this file makes
- * and never keeps. A page that wants an index row to link writes the link.
+ * A compact row used to be linked here to the section of the page its first
+ * cell named. No page that declares this form can use it: they name families,
+ * stores, exit codes and words that have no section of their own, or they
+ * already write their own links. The pass ran over nothing, so it is gone
+ * rather than kept as a promise this file makes and never keeps. A page that
+ * wants a row to link writes the link.
  *
  * The markdown is not touched, so the twin, docs/ and llms-full.txt read the
  * table exactly as written.
  *
  * DEFAULT COLUMNS. A reference table (a key, a flag, a rule) stays a
- * reference: stacking is still right for it, its rows are not an index. But
+ * reference: stacking is still right for it, its rows are not a line. But
  * its first cell used to spend a whole labelled block on the row's default,
  * one KEY/FLAG card followed by a whole DEFAULT card for one short value, and
  * the author read that on a phone and asked for the value beside the label
@@ -108,11 +120,11 @@ import { localeOf, routeOf } from "./site.mjs";
  * `Key` tables do, both get it from one entry), `default` is the heading of
  * the column to hoist. A `table` naming no table on the page, or a `default`
  * naming no column of the table it did find, is an error for the same reason
- * a bad indexTables entry is: a column renamed in the markdown must not put
+ * a bad compactTables entry is: a column renamed in the markdown must not put
  * the default back in its own box without a word. A `default` naming the
  * FIRST column is an error too, since the row's name and the row's default
  * would be the same cell and the card would render with nothing on the left.
- * A table named in both `indexTables` and `defaultColumns` is also an error:
+ * A table named in both `compactTables` and `defaultColumns` is also an error:
  * the compact form already runs every column but the first inline, so the two
  * treatments have nothing to agree on.
  *
@@ -161,7 +173,7 @@ import { localeOf, routeOf } from "./site.mjs";
  *    those from `-card <path>` or from an install command, both of which are
  *    genuine names with a space in them, so the judgement is the page's, the
  *    way it already is for an index. A name matching no table on the page is
- *    an error, for the reason a bad indexTables entry is.
+ *    an error, for the reason a bad compactTables entry is.
  *
  * WHERE A NAME MAY BREAK. Stacked, `td code` carries `overflow-wrap: anywhere`
  * (styles/tables.css), which is what keeps a sixty-character path inside a
@@ -287,14 +299,14 @@ function localeOfFile(file) {
 }
 
 /**
- * The first-column headings of the tables a page declared as indexes, read
+ * The first-column headings of the tables a page declared as compact, read
  * off the frontmatter Astro hands every plugin.
  *
  * @param {any} file the vfile rehype passes through
  * @returns {string[]}
  */
-function indexTablesOf(file) {
-	const declared = file?.data?.astro?.frontmatter?.indexTables;
+function compactTablesOf(file) {
+	const declared = file?.data?.astro?.frontmatter?.compactTables;
 	return Array.isArray(declared) ? declared.map(String) : [];
 }
 
@@ -513,8 +525,8 @@ export default function rehypeTables() {
 	 * @param {any} node
 	 * @param {{
 	 *   label: string,
-	 *   indexes: Set<string>,
-	 *   found: Set<string>,
+	 *   compact: Set<string>,
+	 *   compactFound: Set<string>,
 	 *   defaults: Map<string, string>,
 	 *   defaultsFound: Set<string>,
 	 *   plain: Set<string>,
@@ -529,8 +541,8 @@ export default function rehypeTables() {
 			if (child.type !== "element" || child.tagName !== "table") return child;
 			const columns = headings(child);
 			prepare(child, columns);
-			const index = columns.length > 0 && page.indexes.has(columns[0]);
-			if (index) page.found.add(columns[0]);
+			const compact = columns.length > 0 && page.compact.has(columns[0]);
+			if (compact) page.compactFound.add(columns[0]);
 			const plain = columns.length > 0 && page.plain.has(columns[0]);
 			if (plain) page.plainFound.add(columns[0]);
 			else markIdentities(child);
@@ -538,9 +550,9 @@ export default function rehypeTables() {
 				columns.length > 0 ? page.defaults.get(columns[0]) : undefined;
 			let defaultColumn = false;
 			if (defaultHeading !== undefined) {
-				if (index) {
+				if (compact) {
 					throw new Error(
-						`${page.path}: "${columns[0]}" is named in both indexTables and ` +
+						`${page.path}: "${columns[0]}" is named in both compactTables and ` +
 							"defaultColumns. A table cannot be both: the compact form " +
 							"already runs every column but the first inline.",
 					);
@@ -581,8 +593,8 @@ export default function rehypeTables() {
 				properties: {
 					className: ["table-scroll"],
 					"data-columns": String(columns.length),
-					...(index
-						? { "data-form": "index" }
+					...(compact
+						? { "data-form": "compact" }
 						: defaultColumn
 							? { "data-form": "default" }
 							: {}),
@@ -604,8 +616,8 @@ export default function rehypeTables() {
 		const defaultEntries = defaultColumnsOf(file);
 		const page = {
 			label: REGION_LABEL[localeOfFile(file)],
-			indexes: new Set(indexTablesOf(file)),
-			found: new Set(),
+			compact: new Set(compactTablesOf(file)),
+			compactFound: new Set(),
 			defaults: new Map(
 				defaultEntries.map((entry) => [entry.table, entry.default]),
 			),
@@ -615,10 +627,12 @@ export default function rehypeTables() {
 			path: file?.path ?? "a page",
 		};
 		walk(tree, page);
-		const missing = [...page.indexes].filter((name) => !page.found.has(name));
+		const missing = [...page.compact].filter(
+			(name) => !page.compactFound.has(name),
+		);
 		if (missing.length) {
 			throw new Error(
-				`${page.path}: indexTables names ${missing
+				`${page.path}: compactTables names ${missing
 					.map((name) => `"${name}"`)
 					.join(", ")}, and no table on the page has that first column. ` +
 					"Rename the entry to the table's first heading, or remove it.",

@@ -19,11 +19,12 @@
  *            written into the markup by src/lib/rehype-tables.mjs,
  *            because the browser stops inferring them the moment
  *            `display` changes.
- *   COMPACT  what an INDEX table gets instead of STACKED, at the
- *            same breakpoints: one line per row naming the item,
- *            a smaller line under it with the rest of the row,
- *            each value after its heading. See "The compact form"
- *            at the end of this file for which tables and why.
+ *   COMPACT  what a table too short for a card gets instead of
+ *            STACKED, at the same breakpoints: one line per row
+ *            naming the item, a smaller line under it with the
+ *            rest of the row, each value after its heading. See
+ *            "The compact form" at the end of this file for which
+ *            tables and why.
  *
  * A table that stays STACKED can additionally have one column marked
  * DEFAULT (`defaultColumns` in the frontmatter): its value moves onto
@@ -39,7 +40,7 @@
  * 0.85rem instead of only its colour. Where the first cell holds
  * prose rather than a value, a nearby rule cancels the size back down;
  * see the comment beside it. The compact form below reuses the same
- * property at the same size, so an index row's name and a stacked
+ * property at the same size, so a compact row's name and a stacked
  * block's key read at one weight across the site rather than two.
  * The WIDE form is the fallback written into each `var()` below, so
  * it is stated once, at the declaration that uses it; the stacked
@@ -226,7 +227,7 @@
  * link-only name (InfluxDB, PostgreSQL, neither a `code` span) at this size,
  * and undoing that here would be the regression, not the fix. */
 .sl-markdown-content
-	.table-scroll:not([data-form="index"])
+	.table-scroll:not([data-form="compact"])
 	td:first-child:not([data-role="identity"]) {
 	--table-key-size: initial;
 }
@@ -548,23 +549,29 @@
 }
 
 /* ------------------------------------------------------------
- * The compact form: an index, one line per row.
+ * The compact form: one line per row.
  *
  * WHICH TABLES. A page names them in its frontmatter
- * (`indexTables`, by the heading of the first column), and
+ * (`compactTables`, by the heading of the first column), and
  * src/lib/rehype-tables.mjs marks their container
- * `data-form="index"`. It used to link each row's first cell to
+ * `data-form="compact"`. It used to link each row's first cell to
  * the section of the page it names as well; that pass was removed
  * in 2dd55a6, when the layouts page stopped carrying an index and
  * the rule ran over nothing, so a row is a link only where the
  * markdown made it one, which is what the stretch rule below is
- * for. The judgement is the page's: an index is a table a reader
- * uses to FIND an item, a short row per item that is documented
- * further on, and the stacked form serves it badly. Measured on
- * /card/layouts/ while it still carried an index, at a 360 px
- * viewport, stacked: 13 rows, 337 px each, 4,691 px of labelled
- * boxes before the first card, where on a desktop the same table
- * is one glance.
+ * for. The judgement is the page's, and the rule it applies is
+ * that the stacked card is the REFERENCE register: a row earns a
+ * card when it is a name you look up carrying more than one fact
+ * about it. An index is the first case that is not, a table a
+ * reader uses to FIND an item; a closed set (three exit codes,
+ * two archive names) and a glossary are the others, and the
+ * stacked form serves all three badly. Measured on /card/layouts/
+ * while it still carried an index, at a 360 px viewport, stacked:
+ * 13 rows, 337 px each, 4,691 px of labelled boxes before the
+ * first card, where on a desktop the same table is one glance.
+ * Measured on the three exit codes of /reference/subprocess/:
+ * 522 px of card to say that 0 means the sweep ran, against
+ * 277 px of line.
  *
  * WHEN. At exactly the widths the table would otherwise stack,
  * whatever its column count, and at no other. That is the job of
@@ -577,14 +584,17 @@
  * property it feeds falls back to the stacked or the wide value
  * written at the rule that consumes it. So these declarations are
  * stated once, without a breakpoint, and still cannot reach the
- * wide form or a table that is not an index. The other way to
+ * wide form or a table that is not compact. The other way to
  * write it was the same sixteen lines inside each of the four
  * breakpoints.
  *
  * WHAT. The row loses its box and its stripe and becomes a line
  * between hairlines. The first cell, the item's name, loses its
  * label and keeps its size, the same `--table-key-size` a plain
- * stacked block's key reads at; the rest run on as one smaller line,
+ * stacked block's key reads at, whether or not the plugin marked
+ * it an identity: the review that asked for this form wanted a
+ * link-only name (InfluxDB, PostgreSQL, neither a `code` span) at
+ * that size, so the form exempts itself from the identity rule; the rest run on as one smaller line,
  * each value after its heading and a dot between them, which is
  * what keeps "Animated no · Loops no" meaning something without
  * the columns. When the name is a link, the link is stretched
@@ -594,7 +604,7 @@
  * It stays a table in the accessibility tree for the reason the
  * stacked form does: the roles the plugin writes out.
  * ------------------------------------------------------------ */
-.sl-markdown-content .table-scroll[data-form="index"] > table {
+.sl-markdown-content .table-scroll[data-form="compact"] > table {
 	--table-compact-rest: var(--table-stacked) inline;
 	--table-compact-rest-size: var(--table-stacked) 0.8rem;
 	--table-compact-leading: var(--table-stacked) 1.55;
@@ -661,8 +671,8 @@
  * column's heading and the heading of the column to hoist) and
  * src/lib/rehype-tables.mjs marks the container `data-form="default"`
  * and the resolved cell of every row `data-role="default"`. This is
- * still a reference, unlike an index: the rows are not short and the
- * reader is not finding one among many, so everything below only
+ * still a reference, unlike a compact table: the rows are not short
+ * and the reader is not looking one up among many, so everything below only
  * touches the row's first line, never its shape.
  *
  * WHEN. The same rule as the compact form's: exactly the widths the

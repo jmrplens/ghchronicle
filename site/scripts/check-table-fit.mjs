@@ -3,8 +3,10 @@
  * Gates that no prose table overflows the column it sits in, on a phone.
  *
  * THE FAILURE IT EXISTS FOR, measured on the built site on 2026-09-16: every
- * one of the 98 tables this site publishes, in both languages, overflowed its
- * column at a 360 px and at a 400 px viewport, by 176 px to 417 px. The
+ * table this site published, in both languages, overflowed its column at a
+ * 360 px and at a 400 px viewport, by 176 px to 417 px. The count is left out
+ * on purpose. It was written here as 98 and the corpus was at 112 within the
+ * month; the measurement is what this paragraph is for, not the census. The
  * documentation was unreadable sideways on a phone and no gate here noticed,
  * because every other check reads the markup and none of them measure a
  * layout: the HTML was valid, the twins matched, pa11y passed, and the table
@@ -27,17 +29,17 @@
  * drift, a wrong working directory or a plugin that stopped wrapping tables
  * would read as success.
  *
- * The same walk checks the compact form an index table gets (see "The
- * compact form" in styles/tables.css), and it checks it from the SOURCE, not
- * from the markup. The tables a page declares in its frontmatter
- * (`indexTables`) are read here straight from src/content/docs, and every one
+ * The same walk checks the compact form a table too short for a card gets
+ * (see "The compact form" in styles/tables.css), and it checks it from the
+ * SOURCE, not from the markup. The tables a page declares in its frontmatter
+ * (`compactTables`) are read here straight from src/content/docs, and every one
  * of them has to render compact at both widths, on its page, in both
  * languages. Reading the markup instead would have checked only the tables the
  * plugin had marked, so a plugin that stopped marking them (Astro moving the
  * frontmatter away from where src/lib/rehype-tables.mjs reads it, say) would
- * have printed "0 compact indexes" and passed with every index back in stacked
- * boxes. For the same reason a corpus that declares no index at all is a
- * failure. Every `#` link in a table must also land on something on its page.
+ * have printed "0 compact" and passed with every one of them back in stacked
+ * boxes. For the same reason a corpus that declares none at all is a failure.
+ * Every `#` link in a table must also land on something on its page.
  *
  * There used to be one more rule here: the layouts pages declared an index of
  * thirteen rows, each linking to that layout's own section, and a row without
@@ -50,8 +52,8 @@
  *
  * The compact form is switched on by an empty custom property,
  * `--table-stacked: ;`, and a minifier that decided an empty value was a
- * mistake is the other way the indexes go back to boxes while every table
- * still fits. This catches that too.
+ * mistake is the other way a compact table goes back to boxes while every
+ * table still fits. This catches that too.
  *
  * The fixtures at the bottom run on every invocation.
  *
@@ -105,7 +107,7 @@ const KEY_SEPARATORS = new Set([
  */
 const TOLERANCE = 1;
 
-/** Where the pages, and the indexTables they declare, are written. */
+/** Where the pages, and the compactTables they declare, are written. */
 const DOCS = resolve(
 	dirname(fileURLToPath(import.meta.url)),
 	"..",
@@ -155,15 +157,15 @@ export function routeOfSource(file) {
 }
 
 /**
- * The first-column headings a page's frontmatter declares as index tables.
+ * The first-column headings a page's frontmatter declares as compact tables.
  *
  * @param {string} source the whole page, frontmatter included
  * @returns {string[]}
  */
-export function declaredIndexTables(source) {
+export function declaredCompactTables(source) {
 	const match = /^---\r?\n([\s\S]*?)\r?\n---/.exec(source);
 	if (!match) return [];
-	const declared = parse(match[1])?.indexTables;
+	const declared = parse(match[1])?.compactTables;
 	return Array.isArray(declared) ? declared.map(String) : [];
 }
 
@@ -187,7 +189,7 @@ export function declaredDefaultColumns(source) {
 
 /**
  * Every page under `dir` that declares at least one entry of `frontmatterKey`
- * (`indexTables` or `defaultColumns`), by route, read with `reader`.
+ * (`compactTables` or `defaultColumns`), by route, read with `reader`.
  *
  * @param {(source: string) => unknown[]} reader
  * @param {string} dir
@@ -211,9 +213,9 @@ function declaredBy(reader, dir = DOCS) {
 	return declared;
 }
 
-/** Every page under src/content/docs that declares an index, by route. */
+/** Every page under src/content/docs that declares a compact table, by route. */
 function declaredCorpus(dir = DOCS) {
-	return declaredBy(declaredIndexTables, dir);
+	return declaredBy(declaredCompactTables, dir);
 }
 
 /** Every page under src/content/docs that declares a default column, by route. */
@@ -222,8 +224,8 @@ function declaredDefaultCorpus(dir = DOCS) {
 }
 
 /**
- * What is wrong with one page's index tables at one width, read against what
- * its source declared rather than against what the markup says.
+ * What is wrong with one page's compact tables at one width, read against
+ * what its source declared rather than against what the markup says.
  *
  * @param {{
  *   declared: string[],
@@ -231,19 +233,19 @@ function declaredDefaultCorpus(dir = DOCS) {
  * }} page
  * @returns {string[]} one sentence per problem, none when the page is right
  */
-export function indexProblems({ declared, tables }) {
+export function compactProblems({ declared, tables }) {
 	const problems = [];
 	for (const heading of declared) {
 		const matching = tables.filter((table) => table.firstHeading === heading);
 		if (matching.length === 0) {
 			problems.push(
-				`declares "${heading}" an index and renders no table with that first column`,
+				`declares "${heading}" compact and renders no table with that first column`,
 			);
 		}
 		for (const table of matching) {
 			if (!table.compact) {
 				problems.push(
-					`"${heading}" is declared an index and did not render compact: ` +
+					`"${heading}" is declared compact and did not render compact: ` +
 						"either src/lib/rehype-tables.mjs did not mark it or the " +
 						"compact form in src/styles/tables.css did not switch on",
 				);
@@ -735,7 +737,7 @@ async function walk(dist) {
 	const declared = declaredCorpus();
 	if (declared.size === 0) {
 		throw new Error(
-			`no page under ${DOCS} declares indexTables, so the compact form ` +
+			`no page under ${DOCS} declares compactTables, so the compact form ` +
 				"would go unchecked. Either the frontmatter key was renamed or " +
 				"this file reads the wrong directory.",
 		);
@@ -746,7 +748,7 @@ async function walk(dist) {
 	if (undeclaredRoutes.length > 0) {
 		throw new Error(
 			`${undeclaredRoutes.map((route) => `/${route}`).join(", ")} declare ` +
-				"indexTables and render no table at all.",
+				"compactTables and render no table at all.",
 		);
 	}
 
@@ -774,7 +776,7 @@ async function walk(dist) {
 	let tables = 0;
 	let stacked = 0;
 	let compact = 0;
-	let indexes = 0;
+	let declaredCompact = 0;
 	let defaultColumnsChecked = 0;
 	let defaultCellsChecked = 0;
 	let defaultRowsChecked = 0;
@@ -814,12 +816,12 @@ async function walk(dist) {
 					}
 				}
 				if (declared.has(route)) {
-					indexes += declared.get(route).length;
-					for (const problem of indexProblems({
+					declaredCompact += declared.get(route).length;
+					for (const problem of compactProblems({
 						declared: declared.get(route),
 						tables: measuredTables,
 					})) {
-						failures.push({ width, route, index: "index", problem });
+						failures.push({ width, route, index: "compact", problem });
 					}
 				}
 				if (declaredDefaults.has(route)) {
@@ -882,7 +884,7 @@ async function walk(dist) {
 		tables,
 		stacked,
 		compact,
-		indexes,
+		declaredCompact,
 		defaultColumnsChecked,
 		defaultCellsChecked,
 		defaultRowsChecked,
@@ -953,38 +955,40 @@ function selfTest() {
 	is("the home page is the empty route", routeOfSource("index.mdx"), "");
 	is(
 		"a block list in the frontmatter is read",
-		declaredIndexTables("---\ntitle: x\nindexTables:\n  - Layout\n---\n\nbody"),
+		declaredCompactTables(
+			"---\ntitle: x\ncompactTables:\n  - Layout\n---\n\nbody",
+		),
 		["Layout"],
 	);
 	is(
 		"a page without the key declares nothing",
-		declaredIndexTables("---\ntitle: x\n---\n"),
+		declaredCompactTables("---\ntitle: x\n---\n"),
 		[],
 	);
-	const index = { firstHeading: "Store", compact: true };
+	const declaredTable = { firstHeading: "Store", compact: true };
 	is(
-		"a compact index is right",
-		indexProblems({ declared: ["Store"], tables: [index] }),
+		"a declared table that rendered compact is right",
+		compactProblems({ declared: ["Store"], tables: [declaredTable] }),
 		[],
 	);
 	is(
-		"an index the plugin stopped marking is caught from its source",
-		indexProblems({
+		"a declared table the plugin stopped marking is caught from its source",
+		compactProblems({
 			declared: ["Store"],
-			tables: [{ ...index, compact: false }],
+			tables: [{ ...declaredTable, compact: false }],
 		}).length,
 		1,
 	);
 	is(
-		"a declared index with no table of that name is caught",
-		indexProblems({ declared: ["Store"], tables: [] }).length,
+		"a declaration with no table of that name is caught",
+		compactProblems({ declared: ["Store"], tables: [] }).length,
 		1,
 	);
 	is(
-		"a table that is not the declared index is not asked to be compact",
-		indexProblems({
+		"a table the page did not declare is not asked to be compact",
+		compactProblems({
 			declared: ["Store"],
-			tables: [index, { firstHeading: "Field", compact: false }],
+			tables: [declaredTable, { firstHeading: "Field", compact: false }],
 		}),
 		[],
 	);
@@ -1255,7 +1259,7 @@ try {
 		tables,
 		stacked,
 		compact,
-		indexes,
+		declaredCompact,
 		defaultColumnsChecked,
 		defaultCellsChecked,
 		defaultRowsChecked,
@@ -1276,7 +1280,8 @@ try {
 			"[table-fit] a table that does not fit has to scroll sideways, which " +
 				"on a phone is how the documentation stopped being readable. Either " +
 				"the breakpoint in src/styles/tables.css no longer covers this " +
-				"shape, or something in the cell cannot wrap. An index in stacked " +
+				"shape, or something in the cell cannot wrap. A table declared " +
+				"compact still in stacked " +
 				"boxes, or a default not beside its label, is the compact or " +
 				"default form of the same file and of src/lib/rehype-tables.mjs; " +
 				"a key or a hoisted value that took two line boxes is that form's " +
@@ -1291,10 +1296,11 @@ try {
 	console.log(
 		`[table-fit] ${tables} measurements over ${routes} pages at ` +
 			`${WIDTHS.join(" and ")} px: every table fits its column ` +
-			`(${stacked - compact} stacked, ${compact} compact indexes, ` +
-			`${tables - stacked} still tables); all ${indexes} measurements of ` +
-			"the index tables the sources declare rendered compact, every row " +
-			`link lands, and the ${defaultColumnsChecked} measurements of the ` +
+			`(${stacked - compact} stacked cards, ${compact} compact lines, ` +
+			`${tables - stacked} still tables); all ${declaredCompact} ` +
+			"measurements of the tables the sources declare compact rendered " +
+			"as lines rather than as cards, every row link lands, and the " +
+			`${defaultColumnsChecked} measurements of the ` +
 			"default columns the sources declare hoisted " +
 			`${defaultCellsChecked} of their ${defaultRowsChecked} rows beside ` +
 			"their key, which is every cell of them that is a value and no cell " +

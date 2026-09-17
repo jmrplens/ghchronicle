@@ -4,10 +4,12 @@ import { docsLoader, i18nLoader } from "@astrojs/starlight/loaders";
 import { docsSchema, i18nSchema } from "@astrojs/starlight/schema";
 
 export const collections = {
-	// `indexTables` names, by the heading of their first column, the tables on
-	// a page that are indexes rather than references. src/lib/rehype-tables.mjs
-	// reads it and styles/tables.css gives those a compact form on a phone
-	// instead of the stacked one.
+	// `compactTables` names, by the heading of their first column, the tables on
+	// a page that are not references: an index, a closed set, a glossary, any
+	// table whose row is not a name you look up carrying more than one fact
+	// about it. src/lib/rehype-tables.mjs reads it and styles/tables.css gives
+	// those a compact line on a phone instead of the stacked card. It was
+	// called `indexTables` while an index was the only case.
 	//
 	// `defaultColumns` names, for a table that stays a reference, which of its
 	// other columns holds the row's default: `table` is the first column's
@@ -27,13 +29,13 @@ export const collections = {
 	// hold a code span, as configuration/index.mdx's `Remembers` and `Message`
 	// tables do. src/lib/rehype-tables.mjs leaves those cells unmarked, so
 	// styles/tables.css sizes them as the body text they are instead of as a
-	// card title. A list of scalars like `indexTables`, and translated the same
+	// card title. A list of scalars like `compactTables`, and translated the same
 	// way: only the values differ between the twins.
 	docs: defineCollection({
 		loader: docsLoader(),
 		schema: docsSchema({
 			extend: z.object({
-				indexTables: z.array(z.string()).optional(),
+				compactTables: z.array(z.string()).optional(),
 				defaultColumns: z
 					.array(z.object({ table: z.string(), default: z.string() }))
 					.optional(),
