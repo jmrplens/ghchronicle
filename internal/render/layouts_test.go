@@ -506,41 +506,86 @@ func TestTheHeatmapWaveIsOneClassPerWeek(t *testing.T) {
 func heatNums() []metric {
 	for _, l := range layouts {
 		if l.Name == "activity-heatmap" {
-			return metricsOf(sample(), l.Fields)
+			return heatNumbers(metricsOf(sample(), l.Fields))
 		}
 	}
 	return nil
 }
 
-// TestTheHeatmapGridFillsEveryWidthItAccepts is the point of deriving the week
-// count from the width, and it sweeps every width the layout accepts rather
-// than a handful: at each of them the grid and the column of numbers beside it
-// reach the far padding, leaving at most the one pitch that a further week
-// would not have fitted in.
+// heatSlack is what a card of this field set leaves empty at this width: the
+// room between the grid's last square and the far padding, once the numbers
+// have taken their column. The drawing's own geometry, so a test of it is a
+// test of the card.
+func heatSlack(width, numsW float64) (weeks int, slack float64) {
+	weeks = heatGridWeeks(width, numsW)
+	gridW := float64(weeks)*heatPitch - (heatPitch - heatCell)
+	room := width - 2*ghPad
+	if numsW > 0 {
+		room -= heatNumsGap + numsW
+	}
+	return weeks, room - gridW
+}
+
+// TestTheHeatmapGridTakesEveryWeekItHasRoomAndDataFor is the invariant that
+// holds whatever the card was asked to show: the grid is never smaller than
+// the room allows unless it has already drawn the whole year, and it never
+// overruns the card. It sweeps every width the layout accepts, over the field
+// set it draws by default and over three narrower ones.
 //
-// The sweep is the whole range and not samples because of what the far end is
+// The narrower sets are here because the layout's far end cannot know them.
+// heatFullWidth is where the year lands for the default card, and a card with
+// a shorter column of numbers reaches the year earlier: -card-fields sparkline
+// has no column at all, draws its year at 769 and leaves a hundred and
+// twenty-two units empty by 891. That is not a grid stopping short, which is
+// what this rewrite was about, it is a grid that has run out of calendar, and
+// the difference is exactly what the second clause below says. The stronger
+// claim, that there is no empty space at all, is true of the default card only
+// and is TestTheHeatmapFarEndIsWhereTheDefaultCardsYearLands.
+func TestTheHeatmapGridTakesEveryWeekItHasRoomAndDataFor(t *testing.T) {
+	def := mustLayout(t, "activity-heatmap")
+	for _, fields := range [][]string{
+		def.Fields,
+		{fieldSparkline, fieldStars, fieldForks, fieldRepos},
+		{fieldSparkline, fieldStars},
+		{fieldSparkline},
+	} {
+		numsW := heatNumsWidth(heatNumbers(metricsOf(sample(), fields)))
+		for width := def.MinWidth; width <= def.MaxWidth; width++ {
+			weeks, slack := heatSlack(float64(width), numsW)
+			if slack < 0 {
+				t.Fatalf("%v at width %d: %d weeks overrun the card by %v", fields, width, weeks, -slack)
+			}
+			if slack >= heatPitch && weeks != heatWeeksMax {
+				t.Fatalf("%v at width %d: %d weeks leave %v units empty with calendar still to draw",
+					fields, width, weeks, slack)
+			}
+		}
+	}
+}
+
+// TestTheHeatmapFarEndIsWhereTheDefaultCardsYearLands is the stronger claim,
+// and it is why the layout declares a far end of its own rather than the
+// typo guard every other layout takes: on the card it draws when nothing is
+// asked for, there is no accepted width with a square's worth of empty space
+// at the end of it.
+//
+// The sweep is the whole range and not samples because of what that end is
 // for. The grid stops at a year, so a width past the one where the year fits
 // has room for weeks that do not exist, and the layout drew the year and then
 // the empty quarter this rewrite was meant to remove: three hundred and nine
-// units of it at twelve hundred, measured. The layout's MaxWidth is now the
-// width where the year fits, and this is what says so: if that end is ever
-// moved past it, some width in the sweep leaves a pitch of empty space and
-// this fails.
-func TestTheHeatmapGridFillsEveryWidthItAccepts(t *testing.T) {
+// units of it at twelve hundred, measured. If the end is ever moved past where
+// the year lands, some width in the sweep leaves a pitch of empty space and
+// this fails with that width named.
+func TestTheHeatmapFarEndIsWhereTheDefaultCardsYearLands(t *testing.T) {
 	def := mustLayout(t, "activity-heatmap")
 	numsW := heatNumsWidth(heatNums())
 	for width := def.MinWidth; width <= def.MaxWidth; width++ {
-		weeks := heatGridWeeks(float64(width), numsW)
-		gridW := float64(weeks)*heatPitch - (heatPitch - heatCell)
-		slack := float64(width) - ghPad - (ghPad + gridW + heatNumsGap + numsW)
-		if slack < 0 {
-			t.Fatalf("width %d: %d weeks overrun the card by %v", width, weeks, -slack)
-		}
+		weeks, slack := heatSlack(float64(width), numsW)
 		if slack >= heatPitch {
 			t.Fatalf("width %d: %d weeks leave %v units empty, room for another week", width, weeks, slack)
 		}
 	}
-	// The far end is exactly where the year lands: one unit less is a week
+	// The far end is exactly where the year lands: one pitch less is a week
 	// short of it, and the end itself is the whole year.
 	if got := heatGridWeeks(float64(def.MaxWidth), numsW); got != heatWeeksMax {
 		t.Errorf("the far end draws %d weeks, want the year, %d", got, heatWeeksMax)

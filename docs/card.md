@@ -507,11 +507,17 @@ not a fixed number: the grid takes whatever room the numbers beside it leave, so
 it ends where the card does rather than stopping a third of the way short. At
 the width this layout declares that is twenty-three weeks, at its minimum
 sixteen, and `-card-width` at the far end its facts state draws the whole year
-the collector keeps. An account whose numbers run to eight digits and more
-takes a wider column for them and leaves the grid a week or two fewer, which is
-the same rule seen from the other side. The weeks fade in from the left, the
-wave crossing the grid in 0.22 s however many weeks it holds, so the calendar
-fills in as a wave of the same length at every width.
+the collector keeps. An account whose numbers reach seven digits takes a wider
+column for them and leaves the grid a week or two fewer, which is the same rule
+seen from the other side: at the width this layout declares, a million
+contributions is twenty-two weeks rather than twenty-three, and six digits
+still fits inside the labels. The far end is where the year lands for the three
+numbers this layout draws by default, so a card asked for fewer, or for numbers
+with shorter labels, reaches the year before it and has room to spare at the
+end: `-card-fields sparkline` draws its whole year well short of the far end.
+The weeks fade in from the left, the wave crossing the grid in 0.22 s however
+many weeks it holds, so the calendar fills in as a wave of the same length at
+every width.
 
 - **Family**: github
 - **Motion**: plays once

@@ -40,9 +40,15 @@ const (
 	heatSweep = 0.22
 )
 
+// heatMaxNums is how many numbers fit beside the grid, which is all the height
+// the grid gives them. Both the drawing and heatFullWidth cut to it, so the
+// width the layout accepts is measured from the numbers the card actually
+// draws rather than from every one it was handed.
+const heatMaxNums = 3
+
 // heatFields is what this layout draws when nothing is asked for. It is named
 // here rather than written into the registry entry because heatFullWidth is
-// measured from the labels of these three, and the registry entry is what
+// measured from the labels of its numbers, and the registry entry is what
 // carries that width.
 var heatFields = []string{fieldSparkline, fieldContributions, fieldCommits, fieldPullRequests}
 
@@ -63,9 +69,32 @@ var heatFields = []string{fieldSparkline, fieldContributions, fieldCommits, fiel
 // that used to be right. An account whose numbers are wider than those labels
 // needs a wider column, gets one, and draws a week or two fewer: the grid takes
 // what is left, which is the rule everywhere else in this file.
+//
+// What it does NOT know is the field set. A card asked for fewer numbers, or
+// for numbers with shorter labels, has a narrower column and so reaches the
+// year before this width: -card-fields sparkline has no column at all, draws
+// the year at 769, and by 891 has a hundred and twenty-two units of nothing on
+// its right, measured. The bound is static because the registry is static, and
+// making it follow the fields would mean a width this layout accepts by default
+// being refused once a reader narrows them, which is a worse thing to hand him
+// than some empty space at the end of a range he had to make two deliberate
+// choices to reach. TestTheHeatmapGridTakesEveryWeekItHasRoomAndDataFor is the
+// invariant that does hold over every field set: the grid is never smaller than
+// the room allows unless it has already drawn the year.
 var heatFullWidth = int(math.Ceil(2*ghPad + heatNumsGap +
 	float64(heatWeeksMax)*heatPitch - (heatPitch - heatCell) +
-	heatNumsWidth(metricsOf(&Card{}, heatFields))))
+	heatNumsWidth(heatNumbers(metricsOf(&Card{}, heatFields)))))
+
+// heatNumbers is the numbers the card draws of the ones it was handed: the
+// first heatMaxNums, because that is all the height beside the grid there is.
+// One function for the drawing and for heatFullWidth, so the width the layout
+// accepts cannot come to be measured from a number the card leaves out.
+func heatNumbers(nums []metric) []metric {
+	if len(nums) > heatMaxNums {
+		return nums[:heatMaxNums]
+	}
+	return nums
+}
 
 // heatNumsWidth is the room the numbers beside the grid need: the widest of
 // them measured against its own label, which on an ordinary account is the
@@ -91,10 +120,10 @@ func heatNumsWidth(nums []metric) float64 {
 // heatGridWeeks is how many weeks of the calendar fit in what the width leaves
 // once the numbers have their column, so the grid ends where the card does
 // instead of stopping at a number somebody picked. The width is therefore the
-// knob: the registered default draws twenty-three weeks, the minimum width
-// sixteen, and a card rendered at about nine hundred units draws the whole
-// year. Only a caller of render.Options can turn it today; the binary leaves
-// Width at zero and every card comes out at its layout's own width.
+// knob, and -card-width on the binary and card-width on the Action are how a
+// reader turns it: sixteen weeks at the layout's MinWidth, twenty-three at the
+// width it declares, and the whole year at heatFullWidth, which is its
+// MaxWidth and the widest it accepts precisely because the year lands there.
 //
 // The last week spends a cell and not a whole pitch, because the gap that
 // follows every other week is the card's right padding after the last one. The
@@ -163,13 +192,10 @@ func heatLevelClass(level int) string {
 
 func drawActivityHeatmap(b *strings.Builder, c *Card, s *spec) {
 	const band = 44.0
-	// Up to three numbers stacked to the right of the grid, which is all the
-	// height the grid gives them. They are measured before anything is drawn
-	// because their column is what decides how wide the grid may be.
-	nums := s.nums
-	if len(nums) > 3 {
-		nums = nums[:3]
-	}
+	// The numbers stacked to the right of the grid, cut to the height the grid
+	// gives them. They are measured before anything is drawn because their
+	// column is what decides how wide the grid may be.
+	nums := heatNumbers(s.nums)
 	numsW := heatNumsWidth(nums)
 	weeks := heatGridWeeks(s.width, numsW)
 	// The heading names the period the grid drew, so a card that draws no grid
