@@ -385,7 +385,7 @@ func cachePoints(ctx context.Context, c *ghapi.Client, repo Repo, base map[strin
 			Time:        now,
 		})
 	case !isSkippable(err):
-		return nil, err
+		return points, err
 	}
 
 	var caches struct {
@@ -422,7 +422,9 @@ func cachePoints(ctx context.Context, c *ghapi.Client, repo Repo, base map[strin
 			})
 		}
 	case !isSkippable(err):
-		return nil, err
+		// The totals row above is already in hand, and the per-entry listing
+		// failing does not make it less true.
+		return points, err
 	}
 	return points, nil
 }
