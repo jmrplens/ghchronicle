@@ -3,6 +3,7 @@ package e2e
 import (
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -69,6 +70,36 @@ func TestInfluxSinkWritesLineProtocol(t *testing.T) {
 	// The default exclude keeps the job log out of the metrics database.
 	if byName["gh_job_log"] != 0 {
 		t.Errorf("%d gh_job_log lines were written to InfluxDB despite the default exclude", byName["gh_job_log"])
+	}
+}
+
+// TestTheSweepLogCountsWhatInfluxDBTookNotWhatItWasOffered: the excluded
+// measurement is collected and offered like any other, and the line that
+// reports the write used to count it as written. Production read
+// "sink=influxdb family=joblogs points=440 unchanged=0" for a measurement the
+// database has never held a row of, and a review spent an afternoon on it.
+func TestTheSweepLogCountsWhatInfluxDBTookNotWhatItWasOffered(t *testing.T) {
+	t.Parallel()
+	gh := newFakeGitHub(t)
+	rec := newCapture(t, nil)
+	dir := t.TempDir()
+	cfg := writeSinkConfig(t, dir, gh.URL(), influxConfig(rec, ""))
+
+	out := sweepOnce(t, cfg)
+
+	if byName := measurementsOf(parseLineProtocol(t, rec.Body())); byName["gh_job_log"] != 0 {
+		t.Fatalf("%d gh_job_log lines reached InfluxDB, so this proves nothing", byName["gh_job_log"])
+	}
+	line := regexp.MustCompile(`sink=influxdb family=joblogs points=(\d+) unchanged=\d+ filtered=(\d+)`)
+	m := line.FindStringSubmatch(out)
+	if m == nil {
+		t.Fatalf("the sweep log does not report what the InfluxDB sink filtered:\n%s", out)
+	}
+	if m[1] != "0" {
+		t.Errorf("the log credits InfluxDB with writing %s job log points: %s", m[1], m[0])
+	}
+	if m[2] == "0" {
+		t.Errorf("the log reports nothing filtered, so nothing was offered: %s", m[0])
 	}
 }
 

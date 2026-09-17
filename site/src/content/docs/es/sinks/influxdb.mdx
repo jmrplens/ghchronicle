@@ -66,6 +66,22 @@ Nombra las medidas que este destino no debe recibir. Por omisión es
 líneas de salida de compilación en una base de datos de métricas es mucho
 almacenamiento para algo que nadie va a consultar como número.
 
+Una medida excluida se recoge igual y se le ofrece igual a este destino, así que
+el log de la pasada dice lo que aceptó la base de datos y no lo que se le
+entregó:
+
+```text
+level=INFO msg=written sink=influxdb family=joblogs points=0 unchanged=0 filtered=440
+```
+
+`points` es lo que se escribió, `unchanged` lo que el registro de escrituras ya
+había enviado, y `filtered` lo que este destino descartó: una medida nombrada
+aquí, y cualquier punto que no lleve ningún campo que el protocolo de línea
+pueda representar. La clave solo aparece cuando hay algo que contar, y el total
+de la pasada se imprime una vez al final. Hasta que se contó, la línea decía
+`points=440` de una medida de la que la base de datos no ha tenido nunca una
+fila.
+
 ## Los tipos de columna se fijan al primer contacto
 
 <Aside type="danger" title="InfluxDB 3 no deja que un nombre cambie de bando">

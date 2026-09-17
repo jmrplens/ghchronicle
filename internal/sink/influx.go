@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync/atomic"
 	"time"
 )
 
@@ -29,6 +30,10 @@ type Influx struct {
 	// in a metrics database.
 	Exclude map[string]bool
 	client  *http.Client
+	// filtered counts the points this sink dropped instead of writing, which
+	// is what makes the difference between what it was offered and what the
+	// database holds readable from outside. See Filtering.
+	filtered atomic.Uint64
 }
 
 // NewInflux returns a sink. A zero batch means 5000 lines per request.
@@ -48,6 +53,12 @@ func NewInflux(url, token, org, bucket string, batch int, timeout time.Duration)
 func (i *Influx) Name() string { return "influxdb" }
 func (i *Influx) Close() error { return nil }
 
+// Filtered counts the points this sink has dropped rather than written: a
+// measurement named by Exclude, and a point carrying no field the line
+// protocol can render. Both are decisions this sink makes after the point was
+// handed to it, so nothing outside can count them.
+func (i *Influx) Filtered() uint64 { return i.filtered.Load() }
+
 func (i *Influx) Write(ctx context.Context, points []Point) error {
 	lines := make([]string, 0, len(points))
 	for _, p := range points {
@@ -57,6 +68,9 @@ func (i *Influx) Write(ctx context.Context, points []Point) error {
 		if l := LineProtocol(p); l != "" {
 			lines = append(lines, l)
 		}
+	}
+	if dropped := len(points) - len(lines); dropped > 0 {
+		i.filtered.Add(uint64(dropped))
 	}
 	rejected := 0
 	for start := 0; start < len(lines); start += i.Batch {

@@ -217,6 +217,20 @@ which is text meant for a log store: writing thousands of lines of build output
 into a metrics database is a lot of storage for something nobody will query as
 a number.
 
+An excluded measurement is still collected and still offered to this sink, so
+the sweep log says what the database took rather than what it was handed:
+
+```text
+level=INFO msg=written sink=influxdb family=joblogs points=0 unchanged=0 filtered=440
+```
+
+`points` is what was written, `unchanged` what the write ledger had already
+sent, and `filtered` what this sink dropped: a measurement named here, and any
+point carrying no field the line protocol can render. The key appears only when
+there is something to report, and the sweep's own total is printed once at the
+end. Until this was counted the line read `points=440` for a measurement the
+database has never held a row of.
+
 ### Column types are fixed on first sight
 
 > **InfluxDB 3 will not let a name change side**

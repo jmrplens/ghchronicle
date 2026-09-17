@@ -45,6 +45,23 @@ type Sink interface {
 	Close() error
 }
 
+// Filtering is a sink that writes only part of what it is offered and counts
+// the rest. The count is cumulative over the sink's life, so a caller reads it
+// before a write and again after, and the difference is what that write left
+// out.
+//
+// It exists because the caller cannot see it otherwise. A sink filters inside
+// its own Write, past the point where anything else can look, so a log line
+// counting what was handed over reports points the store never received:
+// production logged 440 points of gh_job_log delivered to InfluxDB, which
+// excludes that measurement by default and has never held a row of it. A sink
+// that writes everything it is given implements nothing and is counted whole.
+type Filtering interface {
+	// Filtered counts the points this sink has dropped rather than written,
+	// since it was created.
+	Filtered() uint64
+}
+
 // LineProtocol renders a point as InfluxDB line protocol.
 //
 // Tag values are escaped, never rewritten: a space in "Cloudflare, Inc." has to

@@ -366,6 +366,18 @@ func (u *Unchanged) Write(ctx context.Context, points []Point) error {
 	return nil
 }
 
+// Filtered reports what the wrapped sink dropped rather than wrote. The
+// ledger sits in front of that sink, so without this the wrapper would hide
+// the wrapped sink's own filtering from anything counting the pair: see
+// Filtering. A wrapped sink that writes everything it is given reports
+// nothing.
+func (u *Unchanged) Filtered() uint64 {
+	if f, ok := u.inner.(Filtering); ok {
+		return f.Filtered()
+	}
+	return 0
+}
+
 // Dropped reports how many points this sink was spared since it started.
 func (u *Unchanged) Dropped() uint64 {
 	u.mu.Lock()

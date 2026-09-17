@@ -423,6 +423,10 @@ func (r *Runner) finish() {
 			r.Log.Info("points already written and not sent again",
 				"sink", u.Name(), "skipped", u.Dropped())
 		}
+		if f, ok := s.(sink.Filtering); ok && f.Filtered() > 0 {
+			r.Log.Info("points the sink did not write",
+				"sink", s.Name(), "filtered", f.Filtered())
+		}
 	}
 	r.Log.Info("sweep finished")
 }
@@ -864,6 +868,15 @@ func (r *Runner) emit(ctx context.Context, family string, points []sink.Point) {
 		if u, ok := s.(*sink.Unchanged); ok {
 			filter, before = u, u.Dropped()
 		}
+		// And a sink that drops points of its own reports those too, for the
+		// same reason and one step further in: InfluxDB excludes gh_job_log by
+		// default, and until this was read the line said 440 points written to
+		// a database that has never held one.
+		var selective sink.Filtering
+		filteredBefore := uint64(0)
+		if f, ok := s.(sink.Filtering); ok {
+			selective, filteredBefore = f, f.Filtered()
+		}
 		err := s.Write(ctx, points)
 		if rejected, ok := errors.AsType[*sink.RejectedError](err); ok {
 			// Everything parseable was written. The lines themselves are
@@ -894,6 +907,20 @@ func (r *Runner) emit(ctx context.Context, family string, points []sink.Point) {
 			// out of the log line instead of reporting a negative total.
 			skipped = min(filter.Dropped()-before, written)
 			written -= skipped
+		}
+		filtered := uint64(0)
+		if selective != nil {
+			// The same cumulative counter and the same bound, over what is
+			// left after the ledger: the sink only ever saw those.
+			filtered = min(selective.Filtered()-filteredBefore, written)
+			written -= filtered
+		}
+		if filtered > 0 {
+			// Said only when there is something to say, so the key appears
+			// exactly where the question "where did the rest go" arises.
+			r.Log.Info("written", "sink", s.Name(), "family", family,
+				"points", written, "unchanged", skipped, "filtered", filtered)
+			continue
 		}
 		r.Log.Info("written", "sink", s.Name(), "family", family,
 			"points", written, "unchanged", skipped)

@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -311,5 +312,80 @@ func TestIsParseRejectionNeedsAnError(t *testing.T) {
 	}
 	if isParseRejection(errors.New("503 Service Unavailable")) {
 		t.Error("a server failure was read as a parse rejection")
+	}
+}
+
+// TestInfluxCountsWhatItDidNotWrite: the sink is the only thing that knows
+// what its own exclude dropped, and the sweep's log line counts on it to say
+// what the database took. Without it production logged 440 points of
+// gh_job_log written to a database that excludes the measurement by default
+// and has never held a row of it.
+func TestInfluxCountsWhatItDidNotWrite(t *testing.T) {
+	t.Parallel()
+	s, url := newInfluxServer(t, 0)
+	i := NewInflux(url, "tok", "acme", "gh", 0, time.Second)
+	i.Exclude = map[string]bool{"gh_job_log": true}
+	offered := []Point{
+		star("a"),
+		{Measurement: "gh_job_log", Tags: map[string]string{"repo": "a"}, Fields: map[string]any{"line": "x"}},
+		{Measurement: "gh_job_log", Tags: map[string]string{"repo": "b"}, Fields: map[string]any{"line": "y"}},
+		// No field the line protocol can render, so this one is not written
+		// either and is counted the same way.
+		{Measurement: "gh_star", Tags: map[string]string{"repo": "c"}},
+	}
+	if err := i.Write(t.Context(), offered); err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+	if got := len(s.written()); got != 1 {
+		t.Fatalf("%d lines reached the database, want the one star", got)
+	}
+	if got := i.Filtered(); got != 3 {
+		t.Errorf("Filtered() = %d after offering 4 points and writing 1, want 3", got)
+	}
+	// Cumulative over the sink's life, which is what lets a caller read it
+	// around one write and report the difference.
+	if err := i.Write(t.Context(), []Point{star("d")}); err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+	if got := i.Filtered(); got != 3 {
+		t.Errorf("Filtered() = %d after a write that dropped nothing, want it unmoved at 3", got)
+	}
+}
+
+// TestTheLedgerDoesNotHideWhatTheSinkBehindItDropped: production wraps the
+// InfluxDB sink in the write ledger, so a caller holding the pair sees the
+// wrapper. If the wrapper answered for itself, the exclude would be invisible
+// again.
+func TestTheLedgerDoesNotHideWhatTheSinkBehindItDropped(t *testing.T) {
+	t.Parallel()
+	_, url := newInfluxServer(t, 0)
+	i := NewInflux(url, "tok", "acme", "gh", 0, time.Second)
+	i.Exclude = map[string]bool{"gh_job_log": true}
+	wrapped := OnlyChanged(i, LoadLedger(filepath.Join(t.TempDir(), "ledger.bin"), 0, 0))
+	if err := wrapped.Write(t.Context(), []Point{
+		star("a"),
+		{Measurement: "gh_job_log", Tags: map[string]string{"repo": "a"}, Fields: map[string]any{"line": "x"}},
+	}); err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+	filtering, ok := wrapped.(Filtering)
+	if !ok {
+		t.Fatal("the wrapped sink does not report what it filtered")
+	}
+	if got := filtering.Filtered(); got != 1 {
+		t.Errorf("Filtered() through the ledger = %d, want the one excluded point", got)
+	}
+}
+
+// TestASinkThatWritesEverythingReportsNothingFiltered: the ledger wrapping a
+// sink with no filtering of its own must not invent a count.
+func TestASinkThatWritesEverythingReportsNothingFiltered(t *testing.T) {
+	t.Parallel()
+	wrapped := OnlyChanged(newStdout(io.Discard), LoadLedger(filepath.Join(t.TempDir(), "ledger.bin"), 0, 0))
+	if err := wrapped.Write(t.Context(), []Point{star("a")}); err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+	if got := wrapped.(Filtering).Filtered(); got != 0 {
+		t.Errorf("Filtered() = %d for a sink that writes everything, want 0", got)
 	}
 }

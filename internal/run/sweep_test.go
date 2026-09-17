@@ -307,3 +307,73 @@ func TestServeSweepsUntilCanceled(t *testing.T) {
 		t.Fatal("Serve did not return after its context ended")
 	}
 }
+
+// excluding is a sink that writes only some of what it is offered and counts
+// the rest, which is what the InfluxDB sink does with its `exclude` list.
+type excluding struct {
+	captured
+	skip     string
+	filtered uint64
+}
+
+func (e *excluding) Write(ctx context.Context, points []sink.Point) error {
+	var kept []sink.Point
+	for _, p := range points {
+		if p.Measurement == e.skip {
+			e.filtered++
+			continue
+		}
+		kept = append(kept, p)
+	}
+	return e.captured.Write(ctx, kept)
+}
+
+func (e *excluding) Filtered() uint64 { return e.filtered }
+
+// TestASinkThatDropsPointsIsNotCreditedWithWritingThem is the log line the
+// review of 2026-09-17 was misled by: production read
+// "sink=influxdb family=joblogs points=440 unchanged=0" for 440 points of
+// gh_job_log, which that sink excludes by default and which the database has
+// never held a row of. The count is what the store took.
+func TestASinkThatDropsPointsIsNotCreditedWithWritingThem(t *testing.T) {
+	t.Parallel()
+	skipping := &excluding{skip: "gh_job_log"}
+	skipping.name = "influxdb"
+	ledger := sink.LoadLedger(filepath.Join(t.TempDir(), "ledger.bin"), 0, 0)
+	r, _, log := fakeRunner(t, sink.OnlyChanged(skipping, ledger))
+	logLine := func(m string) sink.Point {
+		return sink.Point{
+			Measurement: m, Tags: map[string]string{"repo": "a"},
+			Fields: map[string]any{"lines": 1}, Time: time.Unix(1700000000, 0),
+		}
+	}
+	r.emit(t.Context(), "joblogs", []sink.Point{logLine("gh_job_log"), logLine("gh_workflow_job")})
+	if got := skipping.measured("gh_job_log"); got != 0 {
+		t.Fatalf("the sink wrote %d excluded points, so this test proves nothing", got)
+	}
+	want := `msg=written sink=influxdb family=joblogs points=1 unchanged=0 filtered=1`
+	if !strings.Contains(log.String(), want) {
+		t.Errorf("the log does not say\n%s\nin\n%s", want, log)
+	}
+	// And the sweep's own total, once, at the end.
+	r.finish()
+	if !strings.Contains(log.String(), `msg="points the sink did not write" sink=influxdb filtered=1`) {
+		t.Errorf("finish does not report what the sink dropped:\n%s", log)
+	}
+}
+
+// TestASinkThatWritesEverythingSaysNothingAboutFiltering keeps the key out of
+// every other line: a sweep writing five families to five stores would
+// otherwise carry a zero on every one of them.
+func TestASinkThatWritesEverythingSaysNothingAboutFiltering(t *testing.T) {
+	t.Parallel()
+	r, _, log := fakeRunner(t, &captured{name: "plain"})
+	r.emit(t.Context(), "stars", []sink.Point{{
+		Measurement: "gh_star", Tags: map[string]string{"repo": "a"},
+		Fields: map[string]any{"starred": 1}, Time: time.Unix(1700000000, 0),
+	}})
+	r.finish()
+	if strings.Contains(log.String(), "filtered=") {
+		t.Errorf("a sink that wrote everything reported filtering:\n%s", log)
+	}
+}
