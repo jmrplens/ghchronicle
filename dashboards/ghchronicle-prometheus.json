@@ -11763,7 +11763,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo, sku, unit) (github_billing_usage_quantity{repo!=\"\"})",
+              "expr": "sum by (repo, sku, unit) (github_billing_usage_quantity{repo!=\"(none)\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -11772,7 +11772,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo, sku, unit) (github_billing_usage_price_per_unit{repo!=\"\"})",
+              "expr": "max by (repo, sku, unit) (github_billing_usage_price_per_unit{repo!=\"(none)\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -11781,7 +11781,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo, sku, unit) (github_billing_usage_gross{repo!=\"\"})",
+              "expr": "sum by (repo, sku, unit) (github_billing_usage_gross{repo!=\"(none)\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -11790,7 +11790,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo, sku, unit) (github_billing_usage_net{repo!=\"\"})",
+              "expr": "sum by (repo, sku, unit) (github_billing_usage_net{repo!=\"(none)\"})",
               "format": "table",
               "instant": true,
               "range": false,

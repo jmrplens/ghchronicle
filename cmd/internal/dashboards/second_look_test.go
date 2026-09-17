@@ -219,3 +219,81 @@ func checkPieLegend(t *testing.T, store string, p map[string]any) {
 		t.Errorf("%s: %q has a %v legend placed %v, and only a bottom list wraps on a phone", store, title, legend["displayMode"], legend["placement"])
 	}
 }
+
+// TestEveryGraphiteTableReducesItsSeriesToRows is the shape a Graphite table
+// has to have, and the one thing that says so.
+//
+// Grafana renders a Graphite frame as it arrives: a time column and one column
+// per series, headed with the series name. That is a chart, not a table, and a
+// table panel given it draws one row per storage slot, seven hundred and twenty
+// of them over a thirty day range at hourly resolution, under a heading that is
+// the whole target expression. Every Graphite table here is therefore built by
+// gTbl, which adds the reduce that turns each series into one row and the
+// organize that names its columns.
+//
+// One was not, and only a rendered picture showed it: "Downloads gained" was
+// handed a bare target, so it drew those seven hundred and twenty rows and an
+// empty column headed nonNegativeDerivative(github.release_asset...). The panel
+// query answered, every offline check passed, and its own description promised
+// the reduced shape it did not have.
+func TestEveryGraphiteTableReducesItsSeriesToRows(t *testing.T) {
+	t.Parallel()
+	tables := 0
+	for title, p := range rendered(t, "graphite") {
+		if p["type"] != "table" || len(targetList(p)) == 0 {
+			continue
+		}
+		tables++
+		if !reducesToRows(p) {
+			t.Errorf("the Graphite table %q has no reduce transformation, so Grafana draws it as "+
+				"one row per storage slot under the target expression: %s",
+				title, asJSON(t, p["transformations"]))
+		}
+		// And the other half of the shape: Graphite answers for a path whose
+		// only point is older than the range with a row of nulls, which a
+		// reducer turns into NaN or 0 and a reader into a measurement of
+		// something that is not there.
+		for _, raw := range targetList(p) {
+			target, _ := raw.(map[string]any)
+			expr, _ := target["target"].(string)
+			if !strings.HasPrefix(expr, "removeEmptySeries(") {
+				t.Errorf("the Graphite table %q keeps the series that hold nothing in the "+
+					"range, so it draws a row of NaN for each: %s", title, expr)
+			}
+		}
+	}
+	if tables == 0 {
+		t.Fatal("no Graphite table was examined, so this checks nothing")
+	}
+}
+
+// targetList is a panel's targets, whatever concrete type the builder left
+// them in. A panel with none is the text note a store that cannot answer a
+// panel is given.
+func targetList(p map[string]any) []any {
+	switch list := p["targets"].(type) {
+	case []any:
+		return list
+	case []map[string]any:
+		out := make([]any, len(list))
+		for i, target := range list {
+			out[i] = target
+		}
+		return out
+	default:
+		return nil
+	}
+}
+
+// reducesToRows reports whether a panel carries the reduce transformation that
+// turns a series list into one row each.
+func reducesToRows(p map[string]any) bool {
+	list, _ := p["transformations"].([]any)
+	for _, raw := range list {
+		tf, _ := raw.(map[string]any)
+		if tf["id"] == "reduce" {
+			return true
+		}
+	}
+	return false
+}

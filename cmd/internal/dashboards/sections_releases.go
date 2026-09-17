@@ -47,6 +47,19 @@ func releases(b *builder) []Panel {
 	assetsGR, assetsGRtf := gTbl(topRows(rp(ra, "downloads"), 40,
 		gn(ra, "repo"), gn(ra, "tag"), gn(ra, "asset")),
 		"Asset", []col{{"lastNotNull", "Downloads"}})
+	// The same shape for the panel below, and it is the shape that was
+	// missing. A Graphite target handed to a table panel with no reduction is
+	// rendered as the frame it is, one row per storage slot: this drew seven
+	// hundred and twenty hourly rows under a single column headed with the
+	// whole expression, while its own description promised the one row per
+	// series every other Graphite table here gives. The sum of a
+	// nonNegativeDerivative over the range is what the SQL twin computes as
+	// the last value less the first.
+	gainedGR, gainedGRtf := gTbl(rowsOf(fmt.Sprintf(
+		`limit(sortBy(nonNegativeDerivative(%s), "sum", true), 25)`,
+		rp(ra, "downloads"),
+	), gn(ra, "repo"), gn(ra, "tag"), gn(ra, "asset")),
+		"Asset", []col{{"sum", "Gained"}})
 	assetsES, assetsEStf := esTbl(ra, []any{b.tm("repo", 50), b.tm("tag", 500), b.tm("asset", 40), b.tmURL()},
 		[]any{b.mNewest("downloads", "size_bytes")},
 		[]named{
@@ -146,12 +159,9 @@ func releases(b *builder) []Panel {
 				barCell("Gained", "short", 120), width("Asset", 200),
 				width("Tag", 110), downloadColumn(),
 			},
-			GR: []Target{grq(fmt.Sprintf(
-				`limit(sortBy(nonNegativeDerivative(%s), "sum", true), 25)`,
-				rp("gh_release_asset", "downloads"),
-			))},
-			GRDesc: "Graphite differentiates the series itself, and names each one by its " +
-				"whole path rather than in columns. " + grRows,
+			GR: gainedGR, GRTF: gainedGRtf,
+			GRDesc: "Graphite names each row repository, tag and asset from the path, and " +
+				"differentiates the series itself. " + grRows,
 			ESNote: cannot("the downloads each asset gained across the range, as the difference "+
 				"between the first and last value of a cumulative counter.",
 				"The Elasticsearch datasource has no derivative across a terms "+

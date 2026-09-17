@@ -819,6 +819,12 @@ func TestEveryStoreExcludesTheSentinelTheSameWay(t *testing.T) {
 		// Inside the JSON the pattern's backslash is escaped once more.
 		{store: "graphite", want: `exclude(aliasByNode(github.billing_usage.*.*.*.*.*.*.*.gross, 5, 6), \"^_none_\\.\")`},
 		{store: "elasticsearch", want: `NOT repo.keyword:\"(none)\"`},
+		// The fifth store, added after it was found still asking for a label
+		// that is not empty while the other four had been corrected. The
+		// sentinel is not empty, so the seat was a repository called (none)
+		// here and nowhere else, and this list not having a Prometheus row is
+		// the whole reason nothing said so.
+		{store: "prometheus", want: `github_billing_usage_gross{repo!=\"(none)\"}`},
 	} {
 		panel := mustPanel(t, rendered(t, tc.store), "Usage by repository")
 		// The SQL is read as SQL: inside the JSON its comparison operator is

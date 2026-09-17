@@ -19,6 +19,22 @@ const (
 	costSumSeries      = "sumSeries("
 )
 
+// promByRepo is one column of the cost table in Prometheus: a billing field
+// aggregated by repository, SKU and unit, with the charge that belongs to no
+// repository left out.
+//
+// The exclusion is written here rather than inline because it is the fourth
+// spelling of one rule and the one that was missed: the SQL stores compare the
+// value, Graphite matches the path node and Elasticsearch negates a term, and
+// all three were corrected to the sentinel the collectors really write while
+// this store went on asking for a label that is not empty. The sentinel is not
+// empty, so the Copilot seat stayed in the table as a repository called (none)
+// here alone.
+func promByRepo(field, aggregation string) string {
+	return fmt.Sprintf("%s by (repo, sku, unit) (github_billing_usage_%s{repo!=%q})",
+		aggregation, field, noneValue)
+}
+
 func cost(b *builder) []Panel {
 	bu := "gh_billing_usage"
 
@@ -28,8 +44,8 @@ func cost(b *builder) []Panel {
 	// A charge that belongs to no repository is not a repository called
 	// (none), so it is left out of a table of repositories. The sentinel is
 	// what the row carries: `repo <> ''` matched every row, so the Copilot
-	// seat was listed here as a repository, and the two twins below missed it
-	// in their own spellings.
+	// seat was listed here as a repository, and the three twins below missed
+	// it in their own spellings.
 	byRepo := `SELECT repo AS "Repository", SUM(gross) AS "Gross", sku AS "SKU",` +
 		` SUM(quantity) AS "Quantity", MAX(unit) AS "Unit",` +
 		` MAX(price_per_unit) AS "Price", SUM(net) AS "Net"` +
@@ -148,10 +164,10 @@ func cost(b *builder) []Panel {
 			}),
 		panel("table", "Usage by repository", box{W: 24, H: 9, X: 0, Y: 12}, []Target{sqlT(byRepo)}, &P{
 			Prom: []Target{
-				promTbl(`sum by (repo, sku, unit) (github_billing_usage_quantity{repo!=""})`, "A"),
-				promTbl(`max by (repo, sku, unit) (github_billing_usage_price_per_unit{repo!=""})`, "B"),
-				promTbl(`sum by (repo, sku, unit) (github_billing_usage_gross{repo!=""})`, "C"),
-				promTbl(`sum by (repo, sku, unit) (github_billing_usage_net{repo!=""})`, "D"),
+				promTbl(promByRepo("quantity", "sum"), "A"),
+				promTbl(promByRepo("price_per_unit", "max"), "B"),
+				promTbl(promByRepo("gross", "sum"), "C"),
+				promTbl(promByRepo("net", "sum"), "D"),
 			},
 			PromTF: merged(map[string]string{
 				"repo": "Repository", "sku": "SKU", "unit": "Unit",

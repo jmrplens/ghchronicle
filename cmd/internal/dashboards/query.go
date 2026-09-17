@@ -443,6 +443,25 @@ var reducers = map[string]string{
 // Grafana's reduce transformation emits the columns in the order given.
 type col struct{ Reducer, Name string }
 
+// removeEmptySeries drops the series that hold nothing inside the range.
+//
+// Graphite answers for every path that exists, whatever the range: a series
+// whose only point is older than the window comes back as a full row of nulls
+// rather than not at all. Reduced to a table that is a row per such path, and
+// what it says depends on the reducer, none of it true: `NaN` from a mean or a
+// last value, `0` from a count. Nine tables drew one, and each of them was a
+// fork made in 2024, an alert closed in July, a sponsorship from 2021 or a
+// contribution year before this one, listed beside the rows that do have a
+// point with a number that reads like a measurement of them.
+//
+// The SQL stores have nothing to do here: no row in the range is no row in the
+// result. This is the same sentence in Graphite, and it goes around every
+// table rather than around the nine, because the next table would have the
+// same hole and nothing would say so.
+func removeEmptySeries(expr string) string {
+	return "removeEmptySeries(" + expr + ")"
+}
+
 func gTbl(expr, name string, cols []col) (targets []Target, tf []any) {
 	names := map[string]any{"Field": name}
 	list := make([]any, len(cols))
@@ -450,7 +469,7 @@ func gTbl(expr, name string, cols []col) (targets []Target, tf []any) {
 		list[i] = c.Reducer
 		names[reducers[c.Reducer]] = c.Name
 	}
-	return []Target{grq(expr)}, []any{
+	return []Target{grq(removeEmptySeries(expr))}, []any{
 		map[string]any{"id": "reduce", "options": map[string]any{
 			"mode": "seriesToRows", "reducers": list, "includeTimeField": false,
 		}},
