@@ -469,4 +469,17 @@ func TestNoRowDatedInThePastMovesWithTheClock(t *testing.T) {
 	if shared < 100 {
 		t.Fatalf("only %d past-dated rows were written by both sweeps, so this checks almost nothing", shared)
 	}
+	// And the two sweeps must write the same set of past-dated rows, not just
+	// agree on the ones they share. A field taken from the clock keeps the
+	// row's identity and is caught above; its two neighbors move it and would
+	// otherwise fall out of the comparison unseen. A clock-derived tag forks
+	// the series as well as rewriting the partition, which is worse than the
+	// field form, and a rolling anchor such as now.AddDate(0, 0, -7) writes a
+	// past-dated row into a different old partition every sweep. Both show up
+	// here as a row one sweep wrote and the other did not.
+	if len(before) != shared || len(after) != shared {
+		t.Errorf("the two sweeps wrote %d and %d past-dated rows and agree on %d: "+
+			"a row whose identity moves with the clock is a tag or a timestamp taken from it",
+			len(before), len(after), shared)
+	}
 }
