@@ -1,6 +1,8 @@
 ---
 title: Windows
 description: "El camino completo en Windows: el zip, PowerShell y cmd, una tarea programada y lo que de verdad cambia allí."
+compactTables:
+  - $env:PROCESSOR_ARCHITECTURE
 ---
 
 import { Steps, Tabs, TabItem, Aside, FileTree } from "@astrojs/starlight/components";
@@ -16,13 +18,16 @@ de `cmd` al lado siempre que las dos difieran.
 Lee esto primero. Cuatro de las cinco líneas de abajo son la razón de que una
 orden copiada de una página de Linux no funcione.
 
-| | En Windows |
-| --- | --- |
-| El programa | `ghchronicle.exe`. Escribir `ghchronicle` lo encuentra, porque `PATHEXT` lista `.EXE` |
-| Dependencias en ejecución | Ninguna. El binario se compila con `CGO_ENABLED=0`, así que no hay runtime de C que instalar |
-| Pararlo | Ctrl+C en su consola. No hay señal que enviarle, y `taskkill /F` lo termina sin cerrar sus destinos |
-| Rutas en la configuración | Una barra invertida dentro de un escalar YAML entre comillas dobles es un escape. Usa barras normales |
-| Ejecución desatendida | Una tarea programada. El binario no es un servicio del Administrador de control de servicios |
+- **El programa** es `ghchronicle.exe`. Escribir `ghchronicle` lo encuentra,
+  porque `PATHEXT` lista `.EXE`.
+- **Dependencias en ejecución**: ninguna. El binario se compila con
+  `CGO_ENABLED=0`, así que no hay runtime de C que instalar.
+- **Pararlo** es Ctrl+C en su consola. No hay señal que enviarle, y
+  `taskkill /F` lo termina sin cerrar sus destinos.
+- **Rutas en la configuración**: una barra invertida dentro de un escalar YAML
+  entre comillas dobles es un escape. Usa barras normales.
+- **Ejecución desatendida**: una tarea programada. El binario no es un servicio
+  del Administrador de control de servicios.
 
 ## Elegir el archivo
 
@@ -354,10 +359,10 @@ Start-ScheduledTask -TaskName ghchronicle
 Get-ScheduledTaskInfo -TaskName ghchronicle   # última ejecución, último resultado
 ```
 
-`Stop-ScheduledTask` termina el proceso en vez de pedirle que acabe, que es el
-`taskkill /F` de la primera tabla con otro nombre. En la forma con
-temporizador no hay nada que parar, que es buena parte de por qué es la mejor
-opción por omisión.
+`Stop-ScheduledTask` termina el proceso en vez de pedirle que acabe: es
+`taskkill /F` con otro nombre, y no cierra ningún destino al salir. En la forma
+con temporizador no hay nada que parar, que es buena parte de por qué es la
+mejor opción por omisión.
 
 <Aside type="note" title="Dónde va el log">
   Una tarea no tiene consola, así que el log tiene que ser un fichero: pon

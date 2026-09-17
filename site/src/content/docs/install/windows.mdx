@@ -1,6 +1,8 @@
 ---
 title: Windows
 description: "The whole path on Windows: the zip, PowerShell and cmd, a scheduled task, and what is genuinely different there."
+compactTables:
+  - $env:PROCESSOR_ARCHITECTURE
 ---
 
 import { Steps, Tabs, TabItem, Aside, FileTree } from "@astrojs/starlight/components";
@@ -15,13 +17,16 @@ written for PowerShell, with the `cmd` form beside it wherever the two differ.
 Read this first. Four of the five lines below are the reason a command copied
 from a Linux page does not work.
 
-| | On Windows |
-| --- | --- |
-| The program | `ghchronicle.exe`. Typing `ghchronicle` finds it, because `PATHEXT` lists `.EXE` |
-| Runtime dependencies | None. The binary is built `CGO_ENABLED=0`, so there is no C runtime to install |
-| Stopping it | Ctrl+C in its console. There is no signal to send it, and `taskkill /F` ends it without closing its sinks |
-| Paths in the configuration | A backslash inside a double-quoted YAML scalar is an escape. Use forward slashes |
-| Running unattended | A scheduled task. The binary is not a Service Control Manager service |
+- **The program** is `ghchronicle.exe`. Typing `ghchronicle` finds it, because
+  `PATHEXT` lists `.EXE`.
+- **Runtime dependencies**: none. The binary is built `CGO_ENABLED=0`, so there
+  is no C runtime to install.
+- **Stopping it** is Ctrl+C in its console. There is no signal to send it, and
+  `taskkill /F` ends it without closing its sinks.
+- **Paths in the configuration**: a backslash inside a double-quoted YAML
+  scalar is an escape. Use forward slashes.
+- **Running unattended** is a scheduled task. The binary is not a Service
+  Control Manager service.
 
 ## Pick the archive
 
@@ -345,9 +350,10 @@ Start-ScheduledTask -TaskName ghchronicle
 Get-ScheduledTaskInfo -TaskName ghchronicle   # last run, last result
 ```
 
-`Stop-ScheduledTask` ends the process rather than asking it to finish, which is
-the `taskkill /F` of the first table by another name. In the timer shape there
-is nothing to stop, which is most of why it is the better default.
+`Stop-ScheduledTask` ends the process rather than asking it to finish: it is
+`taskkill /F` by another name, and it closes no sink on its way out. In the
+timer shape there is nothing to stop, which is most of why it is the better
+default.
 
 <Aside type="note" title="Where the log goes">
   A task has no console, so the log has to be a file: set `log.file` in the

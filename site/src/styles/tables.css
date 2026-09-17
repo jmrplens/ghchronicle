@@ -439,6 +439,38 @@
 	}
 }
 
+/* The same treatment for the one heading a two-column COMPACT table
+ * repeats. Compact, a heading is printed inline before its value, and on a
+ * table of three or more columns that is what keeps the supporting line
+ * meaning anything once the columns are gone: "Animated no · Loops no" needs
+ * both words. On a two-column table there is one heading and it prints on
+ * every row, which is the complaint this register was built to answer: six
+ * rows of `WHAT IT MEANS HERE` down a glossary, three of `MEANS` down a list
+ * of exit codes. The table has one column after the name, the reader can see
+ * it, and a word repeated once per row is noise rather than a label.
+ *
+ * Clipped rather than removed, for the reason the default label above is:
+ * `thead` computes to `display: none` in both narrow forms (measured), so the
+ * column header has already left the accessibility tree and this generated
+ * word is the only thing left naming the column for a screen reader. Deleting
+ * it would take the column name with it. Clipped, the row still reads
+ * "0, Means, The sweep ran".
+ *
+ * `[data-columns="2"]` is the whole condition, and it is written on the
+ * container the plugin already counts the columns onto, so a table that grows
+ * a third column gets its headings back without anybody remembering to say
+ * so. */
+.sl-markdown-content
+	.table-scroll[data-form="compact"][data-columns="2"]
+	> table
+	td[data-label]::before {
+	position: var(--table-stacked) absolute;
+	width: var(--table-stacked) 1px;
+	height: var(--table-stacked) 1px;
+	overflow: var(--table-stacked) hidden;
+	clip-path: var(--table-stacked) inset(50%);
+}
+
 /* ------------------------------------------------------------
  * The breakpoints: the same thirteen declarations, once per column
  * count, each at the floor that column count needs. The last one
