@@ -109,6 +109,12 @@ func word(t *testing.T, n, i int, capital bool) string {
 // numbers, where numericFields holds twelve. The layout counts joined it when
 // every other registry fact on the page stopped being hand-written, which left
 // them the only ones a fourteenth layout could have falsified in silence.
+//
+// The page is prose wrapped at about seventy-six columns, so a claim can be
+// split across two lines by an edit that does not touch a word of it. The body
+// is read with its runs of whitespace collapsed for that reason: a test that
+// pins a sentence has to survive the sentence being rewrapped, or it fails for
+// the one reason it is not about.
 func TestEveryCountWrittenInProseMatchesTheCode(t *testing.T) {
 	layouts := Layouts()
 	loopers := 0
@@ -118,15 +124,14 @@ func TestEveryCountWrittenInProseMatchesTheCode(t *testing.T) {
 		}
 	}
 	for i, path := range layoutFieldTables {
-		body, err := os.ReadFile(path)
+		raw, err := os.ReadFile(path)
 		if err != nil {
 			t.Fatalf("%s: %v", path, err)
 		}
+		body := strings.Join(strings.Fields(string(raw)), " ")
 		fields := word(t, len(numericFields), i, true)
 		all := word(t, len(Fields()), i, false)
 		every := word(t, len(layouts), i, true)
-		these := word(t, len(layouts), i, false)
-		still := word(t, len(layouts)-loopers, i, false)
 		two := word(t, loopers, i, false)
 		claims := [][2]string{
 			// "Twelve of the fifteen fields are numbers", above the table of
@@ -134,13 +139,21 @@ func TestEveryCountWrittenInProseMatchesTheCode(t *testing.T) {
 			{fields + " of the " + all, fields + " de los " + all},
 			// The frontmatter description of the page.
 			{every + " layouts", every + " diseños"},
-			// The note on looping, which counts both sides of it.
-			{"Only " + two + " layouts loop", "Solo " + two + " diseños hacen bucle"},
-			{still + " of these " + these + " layouts", still + " de estos " + these + " diseños"},
+			// The Motion section, which names how many layouts have motion
+			// that ends nothing. It used to count the other side too, as
+			// "eleven of these thirteen", and that sentence is gone: the
+			// section now says loop draws what once draws on every layout but
+			// those two, which is the same fact without the arithmetic. The
+			// count that is left is the one a fourteenth looping layout would
+			// falsify.
+			{
+				"but the " + two + " whose motion ends nothing",
+				"salvo los " + two + " cuyo movimiento no termina",
+			},
 		}
 		for _, claim := range claims {
 			want := claim[i]
-			if !strings.Contains(string(body), want) {
+			if !strings.Contains(body, want) {
 				t.Errorf("%s does not say %q, and the registry holds %d layouts, "+
 					"%d of which loop, and %d numeric fields of %d. Correct the page",
 					path, want, len(layouts), loopers, len(numericFields), len(Fields()))
