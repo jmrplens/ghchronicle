@@ -1,9 +1,11 @@
 package run
 
 import (
+	"errors"
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/jmrplens/ghchronicle/internal/sink"
 )
@@ -150,5 +152,42 @@ func TestAFamilySkippedAsNotDueWritesNoRowAtAll(t *testing.T) {
 		if p.Tags["family"] != "traffic" {
 			t.Errorf("%s is switched off and the sweep reported on it anyway", p.Tags["family"])
 		}
+	}
+}
+
+// TestAnAccountFamilyIsMarkedWhenItDeliveredSomeOfIt pins the rule that
+// replaced the one the collectors used to carry. Several account-wide families
+// read every repository in batches, and a batch lost to a 502 must not cost
+// the whole family's pass on every sweep until it comes back; a family that
+// delivered nothing at all has not run and is not marked, so the next sweep
+// asks again rather than waiting out a twelve hour cadence.
+func TestAnAccountFamilyIsMarkedWhenItDeliveredSomeOfIt(t *testing.T) {
+	t.Parallel()
+	store := &kept{}
+	r, _, log := fakeRunner(t, store)
+	now := time.Now()
+	boom := errors.New("graphql: INTERNAL: boom")
+
+	r.family(t.Context(), "totals", now, func() ([]sink.Point, error) {
+		return []sink.Point{{
+			Measurement: "gh_account_total",
+			Tags:        map[string]string{"user": "octocat"},
+			Fields:      map[string]any{"commits": 1},
+			Time:        now,
+		}}, boom
+	})
+	if _, marked := r.State.LastRun["totals"]; !marked {
+		t.Error("a family that delivered most of its rows was not marked, so the next sweep pays for it again")
+	}
+	if n := len(store.rows("gh_account_total")); n != 1 {
+		t.Errorf("%d rows reached the sink, want the one the family did collect", n)
+	}
+	if !strings.Contains(log.String(), "collector failed") {
+		t.Errorf("the failure was not reported at all:\n%s", log)
+	}
+
+	r.family(t.Context(), "profile", now, func() ([]sink.Point, error) { return nil, boom })
+	if when, marked := r.State.LastRun["profile"]; marked {
+		t.Errorf("a family that delivered nothing was marked as run at %s", when)
 	}
 }
