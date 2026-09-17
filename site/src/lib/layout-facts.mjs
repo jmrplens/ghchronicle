@@ -27,9 +27,9 @@ export const LAYOUT_FACTS_TEXT = {
 		still: "still",
 		once: "plays once",
 		loop: "plays once, or in a loop",
-		/** @param {number} width @param {number} min */
-		size: (width, min) =>
-			min > 0 ? `${width} px, minimum ${min}` : `${width} px`,
+		/** @param {number} width @param {number} min @param {number} max */
+		size: (width, min, max) =>
+			min > 0 ? `${width} px, drawn from ${min} to ${max}` : `${width} px`,
 		content: "follows its content",
 	},
 	es: {
@@ -40,9 +40,9 @@ export const LAYOUT_FACTS_TEXT = {
 		still: "quieto",
 		once: "se reproduce una vez",
 		loop: "se reproduce una vez, o en bucle",
-		/** @param {number} width @param {number} min */
-		size: (width, min) =>
-			min > 0 ? `${width} px, mínimo ${min}` : `${width} px`,
+		/** @param {number} width @param {number} min @param {number} max */
+		size: (width, min, max) =>
+			min > 0 ? `${width} px, se dibuja de ${min} a ${max}` : `${width} px`,
 		content: "sigue al contenido",
 	},
 };
@@ -51,7 +51,7 @@ export const LAYOUT_FACTS_TEXT = {
  * One registry entry, by name.
  *
  * @param {string} name the layout's name
- * @returns {{ name: string, family: string, animated: boolean, loops: boolean, width: number, minWidth: number, fields: string[] } | undefined}
+ * @returns {{ name: string, family: string, animated: boolean, loops: boolean, width: number, minWidth: number, maxWidth: number, fields: string[] } | undefined}
  */
 export const layoutNamed = (name) =>
 	layouts.find((entry) => entry.name === name);
@@ -91,9 +91,14 @@ export function factsOf(name, locale) {
 			// A width of zero is the registry saying the layout sets none:
 			// badge-row is a row of pills, and stretching it to a fixed width
 			// would put gaps in it.
+			//
+			// The two ends are the layout's own, not one figure for all of
+			// them: activity-heatmap's far end is the width at which its grid
+			// holds the year it has, because past that it would draw empty
+			// space. Read from here so that no page has to type either number.
 			values: [
 				layout.width > 0
-					? text.size(layout.width, layout.minWidth)
+					? text.size(layout.width, layout.minWidth, layout.maxWidth)
 					: text.content,
 			],
 			code: false,

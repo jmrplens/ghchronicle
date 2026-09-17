@@ -121,13 +121,13 @@ como los cuadrados verdes de GitHub, con hasta tres números al lado. El número
 de semanas no es una cifra fija: la rejilla ocupa el sitio que le dejan los
 números de al lado, así que termina donde termina la tarjeta en vez de quedarse
 a un tercio del final. Con el ancho que declara este diseño son veintitrés
-semanas, con su mínimo dieciséis, y una tarjeta dibujada a unas novecientas
-unidades dibuja el año entero que guarda el recolector. Una cuenta con cifras
-de ocho dígitos o más se lleva una columna más ancha y le deja a la rejilla una
-o dos semanas menos, que es la misma regla vista del otro lado. Las semanas aparecen
-desde la izquierda, y la ola cruza la rejilla en 0,22 s tenga las semanas que
-tenga, así que el calendario se llena como una ola de la misma duración a
-cualquier ancho.
+semanas, con su mínimo dieciséis, y `-card-width` en el extremo lejano que
+dicen sus datos dibuja el año entero que guarda el recolector. Una cuenta con
+cifras de ocho dígitos o más se lleva una columna más ancha y le deja a la
+rejilla una o dos semanas menos, que es la misma regla vista del otro lado. Las
+semanas aparecen desde la izquierda, y la ola cruza la rejilla en 0,22 s tenga
+las semanas que tenga, así que el calendario se llena como una ola de la misma
+duración a cualquier ancho.
 
 <LayoutFacts name="activity-heatmap" />
 
@@ -200,17 +200,28 @@ razonamiento está en
 
 ## Ancho
 
-Cada diseño declara su propio ancho, y un mínimo por debajo del cual se negaría
-a dibujar, y su propia sección de arriba dice los dos. Nada pide otro:
-`render.Options` tiene un campo `Width`, el binario lo deja a cero y no hay
-forma de fijarlo desde fuera, así que cada tarjeta sale con el ancho de su
-diseño. `badge-row` no declara ninguno de los dos, porque una fila de píldoras
-estirada a un ancho fijo tendría huecos; su ancho sigue al contenido.
+Cada diseño declara el ancho con el que se dibuja y los dos extremos fuera de
+los cuales se niega a hacerlo, y su propia sección de arriba dice los tres.
+`-card-width` en el binario, y `card-width` en la Action, piden otro: cualquiera
+entre los dos extremos de ese diseño. Un ancho fuera de ahí se rechaza antes de
+la pasada, nombrando los dos, y `-card-layouts` los imprime. Si no se dice nada,
+la tarjeta sale con el ancho de su diseño, que es el ancho con el que salían
+todas antes de que existiera la opción. `badge-row` no declara ninguno de los
+tres, porque una fila de píldoras estirada a un ancho fijo tendría huecos; su
+ancho sigue al contenido, y la opción ni se lo cambia ni la rechaza.
 
-Hay un diseño que lee el ancho en vez de limitarse a que lo dimensione:
-`activity-heatmap` calcula cuántas semanas del calendario de contribuciones
-puede dibujar con el sitio que le deja el ancho, así que la misma tarjeta son
-dieciséis semanas con su mínimo y un año entero si se le da sitio de sobra.
+El extremo cercano es donde una columna deja de caber. El lejano casi siempre
+es solo una defensa contra una errata, porque a un diseño con más sitio lo que
+le pasa es que reparte el mismo contenido por él, y uno al que se le pedían
+veinte mil se dibujaba de veinte mil unidades. `activity-heatmap` es el que
+tiene uno de verdad, y es la razón de que los extremos sean los de cada diseño
+y no un par para todos: lee el ancho en vez de limitarse a que lo dimensione, y
+calcula cuántas semanas del calendario de contribuciones caben en el sitio que
+le deja, así que la misma tarjeta son dieciséis semanas en su extremo cercano,
+veintitrés con el ancho que declara y el año entero que guarda el recolector en
+su extremo lejano. Más allá ya no hay calendario que dibujar, así que el
+extremo lejano es justo el ancho en el que cae el año y a la tarjeta nunca se
+le pide que llene un sitio para el que no tiene nada.
 
 ## Campos que un diseño no puede dibujar
 

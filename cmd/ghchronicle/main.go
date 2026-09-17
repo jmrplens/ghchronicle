@@ -13,7 +13,6 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime/debug"
-	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -143,11 +142,11 @@ func parseFlags(args []string, stderr io.Writer) (options, error) {
 	fs.StringVar(&o.motion, "card-motion", render.MotionOnce,
 		"how an animated layout moves: once, loop or off; a layout that does not move ignores it")
 	fs.IntVar(&o.width, "card-width", 0,
-		"card width in pixels; 0 draws the layout at its own width. -card-layouts states each layout's "+
-			"width and the minimum it refuses to go below, and no card is drawn wider than "+
-			strconv.Itoa(render.MaxWidth)+". Only activity-heatmap turns the room into more data, one more "+
-			"week of the contribution calendar at a time and a whole year at about 900; every other layout "+
-			"spreads the same content wider. badge-row ignores it: its width follows its pills")
+		"card width in pixels; 0 draws the layout at its own width. Each layout draws between two ends of "+
+			"its own and refuses anything outside them, and -card-layouts states both. Only "+
+			"activity-heatmap turns the room into more data, one more week of the contribution calendar at "+
+			"a time until the year it holds is drawn, which is also where its far end is; every other "+
+			"layout spreads the same content wider. badge-row ignores it: its width follows its pills")
 	fs.BoolVar(&o.layouts, "card-layouts", false, "list the card layouts and their fields, then exit")
 	fs.BoolVar(&o.groups, "groups", false, "list the metric groups and the families in each, then exit")
 	fs.BoolVar(&o.cardOnly, "card-only", false, "with -card, write the SVG and nothing else")
@@ -334,7 +333,7 @@ func layoutWidth(l render.Layout) string {
 	if l.Width == 0 {
 		return "width: follows its content"
 	}
-	return fmt.Sprintf("width: %d, from %d to %d", l.Width, l.MinWidth, render.MaxWidth)
+	return fmt.Sprintf("width: %d, from %d to %d", l.Width, l.MinWidth, l.MaxWidth)
 }
 
 // printGroups lists the metric groups and the families in each, so the

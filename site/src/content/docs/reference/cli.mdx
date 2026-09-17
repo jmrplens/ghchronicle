@@ -30,7 +30,7 @@ ghchronicle -config /etc/ghchronicle/config.yaml
 | `-card-motion`    | `once`        | `once`, `loop` or `off`; `loop` changes only `terminal` and `ticker`                                                                            |
 | `-card-layout`    | `summary`     | Which of the thirteen [layouts](/ghchronicle/card/layouts/) to draw                                                                             |
 | `-card-fields`    | none          | Comma-separated fields the card shows, from [the fields](/ghchronicle/card/#the-fields); empty means the layout's own default              |
-| `-card-width`     | the layout's  | Card width in pixels. Each layout draws between its own minimum and 1200, and `-card-layouts` prints both ends; `badge-row` ignores it, its width following its pills |
+| `-card-width`     | the layout's  | Card width in pixels. Each layout draws between two ends of its own, which its [section](/ghchronicle/card/layouts/) and `-card-layouts` both state; `badge-row` ignores it, its width following its pills |
 | `-card-layouts`   | off           | Print the layouts with the fields and the widths each draws, then exit                                                                     |
 
 ## The four that print and exit
@@ -80,16 +80,18 @@ otherwise be refused at start-up is accepted.
 `-card-width` is the one flag that changes what a card says rather than only
 how it looks, and on one layout only.
 [`activity-heatmap`](/ghchronicle/card/layouts/#activity-heatmap) spends the
-room on data: sixteen weeks of the contribution calendar at its minimum of 400,
+room on data: sixteen weeks of the contribution calendar at its near end,
 twenty-three at the width it declares, and the whole year the collector keeps
-at about 900. Every other layout spreads the same content over whatever width
-it is given, so widening one of those buys proportions and not information. A
-width outside what the layout draws is refused before the sweep runs, naming
-both ends, and `-card-layouts` prints them for every layout.
+at its far end, which sits exactly where the year lands so the card is never
+asked to fill space it has nothing for. Every other layout spreads the same
+content over whatever width it is given, so widening one of those buys
+proportions and not information, and its far end is only a guard against a
+typo. A width outside a layout's two ends is refused before the sweep runs,
+naming both, and `-card-layouts` prints them for every layout.
 
 ```sh
 ghchronicle -config config.yaml -card calendar.svg -card-only \
-  -card-layout activity-heatmap -card-width 900
+  -card-layout activity-heatmap -card-width 700
 ```
 
 ## Where the rest lives

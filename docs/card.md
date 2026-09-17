@@ -265,7 +265,7 @@ repositories.
 
 - **Family**: chronicle
 - **Motion**: still
-- **Width**: 495 px, minimum 300
+- **Width**: 495 px, drawn from 300 to 1200
 - **Default fields**: `stars`, `forks`, `followers`, `repos`, `contributions`, `views`, `visitors`, `sparkline`, `top_repos`
 
 ![The summary layout: a title, two rows of large numbers, a contribution sparkline and a list of the most starred repositories](../site/src/assets/card-summary.svg)
@@ -297,7 +297,7 @@ left edge once they have landed.
 
 - **Family**: github
 - **Motion**: plays once
-- **Width**: 800 px, minimum 600
+- **Width**: 800 px, drawn from 600 to 1200
 - **Default fields**: `repos`, `stars`, `forks`, `followers`, `commits`, `pull_requests`, `views`, `clones`, `languages`
 
 ![The github-stats layout played once: a header band over rows of four monospace numbers counting up, and a horizontal language share bar growing in from the left beside its legend](../site/src/assets/card-github-stats.svg)
@@ -326,7 +326,7 @@ One row of monospace numbers under a thin header band.
 
 - **Family**: github
 - **Motion**: still
-- **Width**: 495 px, minimum 300
+- **Width**: 495 px, drawn from 300 to 1200
 - **Default fields**: `stars`, `forks`, `followers`, `repos`, `commits`
 
 ![The github-compact layout: a thin header band above a single row of monospace numbers](../site/src/assets/card-github-compact.svg)
@@ -385,7 +385,7 @@ sparkline drawing itself behind them.
 
 - **Family**: chronicle
 - **Motion**: plays once
-- **Width**: 800 px, minimum 500
+- **Width**: 800 px, drawn from 500 to 1200
 - **Default fields**: `stars`, `forks`, `followers`, `contributions`, `sparkline`
 
 ![The wide-banner layout played once: a wide, short banner with the login on the left, numbers spread across and a sparkline drawing itself behind them](../site/src/assets/card-wide-banner.svg)
@@ -415,7 +415,7 @@ overlaid. The line draws itself on load.
 
 - **Family**: chronicle
 - **Motion**: plays once
-- **Width**: 495 px, minimum 300
+- **Width**: 495 px, drawn from 300 to 1200
 - **Default fields**: `contributions`, `stars`, `followers`, `sparkline`
 
 ![The sparkline-hero layout played once: a large contribution sparkline drawing itself across the card with three numbers overlaid](../site/src/assets/card-sparkline-hero.svg)
@@ -446,7 +446,7 @@ the legend appears when the donut is whole.
 
 - **Family**: github
 - **Motion**: plays once
-- **Width**: 495 px, minimum 400
+- **Width**: 495 px, drawn from 400 to 1200
 - **Default fields**: `languages`, `stars`, `repos`
 
 ![The language-ring layout played once: a donut chart whose language slices draw themselves one after another, with a legend appearing beside it and a row of headline numbers](../site/src/assets/card-language-ring.svg)
@@ -476,7 +476,7 @@ bar per row, totals underneath.
 
 - **Family**: github
 - **Motion**: still
-- **Width**: 495 px, minimum 300
+- **Width**: 495 px, drawn from 300 to 1200
 - **Default fields**: `top_repos`, `stars`, `forks`, `repos`
 
 ![The repo-list layout: one row per repository with a language dot, the star count and a proportional bar, with totals underneath](../site/src/assets/card-repo-list.svg)
@@ -506,16 +506,16 @@ GitHub's green squares, with up to three numbers beside it. The week count is
 not a fixed number: the grid takes whatever room the numbers beside it leave, so
 it ends where the card does rather than stopping a third of the way short. At
 the width this layout declares that is twenty-three weeks, at its minimum
-sixteen, and a card rendered at about nine hundred units draws the whole year
+sixteen, and `-card-width` at the far end its facts state draws the whole year
 the collector keeps. An account whose numbers run to eight digits and more
 takes a wider column for them and leaves the grid a week or two fewer, which is
-the same rule seen from the other side. The weeks fade in from the left, the wave crossing the grid
-in 0.22 s however many weeks it holds, so the calendar fills in as a wave of the
-same length at every width.
+the same rule seen from the other side. The weeks fade in from the left, the
+wave crossing the grid in 0.22 s however many weeks it holds, so the calendar
+fills in as a wave of the same length at every width.
 
 - **Family**: github
 - **Motion**: plays once
-- **Width**: 495 px, minimum 400
+- **Width**: 495 px, drawn from 400 to 891
 - **Default fields**: `sparkline`, `contributions`, `commits`, `pull_requests`
 
 ![The activity-heatmap layout played once: twenty-three weeks of contribution squares in GitHub's green scale fading in from the left, with three numbers beside them](../site/src/assets/card-activity-heatmap.svg)
@@ -545,7 +545,7 @@ the static card.
 
 - **Family**: chronicle
 - **Motion**: plays once
-- **Width**: 495 px, minimum 300
+- **Width**: 495 px, drawn from 300 to 1200
 - **Default fields**: `stars`, `forks`, `followers`, `repos`, `contributions`, `views`, `sparkline`
 
 ![The animated-counters layout played once: a grid of large numbers counting up over a contribution sparkline that draws itself](../site/src/assets/card-animated-counters.svg)
@@ -584,7 +584,7 @@ happens once either way.
 
 - **Family**: chronicle
 - **Motion**: plays once, or in a loop
-- **Width**: 495 px, minimum 360
+- **Width**: 495 px, drawn from 360 to 1200
 - **Default fields**: `stars`, `forks`, `followers`, `repos`, `contributions`, `top_repos`
 
 ![The terminal layout played once: a terminal window with the project's mark in its title bar, whose lines of output each have a number typing itself in under a lit block cursor that begins blinking when the last number lands, and the page can also play it in a loop, where the typing still happens once and the cursor blinks from the start and never stops](../site/src/assets/card-terminal.svg)
@@ -637,7 +637,7 @@ round than any other layout takes to settle.
 
 - **Family**: chronicle
 - **Motion**: plays once, or in a loop
-- **Width**: 800 px, minimum 400
+- **Width**: 800 px, drawn from 400 to 1200
 - **Default fields**: `stars`, `forks`, `followers`, `repos`, `contributions`, `commits`, `views`, `top_repos`
 
 ![The ticker layout played once: a wide band of rounded pills, one per number and one per repository, scrolling from right to left under the account name, and the page can also play it in a loop](../site/src/assets/card-ticker.svg)
@@ -688,7 +688,7 @@ stopped. The layout that shows the share of a language as its own line, where
 
 - **Family**: github
 - **Motion**: plays once
-- **Width**: 495 px, minimum 360
+- **Width**: 495 px, drawn from 360 to 1200
 - **Default fields**: `languages`
 
 ![The language-bars layout played once: one full-width bar per language growing from its left edge, one after another, with the language name and its percentage arriving behind each bar](../site/src/assets/card-language-bars.svg)
@@ -724,17 +724,27 @@ and the reasoning is in
 
 ### Width
 
-Each layout declares its own width, and a minimum it would refuse to go below,
-and its own section above states both. Nothing asks for a different one:
-`render.Options` carries a `Width`, the binary leaves it at zero, and there is
-no way to set it from outside, so every card comes out at its layout's own
-width. `badge-row` declares neither, because a pill row stretched to a fixed
-width would have gaps in it; its width follows its content.
+Each layout declares the width it is drawn at and the two ends it refuses to go
+outside, and its own section above states all three. `-card-width` on the
+binary, and `card-width` on the Action, ask for another: anything between that
+layout's own two ends. A width outside them is refused before the sweep runs,
+naming both, and `-card-layouts` prints them. Left out, a card comes out at its
+layout's own width, which is what every card came out at before the flag
+existed. `badge-row` declares none of the three, because a pill row stretched
+to a fixed width would have gaps in it; its width follows its content, and the
+flag neither changes it nor is refused by it.
 
-One layout reads the width rather than only being sized by it:
-`activity-heatmap` works out how many weeks of the contribution calendar it can
-draw from the room the width leaves, so the same card is sixteen weeks at its
-minimum and a year of them if it is given enough room.
+The near end is where a column stops fitting. The far end is usually only a
+guard against a typo, because a layout given more room spreads the same content
+over it, and one asked for twenty thousand used to be drawn twenty thousand
+units wide. `activity-heatmap` is the one with a real one, and it is the reason
+the ends are each layout's own rather than one pair for all of them: it reads
+the width rather than only being sized by it, working out how many weeks of the
+contribution calendar fit in the room the width leaves, so the same card is
+sixteen weeks at its near end, twenty-three at the width it declares and the
+whole year the collector keeps at its far end. Past that there is no more
+calendar to draw, so the far end is exactly the width where the year lands and
+the card is never asked to fill space it has nothing for.
 
 ### Fields a layout cannot draw
 

@@ -512,27 +512,41 @@ func heatNums() []metric {
 	return nil
 }
 
-// TestTheHeatmapGridFillsTheWidthItIsGiven is the point of deriving the week
-// count from the width: whatever the card is drawn at, the grid and the column
-// of numbers beside it reach the far padding, leaving at most the one pitch
-// that a further week would not have fitted in. Before this, the grid was
-// twelve weeks at every width and a card wider than about four hundred units
-// ended in empty space that grew with the width.
-func TestTheHeatmapGridFillsTheWidthItIsGiven(t *testing.T) {
+// TestTheHeatmapGridFillsEveryWidthItAccepts is the point of deriving the week
+// count from the width, and it sweeps every width the layout accepts rather
+// than a handful: at each of them the grid and the column of numbers beside it
+// reach the far padding, leaving at most the one pitch that a further week
+// would not have fitted in.
+//
+// The sweep is the whole range and not samples because of what the far end is
+// for. The grid stops at a year, so a width past the one where the year fits
+// has room for weeks that do not exist, and the layout drew the year and then
+// the empty quarter this rewrite was meant to remove: three hundred and nine
+// units of it at twelve hundred, measured. The layout's MaxWidth is now the
+// width where the year fits, and this is what says so: if that end is ever
+// moved past it, some width in the sweep leaves a pitch of empty space and
+// this fails.
+func TestTheHeatmapGridFillsEveryWidthItAccepts(t *testing.T) {
+	def := mustLayout(t, "activity-heatmap")
 	numsW := heatNumsWidth(heatNums())
-	for _, width := range []float64{400, 440, 495, 600, 700, 800, 900, 1200} {
-		weeks := heatGridWeeks(width, numsW)
+	for width := def.MinWidth; width <= def.MaxWidth; width++ {
+		weeks := heatGridWeeks(float64(width), numsW)
 		gridW := float64(weeks)*heatPitch - (heatPitch - heatCell)
-		slack := width - ghPad - (ghPad + gridW + heatNumsGap + numsW)
-		if weeks == heatWeeksMax {
-			continue // a year is all the data there is; past that the card may have room to spare
-		}
+		slack := float64(width) - ghPad - (ghPad + gridW + heatNumsGap + numsW)
 		if slack < 0 {
-			t.Errorf("width %v: %d weeks overrun the card by %v", width, weeks, -slack)
+			t.Fatalf("width %d: %d weeks overrun the card by %v", width, weeks, -slack)
 		}
 		if slack >= heatPitch {
-			t.Errorf("width %v: %d weeks leave %v units empty, room for another week", width, weeks, slack)
+			t.Fatalf("width %d: %d weeks leave %v units empty, room for another week", width, weeks, slack)
 		}
+	}
+	// The far end is exactly where the year lands: one unit less is a week
+	// short of it, and the end itself is the whole year.
+	if got := heatGridWeeks(float64(def.MaxWidth), numsW); got != heatWeeksMax {
+		t.Errorf("the far end draws %d weeks, want the year, %d", got, heatWeeksMax)
+	}
+	if got := heatGridWeeks(float64(def.MaxWidth)-heatPitch, numsW); got != heatWeeksMax-1 {
+		t.Errorf("a pitch short of the far end draws %d weeks, want %d", got, heatWeeksMax-1)
 	}
 	if got := heatGridWeeks(400, numsW); got != 16 {
 		t.Errorf("the minimum width draws %d weeks, want 16", got)
@@ -540,6 +554,8 @@ func TestTheHeatmapGridFillsTheWidthItIsGiven(t *testing.T) {
 	if got := heatGridWeeks(defaultWidth, numsW); got != 23 {
 		t.Errorf("the default width draws %d weeks, want 23", got)
 	}
+	// A width the layout would refuse still cannot ask for more than the year,
+	// because the year is all the data there is.
 	if got := heatGridWeeks(4000, numsW); got != heatWeeksMax {
 		t.Errorf("a very wide card draws %d weeks, want the year the data holds, %d", got, heatWeeksMax)
 	}
@@ -548,7 +564,7 @@ func TestTheHeatmapGridFillsTheWidthItIsGiven(t *testing.T) {
 // TestTheHeatmapTitleNamesTheWeeksItDrew keeps the heading honest at every
 // width, since the width is now what decides the period.
 func TestTheHeatmapTitleNamesTheWeeksItDrew(t *testing.T) {
-	for _, width := range []int{400, defaultWidth, 900} {
+	for _, width := range []int{400, defaultWidth, mustLayout(t, "activity-heatmap").MaxWidth} {
 		doc := mustRender(t, sample(), &Options{Theme: "dark", Layout: "activity-heatmap", Width: width})
 		weeks := heatGridWeeks(float64(width), heatNumsWidth(heatNums()))
 		want := fmt.Sprintf("Contributions, last %d weeks", weeks)
@@ -576,7 +592,7 @@ func TestTheHeatmapTitleNamesTheWeeksItDrew(t *testing.T) {
 // weeks wide and when it is fifty-two. A fixed step per week would have taken
 // a year of squares to 2.62 s, outside the range that figure was chosen from.
 func TestTheHeatmapWaveTakesTheSameTimeAtEveryWidth(t *testing.T) {
-	for _, width := range []int{400, defaultWidth, 700, 900} {
+	for _, width := range []int{400, defaultWidth, 700, mustLayout(t, "activity-heatmap").MaxWidth} {
 		doc := mustRender(t, sample(), &Options{Theme: "dark", Layout: "activity-heatmap", Width: width})
 		for _, m := range animatingClass.FindAllStringSubmatch(doc, -1) {
 			want := "." + m[1] + "{animation:" + m[1] + " 1.82s ease-out 1}"
@@ -600,7 +616,10 @@ func TestTheHeatmapWaveTakesTheSameTimeAtEveryWidth(t *testing.T) {
 func TestTheHeatmapPadsAYoungAccountToTheFullGrid(t *testing.T) {
 	young := sample()
 	young.Sparkline = []int{0, 3, 12, 7, 0, 1, 20, 15, 4, 9}
-	doc := mustRender(t, young, &Options{Theme: "dark", Layout: "activity-heatmap", Width: 900})
+	doc := mustRender(t, young, &Options{
+		Theme: "dark", Layout: "activity-heatmap",
+		Width: mustLayout(t, "activity-heatmap").MaxWidth,
+	})
 	if n := strings.Count(doc, `<rect class="h`); n != heatWeeksMax*7+5 {
 		t.Errorf("a ten day series drew %d squares, want a full year plus the key", n)
 	}
@@ -1240,16 +1259,37 @@ func TestOverlaysCapTheirNumbers(t *testing.T) {
 	}
 }
 
+// Every layout's three widths are either all zero, which is the registry
+// saying the width follows the content, or an ordered triple with the drawn
+// width between the two ends. A layout that declared a near end and forgot the
+// far one would refuse every width there is, and the refusal would name a
+// maximum of zero.
+func TestEveryLayoutsWidthsAreOrderedOrAbsent(t *testing.T) {
+	for _, def := range layouts {
+		if def.Width == 0 && def.MinWidth == 0 && def.MaxWidth == 0 {
+			continue
+		}
+		if def.MinWidth <= 0 || def.MaxWidth <= 0 {
+			t.Errorf("%s declares a width of %d between %d and %d: a layout states all three or none",
+				def.Name, def.Width, def.MinWidth, def.MaxWidth)
+			continue
+		}
+		if def.MinWidth > def.Width || def.Width > def.MaxWidth {
+			t.Errorf("%s is drawn at %d, outside its own %d to %d", def.Name, def.Width, def.MinWidth, def.MaxWidth)
+		}
+	}
+}
+
 func TestEachLayoutRefusesAWidthOutsideWhatItDraws(t *testing.T) {
 	for _, def := range layouts {
 		if def.MinWidth == 0 {
 			checkWidthFollowsContent(t, def.Name)
 			continue
 		}
-		for _, w := range []int{def.MinWidth - 1, MaxWidth + 1, 20000} {
+		for _, w := range []int{def.MinWidth - 1, def.MaxWidth + 1, 20000} {
 			checkWidthMessageNamesBothEnds(t, def.Layout, w)
 		}
-		for _, w := range []int{def.MinWidth, def.Width, MaxWidth} {
+		for _, w := range []int{def.MinWidth, def.Width, def.MaxWidth} {
 			if _, err := SVG(sample(), &Options{Layout: def.Name, Width: w}); err != nil {
 				t.Errorf("%s refused %d, which is inside what it draws: %v", def.Name, w, err)
 			}
@@ -1263,7 +1303,7 @@ func TestEachLayoutRefusesAWidthOutsideWhatItDraws(t *testing.T) {
 func checkWidthFollowsContent(t *testing.T, layout string) {
 	t.Helper()
 	same := mustRender(t, sample(), &Options{Layout: layout})
-	for _, w := range []int{1, 300, MaxWidth + 5000} {
+	for _, w := range []int{1, 300, maxWidth + 5000} {
 		out, err := SVG(sample(), &Options{Layout: layout, Width: w})
 		if err != nil {
 			t.Errorf("%s refused width %d, but its width follows its content: %v", layout, w, err)
@@ -1284,7 +1324,7 @@ func checkWidthMessageNamesBothEnds(t *testing.T, l Layout, w int) {
 	err := widthError(t, l.Name, w)
 	for _, want := range []string{
 		strconv.Itoa(w), l.Name,
-		strconv.Itoa(l.MinWidth), strconv.Itoa(MaxWidth),
+		strconv.Itoa(l.MinWidth), strconv.Itoa(l.MaxWidth),
 	} {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("%s at width %d: %q does not say %q", l.Name, w, err, want)
@@ -1314,7 +1354,7 @@ func TestACardIsByteIdenticalAtEveryWidthItAccepts(t *testing.T) {
 		if def.MinWidth == 0 {
 			continue
 		}
-		for _, w := range []int{def.MinWidth, def.Width, MaxWidth} {
+		for _, w := range []int{def.MinWidth, def.Width, def.MaxWidth} {
 			o := &Options{Layout: def.Name, Theme: "dark", Width: w}
 			first := mustRender(t, sample(), o)
 			for range 5 {

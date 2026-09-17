@@ -120,12 +120,12 @@ GitHub's green squares, with up to three numbers beside it. The week count is
 not a fixed number: the grid takes whatever room the numbers beside it leave, so
 it ends where the card does rather than stopping a third of the way short. At
 the width this layout declares that is twenty-three weeks, at its minimum
-sixteen, and a card rendered at about nine hundred units draws the whole year
+sixteen, and `-card-width` at the far end its facts state draws the whole year
 the collector keeps. An account whose numbers run to eight digits and more
 takes a wider column for them and leaves the grid a week or two fewer, which is
-the same rule seen from the other side. The weeks fade in from the left, the wave crossing the grid
-in 0.22 s however many weeks it holds, so the calendar fills in as a wave of the
-same length at every width.
+the same rule seen from the other side. The weeks fade in from the left, the
+wave crossing the grid in 0.22 s however many weeks it holds, so the calendar
+fills in as a wave of the same length at every width.
 
 <LayoutFacts name="activity-heatmap" />
 
@@ -195,17 +195,27 @@ and the reasoning is in
 
 ## Width
 
-Each layout declares its own width, and a minimum it would refuse to go below,
-and its own section above states both. Nothing asks for a different one:
-`render.Options` carries a `Width`, the binary leaves it at zero, and there is
-no way to set it from outside, so every card comes out at its layout's own
-width. `badge-row` declares neither, because a pill row stretched to a fixed
-width would have gaps in it; its width follows its content.
+Each layout declares the width it is drawn at and the two ends it refuses to go
+outside, and its own section above states all three. `-card-width` on the
+binary, and `card-width` on the Action, ask for another: anything between that
+layout's own two ends. A width outside them is refused before the sweep runs,
+naming both, and `-card-layouts` prints them. Left out, a card comes out at its
+layout's own width, which is what every card came out at before the flag
+existed. `badge-row` declares none of the three, because a pill row stretched
+to a fixed width would have gaps in it; its width follows its content, and the
+flag neither changes it nor is refused by it.
 
-One layout reads the width rather than only being sized by it:
-`activity-heatmap` works out how many weeks of the contribution calendar it can
-draw from the room the width leaves, so the same card is sixteen weeks at its
-minimum and a year of them if it is given enough room.
+The near end is where a column stops fitting. The far end is usually only a
+guard against a typo, because a layout given more room spreads the same content
+over it, and one asked for twenty thousand used to be drawn twenty thousand
+units wide. `activity-heatmap` is the one with a real one, and it is the reason
+the ends are each layout's own rather than one pair for all of them: it reads
+the width rather than only being sized by it, working out how many weeks of the
+contribution calendar fit in the room the width leaves, so the same card is
+sixteen weeks at its near end, twenty-three at the width it declares and the
+whole year the collector keeps at its far end. Past that there is no more
+calendar to draw, so the far end is exactly the width where the year lands and
+the card is never asked to fill space it has nothing for.
 
 ## Fields a layout cannot draw
 

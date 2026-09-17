@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -406,11 +407,12 @@ func TestExecuteCardWidthReachesTheCardAndItsRefusal(t *testing.T) {
 	}
 
 	// The width the flag named is the width of the document, and the heatmap
-	// spends it on weeks of the calendar rather than on empty space: nine
-	// hundred units is the whole year, the registered width is twenty-three.
-	wide := draw(t, "wide", "-card-layout", "activity-heatmap", "-card-width", "900")
-	if !strings.Contains(wide, `width="900"`) || !strings.Contains(wide, "Contributions, last 52 weeks") {
-		t.Errorf("-card-width 900 drew:\n%.200s", wide)
+	// spends it on weeks of the calendar rather than on empty space: its far
+	// end is the whole year, the registered width is twenty-three.
+	far := strconv.Itoa(layoutNamed(t, "activity-heatmap").MaxWidth)
+	wide := draw(t, "wide", "-card-layout", "activity-heatmap", "-card-width", far)
+	if !strings.Contains(wide, `width="`+far+`"`) || !strings.Contains(wide, "Contributions, last 52 weeks") {
+		t.Errorf("-card-width %s drew:\n%.200s", far, wide)
 	}
 	narrow := draw(t, "narrow", "-card-layout", "activity-heatmap", "-card-width", "400")
 	if !strings.Contains(narrow, `width="400"`) || !strings.Contains(narrow, "Contributions, last 16 weeks") {
@@ -432,10 +434,23 @@ func TestExecuteCardWidthReachesTheCardAndItsRefusal(t *testing.T) {
 	// Same command, same bytes: a width is one more input, not a source of
 	// variation, or a workflow that commits the card writes a diff out of
 	// nothing.
-	again := draw(t, "wide-again", "-card-layout", "activity-heatmap", "-card-width", "900")
+	again := draw(t, "wide-again", "-card-layout", "activity-heatmap", "-card-width", far)
 	if again != wide {
 		t.Error("the same card at the same width must be written twice to the byte")
 	}
+}
+
+// layoutNamed is one registered layout, by name, for a test that needs a fact
+// the registry states rather than a figure typed beside it.
+func layoutNamed(t *testing.T, name string) render.Layout {
+	t.Helper()
+	for _, l := range render.Layouts() {
+		if l.Name == name {
+			return l
+		}
+	}
+	t.Fatalf("no layout %q", name)
+	return render.Layout{}
 }
 
 // TestExecuteBothThemesComeFromOneSweep writes the light and the dark card of

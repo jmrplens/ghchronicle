@@ -107,16 +107,17 @@ type Options struct {
 const (
 	defaultWidth = 495
 	minWidth     = 300
-	// MaxWidth is the widest any card is drawn at, and unlike minWidth, which
-	// is a figure several layouts happen to pick for their own MinWidth, it is
-	// one ceiling over all of them. It exists because Options.Width became
-	// something a reader types: the widest layout declares 800 and the one
-	// layout that turns room into content, activity-heatmap, has drawn the
-	// whole year it holds by about 900, so nothing above this can be used by
-	// anything, and a card asked for twenty thousand is a typo rather than a
-	// card. A layout whose width follows its content is not bounded by it,
-	// because it is not bounded by MinWidth either: it ignores Options.Width.
-	MaxWidth = 1200
+	// maxWidth is the far end a layout takes when nothing about its content
+	// decides one, the way minWidth is the near end several of them take. It
+	// exists because Options.Width became something a reader types: the widest
+	// layout declares 800, and a card asked for twenty thousand was drawn
+	// twenty thousand units wide rather than refused, which is a typo and not
+	// a card.
+	//
+	// It is a guard and not a judgement about what looks right. The layout
+	// that has a judgement to make declares its own: see Layout.MaxWidth and
+	// heatFullWidth.
+	maxWidth = 1200
 
 	defaultMaxRepos = 5
 	maxLanguages    = 8
@@ -224,10 +225,10 @@ var (
 // ErrTheme is returned for a theme this package cannot draw.
 var ErrTheme = errors.New("render: unknown theme")
 
-// ErrWidth is returned for an Options.Width outside what the layout draws:
-// below its own MinWidth or above MaxWidth. It names both ends, because the
-// width is typed at a command line now and a reader told only that his number
-// is wrong has to go and look up the one that is not.
+// ErrWidth is returned for an Options.Width outside what the layout draws,
+// which is its own MinWidth to its own MaxWidth. It names both ends, because
+// the width is typed at a command line now and a reader told only that his
+// number is wrong has to go and look up the ones that are not.
 var ErrWidth = errors.New("render: width out of range")
 
 // SVG renders the card. It returns a complete standalone <svg> document.
@@ -306,9 +307,9 @@ func resolveWidth(asked int, l Layout) (float64, error) {
 	if asked == 0 {
 		return float64(l.Width), nil
 	}
-	if l.MinWidth > 0 && (asked < l.MinWidth || asked > MaxWidth) {
+	if l.MinWidth > 0 && (asked < l.MinWidth || asked > l.MaxWidth) {
 		return 0, fmt.Errorf("%w: %d (layout %q draws from %d to %d)",
-			ErrWidth, asked, l.Name, l.MinWidth, MaxWidth)
+			ErrWidth, asked, l.Name, l.MinWidth, l.MaxWidth)
 	}
 	return float64(asked), nil
 }

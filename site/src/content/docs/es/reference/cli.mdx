@@ -30,7 +30,7 @@ ghchronicle -config /etc/ghchronicle/config.yaml
 | `-card-motion`    | `once`        | `once`, `loop` u `off`; `loop` solo cambia `terminal` y `ticker`                                                                               |
 | `-card-layout`    | `summary`     | Cuál de los trece [diseños](/ghchronicle/es/card/layouts/) dibujar                                                                        |
 | `-card-fields`    | ninguno       | Campos que muestra la tarjeta, separados por comas, de entre [los campos](/ghchronicle/es/card/#los-campos); vacío significa el valor por omisión del diseño |
-| `-card-width`     | el del diseño | Ancho de la tarjeta en píxeles. Cada diseño dibuja entre su propio mínimo y 1200, y `-card-layouts` imprime los dos extremos; `badge-row` la ignora, porque su ancho lo deciden sus píldoras |
+| `-card-width`     | el del diseño | Ancho de la tarjeta en píxeles. Cada diseño dibuja entre dos extremos propios, que dicen tanto su [sección](/ghchronicle/es/card/layouts/) como `-card-layouts`; `badge-row` la ignora, porque su ancho lo deciden sus píldoras |
 | `-card-layouts`   | apagada       | Imprime los diseños con los campos y los anchos que dibuja cada uno, y sale                                                               |
 
 ## Las cuatro que imprimen y salen
@@ -80,17 +80,19 @@ configuración que de otro modo se rechazaría al arrancar.
 `-card-width` es la única opción que cambia lo que dice una tarjeta y no solo
 cómo se ve, y en un solo diseño.
 [`activity-heatmap`](/ghchronicle/es/card/layouts/#activity-heatmap) se gasta
-el sitio en datos: dieciséis semanas del calendario de contribuciones con su
-mínimo de 400, veintitrés con el ancho que declara y el año entero que guarda
-el recolector a unas 900. Cualquier otro diseño reparte el mismo contenido por
-el ancho que le den, así que ensanchar uno de esos compra proporciones y no
-información. Un ancho fuera de lo que dibuja el diseño se rechaza antes de la
-pasada, nombrando los dos extremos, y `-card-layouts` los imprime para cada
-diseño.
+el sitio en datos: dieciséis semanas del calendario de contribuciones en su
+extremo cercano, veintitrés con el ancho que declara y el año entero que guarda
+el recolector en su extremo lejano, que cae justo donde cae el año para que a
+la tarjeta nunca se le pida llenar un sitio para el que no tiene nada.
+Cualquier otro diseño reparte el mismo contenido por el ancho que le den, así
+que ensanchar uno de esos compra proporciones y no información, y su extremo
+lejano es solo una defensa contra una errata. Un ancho fuera de los dos
+extremos de un diseño se rechaza antes de la pasada, nombrándolos, y
+`-card-layouts` los imprime para cada diseño.
 
 ```sh
 ghchronicle -config config.yaml -card calendar.svg -card-only \
-  -card-layout activity-heatmap -card-width 900
+  -card-layout activity-heatmap -card-width 700
 ```
 
 ## Dónde está lo demás

@@ -63,14 +63,27 @@ type Layout struct {
 	Loops    bool
 	Fields   []string // the default set, in drawing order
 	Supports []string // every field the layout can show
-	// Width is what the layout is drawn at, and MinWidth the width it refuses
-	// to go below. Both are zero on a layout whose width follows its content,
-	// badge-row being the one, and on such a layout Options.Width is ignored:
-	// no minimum can reject it and the drawing overwrites it with the width of
-	// the pills it laid out. They are part of the public Layout rather than of
-	// the definition below because the site states them per layout, and it
-	// reads them from here through cmd/gen_layouts.
-	Width, MinWidth int
+	// Width is what the layout is drawn at, and MinWidth and MaxWidth the two
+	// ends it refuses to go outside. All three are zero on a layout whose
+	// width follows its content, badge-row being the one, and on such a layout
+	// Options.Width is ignored: no end can reject it and the drawing
+	// overwrites it with the width of the pills it laid out.
+	//
+	// MaxWidth is the layout's own and not one figure for all of them, because
+	// a layout has as much room as it has content for. Twelve of them spread
+	// the same content over whatever they are given and stop being a card long
+	// before anyone would notice, so they take maxWidth, which is the typo
+	// guard. activity-heatmap is the one whose content ends: its grid holds a
+	// year of the calendar and no more, so past the width where the year fits
+	// it would draw the empty third this layout was rewritten to get rid of,
+	// and it declares that width instead. badge-row's own rule, that a row
+	// stretched to a fixed width has gaps in it, is this rule with nothing at
+	// all left over.
+	//
+	// They are part of the public Layout rather than of the definition below
+	// because the site states them per layout, and it reads them from here
+	// through cmd/gen_layouts.
+	Width, MinWidth, MaxWidth int
 }
 
 type layoutDef struct {
@@ -101,7 +114,7 @@ var layouts = []layoutDef{
 		Description: "The original card: title, two rows of numbers, a sparkline and the most starred repositories.",
 		Fields:      []string{fieldStars, fieldForks, fieldFollowers, fieldRepos, fieldContributions, fieldViews, fieldVisitors, fieldSparkline, fieldTopRepos},
 		Supports:    join(allNumeric, fieldLanguages, fieldSparkline, fieldTopRepos),
-		Width:       defaultWidth, MinWidth: minWidth,
+		Width:       defaultWidth, MinWidth: minWidth, MaxWidth: maxWidth,
 
 		draw: drawSummary,
 	},
@@ -110,7 +123,7 @@ var layouts = []layoutDef{
 		Description: "GitHub's own box: a header band, rows of four monospace numbers that count up and a language share bar that grows in beside its legend.",
 		Fields:      []string{fieldRepos, fieldStars, fieldForks, fieldFollowers, fieldCommits, fieldPullRequests, fieldViews, fieldClones, fieldLanguages},
 		Supports:    join(allNumeric, fieldLanguages, fieldTopRepos, fieldSparkline),
-		Width:       800, MinWidth: 600,
+		Width:       800, MinWidth: 600, MaxWidth: maxWidth,
 
 		draw: drawGithubStats,
 	},
@@ -119,7 +132,7 @@ var layouts = []layoutDef{
 		Description: "One row of monospace numbers under a thin header band.",
 		Fields:      []string{fieldStars, fieldForks, fieldFollowers, fieldRepos, fieldCommits},
 		Supports:    allNumeric,
-		Width:       defaultWidth, MinWidth: minWidth,
+		Width:       defaultWidth, MinWidth: minWidth, MaxWidth: maxWidth,
 
 		draw: drawGithubCompact,
 	},
@@ -128,7 +141,7 @@ var layouts = []layoutDef{
 		Description: "A row of 20px pill badges, one per number, for a README line; the width follows the content.",
 		Fields:      []string{fieldStars, fieldForks, fieldFollowers, fieldRepos, fieldContributions},
 		Supports:    allNumeric,
-		Width:       0, MinWidth: 0,
+		Width:       0, MinWidth: 0, MaxWidth: 0,
 
 		draw: drawBadgeRow,
 	},
@@ -137,7 +150,7 @@ var layouts = []layoutDef{
 		Description: "A full-width 60px banner: login on the left, numbers spread across, the sparkline drawing itself behind them.",
 		Fields:      []string{fieldStars, fieldForks, fieldFollowers, fieldContributions, fieldSparkline},
 		Supports:    join(allNumeric, fieldSparkline),
-		Width:       800, MinWidth: 500,
+		Width:       800, MinWidth: 500, MaxWidth: maxWidth,
 
 		draw: drawWideBanner,
 	},
@@ -146,7 +159,7 @@ var layouts = []layoutDef{
 		Description: "The contribution sparkline is the whole card, with up to three numbers overlaid; the line draws itself.",
 		Fields:      []string{fieldContributions, fieldStars, fieldFollowers, fieldSparkline},
 		Supports:    join(allNumeric, fieldSparkline),
-		Width:       defaultWidth, MinWidth: minWidth,
+		Width:       defaultWidth, MinWidth: minWidth, MaxWidth: maxWidth,
 
 		draw: drawSparklineHero,
 	},
@@ -155,7 +168,7 @@ var layouts = []layoutDef{
 		Description: "A donut of language shares with the legend beside it and a row of headline numbers; each slice draws itself and the legend follows.",
 		Fields:      []string{fieldLanguages, fieldStars, fieldRepos},
 		Supports:    join(allNumeric, fieldLanguages),
-		Width:       defaultWidth, MinWidth: 400,
+		Width:       defaultWidth, MinWidth: 400, MaxWidth: maxWidth,
 
 		draw: drawLanguageRing,
 	},
@@ -164,16 +177,16 @@ var layouts = []layoutDef{
 		Description: "The most starred repositories as the main content: language dot, stars and a bar per row, totals underneath.",
 		Fields:      []string{fieldTopRepos, fieldStars, fieldForks, fieldRepos},
 		Supports:    join(allNumeric, fieldTopRepos),
-		Width:       defaultWidth, MinWidth: minWidth,
+		Width:       defaultWidth, MinWidth: minWidth, MaxWidth: maxWidth,
 
 		draw: drawRepoList,
 	},
 	{
 		Name: "activity-heatmap", Family: "github", Animated: true,
 		Description: "As much of the contribution calendar as the width holds, up to a year of it, as GitHub's green squares, week by week from the left, with up to three numbers beside it.",
-		Fields:      []string{fieldSparkline, fieldContributions, fieldCommits, fieldPullRequests},
+		Fields:      heatFields,
 		Supports:    join(allNumeric, fieldSparkline),
-		Width:       defaultWidth, MinWidth: 400,
+		Width:       defaultWidth, MinWidth: 400, MaxWidth: heatFullWidth,
 
 		draw: drawActivityHeatmap,
 	},
@@ -182,7 +195,7 @@ var layouts = []layoutDef{
 		Description: "Numbers that count up on load over a sparkline that draws itself; settles to the static card.",
 		Fields:      []string{fieldStars, fieldForks, fieldFollowers, fieldRepos, fieldContributions, fieldViews, fieldSparkline},
 		Supports:    join(allNumeric, fieldSparkline),
-		Width:       defaultWidth, MinWidth: minWidth,
+		Width:       defaultWidth, MinWidth: minWidth, MaxWidth: maxWidth,
 
 		draw: drawAnimatedCounters,
 	},
@@ -191,7 +204,7 @@ var layouts = []layoutDef{
 		Description: "A terminal window with the project's mark: one line of output per number, each number typed in, and a cursor at the prompt that blinks when the last of them lands, or from the start and for ever under loop.",
 		Fields:      []string{fieldStars, fieldForks, fieldFollowers, fieldRepos, fieldContributions, fieldTopRepos},
 		Supports:    join(allNumeric, fieldTopRepos),
-		Width:       defaultWidth, MinWidth: 360,
+		Width:       defaultWidth, MinWidth: 360, MaxWidth: maxWidth,
 
 		draw: drawTerminal,
 	},
@@ -200,7 +213,7 @@ var layouts = []layoutDef{
 		Description: "A band of pills, one per number and one per repository, scrolling from right to left without a seam, at a fixed speed, so a pass takes as long as the content is wide.",
 		Fields:      []string{fieldStars, fieldForks, fieldFollowers, fieldRepos, fieldContributions, fieldCommits, fieldViews, fieldTopRepos},
 		Supports:    join(allNumeric, fieldTopRepos),
-		Width:       800, MinWidth: 400,
+		Width:       800, MinWidth: 400, MaxWidth: maxWidth,
 
 		draw: drawTicker,
 	},
@@ -209,7 +222,7 @@ var layouts = []layoutDef{
 		Description: "One bar per language, each growing from its own left edge after the one above it, with the name and the share arriving behind it.",
 		Fields:      []string{fieldLanguages},
 		Supports:    join(allNumeric, fieldLanguages),
-		Width:       defaultWidth, MinWidth: 360,
+		Width:       defaultWidth, MinWidth: 360, MaxWidth: maxWidth,
 
 		draw: drawLanguageBars,
 	},

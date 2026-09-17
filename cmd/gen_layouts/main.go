@@ -53,6 +53,7 @@ type layout struct {
 	Loops    bool     `json:"loops"`
 	Width    int      `json:"width"`
 	MinWidth int      `json:"minWidth"`
+	MaxWidth int      `json:"maxWidth"`
 	Fields   []string `json:"fields"`
 }
 
@@ -129,6 +130,7 @@ func layoutsJSON(registered []render.Layout) ([]byte, error) {
 			Loops:    l.Loops,
 			Width:    l.Width,
 			MinWidth: l.MinWidth,
+			MaxWidth: l.MaxWidth,
 			Fields:   l.Fields,
 		})
 	}

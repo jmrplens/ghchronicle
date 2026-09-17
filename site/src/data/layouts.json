@@ -6,6 +6,7 @@
     "loops": false,
     "width": 495,
     "minWidth": 300,
+    "maxWidth": 1200,
     "fields": [
       "stars",
       "forks",
@@ -25,6 +26,7 @@
     "loops": false,
     "width": 800,
     "minWidth": 600,
+    "maxWidth": 1200,
     "fields": [
       "repos",
       "stars",
@@ -44,6 +46,7 @@
     "loops": false,
     "width": 495,
     "minWidth": 300,
+    "maxWidth": 1200,
     "fields": [
       "stars",
       "forks",
@@ -59,6 +62,7 @@
     "loops": false,
     "width": 0,
     "minWidth": 0,
+    "maxWidth": 0,
     "fields": [
       "stars",
       "forks",
@@ -74,6 +78,7 @@
     "loops": false,
     "width": 800,
     "minWidth": 500,
+    "maxWidth": 1200,
     "fields": [
       "stars",
       "forks",
@@ -89,6 +94,7 @@
     "loops": false,
     "width": 495,
     "minWidth": 300,
+    "maxWidth": 1200,
     "fields": [
       "contributions",
       "stars",
@@ -103,6 +109,7 @@
     "loops": false,
     "width": 495,
     "minWidth": 400,
+    "maxWidth": 1200,
     "fields": [
       "languages",
       "stars",
@@ -116,6 +123,7 @@
     "loops": false,
     "width": 495,
     "minWidth": 300,
+    "maxWidth": 1200,
     "fields": [
       "top_repos",
       "stars",
@@ -130,6 +138,7 @@
     "loops": false,
     "width": 495,
     "minWidth": 400,
+    "maxWidth": 891,
     "fields": [
       "sparkline",
       "contributions",
@@ -144,6 +153,7 @@
     "loops": false,
     "width": 495,
     "minWidth": 300,
+    "maxWidth": 1200,
     "fields": [
       "stars",
       "forks",
@@ -161,6 +171,7 @@
     "loops": true,
     "width": 495,
     "minWidth": 360,
+    "maxWidth": 1200,
     "fields": [
       "stars",
       "forks",
@@ -177,6 +188,7 @@
     "loops": true,
     "width": 800,
     "minWidth": 400,
+    "maxWidth": 1200,
     "fields": [
       "stars",
       "forks",
@@ -195,6 +207,7 @@
     "loops": false,
     "width": 495,
     "minWidth": 360,
+    "maxWidth": 1200,
     "fields": [
       "languages"
     ]

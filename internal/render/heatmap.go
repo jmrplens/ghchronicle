@@ -40,6 +40,33 @@ const (
 	heatSweep = 0.22
 )
 
+// heatFields is what this layout draws when nothing is asked for. It is named
+// here rather than written into the registry entry because heatFullWidth is
+// measured from the labels of these three, and the registry entry is what
+// carries that width.
+var heatFields = []string{fieldSparkline, fieldContributions, fieldCommits, fieldPullRequests}
+
+// heatFullWidth is the width at which the grid holds the whole year, and so
+// the widest this layout has anything to draw at: the card's two paddings, a
+// year of squares, the channel, and the column the default card's numbers ask
+// for. It is the layout's MaxWidth.
+//
+// Every other layout takes maxWidth, which only catches a typo, because every
+// other layout spreads the same content over whatever it is given. This one
+// runs out: the collector keeps a year of daily counts, heatGridWeeks stops at
+// fifty-two, and a card wider than this drew the year and then the empty
+// quarter that this layout was rewritten to get rid of. Three hundred and nine
+// units of it at twelve hundred, measured.
+//
+// Computed rather than typed, from the same labels the card sets, so a metric
+// renamed to something longer moves this with it instead of leaving a figure
+// that used to be right. An account whose numbers are wider than those labels
+// needs a wider column, gets one, and draws a week or two fewer: the grid takes
+// what is left, which is the rule everywhere else in this file.
+var heatFullWidth = int(math.Ceil(2*ghPad + heatNumsGap +
+	float64(heatWeeksMax)*heatPitch - (heatPitch - heatCell) +
+	heatNumsWidth(metricsOf(&Card{}, heatFields))))
+
 // heatNumsWidth is the room the numbers beside the grid need: the widest of
 // them measured against its own label, which on an ordinary account is the
 // wider of the two. Measured rather than fixed, because everything this column
