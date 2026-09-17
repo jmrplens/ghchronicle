@@ -216,6 +216,7 @@
  *    where `account` names eight consecutive rows, so eight cards carried the
  *    same title while the cell that tells them apart sat below it in body
  *    type. Its eight-row twin, whose groups are unique, keeps the title.
+ *
  * The compact form is excluded on purpose: its own review already wanted a
  * link-only name (InfluxDB, PostgreSQL, neither a `code` span) at this size,
  * and undoing that here would be the regression, not the fix. */

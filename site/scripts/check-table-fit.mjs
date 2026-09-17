@@ -156,6 +156,18 @@ export function routeOfSource(file) {
 	return path ? `${path}/` : "";
 }
 
+/** Frontmatter keys that once meant something here, and what replaced them. */
+const RETIRED_KEYS = {
+	// Renamed when the compact form stopped being only for indexes.
+	indexTables: "indexTables is called compactTables now.",
+	// Removed once nothing declared it: the rule it turned off now keys on
+	// whether the cell is a code span rather than on the page saying so.
+	plainTables:
+		"plainTables is gone: the rule it turned off now reads the cell " +
+		"instead of the page, so a first cell that is not a code span is " +
+		"already left at body size.",
+};
+
 /**
  * The first-column headings a page's frontmatter declares as compact tables.
  *
@@ -167,6 +179,28 @@ export function declaredCompactTables(source) {
 	if (!match) return [];
 	const declared = parse(match[1])?.compactTables;
 	return Array.isArray(declared) ? declared.map(String) : [];
+}
+
+/**
+ * The keys this page's frontmatter names that no longer do anything.
+ *
+ * A renamed key is the one way a page can ask for a form and be ignored in
+ * silence: the content schema strips a key it does not know, so `indexTables`
+ * on a page today reaches neither the plugin nor this gate, the page keeps the
+ * card it asked to lose, and every check stays green. A revert, a long-lived
+ * branch or a copied page is all it takes. So the retired spellings are named
+ * here and refused, which is the one thing that turns a silent nothing into a
+ * sentence saying what to write instead.
+ *
+ * @param {string} source the whole page, frontmatter included
+ * @returns {string[]}
+ */
+export function retiredKeysIn(source) {
+	const match = /^---\r?\n([\s\S]*?)\r?\n---/.exec(source);
+	if (!match) return [];
+	const front = parse(match[1]);
+	if (!front || typeof front !== "object") return [];
+	return Object.keys(RETIRED_KEYS).filter((key) => key in front);
 }
 
 /**
@@ -731,6 +765,20 @@ async function walk(dist) {
 			`none of the ${files.length} built pages under ${dist} carries a ` +
 				`.${WRAPPER} wrapper. Either the corpus lost every table or ` +
 				"src/lib/rehype-tables.mjs stopped wrapping them.",
+		);
+	}
+
+	const retired = declaredBy(retiredKeysIn);
+	if (retired.size > 0) {
+		const found = new Set([...retired.values()].flat());
+		throw new Error(
+			[...retired.entries()]
+				.map(([route, keys]) => `/${route} names ${keys.join(" and ")}`)
+				.join(", ") +
+				". A frontmatter key the schema does not know is stripped rather " +
+				"than refused, so that page keeps the form it asked to lose and " +
+				"every check stays green. " +
+				[...found].map((key) => RETIRED_KEYS[key]).join(" "),
 		);
 	}
 
