@@ -92,6 +92,7 @@ func CollectorPoints(runs []FamilyRun, now time.Time) []sink.Point {
 			}),
 			Fields: map[string]any{
 				"repos": run.Repos, "failed": run.Failed, "points": run.Points,
+				"error": errorText(run.Err),
 			},
 			Time: now,
 		})
@@ -102,16 +103,31 @@ func CollectorPoints(runs []FamilyRun, now time.Time) []sink.Point {
 					"family": run.Family, "scope": scopeRepo,
 					"reason": FailureReason(f.Err),
 				}),
-				// The message itself, which is the request and what GitHub
-				// said about it. A field and not a tag: it carries a run id
-				// and a query string, which as a tag is one series per
-				// failure for ever.
-				Fields: map[string]any{"failed": 1, "error": f.Err.Error()},
+				Fields: map[string]any{"failed": 1, "error": errorText(f.Err)},
 				Time:   now,
 			})
 		}
 	}
 	return points
+}
+
+// errorText is the message a row carries, and the sentinel where there is no
+// message to carry.
+//
+// A field and not a tag, because the message names the request and the request
+// carries a run id and a query string, which as a tag is one series per failed
+// call for ever. The sentinel is what a tag would have written anyway, and here
+// it is load-bearing for a different reason: sink.LineProtocol drops an empty
+// string field, so a column only ever written on a failure would not exist at
+// all on an account where nothing has failed, and InfluxDB refuses a query that
+// names a column it has never seen rather than answering it with no rows. The
+// panel that lists the failures would then be broken for exactly the readers
+// who have nothing to fix.
+func errorText(err error) string {
+	if err == nil {
+		return noneTag
+	}
+	return err.Error()
 }
 
 // FailureReason is what stopped a collector, in the few words a reader can

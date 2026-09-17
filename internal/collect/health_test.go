@@ -83,6 +83,14 @@ func TestASweepReportsEveryFamilyItRanAndEveryRepositoryItLost(t *testing.T) {
 	if quiet.Tags["reason"] != noneTag || quiet.Tags["repo"] != noneTag {
 		t.Errorf("a family that failed on nothing is filed under %v", quiet.Tags)
 	}
+	// The one field that would otherwise be written on a failure alone. A
+	// column no point has ever carried does not exist, and InfluxDB refuses a
+	// query that names one rather than answering it with no rows, so the panel
+	// listing the failures would be broken on every account that has none.
+	if quiet.Fields["error"] != noneTag {
+		t.Errorf("a family that failed on nothing carries error=%v, want the sentinel that "+
+			"creates the column", quiet.Fields["error"])
+	}
 	if quiet.Fields["failed"] != 0 || quiet.Fields["repos"] != 59 || quiet.Fields["points"] != 812 {
 		t.Errorf("the traffic row says %v, want 59 repositories, none failed, 812 rows", quiet.Fields)
 	}
