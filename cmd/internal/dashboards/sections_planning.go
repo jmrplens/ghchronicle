@@ -217,7 +217,7 @@ func discussionAndComments(b *builder) []Panel {
 	// per comment: is_answer is a tag, so a comment seen before the
 	// maintainer accepted it and again after is two rows at one instant,
 	// and the one whose answers field says accepted is the later state.
-	elsewhere := `SELECT title AS "Title", time AS "When", repo AS "Repository",` +
+	elsewhere := `SELECT title AS "Title", time AS "When", full_name AS "Repository",` +
 		` answers AS "Accepted", url AS "Link" FROM (SELECT *, ROW_NUMBER() OVER` +
 		" (PARTITION BY comment ORDER BY answers DESC) AS rn FROM gh_discussion_comment" +
 		" WHERE " + wholeHistory + " AND own = 'false') x WHERE rn = 1" +
@@ -234,13 +234,13 @@ func discussionAndComments(b *builder) []Panel {
 		{"has_answer", "Answered"},
 		{"url", "Link"},
 	}, []string{ESF})
-	elsewhereGR, elsewhereGRtf := gTbl(rowsOf(gp(dcc, "comments", "own", "false"), gn(dcc, "repo"),
+	elsewhereGR, elsewhereGRtf := gTbl(rowsOf(gp(dcc, "comments", "own", "false"), gn(dcc, "full_name"),
 		gn(dcc, "number"), gn(dcc, "is_answer")),
 		"Repository, number, accepted", []col{{"lastNotNull", "Comments"}})
 	elsewhereES, elsewhereEStf := b.esRaw(dcc, 50, []named{
 		{"title", "Title"},
 		{panelESTime, "When"},
-		{"repo", "Repository"},
+		{"full_name", "Repository"},
 		{"is_answer", "Accepted"},
 		{"url", "Link"},
 	}, []string{"own:false"})
@@ -264,17 +264,20 @@ func discussionAndComments(b *builder) []Panel {
 			{"u", "Upvotes each"},
 		}, []string{ESF})
 
+	// Both of these are mostly other people's repositories, so the row names
+	// one in full: `repo` is the short name on every measurement now, and two
+	// owners using the same one would be one row here.
 	commentsGR, commentsGRtf := gTbl(rowsOf(countOf(gp("gh_issue_comment", "comments")),
-		gn("gh_issue_comment", "repo")), "Repository", []col{{"sum", "Comments"}})
-	commentsES, commentsEStf := esTbl("gh_issue_comment", []any{b.tm("repo", 20)}, []any{b.mCount()},
-		[]named{{panelRepoField, "Repository"}, {"n", "Comments"}}, nil)
+		gn("gh_issue_comment", "full_name")), "Repository", []col{{"sum", "Comments"}})
+	commentsES, commentsEStf := esTbl("gh_issue_comment", []any{b.tm("full_name", 20)}, []any{b.mCount()},
+		[]named{{panelFullNameField, "Repository"}, {"n", "Comments"}}, nil)
 
 	answersGR, answersGRtf := gTbl(rowsOf(countOf(gp("gh_discussion_comment", "comments")),
-		gn("gh_discussion_comment", "repo")), "Repository", []col{{"sum", "Comments"}})
-	answersES, answersEStf := esTbl("gh_discussion_comment", []any{b.tm("repo", 20)},
+		gn("gh_discussion_comment", "full_name")), "Repository", []col{{"sum", "Comments"}})
+	answersES, answersEStf := esTbl("gh_discussion_comment", []any{b.tm("full_name", 20)},
 		[]any{b.mCount(), b.mSum("answers"), b.mSum("upvotes")},
 		[]named{
-			{panelRepoField, "Repository"},
+			{panelFullNameField, "Repository"},
 			{"n", "Comments"},
 			{"a", "Accepted answers"},
 			{"u", "Upvotes"},
@@ -344,7 +347,7 @@ func discussionAndComments(b *builder) []Panel {
 			ES: []Target{b.esDaily("gh_issue_event", b.mCount(), "event", "", []string{ESF}, "")},
 		}),
 		panel("table", "Comments left", box{W: 12, H: 8, X: 12, Y: 24}, []Target{sqlT(
-			`SELECT repo AS "Repository", COUNT(*) AS "Comments",` +
+			`SELECT full_name AS "Repository", COUNT(*) AS "Comments",` +
 				` MAX(CASE WHEN own = 'false' THEN 1 ELSE 0 END) AS "Elsewhere"` +
 				" FROM gh_issue_comment WHERE $__timeFilter(time)" +
 				" GROUP BY 1 ORDER BY 2 DESC LIMIT 20",
@@ -360,7 +363,7 @@ func discussionAndComments(b *builder) []Panel {
 			ES: commentsES, ESTF: commentsEStf,
 		}),
 		panel("table", "Discussion answers", box{W: 8, H: 8, X: 0, Y: 32}, []Target{sqlT(
-			`SELECT repo AS "Repository", SUM(answers) AS "Accepted answers",` +
+			`SELECT full_name AS "Repository", SUM(answers) AS "Accepted answers",` +
 				` COUNT(*) AS "Comments", SUM(upvotes) AS "Upvotes"` +
 				" FROM gh_discussion_comment WHERE $__timeFilter(time)" +
 				" GROUP BY 1 ORDER BY 2 DESC, 3 DESC LIMIT 20",

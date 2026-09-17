@@ -19,8 +19,11 @@ const (
 	panelWidthField       = "custom.width"
 	panelCellOptionsField = "custom.cellOptions"
 	panelRepoField        = "repo.keyword"
-	panelURLField         = "url.keyword"
-	panelESTime           = "@timestamp"
+	// The full name, for the panels over a measurement that can hold more
+	// than one owner, where the short name identifies nothing.
+	panelFullNameField = "full_name.keyword"
+	panelURLField      = "url.keyword"
+	panelESTime        = "@timestamp"
 )
 
 // Grafana names the value column of a joined query after the query's letter,

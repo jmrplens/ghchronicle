@@ -233,6 +233,7 @@ func TestOnceAgainstFakeGitHub(t *testing.T) {
 		t.Fatalf("only %d points written", len(points))
 	}
 	assertEveryFamilyIsRepresented(t, points)
+	assertOneShapeNamesEveryRepository(t, points)
 	assertTheForkWasFiltered(t, points)
 	assertDatingRulesSurvived(t, points)
 	assertAchievementProgressAgreesWithThePage(t, points, out)
@@ -509,6 +510,64 @@ func assertDatingRulesSurvived(t *testing.T, points []point) {
 			if s, _ := p.Fields["line"].(string); strings.ContainsRune(s, 0x1b) {
 				t.Errorf("job log line kept an escape code: %q", s)
 			}
+		}
+	}
+}
+
+// assertOneShapeNamesEveryRepository holds every point a sweep writes to one
+// way of naming a repository: `owner`, a short `repo` and `full_name`, all
+// three or none of them.
+//
+// This is the runtime half of the rule TestNoCollectorSpellsTheRepositoryTagsItself
+// keeps at the source. That one proves no collector builds the tags itself;
+// this one proves what actually comes out of a sweep, over every family the
+// fake answers, which is where a value that is a full name in the wrong column
+// would show. Three shapes stood side by side before this: sixty-one
+// measurements in this one, twelve with the full name inside `repo` and no
+// owner, and one with neither. A filter written against any of them matched
+// nothing at all in the others, and a union of two counted every repository
+// twice.
+//
+// The slash is the whole test. A `repo` that carries one is a full name in the
+// column that holds short names, which is exactly how the shapes came apart,
+// one collector at a time.
+func assertOneShapeNamesEveryRepository(t *testing.T, points []point) {
+	t.Helper()
+	named := map[string]bool{}
+	for _, p := range points {
+		owner, hasOwner := p.Tags["owner"]
+		repo, hasRepo := p.Tags["repo"]
+		full, hasFull := p.Tags["full_name"]
+		if !hasOwner && !hasRepo && !hasFull {
+			continue
+		}
+		named[p.Measurement] = true
+		if !hasOwner || !hasRepo || !hasFull {
+			t.Errorf("%s names a repository with %v: the three tags travel together, "+
+				"so a query written against one measurement answers in the rest",
+				p.Measurement, p.Tags)
+			continue
+		}
+		if strings.Contains(repo, "/") {
+			t.Errorf("%s has repo=%q, which is a full name in the column that holds "+
+				"short names. It belongs in full_name; repo is what the dashboards' "+
+				"repository variable is built from", p.Measurement, repo)
+		}
+		if want := owner + "/" + repo; full != want && full != "(none)" {
+			t.Errorf("%s has full_name=%q beside owner=%q and repo=%q", p.Measurement, full, owner, repo)
+		}
+	}
+	// A rule nothing is measured against is not a rule. These are the families
+	// that most recently carried the other shape, so a fixture that stopped
+	// answering one of them would take this assertion's reach with it.
+	for _, m := range []string{
+		"gh_repo", "gh_event", "gh_notification", "gh_star_given",
+		"gh_external_contribution", "gh_issue_comment", "gh_discussion_comment",
+		"gh_package", "gh_pinned_item", "gh_contribution_repo", "gh_billing_usage",
+	} {
+		if !named[m] {
+			t.Errorf("no %s point names a repository, so this sweep did not test the shape "+
+				"where it last went wrong; measurements seen: %v", m, sortedNames(named))
 		}
 	}
 }

@@ -64,6 +64,42 @@ func TestNoTagTableEntryOutlivesItsCollector(t *testing.T) {
 	}
 }
 
+// TestEveryRepositoryTagSetIsTheSameShape fails when an entry names a
+// repository in any shape but the one every measurement now uses.
+//
+// The three keys travel together or not at all. `repo` alone was the twelve's
+// old shape, where it held the full name; `owner` and `repo` without
+// `full_name` would leave a reader rejoining a string to get an identity back,
+// which is the work this shape exists to remove. The table is hand-written and
+// decides the node index of every Graphite target, so an entry that drifts
+// takes the paths with it.
+func TestEveryRepositoryTagSetIsTheSameShape(t *testing.T) {
+	t.Parallel()
+	const owner, repo, full = "owner", "repo", "full_name"
+	names := make([]string, 0, len(tags))
+	for name := range tags {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		has := map[string]bool{}
+		for _, tag := range tags[name] {
+			has[tag] = true
+		}
+		if !has[owner] && !has[repo] && !has[full] {
+			continue
+		}
+		if has[owner] && has[repo] && has[full] {
+			continue
+		}
+		t.Errorf("%s names a repository with %v. A measurement that names one carries "+
+			"all three of %q, %q and %q, with %q holding the short name: %q alone is the "+
+			"shape twelve measurements used to have, where it held the full name and no "+
+			"filter built from any other measurement could match it",
+			name, tags[name], owner, repo, full, repo, repo)
+	}
+}
+
 // measurementsInCollectors is every measurement name written as a literal in
 // internal/collect, sorted.
 func measurementsInCollectors(t *testing.T) []string {

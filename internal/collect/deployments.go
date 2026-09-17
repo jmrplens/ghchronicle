@@ -286,7 +286,7 @@ func (Deployments) args(first int, cursor string) string {
 }
 
 func (Deployments) points(repo Repo, nodes []deploymentNode) []sink.Point {
-	base := map[string]string{"owner": repo.Owner, "repo": repo.Name, "full_name": repo.FullName}
+	base := repoTags(repo.Owner, repo.Name)
 	points := make([]sink.Point, 0, len(nodes))
 	for i := range nodes {
 		points = append(points, nodes[i].point(repo, base))

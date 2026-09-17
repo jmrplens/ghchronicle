@@ -114,12 +114,16 @@ func fieldOf(p Point, k string) string {
 	return fmt.Sprint(v)
 }
 
+// Every sentence that names a repository names it in full. `repo` is the short
+// name on every measurement now, and these four are about other people's
+// repositories more often than the account's own: "octocat starred go" says
+// nothing a reader can act on, and two owners can name a repository the same.
 var lokiEvents = map[string]lokiEvent{
 	"gh_star": {kind: "star", message: func(p Point) string {
 		return fmt.Sprintf("%s starred %s", tagOf(p, "user"), tagOf(p, "full_name"))
 	}},
 	"gh_star_given": {kind: "star_given", message: func(p Point) string {
-		return fmt.Sprintf("%s starred %s", tagOf(p, "user"), tagOf(p, "repo"))
+		return fmt.Sprintf("%s starred %s", tagOf(p, "user"), tagOf(p, "full_name"))
 	}},
 	"gh_fork": {kind: "fork", message: func(p Point) string {
 		return fmt.Sprintf("%s forked %s", tagOf(p, "by"), tagOf(p, "full_name"))
@@ -176,10 +180,10 @@ var lokiEvents = map[string]lokiEvent{
 	// No actor: the feed is the account's own, so the actor is the login on
 	// every row and the collector stopped writing it.
 	"gh_event": {kind: "event", message: func(p Point) string {
-		return fmt.Sprintf("%s on %s", tagOf(p, "type"), tagOf(p, "repo"))
+		return fmt.Sprintf("%s on %s", tagOf(p, "type"), tagOf(p, "full_name"))
 	}},
 	"gh_notification": {kind: "notification", message: func(p Point) string {
-		return fmt.Sprintf("%s: %s (%s)", tagOf(p, "repo"), fieldOf(p, "title"), tagOf(p, "reason"))
+		return fmt.Sprintf("%s: %s (%s)", tagOf(p, "full_name"), fieldOf(p, "title"), tagOf(p, "reason"))
 	}},
 	"gh_discussion": {kind: "discussion", message: func(p Point) string {
 		return fmt.Sprintf("discussion in %s (%s), answered %s", tagOf(p, "full_name"),
@@ -194,7 +198,7 @@ var lokiEvents = map[string]lokiEvent{
 		return fieldOf(p, "line")
 	}},
 	"gh_external_contribution": {kind: "external_contribution", message: func(p Point) string {
-		return fmt.Sprintf("%s merged %s#%s", tagOf(p, "user"), tagOf(p, "repo"), tagOf(p, "number"))
+		return fmt.Sprintf("%s merged %s#%s", tagOf(p, "user"), tagOf(p, "full_name"), tagOf(p, "number"))
 	}},
 	// The environment is what a reader is looking for here, so it goes in the
 	// sentence rather than only in the logfmt tail: "which of my environments

@@ -33,7 +33,7 @@ type trafficCount struct {
 }
 
 func (Traffic) Collect(ctx context.Context, c *ghapi.Client, repo Repo, now time.Time) ([]sink.Point, error) {
-	base := map[string]string{"owner": repo.Owner, "repo": repo.Name, "full_name": repo.FullName}
+	base := repoTags(repo.Owner, repo.Name)
 	// GitHub's own traffic graph, which is the page these numbers vanish from
 	// after fourteen days.
 	graph := githubPage(repo.FullName, "graphs", "traffic")

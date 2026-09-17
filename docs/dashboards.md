@@ -646,8 +646,8 @@ creation they would all fall outside every range and read as no tiers at all.
 Pinned items carry the position as a field and not a tag, because a repository
 that moves from slot two to slot three is the same pin, and as a tag every
 rearrangement would fork the series. The repository filter at the top of the
-dashboard does not reach that panel: a pin is named owner/name, or is a gist,
-and the variable holds neither.
+dashboard does not reach that panel: a pin can be a gist, which is named by its
+hash and is in no repository the filter knows.
 
 The achievements are read once a day from the public profile page, because no
 API lists them. Next tier at is the community-observed threshold

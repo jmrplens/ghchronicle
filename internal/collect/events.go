@@ -109,7 +109,7 @@ func (e *Events) Collect(ctx context.Context, c *ghapi.Client, _ time.Time) ([]s
 // a field: nobody groups by it, and a field is where a value that identifies
 // nothing goes.
 func eventPoint(ev *eventRow) sink.Point {
-	tags := map[string]string{"type": ev.Type, "repo": ev.Repo.Name}
+	tags := merge(fullNameTags(ev.Repo.Name), map[string]string{"type": ev.Type})
 	fields := map[string]any{"events": 1, "public": ev.Public}
 	// An event has no page of its own. The repository it happened in does, and
 	// it is the one place a reader can go and see it.
@@ -236,11 +236,10 @@ func (n *Notifications) Collect(ctx context.Context, c *ghapi.Client, _ time.Tim
 			fields["is_unread"] = it.Unread
 			points = append(points, sink.Point{
 				Measurement: "gh_notification",
-				Tags: map[string]string{
-					"reason": it.Reason,
-					"repo":   it.Repository.FullName, "private": boolTag(it.Repository.Private),
+				Tags: merge(fullNameTags(it.Repository.FullName), map[string]string{
+					"reason": it.Reason, "private": boolTag(it.Repository.Private),
 					"subject_type": it.Subject.Type,
-				},
+				}),
 				Fields: fields,
 				Time:   it.UpdatedAt,
 			})

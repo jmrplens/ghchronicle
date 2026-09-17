@@ -64,7 +64,7 @@ var securitySettings = []string{
 }
 
 func (rc RepoCore) Collect(ctx context.Context, c *ghapi.Client, repo Repo, now time.Time) ([]sink.Point, error) {
-	base := map[string]string{"owner": repo.Owner, "repo": repo.Name, "full_name": repo.FullName}
+	base := repoTags(repo.Owner, repo.Name)
 	var points []sink.Point
 
 	var r struct {

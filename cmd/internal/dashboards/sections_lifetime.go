@@ -103,10 +103,14 @@ func lifetime(b *builder) []Panel {
 		") x WHERE rn = 1", "Repository", "Runs", 10)
 	rcr, rar, wrt := "gh_repo_created", "gh_repo_archived", "gh_workflow_run_total"
 
-	// gh_repo_created tags `repo` with owner/name rather than the bare name, so
-	// the $repo variable never matches it and the panel carries no repository
-	// filter in any store: gp() with a wildcard node here, the way the
-	// gh_contribution_repo panel does it, and no ESF on the documents.
+	// No repository filter in any store: gp() with a wildcard node here, the
+	// way the gh_contribution_repo panel does it, and no ESF on the documents.
+	// `repo` is the bare name here like everywhere else now, so the $repo
+	// variable would match it, but the variable is built from gh_repo, which
+	// is the repositories the sweep collects. This measurement is here for the
+	// ones it does not: forks and private repositories that include_forks off
+	// never discovers. Filtering by that list would hide exactly the rows the
+	// panel exists for.
 	createdGR, createdGRtf := gTbl(fmt.Sprintf(`groupByNode(isNonNull(%s), %d, "sum")`,
 		gp(rcr, "created"), gn(rcr, "repo")), "Repository", []col{{"sum", "Created"}})
 	// esRaw rather than a bucket aggregation, and that is what makes the two

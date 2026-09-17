@@ -101,18 +101,11 @@ func (b Billing) Collect(ctx context.Context, c *ghapi.Client, now time.Time) ([
 			day = day.UTC().Truncate(24 * time.Hour)
 			points = append(points, sink.Point{
 				Measurement: "gh_billing_usage",
-				Tags: map[string]string{
-					"user": b.Login, "product": u.Product, "sku": u.SKU,
-					// Both are absent on a charge that belongs to no
-					// repository and on a personal account with no
-					// organization: measured on 2026-09-10, `org` was empty on
-					// all 937 rows of this account and `repo` on the three
-					// Copilot credit rows. An empty tag value is dropped on
-					// the way into InfluxDB, which would split this
-					// measurement into three series with three tag sets.
-					"unit": u.UnitType,
-					"repo": orNone(u.RepositoryName), "org": orNone(u.OrgName),
-				},
+				Tags: merge(billingRepoTags(b.Login, u.OrgName, u.RepositoryName),
+					map[string]string{
+						"user": b.Login, "product": u.Product, "sku": u.SKU,
+						"unit": u.UnitType,
+					}),
 				Fields: map[string]any{
 					"quantity": u.Quantity, "price_per_unit": u.PricePerUnit,
 					"gross": u.GrossAmount, "discount": u.DiscountAmount, "net": u.NetAmount,
@@ -125,4 +118,28 @@ func (b Billing) Collect(ctx context.Context, c *ghapi.Client, now time.Time) ([
 		}
 	}
 	return points, nil
+}
+
+// billingRepoTags names the repository a charge belongs to, in the one shape
+// every other measurement names one in.
+//
+// The `org` tag this replaces was the same dimension as `owner` with half of
+// it left blank. GitHub fills organizationName only when the work was done in
+// an organization, and on a personal account that is never: measured on
+// 2026-09-10 it was the empty string on all 937 rows, so the tag carried the
+// sentinel and nothing else, and a reader asking whose repository burned the
+// minutes had no answer at all. One tag carries it now, filled in both cases.
+//
+// A charge that belongs to no repository names none of the three. Those rows
+// are the monthly Copilot credit, three of the 937, and they are not about a
+// repository, so saying the account owns one would be an invention rather than
+// a fallback.
+func billingRepoTags(login, org, repo string) map[string]string {
+	if repo == "" {
+		return repoTags("", "")
+	}
+	if org != "" {
+		return repoTags(org, repo)
+	}
+	return repoTags(login, repo)
 }

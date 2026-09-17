@@ -643,7 +643,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "groupByNode(isNonNull(github.repo_created.*.*.*.created), 3, \"sum\")",
+              "target": "groupByNode(isNonNull(github.repo_created.*.*.*.*.*.created), 5, \"sum\")",
               "textEditor": true
             }
           ],
@@ -2400,7 +2400,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "aliasByNode(limit(sortByMaxima(github.contribution_repo.commits.*.*.commits), 25), 3)",
+              "target": "aliasByNode(limit(sortByMaxima(github.contribution_repo.*.commits.*.*.*.commits), 25), 5)",
               "textEditor": true
             }
           ],
@@ -2611,7 +2611,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "consolidateBy(groupByNode(summarize(github.contribution_day_repo.*.*.*.*.commits, \"1d\", \"sum\"), 4, \"sum\"), \"sum\")",
+              "target": "consolidateBy(groupByNode(summarize(github.contribution_day_repo.*.*.*.*.*.*.commits, \"1d\", \"sum\"), 2, \"sum\"), \"sum\")",
               "textEditor": true
             }
           ],
@@ -2664,7 +2664,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "groupByNodes(github.contribution_day_repo.*.*.*.*.commits, \"sum\", 2, 3)",
+              "target": "groupByNodes(github.contribution_day_repo.*.*.*.*.*.*.commits, \"sum\", 3, 5)",
               "textEditor": true
             }
           ],
@@ -7683,7 +7683,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "aliasByNode(sumSeries(isNonNull(github.issue_comment.*.*.*.*.comments)), 4)",
+              "target": "aliasByNode(sumSeries(isNonNull(github.issue_comment.*.*.*.*.*.*.comments)), 2)",
               "textEditor": true
             }
           ],
@@ -7798,7 +7798,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "aliasByNode(sumSeries(isNonNull(github.discussion_comment.*.*.*.*.*.*.*.*.comments)), 8)",
+              "target": "aliasByNode(sumSeries(isNonNull(github.discussion_comment.*.*.*.*.*.*.*.*.*.*.comments)), 4)",
               "textEditor": true
             }
           ],
@@ -7940,7 +7940,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "aliasByNode(github.discussion_comment.*.*.*.*.*.false.*.*.comments, 8, 6, 4)",
+              "target": "aliasByNode(github.discussion_comment.*.*.*.*.*.*.false.*.*.*.comments, 4, 7, 5)",
               "textEditor": true
             }
           ],
@@ -11726,25 +11726,25 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "alias(summarize(sumSeries(github.billing_usage.*.*.*.*.*.*.gross), \"100y\", \"sum\", true), \"Gross\")",
+              "target": "alias(summarize(sumSeries(github.billing_usage.*.*.*.*.*.*.*.gross), \"100y\", \"sum\", true), \"Gross\")",
               "textEditor": true
             },
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "B",
-              "target": "alias(summarize(sumSeries(github.billing_usage.*.*.*.*.*.*.discount), \"100y\", \"sum\", true), \"Covered by the plan\")",
+              "target": "alias(summarize(sumSeries(github.billing_usage.*.*.*.*.*.*.*.discount), \"100y\", \"sum\", true), \"Covered by the plan\")",
               "textEditor": true
             },
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "C",
-              "target": "alias(summarize(sumSeries(github.billing_usage.*.*.*.*.*.*.net), \"100y\", \"sum\", true), \"Actually billed\")",
+              "target": "alias(summarize(sumSeries(github.billing_usage.*.*.*.*.*.*.*.net), \"100y\", \"sum\", true), \"Actually billed\")",
               "textEditor": true
             },
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "D",
-              "target": "alias(summarize(sumSeries(github.billing_usage.*.*.*.*.Minutes.*.quantity), \"100y\", \"sum\", true), \"Actions minutes\")",
+              "target": "alias(summarize(sumSeries(github.billing_usage.*.*.*.*.*.Minutes.*.quantity), \"100y\", \"sum\", true), \"Actions minutes\")",
               "textEditor": true
             }
           ],
@@ -11804,7 +11804,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "consolidateBy(groupByNode(summarize(github.billing_usage.*.*.*.*.*.*.gross, \"1d\", \"sum\"), 3, \"sum\"), \"sum\")",
+              "target": "consolidateBy(groupByNode(summarize(github.billing_usage.*.*.*.*.*.*.*.gross, \"1d\", \"sum\"), 4, \"sum\"), \"sum\")",
               "textEditor": true
             }
           ],
@@ -11865,7 +11865,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "consolidateBy(groupByNode(summarize(github.billing_usage.*.*.*.*.Minutes.*.quantity, \"1d\", \"sum\"), 5, \"sum\"), \"sum\")",
+              "target": "consolidateBy(groupByNode(summarize(github.billing_usage.*.*.*.*.*.Minutes.*.quantity, \"1d\", \"sum\"), 6, \"sum\"), \"sum\")",
               "textEditor": true
             }
           ],
@@ -12036,7 +12036,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "limit(sortByTotal(exclude(aliasByNode(github.billing_usage.*.*.*.*.*.*.gross, 4, 5), \"^none\\.\")), 40)",
+              "target": "limit(sortByTotal(exclude(aliasByNode(github.billing_usage.*.*.*.*.*.*.*.gross, 5, 6), \"^none\\.\")), 40)",
               "textEditor": true
             }
           ],
@@ -12400,7 +12400,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "consolidateBy(groupByNode(summarize(github.event.*.*.*.*.events, \"1h\", \"sum\"), -2, \"sum\"), \"sum\")",
+              "target": "consolidateBy(groupByNode(summarize(github.event.*.*.*.*.*.*.events, \"1h\", \"sum\"), -2, \"sum\"), \"sum\")",
               "textEditor": true
             }
           ],
@@ -12460,7 +12460,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "groupByNode(github.event.*.*.*.*.events, -2, \"sum\")",
+              "target": "groupByNode(github.event.*.*.*.*.*.*.events, -2, \"sum\")",
               "textEditor": true
             }
           ],
@@ -12536,7 +12536,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "limit(sortByTotal(groupByNode(github.event.*.*.*.*.events, -3, \"sum\")), 20)",
+              "target": "limit(sortByTotal(groupByNode(github.event.*.*.*.*.*.*.events, 3, \"sum\")), 20)",
               "textEditor": true
             }
           ],
@@ -12651,7 +12651,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "limit(sortByTotal(groupByNodes(github.notification.*.*.*.*.notifications, \"sum\", 3, 5)), 25)",
+              "target": "limit(sortByTotal(groupByNodes(github.notification.*.*.*.*.*.*.notifications, \"sum\", 5, 7)), 25)",
               "textEditor": true
             }
           ],
@@ -12735,7 +12735,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "consolidateBy(groupByNode(summarize(github.notification.*.*.*.*.notifications, \"1d\", \"sum\"), 3, \"sum\"), \"sum\")",
+              "target": "consolidateBy(groupByNode(summarize(github.notification.*.*.*.*.*.*.notifications, \"1d\", \"sum\"), 5, \"sum\"), \"sum\")",
               "textEditor": true
             }
           ],
@@ -12884,7 +12884,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "aliasByNode(github.external_contribution.*.*.*.*.*.comments, 4, 2, 3, 5)",
+              "target": "aliasByNode(github.external_contribution.*.*.*.*.*.*.*.comments, 2, 3, 4, 7)",
               "textEditor": true
             }
           ],
@@ -12960,7 +12960,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "limit(sortByMaxima(groupByNode(sumSeries(isNonNull(github.star_given.*.*.*.stars)), 2, \"sum\")), 12)",
+              "target": "limit(sortByMaxima(groupByNode(sumSeries(isNonNull(github.star_given.*.*.*.*.*.stars)), 3, \"sum\")), 12)",
               "textEditor": true
             }
           ],
@@ -13098,7 +13098,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "aliasByNode(keepLastValue(github.star_given.*.*.*.repo_stars), 3)",
+              "target": "aliasByNode(keepLastValue(github.star_given.*.*.*.*.*.repo_stars), 2)",
               "textEditor": true
             }
           ],
@@ -13991,7 +13991,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "aliasByNode(github.package.*.*.*.*.*.versions, 2, 4)",
+              "target": "aliasByNode(github.package.*.*.*.*.*.*.*.versions, 4, 6)",
               "textEditor": true
             }
           ],
@@ -14292,7 +14292,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "groupByNode(isNonNull(github.package_version.*.*.*.*.*.*.published), 2, \"sum\")",
+              "target": "groupByNode(isNonNull(github.package_version.*.*.*.*.*.*.*.*.published), 4, \"sum\")",
               "textEditor": true
             }
           ],
@@ -15688,7 +15688,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "What the profile shows first, in the order it shows it. The row worth seeing is a pinned repository nobody has pushed to in two years. Position is a field and not a tag on purpose: a repository that moves from slot two to slot three is the same pin, and as a tag every rearrangement would fork the series. The repository filter at the top of the dashboard does not reach this panel, because a pin is named owner/name, or is a gist, and the variable holds neither. Graphite has no strings either, so this is the slot each pin sits in. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "What the profile shows first, in the order it shows it. The row worth seeing is a pinned repository nobody has pushed to in two years. Position is a field and not a tag on purpose: a repository that moves from slot two to slot three is the same pin, and as a tag every rearrangement would fork the series. The repository filter at the top of the dashboard does not reach this panel, because a pin can be a gist, which is named by its hash and is in no repository the filter knows. Graphite has no strings either, so this is the slot each pin sits in. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -15779,7 +15779,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "aliasByNode(keepLastValue(github.pinned_item.*.*.position), 2)",
+              "target": "aliasByNode(keepLastValue(github.pinned_item.*.*.*.*.position), 4)",
               "textEditor": true
             }
           ],

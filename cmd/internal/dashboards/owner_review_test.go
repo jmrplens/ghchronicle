@@ -287,7 +287,7 @@ func TestDiscussionsAreListedOneByOne(t *testing.T) {
 		// is a tag, so a comment seen before it was accepted and again after
 		// is two rows at one instant, and without the partition it read twice.
 		"Answers elsewhere": {
-			`title AS "Title"`, `repo AS "Repository"`, `url AS "Link"`, `answers AS "Accepted"`,
+			`title AS "Title"`, `full_name AS "Repository"`, `url AS "Link"`, `answers AS "Accepted"`,
 			"INTERVAL '30 years'", "own = 'false'", "PARTITION BY comment ORDER BY answers DESC",
 		},
 	} {

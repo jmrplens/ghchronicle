@@ -25,7 +25,12 @@ func activity(b *builder) []Panel {
 		" WHERE $__timeFilter(time) GROUP BY 1", "Type", "Events", topSeriesKept)
 	// Ten bars and the rest folded: twenty labels in seven units of height
 	// could not be read at all.
-	byRepo := otherRows(`SELECT repo AS "Repository", SUM(events) AS "Events",`+
+	// Named in full here and in every other panel over a measurement that can
+	// hold more than one owner. `repo` is the short name on every measurement
+	// now, and the feed, the inbox, the outbound contributions and the stars
+	// given are mostly about other people's repositories, where a bare name
+	// identifies nothing and two owners using the same one become one row.
+	byRepo := otherRows(`SELECT full_name AS "Repository", SUM(events) AS "Events",`+
 		" ROW_NUMBER() OVER (ORDER BY SUM(events) DESC) AS rn FROM gh_event"+
 		" WHERE $__timeFilter(time) GROUP BY 1", "Repository", "Events", 10)
 	notif := "SELECT " + timeBin + ", reason AS series," +
@@ -38,7 +43,7 @@ func activity(b *builder) []Panel {
 	// reason and the curve by day, and neither can open the comment that
 	// caused one. `notifications` is how many updates the thread had in the
 	// sweep, which is what makes a busy thread stand out from a quiet one.
-	latest := `SELECT title AS "Title", time AS "Updated", repo AS "Repository",` +
+	latest := `SELECT title AS "Title", time AS "Updated", full_name AS "Repository",` +
 		` subject_type AS "Kind", reason AS "Reason", notifications AS "Updates",` +
 		` url AS "Link"` +
 		" FROM gh_notification WHERE $__timeFilter(time) ORDER BY time DESC LIMIT 25"
@@ -46,11 +51,11 @@ func activity(b *builder) []Panel {
 	// row's time is when it was seen and not when it was opened; the day it
 	// was opened is the row's time minus how long it has been open, and the
 	// newest row of each item is the one listed.
-	external := `SELECT repo AS "Repository", ` + agoSQL("time", "seconds_open") + ` AS "Opened",` +
+	external := `SELECT full_name AS "Repository", ` + agoSQL("time", "seconds_open") + ` AS "Opened",` +
 		` time AS "Seen", kind AS "Kind",` +
 		` state AS "State", title AS "Title", comments AS "Comments",` +
 		` url AS "Link" FROM (` +
-		"SELECT *, ROW_NUMBER() OVER (PARTITION BY repo, kind, number ORDER BY time DESC) AS rn" +
+		"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, kind, number ORDER BY time DESC) AS rn" +
 		" FROM gh_external_contribution WHERE $__timeFilter(time)) x WHERE rn = 1" +
 		" ORDER BY time DESC LIMIT 40"
 	ev, nt, ec := "gh_event", "gh_notification", "gh_external_contribution"
@@ -62,11 +67,11 @@ func activity(b *builder) []Panel {
 		[]named{{"type.keyword", "Type"}, {"e", "Events"}}, nil)
 
 	repoGR, repoGRtf := gTbl(fmt.Sprintf(
-		`limit(sortByTotal(groupByNode(%s, -3, "sum")), 20)`, events("events"),
+		`limit(sortByTotal(groupByNode(%s, %d, "sum")), 20)`, events("events"), gn(ev, "full_name"),
 	),
 		"Repository", []col{{"sum", "Events"}})
-	repoES, repoEStf := esTbl(ev, []any{b.tm("repo", 20, "1")}, []any{b.mSum("events")},
-		[]named{{"repo.keyword", "Repository"}, {"e", "Events"}}, nil)
+	repoES, repoEStf := esTbl(ev, []any{b.tm("full_name", 20, "1")}, []any{b.mSum("events")},
+		[]named{{"full_name.keyword", "Repository"}, {"e", "Events"}}, nil)
 
 	notifGR, notifGRtf := gTbl(fmt.Sprintf(
 		`limit(sortByTotal(groupByNodes(%s, "sum", %d, %d)), 25)`,
@@ -83,7 +88,7 @@ func activity(b *builder) []Panel {
 
 	latestES, latestEStf := b.esRaw(nt, 25, []named{
 		{panelESTime, "Updated"},
-		{"repo", "Repository"},
+		{"full_name", "Repository"},
 		{"subject_type", "Kind"},
 		{"reason", "Reason"},
 		{"title", "Title"},
@@ -91,12 +96,12 @@ func activity(b *builder) []Panel {
 		{"url", "Link"},
 	}, nil)
 
-	extGR, extGRtf := gTbl(rowsOf(gp(ec, "comments"), gn(ec, "repo"), gn(ec, "kind"),
+	extGR, extGRtf := gTbl(rowsOf(gp(ec, "comments"), gn(ec, "full_name"), gn(ec, "kind"),
 		gn(ec, "number"), gn(ec, "state")),
 		"Repository, kind, number, state", []col{{"lastNotNull", "Comments"}})
 	extES, extEStf := b.esRaw(ec, 40, []named{
 		{panelESTime, "Seen"},
-		{"repo", "Repository"},
+		{"full_name", "Repository"},
 		{"kind", "Kind"},
 		{"state", "State"},
 		{"title", "Title"},
@@ -186,12 +191,12 @@ func activity(b *builder) []Panel {
 		panel("table", "Work elsewhere", box{W: 24, H: 9, X: 0, Y: 31},
 			[]Target{sqlT(external)}, &P{
 				Prom: []Target{
-					promTbl("sum by (repo) (increase(github_external_contributions_total[$__range]))", "A"),
-					promTbl("avg by (repo) (github_external_contributions_merged_mean)", "B"),
-					promTbl("avg by (repo) (github_external_contributions_comments_mean)", "C"),
+					promTbl("sum by (full_name) (increase(github_external_contributions_total[$__range]))", "A"),
+					promTbl("avg by (full_name) (github_external_contributions_merged_mean)", "B"),
+					promTbl("avg by (full_name) (github_external_contributions_comments_mean)", "C"),
 				},
 				PromTF: merged(map[string]string{
-					"repo": "Repository", panelValueA: "Contributions", panelValueB: "Merged",
+					"full_name": "Repository", panelValueA: "Contributions", panelValueB: "Merged",
 					panelValueC: "Comments",
 				}, nil, nil),
 				Desc: "Pull requests and issues opened in repositories this account does not own, " +
@@ -229,10 +234,10 @@ func starsGiven(b *builder) []Panel {
 		[]named{{"language.keyword", "Language"}, {"n", overviewStarsGiven}}, nil)
 
 	starGR, starGRtf := gTbl(rowsOf("keepLastValue("+gp("gh_star_given", "repo_stars")+")",
-		gn("gh_star_given", "repo")), "Repository", []col{{"lastNotNull", activityItsStars}})
+		gn("gh_star_given", "full_name")), "Repository", []col{{"lastNotNull", activityItsStars}})
 	starES, starEStf := b.esRaw("gh_star_given", 25, []named{
 		{panelESTime, "When"},
-		{"repo", "Repository"},
+		{"full_name", "Repository"},
 		{"language", "Language"},
 		{"repo_stars", activityItsStars},
 		{"url", "Link"},
@@ -256,7 +261,7 @@ func starsGiven(b *builder) []Panel {
 			ES: langES, ESTF: langEStf,
 		}),
 		panel("table", "Recently starred", box{W: 12, H: 8, X: 12, Y: 40}, []Target{sqlT(
-			`SELECT repo AS "Repository", time AS "When",` +
+			`SELECT full_name AS "Repository", time AS "When",` +
 				` language AS "Language", repo_stars AS "Its stars",` +
 				` url AS "Link"` +
 				" FROM gh_star_given WHERE $__timeFilter(time)" +

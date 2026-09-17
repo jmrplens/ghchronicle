@@ -25,7 +25,7 @@ type Settings struct {
 }
 
 func (s Settings) Collect(ctx context.Context, c *ghapi.Client, repo Repo, now time.Time) ([]sink.Point, error) {
-	base := map[string]string{"owner": repo.Owner, "repo": repo.Name, "full_name": repo.FullName}
+	base := repoTags(repo.Owner, repo.Name)
 	var points []sink.Point
 	for _, read := range []func(context.Context, *ghapi.Client, Repo, map[string]string, time.Time) ([]sink.Point, error){
 		s.webhookPoints, environmentPoints, deployKeyPoints,

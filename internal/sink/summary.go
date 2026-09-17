@@ -63,11 +63,18 @@ type rule struct {
 	labels []string
 }
 
+// The three tags that name a repository travel together wherever a rule keeps
+// one, the way gh_repo has always kept them. The short name is not an identity:
+// four of these reduce measurements that hold other people's repositories as
+// well as the account's own, and two owners can name a repository the same
+// thing, which by `repo` alone collapses into one series that is the sum of
+// two. They cost no extra series, since each of the three is decided by the
+// others, and they let a panel group by whichever one it means.
 var promRules = map[string]rule{
 	// Account-wide snapshots.
 	"gh_account":             {mode: keepLast, keep: []string{"user"}},
 	"gh_contributions_total": {mode: keepLast, keep: []string{"user"}},
-	"gh_contribution_repo":   {mode: keepLast, keep: []string{"user", "repo", "kind"}},
+	"gh_contribution_repo":   {mode: keepLast, keep: []string{"user", "owner", "repo", "full_name", "kind"}},
 	"gh_social_account":      {mode: keepLast, keep: []string{"user", "provider"}},
 	"gh_achievement":         {mode: keepLast, keep: []string{"user", "achievement"}},
 	// The progress beside each badge: a daily snapshot like the badge, and
@@ -80,7 +87,7 @@ var promRules = map[string]rule{
 	// so the newest reading is the only one that means anything: which
 	// repositories are pinned and where, which badges the account wears, and
 	// what the sponsors page earns and is owed.
-	"gh_pinned_item":      {mode: keepLast, keep: []string{"user", "repo"}},
+	"gh_pinned_item":      {mode: keepLast, keep: []string{"user", "owner", "repo", "full_name"}},
 	"gh_profile_flag":     {mode: keepLast, keep: []string{"user", "flag"}},
 	"gh_sponsors_listing": {mode: keepLast, keep: []string{"user"}},
 	// Tiers are inventory rather than a stream. The collector anchors them to
@@ -116,7 +123,7 @@ var promRules = map[string]rule{
 	// Windows that only mean anything added up.
 	"gh_traffic":          {mode: sum, keep: []string{"repo", "kind"}},
 	"gh_traffic_referrer": {mode: sum, keep: []string{"repo", "referrer"}},
-	"gh_billing_usage":    {mode: sum, keep: []string{"product", "sku", "unit", "repo"}},
+	"gh_billing_usage":    {mode: sum, keep: []string{"product", "sku", "unit", "owner", "repo", "full_name"}},
 
 	// Dated items, reduced to a count and the mean of their numbers.
 	"gh_pull_request": {mode: count, as: "gh_pull_requests", keep: []string{"repo", "state"}},
@@ -189,7 +196,7 @@ var promRules = map[string]rule{
 	"gh_code_scanning_analysis": {mode: count, as: "gh_code_scanning_analyses", keep: []string{"repo", "tool"}},
 	"gh_fork":                   {mode: count, as: "gh_forks_seen", keep: []string{"repo"}},
 	"gh_star_given":             {mode: count, as: "gh_stars_given", keep: []string{"user"}},
-	"gh_external_contribution":  {mode: count, as: "gh_external_contributions", keep: []string{"user", "repo"}},
+	"gh_external_contribution":  {mode: count, as: "gh_external_contributions", keep: []string{"user", "owner", "repo", "full_name"}},
 	"gh_dependabot_alert_item":  {mode: count, as: "gh_dependabot_alerts", keep: []string{"repo", "severity"}, labels: []string{"alert_state"}},
 	"gh_label":                  {mode: keepLast, keep: []string{"repo", "label"}},
 	"gh_milestone":              {mode: keepLast, keep: []string{"repo", "milestone", "state"}},

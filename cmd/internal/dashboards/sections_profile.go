@@ -580,10 +580,10 @@ func profileStanding(b *builder) []Panel {
 		}, nil)
 
 	return []Panel{
-		// No repository filter anywhere in this panel. `repo` here is
-		// owner/name, or the name of a gist, and the dashboard variable holds
-		// bare repository names, so every one of the five filters would match
-		// nothing at all rather than narrowing anything.
+		// No repository filter anywhere in this panel. `repo` is the bare
+		// name here like everywhere else now, but a pinned gist is named by
+		// its hash and the variable is built from gh_repo, so each of the five
+		// filters would drop every gist from a closed list of six rows.
 		//
 		// Ten rows high, like Achievements: the two tables on this row are
 		// closed lists (six pinned items is GitHub's ceiling, eight flags is
@@ -607,8 +607,8 @@ func profileStanding(b *builder) []Panel {
 				"and not a tag on purpose: a repository that moves from slot two to slot three " +
 				"is the same pin, and as a tag every rearrangement would fork the series. The " +
 				"repository filter at the top of the dashboard does not reach this panel, " +
-				"because a pin is named owner/name, or is a gist, and the variable holds " +
-				"neither.",
+				"because a pin can be a gist, which is named by its hash and is in no " +
+				"repository the filter knows.",
 			PromDesc: "Prometheus keeps the numbers; the kind is a string and does not survive " +
 				"as a metric.",
 			Overrides: []any{

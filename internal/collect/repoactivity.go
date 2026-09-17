@@ -19,7 +19,7 @@ import (
 type RepoActivity struct{}
 
 func (RepoActivity) Collect(ctx context.Context, c *ghapi.Client, repo Repo, now time.Time) ([]sink.Point, error) {
-	base := map[string]string{"owner": repo.Owner, "repo": repo.Name, "full_name": repo.FullName}
+	base := repoTags(repo.Owner, repo.Name)
 	var points []sink.Point
 	for _, read := range []func(context.Context, *ghapi.Client, Repo, map[string]string, time.Time) ([]sink.Point, error){
 		weeklyCommitPoints, punchCardPoints, workflowPoints,
@@ -312,7 +312,7 @@ func (d Discussions) Collect(ctx context.Context, c *ghapi.Client, repo Repo, _ 
 			Discussions discussionConnection `json:"discussions"`
 		} `json:"repository"`
 	}
-	base := map[string]string{"owner": repo.Owner, "repo": repo.Name, "full_name": repo.FullName}
+	base := repoTags(repo.Owner, repo.Name)
 	var points []sink.Point
 	after := ""
 	most := d.Walk.limit(1)
@@ -451,15 +451,15 @@ func discussionComment(user, full string, d *discussionNode, c threadComment) si
 	d.context().addTo(fields)
 	return sink.Point{
 		Measurement: "gh_discussion_comment",
-		Tags: map[string]string{
-			"user": user, "repo": full,
+		Tags: merge(fullNameTags(full), map[string]string{
+			"user":      user,
 			"own":       boolTag(isOwn(full, user)),
 			"is_answer": boolTag(c.IsAnswer),
 			"is_reply":  boolTag(c.ReplyTo != 0),
 			"author":    c.By,
 			"comment":   strconv.FormatInt(c.ID, 10),
 			"number":    strconv.Itoa(d.Number),
-		},
+		}),
 		Fields: fields,
 		Time:   c.When,
 	}

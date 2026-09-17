@@ -3905,10 +3905,10 @@
           },
           "targets": [
             {
-              "alias": "{{term repo.keyword}}",
+              "alias": "{{term full_name.keyword}}",
               "bucketAggs": [
                 {
-                  "field": "repo.keyword",
+                  "field": "full_name.keyword",
                   "id": "83",
                   "settings": {
                     "min_doc_count": "1",
@@ -11052,7 +11052,7 @@
             {
               "bucketAggs": [
                 {
-                  "field": "repo.keyword",
+                  "field": "full_name.keyword",
                   "id": "250",
                   "settings": {
                     "min_doc_count": "1",
@@ -11084,7 +11084,7 @@
                 "indexByName": {},
                 "renameByName": {
                   "Count": "Comments",
-                  "repo.keyword": "Repository"
+                  "full_name.keyword": "Repository"
                 }
               }
             }
@@ -11176,7 +11176,7 @@
             {
               "bucketAggs": [
                 {
-                  "field": "repo.keyword",
+                  "field": "full_name.keyword",
                   "id": "252",
                   "settings": {
                     "min_doc_count": "1",
@@ -11220,7 +11220,7 @@
                   "Count": "Comments",
                   "Sum answers": "Accepted answers",
                   "Sum upvotes": "Upvotes",
-                  "repo.keyword": "Repository"
+                  "full_name.keyword": "Repository"
                 }
               }
             }
@@ -11405,22 +11405,22 @@
                 "excludeByName": {},
                 "includeByName": {
                   "@timestamp": true,
+                  "full_name": true,
                   "is_answer": true,
-                  "repo": true,
                   "title": true,
                   "url": true
                 },
                 "indexByName": {
                   "@timestamp": 1,
+                  "full_name": 2,
                   "is_answer": 3,
-                  "repo": 2,
                   "title": 0,
                   "url": 4
                 },
                 "renameByName": {
                   "@timestamp": "When",
+                  "full_name": "Repository",
                   "is_answer": "Accepted",
-                  "repo": "Repository",
                   "title": "Title",
                   "url": "Link"
                 }
@@ -18141,7 +18141,7 @@
             {
               "bucketAggs": [
                 {
-                  "field": "repo.keyword",
+                  "field": "full_name.keyword",
                   "id": "424",
                   "settings": {
                     "min_doc_count": "1",
@@ -18174,7 +18174,7 @@
                 "indexByName": {},
                 "renameByName": {
                   "Sum": "Events",
-                  "repo.keyword": "Repository"
+                  "full_name.keyword": "Repository"
                 }
               }
             }
@@ -18581,27 +18581,27 @@
                 "excludeByName": {},
                 "includeByName": {
                   "@timestamp": true,
+                  "full_name": true,
                   "notifications": true,
                   "reason": true,
-                  "repo": true,
                   "subject_type": true,
                   "title": true,
                   "url": true
                 },
                 "indexByName": {
                   "@timestamp": 0,
+                  "full_name": 1,
                   "notifications": 5,
                   "reason": 3,
-                  "repo": 1,
                   "subject_type": 2,
                   "title": 4,
                   "url": 6
                 },
                 "renameByName": {
                   "@timestamp": "Updated",
+                  "full_name": "Repository",
                   "notifications": "Updates",
                   "reason": "Reason",
-                  "repo": "Repository",
                   "subject_type": "Kind",
                   "title": "Title",
                   "url": "Link"
@@ -18787,8 +18787,8 @@
                 "includeByName": {
                   "@timestamp": true,
                   "comments": true,
+                  "full_name": true,
                   "kind": true,
-                  "repo": true,
                   "state": true,
                   "title": true,
                   "url": true
@@ -18796,8 +18796,8 @@
                 "indexByName": {
                   "@timestamp": 0,
                   "comments": 5,
+                  "full_name": 1,
                   "kind": 2,
-                  "repo": 1,
                   "state": 3,
                   "title": 4,
                   "url": 6
@@ -18805,8 +18805,8 @@
                 "renameByName": {
                   "@timestamp": "Seen",
                   "comments": "Comments",
+                  "full_name": "Repository",
                   "kind": "Kind",
-                  "repo": "Repository",
                   "state": "State",
                   "title": "Title",
                   "url": "Link"
@@ -19063,22 +19063,22 @@
                 "excludeByName": {},
                 "includeByName": {
                   "@timestamp": true,
+                  "full_name": true,
                   "language": true,
-                  "repo": true,
                   "repo_stars": true,
                   "url": true
                 },
                 "indexByName": {
                   "@timestamp": 0,
+                  "full_name": 1,
                   "language": 2,
-                  "repo": 1,
                   "repo_stars": 3,
                   "url": 4
                 },
                 "renameByName": {
                   "@timestamp": "When",
+                  "full_name": "Repository",
                   "language": "Language",
-                  "repo": "Repository",
                   "repo_stars": "Its stars",
                   "url": "Link"
                 }
@@ -22931,7 +22931,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "What the profile shows first, in the order it shows it. The row worth seeing is a pinned repository nobody has pushed to in two years. Position is a field and not a tag on purpose: a repository that moves from slot two to slot three is the same pin, and as a tag every rearrangement would fork the series. The repository filter at the top of the dashboard does not reach this panel, because a pin is named owner/name, or is a gist, and the variable holds neither. Elasticsearch takes the newest position of each pin, and the largest stars and idle days inside the range rather than the newest ones, because a gist carries neither field and only an aggregation that can answer null keeps its row. Stars only grow, so the largest is the current count. Idle days reset to 0 on a push, so a pin that was pushed to inside the range still reads as idle here until the range has rolled past the push.",
+          "description": "What the profile shows first, in the order it shows it. The row worth seeing is a pinned repository nobody has pushed to in two years. Position is a field and not a tag on purpose: a repository that moves from slot two to slot three is the same pin, and as a tag every rearrangement would fork the series. The repository filter at the top of the dashboard does not reach this panel, because a pin can be a gist, which is named by its hash and is in no repository the filter knows. Elasticsearch takes the newest position of each pin, and the largest stars and idle days inside the range rather than the newest ones, because a gist carries neither field and only an aggregation that can answer null keeps its row. Stars only grow, so the largest is the current count. Idle days reset to 0 on a push, so a pin that was pushed to inside the range still reads as idle here until the range has rolled past the push.",
           "fieldConfig": {
             "defaults": {
               "custom": {

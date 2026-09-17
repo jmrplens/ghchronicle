@@ -305,7 +305,7 @@ func (p Pulls) Collect(ctx context.Context, c *ghapi.Client, repo Repo, now time
 			Issues       issueConnection `json:"issues"`
 		} `json:"repository"`
 	}
-	base := map[string]string{"owner": repo.Owner, "repo": repo.Name, "full_name": repo.FullName}
+	base := repoTags(repo.Owner, repo.Name)
 	var points []sink.Point
 
 	// Two cursors, one per connection, walked in the same query while both

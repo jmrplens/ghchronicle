@@ -51,7 +51,8 @@ func TestEventsPointsAndPayloads(t *testing.T) {
 		t.Errorf("a short page ends the walk, made %d calls", n)
 	}
 	push := find(t, points, "gh_event", map[string]string{"type": "PushEvent"})
-	if push.Tags["repo"] != "octocat/hello-world" {
+	if push.Tags["full_name"] != "octocat/hello-world" || push.Tags["owner"] != "octocat" ||
+		push.Tags["repo"] != "hello-world" {
 		t.Errorf("push tags = %v", push.Tags)
 	}
 	// The feed is the account's own, so the actor was the login on every row
@@ -124,7 +125,9 @@ func TestNotifications(t *testing.T) {
 		t.Fatalf("got %d notifications, want 5", len(points))
 	}
 	mention := find(t, points, "gh_notification", map[string]string{"reason": "mention"})
-	if mention.Tags["subject_type"] != "Issue" || mention.Tags["repo"] != "octocat/hello-world" || mention.Tags["private"] != "false" {
+	if mention.Tags["subject_type"] != "Issue" || mention.Tags["full_name"] != "octocat/hello-world" ||
+		mention.Tags["owner"] != "octocat" || mention.Tags["repo"] != "hello-world" ||
+		mention.Tags["private"] != "false" {
 		t.Errorf("mention tags = %v", mention.Tags)
 	}
 	// Reading a thread does not move its updated_at, so as a tag the read

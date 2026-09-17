@@ -46,10 +46,20 @@ func isSkippable(err error) bool {
 	return errors.As(err, &unavailable) || errors.As(err, &notReady)
 }
 
-func merge(base, extra map[string]string) map[string]string {
-	out := make(map[string]string, len(base)+len(extra))
+// merge copies its arguments left to right into a new map, so a later one wins
+// where two set the same key. Variadic because a point's tag set is now built
+// from three parts as often as from two: what the collector shares, the three
+// tags that name the repository, and what this one point adds.
+func merge(base map[string]string, extra ...map[string]string) map[string]string {
+	size := len(base)
+	for _, e := range extra {
+		size += len(e)
+	}
+	out := make(map[string]string, size)
 	maps.Copy(out, base)
-	maps.Copy(out, extra)
+	for _, e := range extra {
+		maps.Copy(out, e)
+	}
 	return out
 }
 

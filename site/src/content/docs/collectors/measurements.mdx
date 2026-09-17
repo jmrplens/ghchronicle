@@ -19,7 +19,32 @@ the thing that decides which questions it can answer.
 | **now**   | A current state, which only makes sense as "what is true at this moment"                                                            |
 
 Every measurement carries `owner`, `repo` and `full_name` as tags unless it is
-account-wide, in which case it carries `user`. Most of them also carry a `url`
+account-wide, in which case it carries `user`. The three travel together or not
+at all, and `repo` is always the short name, on somebody else's repository as
+much as on your own: `owner=golang`, `repo=go`, `full_name=golang/go`. That is
+what lets a filter written for one measurement answer in every other, and it is
+what the dashboards' repository variable is built from. The short name is not an
+identity, since two owners can use the same one, so a query that needs identity
+groups by `full_name` and one that needs a person groups by `owner`.
+
+That has not always been true of all of them. Twelve
+carried no `owner` and put the full name inside `repo`, and `gh_billing_usage`
+had a short `repo`, no `owner` and an `org`. The three shapes did not overlap at
+all, which is worse than overlapping badly: a filter built from one of them
+matched nothing whatsoever in the others, and a union of two counted every
+repository twice. They are one shape now, and `org` is gone because it was
+`owner` with the personal half left blank.
+
+This is a breaking change to what is already stored. Rows written by an earlier
+release keep the old tags, new rows carry the new ones, and the two do not join:
+in InfluxDB the tag set is part of a point's identity, so an upgraded collector
+opens a second series for every repository rather than continuing the first.
+Nothing is lost and nothing is rewritten, but a panel spanning the upgrade sees
+two half-populated series. Recreating the database, or accepting the seam and
+letting the old rows age out of the range you query, are the two ways through
+it; there is no migration, because a tag cannot be renamed in place.
+
+Most measurements also carry a `url`
 field: the page on GitHub for the thing the row is about, so a dashboard row
 that names an item can also open it. A `url` is absolute or absent, since the
 dashboards link to the value itself, and every measurement that has one is
@@ -182,7 +207,7 @@ which is why they are a snapshot rather than a series.
 | Measurement     | Dated                            | Tags                       | Fields                                                 |
 | --------------- | -------------------------------- | -------------------------- | ------------------------------------------------------ |
 | `gh_star` | dated, when the star was given | `user` | `starred`, `url`, `user_url` |
-| `gh_star_given` | dated                            | `user`, `repo`, `language` | `stars`, `repo_stars`, `url`                           |
+| `gh_star_given` | dated                            | `user`, `language` | `stars`, `repo_stars`, `url`                           |
 | `gh_fork`       | dated, when the fork was created | `by`                       | `forks`, `stars`, `days_since_push`, `advanced`, `url` |
 
 `gh_star_given` is the outbound direction: what this account starred in other
@@ -238,7 +263,7 @@ is the one kind with no row.
 | `gh_discussion` | dated, when created | `category`, `answerable`, `author`, `number` | `has_answer`, `comments`, `replies`, `reactions`, `upvotes`, `closed`, `state_reason`, `seconds_to_answer`, `seconds_to_close`, `title`, `url` |
 | `gh_label`                 | daily                               | `label`                                                  | `issues`, `pull_requests`, `used`, `url`                                                                                                                   |
 | `gh_milestone`             | daily                               | `milestone`, `state`                                     | `progress`, `issues`, `pull_requests`, `days_to_due`, `seconds_to_close`, `url`                                                                            |
-| `gh_external_contribution` | dated                               | `user`, `repo`, `number`, `kind`, `state`                | `contributions`, `merged`, `title`, `comments`, `seconds_to_merge`, `seconds_open`, `url`                                                                  |
+| `gh_external_contribution` | dated                               | `user`, `number`, `kind`, `state`                | `contributions`, `merged`, `title`, `comments`, `seconds_to_merge`, `seconds_open`, `url`                                                                  |
 
 `gh_commit` is what replaces `stats/code_frequency`, which returns 202 with an
 empty body forever on a personal account. `signature` is `unsigned` when there
@@ -495,27 +520,27 @@ page, so at most a hundred, rather than the repository's total.
 | `gh_contributions_total` | now                                  |                                                                       | `calendar_total`, `commits`, `pull_requests`, `reviews`, `issues`, `repositories`, `restricted`, `repos_with_commits`, `repos_with_issues`, `repos_with_pulls`, `repos_with_reviews`, `url`                                                                                               |
 | `gh_contribution_day`    | dated, one point per calendar day    |                                                                       | `contributions`, `level`, `url`                                                                                                                                                                                                                                                                    |
 | `gh_contribution_year` | dated, end of the year; the year in progress daily | `year` | `contributions`, `commits`, `issues`, `pull_requests`, `reviews`, `repositories`, `restricted`, `repos_with_commits`, `repos_with_issues`, `repos_with_pulls`, `repos_with_reviews`, `partial` |
-| `gh_contribution_repo` | now | `repo`, `kind` (commits, issues, pulls, reviews) | `contributions`, `commits`, `days`, `commits_dated`, `url` |
-| `gh_contribution_day_repo` | dated, the day the commits belong to | `repo`, `private`, `own` | `commits`, `url` |
+| `gh_contribution_repo` | now | `kind` (commits, issues, pulls, reviews) | `contributions`, `commits`, `days`, `commits_dated`, `url` |
+| `gh_contribution_day_repo` | dated, the day the commits belong to | `private`, `own` | `commits`, `url` |
 | `gh_commits_week`        | dated, the Sunday of its week        |                                                                       | `commits`, `owner_commits`                                                                                                                                                                                                                                                                |
 | `gh_commit_punchcard`    | now                                  | `weekday`, `hour`                                                     | `commits`                                                                                                                                                                                                                                                                                 |
-| `gh_package`             | now                                  | `package`, `type`, `visibility`, `repo`                               | `versions`, `tagged_versions`, `age_days`, `days_since_update`, `url`                                                                                                                                                                                                                     |
-| `gh_package_version`     | dated, when published                | `package`, `type`, `visibility`, `repo`, `tag`                        | `digest`, `published`, `url`                                                                                                                                                                                                                                                              |
+| `gh_package`             | now                                  | `package`, `type`, `visibility`                               | `versions`, `tagged_versions`, `age_days`, `days_since_update`, `url`                                                                                                                                                                                                                     |
+| `gh_package_version`     | dated, when published                | `package`, `type`, `visibility`, `tag`                        | `digest`, `published`, `url`                                                                                                                                                                                                                                                              |
 | `gh_gist`                | now                                  | `gist`, `public`                                                      | `files`, `comments`, `size_bytes`, `description`, `url`, `age_days`, `days_since_update`                                                                                                                                                                                                  |
 | `gh_achievement`         | daily                                | `achievement`                                                         | `name`, `tier_number`, `tier_name`, `present`, `image`, `url` |
 | `gh_achievement_progress` | daily                               | `achievement`                                                         | `name`, `count`, `tier_number`, `next_threshold`, `percent`, `page_tier`, `agrees`, `image`, `url` |
 | `gh_social_account`       | now; the `orcid` row daily          | `provider`                                                            | `url`, `present`                                                                                   |
-| `gh_pinned_item`         | now                                  | `repo`                                                                | `pinned`, `position`, `kind`, `stars`, `days_since_push`, `url`                                                                                                                                                                                                                           |
+| `gh_pinned_item`         | now                                  |                                                                       | `pinned`, `position`, `kind`, `stars`, `days_since_push`, `url`                                                                                                                                                                                                                           |
 | `gh_profile_flag`        | now                                  | `flag`                                                                | `enabled`, `message`, `age_days`, `url`                                                                                                                                                                                                                                                   |
 | `gh_sponsorship`         | dated, when the sponsorship was made | `direction` (sponsor, maintainer), `sponsorable`                      | `sponsorship`, `active`, `one_time`, `privacy`, `tier`, `amount_cents`, `url`                                                                                                                                                                                                             |
 | `gh_sponsors_listing`    | now                                  |                                                                       | `has_listing`, `listing_name`, `listing_public`, `listing_age_days`, `tiers`, `monthly_income_cents`, `next_payout_cents`, `next_payout_date`, `sponsor_spend_cents`, `lifetime_received_cents`, `sponsorships_received`, `goal_kind`, `goal_title`, `goal_target`, `goal_percent`, `url` |
 | `gh_sponsors_tier`       | daily                                | `tier`                                                                | `tiers`, `price_cents`, `one_time`, `retired`, `age_days`, `url`                                                                                                                                                                                                                          |
 | `gh_star_list`           | daily                                | `list`                                                                | `lists`, `items`, `private`, `name`, `age_days`, `days_since_add`, `url`                                                                                                                                                                                                                  |
 | `gh_account_total`       | now                                  |                                                                       | `pulls_opened`, `pulls_merged`, `pulls_open_now`, `pulls_merged_elsewhere`, `pulls_reviewed`, `issues_opened`, `issues_closed`, `issues_elsewhere`, `commented_elsewhere`, `commits`, `repositories`, `url`                                                                               |
-| `gh_repo_created`        | dated, when created                  | `repo`, `fork`                                                        | `created`, `private`, `url`                                                                                                                                                                                                                                                               |
+| `gh_repo_created`        | dated, when created                  | `fork`                                                        | `created`, `private`, `url`                                                                                                                                                                                                                                                               |
 | `gh_key`                 | daily                                | `kind` (ssh, gpg), `key`                                              | `keys`, `age_days`, `days_since_use`, `never_used`, `days_to_expiry`, `verified`, `revoked`, `can_sign`, `emails`, `url`                                                                                                                                                                  |
-| `gh_discussion_comment` | dated | `repo`, `own`, `is_answer`, `is_reply`, `author`, `comment`, `number` | `comments`, `answers`, `upvotes`, `title`, `reply_to`, `discussion_answered`, `discussion_answerable`, `discussion_closed`, `answered_by`, `answer_chosen_by`, `state_reason`, `category`, `seconds_to_answer`, `seconds_to_close`, `url` |
-| `gh_issue_comment`       | dated                                | `repo`, `own`, `number`                                               | `comments`, `url`                                                                                                                                                                                                                                                                         |
+| `gh_discussion_comment` | dated | `own`, `is_answer`, `is_reply`, `author`, `comment`, `number` | `comments`, `answers`, `upvotes`, `title`, `reply_to`, `discussion_answered`, `discussion_answerable`, `discussion_closed`, `answered_by`, `answer_chosen_by`, `state_reason`, `category`, `seconds_to_answer`, `seconds_to_close`, `url` |
+| `gh_issue_comment`       | dated                                | `own`, `number`                                               | `comments`, `url`                                                                                                                                                                                                                                                                         |
 
 `following` is the profile's own number, and it counts organisations as well as
 people. GraphQL's `following` connection counts only users, which on this
@@ -532,10 +557,16 @@ fallback tag GitHub publishes for each attestation and signature manifest:
 `sha256-` followed by the digest the row already carries. Nobody pulls one,
 there is a fresh one on every build, and excluding them halved the count on two
 packages, from a hundred and twenty six to fifty seven on one.
-`gh_package_version` no longer writes a row for one either.
+`gh_package_version` no longer writes a row for one either. A package GitHub
+attaches to no repository writes `(none)` in all three of the tags that name
+one, rather than leaving them out and landing in a series with no repository
+column for a query to name.
 
 `gh_pinned_item` and `gh_profile_flag` are the profile page itself as data. A
-pin has no date of its own, so both are stamped now. `position` is a field and
+pin has no date of its own, so both are stamped now. A pinned gist is not in a
+repository at all: GitHub names it by its hash, so `repo` is that hash and
+`owner` is the account, which is the only owner a pin can have. The `kind` field
+says which of the two a row is. `position` is a field and
 not a tag: a repository that moves from slot two to slot three is the same pin,
 and as a tag every rearrangement would fork the series. `flag` is a closed list
 of eight: `hireable`, `developer_program`, `campus_expert`, `github_star`,
@@ -708,8 +739,8 @@ the two can be told apart.
 
 | Measurement       | Dated              | Tags                                                    | Fields                          |
 | ----------------- | ------------------ | ------------------------------------------------------- | ------------------------------- |
-| `gh_event`        | dated              | `type`, `repo`, `action`, `ref_type`                    | `events`, `public`, `commits`, `url` |
-| `gh_notification` | dated, last update | `reason`, `repo`, `private`, `subject_type`   | `is_unread`, `notifications`, `title`, `url` |
+| `gh_event`        | dated              | `type`, `action`, `ref_type`                    | `events`, `public`, `commits`, `url` |
+| `gh_notification` | dated, last update | `reason`, `private`, `subject_type`   | `is_unread`, `notifications`, `title`, `url` |
 
 Both are windows, not histories. GitHub keeps the last three hundred events
 whatever their dates and discards read notifications quickly. What is captured
@@ -876,7 +907,7 @@ is still made here, by when the run finished.
 
 | Measurement        | Dated          | Tags                                    | Fields                                                          |
 | ------------------ | -------------- | --------------------------------------- | --------------------------------------------------------------- |
-| `gh_billing_usage` | dated, per day | `product`, `sku`, `unit`, `repo`, `org` | `quantity`, `price_per_unit`, `gross`, `discount`, `net`, `url` |
+| `gh_billing_usage` | dated, per day | `product`, `sku`, `unit` | `quantity`, `price_per_unit`, `gross`, `discount`, `net`, `url` |
 
 `unit` is GitHub's own `unitType`, capitalised as GitHub sends it: `Minutes`,
 `GigabyteHours`, `AICredits`, `Requests`. It is passed through rather than

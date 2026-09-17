@@ -12647,7 +12647,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo) (increase(github_external_contributions_total[$__range]))",
+              "expr": "sum by (full_name) (increase(github_external_contributions_total[$__range]))",
               "format": "table",
               "instant": true,
               "range": false,
@@ -12656,7 +12656,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "avg by (repo) (github_external_contributions_merged_mean)",
+              "expr": "avg by (full_name) (github_external_contributions_merged_mean)",
               "format": "table",
               "instant": true,
               "range": false,
@@ -12665,7 +12665,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "avg by (repo) (github_external_contributions_comments_mean)",
+              "expr": "avg by (full_name) (github_external_contributions_comments_mean)",
               "format": "table",
               "instant": true,
               "range": false,
@@ -12694,7 +12694,7 @@
                   "Value #A": "Contributions",
                   "Value #B": "Merged",
                   "Value #C": "Comments",
-                  "repo": "Repository"
+                  "full_name": "Repository"
                 }
               }
             }
@@ -15824,7 +15824,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "What the profile shows first, in the order it shows it. The row worth seeing is a pinned repository nobody has pushed to in two years. Position is a field and not a tag on purpose: a repository that moves from slot two to slot three is the same pin, and as a tag every rearrangement would fork the series. The repository filter at the top of the dashboard does not reach this panel, because a pin is named owner/name, or is a gist, and the variable holds neither. Prometheus keeps the numbers; the kind is a string and does not survive as a metric. The Prometheus exporter carries no url, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "What the profile shows first, in the order it shows it. The row worth seeing is a pinned repository nobody has pushed to in two years. Position is a field and not a tag on purpose: a repository that moves from slot two to slot three is the same pin, and as a tag every rearrangement would fork the series. The repository filter at the top of the dashboard does not reach this panel, because a pin can be a gist, which is named by its hash and is in no repository the filter knows. Prometheus keeps the numbers; the kind is a string and does not survive as a metric. The Prometheus exporter carries no url, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {

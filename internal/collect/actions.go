@@ -147,7 +147,7 @@ func actorTag(r *runRow) string {
 }
 
 func (a Actions) Collect(ctx context.Context, c *ghapi.Client, repo Repo, now time.Time) ([]sink.Point, error) {
-	base := map[string]string{"owner": repo.Owner, "repo": repo.Name, "full_name": repo.FullName}
+	base := repoTags(repo.Owner, repo.Name)
 
 	runs, declared, listed, err := a.runList(ctx, c, repo)
 	if err != nil {
@@ -624,7 +624,7 @@ type artifactRow struct {
 }
 
 func (a Artifacts) Collect(ctx context.Context, c *ghapi.Client, repo Repo, now time.Time) ([]sink.Point, error) {
-	base := map[string]string{"owner": repo.Owner, "repo": repo.Name, "full_name": repo.FullName}
+	base := repoTags(repo.Owner, repo.Name)
 	// Five pages, five hundred artifacts. Twenty pages across eighteen
 	// repositories was three hundred and sixty requests an hour on its own,
 	// which ate the rate budget the rest of the sweep needed. When a

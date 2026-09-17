@@ -200,7 +200,7 @@ func alertCWEs(ids []string) string {
 }
 
 func (sc Security) Collect(ctx context.Context, c *ghapi.Client, repo Repo, now time.Time) ([]sink.Point, error) {
-	base := map[string]string{"owner": repo.Owner, "repo": repo.Name, "full_name": repo.FullName}
+	base := repoTags(repo.Owner, repo.Name)
 	var points []sink.Point
 
 	dependabot, dependabotOn, err := sc.dependabotAlerts(ctx, c, repo)
@@ -555,7 +555,7 @@ type Analyses struct {
 }
 
 func (a Analyses) Collect(ctx context.Context, c *ghapi.Client, repo Repo, _ time.Time) ([]sink.Point, error) {
-	base := map[string]string{"owner": repo.Owner, "repo": repo.Name, "full_name": repo.FullName}
+	base := repoTags(repo.Owner, repo.Name)
 	var points []sink.Point
 	most := a.Walk.limit(1)
 	for page := 1; page <= most; page++ {

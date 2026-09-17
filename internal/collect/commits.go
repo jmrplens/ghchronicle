@@ -159,7 +159,7 @@ func (cm Commits) Collect(ctx context.Context, c *ghapi.Client, repo Repo, _ tim
 	if w.Since.IsZero() {
 		w.Since = cm.Since
 	}
-	base := map[string]string{"owner": repo.Owner, "repo": repo.Name, "full_name": repo.FullName}
+	base := repoTags(repo.Owner, repo.Name)
 	var points []sink.Point
 	after := ""
 	most := w.limit(1)

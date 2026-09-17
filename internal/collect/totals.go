@@ -378,11 +378,10 @@ func (rt *repoTotals) point(repo Repo, now time.Time) sink.Point {
 	}
 	return sink.Point{
 		Measurement: "gh_repo_total",
-		Tags: map[string]string{
-			"owner": repo.Owner, "repo": repo.Name, "full_name": repo.FullName,
+		Tags: merge(repoTags(repo.Owner, repo.Name), map[string]string{
 			"fork": boolTag(rt.IsFork), "archived": boolTag(rt.IsArchived),
 			"visibility": visibility(rt.IsPrivate),
-		},
+		}),
 		Fields: map[string]any{
 			"commits": commits,
 			"stars":   rt.Stars, "forks": rt.Forks, "watchers": rt.Watchers.TotalCount,
@@ -418,9 +417,7 @@ func (rt *repoTotals) policy(repo Repo, now time.Time) sink.Point {
 	}
 	return sink.Point{
 		Measurement: "gh_repo_policy",
-		Tags: map[string]string{
-			"owner": repo.Owner, "repo": repo.Name, "full_name": repo.FullName,
-		},
+		Tags:        repoTags(repo.Owner, repo.Name),
 		Fields: withURL(map[string]any{
 			"security_policy": rt.SecurityPolicy, "forking_allowed": rt.ForkingAllowed,
 			"vulnerability_alerts": rt.VulnerabilityAlerts,
@@ -526,10 +523,8 @@ func (rt *repoTotals) archived(repo Repo) (sink.Point, bool) {
 	}
 	return sink.Point{
 		Measurement: "gh_repo_archived",
-		Tags: map[string]string{
-			"owner": repo.Owner, "repo": repo.Name, "full_name": repo.FullName,
-		},
-		Fields: fields,
-		Time:   *rt.ArchivedAt,
+		Tags:        repoTags(repo.Owner, repo.Name),
+		Fields:      fields,
+		Time:        *rt.ArchivedAt,
 	}, true
 }

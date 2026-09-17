@@ -1991,11 +1991,11 @@ func TestAccountRowsLeaveOutWhatHasNothingToStandOn(t *testing.T) {
 		t.Errorf("calendar = %v, want the one day that reads", days)
 	}
 	byRepo := commitDayPoints(u.Contributions.ByRepository, "octocat")
-	if len(byRepo) != 1 || byRepo[0].Tags["repo"] != "octocat/new" || fieldInt(t, byRepo[0], "commits") != 3 {
+	if len(byRepo) != 1 || byRepo[0].Tags["full_name"] != "octocat/new" || fieldInt(t, byRepo[0], "commits") != 3 {
 		t.Errorf("daily commits = %v, want the one named repository's one dated row", byRepo)
 	}
 	pins := pinnedItemPoints(u, base, testNow)
-	if len(pins) != 1 || pins[0].Tags["repo"] != "octocat/new" || hasField(pins[0], "days_since_push") {
+	if len(pins) != 1 || pins[0].Tags["full_name"] != "octocat/new" || hasField(pins[0], "days_since_push") {
 		t.Errorf("pins = %v, want the named pin with no push age", pins)
 	}
 }

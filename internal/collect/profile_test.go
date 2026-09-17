@@ -114,7 +114,9 @@ func TestWebsiteURLIsAbsoluteOrAbsent(t *testing.T) {
 func checkContainerPackage(t *testing.T, points []sink.Point) {
 	t.Helper()
 	pkg := only(t, points, "gh_package")[0]
-	if pkg.Tags["package"] != "ghchronicle" || pkg.Tags["type"] != "container" || pkg.Tags["visibility"] != "public" || pkg.Tags["repo"] != "octocat/hello-world" {
+	if pkg.Tags["package"] != "ghchronicle" || pkg.Tags["type"] != "container" ||
+		pkg.Tags["visibility"] != "public" || pkg.Tags["full_name"] != "octocat/hello-world" ||
+		pkg.Tags["owner"] != "octocat" || pkg.Tags["repo"] != "hello-world" {
 		t.Errorf("package tags = %v", pkg.Tags)
 	}
 	// The listing carries no version_count at all, so the total is the one the

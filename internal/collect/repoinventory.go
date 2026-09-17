@@ -33,7 +33,7 @@ type RepoInventory struct {
 }
 
 func (inv RepoInventory) Collect(ctx context.Context, c *ghapi.Client, repo Repo, now time.Time) ([]sink.Point, error) {
-	base := map[string]string{"owner": repo.Owner, "repo": repo.Name, "full_name": repo.FullName}
+	base := repoTags(repo.Owner, repo.Name)
 	day := now.UTC().Truncate(24 * time.Hour)
 	var points []sink.Point
 

@@ -430,7 +430,7 @@ func (it *timelineItem) row(issue *issueEventIssue) *issueEventRow {
 }
 
 func (ie IssueEvents) Collect(ctx context.Context, c *ghapi.Client, repo Repo, now time.Time) ([]sink.Point, error) {
-	base := map[string]string{"owner": repo.Owner, "repo": repo.Name, "full_name": repo.FullName}
+	base := repoTags(repo.Owner, repo.Name)
 	if ie.Walk.Pages != 0 {
 		return ie.history(ctx, c, repo, base)
 	}

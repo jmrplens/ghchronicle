@@ -62,7 +62,7 @@ func TestAccount(t *testing.T) {
 	// than one of the four, and find takes the first match in a map whose
 	// iteration order is random.
 	other := find(t, points, "gh_contribution_repo",
-		map[string]string{"repo": "someone/else", "kind": "commits"})
+		map[string]string{"full_name": "someone/else", "kind": "commits"})
 	if fieldInt(t, other, "commits") != 12 || fieldInt(t, other, "days") != 1 ||
 		fieldInt(t, other, "commits_dated") != 12 {
 		t.Errorf("contribution repo = %v", other.Fields)
@@ -70,7 +70,7 @@ func TestAccount(t *testing.T) {
 	// The three fields the daily breakdown adds belong to the commit
 	// connection alone: the other three kinds have no sub-connection to count.
 	issues := find(t, points, "gh_contribution_repo",
-		map[string]string{"repo": "someone/else", "kind": "issues"})
+		map[string]string{"full_name": "someone/else", "kind": "issues"})
 	if hasField(issues, "days") || hasField(issues, "commits_dated") {
 		t.Errorf("a non-commit kind has no breakdown: %v", issues.Fields)
 	}
@@ -162,9 +162,9 @@ func TestAccountSplitsTheCalendarByRepository(t *testing.T) {
 	}
 	// Every row carries all four tags, whatever its values: a tag written
 	// under an `if` would give the measurement two path depths.
-	checkEveryRowTagged(t, days, "user", "repo", "private", "own")
+	checkEveryRowTagged(t, days, "user", "owner", "repo", "full_name", "private", "own")
 
-	own := find(t, points, "gh_contribution_day_repo", map[string]string{"repo": "octocat/hello-world"})
+	own := find(t, points, "gh_contribution_day_repo", map[string]string{"full_name": "octocat/hello-world"})
 	if own.Tags["own"] != "true" || own.Tags["private"] != "false" || own.Tags["user"] != "octocat" {
 		t.Errorf("own repository row = %v", own.Tags)
 	}
@@ -180,7 +180,7 @@ func TestAccountSplitsTheCalendarByRepository(t *testing.T) {
 	// the summer one, has to land on its own day just the same.
 	var winter []time.Time
 	for _, p := range days {
-		if p.Tags["repo"] == "octocat/hello-world" && fieldInt(t, p, "commits") == 489 {
+		if p.Tags["full_name"] == "octocat/hello-world" && fieldInt(t, p, "commits") == 489 {
 			winter = append(winter, p.Time)
 		}
 	}
@@ -189,11 +189,11 @@ func TestAccountSplitsTheCalendarByRepository(t *testing.T) {
 		t.Errorf("the T08:00:00Z row stamped %v, want %s", winter, want)
 	}
 
-	private := find(t, points, "gh_contribution_day_repo", map[string]string{"repo": "octocat/secret-thing"})
+	private := find(t, points, "gh_contribution_day_repo", map[string]string{"full_name": "octocat/secret-thing"})
 	if private.Tags["private"] != "true" || private.Tags["own"] != "true" {
 		t.Errorf("private repository row = %v", private.Tags)
 	}
-	third := find(t, points, "gh_contribution_day_repo", map[string]string{"repo": "someone/else"})
+	third := find(t, points, "gh_contribution_day_repo", map[string]string{"full_name": "someone/else"})
 	if third.Tags["own"] != "false" || third.Tags["private"] != "false" {
 		t.Errorf("third party row = %v", third.Tags)
 	}
@@ -328,7 +328,7 @@ func TestAccountPinnedItemsAndProfileFlags(t *testing.T) {
 	if len(pins) != 2 {
 		t.Fatalf("got %d pinned items, want the repository and the gist", len(pins))
 	}
-	repo := find(t, points, "gh_pinned_item", map[string]string{"repo": "octocat/hello-world"})
+	repo := find(t, points, "gh_pinned_item", map[string]string{"full_name": "octocat/hello-world"})
 	if !repo.Time.Equal(testNow) {
 		t.Errorf("a pin has no date of its own and is stamped now, got %s", repo.Time)
 	}
@@ -548,7 +548,7 @@ func TestHistoryWalksEveryPastYearFromCreation(t *testing.T) {
 	if len(byRepo) != 6 {
 		t.Fatalf("got %d per-repository daily rows, want 2 per year", len(byRepo))
 	}
-	row := find(t, points, "gh_contribution_day_repo", map[string]string{"repo": "octocat/hello-world"})
+	row := find(t, points, "gh_contribution_day_repo", map[string]string{"full_name": "octocat/hello-world"})
 	if row.Tags["user"] != "octocat" || row.Tags["own"] != "true" || row.Tags["private"] != "false" {
 		t.Errorf("backfilled row = %v", row.Tags)
 	}

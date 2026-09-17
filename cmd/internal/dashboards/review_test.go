@@ -346,7 +346,7 @@ func TestOpenItemsAreReadFromTheirNewestRow(t *testing.T) {
 	}
 	sql := sqlOf(t, mustPanel(t, panels, "Work elsewhere"))
 	if !strings.Contains(sql, `AS "Opened"`) || !strings.Contains(sql, `time AS "Seen"`) ||
-		!strings.Contains(sql, "PARTITION BY repo, kind, number ORDER BY time DESC") {
+		!strings.Contains(sql, "PARTITION BY full_name, kind, number ORDER BY time DESC") {
 		t.Errorf("Work elsewhere dates the snapshot as the fact: %s", sql)
 	}
 }
@@ -584,8 +584,14 @@ func TestSeriesAreNamedAndColored(t *testing.T) {
 			}
 		}
 	}
-	if sql := sqlOf(t, mustPanel(t, panels, "Commits by repository")); !strings.Contains(sql, "regexp_replace(repo, '^[^/]+/', '')") {
-		t.Errorf("the one table with owner/ in front of every name keeps it: %s", sql)
+	// `repo` is the short name on every measurement now, so this column is
+	// read rather than parsed. The window still partitions by the full name,
+	// because two owners can use one short name and the newest row has to be
+	// picked per repository.
+	if sql := sqlOf(t, mustPanel(t, panels, "Commits by repository")); strings.Contains(sql, "regexp_replace") ||
+		!strings.Contains(sql, `SELECT repo AS "Repository"`) ||
+		!strings.Contains(sql, "PARTITION BY full_name ORDER BY time DESC") {
+		t.Errorf("the one table that shows the short name reads it rather than parsing it: %s", sql)
 	}
 	for _, title := range []string{"Community profile", "Repository settings", "Policy files", "Discussions"} {
 		raw := asJSON(t, mustPanel(t, panels, title)["fieldConfig"])

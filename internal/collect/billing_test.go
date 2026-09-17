@@ -44,13 +44,20 @@ func TestBillingParsesRFC3339Dates(t *testing.T) {
 	if copilot.Fields["net"] != 10.0 {
 		t.Errorf("net is not always zero, got %v", copilot.Fields["net"])
 	}
-	// A seat is charged to no repository, and a personal account belongs to no
-	// organization: measured on 2026-09-10, `org` was empty on all 937 rows of
-	// this account and `repo` on its three Copilot credit rows. Both tags are
-	// still written, because an empty tag value is dropped on the way into
-	// InfluxDB and those rows would land in a series of their own.
-	if copilot.Tags["repo"] != noneTag || copilot.Tags["org"] != noneTag {
-		t.Errorf("a charge that belongs to no repository still carries both tags, got %v", copilot.Tags)
+	// A seat is charged to no repository, so all three of the tags that name
+	// one say so rather than being left out: an empty tag value is dropped on
+	// the way into InfluxDB and those rows would land in a series of their own.
+	// Naming the account as the owner would be an invention, since the charge
+	// is not about a repository at all.
+	for _, tag := range []string{"owner", "repo", "full_name"} {
+		if copilot.Tags[tag] != noneTag {
+			t.Errorf("a charge that belongs to no repository names none of the three, got %v", copilot.Tags)
+		}
+	}
+	// `org` was the same dimension as `owner` with the personal half left
+	// blank, so it is gone and `owner` carries it in both cases.
+	if _, isTag := copilot.Tags["org"]; isTag {
+		t.Errorf("org is folded into owner, got %v", copilot.Tags)
 	}
 	checkBareDates(t, points)
 }
@@ -71,7 +78,11 @@ func checkActionsCharge(t *testing.T, points []sink.Point) {
 	// filter on `unit = 'Minutes'`. The fixture used to say "minutes", which
 	// made those panels answer nothing in the containerised suite and read as
 	// a defect in the panels for as long as it stood.
-	if actions.Tags["sku"] != "Actions Linux" || actions.Tags["unit"] != "Minutes" || actions.Tags["org"] != "octocat" || actions.Tags["user"] != "octocat" {
+	// The organization GitHub names on the row is the owner of the repository
+	// that burned the minutes, which is what `owner` carries now.
+	if actions.Tags["sku"] != "Actions Linux" || actions.Tags["unit"] != "Minutes" ||
+		actions.Tags["owner"] != "octocat" || actions.Tags["full_name"] != "octocat/hello-world" ||
+		actions.Tags["user"] != "octocat" {
 		t.Errorf("billing tags = %v", actions.Tags)
 	}
 	if actions.Fields["quantity"] != 214.0 || actions.Fields["gross"] != 1.712 || actions.Fields["discount"] != 1.712 || actions.Fields["net"] != 0.0 {

@@ -74,9 +74,13 @@ func (p Profile) packagePoints(ctx context.Context, c *ghapi.Client, base map[st
 			if pk.Repository != nil {
 				repo = pk.Repository.FullName
 			}
-			tags := merge(base, map[string]string{
+			// A package GitHub attaches to no repository names none of the
+			// three rather than dropping the keys: an empty tag value is not
+			// written at all, which would put those rows in a series of their
+			// own carrying no repository column for a query to name.
+			tags := merge(base, fullNameTags(repo), map[string]string{
 				"package": pk.Name, "type": pk.Type,
-				"visibility": pk.Visibility, "repo": repo,
+				"visibility": pk.Visibility,
 			})
 			fields := map[string]any{
 				"age_days":          int(now.Sub(pk.CreatedAt).Hours() / 24),

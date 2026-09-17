@@ -2382,7 +2382,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT regexp_replace(repo, '^[^/]+/', '') AS \"Repository\", commits AS \"Commits\", url AS \"Link\" FROM (SELECT repo, commits, url, ROW_NUMBER() OVER (PARTITION BY repo ORDER BY time DESC) AS rn FROM gh_contribution_repo WHERE $__timeFilter(time) AND kind = 'commits') x WHERE rn = 1 ORDER BY 2 DESC LIMIT 25",
+              "rawSql": "SELECT repo AS \"Repository\", commits AS \"Commits\", url AS \"Link\" FROM (SELECT repo, commits, url, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn FROM gh_contribution_repo WHERE $__timeFilter(time) AND kind = 'commits') x WHERE rn = 1 ORDER BY 2 DESC LIMIT 25",
               "refId": "A"
             }
           ],
@@ -2549,7 +2549,7 @@
               "editorMode": "code",
               "format": "time_series",
               "rawQuery": true,
-              "rawSql": "SELECT time, CASE WHEN rk \u003c= 8 THEN repo ELSE 'other' END AS metric, SUM(v) AS commits FROM (SELECT time, repo, v, DENSE_RANK() OVER (ORDER BY total DESC, repo) AS rk FROM (SELECT $__timeGroupAlias(time, $__interval), repo, SUM(commits) AS v, SUM(SUM(commits)) OVER (PARTITION BY repo) AS total FROM gh_contribution_day_repo WHERE $__timeFilter(time) AND commits \u003e 0 GROUP BY 1, 2) y) x GROUP BY 1, 2 HAVING SUM(v) \u003e 0 ORDER BY 1",
+              "rawSql": "SELECT time, CASE WHEN rk \u003c= 8 THEN full_name ELSE 'other' END AS metric, SUM(v) AS commits FROM (SELECT time, full_name, v, DENSE_RANK() OVER (ORDER BY total DESC, full_name) AS rk FROM (SELECT $__timeGroupAlias(time, $__interval), full_name, SUM(commits) AS v, SUM(SUM(commits)) OVER (PARTITION BY full_name) AS total FROM gh_contribution_day_repo WHERE $__timeFilter(time) AND commits \u003e 0 GROUP BY 1, 2) y) x GROUP BY 1, 2 HAVING SUM(v) \u003e 0 ORDER BY 1",
               "refId": "A"
             }
           ],
@@ -7712,7 +7712,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT repo AS \"Repository\", COUNT(*) AS \"Comments\", MAX(CASE WHEN own = 'false' THEN 1 ELSE 0 END) AS \"Elsewhere\" FROM gh_issue_comment WHERE $__timeFilter(time) GROUP BY 1 ORDER BY 2 DESC LIMIT 20",
+              "rawSql": "SELECT full_name AS \"Repository\", COUNT(*) AS \"Comments\", MAX(CASE WHEN own = 'false' THEN 1 ELSE 0 END) AS \"Elsewhere\" FROM gh_issue_comment WHERE $__timeFilter(time) GROUP BY 1 ORDER BY 2 DESC LIMIT 20",
               "refId": "A"
             }
           ],
@@ -7806,7 +7806,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT repo AS \"Repository\", SUM(answers) AS \"Accepted answers\", COUNT(*) AS \"Comments\", SUM(upvotes) AS \"Upvotes\" FROM gh_discussion_comment WHERE $__timeFilter(time) GROUP BY 1 ORDER BY 2 DESC, 3 DESC LIMIT 20",
+              "rawSql": "SELECT full_name AS \"Repository\", SUM(answers) AS \"Accepted answers\", COUNT(*) AS \"Comments\", SUM(upvotes) AS \"Upvotes\" FROM gh_discussion_comment WHERE $__timeFilter(time) GROUP BY 1 ORDER BY 2 DESC, 3 DESC LIMIT 20",
               "refId": "A"
             }
           ],
@@ -7957,7 +7957,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT title AS \"Title\", time AS \"When\", repo AS \"Repository\", answers AS \"Accepted\", url AS \"Link\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY comment ORDER BY answers DESC) AS rn FROM gh_discussion_comment WHERE time \u003e now() - INTERVAL '30 years' AND own = 'false') x WHERE rn = 1 ORDER BY 2 DESC LIMIT 50",
+              "rawSql": "SELECT title AS \"Title\", time AS \"When\", full_name AS \"Repository\", answers AS \"Accepted\", url AS \"Link\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY comment ORDER BY answers DESC) AS rn FROM gh_discussion_comment WHERE time \u003e now() - INTERVAL '30 years' AND own = 'false') x WHERE rn = 1 ORDER BY 2 DESC LIMIT 50",
               "refId": "A"
             }
           ],
@@ -12494,7 +12494,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT \"Repository\", \"Events\" FROM (SELECT CASE WHEN rn \u003c= 10 THEN \"Repository\" ELSE 'other' END AS \"Repository\", SUM(\"Events\") AS \"Events\", MIN(rn) AS o FROM (SELECT repo AS \"Repository\", SUM(events) AS \"Events\", ROW_NUMBER() OVER (ORDER BY SUM(events) DESC) AS rn FROM gh_event WHERE $__timeFilter(time) GROUP BY 1) z GROUP BY 1) w ORDER BY o",
+              "rawSql": "SELECT \"Repository\", \"Events\" FROM (SELECT CASE WHEN rn \u003c= 10 THEN \"Repository\" ELSE 'other' END AS \"Repository\", SUM(\"Events\") AS \"Events\", MIN(rn) AS o FROM (SELECT full_name AS \"Repository\", SUM(events) AS \"Events\", ROW_NUMBER() OVER (ORDER BY SUM(events) DESC) AS rn FROM gh_event WHERE $__timeFilter(time) GROUP BY 1) z GROUP BY 1) w ORDER BY o",
               "refId": "A"
             }
           ],
@@ -12805,7 +12805,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT title AS \"Title\", time AS \"Updated\", repo AS \"Repository\", subject_type AS \"Kind\", reason AS \"Reason\", notifications AS \"Updates\", url AS \"Link\" FROM gh_notification WHERE $__timeFilter(time) ORDER BY time DESC LIMIT 25",
+              "rawSql": "SELECT title AS \"Title\", time AS \"Updated\", full_name AS \"Repository\", subject_type AS \"Kind\", reason AS \"Reason\", notifications AS \"Updates\", url AS \"Link\" FROM gh_notification WHERE $__timeFilter(time) ORDER BY time DESC LIMIT 25",
               "refId": "A"
             }
           ],
@@ -12965,7 +12965,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT repo AS \"Repository\", time - seconds_open * INTERVAL '1 second' AS \"Opened\", time AS \"Seen\", kind AS \"Kind\", state AS \"State\", title AS \"Title\", comments AS \"Comments\", url AS \"Link\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo, kind, number ORDER BY time DESC) AS rn FROM gh_external_contribution WHERE $__timeFilter(time)) x WHERE rn = 1 ORDER BY time DESC LIMIT 40",
+              "rawSql": "SELECT full_name AS \"Repository\", time - seconds_open * INTERVAL '1 second' AS \"Opened\", time AS \"Seen\", kind AS \"Kind\", state AS \"State\", title AS \"Title\", comments AS \"Comments\", url AS \"Link\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, kind, number ORDER BY time DESC) AS rn FROM gh_external_contribution WHERE $__timeFilter(time)) x WHERE rn = 1 ORDER BY time DESC LIMIT 40",
               "refId": "A"
             }
           ],
@@ -13167,7 +13167,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT repo AS \"Repository\", time AS \"When\", language AS \"Language\", repo_stars AS \"Its stars\", url AS \"Link\" FROM gh_star_given WHERE $__timeFilter(time) ORDER BY time DESC LIMIT 25",
+              "rawSql": "SELECT full_name AS \"Repository\", time AS \"When\", language AS \"Language\", repo_stars AS \"Its stars\", url AS \"Link\" FROM gh_star_given WHERE $__timeFilter(time) ORDER BY time DESC LIMIT 25",
               "refId": "A"
             }
           ],
@@ -15745,7 +15745,7 @@
         },
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "What the profile shows first, in the order it shows it. The row worth seeing is a pinned repository nobody has pushed to in two years. Position is a field and not a tag on purpose: a repository that moves from slot two to slot three is the same pin, and as a tag every rearrangement would fork the series. The repository filter at the top of the dashboard does not reach this panel, because a pin is named owner/name, or is a gist, and the variable holds neither.",
+          "description": "What the profile shows first, in the order it shows it. The row worth seeing is a pinned repository nobody has pushed to in two years. Position is a field and not a tag on purpose: a repository that moves from slot two to slot three is the same pin, and as a tag every rearrangement would fork the series. The repository filter at the top of the dashboard does not reach this panel, because a pin can be a gist, which is named by its hash and is in no repository the filter knows.",
           "fieldConfig": {
             "defaults": {
               "custom": {

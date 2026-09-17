@@ -153,7 +153,7 @@ func (a Audience) Collect(ctx context.Context, c *ghapi.Client, now time.Time) (
 	var points []sink.Point
 	failed := aliasBatch(ctx, c, a.Repos, size, build, func(repo Repo, node audienceNode) {
 		if a.Stars {
-			base := map[string]string{"owner": repo.Owner, "repo": repo.Name, "full_name": repo.FullName}
+			base := repoTags(repo.Owner, repo.Name)
 			points = append(points, starPoints([][]starRow{node.stars()}, base,
 				githubPage(repo.FullName, "stargazers"))...)
 		}

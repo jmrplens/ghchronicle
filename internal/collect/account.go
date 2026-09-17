@@ -654,9 +654,8 @@ func contributionRepoPoints(u *accountUser, base map[string]string, now time.Tim
 			}
 			points = append(points, sink.Point{
 				Measurement: "gh_contribution_repo",
-				Tags: merge(base, map[string]string{
-					"repo": r.name, "kind": kind,
-				}),
+				Tags: merge(base, fullNameTags(r.name),
+					map[string]string{"kind": kind}),
 				Fields: fields,
 				Time:   now,
 			})
@@ -691,11 +690,11 @@ func commitDayPoints(repos commitContributionRepos, login string) []sink.Point {
 		}
 		// One map for every day of a repository: the tag set is the identity
 		// of the series and does not vary within it.
-		tags := map[string]string{
-			"user": login, "repo": name,
+		tags := merge(fullNameTags(name), map[string]string{
+			"user":    login,
 			"private": boolTag(r.Repository.IsPrivate),
 			"own":     boolTag(isOwn(name, login)),
-		}
+		})
 		for _, d := range r.Contributions.Nodes {
 			day, err := calendarDay(d.OccurredAt)
 			if err != nil {
@@ -731,10 +730,8 @@ func repoCreatedPoints(u *accountUser, base map[string]string) []sink.Point {
 	for _, r := range u.Contributions.RepositoryContributions.Nodes {
 		points = append(points, sink.Point{
 			Measurement: "gh_repo_created",
-			Tags: merge(base, map[string]string{
-				"repo": r.Repository.NameWithOwner,
-				"fork": strconv.FormatBool(r.Repository.IsFork),
-			}),
+			Tags: merge(base, fullNameTags(r.Repository.NameWithOwner),
+				map[string]string{"fork": strconv.FormatBool(r.Repository.IsFork)}),
 			Fields: withURL(map[string]any{
 				"created": 1, "private": r.Repository.IsPrivate,
 			}, githubPage(r.Repository.NameWithOwner)),
@@ -755,9 +752,16 @@ func pinnedItemPoints(u *accountUser, base map[string]string, now time.Time) []s
 	for i, item := range u.PinnedItems.Nodes {
 		name, kind := item.NameWithOwner, "repository"
 		link := githubPage(name)
+		// A gist is named by its hash alone and lives on another host, so the
+		// owner has to come from the profile being read. It is the only owner
+		// a pinned gist can have, since GitHub pins only one's own, and taking
+		// it from there is what lets a pin carry the same three tags as every
+		// other row instead of a shape of its own.
+		where := fullNameTags(name)
 		if item.TypeName == "Gist" {
 			name, kind = item.Name, "gist"
 			link = pageURL("https://gist.github.com", u.Login, name)
+			where = repoTags(u.Login, name)
 		}
 		if name == "" {
 			continue
@@ -773,7 +777,7 @@ func pinnedItemPoints(u *accountUser, base map[string]string, now time.Time) []s
 		}
 		points = append(points, sink.Point{
 			Measurement: "gh_pinned_item",
-			Tags:        merge(base, map[string]string{"repo": name}),
+			Tags:        merge(base, where),
 			Fields:      fields,
 			Time:        now,
 		})

@@ -72,7 +72,7 @@ func (rh RulesetHistory) Collect(ctx context.Context, c *ghapi.Client, repo Repo
 		}
 		return nil, err
 	}
-	base := map[string]string{"owner": repo.Owner, "repo": repo.Name, "full_name": repo.FullName}
+	base := repoTags(repo.Owner, repo.Name)
 	var points []sink.Point
 	for _, rs := range rulesets {
 		pts, err := rh.versions(ctx, c, repo, base, rs)

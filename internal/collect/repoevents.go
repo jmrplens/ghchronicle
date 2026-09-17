@@ -37,7 +37,7 @@ type activityRow struct {
 }
 
 func (r RepoActivityLog) Collect(ctx context.Context, c *ghapi.Client, repo Repo, _ time.Time) ([]sink.Point, error) {
-	base := map[string]string{"owner": repo.Owner, "repo": repo.Name, "full_name": repo.FullName}
+	base := repoTags(repo.Owner, repo.Name)
 	var rows []activityRow
 	after := ""
 	most := r.Walk.limit(2)

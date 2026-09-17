@@ -183,7 +183,7 @@ func policyPaths() []flatPath {
 }
 
 func policyPoints(repo Repo, res policyResponse, now time.Time) []sink.Point {
-	base := map[string]string{"owner": repo.Owner, "repo": repo.Name, "full_name": repo.FullName}
+	base := repoTags(repo.Owner, repo.Name)
 	blobs := readPolicyBlobs(res)
 
 	var points []sink.Point

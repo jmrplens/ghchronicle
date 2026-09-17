@@ -28,6 +28,13 @@ package dashboards
 // now, under a new name; a Graphite panel that wants one of them cannot have
 // it by path, and says so.
 //
+// A measurement that names a repository names it with the same three keys
+// everywhere: `owner`, the short `repo`, and `full_name`. Twelve of them used
+// to carry `repo` alone with the full name inside it, which is what made a
+// filter written against one group match nothing at all in the other. Nothing
+// else in the build reads this table against the collectors' tag sets, so
+// TestEveryRepositoryTagSetIsTheSameShape holds the entries to it here.
+//
 // One measurement is absent from this table altogether. gh_job_log is absent
 // because no panel queries it, so it has no node index to get wrong; a panel
 // that wanted it would have to add its tags here first. gh_event is listed
@@ -42,7 +49,7 @@ var tags = map[string][]string{
 	"gh_actions_policy":           {"full_name", "owner", "permissions", "repo"},
 	"gh_artifact":                 {"artifact", "full_name", "owner", "repo"},
 	"gh_artifact_total":           {"full_name", "owner", "repo"},
-	"gh_billing_usage":            {"org", "product", "repo", "sku", "unit", "user"},
+	"gh_billing_usage":            {"full_name", "owner", "product", "repo", "sku", "unit", "user"},
 	"gh_branch":                   {"branch", "full_name", "is_default", "owner", "repo"},
 	"gh_branch_protection":        {"full_name", "owner", "pattern", "repo"},
 	"gh_code_scanning_alert":      {"full_name", "owner", "repo", "severity", "tool"},
@@ -54,8 +61,8 @@ var tags = map[string][]string{
 	"gh_commit_punchcard":         {"full_name", "hour", "owner", "repo", "weekday"},
 	"gh_commits_week":             {"full_name", "owner", "repo"},
 	"gh_contribution_day":         {"user"},
-	"gh_contribution_day_repo":    {"own", "private", "repo", "user"},
-	"gh_contribution_repo":        {"kind", "repo", "user"},
+	"gh_contribution_day_repo":    {"full_name", "own", "owner", "private", "repo", "user"},
+	"gh_contribution_repo":        {"full_name", "kind", "owner", "repo", "user"},
 	"gh_contribution_year":        {"user", "year"},
 	"gh_contributions_total":      {"user"},
 	"gh_dependabot_alert":         {"ecosystem", "full_name", "owner", "repo", "severity"},
@@ -67,22 +74,22 @@ var tags = map[string][]string{
 	"gh_deploy_key":               {"full_name", "key", "owner", "read_only", "repo"},
 	"gh_deployment":               {"deployment", "environment", "full_name", "owner", "repo", "task"},
 	"gh_discussion":               {"answerable", "author", "category", "full_name", "number", "owner", "repo"},
-	"gh_discussion_comment":       {"author", "comment", "is_answer", "is_reply", "number", "own", "repo", "user"},
+	"gh_discussion_comment":       {"author", "comment", "full_name", "is_answer", "is_reply", "number", "own", "owner", "repo", "user"},
 	"gh_environment":              {"environment", "full_name", "owner", "repo"},
-	"gh_external_contribution":    {"kind", "number", "repo", "state", "user"},
+	"gh_external_contribution":    {"full_name", "kind", "number", "owner", "repo", "state", "user"},
 	"gh_fork":                     {"by", "full_name", "owner", "repo"},
 	"gh_gist":                     {"gist", "public", "user"},
-	"gh_event":                    {"action", "ref_type", "repo", "type"},
+	"gh_event":                    {"action", "full_name", "owner", "ref_type", "repo", "type"},
 	"gh_issue":                    {"author", "full_name", "number", "owner", "repo", "state"},
-	"gh_issue_comment":            {"number", "own", "repo", "user"},
+	"gh_issue_comment":            {"full_name", "number", "own", "owner", "repo", "user"},
 	"gh_issue_event":              {"actor", "bot", "event", "full_name", "kind", "label", "mentioned", "milestone", "owner", "repo", "requested_reviewer", "review_requester"},
 	"gh_key":                      {"key", "kind", "user"},
 	"gh_label":                    {"full_name", "label", "owner", "repo"},
 	"gh_milestone":                {"full_name", "milestone", "owner", "repo", "state"},
-	"gh_notification":             {"private", "reason", "repo", "subject_type"},
-	"gh_package":                  {"package", "repo", "type", "user", "visibility"},
-	"gh_package_version":          {"package", "repo", "tag", "type", "user", "visibility"},
-	"gh_pinned_item":              {"repo", "user"},
+	"gh_notification":             {"full_name", "owner", "private", "reason", "repo", "subject_type"},
+	"gh_package":                  {"full_name", "owner", "package", "repo", "type", "user", "visibility"},
+	"gh_package_version":          {"full_name", "owner", "package", "repo", "tag", "type", "user", "visibility"},
+	"gh_pinned_item":              {"full_name", "owner", "repo", "user"},
 	"gh_policy_file":              {"file", "full_name", "owner", "repo"},
 	"gh_profile_flag":             {"flag", "user"},
 	"gh_pull_request":             {"author", "full_name", "number", "owner", "repo", "state"},
@@ -93,7 +100,7 @@ var tags = map[string][]string{
 	"gh_repo":                     {"archived", "default_branch", "fork", "full_name", "language", "license", "owner", "repo", "visibility"},
 	"gh_repo_activity":            {"activity", "actor", "full_name", "owner", "repo"},
 	"gh_repo_community":           {"full_name", "owner", "repo"},
-	"gh_repo_created":             {"fork", "repo", "user"},
+	"gh_repo_created":             {"fork", "full_name", "owner", "repo", "user"},
 	"gh_repo_language":            {"full_name", "language", "owner", "repo"},
 	"gh_repo_archived":            {"full_name", "owner", "repo"},
 	"gh_repo_policy":              {"full_name", "owner", "repo"},
@@ -111,7 +118,7 @@ var tags = map[string][]string{
 	"gh_sponsors_tier":            {"tier", "user"},
 	"gh_sponsorship":              {"direction", "sponsorable", "user"},
 	"gh_star":                     {"full_name", "owner", "repo", "user"},
-	"gh_star_given":               {"language", "repo", "user"},
+	"gh_star_given":               {"full_name", "language", "owner", "repo", "user"},
 	"gh_star_list":                {"list", "user"},
 	"gh_traffic":                  {"full_name", "kind", "owner", "repo"},
 	"gh_traffic_path":             {"full_name", "owner", "path", "repo"},
