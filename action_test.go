@@ -558,9 +558,16 @@ func readRecord(t *testing.T, path string) string {
 // regenerates is a number waiting to go stale. So: no run of two or more
 // digits. A single digit still passes, which is what lets the sentence say
 // that 0 means the layout's own width.
+//
+// Digits are not the only way to write a number, and the spelled form is not
+// hypothetical here: the comment above heatGridWeeks went stale as "about nine
+// hundred units", in this same repository, in this same change. A rule that
+// caught the shape that just went wrong and missed the one beside it would be
+// the weaker half of a gate, so the magnitudes are refused too.
 func TestTheCardWidthInputNamesNoWidth(t *testing.T) {
 	description := actionInputDescription(t, "card-width")
-	if found := regexp.MustCompile(`\d\d+`).FindAllString(description, -1); found != nil {
+	written := regexp.MustCompile(`(?i)\d\d+|hundred|thousand`)
+	if found := written.FindAllString(description, -1); found != nil {
 		t.Errorf("the card-width input names the width(s) %v. A width belongs to a layout, "+
 			"and every layout's two ends are printed by -card-layouts and stated in its own "+
 			"section of the layouts page, both from internal/render. Point at those instead "+
