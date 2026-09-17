@@ -122,13 +122,14 @@ GRAFANA_TOKEN=... go run ./cmd/check_prometheus <metrics-dump> <datasource-uid>
 go run ./cmd/check_postgres <schema.json>
 ```
 
-`check_dashboards` informa de cada panel como correcto, vacío o fallido, y
-cuenta aparte dos clases de fallo: un panel que nombra una tabla que el almacén
-no ha creado, que es una familia que allí aún no se ha recogido y se llenará
-sola, y un panel que nombra una columna que no ha creado, que es un panel que
-nadie con el historial de esa cuenta puede dibujar. Lo segundo es la razón de
-ejecutarlo contra un almacén con una cuenta real y no solo contra el banco de
-pruebas: una columna de estos almacenes existe desde que un punto la ha
+`check_dashboards` informa de cada panel como correcto, vacío, en espera o
+fallido, y su estado sigue esa lectura: un panel sobre una tabla que el almacén
+no ha creado es una familia que aún no ha recogido y que se llenará sola, así
+que se informa como `WAIT` y no hace fallar la ejecución, mientras que un panel
+que nombra una columna que el almacén no ha creado es uno que nadie con el
+historial de esa cuenta puede dibujar y sí la hace fallar. Lo segundo es la
+razón de ejecutarlo contra un almacén con una cuenta real y no solo contra el
+banco de pruebas: una columna de estos almacenes existe desde que un punto la ha
 llevado, el banco de pruebas lleva todos los campos de todas las medidas, y una
 cuenta solo lleva lo que le ha pasado. Un panel que selecciona un campo que la
 cuenta nunca ha escrito se rechaza entero y Grafana dibuja «Sin datos» con un

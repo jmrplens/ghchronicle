@@ -138,12 +138,13 @@ and `stores.go` only chooses a query set and a datasource.
 > go run ./cmd/check_postgres <schema.json>
 > ```
 >
-> `check_dashboards` reports every panel as ok, empty or failing, and counts two
-> kinds of failure apart from the rest: a panel naming a table the store has not
-> created, which is a family that has not been collected there yet and will fill
-> itself, and a panel naming a column it has not created, which is a panel nobody
-> with that account's history can draw. The second is why this is worth running
-> against a store holding a real account and not only against the fixture: a
+> `check_dashboards` reports every panel as ok, empty, waiting or failing, and
+> its status follows that reading: a panel over a table the store has not created
+> is a family it has not collected yet, which fills itself, so it is reported as
+> `WAIT` and does not fail the run, while a panel naming a column the store has
+> not created is one nobody with that account's history can draw and fails it.
+> The second is why this is worth running against a store holding a real account
+> and not only against the fixture: a
 > column of these stores exists once a point has carried it, the fixture carries
 > every field of every measurement, and an account carries only what has happened
 > to it. A panel selecting a field the account has never written is refused
@@ -235,7 +236,8 @@ Continuous integration clones all day, so the clone count belongs beside the
 figure that explains it rather than in a headline: measured on the account this
 was read against, one repository was cloned 135,683 times in a fortnight by
 1,807 cloners, and 186 K beside 2.89 K views reads as an audience. The count
-itself is two panels of the Audience section.
+itself is two panels of the Audience section. The capture above predates that
+change and still reads "clones".
 
 Reads `gh_account`, `gh_repo`, `gh_traffic` and `gh_contributions_total`.
 

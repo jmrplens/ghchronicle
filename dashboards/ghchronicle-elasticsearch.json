@@ -932,7 +932,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "Each repository the account created, dated when it was created rather than when a sweep noticed it. Forks and private repositories are included, which is the point: those are exactly the ones a sweep with `include_forks` off never discovers. The contributions collection offers one trailing year of them at a time, so a fresh install sees a year here and the table reaches further back with every year the rows are kept. It names its own window rather than taking the dashboard's, so narrowing the range at the top of the page does not narrow this table. Elasticsearch answers only inside the dashboard range, so years outside it are missing.",
+          "description": "A trailing year at a time, whatever the row above is called: GitHub's contributions collection offers twelve months of them per sweep, so a fresh install sees one year here and the table reaches further back with every year the rows are kept. Each repository the account created, dated when it was created rather than when a sweep noticed it. Forks and private repositories are included, which is the point: those are exactly the ones a sweep with `include_forks` off never discovers. It names its own window rather than taking the dashboard's, so narrowing the range at the top of the page does not narrow this table. Elasticsearch answers only inside the dashboard range, so years outside it are missing.",
           "fieldConfig": {
             "defaults": {
               "custom": {

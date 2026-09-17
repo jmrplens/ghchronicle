@@ -11,6 +11,18 @@ const (
 	lifetimeMostUsed        = "Most used"
 )
 
+// repositoriesCreatedDesc leads with the window the panel has rather than
+// explaining it in the middle, and is out here for the reason
+// everyRepositoryDesc is.
+const repositoriesCreatedDesc = "A trailing year at a time, whatever the row above is " +
+	"called: GitHub's contributions collection offers twelve months of them per sweep, so " +
+	"a fresh install sees one year here and the table reaches further back with every year " +
+	"the rows are kept. Each repository the account created, dated when it was created " +
+	"rather than when a sweep noticed it. Forks and private repositories are included, " +
+	"which is the point: those are exactly the ones a sweep with `include_forks` off never " +
+	"discovers. It names its own window rather than taking the dashboard's, so narrowing " +
+	"the range at the top of the page does not narrow this table."
+
 // everyRepositoryDesc is what the widest table on the dashboard says about
 // itself, out here rather than at its call site so that the function building
 // the section stays inside the maintainability the linter holds it to.
@@ -192,6 +204,16 @@ func lifetime(b *builder) []Panel {
 				GR: reposGR, GRTF: reposGRtf, GRDesc: grSlot,
 				ES: reposES, ESTF: reposEStf,
 			}),
+		// The description leads with the window rather than explaining it in
+		// the middle. The row above this says Lifetime and the panel beside it
+		// genuinely reaches back nine years, so on the account this was read
+		// against, where the contributions collection had given 38 of 59
+		// repositories and none older than 2025-12-14, a reader concluded
+		// nothing had been created before December. The title cannot carry it:
+		// every spelling that stays true once a second year has accumulated is
+		// past the twenty-nine characters a phone shows (TestTitlesFitAPhone),
+		// and "(last twelve months)" is true the day it is written and wrong a
+		// year later.
 		panel("table", "Repositories created", box{W: 8, H: 8, X: 0, Y: 17}, []Target{sqlT(created)}, &P{
 			// The exporter reduces this measurement to a count, so the answer
 			// here is a real one and it is a smaller one. Said rather than
@@ -206,14 +228,7 @@ func lifetime(b *builder) []Panel {
 				"them were forks, and can name none of them: the repository is not a " +
 				"label on that gauge. It is the last sweep's count, so it is that one " +
 				"trailing year and never the years the other stores have kept.",
-			Desc: "Each repository the account created, dated when it was created rather than " +
-				"when a sweep noticed it. Forks and private repositories are included, " +
-				"which is the point: those are exactly the ones a sweep with " +
-				"`include_forks` off never discovers. The contributions collection offers " +
-				"one trailing year of them at a time, so a fresh install sees a year here " +
-				"and the table reaches further back with every year the rows are kept. It " +
-				"names its own window rather than taking the dashboard's, so narrowing " +
-				"the range at the top of the page does not narrow this table.",
+			Desc: repositoriesCreatedDesc,
 			Overrides: []any{
 				when("Created"), width("Fork", 70), width("Private", 80), linkOn("Repository"),
 			},

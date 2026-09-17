@@ -112,13 +112,18 @@ func check(ctx context.Context, args []string, stdout io.Writer) (passed bool, e
 	var noColumn, noTable []string
 	for _, r := range results {
 		switch {
+		// A table the store has not created is the one failure that is not
+		// the dashboard's: the family has not been collected here yet, and
+		// the panel will draw the day it is. Reported, counted on its own
+		// line, and deliberately not part of the status, so that this can be
+		// a release gate on a store whose backfill is still walking.
+		case r.Err != "" && classify(r.Err) == missingTable:
+			noTable = append(noTable, r.Panel.Title)
+			fmt.Fprintf(stdout, "WAIT %s: %s\n", r.Panel.Title, grafana.Trim(r.Err, 240))
 		case r.Err != "":
 			bad++
-			switch classify(r.Err) {
-			case missingColumn:
+			if classify(r.Err) == missingColumn {
 				noColumn = append(noColumn, r.Panel.Title)
-			case missingTable:
-				noTable = append(noTable, r.Panel.Title)
 			}
 			fmt.Fprintf(stdout, "FAIL %s: %s\n", r.Panel.Title, grafana.Trim(r.Err, 240))
 		case r.Rows == 0:
@@ -129,14 +134,14 @@ func check(ctx context.Context, args []string, stdout io.Writer) (passed bool, e
 		}
 	}
 	if len(noTable) > 0 {
-		fmt.Fprintf(stdout, "\n%d of those name a table this store has not created, which is a "+
-			"family that has not been collected here yet: %s\n",
+		fmt.Fprintf(stdout, "\n%d waiting on a table this store has not created, which is a "+
+			"family it has not collected yet; they do not fail the run: %s\n",
 			len(noTable), strings.Join(noTable, ", "))
 	}
 	if len(noColumn) > 0 {
-		fmt.Fprintf(stdout, "\n%d of those name a column this store has not created. A column "+
-			"exists once a point has carried it, so this is a panel nobody with this account's "+
-			"history can draw, and no amount of collecting will fill it: %s\n",
+		fmt.Fprintf(stdout, "\n%d of the failures name a column this store has not created. A "+
+			"column exists once a point has carried it, so that is a panel nobody with this "+
+			"account's history can draw, and no amount of collecting will fill it: %s\n",
 			len(noColumn), strings.Join(noColumn, ", "))
 	}
 	fmt.Fprintf(stdout, "\n%d failing, %d empty\n", bad, empty)
@@ -146,10 +151,17 @@ func check(ctx context.Context, args []string, stdout io.Writer) (passed bool, e
 // Why a failure is worth telling apart.
 //
 // A release check against a real account answers with three kinds of failure
-// under one word. A family the backfill has not reached yet leaves the store
-// with no table at all, and every panel over it fails; that is a gap that
-// fills itself. A panel naming a column the store has never created is the
-// opposite: a column of these stores exists once a point has carried it, so a
+// under one word, and the status has to mean something or the checklist item
+// it is on becomes a thing people tick. Measured on the production store on
+// 2026-09-17: thirty-three panels failed for a family the backfill had not
+// reached and one for a column that account will never have, and the command
+// exited 1 either way, the same status it gives for the run where the one is
+// absent. So a family the backfill has not reached leaves the store with no
+// table, every panel over it is reported as waiting rather than failing, and
+// it does not touch the status: that gap fills itself, and the misspelled
+// measurement it might hide is what the containerised suite catches, where
+// every family is written and none of these tables can be missing. A panel
+// naming a column the store has never created is the opposite: a column of these stores exists once a point has carried it, so a
 // field the account has never had a reason to write is a column the planner
 // rejects before it reads a row, for ever. That is what hid eight resolved
 // Dependabot alerts behind "No data" on the account this was first run

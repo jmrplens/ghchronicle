@@ -263,6 +263,17 @@ func TestEveryWholeHistoryWindowIsOnTheList(t *testing.T) {
 	}
 }
 
+// flagsLookup is the join repoFlagsJoin writes. It carries the unbounded
+// window and is not the panel reading its own measurement from the beginning:
+// it reads the newest gh_repo row per repository, a snapshot of 59 rows in one
+// parquet file on the production store, while the panel's own rows still
+// follow the dashboard range. So it is taken out before a panel is judged,
+// and the rule above keeps meaning what it says. The reason it must be
+// unbounded at all is in repoFlagsJoin.
+var flagsLookup = regexp.MustCompile(
+	`LEFT JOIN \(SELECT repo, fork, archived FROM .*?\) f ON f\.repo = \w+\.repo`,
+)
+
 // carriesWholeHistory says whether any store of a panel reads from the
 // beginning rather than over the dashboard range.
 func carriesWholeHistory(p Panel) bool {
@@ -271,10 +282,38 @@ func carriesWholeHistory(p Panel) bool {
 			continue
 		}
 		for i := range st.Q {
-			if strings.Contains(st.Q[i].SQL, wholeHistory) {
+			if strings.Contains(flagsLookup.ReplaceAllString(st.Q[i].SQL, ""), wholeHistory) {
 				return true
 			}
 		}
 	}
 	return false
+}
+
+// TestTheRepositoryFlagsAreReadOutsideTheRange: the four lists of what to do
+// next leave out what nobody can act on by joining gh_repo, which is a
+// snapshot, so the flags are only knowable where a sweep landed. Bounded by
+// the page's range the join matched nothing outside one, every missing flag
+// read as "not flagged", and all four panels reverted to the behavior they
+// were changed to fix, with nothing on the screen to say so. Measured on the
+// production store on 2026-09-17: gh_repo holds 59 rows at a single
+// timestamp, so a reader who picked "Last 6 hours" had the exclusion switched
+// off already.
+func TestTheRepositoryFlagsAreReadOutsideTheRange(t *testing.T) {
+	t.Parallel()
+	for _, store := range []string{"influxdb", "postgres"} {
+		panels := rendered(t, store)
+		for _, title := range theQueues {
+			sql := everySQL(t, mustPanel(t, panels, title))
+			lookup := flagsLookup.FindString(sql)
+			if lookup == "" {
+				t.Fatalf("%s %s no longer joins the repository's own flags: %s", store, title, sql)
+			}
+			if strings.Contains(lookup, "$__timeFilter") || strings.Contains(lookup, "__timeGroup") ||
+				!strings.Contains(lookup, "30 years") {
+				t.Errorf("%s %s reads the flags inside the dashboard range, so the exclusion "+
+					"turns itself off on a range holding no sweep: %s", store, title, lookup)
+			}
+		}
+	}
 }

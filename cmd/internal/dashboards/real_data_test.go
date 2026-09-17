@@ -1,6 +1,8 @@
 package dashboards
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -181,6 +183,72 @@ func TestEveryRepositoryEverOpensOnTheAccountsOwnWork(t *testing.T) {
 			`[{"desc":false,"displayName":"Fork"},{"desc":true,"displayName":"Commits"}]` {
 			t.Errorf("%s: the table opens sorted %s, want the forks under the account's own "+
 				"work and both ranked by commits", store, got)
+		}
+	}
+}
+
+// conditionalColumns is every column a panel selects that the collector writes
+// only when something has happened to the account, with the reason it cannot
+// be replaced by one that is always written.
+//
+// This is the `dismissed_reason` shape, and the alert panel was the instance
+// that could be fixed: `alert_state` says the same thing and is on every row.
+// These five have no such twin. They draw on the account this was read against
+// because it has done the thing that creates them, which is exactly why the
+// live check cannot find them here: it can only report a column the store it
+// is pointed at has never been given. An account that works alone, has never
+// let a key expire or has never deployed with an environment url will have one
+// of these panels refused whole.
+//
+// The list is here so that a sixth is a deliberate act, and so that the reader
+// who meets the class has the instances in one place rather than spread over
+// four files. It does not catch a sixth on its own: nothing does, short of a
+// second end-to-end fixture for an account that has done none of the optional
+// things, the one we have carrying every field of every measurement. The
+// release checklist says the same in prose.
+var conditionalColumns = map[string]struct{ panel, writtenIn, only string }{
+	"seconds_to_first_human_review": {
+		"Merged and closed in range", "pulls.go",
+		"only when somebody other than the author reviewed a pull request; " +
+			"fourteen rows in the whole of the store this was read against, " +
+			"and the panel is the six-value stat of the section",
+	},
+	"never_used": {
+		"Account keys", "profile.go",
+		"only for a key that has never been used, the other side of days_since_use",
+	},
+	"days_to_expiry": {
+		"Account keys", "profile.go", "only for a GPG key that has an expiry",
+	},
+	"days_since_use": {
+		"Deploy keys", "settings.go", "only for a deploy key that has ever been used",
+	},
+	"environment_url": {
+		"Deployments by environment", "deployments.go",
+		"only for a deployment that carried one",
+	},
+}
+
+// TestTheColumnsOnlyAnAccountsHistoryCreatesAreOnTheList: each entry is still
+// selected by the panel it names and still written by the file it names, so an
+// entry cannot quietly stop describing anything, which is the failure mode of
+// every list kept by hand.
+func TestTheColumnsOnlyAnAccountsHistoryCreatesAreOnTheList(t *testing.T) {
+	t.Parallel()
+	panels := rendered(t, "influxdb")
+	for column, e := range conditionalColumns {
+		sql := everySQL(t, mustPanel(t, panels, e.panel))
+		if !strings.Contains(sql, column) {
+			t.Errorf("%q no longer selects %s, so its entry on the list describes nothing",
+				e.panel, column)
+		}
+		src, err := os.ReadFile(filepath.Join("..", "..", "..", "internal", "collect", e.writtenIn))
+		if err != nil {
+			t.Fatalf("reading the collector that writes %s: %v", column, err)
+		}
+		if !strings.Contains(string(src), `"`+column+`"`) {
+			t.Errorf("internal/collect/%s no longer writes %s, so the reason on the list is "+
+				"about something else now", e.writtenIn, column)
 		}
 	}
 }

@@ -488,15 +488,46 @@ func TestARefusedColumnIsReportedApartFromAnAbsentTable(t *testing.T) {
 	for _, want := range []string{
 		"name a column this store has not created",
 		"Time to resolve an alert",
-		"name a table this store has not created",
+		"waiting on a table this store has not created",
+		"WAIT Commits:",
 	} {
 		if !strings.Contains(stdout, want) {
 			t.Errorf("the run does not say %q:\n%s", want, stdout)
 		}
 	}
-	// The tally stays the last line, since that is what a long run is read by.
-	if !strings.Contains(stdout, " failing, ") || !strings.HasSuffix(stdout, " empty\n") {
-		t.Errorf("stdout ends %q, want the tally last", stdout[max(0, len(stdout)-40):])
+	// The tally stays the last line, since that is what a long run is read by,
+	// and it counts the refused columns and not the absent tables.
+	if !strings.HasSuffix(stdout, "\n2 failing, 0 empty\n") {
+		t.Errorf("stdout ends %q, want a tally counting the two refused columns alone",
+			stdout[max(0, len(stdout)-40):])
+	}
+}
+
+// TestATableTheStoreHasNotCreatedDoesNotFailTheRun: the release step is a
+// checklist item, so its status has to mean something. Against the production
+// store on 2026-09-17 thirty-three panels named a family the backfill had not
+// reached and one named a column that account will never have, and the command
+// exited 1 for both, which is how an item becomes a thing people tick. A store
+// that is merely incomplete now passes.
+func TestATableTheStoreHasNotCreatedDoesNotFailTheRun(t *testing.T) {
+	serve(t, func(q map[string]any) ([]column, string) {
+		sql, _ := q["rawSql"].(string)
+		switch {
+		case sql == repoListSQL:
+			return one("octocat/hello-world"), ""
+		case strings.Contains(sql, "FROM gh_commit "):
+			return nil, "table 'public.iox.gh_commit' not found"
+		}
+		return columnsOf(q), ""
+	})
+	status, stdout, _ := checkRun(t, "influxdb", "influx-uid")
+	if status != 0 {
+		t.Errorf("status %d, want a store whose backfill is still walking to pass:\n%s",
+			status, stdout)
+	}
+	if !strings.Contains(stdout, "they do not fail the run") ||
+		!strings.HasSuffix(stdout, "\n0 failing, 0 empty\n") {
+		t.Errorf("the run does not report the waiting panels apart from the failures:\n%s", stdout)
 	}
 }
 

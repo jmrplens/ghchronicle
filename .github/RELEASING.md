@@ -27,14 +27,33 @@ is not.
       release, on an account that had only ever fixed alerts and so had never
       written `dismissed_reason`.
 
-      Read the two lines above the tally rather than the tally itself. Panels
-      that name a table the store has not created are families that have not
-      been collected here yet and will fill themselves; panels that name a
-      column it has not created are the defect, and no sweep will fix one.
-      `EMPTY` is not a failure: a panel can be honestly empty.
+      It exits 0 when no panel names a column the store has not created, so it
+      is a gate and not a reading exercise. A panel over a family the store has
+      not collected yet is reported as `WAIT` and counted on its own line,
+      because that fills itself; `EMPTY` is not a failure either, a panel can
+      be honestly empty. Anything under `FAIL` is the release's problem.
 
       Run it for each store you have a datasource for. It needs a Grafana, so
       CI can never do it.
+
+      **The class is open, and this check only closes it for the account it is
+      run against.** These five panels name a column the collector writes only
+      when something has happened, and they draw here only because this account
+      has done it: `seconds_to_first_human_review` in "Merged and closed in
+      range" (`internal/collect/pulls.go`, written only when somebody other
+      than the author reviewed a pull request, and fourteen rows in this whole
+      store), `never_used` and `days_to_expiry` in "Account keys"
+      (`internal/collect/profile.go`), `days_since_use` in "Deploy keys"
+      (`internal/collect/settings.go`) and `environment_url` in "Deployments by
+      environment" (`internal/collect/deployments.go`). None of the five has an
+      unconditional column that says the same thing, the way `alert_state`
+      replaced `dismissed_reason`, so they stay, and an account that has never
+      had a human review or never expired a key will see one of them refused.
+      If this check reports a refused column on somebody else's store, look
+      here first. What would find them before a user does is a second
+      end-to-end fixture for an account that has done none of the optional
+      things; the one we have carries every field of every measurement, which
+      is exactly why it cannot.
 - [ ] `cd site && pnpm run build && pnpm run lint` is green, which also holds
       the published counts to the code.
 - [ ] The documentation says what this version does, not what the last one did.

@@ -55,9 +55,11 @@ The second has to be pointed at a store holding a real account. The fixture
 carries every field of every measurement; an account carries only what has
 happened to it, and a column of these stores exists once a point has carried
 it, so a panel selecting a field the account has never written is refused and
-draws "No data". The same check is the last item of
-[RELEASING.md](../.github/RELEASING.md) before the tag, with what its two
-summary lines mean.
+draws "No data". It exits 0 when no panel names such a column, and reports a
+panel over a family the store has not collected yet as `WAIT` rather than
+failing the run. The same check is a "before the tag" item of
+[RELEASING.md](../.github/RELEASING.md), which also names the five panels where
+this class is still open.
 
 ## Publishing to your own Grafana
 

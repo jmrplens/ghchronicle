@@ -493,7 +493,7 @@
         },
         {
           "datasource": "${DS_INFLUXDB}",
-          "description": "Each repository the account created, dated when it was created rather than when a sweep noticed it. Forks and private repositories are included, which is the point: those are exactly the ones a sweep with `include_forks` off never discovers. The contributions collection offers one trailing year of them at a time, so a fresh install sees a year here and the table reaches further back with every year the rows are kept. It names its own window rather than taking the dashboard's, so narrowing the range at the top of the page does not narrow this table.",
+          "description": "A trailing year at a time, whatever the row above is called: GitHub's contributions collection offers twelve months of them per sweep, so a fresh install sees one year here and the table reaches further back with every year the rows are kept. Each repository the account created, dated when it was created rather than when a sweep noticed it. Forks and private repositories are included, which is the point: those are exactly the ones a sweep with `include_forks` off never discovers. It names its own window rather than taking the dashboard's, so narrowing the range at the top of the page does not narrow this table.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -3837,7 +3837,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT x.number AS \"Number\", x.seconds_open AS \"Open for\", x.repo AS \"Repository\", x.title AS \"Title\", x.author AS \"Author\", x.label_names AS \"Labels\", x.comments AS \"Comments\", x.reviews AS \"Reviews\", f.fork AS \"Fork\", x.url AS \"Link\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo, number ORDER BY time DESC) AS rn FROM gh_pull_request WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) AND number IS NOT NULL) x LEFT JOIN (SELECT repo, fork, archived FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo ORDER BY time DESC) AS rn FROM gh_repo WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE rn = 1) f ON f.repo = x.repo WHERE x.rn = 1 AND x.state = 'OPEN' AND COALESCE(f.archived, 'false') \u003c\u003e 'true' ORDER BY x.seconds_open DESC LIMIT 25",
+              "rawSql": "SELECT x.number AS \"Number\", x.seconds_open AS \"Open for\", x.repo AS \"Repository\", x.title AS \"Title\", x.author AS \"Author\", x.label_names AS \"Labels\", x.comments AS \"Comments\", x.reviews AS \"Reviews\", f.fork AS \"Fork\", x.url AS \"Link\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo, number ORDER BY time DESC) AS rn FROM gh_pull_request WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) AND number IS NOT NULL) x LEFT JOIN (SELECT repo, fork, archived FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo ORDER BY time DESC) AS rn FROM gh_repo WHERE time \u003e now() - INTERVAL '30 years' AND repo IN (${repo:singlequote})) x WHERE rn = 1) f ON f.repo = x.repo WHERE x.rn = 1 AND x.state = 'OPEN' AND COALESCE(f.archived, 'false') \u003c\u003e 'true' ORDER BY x.seconds_open DESC LIMIT 25",
               "refId": "A"
             }
           ],
@@ -3985,7 +3985,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT x.number AS \"Number\", x.seconds_open AS \"Open for\", x.repo AS \"Repository\", x.author AS \"Author\", x.comments AS \"Comments\", x.label_names AS \"Labels\", f.fork AS \"Fork\", x.url AS \"Link\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo, number ORDER BY time DESC) AS rn FROM gh_issue WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) AND number IS NOT NULL) x LEFT JOIN (SELECT repo, fork, archived FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo ORDER BY time DESC) AS rn FROM gh_repo WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE rn = 1) f ON f.repo = x.repo WHERE x.rn = 1 AND x.state = 'OPEN' AND COALESCE(f.archived, 'false') \u003c\u003e 'true' ORDER BY x.seconds_open DESC LIMIT 25",
+              "rawSql": "SELECT x.number AS \"Number\", x.seconds_open AS \"Open for\", x.repo AS \"Repository\", x.author AS \"Author\", x.comments AS \"Comments\", x.label_names AS \"Labels\", f.fork AS \"Fork\", x.url AS \"Link\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo, number ORDER BY time DESC) AS rn FROM gh_issue WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) AND number IS NOT NULL) x LEFT JOIN (SELECT repo, fork, archived FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo ORDER BY time DESC) AS rn FROM gh_repo WHERE time \u003e now() - INTERVAL '30 years' AND repo IN (${repo:singlequote})) x WHERE rn = 1) f ON f.repo = x.repo WHERE x.rn = 1 AND x.state = 'OPEN' AND COALESCE(f.archived, 'false') \u003c\u003e 'true' ORDER BY x.seconds_open DESC LIMIT 25",
               "refId": "A"
             }
           ],
@@ -5585,7 +5585,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT w.repo AS \"Repository\", w.workflow AS \"Workflow\", w.state AS \"State\", f.fork AS \"Fork\", w.url AS \"Link\" FROM (SELECT DISTINCT repo, workflow, path, state, url FROM gh_workflow WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) w LEFT JOIN (SELECT DISTINCT repo, workflow FROM gh_workflow_run WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) r ON w.repo = r.repo AND w.path = r.workflow LEFT JOIN (SELECT repo, fork, archived FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo ORDER BY time DESC) AS rn FROM gh_repo WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE rn = 1) f ON f.repo = w.repo WHERE r.workflow IS NULL AND COALESCE(f.archived, 'false') \u003c\u003e 'true' ORDER BY 1, 2",
+              "rawSql": "SELECT w.repo AS \"Repository\", w.workflow AS \"Workflow\", w.state AS \"State\", f.fork AS \"Fork\", w.url AS \"Link\" FROM (SELECT DISTINCT repo, workflow, path, state, url FROM gh_workflow WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) w LEFT JOIN (SELECT DISTINCT repo, workflow FROM gh_workflow_run WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) r ON w.repo = r.repo AND w.path = r.workflow LEFT JOIN (SELECT repo, fork, archived FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo ORDER BY time DESC) AS rn FROM gh_repo WHERE time \u003e now() - INTERVAL '30 years' AND repo IN (${repo:singlequote})) x WHERE rn = 1) f ON f.repo = w.repo WHERE r.workflow IS NULL AND COALESCE(f.archived, 'false') \u003c\u003e 'true' ORDER BY 1, 2",
               "refId": "A"
             }
           ],
@@ -8735,7 +8735,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT b.branch AS \"Branch\", b.days_since_commit AS \"Idle\", b.repo AS \"Repository\", b.is_default AS \"Default\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo, branch ORDER BY time DESC) AS rn FROM gh_branch WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) b LEFT JOIN (SELECT repo, fork, archived FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo ORDER BY time DESC) AS rn FROM gh_repo WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE rn = 1) f ON f.repo = b.repo WHERE b.rn = 1 AND COALESCE(f.fork, 'false') \u003c\u003e 'true' AND COALESCE(f.archived, 'false') \u003c\u003e 'true' ORDER BY 2 DESC",
+              "rawSql": "SELECT b.branch AS \"Branch\", b.days_since_commit AS \"Idle\", b.repo AS \"Repository\", b.is_default AS \"Default\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo, branch ORDER BY time DESC) AS rn FROM gh_branch WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) b LEFT JOIN (SELECT repo, fork, archived FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo ORDER BY time DESC) AS rn FROM gh_repo WHERE time \u003e now() - INTERVAL '30 years' AND repo IN (${repo:singlequote})) x WHERE rn = 1) f ON f.repo = b.repo WHERE b.rn = 1 AND COALESCE(f.fork, 'false') \u003c\u003e 'true' AND COALESCE(f.archived, 'false') \u003c\u003e 'true' ORDER BY 2 DESC",
               "refId": "A"
             }
           ],

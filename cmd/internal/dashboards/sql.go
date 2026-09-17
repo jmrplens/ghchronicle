@@ -79,10 +79,16 @@ func otherRows(ranked, label, value string, n int) string {
 // gh_repo is a snapshot rewritten every sweep, so summing it directly would
 // count each repository once per sweep. This keeps one row each.
 func latestPerRepo(fields []string) string {
+	return latestPerRepoWithin(fields, "$__timeFilter(time)")
+}
+
+// latestPerRepoWithin is the same with the window named, for the one caller
+// that must not take the page's: see repoFlagsJoin.
+func latestPerRepoWithin(fields []string, window string) string {
 	return fmt.Sprintf("SELECT repo, %s FROM ("+
 		"SELECT *, ROW_NUMBER() OVER (PARTITION BY repo ORDER BY time DESC) AS rn"+
-		" FROM gh_repo WHERE $__timeFilter(time) AND %s) x WHERE rn = 1",
-		strings.Join(fields, ", "), RF)
+		" FROM gh_repo WHERE %s AND %s) x WHERE rn = 1",
+		strings.Join(fields, ", "), window, RF)
 }
 
 // latestSumSQL is the sum of a snapshot field, one row per partition, newest
@@ -146,8 +152,21 @@ instead of this note.
 // pull requests were dependabot's in two archived repositories, every workflow
 // in "Workflows that never ran" was in an archived one, and 1,083 of the 1,208
 // branches in "Stale branches" were a fork's.
+// The lookup takes wholeHistory and never the page's range, which is the whole
+// difference between a fix and a fix that switches itself off. gh_repo is a
+// snapshot, so a repository's flags are only knowable where a sweep landed: on
+// a range holding none the join matches nothing, COALESCE reads every missing
+// flag as "not flagged", and all four panels quietly revert to listing what
+// nobody can act on. That is not a corner. Measured on the production store on
+// 2026-09-17, gh_repo holds 59 rows at exactly one timestamp, so "Last 6 hours"
+// was already outside it and the exclusion was already off there. The scan is
+// free, which is what lets the window be the unbounded one: one parquet file
+// and 59 rows (system.parquet_files, same day) against the forty thousand file
+// limit the other whole-history panels are measured against.
 func repoFlagsJoin(on string) string {
-	return " LEFT JOIN (" + latestPerRepo([]string{"fork", "archived"}) + ") f ON f.repo = " + on
+	return " LEFT JOIN (" +
+		latestPerRepoWithin([]string{"fork", "archived"}, wholeHistory) +
+		") f ON f.repo = " + on
 }
 
 // The predicates that go with it.
