@@ -25,20 +25,27 @@ func cost(b *builder) []Panel {
 	perDay := "SELECT " + timeBin + ", product AS series," +
 		" SUM(gross) AS cost FROM gh_billing_usage WHERE $__timeFilter(time)" +
 		" GROUP BY 1, 2 ORDER BY 1"
+	// A charge that belongs to no repository is not a repository called
+	// (none), so it is left out of a table of repositories. The sentinel is
+	// what the row carries: `repo <> ''` matched every row, so the Copilot
+	// seat was listed here as a repository, and the two twins below missed it
+	// in their own spellings.
 	byRepo := `SELECT repo AS "Repository", SUM(gross) AS "Gross", sku AS "SKU",` +
 		` SUM(quantity) AS "Quantity", MAX(unit) AS "Unit",` +
 		` MAX(price_per_unit) AS "Price", SUM(net) AS "Net"` +
-		" FROM gh_billing_usage WHERE $__timeFilter(time) AND repo <> ''" +
+		" FROM gh_billing_usage WHERE $__timeFilter(time) AND repo <> '(none)'" +
 		" GROUP BY 1, 3 ORDER BY 2 DESC LIMIT 40"
 	minutes := "SELECT " + timeBin + ", sku AS series," +
 		" SUM(quantity) AS quantity FROM gh_billing_usage" +
 		" WHERE $__timeFilter(time) AND unit = 'Minutes' GROUP BY 1, 2 ORDER BY 1"
 	mins := gp(bu, "quantity", "unit", "Minutes")
 
-	// An empty repository tag is the `none` node; the usage that is not
-	// attributed to a repository is excluded by that node.
+	// The (none) of a charge attributed to no repository is the node
+	// `_none_` in a Graphite path: the parentheses are not path characters
+	// and become underscores, so a pattern written for a bare `none` matched
+	// nothing and listed the charge as a repository.
 	byRepoGR, byRepoGRtf := gTbl(fmt.Sprintf(
-		`limit(sortByTotal(exclude(%s, "^none\.")), 40)`,
+		`limit(sortByTotal(exclude(%s, "^_none_\.")), 40)`,
 		rowsOf(gp(bu, "gross"), gn(bu, "repo"), gn(bu, "sku")),
 	),
 		"Repository, SKU", []col{{"sum", "Gross"}})
@@ -53,7 +60,7 @@ func cost(b *builder) []Panel {
 			{"g", "Gross"},
 			{"n", "Net"},
 		},
-		[]string{"_exists_:repo"})
+		[]string{`NOT repo.keyword:"(none)"`})
 
 	entryGR, entryGRtf := gTbl(rowsOf("keepLastValue("+rp("gh_actions_cache_entry", "size_bytes")+")",
 		gn("gh_actions_cache_entry", "repo"), gn("gh_actions_cache_entry", "cache")),
