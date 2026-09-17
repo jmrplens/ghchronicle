@@ -18,6 +18,11 @@ que se dibuja y esos campos, sobre una imagen de la tarjeta. Cada tarjeta se
 muestra en la paleta en la que está esta página, clara u oscura; todos los
 diseños dibujan las dos, y `auto` mete ambas en un fichero.
 
+Donde un diseño se anima, la animación se reproduce una vez y se asienta en la
+tarjeta estática completa, así que cada imagen de abajo es ese fotograma final
+y no un instante intermedio. Cómo se fija y qué la desactiva está en
+[Movimiento](/ghchronicle/es/card/#movimiento).
+
 ## Las dos familias
 
 La familia **chronicle** es el aspecto propio de esta herramienta. La familia
@@ -173,24 +178,17 @@ barra.
 
 <Card name="language-bars" alt="El diseño language-bars reproducido una vez: una barra de ancho completo por lenguaje que crece desde su borde izquierdo, una detrás de otra, con el nombre del lenguaje y su porcentaje llegando detrás de cada barra" animated />
 
-<Aside type="note" title="El fotograma final es toda la tarjeta">
-  La animación es CSS dentro del SVG. Se reproduce una vez y se asienta (ver
-  [Movimiento](/ghchronicle/es/card/#movimiento)), y el fotograma final es la
-  tarjeta estática completa. Un renderizador que ignore la animación muestra el
-  estado terminado, y `prefers-reduced-motion` la desactiva. Las capturas de
-  arriba son esos fotogramas finales.
-</Aside>
+## Movimiento
 
-<Aside type="note" title="Solo dos diseños hacen bucle, y ninguno de los dos repite">
-  Una animación que revela contenido no se reproduce otra vez: hacerlo sería
-  quitar una cifra, una barra o una línea que quien lee ya había visto. Así que
-  `loop` no añade nada en once de estos trece diseños, y dibuja exactamente la
-  tarjeta que dibuja `once`. Los dos en los que sí cambia algo tienen algo que
-  no termina: el cursor de `terminal` sigue parpadeando cuando ya se ha tecleado
-  la última cifra, y la banda de `ticker` sigue desplazándose, trayendo las
-  mismas píldoras otra vez. Son los dos en los que la página ofrece el botón de
-  bucle.
-</Aside>
+Cada sección de arriba dice el movimiento de su diseño, y hay un hecho que
+decide lo que esa línea puede decir: una revelación nunca se repite. Una cifra
+que ya ha contado, una barra que ya ha crecido y una línea que ya se ha
+dibujado no se quitan, así que `-card-motion loop` dibuja exactamente la
+tarjeta que dibuja `once` en todos los diseños salvo los dos cuyo movimiento no
+termina, el cursor parpadeante de `terminal` y la banda que se desplaza de
+`ticker`. Esos dos son los que llevan el botón de bucle bajo su imagen, y el
+razonamiento está en
+[Un bucle nunca repite](/ghchronicle/es/card/#un-bucle-nunca-repite).
 
 ## Ancho
 

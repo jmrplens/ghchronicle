@@ -235,6 +235,11 @@ and those fields, over a picture of the card. Each card is shown in the palette
 this page is in, light or dark; every layout draws both, and `auto` puts both
 in one file.
 
+Where a layout animates, the animation plays once and settles on the complete
+static card, so every picture below is that settled frame and not a moment in
+the middle of one. How that is set, and what switches it off, is
+[Motion](https://jmrp.io/docs/ghchronicle/card/#motion).
+
 ### The two families
 
 The **chronicle** family is this tool's own look. The **github** family uses
@@ -697,25 +702,16 @@ stopped. The layout that shows the share of a language as its own line, where
       card-theme: both
   ```
 
-> **The settled frame is the whole card**
->
-> Animation is CSS inside the SVG. It plays once and settles (see
-> [Motion](https://jmrp.io/docs/ghchronicle/card/#motion)), and the settled frame is the complete
-> static card. A renderer that ignores animation shows the finished state, and
-> `prefers-reduced-motion` switches it off. The captures above are those settled
-> frames.
+### Motion
 
-<!-- -->
-
-> **Only two layouts loop, and neither of them replays**
->
-> An animation that reveals content is never played again: doing so would take
-> back a number, a bar or a line the reader has already been shown. `loop`
-> therefore adds nothing to eleven of these thirteen layouts, and draws exactly
-> the card `once` draws. The two it does change have something that ends
-> nothing: `terminal`'s cursor goes on blinking after the last number has been
-> typed, and `ticker`'s band goes on scrolling, bringing the same pills round
-> again. Those are the two the page offers a loop toggle on.
+Each section above states its layout's motion, and one fact decides what that
+line can say: a reveal is never replayed. A number that has counted up, a bar
+that has grown and a line that has drawn itself are not taken back, so
+`-card-motion loop` draws exactly the card `once` draws on every layout but the
+two whose motion ends nothing, `terminal`'s blinking cursor and `ticker`'s
+scrolling band. Those two are the ones with a loop toggle under their picture,
+and the reasoning is in
+[A loop never replays](https://jmrp.io/docs/ghchronicle/card/#a-loop-never-replays).
 
 ### Width
 
