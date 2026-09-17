@@ -4,6 +4,17 @@
 
 # ghchronicle
 
+[![CI](https://img.shields.io/github/actions/workflow/status/jmrplens/ghchronicle/ci.yml?branch=main&style=flat&logo=githubactions&logoColor=white&label=CI)](https://github.com/jmrplens/ghchronicle/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/jmrplens/ghchronicle?style=flat&logo=github&label=Release)](https://github.com/jmrplens/ghchronicle/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/jmrplens/ghchronicle/total?style=flat&label=Downloads)](https://github.com/jmrplens/ghchronicle/releases)
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=jmrplens_ghchronicle&metric=coverage)](https://sonarcloud.io/summary/overall?id=jmrplens_ghchronicle)
+[![Go Reference](https://pkg.go.dev/badge/github.com/jmrplens/ghchronicle.svg)](https://pkg.go.dev/github.com/jmrplens/ghchronicle)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/jmrplens/ghchronicle?style=flat&logo=go&logoColor=white&label=Go)](go.mod)
+[![ghcr.io](https://img.shields.io/badge/ghcr.io-ghchronicle-2496ED?style=flat&logo=docker&logoColor=white)](https://github.com/jmrplens/ghchronicle/pkgs/container/ghchronicle)
+[![Docker Hub](https://img.shields.io/docker/v/jmrplens/ghchronicle?style=flat&logo=docker&logoColor=white&label=Docker%20Hub)](https://hub.docker.com/r/jmrplens/ghchronicle)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+![Platform](https://img.shields.io/badge/Linux%20%7C%20macOS%20%7C%20Windows-amd64%20%26%20arm64-lightgrey?style=flat)
+
 Collects everything GitHub will tell you about an account, and keeps it with
 the date it happened.
 
@@ -23,9 +34,9 @@ ghchronicle -config config.yaml
 
 ## What it draws
 
-Five Grafana dashboards, one per store that can answer with dated points,
-generated from a single specification and shipped in the repository. This is
-one section of the eighteen, drawn from a demonstration account:
+Five Grafana dashboards, one per store Grafana can query, generated from a
+single specification and shipped in the repository. This is one section of the
+seventeen, drawn from a demonstration account:
 
 ![The contributions section of the InfluxDB dashboard: contributions over
 time, a contribution calendar, the commit mix, commits per week, per hour of
@@ -67,8 +78,8 @@ The full documentation is at
 [choosing a store](https://jmrp.io/docs/ghchronicle/sinks/),
 [the cost of a sweep](https://jmrp.io/docs/ghchronicle/api/cost/) and
 [troubleshooting](https://jmrp.io/docs/ghchronicle/reference/troubleshooting/).
-Every page also serves itself as markdown at the same path with `.md` on the
-end, and [llms.txt](https://jmrp.io/docs/ghchronicle/llms.txt) indexes the
+Every page also serves itself as markdown at its own path with `index.md` on
+the end, and [llms.txt](https://jmrp.io/docs/ghchronicle/llms.txt) indexes the
 lot. The copies under [docs/](docs/README.md) are generated from those pages.
 
 ## What it collects
@@ -137,16 +148,29 @@ than the JSON.
 go install github.com/jmrplens/ghchronicle/cmd/ghchronicle@latest
 ```
 
-or take a binary from the releases page, or run the container:
+or take a binary from the
+[releases page](https://github.com/jmrplens/ghchronicle/releases), or run the
+container:
 
 ```sh
 docker run -v $PWD/config.yaml:/config.yaml -e GITHUB_TOKEN ghcr.io/jmrplens/ghchronicle -config /config.yaml
 ```
 
+For the whole path on one system rather than the one line:
+[Linux](https://jmrp.io/docs/ghchronicle/install/linux/),
+[macOS](https://jmrp.io/docs/ghchronicle/install/macos/) and
+[Windows](https://jmrp.io/docs/ghchronicle/install/windows/) each name the
+archive, check it against `checksums.txt` and the cosign signature published
+beside it, and end with something that keeps the sweep running: a systemd unit,
+a launchd agent, a scheduled task.
+[Docker](https://jmrp.io/docs/ghchronicle/install/docker/) and
+[GitHub Actions](https://jmrp.io/docs/ghchronicle/install/actions/) are the two
+that want no host of your own.
+
 ## Configure
 
-Two decisions are enough to start, and none of the three installs above leaves
-a file behind to copy:
+Two decisions are enough to start, and none of the installs above leaves a
+file behind to copy:
 
 ```yaml
 github:
@@ -223,9 +247,22 @@ ghchronicle -config config.yaml -card profile.svg -card-only
 One sweep, one self-contained SVG: no webfont, no external stylesheet, no
 script, and byte-identical output for the same input so a scheduled job that
 commits it does not produce a diff on every run. Thirteen layouts in two visual
-families, one of them GitHub's own look, the animated ones playing once or in a
-loop, all with a choosable set of fields. The repository ships as a composite
-Action:
+families, one of them GitHub's own look, all with a choosable set of fields.
+
+Nine of the thirteen animate, and the animation is a reveal, so it plays once
+and settles. `-card-motion loop` does not replay it: replaying a reveal hides
+what the reader has already been shown. It keeps going only what ends nothing,
+which is the terminal's cursor and the ticker's band, so on the other eleven
+`loop` draws what `once` draws, to the byte, and `off` draws the finished card
+with no animation at all.
+
+`-card-width` sets the width in pixels, between the two ends each layout
+declares and `-card-layouts` prints. Most of them spread the same content
+wider; `activity-heatmap` spends the room on data instead, one more week of
+the contribution calendar at a time until the whole year is drawn, and
+`badge-row` ignores it, its width following its pills.
+
+The repository ships as a composite Action:
 
 ```yaml
 - uses: jmrplens/ghchronicle@v1
