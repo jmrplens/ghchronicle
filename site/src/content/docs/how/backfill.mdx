@@ -21,15 +21,75 @@ the tool treats them as such.
 | Pages per collector         | the collector's own small default | until the API runs out, or the bound is reached    |
 | When the reserve is reached | skip the family and warn          | wait for the window to reset, then carry on        |
 | Which families run          | those whose interval has elapsed  | every enabled family, whatever the state file says |
+| When it is stopped          | nothing to keep; the next tick sweeps | a checkpoint keeps its place, and the same command carries on |
 | How often                   | on a schedule, forever            | deliberately, usually once                         |
 
 A normal sweep must never block. It protects the reserve so whatever else uses
 the same token keeps working, and it skips a family rather than sleeping. A
 backfill is run on purpose and the only thing that matters is that it finishes,
-so it parks until the budget is whole again. A backfill that gives up half way
-has spent the expensive part of the budget and keeps only the families it got
-to the end of: each one is written and marked as soon as it finishes, so the
-rest is what has to be run again.
+so it parks until the budget is whole again. And a backfill that is stopped
+half way keeps its place, so the same command started again carries on from
+there rather than from the first repository.
+
+## Stopping one, and picking it up again
+
+A walk of a real account is hours long, and a reason to stop it turns up: the
+author's own had been going six and a half hours when the binary underneath it
+had to be replaced. Stopping it used to cost the whole walk.
+
+The place is kept in a file beside the state file, named after it with
+`-progress.json` instead of `.json`. Nothing configures it. It is written after
+every repository rather than after every family, and that is measured rather
+than preferred: on an account of fifty nine repositories the account wide
+families take four minutes between them, and then `actions` takes two hours and
+three quarters and `commits` longer still, so a checkpoint at the end of each
+family would keep the four minutes and throw away the rest.
+
+What it records is what has been delivered. A repository goes into it only once
+its whole walk has reached every configured sink, which is what makes skipping
+it on the way back safe: there is no tail of its own pagination left anywhere.
+A repository whose collector failed, or whose rows a store refused, is not
+recorded, and the walk comes back to it. Coming back to it costs requests and
+nothing else, because a point carries the date the thing happened and
+re-collection rewrites the same rows.
+
+```text
+level=INFO msg="backfill stopped, and what it had written is kept" file=/var/lib/ghchronicle/backfill-progress.json running_for=6h40m7s families_complete=9 family=actions repositories_written=23 resume="run the same command again"
+```
+
+The file itself is meant to be read, and says the same thing at more length:
+the families that finished and when, the family that was in flight, and which
+of its repositories are done. It is removed when the walk reaches the end, so a
+checkpoint that exists is a walk that did not.
+
+An ordinary sweep keeps none of this. It writes no checkpoint and reads none:
+the state file it keeps is about cadences, and a half walked backfill has no
+business in it.
+
+### The two things it refuses
+
+**A checkpoint it cannot read.** A machine that loses power can leave an empty
+or half written file behind. The run stops with a sentence naming it rather
+than starting the walk over in silence: what the file lists may be hours of
+somebody's history, and starting over is the answer that looks like success.
+
+**A checkpoint from a different walk.** The file records what the walk was
+asked for: the API it reads, the targets, the families that were enabled, and
+the date bound exactly as it was spelled. If one of those changed between the
+stop and the resume, the list of repositories not to walk again means something
+else, and the run stops and names the setting that changed.
+
+The bound is the one that would go wrong quietly. A walk bounded at a year
+records its repositories as written; an unbounded resume would skip every one
+of them and leave a store that looks complete and stops a year back, with
+nothing in the rows to say so.
+
+Both refusals leave the file where it is. Put the setting back to carry on, or
+delete the file to walk again from the first repository.
+
+Replacing the binary is not one of them. That is the thing that stopped the
+walk this was written for, so a checkpoint written by another build is resumed,
+with a line saying which build wrote what it names.
 
 ## The cooldown
 

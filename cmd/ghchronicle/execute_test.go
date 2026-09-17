@@ -1277,3 +1277,50 @@ func TestMainRunsTheProcessCommandLine(t *testing.T) {
 		t.Errorf("main printed %q, want the build line", printed)
 	}
 }
+
+// TestExecuteRefusesABackfillItCannotResumeHonestly is the operator's half of
+// the checkpoint: the two refusals have to reach him as an exit and a
+// sentence, before a request is made, rather than as a walk that quietly
+// starts over or quietly skips.
+//
+// Both cases leave the checkpoint where it is. Deleting it is the reader's
+// decision, because what it lists may be hours of somebody's history.
+func TestExecuteRefusesABackfillItCannotResumeHonestly(t *testing.T) {
+	gh := fakegh.New(t, fixtures)
+	for name, tc := range map[string]struct {
+		checkpoint string
+		says       string
+	}{
+		"a checkpoint a kill cut in half": {
+			checkpoint: `{"scope":{"base_url":"","targets":{"user":"octo`,
+			says:       "cannot be read as one",
+		},
+		"a checkpoint from another walk": {
+			checkpoint: `{"scope":{"since":"2y","targets":{"user":"someone-else"}},"started":"2026-09-17T16:19:48Z"}`,
+			says:       "belongs to a different walk",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			cfg := writeConfig(t, dir, gh.URL(), collectorOnly+"sinks:\n  stdout: true\n")
+			path := filepath.Join(dir, "state-progress.json")
+			if err := os.WriteFile(path, []byte(tc.checkpoint), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			before := len(gh.Requests())
+			got := runCommand(t, "-config", cfg, "-backfill")
+			if got.status != 1 || !strings.Contains(got.stderr, tc.says) {
+				t.Errorf("-backfill on %s = %d, want 1 and %q:\n%s", name, got.status, tc.says, got.stderr)
+			}
+			if !strings.Contains(got.stderr, path) {
+				t.Errorf("the refusal does not name the file to look at:\n%s", got.stderr)
+			}
+			if after := len(gh.Requests()); after != before {
+				t.Errorf("%d requests reached GitHub from a backfill that was refused", after-before)
+			}
+			if _, err := os.Stat(path); err != nil {
+				t.Errorf("the refused checkpoint was removed (%v); deleting it is the reader's decision", err)
+			}
+		})
+	}
+}

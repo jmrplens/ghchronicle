@@ -35,6 +35,16 @@ type Runner struct {
 	// goes, however long that takes.
 	BackfillSince time.Time
 
+	// Progress is where this backfill writes down what it has already
+	// delivered, so that a stop costs one repository instead of the walk. Nil
+	// is a run that keeps no checkpoint, which every sweep is: see Progress
+	// for why a walk and a sweep do not share one.
+	Progress *Progress
+	// progressWarned is whether a checkpoint that cannot be written has
+	// already been reported. A disk that refuses one save refuses the next
+	// fifteen hundred, and the walk goes on either way.
+	progressWarned bool
+
 	// Prime makes the first sweep after start-up run every enabled family,
 	// whatever the state file says they last did.
 	//
@@ -185,6 +195,7 @@ func (r *Runner) Once(ctx context.Context) error {
 		}
 		r.Log.Info(why)
 	}
+	r.openProgress(now)
 	r.beginHealth()
 	err := r.sweep(ctx, now)
 	// On the way out whatever happened, and not only when the sweep reached
@@ -196,9 +207,11 @@ func (r *Runner) Once(ctx context.Context) error {
 	// the shutdown half of that.
 	r.emitHealth(ctx, now)
 	if err != nil {
+		r.closeProgress(ctx, err)
 		return err
 	}
 	r.finish()
+	r.closeProgress(ctx, nil)
 	return nil
 }
 
@@ -385,21 +398,47 @@ func (r *Runner) repoFamilies(ctx context.Context, now time.Time) error {
 		if !enabled || (!r.prime && !r.State.Due(family, every, now)) {
 			continue
 		}
+		// A family the interrupted walk finished is not run again. Its rows
+		// are in the stores already, and the checkpoint only says so after
+		// every one of them reached every sink. Said in the log, because a
+		// family with no row of its own in gh_collector_family is read as one
+		// that did not run, and in this process it did not.
+		if r.Progress.FamilyDone(family) {
+			r.Log.Info("family already written by the walk this resumes", "family", family)
+			continue
+		}
 		if !r.awaitBudget(ctx, family) {
 			continue
 		}
-		points, failed, err := r.collectFamily(ctx, family, now)
+		pass, err := r.collectFamily(ctx, family, now)
 		if err != nil {
 			return err
 		}
-		r.emit(ctx, family, points)
-		r.noteFamily(family, len(r.repos), failed, len(points))
+		r.emit(ctx, family, pass.points)
+		r.noteFamily(family, pass.covered, pass.failed, pass.written)
 		// A family where every repository failed has not run. Marking it would
 		// hide the outage until its next cadence, which for the slow families
 		// is half a day.
-		if failed > 0 && failed == len(r.repos) {
-			r.Log.Warn("family failed everywhere, not marking it as run", "family", family, "repos", failed)
+		//
+		// Counted against the repositories this pass covers rather than against
+		// every repository there is, because a resumed walk covers only the
+		// ones the checkpoint does not already hold. Without a checkpoint the
+		// two are the same number, and settled before the loop rather than by
+		// it, so a pass that stopped early for want of budget is read as it
+		// always was: some repositories failed, not all of them.
+		if pass.failed > 0 && pass.failed == pass.covered {
+			r.Log.Warn("family failed everywhere, not marking it as run", "family", family, "repos", pass.failed)
 			continue
+		}
+		// Recorded complete only when every repository of this walk is
+		// recorded for it, which is asked of the checkpoint rather than
+		// counted off this pass. Counting would miss two cases that leave
+		// repositories behind without a collector failing: a pass that stops
+		// early for want of budget, and a sink that refused one repository's
+		// rows. A family recorded complete is a family the resume never opens
+		// again, so what it is recorded on has to be the thing itself.
+		if pass.failed == 0 && r.everyRepoWritten(family) {
+			r.checkpointFamily(family)
 		}
 		// Marked after the repositories ran, so every one of them saw the
 		// same answer to "is the whole page due" that the first did; and
@@ -408,12 +447,65 @@ func (r *Runner) repoFamilies(ctx context.Context, now time.Time) error {
 		// and a repository it failed on would otherwise wait a day for the
 		// next. Left unrecorded, the next sweep reads the whole page again,
 		// which costs one more daily pass and loses nothing.
-		if failed == 0 && r.fullPassDue(family, now) {
+		if pass.failed == 0 && r.fullPassDue(family, now) {
 			r.State.MarkFull(family, now)
 		}
 		r.State.Mark(family, now)
 	}
 	return nil
+}
+
+// reposToCover is how many repositories a family's pass is about to ask, which
+// is all of them and, on a resumed walk, all of them but the ones already
+// written.
+func (r *Runner) reposToCover(family string) int {
+	left := 0
+	for _, repo := range r.repos {
+		if !r.Progress.RepoDone(family, repo.FullName) {
+			left++
+		}
+	}
+	return left
+}
+
+// everyRepoWritten reports whether the checkpoint holds every repository of
+// this walk for a family.
+//
+// True of a family with no per-repository part at all, and rightly: the loop
+// still asks it about each repository, that part answers with nothing to do,
+// and nothing to do is done. What such a family collects is in its batch,
+// which a resume runs again.
+func (r *Runner) everyRepoWritten(family string) bool {
+	if !r.Progress.Active() {
+		return true
+	}
+	for _, repo := range r.repos {
+		if !r.Progress.RepoDone(family, repo.FullName) {
+			return false
+		}
+	}
+	return true
+}
+
+// familyPass is what one family's pass over the repositories came to.
+//
+// points is what the caller still has to send, and it is empty on a walk that
+// keeps a checkpoint: such a pass sends each repository's rows itself, because
+// the checkpoint it writes beside them is a claim that they have been sent.
+// written counts the rows either way, so the family's own row in
+// gh_collector_family says the same thing in both.
+//
+// covered is how many repositories this pass is about to ask about, which on a
+// resumed walk is fewer than there are: the ones the checkpoint already holds
+// are not among them. It is the denominator "every repository failed" is read
+// against, and it is settled before the pass rather than counted by it, so a
+// pass cut short for want of budget still reads as some repositories failing
+// and not as all of them.
+type familyPass struct {
+	points  []sink.Point
+	written int
+	failed  int
+	covered int
 }
 
 // collectFamily runs one family over every repository and reports what it
@@ -422,30 +514,47 @@ func (r *Runner) repoFamilies(ctx context.Context, now time.Time) error {
 // An error return is a canceled sweep and nothing else: a repository that
 // fails is counted and the loop goes on, because one repository with a broken
 // feature must not stop the other forty.
-func (r *Runner) collectFamily(ctx context.Context, family string, now time.Time) ([]sink.Point, int, error) {
-	var points []sink.Point
+func (r *Runner) collectFamily(ctx context.Context, family string, now time.Time) (familyPass, error) {
+	pass := familyPass{covered: r.reposToCover(family)}
 	// Some families begin with one batched query for every repository at
 	// once, which is what turns a REST call per repository into a shared
 	// GraphQL point. It is not a per-repository failure if it fails: the
 	// loop below still runs.
-	failed := 0
 	batch, batchErr := r.familyBatch(ctx, family, now)
 	// Kept whichever way it went. A batched read covers fourteen
 	// repositories at a time and the collectors hand back every repository
 	// that answered beside the error, so the rows of the batches that
 	// succeeded are as true as if none had failed.
-	points = append(points, batch...)
+	pass.written += len(batch)
+	if r.Progress.Active() {
+		// Sent here rather than with the rest of the family, so that nothing
+		// the first checkpointed repository claims is still waiting in a
+		// slice. The batch itself is never checkpointed: it is one query for
+		// every repository at once, a resume runs it again, and running it
+		// again rewrites the rows it wrote the first time.
+		r.emit(ctx, family, batch, "part", "batch")
+	} else {
+		pass.points = append(pass.points, batch...)
+	}
 	if batchErr != nil {
 		r.Log.Error("batched collector failed", "family", family, "err", batchErr)
 		r.noteFamilyFailure(family, batchErr)
-		failed = batchFailures(batchAnswered(batch, batchErr), r.batched(family))
+		pass.failed = batchFailures(batchAnswered(batch, batchErr), r.batched(family))
 	}
 	for _, repo := range r.repos {
 		// A shutdown cancels the sweep. Without this every remaining
 		// repository logs its own "context canceled" and the family is
 		// then marked as done, which is exactly backwards.
 		if ctx.Err() != nil {
-			return points, failed, ctx.Err()
+			return pass, ctx.Err()
+		}
+		// Walked by the run this one resumes, and its rows delivered before it
+		// was written down. Skipping it is the whole saving, and it costs
+		// nothing: the checkpoint is only written after a repository's walk
+		// reached the end of its own pagination, so there is no tail of it
+		// left behind to lose.
+		if r.Progress.RepoDone(family, repo.FullName) {
+			continue
 		}
 		pts, err := r.repoFamily(ctx, family, repo, now)
 		// Before the error is looked at, because what a collector gathered
@@ -459,10 +568,24 @@ func (r *Runner) collectFamily(ctx context.Context, family string, now time.Time
 		// would have helped that 502 and nothing else; keeping what was
 		// collected is right whatever failed, which is why it is this and not
 		// a retry. The repository is still counted as failed below: half a
-		// repository is not a repository that succeeded, and `failed` is what
-		// decides whether the family is marked as run and what the collector's
-		// own rows report.
-		points = append(points, pts...)
+		// repository is not a repository that succeeded, and pass.failed is
+		// what decides whether the family is marked as run and what the
+		// collector's own rows report. It is also what keeps half a repository
+		// out of the checkpoint: kept is not the same as complete, and only
+		// what is complete may be skipped by a resume.
+		pass.written += len(pts)
+		if r.Progress.Active() {
+			// Delivered now, and written down only when every sink took it.
+			// A sink that refused leaves the repository unrecorded, so the
+			// resume walks it again rather than believing a store holds rows
+			// it never got.
+			delivered := r.emit(ctx, family, pts, "repo", repo.FullName)
+			if err == nil && delivered {
+				r.checkpointRepo(family, repo.FullName)
+			}
+		} else {
+			pass.points = append(pass.points, pts...)
+		}
 		if err != nil {
 			if limited, ok := errors.AsType[*ghapi.RateLimitedError](err); ok {
 				// Not a failure of this repository: the budget ran out
@@ -471,9 +594,10 @@ func (r *Runner) collectFamily(ctx context.Context, family string, now time.Time
 				r.Log.Warn("budget spent mid-family", "family", family,
 					"at", repo.FullName, "resets", limited.Reset.Format(time.TimeOnly))
 				r.noteFamilyFailure(family, err)
-				return points, len(r.repos), nil
+				pass.failed = pass.covered
+				return pass, nil
 			}
-			failed++
+			pass.failed++
 			r.Log.Error("collector failed", "family", family, "repo", repo.FullName, "err", err)
 			r.noteRepoFailure(family, repo, err)
 			continue
@@ -483,7 +607,7 @@ func (r *Runner) collectFamily(ctx context.Context, family string, now time.Time
 			break
 		}
 	}
-	return points, failed, nil
+	return pass, nil
 }
 
 // batchFailures is what a failed batch counts as: how many repositories it
@@ -879,6 +1003,14 @@ func (r *Runner) family(ctx context.Context, name string, now time.Time, run fun
 	if !enabled || (!r.prime && !r.State.Due(name, every, now)) {
 		return
 	}
+	// Already written by the walk this run resumes. An account family is its
+	// own unit: it asks about no repository, so there is nothing smaller of it
+	// to record, and the four minutes the eleven of them took on the author's
+	// account is a checkpoint fine enough for them.
+	if r.Progress.FamilyDone(name) {
+		r.Log.Info("family already written by the walk this resumes", "family", name)
+		return
+	}
 	if !r.awaitBudget(ctx, name) {
 		return
 	}
@@ -889,7 +1021,7 @@ func (r *Runner) family(ctx context.Context, name string, now time.Time, run fun
 	// Emitted whether or not it failed, for the reason collectFamily gives at
 	// length: several of these families read every repository in batches of
 	// fourteen, and the batches that answered answered.
-	r.emit(ctx, name, points)
+	delivered := r.emit(ctx, name, points)
 	// An account-wide family asks about no repository, so it fails as one
 	// thing or not at all.
 	failed := 0
@@ -911,6 +1043,13 @@ func (r *Runner) family(ctx context.Context, name string, now time.Time, run fun
 	// is not lost by being marked; it is in the log and in the collector's own
 	// rows, which is where it was missing.
 	r.State.Mark(name, now)
+	// The checkpoint is stricter than the mark above, and on purpose. A mark
+	// costs a family one pass of its own cadence; a checkpoint is a family a
+	// resume never opens again, so a family that lost a batch, or whose rows
+	// one sink refused, is left out of it and walked again.
+	if err == nil && delivered {
+		r.checkpointFamily(name)
+	}
 }
 
 // budgetLeft brakes before the token runs out, leaving the reserve untouched so
@@ -1005,10 +1144,25 @@ func (r *Runner) reserveFor(rate ghapi.RateState) int {
 	return reserve
 }
 
-func (r *Runner) emit(ctx context.Context, family string, points []sink.Point) {
+// emit sends one family's points, or one repository's of them, and reports
+// whether every sink took them.
+//
+// The answer is what the backfill checkpoint is written on: a record there is
+// a claim that a store already holds those rows, and a sink that failed is the
+// one case where that claim would be false. Nothing else reads it, because
+// nothing else may skip work on the strength of it.
+//
+// attrs are added to each line this writes. A walk that keeps a checkpoint
+// sends a repository at a time, and without the repository's name the journal
+// would carry fifty nine lines a family that a reader cannot tell apart.
+func (r *Runner) emit(ctx context.Context, family string, points []sink.Point, attrs ...any) bool {
 	if len(points) == 0 {
-		return
+		// Nothing to deliver is delivered: a repository a family has no rows
+		// for is done, and a checkpoint that refused to say so would walk it
+		// again on every resume forever.
+		return true
 	}
+	delivered := true
 	for _, s := range r.Sinks {
 		// A sink that skips unchanged points reports how many, so the log line
 		// says what reached the store rather than what was offered to it.
@@ -1033,7 +1187,11 @@ func (r *Runner) emit(ctx context.Context, family string, points []sink.Point) {
 			err = nil
 		}
 		if err != nil {
-			r.Log.Error("sink write failed", "sink", s.Name(), "family", family, "points", len(points), "err", err)
+			r.Log.Error("sink write failed", append([]any{
+				"sink", s.Name(), "family", family,
+				"points", len(points), "err", err,
+			}, attrs...)...)
+			delivered = false
 			continue
 		}
 		// Counted in the sink's own unsigned type rather than converted into
@@ -1058,13 +1216,18 @@ func (r *Runner) emit(ctx context.Context, family string, points []sink.Point) {
 		if filtered > 0 {
 			// Said only when there is something to say, so the key appears
 			// exactly where the question "where did the rest go" arises.
-			r.Log.Info("written", "sink", s.Name(), "family", family,
-				"points", written, "unchanged", skipped, "filtered", filtered)
+			r.Log.Info("written", append([]any{
+				"sink", s.Name(), "family", family,
+				"points", written, "unchanged", skipped, "filtered", filtered,
+			}, attrs...)...)
 			continue
 		}
-		r.Log.Info("written", "sink", s.Name(), "family", family,
-			"points", written, "unchanged", skipped)
+		r.Log.Info("written", append([]any{
+			"sink", s.Name(), "family", family,
+			"points", written, "unchanged", skipped,
+		}, attrs...)...)
 	}
+	return delivered
 }
 
 // nonNegative is a sink's own count as an unsigned one. A negative is a sink

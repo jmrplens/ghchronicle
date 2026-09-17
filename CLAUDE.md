@@ -25,7 +25,8 @@ internal/sink       Point, line protocol, eleven sink implementations, the
                     which is what site/scripts/gen-stats.mjs counts
 internal/render     the SVG card: thirteen layouts in two families, and the accumulator sink
 internal/config     YAML with ${VAR} expansion, per-family cadences, backfill bound
-internal/run        the sweep scheduler, its state file, the backfill cooldown
+internal/run        the sweep scheduler, its state file, the backfill cooldown,
+                    and the checkpoint that makes a backfill resumable
 internal/grafana    the little Grafana client, and the panel run both the
                     dashboard checker and the containerised suite use
 test/e2e            builds the binary and runs it against a fake GitHub

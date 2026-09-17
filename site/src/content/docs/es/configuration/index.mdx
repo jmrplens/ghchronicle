@@ -148,6 +148,13 @@ backfill:
 Solo se aplica a una ejecución lanzada con `-backfill`, y `-backfill-since` lo
 sobrescribe. Ver [relleno histórico](/ghchronicle/es/how/backfill/).
 
+Un relleno lleva un tercer fichero junto a `state_file`,
+`<nombre>-progress.json`, donde anota lo que ya ha escrito para que una parada
+cueste un repositorio y no el recorrido entero. No hay nada que configurar:
+aparece cuando arranca un relleno, se borra cuando el recorrido llega al final,
+y una pasada normal ni lo escribe ni lo lee. Ver [pararlo, y
+retomarlo](/ghchronicle/es/how/backfill/#pararlo-y-retomarlo).
+
 ## Cuando está mal, lo dice al arrancar
 
 La configuración se valida antes de hacer la primera llamada, y los mensajes

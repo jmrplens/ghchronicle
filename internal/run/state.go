@@ -96,12 +96,61 @@ func (s *State) Save() error {
 
 // replaceFile writes b beside path and renames it over path, so a reader sees
 // either the old file whole or the new one whole and never a half.
+//
+// The rename is what makes that true for a reader. It is not what makes it
+// true for a machine that loses power: a rename can reach the disk before the
+// contents it renames, and what comes back is then a name with nothing under
+// it. So the contents are flushed before the rename and the directory after
+// it, which is the pair that turns "never a half" into something that survives
+// the plug being pulled. The backfill checkpoint is saved this way after every
+// repository and is read back by a walk that will skip whatever it names, so a
+// zero length file there is not a cosmetic problem; the sweep's state pays one
+// flush a sweep for the same guarantee.
 func replaceFile(path string, b []byte) error {
 	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, b, 0o600); err != nil {
+	if err := writeWhole(tmp, b); err != nil {
 		return err
 	}
-	return os.Rename(tmp, path)
+	if err := os.Rename(tmp, path); err != nil {
+		return err
+	}
+	syncDir(filepath.Dir(path))
+	return nil
+}
+
+// writeWhole writes b to path and flushes it, so what the rename above puts in
+// place is the contents and not just the name of them.
+func writeWhole(path string, b []byte) error {
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
+	if err != nil {
+		return err
+	}
+	if _, err = f.Write(b); err != nil {
+		_ = f.Close()
+		return err
+	}
+	if err = f.Sync(); err != nil {
+		_ = f.Close()
+		return err
+	}
+	return f.Close()
+}
+
+// syncDir flushes the directory entry the rename above created.
+//
+// Its failure is not reported, and that is deliberate rather than lazy: a
+// directory cannot be opened for this on every platform the binary is built
+// for, Windows among them, and the file's own contents have already been
+// flushed. A saved state under a name that has not reached the disk yet is the
+// small half of the problem; refusing a save that worked would be the larger
+// one.
+func syncDir(dir string) {
+	d, err := os.Open(dir)
+	if err != nil {
+		return
+	}
+	_ = d.Sync()
+	_ = d.Close()
 }
 
 // Due reports whether a family should run now.

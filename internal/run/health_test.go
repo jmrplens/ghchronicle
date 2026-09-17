@@ -421,16 +421,16 @@ func TestAChunkWithNothingToSayStillCountsAsAnAnswer(t *testing.T) {
 		r.repos = append(r.repos, collect.Repo{Owner: "o", Name: name, FullName: "o/" + name})
 	}
 
-	points, failed, err := r.collectFamily(t.Context(), "deployments", time.Now())
+	pass, err := r.collectFamily(t.Context(), "deployments", time.Now())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(points) != 0 {
+	if pass.written != 0 {
 		t.Fatalf("the fake answered every chunk with an empty page and %d points came back, "+
-			"so this is no longer the shape it was written for", len(points))
+			"so this is no longer the shape it was written for", pass.written)
 	}
-	if failed != 1 {
+	if pass.failed != 1 {
 		t.Errorf("failed = %d, want the one thing that failed: six repositories were asked "+
-			"and answered, they simply had nothing to report", failed)
+			"and answered, they simply had nothing to report", pass.failed)
 	}
 }

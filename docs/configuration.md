@@ -140,6 +140,13 @@ backfill:
 Only applies to a run started with `-backfill`, and is overridden by
 `-backfill-since`. See [backfill](https://jmrp.io/docs/ghchronicle/how/backfill/).
 
+A backfill keeps a third file beside `state_file`, `<name>-progress.json`,
+which is where it records what it has already written so a stop costs one
+repository rather than the walk. There is nothing to configure: it appears when
+a backfill starts, it is removed when the walk reaches the end, and a sweep
+neither writes nor reads it. See [stopping one, and picking it up
+again](https://jmrp.io/docs/ghchronicle/how/backfill/#stopping-one-and-picking-it-up-again).
+
 ### When it is wrong, it says so at start-up
 
 Configuration is validated before the first call is made, and the messages name

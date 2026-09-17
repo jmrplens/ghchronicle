@@ -21,15 +21,78 @@ intenciones opuestas y la herramienta las trata como tales.
 | Páginas por colector   | el pequeño valor por defecto del colector | hasta que se acabe la API, o hasta el límite dado        |
 | Al llegar a la reserva | saltar la familia y avisar                | esperar a que la ventana se reinicie y seguir            |
 | Qué familias corren    | las que tienen el intervalo vencido       | todas las activas, diga lo que diga el fichero de estado |
+| Si se para             | no hay nada que guardar; el siguiente tic barre | un punto de control guarda su sitio, y el mismo comando sigue desde ahí |
 | Con qué frecuencia     | según horario, siempre                    | a propósito, normalmente una vez                         |
 
 Una pasada normal nunca debe bloquear. Protege la reserva para que lo demás que
 use el mismo token siga funcionando, y salta una familia antes que dormir. Un
 relleno se lanza a propósito y lo único que importa es que termine, así que
-aparca hasta que el presupuesto vuelva a estar entero. Un relleno que se rinde a
-medias ha gastado la parte cara del presupuesto y conserva solo las familias que
-llegó a terminar: cada una se escribe y se marca en cuanto acaba, así que lo que
-hay que volver a lanzar es el resto.
+aparca hasta que el presupuesto vuelva a estar entero. Y un relleno que se para
+a medias guarda su sitio, así que el mismo comando lanzado otra vez sigue desde
+ahí y no desde el primer repositorio.
+
+## Pararlo, y retomarlo
+
+Un recorrido sobre una cuenta real dura horas, y siempre aparece un motivo para
+pararlo: el del autor llevaba seis horas y media cuando hubo que sustituir el
+binario que lo ejecutaba. Pararlo costaba el recorrido entero.
+
+El sitio se guarda en un fichero junto al de estado, con su mismo nombre y
+`-progress.json` en lugar de `.json`. No se configura. Se escribe después de
+cada repositorio y no después de cada familia, y eso está medido, no elegido:
+en una cuenta de cincuenta y nueve repositorios las familias de cuenta tardan
+cuatro minutos entre todas, y luego `actions` tarda dos horas y tres cuartos y
+`commits` más todavía, así que un punto de control al final de cada familia
+guardaría los cuatro minutos y tiraría el resto.
+
+Lo que anota es lo que ya se ha entregado. Un repositorio entra en el fichero
+solo cuando su recorrido completo ha llegado a todos los destinos configurados,
+y eso es lo que hace seguro saltárselo a la vuelta: no queda cola alguna de su
+propia paginación en ninguna parte. Un repositorio cuyo colector falló, o cuyas
+filas rechazó un almacén, no se anota, y el recorrido vuelve a él. Volver a él
+cuesta peticiones y nada más, porque un punto lleva la fecha en que ocurrió la
+cosa y recolectarlo otra vez reescribe las mismas filas.
+
+```text
+level=INFO msg="backfill stopped, and what it had written is kept" file=/var/lib/ghchronicle/backfill-progress.json running_for=6h40m7s families_complete=9 family=actions repositories_written=23 resume="run the same command again"
+```
+
+El fichero está pensado para leerse, y dice lo mismo con más detalle: las
+familias que terminaron y cuándo, la familia que estaba en curso, y cuáles de
+sus repositorios están hechos. Se borra cuando el recorrido llega al final, así
+que un punto de control que existe es un recorrido que no llegó.
+
+Una pasada normal no guarda nada de esto. Ni escribe un punto de control ni lee
+ninguno: el fichero de estado que lleva habla de cadencias, y un relleno a
+medias no pinta nada ahí.
+
+### Las dos cosas que rechaza
+
+**Un punto de control que no puede leer.** Una máquina que pierde la corriente
+puede dejar un fichero vacío o escrito a medias. La ejecución se para con una
+frase que lo nombra en vez de rehacer el recorrido en silencio: lo que ese
+fichero lista pueden ser horas de la historia de alguien, y empezar de cero es
+la respuesta que parece un éxito.
+
+**Un punto de control de otro recorrido.** El fichero anota lo que se le pidió
+al recorrido: la API que lee, los objetivos, las familias activas y el límite de
+fecha tal y como se escribió. Si algo de eso cambió entre la parada y la vuelta,
+la lista de repositorios que no hay que volver a recorrer significa otra cosa, y
+la ejecución se para y nombra el ajuste que cambió.
+
+El límite es el que fallaría en silencio. Un recorrido limitado a un año anota
+sus repositorios como escritos; una vuelta sin límite se saltaría todos ellos y
+dejaría un almacén que parece completo y se corta hace un año, sin que nada en
+las filas lo diga.
+
+Los dos rechazos dejan el fichero donde está. Devuelve el ajuste a lo que era
+para seguir, o borra el fichero para recorrer otra vez desde el primer
+repositorio.
+
+Sustituir el binario no es uno de ellos. Eso es justo lo que paró el recorrido
+para el que se escribió todo esto, así que un punto de control escrito por otra
+versión se retoma, con una línea que dice qué versión escribió lo que el
+fichero nombra.
 
 ## La espera
 

@@ -794,6 +794,26 @@ func (c *Config) resolveFilePaths() {
 	}
 }
 
+// BackfillProgressFile is where a backfill keeps its checkpoint: beside the
+// state file, the way the dedupe ledger is.
+//
+// Derived and not a setting of its own, because there is no configuration to
+// make. The file belongs to one walk, it is written only while that walk is
+// running and removed when it ends, and the one thing it has to agree with is
+// which walk: two ghchronicle instances that already keep separate state files,
+// as the author's service and his backfill do, keep separate checkpoints for
+// free, and two that share one would have shared the state file's marks long
+// before they could confuse each other here.
+//
+// Empty when there is no state file, which is what a run keeping its state in
+// memory is, and such a run keeps no checkpoint either.
+func (c *Config) BackfillProgressFile() string {
+	if c.StateFile == "" {
+		return ""
+	}
+	return strings.TrimSuffix(c.StateFile, ".json") + "-progress.json"
+}
+
 // resolveSinks expands the environment in every configured sink, fills its
 // defaults and reports the first that cannot work.
 //
