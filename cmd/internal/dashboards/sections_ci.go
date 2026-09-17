@@ -53,10 +53,11 @@ const (
 	ciUndecidedRuns   = "Undecided runs"
 	ciRunTime         = "Run duration"
 	ciQueueWait       = "Queue wait"
-	ciArtifactStorage = "Artifact storage"
+	ciArtifactStorage = "Artifact storage walked"
 	ciCacheSize       = "Actions cache"
 	ciTimesRun        = "Times run"
 	ciLiveSize        = "Live size"
+	ciLiveCount       = "Live"
 )
 
 // GitHub spells this conclusion the British way and the linter's dictionary
@@ -176,7 +177,10 @@ func runOutcomes(b *builder) []Panel {
 				"rather than as a failure. The run duration is the median over the range " +
 				"and the queue wait is the time a job spent waiting for a runner, which " +
 				"only exists at job level, the run-level number folding the wait into the " +
-				"duration. " + expanded + " Last come the bytes the runs left behind.",
+				"duration. " + expanded + " Last come the bytes the runs left behind, which " +
+				"are the artifacts the walk reached: GitHub lists thousands of them per " +
+				"repository and the walk stops at five hundred, so this is a floor wherever " +
+				"it did. \"Artifact storage counted\" below puts the two counts beside it.",
 			PromDesc: sinceStart + " " + lastSweep,
 			GR: []Target{
 				grNamed("A", ciRunCount, total(countOf(runSeconds))),
@@ -276,7 +280,10 @@ func runOutcomes(b *builder) []Panel {
 				legend("{{repo}}"))},
 			Opts:    mergeOpts(Opts{"unit": "bytes"}, hourBins),
 			SQLOpts: seriesOpts,
-			Desc: "Artifacts that have not expired. GitHub deletes them on their own " +
+			Desc: "Artifacts that have not expired, over the ones the walk reached, which " +
+				"is a floor on any repository with more than five hundred: " +
+				"\"Artifact storage counted\" further down has the counts that say which " +
+				"those are. GitHub deletes artifacts on their own " +
 				"schedule, which is why this falls without anyone doing anything. A " +
 				"reading taken at each sweep, so the curve starts the day the collector " +
 				"did: there is no history of it to rebuild. The eight repositories holding " +
@@ -616,11 +623,12 @@ func artifactStorage(b *builder) []Panel {
 		rp("gh_artifact_total", "live_bytes")), gn("gh_artifact_total", "repo")),
 		"Repository", []col{{"lastNotNull", ciLiveSize}})
 	walkedES, walkedEStf := esTbl("gh_artifact_total", []any{b.tm("repo", 50)},
-		[]any{b.mNewest("count", "walked", "live_bytes")},
+		[]any{b.mNewest("count", "walked", "live_count", "live_bytes")},
 		[]named{
 			{inventoryRepoTerm, "Repository"},
 			{"count", "Declared"},
 			{"walked", "Walked"},
+			{"live_count", ciLiveCount},
 			{"live_bytes", ciLiveSize},
 		}, []string{ESF})
 
@@ -643,26 +651,32 @@ func artifactStorage(b *builder) []Panel {
 		}),
 		panel("table", "Artifact storage counted", box{W: 12, H: 8, X: 12, Y: 54},
 			[]Target{sqlT(`SELECT repo AS "Repository", MAX(count) AS "Declared",` +
-				` MAX(walked) AS "Walked", MAX(live_bytes) AS "Live size"` +
+				` MAX(walked) AS "Walked", MAX(live_count) AS "` + ciLiveCount + `",` +
+				` MAX(live_bytes) AS "Live size"` +
 				" FROM gh_artifact_total WHERE $__timeFilter(time) AND " + RF +
 				" GROUP BY 1 ORDER BY 2 DESC")}, &P{
 				Prom: []Target{
 					promTbl(fmt.Sprintf("max by (repo) (github_artifact_total_count{%s})", PF), "A"),
 					promTbl(fmt.Sprintf("max by (repo) (github_artifact_total_walked{%s})", PF), "B"),
 					promTbl(fmt.Sprintf("max by (repo) (github_artifact_total_live_bytes{%s})", PF), "C"),
+					promTbl(fmt.Sprintf("max by (repo) (github_artifact_total_live_count{%s})", PF), "D"),
 				},
 				PromTF: merged(map[string]string{
 					"repo": "Repository", inventoryValueCol + "A": "Declared", inventoryValueCol + "B": "Walked",
-					inventoryValueCol + "C": ciLiveSize,
+					inventoryValueCol + "C": ciLiveSize, inventoryValueCol + "D": ciLiveCount,
 				}, nil, nil),
 				Opts: Opts{"sort": "Declared"},
-				Desc: "Artifact storage, and how much of it was counted. When Walked is lower " +
-					"than Declared, the live size is a floor rather than a total: the walk " +
-					"stopped at the page cap. Here it is short by a factor of fifty six, and " +
-					"without this column the tile above would say so nowhere.",
+				Desc: "Artifact storage, and how much of it was counted. Three counts, because " +
+					"the live size is on neither of the other two: Declared is GitHub's own " +
+					"total and counts the artifacts it has already expired, Walked is how far " +
+					"the page cap let the walk go, and Live is the artifacts still held among " +
+					"those, which is what the live size is the size of. When Walked is lower " +
+					"than Declared the live size is a floor rather than a total: here it is " +
+					"short by a factor of fifty six, and without these columns the tile above " +
+					"would say so nowhere.",
 				Overrides: []any{
 					unitOf(ciLiveSize, "bytes", 120), width("Declared", 110),
-					width("Walked", 100),
+					width("Walked", 100), width(ciLiveCount, 90),
 				},
 				GR: walkedGR, GRTF: walkedGRtf, GRDesc: grSlot,
 				ES: walkedES, ESTF: walkedEStf,

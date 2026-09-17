@@ -736,3 +736,51 @@ func TestCumulativeCurvesSpanTheWholeRange(t *testing.T) {
 		}
 	}
 }
+
+// TestEveryPanelReadingTheArtifactSizeSaysWhatItIsOver is the gate on a
+// number that is right and reads as something else.
+//
+// `live_bytes` is the size of the artifacts the walk reached, and the walk
+// stops at five hundred: on the account this was developed against it read
+// 11.5 GB beside a declared 29,361, short by a factor of fifty six, with
+// nothing beside it saying so. `count` is not its denominator either, since
+// GitHub counts the artifacts it has already expired in it. So a panel that
+// shows the size either shows the counts it is over or says in its
+// description that it is a floor. Both is what the two panels do.
+func TestEveryPanelReadingTheArtifactSizeSaysWhatItIsOver(t *testing.T) {
+	t.Parallel()
+	for _, store := range []string{"influxdb", "postgres"} {
+		panels := rendered(t, store)
+		read := 0
+		for title, p := range panels {
+			sql := allSQL(p)
+			if !strings.Contains(sql, "live_bytes") {
+				continue
+			}
+			read++
+			desc, _ := p["description"].(string)
+			counted := strings.Contains(sql, "walked") && strings.Contains(sql, "live_count")
+			if !counted && !strings.Contains(desc, "floor") {
+				t.Errorf("%s: %q shows the artifact size over the walked artifacts alone,"+
+					" without the counts that say so and without calling it a floor:\n%s",
+					store, title, desc)
+			}
+		}
+		if read == 0 {
+			t.Errorf("%s: no panel reads live_bytes, so this checks nothing", store)
+		}
+	}
+}
+
+// allSQL is every statement of a panel, and nothing when it has none.
+func allSQL(p map[string]any) string {
+	targets, _ := p["targets"].([]any)
+	var out []string
+	for _, raw := range targets {
+		target, _ := raw.(map[string]any)
+		if sql, _ := target["rawSql"].(string); sql != "" {
+			out = append(out, sql)
+		}
+	}
+	return strings.Join(out, "\n")
+}

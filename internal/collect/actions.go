@@ -634,7 +634,7 @@ func (a Artifacts) Collect(ctx context.Context, c *ghapi.Client, repo Repo, now 
 
 	var points []sink.Point
 	var live int64
-	var walked, declared int
+	var liveCount, walked, declared int
 
 	// Paginated. Summing only the first hundred artifacts published a live
 	// total of three megabytes next to a count of twenty-eight thousand, which
@@ -660,6 +660,7 @@ func (a Artifacts) Collect(ctx context.Context, c *ghapi.Client, repo Repo, now 
 			art := &res.Artifacts[i]
 			if !art.Expired {
 				live += art.SizeBytes
+				liveCount++
 			}
 			fields := map[string]any{
 				"size_bytes": art.SizeBytes,
@@ -713,15 +714,32 @@ func (a Artifacts) Collect(ctx context.Context, c *ghapi.Client, repo Repo, now 
 
 	// One current total, so a dashboard can show storage without summing a
 	// window that would double-count artifacts still alive from earlier days.
+	//
+	// Four numbers rather than two, because `live_bytes` and `count` are not
+	// on the same denominator and a reader has no way to tell. `count` is
+	// GitHub's own total and it counts expired artifacts: measured on
+	// jmrplens/jmrp.io on 2026-09-17, page 40 of the listing was expired
+	// artifacts to the last row, against a declared 29,405. `live_bytes` is
+	// the size of the artifacts GitHub still holds, over the ones this walk
+	// reached, which the page cap stops at five hundred. So the panel read
+	// 11.5 GB beside a count of 29,361 with nothing saying the two are
+	// counting different things. `live_count` gives the bytes the count they
+	// are the size of, and `complete` says in one value whether the walk saw
+	// everything, which is the difference between a total and a floor.
 	points = append(points, sink.Point{
 		Measurement: "gh_artifact_total",
 		Tags:        base,
 		Fields: map[string]any{
 			"live_bytes": live, "count": declared,
-			// How many of the declared total were actually walked. When these
-			// two disagree the live figure is a floor, not a total, and the
-			// dashboard can say so instead of quietly lying.
+			// How many of the declared total were actually walked.
 			"walked": walked,
+			// The artifacts behind live_bytes: the walked ones GitHub has
+			// not expired.
+			"live_count": liveCount,
+			// Whether live_bytes and live_count are totals rather than
+			// floors. False is the walk having stopped at the page cap with
+			// artifacts left behind.
+			"complete": walked >= declared,
 		},
 		Time: now,
 	})
