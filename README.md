@@ -7,6 +7,7 @@
 [![CI](https://img.shields.io/github/actions/workflow/status/jmrplens/ghchronicle/ci.yml?branch=main&style=flat&logo=githubactions&logoColor=white&label=CI)](https://github.com/jmrplens/ghchronicle/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/jmrplens/ghchronicle?style=flat&logo=github&label=Release)](https://github.com/jmrplens/ghchronicle/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/jmrplens/ghchronicle/total?style=flat&label=Downloads)](https://github.com/jmrplens/ghchronicle/releases)
+[![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=jmrplens_ghchronicle&metric=alert_status)](https://sonarcloud.io/summary/overall?id=jmrplens_ghchronicle)
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=jmrplens_ghchronicle&metric=coverage)](https://sonarcloud.io/summary/overall?id=jmrplens_ghchronicle)
 [![Go Reference](https://pkg.go.dev/badge/github.com/jmrplens/ghchronicle.svg)](https://pkg.go.dev/github.com/jmrplens/ghchronicle)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/jmrplens/ghchronicle?style=flat&logo=go&logoColor=white&label=Go)](go.mod)
