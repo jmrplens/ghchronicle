@@ -138,7 +138,7 @@ func (n *audienceNode) forks() []forkRow {
 	return rows
 }
 
-func (a Audience) Collect(ctx context.Context, c *ghapi.Client, now time.Time) ([]sink.Point, error) {
+func (a Audience) Collect(ctx context.Context, c *ghapi.Client, _ time.Time) ([]sink.Point, error) {
 	if len(a.Repos) == 0 || (!a.Stars && !a.Forks) {
 		return nil, nil
 	}
@@ -158,7 +158,7 @@ func (a Audience) Collect(ctx context.Context, c *ghapi.Client, now time.Time) (
 				githubPage(repo.FullName, "stargazers"))...)
 		}
 		if a.Forks {
-			points = append(points, forkPoints(node.forks(), repo, now)...)
+			points = append(points, forkPoints(node.forks(), repo)...)
 			if a.Overflow != nil && node.Forks.TotalCount > audiencePage {
 				a.Overflow(repo)
 			}

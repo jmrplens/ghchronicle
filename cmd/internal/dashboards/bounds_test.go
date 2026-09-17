@@ -196,8 +196,11 @@ var wholeHistoryPanels = map[string]string{
 	"Answers elsewhere": "the newest fifty of 189 comments reaching back to 2021; " +
 		"gh_discussion_comment, 177 files",
 	"Oldest open alerts": "an alert is dated when it was raised and the panel exists to show the " +
-		"oldest, so a window drops exactly the rows it is for; gh_dependabot_alert_item 726 " +
-		"files and gh_code_scanning_alert_item 347",
+		"oldest, so a window drops exactly the rows it is for; gh_dependabot_alert_item 1,059 " +
+		"files and gh_code_scanning_alert_item 673, re-measured on 2026-09-17, up from 726 and " +
+		"347 three days earlier because every sweep rewrote every open alert to move its age " +
+		"along. The collector no longer writes that age, so these two grow with the alerts " +
+		"rather than with the clock",
 	"Policy files": "each row is dated at the last commit that touched the path, so a file " +
 		"nobody has touched in a year is outside any window; gh_policy_file, 149 files",
 	"Dependabot ecosystems": "dated at the last commit to dependabot.yml, the same way; " +

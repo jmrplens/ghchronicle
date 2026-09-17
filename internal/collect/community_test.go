@@ -30,17 +30,22 @@ func TestForks(t *testing.T) {
 	if want := time.Date(2025, 2, 10, 10, 0, 0, 0, time.UTC); !alice.Time.Equal(want) {
 		t.Errorf("fork stamped %s, want created_at %s", alice.Time, want)
 	}
-	// Pushed ten days after forking: a real derivative.
+	// Pushed ten days after forking: a real derivative. The ten days are
+	// counted from the fork's own date, not from the sweep's clock, so the
+	// row says the same thing however long after it is read.
 	if alice.Fields["advanced"] != true || fieldInt(t, alice, "stars") != 2 || fieldInt(t, alice, "forks") != 1 {
 		t.Errorf("alice's fork = %v", alice.Fields)
+	}
+	if fieldInt(t, alice, "seconds_to_push") != 10*86400 {
+		t.Errorf("seconds_to_push = %v, want the ten days between the fork and its last push", alice.Fields["seconds_to_push"])
 	}
 	// Pushed thirty seconds after forking: the fork itself, a bookmark.
 	bob := find(t, points, "gh_fork", map[string]string{"by": "bob"})
 	if bob.Fields["advanced"] != false {
 		t.Errorf("bob's fork = %v", bob.Fields)
 	}
-	if fieldInt(t, bob, "days_since_push") != 38 {
-		t.Errorf("days_since_push = %v", bob.Fields["days_since_push"])
+	if fieldInt(t, bob, "seconds_to_push") != 30 {
+		t.Errorf("seconds_to_push = %v, want the thirty seconds the fork itself took", bob.Fields["seconds_to_push"])
 	}
 }
 

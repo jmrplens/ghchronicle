@@ -39,6 +39,7 @@ const (
 	securityQuerySuite   = "Query suite"
 	securityCanApprovePR = "Can approve pull requests"
 	securityLastRotated  = "Last rotated"
+	securityCVSS         = "CVSS"
 )
 
 // onOff renders a genuinely two-state boolean column as a word rather than as
@@ -271,7 +272,7 @@ func scanningAndResolution(b *builder) []Panel {
 	// advisory, which is why the old MAX(cvss) read 0 for a whole bucket.
 	resolve := `SELECT package AS "Package", time AS "Raised", repo AS "Repository",` +
 		` severity AS "Severity", summary AS "Advisory",` +
-		` COALESCE(cvss_v4, cvss) AS "CVSS", dismissed_reason AS "Dismissed",` +
+		` COALESCE(cvss_v4, cvss) AS "` + securityCVSS + `", dismissed_reason AS "Dismissed",` +
 		` seconds_to_resolve AS "Time to resolve", url AS "Link"` +
 		" FROM gh_dependabot_alert_item WHERE $__timeFilter(time) AND " + RF +
 		" AND seconds_to_resolve IS NOT NULL ORDER BY time DESC LIMIT 25"
@@ -288,21 +289,27 @@ func scanningAndResolution(b *builder) []Panel {
 	// The alerts still open, oldest first, from both families in one list:
 	// the two stats at the top count them and this is the one place that
 	// names them. What is the package for a Dependabot alert and the rule
-	// for a code scanning one. An open row converges in place as the sweeps
-	// rewrite it, so seconds_open is the newest reading. The row is dated
-	// when the alert was raised, and an open alert is a state, not an event:
-	// bounded by the dashboard range on that date the seven day view lost
-	// every alert older than a week, which are the oldest ones the title
-	// promises. Whole history, as the two stats above read it.
+	// for a code scanning one. The row is dated when the alert was raised,
+	// and an open alert is a state, not an event: bounded by the dashboard
+	// range on that date the seven day view lost every alert older than a
+	// week, which are the oldest ones the title promises. Whole history, as
+	// the two stats above read it.
+	//
+	// How long it has been open is computed here and is no longer a field.
+	// The collector used to write one, from the clock of the sweep that
+	// wrote it, on to a row dated months earlier; this reads the row's own
+	// date and is right at the moment the panel is drawn. date_part over an
+	// interval is the one spelling both SQL stores take.
 	openAlerts := " WHERE " + wholeHistory + " AND " + RF + " AND alert_state = 'open'"
+	openFor := `date_part('epoch', now() - time) AS "Open for"`
 	oldest := `SELECT package AS "What", time AS "Raised", 'dependabot' AS "Kind",` +
 		` repo AS "Repository", severity AS "Severity", summary AS "Detail",` +
-		` seconds_open AS "Open for", url AS "Link"` +
+		" " + openFor + `, url AS "Link"` +
 		securityFrom + di + openAlerts +
 		" UNION ALL " +
 		`SELECT rule AS "What", time AS "Raised", 'code scanning' AS "Kind",` +
 		` repo AS "Repository", severity AS "Severity", tool AS "Detail",` +
-		` seconds_open AS "Open for", url AS "Link"` +
+		" " + openFor + `, url AS "Link"` +
 		securityFrom + csi + openAlerts +
 		" ORDER BY 2 LIMIT 25"
 
@@ -326,7 +333,7 @@ func scanningAndResolution(b *builder) []Panel {
 		{"package", "Package"},
 		{"summary", "Advisory"},
 		{"cvss_v4", "CVSS v4"},
-		{"cvss", "CVSS"},
+		{"cvss", securityCVSS},
 		{"dismissed_reason", "Dismissed"},
 		{"seconds_to_resolve", securityResolveTime},
 		{"url", "Link"},
@@ -336,16 +343,19 @@ func scanningAndResolution(b *builder) []Panel {
 	// alerts carry no url still gets its rows: a document without the field
 	// lands in the empty bucket, where a raw listing would have no column.
 	// The advisory text is a string and stays out, as every ES table's do.
+	// The score rather than the wait: how long an alert has been open is
+	// now() less the row's own date, which a terms bucket cannot subtract,
+	// and the CVSS is a number every Dependabot alert carries.
 	oldestES, oldestEStf := esTbl(di,
 		[]any{b.tm("repo", 50), b.tm("number", 25), b.tm("severity", 5), b.tm("package", 5), b.tmURL()},
-		[]any{b.mMax("seconds_open")},
+		[]any{b.mMax("cvss")},
 		[]named{
 			{inventoryRepoTerm, "Repository"},
 			{"number.keyword", "Number"},
 			{"severity.keyword", "Severity"},
 			{"package.keyword", "What"},
 			{"url.keyword", "Link"},
-			{"s", "Open for"},
+			{"s", securityCVSS},
 		}, []string{ESF, "alert_state:open"})
 
 	toolGR, toolGRtf := gTbl(fmt.Sprintf(
@@ -417,7 +427,7 @@ func scanningAndResolution(b *builder) []Panel {
 				"severity, the worst mean score and the mean time. " + sinceStart + " " + lastSweep,
 			Overrides: []any{
 				when("Raised"), repoColumn(), width("Severity", 90),
-				width("Package", 130), width("CVSS", 70), width("Dismissed", 110),
+				width("Package", 130), width(securityCVSS, 70), width("Dismissed", 110),
 				unitOf(securityResolveTime, "s", 130), ownerLinkOn("Package", "the alert"),
 			},
 			PromOver: []any{
@@ -465,8 +475,9 @@ func scanningAndResolution(b *builder) []Panel {
 			Desc: "The two counts at the top of the section, as the rows they are made of, " +
 				"whatever the dashboard range: an alert is listed while it is open, however " +
 				"long ago it was raised. A Dependabot alert names its package and advisory, " +
-				"a code scanning alert its rule and tool. Open for is the newest reading, so " +
-				"the row moves forward every sweep until the alert is fixed or dismissed. The " +
+				"a code scanning alert its rule and tool. Open for is counted from the row's " +
+				"own date to now, so it is right when the panel is drawn rather than when the " +
+				"last sweep ran. The " +
 				"link opens the alert, which GitHub shows to the owner alone.",
 			Overrides: []any{
 				when("Raised"), width("Kind", 110), repoColumn(),
@@ -476,8 +487,11 @@ func scanningAndResolution(b *builder) []Panel {
 			ES: oldestES, ESTF: oldestEStf,
 			ESDesc: "Elasticsearch lists the Dependabot alerts alone, the two families " +
 				"being two indices, and by number rather than by date: the advisory is " +
-				"text, which a bucket cannot show. It also lists only the ones raised " +
-				"inside the dashboard range, since every Elasticsearch query is bounded by it.",
+				"text, which a bucket cannot show. It carries the CVSS score in place of " +
+				"how long the alert has been open, which is the row's own date subtracted " +
+				"from now and not something a bucket can compute. It also lists only the " +
+				"ones raised inside the dashboard range, since every Elasticsearch query " +
+				"is bounded by it.",
 		}),
 	}
 }

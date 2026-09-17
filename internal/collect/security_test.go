@@ -72,8 +72,13 @@ func checkDependabotAlertItems(t *testing.T, points []sink.Point) {
 	if open.Fields["alert_state"] != "open" {
 		t.Errorf("alert_state = %v, want open", open.Fields["alert_state"])
 	}
-	if hasField(open, "seconds_to_resolve") || !hasField(open, "seconds_open") {
-		t.Errorf("an open alert carries seconds_open, not seconds_to_resolve: %v", open.Fields)
+	// An open alert carries no age at all. The row is dated when the alert
+	// was raised, so how long it has been open is now() less that date and
+	// belongs in the query; written here it would be a figure from the
+	// sweep's clock sitting on a row dated months earlier, rewritten with a
+	// new answer every sweep.
+	if hasField(open, "seconds_to_resolve") || hasField(open, "seconds_open") {
+		t.Errorf("an open alert carries neither age: %v", open.Fields)
 	}
 	if open.Fields["cvss"] != 7.5 || open.Fields["cvss_v4"] != 6.6 {
 		t.Errorf("cvss = %v, cvss_v4 = %v", open.Fields["cvss"], open.Fields["cvss_v4"])
@@ -269,8 +274,8 @@ func checkCodeScanningAlertItems(t *testing.T, points []sink.Point) {
 	if scanOpen.Fields["resolution"] != "open" || scanOpen.Fields["alert_state"] != "open" {
 		t.Errorf("an open alert reads open: %v", scanOpen.Fields)
 	}
-	if hasField(scanOpen, "seconds_to_resolve") || !hasField(scanOpen, "seconds_open") {
-		t.Errorf("an open alert carries seconds_open: %v", scanOpen.Fields)
+	if hasField(scanOpen, "seconds_to_resolve") || hasField(scanOpen, "seconds_open") {
+		t.Errorf("an open alert carries neither age: %v", scanOpen.Fields)
 	}
 }
 
@@ -555,5 +560,53 @@ func TestAlertTagIsNeverEmpty(t *testing.T) {
 	}
 	if !strings.Contains(sink.LineProtocol(p), "scope="+noneTag) {
 		t.Errorf("the tag must reach the line protocol: %s", sink.LineProtocol(p))
+	}
+}
+
+// TestAPastDatedRowSaysTheSameThingWheneverItIsCollected is the gate on the
+// whole class of defect this closes: a field derived from the clock, written
+// on to a row dated when the thing happened.
+//
+// Such a field is only true at the instant of the sweep that wrote it, and it
+// makes every later sweep rewrite a row dated in the past, which in InfluxDB 3
+// files another parquet file into that old partition and never compacts it.
+// Measured on 2026-09-17, the two alert families and gh_fork were writing
+// about 260 files a day between them for some 2,300 rows, growing with the
+// clock rather than with anything GitHub had to say.
+//
+// So the same fixture collected three days apart has to produce byte for byte
+// the same rows. Anything a panel wants from the clock is now() less the row's
+// own timestamp, which is right when it is asked rather than when it was
+// written.
+func TestAPastDatedRowSaysTheSameThingWheneverItIsCollected(t *testing.T) {
+	t.Parallel()
+	dated := []string{"gh_dependabot_alert_item", "gh_code_scanning_alert_item", "gh_fork"}
+	collect := func(now time.Time) []string {
+		f := newFixtureServer(t)
+		f.file("/repos/octocat/hello-world/dependabot/alerts", "dependabot_alerts.json")
+		f.file("/repos/octocat/hello-world/code-scanning/alerts", "code_scanning_alerts.json")
+		f.file("/repos/octocat/hello-world/forks", "forks.json")
+		points, err := Security{}.Collect(ctx(t), f.Client, testRepo, now)
+		if err != nil {
+			t.Fatal(err)
+		}
+		forks, err := (Forks{}).Collect(ctx(t), f.Client, testRepo, now)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return lines(append(points, forks...), dated...)
+	}
+	first, later := collect(testNow), collect(testNow.AddDate(0, 0, 3))
+	if len(first) == 0 {
+		t.Fatal("the fixtures produced no past-dated row to compare")
+	}
+	if len(first) != len(later) {
+		t.Fatalf("%d rows collected now against %d three days later", len(first), len(later))
+	}
+	for i := range first {
+		if first[i] != later[i] {
+			t.Errorf("a row dated in the past moved with the clock:\n at the time %s\nthree days later %s",
+				first[i], later[i])
+		}
 	}
 }

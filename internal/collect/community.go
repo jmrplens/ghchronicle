@@ -34,7 +34,7 @@ type forkRow struct {
 	} `json:"owner"`
 }
 
-func (f Forks) Collect(ctx context.Context, c *ghapi.Client, repo Repo, now time.Time) ([]sink.Point, error) {
+func (f Forks) Collect(ctx context.Context, c *ghapi.Client, repo Repo, _ time.Time) ([]sink.Point, error) {
 	var points []sink.Point
 	most := f.Walk.limit(5)
 	for page := 1; page <= most; page++ {
@@ -49,7 +49,7 @@ func (f Forks) Collect(ctx context.Context, c *ghapi.Client, repo Repo, now time
 		if len(batch) == 0 {
 			break
 		}
-		points = append(points, forkPoints(batch, repo, now)...)
+		points = append(points, forkPoints(batch, repo)...)
 		if len(batch) < 100 {
 			break
 		}
@@ -59,16 +59,28 @@ func (f Forks) Collect(ctx context.Context, c *ghapi.Client, repo Repo, now time
 
 // forkPoints stamps each fork at the moment it was created, so re-reading the
 // list rewrites the same rows rather than adding to them.
-func forkPoints(rows []forkRow, repo Repo, now time.Time) []sink.Point {
+func forkPoints(rows []forkRow, repo Repo) []sink.Point {
 	base := repoTags(repo.Owner, repo.Name)
 	points := make([]sink.Point, 0, len(rows))
 	for i := range rows {
 		f := &rows[i]
 		fields := map[string]any{"forks": 1, "stars": f.Stars}
 		// Whether the fork was ever pushed to separates a real derivative
-		// from a bookmark, which is most of them.
+		// from a bookmark, which is most of them, and how long after the fork
+		// that last push came says how long it stayed a derivative. Negative
+		// when GitHub reports a push older than the fork itself, which is
+		// what a fork of a repository nobody has touched since looks like.
+		//
+		// Counted from the fork's own date rather than from now, because the
+		// row is dated at the fork. As `days_since_push` this was one more
+		// day every day, on a row dated whenever the fork was made: the value
+		// meant "when the sweep ran" rather than anything about the fork, and
+		// every rewrite cost a parquet file in the fork's original bucket,
+		// 569 files for 592 rows measured on 2026-09-17. What a reader wants,
+		// how long it has been idle, is that bucket's own arithmetic:
+		// now() less the row's time, less this.
 		if !f.PushedAt.IsZero() {
-			fields["days_since_push"] = int(now.Sub(f.PushedAt).Hours() / 24)
+			fields["seconds_to_push"] = int(f.PushedAt.Sub(f.CreatedAt).Seconds())
 			fields["advanced"] = f.PushedAt.After(f.CreatedAt.Add(time.Minute))
 		}
 		points = append(points, sink.Point{

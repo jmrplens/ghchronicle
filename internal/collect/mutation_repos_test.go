@@ -1035,10 +1035,10 @@ func TestADependabotAlertClosesOneOfThreeWays(t *testing.T) {
 		{"fixed after a dismissal was undone", dependabotRow{FixedAt: at(5), DismissedAt: at(1)}, 5},
 	} {
 		tc.row.CreatedAt = created
-		f := dependabotAlertFields(&tc.row, testNow)
+		f := dependabotAlertFields(&tc.row)
 		if tc.resolve < 0 {
-			if hasField(sink.Point{Fields: f}, "seconds_to_resolve") || f["seconds_open"] != int(testNow.Sub(created).Seconds()) {
-				t.Errorf("%s: fields %v, want seconds_open only", tc.name, f)
+			if hasField(sink.Point{Fields: f}, "seconds_to_resolve") || hasField(sink.Point{Fields: f}, "seconds_open") {
+				t.Errorf("%s: fields %v, want no age on an open alert", tc.name, f)
 			}
 			continue
 		}
@@ -1054,12 +1054,12 @@ func TestADependabotAlertClosesOneOfThreeWays(t *testing.T) {
 func TestAZeroEPSSPercentileIsNotAPercentile(t *testing.T) {
 	t.Parallel()
 	var none dependabotRow
-	if f := dependabotAlertFields(&none, testNow); hasField(sink.Point{Fields: f}, "epss_percentile") {
+	if f := dependabotAlertFields(&none); hasField(sink.Point{Fields: f}, "epss_percentile") {
 		t.Errorf("a zero percentile was written: %v", f["epss_percentile"])
 	}
 	var scored dependabotRow
 	scored.SecurityAdvisory.EPSS.Percentile = 0.2
-	if f := dependabotAlertFields(&scored, testNow); f["epss_percentile"] != 0.2 {
+	if f := dependabotAlertFields(&scored); f["epss_percentile"] != 0.2 {
 		t.Errorf("epss_percentile = %v, want 0.2", f["epss_percentile"])
 	}
 	if got := alertCWEs([]string{"CWE-79", "", "CWE-89"}); got != "CWE-79,CWE-89" {

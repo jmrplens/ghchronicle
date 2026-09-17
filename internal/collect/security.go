@@ -324,7 +324,7 @@ func dependabotPoints(rows []dependabotRow, base map[string]string, repo Repo, n
 			counts[[2]string{a.SecurityAdvisory.Severity, a.Dependency.Package.Ecosystem}]++
 			open++
 		}
-		fields := dependabotAlertFields(a, now)
+		fields := dependabotAlertFields(a)
 		// The state is a field and not a tag: the row is dated when the
 		// alert was raised and the state moves later, so as a tag an alert
 		// that was open and is now fixed was two rows at the same instant for
@@ -369,7 +369,7 @@ func dependabotPoints(rows []dependabotRow, base map[string]string, repo Repo, n
 // The point is dated when the alert was raised and carries how long it stayed.
 // created_at never moves, so a re-read rewrites the same row rather than
 // adding one every sweep.
-func dependabotAlertFields(a *dependabotRow, now time.Time) map[string]any {
+func dependabotAlertFields(a *dependabotRow) map[string]any {
 	f := map[string]any{"alerts": 1, "url": a.HTMLURL}
 	// Same guard for both scores. GitHub sends {"score": 0.0} for a vector
 	// it does not have, and it has no v3 vector for an advisory published
@@ -428,7 +428,7 @@ func dependabotAlertFields(a *dependabotRow, now time.Time) map[string]any {
 	case a.AutoDismissedAt != nil:
 		closed = a.AutoDismissedAt
 	}
-	addResolutionAge(f, closed, a.CreatedAt, now)
+	addTimeToResolve(f, closed, a.CreatedAt)
 	return f
 }
 
@@ -449,7 +449,7 @@ func codeScanningPoints(rows []scanRow, base map[string]string, repo Repo, now t
 		points = append(points, sink.Point{
 			Measurement: "gh_code_scanning_alert_item",
 			Tags:        scanAlertTags(a, base, sev),
-			Fields:      scanAlertFields(a, now),
+			Fields:      scanAlertFields(a),
 			Time:        a.CreatedAt,
 		})
 	}
@@ -501,7 +501,7 @@ func resolutionOf(a *scanRow) string {
 // alert about a whole file rather than about a line is served with
 // "start_line": 0, measured against a real repository, so a zero here is the
 // API's answer and not a reading this code failed to take.
-func scanAlertFields(a *scanRow, now time.Time) map[string]any {
+func scanAlertFields(a *scanRow) map[string]any {
 	f := map[string]any{
 		"alerts": 1, "url": a.HTMLURL,
 		"commit": a.MostRecentInstance.CommitSHA,
@@ -527,19 +527,30 @@ func scanAlertFields(a *scanRow, now time.Time) map[string]any {
 	if closed == nil {
 		closed = a.DismissedAt
 	}
-	addResolutionAge(f, closed, a.CreatedAt, now)
+	addTimeToResolve(f, closed, a.CreatedAt)
 	return f
 }
 
-// addResolutionAge writes how long the alert took to close, or how long it has
-// been open. One of the two is always there, so a panel never has to guess
-// which question it is answering.
-func addResolutionAge(f map[string]any, closed *time.Time, created, now time.Time) {
+// addTimeToResolve writes how long the alert took to close. An alert still
+// open gets no field at all: the row is dated when the alert was raised, so
+// how long it has been open is now() less the row's own timestamp, and a
+// panel computes that when it is asked rather than reading what a sweep
+// believed.
+//
+// It used to write that figure here, as seconds_open. Two things were wrong
+// with it. The value was only true at the instant of the sweep that wrote it,
+// yet it sat on a row dated months earlier, so a reader querying last week
+// got whatever the last sweep decided rather than what was true then. And
+// every sweep changed the value, so every sweep rewrote the row, and InfluxDB
+// 3 files a row by its own timestamp and never compacts: measured on
+// 2026-09-17, gh_dependabot_alert_item held 1,059 parquet files for 1,419
+// rows and gh_code_scanning_alert_item 673 for 10,670, about 234 files a day
+// between them, growing with the clock whether or not GitHub had anything new
+// to say.
+func addTimeToResolve(f map[string]any, closed *time.Time, created time.Time) {
 	if closed != nil {
 		f["seconds_to_resolve"] = int(closed.Sub(created).Seconds())
-		return
 	}
-	f["seconds_open"] = int(now.Sub(created).Seconds())
 }
 
 // Analyses collects the code scanning analyses themselves, not just the alerts.

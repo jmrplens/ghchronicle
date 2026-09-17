@@ -1147,14 +1147,14 @@ func TestForksTellAMissingListFromABrokenOne(t *testing.T) {
 	}
 }
 
-// A fork that was never pushed has no push to measure from: no age since the
-// push and no verdict on whether it advanced.
+// A fork that was never pushed has no push to measure to: no gap from the
+// fork to it and no verdict on whether it advanced.
 func TestForkNeverPushedHasNoPushFields(t *testing.T) {
 	t.Parallel()
 	rows := []forkRow{{FullName: "carol/hello-world", CreatedAt: testNow.Add(-time.Hour), HTMLURL: "https://github.com/carol/hello-world"}}
 	rows[0].Owner.Login = "carol"
-	p := forkPoints(rows, testRepo, testNow)[0]
-	if hasField(p, "days_since_push") || hasField(p, "advanced") {
+	p := forkPoints(rows, testRepo)[0]
+	if hasField(p, "seconds_to_push") || hasField(p, "advanced") {
 		t.Errorf("a fork never pushed = %v", p.Fields)
 	}
 }
