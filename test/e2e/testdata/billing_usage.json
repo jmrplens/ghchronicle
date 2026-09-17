@@ -10,7 +10,6 @@
       "grossAmount": 1.712,
       "discountAmount": 1.712,
       "netAmount": 0,
-      "organizationName": "octocat",
       "repositoryName": "hello-world"
     },
     {
@@ -23,8 +22,7 @@
       "grossAmount": 10,
       "discountAmount": 0,
       "netAmount": 10,
-      "organizationName": "octocat",
-      "repositoryName": "octocat"
+      "repositoryName": ""
     }
   ]
 }

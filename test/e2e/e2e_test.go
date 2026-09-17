@@ -514,6 +514,10 @@ func assertDatingRulesSurvived(t *testing.T, points []point) {
 	}
 }
 
+// noRepository is collect.noneTag as it reaches a sink: what all three tags
+// carry on a row that is about no repository at all.
+const noRepository = "(none)"
+
 // assertOneShapeNamesEveryRepository holds every point a sweep writes to one
 // way of naming a repository: `owner`, a short `repo` and `full_name`, all
 // three or none of them.
@@ -531,13 +535,17 @@ func assertDatingRulesSurvived(t *testing.T, points []point) {
 // The slash is the whole test. A `repo` that carries one is a full name in the
 // column that holds short names, which is exactly how the shapes came apart,
 // one collector at a time.
-// noRepository is collect.noneTag as it reaches a sink: what all three tags
-// carry on a row that is about no repository at all.
-const noRepository = "(none)"
-
+//
+// What this cannot see, so that nobody goes looking for it here: a collector
+// that passes the owner and the name the wrong way round writes a tag set that
+// is self consistent and has no slash in `repo`, and no gate over shapes can
+// tell that from the truth without knowing which repository the row was about.
+// The reading of the constructor is pinned instead, by
+// TestANameWithNoOwnerIsTheNameAndNotTheOwner in internal/collect.
 func assertOneShapeNamesEveryRepository(t *testing.T, points []point) {
 	t.Helper()
-	named := map[string]bool{}
+	named, namesOne := map[string]bool{}, map[string]bool{}
+	sentinels := 0
 	for _, p := range points {
 		owner, hasOwner := p.Tags["owner"]
 		repo, hasRepo := p.Tags["repo"]
@@ -546,6 +554,7 @@ func assertOneShapeNamesEveryRepository(t *testing.T, points []point) {
 			continue
 		}
 		named[p.Measurement] = true
+		namesOne[p.Measurement] = namesOne[p.Measurement] || repo != noRepository
 		if !hasOwner || !hasRepo || !hasFull {
 			t.Errorf("%s names a repository with %v: the three tags travel together, "+
 				"so a query written against one measurement answers in the rest",
@@ -568,6 +577,7 @@ func assertOneShapeNamesEveryRepository(t *testing.T, points []point) {
 		// measurements name a repository and not one carries a sentinel, so
 		// the narrow reading costs nothing.
 		if full == noRepository {
+			sentinels++
 			if owner != noRepository || repo != noRepository {
 				t.Errorf("%s has full_name=%q beside owner=%q and repo=%q: a row about no "+
 					"repository names none of the three, and a row about one names all three",
@@ -582,15 +592,36 @@ func assertOneShapeNamesEveryRepository(t *testing.T, points []point) {
 	// A rule nothing is measured against is not a rule. These are the families
 	// that most recently carried the other shape, so a fixture that stopped
 	// answering one of them would take this assertion's reach with it.
+	//
+	// Each has to name a real repository, not merely carry the three tags. The
+	// list used to ask only whether they were present, and a collector that
+	// dropped the identity altogether, fullNameTags(""), shipped every row as
+	// the sentinel trio and passed: self consistent, no slash, three tags
+	// there, and a measurement that is definitionally about a repository
+	// naming none of them for a year with nothing failing.
 	for _, m := range []string{
 		"gh_repo", "gh_event", "gh_notification", "gh_star_given",
 		"gh_external_contribution", "gh_issue_comment", "gh_discussion_comment",
 		"gh_package", "gh_pinned_item", "gh_contribution_repo", "gh_billing_usage",
 	} {
-		if !named[m] {
+		switch {
+		case !named[m]:
 			t.Errorf("no %s point names a repository, so this sweep did not test the shape "+
 				"where it last went wrong; measurements seen: %v", m, sortedNames(named))
+		case !namesOne[m]:
+			t.Errorf("every %s point carries %q for its repository, so the measurement claims "+
+				"no repository at all and the shape it would have is untested", m, noRepository)
 		}
+	}
+	// The arm that permits the trio has to be reached by a real row, or a
+	// later edit could invert it and nothing here would fail. The row is
+	// gh_billing_usage's monthly Copilot credit, which is charged to the
+	// account and to no repository, and the fake answers one because the live
+	// endpoint does.
+	if sentinels == 0 {
+		t.Error("no point in this sweep is about no repository at all, so the rule that lets " +
+			"all three tags say (none) together is never exercised. The billing fixture's " +
+			"credit row, charged to no repository, is what reaches it")
 	}
 }
 

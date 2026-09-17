@@ -71,16 +71,26 @@ release created, so the `INSERT` that follows names `owner` and `full_name`
 columns that do not exist and an `ON CONFLICT` key that does not exist either,
 and psql rejects it for all thirteen measurements. Drop those tables and let
 the next file recreate them, or add the two columns and rebuild each primary
-key, which is `time` plus every tag column in name order:
+key:
 
 ```sql
 ALTER TABLE gh_event
   ADD COLUMN IF NOT EXISTS "owner" TEXT NOT NULL DEFAULT '',
   ADD COLUMN IF NOT EXISTS "full_name" TEXT NOT NULL DEFAULT '';
-ALTER TABLE gh_event DROP CONSTRAINT gh_event_pkey;
+ALTER TABLE gh_event DROP CONSTRAINT IF EXISTS gh_event_pkey;
 ALTER TABLE gh_event
   ADD PRIMARY KEY ("time", "action", "full_name", "owner", "ref_type", "repo", "type");
 ```
+
+**The rebuilt key must be exactly the key this tool would declare** for that
+measurement: `time` followed by the tag columns of the table above, in name
+order. Do not assemble it from the columns your table happens to have. An
+upgraded `gh_billing_usage` still carries an `org` column from the old shape
+that nothing writes any more and that is not part of the key; include it and
+the `ON CONFLICT` the sink emits matches no unique constraint, so the load
+fails again with a message that points nowhere. The check on your own work is
+the `CREATE TABLE` the sink writes for that measurement into a fresh file: its
+`PRIMARY KEY` list is the answer.
 
 Adding the columns keeps the old rows but does not convert them: they hold the
 empty string where the new rows hold an owner, so they double-count exactly as

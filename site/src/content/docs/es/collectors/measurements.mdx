@@ -75,16 +75,26 @@ versión anterior, así que el `INSERT` que viene detrás nombra columnas `owner
 `full_name` que no existen y un `ON CONFLICT` con una clave que tampoco existe,
 y psql lo rechaza en las trece medidas. Elimina esas tablas y deja que el
 siguiente fichero las recree, o añade las dos columnas y reconstruye cada clave
-primaria, que es `time` más todas las columnas de etiqueta por orden de nombre:
+primaria:
 
 ```sql
 ALTER TABLE gh_event
   ADD COLUMN IF NOT EXISTS "owner" TEXT NOT NULL DEFAULT '',
   ADD COLUMN IF NOT EXISTS "full_name" TEXT NOT NULL DEFAULT '';
-ALTER TABLE gh_event DROP CONSTRAINT gh_event_pkey;
+ALTER TABLE gh_event DROP CONSTRAINT IF EXISTS gh_event_pkey;
 ALTER TABLE gh_event
   ADD PRIMARY KEY ("time", "action", "full_name", "owner", "ref_type", "repo", "type");
 ```
+
+**La clave reconstruida tiene que ser exactamente la que declararía esta
+herramienta** para esa medida: `time` seguido de las columnas de etiqueta de la
+tabla de arriba, por orden de nombre. No la armes con las columnas que tu tabla
+tenga. Un `gh_billing_usage` actualizado aún lleva una columna `org` de la forma
+vieja que ya no escribe nadie y que no forma parte de la clave; si la incluyes,
+el `ON CONFLICT` que emite el destino no coincide con ninguna restricción única
+y la carga vuelve a fallar con un mensaje que no apunta a nada. Para comprobar
+tu trabajo, mira el `CREATE TABLE` que el destino escribe para esa medida en un
+fichero nuevo: su lista de `PRIMARY KEY` es la respuesta.
 
 Añadir las columnas conserva las filas viejas pero no las convierte: llevan la
 cadena vacía donde las nuevas llevan un dueño, así que cuentan doble igual que
