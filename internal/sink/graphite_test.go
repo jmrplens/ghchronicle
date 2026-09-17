@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"net"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -251,5 +252,49 @@ func TestGraphiteWritesADateAsSecondsAndSkipsAnUnsetOne(t *testing.T) {
 	want := "github.repo.pushed_at 1.6e+09 1700000000\ngithub.repo.stars 2 1700000000\n"
 	if len(got) != 1 || got[0] != want {
 		t.Errorf("wire = %q, want %q in batches of one over one connection", got, want)
+	}
+}
+
+// TestGraphiteCountsAPartialFailureInPointsAndNotInLines pins the arithmetic
+// of a write that dies between batches.
+//
+// A point is one line per numeric field, so lines and points are not in
+// proportion, and the count this sink returns is points: the interface says
+// accepted is how much of the batch landed. The worked case is the one that
+// makes the difference visible: a hundred points where the first renders a
+// thousand lines and the other ninety nine render one apiece. With a batch of
+// a thousand, the first batch is exactly that point and the second fails, so
+// one point landed. Estimated as the share of the lines that went out, the
+// answer was ninety.
+func TestGraphiteCountsAPartialFailureInPointsAndNotInLines(t *testing.T) {
+	t.Parallel()
+	wide := Point{
+		Measurement: "gh_wide", Tags: map[string]string{"repo": "a"},
+		Fields: make(map[string]any, 1000), Time: time.Unix(1700000000, 0),
+	}
+	for i := range 1000 {
+		wide.Fields["f"+strconv.Itoa(i)] = i
+	}
+	points := []Point{wide}
+	for i := range 99 {
+		points = append(points, Point{
+			Measurement: "gh_narrow", Tags: map[string]string{"repo": strconv.Itoa(i)},
+			Fields: map[string]any{"v": 1}, Time: time.Unix(1700000000, 0),
+		})
+	}
+	g := NewGraphite("127.0.0.1:1", "github", 1000, time.Second)
+	lines, ends := g.render(points)
+	if len(lines) != 1099 || len(ends) != 100 {
+		t.Fatalf("%d lines over %d points, want 1099 over 100", len(lines), len(ends))
+	}
+	if got := pointsSentBefore(ends, 1000); got != 1 {
+		t.Errorf("a failure at line 1000 counted %d points landed, want the one whose lines all went", got)
+	}
+	// The edges: nothing sent, and everything but the last line.
+	if got := pointsSentBefore(ends, 0); got != 0 {
+		t.Errorf("a failure on the first batch counted %d points landed", got)
+	}
+	if got := pointsSentBefore(ends, len(lines)-1); got != 99 {
+		t.Errorf("a failure on the last line counted %d points landed, want every point but that one", got)
 	}
 }
