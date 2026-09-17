@@ -122,8 +122,13 @@ its status follows that reading: a panel over a table the store has not created
 is a family it has not collected yet, which fills itself, so it is reported as
 `WAIT` and does not fail the run, while a panel naming a column the store has
 not created is one nobody with that account's history can draw and fails it.
-The second is why this is worth running against a store holding a real account
-and not only against the fixture: a
+It can only answer that question on the two SQL stores: on Elasticsearch,
+Prometheus and Graphite a missing field is not an error, the query answers
+nothing, and the same defect arrives as an empty panel. Those three are covered
+by the containerised suite instead, which runs every panel against stores where
+every family has been written and fails on any panel error it does not
+explicitly allow. The second kind of failure is why this is worth running
+against a store holding a real account and not only against the fixture: a
 column of these stores exists once a point has carried it, the fixture carries
 every field of every measurement, and an account carries only what has happened
 to it. A panel selecting a field the account has never written is refused

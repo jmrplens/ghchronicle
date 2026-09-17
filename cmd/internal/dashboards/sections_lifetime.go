@@ -209,11 +209,12 @@ func lifetime(b *builder) []Panel {
 		// genuinely reaches back nine years, so on the account this was read
 		// against, where the contributions collection had given 38 of 59
 		// repositories and none older than 2025-12-14, a reader concluded
-		// nothing had been created before December. The title cannot carry it:
-		// every spelling that stays true once a second year has accumulated is
-		// past the twenty-nine characters a phone shows (TestTitlesFitAPhone),
-		// and "(last twelve months)" is true the day it is written and wrong a
-		// year later.
+		// nothing had been created before December. The title is not where the
+		// window can go, and length is not the reason: twenty-nine characters
+		// fit on a phone (TestTitlesFitAPhone) and "Repositories created (1y)"
+		// is twenty-five. It is that any title naming a window stops being
+		// true, this table gaining a year for every year the rows are kept, and
+		// a title that ages is worse than one that says less.
 		panel("table", "Repositories created", box{W: 8, H: 8, X: 0, Y: 17}, []Target{sqlT(created)}, &P{
 			// The exporter reduces this measurement to a count, so the answer
 			// here is a real one and it is a smaller one. Said rather than

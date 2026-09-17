@@ -49,6 +49,12 @@ const (
 // against a limit of 40,000, and the whole set together opens 2,969. Each
 // panel is on the list in bounds_test.go with the reason a narrower window
 // would change its answer.
+//
+// A tenth reader is not a panel: repoFlagsJoin reads gh_repo on this window so
+// that the four lists of what to do next can leave out what nobody can act on
+// whatever the page's range is set to. It is the cheapest of the ten, one
+// parquet file and 59 rows measured the same way on 2026-09-17, and it is
+// counted here because the budget is over readers and not over panels.
 const wholeHistory = "time > now() - INTERVAL '30 years'"
 
 // The sentence each bounded panel carries, so the badge in the header is

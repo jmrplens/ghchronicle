@@ -157,12 +157,13 @@ instead of this note.
 // snapshot, so a repository's flags are only knowable where a sweep landed: on
 // a range holding none the join matches nothing, COALESCE reads every missing
 // flag as "not flagged", and all four panels quietly revert to listing what
-// nobody can act on. That is not a corner. Measured on the production store on
-// 2026-09-17, gh_repo holds 59 rows at exactly one timestamp, so "Last 6 hours"
-// was already outside it and the exclusion was already off there. The scan is
-// free, which is what lets the window be the unbounded one: one parquet file
-// and 59 rows (system.parquet_files, same day) against the forty thousand file
-// limit the other whole-history panels are measured against.
+// nobody can act on. That is not a corner: measured on the production store on
+// 2026-09-17, gh_repo holds 59 rows at exactly one timestamp, so every range
+// that does not contain the last sweep has no flags at all, and which ranges
+// those are moves with the clock. The scan is free, which is what lets the
+// window be the unbounded one: one parquet file and 59 rows
+// (system.parquet_files, same day) against the forty thousand file limit the
+// other whole-history panels are measured against.
 func repoFlagsJoin(on string) string {
 	return " LEFT JOIN (" +
 		latestPerRepoWithin([]string{"fork", "archived"}, wholeHistory) +

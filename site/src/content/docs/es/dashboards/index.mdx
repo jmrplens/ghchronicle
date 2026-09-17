@@ -127,9 +127,14 @@ fallido, y su estado sigue esa lectura: un panel sobre una tabla que el almacén
 no ha creado es una familia que aún no ha recogido y que se llenará sola, así
 que se informa como `WAIT` y no hace fallar la ejecución, mientras que un panel
 que nombra una columna que el almacén no ha creado es uno que nadie con el
-historial de esa cuenta puede dibujar y sí la hace fallar. Lo segundo es la
-razón de ejecutarlo contra un almacén con una cuenta real y no solo contra el
-banco de pruebas: una columna de estos almacenes existe desde que un punto la ha
+historial de esa cuenta puede dibujar y sí la hace fallar. Esa pregunta solo la puede responder en los dos almacenes SQL: en
+Elasticsearch, Prometheus y Graphite un campo que falta no es un error, la
+consulta no devuelve nada, y el mismo defecto llega como un panel vacío. De
+esos tres se encarga la suite en contenedores, que ejecuta todos los paneles
+contra almacenes donde se ha escrito cada familia y falla ante cualquier error
+de panel que no permita explícitamente. La segunda clase de fallo es la razón
+de ejecutarlo contra un almacén con una cuenta real y no solo contra el banco
+de pruebas: una columna de estos almacenes existe desde que un punto la ha
 llevado, el banco de pruebas lleva todos los campos de todas las medidas, y una
 cuenta solo lleva lo que le ha pasado. Un panel que selecciona un campo que la
 cuenta nunca ha escrito se rechaza entero y Grafana dibuja «Sin datos» con un

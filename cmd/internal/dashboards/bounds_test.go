@@ -270,6 +270,12 @@ func TestEveryWholeHistoryWindowIsOnTheList(t *testing.T) {
 // follow the dashboard range. So it is taken out before a panel is judged,
 // and the rule above keeps meaning what it says. The reason it must be
 // unbounded at all is in repoFlagsJoin.
+//
+// One pattern for one lookup, deliberately. A second unbounded lookup gets its
+// own pattern here and its own entry in the file-limit accounting in bounds.go,
+// rather than this one widened to match both: a pattern loose enough to cover
+// two is loose enough to hide a panel that reads its whole measurement by
+// accident, which is the thing the rule above exists to catch.
 var flagsLookup = regexp.MustCompile(
 	`LEFT JOIN \(SELECT repo, fork, archived FROM .*?\) f ON f\.repo = \w+\.repo`,
 )
@@ -296,9 +302,9 @@ func carriesWholeHistory(p Panel) bool {
 // the page's range the join matched nothing outside one, every missing flag
 // read as "not flagged", and all four panels reverted to the behavior they
 // were changed to fix, with nothing on the screen to say so. Measured on the
-// production store on 2026-09-17: gh_repo holds 59 rows at a single
-// timestamp, so a reader who picked "Last 6 hours" had the exclusion switched
-// off already.
+// production store on 2026-09-17: gh_repo holds 59 rows at a single timestamp,
+// so any range not containing the last sweep had no flags at all, and which
+// ranges those are moves with the clock.
 func TestTheRepositoryFlagsAreReadOutsideTheRange(t *testing.T) {
 	t.Parallel()
 	for _, store := range []string{"influxdb", "postgres"} {

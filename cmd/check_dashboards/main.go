@@ -6,6 +6,17 @@
 // /api/ds/query exactly as a render does, and reports what came back, one line
 // per panel and a count at the end.
 //
+// What it can find where: a column the store has never created is an error on
+// InfluxDB and on PostgreSQL, and this reports it and fails. On Elasticsearch,
+// Prometheus and Graphite a missing field is not an error at all, the query
+// answers nothing, so the same defect arrives here as EMPTY and the run passes.
+// Running this against those three still says every panel is answerable; it
+// does not say that every column exists. Against those three the check that
+// finds a panel nobody can draw is the containerised suite, which runs every
+// panel against stores where every family has been written and fails on any
+// panel error not on an explicit allowlist (test/e2e/docker, behind the
+// dockere2e tag, called from release.yml through e2e.yml before every tag).
+//
 //	GRAFANA_TOKEN=... go run ./cmd/check_dashboards <store> <datasource-uid> [range]
 //
 // The run itself lives in internal/grafana, because the containerized
@@ -161,9 +172,10 @@ func check(ctx context.Context, args []string, stdout io.Writer) (passed bool, e
 // it does not touch the status: that gap fills itself, and the misspelled
 // measurement it might hide is what the containerised suite catches, where
 // every family is written and none of these tables can be missing. A panel
-// naming a column the store has never created is the opposite: a column of these stores exists once a point has carried it, so a
-// field the account has never had a reason to write is a column the planner
-// rejects before it reads a row, for ever. That is what hid eight resolved
+// naming a column the store has never created is the opposite: a column of
+// these stores exists once a point has carried it, so a field the account has
+// never had a reason to write is a column the planner rejects before it reads
+// a row, for ever. That is what hid eight resolved
 // Dependabot alerts behind "No data" on the account this was first run
 // against, under a corner badge nobody notices, because the panel asked for
 // `dismissed_reason` and the account had only ever fixed alerts. Everything

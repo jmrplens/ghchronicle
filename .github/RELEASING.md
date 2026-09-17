@@ -36,24 +36,50 @@ is not.
       Run it for each store you have a datasource for. It needs a Grafana, so
       CI can never do it.
 
+      **It can only find a refused column on InfluxDB and PostgreSQL.** On
+      Elasticsearch, Prometheus and Graphite a missing field is not an error:
+      the query answers nothing, so the same defect arrives as `EMPTY` and the
+      run passes. A green run against those three says every panel is
+      answerable, not that every column exists. What covers them is the
+      containerised suite, which runs every panel against stores where every
+      family has been written and fails on any panel error not on an explicit
+      allowlist (`test/e2e/docker`, behind the `dockere2e` tag); the release
+      workflow calls `e2e.yml` as a job the release needs, so it has already
+      run by the time a tag publishes anything.
+
       **The class is open, and this check only closes it for the account it is
-      run against.** These five panels name a column the collector writes only
-      when something has happened, and they draw here only because this account
-      has done it: `seconds_to_first_human_review` in "Merged and closed in
-      range" (`internal/collect/pulls.go`, written only when somebody other
-      than the author reviewed a pull request, and fourteen rows in this whole
-      store), `never_used` and `days_to_expiry` in "Account keys"
-      (`internal/collect/profile.go`), `days_since_use` in "Deploy keys"
-      (`internal/collect/settings.go`) and `environment_url` in "Deployments by
-      environment" (`internal/collect/deployments.go`). None of the five has an
-      unconditional column that says the same thing, the way `alert_state`
-      replaced `dismissed_reason`, so they stay, and an account that has never
-      had a human review or never expired a key will see one of them refused.
-      If this check reports a refused column on somebody else's store, look
-      here first. What would find them before a user does is a second
-      end-to-end fixture for an account that has done none of the optional
-      things; the one we have carries every field of every measurement, which
-      is exactly why it cannot.
+      run against.** Some panels name a column the collector writes only when
+      something has happened, and they draw here only because this account has
+      done it. The whole list, with the condition each is written under, is
+      `conditionalColumns` in
+      `cmd/internal/dashboards/conditional_columns_test.go`, and a test keeps it
+      complete: it parses every collector for a field written under a condition,
+      intersects that with every column the two SQL dashboards name, and fails
+      when the two agree on something the list does not carry. The ones an
+      ordinary account meets, worth knowing by name:
+
+      - `label_names` (`pulls.go`), in "Open the longest", "Open issues the
+        longest" and "Largest merged pull requests": an account that has never
+        labelled an issue or a pull request loses three tables, two of them the
+        lists this dashboard's own round of fixes was about.
+      - `seconds_to_merge` (`pulls.go`), in "Merged and closed in range" and
+        three more: a fresh install, and anyone who pushes to main rather than
+        merging, has never written it.
+      - `seconds_to_first_human_review` (`pulls.go`), in "Merged and closed in
+        range": fourteen rows in the whole of the store this was measured
+        against, so an account that works alone loses that panel.
+      - `never_used` and `days_to_expiry` in "Account keys"
+        (`internal/collect/profile.go`), `days_since_use` in "Deploy keys"
+        (`internal/collect/settings.go`), `environment_url` in "Deployments by
+        environment" (`internal/collect/deployments.go`).
+
+      None of them has an unconditional column that says the same thing, the way
+      `alert_state` replaced `dismissed_reason`, so they stay. If this check
+      reports a refused column on somebody else's store, look at that list
+      first. What would find them before a user does is a second end-to-end
+      fixture for an account that has done none of the optional things; the one
+      we have carries every field of every measurement, which is exactly why it
+      cannot.
 - [ ] `cd site && pnpm run build && pnpm run lint` is green, which also holds
       the published counts to the code.
 - [ ] The documentation says what this version does, not what the last one did.
