@@ -201,6 +201,9 @@ type Server struct {
 
 	mu       sync.Mutex
 	requests []Request
+	// failing is the paths a test has asked the fake to break, and the status
+	// each answers with.
+	failing map[string]int
 	// used is what each bucket has been charged since the fake started. It is
 	// what the x-ratelimit-used header and the budget block report, so a
 	// sweep's cost can be read the way it is read against api.github.com:
@@ -234,7 +237,10 @@ func New(tb testing.TB, dir string, overlays ...string) *Server {
 	for _, overlay := range overlays {
 		maps.Copy(bodies, readFixtures(tb, overlay))
 	}
-	s := &Server{tb: tb, bodies: bodies, used: map[string]int{}, perRepo: len(overlays) > 0}
+	s := &Server{
+		tb: tb, bodies: bodies, used: map[string]int{},
+		perRepo: len(overlays) > 0, failing: map[string]int{},
+	}
 	s.srv = httptest.NewServer(http.HandlerFunc(s.serve))
 	tb.Cleanup(s.srv.Close)
 	return s
@@ -263,6 +269,25 @@ func readFixtures(tb testing.TB, dir string) map[string][]byte {
 
 // URL is the base URL to point github.base_url at.
 func (s *Server) URL() string { return s.srv.URL }
+
+// Fail makes one path answer with a status instead of with its fixture, and
+// keeps answering that way until Fail is called again for the same path.
+//
+// It exists for one shape of test and it is worth naming it: on the author's
+// own account, one 502 from /repos/<repo>/actions/runs/<id>/jobs, once per
+// repository, cost five repositories every workflow run and job they had.
+// Nothing here can be made to answer that by arranging fixtures, because the
+// fixtures are what a working GitHub says. A status of zero restores the
+// fixture, so a test can break a path for one sweep and mend it for the next.
+func (s *Server) Fail(path string, status int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if status == 0 {
+		delete(s.failing, path)
+		return
+	}
+	s.failing[path] = status
+}
 
 // Requests returns a copy of everything served so far.
 func (s *Server) Requests() []Request {
@@ -370,6 +395,17 @@ const jsonType = "application/json; charset=utf-8"
 
 // answer decides what a request is served.
 func (s *Server) answer(r *http.Request, body []byte) answer {
+	s.mu.Lock()
+	broken := s.failing[r.URL.Path]
+	s.mu.Unlock()
+	if broken != 0 {
+		// Charged, because a request that was made was made, and with no
+		// validator, because there is no fixture behind it to validate.
+		return answer{
+			status: broken, contentType: jsonType, cost: 1,
+			body: []byte(`{"message":"` + http.StatusText(broken) + `"}`),
+		}
+	}
 	if r.URL.Path == jobLogPath {
 		return answer{status: http.StatusFound, location: "/storage/2000000011.txt", cost: 1}
 	}

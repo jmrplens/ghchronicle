@@ -209,7 +209,19 @@ var promRules = map[string]rule{
 	"gh_repo_total": {mode: keepLast, keep: []string{
 		"owner", "repo", "full_name", "visibility", "archived", "fork",
 	}},
-	"gh_rate_limit":  {mode: keepLast, keep: []string{"resource"}},
+	"gh_rate_limit": {mode: keepLast, keep: []string{"resource"}},
+	// The sweep's report on itself, which is a snapshot by construction: one
+	// row per family per sweep and one per repository it could not collect,
+	// all of them stamped at the sweep, so the newest is the whole answer.
+	// Every tag is kept, `reason` included, because the question this
+	// measurement exists to answer is which family failed on which
+	// repository and why, and a reduction that dropped any of the three
+	// would answer a different one. The three that name the repository
+	// travel together as everywhere else, and hold the sentinel on the row
+	// that is about a family rather than about a repository.
+	"gh_collector_family": {mode: keepLast, keep: []string{
+		"family", "scope", "owner", "repo", "full_name", "reason",
+	}},
 	"gh_repo_policy": {mode: keepLast, keep: []string{"owner", "repo", "full_name"}},
 
 	// Code scanning per item, the twin of the Dependabot rule above.

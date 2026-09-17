@@ -56,6 +56,7 @@ var tags = map[string][]string{
 	"gh_code_scanning_alert_item": {"category", "full_name", "number", "owner", "path", "ref", "repo", "rule", "severity", "tool"},
 	"gh_code_scanning_analysis":   {"category", "full_name", "owner", "ref", "repo", "tool", "version"},
 	"gh_code_scanning_setup":      {"full_name", "owner", "query_suite", "repo", "schedule", "state"},
+	"gh_collector_family":         {"family", "full_name", "owner", "reason", "repo", "scope"},
 	"gh_commit":                   {"author", "branch", "full_name", "owner", "repo", "sha", "signature"},
 	"gh_commit_check":             {"app", "check", "conclusion", "full_name", "owner", "repo", "sha"},
 	"gh_commit_punchcard":         {"full_name", "hour", "owner", "repo", "weekday"},

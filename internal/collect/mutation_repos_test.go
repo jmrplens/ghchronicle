@@ -475,10 +475,12 @@ func TestATruncatedDependabotFileIsPresentButNotRead(t *testing.T) {
 	}
 }
 
-// TestPolicyFilesKeepWhatAnsweredWhenABatchFails pins that a batch lost to an
-// error nothing recovers from costs only its own repositories: the rows of
-// the batch that answered are returned, and the sweep does not fail for it.
-func TestPolicyFilesKeepWhatAnsweredWhenABatchFails(t *testing.T) {
+// TestPolicyFilesKeepWhatAnsweredAndStillReportTheBatchThatFailed pins both
+// halves: a batch lost to an error nothing recovers from costs only its own
+// repositories, and the failure still comes back, because a family that half
+// failed is not a family that succeeded and the runner is what decides what
+// to do about it.
+func TestPolicyFilesKeepWhatAnsweredAndStillReportTheBatchThatFailed(t *testing.T) {
 	t.Parallel()
 	f := newFixtureServer(t)
 	f.graphQL(func(w http.ResponseWriter, _ *http.Request, query string, _ map[string]any) {
@@ -489,8 +491,8 @@ func TestPolicyFilesKeepWhatAnsweredWhenABatchFails(t *testing.T) {
 		f.write(w, "graphql_policy_files.json")
 	})
 	points, err := PolicyFiles{Repos: policyRepos[:2], Batch: 1}.Collect(ctx(t), f.Client, testNow)
-	if err != nil {
-		t.Fatalf("one failed batch beside one that answered: %v", err)
+	if err == nil {
+		t.Error("a batch failed and the collector reported success")
 	}
 	rows := only(t, points, "gh_policy_file")
 	if len(rows) != len(policyFileSet) {
@@ -723,10 +725,11 @@ func TestRepoDetailAsksTenAtATimeByDefault(t *testing.T) {
 	}
 }
 
-// TestRepoDetailReportsAFailureOnlyWhenNothingAnswered pins both sides of the
-// rule at the end of Collect: a sweep where every batch failed is a failure,
-// and one where some batch answered keeps its rows and is not.
-func TestRepoDetailReportsAFailureOnlyWhenNothingAnswered(t *testing.T) {
+// TestRepoDetailKeepsTheBatchesThatAnsweredAndReportsTheOnesThatDidNot pins
+// both sides of the rule at the end of Collect: a sweep where every batch
+// failed returns no rows, and one where some batch answered keeps those rows
+// and still says that a batch failed.
+func TestRepoDetailKeepsTheBatchesThatAnsweredAndReportsTheOnesThatDidNot(t *testing.T) {
 	t.Parallel()
 	failing := newFixtureServer(t)
 	failing.graphQL(func(w http.ResponseWriter, _ *http.Request, _ string, _ map[string]any) {
@@ -749,8 +752,8 @@ func TestRepoDetailReportsAFailureOnlyWhenNothingAnswered(t *testing.T) {
 		answerRepoDetail(w, query)
 	})
 	points, err = RepoDetail{Repos: reposDetailRepos(2), Batch: 1}.Collect(ctx(t), partial.Client, testNow)
-	if err != nil {
-		t.Fatalf("one failed batch beside one that answered: %v", err)
+	if err == nil {
+		t.Error("one batch failed beside one that answered and the collector reported success")
 	}
 	for _, p := range only(t, points, "gh_repo_language") {
 		if p.Tags["repo"] != "r1" {

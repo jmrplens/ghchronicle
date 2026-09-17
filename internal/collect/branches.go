@@ -130,10 +130,7 @@ func (b Branches) Collect(ctx context.Context, c *ghapi.Client, now time.Time) (
 			points = append(points, inv.points(repo, now, day)...)
 		}
 	}
-	if len(points) == 0 && failed != nil {
-		return nil, failed
-	}
-	return points, nil
+	return points, failed
 }
 
 // points renders one row per branch, stamped at the start of the UTC day.

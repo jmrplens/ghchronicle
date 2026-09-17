@@ -154,6 +154,18 @@ func (a Actions) Collect(ctx context.Context, c *ghapi.Client, repo Repo, now ti
 		return nil, err
 	}
 	points, expanded, err := a.runPoints(ctx, c, repo, runs, base)
+	// Remembered here, beside the points that carry those jobs, and not on
+	// the way out: the runner keeps what a collector that failed returned, so
+	// a run whose jobs are in points has been written whether or not a later
+	// call failed, and listing it again next sweep is the round trip this
+	// memory exists to save. It used to be remembered only once the whole
+	// collection had succeeded, which was right for as long as the runner
+	// threw a failed collector's points away.
+	if a.Expanded != nil {
+		for _, key := range expanded {
+			a.Expanded[key] = struct{}{}
+		}
+	}
 	if err != nil {
 		return points, err
 	}
@@ -170,20 +182,11 @@ func (a Actions) Collect(ctx context.Context, c *ghapi.Client, repo Repo, now ti
 			Time:        now,
 		})
 	}
+	// The cache totals are the last call of the family and the least of it:
+	// a repository's whole run and job history is already in points, so a
+	// failure here goes back with them rather than instead of them.
 	cache, err := cachePoints(ctx, c, repo, base, now)
-	if err != nil {
-		return nil, err
-	}
-	// Remembered only now, with the whole collection in hand: the runner
-	// drops every point of a collector that returned an error, so a run
-	// remembered on the way to one would have its jobs neither written nor
-	// ever listed again.
-	if a.Expanded != nil {
-		for _, key := range expanded {
-			a.Expanded[key] = struct{}{}
-		}
-	}
-	return append(points, cache...), nil
+	return append(points, cache...), err
 }
 
 // runList walks the run listing newest first and says how many the repository
@@ -240,7 +243,9 @@ func (a Actions) runList(ctx context.Context, c *ghapi.Client, repo Repo) (all [
 
 // runPoints renders one point per finished run, and the jobs of as many of
 // them as the caller is willing to pay for. It also says which runs those
-// were, for Collect to remember once it knows the sweep kept the points.
+// were, for Collect to remember, and it says it on the failing path too: the
+// points rendered before the failure are kept, so the runs behind them have
+// been written.
 func (a Actions) runPoints(ctx context.Context, c *ghapi.Client, repo Repo, all []runRow, base map[string]string) (points []sink.Point, expanded []RunKey, err error) {
 	for i := range all {
 		r := &all[i]
@@ -252,7 +257,9 @@ func (a Actions) runPoints(ctx context.Context, c *ghapi.Client, repo Repo, all 
 		if a.Jobs && !written && (a.MaxJobRuns == 0 || len(expanded) < a.MaxJobRuns) {
 			jp, listErr := a.jobsFor(ctx, c, repo, r, base)
 			if listErr != nil {
-				return points, nil, listErr
+				// The runs and jobs already rendered go back with the error,
+				// and so do the runs they belong to: both are kept now.
+				return points, expanded, listErr
 			}
 			points = append(points, jp...)
 			// Counted even when the listing answered nothing, and so

@@ -214,7 +214,10 @@ func (sc Security) Collect(ctx context.Context, c *ghapi.Client, repo Repo, now 
 
 	scanning, scanningOn, err := sc.codeScanningAlerts(ctx, c, repo)
 	if err != nil {
-		return nil, err
+		// Dependabot answered and code scanning did not: the rows above are
+		// as true as they were, so they travel with the error rather than
+		// being thrown away with it.
+		return points, err
 	}
 	alerts, open = codeScanningPoints(scanning, base, repo, now)
 	points = append(points, alerts...)

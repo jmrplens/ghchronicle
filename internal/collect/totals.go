@@ -258,13 +258,9 @@ func (t Totals) Collect(ctx context.Context, c *ghapi.Client, now time.Time) ([]
 	points = append(points, archivedPoints...)
 	failed = errors.Join(failed, err)
 
-	// Only a total failure is a failure. A family that returns nothing at all
-	// should say why; one that returned most of its rows should not be marked
-	// as not having run.
-	if len(points) == 0 && failed != nil {
-		return nil, failed
-	}
-	return points, nil
+	// Both the rows and the reason. Whether a family that half failed counts
+	// as having run is the runner's decision, and it is made there.
+	return points, failed
 }
 
 // accountCounts reads the eleven lifetime counts: ten from one GraphQL query,
@@ -365,10 +361,7 @@ func (t Totals) repoTotals(ctx context.Context, c *ghapi.Client, repos []Repo, n
 			points = append(points, archived)
 		}
 	})
-	if len(points) == 0 && failed != nil {
-		return nil, failed
-	}
-	return points, nil
+	return points, failed
 }
 
 func (rt *repoTotals) point(repo Repo, now time.Time) sink.Point {
@@ -496,10 +489,7 @@ func archivedDates(ctx context.Context, c *ghapi.Client, repos []Repo) ([]sink.P
 			points = append(points, point)
 		}
 	})
-	if len(points) == 0 && failed != nil {
-		return nil, failed
-	}
-	return points, nil
+	return points, failed
 }
 
 // archived is the one row that carries a date rather than a state: the instant

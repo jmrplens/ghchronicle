@@ -164,11 +164,10 @@ func (a Audience) Collect(ctx context.Context, c *ghapi.Client, _ time.Time) ([]
 			}
 		}
 	})
-	// Only a total failure is a failure: aliasBatch already kept every
-	// repository that answered, and a family that returned most of its rows
-	// should not be marked as not having run.
-	if len(points) == 0 && failed != nil {
-		return nil, failed
-	}
-	return points, nil
+	// Both: aliasBatch already kept every repository that answered, and the
+	// error goes back with them rather than being dropped because some of
+	// them did. Whether a family that half failed is marked as having run is
+	// the runner's decision and is made there; here it is a fact, and a fact
+	// nobody was told cost five repositories their whole history once.
+	return points, failed
 }

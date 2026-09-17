@@ -267,12 +267,11 @@ func (d Deployments) Collect(ctx context.Context, c *ghapi.Client, _ time.Time) 
 		todo = next
 	}
 
-	// Only a total failure is a failure: a batch that lost one repository to a
-	// rename must not mark the family as not having run.
-	if len(points) == 0 && failed != nil {
-		return nil, failed
-	}
-	return points, nil
+	// A batch that lost one repository to a rename is not in failed at all:
+	// aliasBatch drops that case after asking one at a time. What is left is
+	// worth reporting, and the rows that did arrive are worth keeping, so
+	// both travel back together.
+	return points, failed
 }
 
 // args writes the connection arguments, newest first so a walk can stop at a

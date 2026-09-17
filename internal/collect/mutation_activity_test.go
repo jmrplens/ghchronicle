@@ -522,21 +522,21 @@ func TestDeploymentsAskAGoneRepositoryOnlyOnce(t *testing.T) {
 	}
 }
 
-// TestDeploymentsReportAFailureOnlyWhenNothingWasCollected keeps what a sweep
-// did collect when one repository fails, and reports the failure when that
-// repository was all there was.
-func TestDeploymentsReportAFailureOnlyWhenNothingWasCollected(t *testing.T) {
+// TestDeploymentsKeepWhatAnsweredAndStillReportTheOneThatFailed keeps what a
+// sweep did collect when one repository fails, and reports the failure
+// whether or not the others answered.
+func TestDeploymentsKeepWhatAnsweredAndStillReportTheOneThatFailed(t *testing.T) {
 	t.Parallel()
 	t.Run("one of two fails", func(t *testing.T) {
 		t.Parallel()
 		f := newFixtureServer(t)
 		activityOneRepoAtATime(t, f, "", "gitlab-mcp-server")
 		points, err := Deployments{Repos: deployRepos, Batch: 1}.Collect(ctx(t), f.Client, testNow)
-		if err != nil {
-			t.Fatalf("the failure of one repository discarded the other: %v", err)
-		}
 		if len(points) != 1 {
-			t.Errorf("got %d points, want the working repository's one", len(points))
+			t.Fatalf("got %d points, want the working repository's one kept", len(points))
+		}
+		if err == nil {
+			t.Error("one repository failed and the collector reported success")
 		}
 	})
 	t.Run("the only one fails", func(t *testing.T) {
@@ -649,9 +649,10 @@ func TestBranchesAskOneQueryForABatchThatFitsExactly(t *testing.T) {
 	}
 }
 
-// TestBranchesReportAFailureOnlyWhenNothingWasCollected is the branch twin of
-// the deployments rule: one broken repository does not cost the others.
-func TestBranchesReportAFailureOnlyWhenNothingWasCollected(t *testing.T) {
+// TestBranchesKeepWhatAnsweredAndStillReportTheOneThatFailed is the branch
+// twin of the deployments rule: one broken repository does not cost the
+// others, and it is still reported.
+func TestBranchesKeepWhatAnsweredAndStillReportTheOneThatFailed(t *testing.T) {
 	t.Parallel()
 	serve := func(f *fixtureServer) {
 		f.graphQL(func(w http.ResponseWriter, _ *http.Request, query string, _ map[string]any) {
@@ -668,8 +669,11 @@ func TestBranchesReportAFailureOnlyWhenNothingWasCollected(t *testing.T) {
 		f := newFixtureServer(t)
 		serve(f)
 		points, err := Branches{Repos: []Repo{testRepo, broken}, Batch: 1}.Collect(ctx(t), f.Client, testNow)
-		if err != nil || len(points) != 1 {
-			t.Fatalf("got %d points and %v, want the working repository's branch and no error", len(points), err)
+		if len(points) != 1 {
+			t.Fatalf("got %d points, want the working repository's branch kept", len(points))
+		}
+		if err == nil {
+			t.Error("one repository failed and the collector reported success")
 		}
 	})
 	t.Run("the only one fails", func(t *testing.T) {

@@ -497,16 +497,16 @@ func accountRepo(name string) Repo {
 	return Repo{Owner: "octocat", Name: name, FullName: "octocat/" + name}
 }
 
-// A batch that fails beside one that answered costs its own rows, not the
-// family: most of the rows came back and the family ran.
-func TestAudienceKeepsTheRowsOfTheBatchesThatAnswered(t *testing.T) {
+// A batch that fails beside one that answered costs its own rows and nothing
+// else, and the failure travels back with the rows that did arrive.
+func TestAudienceKeepsTheRowsOfTheBatchesThatAnsweredAndReportsTheOneThatDidNot(t *testing.T) {
 	t.Parallel()
 	f := newFixtureServer(t)
 	accountBrokenFor("broken", answerAudience)(t, f)
 	a := Audience{Repos: []Repo{testRepo, accountRepo("broken")}, Stars: true, Batch: 1}
 	points, err := a.Collect(ctx(t), f.Client, testNow)
-	if err != nil {
-		t.Fatalf("one failed batch of two failed the family: %v", err)
+	if err == nil {
+		t.Error("one batch failed and the collector reported success")
 	}
 	if got := len(only(t, points, "gh_star")); got != 4 {
 		t.Errorf("got %d stars, want the 4 of the repository that answered", got)
@@ -615,14 +615,15 @@ func TestTotalsWithOnlyNullAnswersIsNoFailure(t *testing.T) {
 	}
 }
 
-// A batch that fails beside one that answered costs its own rows only.
+// A batch that fails beside one that answered costs its own rows only, and is
+// still reported.
 func TestTotalsKeepsTheRepositoriesThatAnsweredBesideOneThatFailed(t *testing.T) {
 	t.Parallel()
 	f := newFixtureServer(t)
 	accountBrokenFor("broken", answerTotals)(t, f)
 	points, err := Totals{Repos: []Repo{accountRepo("r0"), accountRepo("broken")}, Batch: 1}.Collect(ctx(t), f.Client, testNow)
-	if err != nil {
-		t.Fatalf("one failed batch of two failed the family: %v", err)
+	if err == nil {
+		t.Error("one batch failed and the collector reported success")
 	}
 	if got := len(only(t, points, "gh_repo_total")); got != 1 {
 		t.Errorf("got %d repository rows, want the one that answered", got)
@@ -693,8 +694,8 @@ func accountArchiveAnswer(t *testing.T, w http.ResponseWriter, query string) {
 }
 
 // The archive rows of the repositories set aside follow the rule of the
-// family: one that failed beside one that answered costs its own row, and
-// none answering is a failure.
+// family: one that failed beside one that answered costs its own row, the
+// failure is reported either way, and none answering leaves no rows at all.
 func TestTotalsKeepsTheArchiveRowsThatAnswered(t *testing.T) {
 	t.Parallel()
 	f := newFixtureServer(t)
@@ -703,8 +704,8 @@ func TestTotalsKeepsTheArchiveRowsThatAnswered(t *testing.T) {
 	})
 	aside := []Repo{accountRepo("a0"), accountRepo("a1")}
 	points, err := Totals{Archived: aside}.Collect(ctx(t), f.Client, testNow)
-	if err != nil {
-		t.Fatalf("one repository refused of two failed the family: %v", err)
+	if err == nil {
+		t.Error("one repository refused of two and the collector reported success")
 	}
 	if got := len(only(t, points, "gh_repo_archived")); got != 1 {
 		t.Errorf("got %d archive rows, want the one that answered", got)

@@ -188,10 +188,7 @@ func (rd RepoDetail) Collect(ctx context.Context, c *ghapi.Client, now time.Time
 	failed := aliasBatch(ctx, c, rd.Repos, size, build, func(repo Repo, d repoDetail) {
 		points = append(points, d.points(repo, now, day)...)
 	})
-	if len(points) == 0 && failed != nil {
-		return nil, failed
-	}
-	return points, nil
+	return points, failed
 }
 
 func (d *repoDetail) points(repo Repo, now, day time.Time) []sink.Point {

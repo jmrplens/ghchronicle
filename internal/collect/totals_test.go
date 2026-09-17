@@ -354,8 +354,8 @@ func TestTotalsKeepsTheNumbersThatAnswered(t *testing.T) {
 	})
 
 	points, err := Totals{Login: "octocat", Repos: []Repo{testRepo}}.Collect(ctx(t), f.Client, testNow)
-	if err != nil {
-		t.Fatal(err)
+	if err == nil {
+		t.Error("neither search answered and the family reported success")
 	}
 	for _, p := range points {
 		if p.Measurement == "gh_account_total" {
@@ -381,8 +381,8 @@ func TestTotalsWritesTheCountsThatAnsweredWhenOneSourceFails(t *testing.T) {
 		answerTotals(t, w, query)
 	})
 	points, err := Totals{Login: "octocat", Repos: []Repo{testRepo}}.Collect(ctx(t), f.Client, testNow)
-	if err != nil {
-		t.Fatal(err)
+	if err == nil {
+		t.Error("the counts query was refused and the family reported success")
 	}
 	account := find(t, points, "gh_account_total", map[string]string{"user": "octocat"})
 	if fieldInt(t, account, "commits") != 9228 || hasField(account, "pulls_opened") {
@@ -393,8 +393,8 @@ func TestTotalsWritesTheCountsThatAnsweredWhenOneSourceFails(t *testing.T) {
 	f2.status("/search/commits", http.StatusForbidden, "API rate limit exceeded")
 	graphQLTotals(f2, nil)
 	points, err = Totals{Login: "octocat", Repos: []Repo{testRepo}}.Collect(ctx(t), f2.Client, testNow)
-	if err != nil {
-		t.Fatal(err)
+	if err == nil {
+		t.Error("the commit search was refused and the family reported success")
 	}
 	account = find(t, points, "gh_account_total", map[string]string{"user": "octocat"})
 	if fieldInt(t, account, "pulls_opened") != 1799 || hasField(account, "commits") {
@@ -596,8 +596,8 @@ func TestTotalsAsksTheCountsOneByOneWhenTheQueryIsRefused(t *testing.T) {
 		answerCounts(t, w, query)
 	})
 	points, err := Totals{Login: "octocat", Repos: []Repo{testRepo}}.Collect(ctx(t), f.Client, testNow)
-	if err != nil {
-		t.Fatal(err)
+	if err == nil {
+		t.Error("one of the ten searches failed and the family reported success")
 	}
 	account := find(t, points, "gh_account_total", map[string]string{"user": "octocat"})
 	if hasField(account, "pulls_reviewed") {
@@ -627,8 +627,8 @@ func TestTotalsDoesNotRetryTheCountsOnASpentBudget(t *testing.T) {
 		}
 		answerTotals(t, w, query)
 	})
-	if _, err := (Totals{Login: "octocat", Repos: []Repo{testRepo}}).Collect(ctx(t), f.Client, testNow); err != nil {
-		t.Fatal(err)
+	if _, err := (Totals{Login: "octocat", Repos: []Repo{testRepo}}).Collect(ctx(t), f.Client, testNow); err == nil {
+		t.Error("the budget was spent and the family reported success")
 	}
 	if counts != 1 {
 		t.Errorf("%d counts queries on a spent budget, want the one that was refused", counts)
