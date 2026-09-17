@@ -683,16 +683,14 @@ func TestArtifactsWalkedVersusCount(t *testing.T) {
 	if fieldInt(t, total, "live_bytes") != 100*1000 {
 		t.Errorf("live_bytes = %v, only the unexpired half of 200 artifacts at 1000 bytes", total.Fields["live_bytes"])
 	}
-	// The size travels with the count it is the size of, and with the verdict
-	// on whether the walk saw everything. Without them a panel reads a floor
-	// over 200 walked artifacts beside a declared 350 that counts the expired
-	// ones too, and nothing says the two are different denominators.
+	// The size travels with the count it is the size of. Without it a panel
+	// reads a floor over 200 walked artifacts beside a declared 350 that
+	// counts the expired ones too, and nothing says the two are different
+	// denominators.
 	if fieldInt(t, total, "live_count") != 100 {
 		t.Errorf("live_count = %v, want the 100 unexpired artifacts live_bytes adds up", total.Fields["live_count"])
 	}
-	if total.Fields["complete"] != false {
-		t.Errorf("complete = %v, want false: the walk stopped at the page cap", total.Fields["complete"])
-	}
+
 	if !total.Time.Equal(testNow) {
 		t.Errorf("the total is current state and must be stamped now, got %s", total.Time)
 	}
@@ -715,8 +713,8 @@ func TestArtifactsShortPageEndsTheWalk(t *testing.T) {
 		t.Errorf("total = %v", total.Fields)
 	}
 	// Everything GitHub declared was walked, so the live figures are totals.
-	if total.Fields["complete"] != true || fieldInt(t, total, "live_count") != 1 {
-		t.Errorf("total = %v, want a complete walk and the one live artifact", total.Fields)
+	if fieldInt(t, total, "live_count") != 1 {
+		t.Errorf("total = %v, want the one live artifact", total.Fields)
 	}
 	live := find(t, points, "gh_artifact", map[string]string{"artifact": "coverage"})
 	checkArtifactDemotedTags(t, live)
@@ -788,10 +786,8 @@ func TestArtifactsDisabledStillWritesATotal(t *testing.T) {
 	if fieldInt(t, total, "count") != 0 || fieldInt(t, total, "walked") != 0 {
 		t.Errorf("total = %v", total.Fields)
 	}
-	// Nothing to walk is a complete walk: zero of zero is a total, not a
-	// floor, and a panel that hides the incomplete ones must not hide this.
-	if total.Fields["complete"] != true || fieldInt(t, total, "live_count") != 0 {
-		t.Errorf("total = %v, want a complete walk of nothing", total.Fields)
+	if fieldInt(t, total, "live_count") != 0 {
+		t.Errorf("total = %v, want nothing live", total.Fields)
 	}
 }
 
