@@ -812,7 +812,7 @@ func TestEveryStoreExcludesTheSentinelTheSameWay(t *testing.T) {
 		{store: "influxdb", want: `repo <> '(none)'`, sql: true},
 		{store: "postgres", want: `repo <> '(none)'`, sql: true},
 		// Inside the JSON the pattern's backslash is escaped once more.
-		{store: "graphite", want: `exclude(aliasByNode(github.billing_usage.*.*.*.*.*.gross, 3, 4), \"^_none_\\.\")`},
+		{store: "graphite", want: `exclude(aliasByNode(github.billing_usage.*.*.*.*.*.*.*.gross, 5, 6), \"^_none_\\.\")`},
 		{store: "elasticsearch", want: `NOT repo.keyword:\"(none)\"`},
 	} {
 		panel := mustPanel(t, rendered(t, tc.store), "Usage by repository")

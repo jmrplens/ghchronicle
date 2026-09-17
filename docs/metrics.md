@@ -548,11 +548,20 @@ which is why they are a snapshot rather than a series.
 | --------------- | -------------------------------- | -------------------------- | ------------------------------------------------------ |
 | `gh_star` | dated, when the star was given | `user` | `starred`, `url`, `user_url` |
 | `gh_star_given` | dated                            | `user`, `language` | `stars`, `repo_stars`, `url`                           |
-| `gh_fork`       | dated, when the fork was created | `by`                       | `forks`, `stars`, `days_since_push`, `advanced`, `url` |
+| `gh_fork`       | dated, when the fork was created | `by`                       | `forks`, `stars`, `seconds_to_push`, `advanced`, `url` |
 
 `gh_star_given` is the outbound direction: what this account starred in other
 people's repositories. `advanced` on a fork separates a real derivative from a
-bookmark, which most forks are.
+bookmark, which most forks are, and `seconds_to_push` says how long after the
+fork its last push came. It is negative when GitHub reports a push older than
+the fork itself.
+
+How long a fork has been idle is not stored, because the row is dated when the
+fork was created: it is that date subtracted from now, less `seconds_to_push`,
+and a query computes it. Stored, it was one day larger every day written on to
+a row dated years earlier, which meant "when the sweep ran" rather than
+anything about the fork, and every rewrite cost a file in the fork's own
+partition.
 
 ### Repositories
 
@@ -686,7 +695,7 @@ two added together.
 | `gh_workflow_step`       | dated, when it finished | `workflow`, `job_name`, `attempt`, `step`, `conclusion`                   | `duration_seconds`, `step_number`                                                                                                                       |
 | `gh_workflow` | now | `workflow`, `path`, `state` | `active`, `age_days`, `days_since_change`, `url` |
 | `gh_artifact`            | dated, when created     | `artifact`                                                                | `live`, `size_bytes`, `retention_days`, `digest`, `run_id`, `head_sha`, `head_branch`, `url`                                                            |
-| `gh_artifact_total`      | now                     |                                                                           | `live_bytes`, `count`, `walked`                                                                                                                         |
+| `gh_artifact_total`      | now                     |                                                                           | `live_bytes`, `live_count`, `count`, `walked`                                                                                                           |
 | `gh_actions_cache`       | now                     |                                                                           | `size_bytes`, `count`                                                                                                                                   |
 | `gh_actions_cache_entry` | daily                   | `cache`, `ref`                                                            | `size_bytes`, `caches`, `key`, `days_since_use`, `age_days`                                                                                             |
 | `gh_repo_activity`       | dated                   | `activity`, `actor`                                                       | `events`, `id`, `ref_name`                                                                                                                              |
@@ -783,8 +792,15 @@ as a tag it would create a series for every job ever executed. The workflow job
 tag is `job_name` rather than `job`, because `job` collides with the labels
 Prometheus adds at scrape time.
 
-When `walked` is lower than `count`, the live size is a floor and the
-repository has more artifacts than the page cap reached.
+`gh_artifact_total` carries three counts because its size is on none of the
+obvious ones. `count` is GitHub's own total for the repository and it counts
+the artifacts GitHub has already expired: measured on jmrplens/jmrp.io on
+2026-09-17, page 40 of the listing was expired to the last row against a
+declared 29,405. `walked` is how far the five-page cap let the walk go.
+`live_bytes` is the size of the artifacts GitHub still holds among the ones
+walked, and `live_count` is how many those are, which is the count the size is
+over. When `walked` is below `count` the live figures are a floor rather than a
+total, which on that repository was short by a factor of fifty six.
 
 `gh_actions_cache` says a repository holds twelve gigabytes;
 `gh_actions_cache_entry` says which key holds them and which has not been
@@ -797,9 +813,9 @@ whole key is a series per build.
 | Measurement                   | Dated                    | Tags                                                                                               | Fields                                                                                                                               |
 | ----------------------------- | ------------------------ | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
 | `gh_dependabot_alert`         | now                      | `severity`, `ecosystem`                                                                            | `open`, `url`                                                                                                                        |
-| `gh_dependabot_alert_item` | dated, when raised | `number`, `severity`, `ecosystem`, `package`, `ghsa`, `scope`, `relationship`, `manifest` | `alert_state`, `alerts`, `cvss`, `cvss_v4`, `epss`, `epss_percentile`, `cve`, `cwe`, `summary`, `vulnerable_range`, `first_patched`, `dismissed_reason`, `dismissed_by`, `dismissed_comment`, `seconds_to_detect`, `seconds_to_resolve`, `seconds_open`, `url` |
+| `gh_dependabot_alert_item` | dated, when raised | `number`, `severity`, `ecosystem`, `package`, `ghsa`, `scope`, `relationship`, `manifest` | `alert_state`, `alerts`, `cvss`, `cvss_v4`, `epss`, `epss_percentile`, `cve`, `cwe`, `summary`, `vulnerable_range`, `first_patched`, `dismissed_reason`, `dismissed_by`, `dismissed_comment`, `seconds_to_detect`, `seconds_to_resolve`, `url` |
 | `gh_code_scanning_alert`      | now                      | `severity`, `tool`                                                                                 | `open`, `url`                                                                                                                        |
-| `gh_code_scanning_alert_item` | dated, when raised       | `number`, `severity`, `tool`, `rule`, `path`, `category`, `ref`                                    | `alert_state`, `resolution`, `alerts`, `commit`, `line`, `cwe`, `seconds_to_resolve`, `seconds_open`, `url`                                                       |
+| `gh_code_scanning_alert_item` | dated, when raised       | `number`, `severity`, `tool`, `rule`, `path`, `category`, `ref`                                    | `alert_state`, `resolution`, `alerts`, `commit`, `line`, `cwe`, `seconds_to_resolve`, `url`                                                       |
 | `gh_code_scanning_analysis`   | dated, when the scan ran | `tool`, `version`, `ref`, `category`                                                               | `analyses`, `results`, `rules`, `commit`                                                                                             |
 | `gh_security_feature`         | now                      | `feature`                                                                                          | `enabled`, `open_alerts`, `alerts`, `url`                                                                                            |
 | `gh_security_setting` | now | `setting`, `status` | `enabled` |
@@ -843,7 +859,17 @@ is GitHub's own value for an alert about a whole file, not a missing reading.
 
 A Dependabot alert closes three ways, not two: `auto_dismissed_at` is how GitHub
 closes a development-dependency alert on its own, leaving the other two null.
-An alert closed that way used to grow `seconds_open` forever.
+An alert closed that way used to be counted as still open forever.
+
+An alert still open carries no field for how long it has been open, and that is
+deliberate. The row is dated when the alert was raised, so the answer is now()
+less the row's own timestamp and a panel computes it when it is asked. Written
+by the collector instead, as `seconds_open`, it was true only at the instant of
+the sweep that wrote it and it moved on every sweep: a reader querying last
+week got whatever the last sweep decided, and every rewrite filed another
+parquet file in the partition of the alert's original date. Measured on
+2026-09-17, the two alert families were writing about 234 files a day between
+them for 1,700 rows, whether or not GitHub had anything new to say.
 
 `gh_security_feature` exists so that no data and no alerts are distinguishable.
 Without it, a repository with Dependabot switched off looks exactly like one
@@ -1253,6 +1279,18 @@ is still made here, by when the run finished.
 `GigabyteHours`, `AICredits`, `Requests`. It is passed through rather than
 normalised, and the panels that read minutes filter on the capital.
 
+There is no `org` tag. The only billing endpoint a personal account can read is
+its own, and that report has no `organizationName`: the field belongs to the
+organization report, which needs an organization to ask about. Checked against
+the published OpenAPI description and against the live endpoint, where none of
+487 usage items carried the key. Written anyway it was `(none)` on every row
+ever collected, which is a column and a legend entry that only ever says there
+is nothing here.
+
+`repo` is `(none)` on a charge that belongs to no repository, which is what a
+Copilot seat is. That is a real row of the bill and not a repository, so the
+cost table by repository leaves it out; the spend totals above it include it.
+
 `net` is not always zero. On the account this was developed against it carries
 the monthly credit, which is why gross, discount and net are all stored rather
 than one being derived from the others. The row is stamped at the start of its
@@ -1282,3 +1320,29 @@ dismissed an alert typed a reason, and `gh_event.commits`, written only on a
 push event. Neither column exists on the production database this
 documentation was checked against. `gh_label` writes only the labels somebody
 has used; `gh_repo_total.labels` is the declared count.
+
+One of these is named by a shipped panel, and it is the one most likely to be
+missing: `gh_pull_request.seconds_to_first_human_review`, which exists only
+once somebody other than the author and other than a bot has reviewed a pull
+request. On a database where that has never happened, the stat that reads it
+reports a schema error rather than No data, and it takes the five values
+beside it in the same panel with it. Nothing in a query can ask whether a
+column exists, so this is a property of the store rather than a defect to
+repair: the repair, if it bites, is one row of any kind carrying the field.
+
+How rare it is, measured on 2026-09-17 against the account this was developed
+on: fourteen rows in the whole store, over fourteen pull requests of four
+repositories, the newest raised on 2026-07-05, and none of them inside the
+last fortnight, against 703 pull requests of 825 in that fortnight that had a
+first review from a bot or from their own author. The field is not broken; it
+is the answer to a narrower question than a reader expects, which is why the
+panel is named for that question.
+
+The same reading applies to the two on `gh_workflow_run`.
+`initial_actor` is written only when GitHub's `actor` and `triggering_actor`
+differ, which is a re-run somebody else asked for: 0 of 10,201 runs in a
+fortnight here, and 0 of the 300 newest runs of three repositories checked
+against the API at the same time. `head_repo` is written only for a run that
+came from another repository: 18 of those 10,201, all from one fork's pull
+request. Both are correct and both are rare, which is what a field written
+only when GitHub has something to say looks like.

@@ -2710,7 +2710,7 @@
       "panels": [
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "How much closed in the range and how long each took. Every duration is a median: half of what merged or closed took less than the number shown. Time to first review is the wait before a person other than the author looked at a pull request, so review bots, which answer in seconds, and the author's own replies are left out; a range where nobody else reviewed anything reads No data, which is the honest answer. Lines per pull request is the median of added plus removed by a merged one. In Graphite two facts landing in the same storage slot of one series are reduced to one point, so the medians are over what the storage kept.",
+          "description": "How much closed in the range and how long each took. Every duration is a median: half of what merged or closed took less than the number shown. Time to review by someone else is the wait before a person other than the author looked at a pull request, so review bots, which answer in seconds, and the author's own replies are left out; a range where nobody else reviewed anything reads No data, which is the honest answer and not the claim that nothing was reviewed. Lines per pull request is the median of added plus removed by a merged one. In Graphite two facts landing in the same storage slot of one series are reduced to one point, so the medians are over what the storage kept.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -2745,7 +2745,7 @@
               {
                 "matcher": {
                   "id": "byName",
-                  "options": "Time to first review"
+                  "options": "Time to review by someone else"
                 },
                 "properties": [
                   {
@@ -2805,7 +2805,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "C",
-              "target": "alias(summarize(percentileOfSeries(github.pull_request.*.*.*.*.$repo.*.seconds_to_first_human_review, 50), \"100y\", \"median\", true), \"Time to first review\")",
+              "target": "alias(summarize(percentileOfSeries(github.pull_request.*.*.*.*.$repo.*.seconds_to_first_human_review, 50), \"100y\", \"median\", true), \"Time to review by someone else\")",
               "textEditor": true
             },
             {
@@ -4245,7 +4245,7 @@
       "panels": [
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "How many runs the range holds and how they ended. The success rate is the runs that succeeded as a share of the runs that succeeded or failed: a run canceled by a newer push under a concurrency group, or skipped by its own condition, decided nothing and is counted beside it as undecided rather than as a failure. The run duration is the median over the range and the queue wait is the time a job spent waiting for a runner, which only exists at job level, the run-level number folding the wait into the duration. Over the runs whose jobs were expanded, which is the newest runs of each sweep and, after a backfill, the ninety days GitHub keeps jobs for; not every run the run count includes. Last come the bytes the runs left behind. In Graphite two facts landing in the same storage slot of one series are reduced to one point, so the medians are over what the storage kept.",
+          "description": "How many runs the range holds and how they ended. The success rate is the runs that succeeded as a share of the runs that succeeded or failed: a run canceled by a newer push under a concurrency group, or skipped by its own condition, decided nothing and is counted beside it as undecided rather than as a failure. The run duration is the median over the range and the queue wait is the time a job spent waiting for a runner, which only exists at job level, the run-level number folding the wait into the duration. Over the runs whose jobs were expanded, which is the newest runs of each sweep and, after a backfill, the ninety days GitHub keeps jobs for; not every run the run count includes. Last come the bytes the runs left behind, which are the artifacts the walk reached: GitHub lists thousands of them per repository and the walk stops at five hundred, so this is a floor wherever it did. \"Artifact storage counted\" below puts the two counts beside it. In Graphite two facts landing in the same storage slot of one series are reduced to one point, so the medians are over what the storage kept.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -4330,7 +4330,7 @@
               {
                 "matcher": {
                   "id": "byName",
-                  "options": "Artifact storage"
+                  "options": "Artifact storage walked"
                 },
                 "properties": [
                   {
@@ -4408,7 +4408,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "F",
-              "target": "alias(sumSeries(keepLastValue(github.artifact_total.*.*.$repo.live_bytes)), \"Artifact storage\")",
+              "target": "alias(sumSeries(keepLastValue(github.artifact_total.*.*.$repo.live_bytes)), \"Artifact storage walked\")",
               "textEditor": true
             },
             {
@@ -4707,7 +4707,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Artifacts that have not expired. GitHub deletes them on their own schedule, which is why this falls without anyone doing anything. A reading taken at each sweep, so the curve starts the day the collector did: there is no history of it to rebuild. The eight repositories holding the most are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "Artifacts that have not expired, over the ones the walk reached, which is a floor on any repository with more than five hundred: \"Artifact storage counted\" further down has the counts that say which those are. GitHub deletes artifacts on their own schedule, which is why this falls without anyone doing anything. A reading taken at each sweep, so the curve starts the day the collector did: there is no history of it to rebuild. The eight repositories holding the most are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -5671,7 +5671,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Artifact storage, and how much of it was counted. When Walked is lower than Declared, the live size is a floor rather than a total: the walk stopped at the page cap. Here it is short by a factor of fifty six, and without this column the tile above would say so nowhere. In Graphite two facts landing in the same storage slot of one series are reduced to one point, so the medians are over what the storage kept.",
+          "description": "Artifact storage, and how much of it was counted. Three counts, because the live size is on neither of the other two: Declared is GitHub's own total and counts the artifacts it has already expired, Walked is how far the page cap let the walk go, and Live is the artifacts still held among those, which is what the live size is the size of. When Walked is lower than Declared the live size is a floor rather than a total: here it is short by a factor of fifty six, and without these columns the tile above would say so nowhere. In Graphite two facts landing in the same storage slot of one series are reduced to one point, so the medians are over what the storage kept.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -5722,6 +5722,18 @@
                   {
                     "id": "custom.width",
                     "value": 100
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Live"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 90
                   }
                 ]
               }
@@ -7140,11 +7152,27 @@
                 "properties": [
                   {
                     "id": "unit",
-                    "value": "d"
+                    "value": "s"
                   },
                   {
                     "id": "custom.width",
-                    "value": 100
+                    "value": 90
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Pushed after"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "s"
+                  },
+                  {
+                    "id": "custom.width",
+                    "value": 110
                   }
                 ]
               }
@@ -7173,7 +7201,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "aliasByNode(github.fork.*.*.*.$repo.days_since_push, 2, 5)",
+              "target": "aliasByNode(github.fork.*.*.*.$repo.seconds_to_push, 2, 5)",
               "textEditor": true
             }
           ],
@@ -7196,7 +7224,7 @@
                 "indexByName": {},
                 "renameByName": {
                   "Field": "By, repository",
-                  "Last *": "Idle"
+                  "Last *": "Pushed after"
                 }
               }
             }
@@ -12036,7 +12064,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "limit(sortByTotal(exclude(aliasByNode(github.billing_usage.*.*.*.*.*.*.*.gross, 5, 6), \"^none\\.\")), 40)",
+              "target": "limit(sortByTotal(exclude(aliasByNode(github.billing_usage.*.*.*.*.*.*.*.gross, 5, 6), \"^_none_\\.\")), 40)",
               "textEditor": true
             }
           ],
