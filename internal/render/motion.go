@@ -77,11 +77,35 @@ var ErrSpeed = errors.New("render: speed out of range")
 // minute to come round. Everything else sits between 1.6 s and 2.3 s and has
 // room either way, so it is these two that fix the range. A card still settles
 // in 4.6 s at the slowest.
+//
+// CHANGING IT IS NOT FREE, AND NOT EVERY VALUE IS ALLOWED. The reach has to be
+// a value for which speedPivot and speedPivot minus one are both exactly
+// representable in binary, or motionScale stops returning exactly one at
+// SpeedDefault and every animated card is drawn with different bytes. 2, 3,
+// 1.5 and 4 qualify. 2.5 does not: it makes motionScale(0.5) return
+// 1.0000000000000002. Four thirds written as a decimal does not either, at
+// 0.9999999999999999. Neither is visible on a card and both move the whole
+// gallery, which is why this paragraph is here and not in a commit message.
+//
+// A violation is caught at once and in two places, so nothing wrong can ship:
+// TestTheDefaultSpeedIsExactlyTheEngineOwnDurations compares that value to one
+// exactly, and `make check-gallery` finds all thirty committed cards changed.
+// A reach that is allowed still fails seven pinned durations, six in
+// TestSpeedChangesTheDurationAndNothingElse and one in
+// TestTheSlowestSpeedStillAnimates, which are arithmetic to update and are
+// deliberately spelled out rather than derived: a test that recomputed the
+// expected seconds the way the engine does would agree with any arithmetic the
+// engine had, including wrong arithmetic.
+//
+// The prose that states this number is gated too, by
+// TestTheReachOfTheSpeedRangeIsWrittenAsTheEngineSetsIt in documented_test.go,
+// which names the four pages that write it out in words.
 const speedReach = 2.0
 
 // speedPivot is where the curve below is centered so that SpeedDefault lands
 // on exactly one. It is a constant expression, so what motionScale evaluates
-// is (2 - speed) / (1 + speed).
+// is (2 - speed) / (1 + speed), and both of those halves are 1.5 at the
+// default. See the paragraph above for which reaches keep that true.
 const speedPivot = speedReach / (speedReach - 1)
 
 // motionScale is the multiple of its own durations the engine draws a card at.
@@ -98,6 +122,12 @@ const speedPivot = speedReach / (speedReach - 1)
 // hope for. That is the promise this whole change hangs on and it is
 // structural here rather than arithmetical: see scaled, which does not
 // multiply at all when the scale is one.
+//
+// Read that as a property of these two particular numbers and not of the
+// curve's shape. A ratio of two straight lines is what makes the identity
+// reachable; it is speedPivot and speedPivot minus one both being exact that
+// makes it hold. Another reach can lose it while the shape is unchanged, and
+// speedReach says which ones do.
 //
 // It reaches the same distance either way. motionScale(s) * motionScale(1-s)
 // is exactly one, so a quarter below the default is as much slower as a

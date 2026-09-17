@@ -653,7 +653,7 @@ func TestTheCardSpeedInputNamesTheRangeItsReaderHasToType(t *testing.T) {
 	}
 	// And the thing a range starting at zero does not say for itself. A reader
 	// who wants a still card and reaches for 0 gets the slowest animation
-	// there is, which is the opposite of what he asked for.
+	// there is, which is the opposite of what was asked for.
 	if !strings.Contains(description, render.MotionOff) {
 		t.Errorf("the card-speed input never says that %s is the slowest animation rather than "+
 			"none, and never names card-motion %s, which is what draws a still card:\n%s",

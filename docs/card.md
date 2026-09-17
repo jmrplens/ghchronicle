@@ -213,9 +213,9 @@ longer to come round and a cursor that blinks more slowly at the same time.
 
 | `-card-speed` | What the card does                                                     |
 | ------------- | ---------------------------------------------------------------------- |
-| `0`           | The slowest animation, twice the length of the default                 |
+| `0`           | The slowest animation, twice as long as the default                    |
 | `0.5`         | Exactly the card this renderer always drew, to the byte. The default   |
-| `1`           | The fastest, half the length of the default                            |
+| `1`           | The fastest, half as long as the default                               |
 
 There is one knob and not one per layout for the reason there is one width and
 not one per layout: the cycles here were paced against each other, and scaling
@@ -230,7 +230,7 @@ outside the range is refused before the sweep runs, naming both ends.
 > that makes the file smaller.
 
 `prefers-reduced-motion` is untouched by any of this: a reader who has asked
-his machine for less motion gets no animation to slow down or speed up.
+their machine for less motion gets no animation to slow down or speed up.
 
 ### In a README
 

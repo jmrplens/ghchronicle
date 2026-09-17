@@ -24,6 +24,86 @@ var layoutFieldTables = []string{
 	filepath.Join("..", "..", "site", "src", "content", "docs", "es", "card", "layouts.mdx"),
 }
 
+// speedRangePages are the pages that state how far each end of Options.Speed
+// reaches, by language: English first, Spanish second, the way every other
+// pair here is ordered. Two per language, because a reader meets the option on
+// the card page and again in the flag table, and both had to say what the ends
+// do or neither sentence was worth reading.
+var speedRangePages = [2][]string{
+	{
+		filepath.Join("..", "..", "site", "src", "content", "docs", "card", "index.mdx"),
+		filepath.Join("..", "..", "site", "src", "content", "docs", "reference", "cli.mdx"),
+	},
+	{
+		filepath.Join("..", "..", "site", "src", "content", "docs", "es", "card", "index.mdx"),
+		filepath.Join("..", "..", "site", "src", "content", "docs", "es", "reference", "cli.mdx"),
+	},
+}
+
+// reachWording is how a page writes speedReach: what the slow end does to the
+// length of a card's animation, and what the fast end does to it. Two
+// fragments and not a whole sentence, so the pages can put them in a table
+// cell and in a line of prose without either of them being a second spelling
+// nothing checks.
+type reachWording struct{ slow, fast string }
+
+// reachWords is that wording per reach, in the languages of speedRangePages.
+// A reach this table has no entry for fails the test below rather than passing
+// it in silence, which is the same arrangement numberWords has, and for the
+// same reason: these are sentences and a sentence cannot be generated.
+//
+// The entry is keyed by the reach and not by the word, so the table is the one
+// place the two have to agree. Adding a reach means writing what it reads like
+// in both languages before the pages may say it.
+var reachWords = map[float64][2]reachWording{
+	2: {
+		{slow: "twice as long as the default", fast: "half as long as the default"},
+		{slow: "el doble de larga que la de por omisión", fast: "la mitad de larga que la de por omisión"},
+	},
+}
+
+// TestTheReachOfTheSpeedRangeIsWrittenAsTheEngineSetsIt holds the four pages
+// that say what speed 0 and speed 1 do to the constant that decides it.
+//
+// speedReach is one number, and these pages write it out in words: "twice as
+// long", "la mitad de larga". Written there it is a copy, and a copy of a
+// number nothing regenerates is a number waiting to go stale. This is the same
+// defect TestTheCardWidthInputNamesNoWidth exists to prevent, arriving from the
+// other side: there the remedy is to forbid the copy, because -card-layouts
+// already prints the widths; here nothing prints the reach, so a page that
+// named no number would leave a reader with a range and no idea what its ends
+// do. So the copy is allowed and held to its source instead.
+//
+// The generated files under docs/ carry the same sentences and are not read
+// here. They do not need to be: make check-docs already fails when they no
+// longer match the pages, so the page is the only place a sentence can be
+// wrong on its own.
+func TestTheReachOfTheSpeedRangeIsWrittenAsTheEngineSetsIt(t *testing.T) {
+	wording, known := reachWords[speedReach]
+	if !known {
+		t.Fatalf("no wording for a reach of %v, and %d pages write it out in words. "+
+			"Add its entry to reachWords, in both languages, and correct the pages",
+			speedReach, len(speedRangePages[0])+len(speedRangePages[1]))
+	}
+	for i, pages := range speedRangePages {
+		for _, path := range pages {
+			raw, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatalf("%s: %v", path, err)
+			}
+			// Collapsed, because these pages are wrapped at about seventy-six
+			// columns and one of the two fragments is split across two lines.
+			body := strings.Join(strings.Fields(string(raw)), " ")
+			for _, want := range []string{wording[i].slow, wording[i].fast} {
+				if !strings.Contains(body, want) {
+					t.Errorf("%s does not say %q, and the engine reaches %v either way "+
+						"of the default. Correct the page", path, want, speedReach)
+				}
+			}
+		}
+	}
+}
+
 // TestEveryCountTheReadmeWritesMatchesTheCode is the same rule for the file
 // that is read more than any page of the site and had no check at all.
 //
