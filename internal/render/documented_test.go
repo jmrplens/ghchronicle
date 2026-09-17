@@ -24,6 +24,44 @@ var layoutFieldTables = []string{
 	filepath.Join("..", "..", "site", "src", "content", "docs", "es", "card", "layouts.mdx"),
 }
 
+// TestEveryCountTheReadmeWritesMatchesTheCode is the same rule for the file
+// that is read more than any page of the site and had no check at all.
+//
+// The README states counts in prose the way the pages do, and this round found
+// one already wrong: it called the dashboards eighteen sections when they are
+// seventeen. Everything the layouts pages state is generated now, and the front
+// page is where the last hand-written registry facts live, so they are held
+// here. Only the two the registry answers directly are pinned; the dashboard
+// sections are pinned by cmd/internal/dashboards' own tests.
+func TestEveryCountTheReadmeWritesMatchesTheCode(t *testing.T) {
+	path := filepath.Join("..", "..", "README.md")
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("%s: %v", path, err)
+	}
+	body := strings.Join(strings.Fields(string(raw)), " ")
+	layouts := Layouts()
+	animated := 0
+	for _, l := range layouts {
+		if l.Animated {
+			animated++
+		}
+	}
+	claims := []string{
+		// "Thirteen layouts in two visual families", in the card section.
+		word(t, len(layouts), 0, true) + " layouts",
+		// "Nine of the thirteen animate", and the sentence that follows it
+		// turns on the difference between the two numbers.
+		word(t, animated, 0, true) + " of the " + word(t, len(layouts), 0, false),
+	}
+	for _, want := range claims {
+		if !strings.Contains(body, want) {
+			t.Errorf("README.md does not say %q, and the registry holds %d layouts, "+
+				"%d of which animate. Correct the README", want, len(layouts), animated)
+		}
+	}
+}
+
 // blockFields are the three that need room of their own, so each layout
 // chooses whether to draw them. Every other field is a number every layout
 // takes, which is what makes these three the only rows worth a table.
