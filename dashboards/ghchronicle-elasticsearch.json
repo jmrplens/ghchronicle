@@ -201,7 +201,7 @@
     },
     {
       "datasource": "${DS_ELASTICSEARCH}",
-      "description": "Page views, unique visitors and clones, summed over the dashboard range, so they move with the range picker. GitHub only keeps 14 days of traffic, so a range wider than that shows what was captured while it was still there.",
+      "description": "Page views, unique visitors and the people who cloned, summed over the dashboard range, so they move with the range picker. GitHub only keeps 14 days of traffic, so a range wider than that shows what was captured while it was still there. Cloners rather than clones because a clone is counted per pull and continuous integration pulls all day: on the account this was measured against one repository was cloned 135,683 times in a fortnight by 1,807 cloners, and 186 K beside 2.89 K views read as an audience. The clone count itself is two panels of the Audience section, \"Clones over time\" and \"Clone amplification\", where it is the subject rather than a headline.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -253,7 +253,7 @@
             "properties": [
               {
                 "id": "displayName",
-                "value": "Clones"
+                "value": "Unique cloners"
               }
             ]
           }
@@ -350,7 +350,7 @@
           "datasource": "${DS_ELASTICSEARCH}",
           "metrics": [
             {
-              "field": "count",
+              "field": "uniques",
               "id": "9",
               "type": "sum"
             }
@@ -733,7 +733,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "The whole life of each repository in one row: not what happened in the dashboard range, but everything there has ever been. The repository picker holds every repository the account can see, its forks and its archived ones alongside its own, so a count here is over all of them until the picker is narrowed. Sorted by commits, a fork of a busy project outranks anything the account wrote, so the fork and archived flags are columns here and a click on either sorts by it.",
+          "description": "The whole life of each repository in one row: not what happened in the dashboard range, but everything there has ever been. The repository picker holds every repository the account can see, its forks and its archived ones alongside its own, so a count here is over all of them until the picker is narrowed. Sorted by commits, a fork of a busy project outranks anything the account wrote, 370,296 commits against 3,385 on the account this was measured on, so the table opens with the account's own repositories first and the forks under them, both ranked by commits. The fork and archived flags are columns here rather than a filter, the title being what it is, and a click on either sorts by it.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -821,6 +821,10 @@
             },
             "showHeader": true,
             "sortBy": [
+              {
+                "desc": false,
+                "displayName": "Fork"
+              },
               {
                 "desc": true,
                 "displayName": "Commits"
@@ -4047,7 +4051,7 @@
       "panels": [
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "How much closed in the range and how long each took. Every duration is a median: half of what merged or closed took less than the number shown. Time to review by someone else is the wait before a person other than the author looked at a pull request, so review bots, which answer in seconds, and the author's own replies are left out; a range where nobody else reviewed anything reads No data, which is the honest answer and not the claim that nothing was reviewed. Lines per pull request is the median of added plus removed by a merged one.",
+          "description": "How much closed in the range and how long each took. Every duration is a median: half of what merged or closed took less than the number shown. Time to review by someone else is the wait before a person other than the author looked at a pull request, so review bots, which answer in seconds, and the author's own replies are left out; a range in which nobody else reviewed anything reads \"no human review\" rather than a number, which is the honest answer and not the claim that nothing was reviewed. On the account this was measured against, 0 of 925 pull requests in the range had one. Lines per pull request is the median of added plus removed by a merged one.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -4100,6 +4104,18 @@
                   {
                     "id": "unit",
                     "value": "s"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Time to review by someone else"
+                },
+                "properties": [
+                  {
+                    "id": "noValue",
+                    "value": "no human review"
                   }
                 ]
               },
@@ -5521,7 +5537,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "Time to merge only counts what merged. This is the other half: what is still open and how long it has been, which is the number that decides what to do next rather than describing what already happened. Each pull request is read from its newest row, so one that merged inside the range is not here any more. This store cannot read each item from its newest row, so one that closed inside the range stays listed as open, at the reading of its last open day, until the range moves past that day.",
+          "description": "Time to merge only counts what merged. This is the other half: what is still open and how long it has been, which is the number that decides what to do next rather than describing what already happened. Each pull request is read from its newest row, so one that merged inside the range is not here any more. Archived repositories are left out, since nothing in one can be merged, closed or run until it is unarchived; narrowing the picker to one shows an empty table here rather than rows nobody can act on. A fork's pull request is still one that can be merged, so those stay and Fork says which they are. This store cannot read each item from its newest row, so one that closed inside the range stays listed as open, at the reading of its last open day, until the range moves past that day. Only gh_repo carries the fork and archived flags and this store cannot join one measurement to another, so the rows the SQL dashboards leave out are listed here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -5608,6 +5624,18 @@
                   {
                     "id": "custom.width",
                     "value": 90
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Fork"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 70
                   }
                 ]
               },
@@ -5749,7 +5777,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "The same question for issues: what is still open and for how long. Labels is what the issue was filed as, so an old one reads as a bug nobody fixed or a wish nobody granted. Each issue is read from its newest row, so one closed inside the range is not here any more. This store cannot read each item from its newest row, so one that closed inside the range stays listed as open, at the reading of its last open day, until the range moves past that day.",
+          "description": "The same question for issues: what is still open and for how long. Labels is what the issue was filed as, so an old one reads as a bug nobody fixed or a wish nobody granted. Each issue is read from its newest row, so one closed inside the range is not here any more. Archived repositories are left out, since nothing in one can be merged, closed or run until it is unarchived; narrowing the picker to one shows an empty table here rather than rows nobody can act on. A fork's issues stay, and Fork says which they are. This store cannot read each item from its newest row, so one that closed inside the range stays listed as open, at the reading of its last open day, until the range moves past that day. Only gh_repo carries the fork and archived flags and this store cannot join one measurement to another, so the rows the SQL dashboards leave out are listed here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -5812,6 +5840,18 @@
                   {
                     "id": "custom.width",
                     "value": 160
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Fork"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 70
                   }
                 ]
               },
@@ -12605,7 +12645,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "Nothing else answers which branches were abandoned: GitHub's own branch list is ordered by name and keeps no history. The refs come back unordered and capped at a hundred per repository, so `gh_repo_total.branches` is the true count and is what makes the truncation visible. The repository picker holds every repository the account can see, its forks and its archived ones alongside its own, so a count here is over all of them until the picker is narrowed. Of the 1,208 branches in the picker when this was measured, 1,083 were a fork's; gh_branch carries no fork tag, so narrowing the picker is the only way to read this as the account's own branches. Elasticsearch answers with the largest number of days inside the range rather than with the newest reading. A branch whose ref points at something that is not a commit has no age at all, in this dashboard or any of the others, and its cell is empty.",
+          "description": "Nothing else answers which branches were abandoned: GitHub's own branch list is ordered by name and keeps no history. The refs come back unordered and capped at a hundred per repository, so `gh_repo_total.branches` is the true count and is what makes the truncation visible. The account's own live repositories only: a branch of a fork is the upstream project's history and not the account's, and a branch of an archived repository can be neither pushed to nor deleted. Of the 1,208 branches in the picker when this was measured, 1,083 were a fork's and those are the rows this leaves out. Elasticsearch answers with the largest number of days inside the range rather than with the newest reading. A branch whose ref points at something that is not a commit has no age at all, in this dashboard or any of the others, and its cell is empty. Only gh_repo carries the fork and archived flags and this store cannot join one measurement to another, so the rows the SQL dashboards leave out are listed here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -15609,7 +15649,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "Dependabot alerts that were fixed or dismissed, newest first, with the advisory each one was and how long it stayed open. The score is there because the word rounds it away: one alert in the measured account scores 9.3 under a word whose mean is 6.1. It is the v4 score where the advisory carries one. In Elasticsearch this lists the newest 500 documents and the panel sorts them.",
+          "description": "Dependabot alerts that were fixed or dismissed, newest first, with the advisory each one was and how long it stayed open. Outcome is which of the two it was, read from the alert's own state rather than from the reason it was dismissed: an account that has only ever fixed its alerts has never written such a reason, and a column these stores were never given does not exist to be selected. The score is there because the word rounds it away: one alert in the measured account scores 9.3 under a word whose mean is 6.1. It is the v4 score where the advisory carries one. In Elasticsearch this lists the newest 500 documents and the panel sorts them.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -15690,7 +15730,7 @@
               {
                 "matcher": {
                   "id": "byName",
-                  "options": "Dismissed"
+                  "options": "Outcome"
                 },
                 "properties": [
                   {
@@ -15799,9 +15839,9 @@
                 "excludeByName": {},
                 "includeByName": {
                   "@timestamp": true,
+                  "alert_state": true,
                   "cvss": true,
                   "cvss_v4": true,
-                  "dismissed_reason": true,
                   "package": true,
                   "repo": true,
                   "seconds_to_resolve": true,
@@ -15811,9 +15851,9 @@
                 },
                 "indexByName": {
                   "@timestamp": 0,
+                  "alert_state": 7,
                   "cvss": 6,
                   "cvss_v4": 5,
-                  "dismissed_reason": 7,
                   "package": 3,
                   "repo": 1,
                   "seconds_to_resolve": 8,
@@ -15823,9 +15863,9 @@
                 },
                 "renameByName": {
                   "@timestamp": "Raised",
+                  "alert_state": "Outcome",
                   "cvss": "CVSS",
                   "cvss_v4": "CVSS v4",
-                  "dismissed_reason": "Dismissed",
                   "package": "Package",
                   "repo": "Repository",
                   "seconds_to_resolve": "Time to resolve",
@@ -17775,7 +17815,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "GitHub caps a repository at ten gigabytes and evicts the least recently used entry past it. Three repositories here are over the line and are throwing caches away on every run; the panel above says which key goes.",
+          "description": "GitHub caps a repository at ten gigabytes and evicts the least recently used entry past it. The bar is each repository's cache against that cap, so one that has reached the red end is throwing caches away on every run and the panel above says which key goes.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -24117,7 +24157,7 @@
       "panels": [
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "The share of each bucket spent, which puts a bucket of five thousand and one of fifteen thousand on the same axis. The buckets worth watching, which are the ones with more than thirty requests in them: search has thirty a minute and would flatten the axis. A bucket this account never touched is left out of the chart entirely, since its flat zero was still a legend entry; \"Every bucket\" beside this lists all eleven, and a Most used of 0 is where that absence belongs. A reading taken at each sweep, so the curve starts the day the collector did. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year. In Elasticsearch each point is the largest reading of its five minutes.",
+          "description": "The share of each bucket spent, which puts a bucket of five thousand and one of fifteen thousand on the same axis. The buckets worth watching, which are the ones with more than thirty requests in them: search has thirty a minute and would flatten the axis. A bucket this account never touched is left out of the chart entirely, since its flat zero was still a legend entry; \"Every bucket\" beside this lists every one of them, and a Most used of 0 is where that absence belongs. A reading taken at each sweep, so the curve starts the day the collector did. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year. In Elasticsearch each point is the largest reading of its five minutes.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -24208,7 +24248,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "Fifteen buckets, and the one that runs out first decides what a sweep can collect. Reading them costs nothing: GET /rate_limit is free.",
+          "description": "Every budget GitHub reports, and the one that runs out first decides what a sweep can collect. Reading them costs nothing: GET /rate_limit is free.",
           "fieldConfig": {
             "defaults": {
               "custom": {

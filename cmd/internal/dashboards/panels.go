@@ -284,9 +284,23 @@ func table(a panelArgs, o Opts) map[string]any {
 	if v, ok := optAny(o, "footer"); ok {
 		footer = v
 	}
+	// `sort` is the column the table opens sorted by, biggest first, which is
+	// what a ranked table wants. `sort_leading` is a column sorted the other
+	// way in front of it: Grafana sorts by the whole list in order, so a flag
+	// column first groups the rows without hiding any of them. "Every
+	// repository, ever" is ranked by commits and a fork of a busy project
+	// outranks everything the account wrote, 370,296 commits against 3,385;
+	// leading on Fork puts the account's own work first and leaves the forks
+	// where the title promises they are. A store whose frame has no such
+	// column is not left unsorted: measured on Grafana 13.2.1, a sort key
+	// naming a column that is not there is skipped and the next one still
+	// sorts.
 	sortBy := []any{}
+	if s := optString(o, "sort_leading", ""); s != "" {
+		sortBy = append(sortBy, map[string]any{"displayName": s, "desc": false})
+	}
 	if s := optString(o, "sort", ""); s != "" {
-		sortBy = []any{map[string]any{"displayName": s, "desc": true}}
+		sortBy = append(sortBy, map[string]any{"displayName": s, "desc": true})
 	}
 	// Small rows, unless the table draws something a small row cannot hold:
 	// the badge images of the achievement progress need the large one.
@@ -529,6 +543,19 @@ func colorOf(name, color string) any {
 // unit as words, "6.43 years" and "3.9 weeks", and at seventy pixels those
 // read ".43 years" and ".9 weeks".
 const dayWidth = 100
+
+// noValueOf is what one value of a stat group reads when its query answers
+// nothing.
+//
+// A stat panel with no value draws an empty space, and a group draws that
+// space under the value's own label: "Time to review by someone else" was a
+// labeled hole in the middle of six numbers, which reads as a broken panel
+// rather than as an answer. Grafana's `noValue` fills it with a sentence. It
+// is for a null that means something, not for a zero: a count that is genuinely
+// zero already prints 0.
+func noValueOf(name, text string) any {
+	return override(name, []any{map[string]any{"id": "noValue", "value": text}})
+}
 
 func unitOf(name, unit string, w int) any {
 	if unit == "d" && w > 0 {

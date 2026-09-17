@@ -107,10 +107,14 @@ func TestNoTitleClaimsAPeriodTheBucketDoesNotKeep(t *testing.T) {
 // Prometheus or Graphite, which have no join; saying it is what every store
 // can do, and these are the panels whose title reads as the account's own
 // work.
+//
+// These three count. "Stale branches" was the fourth and is not any more: a
+// list of what to do next can leave the rows out instead of warning about
+// them, which the two SQL stores now do (TestTheListsOfWhatToDoNextLeaveOutTheUnactionable).
 func TestThePanelsForksDistortSaySo(t *testing.T) {
 	t.Parallel()
 	want := []string{
-		"Commits", "Commits by author", "Every repository, ever", "Stale branches",
+		"Commits", "Commits by author", "Every repository, ever",
 	}
 	seen := map[string]bool{}
 	b := &builder{}

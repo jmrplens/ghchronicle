@@ -11,6 +11,17 @@ const (
 	lifetimeMostUsed        = "Most used"
 )
 
+// everyRepositoryDesc is what the widest table on the dashboard says about
+// itself, out here rather than at its call site so that the function building
+// the section stays inside the maintainability the linter holds it to.
+const everyRepositoryDesc = "The whole life of each repository in one row: not what " +
+	"happened in the dashboard range, but everything there has ever been. " + forksIncluded +
+	" Sorted by commits, a fork of a busy project outranks anything the account wrote, " +
+	"370,296 commits against 3,385 on the account this was measured on, so the table " +
+	"opens with the account's own repositories first and the forks under them, both " +
+	"ranked by commits. The fork and archived flags are columns here rather than a " +
+	"filter, the title being what it is, and a click on either sorts by it."
+
 // ── Lifetime ────────────────────────────────────────────────────────────────
 
 // lifetime is the numbers that are true since the beginning, as one row each.
@@ -28,6 +39,10 @@ func lifetime(b *builder) []Panel {
 	// account's own first repository ninth. Filtering them out is not right
 	// either: the title says every repository, ever. So the two tags GitHub
 	// already gives are shown, and one click on either column sorts by them.
+	// The columns were not enough on their own: labeled or not, the first
+	// screen was still eight rows of somebody else's project. The table now
+	// opens sorted by Fork and then by commits, which puts the account's own
+	// work first and still lists every repository (see sort_leading).
 	// Third and fourth, not last: the sorted column has to stay beside the
 	// first for the phone, so Commits keeps second place and the two flags
 	// take the next two. At 430 pixels that is Repository, Commits and Fork
@@ -169,12 +184,8 @@ func lifetime(b *builder) []Panel {
 				}, []string{
 					"owner", "full_name", "visibility", "instance", "job", "__name__",
 				}, map[string]int{"repo": 0, panelValueA: 1, "fork": 2, "archived": 3}),
-				Opts: Opts{"sort": "Commits"},
-				Desc: "The whole life of each repository in one row: not what happened in the " +
-					"dashboard range, but everything there has ever been. " + forksIncluded +
-					" Sorted by commits, a fork of a busy project outranks anything the " +
-					"account wrote, so the fork and archived flags are columns here and a " +
-					"click on either sorts by it.",
+				Opts: Opts{"sort": "Commits", "sort_leading": "Fork"},
+				Desc: everyRepositoryDesc,
 				Overrides: []any{
 					linkOn("Repository"), width("Fork", 70), width("Archived", 90),
 				},
@@ -292,8 +303,8 @@ func collectorSection(b *builder) []Panel {
 	// of legend above an empty 243 pixel plot: over two years the mean share
 	// per weekly bucket rounds to zero and the axis topped out at 0.25 per
 	// cent. The three that are used are the panel. "Every bucket" beside it
-	// still lists all eleven with their Most used at 0, which is where the
-	// absence belongs.
+	// still lists every bucket the store holds a reading of, with their Most
+	// used at 0, which is where the absence belongs.
 	budget := "SELECT time, series, used FROM (" +
 		"SELECT time, resource AS series, used_ratio AS used," +
 		" MAX(used_ratio) OVER (PARTITION BY resource) AS ever FROM (" +
@@ -378,8 +389,8 @@ func collectorSection(b *builder) []Panel {
 					"watching, which are the ones with more than thirty requests in them: " +
 					"search has thirty a minute and would flatten the axis. A bucket this " +
 					"account never touched is left out of the chart entirely, since its flat " +
-					"zero was still a legend entry; \"Every bucket\" beside this lists all " +
-					"eleven, and a Most used of 0 is where that absence belongs. A reading " +
+					"zero was still a legend entry; \"Every bucket\" beside this lists every " +
+					"one of them, and a Most used of 0 is where that absence belongs. A reading " +
 					"taken at each sweep, so the curve starts the day the collector did. " +
 					bucketFollowsRange,
 				GR: []Target{grq(fmt.Sprintf("aliasByNode(keepLastValue(%s), %d)",
@@ -398,8 +409,8 @@ func collectorSection(b *builder) []Panel {
 				panelValueB: lifetimeLowestRemaining, panelValueC: lifetimeMostUsed,
 			}, nil, nil),
 			Opts: Opts{"sort": lifetimeMostUsed},
-			Desc: "Fifteen buckets, and the one that runs out first decides what a sweep " +
-				"can collect. Reading them costs nothing: GET /rate_limit is free.",
+			Desc: "Every budget GitHub reports, and the one that runs out first decides what " +
+				"a sweep can collect. Reading them costs nothing: GET /rate_limit is free.",
 			GR: bucketsGR, GRTF: bucketsGRtf, GRDesc: grSlot,
 			ES: bucketsES, ESTF: bucketsEStf,
 		}),

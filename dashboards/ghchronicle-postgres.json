@@ -129,7 +129,7 @@
     },
     {
       "datasource": "${DS_POSTGRES}",
-      "description": "Page views, unique visitors and clones, summed over the dashboard range, so they move with the range picker. GitHub only keeps 14 days of traffic, so a range wider than that shows what was captured while it was still there.",
+      "description": "Page views, unique visitors and the people who cloned, summed over the dashboard range, so they move with the range picker. GitHub only keeps 14 days of traffic, so a range wider than that shows what was captured while it was still there. Cloners rather than clones because a clone is counted per pull and continuous integration pulls all day: on the account this was measured against one repository was cloned 135,683 times in a fortnight by 1,807 cloners, and 186 K beside 2.89 K views read as an audience. The clone count itself is two panels of the Audience section, \"Clones over time\" and \"Clone amplification\", where it is the subject rather than a headline.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -177,7 +177,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT SUM(CASE WHEN kind = 'views' THEN count ELSE 0 END) AS \"Views\", SUM(CASE WHEN kind = 'views' THEN uniques ELSE 0 END) AS \"Unique visitors\", SUM(CASE WHEN kind = 'clones' THEN count ELSE 0 END) AS \"Clones\" FROM gh_traffic WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})",
+          "rawSql": "SELECT SUM(CASE WHEN kind = 'views' THEN count ELSE 0 END) AS \"Views\", SUM(CASE WHEN kind = 'views' THEN uniques ELSE 0 END) AS \"Unique visitors\", SUM(CASE WHEN kind = 'clones' THEN uniques ELSE 0 END) AS \"Unique cloners\" FROM gh_traffic WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})",
           "refId": "A"
         }
       ],
@@ -388,7 +388,7 @@
         },
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "The whole life of each repository in one row: not what happened in the dashboard range, but everything there has ever been. The repository picker holds every repository the account can see, its forks and its archived ones alongside its own, so a count here is over all of them until the picker is narrowed. Sorted by commits, a fork of a busy project outranks anything the account wrote, so the fork and archived flags are columns here and a click on either sorts by it.",
+          "description": "The whole life of each repository in one row: not what happened in the dashboard range, but everything there has ever been. The repository picker holds every repository the account can see, its forks and its archived ones alongside its own, so a count here is over all of them until the picker is narrowed. Sorted by commits, a fork of a busy project outranks anything the account wrote, 370,296 commits against 3,385 on the account this was measured on, so the table opens with the account's own repositories first and the forks under them, both ranked by commits. The fork and archived flags are columns here rather than a filter, the title being what it is, and a click on either sorts by it.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -476,6 +476,10 @@
             },
             "showHeader": true,
             "sortBy": [
+              {
+                "desc": false,
+                "displayName": "Fork"
+              },
               {
                 "desc": true,
                 "displayName": "Commits"
@@ -2627,7 +2631,7 @@
       "panels": [
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "How much closed in the range and how long each took. Every duration is a median: half of what merged or closed took less than the number shown. Time to review by someone else is the wait before a person other than the author looked at a pull request, so review bots, which answer in seconds, and the author's own replies are left out; a range where nobody else reviewed anything reads No data, which is the honest answer and not the claim that nothing was reviewed. Lines per pull request is the median of added plus removed by a merged one.",
+          "description": "How much closed in the range and how long each took. Every duration is a median: half of what merged or closed took less than the number shown. Time to review by someone else is the wait before a person other than the author looked at a pull request, so review bots, which answer in seconds, and the author's own replies are left out; a range in which nobody else reviewed anything reads \"no human review\" rather than a number, which is the honest answer and not the claim that nothing was reviewed. On the account this was measured against, 0 of 925 pull requests in the range had one. Lines per pull request is the median of added plus removed by a merged one.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -2680,6 +2684,18 @@
                   {
                     "id": "unit",
                     "value": "s"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Time to review by someone else"
+                },
+                "properties": [
+                  {
+                    "id": "noValue",
+                    "value": "no human review"
                   }
                 ]
               }
@@ -3706,7 +3722,7 @@
         },
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "Time to merge only counts what merged. This is the other half: what is still open and how long it has been, which is the number that decides what to do next rather than describing what already happened. Each pull request is read from its newest row, so one that merged inside the range is not here any more.",
+          "description": "Time to merge only counts what merged. This is the other half: what is still open and how long it has been, which is the number that decides what to do next rather than describing what already happened. Each pull request is read from its newest row, so one that merged inside the range is not here any more. Archived repositories are left out, since nothing in one can be merged, closed or run until it is unarchived; narrowing the picker to one shows an empty table here rather than rows nobody can act on. A fork's pull request is still one that can be merged, so those stay and Fork says which they are.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -3799,6 +3815,18 @@
               {
                 "matcher": {
                   "id": "byName",
+                  "options": "Fork"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 70
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
                   "options": "Number"
                 },
                 "properties": [
@@ -3858,7 +3886,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT number AS \"Number\", seconds_open AS \"Open for\", repo AS \"Repository\", title AS \"Title\", author AS \"Author\", label_names AS \"Labels\", comments AS \"Comments\", reviews AS \"Reviews\", url AS \"Link\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo, number ORDER BY time DESC) AS rn FROM gh_pull_request WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring}) AND number \u003c\u003e '') x WHERE rn = 1 AND state = 'OPEN' ORDER BY seconds_open DESC LIMIT 25",
+              "rawSql": "SELECT x.number AS \"Number\", x.seconds_open AS \"Open for\", x.repo AS \"Repository\", x.title AS \"Title\", x.author AS \"Author\", x.label_names AS \"Labels\", x.comments AS \"Comments\", x.reviews AS \"Reviews\", f.fork AS \"Fork\", x.url AS \"Link\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo, number ORDER BY time DESC) AS rn FROM gh_pull_request WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring}) AND number \u003c\u003e '') x LEFT JOIN (SELECT repo, fork, archived FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo ORDER BY time DESC) AS rn FROM gh_repo WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1) f ON f.repo = x.repo WHERE x.rn = 1 AND x.state = 'OPEN' AND COALESCE(f.archived, 'false') \u003c\u003e 'true' ORDER BY x.seconds_open DESC LIMIT 25",
               "refId": "A"
             }
           ],
@@ -3867,7 +3895,7 @@
         },
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "The same question for issues: what is still open and for how long. Labels is what the issue was filed as, so an old one reads as a bug nobody fixed or a wish nobody granted. Each issue is read from its newest row, so one closed inside the range is not here any more.",
+          "description": "The same question for issues: what is still open and for how long. Labels is what the issue was filed as, so an old one reads as a bug nobody fixed or a wish nobody granted. Each issue is read from its newest row, so one closed inside the range is not here any more. Archived repositories are left out, since nothing in one can be merged, closed or run until it is unarchived; narrowing the picker to one shows an empty table here rather than rows nobody can act on. A fork's issues stay, and Fork says which they are.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -3936,6 +3964,18 @@
               {
                 "matcher": {
                   "id": "byName",
+                  "options": "Fork"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 70
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
                   "options": "Number"
                 },
                 "properties": [
@@ -3995,7 +4035,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT number AS \"Number\", seconds_open AS \"Open for\", repo AS \"Repository\", author AS \"Author\", comments AS \"Comments\", label_names AS \"Labels\", url AS \"Link\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo, number ORDER BY time DESC) AS rn FROM gh_issue WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring}) AND number \u003c\u003e '') x WHERE rn = 1 AND state = 'OPEN' ORDER BY seconds_open DESC LIMIT 25",
+              "rawSql": "SELECT x.number AS \"Number\", x.seconds_open AS \"Open for\", x.repo AS \"Repository\", x.author AS \"Author\", x.comments AS \"Comments\", x.label_names AS \"Labels\", f.fork AS \"Fork\", x.url AS \"Link\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo, number ORDER BY time DESC) AS rn FROM gh_issue WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring}) AND number \u003c\u003e '') x LEFT JOIN (SELECT repo, fork, archived FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo ORDER BY time DESC) AS rn FROM gh_repo WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1) f ON f.repo = x.repo WHERE x.rn = 1 AND x.state = 'OPEN' AND COALESCE(f.archived, 'false') \u003c\u003e 'true' ORDER BY x.seconds_open DESC LIMIT 25",
               "refId": "A"
             }
           ],
@@ -5508,7 +5548,7 @@
         },
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "Sixty six of a hundred and thirteen declared workflows had not run in a week here. A workflow that never runs is either dead or waiting on a trigger that no longer fires, and nothing else in the dashboard would say so.",
+          "description": "A workflow that never runs is either dead or waiting on a trigger that no longer fires, and nothing else in the dashboard would say so. Archived repositories are left out, since nothing in one can be merged, closed or run until it is unarchived; narrowing the picker to one shows an empty table here rather than rows nobody can act on. A workflow in an archived repository cannot run at all, which is why every row of this table was one of those until they came out. A fork's workflows stay, since a fork can be given one that runs, and Fork says which they are.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -5543,6 +5583,18 @@
                   {
                     "id": "custom.width",
                     "value": 200
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Fork"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 70
                   }
                 ]
               },
@@ -5603,7 +5655,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT w.repo AS \"Repository\", w.workflow AS \"Workflow\", w.state AS \"State\", w.url AS \"Link\" FROM (SELECT DISTINCT repo, workflow, path, state, url FROM gh_workflow WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) w LEFT JOIN (SELECT DISTINCT repo, workflow FROM gh_workflow_run WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) r ON w.repo = r.repo AND w.path = r.workflow WHERE r.workflow IS NULL ORDER BY 1, 2",
+              "rawSql": "SELECT w.repo AS \"Repository\", w.workflow AS \"Workflow\", w.state AS \"State\", f.fork AS \"Fork\", w.url AS \"Link\" FROM (SELECT DISTINCT repo, workflow, path, state, url FROM gh_workflow WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) w LEFT JOIN (SELECT DISTINCT repo, workflow FROM gh_workflow_run WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) r ON w.repo = r.repo AND w.path = r.workflow LEFT JOIN (SELECT repo, fork, archived FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo ORDER BY time DESC) AS rn FROM gh_repo WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1) f ON f.repo = w.repo WHERE r.workflow IS NULL AND COALESCE(f.archived, 'false') \u003c\u003e 'true' ORDER BY 1, 2",
               "refId": "A"
             }
           ],
@@ -8684,7 +8736,7 @@
         },
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "Nothing else answers which branches were abandoned: GitHub's own branch list is ordered by name and keeps no history. The refs come back unordered and capped at a hundred per repository, so `gh_repo_total.branches` is the true count and is what makes the truncation visible. The repository picker holds every repository the account can see, its forks and its archived ones alongside its own, so a count here is over all of them until the picker is narrowed. Of the 1,208 branches in the picker when this was measured, 1,083 were a fork's; gh_branch carries no fork tag, so narrowing the picker is the only way to read this as the account's own branches.",
+          "description": "Nothing else answers which branches were abandoned: GitHub's own branch list is ordered by name and keeps no history. The refs come back unordered and capped at a hundred per repository, so `gh_repo_total.branches` is the true count and is what makes the truncation visible. The account's own live repositories only: a branch of a fork is the upstream project's history and not the account's, and a branch of an archived repository can be neither pushed to nor deleted. Of the 1,208 branches in the picker when this was measured, 1,083 were a fork's and those are the rows this leaves out.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -8782,7 +8834,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT branch AS \"Branch\", days_since_commit AS \"Idle\", repo AS \"Repository\", is_default AS \"Default\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo, branch ORDER BY time DESC) AS rn FROM gh_branch WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1 ORDER BY 2 DESC",
+              "rawSql": "SELECT b.branch AS \"Branch\", b.days_since_commit AS \"Idle\", b.repo AS \"Repository\", b.is_default AS \"Default\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo, branch ORDER BY time DESC) AS rn FROM gh_branch WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) b LEFT JOIN (SELECT repo, fork, archived FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo ORDER BY time DESC) AS rn FROM gh_repo WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1) f ON f.repo = b.repo WHERE b.rn = 1 AND COALESCE(f.fork, 'false') \u003c\u003e 'true' AND COALESCE(f.archived, 'false') \u003c\u003e 'true' ORDER BY 2 DESC",
               "refId": "A"
             }
           ],
@@ -10798,7 +10850,7 @@
         },
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "Dependabot alerts that were fixed or dismissed, newest first, with the advisory each one was and how long it stayed open. The score is there because the word rounds it away: one alert in the measured account scores 9.3 under a word whose mean is 6.1. It is the v4 score where the advisory carries one.",
+          "description": "Dependabot alerts that were fixed or dismissed, newest first, with the advisory each one was and how long it stayed open. Outcome is which of the two it was, read from the alert's own state rather than from the reason it was dismissed: an account that has only ever fixed its alerts has never written such a reason, and a column these stores were never given does not exist to be selected. The score is there because the word rounds it away: one alert in the measured account scores 9.3 under a word whose mean is 6.1. It is the v4 score where the advisory carries one.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -10879,7 +10931,7 @@
               {
                 "matcher": {
                   "id": "byName",
-                  "options": "Dismissed"
+                  "options": "Outcome"
                 },
                 "properties": [
                   {
@@ -10966,7 +11018,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT package AS \"Package\", time AS \"Raised\", repo AS \"Repository\", severity AS \"Severity\", summary AS \"Advisory\", COALESCE(cvss_v4, cvss) AS \"CVSS\", dismissed_reason AS \"Dismissed\", seconds_to_resolve AS \"Time to resolve\", url AS \"Link\" FROM gh_dependabot_alert_item WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring}) AND seconds_to_resolve IS NOT NULL ORDER BY time DESC LIMIT 25",
+              "rawSql": "SELECT package AS \"Package\", time AS \"Raised\", repo AS \"Repository\", severity AS \"Severity\", summary AS \"Advisory\", COALESCE(cvss_v4, cvss) AS \"CVSS\", alert_state AS \"Outcome\", seconds_to_resolve AS \"Time to resolve\", url AS \"Link\" FROM gh_dependabot_alert_item WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring}) AND seconds_to_resolve IS NOT NULL ORDER BY time DESC LIMIT 25",
               "refId": "A"
             }
           ],
@@ -12209,7 +12261,7 @@
         },
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "GitHub caps a repository at ten gigabytes and evicts the least recently used entry past it. Three repositories here are over the line and are throwing caches away on every run; the panel above says which key goes.",
+          "description": "GitHub caps a repository at ten gigabytes and evicts the least recently used entry past it. The bar is each repository's cache against that cap, so one that has reached the red end is throwing caches away on every run and the panel above says which key goes.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -16602,7 +16654,7 @@
       "panels": [
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "The share of each bucket spent, which puts a bucket of five thousand and one of fifteen thousand on the same axis. The buckets worth watching, which are the ones with more than thirty requests in them: search has thirty a minute and would flatten the axis. A bucket this account never touched is left out of the chart entirely, since its flat zero was still a legend entry; \"Every bucket\" beside this lists all eleven, and a Most used of 0 is where that absence belongs. A reading taken at each sweep, so the curve starts the day the collector did. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "The share of each bucket spent, which puts a bucket of five thousand and one of fifteen thousand on the same axis. The buckets worth watching, which are the ones with more than thirty requests in them: search has thirty a minute and would flatten the axis. A bucket this account never touched is left out of the chart entirely, since its flat zero was still a legend entry; \"Every bucket\" beside this lists every one of them, and a Most used of 0 is where that absence belongs. A reading taken at each sweep, so the curve starts the day the collector did. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -16662,7 +16714,7 @@
         },
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "Fifteen buckets, and the one that runs out first decides what a sweep can collect. Reading them costs nothing: GET /rate_limit is free.",
+          "description": "Every budget GitHub reports, and the one that runs out first decides what a sweep can collect. Reading them costs nothing: GET /rate_limit is free.",
           "fieldConfig": {
             "defaults": {
               "custom": {

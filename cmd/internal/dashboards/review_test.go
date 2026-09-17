@@ -329,7 +329,7 @@ func TestOpenItemsAreReadFromTheirNewestRow(t *testing.T) {
 	for _, title := range []string{"Open the longest", "Open issues the longest"} {
 		sql := sqlOf(t, mustPanel(t, panels, title))
 		if !strings.Contains(sql, "PARTITION BY repo, number ORDER BY time DESC") ||
-			!strings.Contains(sql, "rn = 1 AND state = 'OPEN'") {
+			!strings.Contains(sql, "x.rn = 1 AND x.state = 'OPEN'") {
 			t.Errorf("%s filters the open rows before taking the newest: %s", title, sql)
 		}
 	}
@@ -626,7 +626,7 @@ func TestNewFieldsAreShown(t *testing.T) {
 		"Commits behind a red branch":  {`run_number AS "Run number"`},
 		"Open the longest":             {`title AS "Title"`, `label_names AS "Labels"`},
 		"Largest merged pull requests": {`title AS "Title"`, `label_names AS "Labels"`, `author_association AS "Association"`},
-		"Time to resolve an alert":     {`summary AS "Advisory"`, `COALESCE(cvss_v4, cvss) AS "CVSS"`, `dismissed_reason AS "Dismissed"`},
+		"Time to resolve an alert":     {`summary AS "Advisory"`, `COALESCE(cvss_v4, cvss) AS "CVSS"`, `alert_state AS "Outcome"`},
 	} {
 		sql := sqlOf(t, mustPanel(t, panels, title))
 		for _, c := range cols {

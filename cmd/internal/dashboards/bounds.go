@@ -76,9 +76,32 @@ func bounded() Opts { return Opts{"time_from": commitWindow} }
 // archived tags, so a panel over any other measurement cannot filter on them
 // in Prometheus or Graphite, which have no join. Saying it is what every
 // store can do.
+//
+// Saying it is not all the two SQL stores can do, and where the panel is a
+// list of what to do next rather than a count they join gh_repo and leave the
+// unactionable rows out instead: see repoFlagsJoin. This sentence stays on the
+// panels that count, where leaving rows out would be answering a different
+// question from the one the title asks.
 const forksIncluded = "The repository picker holds every repository the account can see, " +
 	"its forks and its archived ones alongside its own, so a count here is over all of " +
 	"them until the picker is narrowed."
+
+// archivedLeftOut is what a list of what to do next says where it leaves the
+// archived repositories out. A pull request in one cannot be merged, an issue
+// in one cannot be worked on and a workflow in one cannot run: GitHub refuses
+// all three until the repository is unarchived. The rows are not gone from the
+// dashboard, they are in the panels that count and in "Repositories archived".
+const archivedLeftOut = "Archived repositories are left out, since nothing in one can be " +
+	"merged, closed or run until it is unarchived; narrowing the picker to one shows an " +
+	"empty table here rather than rows nobody can act on."
+
+// noRepoFlagsHere is what a store says in place of leaving them out. It is on
+// the Prometheus, Graphite and Elasticsearch side of every panel whose two SQL
+// twins filter on the flags, so the same title does not promise the same list
+// in five dashboards.
+const noRepoFlagsHere = "Only gh_repo carries the fork and archived flags and this store " +
+	"cannot join one measurement to another, so the rows the SQL dashboards leave out " +
+	"are listed here."
 
 // bucketFollowsRange is what a dated chart says instead of "per day" in its
 // title.

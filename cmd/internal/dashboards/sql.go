@@ -125,3 +125,38 @@ Published to a Grafana that has a Loki datasource, with
 ` + "`cmd/publish_dashboard -loki <datasource-uid>`" + `, this panel shows those lines
 instead of this note.
 `
+
+// ── The repository's own flags ──────────────────────────────────────────────
+
+// repoFlagsJoin hangs `fork` and `archived` on a table of something else,
+// under the alias `f`, matched on the repository name. `on` is the column of
+// the outer query the repository is named by.
+//
+// Only gh_repo carries either: both are tags there and no other measurement
+// has them at all. Reading them costs a join, which is why the panels that
+// need them are the two SQL dashboards and why the other three say instead
+// that they cannot.
+//
+// What they are for: with 59 repositories in the picker, 17 of them archived
+// and 22 of them forks of other people's projects, every "oldest", "stalest"
+// and "never" sort on the page was won by something nothing can be done to. A
+// workflow declared in an archived repository cannot run, by definition; a
+// pull request in one cannot be merged; a branch of a fork is upstream's
+// history and not the account's. Measured on 2026-09-17: the eight oldest open
+// pull requests were dependabot's in two archived repositories, every workflow
+// in "Workflows that never ran" was in an archived one, and 1,083 of the 1,208
+// branches in "Stale branches" were a fork's.
+func repoFlagsJoin(on string) string {
+	return " LEFT JOIN (" + latestPerRepo([]string{"fork", "archived"}) + ") f ON f.repo = " + on
+}
+
+// The predicates that go with it.
+//
+// A LEFT JOIN answers NULL where the repository has no gh_repo row inside the
+// range, and a PostgreSQL tag column is the empty string where nothing was
+// written. Both read as "not flagged" here rather than as a row to drop: a
+// row whose repository is unknown is not one the reader can be told to ignore.
+const (
+	notArchived = "COALESCE(f.archived, 'false') <> 'true'"
+	notAFork    = "COALESCE(f.fork, 'false') <> 'true'"
+)

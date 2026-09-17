@@ -364,10 +364,17 @@ func blockedOrAllowed(name string, w int) any {
 func branchesAndProtections(b *builder) []Panel {
 	gb, bp, rr := "gh_branch", "gh_branch_protection", "gh_ruleset_rule"
 
-	branches := `SELECT branch AS "Branch", days_since_commit AS "Idle",` +
-		` repo AS "Repository", is_default AS "Default" FROM (` +
+	// The one table of this section that reads the repository's own flags: a
+	// branch of a fork is upstream's history, and a branch of an archived
+	// repository cannot be pushed to or deleted. Both won this sort outright
+	// before the join, the oldest row being `v1` in a fork of somebody else's
+	// backup tool at 10.1 years.
+	branches := `SELECT b.branch AS "Branch", b.days_since_commit AS "Idle",` +
+		` b.repo AS "Repository", b.is_default AS "Default" FROM (` +
 		"SELECT *, ROW_NUMBER() OVER (PARTITION BY repo, branch ORDER BY time DESC) AS rn" +
-		" FROM gh_branch WHERE $__timeFilter(time) AND " + RF + deliveryNewestRow +
+		" FROM gh_branch WHERE $__timeFilter(time) AND " + RF + ") b" +
+		repoFlagsJoin("b.repo") +
+		" WHERE b.rn = 1 AND " + notAFork + " AND " + notArchived +
 		" ORDER BY 2 DESC"
 	protections := `SELECT repo AS "Repository", pattern AS "Pattern",` +
 		` required_reviews AS "Reviews",` +
@@ -464,26 +471,27 @@ func branchesAndProtections(b *builder) []Panel {
 			}, nil, map[string]int{"repo": 0, "branch": 1, "is_default": 2})},
 			Opts: Opts{"sort": "Idle"},
 			PromDesc: "Prometheus has no LIMIT, so the twin is the fifty idlest branches " +
-				"rather than every one of them.",
+				"rather than every one of them. " + noRepoFlagsHere,
 			Desc: "Nothing else answers which branches were abandoned: GitHub's own branch list " +
 				"is ordered by name and keeps no history. The refs come back unordered and " +
 				"capped at a hundred per repository, so `gh_repo_total.branches` is the true " +
-				"count and is what makes the truncation visible. " + forksIncluded +
-				" Of the 1,208 branches in the picker when this was measured, 1,083 were " +
-				"a fork's; gh_branch carries no fork tag, so narrowing the picker is the " +
-				"only way to read this as the account's own branches.",
+				"count and is what makes the truncation visible. The account's own live " +
+				"repositories only: a branch of a fork is the upstream project's history and " +
+				"not the account's, and a branch of an archived repository can be neither " +
+				"pushed to nor deleted. Of the 1,208 branches in the picker when this was " +
+				"measured, 1,083 were a fork's and those are the rows this leaves out.",
 			Overrides: []any{
 				repoColumn(), width("Branch", 200), width("Default", 90),
 				unitOf("Idle", "d", 100),
 			},
 			GR: branchGR, GRTF: branchGRtf,
 			GRDesc: "Graphite names each row repository, branch and whether it is the default " +
-				"from the path.",
+				"from the path. " + noRepoFlagsHere,
 			ES: branchES, ESTF: branchEStf,
 			ESDesc: "Elasticsearch answers with the largest number of days inside the range " +
 				"rather than with the newest reading. A branch whose ref points at something " +
 				"that is not a commit has no age at all, in this dashboard or any of the " +
-				"others, and its cell is empty.",
+				"others, and its cell is empty. " + noRepoFlagsHere,
 		}),
 		panel("table", "Branch protection rules", box{W: 12, H: 8, X: 12, Y: 32},
 			[]Target{sqlT(protections)}, &P{

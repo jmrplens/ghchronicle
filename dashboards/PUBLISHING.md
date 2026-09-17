@@ -51,6 +51,14 @@ go run ./cmd/gen_dashboards -check                                # the five fil
 GRAFANA_TOKEN=... go run ./cmd/check_dashboards influxdb <uid>    # every panel still returns data
 ```
 
+The second has to be pointed at a store holding a real account. The fixture
+carries every field of every measurement; an account carries only what has
+happened to it, and a column of these stores exists once a point has carried
+it, so a panel selecting a field the account has never written is refused and
+draws "No data". The same check is the last item of
+[RELEASING.md](../.github/RELEASING.md) before the tag, with what its two
+summary lines mean.
+
 ## Publishing to your own Grafana
 
 The directory takes the files as they are. A running server does not: the

@@ -122,7 +122,17 @@ GRAFANA_TOKEN=... go run ./cmd/check_prometheus <metrics-dump> <datasource-uid>
 go run ./cmd/check_postgres <schema.json>
 ```
 
-`check_dashboards` informa de cada panel como correcto, vacío o fallido.
+`check_dashboards` informa de cada panel como correcto, vacío o fallido, y
+cuenta aparte dos clases de fallo: un panel que nombra una tabla que el almacén
+no ha creado, que es una familia que allí aún no se ha recogido y se llenará
+sola, y un panel que nombra una columna que no ha creado, que es un panel que
+nadie con el historial de esa cuenta puede dibujar. Lo segundo es la razón de
+ejecutarlo contra un almacén con una cuenta real y no solo contra el banco de
+pruebas: una columna de estos almacenes existe desde que un punto la ha
+llevado, el banco de pruebas lleva todos los campos de todas las medidas, y una
+cuenta solo lleva lo que le ha pasado. Un panel que selecciona un campo que la
+cuenta nunca ha escrito se rechaza entero y Grafana dibuja «Sin datos» con un
+distintivo en la esquina que nadie ve.
 `check_prometheus` comprueba además cada nombre de métrica contra un volcado
 real del propio `/metrics` del exportador, porque una errata en un nombre de
 métrica no es un error de sintaxis: PromQL la analiza tan contento y no

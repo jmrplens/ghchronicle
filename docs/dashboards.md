@@ -138,7 +138,16 @@ and `stores.go` only chooses a query set and a datasource.
 > go run ./cmd/check_postgres <schema.json>
 > ```
 >
-> `check_dashboards` reports every panel as ok, empty or failing.
+> `check_dashboards` reports every panel as ok, empty or failing, and counts two
+> kinds of failure apart from the rest: a panel naming a table the store has not
+> created, which is a family that has not been collected there yet and will fill
+> itself, and a panel naming a column it has not created, which is a panel nobody
+> with that account's history can draw. The second is why this is worth running
+> against a store holding a real account and not only against the fixture: a
+> column of these stores exists once a point has carried it, the fixture carries
+> every field of every measurement, and an account carries only what has happened
+> to it. A panel selecting a field the account has never written is refused
+> outright and Grafana draws "No data" with a corner badge nobody notices.
 > `check_prometheus` additionally checks each metric name against a live dump of
 > the exporter's own `/metrics`, because a typo in a metric name is not a syntax
 > error: PromQL parses it happily and returns nothing forever.
@@ -208,7 +217,7 @@ than all of them.
 A masthead rather than a panel: the mark, large and centered, the name under
 it, and under the name a button to this documentation and one to the source,
 on the page itself with no box around them. Then four groups of numbers: Repositories (repositories, stars,
-forks), Traffic in range (views, unique visitors, clones), Community
+forks), Traffic in range (views, unique visitors, unique cloners), Community
 (followers, following, sponsors, sponsoring) and Account (contributions in the
 last year, account age, watching, stars given, gists, packages). A group is one
 stat panel of several values rather than a tile per number: on a desktop it
@@ -220,6 +229,13 @@ range, because both are current state and a sum over the range would count
 every sweep.
 
 ![The Overview row: the repository picker and the 90 day range across the top, the ghchronicle badge with its Docs and Source buttons, then four tile groups reading 5 repositories with 350 stars and 51 forks, 37.5 thousand views with 21.1 thousand unique visitors and 19.6 thousand clones, 117 followers and 58 following with 4 sponsors and 2 sponsored, and an account with 3.22 thousand contributions over 7.78 years](../site/src/assets/dashboards/overview.png)
+
+The third traffic tile counts the people who cloned and not the clones.
+Continuous integration clones all day, so the clone count belongs beside the
+figure that explains it rather than in a headline: measured on the account this
+was read against, one repository was cloned 135,683 times in a fortnight by
+1,807 cloners, and 186 K beside 2.89 K views reads as an audience. The count
+itself is two panels of the Audience section.
 
 Reads `gh_account`, `gh_repo`, `gh_traffic` and `gh_contributions_total`.
 
@@ -240,6 +256,15 @@ running total kept by this tool would not be. It is also the shape a store can
 answer without reading everything it holds: InfluxDB 3 Core refuses a query
 that would open more than its file limit, forty thousand where this was
 measured, and "how many ever" from a row per fact is exactly that query.
+
+"Every repository, ever" lists every repository the picker holds, forks and
+archived ones included, since that is what the title says. It is ranked by
+commits, which on an account with forks of busy projects means somebody else's
+history outranks everything the account wrote: 370,296 commits against 3,385
+where this was read. So the fork and archived flags are columns, and the table
+opens sorted by the first of them and then by commits, which puts the account's
+own repositories on the first screen and the forks under them without leaving
+one out.
 
 Reads `gh_account_total` and `gh_repo_total`.
 
@@ -344,14 +369,31 @@ each item from its newest row.
 > **Read the review wait carefully**
 >
 > The tile counts the first review by somebody other than the author and other
-> than a bot, so on an account reviewed by bots alone it reads No data rather
-> than the bots' few seconds. It is named for that, because "Time to first
+> than a bot, so on an account reviewed by bots alone it reads "no human
+> review" rather than the bots' few seconds. It is named for that, because "Time to first
 > review" over No data read as nothing having been reviewed at all: measured
 > here on 2026-09-17, 703 of 825 pull requests in a fortnight had a first
 > review and none of them had one from anybody else, and the field holds
 > fourteen rows in the whole store. Nine pull requests in ten had a bot review
 > inside a minute; the Reviewers table shows that, with each bot marked
 > as one and the author's own replies as one row.
+
+<!-- -->
+
+> **The lists of what to do next leave out what cannot be done**
+>
+> "Open the longest", "Open issues the longest", "Workflows that never ran" and
+> "Stale branches" are the four panels that read as a queue of work. On an
+> account with 17 archived repositories and 22 forks of other people's
+> projects, all four were won by rows nothing can be done to: the eight oldest
+> open pull requests were dependabot's in two archived repositories, every
+> workflow that had never run was in an archived one, and 1,083 of 1,208
+> branches were a fork's. So the two SQL dashboards join each row's repository
+> to `gh_repo`, the one measurement carrying the fork and archived flags, and
+> leave the archived out of the first three and both the archived and the forks
+> out of the branches; the first three keep a Fork column, because a fork's
+> pull request is still one that can be merged. Prometheus, Graphite and
+> Elasticsearch have no join, so there the rows stay and each panel says so.
 
 Reads `gh_pull_request`, `gh_pull_request_review` and `gh_issue`.
 

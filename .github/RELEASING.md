@@ -10,6 +10,31 @@ is not.
 - [ ] `go build ./... && go vet ./... && go test -race ./...` and
       `golangci-lint run ./...` are green on `main`.
 - [ ] `go run ./cmd/gen_dashboards -check` writes nothing.
+- [ ] Every panel has been run against a store holding a real account, not
+      only against the fixture:
+
+      ```sh
+      GRAFANA_TOKEN=... make check-dashboards-live STORE=influxdb DS=<datasource-uid> RANGE=now-10y
+      ```
+
+      This is the one check the offline ones cannot stand in for. A column of
+      InfluxDB, PostgreSQL or Elasticsearch exists once a point has carried it,
+      and the fixture carries every field of every measurement while a real
+      account only carries what has happened to it: a panel selecting a field
+      nobody has ever had a reason to write is refused outright, and Grafana
+      draws "No data" with a corner badge nobody notices. That is how "Time to
+      resolve an alert" hid eight resolved alerts behind an empty panel for a
+      release, on an account that had only ever fixed alerts and so had never
+      written `dismissed_reason`.
+
+      Read the two lines above the tally rather than the tally itself. Panels
+      that name a table the store has not created are families that have not
+      been collected here yet and will fill themselves; panels that name a
+      column it has not created are the defect, and no sweep will fix one.
+      `EMPTY` is not a failure: a panel can be honestly empty.
+
+      Run it for each store you have a datasource for. It needs a Grafana, so
+      CI can never do it.
 - [ ] `cd site && pnpm run build && pnpm run lint` is green, which also holds
       the published counts to the code.
 - [ ] The documentation says what this version does, not what the last one did.

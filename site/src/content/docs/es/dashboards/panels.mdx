@@ -41,7 +41,7 @@ paneles de Overview y no todos.
 Una cabecera y no un panel: la marca, grande y centrada, el nombre debajo, y
 bajo el nombre un botón a esta documentación y otro al código, sobre la propia
 página y sin caja alrededor. Después cuatro grupos de cifras: Repositories (repositorios, estrellas, forks),
-Traffic in range (visitas, visitantes únicos, clones), Community (seguidores,
+Traffic in range (visitas, visitantes únicos, clonadores únicos), Community (seguidores,
 seguidos, patrocinadores, patrocinados) y Account (contribuciones del último
 año, edad de la cuenta, vigilados, estrellas dadas, gists, paquetes). Un grupo
 es un panel de estadística con varios valores y no una tarjeta por cifra: en un
@@ -53,6 +53,13 @@ fila más reciente de cada repositorio y no todas las del rango, porque ambas so
 estado actual y una suma sobre el rango contaría cada pasada.
 
 ![La fila Overview: el selector de repositorio y el rango de 90 días en la parte superior, el distintivo de ghchronicle con sus botones Docs y Source, y luego cuatro grupos de tarjetas con 5 repositorios, 350 estrellas y 51 forks; 37,5 mil visitas, 21,1 mil visitantes únicos y 19,6 mil clones; 117 seguidores, 58 seguidos, 4 patrocinadores y 2 patrocinados; y una cuenta con 3,22 mil contribuciones y 7,78 años de antigüedad](../../../../assets/dashboards/overview.png)
+
+La tercera tarjeta de tráfico cuenta a quienes clonaron y no los clones. La
+integración continua clona todo el día, así que el recuento de clones va junto
+a la cifra que lo explica y no en un titular: medido en la cuenta con la que se
+leyó esto, un repositorio se clonó 135.683 veces en quince días desde 1.807
+clonadores, y 186 K junto a 2,89 K visitas se lee como audiencia. El recuento
+está en dos paneles de la sección Audience.
 
 Lee `gh_account`, `gh_repo`, `gh_traffic` y `gh_contributions_total`.
 
@@ -73,6 +80,15 @@ acumulado por esta herramienta no sería. Es además la forma que un almacén pu
 responder sin leer todo lo que guarda: InfluxDB 3 Core rechaza una consulta que
 abra más ficheros que su tope, cuarenta mil donde esto se midió, y "cuántas en
 total" a partir de una fila por hecho es exactamente esa consulta.
+
+"Every repository, ever" lista todos los repositorios que tiene el selector,
+forks y archivados incluidos, porque eso es lo que dice el título. Se ordena
+por commits, lo que en una cuenta con forks de proyectos concurridos significa
+que la historia de otra persona supera a todo lo que ha escrito la cuenta:
+370.296 commits frente a 3.385 donde se leyó esto. Así que las marcas de fork y
+archivado son columnas, y la tabla se abre ordenada por la primera y luego por
+commits, lo que pone los repositorios propios en la primera pantalla y los
+forks debajo sin dejar ninguno fuera.
 
 Lee `gh_account_total` y `gh_repo_total`.
 
@@ -185,14 +201,31 @@ de su fila más reciente.
 <Aside
   type="caution" title="Cuidado al leer la espera de revisión" >
   El panel cuenta la primera revisión de alguien que no es el autor ni un bot,
-  así que en una cuenta revisada solo por bots dice No data en vez de los pocos
-  segundos de los bots. Se llama así por eso, porque "Time to first review"
+  así que en una cuenta revisada solo por bots dice "no human review" en vez de
+  los pocos segundos de los bots. Se llama así por eso, porque "Time to first review"
   sobre un No data se leía como que no se había revisado nada: medido aquí el
   2026-09-17, 703 de 825 pull requests en quince días tuvieron una primera
   revisión y ninguna la tuvo de otra persona, y el campo tiene catorce filas en
   todo el almacén. Nueve de cada diez pull requests tuvieron una
   revisión de un bot en menos de un minuto; la tabla Reviewers lo enseña, con
   cada bot marcado como tal y las respuestas del propio autor en una sola fila.
+</Aside>
+
+<Aside type="note" title="Las listas de qué hacer ahora dejan fuera lo que no se puede hacer">
+  "Open the longest", "Open issues the longest", "Workflows that never ran" y
+  "Stale branches" son los cuatro paneles que se leen como una cola de trabajo.
+  En una cuenta con 17 repositorios archivados y 22 forks de proyectos de otras
+  personas, los cuatro los encabezaban filas sobre las que no se puede hacer
+  nada: las ocho pull requests abiertas más antiguas eran de dependabot en dos
+  repositorios archivados, todos los workflows que nunca se habían ejecutado
+  estaban en uno archivado, y 1.083 de 1.208 ramas eran de un fork. Así que los
+  dos dashboards SQL unen el repositorio de cada fila con `gh_repo`, la única
+  medida que lleva las marcas de fork y archivado, y dejan fuera los archivados
+  en los tres primeros y tanto los archivados como los forks en el de ramas;
+  los tres primeros conservan una columna Fork, porque la pull request de un
+  fork sigue siendo una que se puede fusionar. Prometheus, Graphite y
+  Elasticsearch no tienen join, así que allí esas filas se quedan y cada panel
+  lo dice.
 </Aside>
 
 Lee `gh_pull_request`, `gh_pull_request_review` y `gh_issue`.

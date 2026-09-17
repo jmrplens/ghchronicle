@@ -580,13 +580,14 @@ func whatKeepsFailing(b *builder) []Panel {
 		// looks like data rather than like a broken query.
 		panel("table", "Workflows that never ran", box{W: 12, H: 8, X: 12, Y: 46}, []Target{sqlT(
 			`SELECT w.repo AS "Repository", w.workflow AS "Workflow",` +
-				` w.state AS "State", w.url AS "Link" FROM (` +
+				` w.state AS "State", f.fork AS "Fork", w.url AS "Link" FROM (` +
 				"SELECT DISTINCT repo, workflow, path, state, url FROM gh_workflow" +
 				ciInRange + RF + ") w" +
 				" LEFT JOIN (SELECT DISTINCT repo, workflow FROM gh_workflow_run" +
 				ciInRange + RF + ") r" +
 				ciOnWorkflowPath +
-				" WHERE r.workflow IS NULL ORDER BY 1, 2",
+				repoFlagsJoin("w.repo") +
+				" WHERE r.workflow IS NULL AND " + notArchived + " ORDER BY 1, 2",
 		)}, &P{
 			PromNote: cannot("the workflows that are declared in a repository and did not run "+
 				"in the range, which is a join between two measurements.",
@@ -605,11 +606,14 @@ func whatKeepsFailing(b *builder) []Panel {
 				"measurements.",
 				"Elasticsearch aggregations run inside one index, and these are two.",
 				"elasticsearch"),
-			Desc: "Sixty six of a hundred and thirteen declared workflows had not run in a week " +
-				"here. A workflow that never runs is either dead or waiting on a trigger that " +
-				"no longer fires, and nothing else in the dashboard would say so.",
+			Desc: "A workflow that never runs is either dead or waiting on a trigger that " +
+				"no longer fires, and nothing else in the dashboard would say so. " +
+				archivedLeftOut + " A workflow in an archived repository cannot run at all, " +
+				"which is why every row of this table was one of those until they came out. " +
+				"A fork's workflows stay, since a fork can be given one that runs, and Fork " +
+				"says which they are.",
 			Overrides: []any{
-				repoColumn(), width("Workflow", 200),
+				repoColumn(), width("Workflow", 200), width("Fork", 70),
 				linkOn("Workflow"),
 			},
 		}),

@@ -15,6 +15,7 @@ const (
 	overviewAccountAge     = "Account age"
 	overviewStarsGiven     = "Stars given"
 	overviewUniqueVisitors = "Unique visitors"
+	overviewUniqueCloners  = "Unique cloners"
 )
 
 // ── Overview ────────────────────────────────────────────────────────────────
@@ -97,10 +98,15 @@ func overview(b *builder) []Panel {
 	// Prometheus, which holds GitHub's whole fourteen day window as one gauge.
 	// So the title names the range on the stores that sum rows, and the
 	// window on the one that cannot, and all carry the same sentence.
-	trafficDesc := "Page views, unique visitors and clones, summed over the dashboard " +
-		"range, so they move with the range picker. GitHub only keeps 14 days of " +
-		"traffic, so a range wider than that shows what was captured while it was " +
-		"still there."
+	trafficDesc := "Page views, unique visitors and the people who cloned, summed over " +
+		"the dashboard range, so they move with the range picker. GitHub only keeps 14 " +
+		"days of traffic, so a range wider than that shows what was captured while it " +
+		"was still there. Cloners rather than clones because a clone is counted per " +
+		"pull and continuous integration pulls all day: on the account this was measured " +
+		"against one repository was cloned 135,683 times in a fortnight by 1,807 cloners, " +
+		"and 186 K beside 2.89 K views read as an audience. The clone count itself is two " +
+		"panels of the Audience section, \"Clones over time\" and \"Clone amplification\", " +
+		"where it is the subject rather than a headline."
 	trafficSQL := func(kind, field string) string {
 		return fmt.Sprintf("SUM(CASE WHEN kind = '%s' THEN %s ELSE 0 END)", kind, field)
 	}
@@ -167,14 +173,14 @@ func overview(b *builder) []Panel {
 		}),
 		statGroup("Traffic in range", box{W: 8, H: 4, X: 8, Y: brandHeight}, []Target{sqlT(
 			"SELECT " + trafficSQL("views", "count") + ` AS "Views", ` +
-				trafficSQL("views", "uniques") + ` AS "Unique visitors", ` +
-				trafficSQL("clones", "count") + ` AS "Clones"` +
+				trafficSQL("views", "uniques") + ` AS "` + overviewUniqueVisitors + `", ` +
+				trafficSQL("clones", "uniques") + ` AS "` + overviewUniqueCloners + `"` +
 				" FROM gh_traffic WHERE $__timeFilter(time) AND " + RF,
 		)}, &P{
 			Prom: []Target{
 				trafficProm("A", "Views", "views", "count"),
 				trafficProm("B", overviewUniqueVisitors, "views", "uniques"),
-				trafficProm("C", "Clones", "clones", "count"),
+				trafficProm("C", overviewUniqueCloners, "clones", "uniques"),
 			},
 			PromTitle: "Traffic, 14-day window",
 			Desc:      trafficDesc,
@@ -182,15 +188,16 @@ func overview(b *builder) []Panel {
 			GR: []Target{
 				trafficGR("A", "Views", "views", "count"),
 				trafficGR("B", overviewUniqueVisitors, "views", "uniques"),
-				trafficGR("C", "Clones", "clones", "count"),
+				trafficGR("C", overviewUniqueCloners, "clones", "uniques"),
 			},
 			ES: []Target{
 				trafficES("A", "views", "count"),
 				trafficES("B", "views", "uniques"),
-				trafficES("C", "clones", "count"),
+				trafficES("C", "clones", "uniques"),
 			},
 			ESOver: []any{
-				frameName("A", "Views"), frameName("B", overviewUniqueVisitors), frameName("C", "Clones"),
+				frameName("A", "Views"), frameName("B", overviewUniqueVisitors),
+				frameName("C", overviewUniqueCloners),
 			},
 		}),
 		fieldGroup(b, "gh_account", "Community", box{W: 8, H: 4, X: 16, Y: brandHeight}, []named{

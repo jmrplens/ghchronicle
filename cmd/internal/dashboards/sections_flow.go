@@ -171,9 +171,11 @@ func flowRates(b *builder) []Panel {
 				"median: half of what merged or closed took less than the number shown. " +
 				"Time to review by someone else is the wait before a person other than the " +
 				"author looked at a pull request, so review bots, which answer in seconds, " +
-				"and the author's own replies are left out; a range where nobody else " +
-				"reviewed anything reads No data, which is the honest answer and not the " +
-				"claim that nothing was reviewed. Lines per " +
+				"and the author's own replies are left out; a range in which nobody else " +
+				"reviewed anything reads \"no human review\" rather than a number, which is " +
+				"the honest answer and not the claim that nothing was reviewed. On the " +
+				"account this was measured against, 0 of 925 pull requests in the range had " +
+				"one. Lines per " +
 				"pull request is the median of added plus removed by a merged one.",
 			PromDesc: sinceStart + " " + lastSweep,
 			GR: []Target{
@@ -205,6 +207,7 @@ func flowRates(b *builder) []Panel {
 			Overrides: []any{
 				unitOf(flowMergeTime, "s", 0), unitOf(flowFirstReviewTime, "s", 0),
 				unitOf(flowIssueCloseTime, "s", 0),
+				noValueOf(flowFirstReviewTime, "no human review"),
 			},
 		}),
 		panel("timeseries", "Pull requests over time", box{W: 12, H: 8, X: 0, Y: 5}, []Target{sqlTS(perDay)}, &P{
@@ -581,22 +584,27 @@ func stillOpen(b *builder) []Panel {
 	// ones whose newest row is still open: a merged pull request keeps its
 	// daily open rows behind it, and reading those as open listed three
 	// merged ones as open for hours.
-	openest := `SELECT number AS "Number", seconds_open AS "Open for", repo AS "Repository",` +
-		` title AS "Title", author AS "Author", label_names AS "Labels",` +
-		` comments AS "Comments", reviews AS "Reviews", url AS "Link" FROM (` +
+	openest := `SELECT x.number AS "Number", x.seconds_open AS "Open for", x.repo AS "Repository",` +
+		` x.title AS "Title", x.author AS "Author", x.label_names AS "Labels",` +
+		` x.comments AS "Comments", x.reviews AS "Reviews", f.fork AS "Fork",` +
+		` x.url AS "Link" FROM (` +
 		"SELECT *, ROW_NUMBER() OVER (PARTITION BY repo, number ORDER BY time DESC) AS rn" +
 		flowFromPulls + RF + " AND " + identified +
-		") x WHERE rn = 1 AND state = 'OPEN' ORDER BY seconds_open DESC LIMIT 25"
+		") x" + repoFlagsJoin("x.repo") +
+		" WHERE x.rn = 1 AND x.state = 'OPEN' AND " + notArchived +
+		" ORDER BY x.seconds_open DESC LIMIT 25"
 	// The twin for issues, read the same way: until this table no issue was
 	// reachable by unit from any panel, only counted. `label_names` is the
 	// field the collector writes for what the issue is about, which is what
 	// decides whether an old open issue is a bug or a wish.
-	openIssues := `SELECT number AS "Number", seconds_open AS "Open for", repo AS "Repository",` +
-		` author AS "Author", comments AS "Comments",` +
-		` label_names AS "Labels", url AS "Link" FROM (` +
+	openIssues := `SELECT x.number AS "Number", x.seconds_open AS "Open for", x.repo AS "Repository",` +
+		` x.author AS "Author", x.comments AS "Comments",` +
+		` x.label_names AS "Labels", f.fork AS "Fork", x.url AS "Link" FROM (` +
 		"SELECT *, ROW_NUMBER() OVER (PARTITION BY repo, number ORDER BY time DESC) AS rn" +
 		" FROM gh_issue WHERE $__timeFilter(time) AND " + RF + " AND " + identified +
-		") x WHERE rn = 1 AND state = 'OPEN' ORDER BY seconds_open DESC LIMIT 25"
+		") x" + repoFlagsJoin("x.repo") +
+		" WHERE x.rn = 1 AND x.state = 'OPEN' AND " + notArchived +
+		" ORDER BY x.seconds_open DESC LIMIT 25"
 
 	openGR, openGRtf := gTbl(fmt.Sprintf(`limit(sortBy(groupByNodes(%s, "max", %d, %d), "max", true), 25)`,
 		rp("gh_pull_request", "seconds_open", "state", "OPEN"),
@@ -645,15 +653,17 @@ func stillOpen(b *builder) []Panel {
 				"still open and how long it has been, which is the number that decides what " +
 				"to do next rather than describing what already happened. Each pull request " +
 				"is read from its newest row, so one that merged inside the range is not " +
-				"here any more.",
-			PromDesc: lastSweep,
+				"here any more. " + archivedLeftOut + " A fork's pull request is still one " +
+				"that can be merged, so those stay and Fork says which they are.",
+			PromDesc: lastSweep + " " + noRepoFlagsHere,
 			Overrides: []any{
 				repoColumn(), width("Number", 80), width("Author", 120),
 				unitOf(flowOpenAge, "s", 130),
-				width("Comments", 100), width("Reviews", 90), linkOn("Number"),
+				width("Comments", 100), width("Reviews", 90), width("Fork", 70),
+				linkOn("Number"),
 			},
-			GR: openGR, GRTF: openGRtf, GRDesc: grSlot + " " + stillOpenNote,
-			ES: openES, ESTF: openEStf, ESDesc: stillOpenNote,
+			GR: openGR, GRTF: openGRtf, GRDesc: grSlot + " " + stillOpenNote + " " + noRepoFlagsHere,
+			ES: openES, ESTF: openEStf, ESDesc: stillOpenNote + " " + noRepoFlagsHere,
 		}),
 		panel("table", "Open issues the longest", box{W: 12, H: 8, X: 12, Y: 45}, []Target{sqlT(openIssues)}, &P{
 			PromNote: cannot("the twenty-five open issues that have waited longest, with "+
@@ -664,13 +674,17 @@ func stillOpen(b *builder) []Panel {
 			Desc: "The same question for issues: what is still open and for how long. Labels " +
 				"is what the issue was filed as, so an old one reads as a bug nobody fixed " +
 				"or a wish nobody granted. Each issue is read from its newest row, so one " +
-				"closed inside the range is not here any more.",
+				"closed inside the range is not here any more. " + archivedLeftOut +
+				" A fork's issues stay, and Fork says which they are.",
 			Overrides: []any{
 				unitOf(flowOpenAge, "s", 130), width("Number", 80),
-				width("Comments", 110), width("Labels", 160), linkOn("Number"),
+				width("Comments", 110), width("Labels", 160), width("Fork", 70),
+				linkOn("Number"),
 			},
-			GR: openIssuesGR, GRTF: openIssuesGRtf, GRDesc: grSlot + " " + stillOpenNote,
-			ES: openIssuesES, ESTF: openIssuesEStf, ESDesc: stillOpenNote,
+			GR: openIssuesGR, GRTF: openIssuesGRtf,
+			GRDesc: grSlot + " " + stillOpenNote + " " + noRepoFlagsHere,
+			ES:     openIssuesES, ESTF: openIssuesEStf,
+			ESDesc: stillOpenNote + " " + noRepoFlagsHere,
 		}),
 	}
 }

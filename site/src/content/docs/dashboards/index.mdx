@@ -117,7 +117,16 @@ GRAFANA_TOKEN=... go run ./cmd/check_prometheus <metrics-dump> <datasource-uid>
 go run ./cmd/check_postgres <schema.json>
 ```
 
-`check_dashboards` reports every panel as ok, empty or failing.
+`check_dashboards` reports every panel as ok, empty or failing, and counts two
+kinds of failure apart from the rest: a panel naming a table the store has not
+created, which is a family that has not been collected there yet and will fill
+itself, and a panel naming a column it has not created, which is a panel nobody
+with that account's history can draw. The second is why this is worth running
+against a store holding a real account and not only against the fixture: a
+column of these stores exists once a point has carried it, the fixture carries
+every field of every measurement, and an account carries only what has happened
+to it. A panel selecting a field the account has never written is refused
+outright and Grafana draws "No data" with a corner badge nobody notices.
 `check_prometheus` additionally checks each metric name against a live dump of
 the exporter's own `/metrics`, because a typo in a metric name is not a syntax
 error: PromQL parses it happily and returns nothing forever.

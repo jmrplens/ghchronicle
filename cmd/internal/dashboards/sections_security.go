@@ -40,6 +40,7 @@ const (
 	securityCanApprovePR = "Can approve pull requests"
 	securityLastRotated  = "Last rotated"
 	securityCVSS         = "CVSS"
+	securityOutcome      = "Outcome"
 )
 
 // onOff renders a genuinely two-state boolean column as a word rather than as
@@ -258,6 +259,18 @@ func openAlerts(b *builder) []Panel {
 	}
 }
 
+// securityResolveDesc is what the Dependabot resolution table says about
+// itself, out here rather than at its call site so that the function building
+// the section stays inside the maintainability the linter holds it to.
+const securityResolveDesc = "Dependabot alerts that were fixed or dismissed, newest " +
+	"first, with the advisory each one was and how long it stayed open. Outcome is which " +
+	"of the two it was, read from the alert's own state rather than from the reason it " +
+	"was dismissed: an account that has only ever fixed its alerts has never written such " +
+	"a reason, and a column these stores were never given does not exist to be selected. " +
+	"The score is there because the word rounds it away: one alert in the measured " +
+	"account scores 9.3 under a word whose mean is 6.1. It is the v4 score where the " +
+	"advisory carries one."
+
 // scanningAndResolution is the other side of the same section: that the scans
 // ran at all, what they returned, and how long an alert stayed open before it
 // was fixed or dismissed.
@@ -270,9 +283,19 @@ func scanningAndResolution(b *builder) []Panel {
 	// which advisory it was, which a count by severity cannot. The score is
 	// the v4 one where the advisory has it; `cvss` is absent on a v4-only
 	// advisory, which is why the old MAX(cvss) read 0 for a whole bucket.
+	// How the alert ended comes from `alert_state`, not from `dismissed_reason`.
+	// A column of these stores exists once a point has carried it, and this
+	// account has only ever fixed alerts, never dismissed one, so nothing had
+	// ever written a reason: InfluxDB refused the whole statement with "Schema
+	// error: No field named dismissed_reason" and the panel drew No data over
+	// the eight resolved alerts it should have listed. COALESCE would not save
+	// it either, the planner rejecting the name before a row is read. Every row
+	// of this measurement carries `alert_state`, whatever the account has done
+	// with its alerts, and fixed against dismissed is what the column was there
+	// to say.
 	resolve := `SELECT package AS "Package", time AS "Raised", repo AS "Repository",` +
 		` severity AS "Severity", summary AS "Advisory",` +
-		` COALESCE(cvss_v4, cvss) AS "` + securityCVSS + `", dismissed_reason AS "Dismissed",` +
+		` COALESCE(cvss_v4, cvss) AS "` + securityCVSS + `", alert_state AS "` + securityOutcome + `",` +
 		` seconds_to_resolve AS "Time to resolve", url AS "Link"` +
 		" FROM gh_dependabot_alert_item WHERE $__timeFilter(time) AND " + RF +
 		" AND seconds_to_resolve IS NOT NULL ORDER BY time DESC LIMIT 25"
@@ -334,7 +357,7 @@ func scanningAndResolution(b *builder) []Panel {
 		{"summary", "Advisory"},
 		{"cvss_v4", "CVSS v4"},
 		{"cvss", securityCVSS},
-		{"dismissed_reason", "Dismissed"},
+		{"alert_state", securityOutcome},
 		{"seconds_to_resolve", securityResolveTime},
 		{"url", "Link"},
 	}, []string{ESF, "_exists_:seconds_to_resolve"})
@@ -424,16 +447,12 @@ func scanningAndResolution(b *builder) []Panel {
 				inventoryValueCol + "B": "Worst CVSS", inventoryValueCol + "C": securityResolveTime,
 			}, nil, nil),
 			Opts: Opts{"sort": "Raised"},
-			Desc: "Dependabot alerts that were fixed or dismissed, newest first, with the " +
-				"advisory each one was and how long it stayed open. The score is there " +
-				"because the word rounds it away: one alert in the measured account scores " +
-				"9.3 under a word whose mean is 6.1. It is the v4 score where the advisory " +
-				"carries one.",
+			Desc: securityResolveDesc,
 			PromDesc: "Prometheus keeps the severity only, so this is the alerts resolved per " +
 				"severity, the worst mean score and the mean time. " + sinceStart + " " + lastSweep,
 			Overrides: []any{
 				when("Raised"), repoColumn(), width("Severity", 90),
-				width("Package", 130), width(securityCVSS, 70), width("Dismissed", 110),
+				width("Package", 130), width(securityCVSS, 70), width(securityOutcome, 110),
 				unitOf(securityResolveTime, "s", 130), ownerLinkOn("Package", "the alert"),
 			},
 			PromOver: []any{

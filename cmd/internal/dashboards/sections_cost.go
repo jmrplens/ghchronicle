@@ -229,9 +229,10 @@ func cost(b *builder) []Panel {
 				"repo": "Repository", panelValueA: "Cache", panelValueB: "Entries",
 			}, nil, nil),
 			Opts: Opts{"sort": "Cache"},
-			Desc: "GitHub caps a repository at ten gigabytes and evicts the least recently used " +
-				"entry past it. Three repositories here are over the line and are throwing " +
-				"caches away on every run; the panel above says which key goes.",
+			Desc: "GitHub caps a repository at ten gigabytes and evicts the least recently " +
+				"used entry past it. The bar is each repository's cache against that cap, so " +
+				"one that has reached the red end is throwing caches away on every run and " +
+				"the panel above says which key goes.",
 			Overrides: []any{override("Cache", []any{
 				map[string]any{"id": "unit", "value": "bytes"},
 				map[string]any{"id": "custom.cellOptions", "value": map[string]any{
