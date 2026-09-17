@@ -125,9 +125,10 @@ clave:
 level=INFO msg=written sink=loki family=repos points=0 unchanged=0 filtered=42
 ```
 
-`filtered` es lo que el destino no escribió, y la pasada imprime el total de
-cada destino una vez al final. Las líneas que un almacén no supo analizar
-tampoco cuentan como escritas; esas llevan su propia línea de aviso.
+`filtered` es lo que el destino no escribió, y cada pasada termina con una línea
+por destino que lleva el total desde que arrancó la ejecución, igual que se lee
+el total del propio registro que va al lado. Las líneas que un almacén no supo
+analizar tampoco cuentan como escritas; esas llevan su propia línea de aviso.
 
 Hasta que se contó, la línea decía lo que el runner había entregado, así que una
 pasada leía `points=440` de una medida que InfluxDB excluye por omisión y de la

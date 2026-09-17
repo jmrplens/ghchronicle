@@ -119,8 +119,9 @@ key appears when that happened:
 level=INFO msg=written sink=loki family=repos points=0 unchanged=0 filtered=42
 ```
 
-`filtered` is what the sink did not write, and the sweep prints each sink's
-total once at the end. Lines a store refused to parse are not counted as
+`filtered` is what the sink did not write, and each sweep ends with one line
+per sink carrying the total since the run started, the way the ledger's own
+total beside it reads. Lines a store refused to parse are not counted as
 written either; they get a warning line of their own.
 
 Until this was counted the line said what the runner had handed over, so a

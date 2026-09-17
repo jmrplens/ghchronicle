@@ -105,8 +105,10 @@ type Runner struct {
 	Now func() time.Time
 
 	// filtered counts, per sink name, the points that sink was offered and
-	// did not write. A sweep prints its own total at the end, beside the
-	// ledger's: the per-family lines say where, and this says how much.
+	// did not write. It is never reset, so the total printed at the end of
+	// each sweep is the count since the run started, which is how the ledger's
+	// own total beside it reads too: the per-family lines say where, and this
+	// says how much.
 	filtered map[string]uint64
 
 	// markupWarned is whether the achievements page has already been
