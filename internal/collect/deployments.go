@@ -34,10 +34,49 @@ const defaultAliasBatch = 5
 // emit is called per repository that answered, so a caller can accumulate
 // points and cursors at once; a repository whose alias came back null is
 // skipped without failing the rest.
+//
+// A failure that still asked some repositories successfully comes back as a
+// PartialError carrying how many, which is the difference between "no chunk
+// answered" and "the chunks that answered had nothing to say". Those two are
+// the same number of points and they are not the same event: see PartialError.
 func aliasBatch[T any](ctx context.Context, c *ghapi.Client, repos []Repo, size int, build func(batch []Repo) string, emit func(repo Repo, node T)) error {
+	asked, failed := aliasBatchAsked(ctx, c, repos, size, build, emit)
+	if failed != nil && asked > 0 {
+		return &PartialError{Asked: asked, Err: failed}
+	}
+	return failed
+}
+
+// PartialError is a batched read that failed for some of the repositories it
+// covered and answered for the rest.
+//
+// Asked is how many repositories were in the chunks that answered, not how
+// many rows came back, and the difference is the whole reason this type
+// exists. A family whose collector legitimately writes nothing for a
+// repository with nothing to report, deployments on an account that has never
+// deployed, produces zero points from chunks that all answered perfectly; read
+// as "the batch brought back nothing" that leaves the family unmarked and due
+// again on the next tick, which for an hourly family is every fifteen minutes
+// for as long as one repository keeps failing.
+type PartialError struct {
+	Asked int
+	Err   error
+}
+
+func (e *PartialError) Error() string {
+	return fmt.Sprintf("%s (%d repositories were asked successfully)", e.Err, e.Asked)
+}
+
+// Unwrap keeps the failure underneath reachable, so a rate limit or a canceled
+// sweep is still found by errors.As through this wrapper.
+func (e *PartialError) Unwrap() error { return e.Err }
+
+// aliasBatchAsked is aliasBatch with the count carried through the halvings.
+func aliasBatchAsked[T any](ctx context.Context, c *ghapi.Client, repos []Repo, size int, build func(batch []Repo) string, emit func(repo Repo, node T)) (int, error) {
 	if size <= 0 {
 		size = defaultAliasBatch
 	}
+	asked := 0
 	var failed error
 	for start := 0; start < len(repos); start += size {
 		end := min(start+size, len(repos))
@@ -51,13 +90,18 @@ func aliasBatch[T any](ctx context.Context, c *ghapi.Client, repos []Repo, size 
 			case !recoverable:
 				failed = errors.Join(failed, err)
 			case retryAt > 0:
-				failed = errors.Join(failed, aliasBatch(ctx, c, batch, retryAt, build, emit))
+				smaller, retryErr := aliasBatchAsked(ctx, c, batch, retryAt, build, emit)
+				asked += smaller
+				failed = errors.Join(failed, retryErr)
 			}
 			continue
 		}
 		decodeAliases(batch, res, emit)
+		// The chunk, not the aliases it filled: an alias that came back null
+		// is a repository that is gone, which is an answer.
+		asked += len(batch)
 	}
-	return failed
+	return asked, failed
 }
 
 // aliasRetry decides what to do with a batch the gateway refused: the size to

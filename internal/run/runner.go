@@ -192,9 +192,8 @@ func (r *Runner) Once(ctx context.Context) error {
 	// with no row did not run, so a sweep that listed its repositories, ran
 	// its account families and was then cut short by a discovery that failed
 	// or by a shutdown would leave that sentence saying something false about
-	// the families that did run. Under the sweep's own context: a shutdown
-	// has canceled it and the row is lost, which is the one case where the
-	// next sweep is moments away.
+	// the families that did run. emitHealth detaches from this context for
+	// the shutdown half of that.
 	r.emitHealth(ctx, now)
 	if err != nil {
 		return err
@@ -439,7 +438,7 @@ func (r *Runner) collectFamily(ctx context.Context, family string, now time.Time
 	if batchErr != nil {
 		r.Log.Error("batched collector failed", "family", family, "err", batchErr)
 		r.noteFamilyFailure(family, batchErr)
-		failed = batchFailures(len(batch), r.batched(family))
+		failed = batchFailures(batchAnswered(batch, batchErr), r.batched(family))
 	}
 	for _, repo := range r.repos {
 		// A shutdown cancels the sweep. Without this every remaining
@@ -488,31 +487,50 @@ func (r *Runner) collectFamily(ctx context.Context, family string, now time.Time
 }
 
 // batchFailures is what a failed batch counts as: how many repositories it
-// took with it, or one when it still delivered rows.
+// took with it, or one when some of them answered.
 //
 // The two are different questions and they used to be the same answer.
 // Where the batch is the whole family, or the part of it these repositories
-// were going to get, and it brought back nothing, every repository it covered
+// were going to get, and no chunk of it answered, every repository it covered
 // is lost: repoFamilies reads failed == len(repos) as "this family has not
 // run" and leaves it unmarked, which is what stops an outage hiding until the
 // family's next cadence, a whole day for two of the three.
 //
-// A batch that failed and still delivered rows is the other case, and counting
-// it as every repository was a cost regression this branch introduced by
-// itself: the batched collectors now report a chunk they lost instead of
-// swallowing it, so a single repository failing its alias batch marked all
-// fifty-nine as failed, left the family unmarked, and turned a daily family
-// into a quarter-hourly one for as long as that repository stayed broken. It
-// counts as one thing that failed, which is what r.family already counts an
-// account-wide failure as and for the same reason: nothing in the error names
-// a repository, and the family delivered some of what it was asked for. The
-// failure is not lost by the family being marked; it is in the log and in the
-// family's own row, with the reason that says which kind it was.
-func batchFailures(collected, covered int) int {
-	if collected > 0 {
+// A batch that failed and still answered for some repositories is the other
+// case, and counting it as every repository was a cost regression this branch
+// introduced by itself: the batched collectors now report a chunk they lost
+// instead of swallowing it, so a single repository failing its alias batch
+// marked all fifty-nine as failed, left the family unmarked, and turned a
+// daily family into a quarter-hourly one for as long as that repository stayed
+// broken. It counts as one thing that failed, which is what r.family already
+// counts an account-wide failure as and for the same reason: nothing in the
+// error names a repository, and the family delivered some of what it was asked
+// for. The failure is not lost by the family being marked; it is in the log
+// and in the family's own row, with the reason that says which kind it was.
+func batchFailures(answered bool, covered int) int {
+	if answered {
 		return 1
 	}
 	return covered
+}
+
+// batchAnswered reports whether the batched part of a family answered for any
+// repository at all.
+//
+// Rows are not the test, and reading them as one was a corner that survived
+// the first fix: a collector that legitimately writes nothing for a repository
+// with nothing to report produces zero points from chunks that all answered
+// perfectly. deployments is the live example, hourly, on an account that has
+// never deployed anything, so its batch yields no rows on every sweep and one
+// chunk failing would have left it due on every tick. The collectors say how
+// many repositories were in the chunks that answered, through
+// collect.PartialError, which is the question this is really asking.
+func batchAnswered(points []sink.Point, err error) bool {
+	if len(points) > 0 {
+		return true
+	}
+	partial, ok := errors.AsType[*collect.PartialError](err)
+	return ok && partial.Asked > 0
 }
 
 // finish saves what the sweep learned, unless it was a card-only sweep, which

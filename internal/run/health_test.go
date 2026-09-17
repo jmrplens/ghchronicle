@@ -1,6 +1,7 @@
 package run
 
 import (
+	"context"
 	"errors"
 	"io"
 	"net/http"
@@ -320,5 +321,116 @@ func TestAListingThatWorkedWritesNoRowOfItsOwn(t *testing.T) {
 		if p.Tags["family"] == "discover" {
 			t.Errorf("the listing worked and still wrote %v", p.Fields)
 		}
+	}
+}
+
+// honorsContext is a sink that refuses a write under a canceled context, the
+// way a network sink does. The one in this package ignores it, which is why
+// nothing here could see that a shutdown took the self report with it.
+type honorsContext struct {
+	kept
+}
+
+func (h *honorsContext) Name() string { return "honors-context" }
+
+func (h *honorsContext) Write(ctx context.Context, points []sink.Point) (int, error) {
+	if err := ctx.Err(); err != nil {
+		return 0, err
+	}
+	return h.kept.Write(ctx, points)
+}
+
+// TestAShutdownMidSweepStillSaysWhatRanBeforeIt: a shutdown cancels the
+// sweep's context, and the row that says what the sweep managed to do is the
+// one write that must survive it. Measured before the detachment: ten
+// measurements delivered by the families that ran, and no self report, which
+// makes the panel's rule say something false about all ten.
+func TestAShutdownMidSweepStillSaysWhatRanBeforeIt(t *testing.T) {
+	t.Parallel()
+	store := &honorsContext{}
+	r, _, _ := fakeRunner(t, store)
+
+	// Canceled once the account families have run and before the sweep is
+	// done, which is what a restart landing mid-sweep looks like.
+	ctx, cancel := context.WithCancel(t.Context())
+	r.Cfg.Every = everyOnly("account", "traffic")
+	if err := r.Cfg.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	r.Sinks = []sink.Sink{cancelOnFirstFamily{store: store, cancel: cancel}}
+
+	if err := r.Once(ctx); err == nil {
+		t.Fatal("the sweep was canceled and Once reported success")
+	}
+	if n := len(store.rows("gh_collector_family")); n == 0 {
+		t.Errorf("a shutdown mid-sweep delivered %d measurements and no self report",
+			len(store.points))
+	}
+}
+
+// cancelOnFirstFamily delivers to the store and cancels the sweep as soon as
+// one family has been written, so the cancellation lands in the middle of the
+// sweep rather than before it or after everything.
+type cancelOnFirstFamily struct {
+	store  *honorsContext
+	cancel context.CancelFunc
+}
+
+func (c cancelOnFirstFamily) Name() string { return "cancel-on-first-family" }
+func (c cancelOnFirstFamily) Close() error { return nil }
+
+func (c cancelOnFirstFamily) Write(ctx context.Context, points []sink.Point) (int, error) {
+	n, err := c.store.Write(ctx, points)
+	if c.store.measured("gh_account") > 0 {
+		c.cancel()
+	}
+	return n, err
+}
+
+// TestAChunkWithNothingToSayStillCountsAsAnAnswer is the corner the first fix
+// left: reading rows as the test for "did the batch answer" reads a collector
+// that legitimately writes nothing as a collector that failed. deployments is
+// the live example, hourly, on an account that has never deployed, so its
+// batch produces no rows on any sweep; one chunk failing would then have left
+// it due on every tick, which is the cost the rule above exists to prevent.
+func TestAChunkWithNothingToSayStillCountsAsAnAnswer(t *testing.T) {
+	t.Parallel()
+	// Every chunk that answers answers with an empty page, which is what a
+	// repository with no deployment looks like, so the family collects
+	// nothing at all and one repository still fails.
+	r := sweepRunner(t, func(w http.ResponseWriter, req *http.Request) {
+		body, _ := io.ReadAll(req.Body)
+		w.Header().Set("Content-Type", "application/json")
+		if strings.Contains(string(body), `name: \"broken\"`) {
+			_, _ = w.Write([]byte(`{"errors":[{"type":"INTERNAL","message":"boom"}]}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"data":{"r0":{"deployments":{"nodes":[],` +
+			`"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}`))
+	})
+	r.Cfg.Every = everyOnly("deployments")
+	if err := r.Cfg.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	r.repos = nil
+	for i := range 7 {
+		name := "fine" + strconv.Itoa(i)
+		if i == 3 {
+			name = "broken"
+		}
+		r.repos = append(r.repos, collect.Repo{Owner: "o", Name: name, FullName: "o/" + name})
+	}
+
+	points, failed, err := r.collectFamily(t.Context(), "deployments", time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(points) != 0 {
+		t.Fatalf("the fake answered every chunk with an empty page and %d points came back, "+
+			"so this is no longer the shape it was written for", len(points))
+	}
+	if failed != 1 {
+		t.Errorf("failed = %d, want the one thing that failed: six repositories were asked "+
+			"and answered, they simply had nothing to report", failed)
 	}
 }

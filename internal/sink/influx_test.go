@@ -266,6 +266,23 @@ func TestInfluxTreatsAnyNonSuccessStatusAsAFailure(t *testing.T) {
 
 // TestInfluxStopsBisectingAtAFailureDeepInside returns a server failure met
 // two halvings down, without writing the rest of the batch.
+//
+// The assertion is "at least three requests and the 503", not "exactly three",
+// and the client's transport keeps no connection alive. Both are about the
+// network rather than about the sink. Write and bisect are strictly
+// sequential, with no goroutine, no retry and no timeout, and the count of
+// three is the same for four points, three or two, so nothing in the code
+// under test can vary it. A transport can: a pooled connection that fails
+// before anything was written is replayed silently and shows up here as a
+// fourth request.
+//
+// This is written down because the test failed once, on 2026-09-17, on a host
+// that was at that moment running a backfill, a nine container stack and
+// several agents, and then survived three hundred serial repeats, sixteen
+// hundred more across eight concurrent processes, the whole package set three
+// times in parallel and a race build. The failure message from that one run
+// was never captured, and that single line would have settled which of the two
+// causes it was. Printing the count is what makes the next one diagnosable.
 func TestInfluxStopsBisectingAtAFailureDeepInside(t *testing.T) {
 	t.Parallel()
 	var calls int
@@ -283,11 +300,20 @@ func TestInfluxStopsBisectingAtAFailureDeepInside(t *testing.T) {
 		w.WriteHeader(http.StatusServiceUnavailable)
 	}))
 	t.Cleanup(srv.Close)
-	_, err := NewInflux(srv.URL, "tok", "acme", "gh", 0, 0).Write(t.Context(), []Point{star("a"), star("b"), star("c"), star("d")})
+	influx := NewInflux(srv.URL, "tok", "acme", "gh", 0, 0)
+	influx.client = &http.Client{Transport: &http.Transport{DisableKeepAlives: true}}
+	_, err := influx.Write(t.Context(), []Point{star("a"), star("b"), star("c"), star("d")})
 	mu.Lock()
 	defer mu.Unlock()
-	if err == nil || !strings.Contains(err.Error(), "503") || calls != 3 {
-		t.Errorf("Write = %v after %d requests, want the 503 from the third and nothing after it", err, calls)
+	if err == nil || !strings.Contains(err.Error(), "503") {
+		t.Errorf("Write = %v after %d requests, want the 503 met two halvings down", err, calls)
+	}
+	// Three is what the bisect makes: the whole batch, its first half, and the
+	// half of that. More than three means the transport repeated one of them,
+	// which is not this sink's doing; fewer means the bisect stopped early,
+	// which is.
+	if calls < 3 {
+		t.Errorf("Write made %d requests, want at least the 3 the bisect makes; err = %v", calls, err)
 	}
 }
 
