@@ -147,7 +147,7 @@ func TestAudienceAsksOnlyForTheFamilyThatIsDue(t *testing.T) {
 	if strings.Contains(queries[0], "stargazers(") {
 		t.Errorf("a forks sweep asked for stargazers:\n%s", queries[0])
 	}
-	if got := byMeasurement(points); len(got["gh_star"]) != 0 || len(got["gh_fork"]) != 2 {
+	if got := byMeasurement(points); len(got["gh_star"]) != 0 || len(got["gh_fork"]) != 3 {
 		t.Errorf("forks sweep wrote %v", measurements(points))
 	}
 }
@@ -199,7 +199,7 @@ func TestAudienceReportsTheForkListsItCannotFinish(t *testing.T) {
 	}{{total: 150, want: []string{"octocat/hello-world"}}, {total: 100, want: nil}} {
 		f := newFixtureServer(t)
 		f.graphQL(func(w http.ResponseWriter, _ *http.Request, _ string, _ map[string]any) {
-			body := strings.Replace(string(fixture(t, "graphql_audience.json")), `"totalCount": 2`, fmt.Sprintf(`"totalCount": %d`, tc.total), 1)
+			body := strings.Replace(string(fixture(t, "graphql_audience.json")), `"totalCount": 3`, fmt.Sprintf(`"totalCount": %d`, tc.total), 1)
 			_, _ = w.Write([]byte(body))
 		})
 		var overflow []string
@@ -212,8 +212,8 @@ func TestAudienceReportsTheForkListsItCannotFinish(t *testing.T) {
 			t.Errorf("with %d forks the batch reported %v for the walk, want %v", tc.total, overflow, tc.want)
 		}
 		// The hundred it did read are written either way.
-		if got := len(only(t, points, "gh_fork")); got != 2 {
-			t.Errorf("with %d forks the batch wrote %d rows, want the 2 it was served", tc.total, got)
+		if got := len(only(t, points, "gh_fork")); got != 3 {
+			t.Errorf("with %d forks the batch wrote %d rows, want the 3 it was served", tc.total, got)
 		}
 	}
 }

@@ -173,10 +173,15 @@ func labelsMilestonesAndForks(b *builder) []Panel {
 				panelValueC: planningPushedAfter,
 			}, nil, nil),
 			Desc: "Whether a fork was ever pushed to separates a derivative from a bookmark, " +
-				"which most forks are.",
+				"which most forks are. Idle is the time since that push, counted from the " +
+				"row's own date, so it is right when the panel is drawn rather than when the " +
+				"last sweep ran.",
 			PromDesc: "Prometheus keeps no forker, so this is per repository: forks seen over " +
 				"the range, the share ever pushed to, and on average how long after the fork " +
-				"its last push came. How long a fork has been idle is the row's own date " +
+				"its last push came, which is negative for a fork nobody has pushed to at " +
+				"all: GitHub gives such a fork the parent's own last push, which usually " +
+				"predates it, and two thirds of the forks measured here are that. How long a " +
+				"fork has been idle is the row's own date " +
 				"subtracted from now, which only the two SQL stores can do. " + sinceStart,
 			Overrides: []any{
 				when("Forked"), width(planningPushedTo, 110), unitOf("Idle", "s", 90),
@@ -191,8 +196,16 @@ func labelsMilestonesAndForks(b *builder) []Panel {
 			ESOver: []any{unitOf(planningPushedAfter, "s", 110)},
 			GR:     forkGR, GRTF: forkGRtf,
 			GRDesc: "Graphite names each row forker and repository from the path, and a boolean " +
-				"is not a metric there, so whether it was pushed to is missing. " + grRows,
+				"is not a metric there, so whether it was pushed to is missing. It cannot " +
+				"subtract the row's own date from now either, so the column is how long " +
+				"after the fork its last push came, which is negative for a fork nobody has " +
+				"pushed to: those inherit the parent's last push. " + grRows,
 			ES: forkES, ESTF: forkEStf,
+			ESDesc: "Elasticsearch lists the documents themselves and cannot subtract the " +
+				"row's own date from now, so the column is how long after the fork its last " +
+				"push came. A negative is a fork nobody has pushed to, which inherits the " +
+				"parent's own last push and is most of them; Pushed to says the same thing " +
+				"as a word.",
 		}),
 	}
 }

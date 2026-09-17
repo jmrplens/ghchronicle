@@ -23,8 +23,8 @@ func TestForks(t *testing.T) {
 	if len(calls) != 1 || calls[0].Query["sort"] != "oldest" {
 		t.Errorf("calls = %d, query %v", len(calls), calls[0].Query)
 	}
-	if len(points) != 2 {
-		t.Fatalf("got %d forks, want 2", len(points))
+	if len(points) != 3 {
+		t.Fatalf("got %d forks, want 3", len(points))
 	}
 	alice := find(t, points, "gh_fork", map[string]string{"by": "alice"})
 	if want := time.Date(2025, 2, 10, 10, 0, 0, 0, time.UTC); !alice.Time.Equal(want) {
@@ -46,6 +46,15 @@ func TestForks(t *testing.T) {
 	}
 	if fieldInt(t, bob, "seconds_to_push") != 30 {
 		t.Errorf("seconds_to_push = %v, want the thirty seconds the fork itself took", bob.Fields["seconds_to_push"])
+	}
+	// A fork nobody has pushed to inherits the parent's own last push, which
+	// is usually older than the fork: measured live on 2026-09-17, 19 of the
+	// 28 forks of jmrplens/TFG-TFM_EPS and 27 of 34 of jmrplens/phonometry.
+	// So a negative gap is the common case, not an edge, and what it says is
+	// that this fork has never been pushed to at all.
+	carol := find(t, points, "gh_fork", map[string]string{"by": "carol"})
+	if carol.Fields["advanced"] != false || fieldInt(t, carol, "seconds_to_push") != -2*86400 {
+		t.Errorf("carol's fork = %v, want the two days GitHub reports its push before the fork", carol.Fields)
 	}
 }
 

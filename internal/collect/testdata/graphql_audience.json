@@ -10,7 +10,7 @@
         ]
       },
       "forks": {
-        "totalCount": 2,
+        "totalCount": 3,
         "nodes": [
           {
             "nameWithOwner": "alice/hello-world",
@@ -27,6 +27,14 @@
             "stargazerCount": 0,
             "url": "https://github.com/bob/hello-world",
             "owner": {"login": "bob"}
+          },
+          {
+            "nameWithOwner": "carol/hello-world",
+            "createdAt": "2026-08-20T10:00:00Z",
+            "pushedAt": "2026-08-18T10:00:00Z",
+            "stargazerCount": 0,
+            "url": "https://github.com/carol/hello-world",
+            "owner": {"login": "carol"}
           }
         ]
       }

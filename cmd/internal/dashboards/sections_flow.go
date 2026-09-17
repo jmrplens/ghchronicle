@@ -67,9 +67,10 @@ const (
 	// author, bots excluded, and on an account whose pull requests are
 	// reviewed by their author and by review bots there is nothing to draw:
 	// called "Time to first review", a stat reading No data said that nothing
-	// had ever been reviewed, which is false. Measured on the account this was
-	// developed against, 706 of 829 pull requests in a fortnight had a first
-	// review and none of them had one from anybody else.
+	// had ever been reviewed, which is false. Measured on 2026-09-17, 703 of
+	// 825 pull requests of the fortnight had a first review and none of them
+	// had one from anybody else; the field holds fourteen rows in the whole
+	// store, the newest raised in July.
 	flowFirstReviewTime = "Time to review by someone else"
 	flowIssuesClosed    = "Issues closed"
 	flowIssueCloseTime  = "Time to close an issue"
