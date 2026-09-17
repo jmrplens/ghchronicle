@@ -347,8 +347,9 @@ each item from its newest row.
 > than a bot, so on an account reviewed by bots alone it reads No data rather
 > than the bots' few seconds. It is named for that, because "Time to first
 > review" over No data read as nothing having been reviewed at all: measured
-> here, 706 of 829 pull requests in a fortnight had a first review and none of
-> them had one from anybody else. Nine pull requests in ten had a bot review
+> here on 2026-09-17, 703 of 825 pull requests in a fortnight had a first
+> review and none of them had one from anybody else, and the field holds
+> fourteen rows in the whole store. Nine pull requests in ten had a bot review
 > inside a minute; the Reviewers table shows that, with each bot marked
 > as one and the author's own replies as one row.
 

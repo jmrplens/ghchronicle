@@ -7028,7 +7028,7 @@
         },
         {
           "datasource": "${DS_INFLUXDB}",
-          "description": "Whether a fork was ever pushed to separates a derivative from a bookmark, which most forks are.",
+          "description": "Whether a fork was ever pushed to separates a derivative from a bookmark, which most forks are. Idle is the time since that push, counted from the row's own date, so it is right when the panel is drawn rather than when the last sweep ran.",
           "fieldConfig": {
             "defaults": {
               "custom": {

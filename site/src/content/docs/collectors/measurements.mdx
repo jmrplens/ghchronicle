@@ -413,7 +413,7 @@ two added together.
 | `gh_workflow_step`       | dated, when it finished | `workflow`, `job_name`, `attempt`, `step`, `conclusion`                   | `duration_seconds`, `step_number`                                                                                                                       |
 | `gh_workflow` | now | `workflow`, `path`, `state` | `active`, `age_days`, `days_since_change`, `url` |
 | `gh_artifact`            | dated, when created     | `artifact`                                                                | `live`, `size_bytes`, `retention_days`, `digest`, `run_id`, `head_sha`, `head_branch`, `url`                                                            |
-| `gh_artifact_total`      | now                     |                                                                           | `live_bytes`, `live_count`, `count`, `walked`, `complete`                                                                                               |
+| `gh_artifact_total`      | now                     |                                                                           | `live_bytes`, `live_count`, `count`, `walked`                                                                                                           |
 | `gh_actions_cache`       | now                     |                                                                           | `size_bytes`, `count`                                                                                                                                   |
 | `gh_actions_cache_entry` | daily                   | `cache`, `ref`                                                            | `size_bytes`, `caches`, `key`, `days_since_use`, `age_days`                                                                                             |
 | `gh_repo_activity`       | dated                   | `activity`, `actor`                                                       | `events`, `id`, `ref_name`                                                                                                                              |
@@ -510,16 +510,15 @@ as a tag it would create a series for every job ever executed. The workflow job
 tag is `job_name` rather than `job`, because `job` collides with the labels
 Prometheus adds at scrape time.
 
-`gh_artifact_total` carries four counts because its size is on none of the
+`gh_artifact_total` carries three counts because its size is on none of the
 obvious ones. `count` is GitHub's own total for the repository and it counts
 the artifacts GitHub has already expired: measured on jmrplens/jmrp.io on
 2026-09-17, page 40 of the listing was expired to the last row against a
 declared 29,405. `walked` is how far the five-page cap let the walk go.
 `live_bytes` is the size of the artifacts GitHub still holds among the ones
 walked, and `live_count` is how many those are, which is the count the size is
-over. `complete` is `walked >= count` in one value: false means the live
-figures are a floor rather than a total, which on that repository was short by
-a factor of fifty six.
+over. When `walked` is below `count` the live figures are a floor rather than a
+total, which on that repository was short by a factor of fifty six.
 
 `gh_actions_cache` says a repository holds twelve gigabytes;
 `gh_actions_cache_entry` says which key holds them and which has not been
@@ -1049,11 +1048,13 @@ beside it in the same panel with it. Nothing in a query can ask whether a
 column exists, so this is a property of the store rather than a defect to
 repair: the repair, if it bites, is one row of any kind carrying the field.
 
-How rare it is, measured on the account this was developed against: four rows
-in the whole store, none of them in the last fortnight, against 706 pull
-requests of 829 that had a first review from a bot or from their own author.
-The field is not broken; it is the answer to a narrower question than a reader
-expects, which is why the panel is named for that question.
+How rare it is, measured on 2026-09-17 against the account this was developed
+on: fourteen rows in the whole store, over fourteen pull requests of four
+repositories, the newest raised on 2026-07-05, and none of them inside the
+last fortnight, against 703 pull requests of 825 in that fortnight that had a
+first review from a bot or from their own author. The field is not broken; it
+is the answer to a narrower question than a reader expects, which is why the
+panel is named for that question.
 
 The same reading applies to the two on `gh_workflow_run`.
 `initial_actor` is written only when GitHub's `actor` and `triggering_actor`

@@ -115,13 +115,23 @@ personas.
 GitHub cuenta las pull requests como issues dentro. La medida `gh_issue` es la
 que cuenta issues.
 
-**El almacenamiento de artefactos parece pequeño.** Mira `complete` en
-`gh_artifact_total`, o `walked` frente a `count`. Un `complete` falso significa
-que el tamaño vivo es un suelo: el repositorio tiene más artefactos de los que
-recorrió el tope de páginas. También puede salir más pequeño de lo esperado por
-una segunda razón, que `complete` no cubre: `count` es el total de GitHub e
-incluye los artefactos que ya ha caducado, mientras que el tamaño es solo sobre
-los vivos, que son los que cuenta `live_count`.
+**El almacenamiento de artefactos parece pequeño.** Compara `walked` con `count`
+en `gh_artifact_total`. Cuando no coinciden, el tamaño vivo es un suelo: el
+repositorio tiene más artefactos de los que recorrió el tope de páginas. También
+puede salir más pequeño de lo esperado por una segunda razón: `count` es el
+total de GitHub e incluye los artefactos que ya ha caducado, mientras que el
+tamaño es solo sobre los vivos, que son los que cuenta `live_count`.
+
+**Un panel responde con un error de esquema en vez de decir No data.** InfluxDB 3
+crea una columna la primera vez que una fila la trae, así que una consulta que
+nombra una que ninguna fila ha escrito falla al planificarse. Una versión que
+añade un campo le hace eso a una base ya existente hasta que la familia que lo
+escribe hace una pasada: `gh_fork.seconds_to_push` y
+`gh_artifact_total.live_count` son las dos que añade esta versión, que nombran
+los paneles Forks y "Artifact storage counted", y la familia `forks` corre cada
+doce horas. Espera esa pasada, fuerza una con `-once`, o publica los dashboards
+después. Las demás columnas que pueden faltar están en
+[Columnas que solo existen una vez escritas](/ghchronicle/es/collectors/measurements/#columnas-que-solo-existen-una-vez-escritas).
 
 **La gráfica de tráfico solo llega catorce días atrás.** Eso es una primera
 pasada. La ventana se reescribe día a día en cada pasada, así que la serie se

@@ -10311,7 +10311,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "Whether a fork was ever pushed to separates a derivative from a bookmark, which most forks are.",
+          "description": "Whether a fork was ever pushed to separates a derivative from a bookmark, which most forks are. Idle is the time since that push, counted from the row's own date, so it is right when the panel is drawn rather than when the last sweep ran. Elasticsearch lists the documents themselves and cannot subtract the row's own date from now, so the column is how long after the fork its last push came. A negative is a fork nobody has pushed to, which inherits the parent's own last push and is most of them; Pushed to says the same thing as a word.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -16012,7 +16012,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "The two counts at the top of the section, as the rows they are made of, whatever the dashboard range: an alert is listed while it is open, however long ago it was raised. A Dependabot alert names its package and advisory, a code scanning alert its rule and tool. Open for is counted from the row's own date to now, so it is right when the panel is drawn rather than when the last sweep ran. The link opens the alert, which GitHub shows to the owner alone. Elasticsearch lists the Dependabot alerts alone, the two families being two indices, and by number rather than by date: the advisory is text, which a bucket cannot show. It carries the CVSS score in place of how long the alert has been open, which is the row's own date subtracted from now and not something a bucket can compute. It also lists only the ones raised inside the dashboard range, since every Elasticsearch query is bounded by it.",
+          "description": "The two counts at the top of the section, as the rows they are made of, whatever the dashboard range: an alert is listed while it is open, however long ago it was raised. A Dependabot alert names its package and advisory, a code scanning alert its rule and tool. Open for is counted from the row's own date to now, so it is right when the panel is drawn rather than when the last sweep ran. The link opens the alert, which GitHub shows to the owner alone. Elasticsearch lists the Dependabot alerts alone, the two families being two indices, and the advisory is text, which a bucket cannot show. It gives the date each alert was raised rather than how long it has been open, that being the row's own date subtracted from now and not something a bucket can compute, and it is not sorted by that date: ordering a bucket by a metric needs the metric to be its own child, and this one is four buckets deeper. It also lists only the ones raised inside the dashboard range, since every Elasticsearch query is bounded by it.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -16220,9 +16220,9 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "field": "cvss",
+                  "field": "@timestamp",
                   "id": "373",
-                  "type": "max"
+                  "type": "min"
                 }
               ],
               "query": "_index:ghchronicle-gh_dependabot_alert_item AND repo.keyword:${repo:lucene} AND alert_state:open",
@@ -16238,7 +16238,7 @@
                 "excludeByName": {},
                 "indexByName": {},
                 "renameByName": {
-                  "Max": "CVSS",
+                  "Min": "Raised",
                   "number.keyword": "Number",
                   "package.keyword": "What",
                   "repo.keyword": "Repository",

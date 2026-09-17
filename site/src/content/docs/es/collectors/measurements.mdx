@@ -420,7 +420,7 @@ GitHub enseña en la página es la suma de los dos.
 | `gh_workflow_step`       | fechado, al terminar | `workflow`, `job_name`, `attempt`, `step`, `conclusion`                   | `duration_seconds`, `step_number`                                                                                                                       |
 | `gh_workflow` | ahora | `workflow`, `path`, `state` | `active`, `age_days`, `days_since_change`, `url` |
 | `gh_artifact`            | fechado, al crearse  | `artifact`                                                                | `live`, `size_bytes`, `retention_days`, `digest`, `run_id`, `head_sha`, `head_branch`, `url`                                                            |
-| `gh_artifact_total`      | ahora                |                                                                           | `live_bytes`, `live_count`, `count`, `walked`, `complete`                                                                                               |
+| `gh_artifact_total`      | ahora                |                                                                           | `live_bytes`, `live_count`, `count`, `walked`                                                                                                           |
 | `gh_actions_cache`       | ahora                |                                                                           | `size_bytes`, `count`                                                                                                                                   |
 | `gh_actions_cache_entry` | diario               | `cache`, `ref`                                                            | `size_bytes`, `caches`, `key`, `days_since_use`, `age_days`                                                                                             |
 | `gh_repo_activity`       | fechado              | `activity`, `actor`                                                       | `events`, `id`, `ref_name`                                                                                                                              |
@@ -524,17 +524,16 @@ no es prueba de falta de runners.
 ejecutado alguna vez. La etiqueta del job de workflow es `job_name` y no `job`,
 porque `job` choca con las etiquetas que Prometheus añade en el scrape.
 
-`gh_artifact_total` lleva cuatro cuentas porque su tamaño no está sobre
+`gh_artifact_total` lleva tres cuentas porque su tamaño no está sobre
 ninguna de las evidentes. `count` es el total del propio GitHub para el
 repositorio y cuenta los artefactos que GitHub ya ha caducado: medido en
 jmrplens/jmrp.io el 2026-09-17, la página 40 del listado eran caducados hasta
 la última fila, frente a un total declarado de 29.405. `walked` es hasta dónde
 dejó llegar el tope de cinco páginas. `live_bytes` es el tamaño de los
 artefactos que GitHub todavía guarda entre los recorridos, y `live_count`
-cuántos son, que es la cuenta sobre la que está ese tamaño. `complete` es
-`walked >= count` en un solo valor: falso significa que las cifras vivas son un
-suelo y no un total, que en ese repositorio se quedaba corto por un factor de
-cincuenta y seis.
+cuántos son, que es la cuenta sobre la que está ese tamaño. Cuando `walked` es
+menor que `count`, las cifras vivas son un suelo y no un total, que en ese
+repositorio se quedaba corto por un factor de cincuenta y seis.
 
 `gh_actions_cache` dice que un repositorio ocupa doce gigabytes;
 `gh_actions_cache_entry` dice qué clave los ocupa y cuál lleva una semana sin
@@ -1084,11 +1083,13 @@ una columna existe, así que esto es una propiedad del almacén y no un defecto
 que reparar: la reparación, si llega a morder, es una sola fila de cualquier
 tipo que traiga el campo.
 
-Lo raro que es, medido en la cuenta sobre la que se desarrolló esto: cuatro
-filas en todo el almacén, ninguna en los últimos quince días, frente a 706 pull
-requests de 829 que sí tuvieron una primera revisión de un bot o de su propio
-autor. El campo no está roto; es la respuesta a una pregunta más estrecha de lo
-que espera quien lee, que es por lo que el panel se llama por esa pregunta.
+Lo raro que es, medido el 2026-09-17 en la cuenta sobre la que se desarrolló
+esto: catorce filas en todo el almacén, de catorce pull requests de cuatro
+repositorios, la más reciente abierta el 2026-07-05, y ninguna dentro de los
+últimos quince días, frente a 703 pull requests de 825 de esos quince días que
+sí tuvieron una primera revisión de un bot o de su propio autor. El campo no
+está roto; es la respuesta a una pregunta más estrecha de lo que espera quien
+lee, que es por lo que el panel se llama por esa pregunta.
 
 La misma lectura vale para los dos de `gh_workflow_run`. `initial_actor` solo se
 escribe cuando el `actor` y el `triggering_actor` de GitHub son distintos, que es

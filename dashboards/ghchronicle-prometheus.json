@@ -6706,7 +6706,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "Whether a fork was ever pushed to separates a derivative from a bookmark, which most forks are. Prometheus keeps no forker, so this is per repository: forks seen over the range, the share ever pushed to, and on average how long after the fork its last push came. How long a fork has been idle is the row's own date subtracted from now, which only the two SQL stores can do. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date. The Prometheus exporter carries no url, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "Whether a fork was ever pushed to separates a derivative from a bookmark, which most forks are. Idle is the time since that push, counted from the row's own date, so it is right when the panel is drawn rather than when the last sweep ran. Prometheus keeps no forker, so this is per repository: forks seen over the range, the share ever pushed to, and on average how long after the fork its last push came, which is negative for a fork nobody has pushed to at all: GitHub gives such a fork the parent's own last push, which usually predates it, and two thirds of the forks measured here are that. How long a fork has been idle is the row's own date subtracted from now, which only the two SQL stores can do. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date. The Prometheus exporter carries no url, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
