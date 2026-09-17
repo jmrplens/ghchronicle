@@ -2428,7 +2428,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "Commits this account made in each repository over the last year, as the profile counts them. The Prometheus exporter carries no url, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "Commits this account made in each repository over the last year, as the profile counts them. The rows include repositories this account does not own, so the name carries its owner in every store but this one, where the owner is dropped for width and the row is still identified by the whole name behind the column. Named in full here, for the reason Graphite gives: the label summed by is the label shown. The Prometheus exporter carries no url, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -2511,7 +2511,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "topk(25, sum by (repo) (github_contribution_repo_commits{kind=\"commits\"}))",
+              "expr": "topk(25, sum by (full_name) (github_contribution_repo_commits{kind=\"commits\"}))",
               "format": "table",
               "instant": true,
               "range": false,
@@ -2534,7 +2534,7 @@
                 "indexByName": {},
                 "renameByName": {
                   "Value": "Commits",
-                  "repo": "Repository"
+                  "full_name": "Repository"
                 }
               }
             }

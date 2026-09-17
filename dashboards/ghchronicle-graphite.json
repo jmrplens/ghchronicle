@@ -2317,7 +2317,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Commits this account made in each repository over the last year, as the profile counts them. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "Commits this account made in each repository over the last year, as the profile counts them. The rows include repositories this account does not own, so the name carries its owner in every store but this one, where the owner is dropped for width and the row is still identified by the whole name behind the column. Named in full here: a Graphite series is labeled by the node it is grouped under, so the owner cannot be dropped without merging two repositories that share a short name. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -2400,7 +2400,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "aliasByNode(limit(sortByMaxima(github.contribution_repo.*.commits.*.*.*.commits), 25), 5)",
+              "target": "aliasByNode(limit(sortByMaxima(github.contribution_repo.*.commits.*.*.*.commits), 25), 2)",
               "textEditor": true
             }
           ],

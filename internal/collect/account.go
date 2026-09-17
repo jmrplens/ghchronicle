@@ -757,6 +757,14 @@ func pinnedItemPoints(u *accountUser, base map[string]string, now time.Time) []s
 		// a pinned gist can have, since GitHub pins only one's own, and taking
 		// it from there is what lets a pin carry the same three tags as every
 		// other row instead of a shape of its own.
+		//
+		// The full_name that composes is an identity, not an address: a gist
+		// is at gist.github.com and never at github.com/<login>/<hash>. That
+		// is the `url` field's job, and it is built below from the host the
+		// gist actually lives on. Before this, the absence of a slash in
+		// `repo` was how a reader told the two apart; the `kind` field is how
+		// now, and it says so on every row rather than by the shape of
+		// another tag.
 		where := fullNameTags(name)
 		if item.TypeName == "Gist" {
 			name, kind = item.Name, "gist"

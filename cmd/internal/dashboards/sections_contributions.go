@@ -135,11 +135,21 @@ func contributionTotals(b *builder) []Panel {
 		"{"+strings.Join(totalFields, ",")+"}"), 3), "Field", []col{{"lastNotNull", "Value"}})
 	totalsES, totalsEStf := b.esRaw("gh_contributions_total", 1, totalCols, nil)
 
+	// Grouped by the full name in these three, where the SQL twin shows the
+	// short one. In InfluxDB and PostgreSQL the display and the identity are
+	// two different columns, so the window can partition by `full_name` while
+	// the column shows `repo`. Here they are the same column: the key a series
+	// is grouped under is the label it prints. Grouped by `repo` these three
+	// would each fail differently on two owners sharing a short name, and
+	// silently: Prometheus adds the two repositories together, Elasticsearch
+	// buckets them as one and keeps a single metric, and Graphite prints two
+	// series under one identical label. Measured on a live store, this
+	// measurement already held 68 short names against 70 full ones.
 	byRepoGR, byRepoGRtf := gTbl(topRows(gp("gh_contribution_repo", "commits", "kind", "commits"),
-		25, gn("gh_contribution_repo", "repo")), "Repository", []col{{"lastNotNull", "Commits"}})
-	byRepoES, byRepoEStf := esTbl("gh_contribution_repo", []any{b.tm("repo", 25), b.tmURL()},
+		25, gn("gh_contribution_repo", "full_name")), "Repository", []col{{"lastNotNull", "Commits"}})
+	byRepoES, byRepoEStf := esTbl("gh_contribution_repo", []any{b.tm("full_name", 25), b.tmURL()},
 		[]any{b.mNewest("commits")},
-		[]named{{"repo.keyword", "Repository"}, {"url.keyword", "Link"}, {"commits", "Commits"}},
+		[]named{{panelFullNameField, "Repository"}, {"url.keyword", "Link"}, {"commits", "Commits"}},
 		[]string{"kind:commits"})
 
 	hourGR, hourGRtf, hourES, hourEStf := punch("hour", "Hour")
@@ -219,14 +229,24 @@ func contributionTotals(b *builder) []Panel {
 			ES: dayES, ESTF: dayEStf,
 		}),
 		panel("table", "Commits by repository", box{W: 6, H: 7, X: 18, Y: 19}, []Target{sqlT(byRepo)}, &P{
-			Prom:      []Target{promTbl(`topk(25, sum by (repo) (github_contribution_repo_commits{kind="commits"}))`)},
-			PromTF:    []any{organize(map[string]string{"repo": "Repository", "Value": "Commits"}, nil, nil)},
+			Prom:      []Target{promTbl(`topk(25, sum by (full_name) (github_contribution_repo_commits{kind="commits"}))`)},
+			PromTF:    []any{organize(map[string]string{"full_name": "Repository", "Value": "Commits"}, nil, nil)},
 			Opts:      Opts{"sort": "Commits"},
 			Overrides: []any{barCell("Commits", "short", 120), linkOn("Repository")},
 			Desc: "Commits this account made in each repository over the last year, as the " +
-				"profile counts them.",
+				"profile counts them. The rows include repositories this account does not " +
+				"own, so the name carries its owner in every store but this one, where the " +
+				"owner is dropped for width and the row is still identified by the whole " +
+				"name behind the column.",
 			GR: byRepoGR, GRTF: byRepoGRtf,
+			GRDesc: "Named in full here: a Graphite series is labeled by the node it is " +
+				"grouped under, so the owner cannot be dropped without merging two " +
+				"repositories that share a short name.",
 			ES: byRepoES, ESTF: byRepoEStf,
+			ESDesc: "Named in full here, for the reason Graphite gives: the terms bucket is " +
+				"both the grouping key and the label.",
+			PromDesc: "Named in full here, for the reason Graphite gives: the label summed " +
+				"by is the label shown.",
 		}),
 		panel("table", "Contributions by year", box{W: 24, H: 8, X: 0, Y: 26}, []Target{sqlT(
 			`SELECT year AS "Year", contributions AS "Contributions",` +

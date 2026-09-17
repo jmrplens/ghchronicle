@@ -2267,7 +2267,7 @@
         },
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "Commits this account made in each repository over the last year, as the profile counts them.",
+          "description": "Commits this account made in each repository over the last year, as the profile counts them. The rows include repositories this account does not own, so the name carries its owner in every store but this one, where the owner is dropped for width and the row is still identified by the whole name behind the column.",
           "fieldConfig": {
             "defaults": {
               "custom": {

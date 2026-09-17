@@ -531,6 +531,10 @@ func assertDatingRulesSurvived(t *testing.T, points []point) {
 // The slash is the whole test. A `repo` that carries one is a full name in the
 // column that holds short names, which is exactly how the shapes came apart,
 // one collector at a time.
+// noRepository is collect.noneTag as it reaches a sink: what all three tags
+// carry on a row that is about no repository at all.
+const noRepository = "(none)"
+
 func assertOneShapeNamesEveryRepository(t *testing.T, points []point) {
 	t.Helper()
 	named := map[string]bool{}
@@ -553,7 +557,25 @@ func assertOneShapeNamesEveryRepository(t *testing.T, points []point) {
 				"short names. It belongs in full_name; repo is what the dashboards' "+
 				"repository variable is built from", p.Measurement, repo)
 		}
-		if want := owner + "/" + repo; full != want && full != "(none)" {
+		// A row about no repository at all is the one case where the three
+		// say nothing, and all three have to say it: the three Copilot credit
+		// rows of gh_billing_usage are the only ones in the store. Written
+		// wider, as "full_name may always be the sentinel", this check let a
+		// collector ship a short repo with no owner, which passes the source
+		// gate too, because the constructor was called. That is a repository
+		// row nobody owns, one of the two shapes this assertion exists to
+		// forbid. Measured over a full sweep when the hole was found: 67
+		// measurements name a repository and not one carries a sentinel, so
+		// the narrow reading costs nothing.
+		if full == noRepository {
+			if owner != noRepository || repo != noRepository {
+				t.Errorf("%s has full_name=%q beside owner=%q and repo=%q: a row about no "+
+					"repository names none of the three, and a row about one names all three",
+					p.Measurement, full, owner, repo)
+			}
+			continue
+		}
+		if want := owner + "/" + repo; full != want {
 			t.Errorf("%s has full_name=%q beside owner=%q and repo=%q", p.Measurement, full, owner, repo)
 		}
 	}

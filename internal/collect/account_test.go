@@ -675,3 +675,36 @@ func checkHistoryDays(t *testing.T, points []sink.Point) {
 		}
 	}
 }
+
+// TestARepositoryCreatedElsewhereKeepsItsOwner is the one measurement of the
+// thirteen that the sweep-wide shape gate cannot reach: the fake answers
+// totalRepositoryContributions as a number with no repositoryContributions
+// nodes, so gh_repo_created is never produced there and no fixture asserts its
+// tags. The collector is exercised directly instead.
+//
+// A repository created inside an organization is why the owner matters here
+// and why it cannot be assumed to be the login: repositoryContributions
+// records what the account created, not what it owns.
+func TestARepositoryCreatedElsewhereKeepsItsOwner(t *testing.T) {
+	t.Parallel()
+	u := accountUserFrom(t, `{"login":"octocat","contributionsCollection":{
+		"repositoryContributions":{"nodes":[
+			{"occurredAt":"2026-09-01T10:00:00Z","repository":{"nameWithOwner":"acme/telemetry","isFork":false,"isPrivate":true}},
+			{"occurredAt":"2026-09-02T10:00:00Z","repository":{"nameWithOwner":"octocat/hello-world","isFork":true,"isPrivate":false}}]}}}`)
+	points := repoCreatedPoints(u, map[string]string{"user": "octocat"})
+	if len(points) != 2 {
+		t.Fatalf("got %d rows, want one per repository created", len(points))
+	}
+	elsewhere := find(t, points, "gh_repo_created", map[string]string{"full_name": "acme/telemetry"})
+	if elsewhere.Tags["owner"] != "acme" || elsewhere.Tags["repo"] != "telemetry" ||
+		elsewhere.Tags["fork"] != "false" || elsewhere.Tags["user"] != "octocat" {
+		t.Errorf("a repository created in an organization = %v", elsewhere.Tags)
+	}
+	own := find(t, points, "gh_repo_created", map[string]string{"full_name": "octocat/hello-world"})
+	if own.Tags["owner"] != "octocat" || own.Tags["repo"] != "hello-world" || own.Tags["fork"] != "true" {
+		t.Errorf("a repository created under the account = %v", own.Tags)
+	}
+	if own.Fields["url"] != "https://github.com/octocat/hello-world" {
+		t.Errorf("url = %v", own.Fields["url"])
+	}
+}

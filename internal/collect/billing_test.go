@@ -54,8 +54,8 @@ func TestBillingParsesRFC3339Dates(t *testing.T) {
 			t.Errorf("a charge that belongs to no repository names none of the three, got %v", copilot.Tags)
 		}
 	}
-	// `org` was the same dimension as `owner` with the personal half left
-	// blank, so it is gone and `owner` carries it in both cases.
+	// `org` was the same dimension as `owner`, recorded where it could never
+	// arrive, so it is gone and `owner` carries it in every case.
 	if _, isTag := copilot.Tags["org"]; isTag {
 		t.Errorf("org is folded into owner, got %v", copilot.Tags)
 	}
@@ -78,8 +78,10 @@ func checkActionsCharge(t *testing.T, points []sink.Point) {
 	// filter on `unit = 'Minutes'`. The fixture used to say "minutes", which
 	// made those panels answer nothing in the containerised suite and read as
 	// a defect in the panels for as long as it stood.
-	// The organization GitHub names on the row is the owner of the repository
-	// that burned the minutes, which is what `owner` carries now.
+	// This endpoint names no organization, so the owner of the repository that
+	// burned the minutes is the account the report was asked for. The fixture
+	// carries no organizationName for the same reason: the live endpoint sends
+	// none, and test data that claims otherwise is a claim about GitHub.
 	if actions.Tags["sku"] != "Actions Linux" || actions.Tags["unit"] != "Minutes" ||
 		actions.Tags["owner"] != "octocat" || actions.Tags["full_name"] != "octocat/hello-world" ||
 		actions.Tags["user"] != "octocat" {
@@ -128,5 +130,32 @@ func TestBillingUnavailableMonthIsSkipped(t *testing.T) {
 	}
 	if n := len(f.calls("/users/octocat/settings/billing/usage")); n != 3 {
 		t.Errorf("made %d calls, want 3", n)
+	}
+}
+
+// TestABillingChargeIsOwnedByTheOrganizationWhenThereIsOne covers the branch
+// the fixture cannot reach any more.
+//
+// The user form of the usage report never names an organization, so the
+// collector's own fixture must not either. The organization form does, as a
+// required property naming the organization whose report was asked for, which
+// is the owner of every repository in it, and that is the branch tested here
+// directly rather than through a response GitHub does not send.
+func TestABillingChargeIsOwnedByTheOrganizationWhenThereIsOne(t *testing.T) {
+	t.Parallel()
+	got := billingRepoTags("octocat", "acme", "telemetry")
+	if got["owner"] != "acme" || got["repo"] != "telemetry" || got["full_name"] != "acme/telemetry" {
+		t.Errorf("tags = %v, want the organization as the owner", got)
+	}
+	got = billingRepoTags("octocat", "", "telemetry")
+	if got["owner"] != "octocat" || got["full_name"] != "octocat/telemetry" {
+		t.Errorf("tags = %v, want the billed account as the owner", got)
+	}
+	got = billingRepoTags("octocat", "", "")
+	for _, tag := range []string{"owner", "repo", "full_name"} {
+		if got[tag] != noneTag {
+			t.Errorf("a charge about no repository names none of the three, got %v", got)
+			break
+		}
 	}
 }

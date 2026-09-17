@@ -3528,7 +3528,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "Commits this account made in each repository over the last year, as the profile counts them.",
+          "description": "Commits this account made in each repository over the last year, as the profile counts them. The rows include repositories this account does not own, so the name carries its owner in every store but this one, where the owner is dropped for width and the row is still identified by the whole name behind the column. Named in full here, for the reason Graphite gives: the terms bucket is both the grouping key and the label.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -3641,7 +3641,7 @@
             {
               "bucketAggs": [
                 {
-                  "field": "repo.keyword",
+                  "field": "full_name.keyword",
                   "id": "77",
                   "settings": {
                     "min_doc_count": "1",
@@ -3692,7 +3692,7 @@
                 "indexByName": {},
                 "renameByName": {
                   "Top Metrics": "Commits",
-                  "repo.keyword": "Repository",
+                  "full_name.keyword": "Repository",
                   "url.keyword": "Link"
                 }
               }

@@ -33,18 +33,68 @@ completo dentro de `repo`, y `gh_billing_usage` tenía un `repo` corto, ningún
 `owner` y un `org`. Las tres formas no se solapaban en absoluto, que es peor que
 solaparse mal: un filtro construido desde una de ellas no encontraba nada de
 nada en las otras, y una unión de dos contaba cada repositorio dos veces. Ahora
-son una sola forma, y `org` ha desaparecido porque era `owner` con la mitad
-personal en blanco.
+son una sola forma. `org` se ha ido con ellas, y no se pierde nada:
+`organizationName` no es una propiedad del endpoint de facturación que esta
+herramienta llama, así que la etiqueta solo podía llevar `(none)`, y en la forma
+de organización de ese informe nombra a la organización cuyo informe se pidió,
+que es la dueña. `owner` lo lleva.
 
-Es un cambio incompatible con lo ya almacenado. Las filas escritas por una
-versión anterior conservan las etiquetas viejas, las nuevas llevan las nuevas, y
-las dos no se juntan: en InfluxDB el conjunto de etiquetas forma parte de la
-identidad de un punto, así que un colector actualizado abre una segunda serie
-por repositorio en lugar de continuar la primera. No se pierde ni se reescribe
-nada, pero un panel que cruce la actualización verá dos series a medio poblar.
-Recrear la base de datos, o aceptar la costura y dejar que las filas viejas
-salgan del rango que consultas, son las dos salidas; no hay migración, porque
-una etiqueta no se puede renombrar in situ.
+**Actualizar desde una versión anterior a esta forma** es un cambio incompatible
+con lo ya almacenado, y es más grande que una costura. Lee los cuatro párrafos
+siguientes antes de actualizar una base de datos que quieras conservar.
+
+**Tus filas existentes no se convierten, y la mayoría se vuelven a escribir.**
+Las filas ya almacenadas conservan las etiquetas viejas y nada las reescribe,
+porque en InfluxDB el conjunto de etiquetas forma parte de la identidad de un
+punto. Lo que es fácil pasar por alto es que la mayoría de las doce se fechan en
+el momento del propio ítem y se vuelven a ofrecer en cada barrido, y el libro de
+escrituras se indexa por el conjunto de etiquetas. Cambia el conjunto y cada uno
+de esos puntos falla la búsqueda, así que **el primer barrido tras la
+actualización vuelve a escribir todo el histórico retenido, con las mismas
+marcas de tiempo, bajo las etiquetas nuevas, al lado de las filas viejas**. Eso
+no es una costura que puedas esperar a que pase. Una suma sobre un rango que
+cubra el histórico reescrito **se duplica de inmediato y sigue duplicada**,
+mientras GitHub siga sirviendo esos ítems. En la cuenta con la que se desarrolló
+esto eran un año entero de `gh_contribution_day_repo`, que un panel del producto
+suma, y varios cientos de filas de `gh_issue_comment`,
+`gh_external_contribution` y `gh_discussion_comment`. Solo `gh_event` y
+`gh_notification` se comportan como una costura, porque son ventanas que GitHub
+olvida.
+
+**Así que hay dos salidas honestas, y esperar no es una de ellas.** Recrear la
+base de datos, que es lo que hizo el autor; o borrar tú las filas de la forma
+vieja, lo que en InfluxDB 3 significa eliminar las trece tablas, ya que una
+etiqueta no se puede renombrar in situ y un predicado de borrado no puede
+nombrar una etiqueta que las filas nuevas no llevan. No hay migración ni la
+habrá: renombrar una etiqueta significa reescribir cada fila afectada bajo una
+identidad nueva, que es una restauración y no una actualización.
+
+**El destino PostgreSQL deja de cargar hasta que se cambien sus tablas.** Emite
+`CREATE TABLE IF NOT EXISTS`, que no hace nada contra una tabla creada por una
+versión anterior, así que el `INSERT` que viene detrás nombra columnas `owner` y
+`full_name` que no existen y un `ON CONFLICT` con una clave que tampoco existe,
+y psql lo rechaza en las trece medidas. Elimina esas tablas y deja que el
+siguiente fichero las recree, o añade las dos columnas y reconstruye cada clave
+primaria, que es `time` más todas las columnas de etiqueta por orden de nombre:
+
+```sql
+ALTER TABLE gh_event
+  ADD COLUMN IF NOT EXISTS "owner" TEXT NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS "full_name" TEXT NOT NULL DEFAULT '';
+ALTER TABLE gh_event DROP CONSTRAINT gh_event_pkey;
+ALTER TABLE gh_event
+  ADD PRIMARY KEY ("time", "action", "full_name", "owner", "ref_type", "repo", "type");
+```
+
+Añadir las columnas conserva las filas viejas pero no las convierte: llevan la
+cadena vacía donde las nuevas llevan un dueño, así que cuentan doble igual que
+en InfluxDB. Eliminar es la opción limpia en los dos almacenes.
+
+**Las consultas que hayas escrito tú hay que actualizarlas, y solo algunas
+fallan en voz alta.** `gh_billing_usage.org` ya no existe, y en InfluxDB 3
+nombrar una columna que ninguna fila ha escrito falla al planificar, así que esa
+te avisa. Un filtro como `gh_event WHERE repo = 'owner/name'` sigue siendo
+válido y devuelve nada en silencio; pasa a ser `full_name = 'owner/name'`.
 
 Casi todas llevan además un campo
 `url`: la página de GitHub de aquello de lo que habla la fila, para que una fila

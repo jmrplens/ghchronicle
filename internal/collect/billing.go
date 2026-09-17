@@ -61,7 +61,11 @@ func (b Billing) Collect(ctx context.Context, c *ghapi.Client, now time.Time) ([
 				DiscountAmount float64 `json:"discountAmount"`
 				NetAmount      float64 `json:"netAmount"`
 				RepositoryName string  `json:"repositoryName"`
-				OrgName        string  `json:"organizationName"`
+				// Read, but never sent by this endpoint: see billingRepoTags.
+				// It is kept so that the day the organization form of the
+				// report is collected, the owner is already read from where
+				// GitHub puts it.
+				OrgName string `json:"organizationName"`
 			} `json:"usageItems"`
 		}
 		if _, _, err := c.GetJSON(ctx, path, &res, ""); err != nil {
@@ -123,17 +127,23 @@ func (b Billing) Collect(ctx context.Context, c *ghapi.Client, now time.Time) ([
 // billingRepoTags names the repository a charge belongs to, in the one shape
 // every other measurement names one in.
 //
-// The `org` tag this replaces was the same dimension as `owner` with half of
-// it left blank. GitHub fills organizationName only when the work was done in
-// an organization, and on a personal account that is never: measured on
-// 2026-09-10 it was the empty string on all 937 rows, so the tag carried the
-// sentinel and nothing else, and a reader asking whose repository burned the
-// minutes had no answer at all. One tag carries it now, filled in both cases.
+// The `org` tag this replaces was the same dimension as `owner`, recorded
+// where it could never arrive. `organizationName` is not a property of
+// /users/{login}/settings/billing/usage: it is absent from every row that
+// endpoint returns, absent rather than present and empty, and absent from that
+// path's published schema. It exists only on the organization form of the
+// report, /organizations/{org}/settings/billing/usage, where it is required
+// and names the organization whose report was asked for, which is the owner of
+// every repository in that report. So the tag could only ever carry the
+// sentinel, and a reader asking whose repository burned the minutes had no
+// answer at all. Folding it into `owner` loses nothing in either direction:
+// this endpoint bills the login, and the day the organization report is
+// collected the organization it names is the owner, which is where it goes.
 //
 // A charge that belongs to no repository names none of the three. Those rows
-// are the monthly Copilot credit, three of the 937, and they are not about a
-// repository, so saying the account owns one would be an invention rather than
-// a fallback.
+// are the monthly Copilot credit, three of the 937 measured, and they are not
+// about a repository, so saying the account owns one would be an invention
+// rather than a fallback.
 func billingRepoTags(login, org, repo string) map[string]string {
 	if repo == "" {
 		return repoTags("", "")

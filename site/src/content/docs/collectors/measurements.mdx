@@ -32,17 +32,65 @@ carried no `owner` and put the full name inside `repo`, and `gh_billing_usage`
 had a short `repo`, no `owner` and an `org`. The three shapes did not overlap at
 all, which is worse than overlapping badly: a filter built from one of them
 matched nothing whatsoever in the others, and a union of two counted every
-repository twice. They are one shape now, and `org` is gone because it was
-`owner` with the personal half left blank.
+repository twice. They are one shape now. `org` is gone with them, and it loses
+nothing: `organizationName` is not a property of the billing endpoint this tool
+calls, so the tag could only ever hold `(none)`, and on the organisation form of
+that report it names the organisation whose report was asked for, which is the
+owner. `owner` carries it.
 
-This is a breaking change to what is already stored. Rows written by an earlier
-release keep the old tags, new rows carry the new ones, and the two do not join:
-in InfluxDB the tag set is part of a point's identity, so an upgraded collector
-opens a second series for every repository rather than continuing the first.
-Nothing is lost and nothing is rewritten, but a panel spanning the upgrade sees
-two half-populated series. Recreating the database, or accepting the seam and
-letting the old rows age out of the range you query, are the two ways through
-it; there is no migration, because a tag cannot be renamed in place.
+**Upgrading from a release before this shape** is a breaking change to what is
+already stored, and it is larger than a seam. Read the four paragraphs below
+before upgrading a database you want to keep.
+
+**Your existing rows are not converted, and most of them are written again.**
+Rows already stored keep the old tags and nothing rewrites them, because in
+InfluxDB the tag set is part of a point's identity. What is easy to miss is
+that most of the twelve are dated at the item's own time and re-offered on
+every sweep, and the write ledger keys on the tag set. Change the tag set and
+every one of those points is a miss, so **the first sweep after the upgrade
+writes the whole retained history again, at the same timestamps, under the new
+tags, beside the old rows**. That is not a seam you can wait out. A sum over a
+range that covers the rewritten history **doubles immediately and stays
+doubled**, for as long as GitHub keeps serving those items. On the account this
+was developed against that was a full year of `gh_contribution_day_repo`, which
+a shipped panel sums, and several hundred rows each of `gh_issue_comment`,
+`gh_external_contribution` and `gh_discussion_comment`. Only `gh_event` and
+`gh_notification` behave like a seam, because they are windows GitHub forgets.
+
+**So there are two honest options, and waiting is not one of them.** Recreate
+the database, which is what the author did; or delete the old-shape rows
+yourself, which in InfluxDB 3 means dropping the thirteen tables, since a tag
+cannot be renamed in place and a delete predicate cannot name a tag the new
+rows do not carry. There is no migration and there will not be one: renaming a
+tag means rewriting every affected row under a new identity, which is a restore
+rather than an update.
+
+**The PostgreSQL sink stops loading until its tables are changed.** It emits
+`CREATE TABLE IF NOT EXISTS`, which does nothing against a table an earlier
+release created, so the `INSERT` that follows names `owner` and `full_name`
+columns that do not exist and an `ON CONFLICT` key that does not exist either,
+and psql rejects it for all thirteen measurements. Drop those tables and let
+the next file recreate them, or add the two columns and rebuild each primary
+key, which is `time` plus every tag column in name order:
+
+```sql
+ALTER TABLE gh_event
+  ADD COLUMN IF NOT EXISTS "owner" TEXT NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS "full_name" TEXT NOT NULL DEFAULT '';
+ALTER TABLE gh_event DROP CONSTRAINT gh_event_pkey;
+ALTER TABLE gh_event
+  ADD PRIMARY KEY ("time", "action", "full_name", "owner", "ref_type", "repo", "type");
+```
+
+Adding the columns keeps the old rows but does not convert them: they hold the
+empty string where the new rows hold an owner, so they double-count exactly as
+they do in InfluxDB. Dropping is the clean option in both stores.
+
+**Queries you wrote yourself need updating, and only some of them fail loudly.**
+`gh_billing_usage.org` no longer exists, and in InfluxDB 3 naming a column no
+row has written fails at planning, so that one tells you. A filter such as
+`gh_event WHERE repo = 'owner/name'` keeps parsing and quietly returns nothing;
+it becomes `full_name = 'owner/name'`.
 
 Most measurements also carry a `url`
 field: the page on GitHub for the thing the row is about, so a dashboard row
