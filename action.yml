@@ -52,6 +52,15 @@ inputs:
     description: How an animated layout moves. `once` plays and settles, `loop` does the same and lets whatever the layout has that never ends go on for ever (only `terminal` and `ticker` have one), `off` draws the finished card with no animation.
     required: false
     default: once
+  card-width:
+    description: >
+      Card width in pixels. Empty, or 0, draws the layout at its own width. Each layout draws between
+      its own minimum and 1200 and refuses anything outside that; `badge-row` ignores it, its width
+      following its pills. Only `activity-heatmap` spends the room on data, a week of the contribution
+      calendar at a time and the whole year at about 900; every other layout spreads the same content
+      wider.
+    required: false
+    default: ""
   include-private:
     description: >
       `true` counts private repositories in the card, when no config file is given.
@@ -150,4 +159,5 @@ runs:
         THEME: ${{ inputs.card-theme }}
         FIELDS: ${{ inputs.card-fields }}
         MOTION: ${{ inputs.card-motion }}
+        WIDTH: ${{ inputs.card-width }}
       run: bash "$GITHUB_ACTION_PATH/scripts/action-run.sh"

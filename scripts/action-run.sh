@@ -24,6 +24,7 @@ if [ -n "$CARD" ]; then
   # Passed only when it is not the default, so a workflow that pins
   # `version` to a release older than the flag keeps working.
   [ "$MOTION" != once ] && args+=(-card-motion "$MOTION")
+  [ -n "${WIDTH:-}" ] && [ "$WIDTH" != 0 ] && args+=(-card-width "$WIDTH")
   [ "$MODE" = card ] && args+=(-card-only)
 elif [ "$MODE" = card ]; then
   echo "mode card needs a card path" >&2; exit 2

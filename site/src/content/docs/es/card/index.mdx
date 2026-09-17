@@ -29,7 +29,8 @@ ghchronicle -config config.yaml -card card.svg -card-only
 | `-card-theme <dark\|light\|auto\|both>` | Both escribe la tarjeta clara y una gemela `_dark` en una sola pasada |
 | `-card-motion <once\|loop\|off>`        | Cómo se mueve un diseño animado; los demás la ignoran                 |
 | `-card-fields <lista>`                  | Separados por comas, en orden de dibujo                               |
-| `-card-layouts`                         | Imprime los diseños con sus campos por defecto y termina              |
+| `-card-width <píxeles>`                 | Sin ella, el ancho propio del diseño; en `activity-heatmap` compra semanas |
+| `-card-layouts`                         | Imprime los diseños con sus campos y sus anchos y termina             |
 
 Sin `-card-only` la tarjeta se escribe **además de** todo lo que recibirían
 normalmente los destinos, que es la disposición para una máquina que ya está

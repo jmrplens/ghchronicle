@@ -92,6 +92,10 @@ func writeGHChronicleStub(t *testing.T) (pathDir, record string) {
 // reads.
 type runInputs struct {
 	mode, since, card, layout, theme, fields, motion string
+	// width is the card-width input, as the workflow author typed it. Empty
+	// and "0" both mean the layout's own width, and neither reaches the
+	// binary: an older pinned release would not know the flag.
+	width string
 }
 
 // runActionRunScript runs scripts/action-run.sh with a stand-in ghchronicle
@@ -125,6 +129,7 @@ func runActionRunScript(t *testing.T, in runInputs, configPath, dir string) (sta
 		"THEME="+in.theme,
 		"FIELDS="+in.fields,
 		"MOTION="+in.motion,
+		"WIDTH="+in.width,
 	)
 	out, _ := cmd.CombinedOutput()
 	return cmd.ProcessState.ExitCode(), string(out), record
@@ -247,6 +252,24 @@ func TestTheActionsRunStepBuildsTheRightCommandLineForEachMode(t *testing.T) {
 			name:     "card-theme both is passed through",
 			in:       runInputs{mode: "card", card: "CARD", layout: "summary", theme: "both", motion: "once"},
 			wantArgs: []string{"-config", "CONFIG", "-card", "CARD", "-card-layout", "summary", "-card-theme", "both", "-card-only"},
+		},
+		{
+			name:     "card-width is passed through when given",
+			in:       runInputs{mode: "card", card: "CARD", layout: "activity-heatmap", theme: "auto", motion: "once", width: "900"},
+			wantArgs: []string{"-config", "CONFIG", "-card", "CARD", "-card-layout", "activity-heatmap", "-card-theme", "auto", "-card-width", "900", "-card-only"},
+		},
+		{
+			// Empty and zero are the same answer, the layout's own width, and
+			// neither may reach the binary: a workflow that pins `version` to
+			// a release from before the flag existed would stop running.
+			name:     "card-width is left out when empty",
+			in:       runInputs{mode: "card", card: "CARD", layout: "summary", theme: "auto", motion: "once"},
+			wantArgs: []string{"-config", "CONFIG", "-card", "CARD", "-card-layout", "summary", "-card-theme", "auto", "-card-only"},
+		},
+		{
+			name:     "card-width is left out when it is zero",
+			in:       runInputs{mode: "card", card: "CARD", layout: "summary", theme: "auto", motion: "once", width: "0"},
+			wantArgs: []string{"-config", "CONFIG", "-card", "CARD", "-card-layout", "summary", "-card-theme", "auto", "-card-only"},
 		},
 		{
 			// mkdir -p -- "$(dirname -- "$CARD")" carries both "--"s

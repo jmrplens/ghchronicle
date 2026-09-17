@@ -993,6 +993,11 @@
         "default": "once"
       },
       {
+        "name": "card-width",
+        "required": false,
+        "default": ""
+      },
+      {
         "name": "include-private",
         "required": false,
         "default": "false"

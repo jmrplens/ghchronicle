@@ -105,8 +105,19 @@ type Options struct {
 }
 
 const (
-	defaultWidth    = 495
-	minWidth        = 300
+	defaultWidth = 495
+	minWidth     = 300
+	// MaxWidth is the widest any card is drawn at, and unlike minWidth, which
+	// is a figure several layouts happen to pick for their own MinWidth, it is
+	// one ceiling over all of them. It exists because Options.Width became
+	// something a reader types: the widest layout declares 800 and the one
+	// layout that turns room into content, activity-heatmap, has drawn the
+	// whole year it holds by about 900, so nothing above this can be used by
+	// anything, and a card asked for twenty thousand is a typo rather than a
+	// card. A layout whose width follows its content is not bounded by it,
+	// because it is not bounded by MinWidth either: it ignores Options.Width.
+	MaxWidth = 1200
+
 	defaultMaxRepos = 5
 	maxLanguages    = 8
 
@@ -213,6 +224,12 @@ var (
 // ErrTheme is returned for a theme this package cannot draw.
 var ErrTheme = errors.New("render: unknown theme")
 
+// ErrWidth is returned for an Options.Width outside what the layout draws:
+// below its own MinWidth or above MaxWidth. It names both ends, because the
+// width is typed at a command line now and a reader told only that his number
+// is wrong has to go and look up the one that is not.
+var ErrWidth = errors.New("render: width out of range")
+
 // SVG renders the card. It returns a complete standalone <svg> document.
 //
 // Options is taken by pointer because it is too big to copy per call; a nil
@@ -246,12 +263,9 @@ func SVG(c *Card, o *Options) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	width := float64(o.Width)
-	if o.Width == 0 {
-		width = float64(def.Width)
-	}
-	if def.MinWidth > 0 && width < float64(def.MinWidth) {
-		return nil, fmt.Errorf("render: width %d is below the %d minimum of layout %q", o.Width, def.MinWidth, def.Name)
+	width, err := resolveWidth(o.Width, def.Layout)
+	if err != nil {
+		return nil, err
 	}
 	maxRepos := o.MaxRepos
 	if maxRepos <= 0 {
@@ -280,6 +294,23 @@ func SVG(c *Card, o *Options) ([]byte, error) {
 	def.draw(&b, c, &s)
 	b.WriteString("</svg>\n")
 	return []byte(b.String()), nil
+}
+
+// resolveWidth settles the width a card is drawn at: the one the caller asked
+// for, or the layout's own when he asked for none.
+//
+// A layout whose width follows its content declares neither a width nor a
+// minimum, and draws over whatever it is handed, so there is nothing here to
+// check and no number of its to reject.
+func resolveWidth(asked int, l Layout) (float64, error) {
+	if asked == 0 {
+		return float64(l.Width), nil
+	}
+	if l.MinWidth > 0 && (asked < l.MinWidth || asked > MaxWidth) {
+		return 0, fmt.Errorf("%w: %d (layout %q draws from %d to %d)",
+			ErrWidth, asked, l.Name, l.MinWidth, MaxWidth)
+	}
+	return float64(asked), nil
 }
 
 // spec is what a layout draws from: the options already validated and the

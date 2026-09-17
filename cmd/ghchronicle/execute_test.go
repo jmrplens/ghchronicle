@@ -360,6 +360,16 @@ func TestExecuteCardDrawsTheSweep(t *testing.T) {
 		{"a field there is none of", []string{"-card", svg, "-card-fields", "stars,karma"}, "karma"},
 		{"a directory that is not there", []string{"-card", unreachable}, notFoundText(t, unreachable)},
 		{"a motion there is none of", []string{"-card", svg, "-card-motion", "bounce"}, `"bounce"`},
+		{
+			"a width under the layout's minimum",
+			[]string{"-card", svg, "-card-width", "299"},
+			`width out of range: 299 (layout "summary" draws from 300 to 1200)`,
+		},
+		{
+			"a width no card is drawn at",
+			[]string{"-card", svg, "-card-width", "20000"},
+			`width out of range: 20000 (layout "summary" draws from 300 to 1200)`,
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			failed := runCommand(t, append([]string{"-config", cfg, "-card-only"}, tc.args...)...)
@@ -368,6 +378,63 @@ func TestExecuteCardDrawsTheSweep(t *testing.T) {
 				t.Errorf("status %d, want 1 and %q in:\n%s", failed.status, tc.stderr, failed.stderr)
 			}
 		})
+	}
+}
+
+// TestExecuteCardWidthReachesTheCardAndItsRefusal covers the flag that draws
+// the card at a width the caller picked: the width reaches the document, a
+// layout that turns width into content draws more of it, a layout whose width
+// follows its content is untouched by the flag, and the same command run twice
+// writes the same bytes.
+func TestExecuteCardWidthReachesTheCardAndItsRefusal(t *testing.T) {
+	gh := fakegh.New(t, fixtures)
+	dir := t.TempDir()
+	cfg := writeConfig(t, dir, gh.URL(), "")
+
+	draw := func(t *testing.T, name string, args ...string) string {
+		t.Helper()
+		svg := filepath.Join(dir, name+".svg")
+		got := runCommand(t, append([]string{"-config", cfg, "-card", svg, "-card-only"}, args...)...)
+		if got.status != notExited {
+			t.Fatalf("%s = %d:\n%s", name, got.status, got.stderr)
+		}
+		body, err := os.ReadFile(svg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(body)
+	}
+
+	// The width the flag named is the width of the document, and the heatmap
+	// spends it on weeks of the calendar rather than on empty space: nine
+	// hundred units is the whole year, the registered width is twenty-three.
+	wide := draw(t, "wide", "-card-layout", "activity-heatmap", "-card-width", "900")
+	if !strings.Contains(wide, `width="900"`) || !strings.Contains(wide, "Contributions, last 52 weeks") {
+		t.Errorf("-card-width 900 drew:\n%.200s", wide)
+	}
+	narrow := draw(t, "narrow", "-card-layout", "activity-heatmap", "-card-width", "400")
+	if !strings.Contains(narrow, `width="400"`) || !strings.Contains(narrow, "Contributions, last 16 weeks") {
+		t.Errorf("-card-width 400 drew:\n%.200s", narrow)
+	}
+	own := draw(t, "own", "-card-layout", "activity-heatmap")
+	if !strings.Contains(own, "Contributions, last 23 weeks") {
+		t.Errorf("no -card-width must draw the layout's own width:\n%.200s", own)
+	}
+
+	// badge-row declares no width and no minimum: the flag can neither be
+	// refused by it nor change it, so the pills decide, as they always did.
+	pills := draw(t, "pills", "-card-layout", "badge-row")
+	widePills := draw(t, "wide-pills", "-card-layout", "badge-row", "-card-width", "1200")
+	if pills != widePills {
+		t.Error("-card-width must not change badge-row, whose width follows its content")
+	}
+
+	// Same command, same bytes: a width is one more input, not a source of
+	// variation, or a workflow that commits the card writes a diff out of
+	// nothing.
+	again := draw(t, "wide-again", "-card-layout", "activity-heatmap", "-card-width", "900")
+	if again != wide {
+		t.Error("the same card at the same width must be written twice to the byte")
 	}
 }
 

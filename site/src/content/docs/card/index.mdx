@@ -29,7 +29,8 @@ ghchronicle -config config.yaml -card card.svg -card-only
 | `-card-theme <dark\|light\|auto\|both>` | Both writes the light card and a `_dark` twin from one sweep |
 | `-card-motion <once\|loop\|off>`        | How an animated layout moves; the others ignore it           |
 | `-card-fields <list>`                   | Comma-separated, in drawing order                            |
-| `-card-layouts`                         | Prints the layouts with their default fields, then exits     |
+| `-card-width <pixels>`                  | The layout's own width when left out; on `activity-heatmap` it buys weeks |
+| `-card-layouts`                         | Prints the layouts with their fields and widths, then exits  |
 
 Without `-card-only` the card is written **as well as** everything the sinks
 would normally get, which is the arrangement for a host that is already

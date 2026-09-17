@@ -1240,16 +1240,88 @@ func TestOverlaysCapTheirNumbers(t *testing.T) {
 	}
 }
 
-func TestEachLayoutRefusesAWidthBelowItsMinimum(t *testing.T) {
+func TestEachLayoutRefusesAWidthOutsideWhatItDraws(t *testing.T) {
+	for _, def := range layouts {
+		if def.MinWidth == 0 {
+			checkWidthFollowsContent(t, def.Name)
+			continue
+		}
+		for _, w := range []int{def.MinWidth - 1, MaxWidth + 1, 20000} {
+			checkWidthMessageNamesBothEnds(t, def.Layout, w)
+		}
+		for _, w := range []int{def.MinWidth, def.Width, MaxWidth} {
+			if _, err := SVG(sample(), &Options{Layout: def.Name, Width: w}); err != nil {
+				t.Errorf("%s refused %d, which is inside what it draws: %v", def.Name, w, err)
+			}
+		}
+	}
+}
+
+// checkWidthFollowsContent is the badge-row half: a layout that declares no
+// width has no end to exceed, so Options.Width is neither refused by it nor
+// drawn with, and every width gives the card the pills decided on.
+func checkWidthFollowsContent(t *testing.T, layout string) {
+	t.Helper()
+	same := mustRender(t, sample(), &Options{Layout: layout})
+	for _, w := range []int{1, 300, MaxWidth + 5000} {
+		out, err := SVG(sample(), &Options{Layout: layout, Width: w})
+		if err != nil {
+			t.Errorf("%s refused width %d, but its width follows its content: %v", layout, w, err)
+			continue
+		}
+		if string(out) != same {
+			t.Errorf("%s drew a different card at width %d, but its width follows its content", layout, w)
+		}
+	}
+}
+
+// checkWidthMessageNamesBothEnds is what the refusal owes a reader who typed
+// the width at a command line: the number he gave and the two he may give,
+// because being told only that his is wrong leaves him to go and look the
+// right ones up.
+func checkWidthMessageNamesBothEnds(t *testing.T, l Layout, w int) {
+	t.Helper()
+	err := widthError(t, l.Name, w)
+	for _, want := range []string{
+		strconv.Itoa(w), l.Name,
+		strconv.Itoa(l.MinWidth), strconv.Itoa(MaxWidth),
+	} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("%s at width %d: %q does not say %q", l.Name, w, err, want)
+		}
+	}
+}
+
+// widthError is the error a layout gives for a width it will not draw, and
+// fails the test when it gives none or gives one that is not ErrWidth.
+func widthError(t *testing.T, layout string, width int) error {
+	t.Helper()
+	_, err := SVG(sample(), &Options{Layout: layout, Width: width})
+	if err == nil {
+		t.Fatalf("%s accepted width %d", layout, width)
+	}
+	if !errors.Is(err, ErrWidth) {
+		t.Fatalf("%s at width %d gave %v, want ErrWidth", layout, width, err)
+	}
+	return err
+}
+
+// A width is one more input and not a source of variation: the same card at
+// the same width has to come out the same bytes, or a workflow that commits it
+// writes a diff a day out of nothing.
+func TestACardIsByteIdenticalAtEveryWidthItAccepts(t *testing.T) {
 	for _, def := range layouts {
 		if def.MinWidth == 0 {
 			continue
 		}
-		if _, err := SVG(sample(), &Options{Layout: def.Name, Width: def.MinWidth - 1}); err == nil {
-			t.Errorf("%s accepted a width below %d", def.Name, def.MinWidth)
-		}
-		if _, err := SVG(sample(), &Options{Layout: def.Name, Width: def.MinWidth}); err != nil {
-			t.Errorf("%s refused its own minimum: %v", def.Name, err)
+		for _, w := range []int{def.MinWidth, def.Width, MaxWidth} {
+			o := &Options{Layout: def.Name, Theme: "dark", Width: w}
+			first := mustRender(t, sample(), o)
+			for range 5 {
+				if mustRender(t, sample(), o) != first {
+					t.Fatalf("%s at width %d is not byte-identical between runs", def.Name, w)
+				}
+			}
 		}
 	}
 }

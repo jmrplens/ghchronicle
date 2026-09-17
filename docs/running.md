@@ -1324,6 +1324,7 @@ it downloads a release binary and calls it.
 | `card-theme`      | `auto`               | `dark`, `light`, `auto`, or `both` for a light card and its `_dark` twin                                          |
 | `card-fields`     | `""`                 | Comma-separated fields. Empty means the layout's default                                                          |
 | `card-motion`     | `once`               | `once`, `loop` or `off`; `loop` changes only `terminal` and `ticker`                                                                 |
+| `card-width`      | `""`                 | Card width in pixels. Empty draws the layout at its own width; each one draws between its own minimum and 1200. Only `activity-heatmap` spends the room on data, a whole year of the calendar at about 900 |
 | `include-private` | `false`              | `true` counts private repositories when no config file is given (the default up to v1.0.0). See the warning below |
 | `version`         | `latest`             | The release to install                                                                                            |
 
