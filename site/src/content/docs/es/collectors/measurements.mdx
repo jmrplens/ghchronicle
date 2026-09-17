@@ -950,7 +950,10 @@ cualquier otra medida y con `reason`, una palabra acotada de qué la detuvo (el
 estado HTTP, `rate limited`, `query too large`, `canceled`), con el mensaje
 entero en el campo `error`. `scope` es lo que distingue las dos: `family` para
 la primera clase, cuyas etiquetas de repositorio llevan `(none)`, y `repo` para
-la segunda.
+la segunda. `error` lleva `(none)` también cuando no hay mensaje, y eso no es
+adorno: el protocolo de línea descarta un campo de texto vacío, así que una
+columna escrita solo al fallar no existiría hasta que fallara algo, y una
+consulta que la nombrara se rechazaría en vez de responder sin filas.
 
 Las filas que siempre llegan son el motivo de todo esto. Una familia sin
 ninguna fila en un barrido no se ejecutó en ese barrido, que es justo lo que un

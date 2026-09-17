@@ -923,6 +923,10 @@ measurement names one and carrying `reason`, a bounded word for what stopped it
 (the HTTP status, `rate limited`, `query too large`, `canceled`), with the whole
 message in the `error` field. `scope` is what tells the two apart: `family` for
 the first kind, whose repository tags hold `(none)`, and `repo` for the second.
+`error` holds `(none)` too where there is no message, which is not decoration:
+the line protocol drops an empty string field, so a column written only on a
+failure would not exist at all until one happened, and a query naming it would
+be refused rather than answered with no rows.
 
 The rows that always arrive are the point of it. A family with no row at all in
 a sweep did not run in that sweep, which an empty panel could never say, and
