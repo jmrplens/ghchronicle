@@ -14,11 +14,11 @@ importer to choose their own.
 
 | File                             | Panels | Store                                                    |
 | -------------------------------- | ------ | -------------------------------------------------------- |
-| `ghchronicle-influxdb.json`      | 152 | InfluxDB 3, queried with SQL                             |
-| `ghchronicle-prometheus.json`    | 152 | Prometheus                                               |
-| `ghchronicle-postgres.json`      | 152 | PostgreSQL or TimescaleDB, from the SQL sink             |
-| `ghchronicle-graphite.json`      | 152 | Graphite, from the Graphite sink                         |
-| `ghchronicle-elasticsearch.json` | 152 | Elasticsearch or OpenSearch, from the Elasticsearch sink |
+| `ghchronicle-influxdb.json`      | 154 | InfluxDB 3, queried with SQL                             |
+| `ghchronicle-prometheus.json`    | 154 | Prometheus                                               |
+| `ghchronicle-postgres.json`      | 154 | PostgreSQL or TimescaleDB, from the SQL sink             |
+| `ghchronicle-graphite.json`      | 154 | Graphite, from the Graphite sink                         |
+| `ghchronicle-elasticsearch.json` | 154 | Elasticsearch or OpenSearch, from the Elasticsearch sink |
 
 The five hold the same panels in the same order. What differs is how many of
 them the store behind each one can answer.
@@ -173,12 +173,12 @@ in the repository.
 
 ## What they show
 
-The seventeen sections and their one hundred and fifty two panels, one capture each, and what changes when the store cannot answer.
+The seventeen sections and their one hundred and fifty four panels, one capture each, and what changes when the store cannot answer.
 
 Source: <https://jmrp.io/docs/ghchronicle/dashboards/panels/>
 
 One dashboard, rendered once per store. Seventeen sections, one hundred and
-fifty two panels, in the same places with the same titles whichever database
+fifty four panels, in the same places with the same titles whichever database
 you chose. One capture per section below, in the order the dashboard puts them.
 
 Every section but the Overview opens collapsed. Open, the first seven were
@@ -674,9 +674,10 @@ Reads `gh_sponsors_listing`, `gh_sponsorship`, `gh_sponsors_tier`,
 
 ### The collector itself
 
-What the collector has left to spend: the budget of each of GitHub's fifteen
-independent rate limits over time, and a table of all of them ordered by how
-much of each has been used.
+What the collector has left to spend and what it managed to do: the budget of
+each of GitHub's fifteen independent rate limits over time, a table of all of
+them ordered by how much of each has been used, and under those two the row's
+own report on the sweep.
 
 ![The collector itself section: the rate budget used per bucket over the range, and the table of every bucket with its limit, most used and lowest remaining, led by core at 3134 used of 5000 and 1866 left](../site/src/assets/dashboards/the-collector-itself.png)
 
@@ -686,7 +687,28 @@ this costs nothing: `GET /rate_limit` is the one endpoint GitHub does not
 charge for. Without it, a family skipped because a bucket was spent looks
 exactly like a family with nothing to report.
 
-Reads `gh_rate_limit`.
+"Every family" and "What failed, and where" are the two panels below them, and
+the capture above predates both. The first lists every collector that ran in
+the range, how many repositories it was asked about, how many of them it could
+not collect and how many rows it produced; a family with no row there did not
+run at all. The second is one row per repository one collector could not
+collect, newest first, with what GitHub answered. An empty second table is the
+good case, and it is drawn empty rather than refused because the first table's
+rows are written every sweep whether or not anything failed, so the measurement
+behind both exists from the first one.
+
+They are there because of a failure this page could not explain. On 2026-09-16
+five repositories of this account held no workflow run or job at all, each
+because one call for the jobs of one run had answered `502` once and the
+collector had thrown away everything it had gathered for that repository. The
+Continuous integration row was drawn over an account missing its five busiest
+repositories while the Cost row on the same page reported one of them burning
+27.6 K macOS minutes. Neither panel takes the repository variable: the family
+rows belong to no repository, and a repository a sweep could not collect may be
+one the variable does not list, since the variable is built from rows the same
+sweep writes.
+
+Reads `gh_rate_limit` and `gh_collector_family`.
 
 ### The Link column
 

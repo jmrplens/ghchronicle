@@ -7,7 +7,7 @@ compactTables:
 
 import { Aside } from "@astrojs/starlight/components";
 
-Noventa y una medidas. Cada fila dice cómo se fecha un punto, porque eso es
+Noventa y dos medidas. Cada fila dice cómo se fecha un punto, porque eso es
 lo que decide qué preguntas puede responder.
 
 ## Cómo leer las tablas
@@ -204,7 +204,9 @@ Noventa y una, y cada enlace cae en la tabla en la que está.
 [`gh_code_scanning_alert`](#seguridad) ·
 [`gh_code_scanning_alert_item`](#seguridad) ·
 [`gh_code_scanning_analysis`](#seguridad) ·
-[`gh_code_scanning_setup`](#seguridad) · [`gh_commit`](#desarrollo) ·
+[`gh_code_scanning_setup`](#seguridad) ·
+[`gh_collector_family`](#configuración-y-entrega) ·
+[`gh_commit`](#desarrollo) ·
 [`gh_commit_check`](#desarrollo) · [`gh_commit_punchcard`](#cuenta) ·
 [`gh_commits_week`](#cuenta) · [`gh_contribution_day`](#cuenta) ·
 [`gh_contribution_day_repo`](#cuenta) · [`gh_contribution_repo`](#cuenta) ·
@@ -886,6 +888,7 @@ adivinarla, así que buena parte de las filas no llevan enlace.
 | `gh_dependency_license` | diario                 | `license`                                       | `packages`                                                                                                                                                                                                                                                                                                                                               |
 | `gh_dependency_change`  | ahora                  | `change`, `ecosystem`                           | `packages`, `vulnerable`, `base`, `head`                                                                                                                                                                                                                                                                                                                 |
 | `gh_rate_limit`         | ahora                  | `resource`                                      | `limit`, `used`, `remaining`, `used_ratio`, `seconds_to_reset`, `own_cost`, `own_queries`                                                                                                                                                                                                                                                                |
+| `gh_collector_family`   | ahora                  | `family`, `scope` (family, repo), `reason`      | `repos`, `failed`, `points`, `error`                                                                                                                                                                                                                                                                                                                     |
 
 Los webhooks fallan en silencio. Medido, un hook llevaba respondiendo 403 en
 setenta y ocho de sus últimas cien entregas y no había nada en ningún sitio que
@@ -934,9 +937,37 @@ movió: GitHub lo regenera en cada petición, así que su ETag nunca acierta y
 cada lectura se cobra de su propio cubo, y un repositorio sin commit tiene los
 paquetes que tenía.
 
-`gh_rate_limit` es la única medida que el colector se toma de sí mismo. GitHub
-lleva quince presupuestos independientes, y sin esto una familia saltada por
-falta de presupuesto es idéntica a una familia sin nada que contar.
+`gh_rate_limit` y `gh_collector_family` son lo que el colector mide de sí
+mismo. La primera es lo que le queda por gastar: GitHub lleva quince
+presupuestos independientes, y sin ella una familia saltada por falta de
+presupuesto es idéntica a una familia sin nada que contar.
+
+La segunda es lo que cada barrido consiguió hacer. Una fila por familia
+ejecutada, siempre, con cuántos repositorios se le preguntaron (`repos`),
+cuántos de ellos no pudo recoger (`failed`) y cuántas filas produjo (`points`);
+y una fila más por cada repositorio que perdió, nombrándolo como lo nombra
+cualquier otra medida y con `reason`, una palabra acotada de qué la detuvo (el
+estado HTTP, `rate limited`, `query too large`, `canceled`), con el mensaje
+entero en el campo `error`. `scope` es lo que distingue las dos: `family` para
+la primera clase, cuyas etiquetas de repositorio llevan `(none)`, y `repo` para
+la segunda.
+
+Las filas que siempre llegan son el motivo de todo esto. Una familia sin
+ninguna fila en un barrido no se ejecutó en ese barrido, que es justo lo que un
+panel vacío nunca podría decir, y son además lo que hace que la medida exista
+en una cuenta donde nunca ha fallado nada: una tabla en la que InfluxDB no ha
+escrito nunca no se dibuja vacía, se rechaza.
+
+Esto existe por un fallo medido. El 2026-09-16 `gh_workflow_run` y
+`gh_workflow_job` no tenían absolutamente nada de los cinco repositorios más
+activos de esta cuenta, cada uno porque una llamada a
+`/repos/<repo>/actions/runs/<id>/jobs` había respondido `502` una vez y el
+runner tiraba todo lo que esa familia ya había recogido de ese repositorio. La
+fila Continuous integration del dashboard se calculaba sobre una cuenta a la
+que le faltaban sus cinco repositorios más activos, la fila Cost de la misma
+página decía que uno de ellos había quemado 27,6 K minutos de macOS, y el único
+registro de la causa era una línea en un diario. Ahora el colector conserva lo
+que reunió antes de un fallo, y escribe qué falló.
 
 `GET /rate_limit` informa de los presupuestos y no cobra por ninguno, que es lo
 que hace que casi todo esto sea gratis. No todos los que informa son ciertos:

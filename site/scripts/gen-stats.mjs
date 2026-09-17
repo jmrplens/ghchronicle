@@ -122,15 +122,15 @@ const NUMBER_WORDS = {
 		5: "five",
 		10: "ten",
 		34: "thirty-four",
-		91: "ninety-one",
-		152: "one hundred and fifty two",
+		92: "ninety-two",
+		154: "one hundred and fifty four",
 	},
 	es: {
 		5: "cinco",
 		10: "diez",
 		34: "treinta y cuatro",
-		91: "noventa y una",
-		152: "ciento cincuenta y dos",
+		92: "noventa y dos",
+		154: "ciento cincuenta y cuatro",
 	},
 };
 

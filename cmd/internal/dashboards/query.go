@@ -630,6 +630,22 @@ const (
 	noneElasticsearch = `"` + noneValue + `"`
 )
 
+// The two values of gh_collector_family's `scope` tag, which tell the row
+// about a family from the rows about the repositories it failed on, spelled
+// here exactly as internal/collect writes them. Both halves of the collector's
+// own row of the dashboard select on one of them, so a spelling that drifted
+// would leave both tables empty on a store that is full;
+// TestTheCollectorScopesAreSpelledAsTheCollectorWritesThem holds them
+// together, the way the sentinel above is held.
+const (
+	scopeFamilyTag = "family"
+	scopeRepoTag   = "repo"
+)
+
+// collectorFailures is the one heading the two collector tables count under,
+// and the column the left one is sorted by.
+const collectorFailures = "Failures"
+
 var esNames = map[string]string{
 	"count": "Count", "avg": "Average", "sum": "Sum", "max": "Max", "min": "Min",
 	"percentiles": "Percentiles", "top_metrics": "Top Metrics", "cardinality": "Unique Count",

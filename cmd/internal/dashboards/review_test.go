@@ -847,6 +847,24 @@ func TestEveryStoreExcludesTheSentinelTheSameWay(t *testing.T) {
 	}
 }
 
+// TestTheCollectorScopesAreSpelledAsTheCollectorWritesThem: both halves of
+// the collector's own row select on gh_collector_family's `scope` tag, so a
+// spelling that drifted from the collector's would leave both tables empty on
+// a store that is full, and nothing would say so. The same hole the sentinel
+// above had, closed the same way.
+func TestTheCollectorScopesAreSpelledAsTheCollectorWritesThem(t *testing.T) {
+	t.Parallel()
+	for name, want := range map[string]string{
+		"scopeFamily": scopeFamilyTag,
+		"scopeRepo":   scopeRepoTag,
+	} {
+		if written := collectConst(t, "health.go", name); written != want {
+			t.Errorf("the specification selects %q and the collectors write %q for %s",
+				want, written, name)
+		}
+	}
+}
+
 // collectorSentinel is the value of noneTag in internal/collect, read from its
 // source.
 //
@@ -855,16 +873,27 @@ func TestEveryStoreExcludesTheSentinelTheSameWay(t *testing.T) {
 // needs from them is this string.
 func collectorSentinel(t *testing.T) string {
 	t.Helper()
-	path := filepath.Join("..", "..", "..", "internal", "collect", "strings.go")
+	return collectConst(t, "strings.go", "noneTag")
+}
+
+// collectConst is the value of one string constant of internal/collect, read
+// from the file that declares it.
+//
+// Read rather than imported, for the reason collectorSentinel gives: the
+// command that generates this specification has no business linking the
+// collectors in, and the few strings it needs from them are these.
+func collectConst(t *testing.T, file, name string) string {
+	t.Helper()
+	path := filepath.Join("..", "..", "..", "internal", "collect", file)
 	fset := token.NewFileSet()
-	file, err := parser.ParseFile(fset, path, nil, 0)
+	parsed, err := parser.ParseFile(fset, path, nil, 0)
 	if err != nil {
-		t.Fatalf("cannot read the collectors' sentinel: %v", err)
+		t.Fatalf("cannot read internal/collect/%s: %v", file, err)
 	}
 	var got string
-	ast.Inspect(file, func(n ast.Node) bool {
+	ast.Inspect(parsed, func(n ast.Node) bool {
 		spec, ok := n.(*ast.ValueSpec)
-		if !ok || len(spec.Names) != 1 || spec.Names[0].Name != "noneTag" || len(spec.Values) != 1 {
+		if !ok || len(spec.Names) != 1 || spec.Names[0].Name != name || len(spec.Values) != 1 {
 			return true
 		}
 		lit, isLiteral := spec.Values[0].(*ast.BasicLit)
@@ -873,13 +902,13 @@ func collectorSentinel(t *testing.T) string {
 		}
 		value, unquoteErr := strconv.Unquote(lit.Value)
 		if unquoteErr != nil {
-			t.Fatalf("noneTag is not a plain string literal: %s", lit.Value)
+			t.Fatalf("%s is not a plain string literal: %s", name, lit.Value)
 		}
 		got = value
 		return false
 	})
 	if got == "" {
-		t.Fatalf("no noneTag constant in %s, so this checks nothing", path)
+		t.Fatalf("no %s constant in %s, so this checks nothing", name, path)
 	}
 	return got
 }

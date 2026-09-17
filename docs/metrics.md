@@ -8,7 +8,7 @@ The thirty-four families, what each one asks GitHub for, and the reason each exi
 
 Source: <https://jmrp.io/docs/ghchronicle/collectors/>
 
-Thirty-four families, ninety-one measurements. This page is what each family
+Thirty-four families, ninety-two measurements. This page is what each family
 is _for_; the [measurements reference](https://jmrp.io/docs/ghchronicle/collectors/measurements/)
 is every tag and field.
 
@@ -289,7 +289,7 @@ Every measurement, its tags, its fields, and how each one is dated.
 
 Source: <https://jmrp.io/docs/ghchronicle/collectors/measurements/>
 
-Ninety-one measurements. Each row says how a point is dated, because that is
+Ninety-two measurements. Each row says how a point is dated, because that is
 the thing that decides which questions it can answer.
 
 ### How to read the tables
@@ -480,7 +480,9 @@ Ninety-one, each link landing on the table it is in.
 [`gh_code_scanning_alert`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#security) ·
 [`gh_code_scanning_alert_item`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#security) ·
 [`gh_code_scanning_analysis`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#security) ·
-[`gh_code_scanning_setup`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#security) · [`gh_commit`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#development) ·
+[`gh_code_scanning_setup`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#security) ·
+[`gh_collector_family`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#configuration-and-delivery) ·
+[`gh_commit`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#development) ·
 [`gh_commit_check`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#development) · [`gh_commit_punchcard`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#account) ·
 [`gh_commits_week`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#account) · [`gh_contribution_day`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#account) ·
 [`gh_contribution_day_repo`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#account) · [`gh_contribution_repo`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#account) ·
@@ -1143,6 +1145,7 @@ guessed at, so a good part of the rows carry no link.
 | `gh_dependency_license` | daily                 | `license`                                       | `packages`                                                                                                                                                                                                                                                                                                                                               |
 | `gh_dependency_change`  | now                   | `change`, `ecosystem`                           | `packages`, `vulnerable`, `base`, `head`                                                                                                                                                                                                                                                                                                                 |
 | `gh_rate_limit`         | now                   | `resource`                                      | `limit`, `used`, `remaining`, `used_ratio`, `seconds_to_reset`, `own_cost`, `own_queries`                                                                                                                                                                                                                                                                |
+| `gh_collector_family`   | now                   | `family`, `scope` (family, repo), `reason`      | `repos`, `failed`, `points`, `error`                                                                                                                                                                                                                                                                                                                     |
 
 Webhooks fail silently. Measured, one hook had been answering 403 for
 seventy-eight of its last hundred deliveries and nothing anywhere said so.
@@ -1189,9 +1192,35 @@ is read only when that head moved: GitHub regenerates it on every request, so
 its ETag never matches and each read is charged from its own bucket, and a
 repository without a commit has the packages it had.
 
-`gh_rate_limit` is the only measurement the collector takes of itself. GitHub
-runs fifteen independent budgets, and without this a family skipped for want of
-budget looks exactly like a family with nothing to report.
+`gh_rate_limit` and `gh_collector_family` are what the collector measures of
+itself. The first is what it has left to spend: GitHub runs fifteen independent
+budgets, and without it a family skipped for want of budget looks exactly like a
+family with nothing to report.
+
+The second is what each sweep managed to do. One row per family it ran, always,
+with how many repositories it was asked about (`repos`), how many of them it
+could not collect (`failed`) and how many rows it produced (`points`); and one
+row more per repository it lost, naming that repository the way every other
+measurement names one and carrying `reason`, a bounded word for what stopped it
+(the HTTP status, `rate limited`, `query too large`, `canceled`), with the whole
+message in the `error` field. `scope` is what tells the two apart: `family` for
+the first kind, whose repository tags hold `(none)`, and `repo` for the second.
+
+The rows that always arrive are the point of it. A family with no row at all in
+a sweep did not run in that sweep, which an empty panel could never say, and
+they are also what makes the measurement exist on an account where nothing has
+ever failed: a table InfluxDB has never been written to is not drawn empty, it
+is refused.
+
+This exists because of one measured failure. On 2026-09-16 `gh_workflow_run` and
+`gh_workflow_job` held nothing at all for the five busiest repositories of this
+account, each because one `/repos/<repo>/actions/runs/<id>/jobs` call had
+answered `502` once and the runner had thrown away everything that family had
+already collected for that repository. The Continuous integration row of the
+dashboard was computed over an account missing its five busiest repositories,
+the Cost row on the same page reported one of them burning 27.6 K macOS minutes,
+and the only record of the cause was one line in a journal. The collector keeps
+what it gathered before a failure now, and it writes down what failed.
 
 `GET /rate_limit` reports the budgets and charges for none of them, which is
 what makes almost all of this free. Not every one it reports is true: measured with the token this runs under, the endpoint answered

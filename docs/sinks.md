@@ -651,7 +651,7 @@ Nothing in the dashboard changes.
     SELECT time, "count" FROM gh_traffic WHERE kind = 'views' AND repo = $repo
     ```
 
-`dashboards/ghchronicle-postgres.json` has the same 152 panels as the InfluxDB
+`dashboards/ghchronicle-postgres.json` has the same 154 panels as the InfluxDB
 one, with every query translated to PostgreSQL against this schema.
 
 ### Where to go next
@@ -734,7 +734,7 @@ Everything time-shaped works normally, which is most of the dashboard.
 
 ### The dashboard
 
-`dashboards/ghchronicle-graphite.json` has the same 152 panels as the InfluxDB
+`dashboards/ghchronicle-graphite.json` has the same 154 panels as the InfluxDB
 one, written against these paths with the default prefix. It needs **Graphite
 1.1 or later** for the functions it uses, and any panel a series cannot carry
 says so in its description.
@@ -838,7 +838,7 @@ write. Nothing in the sink depends on them; only the panels' choice of
 
 ### The dashboard
 
-`dashboards/ghchronicle-elasticsearch.json` has the same 152 panels as the
+`dashboards/ghchronicle-elasticsearch.json` has the same 154 panels as the
 InfluxDB one, as Lucene filters and aggregations over **one** datasource
 pointing at `<prefix>-*`, because each target names its own index in its query.
 

@@ -24113,7 +24113,7 @@
         "x": 0,
         "y": 726
       },
-      "id": 169,
+      "id": 171,
       "panels": [
         {
           "datasource": "${DS_ELASTICSEARCH}",
@@ -24295,6 +24295,296 @@
                   "Top Metrics remaining": "Lowest remaining",
                   "Top Metrics used": "Most used",
                   "resource.keyword": "Bucket"
+                }
+              }
+            }
+          ],
+          "type": "table"
+        },
+        {
+          "datasource": "${DS_ELASTICSEARCH}",
+          "description": "Every collector that ran in the range, how many repositories it was asked about, how many of them it could not collect and how many rows it produced. A family with no row here did not run at all, which is the one thing an empty panel could never say: not due, switched off, or skipped because a rate budget was spent. Failures is the sweep's own count, so a family that failed on some of its repositories and was still marked as having run says so here. No repository filter: these rows belong to the collector rather than to a repository.",
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "align": "auto",
+                "cellOptions": {
+                  "type": "auto"
+                },
+                "filterable": false,
+                "minWidth": 90
+              },
+              "fieldMinMax": true
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Failures"
+                },
+                "properties": [
+                  {
+                    "id": "custom.cellOptions",
+                    "value": {
+                      "mode": "gradient",
+                      "type": "gauge"
+                    }
+                  },
+                  {
+                    "id": "unit",
+                    "value": "short"
+                  },
+                  {
+                    "id": "min",
+                    "value": 0
+                  },
+                  {
+                    "id": "thresholds",
+                    "value": {
+                      "mode": "absolute",
+                      "steps": [
+                        {
+                          "color": "green",
+                          "value": null
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "id": "custom.width",
+                    "value": 110
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Repositories"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 110
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Rows"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 90
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": {
+            "h": 9,
+            "w": 12,
+            "x": 0,
+            "y": 738
+          },
+          "id": 169,
+          "options": {
+            "cellHeight": "sm",
+            "footer": {
+              "countRows": false,
+              "reducer": [
+                "sum"
+              ],
+              "show": false
+            },
+            "showHeader": true,
+            "sortBy": [
+              {
+                "desc": true,
+                "displayName": "Failures"
+              }
+            ]
+          },
+          "targets": [
+            {
+              "bucketAggs": [
+                {
+                  "field": "family.keyword",
+                  "id": "543",
+                  "settings": {
+                    "min_doc_count": "1",
+                    "order": "desc",
+                    "orderBy": "_count",
+                    "size": "40"
+                  },
+                  "type": "terms"
+                }
+              ],
+              "datasource": "${DS_ELASTICSEARCH}",
+              "metrics": [
+                {
+                  "field": "failed",
+                  "id": "544",
+                  "type": "sum"
+                },
+                {
+                  "field": "repos",
+                  "id": "545",
+                  "type": "max"
+                },
+                {
+                  "field": "points",
+                  "id": "546",
+                  "type": "sum"
+                }
+              ],
+              "query": "_index:ghchronicle-gh_collector_family AND scope.keyword:\"family\"",
+              "refId": "A",
+              "timeField": "@timestamp"
+            }
+          ],
+          "title": "Every family",
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {},
+                "renameByName": {
+                  "Max": "Repositories",
+                  "Sum failed": "Failures",
+                  "Sum points": "Rows",
+                  "family.keyword": "Family"
+                }
+              }
+            }
+          ],
+          "type": "table"
+        },
+        {
+          "datasource": "${DS_ELASTICSEARCH}",
+          "description": "One row per repository one collector could not collect, newest first: which family, which repository, and what GitHub answered. This is where an empty row of the dashboard gets its explanation. Measured on this account on 2026-09-16, before there was anything to read it from: five repositories held no workflow run or job at all, each because one call for the jobs of one run had answered 502 once, and the Continuous integration row was drawn over an account missing its five busiest repositories. An empty table is the good case. No repository filter: a repository a sweep could not collect may be one the filter does not list, since the filter is built from rows the same sweep writes. In Elasticsearch this lists the newest 100 documents and the panel sorts them.",
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "align": "auto",
+                "cellOptions": {
+                  "type": "auto"
+                },
+                "filterable": false,
+                "minWidth": 90
+              },
+              "fieldMinMax": true
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "When"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "time: YYYY-MM-DD HH:mm"
+                  },
+                  {
+                    "id": "custom.width",
+                    "value": 135
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Repository"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 110
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Why"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 90
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": {
+            "h": 9,
+            "w": 12,
+            "x": 12,
+            "y": 738
+          },
+          "id": 170,
+          "options": {
+            "cellHeight": "sm",
+            "footer": {
+              "countRows": false,
+              "reducer": [
+                "sum"
+              ],
+              "show": false
+            },
+            "showHeader": true,
+            "sortBy": []
+          },
+          "targets": [
+            {
+              "bucketAggs": [],
+              "datasource": "${DS_ELASTICSEARCH}",
+              "metrics": [
+                {
+                  "id": "547",
+                  "settings": {
+                    "order": "desc",
+                    "size": "100",
+                    "useTimeRange": true
+                  },
+                  "type": "raw_data"
+                }
+              ],
+              "query": "_index:ghchronicle-gh_collector_family AND scope.keyword:\"repo\"",
+              "refId": "A",
+              "timeField": "@timestamp"
+            }
+          ],
+          "title": "What failed, and where",
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "includeByName": {
+                  "@timestamp": true,
+                  "error": true,
+                  "family": true,
+                  "reason": true,
+                  "repo": true
+                },
+                "indexByName": {
+                  "@timestamp": 0,
+                  "error": 4,
+                  "family": 1,
+                  "reason": 3,
+                  "repo": 2
+                },
+                "renameByName": {
+                  "@timestamp": "When",
+                  "error": "What GitHub said",
+                  "family": "Family",
+                  "reason": "Why",
+                  "repo": "Repository"
                 }
               }
             }

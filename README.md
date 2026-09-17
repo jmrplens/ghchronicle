@@ -85,7 +85,7 @@ lot. The copies under [docs/](docs/README.md) are generated from those pages.
 
 ## What it collects
 
-Ninety-one measurements across thirty-four families, covering every surface
+Ninety-two measurements across thirty-four families, covering every surface
 a personal or organisation account exposes.
 
 | Area | What is kept |

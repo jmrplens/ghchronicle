@@ -1,12 +1,12 @@
 ---
 title: Qué muestran
-description: Las diecisiete secciones y sus ciento cincuenta y dos paneles, una captura de cada una, y qué cambia cuando el almacén no puede responder.
+description: Las diecisiete secciones y sus ciento cincuenta y cuatro paneles, una captura de cada una, y qué cambia cuando el almacén no puede responder.
 ---
 
 import { Aside } from "@astrojs/starlight/components";
 
 Un dashboard, renderizado una vez por almacén. Diecisiete secciones, ciento
-cincuenta y dos paneles, en los mismos sitios y con los mismos títulos sea cual
+cincuenta y cuatro paneles, en los mismos sitios y con los mismos títulos sea cual
 sea la base de datos elegida. Abajo hay una captura por sección, en el orden en
 que el dashboard las coloca.
 
@@ -526,9 +526,10 @@ Lee `gh_sponsors_listing`, `gh_sponsorship`, `gh_sponsors_tier`,
 
 ## The collector itself
 
-Lo que le queda al colector por gastar: el presupuesto de cada uno de los quince
-límites de GitHub en el tiempo, y una tabla con todos ellos ordenada por cuánto
-se ha gastado de cada uno.
+Lo que le queda al colector por gastar y lo que consiguió hacer: el presupuesto
+de cada uno de los quince límites de GitHub en el tiempo, una tabla con todos
+ellos ordenada por cuánto se ha gastado de cada uno, y debajo de esas dos el
+informe de la fila sobre el propio barrido.
 
 ![La sección The collector itself: el presupuesto de peticiones usado por cubo en el rango, y la tabla de todos los cubos con su límite, el máximo usado y el mínimo restante, encabezada por core con 3134 usados de 5000 y 1866 restantes](../../../../assets/dashboards/the-collector-itself.png)
 
@@ -538,7 +539,30 @@ nada: `GET /rate_limit` es el único endpoint que GitHub no cobra. Sin él, una
 familia saltada por falta de presupuesto es indistinguible de una que no tenía
 nada que contar.
 
-Lee `gh_rate_limit`.
+"Every family" y "What failed, and where" son los dos paneles de debajo, y la
+captura de arriba es anterior a ambos. El primero lista todos los colectores
+que corrieron en el rango, cuántos repositorios se les preguntaron, cuántos de
+ellos no pudieron recoger y cuántas filas produjeron; una familia sin fila ahí
+no corrió en absoluto. El segundo es una fila por cada repositorio que un
+colector no pudo recoger, el más reciente primero, con lo que respondió GitHub.
+Que la segunda tabla esté vacía es el caso bueno, y se dibuja vacía en lugar de
+rechazada porque las filas de la primera se escriben en cada barrido haya
+fallado algo o no, así que la medida que hay detrás de las dos existe desde el
+primero.
+
+Están ahí por un fallo que esta página no podía explicar. El 2026-09-16 cinco
+repositorios de esta cuenta no tenían ninguna ejecución ni trabajo de workflow,
+cada uno porque una llamada por los trabajos de una ejecución había respondido
+`502` una vez y el colector había tirado todo lo que había reunido de ese
+repositorio. La fila Continuous integration se dibujaba sobre una cuenta a la
+que le faltaban sus cinco repositorios más activos mientras la fila Cost de la
+misma página decía que uno de ellos había quemado 27,6 K minutos de macOS.
+Ninguno de los dos paneles usa la variable de repositorio: las filas de familia
+no pertenecen a ningún repositorio, y un repositorio que un barrido no pudo
+recoger puede ser uno que la variable ni siquiera lista, porque la variable se
+construye con filas que escribe ese mismo barrido.
+
+Lee `gh_rate_limit` y `gh_collector_family`.
 
 ## La columna Link
 

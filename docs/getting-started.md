@@ -40,7 +40,7 @@ container, a scheduled workflow.
 | --------------- | ------------------------------------------------------------------------------------------------------ |
 | **family**      | One collector, named in the configuration: `actions`, `stars`, `issues`. There are 34                |
 | **group**       | A named set of families, for switching a whole area on or off: `ci`, `security`, `audience`. There are 8 |
-| **measurement** | One kind of row in the store, named `gh_*`: `gh_star`, `gh_workflow_run`. There are 91               |
+| **measurement** | One kind of row in the store, named `gh_*`: `gh_star`, `gh_workflow_run`. There are 92               |
 | **point**       | One row: a measurement, its tags, its fields and the date the thing happened                         |
 | **sweep**       | One pass over the families that are due, which is what the process does on a loop                    |
 | **backfill**    | A run with `-backfill`, which walks the history instead of the increment                             |

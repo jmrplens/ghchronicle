@@ -317,6 +317,45 @@ func collectorSection(b *builder) []Panel {
 			{"used", lifetimeMostUsed},
 		}, nil)
 
+	// What the sweep says about itself, which until this row had it it said
+	// to nobody but the journal. A family writes one row per sweep whether or
+	// not anything failed, and one more per repository it could not collect,
+	// so the left table is every family that ran and the right one is what
+	// each of them lost. Neither takes the repository variable: the left rows
+	// belong to no repository, and a repository a sweep could not collect may
+	// be one the variable does not list, since the variable is built from
+	// gh_repo and that is a row the same sweep may have failed to write.
+	cf := "gh_collector_family"
+	ranQ := `SELECT family AS "Family", SUM(failed) AS "Failures",` +
+		` MAX(repos) AS "Repositories", SUM(points) AS "Rows"` +
+		" FROM " + cf + " WHERE $__timeFilter(time) AND scope = 'family'" +
+		" GROUP BY 1 ORDER BY 2 DESC, 1"
+	lostQ := `SELECT time AS "When", family AS "Family", repo AS "Repository",` +
+		` reason AS "Why", error AS "What GitHub said" FROM ` + cf +
+		" WHERE $__timeFilter(time) AND scope = 'repo' ORDER BY time DESC LIMIT 100"
+
+	ranGR, ranGRtf := gTbl(rowsOf(gp(cf, "failed", "scope", scopeFamilyTag), gn(cf, "family")),
+		"Family", []col{{"sum", collectorFailures}})
+	ranES, ranEStf := esTbl(cf, []any{b.tm("family", 40)},
+		[]any{b.mSum("failed"), b.mMax("repos"), b.mSum("points")},
+		[]named{
+			{"family.keyword", "Family"},
+			{"f", collectorFailures},
+			{"r", "Repositories"},
+			{"p", "Rows"},
+		}, []string{`scope.keyword:"` + scopeFamilyTag + `"`})
+
+	lostGR, lostGRtf := gTbl(rowsOf(gp(cf, "failed", "scope", scopeRepoTag),
+		gn(cf, "family"), gn(cf, "repo"), gn(cf, "reason")),
+		"Family, repository, why", []col{{"sum", collectorFailures}})
+	lostES, lostEStf := b.esRaw(cf, 100, []named{
+		{panelESTime, "When"},
+		{"family", "Family"},
+		{"repo", "Repository"},
+		{"reason", "Why"},
+		{"error", "What GitHub said"},
+	}, []string{`scope.keyword:"` + scopeRepoTag + `"`})
+
 	return []Panel{
 		panel("timeseries", "Rate budget used", box{W: 12, H: 11, X: 0, Y: 0},
 			[]Target{sqlTS(budget)}, &P{
@@ -353,6 +392,60 @@ func collectorSection(b *builder) []Panel {
 				"can collect. Reading them costs nothing: GET /rate_limit is free.",
 			GR: bucketsGR, GRTF: bucketsGRtf, GRDesc: grSlot,
 			ES: bucketsES, ESTF: bucketsEStf,
+		}),
+		panel("table", "Every family", box{W: 12, H: 9, X: 0, Y: 11}, []Target{sqlT(ranQ)}, &P{
+			Prom: []Target{
+				promTbl("sum by (family) (github_collector_family_failed{scope=\""+scopeFamilyTag+"\"})", "A"),
+				promTbl("sum by (family) (github_collector_family_repos{scope=\""+scopeFamilyTag+"\"})", "B"),
+				promTbl("sum by (family) (github_collector_family_points{scope=\""+scopeFamilyTag+"\"})", "C"),
+			},
+			PromTF: merged(map[string]string{
+				"family": "Family", panelValueA: collectorFailures,
+				panelValueB: "Repositories", panelValueC: "Rows",
+			}, []string{"scope"}, nil),
+			PromDesc: sweepCount,
+			Opts:     Opts{"sort": collectorFailures},
+			Overrides: []any{
+				barCell(collectorFailures, "short", 110),
+				width("Repositories", 110), width("Rows", 90),
+			},
+			Desc: "Every collector that ran in the range, how many repositories it was " +
+				"asked about, how many of them it could not collect and how many rows it " +
+				"produced. A family with no row here did not run at all, which is the one " +
+				"thing an empty panel could never say: not due, switched off, or skipped " +
+				"because a rate budget was spent. Failures is the sweep's own count, so a " +
+				"family that failed on some of its repositories and was still marked as " +
+				"having run says so here. No repository filter: these rows belong to the " +
+				"collector rather than to a repository.",
+			GR: ranGR, GRTF: ranGRtf, GRDesc: grRows,
+			ES: ranES, ESTF: ranEStf,
+		}),
+		panel("table", "What failed, and where", box{W: 12, H: 9, X: 12, Y: 11}, []Target{sqlT(lostQ)}, &P{
+			Prom: []Target{promTbl(
+				"github_collector_family_failed{scope=\"" + scopeRepoTag + "\"}",
+			)},
+			PromTF: []any{organize(map[string]string{
+				"family": "Family", "repo": "Repository", "reason": "Why",
+				"Value": collectorFailures,
+			}, []string{"scope"}, nil)},
+			PromDesc: "In Prometheus this is the last sweep's failures rather than the " +
+				"range's, and the exporter carries no message, so the What GitHub said " +
+				"column of the InfluxDB dashboard is absent here.",
+			Overrides: []any{when("When"), repoColumn(), width("Why", 90)},
+			Desc: "One row per repository one collector could not collect, newest first: " +
+				"which family, which repository, and what GitHub answered. This is where " +
+				"an empty row of the dashboard gets its explanation. Measured on this " +
+				"account on 2026-09-16, before there was anything to read it from: five " +
+				"repositories held no workflow run or job at all, each because one call " +
+				"for the jobs of one run had answered 502 once, and the Continuous " +
+				"integration row was drawn over an account missing its five busiest " +
+				"repositories. An empty table is the good case. No repository filter: a " +
+				"repository a sweep could not collect may be one the filter does not " +
+				"list, since the filter is built from rows the same sweep writes.",
+			GR: lostGR, GRTF: lostGRtf, GRDesc: grRows,
+			ES: lostES, ESTF: lostEStf,
+			ESDesc: "In Elasticsearch this lists the newest 100 documents and the panel " +
+				"sorts them.",
 		}),
 	}
 }

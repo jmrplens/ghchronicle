@@ -6,7 +6,7 @@ importer to choose their own.
 
 | File | Panels | Store |
 |---|---|---|
-| `ghchronicle-influxdb.json` | 152 | InfluxDB 3, queried with SQL |
+| `ghchronicle-influxdb.json` | 154 | InfluxDB 3, queried with SQL |
 | `ghchronicle-prometheus.json` | 152 | Prometheus |
 | `ghchronicle-postgres.json` | 152 | PostgreSQL or TimescaleDB, from the SQL sink |
 | `ghchronicle-graphite.json` | 152 | Graphite, from the Graphite sink |
