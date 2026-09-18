@@ -12,6 +12,35 @@ silicon and Intel. macOS is not a build target that is merely compiled and
 hoped for: every change runs the whole unit suite and the end-to-end suite on a
 macOS runner, beside Linux and Windows.
 
+## The one-line install
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.sh | bash
+```
+
+It works out the architecture, takes the newest release, checks the archive
+against the checksum that release published, and puts the binary in
+`/usr/local/bin` when that is writable and `~/.local/bin` otherwise. A checksum
+that does not match stops it without installing anything, and there is no flag
+to skip that step. When `cosign` is already on the machine it also verifies
+that the checksum file itself came from the release workflow.
+
+Pin a version, or choose where it goes:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.sh | VERSION=2.0.0 BIN_DIR=~/bin bash
+```
+
+<Aside type="note" title="Reading it first is the whole point of a short script">
+  Piping anything into a shell means running whatever that URL answers with
+  today. `curl -fsSL <url> -o install.sh`, read it, then `bash install.sh`: it
+  is the same script, and it is short enough to read.
+</Aside>
+
+The rest of this page is that same install done by hand, which is what to
+follow when you want to know exactly what landed where, or when you would
+rather not run a script you did not write.
+
 ## Pick the archive
 
 Release archives say `darwin`, which is the name of the system the Go toolchain
@@ -31,9 +60,9 @@ curl -fsSLO "$base/ghchronicle_${VERSION}_darwin_${arch}.tar.gz"
 ```
 
 <Aside type="caution" title="Name the version rather than asking for the newest">
-  The repository publishes a moving `v1` tag beside the numbered releases,
+  The repository publishes a moving major tag beside the numbered releases,
   because the Action is listed on the Marketplace and that listing needs one.
-  The `v1` release carries **no files at all**, so never build a download URL
+  That tag's release carries **no files at all**, so never build a download URL
   from the major tag: there is nothing behind it to download. Take the version
   from the
   [releases page](https://github.com/jmrplens/ghchronicle/releases) and write

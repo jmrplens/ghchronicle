@@ -607,6 +607,22 @@ jobs:
           pnpm run format:check
         working-directory: site
 
+  # install.sh is the one file here a stranger runs by piping it into a shell.
+  # Ubuntu's runner image ships shellcheck, so this needs no action and no
+  # download.
+  shellcheck:
+    name: shellcheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Lint the installer and the Action's steps
+        run: shellcheck install.sh scripts/*.sh
+
   hadolint:
     name: hadolint
     runs-on: ubuntu-latest

@@ -146,6 +146,14 @@ than the JSON.
 ## Install
 
 ```sh
+curl -fsSL https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.sh | bash
+```
+
+On Linux and macOS that works out the platform, takes the newest release and
+refuses to install anything whose checksum is not the one the release
+published. Or build it yourself:
+
+```sh
 go install github.com/jmrplens/ghchronicle/cmd/ghchronicle@latest
 ```
 

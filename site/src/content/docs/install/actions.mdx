@@ -35,7 +35,7 @@ it downloads a release binary and calls it.
 | `card-motion`     | `once`               | `once`, `loop` or `off`; `loop` changes only `terminal` and `ticker`                                                                 |
 | `card-width`      | `""`                 | Card width in pixels. Empty draws the layout at its own width; each one draws between two ends of its own, stated in its [section](/ghchronicle/card/layouts/). Only `activity-heatmap` spends the room on data, a whole year of the calendar at its far end |
 | `card-speed`      | `""`                 | How fast an animated layout plays, as a decimal from 0 to 1. Empty means 0.5, the pace every card has always been drawn at; below it the card is slower, above it faster, and every animated layout scales together. 0 is the slowest animation and not a still card, `card-motion: off` is |
-| `include-private` | `false`              | `true` counts private repositories when no config file is given (the default up to v1.0.0). See the warning below |
+| `include-private` | `false`              | `true` counts private repositories when no config file is given. See the warning below |
 | `version`         | `latest`             | The release to install                                                                                            |
 
 ## The three modes
@@ -220,8 +220,7 @@ in the `<picture>` are relative to the README, so a `docs/README.md` points at
   Without a config file, stars, forks, languages, traffic and repository names
   come from public repositories only, while contribution, commit and pull
   request counts are account totals, as GitHub reports them on your profile.
-  Up to v1.0.0, the Action's default configuration counted private
-  repositories. With `include-private: true` the card adds the stars, forks,
+  With `include-private: true` the card adds the stars, forks,
   languages and traffic of your private repositories, and the layouts that list repositories
   **publish their names**: `repo-list` and `summary` (the Action's default
   layout) list them by default, and so does any layout given `top_repos` in

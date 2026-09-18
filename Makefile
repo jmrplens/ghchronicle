@@ -19,7 +19,7 @@
 	config-options check-config-options config-cases check-config-cases \
 	fmt fmt-check vet tidy lint golangci-lint govulncheck analyze analyze-fix sonar \
 	mdlint mdlint-fix check-doc-links docs check-docs \
-	probe gen-dashboards check-dashboards check-dashboards-live \
+	probe gen-dashboards check-dashboards check-dashboards-live shellcheck \
 	check-prometheus check-postgres publish-dashboard \
 	gen-brand gen-brand-compose \
 	site-install site-dev site-build site-check site-analyze site-preview \
@@ -398,6 +398,14 @@ fmt-check: ## Report formatting drift without rewriting anything
 
 vet: ## Run go vet
 	go vet $(PKGS)
+
+# install.sh is the one file here that a stranger runs by piping it into a
+# shell, so it is held to a linter rather than to review alone. The scripts/
+# ones are what the Action runs, which is the same argument.
+shellcheck: ## Lint every shell script (install.sh and scripts/)
+	@command -v shellcheck >/dev/null 2>&1 || { \
+		echo "make shellcheck: shellcheck is not on PATH (apt install shellcheck)"; exit 2; }
+	shellcheck install.sh scripts/*.sh
 
 tidy: ## Tidy go.mod and go.sum
 	go mod tidy

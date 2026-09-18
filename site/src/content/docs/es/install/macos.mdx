@@ -12,6 +12,35 @@ Apple silicon como en Intel. macOS no es una plataforma que solo se compile y
 se dé por buena: cada cambio ejecuta la suite unitaria entera y la suite de
 extremo a extremo en un runner de macOS, junto a Linux y Windows.
 
+## La instalación en una línea
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.sh | bash
+```
+
+Deduce la arquitectura, coge la release más nueva, comprueba el archivo contra
+la suma de verificación que esa release publicó, y deja el binario en
+`/usr/local/bin` si tiene permiso de escritura y en `~/.local/bin` si no. Una
+suma que no cuadra lo detiene sin instalar nada, y no hay opción para saltarse
+ese paso. Si `cosign` ya está en la máquina, verifica además que el propio
+fichero de sumas viene del workflow de release.
+
+Fijar una versión, o elegir dónde va:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.sh | VERSION=2.0.0 BIN_DIR=~/bin bash
+```
+
+<Aside type="note" title="Leerlo antes es justo para lo que sirve que sea corto">
+  Meter cualquier cosa por una tubería a un shell es ejecutar lo que esa URL
+  responda hoy. `curl -fsSL <url> -o install.sh`, léelo, y luego
+  `bash install.sh`: es el mismo script, y es lo bastante corto para leerlo.
+</Aside>
+
+El resto de esta página es esa misma instalación hecha a mano, que es lo que
+seguir cuando quieres saber exactamente qué ha aterrizado dónde, o cuando
+prefieres no ejecutar un script que no has escrito.
+
 ## Elegir el archivo
 
 Los archivos de release dicen `darwin`, que es el nombre que la cadena de
@@ -31,11 +60,11 @@ curl -fsSLO "$base/ghchronicle_${VERSION}_darwin_${arch}.tar.gz"
 ```
 
 <Aside type="caution" title="Nombra la versión en vez de pedir la más nueva">
-  El repositorio publica una etiqueta móvil `v1` junto a las releases
+  El repositorio publica una etiqueta mayor móvil junto a las releases
   numeradas, porque la Action está listada en el Marketplace y ese listado
-  necesita una. La release `v1` **no lleva ningún fichero**, así que nunca
-  construyas una URL de descarga a partir de la etiqueta mayor: detrás no hay
-  nada que descargar. Coge la versión de la
+  necesita una. La release de esa etiqueta **no lleva ningún fichero**, así que
+  nunca construyas una URL de descarga a partir de la etiqueta mayor: detrás no
+  hay nada que descargar. Coge la versión de la
   [página de releases](https://github.com/jmrplens/ghchronicle/releases) y
   escríbela, como arriba.
 </Aside>

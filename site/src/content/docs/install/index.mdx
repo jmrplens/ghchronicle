@@ -1,6 +1,6 @@
 ---
 title: Ways to install
-description: A page per operating system, four ways to get the binary running, and what each one is good for.
+description: A page per operating system, five ways to get the binary running, and what each one is good for.
 compactTables:
   - Command
 ---
@@ -44,6 +44,16 @@ keep it running once you are done watching it.
 ## Getting the binary
 
 <Tabs syncKey="install">
+  <TabItem label="Script">
+    ```sh
+    curl -fsSL https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.sh | bash
+    ```
+
+    Works out the platform, takes the newest release, and refuses to install
+    anything whose checksum is not the one the release published. Linux and
+    macOS.
+
+  </TabItem>
   <TabItem label="Go">
     ```sh
     go install github.com/jmrplens/ghchronicle/cmd/ghchronicle@latest
@@ -92,8 +102,8 @@ keep it running once you are done watching it.
 
 The collector pushes to every store it supports, so it does not need to be
 reachable from anywhere. It needs to reach GitHub and to reach its databases.
-That is the only constraint, and it is what makes all four of these viable.
-Three of the four want a host you own: systemd, Docker and cron. GitHub Actions
+That is the only constraint, and it is what makes all five of these viable.
+Four of the five want a host you own: systemd, Docker and cron. GitHub Actions
 is the one that does not. The system pages above are where the scheduler lives,
 one per system: systemd or cron on Linux, launchd on macOS, a scheduled task on
 Windows.

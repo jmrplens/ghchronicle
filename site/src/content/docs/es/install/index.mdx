@@ -1,6 +1,6 @@
 ---
 title: Formas de instalar
-description: Una página por sistema operativo, cuatro maneras de poner el binario en marcha, y para qué sirve cada una.
+description: Una página por sistema operativo, cinco maneras de poner el binario en marcha, y para qué sirve cada una.
 compactTables:
   - Orden
 ---
@@ -44,6 +44,15 @@ cómo dejarlo corriendo cuando termines de mirarlo.
 ## Conseguir el binario
 
 <Tabs syncKey="install">
+  <TabItem label="Script">
+    ```sh
+    curl -fsSL https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.sh | bash
+    ```
+
+    Deduce la plataforma, coge la release más nueva y se niega a instalar nada
+    cuya suma de verificación no sea la que publicó la release. Linux y macOS.
+
+  </TabItem>
   <TabItem label="Go">
     ```sh
     go install github.com/jmrplens/ghchronicle/cmd/ghchronicle@latest
@@ -94,8 +103,8 @@ cómo dejarlo corriendo cuando termines de mirarlo.
 El colector envía por push a todos los almacenes que soporta, así que no hace
 falta que sea alcanzable desde ningún sitio. Necesita alcanzar GitHub y alcanzar
 sus bases de datos. Esa es la única restricción, y es lo que hace viables las
-cuatro opciones.
-Tres de las cuatro quieren una máquina propia: systemd, Docker y cron. GitHub
+cinco opciones.
+Cuatro de las cinco quieren una máquina propia: systemd, Docker y cron. GitHub
 Actions es la que no. Las páginas por sistema de arriba son donde vive el
 planificador, uno por sistema: systemd o cron en Linux, launchd en macOS y una
 tarea programada en Windows.
