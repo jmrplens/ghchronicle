@@ -347,7 +347,7 @@ func TestAWalkStoppedInsideARateLimitWaitKeepsItsCheckpoint(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	r := walkRunner(t, dir, newFake(t), &recorded{})
-	if err := r.Progress.FinishFamily("account", walkClock); err != nil {
+	if err := r.Progress.FinishFamily("account", 0, 0, walkClock); err != nil {
 		t.Fatal(err)
 	}
 	ctx, cancel := context.WithCancel(t.Context())
@@ -519,7 +519,7 @@ func TestABuildThatDiffersIsReportedAndNotRefused(t *testing.T) {
 	if !upgraded || was != "1.0.0" {
 		t.Errorf("the build that wrote it = %q, %t; want 1.0.0 reported", was, upgraded)
 	}
-	if err = p.FinishFamily("stars", walkClock); err != nil {
+	if err = p.FinishFamily("stars", 0, 0, walkClock); err != nil {
 		t.Fatal(err)
 	}
 	if again := readCheckpoint(t, path); again.WrittenBy != "1.1.0" {
@@ -543,13 +543,13 @@ func TestACheckpointIsPutInPlaceAndNeverWrittenOver(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err = p.WroteRepo("commits", "octocat/hello-world", walkClock); err != nil {
+	if err = p.WroteRepo("commits", "octocat/hello-world", 0, walkClock); err != nil {
 		t.Fatal(err)
 	}
 	if err = os.Mkdir(path+".tmp", 0o750); err != nil {
 		t.Fatal(err)
 	}
-	if err = p.WroteRepo("commits", "octocat/chronicle-cli", walkClock); err == nil {
+	if err = p.WroteRepo("commits", "octocat/chronicle-cli", 0, walkClock); err == nil {
 		t.Fatal("a save that could not be written reported success")
 	}
 	saved := readCheckpoint(t, path)
@@ -660,4 +660,338 @@ func readCheckpoint(t *testing.T, path string) *Progress {
 		t.Fatalf("the checkpoint is not readable as one: %v\n%s", err, body)
 	}
 	return p
+}
+
+// TestEverySinkSettingIsClassified holds scopeSinks to config.Sinks the way
+// TestEveryTargetSettingIsPartOfTheWalkItShapes holds scopeTargets to
+// config.Targets.
+//
+// A store added to the type and forgotten in scopeSinks would quietly stop
+// being a reason to refuse a resume, which is the whole of what Scope.Sinks is
+// for: the checkpoint says rows reached every sink, and every sink means the
+// ones this process has.
+func TestEverySinkSettingIsClassified(t *testing.T) {
+	t.Parallel()
+	sinks := reflect.TypeFor[config.Sinks]()
+	for field := range sinks.Fields() {
+		name, _, _ := strings.Cut(field.Tag.Get("yaml"), ",")
+		switch {
+		case name == "" || name == "-":
+		case field.Type.Kind() == reflect.Pointer && field.Type.Elem().Kind() == reflect.Struct:
+		case name == "stdout" || name == "stdout_format":
+		case sinksNotStores[name]:
+		default:
+			t.Errorf("sinks.%s is neither a store scopeSinks renders nor a setting sinksNotStores "+
+				"excuses, so a resume would not refuse after it changed. Classify it", name)
+		}
+	}
+	for name := range sinksNotStores {
+		if !slices.Contains(slices.Collect(fieldNames(sinks)), name) {
+			t.Errorf("sinksNotStores excuses %q and config.Sinks has no such setting", name)
+		}
+	}
+}
+
+// TestNoSinkSecretReachesTheCheckpoint. The checkpoint is a file on disk beside
+// the state file that outlives the process, and a store's password has no
+// business in it. Held by the ghc:"secret" tag rather than by a list, so a
+// credential added to a sink later is left out without anybody remembering to.
+func TestNoSinkSecretReachesTheCheckpoint(t *testing.T) {
+	t.Parallel()
+	const sentinel = "sentinel-credential-value"
+	cfg := config.Sinks{Stdout: true}
+	v := reflect.ValueOf(&cfg).Elem()
+	secrets := 0
+	for _, field := range v.Fields() {
+		if field.Kind() != reflect.Pointer || field.Type().Elem().Kind() != reflect.Struct {
+			continue
+		}
+		field.Set(reflect.New(field.Type().Elem()))
+		for named, leaf := range field.Elem().Fields() {
+			if !isSecret(named) {
+				continue
+			}
+			secrets++
+			switch leaf.Kind() {
+			case reflect.String:
+				leaf.SetString(sentinel)
+			case reflect.Map:
+				leaf.Set(reflect.ValueOf(map[string]string{sentinel: sentinel}))
+			default:
+				t.Fatalf("sinks.%s is a secret of a shape this test cannot fill (%s)", named.Name, leaf.Kind())
+			}
+		}
+	}
+	if secrets == 0 {
+		t.Fatal("no sink field is tagged secret, so this test proves nothing")
+	}
+	for name, rendered := range scopeSinks(cfg) {
+		if strings.Contains(rendered, sentinel) {
+			t.Errorf("the %s sink writes a credential into the checkpoint: %s", name, rendered)
+		}
+	}
+}
+
+// TestAStoreAddedDuringTheStopRefusesTheResume is the hole Scope.Sinks closes.
+//
+// "Written" means the rows reached every sink of the process that wrote it. A
+// store added while the walk was stopped holds none of the first half, and the
+// resume would skip every repository the checkpoint records, leaving that
+// store with the tail of the walk and nothing before it. No row says so.
+func TestAStoreAddedDuringTheStopRefusesTheResume(t *testing.T) {
+	t.Parallel()
+	began := scopeWith(config.Sinks{Influx: &config.InfluxSink{URL: "http://influx:8181", Bucket: "github"}})
+	now := scopeWith(config.Sinks{
+		Influx: &config.InfluxSink{URL: "http://influx:8181", Bucket: "github"},
+		Loki:   &config.LokiSink{URL: "http://loki:3100/loki/api/v1/push"},
+	})
+	said := began.Differs(now)
+	if said == "" {
+		t.Fatal("a store added during the stop was resumed into, so it holds the tail of the walk and nothing before it")
+	}
+	if !strings.Contains(said, "loki") {
+		t.Errorf("the refusal does not name the store that changed: %q", said)
+	}
+}
+
+// TestAStoreRetargetedDuringTheStopRefusesTheResume: the same hole, opened by
+// pointing an existing store somewhere else rather than by adding one.
+func TestAStoreRetargetedDuringTheStopRefusesTheResume(t *testing.T) {
+	t.Parallel()
+	began := scopeWith(config.Sinks{Influx: &config.InfluxSink{URL: "http://influx:8181", Bucket: "github"}})
+	for what, moved := range map[string]config.Sinks{
+		"a different host":     {Influx: &config.InfluxSink{URL: "http://elsewhere:8181", Bucket: "github"}},
+		"a different database": {Influx: &config.InfluxSink{URL: "http://influx:8181", Bucket: "github-two"}},
+		"no store at all":      {},
+	} {
+		if said := began.Differs(scopeWith(moved)); said == "" {
+			t.Errorf("a walk resumed into %s, so the rows it already wrote are somewhere else", what)
+		}
+	}
+}
+
+// TestTheSameStoresResumeWhateverOrderTheyAreWrittenIn: the refusal has to be
+// about where the rows go, not about how the file happens to spell it.
+func TestTheSameStoresResumeWhateverOrderTheyAreWrittenIn(t *testing.T) {
+	t.Parallel()
+	began := scopeWith(config.Sinks{Influx: &config.InfluxSink{
+		URL: "http://influx:8181", Bucket: "github", Exclude: []string{"gh_job_log", "gh_event"},
+	}})
+	same := scopeWith(config.Sinks{Influx: &config.InfluxSink{
+		URL: "http://influx:8181", Bucket: "github", Exclude: []string{"gh_event", "gh_job_log"},
+	}})
+	if said := began.Differs(same); said != "" {
+		t.Errorf("the same stores refused a resume: %s", said)
+	}
+}
+
+// scopeWith is a scope that differs from another only in its stores.
+func scopeWith(sinks config.Sinks) Scope {
+	return Scope{
+		Targets:  scopeTargets(config.Targets{User: fakegh.Login}),
+		Families: []string{"account"},
+		Sinks:    scopeSinks(sinks),
+	}
+}
+
+// TestAWalkThatLeftAFamilyBehindKeepsItsCheckpoint is the second way a sweep
+// reaches the end with no error and work still to do.
+//
+// A family truncated by a secondary rate limit is handed back as a pass, and
+// one that failed on every repository is deliberately left unmarked; both
+// continue the loop, so the walk ends tidily. Clearing on the error alone
+// removed the checkpoint there and reported "backfill complete".
+func TestAWalkThatLeftAFamilyBehindKeepsItsCheckpoint(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	r := walkRunner(t, dir, newFake(t), &recorded{})
+	left := r.Progress.Unfinished()
+	if len(left) < 2 {
+		t.Fatalf("this walk covers %d families, too few to leave one behind", len(left))
+	}
+	for _, family := range left[1:] {
+		if err := r.Progress.FinishFamily(family, 0, 0, walkClock); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// A live context and no error: the sweep ended, it just did not cover
+	// everything it was asked for.
+	r.closeProgress(t.Context(), nil)
+	if _, err := os.Stat(r.Progress.Path()); err != nil {
+		t.Errorf("the checkpoint of a walk that never wrote %q was removed (%v)", left[0], err)
+	}
+	if still := r.Progress.Unfinished(); !slices.Equal(still, left[:1]) {
+		t.Errorf("the walk has %v left, want %v", still, left[:1])
+	}
+}
+
+// TestTheScopeAWalkOpensCarriesItsStores closes the gap between scopeSinks and
+// the scope a real walk is opened with: rendering the stores correctly is no
+// use if ScopeOf does not put them in the checkpoint.
+func TestTheScopeAWalkOpensCarriesItsStores(t *testing.T) {
+	t.Parallel()
+	cfg := &config.Config{
+		GitHub:  config.GitHub{Token: "test-token"},
+		Targets: config.Targets{User: fakegh.Login},
+		Sinks: config.Sinks{
+			Influx: &config.InfluxSink{URL: "http://influx:8181", Bucket: "github", Token: "secret-token"},
+		},
+	}
+	if err := cfg.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	scope := ScopeOf(cfg, "")
+	rendered, ok := scope.Sinks["influxdb"]
+	if !ok {
+		t.Fatalf("the walk's scope names no store, it has %v", slices.Sorted(maps.Keys(scope.Sinks)))
+	}
+	if !strings.Contains(rendered, "http://influx:8181") {
+		t.Errorf("the scope does not say where the store is: %q", rendered)
+	}
+	if strings.Contains(rendered, "secret-token") {
+		t.Errorf("the scope carries the store's credential: %q", rendered)
+	}
+}
+
+// TestAResumedWalkGetsBackEverythingTheStoppedOneLearned.
+//
+// The sweep's state is saved once, at the end, by a walk that reached it, so a
+// stopped walk saves none of it and the checkpoint is the only record. Restore
+// says it leaves the same state behind as an uninterrupted walk; with the
+// completion instants alone it left the commit each repository was on, the
+// whole-page marks, the inbox watermark and the event cursor behind.
+func TestAResumedWalkGetsBackEverythingTheStoppedOneLearned(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	r := walkRunner(t, dir, newFake(t), &recorded{})
+	r.openProgress(walkClock)
+
+	learned := r.State
+	learned.LastHead["octocat/one"] = "abc123"
+	learned.LastFull["dependencies"] = walkClock
+	learned.FirstSaw["octocat/one"] = walkClock
+	learned.LastNotified = walkClock
+	learned.LastEvent = "4711"
+	// Any write saves the checkpoint, which is what carries it.
+	if err := r.Progress.WroteRepo("dependencies", "octocat/one", 0, walkClock); err != nil {
+		t.Fatal(err)
+	}
+
+	// The process dies here. A new one opens the same checkpoint with a state
+	// file that never saw any of it.
+	resumed, err := OpenProgress(r.Progress.Path(), "test-build", r.Progress.Scope, walkClock)
+	if err != nil {
+		t.Fatalf("reopening the checkpoint: %v", err)
+	}
+	fresh := LoadState(filepath.Join(dir, "unsaved-state.json"))
+	resumed.Restore(fresh)
+
+	if got := fresh.LastHead["octocat/one"]; got != "abc123" {
+		t.Errorf("the commit the dependency diff ran from came back as %q, want %q; the next diff is a guess", got, "abc123")
+	}
+	if _, ok := fresh.LastFull["dependencies"]; !ok {
+		t.Error("the whole-page mark did not come back, so the resume takes the whole page again")
+	}
+	if _, ok := fresh.FirstSaw["octocat/one"]; !ok {
+		t.Error("the first-seen instant did not come back")
+	}
+	if !fresh.LastNotified.Equal(walkClock) {
+		t.Errorf("the inbox watermark came back as %v, want %v; the resume reads the whole inbox", fresh.LastNotified, walkClock)
+	}
+	if fresh.LastEvent != "4711" {
+		t.Errorf("the event cursor came back as %q, want %q; the resume reads the whole feed", fresh.LastEvent, "4711")
+	}
+}
+
+// familyRows keeps the self-report rows, which the recorded sink deliberately
+// drops because they are facts about the process rather than about the account.
+type familyRows struct {
+	mu   sync.Mutex
+	rows map[string]sink.Point
+}
+
+func (f *familyRows) Name() string { return "family-rows" }
+func (f *familyRows) Close() error { return nil }
+func (f *familyRows) Write(_ context.Context, points []sink.Point) (int, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.rows == nil {
+		f.rows = map[string]sink.Point{}
+	}
+	for _, p := range points {
+		if p.Measurement == "gh_collector_family" && p.Tags["scope"] == "family" {
+			f.rows[p.Tags["family"]] = p
+		}
+	}
+	return len(points), nil
+}
+
+// TestAResumedWalkSaysTheFamiliesTheFirstHalfWrote.
+//
+// The panel's rule is that a family with no row did not run. A resume skips
+// every family the first half finished, and saying nothing about them reported
+// a resumed backfill as a run that skipped most of what it was asked for.
+func TestAResumedWalkSaysTheFamiliesTheFirstHalfWrote(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	rows := &familyRows{}
+	r := walkRunner(t, dir, newFake(t), rows)
+	left := r.Progress.Unfinished()
+	if len(left) == 0 {
+		t.Fatal("this walk covers no family")
+	}
+	earlier := left[0]
+	if err := r.Progress.FinishFamily(earlier, 35, 99, walkClock); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.Once(t.Context()); err != nil {
+		t.Fatalf("the walk: %v", err)
+	}
+	row, ok := rows.rows[earlier]
+	if !ok {
+		t.Fatalf("the resume said nothing about %q, which the first half wrote, so the panel reads it as a family that did not run", earlier)
+	}
+	if got := row.Fields["repos"]; got != 35 {
+		t.Errorf("the row for %q reports %v repositories, want the 35 the first half covered", earlier, got)
+	}
+	if got := row.Fields["points"]; got != 99 {
+		t.Errorf("the row for %q reports %v points, want the 99 the first half wrote", earlier, got)
+	}
+}
+
+// TestAResumedFamilyCountsTheRepositoriesTheFirstHalfWrote: a family the stop
+// landed inside covers the repositories this pass walks and the ones already
+// recorded, and a row that counts only the remainder says a family of many
+// repositories covered the few that were left.
+func TestAResumedFamilyCountsTheRepositoriesTheFirstHalfWrote(t *testing.T) {
+	t.Parallel()
+	dir, fake := t.TempDir(), newFake(t)
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	if err := walkRunner(t, dir, fake, &recorded{stopAfterRepos: 3, cancel: cancel}).Once(ctx); err == nil {
+		t.Fatal("the walk was canceled and ended without saying so")
+	}
+	checkpoint := readCheckpoint(t, filepath.Join(dir, "state-progress.json"))
+	_, family, written := checkpoint.Where()
+	if family == "" || written == 0 {
+		t.Fatal("the stop landed between two families, so there is no half walked one to resume")
+	}
+
+	rows := &familyRows{}
+	resumed := walkRunner(t, dir, fake, rows)
+	if err := resumed.Once(t.Context()); err != nil {
+		t.Fatalf("the resumed walk: %v", err)
+	}
+	row, ok := rows.rows[family]
+	if !ok {
+		t.Fatalf("no row for %q, the family the stop landed in", family)
+	}
+	all := len(resumed.repos)
+	if all <= written {
+		t.Fatalf("the walk covers %d repositories and the checkpoint held %d", all, written)
+	}
+	if got := row.Fields["repos"]; got != all {
+		t.Errorf("the row for %q reports %v repositories, want %d: the %d the first half wrote count too",
+			family, got, all, written)
+	}
 }

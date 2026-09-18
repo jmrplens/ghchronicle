@@ -385,8 +385,15 @@ level=INFO msg="backfill stopped, and what it had written is kept" file=/var/lib
 
 The file itself is meant to be read, and says the same thing at more length:
 the families that finished and when, the family that was in flight, and which
-of its repositories are done. It is removed when the walk reaches the end, so a
-checkpoint that exists is a walk that did not.
+of its repositories are done. It is removed when the walk has covered every
+family it was asked for, so a checkpoint that exists is a walk with work left
+in it.
+
+Reaching the end without an error is not the same thing. A family truncated by
+a secondary rate limit is handed back as a pass rather than as a failure, and a
+family that failed on every repository is deliberately left unmarked; a walk
+can finish tidily with either of those behind it. The checkpoint stays, and the
+line at the end names the families still to do.
 
 An ordinary sweep keeps none of this. It writes no checkpoint and reads none:
 the state file it keeps is about cadences, and a half walked backfill has no
@@ -400,10 +407,19 @@ than starting the walk over in silence: what the file lists may be hours of
 somebody's history, and starting over is the answer that looks like success.
 
 **A checkpoint from a different walk.** The file records what the walk was
-asked for: the API it reads, the targets, the families that were enabled, and
-the date bound exactly as it was spelled. If one of those changed between the
-stop and the resume, the list of repositories not to walk again means something
-else, and the run stops and names the setting that changed.
+asked for: the API it reads, the targets, the families that were enabled, the
+date bound exactly as it was spelled, and the stores it writes to. If one of
+those changed between the stop and the resume, the list of repositories not to
+walk again means something else, and the run stops and names the setting that
+changed.
+
+The stores are there because a record in this file means the rows reached every
+sink, and every sink means the ones that process had. Add a store while the
+walk is stopped and the resume skips everything the first half recorded, so the
+new store ends up holding the tail of the walk and nothing before it. Point an
+existing one somewhere else and the same hole opens in a different place. Only
+the settings you can read are compared: a store's password is never written
+into this file.
 
 The bound is the one that would go wrong quietly. A walk bounded at a year
 records its repositories as written; an unbounded resume would skip every one

@@ -59,8 +59,15 @@ level=INFO msg="backfill stopped, and what it had written is kept" file=/var/lib
 
 El fichero está pensado para leerse, y dice lo mismo con más detalle: las
 familias que terminaron y cuándo, la familia que estaba en curso, y cuáles de
-sus repositorios están hechos. Se borra cuando el recorrido llega al final, así
-que un punto de control que existe es un recorrido que no llegó.
+sus repositorios están hechos. Se borra cuando el recorrido ha cubierto todas
+las familias que se le pidieron, así que un punto de control que existe es un
+recorrido con trabajo pendiente.
+
+Llegar al final sin error no es lo mismo. Una familia truncada por un límite de
+ritmo secundario se devuelve como pasada y no como fallo, y una familia que
+falló en todos sus repositorios se deja a propósito sin marcar; un recorrido
+puede terminar ordenadamente con cualquiera de las dos detrás. El punto de
+control se queda, y la línea del final nombra las familias que faltan.
 
 Una pasada normal no guarda nada de esto. Ni escribe un punto de control ni lee
 ninguno: el fichero de estado que lleva habla de cadencias, y un relleno a
@@ -75,10 +82,19 @@ fichero lista pueden ser horas de la historia de alguien, y empezar de cero es
 la respuesta que parece un éxito.
 
 **Un punto de control de otro recorrido.** El fichero anota lo que se le pidió
-al recorrido: la API que lee, los objetivos, las familias activas y el límite de
-fecha tal y como se escribió. Si algo de eso cambió entre la parada y la vuelta,
-la lista de repositorios que no hay que volver a recorrer significa otra cosa, y
-la ejecución se para y nombra el ajuste que cambió.
+al recorrido: la API que lee, los objetivos, las familias activas, el límite de
+fecha tal y como se escribió y los almacenes a los que escribe. Si algo de eso
+cambió entre la parada y la vuelta, la lista de repositorios que no hay que
+volver a recorrer significa otra cosa, y la ejecución se para y nombra el ajuste
+que cambió.
+
+Los almacenes están ahí porque un registro en este fichero significa que las
+filas llegaron a todos los destinos, y todos los destinos son los que tenía
+aquel proceso. Añade un almacén con el recorrido parado y la vuelta se salta
+todo lo que anotó la primera mitad, así que el almacén nuevo se queda con la
+cola del recorrido y con nada de antes. Apunta uno existente a otro sitio y se
+abre el mismo agujero en otro lugar. Solo se comparan los ajustes que puedes
+leer: la contraseña de un almacén nunca se escribe en este fichero.
 
 El límite es el que fallaría en silencio. Un recorrido limitado a un año anota
 sus repositorios como escritos; una vuelta sin límite se saltaría todos ellos y

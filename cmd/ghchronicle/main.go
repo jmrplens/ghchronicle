@@ -469,6 +469,18 @@ func runBackfill(ctx context.Context, runner *run.Runner, cfg *config.Config,
 	// the same way a sweep does, and a backfill cut short by a signal draws it
 	// from what it reached: its points have been written, and a card is a
 	// picture of those points.
+	//
+	// A resumed one is the case where that sentence needs saying out loud. The
+	// accumulator is a sink, so it holds what this process collected and not
+	// what the process before it did: the families the first half finished are
+	// skipped, and the card is drawn without them. Said rather than refused,
+	// because a partial card is still a picture of real points and the reader
+	// is the one who knows whether that will do.
+	if o.card != "" && runner.Progress.Resumed() {
+		logger.Warn("this card is drawn from the part of the walk this process did; "+
+			"the families the walk it resumes had already finished are not in it",
+			"complete_before_this_process", len(runner.Progress.Complete))
+	}
 	return writeCards(accumulator, files, o, logger)
 }
 

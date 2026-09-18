@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strconv"
 	"strings"
@@ -75,12 +77,51 @@ type Progress struct {
 	// is left is the family that was in flight and how far into it the walk
 	// had got.
 	Written map[string][]string `json:"repositories_written"`
+	// Delivered is, per family that is not complete, how many points have
+	// reached every sink. It moves into FamilyDone.Points when the family
+	// finishes, so a family walked by two processes reports the sum rather
+	// than the second one's share.
+	Delivered map[string]int `json:"points_delivered"`
+	// InFlight is the family the walk was inside when it last wrote anything.
+	//
+	// Recorded rather than worked out from Written, because Written holds more
+	// than one unfinished family as soon as a pass leaves repositories behind
+	// without failing outright, which a secondary rate limit does, and a map
+	// has no order to read the latest off. Reading it off the map named a
+	// family that had finished hours earlier, differently each run.
+	InFlight string `json:"family_in_flight,omitempty"`
+	// Learned is what the interrupted process had put in its state file and
+	// never saved.
+	//
+	// The sweep's state is saved once, at the end, by a walk that reached the
+	// end; a walk that was stopped saves none of it. Everything the first half
+	// learned would otherwise die with the process: which repository was on
+	// which commit when the dependency diff last ran, which families had taken
+	// a whole page, how far the inbox and the event feed had been read. The
+	// completion instants alone are not that, and Restore says it leaves the
+	// same state behind as an uninterrupted walk.
+	//
+	// It is still not the sweep's state file: this is a copy of what one
+	// process learned, kept only until the walk it belongs to ends, and
+	// deleted with the rest of the checkpoint.
+	Learned *State `json:"learned,omitempty"`
 }
 
-// FamilyDone is one family's completion: which, and when.
+// FamilyDone is one family's completion: which, when, and what it came to.
+//
+// The counts are here so a resume can report the family it skips. The rule the
+// self-report panel is read by is that a family with no row did not run, and a
+// resume that says nothing about the families the first half finished makes
+// that rule state the opposite of what happened.
 type FamilyDone struct {
 	Family string    `json:"family"`
 	At     time.Time `json:"at"`
+	// Repos is how many repositories the family covered, zero for the
+	// account-wide families, which ask about none.
+	Repos int `json:"repos"`
+	// Points is every point the family delivered, counted across however many
+	// processes walked it rather than only the one that finished it.
+	Points int `json:"points"`
 }
 
 // Scope is what a backfill was asked to walk: against which API, over which
@@ -113,6 +154,20 @@ type Scope struct {
 	// Since is the date bound exactly as the command line or the file spelled
 	// it. Empty is no bound.
 	Since string `json:"since"`
+	// Sinks is every configured store and the settings it was pointed at,
+	// keyed by the name the configuration file gives it.
+	//
+	// Here for the same reason the targets are. "Written" in this checkpoint
+	// means a repository's rows reached every sink, and every sink means the
+	// ones this process has. Add a store during the stop and the resume skips
+	// everything the first half recorded, so the new store holds the tail of
+	// the walk and nothing before it, with nothing in the rows to say so.
+	// Retarget an existing one and the same hole opens in a different place.
+	//
+	// The value is rendered from the sink's non-secret settings only, decided
+	// by the ghc:"secret" tag rather than by a list kept here, so a credential
+	// added to a sink later cannot arrive in this file: see scopeSinks.
+	Sinks map[string]string `json:"sinks"`
 }
 
 // ScopeOf is the scope of the backfill cfg describes, bounded by since, which
@@ -131,6 +186,7 @@ func ScopeOf(cfg *config.Config, since string) Scope {
 		Targets:  scopeTargets(cfg.Targets),
 		Families: families,
 		Since:    strings.TrimSpace(since),
+		Sinks:    scopeSinks(cfg.Sinks),
 	}
 }
 
@@ -157,6 +213,126 @@ func scopeTargets(t config.Targets) map[string]string {
 		"include_archived": strconv.FormatBool(t.IncludeArchived),
 		"include_private":  strconv.FormatBool(t.PrivateIncluded()),
 	}
+}
+
+// sinksNotStores are the fields of config.Sinks that configure no store of
+// their own. The ledger is housekeeping over what the stores are offered, not
+// somewhere rows land, so changing it opens no hole of the kind Scope.Sinks is
+// here to refuse.
+//
+// A list, because the alternative is a walk that silently classifies a field
+// added later. TestEverySinkSettingIsClassified holds every field of
+// config.Sinks to one of the three shapes below, so a store added to the type
+// and forgotten here fails rather than quietly stopping being a reason to
+// refuse a resume.
+var sinksNotStores = map[string]bool{
+	"dedupe_file":    true,
+	"dedupe_horizon": true,
+}
+
+// scopeSinks renders each configured store under the name the configuration
+// file uses, from its non-secret settings.
+//
+// Non-secret is asked of the ghc:"secret" tag and not of a list here, so a
+// credential added to a sink later is left out without anybody remembering to:
+// this file is written to disk beside the state file, and a password that
+// reached it would outlive the walk. TestNoSinkSecretReachesTheCheckpoint
+// holds that.
+//
+// Every setting rather than a per-sink idea of which one is "the destination":
+// deciding that for ten sinks is exactly the judgement that goes stale, and
+// the cost of being broad is a refusal a reader can undo by putting the
+// setting back, against a hole in a store that nothing reports.
+func scopeSinks(s config.Sinks) map[string]string {
+	out := map[string]string{}
+	for named, field := range reflect.ValueOf(s).Fields() {
+		name := yamlName(named)
+		if name == "" || sinksNotStores[name] {
+			continue
+		}
+		switch {
+		case field.Kind() == reflect.Pointer && field.Type().Elem().Kind() == reflect.Struct:
+			if field.IsNil() {
+				continue
+			}
+			out[name] = sinkSettings(field.Elem())
+		case name == "stdout":
+			// The one store that is a bool rather than a block. Its format
+			// lives beside it at the top level, so it is folded in here
+			// instead of becoming a store of its own.
+			if !field.Bool() {
+				continue
+			}
+			out[name] = "format=" + shownOr(s.StdoutFormat, "influx")
+		}
+	}
+	return out
+}
+
+// sinkSettings renders one store's non-secret settings, sorted, so two runs of
+// the same configuration render the same string.
+func sinkSettings(v reflect.Value) string {
+	parts := make([]string, 0, v.NumField())
+	for named, field := range v.Fields() {
+		if name := yamlName(named); name != "" && !isSecret(named) {
+			parts = append(parts, name+"="+renderSetting(field))
+		}
+	}
+	slices.Sort(parts)
+	return strings.Join(parts, " ")
+}
+
+// yamlName is the name the configuration file gives a field, or empty when the
+// field is not one a file can set.
+func yamlName(f reflect.StructField) string {
+	name, _, _ := strings.Cut(f.Tag.Get("yaml"), ",")
+	if name == "-" {
+		return ""
+	}
+	return name
+}
+
+// isSecret reports whether the ghc tag marks this field a credential, the same
+// question config.Options asks of it.
+func isSecret(f reflect.StructField) bool {
+	return slices.Contains(strings.Split(f.Tag.Get("ghc"), ","), "secret")
+}
+
+// renderSetting writes one setting so that equal configurations render equal
+// strings: collections are sorted, and a pointer's nil has a spelling of its
+// own because for these settings it means "the default" rather than "empty".
+func renderSetting(v reflect.Value) string {
+	switch v.Kind() {
+	case reflect.Pointer:
+		if v.IsNil() {
+			return "unset"
+		}
+		return renderSetting(v.Elem())
+	case reflect.Slice:
+		items := make([]string, v.Len())
+		for i := range v.Len() {
+			items[i] = renderSetting(v.Index(i))
+		}
+		slices.Sort(items)
+		return strings.Join(items, ",")
+	case reflect.Map:
+		items := make([]string, 0, v.Len())
+		for _, key := range v.MapKeys() {
+			items = append(items, renderSetting(key)+":"+renderSetting(v.MapIndex(key)))
+		}
+		slices.Sort(items)
+		return strings.Join(items, ",")
+	default:
+		return fmt.Sprintf("%v", v.Interface())
+	}
+}
+
+// shownOr is v, or fallback when v is empty.
+func shownOr(v, fallback string) string {
+	if strings.TrimSpace(v) == "" {
+		return fallback
+	}
+	return v
 }
 
 // Differs reports, in a sentence, the first way other is not the same walk as
@@ -186,6 +362,18 @@ func (s Scope) Differs(other Scope) string {
 	}
 	if s.Since != other.Since {
 		return fmt.Sprintf("the date bound was %s and is now %s", bound(s.Since), bound(other.Since))
+	}
+	for _, name := range targetKeys(s.Sinks, other.Sinks) {
+		was, had := s.Sinks[name]
+		now, has := other.Sinks[name]
+		switch {
+		case had && !has:
+			return fmt.Sprintf("the %s sink was written to when the walk began and is not configured now", name)
+		case has && !had:
+			return fmt.Sprintf("the %s sink is configured now and was not when the walk began, so it holds none of what the walk already wrote", name)
+		case was != now:
+			return fmt.Sprintf("the %s sink was %s and is now %s", name, shown(was), shown(now))
+		}
 	}
 	return ""
 }
@@ -331,11 +519,16 @@ func (p *Progress) RepoDone(family, repo string) bool {
 // the cost is one small file rewritten at most a few thousand times over those
 // hours, against the alternative of a stop landing between two saves and
 // costing whatever fell in the gap.
-func (p *Progress) WroteRepo(family, repo string, now time.Time) error {
+func (p *Progress) WroteRepo(family, repo string, points int, now time.Time) error {
 	if !p.Active() || p.RepoDone(family, repo) {
 		return nil
 	}
 	p.Written[family] = append(p.Written[family], repo)
+	if p.Delivered == nil {
+		p.Delivered = map[string]int{}
+	}
+	p.Delivered[family] += points
+	p.InFlight = family
 	return p.save(now)
 }
 
@@ -344,17 +537,32 @@ func (p *Progress) WroteRepo(family, repo string, now time.Time) error {
 // The repositories it listed go with it: they are the detail of a family that
 // was in flight, and once the family is done the detail is noise in a file
 // somebody reads to find out where a walk stopped.
-func (p *Progress) FinishFamily(family string, now time.Time) error {
+func (p *Progress) FinishFamily(family string, repos, points int, now time.Time) error {
 	if !p.Active() || p.FamilyDone(family) {
 		return nil
 	}
-	p.Complete = append(p.Complete, FamilyDone{Family: family, At: now})
+	p.Complete = append(p.Complete, FamilyDone{
+		Family: family, At: now, Repos: repos, Points: p.Delivered[family] + points,
+	})
 	delete(p.Written, family)
+	delete(p.Delivered, family)
+	if p.InFlight == family {
+		p.InFlight = ""
+	}
 	return p.save(now)
 }
 
-// Restore puts the marks of the families this checkpoint already completed
-// back into the sweep's state file, so a walk that was stopped and resumed
+// Learn points the checkpoint at the state this walk is filling in, so every
+// save carries what the process has learned so far. Restore is the other half.
+func (p *Progress) Learn(s *State) {
+	if p.Active() {
+		p.Learned = s
+	}
+}
+
+// Restore puts back everything the walk this resumes had learned and never
+// saved: the marks of the families it completed, and the rest of the state the
+// interrupted process was holding, so a walk that was stopped and resumed
 // leaves the same state behind as one that was never stopped.
 //
 // The instants are the ones the interrupted run recorded, not this one's: the
@@ -363,6 +571,22 @@ func (p *Progress) FinishFamily(family string, now time.Time) error {
 func (p *Progress) Restore(s *State) {
 	if p == nil || s == nil {
 		return
+	}
+	// The learned copy first and the completion instants after it, because the
+	// instants are the claim this checkpoint is authoritative about: a family
+	// is complete when its last repository reached every sink, which is later
+	// than the mark the interrupted process had written for it.
+	if p.Learned != nil {
+		maps.Copy(s.LastRun, p.Learned.LastRun)
+		maps.Copy(s.FirstSaw, p.Learned.FirstSaw)
+		maps.Copy(s.LastHead, p.Learned.LastHead)
+		maps.Copy(s.LastFull, p.Learned.LastFull)
+		if p.Learned.LastNotified.After(s.LastNotified) {
+			s.LastNotified = p.Learned.LastNotified
+		}
+		if p.Learned.LastEvent != "" {
+			s.LastEvent = p.Learned.LastEvent
+		}
 	}
 	for _, done := range p.Complete {
 		s.Mark(done.Family, done.At)
@@ -376,16 +600,34 @@ func (p *Progress) Where() (families int, family string, repos int) {
 	if p == nil {
 		return 0, "", 0
 	}
-	// The family in flight is the one with repositories written and no
-	// completion. There is at most one: a family is walked to its end or the
-	// walk stops inside it.
-	for name, written := range p.Written {
-		if !p.FamilyDone(name) && len(written) > 0 {
-			family, repos = name, len(written)
-			break
-		}
+	// The family the walk was inside, which is recorded and not inferred: see
+	// InFlight. Several families can hold written repositories at once, so
+	// picking one out of the map named whichever the runtime offered first.
+	if p.InFlight != "" && !p.FamilyDone(p.InFlight) {
+		family, repos = p.InFlight, len(p.Written[p.InFlight])
 	}
 	return len(p.Complete), family, repos
+}
+
+// Unfinished is every family the walk was asked for that this checkpoint does
+// not hold as complete, sorted.
+//
+// Asked of the scope rather than of what the walk happened to reach, because
+// the question is whether there is work left, and a family that was never
+// opened at all has as much left as one that stopped half way. Empty means the
+// walk covered everything it was asked for.
+func (p *Progress) Unfinished() []string {
+	if !p.Active() {
+		return nil
+	}
+	left := []string{}
+	for _, family := range p.Scope.Families {
+		if !p.FamilyDone(family) {
+			left = append(left, family)
+		}
+	}
+	slices.Sort(left)
+	return left
 }
 
 // Elapsed is how long the walk this checkpoint records has been going,
@@ -438,6 +680,10 @@ func (p *Progress) save(now time.Time) error {
 // that a walk which must not be resumed never starts collecting; this is only
 // the line the reader of the journal meets.
 func (r *Runner) openProgress(now time.Time) {
+	// Before the early return: a walk that starts fresh is the one that will
+	// be interrupted, and what it learns has to be in the checkpoint it leaves
+	// behind. Restoring is only for the walk that finds one.
+	r.Progress.Learn(r.State)
 	if !r.Progress.Resumed() {
 		return
 	}
@@ -490,6 +736,21 @@ func (r *Runner) closeProgress(ctx context.Context, err error) {
 		r.Log.Info("backfill stopped, and what it had written is kept", args...)
 		return
 	}
+	// A sweep can reach here having returned no error and still not covered
+	// what it was asked for: a family truncated by a secondary rate limit is
+	// handed back as a pass rather than as a failure, and one that failed on
+	// every repository is deliberately left unmarked. Both continue the loop,
+	// so the walk ends tidily with families it never wrote. Removing the
+	// checkpoint there would throw away the hours it holds and report the
+	// opposite of what happened.
+	if left := r.Progress.Unfinished(); len(left) > 0 {
+		r.Log.Info("backfill ended without covering every family, and its checkpoint is kept",
+			"file", r.Progress.Path(),
+			"running_for", r.Progress.Elapsed(r.clock()).Round(time.Second).String(),
+			"families_left", strings.Join(left, ","),
+			"resume", "run the same command again")
+		return
+	}
 	if clearErr := r.Progress.Clear(); clearErr != nil {
 		r.Log.Warn("the backfill checkpoint could not be removed",
 			"file", r.Progress.Path(), "err", clearErr)
@@ -499,13 +760,31 @@ func (r *Runner) closeProgress(ctx context.Context, err error) {
 }
 
 // checkpointRepo records a repository whose rows have reached every sink.
-func (r *Runner) checkpointRepo(family, repo string) {
-	r.noteCheckpoint(r.Progress.WroteRepo(family, repo, r.clock()))
+func (r *Runner) checkpointRepo(family, repo string, points int) {
+	r.noteCheckpoint(r.Progress.WroteRepo(family, repo, points, r.clock()))
 }
 
 // checkpointFamily records a family whose whole pass has reached every sink.
-func (r *Runner) checkpointFamily(family string) {
-	r.noteCheckpoint(r.Progress.FinishFamily(family, r.clock()))
+// repos and points are what the family came to, so a later resume can report
+// the row it skips. points is what this call knows that the per-repository
+// records do not: zero for a family walked repository by repository, since
+// every one of those was counted as it was delivered.
+func (r *Runner) checkpointFamily(family string, repos, points int) {
+	r.noteCheckpoint(r.Progress.FinishFamily(family, repos, points, r.clock()))
+}
+
+// Done is what a family's completion came to, and whether this checkpoint
+// holds one at all.
+func (p *Progress) Done(family string) (FamilyDone, bool) {
+	if !p.Active() {
+		return FamilyDone{}, false
+	}
+	for _, done := range p.Complete {
+		if done.Family == family {
+			return done, true
+		}
+	}
+	return FamilyDone{}, false
 }
 
 // noteCheckpoint reports a checkpoint that could not be saved, once.
