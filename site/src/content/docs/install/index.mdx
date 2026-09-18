@@ -49,9 +49,14 @@ keep it running once you are done watching it.
     curl -fsSL https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.sh | bash
     ```
 
-    Works out the platform, takes the newest release, and refuses to install
-    anything whose checksum is not the one the release published. Linux and
-    macOS.
+    On Windows, in PowerShell:
+
+    ```powershell
+    irm https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.ps1 | iex
+    ```
+
+    Either one works out the platform, takes the newest release, and refuses to
+    install anything whose checksum is not the one the release published.
 
   </TabItem>
   <TabItem label="Go">

@@ -49,8 +49,15 @@ cómo dejarlo corriendo cuando termines de mirarlo.
     curl -fsSL https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.sh | bash
     ```
 
-    Deduce la plataforma, coge la release más nueva y se niega a instalar nada
-    cuya suma de verificación no sea la que publicó la release. Linux y macOS.
+    En Windows, desde PowerShell:
+
+    ```powershell
+    irm https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.ps1 | iex
+    ```
+
+    Cualquiera de las dos deduce la plataforma, coge la release más nueva y se
+    niega a instalar nada cuya suma de verificación no sea la que publicó la
+    release.
 
   </TabItem>
   <TabItem label="Go">

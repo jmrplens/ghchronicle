@@ -32,9 +32,14 @@ keep it running once you are done watching it.
   curl -fsSL https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.sh | bash
   ```
 
-  Works out the platform, takes the newest release, and refuses to install
-  anything whose checksum is not the one the release published. Linux and
-  macOS.
+  On Windows, in PowerShell:
+
+  ```powershell
+  irm https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.ps1 | iex
+  ```
+
+  Either one works out the platform, takes the newest release, and refuses to
+  install anything whose checksum is not the one the release published.
 
 - **Go**
 
@@ -666,6 +671,41 @@ Windows is a released platform, not an afterthought: every change runs the
 whole unit suite and the end-to-end suite on a Windows runner, and the source
 carries Windows-only code where the system behaves differently. What follows is
 written for PowerShell, with the `cmd` form beside it wherever the two differ.
+
+### The one-line install
+
+```powershell
+irm https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.ps1 | iex
+```
+
+It works out the architecture, takes the newest release, checks the archive
+against the checksum that release published, and puts `ghchronicle.exe` under
+`%LOCALAPPDATA%\Programs\ghchronicle`. A checksum that does not match stops it
+without installing anything, and there is no switch to skip that step.
+
+It then adds that directory to **your** PATH, the per-user one, so `ghchronicle`
+works by name. Programs already open keep the PATH they started with, so open a
+new terminal. Nothing is written outside your profile and no elevation is asked
+for: a machine-wide install belongs to an installer with a UAC prompt, not to a
+script read off the network.
+
+To pin a version, choose the directory, or leave the PATH alone, the script
+takes parameters, which needs the slightly longer form because `iex` has
+nowhere to put them:
+
+```powershell
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.ps1))) -Version 2.0.0 -BinDir C:\tools -NoPathUpdate
+```
+
+> **Reading it first is the whole point of a short script**
+>
+> `irm ... | iex` runs whatever that URL answers with today. `irm https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.ps1 -OutFile install.ps1`,
+> read it, then `.\install.ps1`: it is the same script, and it is short enough
+> to read.
+
+The rest of this page is that same install done by hand, which is what to
+follow when you want to know exactly what landed where, or when you would
+rather not run a script you did not write.
 
 ### What is different here
 

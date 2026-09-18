@@ -31,6 +31,10 @@ BINARY="ghchronicle"
 COSIGN_IDENTITY='^https://github\.com/jmrplens/ghchronicle/\.github/workflows/release\.yml@refs/tags/v'
 COSIGN_ISSUER="https://token.actions.githubusercontent.com"
 
+# Named once so the advice this prints stays the command the documentation
+# gives, rather than a second spelling of it that can drift.
+SELF_URL="https://raw.githubusercontent.com/${REPO}/main/install.sh"
+
 say() { printf '%s\n' "$*"; }
 die() { printf 'install: %s\n' "$*" >&2; exit 1; }
 
@@ -132,16 +136,62 @@ verify_signature() {
   say "signature verified with cosign"
 }
 
+# on_path reports whether a directory is already one the shell searches.
+on_path() {
+  case ":${PATH}:" in
+    *":$1:"*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 # target_dir picks somewhere writable rather than reaching for sudo. A script
-# read off the network should not be the thing that decides to become root.
+# read off the network should not be the thing that decides to become root, so
+# running it without one installs for this user and says how to finish.
+#
+# A directory the shell already searches comes before one that merely exists.
+# On a Debian-like system ~/.local/bin is added to PATH by ~/.profile only when
+# it already exists, so the first install creates it and the command is not
+# found until the next login: a home directory that is already on PATH is worth
+# preferring over the conventional one for exactly that reason.
 target_dir() {
+  local candidate
   if [ -n "${BIN_DIR:-}" ]; then
     printf '%s\n' "$BIN_DIR"
-  elif [ -w /usr/local/bin ]; then
-    printf '%s\n' /usr/local/bin
-  else
-    printf '%s\n' "${HOME}/.local/bin"
+    return
   fi
+  if [ -w /usr/local/bin ]; then
+    printf '%s\n' /usr/local/bin
+    return
+  fi
+  for candidate in "${HOME}/.local/bin" "${HOME}/bin"; do
+    if [ -d "$candidate" ] && on_path "$candidate"; then
+      printf '%s\n' "$candidate"
+      return
+    fi
+  done
+  printf '%s\n' "${HOME}/.local/bin"
+}
+
+# finishing_line is what to do when the binary landed somewhere the shell does
+# not search. Whichever way it is fixed, "add this to PATH" on its own is the
+# answer that leaves the reader to work out both the line and the file.
+finishing_line() {
+  local dir=$1 profile="your shell's startup file"
+  # Spelled out rather than with a tilde: this is read by a person who is about
+  # to open the file, and "~" in a message is one more thing to resolve.
+  case "${SHELL:-}" in
+    */zsh) profile="${HOME}/.zshrc" ;;
+    */bash) profile="${HOME}/.bashrc" ;;
+    */fish) profile="${HOME}/.config/fish/config.fish" ;;
+  esac
+  say ""
+  say "It is not on your PATH yet, so the command is not found by name. Either:"
+  say ""
+  say "  export PATH=\"${dir}:\$PATH\"      # this shell now, and in ${profile} to keep it"
+  say ""
+  say "or install it for everyone instead, which needs root:"
+  say ""
+  say "  curl -fsSL ${SELF_URL} | sudo bash"
 }
 
 main() {
@@ -194,10 +244,11 @@ main() {
     die "cannot write to $dir. Pass --dir with somewhere writable, or run this with sudo."
 
   say "installed ${dir}/${BINARY}"
-  case ":${PATH}:" in
-    *":${dir}:"*) "${dir}/${BINARY}" -version ;;
-    *) say "note: ${dir} is not on your PATH. Add it, or run ${dir}/${BINARY} by its full path." ;;
-  esac
+  if on_path "$dir"; then
+    "${dir}/${BINARY}" -version
+  else
+    finishing_line "$dir"
+  fi
 }
 
 main "$@"

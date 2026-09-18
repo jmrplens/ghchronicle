@@ -13,6 +13,41 @@ Windows, y el código fuente lleva partes solo de Windows allí donde el sistema
 se comporta distinto. Lo que sigue está escrito para PowerShell, con la forma
 de `cmd` al lado siempre que las dos difieran.
 
+## La instalación en una línea
+
+```powershell
+irm https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.ps1 | iex
+```
+
+Deduce la arquitectura, coge la release más nueva, comprueba el archivo contra
+la suma de verificación que esa release publicó, y deja `ghchronicle.exe` en
+`%LOCALAPPDATA%\Programs\ghchronicle`. Una suma que no cuadra lo detiene sin
+instalar nada, y no hay parámetro para saltarse ese paso.
+
+Después añade ese directorio a **tu** PATH, el de usuario, para que
+`ghchronicle` funcione por nombre. Los programas ya abiertos conservan el PATH
+con el que arrancaron, así que abre una terminal nueva. No escribe nada fuera
+de tu perfil ni pide elevación: una instalación para toda la máquina es cosa de
+un instalador con su aviso de UAC, no de un script bajado de la red.
+
+Para fijar una versión, elegir el directorio o no tocar el PATH, el script
+admite parámetros, y eso pide la forma algo más larga porque `iex` no tiene
+dónde ponerlos:
+
+```powershell
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.ps1))) -Version 2.0.0 -BinDir C:\tools -NoPathUpdate
+```
+
+<Aside type="note" title="Leerlo antes es justo para lo que sirve que sea corto">
+  `irm ... | iex` ejecuta lo que esa URL responda hoy.
+  `irm https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.ps1 -OutFile install.ps1`, léelo, y luego `.\install.ps1`: es el mismo
+  script, y es lo bastante corto para leerlo.
+</Aside>
+
+El resto de esta página es esa misma instalación hecha a mano, que es lo que
+seguir cuando quieres saber exactamente qué ha aterrizado dónde, o cuando
+prefieres no ejecutar un script que no has escrito.
+
 ## Lo que cambia aquí
 
 Lee esto primero. Cuatro de las cinco líneas de abajo son la razón de que una

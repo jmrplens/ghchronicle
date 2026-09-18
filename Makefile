@@ -399,9 +399,10 @@ fmt-check: ## Report formatting drift without rewriting anything
 vet: ## Run go vet
 	go vet $(PKGS)
 
-# install.sh is the one file here that a stranger runs by piping it into a
-# shell, so it is held to a linter rather than to review alone. The scripts/
-# ones are what the Action runs, which is the same argument.
+# install.sh is one of the two files here that a stranger runs by piping it into
+# a shell, so it is held to a linter rather than to review alone. The scripts/
+# ones are what the Action runs, which is the same argument. install.ps1 has no
+# linter here and is covered by the tests that run it instead.
 shellcheck: ## Lint every shell script (install.sh and scripts/)
 	@command -v shellcheck >/dev/null 2>&1 || { \
 		echo "make shellcheck: shellcheck is not on PATH (apt install shellcheck)"; exit 2; }

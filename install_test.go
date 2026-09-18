@@ -40,6 +40,18 @@ type fakeRelease struct {
 
 func buildFakeRelease(t *testing.T, corrupt bool) fakeRelease {
 	t.Helper()
+	return buildFakeReleaseWith(t, runtime.GOOS, runtime.GOARCH, corrupt)
+}
+
+// buildFakeReleaseFor is buildFakeRelease for a platform this machine is not,
+// which is how the macOS path is covered without a Mac.
+func buildFakeReleaseFor(t *testing.T, goos, goarch string) fakeRelease {
+	t.Helper()
+	return buildFakeReleaseWith(t, goos, goarch, false)
+}
+
+func buildFakeReleaseWith(t *testing.T, goos, goarch string, corrupt bool) fakeRelease {
+	t.Helper()
 	var body bytes.Buffer
 	zw := gzip.NewWriter(&body)
 	tw := tar.NewWriter(zw)
@@ -60,7 +72,7 @@ func buildFakeRelease(t *testing.T, corrupt bool) fakeRelease {
 	}
 
 	archive := body.Bytes()
-	name := fmt.Sprintf("ghchronicle_%s_%s_%s.tar.gz", fakeVersion, runtime.GOOS, runtime.GOARCH)
+	name := fmt.Sprintf("ghchronicle_%s_%s_%s.tar.gz", fakeVersion, goos, goarch)
 	sum := sha256.Sum256(archive)
 	digest := hex.EncodeToString(sum[:])
 	if corrupt {
@@ -78,6 +90,13 @@ func buildFakeRelease(t *testing.T, corrupt bool) fakeRelease {
 }
 
 func serveRelease(t *testing.T, rel fakeRelease) string {
+	t.Helper()
+	return serveCounted(t, rel, nil)
+}
+
+// serveNamed reads as what it is at the call site of a platform test: a server
+// holding one named archive.
+func serveNamed(t *testing.T, rel fakeRelease) string {
 	t.Helper()
 	return serveCounted(t, rel, nil)
 }
@@ -255,5 +274,152 @@ source install.sh --dir "$1" --version "$2"`
 	}
 	if n := asked.Load(); n != 0 {
 		t.Errorf("it made %d request(s) after deciding it could not install anything:\n%s", n, out)
+	}
+}
+
+// sourceTargetDir runs the script's target_dir with the environment a test
+// sets up, by sourcing it with the final call to main stripped out. Calling the
+// function is the point: the alternative is asserting on a whole install, which
+// says nothing about which directory was chosen and why.
+func sourceTargetDir(t *testing.T, env ...string) string {
+	t.Helper()
+	if _, err := exec.LookPath("bash"); err != nil {
+		t.Skip("install.sh runs in bash, and there is none here")
+	}
+	const probe = `source <(grep -v '^main "$@"$' install.sh); target_dir`
+	cmd := exec.CommandContext(t.Context(), "bash", "-c", probe)
+	cmd.Env = append(os.Environ(), env...)
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("sourcing install.sh: %v", err)
+	}
+	return strings.TrimSpace(string(out))
+}
+
+// TestTheInstallerPrefersADirectoryTheShellAlreadySearches.
+//
+// On a Debian-like system ~/.local/bin is put on PATH by ~/.profile only when
+// it already exists, so an install that creates it leaves the command not found
+// until the next login. Somewhere already on PATH is worth preferring for that
+// reason alone.
+func TestTheInstallerPrefersADirectoryTheShellAlreadySearches(t *testing.T) {
+	t.Parallel()
+	if unix, err := os.OpenFile("/usr/local/bin/.ghchronicle-write-probe",
+		os.O_CREATE|os.O_WRONLY, 0o600); err == nil {
+		_ = unix.Close()
+		_ = os.Remove("/usr/local/bin/.ghchronicle-write-probe")
+		t.Skip("/usr/local/bin is writable here, so a system-wide install is right and this choice never arises")
+	}
+	home := t.TempDir()
+	for _, sub := range []string{".local/bin", "bin"} {
+		if err := os.MkdirAll(filepath.Join(home, sub), 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Only ~/bin is on PATH, and it is the second candidate, so picking it is
+	// the preference and not the order of the list.
+	got := sourceTargetDir(t, "HOME="+home,
+		"PATH="+filepath.Join(home, "bin")+string(os.PathListSeparator)+os.Getenv("PATH"))
+	if want := filepath.Join(home, "bin"); got != want {
+		t.Errorf("it would install into %s, want %s: that one is already on PATH and the other is not", got, want)
+	}
+}
+
+// TestTheInstallerSaysHowToFinishWhenItLandsOffPath. "Add it to your PATH" on
+// its own leaves the reader to work out both the line and the file it goes in,
+// and does not mention that there is a system-wide install at all.
+func TestTheInstallerSaysHowToFinishWhenItLandsOffPath(t *testing.T) {
+	t.Parallel()
+	rel := buildFakeRelease(t, false)
+	dir := filepath.Join(t.TempDir(), "nowhere-near-path")
+	out, code := runInstaller(t, serveRelease(t, rel), dir, "--version", fakeVersion)
+	if code != 0 {
+		t.Fatalf("exit %d, want 0:\n%s", code, out)
+	}
+	for _, want := range []string{
+		`export PATH="` + dir + `:$PATH"`,
+		"| sudo bash",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("the closing advice does not carry %q:\n%s", want, out)
+		}
+	}
+}
+
+// TestTheInstallerTakesTheDarwinArchiveOnAMac. There is no macOS in this
+// suite, so uname is replaced and the naming, download, digest and install run
+// exactly as they do anywhere else. What this cannot cover is the tooling
+// difference: a Mac has shasum and no sha256sum, which the script handles by
+// looking for both.
+func TestTheInstallerTakesTheDarwinArchiveOnAMac(t *testing.T) {
+	t.Parallel()
+	if _, err := exec.LookPath("bash"); err != nil {
+		t.Skip("install.sh runs in bash, and there is none here")
+	}
+	rel := buildFakeReleaseFor(t, "darwin", "arm64")
+	dir := t.TempDir()
+
+	const shim = `uname() { case "$1" in -s) echo Darwin ;; -m) echo arm64 ;; esac; }
+source install.sh --dir "$1" --version "$2"`
+	cmd := exec.CommandContext(t.Context(), "bash", "-c", shim, "bash", dir, fakeVersion)
+	cmd.Env = append(os.Environ(),
+		"GHCHRONICLE_DOWNLOAD_BASE="+serveNamed(t, rel),
+		"GHCHRONICLE_LATEST_URL=http://127.0.0.1:1/no-such-api")
+	out, _ := cmd.CombinedOutput()
+
+	if cmd.ProcessState.ExitCode() != 0 {
+		t.Fatalf("exit %d, want 0:\n%s", cmd.ProcessState.ExitCode(), out)
+	}
+	if !strings.Contains(string(out), "for darwin/arm64") {
+		t.Errorf("it did not go looking for the macOS archive:\n%s", out)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "ghchronicle")); err != nil {
+		t.Fatalf("no binary was installed: %v\n%s", err, out)
+	}
+}
+
+// TestTheInstallerVerifiesWithShasumWhenThereIsNoSha256sum is the macOS
+// branch. A Mac has shasum, from Perl's Digest::SHA, and no sha256sum, so the
+// one line that checks the download is a different program there. Forced by
+// running with a PATH that holds everything the script needs except that one.
+func TestTheInstallerVerifiesWithShasumWhenThereIsNoSha256sum(t *testing.T) {
+	t.Parallel()
+	if _, err := exec.LookPath("bash"); err != nil {
+		t.Skip("install.sh runs in bash, and there is none here")
+	}
+	if _, err := exec.LookPath("shasum"); err != nil {
+		t.Skip("this machine has no shasum, which is the program being stood in for")
+	}
+	// Everything the run touches, by name, so what is left out is left out on
+	// purpose rather than by accident.
+	shims := t.TempDir()
+	for _, tool := range []string{
+		"bash", "curl", "tar", "gzip", "awk", "grep", "sed",
+		"shasum", "install", "mktemp", "uname", "tr", "head", "mkdir", "rm",
+	} {
+		path, err := exec.LookPath(tool)
+		if err != nil {
+			t.Skipf("this machine has no %s, so the trimmed PATH cannot be built", tool)
+		}
+		if err = os.Symlink(path, filepath.Join(shims, tool)); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	dir := t.TempDir()
+	cmd := exec.CommandContext(t.Context(), "bash", "install.sh")
+	cmd.Args = append(cmd.Args, "--dir", dir, "--version", fakeVersion)
+	cmd.Env = append(os.Environ(),
+		"GHCHRONICLE_DOWNLOAD_BASE="+serveRelease(t, buildFakeRelease(t, false)),
+		"GHCHRONICLE_LATEST_URL=http://127.0.0.1:1/no-such-api",
+		"PATH="+shims)
+	out, _ := cmd.CombinedOutput()
+
+	if cmd.ProcessState.ExitCode() != 0 {
+		t.Fatalf("exit %d, want 0. Without sha256sum the check has to fall to shasum:\n%s",
+			cmd.ProcessState.ExitCode(), out)
+	}
+	if !strings.Contains(string(out), "checksum verified") {
+		t.Errorf("it installed without saying it had checked anything:\n%s", out)
 	}
 }
