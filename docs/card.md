@@ -182,7 +182,7 @@ presses the toggle (WCAG 2.2.2, Pause, Stop, Hide).
 - **GitHub Action**
 
   ```yaml
-  - uses: jmrplens/ghchronicle@v1
+  - uses: jmrplens/ghchronicle@v2
     with:
       token: ${{ secrets.GHCHRONICLE_TOKEN }}
       mode: card
@@ -194,7 +194,7 @@ presses the toggle (WCAG 2.2.2, Pause, Stop, Hide).
   The looping picture:
 
   ```yaml
-  - uses: jmrplens/ghchronicle@v1
+  - uses: jmrplens/ghchronicle@v2
     with:
       token: ${{ secrets.GHCHRONICLE_TOKEN }}
       mode: card
@@ -308,7 +308,7 @@ repositories.
 - **GitHub Action**
 
   ```yaml
-  - uses: jmrplens/ghchronicle@v1
+  - uses: jmrplens/ghchronicle@v2
     with:
       token: ${{ secrets.GHCHRONICLE_TOKEN }}
       mode: card
@@ -340,7 +340,7 @@ left edge once they have landed.
 - **GitHub Action**
 
   ```yaml
-  - uses: jmrplens/ghchronicle@v1
+  - uses: jmrplens/ghchronicle@v2
     with:
       token: ${{ secrets.GHCHRONICLE_TOKEN }}
       mode: card
@@ -369,7 +369,7 @@ One row of monospace numbers under a thin header band.
 - **GitHub Action**
 
   ```yaml
-  - uses: jmrplens/ghchronicle@v1
+  - uses: jmrplens/ghchronicle@v2
     with:
       token: ${{ secrets.GHCHRONICLE_TOKEN }}
       mode: card
@@ -398,7 +398,7 @@ A row of 20 pixel pill badges, one per number, for a README line.
 - **GitHub Action**
 
   ```yaml
-  - uses: jmrplens/ghchronicle@v1
+  - uses: jmrplens/ghchronicle@v2
     with:
       token: ${{ secrets.GHCHRONICLE_TOKEN }}
       mode: card
@@ -428,7 +428,7 @@ sparkline drawing itself behind them.
 - **GitHub Action**
 
   ```yaml
-  - uses: jmrplens/ghchronicle@v1
+  - uses: jmrplens/ghchronicle@v2
     with:
       token: ${{ secrets.GHCHRONICLE_TOKEN }}
       mode: card
@@ -458,7 +458,7 @@ overlaid. The line draws itself on load.
 - **GitHub Action**
 
   ```yaml
-  - uses: jmrplens/ghchronicle@v1
+  - uses: jmrplens/ghchronicle@v2
     with:
       token: ${{ secrets.GHCHRONICLE_TOKEN }}
       mode: card
@@ -489,7 +489,7 @@ the legend appears when the donut is whole.
 - **GitHub Action**
 
   ```yaml
-  - uses: jmrplens/ghchronicle@v1
+  - uses: jmrplens/ghchronicle@v2
     with:
       token: ${{ secrets.GHCHRONICLE_TOKEN }}
       mode: card
@@ -519,7 +519,7 @@ bar per row, totals underneath.
 - **GitHub Action**
 
   ```yaml
-  - uses: jmrplens/ghchronicle@v1
+  - uses: jmrplens/ghchronicle@v2
     with:
       token: ${{ secrets.GHCHRONICLE_TOKEN }}
       mode: card
@@ -564,7 +564,7 @@ every width.
 - **GitHub Action**
 
   ```yaml
-  - uses: jmrplens/ghchronicle@v1
+  - uses: jmrplens/ghchronicle@v2
     with:
       token: ${{ secrets.GHCHRONICLE_TOKEN }}
       mode: card
@@ -594,7 +594,7 @@ the static card.
 - **GitHub Action**
 
   ```yaml
-  - uses: jmrplens/ghchronicle@v1
+  - uses: jmrplens/ghchronicle@v2
     with:
       token: ${{ secrets.GHCHRONICLE_TOKEN }}
       mode: card
@@ -639,7 +639,7 @@ happens once either way.
 - **GitHub Action**
 
   ```yaml
-  - uses: jmrplens/ghchronicle@v1
+  - uses: jmrplens/ghchronicle@v2
     with:
       token: ${{ secrets.GHCHRONICLE_TOKEN }}
       mode: card
@@ -651,7 +651,7 @@ happens once either way.
   The looping picture:
 
   ```yaml
-  - uses: jmrplens/ghchronicle@v1
+  - uses: jmrplens/ghchronicle@v2
     with:
       token: ${{ secrets.GHCHRONICLE_TOKEN }}
       mode: card
@@ -692,7 +692,7 @@ round than any other layout takes to settle.
 - **GitHub Action**
 
   ```yaml
-  - uses: jmrplens/ghchronicle@v1
+  - uses: jmrplens/ghchronicle@v2
     with:
       token: ${{ secrets.GHCHRONICLE_TOKEN }}
       mode: card
@@ -704,7 +704,7 @@ round than any other layout takes to settle.
   The looping picture:
 
   ```yaml
-  - uses: jmrplens/ghchronicle@v1
+  - uses: jmrplens/ghchronicle@v2
     with:
       token: ${{ secrets.GHCHRONICLE_TOKEN }}
       mode: card
@@ -737,7 +737,7 @@ stopped. The layout that shows the share of a language as its own line, where
 - **GitHub Action**
 
   ```yaml
-  - uses: jmrplens/ghchronicle@v1
+  - uses: jmrplens/ghchronicle@v2
     with:
       token: ${{ secrets.GHCHRONICLE_TOKEN }}
       mode: card

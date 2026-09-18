@@ -12,7 +12,7 @@ El repositorio incluye una Action compuesta, así que un workflow no necesita
 cadena de herramientas de Go: descarga un binario de release y lo llama.
 
 ```yaml
-- uses: jmrplens/ghchronicle@v1
+- uses: jmrplens/ghchronicle@v2
   with:
     token: ${{ secrets.GHCHRONICLE_TOKEN }}
     mode: once
@@ -57,7 +57,7 @@ cadena de herramientas de Go: descarga un binario de release y lo llama.
         runs-on: ubuntu-latest
         steps:
           - uses: actions/checkout@v7
-          - uses: jmrplens/ghchronicle@v1
+          - uses: jmrplens/ghchronicle@v2
             with:
               token: ${{ secrets.GHCHRONICLE_TOKEN }}
               mode: once
@@ -89,7 +89,7 @@ cadena de herramientas de Go: descarga un binario de release y lo llama.
         runs-on: ubuntu-latest
         steps:
           - uses: actions/checkout@v7
-          - uses: jmrplens/ghchronicle@v1
+          - uses: jmrplens/ghchronicle@v2
             with:
               token: ${{ secrets.GHCHRONICLE_TOKEN }}
               mode: card
@@ -128,7 +128,7 @@ cadena de herramientas de Go: descarga un binario de release y lo llama.
         timeout-minutes: 360
         steps:
           - uses: actions/checkout@v7
-          - uses: jmrplens/ghchronicle@v1
+          - uses: jmrplens/ghchronicle@v2
             with:
               token: ${{ secrets.GHCHRONICLE_TOKEN }}
               mode: backfill
@@ -177,7 +177,7 @@ El README no se reescribe nunca.
        runs-on: ubuntu-latest
        steps:
          - uses: actions/checkout@v7
-         - uses: jmrplens/ghchronicle@v1
+         - uses: jmrplens/ghchronicle@v2
            with:
              token: ${{ secrets.GHCHRONICLE_TOKEN }}
              mode: card
@@ -203,7 +203,7 @@ El README no se reescribe nunca.
 4. Ejecuta el workflow a mano desde la pestaña Actions la primera vez, para que
    los ficheros existan antes de la primera ejecución programada.
 
-**Más de una tarjeta.** Repite el paso `uses: jmrplens/ghchronicle@v1` con otra
+**Más de una tarjeta.** Repite el paso `uses: jmrplens/ghchronicle@v2` con otra
 ruta en `card` y otro diseño, y pega un `<picture>` por tarjeta. Cada paso es una
 pasada propia, y cada una vuelve a pedir todos los números: una pasada que
 escribe una tarjeta recoge todas las familias diga lo que diga su cadencia, y

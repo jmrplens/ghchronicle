@@ -59,7 +59,7 @@ keep it running once you are done watching it.
     ship as `tar.gz` (`zip` on Windows).
 
     ```sh
-    tar -xzf ghchronicle_1.0.0_linux_amd64.tar.gz
+    tar -xzf ghchronicle_2.0.0_linux_amd64.tar.gz
     sudo install -m 755 ghchronicle /usr/local/bin/
     ```
 
@@ -75,7 +75,7 @@ keep it running once you are done watching it.
   </TabItem>
   <TabItem label="Action">
     ```yaml
-    - uses: jmrplens/ghchronicle@v1
+    - uses: jmrplens/ghchronicle@v2
       with:
         token: ${{ secrets.GHCHRONICLE_TOKEN }}
         mode: once

@@ -60,7 +60,7 @@ cómo dejarlo corriendo cuando termines de mirarlo.
     publican como `tar.gz` (`zip` en Windows).
 
     ```sh
-    tar -xzf ghchronicle_1.0.0_linux_amd64.tar.gz
+    tar -xzf ghchronicle_2.0.0_linux_amd64.tar.gz
     sudo install -m 755 ghchronicle /usr/local/bin/
     ```
 
@@ -76,7 +76,7 @@ cómo dejarlo corriendo cuando termines de mirarlo.
   </TabItem>
   <TabItem label="Action">
     ```yaml
-    - uses: jmrplens/ghchronicle@v1
+    - uses: jmrplens/ghchronicle@v2
       with:
         token: ${{ secrets.GHCHRONICLE_TOKEN }}
         mode: once

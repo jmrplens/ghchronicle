@@ -360,7 +360,7 @@ export function buildStep(
 ) {
 	const needsFile = keysOnlyAFileCanSay(answers).length > 0;
 	const lines = [
-		"- uses: jmrplens/ghchronicle@v1",
+		"- uses: jmrplens/ghchronicle@v2",
 		"  with:",
 		// Never a value: the token is a credential, and this is the reference
 		// every workflow in this repository writes.

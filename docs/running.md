@@ -42,7 +42,7 @@ keep it running once you are done watching it.
   ship as `tar.gz` (`zip` on Windows).
 
   ```sh
-  tar -xzf ghchronicle_1.0.0_linux_amd64.tar.gz
+  tar -xzf ghchronicle_2.0.0_linux_amd64.tar.gz
   sudo install -m 755 ghchronicle /usr/local/bin/
   ```
 
@@ -58,7 +58,7 @@ keep it running once you are done watching it.
 - **Action**
 
   ```yaml
-  - uses: jmrplens/ghchronicle@v1
+  - uses: jmrplens/ghchronicle@v2
     with:
       token: ${{ secrets.GHCHRONICLE_TOKEN }}
       mode: once
@@ -125,7 +125,7 @@ Release archives are named
 | `aarch64`          | `linux_arm64`       |
 
 ```sh
-VERSION=1.0.0
+VERSION=2.0.0
 arch=$(uname -m); case "$arch" in x86_64) arch=amd64 ;; aarch64) arch=arm64 ;; esac
 base=https://github.com/jmrplens/ghchronicle/releases/download/v$VERSION
 curl -fsSLO "$base/ghchronicle_${VERSION}_linux_${arch}.tar.gz"
@@ -163,7 +163,7 @@ the file, then verify the archive against the file.
     ```
 
     ```text
-    ghchronicle_1.0.0_linux_amd64.tar.gz: OK
+    ghchronicle_2.0.0_linux_amd64.tar.gz: OK
     ```
 
 3. Check the checksum file itself, if you have
@@ -192,7 +192,7 @@ that somebody signed the file, which is not the question.
 The archive holds three files and no directory, so extract it somewhere you
 meant to.
 
-- ghchronicle_1.0.0_linux_amd64.tar.gz
+- ghchronicle_2.0.0_linux_amd64.tar.gz
   - ghchronicle the binary
   - LICENSE
   - README.md
@@ -200,7 +200,7 @@ meant to.
 - **For everyone**
 
   ```sh
-  tar -xzf ghchronicle_1.0.0_linux_amd64.tar.gz ghchronicle
+  tar -xzf ghchronicle_2.0.0_linux_amd64.tar.gz ghchronicle
   sudo install -m 755 ghchronicle /usr/local/bin/
   ghchronicle -version
   ```
@@ -209,7 +209,7 @@ meant to.
 
   ```sh
   mkdir -p ~/.local/bin
-  tar -xzf ghchronicle_1.0.0_linux_amd64.tar.gz -C ~/.local/bin ghchronicle
+  tar -xzf ghchronicle_2.0.0_linux_amd64.tar.gz -C ~/.local/bin ghchronicle
   chmod 755 ~/.local/bin/ghchronicle
   ghchronicle -version
   ```
@@ -218,7 +218,7 @@ meant to.
   `ghchronicle -version` answers "command not found", it is not on yours.
 
 ```text
-ghchronicle 1.0.0 (commit 4e5dfc2, built 2026-09-14T23:04:02Z)
+ghchronicle 2.0.0 (commit 4e5dfc2, built 2026-09-14T23:04:02Z)
 ```
 
 ### Run it once
@@ -262,7 +262,7 @@ find.
   build date:
 
   ```text
-  ghchronicle 1.0.0 (commit unknown, built unknown)
+  ghchronicle 2.0.0 (commit unknown, built unknown)
   ```
 
   The version comes from the `VERSION` file the module embeds; the other two
@@ -324,7 +324,7 @@ architecture.
 | `x86_64`           | Intel              | `darwin_amd64`      |
 
 ```sh
-VERSION=1.0.0
+VERSION=2.0.0
 arch=$(uname -m); case "$arch" in x86_64) arch=amd64 ;; esac
 base=https://github.com/jmrplens/ghchronicle/releases/download/v$VERSION
 curl -fsSLO "$base/ghchronicle_${VERSION}_darwin_${arch}.tar.gz"
@@ -362,7 +362,7 @@ signature over that file.
     ```
 
     ```text
-    ghchronicle_1.0.0_darwin_arm64.tar.gz: OK
+    ghchronicle_2.0.0_darwin_arm64.tar.gz: OK
     ```
 
 3. Check the checksum file itself, if you have
@@ -389,7 +389,7 @@ the file, which is not the question.
 
 The archive holds three files and no directory.
 
-- ghchronicle_1.0.0_darwin_arm64.tar.gz
+- ghchronicle_2.0.0_darwin_arm64.tar.gz
   - ghchronicle the binary
   - LICENSE
   - README.md
@@ -397,7 +397,7 @@ The archive holds three files and no directory.
 - **For everyone**
 
   ```sh
-  tar -xzf ghchronicle_1.0.0_darwin_arm64.tar.gz ghchronicle
+  tar -xzf ghchronicle_2.0.0_darwin_arm64.tar.gz ghchronicle
   sudo install -m 755 ghchronicle /usr/local/bin/
   ghchronicle -version
   ```
@@ -409,7 +409,7 @@ The archive holds three files and no directory.
 
   ```sh
   mkdir -p ~/bin
-  tar -xzf ghchronicle_1.0.0_darwin_arm64.tar.gz -C ~/bin ghchronicle
+  tar -xzf ghchronicle_2.0.0_darwin_arm64.tar.gz -C ~/bin ghchronicle
   chmod 755 ~/bin/ghchronicle
   echo 'export PATH="$HOME/bin:$PATH"' >> ~/.zprofile
   ```
@@ -430,7 +430,7 @@ The archive holds three files and no directory.
 > extracts. So look before you clear anything:
 >
 > ```sh
-> xattr -l ghchronicle_1.0.0_darwin_arm64.tar.gz   # what a browser marked
+> xattr -l ghchronicle_2.0.0_darwin_arm64.tar.gz   # what a browser marked
 > xattr -l ghchronicle                             # the extracted binary
 > xattr -c ghchronicle                             # clear it
 > ```
@@ -638,7 +638,7 @@ rather than the shell:
 ```
 
 ```powershell
-$version = "1.0.0"
+$version = "2.0.0"
 $arch = if ($env:PROCESSOR_ARCHITECTURE -eq "ARM64") { "arm64" } else { "amd64" }
 $base = "https://github.com/jmrplens/ghchronicle/releases/download/v$version"
 $zip = "ghchronicle_${version}_windows_${arch}.zip"
@@ -702,7 +702,7 @@ nothing.
 The archive holds three files and no directory, so unpack it into a directory
 you made.
 
-- ghchronicle_1.0.0_windows_amd64.zip
+- ghchronicle_2.0.0_windows_amd64.zip
   - ghchronicle.exe the binary
   - LICENSE
   - README.md
@@ -757,7 +757,7 @@ ghchronicle -version
 ```
 
 ```text
-ghchronicle 1.0.0 (commit 4e5dfc2, built 2026-09-14T23:04:02Z)
+ghchronicle 2.0.0 (commit 4e5dfc2, built 2026-09-14T23:04:02Z)
 ```
 
 > **If Windows warns about the file**
@@ -1303,7 +1303,7 @@ The repository ships a composite Action, so a workflow needs no Go toolchain:
 it downloads a release binary and calls it.
 
 ```yaml
-- uses: jmrplens/ghchronicle@v1
+- uses: jmrplens/ghchronicle@v2
   with:
     token: ${{ secrets.GHCHRONICLE_TOKEN }}
     mode: once
@@ -1348,7 +1348,7 @@ it downloads a release binary and calls it.
       runs-on: ubuntu-latest
       steps:
         - uses: actions/checkout@v7
-        - uses: jmrplens/ghchronicle@v1
+        - uses: jmrplens/ghchronicle@v2
           with:
             token: ${{ secrets.GHCHRONICLE_TOKEN }}
             mode: once
@@ -1380,7 +1380,7 @@ it downloads a release binary and calls it.
       runs-on: ubuntu-latest
       steps:
         - uses: actions/checkout@v7
-        - uses: jmrplens/ghchronicle@v1
+        - uses: jmrplens/ghchronicle@v2
           with:
             token: ${{ secrets.GHCHRONICLE_TOKEN }}
             mode: card
@@ -1419,7 +1419,7 @@ it downloads a release binary and calls it.
       timeout-minutes: 360
       steps:
         - uses: actions/checkout@v7
-        - uses: jmrplens/ghchronicle@v1
+        - uses: jmrplens/ghchronicle@v2
           with:
             token: ${{ secrets.GHCHRONICLE_TOKEN }}
             mode: backfill
@@ -1464,7 +1464,7 @@ itself is never rewritten.
        runs-on: ubuntu-latest
        steps:
          - uses: actions/checkout@v7
-         - uses: jmrplens/ghchronicle@v1
+         - uses: jmrplens/ghchronicle@v2
            with:
              token: ${{ secrets.GHCHRONICLE_TOKEN }}
              mode: card
@@ -1490,7 +1490,7 @@ itself is never rewritten.
 4. Run the workflow by hand from the Actions tab the first time, so the files
    exist before the first scheduled run.
 
-**More than one card.** Repeat the `uses: jmrplens/ghchronicle@v1` step with
+**More than one card.** Repeat the `uses: jmrplens/ghchronicle@v2` step with
 another `card` path and layout, and paste one `<picture>` per card. Each step is
 a sweep of its own, and each draws every number again: a run that writes a card
 collects every family whatever its cadence says, and one in `card` mode writes

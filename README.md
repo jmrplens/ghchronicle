@@ -272,7 +272,7 @@ the fastest. `0` is not a still card, `-card-motion off` is.
 The repository ships as a composite Action:
 
 ```yaml
-- uses: jmrplens/ghchronicle@v1
+- uses: jmrplens/ghchronicle@v2
   with:
     token: ${{ secrets.GHCHRONICLE_TOKEN }}
     mode: card

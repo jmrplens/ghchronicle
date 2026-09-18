@@ -91,7 +91,7 @@ is not.
 ## The tag
 
 ```sh
-git tag -a v1.0.0 -m "v1.0.0" && git push origin v1.0.0
+git tag -a v2.0.0 -m "v2.0.0" && git push origin v2.0.0
 ```
 
 That runs `.github/workflows/release.yml`: the end-to-end and race suites, then
@@ -104,23 +104,23 @@ are set, and writes the release notes from the commit subjects.
 
 - [ ] The release page lists the archives, the checksums, the signatures and
       the SBOMs, and the notes read as notes.
-- [ ] `docker run --rm ghcr.io/jmrplens/ghchronicle:v1.0.0 -version` prints the
+- [ ] `docker run --rm ghcr.io/jmrplens/ghchronicle:v2.0.0 -version` prints the
       version. The workflow checks this too, and it is worth seeing once.
-- [ ] Move the major tag, which is what `uses: jmrplens/ghchronicle@v1`
+- [ ] Move the major tag, which is what `uses: jmrplens/ghchronicle@v2`
       resolves through:
 
       ```sh
-      git tag -f -a v1 v1.0.0^{} -m "v1" && git push -f origin v1
+      git tag -f -a v2 v2.0.0^{} -m "v2" && git push -f origin v2
       ```
 
-      `^{}` because `v1.0.0` is an annotated tag, and a tag pointing at a tag
-      is not what `@v1` should resolve through. `-a -m` because a repository
+      `^{}` because `v2.0.0` is an annotated tag, and a tag pointing at a tag
+      is not what `@v2` should resolve through. `-a -m` because a repository
       configured to sign its tags makes every `git tag` annotated, and an
       annotated tag with no message is an error rather than a prompt.
 
       The release workflow listens for three-part tags, so this move starts
       nothing. With one exception, met once: GitHub reads the workflow file
-      at the ref being pushed, so a `v1` moved onto a commit that predates
+      at the ref being pushed, so a major tag moved onto a commit that predates
       that filter runs the old file. The preflight job refuses it, before
       anything is published, which is what it is for.
 

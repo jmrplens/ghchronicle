@@ -50,7 +50,7 @@ export function cardCommand(name, loop) {
  */
 export function cardStep(name, loop) {
 	return [
-		"- uses: jmrplens/ghchronicle@v1",
+		"- uses: jmrplens/ghchronicle@v2",
 		"  with:",
 		"    token: ${{ secrets.GHCHRONICLE_TOKEN }}",
 		"    mode: card",

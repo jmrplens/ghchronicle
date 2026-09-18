@@ -12,7 +12,7 @@ The repository ships a composite Action, so a workflow needs no Go toolchain:
 it downloads a release binary and calls it.
 
 ```yaml
-- uses: jmrplens/ghchronicle@v1
+- uses: jmrplens/ghchronicle@v2
   with:
     token: ${{ secrets.GHCHRONICLE_TOKEN }}
     mode: once
@@ -57,7 +57,7 @@ it downloads a release binary and calls it.
         runs-on: ubuntu-latest
         steps:
           - uses: actions/checkout@v7
-          - uses: jmrplens/ghchronicle@v1
+          - uses: jmrplens/ghchronicle@v2
             with:
               token: ${{ secrets.GHCHRONICLE_TOKEN }}
               mode: once
@@ -89,7 +89,7 @@ it downloads a release binary and calls it.
         runs-on: ubuntu-latest
         steps:
           - uses: actions/checkout@v7
-          - uses: jmrplens/ghchronicle@v1
+          - uses: jmrplens/ghchronicle@v2
             with:
               token: ${{ secrets.GHCHRONICLE_TOKEN }}
               mode: card
@@ -128,7 +128,7 @@ it downloads a release binary and calls it.
         timeout-minutes: 360
         steps:
           - uses: actions/checkout@v7
-          - uses: jmrplens/ghchronicle@v1
+          - uses: jmrplens/ghchronicle@v2
             with:
               token: ${{ secrets.GHCHRONICLE_TOKEN }}
               mode: backfill
@@ -176,7 +176,7 @@ itself is never rewritten.
        runs-on: ubuntu-latest
        steps:
          - uses: actions/checkout@v7
-         - uses: jmrplens/ghchronicle@v1
+         - uses: jmrplens/ghchronicle@v2
            with:
              token: ${{ secrets.GHCHRONICLE_TOKEN }}
              mode: card
@@ -202,7 +202,7 @@ itself is never rewritten.
 4. Run the workflow by hand from the Actions tab the first time, so the files
    exist before the first scheduled run.
 
-**More than one card.** Repeat the `uses: jmrplens/ghchronicle@v1` step with
+**More than one card.** Repeat the `uses: jmrplens/ghchronicle@v2` step with
 another `card` path and layout, and paste one `<picture>` per card. Each step is
 a sweep of its own, and each draws every number again: a run that writes a card
 collects every family whatever its cadence says, and one in `card` mode writes

@@ -5,7 +5,7 @@ at the repository root, which is the only thing GitHub requires, and a workflow
 elsewhere reaches it as:
 
 ```yaml
-- uses: jmrplens/ghchronicle@v1
+- uses: jmrplens/ghchronicle@v2
 ```
 
 ## Why not a separate repository
@@ -24,20 +24,20 @@ independently of the tool. That is not this.
 GitHub's Marketplace takes an Action from any public repository whose
 `action.yml` is at the root, so this repository qualifies as it stands.
 
-1. Push a tag (`v1.0.0`). The release workflow builds the binaries the Action
+1. Push a tag (`v2.0.0`). The release workflow builds the binaries the Action
     downloads.
 2. Open the release on GitHub. It offers "Publish this Action to the GitHub
     Marketplace"; tick it, accept the terms, and choose the categories
     (Monitoring, and Utilities).
-3. Move the major tag so `@v1` keeps resolving:
+3. Move the major tag so `@v2` keeps resolving:
 
     ```sh
-    git tag -f -a v1 v1.0.0^{} -m "v1" && git push -f origin v1
+    git tag -f -a v2 v2.0.0^{} -m "v2" && git push -f origin v2
     ```
 
-    Every Action in the Marketplace does this. A workflow pinned to `@v1` then
+    Every Action in the Marketplace does this. A workflow pinned to `@v2` then
     follows the patch releases without editing. `^{}` names the commit rather
-    than the annotated tag, which is what `@v1` has to resolve through, and
+    than the annotated tag, which is what `@v2` has to resolve through, and
     the release workflow listens for three-part tags only, so moving this one
     starts nothing.
 

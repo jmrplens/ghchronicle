@@ -23,7 +23,7 @@ Release archives are named
 | `aarch64`          | `linux_arm64`       |
 
 ```sh
-VERSION=1.0.0
+VERSION=2.0.0
 arch=$(uname -m); case "$arch" in x86_64) arch=amd64 ;; aarch64) arch=arm64 ;; esac
 base=https://github.com/jmrplens/ghchronicle/releases/download/v$VERSION
 curl -fsSLO "$base/ghchronicle_${VERSION}_linux_${arch}.tar.gz"
@@ -63,7 +63,7 @@ the file, then verify the archive against the file.
     ```
 
     ```text
-    ghchronicle_1.0.0_linux_amd64.tar.gz: OK
+    ghchronicle_2.0.0_linux_amd64.tar.gz: OK
     ```
 
 3. Check the checksum file itself, if you have
@@ -96,7 +96,7 @@ meant to.
 
 <FileTree>
 
-- ghchronicle_1.0.0_linux_amd64.tar.gz
+- ghchronicle_2.0.0_linux_amd64.tar.gz
   - ghchronicle the binary
   - LICENSE
   - README.md
@@ -106,7 +106,7 @@ meant to.
 <Tabs syncKey="linux-scope">
   <TabItem label="For everyone">
     ```sh
-    tar -xzf ghchronicle_1.0.0_linux_amd64.tar.gz ghchronicle
+    tar -xzf ghchronicle_2.0.0_linux_amd64.tar.gz ghchronicle
     sudo install -m 755 ghchronicle /usr/local/bin/
     ghchronicle -version
     ```
@@ -114,7 +114,7 @@ meant to.
   <TabItem label="For one account">
     ```sh
     mkdir -p ~/.local/bin
-    tar -xzf ghchronicle_1.0.0_linux_amd64.tar.gz -C ~/.local/bin ghchronicle
+    tar -xzf ghchronicle_2.0.0_linux_amd64.tar.gz -C ~/.local/bin ghchronicle
     chmod 755 ~/.local/bin/ghchronicle
     ghchronicle -version
     ```
@@ -126,7 +126,7 @@ meant to.
 </Tabs>
 
 ```text
-ghchronicle 1.0.0 (commit 4e5dfc2, built 2026-09-14T23:04:02Z)
+ghchronicle 2.0.0 (commit 4e5dfc2, built 2026-09-14T23:04:02Z)
 ```
 
 ## Run it once
@@ -170,7 +170,7 @@ find.
     build date:
 
     ```text
-    ghchronicle 1.0.0 (commit unknown, built unknown)
+    ghchronicle 2.0.0 (commit unknown, built unknown)
     ```
 
     The version comes from the `VERSION` file the module embeds; the other two

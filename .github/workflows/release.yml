@@ -4,10 +4,10 @@ on:
   push:
     tags:
       # Three parts, so the moving major tag does not start a release. The
-      # Action resolves `uses: jmrplens/ghchronicle@v1` through a `v1` that is
+      # Action resolves `uses: jmrplens/ghchronicle@vN` through a `vN` that is
       # force-moved onto each patch release, and under a bare `v*` that push
       # started this workflow, whose first job compares the tag against the
-      # VERSION file: `1` is not `1.0.0`, so every move of the major tag left
+      # VERSION file: `2` is not `2.0.0`, so every move of the major tag left
       # a failed release run behind it.
       - "v*.*.*"
 

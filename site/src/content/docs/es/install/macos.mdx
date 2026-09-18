@@ -24,7 +24,7 @@ herramientas de Go da al sistema; macOS es el nombre que le da Apple. `uname
 | `x86_64`               | Intel         | `darwin_amd64`      |
 
 ```sh
-VERSION=1.0.0
+VERSION=2.0.0
 arch=$(uname -m); case "$arch" in x86_64) arch=amd64 ;; esac
 base=https://github.com/jmrplens/ghchronicle/releases/download/v$VERSION
 curl -fsSLO "$base/ghchronicle_${VERSION}_darwin_${arch}.tar.gz"
@@ -64,7 +64,7 @@ sobre ese fichero.
     ```
 
     ```text
-    ghchronicle_1.0.0_darwin_arm64.tar.gz: OK
+    ghchronicle_2.0.0_darwin_arm64.tar.gz: OK
     ```
 
 3. Comprueba el propio fichero de sumas, si tienes
@@ -95,7 +95,7 @@ El archivo lleva tres ficheros y ningún directorio.
 
 <FileTree>
 
-- ghchronicle_1.0.0_darwin_arm64.tar.gz
+- ghchronicle_2.0.0_darwin_arm64.tar.gz
   - ghchronicle el binario
   - LICENSE
   - README.md
@@ -105,7 +105,7 @@ El archivo lleva tres ficheros y ningún directorio.
 <Tabs syncKey="macos-scope">
   <TabItem label="Para todos">
     ```sh
-    tar -xzf ghchronicle_1.0.0_darwin_arm64.tar.gz ghchronicle
+    tar -xzf ghchronicle_2.0.0_darwin_arm64.tar.gz ghchronicle
     sudo install -m 755 ghchronicle /usr/local/bin/
     ghchronicle -version
     ```
@@ -117,7 +117,7 @@ El archivo lleva tres ficheros y ningún directorio.
   <TabItem label="Para una cuenta">
     ```sh
     mkdir -p ~/bin
-    tar -xzf ghchronicle_1.0.0_darwin_arm64.tar.gz -C ~/bin ghchronicle
+    tar -xzf ghchronicle_2.0.0_darwin_arm64.tar.gz -C ~/bin ghchronicle
     chmod 755 ~/bin/ghchronicle
     echo 'export PATH="$HOME/bin:$PATH"' >> ~/.zprofile
     ```
@@ -140,7 +140,7 @@ El archivo lleva tres ficheros y ningún directorio.
   extrae. Así que mira antes de borrar nada:
 
   ```sh
-  xattr -l ghchronicle_1.0.0_darwin_arm64.tar.gz   # lo que marcó el navegador
+  xattr -l ghchronicle_2.0.0_darwin_arm64.tar.gz   # lo que marcó el navegador
   xattr -l ghchronicle                             # el binario extraído
   xattr -c ghchronicle                             # quitarlo
   ```

@@ -385,7 +385,7 @@ This page is a form that writes a configuration. What follows is the inventory i
   These answers need settings no input carries, so the step reads the file above. Commit it at that path.
 
   ```yaml
-  - uses: jmrplens/ghchronicle@v1
+  - uses: jmrplens/ghchronicle@v2
     with:
       token: ${{ secrets.GHCHRONICLE_TOKEN }}
       config: .github/ghchronicle.yaml

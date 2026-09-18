@@ -24,7 +24,7 @@ architecture.
 | `x86_64`           | Intel              | `darwin_amd64`      |
 
 ```sh
-VERSION=1.0.0
+VERSION=2.0.0
 arch=$(uname -m); case "$arch" in x86_64) arch=amd64 ;; esac
 base=https://github.com/jmrplens/ghchronicle/releases/download/v$VERSION
 curl -fsSLO "$base/ghchronicle_${VERSION}_darwin_${arch}.tar.gz"
@@ -64,7 +64,7 @@ signature over that file.
     ```
 
     ```text
-    ghchronicle_1.0.0_darwin_arm64.tar.gz: OK
+    ghchronicle_2.0.0_darwin_arm64.tar.gz: OK
     ```
 
 3. Check the checksum file itself, if you have
@@ -95,7 +95,7 @@ The archive holds three files and no directory.
 
 <FileTree>
 
-- ghchronicle_1.0.0_darwin_arm64.tar.gz
+- ghchronicle_2.0.0_darwin_arm64.tar.gz
   - ghchronicle the binary
   - LICENSE
   - README.md
@@ -105,7 +105,7 @@ The archive holds three files and no directory.
 <Tabs syncKey="macos-scope">
   <TabItem label="For everyone">
     ```sh
-    tar -xzf ghchronicle_1.0.0_darwin_arm64.tar.gz ghchronicle
+    tar -xzf ghchronicle_2.0.0_darwin_arm64.tar.gz ghchronicle
     sudo install -m 755 ghchronicle /usr/local/bin/
     ghchronicle -version
     ```
@@ -117,7 +117,7 @@ The archive holds three files and no directory.
   <TabItem label="For one account">
     ```sh
     mkdir -p ~/bin
-    tar -xzf ghchronicle_1.0.0_darwin_arm64.tar.gz -C ~/bin ghchronicle
+    tar -xzf ghchronicle_2.0.0_darwin_arm64.tar.gz -C ~/bin ghchronicle
     chmod 755 ~/bin/ghchronicle
     echo 'export PATH="$HOME/bin:$PATH"' >> ~/.zprofile
     ```
@@ -140,7 +140,7 @@ The archive holds three files and no directory.
   extracts. So look before you clear anything:
 
   ```sh
-  xattr -l ghchronicle_1.0.0_darwin_arm64.tar.gz   # what a browser marked
+  xattr -l ghchronicle_2.0.0_darwin_arm64.tar.gz   # what a browser marked
   xattr -l ghchronicle                             # the extracted binary
   xattr -c ghchronicle                             # clear it
   ```
