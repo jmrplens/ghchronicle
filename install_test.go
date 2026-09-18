@@ -131,11 +131,25 @@ func serveCounted(t *testing.T, rel fakeRelease, asked *atomic.Int32) string {
 	return srv.URL
 }
 
-func runInstaller(t *testing.T, base, dir string, args ...string) (string, int) {
+// requireBash skips a test that has nothing to say on this machine.
+//
+// Windows is skipped although its runners do have bash, through Git for
+// Windows: install.sh refuses to run there on purpose and points at the zip,
+// so driving it would be asserting that a refusal refuses. What Windows is
+// for is install.ps1, which has tests of its own.
+func requireBash(t *testing.T) {
 	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("install.sh refuses on Windows by design; install.ps1 is what runs there")
+	}
 	if _, err := exec.LookPath("bash"); err != nil {
 		t.Skip("install.sh runs in bash, and there is none here")
 	}
+}
+
+func runInstaller(t *testing.T, base, dir string, args ...string) (string, int) {
+	t.Helper()
+	requireBash(t)
 	// Built up rather than spread into the call: the arguments are this
 	// file's own literals either way, and the spread form is what makes a
 	// subprocess check read them as input from somewhere.
@@ -227,9 +241,7 @@ func TestTheInstallerReadsTheChecksumLineForTheArchiveAndNotItsSBOM(t *testing.T
 // the whole answer.
 func TestTheInstallerNeedsNoArgumentsToKnowWhatItCannotDo(t *testing.T) {
 	t.Parallel()
-	if _, err := exec.LookPath("bash"); err != nil {
-		t.Skip("install.sh runs in bash, and there is none here")
-	}
+	requireBash(t)
 	cmd := exec.CommandContext(t.Context(), "bash", "install.sh", "--nonsense")
 	out, _ := cmd.CombinedOutput()
 	if cmd.ProcessState.ExitCode() == 0 {
@@ -251,9 +263,7 @@ func TestTheInstallerNeedsNoArgumentsToKnowWhatItCannotDo(t *testing.T) {
 // executable bit, and the script runs exactly as it does otherwise.
 func TestTheInstallerStopsAtAPlatformWithNoRelease(t *testing.T) {
 	t.Parallel()
-	if _, err := exec.LookPath("bash"); err != nil {
-		t.Skip("install.sh runs in bash, and there is none here")
-	}
+	requireBash(t)
 	var asked atomic.Int32
 	base := serveCounted(t, buildFakeRelease(t, false), &asked)
 	dir := t.TempDir()
@@ -283,9 +293,7 @@ source install.sh --dir "$1" --version "$2"`
 // says nothing about which directory was chosen and why.
 func sourceTargetDir(t *testing.T, env ...string) string {
 	t.Helper()
-	if _, err := exec.LookPath("bash"); err != nil {
-		t.Skip("install.sh runs in bash, and there is none here")
-	}
+	requireBash(t)
 	const probe = `source <(grep -v '^main "$@"$' install.sh); target_dir`
 	cmd := exec.CommandContext(t.Context(), "bash", "-c", probe)
 	cmd.Env = append(os.Environ(), env...)
@@ -353,9 +361,7 @@ func TestTheInstallerSaysHowToFinishWhenItLandsOffPath(t *testing.T) {
 // looking for both.
 func TestTheInstallerTakesTheDarwinArchiveOnAMac(t *testing.T) {
 	t.Parallel()
-	if _, err := exec.LookPath("bash"); err != nil {
-		t.Skip("install.sh runs in bash, and there is none here")
-	}
+	requireBash(t)
 	rel := buildFakeReleaseFor(t, "darwin", "arm64")
 	dir := t.TempDir()
 
@@ -384,9 +390,7 @@ source install.sh --dir "$1" --version "$2"`
 // running with a PATH that holds everything the script needs except that one.
 func TestTheInstallerVerifiesWithShasumWhenThereIsNoSha256sum(t *testing.T) {
 	t.Parallel()
-	if _, err := exec.LookPath("bash"); err != nil {
-		t.Skip("install.sh runs in bash, and there is none here")
-	}
+	requireBash(t)
 	if _, err := exec.LookPath("shasum"); err != nil {
 		t.Skip("this machine has no shasum, which is the program being stood in for")
 	}
