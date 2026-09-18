@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/jmrplens/ghchronicle/internal/httpx"
 )
 
 // Elasticsearch writes documents through the _bulk API, to Elasticsearch or
@@ -54,7 +56,8 @@ func NewElasticsearch(url, prefix, username, password, apiKey string, batch int,
 	}
 	return &Elasticsearch{
 		URL: strings.TrimRight(url, "/"), Prefix: prefix, Username: username, Password: password,
-		APIKey: apiKey, Batch: batch, client: &http.Client{Timeout: timeout},
+		APIKey: apiKey, Batch: batch,
+		client: &http.Client{Timeout: timeout, Transport: httpx.OwnTransport()},
 	}
 }
 

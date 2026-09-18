@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/jmrplens/ghchronicle/internal/httpx"
 )
 
 // Influx writes line protocol to InfluxDB 2 or 3 over the v2 write endpoint.
@@ -41,7 +43,7 @@ func NewInflux(url, token, org, bucket string, batch int, timeout time.Duration)
 	}
 	return &Influx{
 		URL: strings.TrimRight(url, "/"), Token: token, Org: org, Bucket: bucket,
-		Batch: batch, client: &http.Client{Timeout: timeout},
+		Batch: batch, client: &http.Client{Timeout: timeout, Transport: httpx.OwnTransport()},
 	}
 }
 

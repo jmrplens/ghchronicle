@@ -8,6 +8,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/jmrplens/ghchronicle/internal/httpx"
 )
 
 // Telegraf posts line protocol to Telegraf's http_listener_v2 input.
@@ -38,7 +40,7 @@ func NewTelegraf(rawURL, username, password string, batch int, timeout time.Dura
 	}
 	return &Telegraf{
 		URL: withDefaultPath(rawURL, "/telegraf"), Username: username, Password: password,
-		Batch: batch, client: &http.Client{Timeout: timeout},
+		Batch: batch, client: &http.Client{Timeout: timeout, Transport: httpx.OwnTransport()},
 	}
 }
 

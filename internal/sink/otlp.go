@@ -12,6 +12,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/jmrplens/ghchronicle/internal/httpx"
 )
 
 // OTLP writes metrics over OpenTelemetry's HTTP protocol.
@@ -73,7 +75,7 @@ func NewOTLP(endpoint, service string, headers map[string]string, raw bool, batc
 	}
 	return &OTLP{
 		Endpoint: endpoint, Service: service, Headers: headers, Raw: raw,
-		Batch: batch, client: &http.Client{Timeout: timeout},
+		Batch: batch, client: &http.Client{Timeout: timeout, Transport: httpx.OwnTransport()},
 		reducer: NewReducer(), state: map[string]Point{},
 	}
 }

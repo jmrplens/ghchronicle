@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/jmrplens/ghchronicle/internal/ghapi"
+	"github.com/jmrplens/ghchronicle/internal/httpx"
 	"github.com/jmrplens/ghchronicle/internal/sink"
 )
 
@@ -162,7 +163,7 @@ func (a Achievements) warn(msg string, args ...any) {
 func (a Achievements) fetch(ctx context.Context) (string, error) {
 	client := a.HTTP
 	if client == nil {
-		client = &http.Client{Timeout: 30 * time.Second}
+		client = &http.Client{Timeout: 30 * time.Second, Transport: httpx.OwnTransport()}
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, a.pageURL(""), http.NoBody)
 	if err != nil {

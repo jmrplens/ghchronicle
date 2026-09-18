@@ -19,6 +19,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/jmrplens/ghchronicle/internal/httpx"
 )
 
 const (
@@ -106,7 +108,7 @@ func New(token string, timeout time.Duration) *Client {
 	// test server shutting down broke another test's request about one run in
 	// twenty.
 	return &Client{
-		http:  &http.Client{Timeout: timeout, Transport: ownTransport()},
+		http:  &http.Client{Timeout: timeout, Transport: httpx.OwnTransport()},
 		token: token,
 		base:  defaultBase,
 		cache: newCache(DefaultCacheBytes),
@@ -293,20 +295,6 @@ func newCache(limit int) *cache {
 		limit = DefaultCacheBytes
 	}
 	return &cache{limit: limit, order: list.New(), entries: map[cacheKey]*list.Element{}}
-}
-
-// ownTransport returns a transport with a connection pool nobody else holds.
-//
-// It is a clone of the standard default so that it keeps the default's proxy
-// settings, dial and handshake timeouts. A process that has installed some
-// other RoundTripper as http.DefaultTransport, an instrumented or a mocked
-// one, has nothing of that kind to clone, and a plain transport that still
-// honors the proxy variables is the closest thing to what the clone gives.
-func ownTransport() *http.Transport {
-	if standard, ok := http.DefaultTransport.(*http.Transport); ok {
-		return standard.Clone()
-	}
-	return &http.Transport{Proxy: http.ProxyFromEnvironment}
 }
 
 // pairAt returns the pair an element of the recency order holds, or nil.
@@ -708,6 +696,12 @@ func (c *Client) GetTextAs(ctx context.Context, path, accept string) (string, er
 
 	client := &http.Client{
 		Timeout: c.http.Timeout,
+		// The same pool as the client this request belongs to, rather than a
+		// nil Transport, which would send it through the process-wide
+		// default: a new client is built here for every request that may
+		// redirect, and each one would be borrowing connections from
+		// whatever else in the process is using that default.
+		Transport: c.http.Transport,
 		CheckRedirect: func(r *http.Request, via []*http.Request) error {
 			r.Header.Del("Authorization")
 			// The redirect itself is the API's answer and carries the rate

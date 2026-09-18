@@ -13,6 +13,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/jmrplens/ghchronicle/internal/httpx"
 )
 
 // Loki writes the events, not the numbers.
@@ -85,7 +87,8 @@ func NewLoki(url, tenant string, labels map[string]string, batch int, maxAge, ti
 	}
 	return &Loki{
 		URL: url, TenantID: tenant, Labels: labels, Batch: batch, MaxAge: maxAge,
-		watermarks: map[string]time.Time{}, client: &http.Client{Timeout: timeout},
+		watermarks: map[string]time.Time{},
+		client:     &http.Client{Timeout: timeout, Transport: httpx.OwnTransport()},
 	}
 }
 
