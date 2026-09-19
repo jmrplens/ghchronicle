@@ -79,19 +79,62 @@ func serveWindowsRelease(t *testing.T, name string, zipped []byte, checksums str
 	return srv.URL
 }
 
-func runWindowsInstaller(t *testing.T, base, dir string) (string, int) {
+func runWindowsInstaller(t *testing.T, base, dir string, pathFirst ...string) (string, int) {
 	t.Helper()
 	shell := powershell(t)
 	cmd := exec.CommandContext(t.Context(), shell, "-NoProfile", "-File", "install.ps1")
 	cmd.Args = append(cmd.Args, "-Version", fakeVersion, "-BinDir", dir)
-	cmd.Env = append(os.Environ(),
+	env := append(os.Environ(),
 		"GHCHRONICLE_DOWNLOAD_BASE="+base,
 		"GHCHRONICLE_LATEST_URL="+base+"/no-such-api",
 		// The architecture Windows would report, so the run picks an archive
 		// name whatever the machine underneath actually is.
 		"PROCESSOR_ARCHITECTURE=AMD64")
+	for _, first := range pathFirst {
+		env = prependToPath(env, first)
+	}
+	cmd.Env = env
 	out, _ := cmd.CombinedOutput()
 	return string(out), cmd.ProcessState.ExitCode()
+}
+
+// prependToPath puts dir in front of the PATH entry of environ, matching the
+// name however the platform spells it: Windows says "Path", and appending a
+// second "PATH=" would leave which of the two wins to the runtime rather than
+// to the test.
+func prependToPath(environ []string, dir string) []string {
+	out := make([]string, 0, len(environ)+1)
+	found := false
+	for _, entry := range environ {
+		name, value, ok := strings.Cut(entry, "=")
+		if ok && strings.EqualFold(name, "PATH") {
+			out = append(out, name+"="+dir+string(os.PathListSeparator)+value)
+			found = true
+			continue
+		}
+		out = append(out, entry)
+	}
+	if !found {
+		out = append(out, "PATH="+dir)
+	}
+	return out
+}
+
+// decoy writes something that answers to the binary's name and returns the
+// directory holding it. It is not a working program and does not need to be:
+// resolving a name against PATH reads the directory, it does not run what it
+// finds. Both spellings, because Windows resolves a bare name through PATHEXT
+// and finds the .exe, while PowerShell on Linux finds the executable file
+// named exactly as asked.
+func decoy(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	for _, name := range []string{"ghchronicle", "ghchronicle.exe"} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return dir
 }
 
 func TestTheWindowsInstallerPutsTheBinaryWhereItWasAsked(t *testing.T) {
@@ -107,6 +150,37 @@ func TestTheWindowsInstallerPutsTheBinaryWhereItWasAsked(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(dir, "ghchronicle.exe")); err != nil {
 		t.Fatalf("no binary was installed: %v\n%s", err, out)
+	}
+	// The other half of the shadow warning below: nothing else answers to the
+	// name here, so a run that warns anyway would be crying wolf at every
+	// install there is.
+	if strings.Contains(out, "warning:") {
+		t.Errorf("nothing else is on PATH, so this run had nothing to warn about:\n%s", out)
+	}
+}
+
+// TestTheWindowsInstallerSaysWhenAnotherCopyKeepsWinningTheName covers the one
+// outcome that reads as success and is not: the file is written, the PATH is
+// updated, and the name still resolves somewhere else. Windows reads the
+// machine PATH before the user one this script writes to, so a copy under
+// Program Files, or an older `go install` build, keeps answering. install.sh
+// has warned about this since it learned to; leaving it out here would have
+// the two installers disagree about what a finished install means.
+func TestTheWindowsInstallerSaysWhenAnotherCopyKeepsWinningTheName(t *testing.T) {
+	t.Parallel()
+	name, zipped, checksums := fakeWindowsRelease(t, false)
+	dir := t.TempDir()
+	earlier := decoy(t)
+	out, code := runWindowsInstaller(t,
+		serveWindowsRelease(t, name, zipped, checksums), dir, earlier)
+	if code != 0 {
+		t.Fatalf("exit %d, want 0: a shadowed install is still an install:\n%s", code, out)
+	}
+	if !strings.Contains(out, "still runs") {
+		t.Errorf("the run does not say another copy keeps winning the name:\n%s", out)
+	}
+	if !strings.Contains(out, earlier) {
+		t.Errorf("the warning does not name %s, which is the copy that wins:\n%s", earlier, out)
 	}
 }
 
