@@ -326,6 +326,10 @@ This page is a form that writes a configuration. What follows is the inventory i
   - `sinks.sql.max_bytes`: int, like `67108864`
   - `sinks.sql.keep`: int, like `5`
   - `sinks.sql.dedupe`: bool, defaults to `true`, like `true`
+  - `sinks.postgres`: a block of settings
+  - `sinks.postgres.dsn`: string, required, a credential, like `${DATABASE_URL}`
+  - `sinks.postgres.batch`: int, like `1000`
+  - `sinks.postgres.dedupe`: bool, like `true`
   - `sinks.elasticsearch`: a block of settings
   - `sinks.elasticsearch.url`: string, required, like `http://elasticsearch:9200`
   - `sinks.elasticsearch.prefix`: string, defaults to `ghchronicle`, like `ghchronicle`
@@ -369,6 +373,7 @@ This page is a form that writes a configuration. What follows is the inventory i
   - `grafana.datasource`: a block of settings
   - `grafana.datasource.url`: string, like `http://influxdb:8181`
   - `grafana.datasource.uid`: string, like `ae3x9k2`
+  - `grafana.datasource.sslmode`: string, like `require`
   - `grafana.datasource.loki_uid`: string, like `be7m1q4`
 
 - **config.yaml**

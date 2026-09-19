@@ -22,11 +22,32 @@ INSERT statements in PostgreSQL's dialect, written to a rotating file or, with
 ghchronicle -config config.yaml -once | psql "$DATABASE_URL"
 ```
 
-This is the sink for the Grafana user who self-hosts PostgreSQL or TimescaleDB
-and runs no InfluxDB. The tool cannot speak the PostgreSQL wire protocol
-without a driver, and a driver is a dependency this repository does not take,
-so it emits the SQL and leaves the connection to psql. Grafana's PostgreSQL
-datasource then has a real schema to query.
+This is one of two ways into PostgreSQL, and the other one connects:
+
+```yaml
+sinks:
+  postgres:
+    dsn: ${DATABASE_URL}
+    batch: 1000
+```
+
+`sinks.postgres` writes the same tables into a database that is running, in one
+round trip per batch, with the values sent as parameters rather than rendered
+into the statement. Nothing else about it differs: the schema below is the
+schema both write, deliberately, because the dashboards this project publishes
+query those tables and a second shape would make one of the two a lie.
+
+Which one you want is a question about when the load happens. The file is the
+answer when the database is somewhere this cannot reach, when the statements
+are meant to be read or held before they run, or when the reader is not
+PostgreSQL at all: they are ordinary SQL and another engine can take them. The
+connection is the answer when the database is right there, and it saves you the
+timer that pipes a file into psql.
+
+There is one more difference, and it is in Grafana rather than here. The
+connecting sink knows the server because it dials it, so `-publish-dashboard`
+can build the datasource out of the DSN; the file sink cannot, because it never
+connects and no host, port or user exists anywhere in its config.
 
 ## The schema is the contract
 

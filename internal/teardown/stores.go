@@ -14,6 +14,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5"
+
 	"github.com/jmrplens/ghchronicle/internal/config"
 )
 
@@ -213,4 +215,67 @@ func trim(s string, n int) string {
 		return s
 	}
 	return s[:n] + "..."
+}
+
+// ── PostgreSQL ──────────────────────────────────────────────────────────────
+
+// postgres is the connecting sink's store, which unlike the file sink's has a
+// server to ask and to tell.
+type postgres struct{ sink *config.PostgresSink }
+
+func (p *postgres) Name() string { return "postgres" }
+
+// Holds asks the catalog which of this project's tables are there, which is
+// the same question the InfluxDB store asks and for the same reason: a table
+// nobody writes any more is exactly the one an uninstall is for.
+func (p *postgres) Holds(ctx context.Context) ([]string, error) {
+	conn, err := pgx.Connect(ctx, p.sink.DSN)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = conn.Close(ctx) }()
+	rows, err := conn.Query(ctx,
+		`SELECT tablename FROM pg_tables WHERE schemaname = current_schema() `+
+			`AND tablename LIKE $1 ORDER BY tablename`, Prefix+"%")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var name string
+		if scanErr := rows.Scan(&name); scanErr != nil {
+			return nil, scanErr
+		}
+		if ours(name) {
+			out = append(out, name)
+		}
+	}
+	return out, rows.Err()
+}
+
+// Drop removes one table. The name is an identifier rather than a value, so it
+// cannot be a parameter; it is one this project wrote, checked against the
+// prefix and quoted, and nothing else reaches the statement.
+func (p *postgres) Drop(ctx context.Context, item string) error {
+	if !ours(item) {
+		return fmt.Errorf("%s is not one of this project's tables", item)
+	}
+	conn, err := pgx.Connect(ctx, p.sink.DSN)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = conn.Close(ctx) }()
+	var drop strings.Builder
+	drop.WriteString("DROP TABLE IF EXISTS ")
+	drop.WriteString(quoteIdent(item))
+	_, err = conn.Exec(ctx, drop.String())
+	return err
+}
+
+// quoteIdent is the sink's own identifier quoting, spelled again here rather
+// than reached for across packages: a table this drops is one that sink wrote,
+// and the two have to agree about what its name is.
+func quoteIdent(s string) string {
+	return `"` + strings.ReplaceAll(s, `"`, `""`) + `"`
 }

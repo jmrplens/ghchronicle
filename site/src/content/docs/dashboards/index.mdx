@@ -51,6 +51,16 @@ ghchronicle -config config.yaml -publish-dashboard
 It asks GitHub nothing, so it needs no GitHub token, and it prints what it did
 to each datasource and each dashboard.
 
+<Aside type="note" title="What the token has to be allowed to do">
+  Publishing a dashboard needs an Editor. Creating or correcting a datasource
+  needs `datasources:create`, which an Editor does not have: a token without it
+  gets as far as the dashboard and is refused on the datasource, saying which
+  permission is missing. So a service account that manages its own datasource
+  is an Admin, or an Editor granted that permission; one that only publishes
+  against a datasource named in `grafana.datasource.uid` is an Editor, because
+  adopting reads and never writes.
+</Aside>
+
 <Aside type="caution" title="Grafana often reaches the store by another address">
   The address the collector writes to and the address Grafana queries are
   frequently not the same one: a collector on the host writes to a published

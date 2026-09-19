@@ -1230,7 +1230,8 @@ const SINK_NAMES = {
 		stdout: "stdout",
 		telegraf: "Telegraf",
 		graphite: "Graphite",
-		sql: "PostgreSQL",
+		sql: "PostgreSQL, a fichero",
+		postgres: "PostgreSQL",
 		elasticsearch: "Elasticsearch",
 	},
 	es: {
@@ -1242,7 +1243,8 @@ const SINK_NAMES = {
 		stdout: "stdout",
 		telegraf: "Telegraf",
 		graphite: "Graphite",
-		sql: "PostgreSQL",
+		sql: "PostgreSQL, a fichero",
+		postgres: "PostgreSQL",
 		elasticsearch: "Elasticsearch",
 	},
 };

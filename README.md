@@ -105,7 +105,7 @@ a personal or organisation account exposes.
 
 ## Where it writes
 
-Ten destinations, and more than one at a time is the normal arrangement. Everything
+Eleven destinations, and more than one at a time is the normal arrangement. Everything
 is pushed: nothing here needs to be scraped, so the collector runs wherever it
 can reach its databases.
 

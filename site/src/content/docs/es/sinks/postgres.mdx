@@ -22,11 +22,33 @@ o, con `path: "-"`, a la salida estándar.
 ghchronicle -config config.yaml -once | psql "$DATABASE_URL"
 ```
 
-Este es el destino para quien usa Grafana con un PostgreSQL o TimescaleDB propio
-y sin InfluxDB. La herramienta no puede hablar el protocolo de cable de
-PostgreSQL sin un driver, y un driver es una dependencia que este repositorio no
-asume, así que emite el SQL y deja la conexión a psql. El datasource de
-PostgreSQL de Grafana tiene entonces un esquema real que consultar.
+Esta es una de las dos maneras de llegar a PostgreSQL, y la otra se conecta:
+
+```yaml
+sinks:
+  postgres:
+    dsn: ${DATABASE_URL}
+    batch: 1000
+```
+
+`sinks.postgres` escribe las mismas tablas en una base de datos que está
+corriendo, en una ida y vuelta por lote, con los valores enviados como
+parámetros en vez de renderizados dentro de la sentencia. Nada más cambia: el
+esquema de abajo es el que escriben las dos, a propósito, porque los dashboards
+que publica este proyecto consultan esas tablas y una segunda forma convertiría
+a uno de los dos en una mentira.
+
+Cuál quieres es una pregunta sobre cuándo ocurre la carga. El fichero es la
+respuesta cuando la base está donde esto no llega, cuando las sentencias se van
+a leer o a retener antes de ejecutarse, o cuando quien las lee no es PostgreSQL:
+son SQL corriente y otro motor puede tomarlas. La conexión es la respuesta
+cuando la base está ahí mismo, y te ahorra el temporizador que mete un fichero
+por psql.
+
+Hay una diferencia más, y está en Grafana y no aquí. El sink que conecta sabe
+cuál es el servidor porque lo marca, así que `-publish-dashboard` puede
+construir el datasource a partir del DSN; el de fichero no puede, porque nunca
+se conecta y en su configuración no hay host, ni puerto, ni usuario.
 
 ## El esquema es el contrato
 

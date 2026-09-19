@@ -121,6 +121,7 @@ const NUMBER_WORDS = {
 	en: {
 		5: "five",
 		10: "ten",
+		11: "eleven",
 		34: "thirty-four",
 		92: "ninety-two",
 		154: "one hundred and fifty four",
@@ -128,6 +129,7 @@ const NUMBER_WORDS = {
 	es: {
 		5: "cinco",
 		10: "diez",
+		11: "once",
 		34: "treinta y cuatro",
 		92: "noventa y dos",
 		154: "ciento cincuenta y cuatro",

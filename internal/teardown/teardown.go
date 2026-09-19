@@ -56,6 +56,9 @@ func For(cfg *config.Config) (stores []Store, cannot []Unsupported) {
 	if s := cfg.Sinks.Elasticsearch; s != nil {
 		stores = append(stores, &elastic{sink: s})
 	}
+	if s := cfg.Sinks.Postgres; s != nil {
+		stores = append(stores, &postgres{sink: s})
+	}
 	if s := cfg.Sinks.SQL; s != nil {
 		stores = append(stores, &sqlFile{sink: s})
 	}
