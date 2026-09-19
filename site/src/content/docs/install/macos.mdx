@@ -124,7 +124,7 @@ The archive holds three files and no directory.
 
 <FileTree>
 
-- ghchronicle_2.1.0_darwin_arm64.tar.gz
+- ghchronicle_VERSION_darwin_ARCH.tar.gz
   - ghchronicle the binary
   - LICENSE
   - README.md
@@ -134,7 +134,7 @@ The archive holds three files and no directory.
 <Tabs syncKey="macos-scope">
   <TabItem label="For everyone">
     ```sh
-    tar -xzf ghchronicle_2.1.0_darwin_arm64.tar.gz ghchronicle
+    tar -xzf "ghchronicle_${VERSION}_darwin_${arch}.tar.gz" ghchronicle
     sudo install -m 755 ghchronicle /usr/local/bin/
     ghchronicle -version
     ```
@@ -146,7 +146,7 @@ The archive holds three files and no directory.
   <TabItem label="For one account">
     ```sh
     mkdir -p ~/bin
-    tar -xzf ghchronicle_2.1.0_darwin_arm64.tar.gz -C ~/bin ghchronicle
+    tar -xzf "ghchronicle_${VERSION}_darwin_${arch}.tar.gz" -C ~/bin ghchronicle
     chmod 755 ~/bin/ghchronicle
     echo 'export PATH="$HOME/bin:$PATH"' >> ~/.zprofile
     ```
@@ -169,7 +169,7 @@ The archive holds three files and no directory.
   extracts. So look before you clear anything:
 
   ```sh
-  xattr -l ghchronicle_2.1.0_darwin_arm64.tar.gz   # what a browser marked
+  xattr -l "ghchronicle_${VERSION}_darwin_${arch}.tar.gz"  # what a browser marked
   xattr -l ghchronicle                             # the extracted binary
   xattr -c ghchronicle                             # clear it
   ```

@@ -125,7 +125,7 @@ meant to.
 
 <FileTree>
 
-- ghchronicle_2.1.0_linux_amd64.tar.gz
+- ghchronicle_VERSION_linux_ARCH.tar.gz
   - ghchronicle the binary
   - LICENSE
   - README.md
@@ -135,7 +135,7 @@ meant to.
 <Tabs syncKey="linux-scope">
   <TabItem label="For everyone">
     ```sh
-    tar -xzf ghchronicle_2.1.0_linux_amd64.tar.gz ghchronicle
+    tar -xzf "ghchronicle_${VERSION}_linux_${arch}.tar.gz" ghchronicle
     sudo install -m 755 ghchronicle /usr/local/bin/
     ghchronicle -version
     ```
@@ -143,7 +143,7 @@ meant to.
   <TabItem label="For one account">
     ```sh
     mkdir -p ~/.local/bin
-    tar -xzf ghchronicle_2.1.0_linux_amd64.tar.gz -C ~/.local/bin ghchronicle
+    tar -xzf "ghchronicle_${VERSION}_linux_${arch}.tar.gz" -C ~/.local/bin ghchronicle
     chmod 755 ~/.local/bin/ghchronicle
     ghchronicle -version
     ```

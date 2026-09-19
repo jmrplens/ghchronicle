@@ -127,7 +127,7 @@ quieras de verdad.
 
 <FileTree>
 
-- ghchronicle_2.1.0_linux_amd64.tar.gz
+- ghchronicle_VERSION_linux_ARCH.tar.gz
   - ghchronicle el binario
   - LICENSE
   - README.md
@@ -137,7 +137,7 @@ quieras de verdad.
 <Tabs syncKey="linux-scope">
   <TabItem label="Para todos">
     ```sh
-    tar -xzf ghchronicle_2.1.0_linux_amd64.tar.gz ghchronicle
+    tar -xzf "ghchronicle_${VERSION}_linux_${arch}.tar.gz" ghchronicle
     sudo install -m 755 ghchronicle /usr/local/bin/
     ghchronicle -version
     ```
@@ -145,7 +145,7 @@ quieras de verdad.
   <TabItem label="Para una cuenta">
     ```sh
     mkdir -p ~/.local/bin
-    tar -xzf ghchronicle_2.1.0_linux_amd64.tar.gz -C ~/.local/bin ghchronicle
+    tar -xzf "ghchronicle_${VERSION}_linux_${arch}.tar.gz" -C ~/.local/bin ghchronicle
     chmod 755 ~/.local/bin/ghchronicle
     ghchronicle -version
     ```

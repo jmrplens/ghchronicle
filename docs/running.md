@@ -236,7 +236,7 @@ that somebody signed the file, which is not the question.
 The archive holds three files and no directory, so extract it somewhere you
 meant to.
 
-- ghchronicle_2.1.0_linux_amd64.tar.gz
+- ghchronicle_VERSION_linux_ARCH.tar.gz
   - ghchronicle the binary
   - LICENSE
   - README.md
@@ -244,7 +244,7 @@ meant to.
 - **For everyone**
 
   ```sh
-  tar -xzf ghchronicle_2.1.0_linux_amd64.tar.gz ghchronicle
+  tar -xzf "ghchronicle_${VERSION}_linux_${arch}.tar.gz" ghchronicle
   sudo install -m 755 ghchronicle /usr/local/bin/
   ghchronicle -version
   ```
@@ -253,7 +253,7 @@ meant to.
 
   ```sh
   mkdir -p ~/.local/bin
-  tar -xzf ghchronicle_2.1.0_linux_amd64.tar.gz -C ~/.local/bin ghchronicle
+  tar -xzf "ghchronicle_${VERSION}_linux_${arch}.tar.gz" -C ~/.local/bin ghchronicle
   chmod 755 ~/.local/bin/ghchronicle
   ghchronicle -version
   ```
@@ -462,7 +462,7 @@ the file, which is not the question.
 
 The archive holds three files and no directory.
 
-- ghchronicle_2.1.0_darwin_arm64.tar.gz
+- ghchronicle_VERSION_darwin_ARCH.tar.gz
   - ghchronicle the binary
   - LICENSE
   - README.md
@@ -470,7 +470,7 @@ The archive holds three files and no directory.
 - **For everyone**
 
   ```sh
-  tar -xzf ghchronicle_2.1.0_darwin_arm64.tar.gz ghchronicle
+  tar -xzf "ghchronicle_${VERSION}_darwin_${arch}.tar.gz" ghchronicle
   sudo install -m 755 ghchronicle /usr/local/bin/
   ghchronicle -version
   ```
@@ -482,7 +482,7 @@ The archive holds three files and no directory.
 
   ```sh
   mkdir -p ~/bin
-  tar -xzf ghchronicle_2.1.0_darwin_arm64.tar.gz -C ~/bin ghchronicle
+  tar -xzf "ghchronicle_${VERSION}_darwin_${arch}.tar.gz" -C ~/bin ghchronicle
   chmod 755 ~/bin/ghchronicle
   echo 'export PATH="$HOME/bin:$PATH"' >> ~/.zprofile
   ```
@@ -503,7 +503,7 @@ The archive holds three files and no directory.
 > extracts. So look before you clear anything:
 >
 > ```sh
-> xattr -l ghchronicle_2.1.0_darwin_arm64.tar.gz   # what a browser marked
+> xattr -l "ghchronicle_${VERSION}_darwin_${arch}.tar.gz"  # what a browser marked
 > xattr -l ghchronicle                             # the extracted binary
 > xattr -c ghchronicle                             # clear it
 > ```
@@ -810,7 +810,7 @@ nothing.
 The archive holds three files and no directory, so unpack it into a directory
 you made.
 
-- ghchronicle_2.1.0_windows_amd64.zip
+- ghchronicle_VERSION_windows_ARCH.zip
   - ghchronicle.exe the binary
   - LICENSE
   - README.md

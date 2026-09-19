@@ -124,7 +124,7 @@ El archivo lleva tres ficheros y ningún directorio.
 
 <FileTree>
 
-- ghchronicle_2.1.0_darwin_arm64.tar.gz
+- ghchronicle_VERSION_darwin_ARCH.tar.gz
   - ghchronicle el binario
   - LICENSE
   - README.md
@@ -134,7 +134,7 @@ El archivo lleva tres ficheros y ningún directorio.
 <Tabs syncKey="macos-scope">
   <TabItem label="Para todos">
     ```sh
-    tar -xzf ghchronicle_2.1.0_darwin_arm64.tar.gz ghchronicle
+    tar -xzf "ghchronicle_${VERSION}_darwin_${arch}.tar.gz" ghchronicle
     sudo install -m 755 ghchronicle /usr/local/bin/
     ghchronicle -version
     ```
@@ -146,7 +146,7 @@ El archivo lleva tres ficheros y ningún directorio.
   <TabItem label="Para una cuenta">
     ```sh
     mkdir -p ~/bin
-    tar -xzf ghchronicle_2.1.0_darwin_arm64.tar.gz -C ~/bin ghchronicle
+    tar -xzf "ghchronicle_${VERSION}_darwin_${arch}.tar.gz" -C ~/bin ghchronicle
     chmod 755 ~/bin/ghchronicle
     echo 'export PATH="$HOME/bin:$PATH"' >> ~/.zprofile
     ```
@@ -169,7 +169,7 @@ El archivo lleva tres ficheros y ningún directorio.
   extrae. Así que mira antes de borrar nada:
 
   ```sh
-  xattr -l ghchronicle_2.1.0_darwin_arm64.tar.gz   # lo que marcó el navegador
+  xattr -l "ghchronicle_${VERSION}_darwin_${arch}.tar.gz"  # lo que marcó el navegador
   xattr -l ghchronicle                             # el binario extraído
   xattr -c ghchronicle                             # quitarlo
   ```
