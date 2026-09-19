@@ -101,22 +101,32 @@ func (p *Postgres) Write(ctx context.Context, points []Point) (int, error) {
 	return p.upsertAll(ctx, points, shapes)
 }
 
-// declareAll brings the tables up to the shape of this batch, once per
+// pendingDDL is what the tables need before this batch can land, once per
 // measurement rather than once per point: unlike the file, a connection does
 // not rotate underneath and forget what it was told.
-func (p *Postgres) declareAll(ctx context.Context, points []Point,
-	shapes map[string]*sqlShape,
-) error {
+//
+// Deciding and doing are separate so that what is decided can be read without
+// a server to do it against.
+func (p *Postgres) pendingDDL(points []Point, shapes map[string]*sqlShape) []string {
+	var out []string
 	seen := map[string]bool{}
 	for _, point := range points {
 		if seen[point.Measurement] {
 			continue
 		}
 		seen[point.Measurement] = true
-		for _, ddl := range p.schema.declare(point.Measurement, shapes[point.Measurement]) {
-			if _, err := p.pool.Exec(ctx, ddl); err != nil {
-				return fmt.Errorf("%s: %w", strings.TrimSuffix(ddl, ";"), err)
-			}
+		out = append(out, p.schema.declare(point.Measurement, shapes[point.Measurement])...)
+	}
+	return out
+}
+
+// declareAll runs what pendingDDL decided.
+func (p *Postgres) declareAll(ctx context.Context, points []Point,
+	shapes map[string]*sqlShape,
+) error {
+	for _, ddl := range p.pendingDDL(points, shapes) {
+		if _, err := p.pool.Exec(ctx, ddl); err != nil {
+			return fmt.Errorf("%s: %w", strings.TrimSuffix(ddl, ";"), err)
 		}
 	}
 	return nil
@@ -125,9 +135,36 @@ func (p *Postgres) declareAll(ctx context.Context, points []Point,
 // upsertAll sends the rows in batches. One failed statement fails the batch it
 // is in: a sweep that reports having written what the database refused is
 // worse than a sweep that reports the refusal.
+// row is one upsert waiting to be sent: the statement and what fills it.
+type row struct {
+	statement string
+	values    []any
+}
+
+// rowsFor is every point that has a row to write, turned into one. A point
+// with no field worth a column is not one, the rule the line protocol applies.
+//
+// Separate from sending for pendingDDL's reason: this is the part worth
+// reading, and reading it needs no server.
+func (p *Postgres) rowsFor(points []Point, shapes map[string]*sqlShape) []row {
+	out := make([]row, 0, len(points))
+	for _, point := range points {
+		cols, vals, ok := sqlCells(point, shapes[point.Measurement])
+		if !ok {
+			continue
+		}
+		out = append(out, row{
+			statement: p.upsert(point.Measurement, cols, shapes[point.Measurement]),
+			values:    vals,
+		})
+	}
+	return out
+}
+
 func (p *Postgres) upsertAll(ctx context.Context, points []Point,
 	shapes map[string]*sqlShape,
 ) (int, error) {
+	rows := p.rowsFor(points, shapes)
 	written := 0
 	batch := &pgx.Batch{}
 	send := func() error {
@@ -139,12 +176,8 @@ func (p *Postgres) upsertAll(ctx context.Context, points []Point,
 		batch = &pgx.Batch{}
 		return err
 	}
-	for _, point := range points {
-		cols, vals, ok := sqlCells(point, shapes[point.Measurement])
-		if !ok {
-			continue
-		}
-		batch.Queue(p.upsert(point.Measurement, cols, shapes[point.Measurement]), vals...)
+	for _, r := range rows {
+		batch.Queue(r.statement, r.values...)
 		written++
 		if batch.Len() >= p.batch {
 			if err := send(); err != nil {

@@ -296,3 +296,83 @@ func TestAnUnsupportedSinkReadsAsOneLine(t *testing.T) {
 		t.Errorf("String() = %q", got)
 	}
 }
+
+// TestThePostgresStoreRefusesWhatIsNotOursBeforeConnecting. The prefix check
+// comes first on purpose: a name that is not this project's is refused whether
+// or not there is a server to refuse it at, and a run with the database down
+// still says the right thing about it.
+func TestThePostgresStoreRefusesWhatIsNotOursBeforeConnecting(t *testing.T) {
+	t.Parallel()
+	// A dsn nothing is listening on. Reaching the connection would take the
+	// timeout; refusing first takes none, which is also how this test says
+	// which of the two happened.
+	store := &postgres{sink: &config.PostgresSink{
+		DSN: "postgres://u:p@127.0.0.1:1/d?sslmode=disable&connect_timeout=1",
+	}}
+	if err := store.Drop(t.Context(), "payments"); err == nil ||
+		!strings.Contains(err.Error(), "not one of this project's tables") {
+		t.Errorf("err = %v, want the refusal rather than a connection error", err)
+	}
+}
+
+// TestThePostgresStoreReportsADatabaseItCannotReach rather than reading it as
+// a database holding nothing, which would say there is nothing to remove.
+func TestThePostgresStoreReportsADatabaseItCannotReach(t *testing.T) {
+	t.Parallel()
+	store := &postgres{sink: &config.PostgresSink{
+		DSN: "postgres://u:p@127.0.0.1:1/d?sslmode=disable&connect_timeout=1",
+	}}
+	if _, err := store.Holds(t.Context()); err == nil {
+		t.Error("a database that cannot be reached was read as holding nothing")
+	}
+	if err := store.Drop(t.Context(), "gh_repo"); err == nil {
+		t.Error("a drop against a database that is not there reported success")
+	}
+	if store.Name() != "postgres" {
+		t.Errorf("Name() = %q", store.Name())
+	}
+}
+
+// TestIdentifiersAreQuotedTheWayTheSinkQuotesThem. A table this drops is one
+// that sink wrote, and the two have to agree about what its name is.
+func TestIdentifiersAreQuotedTheWayTheSinkQuotesThem(t *testing.T) {
+	t.Parallel()
+	for in, want := range map[string]string{
+		"gh_repo":  `"gh_repo"`,
+		`gh_"odd"`: `"gh_""odd"""`,
+		"gh_UPPER": `"gh_UPPER"`,
+	} {
+		if got := quoteIdent(in); got != want {
+			t.Errorf("quoteIdent(%q) = %s, want %s", in, got, want)
+		}
+	}
+}
+
+// TestBothWaysIntoPostgresAreOfferedSeparately: the connecting sink can be
+// emptied, and the file sink's file can be removed, and they are two entries
+// because they are two things.
+func TestBothWaysIntoPostgresAreOfferedSeparately(t *testing.T) {
+	t.Parallel()
+	cfg := &config.Config{Sinks: config.Sinks{
+		Postgres: &config.PostgresSink{DSN: "postgres://u@h:5432/d"},
+		SQL:      &config.SQLSink{Path: "/tmp/points.sql"},
+	}}
+	stores, cannot := For(cfg)
+	var names []string
+	for _, s := range stores {
+		names = append(names, s.Name())
+	}
+	if strings.Join(names, ",") != "postgres,sql" {
+		t.Errorf("stores = %v, want one for each way in", names)
+	}
+	// The file sink still says the thing only it has to say.
+	var said string
+	for _, u := range cannot {
+		if u.Sink == "sql" {
+			said = u.Reason
+		}
+	}
+	if !strings.Contains(said, "never connects") {
+		t.Errorf("the sql sink said %q, want it to say rows already loaded are not its to remove", said)
+	}
+}
