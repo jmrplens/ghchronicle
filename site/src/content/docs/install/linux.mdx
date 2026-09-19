@@ -19,10 +19,14 @@ curl -fsSL https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.s
 
 It works out the architecture, takes the newest release, checks the archive
 against the checksum that release published, and puts the binary in
-`/usr/local/bin` when that is writable and `~/.local/bin` otherwise. A checksum
-that does not match stops it without installing anything, and there is no flag
-to skip that step. When `cosign` is already on the machine it also verifies
-that the checksum file itself came from the release workflow.
+`/usr/local/bin` when that is writable. When it is not, it takes the first of
+`~/.local/bin` and `~/bin` that exists and is already on your `PATH`, and falls
+back to `~/.local/bin` when neither is. A checksum that does not match stops it
+without installing anything, and there is no flag to skip that step. When
+`cosign` is already on the machine it also verifies that the checksum file
+itself came from the release workflow. It ends by running what it installed, so
+the version you see is the file it just wrote, and it says so when another
+`ghchronicle` earlier in your `PATH` still wins the name.
 
 Pin a version, or choose where it goes:
 

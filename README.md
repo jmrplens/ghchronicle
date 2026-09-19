@@ -247,6 +247,12 @@ A backfill is the opposite intention and says so: `-backfill` walks every
 surface to the end, bounded by a date you choose or by nothing at all, and when
 a bucket runs out it waits for the window to reset rather than giving up.
 
+A backfill that GitHub cuts short is not thrown away. It keeps a checkpoint of
+what each family covered, `-backfill-status` reads that checkpoint and prints
+what is left without asking GitHub anything, and `-backfill-retry 1h` goes back
+an hour later for the families still missing, until a pass records nothing new
+or ten of them have run.
+
 Three things cannot be backfilled at any price, and the documentation says so
 rather than letting you find out: the event feed keeps three hundred events,
 traffic is fourteen days, and job logs are deleted after ninety.

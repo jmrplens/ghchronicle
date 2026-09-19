@@ -20,10 +20,14 @@ curl -fsSL https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.s
 
 Deduce la arquitectura, coge la release más nueva, comprueba el archivo contra
 la suma de verificación que esa release publicó, y deja el binario en
-`/usr/local/bin` si tiene permiso de escritura y en `~/.local/bin` si no. Una
-suma que no cuadra lo detiene sin instalar nada, y no hay opción para saltarse
-ese paso. Si `cosign` ya está en la máquina, verifica además que el propio
-fichero de sumas viene del workflow de release.
+`/usr/local/bin` si tiene permiso de escritura. Si no lo tiene, coge el primero
+de `~/.local/bin` y `~/bin` que exista y ya esté en tu `PATH`, y recurre a
+`~/.local/bin` cuando no lo está ninguno. Una suma que no cuadra lo detiene sin
+instalar nada, y no hay opción para saltarse ese paso. Si `cosign` ya está en
+la máquina, verifica además que el propio fichero de sumas viene del workflow
+de release. Termina ejecutando lo que ha instalado, así que la versión que ves
+es la del fichero recién escrito, y avisa cuando otro `ghchronicle` anterior en
+tu `PATH` sigue ganando el nombre.
 
 Fijar una versión, o elegir dónde va:
 
