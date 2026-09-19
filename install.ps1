@@ -151,9 +151,13 @@ function Add-ToUserPath {
 function Show-ShadowWarning {
   param([Parameter(Mandatory = $true)][string] $Directory)
   $mine = Join-Path $Directory "$Binary.exe"
-  $running = (Get-Command $Binary -CommandType Application -ErrorAction SilentlyContinue |
-    Select-Object -First 1).Source
-  if (-not $running) { return }
+  # The object first and the property second, because nothing answering to the
+  # name is the ordinary case and Set-StrictMode turns $null.Source into a
+  # thrown error, which would fail the install this is only commenting on.
+  $found = Get-Command $Binary -CommandType Application -ErrorAction SilentlyContinue |
+    Select-Object -First 1
+  if (-not $found) { return }
+  $running = $found.Source
   if ($running -ieq $mine) { return }
   Write-Step ''
   Write-Step "warning: $Binary still runs $running, which comes earlier in your PATH."
