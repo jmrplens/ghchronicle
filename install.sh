@@ -195,7 +195,7 @@ finishing_line() {
 }
 
 main() {
-  local version="${VERSION:-}" dir="" os arch archive tmp
+  local version="${VERSION:-}" dir="" os arch archive tmp running
   while [ $# -gt 0 ]; do
     case "$1" in
       --version) version=${2:-}; shift 2 || die "--version needs a value" ;;
@@ -244,11 +244,24 @@ main() {
     die "cannot write to $dir. Pass --dir with somewhere writable, or run this with sudo."
 
   say "installed ${dir}/${BINARY}"
-  if on_path "$dir"; then
-    "${dir}/${BINARY}" -version
-  else
+  if ! on_path "$dir"; then
     finishing_line "$dir"
+    return
   fi
+  # On PATH is not the same as the one that runs. An older copy from `go
+  # install` in ~/go/bin, or a package manager's, earlier in PATH keeps
+  # winning, and nothing about this install would say so: the version printed
+  # below comes from the file just written, by its full path, so it looks
+  # right while the name resolves elsewhere. Measured the hard way on a machine
+  # where a September build shadowed the release for an afternoon.
+  running=$(command -v "$BINARY" 2>/dev/null || true)
+  if [ -n "$running" ] && [ "$running" != "${dir}/${BINARY}" ]; then
+    say ""
+    say "warning: ${BINARY} still runs ${running}, which comes earlier in your PATH."
+    say "         Remove it, or put ${dir} first, or run ${dir}/${BINARY} by its full path."
+    say ""
+  fi
+  "${dir}/${BINARY}" -version
 }
 
 main "$@"

@@ -427,3 +427,63 @@ func TestTheInstallerVerifiesWithShasumWhenThereIsNoSha256sum(t *testing.T) {
 		t.Errorf("it installed without saying it had checked anything:\n%s", out)
 	}
 }
+
+// TestTheInstallerSaysWhenAnolderCopyStillWins.
+//
+// On PATH is not the same as the one that runs. An older copy from `go
+// install` in ~/go/bin, or a package manager's, earlier in PATH keeps winning,
+// and nothing about the install would say so: the version it prints at the end
+// comes from the file just written, by its full path, so the run looks right
+// while the name resolves elsewhere. That happened on a real machine, where a
+// build from three weeks earlier shadowed a release for an afternoon.
+func TestTheInstallerSaysWhenAnOlderCopyStillWins(t *testing.T) {
+	t.Parallel()
+	requireBash(t)
+	shadow := t.TempDir()
+	impostor := filepath.Join(shadow, "ghchronicle")
+	// A link to something already executable, rather than a script this test
+	// would have to chmod: what is being stood up is a name earlier in PATH,
+	// and command -v cares that it resolves, not what it does.
+	target, err := exec.LookPath("true")
+	if err != nil {
+		t.Skip("this machine has no true(1) to stand in for an older copy")
+	}
+	if err = os.Symlink(target, impostor); err != nil {
+		t.Fatal(err)
+	}
+
+	for name, first := range map[string]bool{
+		"an older copy comes first": true,
+		"nothing else is on PATH":   false,
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			dir := t.TempDir()
+			// The target is on PATH either way, so what changes between the
+			// two runs is only whether something else beats it to the name.
+			path := dir
+			if first {
+				path = shadow + string(os.PathListSeparator) + dir
+			}
+			cmd := exec.CommandContext(t.Context(), "bash", "install.sh")
+			cmd.Args = append(cmd.Args, "--dir", dir, "--version", fakeVersion)
+			cmd.Env = append(os.Environ(),
+				"GHCHRONICLE_DOWNLOAD_BASE="+serveRelease(t, buildFakeRelease(t, false)),
+				"GHCHRONICLE_LATEST_URL=http://127.0.0.1:1/no-such-api",
+				"PATH="+path+string(os.PathListSeparator)+os.Getenv("PATH"))
+			out, _ := cmd.CombinedOutput()
+
+			if cmd.ProcessState.ExitCode() != 0 {
+				t.Fatalf("exit %d, want 0:\n%s", cmd.ProcessState.ExitCode(), out)
+			}
+			warned := strings.Contains(string(out), "still runs "+impostor)
+			switch {
+			case first && !warned:
+				t.Errorf("it installed over a shadowed name and said nothing, so the reader believes "+
+					"the version it printed is the one their shell will run:\n%s", out)
+			case !first && strings.Contains(string(out), "still runs"):
+				t.Errorf("it warned about a copy that is not there:\n%s", out)
+			}
+		})
+	}
+}
