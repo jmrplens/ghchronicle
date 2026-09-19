@@ -513,7 +513,7 @@ func TestExitPutsAnErrorAheadOfTheStatus(t *testing.T) {
 	var out, errs strings.Builder
 	// No DSN and no Grafana: run stops before PostgreSQL says anything.
 	t.Setenv("PGHOST", "")
-	if got := exit(t.Context(), []string{"--dsn", ""}, &out, &errs); got == 0 {
+	if exit(t.Context(), []string{"--dsn", ""}, &out, &errs) == 0 {
 		t.Errorf("exit = 0 for a run that could not start, want a failure\nstdout: %s\nstderr: %s",
 			out.String(), errs.String())
 	}
