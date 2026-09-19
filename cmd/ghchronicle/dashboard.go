@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"net"
+	"net/url"
 	"regexp"
 	"slices"
 	"strconv"
@@ -445,11 +446,45 @@ func fromDSN(want *grafana.Datasource, dsn string, override config.GrafanaDataso
 			fmt.Fprintln(out, note)
 		}
 	}
-	if parsed.Password != "" {
-		want.Secret = map[string]string{"password": parsed.Password}
+	// Only a password the DSN itself carries. pgx reads libpq's environment
+	// and its password file, the way the sink wants it to, but a datasource is
+	// written into a Grafana other people can see: a credential that came from
+	// the machine doing the publishing rather than from the configuration is
+	// one nobody asked to put there. Measured on a Windows runner, where a DSN
+	// with no password produced one.
+	switch written := dsnPassword(dsn); {
+	case written != "":
+		want.Secret = map[string]string{"password": written}
+	case parsed.Password != "":
+		fmt.Fprintln(out, "note: the dsn carries no password and one was found in this "+
+			"machine's environment. It was not copied into the datasource, because that "+
+			"is a credential the configuration never named. Put it in the dsn, or set it "+
+			"on the datasource in Grafana.")
 	}
 	return nil
 }
+
+// dsnPassword is the password the connection string says, and "" when it says
+// none. The URL form carries it in the userinfo and the keyword form in a
+// field of its own.
+func dsnPassword(dsn string) string {
+	if parsed, err := url.Parse(dsn); err == nil && parsed.User != nil {
+		if password, set := parsed.User.Password(); set {
+			return password
+		}
+	}
+	if found := dsnPasswordPattern.FindStringSubmatch(dsn); found != nil {
+		if found[1] != "" {
+			return found[1]
+		}
+		return found[2]
+	}
+	return ""
+}
+
+// dsnPasswordPattern finds the keyword form's password, which runs to the next
+// space or to the end, and may be quoted.
+var dsnPasswordPattern = regexp.MustCompile(`(?:^|\s)password=(?:'([^']*)'|(\S+))`)
 
 // grafanaSSLModes are the four the PostgreSQL datasource understands. libpq
 // has two more, and that is the whole difficulty below.

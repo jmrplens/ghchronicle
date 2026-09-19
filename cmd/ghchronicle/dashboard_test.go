@@ -834,3 +834,50 @@ func TestTheSSLModeIsSaidRatherThanGuessed(t *testing.T) {
 		})
 	}
 }
+
+// TestOnlyAPasswordTheDSNWritesReachesGrafana. pgx reads libpq's environment
+// and its password file, which is what the sink wants: it is going to connect.
+// A datasource is written into a Grafana other people can see, so a credential
+// that came from the machine doing the publishing rather than from the
+// configuration is one nobody asked to put there. A Windows runner found this,
+// where a DSN with no password produced one.
+func TestOnlyAPasswordTheDSNWritesReachesGrafana(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		dsn  string
+		env  string
+		want string
+		note bool
+	}{
+		{"written in the url", "postgres://u:written@h:5432/d", "", "written", false},
+		{"written in the keyword form", "host=h port=5432 user=u password=written dbname=d", "", "written", false},
+		{"quoted in the keyword form", "host=h port=5432 user=u password='w r i t' dbname=d", "", "w r i t", false},
+		{"only in the environment", "postgres://u@h:5432/d", "ambient", "", true},
+		{"nowhere at all", "postgres://u@h:5432/d", "", "", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			// Not parallel: PGPASSWORD is the environment this is about.
+			t.Setenv("PGPASSWORD", tc.env)
+			g := &grafanaStub{missing: true}
+			cfg := &config.Config{
+				Sinks:   config.Sinks{Postgres: &config.PostgresSink{DSN: tc.dsn, Batch: 100}},
+				Grafana: &config.Grafana{URL: g.serve(t), Token: "grafana-token"},
+			}
+			var said strings.Builder
+			if err := publishDashboards(t.Context(), cfg, &said); err != nil {
+				t.Fatal(err)
+			}
+			secret, _ := g.writes[0]["secureJsonData"].(map[string]any)
+			if tc.want == "" {
+				if len(secret) != 0 {
+					t.Errorf("secureJsonData = %v, want no password the config never named", secret)
+				}
+			} else if secret["password"] != tc.want {
+				t.Errorf("password = %v, want %q", secret["password"], tc.want)
+			}
+			if said := strings.Contains(said.String(), "machine's environment"); said != tc.note {
+				t.Errorf("said where the password came from = %v, want %v", said, tc.note)
+			}
+		})
+	}
+}

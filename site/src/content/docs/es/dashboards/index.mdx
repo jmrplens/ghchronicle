@@ -51,6 +51,14 @@ ghchronicle -config config.yaml -publish-dashboard
 No le pregunta nada a GitHub, así que no necesita token de GitHub, e imprime lo
 que hizo con cada datasource y cada dashboard.
 
+<Aside type="caution" title="Una contraseña de la máquina no se copia">
+  pgx lee el entorno de libpq y su fichero de contraseñas, que es lo que quiere
+  el sink, porque es quien se conecta. Un datasource es otra cosa: se escribe
+  en un Grafana que ve más gente, así que solo se envía una contraseña que
+  lleve el propio DSN. Una que venga de `PGPASSWORD` o de un `.pgpass` de la
+  máquina que publicó se nombra en una línea y se queda donde está.
+</Aside>
+
 <Aside type="note" title="Qué tiene que poder hacer el token">
   Publicar un dashboard necesita Editor. Crear o corregir un datasource
   necesita `datasources:create`, que un Editor no tiene: un token sin ese
