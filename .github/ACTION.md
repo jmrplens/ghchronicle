@@ -24,7 +24,7 @@ independently of the tool. That is not this.
 GitHub's Marketplace takes an Action from any public repository whose
 `action.yml` is at the root, so this repository qualifies as it stands.
 
-1. Push a tag (`v2.1.0`). The release workflow builds the binaries the Action
+1. Push a tag (`vX.Y.Z`). The release workflow builds the binaries the Action
     downloads.
 2. Open the release on GitHub. It offers "Publish this Action to the GitHub
     Marketplace"; tick it, accept the terms, and choose the categories

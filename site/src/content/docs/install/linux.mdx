@@ -27,7 +27,7 @@ that the checksum file itself came from the release workflow.
 Pin a version, or choose where it goes:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.sh | VERSION=2.1.0 BIN_DIR=~/bin bash
+curl -fsSL https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.sh | VERSION=__VERSION__ BIN_DIR=~/bin bash
 ```
 
 <Aside type="note" title="Reading it first is the whole point of a short script">
@@ -52,7 +52,7 @@ Release archives are named
 | `aarch64`          | `linux_arm64`       |
 
 ```sh
-VERSION=2.1.0
+VERSION=__VERSION__
 arch=$(uname -m); case "$arch" in x86_64) arch=amd64 ;; aarch64) arch=arm64 ;; esac
 base=https://github.com/jmrplens/ghchronicle/releases/download/v$VERSION
 curl -fsSLO "$base/ghchronicle_${VERSION}_linux_${arch}.tar.gz"
@@ -92,7 +92,7 @@ the file, then verify the archive against the file.
     ```
 
     ```text
-    ghchronicle_2.1.0_linux_amd64.tar.gz: OK
+    ghchronicle___VERSION___linux_amd64.tar.gz: OK
     ```
 
 3. Check the checksum file itself, if you have
@@ -155,7 +155,7 @@ meant to.
 </Tabs>
 
 ```text
-ghchronicle 2.1.0 (commit 4e5dfc2, built 2026-09-14T23:04:02Z)
+ghchronicle __VERSION__ (commit 4e5dfc2, built 2026-09-14T23:04:02Z)
 ```
 
 ## Run it once
@@ -199,7 +199,7 @@ find.
     build date:
 
     ```text
-    ghchronicle 2.1.0 (commit unknown, built unknown)
+    ghchronicle __VERSION__ (commit unknown, built unknown)
     ```
 
     The version comes from the `VERSION` file the module embeds; the other two

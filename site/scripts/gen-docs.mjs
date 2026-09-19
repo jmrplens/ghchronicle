@@ -43,6 +43,7 @@
  *   node scripts/gen-docs.mjs --check   # fail if docs/ is stale
  */
 import { readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { TOKEN, version } from "../src/lib/remark-version.mjs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -231,7 +232,10 @@ function readPages() {
 			}
 			if (!entry.name.endsWith(".mdx") && !entry.name.endsWith(".md")) continue;
 			const relative = path.relative(CONTENT, full).replaceAll(path.sep, "/");
-			const source = readFileSync(full, "utf8");
+			// The version token the pages carry, put in the same way the site
+			// build puts it: these files are read raw on GitHub, so a token
+			// would reach a reader as a token. See src/lib/remark-version.mjs.
+			const source = readFileSync(full, "utf8").replaceAll(TOKEN, version);
 			const split = /^---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/.exec(
 				source,
 			);

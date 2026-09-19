@@ -5,6 +5,7 @@ import sitemap from "@astrojs/sitemap";
 import { unified } from "@astrojs/markdown-remark";
 import starlightLinksValidator from "starlight-links-validator";
 import rehypeMermaid from "rehype-mermaid";
+import remarkVersion from "./src/lib/remark-version.mjs";
 import rehypeTables from "./src/lib/rehype-tables.mjs";
 import rehypeIntegerDimensions from "./src/lib/rehype-integer-dimensions.mjs";
 import rehypeDecodedFragments from "./src/lib/rehype-decoded-fragments.mjs";
@@ -105,6 +106,10 @@ export default defineConfig({
 	markdown: {
 		syntaxHighlight: false, // expressive-code owns it
 		processor: unified({
+			// The version the install pages quote, put in from the VERSION
+			// file. Before the fences are highlighted, because that is where
+			// nearly every one of them sits: see remark-version.mjs.
+			remarkPlugins: [remarkVersion],
 			rehypePlugins: [
 				rehypeTables,
 				[

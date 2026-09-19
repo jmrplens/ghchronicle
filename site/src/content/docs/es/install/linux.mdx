@@ -28,7 +28,7 @@ fichero de sumas viene del workflow de release.
 Fijar una versión, o elegir dónde va:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.sh | VERSION=2.1.0 BIN_DIR=~/bin bash
+curl -fsSL https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.sh | VERSION=__VERSION__ BIN_DIR=~/bin bash
 ```
 
 <Aside type="note" title="Leerlo antes es justo para lo que sirve que sea corto">
@@ -53,7 +53,7 @@ Los archivos de release se llaman
 | `aarch64`              | `linux_arm64`       |
 
 ```sh
-VERSION=2.1.0
+VERSION=__VERSION__
 arch=$(uname -m); case "$arch" in x86_64) arch=amd64 ;; aarch64) arch=arm64 ;; esac
 base=https://github.com/jmrplens/ghchronicle/releases/download/v$VERSION
 curl -fsSLO "$base/ghchronicle_${VERSION}_linux_${arch}.tar.gz"
@@ -94,7 +94,7 @@ fichero y luego verifica el archivo contra el fichero.
     ```
 
     ```text
-    ghchronicle_2.1.0_linux_amd64.tar.gz: OK
+    ghchronicle___VERSION___linux_amd64.tar.gz: OK
     ```
 
 3. Comprueba el propio fichero de sumas, si tienes
@@ -158,7 +158,7 @@ quieras de verdad.
 </Tabs>
 
 ```text
-ghchronicle 2.1.0 (commit 4e5dfc2, built 2026-09-14T23:04:02Z)
+ghchronicle __VERSION__ (commit 4e5dfc2, built 2026-09-14T23:04:02Z)
 ```
 
 ## Ejecutarlo una vez
@@ -203,7 +203,7 @@ cabeceras que encontrar.
     fecha de compilación:
 
     ```text
-    ghchronicle 2.1.0 (commit unknown, built unknown)
+    ghchronicle __VERSION__ (commit unknown, built unknown)
     ```
 
     La versión sale del fichero `VERSION` que el módulo incrusta; las otras dos

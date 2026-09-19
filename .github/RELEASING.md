@@ -5,18 +5,16 @@ is not.
 
 ## Before the tag
 
-- [ ] `VERSION` holds the new number and the pages that quote it were
-      regenerated:
+- [ ] `VERSION` holds the new number:
 
       ```sh
-      echo X.Y.Z > VERSION && make version   # the number, not a placeholder
+      echo X.Y.Z > VERSION
       ```
 
-      `VERSION` is the only place the number is written by hand. `make version`
-      rewrites the install pages and these runbooks from it, in both languages,
-      and `make check-version` in CI fails when they disagree. Before it
-      existed a release edited forty eight places by hand and nothing checked
-      that it had.
+      That is the only place it is written. The install pages carry
+      `__VERSION__` where they quote it, and the site build and `make docs`
+      put the number in, so there is nothing else to edit and nothing to keep
+      in step. Before this a release edited forty eight places by hand.
 
 - [ ] `VERSION` and the tag agree. The release workflow's preflight job refuses
       the tag otherwise, and it is the first thing it checks.
@@ -104,7 +102,7 @@ is not.
 ## The tag
 
 ```sh
-git tag -a v2.1.0 -m "v2.1.0" && git push origin v2.1.0
+git tag -a vX.Y.Z -m "vX.Y.Z" && git push origin vX.Y.Z
 ```
 
 That runs `.github/workflows/release.yml`: the end-to-end and race suites, then
@@ -117,13 +115,13 @@ are set, and writes the release notes from the commit subjects.
 
 - [ ] The release page lists the archives, the checksums, the signatures and
       the SBOMs, and the notes read as notes.
-- [ ] `docker run --rm ghcr.io/jmrplens/ghchronicle:v2.1.0 -version` prints the
+- [ ] `docker run --rm ghcr.io/jmrplens/ghchronicle:vX.Y.Z -version` prints the
       version. The workflow checks this too, and it is worth seeing once.
 - [ ] The major tag moved. The workflow's last job does it, after the release
       has published, so this is a check and not a step:
 
       ```sh
-      git fetch --tags --force && git rev-parse v2^{} v2.1.0^{}
+      git fetch --tags --force && git rev-parse v2^{} vX.Y.Z^{}
       ```
 
       Both must print the same commit. `uses: jmrplens/ghchronicle@v2` is an
