@@ -31,6 +31,60 @@ documentación, `acme` y cinco repositorios, descrita junto a [lo que muestran
 los paneles](/ghchronicle/es/dashboards/panels/). Todas las secciones salvo el
 Overview se envían plegadas, por eso Lifetime es ahí una cabecera.
 
+## Dejárselo al binario
+
+El dashboard se construye con el mismo código que lleva el binario, así que el
+binario puede publicarlo. Dándole un Grafana, reconcilia el datasource a partir
+del sink al que ya escribe, le pregunta a ese datasource si de verdad se le
+puede alcanzar, y publica el dashboard de cada almacén al que escribe.
+
+```yaml
+grafana:
+  url: http://localhost:3000
+  token: ${GRAFANA_TOKEN}
+```
+
+```sh
+ghchronicle -config config.yaml -publish-dashboard
+```
+
+No le pregunta nada a GitHub, así que no necesita token de GitHub, e imprime lo
+que hizo con cada datasource y cada dashboard.
+
+<Aside type="caution" title="Grafana suele llegar al almacén por otra dirección">
+  La dirección a la que escribe el colector y la dirección que consulta Grafana
+  no suelen ser la misma: un colector en el anfitrión escribe a un puerto
+  publicado mientras que Grafana en un contenedor llega al mismo almacén por su
+  nombre en la red de contenedores. Copiar la dirección del sink produce un
+  datasource que Grafana acepta y no puede usar, así que la pasada se lo
+  pregunta antes de publicar y se niega ante un datasource que no responde.
+  `grafana.datasource.url` es la dirección que usar en su lugar.
+</Aside>
+
+Dos de los cinco sinks saben describir su propio datasource, porque aquello a
+lo que escriben es lo que Grafana consulta: InfluxDB y Elasticsearch. Los otros
+tres no pueden, y ninguna lectura de sus ajustes lo encontraría. El sink de
+Prometheus se raspa en vez de recibir escrituras, el sink SQL escribe
+sentencias a un fichero en vez de a un servidor, y el de Graphite habla el
+puerto de ingesta, que no es la API a la que va una consulta. Para esos, crea
+el datasource en Grafana y nómbralo:
+
+```yaml
+grafana:
+  datasource:
+    uid: ae3x9k2
+```
+
+Un datasource nombrado así se adopta y se deja exactamente como está, porque
+corregir uno que no hizo esto sobreescribiría ajustes que nadie le pidió tener.
+
+`publish_on_start: true` hace lo mismo una vez al arrancar el colector, antes
+de la primera pasada. Viene apagado, y es lo que evita que un servidor se quede
+callado por detrás del binario que lo alimenta: el dashboard se genera del
+código, así que actualizar el binario actualiza el dashboard. Un fallo ahí
+avisa y la pasada sigue, porque las métricas de una hora sin recoger no se
+recuperan y un dashboard publicado al siguiente arranque sí.
+
 ## Importar desde la interfaz
 
 <Steps>

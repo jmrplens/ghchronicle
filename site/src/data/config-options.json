@@ -682,6 +682,59 @@
       "kind": "string",
       "group": "run",
       "example": "2y"
+    },
+    {
+      "key": "grafana",
+      "kind": "block",
+      "group": "run"
+    },
+    {
+      "key": "grafana.url",
+      "kind": "string",
+      "group": "run",
+      "example": "http://localhost:3000"
+    },
+    {
+      "key": "grafana.token",
+      "kind": "string",
+      "group": "run",
+      "secret": true,
+      "example": "${GRAFANA_TOKEN}"
+    },
+    {
+      "key": "grafana.folder",
+      "kind": "string",
+      "group": "run",
+      "example": "GitHub"
+    },
+    {
+      "key": "grafana.publish_on_start",
+      "kind": "bool",
+      "group": "run",
+      "example": "false"
+    },
+    {
+      "key": "grafana.datasource",
+      "kind": "block",
+      "group": "run"
+    },
+    {
+      "key": "grafana.datasource.url",
+      "kind": "string",
+      "group": "run",
+      "example": "http://influxdb:8181"
+    },
+    {
+      "key": "grafana.datasource.uid",
+      "kind": "string",
+      "group": "run",
+      "example": "ae3x9k2"
+    },
+    {
+      "key": "grafana.datasource.loki_uid",
+      "kind": "string",
+      "group": "run",
+      "example": "be7m1q4"
     }
   ],
   "groups": [

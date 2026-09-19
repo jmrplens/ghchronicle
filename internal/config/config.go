@@ -39,6 +39,12 @@ type Config struct {
 	// Backfill settings. They only apply to a run started with -backfill.
 	Backfill Backfill `yaml:"backfill"`
 
+	// Grafana is where the dashboard and the datasource it reads from are
+	// published. A pointer because the whole feature is opt-in: without the
+	// key the binary never talks to a Grafana, which is how it behaved before
+	// it could.
+	Grafana *Grafana `yaml:"grafana"`
+
 	// AllowNoSinks lets a caller that supplies its own destination pass
 	// validation with none configured. `-card-only` is the case: it renders an
 	// SVG and needs no database at all. Not a YAML setting, because a config
@@ -757,10 +763,33 @@ func (c *Config) Validate() error {
 	if err := c.resolveHeartbeat(); err != nil {
 		return err
 	}
+	c.resolveGrafana()
 	// Last, because it reads the finished schedule: a family the groups key
 	// removed has no cadence left to complain about.
 	c.noteCadences()
 	return nil
+}
+
+// resolveGrafana expands the credential and the two addresses, and falls back
+// to GRAFANA_TOKEN the way the GitHub token falls back to GITHUB_TOKEN.
+//
+// Every field a reader is likely to write a ${VAR} into has to be named here:
+// expansion is per field rather than over the whole file, so a field left out
+// carries the reference through to the server as text. That is what happened
+// to grafana.token the first time this section was published, and the server
+// answered "Invalid API key" to a request carrying the four characters ${GR.
+func (c *Config) resolveGrafana() {
+	if c.Grafana == nil {
+		return
+	}
+	c.Grafana.URL = expandEnv(c.Grafana.URL)
+	c.Grafana.Token = expandEnv(c.Grafana.Token)
+	c.Grafana.Datasource.URL = expandEnv(c.Grafana.Datasource.URL)
+	c.Grafana.Datasource.UID = expandEnv(c.Grafana.Datasource.UID)
+	c.Grafana.Datasource.LokiUID = expandEnv(c.Grafana.Datasource.LokiUID)
+	if c.Grafana.Token == "" {
+		c.Grafana.Token = os.Getenv("GRAFANA_TOKEN")
+	}
 }
 
 // resolveGitHub expands the credentials and fills the budget reserve.
@@ -1324,4 +1353,43 @@ func Why(fam string) string { return defaultEvery[fam].why }
 func BuiltinEvery(fam string) (time.Duration, bool) {
 	f, known := defaultEvery[fam]
 	return f.every, known
+}
+
+// Grafana is the server the dashboard is published to, and how it should
+// reach the store this writes into.
+type Grafana struct {
+	URL   string `yaml:"url" ghc:"example=http://localhost:3000"`
+	Token string `yaml:"token" ghc:"secret,example=${GRAFANA_TOKEN}"`
+	// Folder is the folder the dashboard goes in, by title, created when it is
+	// not there. Empty means Grafana's default folder.
+	Folder string `yaml:"folder" ghc:"example=GitHub"`
+	// PublishOnStart reconciles the datasource and the dashboard once when the
+	// collector starts, before the first sweep. Off by default: a collector
+	// that writes to Grafana without being asked would surprise, and the
+	// dashboard is generated from the code, so this is what keeps a server
+	// from quietly falling behind the binary that feeds it.
+	PublishOnStart bool `yaml:"publish_on_start" ghc:"example=false"`
+	// Datasource overrides what is otherwise read from the sink.
+	Datasource GrafanaDatasource `yaml:"datasource"`
+}
+
+// GrafanaDatasource is the two things about a datasource that the sink cannot
+// answer for itself.
+type GrafanaDatasource struct {
+	// URL is the address Grafana reaches the store by, when that is not the
+	// address the collector writes to. They differ more often than not: a
+	// collector on the host writes to a published port and Grafana in a
+	// container reaches the same store by its name on the container network,
+	// and copying the sink's address across produces a datasource Grafana
+	// accepts and cannot use.
+	URL string `yaml:"url" ghc:"example=http://influxdb:8181"`
+	// UID adopts a datasource that already exists instead of managing one
+	// named after the store.
+	UID string `yaml:"uid" ghc:"example=ae3x9k2"`
+	// LokiUID is a Loki datasource that already exists. With one, the panel
+	// that would say where a failed job's output went reads the lines from it
+	// instead. It is adopted rather than made: the Loki sink writes to the
+	// push endpoint, and a datasource built from that address would be
+	// pointed at the half of the API that does not answer queries.
+	LokiUID string `yaml:"loki_uid" ghc:"example=be7m1q4"`
 }

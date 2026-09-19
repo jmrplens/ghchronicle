@@ -256,3 +256,78 @@ func TestMalformedYAMLIsReportedAsItselfWithItsPath(t *testing.T) {
 		t.Errorf("err = %q, want the path and the parser's error, not the migration hint", msg)
 	}
 }
+
+// TestGrafanaSettingsExpandFromTheEnvironment. Expansion is per field, so a
+// field nobody remembered to name carries the reference through as text and
+// the server is handed the characters ${GRAFANA_TOKEN} as a credential. It
+// happened: the first run of -publish-dashboard against a real server was
+// refused with "Invalid API key" for exactly that reason.
+func TestGrafanaSettingsExpandFromTheEnvironment(t *testing.T) {
+	t.Setenv("GITHUB_TOKEN", "x")
+	t.Setenv("TEST_GRAFANA_TOKEN", "glsa_secret")
+	t.Setenv("TEST_DS_URL", "http://influxdb:8181")
+	t.Setenv("TEST_DS_UID", "adopted")
+	t.Setenv("TEST_LOKI_UID", "logs")
+	t.Setenv("TEST_GRAFANA_URL", "http://grafana:3000")
+	c, err := Load(write(t, `
+targets: {user: jmrplens}
+sinks: {stdout: true}
+grafana:
+  url: ${TEST_GRAFANA_URL}
+  token: ${TEST_GRAFANA_TOKEN}
+  datasource:
+    url: ${TEST_DS_URL}
+    uid: ${TEST_DS_UID}
+    loki_uid: ${TEST_LOKI_UID}
+`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct{ field, got, want string }{
+		{"url", c.Grafana.URL, "http://grafana:3000"},
+		{"token", c.Grafana.Token, "glsa_secret"},
+		{"datasource.url", c.Grafana.Datasource.URL, "http://influxdb:8181"},
+		{"datasource.uid", c.Grafana.Datasource.UID, "adopted"},
+		{"datasource.loki_uid", c.Grafana.Datasource.LokiUID, "logs"},
+	} {
+		if tc.got != tc.want {
+			t.Errorf("grafana.%s = %q, want %q", tc.field, tc.got, tc.want)
+		}
+	}
+}
+
+// TestGrafanaTokenFallsBackToTheEnvironment, the way the GitHub one does, so a
+// service unit can keep the credential out of the file entirely.
+func TestGrafanaTokenFallsBackToTheEnvironment(t *testing.T) {
+	t.Setenv("GITHUB_TOKEN", "x")
+	t.Setenv("GRAFANA_TOKEN", "from-the-unit")
+	c, err := Load(write(t, `
+targets: {user: jmrplens}
+sinks: {stdout: true}
+grafana:
+  url: http://grafana:3000
+`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Grafana.Token != "from-the-unit" {
+		t.Errorf("token = %q, want the one the environment carries", c.Grafana.Token)
+	}
+}
+
+// TestNoGrafanaSectionStaysNil: the whole feature is opt-in, and a config
+// without the key must not grow a Grafana it never asked for.
+func TestNoGrafanaSectionStaysNil(t *testing.T) {
+	t.Setenv("GITHUB_TOKEN", "x")
+	t.Setenv("GRAFANA_TOKEN", "from-the-unit")
+	c, err := Load(write(t, `
+targets: {user: jmrplens}
+sinks: {stdout: true}
+`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Grafana != nil {
+		t.Errorf("grafana = %+v, want nothing at all", c.Grafana)
+	}
+}

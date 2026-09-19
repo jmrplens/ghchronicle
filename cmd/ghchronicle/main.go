@@ -101,6 +101,10 @@ type options struct {
 	list     bool
 	showVer  bool
 	backfill bool
+	// publishDashboard reconciles the Grafana datasource and dashboard for
+	// every store this writes to, then exits. Like backfillStatus it asks
+	// GitHub nothing, so it needs no token.
+	publishDashboard bool
 	// backfillStatus reads the checkpoint and prints it, and is the one run
 	// that neither asks GitHub anything nor writes anywhere.
 	backfillStatus bool
@@ -141,6 +145,9 @@ func parseFlags(args []string, stderr io.Writer) (options, error) {
 		"reach as far back as each surface allows, waiting for the rate limit to reset rather than stopping")
 	fs.StringVar(&o.since, "backfill-since", "",
 		"bound the backfill: a date (2024-01-01), a duration (720h), days (90d) or years (2y); empty means no bound")
+	fs.BoolVar(&o.publishDashboard, "publish-dashboard", false,
+		"publish the Grafana dashboard and the datasource it reads from, then exit; "+
+			"needs the grafana section of the config and asks GitHub nothing")
 	fs.BoolVar(&o.backfillStatus, "backfill-status", false,
 		"print how far the backfill in progress has got, and exit; asks GitHub nothing and writes nothing")
 	fs.DurationVar(&o.retry, "backfill-retry", 0,
@@ -200,7 +207,10 @@ func execute(args []string, stdout, stderr io.Writer) {
 		return
 	}
 
-	cfg, err := config.LoadWith(o.path, config.Relax{NoSinks: o.cardOnly, NoToken: o.backfillStatus})
+	cfg, err := config.LoadWith(o.path, config.Relax{
+		NoSinks: o.cardOnly,
+		NoToken: o.backfillStatus || o.publishDashboard,
+	})
 	if err != nil {
 		fatal(stderr, err)
 		return
@@ -253,6 +263,8 @@ func execute(args []string, stdout, stderr io.Writer) {
 			_ = s.Close()
 		}
 	}()
+
+	publishOnStart(ctx, cfg, o, logger)
 
 	runner := newRunner(cfg, api, sinks, logger, &o)
 	switch {
@@ -420,9 +432,12 @@ func reported(ctx context.Context, o options, cfg *config.Config,
 	var err error
 	switch {
 	case o.backfillStatus:
-		// This is the one run that asks GitHub nothing: it reads the file a
-		// backfill leaves behind and prints it.
+		// This run asks GitHub nothing: it reads the file a backfill leaves
+		// behind and prints it.
 		err = reportBackfill(cfg, o.path, stdout, time.Now())
+	case o.publishDashboard:
+		// This one asks GitHub nothing either. It talks to Grafana instead.
+		err = publishDashboards(ctx, cfg, stdout)
 	case o.list:
 		err = listRepositories(ctx, api, cfg, stdout)
 	default:

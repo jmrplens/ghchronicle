@@ -58,37 +58,76 @@ func New() Client {
 // context rather than on a client of its own, so a caller that gives up early
 // takes the request down with it.
 func (c Client) Post(ctx context.Context, path string, body any, timeout time.Duration) (map[string]any, error) {
-	raw, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
+	res, err := c.Do(ctx, http.MethodPost, path, body, timeout)
+	return res.Body, err
+}
+
+// Response is one answer, with the status the server gave it. Post throws the
+// status away because the calls it serves read their outcome out of the body,
+// but the datasource calls cannot: a datasource that is not there answers 404
+// with a message shaped like any other failure, and "not there" is the case
+// that decides between creating one and correcting one.
+type Response struct {
+	Status int
+	Body   map[string]any
+	// List holds the answer instead when the server sent an array. /api/search
+	// is one: a reply that is a list at the top level decodes into no map at
+	// all, and reading it as a failed decode would turn every search into an
+	// error about a body that is perfectly well formed.
+	List []any
+}
+
+// Do sends one JSON request under any method and hands back both halves of the
+// answer. A 4xx or 5xx is not an error here, for Post's reason: Grafana says
+// what it refused in the body, and that body is what the caller wants to read.
+func (c Client) Do(ctx context.Context, method, path string, body any,
+	timeout time.Duration,
+) (Response, error) {
+	var reader io.Reader
+	if body != nil {
+		raw, err := json.Marshal(body)
+		if err != nil {
+			return Response{}, err
+		}
+		reader = bytes.NewReader(raw)
 	}
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.URL+path, bytes.NewReader(raw))
+	req, err := http.NewRequestWithContext(ctx, method, c.URL+path, reader)
 	if err != nil {
-		return nil, err
+		return Response{}, err
 	}
-	req.Header.Set("Content-Type", "application/json")
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
 	if c.Token != "" {
 		req.Header.Set("Authorization", "Bearer "+c.Token)
 	}
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return nil, err
+		return Response{}, err
 	}
 	defer res.Body.Close()
 	answer, err := io.ReadAll(res.Body)
 	if err != nil {
-		return nil, err
+		return Response{}, err
 	}
 	if len(bytes.TrimSpace(answer)) == 0 {
-		return map[string]any{}, nil
+		return Response{Status: res.StatusCode, Body: map[string]any{}}, nil
 	}
-	var out map[string]any
+	var out any
 	if json.Unmarshal(answer, &out) != nil {
-		return nil, fmt.Errorf("%s: %s", res.Status, trim(string(answer), 200))
+		return Response{Status: res.StatusCode},
+			fmt.Errorf("%s: %s", res.Status, trim(string(answer), 200))
 	}
-	return out, nil
+	switch decoded := out.(type) {
+	case map[string]any:
+		return Response{Status: res.StatusCode, Body: decoded}, nil
+	case []any:
+		return Response{Status: res.StatusCode, Body: map[string]any{}, List: decoded}, nil
+	default:
+		return Response{Status: res.StatusCode, Body: map[string]any{}}, nil
+	}
 }
 
 // Query posts one datasource query.

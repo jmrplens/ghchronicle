@@ -31,6 +31,60 @@ documentation uses, `acme` and five repositories, described beside [what the
 panels show](/ghchronicle/dashboards/panels/). Every section but the Overview
 ships collapsed, which is why Lifetime is a header there.
 
+## Letting the binary do it
+
+The dashboard is built from the same code the binary carries, so the binary can
+publish it. Given a Grafana, it reconciles the datasource out of the sink it
+already writes to, asks that datasource whether it can actually be reached, and
+publishes the dashboard for every store it writes to.
+
+```yaml
+grafana:
+  url: http://localhost:3000
+  token: ${GRAFANA_TOKEN}
+```
+
+```sh
+ghchronicle -config config.yaml -publish-dashboard
+```
+
+It asks GitHub nothing, so it needs no GitHub token, and it prints what it did
+to each datasource and each dashboard.
+
+<Aside type="caution" title="Grafana often reaches the store by another address">
+  The address the collector writes to and the address Grafana queries are
+  frequently not the same one: a collector on the host writes to a published
+  port while Grafana in a container reaches the same store by its name on the
+  container network. Copying the sink's address across produces a datasource
+  Grafana accepts and cannot use, so the run asks it before publishing and
+  refuses on a datasource that does not answer. `grafana.datasource.url` is the
+  address to use instead.
+</Aside>
+
+Two of the five sinks can describe their own datasource, because what they
+write to is what Grafana queries: InfluxDB and Elasticsearch. The other three
+cannot, and no reading of their settings would find it. The Prometheus sink is
+scraped rather than written to, the SQL sink writes statements to a file rather
+than to a server, and the Graphite sink speaks the ingest port, which is not
+the API a query goes to. For those, make the datasource in Grafana and name it:
+
+```yaml
+grafana:
+  datasource:
+    uid: ae3x9k2
+```
+
+A datasource named that way is adopted and left exactly as it is, since
+correcting one this did not make would overwrite settings nobody asked it to
+have.
+
+`publish_on_start: true` does the same once when the collector starts, before
+the first sweep. It is off by default, and it is what keeps a server from
+quietly falling behind the binary feeding it: the dashboard is generated from
+the code, so updating the binary updates the dashboard. A failure there warns
+and the sweep goes on, because the metrics of an hour spent not running cannot
+be recovered and a dashboard published on the next restart can.
+
 ## Importing from the UI
 
 <Steps>

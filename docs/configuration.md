@@ -360,6 +360,15 @@ This page is a form that writes a configuration. What follows is the inventory i
   - `state_file`: string, defaults to `ghchronicle-state.json`, like `/var/lib/ghchronicle/state.json`
   - `backfill`: a block of settings
   - `backfill.since`: string, like `2y`
+  - `grafana`: a block of settings
+  - `grafana.url`: string, like `http://localhost:3000`
+  - `grafana.token`: string, a credential, like `${GRAFANA_TOKEN}`
+  - `grafana.folder`: string, like `GitHub`
+  - `grafana.publish_on_start`: bool, like `false`
+  - `grafana.datasource`: a block of settings
+  - `grafana.datasource.url`: string, like `http://influxdb:8181`
+  - `grafana.datasource.uid`: string, like `ae3x9k2`
+  - `grafana.datasource.loki_uid`: string, like `be7m1q4`
 
 - **config.yaml**
 
