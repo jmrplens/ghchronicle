@@ -133,3 +133,26 @@ func TestBackfillStatusNeedsNoToken(t *testing.T) {
 		t.Error("a sweep ran with no token, so waiving it for the status waived it for everything")
 	}
 }
+
+// TestSinceAndShownPathSayTheAwkwardCases. Both are one line of the report,
+// and both have a case that is easy to leave printing something nobody can
+// read: a clock that moved backwards, and a configuration that keeps no state
+// file and therefore no checkpoint.
+func TestSinceAndShownPathSayTheAwkwardCases(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, 9, 19, 8, 0, 0, 0, time.UTC)
+	if got := since(now.Add(-90*time.Second), now); got != 90*time.Second {
+		t.Errorf("since = %v, want 1m30s", got)
+	}
+	// A clock that moved backwards between the write and the read. Reporting
+	// the future reads as a bug in the walk rather than in the clock.
+	if got := since(now.Add(time.Hour), now); got != 0 {
+		t.Errorf("an instant in the future is %v ago, want none", got)
+	}
+	if got := shownPath("/var/lib/ghchronicle/state-progress.json"); got != "/var/lib/ghchronicle/state-progress.json" {
+		t.Errorf("shownPath rewrote a path it should have printed: %q", got)
+	}
+	if got := shownPath(""); !strings.Contains(got, "state_file") {
+		t.Errorf("with no state file it says %q, which does not tell the reader why there is no checkpoint", got)
+	}
+}
