@@ -101,6 +101,13 @@ type options struct {
 	list     bool
 	showVer  bool
 	backfill bool
+	// backfillStatus reads the checkpoint and prints it, and is the one run
+	// that neither asks GitHub anything nor writes anywhere.
+	backfillStatus bool
+	// retry is how long a backfill waits before going back for the families a
+	// pass left behind. Zero never goes back, which is what it did before
+	// this existed.
+	retry    time.Duration
 	since    string
 	card     string
 	theme    string
@@ -134,6 +141,10 @@ func parseFlags(args []string, stderr io.Writer) (options, error) {
 		"reach as far back as each surface allows, waiting for the rate limit to reset rather than stopping")
 	fs.StringVar(&o.since, "backfill-since", "",
 		"bound the backfill: a date (2024-01-01), a duration (720h), days (90d) or years (2y); empty means no bound")
+	fs.BoolVar(&o.backfillStatus, "backfill-status", false,
+		"print how far the backfill in progress has got, and exit; asks GitHub nothing and writes nothing")
+	fs.DurationVar(&o.retry, "backfill-retry", 0,
+		"after a backfill ends with families left, wait this long and go back for them, until a pass records nothing new; zero does not go back")
 	fs.StringVar(&o.card, "card", "", "run one sweep and write a summary SVG to this path")
 	fs.StringVar(&o.theme, "card-theme", "auto",
 		"card theme: dark, light, auto, or both to write the light card at -card and the dark one beside it with _dark before the extension")
@@ -189,7 +200,7 @@ func execute(args []string, stdout, stderr io.Writer) {
 		return
 	}
 
-	cfg, err := config.LoadWith(o.path, o.cardOnly)
+	cfg, err := config.LoadWith(o.path, config.Relax{NoSinks: o.cardOnly, NoToken: o.backfillStatus})
 	if err != nil {
 		fatal(stderr, err)
 		return
@@ -208,10 +219,7 @@ func execute(args []string, stdout, stderr io.Writer) {
 	ctx, stop := notifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	if o.list {
-		if err = listRepositories(ctx, api, cfg, stdout); err != nil {
-			fatal(stderr, err)
-		}
+	if reported(ctx, o, cfg, api, stdout, stderr) {
 		return
 	}
 
@@ -400,8 +408,191 @@ func newAPI(cfg *config.Config, backfill bool, logger *slog.Logger) *ghapi.Clien
 	return api
 }
 
+// reported runs the flags that answer a question and return, and says whether
+// one of them did.
+//
+// Together rather than as two branches of execute, which each new one would
+// grow by two: they have the same shape, they write to stdout, and the run
+// ends after them.
+func reported(ctx context.Context, o options, cfg *config.Config,
+	api *ghapi.Client, stdout, stderr io.Writer,
+) bool {
+	var err error
+	switch {
+	case o.backfillStatus:
+		// This is the one run that asks GitHub nothing: it reads the file a
+		// backfill leaves behind and prints it.
+		err = reportBackfill(cfg, o.path, stdout, time.Now())
+	case o.list:
+		err = listRepositories(ctx, api, cfg, stdout)
+	default:
+		return false
+	}
+	if err != nil {
+		fatal(stderr, err)
+	}
+	return true
+}
+
 // listRepositories prints what a sweep would collect and collects nothing.
-// The archived repositories the filter sets aside follow, marked, because a
+// retryLimit is how many passes a backfill will make in one run.
+//
+// A backstop and not a tuning knob: what actually stops a retrying backfill is
+// a pass that records nothing new, and that catches the case worth catching,
+// which is an obstacle no amount of waiting clears. This is here so that a
+// walk which creeps forward by one repository a pass cannot run for a week
+// unattended.
+const retryLimit = 10
+
+// verdict is what to do after a backfill pass.
+type verdict int
+
+const (
+	// stop: the walk covered everything, or it was stopped, or going back was
+	// never asked for.
+	stop verdict = iota
+	// stuck: the pass recorded nothing new, so waiting will not help.
+	stuck
+	// atLimit: there is work left and passes have run out.
+	atLimit
+	// again: wait, then go back for what is left.
+	again
+)
+
+// afterPass decides what a backfill does once a pass has ended.
+//
+// A function of its own, and of four plain values, because this is the whole
+// of the thinking: the loop around it only waits. stopped is a run that was
+// asked to end, left is the families the checkpoint still does not hold,
+// retry is what the reader asked for, and gained says the pass recorded
+// something it had not before.
+//
+// It decides by what the checkpoint gained rather than by the errors the pass
+// reported. Sorting errors into the transient and the permanent means a list
+// that is wrong the moment GitHub answers something new; "did this pass record
+// anything" needs no list and answers the question that matters, which is
+// whether coming back has any chance of helping.
+func afterPass(stopped bool, left []string, retry time.Duration, gained bool, passes int) verdict {
+	switch {
+	case stopped || len(left) == 0 || retry <= 0:
+		return stop
+	case !gained:
+		return stuck
+	case passes >= retryLimit:
+		return atLimit
+	default:
+		return again
+	}
+}
+
+// walkUntilDoneOrStuck runs the walk, and for as long as retry asks, goes back
+// for whatever a pass left behind.
+//
+// A pass can end with families left and no error at all: a family truncated by
+// a secondary rate limit is handed back as a pass, and one that failed on every
+// repository is deliberately left unmarked. Both are usually a bad few minutes
+// at the other end rather than anything about this account, and the checkpoint
+// makes going back cheap, because a resume walks only what it does not already
+// hold.
+func walkUntilDoneOrStuck(ctx context.Context, runner *run.Runner,
+	retry time.Duration, logger *slog.Logger,
+) error {
+	for passes := 1; ; passes++ {
+		families, repos := runner.Progress.Recorded()
+		if err := runner.Once(ctx); err != nil && ctx.Err() == nil {
+			return err
+		}
+		left := runner.Progress.Unfinished()
+		after, afterRepos := runner.Progress.Recorded()
+		gained := after != families || afterRepos != repos
+		switch afterPass(ctx.Err() != nil, left, retry, gained, passes) {
+		case stop:
+			return nil
+		case stuck:
+			logger.Info("this pass recorded nothing new, so waiting will not help; not going back again",
+				"families_left", strings.Join(left, ","), "passes", passes)
+			return nil
+		case atLimit:
+			logger.Warn("stopping after the pass limit, with families still left",
+				"families_left", strings.Join(left, ","), "passes", passes,
+				"resume", "run the same command again")
+			return nil
+		case again:
+		}
+		logger.Info("waiting before going back for the families this pass left",
+			"families_left", strings.Join(left, ","), "waiting", retry.String(), "pass", passes+1)
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-time.After(retry):
+		}
+		// The pass just run marked the families it collected, so without this
+		// the next one honors those cadences and skips the family it came
+		// back for.
+		runner.PrimeAgain()
+	}
+}
+
+// reportBackfill prints how far the backfill in progress has got.
+//
+// It reads the checkpoint and nothing else: no request, no sink, no write, and
+// no checkpoint created for a walk nobody is running. The file was always
+// meant to be read, and until this existed reading it meant knowing the path
+// and parsing JSON by hand.
+//
+// Success either way. "There is no backfill in progress" is an answer, and a
+// status command that exits non-zero for an ordinary state is one nobody can
+// put in a script.
+func reportBackfill(cfg *config.Config, configPath string, stdout io.Writer, now time.Time) error {
+	path := cfg.BackfillProgressFile()
+	progress, inProgress, err := run.ReadProgress(path)
+	if err != nil {
+		return err
+	}
+	if !inProgress {
+		fmt.Fprintln(stdout, "no backfill in progress")
+		fmt.Fprintf(stdout, "  the checkpoint one leaves behind is not there: %s\n", shownPath(path))
+		return nil
+	}
+
+	left := progress.Unfinished()
+	families, inFlight, repos := progress.Where()
+	fmt.Fprintln(stdout, "backfill in progress")
+	fmt.Fprintf(stdout, "  started      %s (%s ago)\n",
+		progress.Started.Format(time.RFC3339), since(progress.Started, now))
+	fmt.Fprintf(stdout, "  last written %s ago\n", since(progress.Updated, now))
+	fmt.Fprintf(stdout, "  families     %d of %d complete\n", families, len(progress.Scope.Families))
+	if inFlight != "" {
+		fmt.Fprintf(stdout, "  in flight    %s, %d repositories written\n", inFlight, repos)
+	}
+	if len(left) > 0 {
+		fmt.Fprintf(stdout, "  left         %s\n", strings.Join(left, ", "))
+	}
+	fmt.Fprintf(stdout, "  written by   %s\n", progress.WrittenBy)
+	fmt.Fprintf(stdout, "  checkpoint   %s\n", path)
+	fmt.Fprintf(stdout, "  resume       ghchronicle -config %s -backfill\n", configPath)
+	return nil
+}
+
+// since is how long ago an instant was, rounded to the second, and never
+// negative: a clock that moved backwards is not worth reporting as the future.
+func since(then, now time.Time) time.Duration {
+	d := now.Sub(then).Round(time.Second)
+	if d < 0 {
+		return 0
+	}
+	return d
+}
+
+// shownPath names the file, or says there is none to name: a configuration
+// with no state file keeps no checkpoint, and "" in a sentence reads as a bug.
+func shownPath(path string) string {
+	if path == "" {
+		return "there is none, because this configuration sets no state_file"
+	}
+	return path
+}
+
 // sweep still writes the one row each has, the date it was archived, and a
 // backfill collects them in full.
 func listRepositories(ctx context.Context, api *ghapi.Client, cfg *config.Config, stdout io.Writer) error {
@@ -461,8 +652,10 @@ func runBackfill(ctx context.Context, runner *run.Runner, cfg *config.Config,
 	}
 	logger.Info("backfill starting, this reaches as far back as GitHub allows and may take a while",
 		"checkpoint", runner.Progress.Path())
-	if err = runner.Once(ctx); err != nil && ctx.Err() == nil {
-		return err
+	// Its own name: reusing err here is a re-assignment one linter wants
+	// written as a declaration and another reads as shadowing the one above.
+	if walked := walkUntilDoneOrStuck(ctx, runner, o.retry, logger); walked != nil {
+		return walked
 	}
 	logger.Info("backfill finished")
 	// A backfill asked for a card draws it from what the backfill collected,

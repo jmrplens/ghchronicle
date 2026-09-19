@@ -110,6 +110,45 @@ para el que se escribió todo esto, así que un punto de control escrito por otr
 versión se retoma, con una línea que dice qué versión escribió lo que el
 fichero nombra.
 
+### Ver hasta dónde ha llegado
+
+```sh
+ghchronicle -config config.yaml -backfill-status
+```
+
+Lee el punto de control y lo imprime: cuándo empezó el recorrido, cuánto hace
+que anotó algo por última vez, cuántas familias van completas de cuántas, en qué
+familia estaba y por dónde, y la orden que lo continúa. No pregunta nada a
+GitHub ni escribe nada, así que puede lanzarse con un recorrido en marcha, y no
+necesita token: la credencial está porque una pasada le pregunta a GitHub, y
+esto no le pregunta a nadie. Si no hay ningún recorrido a medias lo dice, y
+nombra el fichero que ha buscado.
+
+### Volver solo a por lo que falta
+
+Una pasada puede acabar con familias pendientes y sin un solo error. Lo normal
+es un mal rato al otro lado: un `502` en dos repositorios de sesenta deja su
+familia sin marcar, y el recorrido termina ordenadamente con una familia de
+menos.
+
+```sh
+ghchronicle -config config.yaml -backfill -backfill-retry 1h
+```
+
+espera una hora y vuelve a por lo que quede, y sigue haciéndolo hasta que no
+quede nada. Cuesta casi nada, porque al retomar solo recorre lo que el punto de
+control no tiene ya: dos repositorios de sesenta, no sesenta.
+
+Se para solo cuando **una pasada no anota nada nuevo**. Esa es toda la regla, y
+a propósito no es una lista de qué errores merecen reintento: un repositorio
+borrado falla igual cada hora, y una lista de códigos reintentables queda
+desfasada en cuanto GitHub responde algo que antes no respondía. Una pasada que
+no gana nada es una pasada cuyo obstáculo no lo despeja esperar. Hay además un
+tope de diez pasadas, como red de seguridad y no como ajuste.
+
+Sin la opción no espera ni vuelve, que es lo que hacía antes de que esto
+existiera.
+
 ## La espera
 
 Cuando un cubo está en su reserva o por debajo, el relleno espera. La espera no

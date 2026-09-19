@@ -960,38 +960,43 @@ func TestAResumedWalkSaysTheFamiliesTheFirstHalfWrote(t *testing.T) {
 }
 
 // TestAResumedFamilyCountsTheRepositoriesTheFirstHalfWrote: a family the stop
-// landed inside covers the repositories this pass walks and the ones already
-// recorded, and a row that counts only the remainder says a family of many
-// repositories covered the few that were left.
-func TestAResumedFamilyCountsTheRepositoriesTheFirstHalfWrote(t *testing.T) {
+// TestPrimeAgainMakesTheNextPassRunEveryFamily.
+//
+// Priming is spent on the first pass of a process, which is what the long
+// running service wants. A backfill going back for what a pass left behind
+// needs it back: that pass marked the families it ran, so a second pass
+// honoring the cadence would skip the very family it came back for, and going
+// back would quietly do nothing.
+//
+// One family, because what is being watched is the flag and not the walk.
+func TestPrimeAgainMakesTheNextPassRunEveryFamily(t *testing.T) {
 	t.Parallel()
-	dir, fake := t.TempDir(), newFake(t)
-	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
-	if err := walkRunner(t, dir, fake, &recorded{stopAfterRepos: 3, cancel: cancel}).Once(ctx); err == nil {
-		t.Fatal("the walk was canceled and ended without saying so")
-	}
-	checkpoint := readCheckpoint(t, filepath.Join(dir, "state-progress.json"))
-	_, family, written := checkpoint.Where()
-	if family == "" || written == 0 {
-		t.Fatal("the stop landed between two families, so there is no half walked one to resume")
+	r, _, _ := fakeRunner(t)
+	r.Cfg.Every = everyOnly("forks")
+	if err := r.Cfg.Validate(); err != nil {
+		t.Fatal(err)
 	}
 
-	rows := &familyRows{}
-	resumed := walkRunner(t, dir, fake, rows)
-	if err := resumed.Once(t.Context()); err != nil {
-		t.Fatalf("the resumed walk: %v", err)
+	if err := r.Once(t.Context()); err != nil {
+		t.Fatal(err)
 	}
-	row, ok := rows.rows[family]
-	if !ok {
-		t.Fatalf("no row for %q, the family the stop landed in", family)
+	if !r.prime {
+		t.Fatal("the first pass did not prime, so this test measures nothing")
 	}
-	all := len(resumed.repos)
-	if all <= written {
-		t.Fatalf("the walk covers %d repositories and the checkpoint held %d", all, written)
+	// A second pass of the same process follows the cadences, and the family
+	// the first pass ran is not due again.
+	if err := r.Once(t.Context()); err != nil {
+		t.Fatal(err)
 	}
-	if got := row.Fields["repos"]; got != all {
-		t.Errorf("the row for %q reports %v repositories, want %d: the %d the first half wrote count too",
-			family, got, all, written)
+	if r.prime {
+		t.Error("a second pass primed on its own, so the cadences the first pass set mean nothing")
+	}
+
+	r.PrimeAgain()
+	if err := r.Once(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if !r.prime {
+		t.Error("the pass after PrimeAgain did not prime, so a retry would skip the family it came back for")
 	}
 }

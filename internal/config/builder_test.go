@@ -199,7 +199,7 @@ func refuseCase(t *testing.T, c builderCase) {
 	if err := os.WriteFile(path, []byte(c.Config), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	_, err := LoadWith(path, c.AllowNoSinks)
+	_, err := LoadWith(path, Relax{NoSinks: c.AllowNoSinks})
 	if err == nil {
 		t.Fatalf("%s\n\nthe builder wrote:\n%s\nand the loader accepted it, though it is expected to refuse it with %q",
 			c.Why, c.Config, c.Refused)
@@ -218,7 +218,7 @@ func loadCase(t *testing.T, c builderCase) *Config {
 	if err := os.WriteFile(path, []byte(c.Config), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	cfg, err := LoadWith(path, c.AllowNoSinks)
+	cfg, err := LoadWith(path, Relax{NoSinks: c.AllowNoSinks})
 	if err != nil {
 		t.Fatalf("%s\n\nthe builder wrote:\n%s\nand the loader refused it: %v", c.Why, c.Config, err)
 	}

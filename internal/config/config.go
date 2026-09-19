@@ -45,6 +45,13 @@ type Config struct {
 	// file with no sink is a mistake rather than an intention.
 	AllowNoSinks bool `yaml:"-"`
 
+	// AllowNoToken lets a caller that makes no request pass validation with no
+	// credential. `-backfill-status` is the case: it reads the checkpoint file
+	// and prints it, and requiring a token to do that would put the status of
+	// a run behind the credential the run needs rather than the one the reader
+	// has. Not a YAML setting, for the same reason as AllowNoSinks.
+	AllowNoToken bool `yaml:"-"`
+
 	intervals map[string]time.Duration
 	// everySource records which config key gave each family its interval, so
 	// a warning can point at the knob to turn rather than at the family.
@@ -764,7 +771,7 @@ func (c *Config) resolveGitHub() error {
 	if c.GitHub.Token == "" {
 		c.GitHub.Token = os.Getenv("GITHUB_TOKEN")
 	}
-	if c.GitHub.Token == "" {
+	if c.GitHub.Token == "" && !c.AllowNoToken {
 		return errors.New("github.token is empty and GITHUB_TOKEN is unset")
 	}
 	if c.GitHub.ReserveRate <= 0 {

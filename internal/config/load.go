@@ -12,17 +12,36 @@ import (
 )
 
 // Load reads a YAML config file and validates it.
-func Load(path string) (*Config, error) { return LoadWith(path, false) }
+func Load(path string) (*Config, error) { return LoadWith(path, Relax{}) }
 
-// LoadWith is Load, with a caller that supplies its own destination able to
-// waive the "configure at least one sink" rule.
-func LoadWith(path string, allowNoSinks bool) (*Config, error) {
+// Relax names the rules a caller may waive, because it is running something
+// smaller than a sweep. Each one exists for a reason the waiving command does
+// not meet: there must be a destination because a sweep has to put its points
+// somewhere, and there must be a token because a sweep has to ask GitHub. A
+// card written to a file does neither; reading the backfill's checkpoint does
+// neither.
+//
+// A struct rather than a second boolean parameter, so a call site says which
+// rule it is waiving instead of ending in "true, false".
+type Relax struct {
+	// NoSinks lets a caller that supplies its own destination configure none.
+	NoSinks bool
+	// NoToken lets a caller that makes no request run without one. The token
+	// is still read when it is there: the command that waives this reports on
+	// a configuration, and reporting on one that is missing its credential
+	// would be the wrong kind of quiet.
+	NoToken bool
+}
+
+// LoadWith is Load for a caller that may waive one of the rules in Relax.
+func LoadWith(path string, relax Relax) (*Config, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
 	var c Config
-	c.AllowNoSinks = allowNoSinks
+	c.AllowNoSinks = relax.NoSinks
+	c.AllowNoToken = relax.NoToken
 	// KnownFields makes a typo in a key an error instead of a setting that
 	// silently does nothing, which is the worst way to discover a config bug.
 	// It is also what keeps every's three layers unshadowable: default and

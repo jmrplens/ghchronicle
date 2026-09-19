@@ -60,7 +60,7 @@ func TestLiveSweepCacheFootprint(t *testing.T) {
 	}
 	// The sinks are supplied here, so the config file does not have to name
 	// one it will never write to.
-	cfg, err := config.LoadWith(path, true)
+	cfg, err := config.LoadWith(path, config.Relax{NoSinks: true})
 	if err != nil {
 		t.Fatal(err)
 	}

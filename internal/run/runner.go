@@ -175,6 +175,21 @@ const discoverInterval = time.Hour
 // the listing failed and here is why.
 const discoverFamily = "discover"
 
+// PrimeAgain makes the next pass run every family again, whatever the state
+// file says they last did.
+//
+// Priming is spent on the first pass of a process, which is what the long
+// running service wants: fill the exporter at start-up, then follow the
+// cadences. A backfill going back for what a pass left behind needs it back,
+// because that pass marked the families it ran, and a second pass honoring the
+// cadence would skip the very family it came back for and quietly do nothing.
+//
+// Between the passes of one walk and nowhere else. Priming every pass of any
+// run with Backfill set is the wider rule, and it is wrong: a sweep that turns
+// Backfill on after collecting would re-walk every family instead of the ones
+// it came for, which is what TestStarsAndForksAreBatchedOnceWalked walked into.
+func (r *Runner) PrimeAgain() { r.primed = false }
+
 // Once runs every family whose interval has elapsed.
 //
 // A family that fails is logged and skipped; the sweep continues. One

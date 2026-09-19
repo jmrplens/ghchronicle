@@ -85,10 +85,10 @@ func TestAnySingleSinkIsEnoughToStart(t *testing.T) {
 func TestACallerWithItsOwnDestinationNeedsNoSink(t *testing.T) {
 	t.Setenv("GITHUB_TOKEN", "x")
 	path := write(t, "targets: {user: jmrplens}\n")
-	if _, err := LoadWith(path, true); err != nil {
+	if _, err := LoadWith(path, Relax{NoSinks: true}); err != nil {
 		t.Errorf("a caller that brings its own destination was refused: %v", err)
 	}
-	if _, err := LoadWith(path, false); err == nil {
+	if _, err := LoadWith(path, Relax{}); err == nil {
 		t.Error("without the waiver the same file must still be refused")
 	}
 }

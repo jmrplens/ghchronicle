@@ -550,7 +550,7 @@ func TestTheStepTheBuilderWritesWithNoConfigFileStarts(t *testing.T) {
 				t.Errorf("the run waives the sink rule %v and the answers name no destination %v: %v",
 					cardOnly, c.AllowNoSinks, args)
 			}
-			if _, err := config.LoadWith(written, cardOnly); err != nil {
+			if _, err := config.LoadWith(written, config.Relax{NoSinks: cardOnly}); err != nil {
 				t.Errorf("the step the page writes cannot start:\n%s\nand the Action ran %v, which the loader refused: %v",
 					c.Step, args, err)
 			}

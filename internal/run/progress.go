@@ -413,6 +413,39 @@ func bound(v string) string {
 	return strconv.Quote(v)
 }
 
+// ReadProgress reads the checkpoint at path without opening it for a walk.
+//
+// Everything OpenProgress does besides reading is about starting: it creates
+// one that is not there, it refuses one from a different walk, and it stamps
+// the file as resumed. A reader asking how far a backfill has got wants none
+// of that, and in particular must not be the thing that creates a checkpoint
+// for a walk nobody is running.
+//
+// The second value says whether there is one. Not having a backfill in
+// progress is an answer and not a failure, and it is the answer a reader gets
+// most of the time.
+func ReadProgress(path string) (*Progress, bool, error) {
+	if path == "" {
+		return nil, false, nil
+	}
+	body, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, false, fmt.Errorf("the backfill checkpoint %s cannot be read: %w", path, err)
+	}
+	saved := &Progress{}
+	if err = json.Unmarshal(body, saved); err != nil {
+		return nil, false, fmt.Errorf("the backfill checkpoint %s cannot be read as one: %w", path, err)
+	}
+	saved.path = path
+	if saved.Written == nil {
+		saved.Written = map[string][]string{}
+	}
+	return saved, true, nil
+}
+
 // OpenProgress reads the checkpoint at path, or starts one, and refuses
 // anything it cannot resume honestly.
 //
@@ -628,6 +661,26 @@ func (p *Progress) Unfinished() []string {
 	}
 	slices.Sort(left)
 	return left
+}
+
+// Recorded is how much the checkpoint holds: families complete, and the
+// repositories written for families that are not.
+//
+// It is the measure a retry decides by. A pass that came back and recorded
+// nothing new is a pass whose obstacle waiting does not clear, so the two
+// numbers are read before and after. Counting only the unfinished families'
+// repositories is what makes it usable that way: a family that completes moves
+// its repositories out of Written, which would otherwise read as work undone.
+func (p *Progress) Recorded() (families, repos int) {
+	if !p.Active() {
+		return 0, 0
+	}
+	for family, written := range p.Written {
+		if !p.FamilyDone(family) {
+			repos += len(written)
+		}
+	}
+	return len(p.Complete), repos
 }
 
 // Elapsed is how long the walk this checkpoint records has been going,

@@ -24,6 +24,8 @@ ghchronicle -config /etc/ghchronicle/config.yaml
 | `-groups`         | off           | Print the groups with the families in each, then exit                                                                                      |
 | `-backfill`       | off           | Reach as far back as each surface allows, waiting for the rate limit to reset rather than stopping                                         |
 | `-backfill-since` | none          | Bound the backfill: a date (`2024-01-01`), a duration (`720h`), days (`90d`) or years (`2y`)                                               |
+| `-backfill-status` | off          | Print how far the backfill in progress has got, then exit; it asks GitHub nothing, writes nothing, and needs no token                      |
+| `-backfill-retry` | `0`           | After a backfill ends with families left, wait this long and go back for them, until a pass records nothing new; `0` does not go back       |
 | `-card`           | none          | Run one sweep and write a summary SVG to this path; that sweep runs every family, whatever the cadences say                                |
 | `-card-only`      | off           | With `-card`, write the SVG and nothing else: no sink is needed, none is written to, and the state file is left as it was                  |
 | `-card-theme`     | `auto`        | `dark`, `light`, `auto`, or `both`: the light card at `-card` and the dark one beside it with `_dark` before the extension, from one sweep |

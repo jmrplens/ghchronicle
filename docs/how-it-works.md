@@ -433,6 +433,45 @@ Replacing the binary is not one of them. That is the thing that stopped the
 walk this was written for, so a checkpoint written by another build is resumed,
 with a line saying which build wrote what it names.
 
+#### Seeing how far it has got
+
+```sh
+ghchronicle -config config.yaml -backfill-status
+```
+
+It reads the checkpoint and prints it: when the walk began, how long ago it
+last recorded anything, how many families are complete out of how many, the
+family it was inside and how far into it, and the command that carries it on.
+It asks GitHub nothing and writes nothing, so it is safe to run while a walk is
+going, and it needs no token: the credential is there because a sweep asks
+GitHub, and this asks nobody. When there is no walk in progress it says so and
+names the file it looked for.
+
+#### Going back on its own
+
+A pass can end with families left and no error at all. The usual reason is a
+few minutes of bad weather at the other end: a `502` on two repositories out of
+sixty leaves their family unmarked, and the walk ends tidily with one family
+short.
+
+```sh
+ghchronicle -config config.yaml -backfill -backfill-retry 1h
+```
+
+waits an hour and goes back for whatever is left, and keeps doing that until
+there is nothing left. It costs almost nothing, because a resume walks only what
+the checkpoint does not already hold: two repositories out of sixty, not sixty.
+
+It stops on its own when **a pass records nothing new**. That is the whole rule,
+and it is deliberately not a list of which errors are worth retrying: a
+repository that was deleted fails the same way every hour, and a list of
+retryable statuses is wrong the moment GitHub answers something it did not
+answer before. A pass that gains nothing is a pass whose obstacle waiting does
+not clear. There is also a cap of ten passes, as a backstop rather than a knob.
+
+Without the flag nothing waits and nothing goes back, which is what it did
+before this existed.
+
 ### The cooldown
 
 When a bucket is at or below its reserve, the backfill waits. The wait is not
