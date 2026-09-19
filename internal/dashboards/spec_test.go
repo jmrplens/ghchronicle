@@ -15,7 +15,7 @@ import (
 )
 
 // dashboardDir is where the exported files live, relative to this package.
-const dashboardDir = "../../../dashboards"
+const dashboardDir = "../../dashboards"
 
 // TestEveryStoreHasTheSameLayout is the promise the specification makes: a
 // user who picks Graphite gets the same dashboard as one who picks InfluxDB,

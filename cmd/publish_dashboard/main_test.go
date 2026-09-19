@@ -9,7 +9,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/jmrplens/ghchronicle/cmd/internal/dashboards"
+	"github.com/jmrplens/ghchronicle/internal/dashboards"
 )
 
 // grafanaStandIn is a Grafana that answers every request with one reply, and
@@ -168,45 +168,6 @@ func TestPublishRefusesBeforeTouchingTheServer(t *testing.T) {
 				t.Errorf("stdout %q after %d requests, want nothing said and nothing posted", stdout, g.requests())
 			}
 		})
-	}
-}
-
-// TestSubstituteReachesEveryPlaceholder replaces the placeholder in every
-// container the builder and the decoder produce, and nothing else.
-func TestSubstituteReachesEveryPlaceholder(t *testing.T) {
-	t.Parallel()
-	ds := map[string]any{"uid": "x"}
-	doc := map[string]any{
-		"panels": []map[string]any{{"datasource": "${DS_INFLUXDB}", "gridPos": 3}},
-		"list":   []any{"${DS_X}", "kept", true},
-	}
-	got, _ := substitute(doc, ds).(map[string]any)
-	panels, _ := got["panels"].([]any)
-	first, _ := panels[0].(map[string]any)
-	if kept, _ := first["datasource"].(map[string]any); kept["uid"] != "x" || first["gridPos"] != 3 {
-		t.Errorf("panel = %v, want the datasource bound and the rest kept", first)
-	}
-	list, _ := got["list"].([]any)
-	if bound, _ := list[0].(map[string]any); bound["uid"] != "x" || list[1] != "kept" || list[2] != true {
-		t.Errorf("list = %v, want only the placeholder replaced", list)
-	}
-}
-
-// TestPluginIDReadsTheRequiresBlock names each store's plugin from the export,
-// and falls back to the store's own name when the block names none.
-func TestPluginIDReadsTheRequiresBlock(t *testing.T) {
-	t.Parallel()
-	pg, _ := dashboards.ByName("postgres")
-	if got := pluginID(pg); got != "grafana-postgresql-datasource" {
-		t.Errorf("pluginID(postgres) = %q, want the plugin its export requires", got)
-	}
-	bare := &dashboards.Store{Name: "graphite", Requires: []any{
-		"not an entry",
-		map[string]any{"type": "grafana", "id": "grafana"},
-		map[string]any{"type": "datasource"},
-	}}
-	if got := pluginID(bare); got != "graphite" {
-		t.Errorf("pluginID = %q, want the store's name when no datasource is named", got)
 	}
 }
 

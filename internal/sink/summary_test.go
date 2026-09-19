@@ -206,14 +206,12 @@ func TestReducerCountsTheEventsAFoldedRowStandsFor(t *testing.T) {
 // measurementsInCollectors reads every measurement name the collectors write
 // out of their own source.
 //
-// The alternative list, the tags table in cmd/internal/dashboards, is a copy
+// The alternative list, the tags table in internal/dashboards, is a copy
 // and not a source: it is written by hand after the collector is, and it does
 // not even claim to name every measurement (gh_event is excluded on purpose,
 // its own comment says so, and gh_job_log is simply not in it), so a rule
-// missing for either would sail past a test built on it. Go's internal rule
-// settles it anyway: cmd/internal/... is importable only from cmd/..., so this
-// package cannot read that table at all. internal/collect is the thing that
-// decides what exists, so it is the thing to ask.
+// missing for either would sail past a test built on it. internal/collect is
+// the thing that decides what exists, so it is the thing to ask.
 func measurementsInCollectors(t *testing.T) map[string]string {
 	t.Helper()
 	const dir = "../collect"

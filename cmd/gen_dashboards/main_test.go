@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jmrplens/ghchronicle/cmd/internal/dashboards"
+	"github.com/jmrplens/ghchronicle/internal/dashboards"
 )
 
 // TestLayoutOf flattens a collapsed row the way Grafana reads it: the row,

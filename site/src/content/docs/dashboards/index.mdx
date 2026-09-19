@@ -93,7 +93,7 @@ Grafana is fine, because the uids differ per store and cannot collide.
 
 ## They are generated, never hand-edited
 
-`cmd/internal/dashboards` holds one ordered list of sections and panels, and
+`internal/dashboards` holds one ordered list of sections and panels, and
 every panel carries one query set per store. The generator picks one set and
 emits the JSON, so every file has the same panels in the same places with the
 same titles, and it refuses to write files whose layouts have drifted apart.
@@ -103,7 +103,7 @@ go run ./cmd/gen_dashboards          # writes all five files
 go run ./cmd/gen_dashboards -check   # writes nothing, fails if they are stale
 ```
 
-Edit `cmd/internal/dashboards/sections_*.go`, not the JSON. `panels.go` holds
+Edit `internal/dashboards/sections_*.go`, not the JSON. `panels.go` holds
 the panel constructors it uses, `query.go` the query helpers for each store,
 and `stores.go` only chooses a query set and a datasource.
 

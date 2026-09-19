@@ -95,7 +95,7 @@ difieren por almacén y no pueden chocar.
 
 ## Son generados, nunca editados a mano
 
-`cmd/internal/dashboards` tiene una lista ordenada de secciones y paneles, y
+`internal/dashboards` tiene una lista ordenada de secciones y paneles, y
 cada panel lleva un conjunto de consultas por almacén. El generador elige un
 conjunto y emite el JSON, así que todos los ficheros tienen los mismos paneles
 en los mismos sitios con los mismos títulos, y se niega a escribir ficheros
@@ -106,7 +106,7 @@ go run ./cmd/gen_dashboards          # escribe los cinco ficheros
 go run ./cmd/gen_dashboards -check   # no escribe nada, falla si están caducos
 ```
 
-Edita `cmd/internal/dashboards/sections_*.go`, no el JSON. `panels.go` tiene
+Edita `internal/dashboards/sections_*.go`, no el JSON. `panels.go` tiene
 los constructores de panel que usa, `query.go` los ayudantes de consulta de
 cada almacén, y `stores.go` solo elige un conjunto de consultas y un
 datasource.

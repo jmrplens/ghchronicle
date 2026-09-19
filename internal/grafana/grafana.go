@@ -3,12 +3,12 @@
 // panel by panel, and how to render a panel's query the way a dashboard render
 // would before posting it.
 //
-// It sits at the module root rather than under cmd/internal because both its
-// users have to reach it and Go's internal rule leaves nowhere else: the
-// development commands under cmd/, and the containerised end-to-end suite
-// under test/, which runs those same panels against real stores in Docker.
+// Its readers are the collector itself, which publishes the dashboard and the
+// datasource it reads from, the development commands under cmd/, and the
+// containerised end-to-end suite under test/, which runs those same panels
+// against real stores in Docker.
 //
-// The dashboards are built in memory by cmd/internal/dashboards and committed
+// The dashboards are built in memory by internal/dashboards and committed
 // as JSON under dashboards/, so a panel arrives either as a map the builder
 // produced or as one encoding/json decoded. Everything here therefore works on
 // `any` and accepts both shapes: the []map[string]any the builder produces and

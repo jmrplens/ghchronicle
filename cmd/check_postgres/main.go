@@ -39,7 +39,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jmrplens/ghchronicle/cmd/internal/dashboards"
+	"github.com/jmrplens/ghchronicle/internal/dashboards"
 	"github.com/jmrplens/ghchronicle/internal/grafana"
 )
 

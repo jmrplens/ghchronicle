@@ -34,8 +34,8 @@ test/e2e/docker     the same binary against the real stores in Docker, and the
                     five dashboards against those; behind the dockere2e tag
 cmd/                the development utilities: the dashboard generator, its
                     checkers, the publisher and the brand generator
-cmd/internal        the package those commands share: the dashboard
-                    specification
+internal/dashboards the dashboard specification, built in memory: what the
+                    generators write out and what the binary publishes
 dashboards/         one specification rendered into a Grafana dashboard per store
 site/               the documentation site: the English pages and their Spanish
                     twins, and the scripts that generate what is derived from them
@@ -164,7 +164,7 @@ case in `run.repoFamily` or a `r.family` call in `run.Once`, an entry in
 start-up, which has bitten twice), a rule in `sink.promRules` (leaving it out
 means the exporter skips it, which is the safe default), a Loki rendering if
 it is an event, a fixture and a test in `internal/collect`, and a panel in
-`cmd/internal/dashboards` with a query set per store.
+`internal/dashboards` with a query set per store.
 
 It also means an end-to-end fixture, a route for it in `test/e2e/fakegh`, and
 an entry in that package's `Measurements`. The family list both suites schedule
@@ -181,7 +181,7 @@ Adding a sink means: a file in `internal/sink` with an httptest-backed test of
 its exact wire format, a struct in `config.Sinks` with a validation message
 that says what is required, a branch in `buildSinks`, a commented block in
 `config.example.yaml`, a page under `site/src/content/docs/sinks/` with its
-Spanish twin beside it, and a store in `cmd/internal/dashboards/stores.go` if it
+Spanish twin beside it, and a store in `internal/dashboards/stores.go` if it
 can be queried by Grafana.
 
 `docs/` is generated, never hand-edited either. The English pages of the site
@@ -194,7 +194,7 @@ reduction of the same source. A page added to the site fails `make check-docs`
 until it is claimed by an entry of that script's manifest, which is what keeps
 `docs/` complete without anyone remembering it exists.
 
-The dashboards are generated, never hand-edited: `cmd/internal/dashboards` is
+The dashboards are generated, never hand-edited: `internal/dashboards` is
 the one source, `cmd/gen_dashboards` writes the five files and refuses to write
 them when their layouts have drifted apart, and `cmd/check_dashboards` and
 `cmd/check_prometheus` run every panel through Grafana's own query path. A panel

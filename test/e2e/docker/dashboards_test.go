@@ -47,7 +47,7 @@ import (
 // questions.
 
 // The committed dashboards are the subject rather than the builder in
-// cmd/internal/dashboards: they are the files a user imports, nothing outside
+// internal/dashboards: they are the files a user imports, nothing outside
 // cmd/ may import that package, and `make check-dashboards` already fails when
 // the two disagree.
 const dashboardsDir = "../../../dashboards"

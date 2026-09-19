@@ -15,12 +15,12 @@ import (
 // the package directory, and a copy that is not compared is a second mark.
 func TestBrandMarkIsTheRepositoryOne(t *testing.T) {
 	t.Parallel()
-	want, err := os.ReadFile(filepath.Join("..", "..", "..", "brand", "mark-dark.svg"))
+	want, err := os.ReadFile(filepath.Join("..", "..", "brand", "mark-dark.svg"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if string(want) != brandMark {
-		t.Error("cmd/internal/dashboards/mark-dark.svg differs from brand/mark-dark.svg; " +
+		t.Error("internal/dashboards/mark-dark.svg differs from brand/mark-dark.svg; " +
 			"copy the brand one over it")
 	}
 }

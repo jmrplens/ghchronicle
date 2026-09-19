@@ -14,7 +14,7 @@ import (
 
 // collectDir is the collectors' own source, which is the only authority on
 // what measurements exist.
-const collectDir = "../../../internal/collect"
+const collectDir = "../collect"
 
 // tableExclusions is the one measurement deliberately absent from the table,
 // for the reason given in tags.go: gh_job_log has no panel and so no node

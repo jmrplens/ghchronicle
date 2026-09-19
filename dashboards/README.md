@@ -46,7 +46,7 @@ and `DS_ELASTICSEARCH` (`elasticsearch`).
 
 ## One dashboard, five stores
 
-They are the same dashboard. `cmd/internal/dashboards` holds one ordered list of
+They are the same dashboard. `internal/dashboards` holds one ordered list of
 sections and panels, and every panel carries one query set per store. The
 generator picks one set and emits the JSON, so every file has the same panels in
 the same places with the same titles, and a user who chose any store gets the
@@ -92,11 +92,11 @@ go run ./cmd/gen_dashboards          # writes all five files
 go run ./cmd/gen_dashboards -check   # writes nothing, fails if they are stale
 ```
 
-`cmd/internal/dashboards/sections_*.go` is where a panel is added or changed;
+`internal/dashboards/sections_*.go` is where a panel is added or changed;
 `panels.go` holds the panel constructors and `query.go` the query helpers for
 each store. `stores.go` only chooses a query set and a datasource. A new tag on
 a collector changes the Graphite path depth of its measurement, which the `tags`
-table in `tags.go` mirrors. `go test ./cmd/internal/dashboards` fails when the
+table in `tags.go` mirrors. `go test ./internal/dashboards` fails when the
 committed JSON no longer matches the specification.
 
 ## Checking

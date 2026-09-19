@@ -112,7 +112,7 @@ func TestTheReachOfTheSpeedRangeIsWrittenAsTheEngineSetsIt(t *testing.T) {
 // seventeen. Everything the layouts pages state is generated now, and the front
 // page is where the last hand-written registry facts live, so they are held
 // here. Only the two the registry answers directly are pinned; the dashboard
-// sections are pinned by cmd/internal/dashboards' own tests.
+// sections are pinned by internal/dashboards' own tests.
 func TestEveryCountTheReadmeWritesMatchesTheCode(t *testing.T) {
 	path := filepath.Join("..", "..", "README.md")
 	raw, err := os.ReadFile(path)

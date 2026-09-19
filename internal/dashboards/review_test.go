@@ -884,7 +884,7 @@ func collectorSentinel(t *testing.T) string {
 // collectors in, and the few strings it needs from them are these.
 func collectConst(t *testing.T, file, name string) string {
 	t.Helper()
-	path := filepath.Join("..", "..", "..", "internal", "collect", file)
+	path := filepath.Join("..", "collect", file)
 	fset := token.NewFileSet()
 	parsed, err := parser.ParseFile(fset, path, nil, 0)
 	if err != nil {

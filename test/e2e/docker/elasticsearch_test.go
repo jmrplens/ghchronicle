@@ -240,7 +240,7 @@ func TestElasticsearchAnswersTheAggregationsTheDashboardsAsk(t *testing.T) {
 //
 // It reads dashboards/ghchronicle-elasticsearch.json rather than the
 // specification that generates it, for two reasons: the specification lives in
-// cmd/internal/dashboards, which nothing outside cmd/ may import, and the JSON
+// internal/dashboards, which nothing outside cmd/ may import, and the JSON
 // is what Grafana actually loads.
 func esScanCommittedDashboard(ctx context.Context, t *testing.T, s *Stack) {
 	t.Helper()

@@ -1,5 +1,10 @@
 // Package dashboards builds the Grafana dashboard, once per store.
 //
+// It lived under cmd/internal while its only readers were the development
+// commands that write the JSON under dashboards/. The shipped binary publishes
+// the dashboard itself now, so it is product code and sits where product code
+// does; nothing else about it changed in the move.
+//
 // Everything here is deliberately plain maps. Grafana's JSON is the contract;
 // a type per panel kind in between would only hide which key made a panel
 // behave the way it does, and the shapes differ enough between kinds that the

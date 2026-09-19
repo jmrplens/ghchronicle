@@ -63,7 +63,7 @@ is not.
       something has happened, and they draw here only because this account has
       done it. The whole list, with the condition each is written under, is
       `conditionalColumns` in
-      `cmd/internal/dashboards/conditional_columns_test.go`, and a test keeps it
+      `internal/dashboards/conditional_columns_test.go`, and a test keeps it
       complete: it parses every collector for a field written under a condition,
       intersects that with every column the two SQL dashboards name, and fails
       when the two agree on something the list does not carry. The ones an

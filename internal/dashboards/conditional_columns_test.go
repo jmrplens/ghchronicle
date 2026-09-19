@@ -212,7 +212,7 @@ var fieldMaps = map[string]bool{"fields": true, "f": true, "listing": true, "tag
 // `if`, or written unguarded anywhere in the same function, is not one of them.
 func conditionalWrites(t *testing.T) map[conditionalColumn]bool {
 	t.Helper()
-	dir := filepath.Join("..", "..", "..", "internal", "collect")
+	dir := filepath.Join("..", "collect")
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		t.Fatalf("reading the collectors: %v", err)

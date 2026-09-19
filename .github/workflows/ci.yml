@@ -140,7 +140,7 @@ jobs:
       - run: go mod download
 
       # The five dashboards under dashboards/ are generated from
-      # cmd/internal/dashboards and never hand-edited. Nothing enforced that
+      # internal/dashboards and never hand-edited. Nothing enforced that
       # until this job: an edit to the specification that was never
       # regenerated, or an edit to the JSON that the next generation would
       # throw away, both looked exactly like a clean tree.

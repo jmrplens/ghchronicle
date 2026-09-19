@@ -524,7 +524,7 @@ sonar: ## Scan with SonarCloud locally (needs sonar-scanner and SONAR_TOKEN)
 
 # Two different things are called checking a dashboard, and the names below keep
 # them apart. check-dashboards is offline: it asks whether the committed JSON
-# still matches the specification in cmd/internal/dashboards, so it belongs in
+# still matches the specification in internal/dashboards, so it belongs in
 # CI. check-dashboards-live, check-prometheus and check-postgres ask whether the
 # queries actually work, which needs a running Grafana or PostgreSQL and can
 # therefore never run in CI.

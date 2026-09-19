@@ -174,7 +174,7 @@ func TestDashboardLinkColumnsOpenTheItem(t *testing.T) {
 //
 // linkColumn() sits in the panel's own Overrides, and panel() hands it to a
 // store only when that store's query returns the column it reads (placeLinks
-// in cmd/internal/dashboards/spec.go): the two SQL stores select it by name,
+// in internal/dashboards/spec.go): the two SQL stores select it by name,
 // Elasticsearch buckets on url.keyword, and Prometheus and Graphite, which
 // keep no url, get a sentence in the description instead. Before that the
 // override reached all five dashboards and drew nothing on three of them,

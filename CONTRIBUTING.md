@@ -26,7 +26,8 @@ internal/sink       Point, line protocol, the sinks, the Reducer that makes gaug
 internal/render     the SVG card
 internal/config     YAML with ${VAR} expansion, per-family cadences
 internal/run        the sweep scheduler and its state file
-cmd/internal        the dashboard specification the generators share
+internal/dashboards the dashboard specification, shared by the generators
+                    and by the binary that publishes it
 test/e2e            the binary against a fake GitHub, and against real stores
 site/               the documentation, from which docs/ is generated
 ```
@@ -76,13 +77,13 @@ The card pictures are generated and never hand-edited.
 cadence missing there is rejected at start-up), a rule in `sink.promRules`, a
 Loki rendering if it is an event, a fixture and a test, a route in
 `test/e2e/fakegh` with an entry in that package's `Measurements`, a panel in
-`cmd/internal/dashboards`, and a row in the measurements page of the site.
+`internal/dashboards`, and a row in the measurements page of the site.
 
 **A new sink** means: a file in `internal/sink` with an httptest-backed test of
 its exact wire format, a struct in `config.Sinks` with a validation message
 that says what is required, a branch in `buildSinks`, a commented block in
 `config.example.yaml`, a page under `site/src/content/docs/sinks/` with its
-Spanish twin, and a store in `cmd/internal/dashboards/stores.go` if Grafana can
+Spanish twin, and a store in `internal/dashboards/stores.go` if Grafana can
 query it.
 
 **A new setting** means `config.example.yaml` and the configuration pages. A

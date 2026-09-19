@@ -29,7 +29,7 @@ import (
 //
 // Every Graphite panel computes a groupByNode or aliasByNode index from that
 // shape, and it computes it from one hand-maintained table,
-// cmd/internal/dashboards/tags.go, which lists the tags each collector sets.
+// internal/dashboards/tags.go, which lists the tags each collector sets.
 // Nothing has ever checked that table against a collector. A tag added,
 // removed or made conditional moves every node after it by one, the panel
 // then groups by the wrong node, and nothing says so: the query is valid, the
@@ -60,7 +60,7 @@ func TestGraphiteTagsMatchTheTableTheDashboardsIndexFrom(t *testing.T) {
 				continue
 			}
 			if _, ok := table[measurement]; !ok {
-				t.Errorf("%s has no entry in cmd/internal/dashboards/tags.go, so no panel can address it", measurement)
+				t.Errorf("%s has no entry in internal/dashboards/tags.go, so no panel can address it", measurement)
 			}
 		}
 	})
@@ -253,14 +253,15 @@ func graphiteWantNothingSince(ctx context.Context, t *testing.T, s *Stack, path 
 
 // ── The table the dashboards compute their node indices from ────────────────
 
-// graphiteTable reads `var tags` out of cmd/internal/dashboards/tags.go.
+// graphiteTable reads `var tags` out of internal/dashboards/tags.go.
 //
-// It is parsed rather than imported because the package is under cmd/internal,
-// which nothing outside cmd/ may import, and copied rather than parsed would
-// be a second hand-maintained table checking the first.
+// It is parsed rather than imported because the table is unexported and has
+// no reader outside its own package, and exporting it to be read once here
+// would widen that package's surface for a test; copied rather than parsed
+// would be a second hand-maintained table checking the first.
 func graphiteTable(t *testing.T) map[string][]string {
 	t.Helper()
-	path := filepath.Join("..", "..", "..", "cmd", "internal", "dashboards", "tags.go")
+	path := filepath.Join("..", "..", "..", "internal", "dashboards", "tags.go")
 	file, err := parser.ParseFile(token.NewFileSet(), path, nil, 0)
 	if err != nil {
 		t.Fatalf("the node table: %v", err)

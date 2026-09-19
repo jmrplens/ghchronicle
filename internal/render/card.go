@@ -203,7 +203,7 @@ var (
 	// and both ramps had moved since they were last copied here: dark level 1
 	// in particular went from #0e4429 to a much darker #033a16, and the light
 	// ramp from #ebedf0/#9be9a8/#40c463/#30a14e/#216e39. Remeasure rather than
-	// remember, and keep cmd/internal/dashboards.calendarShades in step: it
+	// remember, and keep internal/dashboards.calendarShades in step: it
 	// carries the same four greens, over a lighter empty day on purpose, for
 	// the reason given there.
 	darkHeat  = [5]string{"#151b23", "#033a16", "#196c2e", "#2ea043", "#56d364"}

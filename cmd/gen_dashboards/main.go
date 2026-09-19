@@ -1,6 +1,6 @@
 // Command gen_dashboards writes the five Grafana dashboards.
 //
-// The panels are defined once in cmd/internal/dashboards; this picks each
+// The panels are defined once in internal/dashboards; this picks each
 // store's query set and wraps them in Grafana's shareable export format, where
 // the datasource is a `${DS_*}` placeholder and the `__inputs` block asks the
 // importer to pick their own.
@@ -23,7 +23,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/jmrplens/ghchronicle/cmd/internal/dashboards"
+	"github.com/jmrplens/ghchronicle/internal/dashboards"
 )
 
 func main() {
