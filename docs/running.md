@@ -57,7 +57,7 @@ keep it running once you are done watching it.
   ship as `tar.gz` (`zip` on Windows).
 
   ```sh
-  tar -xzf ghchronicle_2.1.0_linux_amd64.tar.gz
+  tar -xzf ghchronicle_2.2.0_linux_amd64.tar.gz
   sudo install -m 755 ghchronicle /usr/local/bin/
   ```
 
@@ -148,7 +148,7 @@ the version you see is the file it just wrote, and it says so when another
 Pin a version, or choose where it goes:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.sh | VERSION=2.1.0 BIN_DIR=~/bin bash
+curl -fsSL https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.sh | VERSION=2.2.0 BIN_DIR=~/bin bash
 ```
 
 > **Reading it first is the whole point of a short script**
@@ -173,7 +173,7 @@ Release archives are named
 | `aarch64`          | `linux_arm64`       |
 
 ```sh
-VERSION=2.1.0
+VERSION=2.2.0
 arch=$(uname -m); case "$arch" in x86_64) arch=amd64 ;; aarch64) arch=arm64 ;; esac
 base=https://github.com/jmrplens/ghchronicle/releases/download/v$VERSION
 curl -fsSLO "$base/ghchronicle_${VERSION}_linux_${arch}.tar.gz"
@@ -211,7 +211,7 @@ the file, then verify the archive against the file.
     ```
 
     ```text
-    ghchronicle_2.1.0_linux_amd64.tar.gz: OK
+    ghchronicle_2.2.0_linux_amd64.tar.gz: OK
     ```
 
 3. Check the checksum file itself, if you have
@@ -266,7 +266,7 @@ meant to.
   `ghchronicle -version` answers "command not found", it is not on yours.
 
 ```text
-ghchronicle 2.1.0 (commit 4e5dfc2, built 2026-09-14T23:04:02Z)
+ghchronicle 2.2.0 (commit 4e5dfc2, built 2026-09-14T23:04:02Z)
 ```
 
 ### Run it once
@@ -310,7 +310,7 @@ find.
   build date:
 
   ```text
-  ghchronicle 2.1.0 (commit unknown, built unknown)
+  ghchronicle 2.2.0 (commit unknown, built unknown)
   ```
 
   The version comes from the `VERSION` file the module embeds; the other two
@@ -380,7 +380,7 @@ the version you see is the file it just wrote, and it says so when another
 Pin a version, or choose where it goes:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.sh | VERSION=2.1.0 BIN_DIR=~/bin bash
+curl -fsSL https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.sh | VERSION=2.2.0 BIN_DIR=~/bin bash
 ```
 
 > **Reading it first is the whole point of a short script**
@@ -405,7 +405,7 @@ architecture.
 | `x86_64`           | Intel              | `darwin_amd64`      |
 
 ```sh
-VERSION=2.1.0
+VERSION=2.2.0
 arch=$(uname -m); case "$arch" in x86_64) arch=amd64 ;; esac
 base=https://github.com/jmrplens/ghchronicle/releases/download/v$VERSION
 curl -fsSLO "$base/ghchronicle_${VERSION}_darwin_${arch}.tar.gz"
@@ -443,7 +443,7 @@ signature over that file.
     ```
 
     ```text
-    ghchronicle_2.1.0_darwin_arm64.tar.gz: OK
+    ghchronicle_2.2.0_darwin_arm64.tar.gz: OK
     ```
 
 3. Check the checksum file itself, if you have
@@ -705,7 +705,7 @@ takes parameters, which needs the slightly longer form because `iex` has
 nowhere to put them:
 
 ```powershell
-& ([scriptblock]::Create((irm https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.ps1))) -Version 2.1.0 -BinDir C:\tools -NoPathUpdate
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.ps1))) -Version 2.2.0 -BinDir C:\tools -NoPathUpdate
 ```
 
 > **Reading it first is the whole point of a short script**
@@ -757,7 +757,7 @@ rather than the shell:
 ```
 
 ```powershell
-$version = "2.1.0"
+$version = "2.2.0"
 $arch = if ($env:PROCESSOR_ARCHITECTURE -eq "ARM64") { "arm64" } else { "amd64" }
 $base = "https://github.com/jmrplens/ghchronicle/releases/download/v$version"
 $zip = "ghchronicle_${version}_windows_${arch}.zip"
@@ -876,7 +876,7 @@ ghchronicle -version
 ```
 
 ```text
-ghchronicle 2.1.0 (commit 4e5dfc2, built 2026-09-14T23:04:02Z)
+ghchronicle 2.2.0 (commit 4e5dfc2, built 2026-09-14T23:04:02Z)
 ```
 
 > **If Windows warns about the file**
