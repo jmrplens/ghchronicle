@@ -107,6 +107,14 @@ The dashboard is published with `overwrite`, so the second run updates the first
 rather than adding another. That is what makes `publish_on_start` safe to leave
 on.
 
+A run also names what it finds under a uid it no longer writes to. Changing
+which store the collector feeds is the case that leaves one: the old store's
+dashboard and datasource stay where they are, pointing at something nobody
+fills, and the new store's uid is a different string, so nothing overwrites
+them. The note says which uid and which store, and stops there. Deleting a
+dashboard unasked is not something a collector should do, even one it made: it
+may be the copy still being read, or one edited since.
+
 ### If the dashboard is already somewhere else
 
 Importing the JSON through the UI keeps the uid the file carries, so a dashboard

@@ -16,10 +16,23 @@ import (
 // sent, so a test can read the datasource and the dashboard that were written
 // rather than only whether the call returned.
 type grafanaStub struct {
-	missing  bool // the datasource is not there yet
-	unwell   bool // it is there and cannot reach its store
+	missing bool // the datasource is not there yet
+	unwell  bool // it is there and cannot reach its store
+	// present are the uids a GET finds, for the leftover check. Empty means
+	// the ordinary case where nothing of an earlier setup is around.
+	present  map[string]bool
 	writes   []map[string]any
 	askedFor []string
+}
+
+// has says whether the stub should answer a GET for this path.
+func (g *grafanaStub) has(path string) bool {
+	for uid := range g.present {
+		if strings.HasSuffix(path, "/"+uid) {
+			return true
+		}
+	}
+	return false
 }
 
 func (g *grafanaStub) serve(t *testing.T) string {
@@ -34,8 +47,15 @@ func (g *grafanaStub) serve(t *testing.T) string {
 				return
 			}
 			_, _ = io.WriteString(w, `{"status":"OK","message":"reached it"}`)
+		case r.Method == http.MethodGet && strings.Contains(r.URL.Path, "/api/dashboards/uid/"):
+			if !g.has(r.URL.Path) {
+				w.WriteHeader(http.StatusNotFound)
+				_, _ = io.WriteString(w, `{"message":"not found"}`)
+				return
+			}
+			_, _ = io.WriteString(w, `{"dashboard":{"uid":"x"}}`)
 		case r.Method == http.MethodGet && strings.Contains(r.URL.Path, "/api/datasources/"):
-			if g.missing {
+			if g.missing && !g.has(r.URL.Path) {
 				w.WriteHeader(http.StatusNotFound)
 				_, _ = io.WriteString(w, `{"message":"not found"}`)
 				return
@@ -342,4 +362,76 @@ func publishedUIDs(t *testing.T, writes []map[string]any) []string {
 		}
 	}
 	return out
+}
+
+// TestItNamesWhatAnEarlierStoreLeftBehind. Changing which store the collector
+// feeds leaves the old dashboard and datasource where they are: the new
+// store's uid is a different string, so nothing overwrites them and, without
+// this, nothing says they are there.
+func TestItNamesWhatAnEarlierStoreLeftBehind(t *testing.T) {
+	t.Parallel()
+	g := &grafanaStub{missing: true, present: map[string]bool{"ghchronicle-graphite": true}}
+	cfg := influxConfig(g.serve(t))
+	var said strings.Builder
+	if err := publishDashboards(t.Context(), cfg, &said); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(said.String(), "ghchronicle-graphite is still in Grafana") {
+		t.Errorf("output = %q, want the leftover named", said.String())
+	}
+	if !strings.Contains(said.String(), "no graphite sink is configured") {
+		t.Errorf("output = %q, want it to say why it is a leftover", said.String())
+	}
+	// It says so and stops there.
+	for _, call := range g.askedFor {
+		if strings.HasPrefix(call, http.MethodDelete) {
+			t.Errorf("it deleted something: %v", g.askedFor)
+		}
+	}
+}
+
+// TestItSaysNothingAboutTheStoreItJustPublished, which is there because this
+// put it there and is the opposite of a leftover.
+func TestItSaysNothingAboutTheStoreItJustPublished(t *testing.T) {
+	t.Parallel()
+	g := &grafanaStub{missing: true, present: map[string]bool{"ghchronicle-influxdb": true}}
+	cfg := influxConfig(g.serve(t))
+	var said strings.Builder
+	if err := publishDashboards(t.Context(), cfg, &said); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(said.String(), "still in Grafana") {
+		t.Errorf("output = %q, want nothing said about the dashboard it just wrote", said.String())
+	}
+}
+
+// TestTheGeneratedUIDIsALeftoverOnceTheDashboardMovedElsewhere: setting
+// dashboard_uid after a run has already published leaves the generated one
+// behind for the same reason changing store does.
+func TestTheGeneratedUIDIsALeftoverOnceTheDashboardMovedElsewhere(t *testing.T) {
+	t.Parallel()
+	g := &grafanaStub{missing: true, present: map[string]bool{"ghchronicle-influxdb": true}}
+	cfg := influxConfig(g.serve(t))
+	cfg.Grafana.DashboardUID = "somewhere-else"
+	var said strings.Builder
+	if err := publishDashboards(t.Context(), cfg, &said); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(said.String(), "ghchronicle-influxdb is still in Grafana") {
+		t.Errorf("output = %q, want the dashboard it no longer writes to named", said.String())
+	}
+}
+
+// TestACleanGrafanaIsSaidNothingAbout.
+func TestACleanGrafanaIsSaidNothingAbout(t *testing.T) {
+	t.Parallel()
+	g := &grafanaStub{missing: true}
+	cfg := influxConfig(g.serve(t))
+	var said strings.Builder
+	if err := publishDashboards(t.Context(), cfg, &said); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(said.String(), "note:") {
+		t.Errorf("output = %q, want no note where there is nothing to note", said.String())
+	}
 }

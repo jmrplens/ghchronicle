@@ -70,3 +70,26 @@ func (c Client) EnsureFolder(ctx context.Context, title string,
 	}
 	return field(made.Body, "uid"), nil
 }
+
+// Exists says whether something answers at a uid, for dashboards and for
+// datasources alike. A 404 is the ordinary answer and not an error.
+func (c Client) Exists(ctx context.Context, path string, timeout time.Duration) (bool, error) {
+	res, err := c.Do(ctx, http.MethodGet, path, nil, timeout)
+	if err != nil {
+		return false, err
+	}
+	switch {
+	case res.Status == http.StatusNotFound:
+		return false, nil
+	case res.Status >= 200 && res.Status <= 299:
+		return true, nil
+	default:
+		return false, fmt.Errorf("asking about %s: %s", path, answerText(res))
+	}
+}
+
+// DashboardPath is where a dashboard answers to its uid.
+func DashboardPath(uid string) string { return "/api/dashboards/uid/" + uid }
+
+// DatasourcePath is where a datasource answers to its uid.
+func DatasourcePath(uid string) string { return datasourceByUID + uid }

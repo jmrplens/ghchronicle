@@ -49,12 +49,81 @@ func publishDashboards(ctx context.Context, cfg *config.Config, out io.Writer) e
 		return fmt.Errorf("the folder %q: %w", settings.Folder, err)
 	}
 	logs := lokiUID(cfg, settings)
+	written := map[string]bool{}
 	for _, store := range stores {
 		if failed := publishOne(ctx, client, cfg, store, folder, logs, out); failed != nil {
 			return failed
 		}
+		written[publishedUID(cfg, store)] = true
 	}
+	reportLeftovers(ctx, client, written, out)
 	return nil
+}
+
+// publishedUID is where this run's dashboard for a store went.
+func publishedUID(cfg *config.Config, store *dashboards.Store) string {
+	if override := cfg.Grafana.DashboardUID; override != "" {
+		return override
+	}
+	return store.UID
+}
+
+// reportLeftovers names what this made under a uid nothing here writes to any
+// more. Changing which store the collector feeds is the case: the dashboard
+// and datasource for the old one stay where they are, pointing at something
+// nobody fills, and the generated uid of the new store is a different string,
+// so nothing overwrites them and nothing says they are there. Setting
+// dashboard_uid after a run has already published is the other case, for the
+// same reason.
+//
+// It names them and stops. Deleting somebody's dashboard unasked is not a
+// thing a collector should do, even one it made: it may be the copy they are
+// still reading, or one they have edited since.
+func reportLeftovers(ctx context.Context, client grafana.Client,
+	written map[string]bool, out io.Writer,
+) {
+	for _, store := range dashboards.AllStores() {
+		if written[store.UID] {
+			continue
+		}
+		what, err := leftoverAt(ctx, client, store.UID)
+		if err != nil {
+			// A courtesy check. The publishing it follows has already
+			// succeeded, so failing the run over this would undo nothing and
+			// report nothing useful; saying it could not look is the honest
+			// middle.
+			fmt.Fprintf(out, "note: could not check whether %s was left behind: %v\n", store.UID, err)
+			continue
+		}
+		if what == "" {
+			continue
+		}
+		fmt.Fprintf(out, "note: %s is still in Grafana (%s) and no %s sink is configured here. "+
+			"Delete it there if an earlier setup left it.\n", store.UID, what, store.Name)
+	}
+}
+
+// leftoverAt says what answers at a uid, in the words the note prints, and ""
+// when nothing does.
+func leftoverAt(ctx context.Context, client grafana.Client, uid string) (string, error) {
+	dashboard, err := client.Exists(ctx, grafana.DashboardPath(uid), grafanaTimeout)
+	if err != nil {
+		return "", err
+	}
+	datasource, err := client.Exists(ctx, grafana.DatasourcePath(uid), grafanaTimeout)
+	if err != nil {
+		return "", err
+	}
+	switch {
+	case dashboard && datasource:
+		return "a dashboard and its datasource", nil
+	case dashboard:
+		return "a dashboard", nil
+	case datasource:
+		return "a datasource", nil
+	default:
+		return "", nil
+	}
 }
 
 // publishOne does one store: the datasource, the probe that says whether it

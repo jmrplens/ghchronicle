@@ -108,6 +108,14 @@ El dashboard se publica con `overwrite`, así que la segunda ejecución actualiz
 la primera en vez de añadir otra. Eso es lo que hace que `publish_on_start` se
 pueda dejar encendido.
 
+Una ejecución nombra además lo que encuentra bajo un uid al que ya no escribe.
+El caso que deja uno es cambiar de almacén: el dashboard y el datasource del
+viejo se quedan donde están, apuntando a algo que nadie llena, y el uid del
+nuevo es otra cadena, así que nada los sobreescribe. El aviso dice qué uid y
+qué almacén, y ahí se queda. Borrar un dashboard sin que nadie lo pida no es
+cosa de un colector, ni siquiera de uno que lo hizo él: puede ser la copia que
+alguien sigue mirando, o una que ha editado desde entonces.
+
 ### Si el dashboard ya está en otro sitio
 
 Importar el JSON desde la interfaz conserva el uid que trae el fichero, así que
