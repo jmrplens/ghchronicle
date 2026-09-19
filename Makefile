@@ -17,6 +17,7 @@
 	test-e2e-docker test-e2e-docker-race e2e-docker-up e2e-docker-down e2e-docker-logs \
 	gallery check-gallery layouts check-layouts \
 	config-options check-config-options config-cases check-config-cases \
+	version check-version \
 	fmt fmt-check vet tidy lint golangci-lint govulncheck analyze analyze-fix sonar \
 	mdlint mdlint-fix check-doc-links docs check-docs \
 	probe gen-dashboards check-dashboards check-dashboards-live shellcheck \
@@ -325,6 +326,16 @@ check-config-options: ## Fail if the committed configuration surface no longer m
 # (site/src/lib/config-build.mjs) and loaded by the real parser in
 # internal/config/builder_test.go. Node only, no site dependencies: it reads
 # one committed JSON file and writes another.
+# The install pages carry the release number inside their examples, in two
+# languages plus the two runbooks. VERSION is the source and this makes them
+# agree with it, so a release edits one file instead of forty eight places.
+version: ## Rewrite the version in the install pages and runbooks from VERSION
+	node site/scripts/gen-version.mjs
+
+check-version: ## Fail if the install pages no longer say what VERSION says (offline)
+	@echo "=== the install pages agree with VERSION ==="
+	node site/scripts/gen-version.mjs --check
+
 config-cases: ## Regenerate the builder's cases for internal/config's round-trip test
 	node site/scripts/gen-config-cases.mjs
 

@@ -179,6 +179,13 @@ jobs:
       - name: The committed builder cases match what the page writes
         run: make check-config-cases
 
+      # The install pages carry the release number inside their examples, in
+      # two languages plus the two runbooks. A bump that edits VERSION and not
+      # them leaves every download command pointing at the release before, and
+      # 2.1.0 was forty eight edits done by hand.
+      - name: The install pages say what VERSION says
+        run: make check-version
+
   sonarcloud:
     name: SonarCloud
     runs-on: ubuntu-latest

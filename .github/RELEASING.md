@@ -5,6 +5,19 @@ is not.
 
 ## Before the tag
 
+- [ ] `VERSION` holds the new number and the pages that quote it were
+      regenerated:
+
+      ```sh
+      echo X.Y.Z > VERSION && make version   # the number, not a placeholder
+      ```
+
+      `VERSION` is the only place the number is written by hand. `make version`
+      rewrites the install pages and these runbooks from it, in both languages,
+      and `make check-version` in CI fails when they disagree. Before it
+      existed a release edited forty eight places by hand and nothing checked
+      that it had.
+
 - [ ] `VERSION` and the tag agree. The release workflow's preflight job refuses
       the tag otherwise, and it is the first thing it checks.
 - [ ] `go build ./... && go vet ./... && go test -race ./...` and
