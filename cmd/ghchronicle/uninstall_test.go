@@ -16,14 +16,22 @@ import (
 // teardownStub is a Grafana and an InfluxDB in one server, which is all the
 // uninstall talks to, and it remembers every deletion it was asked for.
 type teardownStub struct {
-	tables  []string
-	deleted []string
+	tables []string
+	// refuseDelete makes every removal fail, which is how the run’s behavior
+	// when one does is read.
+	refuseDelete bool
+	deleted      []string
 }
 
 func (s *teardownStub) serve(t *testing.T) string {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodDelete {
+			if s.refuseDelete {
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = io.WriteString(w, `{"message":"it is in use"}`)
+				return
+			}
 			target := r.URL.Path
 			if table := r.URL.Query().Get("table"); table != "" {
 				target = "table:" + table
@@ -204,5 +212,48 @@ func TestAnEmptyTargetListIsRefused(t *testing.T) {
 	var said strings.Builder
 	if err := uninstall(t.Context(), cfg, "  ,  ", true, &said); err == nil {
 		t.Error("an empty list was taken as a request to remove something")
+	}
+}
+
+// TestOneRemovalThatFailsDoesNotStopTheRest, and the run reports it. Stopping
+// at the first would leave the job half done with no list of what is left,
+// which is the worst of both outcomes.
+func TestOneRemovalThatFailsDoesNotStopTheRest(t *testing.T) {
+	t.Parallel()
+	s := &teardownStub{tables: []string{"gh_repo"}, refuseDelete: true}
+	cfg := teardownConfig(t, s.serve(t))
+	var said strings.Builder
+	err := uninstall(t.Context(), cfg, "dashboard,data", true, &said)
+	if err == nil {
+		t.Fatal("every removal failed and the run reported success")
+	}
+	if !strings.Contains(err.Error(), "could not be removed") {
+		t.Errorf("err = %v, want it to count what did not go", err)
+	}
+	if !strings.Contains(said.String(), "could not remove") {
+		t.Errorf("output = %q, want a line naming each one", said.String())
+	}
+	// It kept going rather than stopping at the first.
+	if got := strings.Count(said.String(), "could not remove"); got < 2 {
+		t.Errorf("%d failures reported, want it to have tried them all", got)
+	}
+}
+
+// TestNothingToRemoveSaysSo rather than printing an empty list and a count of
+// zero, which reads like a run that did not look.
+func TestNothingToRemoveSaysSo(t *testing.T) {
+	t.Parallel()
+	s := &teardownStub{}
+	cfg := &config.Config{
+		Sinks:   config.Sinks{Stdout: true},
+		Grafana: &config.Grafana{URL: s.serve(t), Token: "grafana-token"},
+	}
+	// No store to publish for, so no dashboard of ours, and no state file.
+	var said strings.Builder
+	if err := uninstall(t.Context(), cfg, "state", true, &said); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(said.String(), "nothing of this is here to remove") {
+		t.Errorf("output = %q, want it to say there was nothing", said.String())
 	}
 }

@@ -881,3 +881,46 @@ func TestOnlyAPasswordTheDSNWritesReachesGrafana(t *testing.T) {
 		})
 	}
 }
+
+// TestAFolderThatCannotBeMadeStopsTheRun, because publishing into the wrong
+// folder is worse than not publishing: the reader looks where they asked for
+// it and finds nothing.
+func TestAFolderThatCannotBeMadeStopsTheRun(t *testing.T) {
+	t.Parallel()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet && strings.Contains(r.URL.Path, "/api/search") {
+			_, _ = io.WriteString(w, `[]`)
+			return
+		}
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = io.WriteString(w, `{"message":"folders:create is required"}`)
+	}))
+	t.Cleanup(srv.Close)
+	cfg := influxConfig(srv.URL)
+	cfg.Grafana.Folder = "GitHub"
+	var said strings.Builder
+	err := publishDashboards(t.Context(), cfg, &said)
+	if err == nil || !strings.Contains(err.Error(), "GitHub") {
+		t.Errorf("err = %v, want it to name the folder it could not make", err)
+	}
+}
+
+// TestALeftoverDatasourceWithNoDashboardIsStillNamed. Changing store can leave
+// either, and a datasource alone still holds a credential and a connection.
+func TestALeftoverDatasourceWithNoDashboardIsStillNamed(t *testing.T) {
+	t.Parallel()
+	g := &grafanaStub{missing: true}
+	// The stub answers dashboards from `present` and datasources from
+	// `missing`, so asking for a uid that is in neither leaves the datasource
+	// answering and the dashboard not.
+	g.present = map[string]bool{}
+	g.missing = false
+	cfg := influxConfig(g.serve(t))
+	var said strings.Builder
+	if err := publishDashboards(t.Context(), cfg, &said); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(said.String(), "(a datasource)") {
+		t.Errorf("output = %q, want a leftover datasource named as one", said.String())
+	}
+}
