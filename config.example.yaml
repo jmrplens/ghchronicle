@@ -361,6 +361,13 @@ log:
 #     # on the host writes to a published port while Grafana in a container
 #     # reaches the same store by its name on the container network.
 #     url: http://influxdb:8181
+#     # What the PostgreSQL datasource connects with, when the mode the dsn
+#     # asks for is one Grafana cannot express. libpq defaults to "prefer",
+#     # try TLS and carry on without it, and Grafana's datasource either
+#     # insists or refuses, so that case is answered with disable and a line
+#     # saying so unless this names one of disable, require, verify-ca or
+#     # verify-full.
+#     sslmode: require
 #     # Adopt a datasource that already exists instead of managing one named
 #     # after the store.
 #     uid: ae3x9k2

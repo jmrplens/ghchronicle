@@ -1427,6 +1427,11 @@ type GrafanaDatasource struct {
 	// UID adopts a datasource that already exists instead of managing one
 	// named after the store.
 	UID string `yaml:"uid" ghc:"example=ae3x9k2"`
+	// SSLMode is what the PostgreSQL datasource connects with, when the mode
+	// in the dsn is one Grafana cannot express. libpq's default is "prefer",
+	// try TLS and carry on without it, and Grafana's datasource either
+	// insists or refuses, so that case is chosen here rather than guessed.
+	SSLMode string `yaml:"sslmode" ghc:"example=require"`
 	// LokiUID is a Loki datasource that already exists. With one, the panel
 	// that would say where a failed job's output went reads the lines from it
 	// instead. It is adopted rather than made: the Loki sink writes to the

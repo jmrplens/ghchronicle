@@ -6,8 +6,14 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
+	"regexp"
+	"slices"
+	"strconv"
 	"strings"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/jmrplens/ghchronicle/internal/config"
 	"github.com/jmrplens/ghchronicle/internal/dashboards"
@@ -48,7 +54,11 @@ func publishDashboards(ctx context.Context, cfg *config.Config, out io.Writer) e
 	if err != nil {
 		return fmt.Errorf("the folder %q: %w", settings.Folder, err)
 	}
-	logs := lokiUID(cfg, settings)
+	logs, err := lokiDatasource(ctx, client, cfg, out)
+	if err != nil {
+		return err
+	}
+
 	written := map[string]bool{}
 	for _, store := range stores {
 		if failed := publishOne(ctx, client, cfg, store, folder, logs, out); failed != nil {
@@ -175,7 +185,7 @@ func publishOne(ctx context.Context, client grafana.Client, cfg *config.Config,
 func reconcileDatasource(ctx context.Context, client grafana.Client,
 	cfg *config.Config, store *dashboards.Store, out io.Writer,
 ) (string, error) {
-	want, err := datasourceFor(cfg, store)
+	want, err := datasourceFor(cfg, store, out)
 	if err != nil {
 		return "", err
 	}
@@ -193,16 +203,51 @@ func reconcileDatasource(ctx context.Context, client grafana.Client,
 	return want.UID, nil
 }
 
-// lokiUID is the Loki datasource the failed job output panel reads from, or
-// "" to leave that panel as the note saying where the lines went. Only an
-// adopted uid is used: the Loki sink writes to a push endpoint, and a
-// datasource made from it would be a datasource pointed at the wrong half of
-// the API.
-func lokiUID(cfg *config.Config, settings *config.Grafana) string {
-	if cfg.Sinks.Loki == nil {
-		return ""
+// lokiPushPath is where a Loki sink writes. A datasource asks the same server
+// somewhere else, so the datasource's address is this suffix removed.
+const lokiPushPath = "/loki/api/v1/push"
+
+// lokiDatasource is the Loki datasource the failed job output panel reads
+// from, or "" to leave that panel as the note saying where the lines went.
+//
+// A uid in the config is adopted. Otherwise the datasource is made from the
+// sink, which is possible for the one reason it looked impossible at first:
+// the sink's address is the push endpoint and Grafana queries the base, and
+// the difference between them is a fixed, documented suffix rather than
+// anything that has to be guessed. A sink writing somewhere else is the case
+// that cannot be derived, and only that one still needs the uid.
+func lokiDatasource(ctx context.Context, client grafana.Client, cfg *config.Config,
+	out io.Writer,
+) (string, error) {
+	sink := cfg.Sinks.Loki
+	if sink == nil {
+		return "", nil
 	}
-	return settings.Datasource.LokiUID
+	if uid := cfg.Grafana.Datasource.LokiUID; uid != "" {
+		return uid, nil
+	}
+	base, ok := strings.CutSuffix(strings.TrimSuffix(sink.URL, "/"), lokiPushPath)
+	if !ok {
+		fmt.Fprintf(out, "note: sinks.loki.url does not end in %s, so the address Grafana "+
+			"would query cannot be worked out from it. Name a Loki datasource in "+
+			"grafana.datasource.loki_uid to draw the failed job output.\n", lokiPushPath)
+		return "", nil
+	}
+	want := grafana.Datasource{
+		UID: "ghchronicle-loki", Name: "ghchronicle-loki", Type: "loki", URL: base,
+	}
+	if sink.TenantID != "" {
+		// Loki calls it a tenant and reads it from this header; Grafana calls
+		// it an organization and sends it from this setting.
+		want.JSON = map[string]any{"httpHeaderName1": "X-Scope-OrgID"}
+		want.Secret = map[string]string{"httpHeaderValue1": sink.TenantID}
+	}
+	outcome, err := client.EnsureDatasource(ctx, want, grafanaTimeout)
+	if err != nil {
+		return "", fmt.Errorf("the Loki datasource: %w", err)
+	}
+	fmt.Fprintf(out, "datasource %s (loki) %s\n", want.UID, outcome)
+	return want.UID, nil
 }
 
 // storesToPublish is one store per metric sink configured, in a fixed order so
@@ -216,7 +261,9 @@ func storesToPublish(cfg *config.Config) ([]*dashboards.Store, error) {
 		{"influxdb", cfg.Sinks.Influx != nil},
 		{"elasticsearch", cfg.Sinks.Elasticsearch != nil},
 		{"prometheus", cfg.Sinks.Prometheus != nil},
-		{"postgres", cfg.Sinks.SQL != nil},
+		// Either way into a PostgreSQL: the connecting sink, or the file
+		// sink whose statements are loaded into one.
+		{"postgres", cfg.Sinks.SQL != nil || cfg.Sinks.Postgres != nil},
 		{"graphite", cfg.Sinks.Graphite != nil},
 	} {
 		if !named.configured {
@@ -243,7 +290,9 @@ func storesToPublish(cfg *config.Config) ([]*dashboards.Store, error) {
 // written to, the SQL sink writes statements to a file rather than to a
 // server, and the Graphite sink speaks the ingest port, which is not the API
 // Grafana asks. Those three are adopted by uid or not published at all.
-func datasourceFor(cfg *config.Config, store *dashboards.Store) (grafana.Datasource, error) {
+func datasourceFor(cfg *config.Config, store *dashboards.Store,
+	out io.Writer,
+) (grafana.Datasource, error) {
 	override := cfg.Grafana.Datasource
 	want := grafana.Datasource{
 		UID:  firstNonEmpty(override.UID, store.UID),
@@ -287,17 +336,25 @@ func datasourceFor(cfg *config.Config, store *dashboards.Store) (grafana.Datasou
 		// different port on the same host.
 		want.URL = override.URL
 		want.JSON = map[string]any{"graphiteVersion": "1.1"}
+	case store.Name == "postgres" && cfg.Sinks.Postgres != nil:
+		// The connecting sink knows the server, because it connects to it.
+		// Everything Grafana needs is in the DSN.
+		if err := fromDSN(&want, cfg.Sinks.Postgres.DSN, override, out); err != nil {
+			return want, err
+		}
 	case override.UID != "":
 		// Adopted, so nothing here has to describe it.
 		return want, nil
 	case store.Name == "postgres":
-		// The one that cannot be told either. The SQL sink writes statements
-		// to a file and never connects, so there is no host, port, user or
-		// password anywhere in the config to build a datasource out of.
+		// Only the file sink is configured. It writes statements and never
+		// connects, so there is no host, port, user or password anywhere in
+		// the config to build a datasource out of. The connecting sink, in the
+		// case above, is the one that can.
 		return want, errors.New(
 			"the sql sink writes statements to a file and never connects, so nothing here " +
-				"knows the server Grafana would query: create the datasource in Grafana and " +
-				"name it in grafana.datasource.uid",
+				"knows the server Grafana would query: configure sinks.postgres instead, " +
+				"which does, or create the datasource in Grafana and name it in " +
+				"grafana.datasource.uid",
 		)
 	default:
 		return want, fmt.Errorf(
@@ -360,4 +417,85 @@ func publishOnStart(ctx context.Context, cfg *config.Config, o options, logger *
 	for line := range strings.SplitSeq(strings.TrimSpace(said.String()), "\n") {
 		logger.Info("grafana", "did", line)
 	}
+}
+
+// fromDSN fills a PostgreSQL datasource out of the connection string the sink
+// dials with, so the one place the server is written down is the one the
+// collector already uses.
+//
+// pgx's own parser rather than a second one here: it takes the URL form and
+// the keyword form, and it reads the password file and the service file the
+// way libpq does. A parser of our own would disagree with the sink about what
+// the config says on exactly the inputs where being wrong matters.
+func fromDSN(want *grafana.Datasource, dsn string, override config.GrafanaDatasource,
+	out io.Writer,
+) error {
+	parsed, err := pgconn.ParseConfig(dsn)
+	if err != nil {
+		return fmt.Errorf("reading sinks.postgres.dsn: %w", err)
+	}
+	want.URL = firstNonEmpty(override.URL,
+		net.JoinHostPort(parsed.Host, strconv.Itoa(int(parsed.Port))))
+	want.Database = parsed.Database
+	want.User = parsed.User
+	want.JSON = map[string]any{"postgresVersion": 1500}
+	if mode, note := sslMode(dsn, override); mode != "" {
+		want.JSON["sslmode"] = mode
+		if note != "" {
+			fmt.Fprintln(out, note)
+		}
+	}
+	if parsed.Password != "" {
+		want.Secret = map[string]string{"password": parsed.Password}
+	}
+	return nil
+}
+
+// grafanaSSLModes are the four the PostgreSQL datasource understands. libpq
+// has two more, and that is the whole difficulty below.
+var grafanaSSLModes = []string{"disable", "require", "verify-ca", "verify-full"}
+
+// sslMode is the mode the datasource is given, and a line to print when the
+// answer had to be chosen rather than read.
+//
+// libpq defaults to "prefer", which means try TLS and carry on without it, and
+// Grafana cannot say that: its datasource either insists or refuses. So a DSN
+// that names one of the four is believed, a reader who set the override is
+// believed over everything, and a DSN that says nothing, or says "prefer" or
+// "allow", is answered with "disable" and a line saying so. Guessing "require"
+// instead would be the same guess pointed at the other half of the readers,
+// and the ones it breaks would have a datasource that cannot connect at all
+// rather than one that connects without TLS on a private network.
+func sslMode(dsn string, override config.GrafanaDatasource) (mode, note string) {
+	if override.SSLMode != "" {
+		return override.SSLMode, ""
+	}
+	// Read out of the text rather than off the parsed config: pgx spends
+	// sslmode building the TLS settings and does not keep the word, and the
+	// word is what the datasource is configured with.
+	named := dsnSSLMode(dsn)
+	if slices.Contains(grafanaSSLModes, named) {
+		return named, ""
+	}
+	if named == "" {
+		named = "prefer, which is libpq's default when the dsn does not say"
+	}
+	return "disable", fmt.Sprintf(
+		"note: the dsn asks for sslmode=%s and Grafana's datasource has no such mode, "+
+			"so it was given sslmode=disable. Set grafana.datasource.sslmode to one of "+
+			"%s to choose.", named, strings.Join(grafanaSSLModes, ", "),
+	)
+}
+
+// dsnSSLModePattern finds the mode in either shape a DSN takes: a query
+// parameter in the URL form, a word in the keyword form.
+var dsnSSLModePattern = regexp.MustCompile(`(?:^|[?&\s])sslmode=([A-Za-z-]+)`)
+
+// dsnSSLMode is the mode the connection string names, or "" when it names
+// none, in which case libpq's own default applies and Grafana cannot say it.
+func dsnSSLMode(dsn string) string {
+	if found := dsnSSLModePattern.FindStringSubmatch(dsn); found != nil {
+		return strings.ToLower(found[1])
+	}
+	return ""
 }

@@ -765,6 +765,12 @@
       "example": "ae3x9k2"
     },
     {
+      "key": "grafana.datasource.sslmode",
+      "kind": "string",
+      "group": "run",
+      "example": "require"
+    },
+    {
       "key": "grafana.datasource.loki_uid",
       "kind": "string",
       "group": "run",
