@@ -35,7 +35,7 @@ admite parámetros, y eso pide la forma algo más larga porque `iex` no tiene
 dónde ponerlos:
 
 ```powershell
-& ([scriptblock]::Create((irm https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.ps1))) -Version 2.0.0 -BinDir C:\tools -NoPathUpdate
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.ps1))) -Version 2.1.0 -BinDir C:\tools -NoPathUpdate
 ```
 
 <Aside type="note" title="Leerlo antes es justo para lo que sirve que sea corto">
@@ -86,7 +86,7 @@ pregúntale a la máquina y no al intérprete:
 ```
 
 ```powershell
-$version = "2.0.0"
+$version = "2.1.0"
 $arch = if ($env:PROCESSOR_ARCHITECTURE -eq "ARM64") { "arm64" } else { "amd64" }
 $base = "https://github.com/jmrplens/ghchronicle/releases/download/v$version"
 $zip = "ghchronicle_${version}_windows_${arch}.zip"
@@ -157,7 +157,7 @@ directorio que hayas hecho.
 
 <FileTree>
 
-- ghchronicle_2.0.0_windows_amd64.zip
+- ghchronicle_2.1.0_windows_amd64.zip
   - ghchronicle.exe el binario
   - LICENSE
   - README.md
@@ -216,7 +216,7 @@ ghchronicle -version
 ```
 
 ```text
-ghchronicle 2.0.0 (commit 4e5dfc2, built 2026-09-14T23:04:02Z)
+ghchronicle 2.1.0 (commit 4e5dfc2, built 2026-09-14T23:04:02Z)
 ```
 
 <Aside type="note" title="Si Windows avisa sobre el fichero">

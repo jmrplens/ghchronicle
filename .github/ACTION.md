@@ -24,7 +24,7 @@ independently of the tool. That is not this.
 GitHub's Marketplace takes an Action from any public repository whose
 `action.yml` is at the root, so this repository qualifies as it stands.
 
-1. Push a tag (`v2.0.0`). The release workflow builds the binaries the Action
+1. Push a tag (`v2.1.0`). The release workflow builds the binaries the Action
     downloads.
 2. Open the release on GitHub. It offers "Publish this Action to the GitHub
     Marketplace"; tick it, accept the terms, and choose the categories
@@ -32,7 +32,7 @@ GitHub's Marketplace takes an Action from any public repository whose
 3. Move the major tag so `@v2` keeps resolving:
 
     ```sh
-    git tag -f -a v2 v2.0.0^{} -m "v2" && git push -f origin v2
+    git tag -f -a v2 v2.1.0^{} -m "v2" && git push -f origin v2
     ```
 
     Every Action in the Marketplace does this. A workflow pinned to `@v2` then

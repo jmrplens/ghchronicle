@@ -91,7 +91,7 @@ is not.
 ## The tag
 
 ```sh
-git tag -a v2.0.0 -m "v2.0.0" && git push origin v2.0.0
+git tag -a v2.1.0 -m "v2.1.0" && git push origin v2.1.0
 ```
 
 That runs `.github/workflows/release.yml`: the end-to-end and race suites, then
@@ -104,16 +104,16 @@ are set, and writes the release notes from the commit subjects.
 
 - [ ] The release page lists the archives, the checksums, the signatures and
       the SBOMs, and the notes read as notes.
-- [ ] `docker run --rm ghcr.io/jmrplens/ghchronicle:v2.0.0 -version` prints the
+- [ ] `docker run --rm ghcr.io/jmrplens/ghchronicle:v2.1.0 -version` prints the
       version. The workflow checks this too, and it is worth seeing once.
 - [ ] Move the major tag, which is what `uses: jmrplens/ghchronicle@v2`
       resolves through:
 
       ```sh
-      git tag -f -a v2 v2.0.0^{} -m "v2" && git push -f origin v2
+      git tag -f -a v2 v2.1.0^{} -m "v2" && git push -f origin v2
       ```
 
-      `^{}` because `v2.0.0` is an annotated tag, and a tag pointing at a tag
+      `^{}` because `v2.1.0` is an annotated tag, and a tag pointing at a tag
       is not what `@v2` should resolve through. `-a -m` because a repository
       configured to sign its tags makes every `git tag` annotated, and an
       annotated tag with no message is an error rather than a prompt.
