@@ -29,7 +29,7 @@ func (c Client) PublishDashboard(ctx context.Context, doc map[string]any,
 	if err != nil {
 		return "", err
 	}
-	if status := field(res.Body, "status"); status != "success" {
+	if field(res.Body, "status") != "success" {
 		return "", fmt.Errorf("publishing the dashboard: %s", answerText(res))
 	}
 	return field(res.Body, "url"), nil

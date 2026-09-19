@@ -1,7 +1,10 @@
 package grafana
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
 	"maps"
 	"net/http"
@@ -60,11 +63,11 @@ func want() Datasource {
 	}
 }
 
-// asExisting is what Grafana would return for a datasource this had made.
-func asExisting(d, secretOf Datasource) map[string]any {
+// asExisting is what Grafana would return for a datasource this had made. The
+// secret is not in it, because Grafana never hands one back.
+func asExisting(d Datasource) map[string]any {
 	settings := map[string]any{}
 	maps.Copy(settings, d.JSON)
-	settings[fingerprintField] = fingerprint(secretOf.Secret)
 	return map[string]any{
 		"uid": d.UID, "name": d.Name, "type": d.Type,
 		"url": d.URL, "database": d.Database, "jsonData": settings,
@@ -103,7 +106,8 @@ func TestEnsureDatasourceCreatesTheOneThatIsNotThere(t *testing.T) {
 func TestEnsureDatasourceLeavesTheOneThatAlreadySaysThis(t *testing.T) {
 	t.Parallel()
 	w := want()
-	f := &dsServer{existing: asExisting(w, w)}
+	w.Secret = nil
+	f := &dsServer{existing: asExisting(w)}
 	client := f.serve(t)
 	outcome, err := client.EnsureDatasource(t.Context(), w, 5*time.Second)
 	if err != nil {
@@ -131,16 +135,15 @@ func TestEnsureDatasourceCorrectsWhatDiffers(t *testing.T) {
 		{"the database", func(d *Datasource) { d.Database = "other" }},
 		{"a plugin setting", func(d *Datasource) { d.JSON = map[string]any{"version": "Flux"} }},
 		{"the name", func(d *Datasource) { d.Name = "renamed" }},
-		{"the token, which is never readable", func(d *Datasource) {
-			d.Secret = map[string]string{"token": "rotated"}
-		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			stale := want()
+			stale.Secret = nil
 			fresh := want()
+			fresh.Secret = nil
 			tc.break_(&fresh)
-			f := &dsServer{existing: asExisting(stale, stale)}
+			f := &dsServer{existing: asExisting(stale)}
 			client := f.serve(t)
 			outcome, err := client.EnsureDatasource(t.Context(), fresh, 5*time.Second)
 			if err != nil {
@@ -156,25 +159,67 @@ func TestEnsureDatasourceCorrectsWhatDiffers(t *testing.T) {
 	}
 }
 
-// TestTheFingerprintIsNotTheToken: it has to change with the secret and it has
-// to not carry it, since jsonData is readable by anyone who can read the
-// datasource.
-func TestTheFingerprintIsNotTheToken(t *testing.T) {
+// TestADatasourceWithASecretIsWrittenEveryTime. Grafana reports which secret
+// keys are set and never their values, so a token rotated in the config while
+// every visible field stayed the same is invisible from here. Writing it every
+// time is what keeps the credential current; the reconcile runs at most once
+// per process start, so the saved request was never worth the alternative.
+func TestADatasourceWithASecretIsWrittenEveryTime(t *testing.T) {
 	t.Parallel()
-	one := fingerprint(map[string]string{"token": "a-real-looking-secret"})
-	two := fingerprint(map[string]string{"token": "a-real-looking-secre"})
-	if one == two {
-		t.Error("two different tokens fingerprint the same, so a rotation is invisible")
+	w := want()
+	f := &dsServer{existing: asExisting(w)}
+	client := f.serve(t)
+	outcome, err := client.EnsureDatasource(t.Context(), w, 5*time.Second)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if strings.Contains(one, "a-real-looking") || len(one) != 12 {
-		t.Errorf("fingerprint = %q, want twelve characters carrying none of the token", one)
+	if outcome != Updated {
+		t.Errorf("outcome = %s, want updated: the secret cannot be compared, so it is sent", outcome)
 	}
-	if fingerprint(nil) != "" {
-		t.Error("no secret should fingerprint as nothing, or every secretless datasource differs from itself")
+	if len(f.writes) != 1 {
+		t.Fatalf("writes = %+v, want the secret written", f.writes)
 	}
-	// Moving the same value to another field is a change, because the plugin
-	// reads the two fields for different things.
-	if fingerprint(map[string]string{"a": "x"}) == fingerprint(map[string]string{"b": "x"}) {
-		t.Error("the field a secret sits in is part of what it means")
+	secret, _ := f.writes[0].Body["secureJsonData"].(map[string]any)
+	if secret["token"] != "first" {
+		t.Errorf("secureJsonData = %v, want the token sent again", secret)
 	}
+}
+
+// TestNothingDerivedFromTheSecretIsWrittenWhereItCanBeRead. jsonData is
+// readable by anyone who can read the datasource, so a hash of the token kept
+// there to detect a rotation would put something derived from a credential in
+// front of every viewer. CodeQL called an earlier version of this out and it
+// was right to.
+func TestNothingDerivedFromTheSecretIsWrittenWhereItCanBeRead(t *testing.T) {
+	t.Parallel()
+	const token = "a-distinctive-token-value"
+	w := want()
+	w.Secret = map[string]string{"token": token}
+	f := &dsServer{}
+	client := f.serve(t)
+	if _, err := client.EnsureDatasource(t.Context(), w, 5*time.Second); err != nil {
+		t.Fatal(err)
+	}
+	settings, _ := f.writes[0].Body["jsonData"].(map[string]any)
+	for key, value := range settings {
+		text := fmt.Sprint(value)
+		if strings.Contains(text, token) {
+			t.Errorf("jsonData.%s carries the token itself", key)
+		}
+		for _, digest := range []string{
+			hex.EncodeToString(sha256Of(token)),
+			hex.EncodeToString(sha256Of("ghchronicle datasource secret\x00token\x00" + token + "\x00")),
+		} {
+			if strings.Contains(text, digest[:12]) {
+				t.Errorf("jsonData.%s carries a digest of the token", key)
+			}
+		}
+	}
+}
+
+// sha256Of is the digest an earlier version of this stored, kept only so the
+// test above can look for it.
+func sha256Of(s string) []byte {
+	sum := sha256.Sum256([]byte(s))
+	return sum[:]
 }

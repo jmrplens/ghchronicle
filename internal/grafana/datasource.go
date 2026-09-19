@@ -2,27 +2,12 @@ package grafana
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"maps"
 	"net/http"
-	"slices"
 	"time"
 )
-
-// fingerprintField is where the reconciler records which secret a datasource
-// was last given. Grafana never hands a secret back, only a flag saying one is
-// set, so a token rotated in the configuration while every visible field
-// stayed the same would otherwise be invisible and the datasource would go on
-// using the old one. A labeled SHA-256, kept to twelve hex characters: enough
-// to tell two tokens apart, and not the token.
-const fingerprintField = "ghchronicleSecretFingerprint"
-
-// secretLabel keeps the fingerprint from matching the same string hashed for
-// any other purpose.
-const secretLabel = "ghchronicle datasource secret\x00"
 
 // Datasource is the part of a Grafana datasource this needs in order to create
 // one and to tell an existing one apart from the one it would have made.
@@ -36,10 +21,15 @@ type Datasource struct {
 	// version, the name of a header. It differs per store, so it is the
 	// caller's to fill.
 	JSON map[string]any
-	// Secret is written and never read back. Grafana reports only which keys
-	// are set, which is why the fingerprint exists.
+	// Secret is written and never read back: Grafana reports only which keys
+	// are set, never their values. That is why a datasource carrying one is
+	// written on every reconcile rather than compared first.
 	Secret map[string]string
 }
+
+// datasourceByUID is the path a datasource answers to, which three calls here
+// need and one of them builds a suffix onto.
+const datasourceByUID = "/api/datasources/uid/"
 
 // Outcome says what reconciling did, for a caller that reports it to a person.
 type Outcome int
@@ -73,7 +63,7 @@ func (c Client) EnsureDatasource(ctx context.Context, want Datasource,
 	if want.UID == "" || want.Type == "" {
 		return Unchanged, errors.New("a datasource needs a uid and a type")
 	}
-	found, err := c.Do(ctx, http.MethodGet, "/api/datasources/uid/"+want.UID, nil, timeout)
+	found, err := c.Do(ctx, http.MethodGet, datasourceByUID+want.UID, nil, timeout)
 	if err != nil {
 		return Unchanged, err
 	}
@@ -84,11 +74,19 @@ func (c Client) EnsureDatasource(ctx context.Context, want Datasource,
 		return Unchanged, fmt.Errorf("reading datasource %s: %s",
 			want.UID, answerText(found))
 	}
-	if sameDatasource(found.Body, want) {
+	// A datasource with a secret is written every time. There is no way to
+	// tell one carrying the current token from one carrying the token it was
+	// given a month ago, so comparing only what can be seen would leave a
+	// rotated credential in place for as long as nothing else about the
+	// datasource changed. The alternative, a fingerprint of the secret kept in
+	// jsonData, buys one saved request on a path that runs at most once per
+	// process start and pays for it by putting something derived from a
+	// credential in a field every viewer of the datasource can read.
+	if len(want.Secret) == 0 && sameDatasource(found.Body, want) {
 		return Unchanged, nil
 	}
 	return Updated, c.writeDatasource(ctx, http.MethodPut,
-		"/api/datasources/uid/"+want.UID, want, timeout)
+		datasourceByUID+want.UID, want, timeout)
 }
 
 // writeDatasource posts or puts the body both calls share.
@@ -112,7 +110,6 @@ func (c Client) writeDatasource(ctx context.Context, method, path string,
 func datasourceBody(want Datasource) map[string]any {
 	settings := map[string]any{}
 	maps.Copy(settings, want.JSON)
-	settings[fingerprintField] = fingerprint(want.Secret)
 	body := map[string]any{
 		"uid":      want.UID,
 		"name":     want.Name,
@@ -149,25 +146,7 @@ func sameDatasource(have map[string]any, want Datasource) bool {
 			return false
 		}
 	}
-	return field(settings, fingerprintField) == fingerprint(want.Secret)
-}
-
-// fingerprint identifies a set of secrets without carrying them. The keys go
-// in with the values so that moving a token from one field to another counts
-// as a change.
-func fingerprint(secret map[string]string) string {
-	if len(secret) == 0 {
-		return ""
-	}
-	sum := sha256.New()
-	sum.Write([]byte(secretLabel))
-	for _, key := range sortedKeys(secret) {
-		sum.Write([]byte(key))
-		sum.Write([]byte{0})
-		sum.Write([]byte(secret[key]))
-		sum.Write([]byte{0})
-	}
-	return hex.EncodeToString(sum.Sum(nil))[:12]
+	return true
 }
 
 // DatasourceHealth asks the datasource whether it can reach what it names.
@@ -180,7 +159,7 @@ func fingerprint(secret map[string]string) string {
 func (c Client) DatasourceHealth(ctx context.Context, uid string,
 	timeout time.Duration,
 ) (ok bool, message string, err error) {
-	res, err := c.Do(ctx, http.MethodGet, "/api/datasources/uid/"+uid+"/health", nil, timeout)
+	res, err := c.Do(ctx, http.MethodGet, datasourceByUID+uid+"/health", nil, timeout)
 	if err != nil {
 		return false, "", err
 	}
@@ -211,15 +190,4 @@ func answerText(res Response) string {
 		return Trim(message, 200)
 	}
 	return fmt.Sprintf("HTTP %d", res.Status)
-}
-
-// sortedKeys keeps the fingerprint the same across runs, since map order is
-// not.
-func sortedKeys(m map[string]string) []string {
-	out := make([]string, 0, len(m))
-	for key := range m {
-		out = append(out, key)
-	}
-	slices.Sort(out)
-	return out
 }
