@@ -2,6 +2,11 @@ packages:
   - .
 
 overrides:
+  # TypeScript stays on 6.x. The 7.0 compiler is the native one and does not
+  # expose the programmatic API `astro check` is built on, so `pnpm run lint`
+  # stops at "does not expose the programmatic API" the moment 7 is installed.
+  # Astro tracks it at withastro/roadmap#1321; lift this when that closes.
+  typescript: 6.0.3
   lodash: 4.18.1
   yaml: 2.9.0
   yaml-language-server@1.20.0>yaml: 2.9.0
