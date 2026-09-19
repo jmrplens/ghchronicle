@@ -150,3 +150,127 @@ func TestPublishDashboardReportsWhatGrafanaRefused(t *testing.T) {
 		t.Errorf("err = %v, want it to carry what Grafana said", err)
 	}
 }
+
+// TestOutcomeReadsAsALogLineWants.
+func TestOutcomeReadsAsALogLineWants(t *testing.T) {
+	t.Parallel()
+	for outcome, want := range map[Outcome]string{
+		Created: "created", Updated: "updated", Unchanged: "unchanged", Outcome(9): "unchanged",
+	} {
+		if got := outcome.String(); got != want {
+			t.Errorf("Outcome(%d) = %q, want %q", outcome, got, want)
+		}
+	}
+}
+
+// TestExistsTellsThereFromNotThereFromCannotTell. A 404 is the ordinary answer
+// and not a failure; anything else that is not a success is, because treating
+// a server error as "not there" would report a leftover as gone.
+func TestExistsTellsThereFromNotThereFromCannotTell(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name    string
+		status  int
+		want    bool
+		wantErr bool
+	}{
+		{"it is there", http.StatusOK, true, false},
+		{"it is not", http.StatusNotFound, false, false},
+		{"the server could not say", http.StatusInternalServerError, false, true},
+		// A reply with nothing to quote still has to name the failure, or the
+		// note printed about it says only that something went wrong.
+		{"and could not say why", http.StatusBadGateway, false, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			body := `{"message":"said"}`
+			if tc.status == http.StatusBadGateway {
+				body = `{}`
+			}
+			a := &answering{reply: func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(tc.status)
+				_, _ = io.WriteString(w, body)
+			}}
+			got, err := a.serve(t).Exists(t.Context(), DashboardPath("uid"), 5*time.Second)
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("err = %v, want an error: %v", err, tc.wantErr)
+			}
+			if tc.status == http.StatusBadGateway && !strings.Contains(err.Error(), "502") {
+				t.Errorf("err = %v, want the status where there is no message to quote", err)
+			}
+			if got != tc.want {
+				t.Errorf("exists = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+// TestThePathsAreTheOnesGrafanaAnswersAt, spelled once so the leftover check
+// and the reconciler cannot drift apart.
+func TestThePathsAreTheOnesGrafanaAnswersAt(t *testing.T) {
+	t.Parallel()
+	if got := DashboardPath("x"); got != "/api/dashboards/uid/x" {
+		t.Errorf("DashboardPath = %q", got)
+	}
+	if got := DatasourcePath("x"); got != "/api/datasources/uid/x" {
+		t.Errorf("DatasourcePath = %q", got)
+	}
+}
+
+// TestAServerThatIsNotThereIsReportedRatherThanMistakenForAnAnswer.
+func TestAServerThatIsNotThereIsReportedRatherThanMistakenForAnAnswer(t *testing.T) {
+	t.Parallel()
+	client := Client{URL: "http://127.0.0.1:1", Token: "t"}
+	if _, err := client.EnsureFolder(t.Context(), "GitHub", time.Second); err == nil {
+		t.Error("EnsureFolder reported a folder from a server that is not listening")
+	}
+	if _, err := client.PublishDashboard(t.Context(),
+		map[string]any{}, "", "m", time.Second); err == nil {
+		t.Error("PublishDashboard reported a success from a server that is not listening")
+	}
+	if _, err := client.EnsureDatasource(t.Context(),
+		Datasource{UID: "u", Type: "influxdb"}, time.Second); err == nil {
+		t.Error("EnsureDatasource reported an outcome from a server that is not listening")
+	}
+	if _, _, err := client.DatasourceHealth(t.Context(), "u", time.Second); err == nil {
+		t.Error("DatasourceHealth reported health from a server that is not listening")
+	}
+}
+
+// TestADatasourceGrafanaRefusesToWriteIsReported, not swallowed into an
+// outcome that says it was created.
+func TestADatasourceGrafanaRefusesToWriteIsReported(t *testing.T) {
+	t.Parallel()
+	a := &answering{reply: func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			w.WriteHeader(http.StatusNotFound)
+			_, _ = io.WriteString(w, `{"message":"not found"}`)
+			return
+		}
+		w.WriteHeader(http.StatusConflict)
+		_, _ = io.WriteString(w, `{"message":"data source with the same name already exists"}`)
+	}}
+	_, err := a.serve(t).EnsureDatasource(t.Context(),
+		Datasource{UID: "u", Type: "influxdb", Name: "n"}, 5*time.Second)
+	if err == nil || !strings.Contains(err.Error(), "same name already exists") {
+		t.Errorf("err = %v, want what Grafana refused", err)
+	}
+}
+
+// TestADatasourceNeedsAUIDAndAType before anything is sent, since a request
+// without them would create something nothing here could find again.
+func TestADatasourceNeedsAUIDAndAType(t *testing.T) {
+	t.Parallel()
+	a := &answering{reply: func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = io.WriteString(w, `{}`)
+	}}
+	client := a.serve(t)
+	for _, want := range []Datasource{{Type: "influxdb"}, {UID: "u"}} {
+		if _, err := client.EnsureDatasource(t.Context(), want, 5*time.Second); err == nil {
+			t.Errorf("%+v was accepted", want)
+		}
+	}
+	if len(a.asked) != 0 {
+		t.Errorf("it called %v before checking what it had", a.asked)
+	}
+}
