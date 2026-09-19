@@ -36,7 +36,7 @@ func (i *influx) Holds(ctx context.Context) ([]string, error) {
 	endpoint := strings.TrimSuffix(i.sink.URL, "/") + "/api/v3/query_sql?" + url.Values{
 		"db": {i.sink.Bucket}, "q": {q}, "format": {"json"},
 	}.Encode()
-	body, err := i.call(ctx, http.MethodGet, endpoint, nil)
+	body, _, err := i.call(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -66,12 +66,14 @@ func (i *influx) Drop(ctx context.Context, item string) error {
 	endpoint := strings.TrimSuffix(i.sink.URL, "/") + "/api/v3/configure/table?" + url.Values{
 		"db": {i.sink.Bucket}, "table": {item},
 	}.Encode()
-	_, err := i.call(ctx, http.MethodDelete, endpoint, map[int]bool{http.StatusConflict: true})
+	_, _, err := i.call(ctx, http.MethodDelete, endpoint, map[int]bool{http.StatusConflict: true})
 	return err
 }
 
 // call sends one request with the sink's credential and reads the answer.
-func (i *influx) call(ctx context.Context, method, endpoint string, tolerate map[int]bool) ([]byte, error) {
+func (i *influx) call(ctx context.Context, method, endpoint string,
+	tolerate map[int]bool,
+) (body []byte, status int, err error) {
 	return send(ctx, method, endpoint, func(r *http.Request) {
 		if i.sink.Token != "" {
 			r.Header.Set("Authorization", "Bearer "+i.sink.Token)
@@ -90,15 +92,19 @@ func (e *elastic) Name() string { return "elasticsearch" }
 func (e *elastic) Holds(ctx context.Context) ([]string, error) {
 	endpoint := strings.TrimSuffix(e.sink.URL, "/") + "/_cat/indices/" +
 		url.PathEscape(e.sink.Prefix+"*") + "?format=json&h=index"
-	body, err := e.call(ctx, http.MethodGet, endpoint, map[int]bool{http.StatusNotFound: true})
+	body, status, err := e.call(ctx, http.MethodGet, endpoint,
+		map[int]bool{http.StatusNotFound: true})
 	if err != nil {
 		return nil, err
 	}
+	// A cluster with no index under the prefix answers with an empty list, and
+	// an older one answers 404 with its own complaint in the body. Both mean
+	// the same thing here, and only the first is a list.
+	if status == http.StatusNotFound || len(bytes.TrimSpace(body)) == 0 {
+		return nil, nil
+	}
 	var rows []struct {
 		Index string `json:"index"`
-	}
-	if len(bytes.TrimSpace(body)) == 0 {
-		return nil, nil
 	}
 	if err = json.Unmarshal(body, &rows); err != nil {
 		return nil, fmt.Errorf("reading the index list: %w", err)
@@ -117,11 +123,13 @@ func (e *elastic) Drop(ctx context.Context, item string) error {
 		return fmt.Errorf("%s is not under the sink's prefix %q", item, e.sink.Prefix)
 	}
 	endpoint := strings.TrimSuffix(e.sink.URL, "/") + "/" + url.PathEscape(item)
-	_, err := e.call(ctx, http.MethodDelete, endpoint, map[int]bool{http.StatusNotFound: true})
+	_, _, err := e.call(ctx, http.MethodDelete, endpoint, map[int]bool{http.StatusNotFound: true})
 	return err
 }
 
-func (e *elastic) call(ctx context.Context, method, endpoint string, tolerate map[int]bool) ([]byte, error) {
+func (e *elastic) call(ctx context.Context, method, endpoint string,
+	tolerate map[int]bool,
+) (body []byte, status int, err error) {
 	return send(ctx, method, endpoint, func(r *http.Request) {
 		switch {
 		case e.sink.APIKey != "":
@@ -169,29 +177,33 @@ func (s *sqlFile) Drop(_ context.Context, item string) error {
 
 // send makes one request, applies the caller's credential, and turns anything
 // that is not a success into an error carrying what the store said.
+// The second return is the status, which a caller needs when it tolerated one:
+// a body that came with a tolerated 404 is the store's complaint, not the
+// answer, and reading it as the answer is how "no indices here" turned into a
+// parse error.
 func send(ctx context.Context, method, endpoint string,
 	auth func(*http.Request), tolerate map[int]bool,
-) ([]byte, error) {
+) (body []byte, status int, err error) {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, method, endpoint, http.NoBody)
-	if err != nil {
-		return nil, err
+	req, reqErr := http.NewRequestWithContext(ctx, method, endpoint, http.NoBody)
+	if reqErr != nil {
+		return nil, 0, reqErr
 	}
 	auth(req)
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, err
+	res, sendErr := http.DefaultClient.Do(req)
+	if sendErr != nil {
+		return nil, 0, sendErr
 	}
 	defer res.Body.Close()
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		return nil, err
+	body, readErr := io.ReadAll(res.Body)
+	if readErr != nil {
+		return nil, res.StatusCode, readErr
 	}
 	if res.StatusCode >= 200 && res.StatusCode <= 299 || tolerate[res.StatusCode] {
-		return body, nil
+		return body, res.StatusCode, nil
 	}
-	return nil, fmt.Errorf("%s: %s", res.Status, trim(string(body), 200))
+	return nil, res.StatusCode, fmt.Errorf("%s: %s", res.Status, trim(string(body), 200))
 }
 
 // trim keeps a store's complaint to one line's worth.

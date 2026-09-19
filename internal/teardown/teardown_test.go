@@ -175,3 +175,124 @@ func TestTheSQLSinkOffersItsFileAndItsRotations(t *testing.T) {
 		t.Error("it removed a file it did not write")
 	}
 }
+
+// TestTheElasticsearchStoreClaimsItsPrefixAndNothingElse. An index outside the
+// prefix the sink writes under was put there by something else, and the
+// server's own listing is what says which are which.
+func TestTheElasticsearchStoreClaimsItsPrefixAndNothingElse(t *testing.T) {
+	t.Parallel()
+	var deleted []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodDelete {
+			deleted = append(deleted, strings.TrimPrefix(r.URL.Path, "/"))
+			return
+		}
+		// What _cat/indices answers for the prefix it was asked about.
+		_, _ = io.WriteString(w, `[{"index":"ghc-gh_repo"},{"index":"ghc-gh_star"}]`)
+	}))
+	t.Cleanup(srv.Close)
+	store := &elastic{sink: &config.ElasticsearchSink{
+		URL: srv.URL, Prefix: "ghc-", APIKey: "key",
+	}}
+	held, err := store.Holds(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(held, ",") != "ghc-gh_repo,ghc-gh_star" {
+		t.Errorf("holds = %v, want the two the server listed", held)
+	}
+	if err = store.Drop(t.Context(), "somebody-elses-index"); err == nil {
+		t.Error("it deleted an index outside the sink's prefix")
+	}
+	if err = store.Drop(t.Context(), "ghc-gh_repo"); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(deleted, ",") != "ghc-gh_repo" {
+		t.Errorf("deleted = %v, want only the one under the prefix", deleted)
+	}
+}
+
+// TestAnIndexAlreadyGoneIsNotAFailure, for the reason a dropped table is not:
+// what was asked for is that it not be there.
+func TestAnIndexAlreadyGoneIsNotAFailure(t *testing.T) {
+	t.Parallel()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = io.WriteString(w, `{"error":"index_not_found_exception"}`)
+	}))
+	t.Cleanup(srv.Close)
+	store := &elastic{sink: &config.ElasticsearchSink{URL: srv.URL, Prefix: "ghc-"}}
+	if err := store.Drop(t.Context(), "ghc-gh_repo"); err != nil {
+		t.Errorf("an index already gone was reported as a failure: %v", err)
+	}
+	held, err := store.Holds(t.Context())
+	if err != nil || len(held) != 0 {
+		t.Errorf("holds = %v, %v; want nothing and no error from a store with no indices", held, err)
+	}
+}
+
+// TestElasticsearchCarriesWhicheverCredentialItWasGiven, because the listing
+// and the delete both need it and a store with authentication on answers
+// neither without.
+func TestElasticsearchCarriesWhicheverCredentialItWasGiven(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name string
+		sink config.ElasticsearchSink
+		want string
+	}{
+		{"an api key", config.ElasticsearchSink{Prefix: "ghc-", APIKey: "k"}, "ApiKey k"},
+		{"a password", config.ElasticsearchSink{
+			Prefix: "ghc-", Username: "u", Password: "p",
+		}, "Basic dTpw"},
+		{"neither", config.ElasticsearchSink{Prefix: "ghc-"}, ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			var seen string
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				seen = r.Header.Get("Authorization")
+				_, _ = io.WriteString(w, `[]`)
+			}))
+			t.Cleanup(srv.Close)
+			sink := tc.sink
+			sink.URL = srv.URL
+			store := &elastic{sink: &sink}
+			if _, err := store.Holds(t.Context()); err != nil {
+				t.Fatal(err)
+			}
+			if seen != tc.want {
+				t.Errorf("Authorization = %q, want %q", seen, tc.want)
+			}
+		})
+	}
+}
+
+// TestEveryStoreSaysItsName, which is what the lines a person reads are keyed
+// on: a store that answered to the wrong name would report its tables under
+// another sink's heading.
+func TestEveryStoreSaysItsName(t *testing.T) {
+	t.Parallel()
+	cfg := &config.Config{Sinks: config.Sinks{
+		Influx:        &config.InfluxSink{URL: "http://influx:8181", Bucket: "github"},
+		Elasticsearch: &config.ElasticsearchSink{URL: "http://es:9200", Prefix: "ghc-"},
+		SQL:           &config.SQLSink{Path: "/tmp/points.sql"},
+	}}
+	stores, _ := For(cfg)
+	var names []string
+	for _, s := range stores {
+		names = append(names, s.Name())
+	}
+	if strings.Join(names, ",") != "influxdb,elasticsearch,sql" {
+		t.Errorf("names = %v, want one per configured sink in a fixed order", names)
+	}
+}
+
+// TestAnUnsupportedSinkReadsAsOneLine, since that line is printed as it is.
+func TestAnUnsupportedSinkReadsAsOneLine(t *testing.T) {
+	t.Parallel()
+	got := Unsupported{Sink: "graphite", Reason: "offers no delete"}.String()
+	if got != "graphite: offers no delete" {
+		t.Errorf("String() = %q", got)
+	}
+}
