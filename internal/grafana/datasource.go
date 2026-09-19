@@ -17,6 +17,9 @@ type Datasource struct {
 	Type     string
 	URL      string
 	Database string
+	// User is the account the datasource connects as, which only the SQL
+	// datasources have: everything else carries its credential in a header.
+	User string
 	// JSON is the plugin's own settings: the HTTP method, the query language
 	// version, the name of a header. It differs per store, so it is the
 	// caller's to fill.
@@ -119,7 +122,15 @@ func datasourceBody(want Datasource) map[string]any {
 		"jsonData": settings,
 	}
 	if want.Database != "" {
+		// Both places. The top-level field is what older Grafana reads and
+		// what its API still returns; the PostgreSQL plugin has moved the
+		// same value into jsonData, and a datasource with only one of the two
+		// works on one version and draws nothing on the other.
 		body["database"] = want.Database
+		settings["database"] = want.Database
+	}
+	if want.User != "" {
+		body["user"] = want.User
 	}
 	if len(want.Secret) > 0 {
 		body["secureJsonData"] = want.Secret
@@ -138,6 +149,9 @@ func sameDatasource(have map[string]any, want Datasource) bool {
 		return false
 	}
 	if want.Database != "" && field(have, "database") != want.Database {
+		return false
+	}
+	if want.User != "" && field(have, "user") != want.User {
 		return false
 	}
 	settings, _ := have["jsonData"].(map[string]any)

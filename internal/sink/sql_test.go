@@ -7,6 +7,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -268,17 +269,42 @@ func TestSQLTypesAndLiterals(t *testing.T) {
 		{true, "BOOLEAN", "TRUE"},
 		{false, "BOOLEAN", "FALSE"},
 		{"it's\x00", "TEXT", "'it''s'"},
-		{"", "TEXT", ""},
 		{at, "TIMESTAMPTZ", "'2026-09-01T12:00:00.000005Z'::timestamptz"},
 		{time.Time{}, "TIMESTAMPTZ", "NULL"},
-		{nil, "", ""},
-		{[]int{1}, "", ""},
+		{nil, "", "NULL"},
+		{[]int{1}, "", "NULL"},
 	} {
 		if got := sqlType(tc.v); got != tc.typ {
 			t.Errorf("sqlType(%#v) = %q, want %q", tc.v, got, tc.typ)
 		}
-		if got := sqlValue(tc.v); got != tc.literal {
-			t.Errorf("sqlValue(%#v) = %q, want %q", tc.v, got, tc.literal)
+		// The two renderings of one value: what a connection is handed, and
+		// what a file says. A difference between them is the two sinks
+		// writing different data from the same point.
+		if got := sqlLiteral(sqlArg(tc.v)); got != tc.literal {
+			t.Errorf("sqlLiteral(sqlArg(%#v)) = %q, want %q", tc.v, got, tc.literal)
 		}
+	}
+}
+
+// TestAnEmptyStringIsNoCellAtAll. It is not stored as an empty string and not
+// stored as NULL: the column is left out of the row, which is the rule the
+// line protocol follows and the reason the emptiness cannot live in the
+// renderer, where the old sqlValue kept it.
+func TestAnEmptyStringIsNoCellAtAll(t *testing.T) {
+	p := Point{
+		Measurement: "gh_repo",
+		Tags:        map[string]string{"full_name": "a/b"},
+		Fields:      map[string]any{"language": "", "stars": 3},
+	}
+	shapes := sqlShapes([]Point{p})
+	cols, _, ok := sqlCells(p, shapes["gh_repo"])
+	if !ok {
+		t.Fatal("a point with one real field wrote no row")
+	}
+	if slices.Contains(cols, "language") {
+		t.Errorf("columns = %v, want the empty string left out", cols)
+	}
+	if !slices.Contains(cols, "stars") {
+		t.Errorf("columns = %v, want the field that has a value", cols)
 	}
 }

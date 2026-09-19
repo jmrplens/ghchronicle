@@ -177,6 +177,7 @@ type Sinks struct {
 	Telegraf      *TelegrafSink      `yaml:"telegraf"`
 	Graphite      *GraphiteSink      `yaml:"graphite"`
 	SQL           *SQLSink           `yaml:"sql"`
+	Postgres      *PostgresSink      `yaml:"postgres"`
 	Elasticsearch *ElasticsearchSink `yaml:"elasticsearch"`
 
 	// DedupeFile is where the ledger of what has already been written lives.
@@ -325,6 +326,21 @@ type GraphiteSink struct {
 	// timestamp overwrites, so rewriting unchanged history changes nothing it
 	// holds and costs a file per partition per write in a store that never
 	// compacts. Nil means on. See sinks.dedupe_file.
+	Dedupe *bool `yaml:"dedupe" ghc:"example=true"`
+}
+
+// PostgresSink writes to a PostgreSQL that is running, rather than to a file
+// for somebody to replay. It is the SQL sink's other half, not its
+// replacement: the file is still what a load meant for later, for review, or
+// for another SQL engine wants.
+type PostgresSink struct {
+	// DSN is the connection string, in either shape libpq takes:
+	// postgres://user:pass@host:5432/db?sslmode=require, or the keyword form.
+	DSN string `yaml:"dsn" ghc:"required,secret,example=${DATABASE_URL}"`
+	// Batch is how many upserts go in one round trip.
+	Batch int `yaml:"batch" ghc:"example=1000"`
+	// Dedupe skips writing a point whose fields have not changed since the
+	// last time this sink was given it. See sinks.dedupe_file.
 	Dedupe *bool `yaml:"dedupe" ghc:"example=true"`
 }
 
@@ -863,7 +879,7 @@ func (c *Config) resolveSinks() error {
 	for _, resolve := range []func() error{
 		s.Influx.resolve, s.Prometheus.resolve, s.OTLP.resolve, s.Loki.resolve,
 		s.File.resolve, s.resolveStdout, s.Telegraf.resolve, s.Graphite.resolve,
-		s.SQL.resolve, s.Elasticsearch.resolve,
+		s.SQL.resolve, s.Postgres.resolve, s.Elasticsearch.resolve,
 	} {
 		if err := resolve(); err != nil {
 			return err
@@ -991,6 +1007,22 @@ func (g *GraphiteSink) resolve() error {
 	return nil
 }
 
+// resolve checks the one thing a connection needs and fills the batch.
+func (s *PostgresSink) resolve() error {
+	if s == nil {
+		return nil
+	}
+	s.DSN = expandEnv(s.DSN)
+	if strings.TrimSpace(s.DSN) == "" {
+		return errors.New("sinks.postgres: dsn is required, " +
+			"either postgres://user:pass@host:5432/db or the keyword form")
+	}
+	if s.Batch <= 0 {
+		s.Batch = 1000
+	}
+	return nil
+}
+
 func (s *SQLSink) resolve() error {
 	if s == nil {
 		return nil
@@ -1036,7 +1068,7 @@ func (c *Config) requireOneSink() error {
 	s := &c.Sinks
 	if s.Influx == nil && s.Prometheus == nil && s.OTLP == nil && s.Loki == nil &&
 		s.File == nil && !s.Stdout && s.Telegraf == nil && s.Graphite == nil &&
-		s.SQL == nil && s.Elasticsearch == nil {
+		s.SQL == nil && s.Postgres == nil && s.Elasticsearch == nil {
 		return errors.New("sinks: enable at least one of influxdb, prometheus, otlp, loki, file, stdout, telegraf, graphite, sql or elasticsearch, " +
 			"or run with -card <path> -card-only to draw a card and write the points nowhere")
 	}

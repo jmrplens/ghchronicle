@@ -455,6 +455,34 @@
       "example": "true"
     },
     {
+      "key": "sinks.postgres",
+      "kind": "block",
+      "group": "sinks"
+    },
+    {
+      "key": "sinks.postgres.dsn",
+      "kind": "string",
+      "group": "sinks",
+      "sink": "postgres",
+      "secret": true,
+      "required": true,
+      "example": "${DATABASE_URL}"
+    },
+    {
+      "key": "sinks.postgres.batch",
+      "kind": "int",
+      "group": "sinks",
+      "sink": "postgres",
+      "example": "1000"
+    },
+    {
+      "key": "sinks.postgres.dedupe",
+      "kind": "bool",
+      "group": "sinks",
+      "sink": "postgres",
+      "example": "true"
+    },
+    {
       "key": "sinks.elasticsearch",
       "kind": "block",
       "group": "sinks"

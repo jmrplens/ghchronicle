@@ -180,6 +180,16 @@ sinks:
   #   keep: 5
   #   dedupe: true
 
+  # The same tables, written straight into a PostgreSQL that is running. This
+  # is the sql sink's other half rather than its replacement: the file is what
+  # you want when the load happens later or under review, when the database is
+  # somewhere this cannot reach, or when the reader is another SQL engine.
+  # This one saves piping that file into psql on a timer.
+  # postgres:
+  #   dsn: ${DATABASE_URL}
+  #   batch: 1000
+  #   dedupe: true
+
   # The _bulk API of Elasticsearch or OpenSearch, one index per measurement
   # named <prefix>-<measurement>, with a document id derived from the point's
   # identity so a rewrite replaces rather than duplicates.

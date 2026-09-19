@@ -5,7 +5,8 @@
 		"ES_API_KEY": "placeholder-elastic-key-from-the-environment",
 		"ES_PASSWORD": "placeholder-elastic-password-from-the-environment",
 		"OTLP_TOKEN": "placeholder-otlp-from-the-environment",
-		"TELEGRAF_PASSWORD": "placeholder-telegraf-password-from-the-environment"
+		"TELEGRAF_PASSWORD": "placeholder-telegraf-password-from-the-environment",
+		"DATABASE_URL": "postgres://placeholder:placeholder@localhost:5432/ghchronicle"
 	},
 	"inputs": [
 		"token",
@@ -173,10 +174,12 @@
 				"sinks.graphite.addr": "graphite:2003",
 				"sinks.sql": "true",
 				"sinks.sql.path": "/var/lib/ghchronicle/points.sql",
+				"sinks.postgres": "true",
+				"sinks.postgres.dsn": "DATABASE_URL",
 				"sinks.elasticsearch": "true",
 				"sinks.elasticsearch.url": "http://elasticsearch:9200"
 			},
-			"config": "github:\n  token: ${GITHUB_TOKEN}\ntargets:\n  user: octocat\nsinks:\n  influxdb:\n    url: http://localhost:8181\n    bucket: github\n  prometheus: {}\n  otlp:\n    endpoint: http://collector:4318/v1/metrics\n  loki:\n    url: http://loki:3100/loki/api/v1/push\n  file:\n    path: /var/log/ghchronicle/points.lp\n  stdout: true\n  telegraf:\n    url: http://telegraf:8186/telegraf\n  graphite:\n    addr: \"graphite:2003\"\n  sql:\n    path: /var/lib/ghchronicle/points.sql\n  elasticsearch:\n    url: http://elasticsearch:9200\n",
+			"config": "github:\n  token: ${GITHUB_TOKEN}\ntargets:\n  user: octocat\nsinks:\n  influxdb:\n    url: http://localhost:8181\n    bucket: github\n  prometheus: {}\n  otlp:\n    endpoint: http://collector:4318/v1/metrics\n  loki:\n    url: http://loki:3100/loki/api/v1/push\n  file:\n    path: /var/log/ghchronicle/points.lp\n  stdout: true\n  telegraf:\n    url: http://telegraf:8186/telegraf\n  graphite:\n    addr: \"graphite:2003\"\n  sql:\n    path: /var/lib/ghchronicle/points.sql\n  postgres:\n    dsn: ${DATABASE_URL}\n  elasticsearch:\n    url: http://elasticsearch:9200\n",
 			"run": "ghchronicle -config config.yaml -once",
 			"step": "- uses: jmrplens/ghchronicle@v2\n  with:\n    token: ${{ secrets.GHCHRONICLE_TOKEN }}\n    config: .github/ghchronicle.yaml\n",
 			"needsFile": true,
@@ -207,6 +210,8 @@
 				"sinks.graphite.addr": "graphite:2003",
 				"sinks.sql": "true",
 				"sinks.sql.path": "/var/lib/ghchronicle/points.sql",
+				"sinks.postgres": "true",
+				"sinks.postgres.dsn": "DATABASE_URL",
 				"sinks.elasticsearch": "true",
 				"sinks.elasticsearch.url": "http://elasticsearch:9200",
 				"github.base_url": "https://github.example.com/api/v3",
@@ -251,6 +256,8 @@
 				"sinks.sql.max_bytes": "67108864",
 				"sinks.sql.keep": "5",
 				"sinks.sql.dedupe": "true",
+				"sinks.postgres.batch": "1000",
+				"sinks.postgres.dedupe": "true",
 				"sinks.elasticsearch.prefix": "ghchronicle",
 				"sinks.elasticsearch.api_key": "ES_API_KEY",
 				"sinks.elasticsearch.batch": "1000",
@@ -325,7 +332,7 @@
 				"every.groups.work": "30m",
 				"groups.work": "true"
 			},
-			"config": "github:\n  token: ${GITHUB_TOKEN}\n  base_url: https://github.example.com/api/v3\n  web_url: https://github.example.com\n  timeout: 30s\n  reserve_rate: 500\ntargets:\n  user: your-github-login\n  orgs: [some-org, another-org]\n  repos: [\"someone/one-repo\"]\n  exclude: [\"someone/experiment-*\"]\n  include_forks: false\n  include_archived: false\n  include_private: true\nsinks:\n  influxdb:\n    url: http://localhost:8181\n    token: ${INFLUX_TOKEN}\n    org: default\n    bucket: github\n    batch: 5000\n    exclude: [gh_job_log]\n    dedupe: true\n  prometheus:\n    listen: \"127.0.0.1:9605\"\n    path: /metrics\n    no_prime: false\n  otlp:\n    endpoint: http://collector:4318/v1/metrics\n    headers:\n      Authorization: \"Bearer ${OTLP_TOKEN}\"\n    service: ghchronicle\n    raw: false\n    batch: 2000\n    repeat: 1m\n  loki:\n    url: http://loki:3100/loki/api/v1/push\n    tenant_id: tenant-one\n    labels:\n      job: ghchronicle\n    batch: 1000\n    max_age: 1h\n  file:\n    path: /var/log/ghchronicle/points.lp\n    format: influx\n    max_bytes: 67108864\n    keep: 5\n  stdout: false\n  stdout_format: influx\n  telegraf:\n    url: http://telegraf:8186/telegraf\n    username: telegraf\n    password: ${TELEGRAF_PASSWORD}\n    batch: 5000\n    dedupe: true\n  graphite:\n    addr: \"graphite:2003\"\n    prefix: github\n    batch: 1000\n    dedupe: true\n  sql:\n    dialect: postgres\n    path: /var/lib/ghchronicle/points.sql\n    max_bytes: 67108864\n    keep: 5\n    dedupe: true\n  elasticsearch:\n    url: http://elasticsearch:9200\n    prefix: ghchronicle\n    api_key: ${ES_API_KEY}\n    batch: 1000\n    dedupe: true\n  dedupe_file: /var/lib/ghchronicle/state-written.bin\n  dedupe_horizon: 720h\nevery:\n  default: 15m\n  groups:\n    account: 30m\n    audience: 30m\n    ci: 30m\n    collector: 30m\n    feeds: 30m\n    repos: 30m\n    security: 30m\n    work: 30m\n  families:\n    account: 12h\n    achievements: 24h\n    actions: 15m\n    activity: 30m\n    analyses: 6h\n    artifacts: 1h\n    billing: 6h\n    branches: 24h\n    commits: 1h\n    deployments: 1h\n    deps: 24h\n    discussions: 2h\n    events: 30m\n    forks: 12h\n    history: 24h\n    inventory: 24h\n    issueevents: 1h\n    issues: 1h\n    joblogs: 24h\n    keys: 24h\n    notifs: 30m\n    outbound: 12h\n    planning: 6h\n    policyfiles: 24h\n    profile: 12h\n    ratelimit: 15m\n    repo: 1h\n    rulesets: 24h\n    security: 1h\n    settings: 6h\n    stars: 6h\n    stats: 12h\n    totals: 12h\n    traffic: 6h\nheartbeat: 15s\ngroups: [account, audience, ci, collector, feeds, repos, security, work]\nlog:\n  level: debug\n  format: text\n  file: /var/log/ghchronicle/ghchronicle.log\n  max_bytes: 67108864\n  keep: 5\nstate_file: /var/lib/ghchronicle/state.json\nbackfill:\n  since: 2y\ngrafana:\n  url: http://localhost:3000\n  token: ${GITHUB_TOKEN}\n  folder: GitHub\n  publish_on_start: false\n  dashboard_uid: my-existing-dashboard\n  datasource:\n    url: http://influxdb:8181\n    uid: ae3x9k2\n    loki_uid: be7m1q4\n",
+			"config": "github:\n  token: ${GITHUB_TOKEN}\n  base_url: https://github.example.com/api/v3\n  web_url: https://github.example.com\n  timeout: 30s\n  reserve_rate: 500\ntargets:\n  user: your-github-login\n  orgs: [some-org, another-org]\n  repos: [\"someone/one-repo\"]\n  exclude: [\"someone/experiment-*\"]\n  include_forks: false\n  include_archived: false\n  include_private: true\nsinks:\n  influxdb:\n    url: http://localhost:8181\n    token: ${INFLUX_TOKEN}\n    org: default\n    bucket: github\n    batch: 5000\n    exclude: [gh_job_log]\n    dedupe: true\n  prometheus:\n    listen: \"127.0.0.1:9605\"\n    path: /metrics\n    no_prime: false\n  otlp:\n    endpoint: http://collector:4318/v1/metrics\n    headers:\n      Authorization: \"Bearer ${OTLP_TOKEN}\"\n    service: ghchronicle\n    raw: false\n    batch: 2000\n    repeat: 1m\n  loki:\n    url: http://loki:3100/loki/api/v1/push\n    tenant_id: tenant-one\n    labels:\n      job: ghchronicle\n    batch: 1000\n    max_age: 1h\n  file:\n    path: /var/log/ghchronicle/points.lp\n    format: influx\n    max_bytes: 67108864\n    keep: 5\n  stdout: false\n  stdout_format: influx\n  telegraf:\n    url: http://telegraf:8186/telegraf\n    username: telegraf\n    password: ${TELEGRAF_PASSWORD}\n    batch: 5000\n    dedupe: true\n  graphite:\n    addr: \"graphite:2003\"\n    prefix: github\n    batch: 1000\n    dedupe: true\n  sql:\n    dialect: postgres\n    path: /var/lib/ghchronicle/points.sql\n    max_bytes: 67108864\n    keep: 5\n    dedupe: true\n  postgres:\n    dsn: ${DATABASE_URL}\n    batch: 1000\n    dedupe: true\n  elasticsearch:\n    url: http://elasticsearch:9200\n    prefix: ghchronicle\n    api_key: ${ES_API_KEY}\n    batch: 1000\n    dedupe: true\n  dedupe_file: /var/lib/ghchronicle/state-written.bin\n  dedupe_horizon: 720h\nevery:\n  default: 15m\n  groups:\n    account: 30m\n    audience: 30m\n    ci: 30m\n    collector: 30m\n    feeds: 30m\n    repos: 30m\n    security: 30m\n    work: 30m\n  families:\n    account: 12h\n    achievements: 24h\n    actions: 15m\n    activity: 30m\n    analyses: 6h\n    artifacts: 1h\n    billing: 6h\n    branches: 24h\n    commits: 1h\n    deployments: 1h\n    deps: 24h\n    discussions: 2h\n    events: 30m\n    forks: 12h\n    history: 24h\n    inventory: 24h\n    issueevents: 1h\n    issues: 1h\n    joblogs: 24h\n    keys: 24h\n    notifs: 30m\n    outbound: 12h\n    planning: 6h\n    policyfiles: 24h\n    profile: 12h\n    ratelimit: 15m\n    repo: 1h\n    rulesets: 24h\n    security: 1h\n    settings: 6h\n    stars: 6h\n    stats: 12h\n    totals: 12h\n    traffic: 6h\nheartbeat: 15s\ngroups: [account, audience, ci, collector, feeds, repos, security, work]\nlog:\n  level: debug\n  format: text\n  file: /var/log/ghchronicle/ghchronicle.log\n  max_bytes: 67108864\n  keep: 5\nstate_file: /var/lib/ghchronicle/state.json\nbackfill:\n  since: 2y\ngrafana:\n  url: http://localhost:3000\n  token: ${GITHUB_TOKEN}\n  folder: GitHub\n  publish_on_start: false\n  dashboard_uid: my-existing-dashboard\n  datasource:\n    url: http://influxdb:8181\n    uid: ae3x9k2\n    loki_uid: be7m1q4\n",
 			"run": "ghchronicle -config config.yaml -once",
 			"step": "- uses: jmrplens/ghchronicle@v2\n  with:\n    token: ${{ secrets.GHCHRONICLE_TOKEN }}\n    config: .github/ghchronicle.yaml\n",
 			"needsFile": true,

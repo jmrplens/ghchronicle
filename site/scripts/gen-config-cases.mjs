@@ -77,6 +77,7 @@ const ENVIRONMENT = {
 	ES_PASSWORD: "placeholder-elastic-password-from-the-environment",
 	OTLP_TOKEN: "placeholder-otlp-from-the-environment",
 	TELEGRAF_PASSWORD: "placeholder-telegraf-password-from-the-environment",
+	DATABASE_URL: "postgres://placeholder:placeholder@localhost:5432/ghchronicle",
 };
 
 /**
@@ -264,7 +265,14 @@ function everySinkAnswers() {
 			answers[option.key] = "true";
 			continue;
 		}
-		if (option.sink && option.required) answers[option.key] = option.example;
+		if (!option.sink || !option.required) continue;
+		// A required setting that is also a credential is answered with the
+		// NAME of a variable, the way the form takes one: its example is a
+		// ${VAR} reference, and an answer that is not a name is left out of
+		// the file, which would leave the sink missing the one key it needs.
+		answers[option.key] = option.secret
+			? secretVariable(option)
+			: option.example;
 	}
 	// The two that cannot both be set: the loader refuses an Elasticsearch
 	// api_key beside a username, and neither is required, so neither is here.

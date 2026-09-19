@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -205,6 +206,16 @@ func TestEveryExampleOfferedLoads(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// A credential's example is the reference, not the value, so the copied
+	// line only starts when the variable it names is there. Setting every
+	// variable any example mentions is what the reader would have done, and
+	// it is what makes this a test of the examples rather than of which ones
+	// somebody remembered to set by hand.
+	for _, o := range options {
+		if named := envReference.FindStringSubmatch(o.Example); named != nil {
+			t.Setenv(named[1], "example-value-for-"+named[1])
+		}
+	}
 	var checked int
 	for _, o := range options {
 		if o.Kind == KindBlock {
@@ -313,3 +324,7 @@ func writeConfig(t *testing.T, body string) string {
 	}
 	return path
 }
+
+// envReference matches an example that is a reference to a variable rather
+// than a value, which is how every credential's example is written.
+var envReference = regexp.MustCompile(`^\$\{([A-Z0-9_]+)\}$`)

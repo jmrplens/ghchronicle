@@ -888,6 +888,9 @@ func buildSinks(cfg *config.Config, log *slog.Logger, oneShot bool) ([]sink.Sink
 	if s := cfg.Sinks.SQL; s != nil {
 		out = append(out, sink.OnlyChanged(sink.NewSQL(s.Dialect, s.Path, s.MaxBytes, s.Keep), dedupe(s.Dedupe)))
 	}
+	if s := cfg.Sinks.Postgres; s != nil {
+		out = append(out, sink.OnlyChanged(sink.NewPostgres(s.DSN, s.Batch), dedupe(s.Dedupe)))
+	}
 	if e := cfg.Sinks.Elasticsearch; e != nil {
 		es := sink.NewElasticsearch(e.URL, e.Prefix, e.Username, e.Password, e.APIKey, e.Batch, cfg.GitHub.HTTPTimeout())
 		es.OnReject = func(reason string) {
