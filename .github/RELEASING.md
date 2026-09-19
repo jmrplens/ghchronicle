@@ -106,23 +106,23 @@ are set, and writes the release notes from the commit subjects.
       the SBOMs, and the notes read as notes.
 - [ ] `docker run --rm ghcr.io/jmrplens/ghchronicle:v2.1.0 -version` prints the
       version. The workflow checks this too, and it is worth seeing once.
-- [ ] Move the major tag, which is what `uses: jmrplens/ghchronicle@v2`
-      resolves through:
+- [ ] The major tag moved. The workflow's last job does it, after the release
+      has published, so this is a check and not a step:
 
       ```sh
-      git tag -f -a v2 v2.1.0^{} -m "v2" && git push -f origin v2
+      git fetch --tags --force && git rev-parse v2^{} v2.1.0^{}
       ```
 
-      `^{}` because `v2.1.0` is an annotated tag, and a tag pointing at a tag
-      is not what `@v2` should resolve through. `-a -m` because a repository
-      configured to sign its tags makes every `git tag` annotated, and an
-      annotated tag with no message is an error rather than a prompt.
+      Both must print the same commit. `uses: jmrplens/ghchronicle@v2` is an
+      exact git lookup and not a semver range, so a stale major tag leaves
+      every Action user on the previous release without telling them, and it
+      was a manual step here until it was forgotten for the length of one.
 
-      The release workflow listens for three-part tags, so this move starts
-      nothing. With one exception, met once: GitHub reads the workflow file
-      at the ref being pushed, so a major tag moved onto a commit that predates
-      that filter runs the old file. The preflight job refuses it, before
-      anything is published, which is what it is for.
+      Pushing it starts nothing: the workflow listens for three-part tags. With
+      one exception, met once: GitHub reads the workflow file at the ref being
+      pushed, so a major tag moved by hand onto a commit that predates that
+      filter runs the old file. The preflight job refuses it, before anything
+      is published, which is what it is for.
 
 - [ ] Publish the Action to the Marketplace from the release page, on a first
       release. [ACTION.md](ACTION.md) has the steps and the categories.

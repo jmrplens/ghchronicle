@@ -252,3 +252,64 @@ jobs:
                 ;;
             esac
           done
+
+  # The moving major tag, which is the only thing that makes
+  # `uses: jmrplens/ghchronicle@v2` follow a release. A `uses:` ref is an exact
+  # git lookup and not a semver range: with no tag named `v2` a workflow fails
+  # to resolve it, and with a stale one every Action user silently stays on the
+  # previous release. Proven against this repository's own refs: `tags/v2` and
+  # `tags/v2.1.0` resolve, `tags/v2.1` is a 404.
+  #
+  # Last, and only when the release actually published. Moving the pointer
+  # before the archives exist would send every Action user at a release that
+  # is not there. It was a manual step in RELEASING.md until 2026-09-19, and it
+  # was forgotten for the length of one release: the tag is a rule that holds
+  # where somebody remembered to apply it, which is the kind this repository
+  # keeps turning into something checked.
+  #
+  # Pushing it starts nothing: the workflow's own filter is `v*.*.*`, and a tag
+  # pushed with GITHUB_TOKEN does not trigger workflows anyway.
+  major-tag:
+    name: Major tag
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [preflight, goreleaser]
+    permissions:
+      contents: write # force-move the major tag
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          # Every tag, to read where the three-part one points.
+          fetch-depth: 0
+          # The one checkout in this workflow that keeps its credentials,
+          # because this is the one step that pushes. The token it keeps is
+          # the job's own, narrowed to contents: write above.
+          persist-credentials: true
+
+      - name: Move the major tag onto this release
+        env:
+          VERSION: ${{ needs.preflight.outputs.version }}
+        run: |
+          set -euo pipefail
+          major="v${VERSION%%.*}"
+          # The commit and not the tag object: a tag pointing at a tag is not
+          # what `@v2` should resolve through.
+          commit="$(git rev-parse --verify --quiet "v${VERSION}^{}")"
+          # --verify --quiet, because a bare rev-parse prints the string it
+          # could not resolve to stdout and then fails: without it a major tag
+          # that does not exist yet lands in the variable as the literal
+          # "v3^{}" rather than as nothing.
+          at="$(git rev-parse --verify --quiet "${major}^{}" || true)"
+          if [ "${at}" = "${commit}" ]; then
+            echo "${major} already points at ${commit}"
+            exit 0
+          fi
+          # Annotated with a message, because a repository configured to sign
+          # its tags makes every `git tag` annotated, and an annotated tag with
+          # no message is an error rather than a prompt.
+          git -c user.name="github-actions[bot]" \
+              -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+              tag -f -a "${major}" "${commit}" -m "${major}"
+          git push -f origin "refs/tags/${major}"
+          echo "::notice::${major} now points at ${commit} (v${VERSION})"
