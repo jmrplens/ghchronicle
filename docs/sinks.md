@@ -18,7 +18,8 @@ exception, and it exists because Prometheus insists.
 | Store                                              | Keeps                                        | Good for                                       | Config                          |
 | -------------------------------------------------- | -------------------------------------------- | ---------------------------------------------- | ------------------------------- |
 | [InfluxDB](https://jmrp.io/docs/ghchronicle/sinks/influxdb/)           | the dated history                            | "how fast were we merging in July"             | `url`, `token`, `org`, `bucket` |
-| [PostgreSQL](https://jmrp.io/docs/ghchronicle/sinks/postgres/)         | the dated history, as SQL you pipe into psql | a Grafana user with a Postgres and no InfluxDB | `dialect`, `path`               |
+| [PostgreSQL](https://jmrp.io/docs/ghchronicle/sinks/postgres/)         | the dated history, in a database it connects to | a Grafana user with a Postgres and no InfluxDB | `dsn`, `batch`                  |
+| [PostgreSQL, to a file](https://jmrp.io/docs/ghchronicle/sinks/postgres/) | the same tables, as SQL you pipe into psql | a load that happens later, or elsewhere        | `dialect`, `path`               |
 | [Graphite](https://jmrp.io/docs/ghchronicle/sinks/graphite/)           | the dated history                            | a Graphite that is already there               | `addr`, `prefix`                |
 | [Elasticsearch](https://jmrp.io/docs/ghchronicle/sinks/elasticsearch/) | the dated history, as documents              | search across everything collected             | `url`, `prefix`, `api_key`      |
 | [Prometheus](https://jmrp.io/docs/ghchronicle/sinks/prometheus/)       | the current value                            | alerting, and a number on a wall               | `listen`, `path`                |

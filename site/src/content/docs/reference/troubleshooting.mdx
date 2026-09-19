@@ -191,3 +191,105 @@ out-of-order window behind the newest entry already in that stream, about two
 hours by default, so the sink leaves the older ones out rather than losing the
 whole push. Raise `max_age` only alongside Loki's own
 `out_of_order_time_window`. See [Loki](/ghchronicle/sinks/loki/).
+
+## Publishing the dashboard
+
+**`Permissions needed: datasources:create`.** The token publishes dashboards
+and cannot make datasources. An Editor can do the first and not the second, so
+either give the service account that permission, make it an Admin, or let it
+adopt a datasource you made yourself by naming it in
+`grafana.datasource.uid`, which only ever reads.
+
+**`datasource ... does not answer: connection refused`.** Grafana reached the
+address and nothing was listening, which almost always means the address is
+right for the collector and wrong for Grafana. A collector on the host writes
+to a published port; Grafana in a container reaches the same store by its name
+on the container network, and `127.0.0.1` there is the container. Put the
+address Grafana would use in `grafana.datasource.url`. The run refuses rather
+than publishing, because a dashboard against a datasource that cannot be
+reached draws nothing and says nothing about why.
+
+**`Invalid API key`.** The token reached Grafana as the characters
+`${GRAFANA_TOKEN}` rather than as a token, which means the variable is not set
+where the collector runs. In a service unit that is an `EnvironmentFile` the
+unit does not read, or a variable named in the file and not exported.
+
+**The datasource is there and has no password.** Only a password the DSN itself
+writes is sent. One that pgx found in `PGPASSWORD` or a `.pgpass` on the
+machine that published is named in a line and left there, because a Grafana is
+shared and a credential the configuration never mentioned is not one to copy
+into it.
+
+**`the dsn asks for sslmode=prefer and Grafana's datasource has no such
+mode`.** libpq's default is to try TLS and carry on without it, and the
+datasource either insists or refuses. It was given `disable`; set
+`grafana.datasource.sslmode` to `require`, `verify-ca` or `verify-full` if that
+is wrong for your server.
+
+**Two dashboards, and the one you are looking at stops changing.** The
+generated dashboard has its own uid and every publish overwrites it, so this
+only happens when yours lives somewhere else: imported as new, or renamed by
+hand. Name the one you read in `grafana.dashboard_uid`.
+
+**`... is still in Grafana and no ... sink is configured here`.** Something this
+made is under a uid nothing writes to any more, which is what changing store
+leaves behind. It is a note and nothing was touched; delete it in Grafana when
+you are done with it.
+
+**`no sink this builds a dashboard for is configured`.** Dashboards exist for
+five stores, and the sink you have is not one of them. A forwarding sink has no
+dashboard of its own because the dashboard belongs to wherever it forwards to,
+and `file`, `stdout` and `loki` are not metric stores.
+
+**The failed job output panel is still a note.** That panel becomes the log
+lines when there is a Loki sink whose address ends in `/loki/api/v1/push`, which
+is what says where the query endpoint is. A sink writing anywhere else says so
+and leaves the panel alone; name a Loki datasource in
+`grafana.datasource.loki_uid`.
+
+**Nothing was published and nothing failed.** `publish_on_start` is off unless
+you turn it on, and it is skipped for `-once`, `-backfill` and `-card`, because
+turning it on in a service unit did not mean rewriting the dashboard on every
+run of a scheduled card render.
+
+**The collector started and the dashboard did not appear.** A publish that
+fails at start-up warns and the sweep goes on. The metrics of an hour spent not
+running cannot be recovered and a dashboard published on the next restart can,
+so the log line is the place to look.
+
+## Taking things away
+
+**`-uninstall` printed a list and removed nothing.** That is the default. Add
+`-yes`.
+
+**The datasource survived the uninstall.** One named in
+`grafana.datasource.uid` is adopted, not made, so it was somebody else's before
+this ran and stays theirs.
+
+**`unknown -uninstall target`.** The whole list is refused rather than the part
+that parsed, so a typo removes nothing. The targets are `dashboard`, `data`,
+`state` and `all`.
+
+**The rows are still in the database after `-uninstall data`.** Three stores
+cannot be emptied from here and say so: Graphite has no delete, the Prometheus
+sink was scraped rather than written to, and the SQL sink's file goes but rows
+already loaded from it into a real database were loaded by you.
+
+## The PostgreSQL that connects
+
+**`could not reach its database`.** The sink connects on the first write rather
+than at start-up, so this is the first sweep and not the configuration being
+read. The DSN takes either shape libpq does, and the message is the driver's.
+
+**A column is missing rather than the row.** A field with no value does not get
+a cell: an empty string is left out, and a float that is not a number is stored
+as NULL. The column appears the first time a point carries something for it.
+
+**A field changed type and the insert fails.** A column is created with the
+type of the first value seen and is never altered afterwards, so a field that
+was a number and is now a string has nowhere to go. Rename the field, or drop
+the table and let the next sweep declare it again.
+
+**The file sink and this one disagree.** They cannot: both render the same
+schema from the same code, and `cmd/check_postgres` plans every panel query
+against it. If the tables differ, one of them was loaded from an older version.

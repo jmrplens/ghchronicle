@@ -17,7 +17,8 @@ excepción, y existe porque Prometheus insiste.
 | Almacén                                               | Guarda                                         | Bueno para                                       | Configuración                   |
 | ----------------------------------------------------- | ---------------------------------------------- | ------------------------------------------------ | ------------------------------- |
 | [InfluxDB](/ghchronicle/es/sinks/influxdb/)           | la historia fechada                            | "a qué velocidad fusionábamos en julio"          | `url`, `token`, `org`, `bucket` |
-| [PostgreSQL](/ghchronicle/es/sinks/postgres/)         | la historia fechada, como SQL que pasas a psql | quien usa Grafana con un Postgres y sin InfluxDB | `dialect`, `path`               |
+| [PostgreSQL](/ghchronicle/es/sinks/postgres/)         | la historia fechada, en una base a la que conecta | quien usa Grafana con un Postgres y sin InfluxDB | `dsn`, `batch`                  |
+| [PostgreSQL, a fichero](/ghchronicle/es/sinks/postgres/) | las mismas tablas, como SQL que pasas a psql | una carga que ocurre después, o en otro sitio    | `dialect`, `path`               |
 | [Graphite](/ghchronicle/es/sinks/graphite/)           | la historia fechada                            | un Graphite que ya está ahí                      | `addr`, `prefix`                |
 | [Elasticsearch](/ghchronicle/es/sinks/elasticsearch/) | la historia fechada, como documentos           | buscar en todo lo recogido                       | `url`, `prefix`, `api_key`      |
 | [Prometheus](/ghchronicle/es/sinks/prometheus/)       | el valor actual                                | alertas, y un número en una pared                | `listen`, `path`                |

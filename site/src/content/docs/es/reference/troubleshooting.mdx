@@ -198,3 +198,107 @@ más atrasada que su ventana de desorden respecto a la entrada más nueva que ya
 hay en ese stream, unas dos horas por omisión, así que el destino deja fuera las
 más viejas en vez de perder el envío entero. Sube `max_age` solo junto al propio
 `out_of_order_time_window` de Loki. Ver [Loki](/ghchronicle/es/sinks/loki/).
+
+## Publicar el dashboard
+
+**`Permissions needed: datasources:create`.** El token publica dashboards y no
+puede crear datasources. Un Editor puede lo primero y no lo segundo, así que
+dale ese permiso a la cuenta de servicio, hazla Admin, o deja que adopte un
+datasource creado por ti nombrándolo en `grafana.datasource.uid`, que solo lee.
+
+**`datasource ... does not answer: connection refused`.** Grafana llegó a la
+dirección y no había nadie escuchando, que casi siempre significa que la
+dirección es la buena para el colector y la mala para Grafana. Un colector en
+el anfitrión escribe a un puerto publicado; Grafana en un contenedor llega al
+mismo almacén por su nombre en la red de contenedores, y `127.0.0.1` allí es el
+contenedor. Pon en `grafana.datasource.url` la dirección que usaría Grafana. La
+ejecución se niega en vez de publicar, porque un dashboard contra un datasource
+inalcanzable no dibuja nada y no dice por qué.
+
+**`Invalid API key`.** El token llegó a Grafana como los caracteres
+`${GRAFANA_TOKEN}` y no como un token, lo que significa que la variable no está
+donde corre el colector. En una unidad de systemd eso es un `EnvironmentFile`
+que la unidad no lee, o una variable nombrada en el fichero y no exportada.
+
+**El datasource está y no tiene contraseña.** Solo se envía una contraseña que
+escriba el propio DSN. Una que pgx encontrara en `PGPASSWORD` o en un `.pgpass`
+de la máquina que publicó se nombra en una línea y se queda ahí, porque un
+Grafana es compartido y una credencial que la configuración nunca mencionó no
+es cosa de copiar dentro.
+
+**`the dsn asks for sslmode=prefer and Grafana's datasource has no such
+mode`.** Lo que hace libpq por omisión es intentar TLS y seguir sin él, y el
+datasource o exige o rechaza. Se le puso `disable`; pon
+`grafana.datasource.sslmode` en `require`, `verify-ca` o `verify-full` si eso
+no encaja con tu servidor.
+
+**Dos dashboards, y el que miras deja de cambiar.** El generado tiene su propio
+uid y cada publicación lo sobreescribe, así que esto solo pasa cuando el tuyo
+vive en otro sitio: importado como nuevo, o renombrado a mano. Nombra el que
+lees en `grafana.dashboard_uid`.
+
+**`... is still in Grafana and no ... sink is configured here`.** Algo que esto
+creó está bajo un uid al que ya nadie escribe, que es lo que deja atrás cambiar
+de almacén. Es un aviso y no se tocó nada; bórralo en Grafana cuando hayas
+terminado con él.
+
+**`no sink this builds a dashboard for is configured`.** Hay dashboards para
+cinco almacenes y el sink que tienes no es uno de ellos. Un sink que reenvía no
+tiene dashboard propio porque el dashboard pertenece al destino, y `file`,
+`stdout` y `loki` no son almacenes de métricas.
+
+**El panel de la salida del trabajo fallido sigue siendo una nota.** Ese panel
+pasa a ser las líneas cuando hay un sink de Loki cuya dirección termina en
+`/loki/api/v1/push`, que es lo que dice dónde está el extremo de consulta. Un
+sink que escriba en otro sitio lo dice y deja el panel como está; nombra un
+datasource de Loki en `grafana.datasource.loki_uid`.
+
+**No se publicó nada y no falló nada.** `publish_on_start` está apagado salvo
+que lo enciendas, y se salta en `-once`, `-backfill` y `-card`, porque
+encenderlo en una unidad de systemd no quería decir reescribir el dashboard en
+cada ejecución de una tarjeta programada.
+
+**El colector arrancó y el dashboard no apareció.** Una publicación que falla
+al arrancar avisa y la pasada sigue. Las métricas de una hora sin recoger no se
+recuperan y un dashboard publicado al siguiente arranque sí, así que el sitio
+donde mirar es la línea del log.
+
+## Quitar cosas
+
+**`-uninstall` imprimió una lista y no quitó nada.** Eso es lo que hace por
+omisión. Añade `-yes`.
+
+**El datasource sobrevivió al uninstall.** Uno nombrado en
+`grafana.datasource.uid` se adopta, no se crea, así que era de otro antes de
+que esto corriera y sigue siéndolo.
+
+**`unknown -uninstall target`.** Se rechaza la lista entera en vez de la parte
+que se entendió, así que una errata no quita nada. Los objetivos son
+`dashboard`, `data`, `state` y `all`.
+
+**Las filas siguen en la base después de `-uninstall data`.** Tres almacenes no
+se pueden vaciar desde aquí y lo dicen: Graphite no tiene borrado, el sink de
+Prometheus se raspaba en vez de recibir escrituras, y el fichero del sink SQL
+se va pero las filas que ya cargaste de ahí a una base de verdad las cargaste
+tú.
+
+## El PostgreSQL que conecta
+
+**`could not reach its database`.** El sink conecta en la primera escritura y
+no al arrancar, así que esto es la primera pasada y no la lectura de la
+configuración. El DSN admite las dos formas que admite libpq, y el mensaje es
+el del driver.
+
+**Falta una columna en vez de la fila.** Un campo sin valor no ocupa celda: una
+cadena vacía se deja fuera, y un float que no es un número se guarda como NULL.
+La columna aparece la primera vez que un punto lleva algo para ella.
+
+**Un campo cambió de tipo y el insert falla.** Una columna se crea con el tipo
+del primer valor visto y no se altera después, así que un campo que era un
+número y ahora es una cadena no tiene dónde ir. Renombra el campo, o tira la
+tabla y deja que la siguiente pasada la declare otra vez.
+
+**El sink de fichero y este no coinciden.** No pueden: los dos renderizan el
+mismo esquema desde el mismo código, y `cmd/check_postgres` planifica contra él
+cada consulta de panel. Si las tablas difieren, una se cargó desde una versión
+anterior.

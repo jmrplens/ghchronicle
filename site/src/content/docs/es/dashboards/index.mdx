@@ -79,13 +79,16 @@ que hizo con cada datasource y cada dashboard.
   `grafana.datasource.url` es la dirección que usar en su lugar.
 </Aside>
 
-Dos de los cinco sinks describen su propio datasource sin decirles nada más,
-porque aquello a lo que escriben es lo que Grafana consulta: InfluxDB y
-Elasticsearch. Otros dos necesitan la dirección y nada más, porque escriben en
-un sitio que no es al que va una consulta: el sink de Prometheus se raspa en
-vez de recibir escrituras, y el de Graphite habla el puerto de ingesta mientras
-que Grafana pregunta a la API web, en otro puerto. Dales la dirección y el
-datasource se crea igual:
+Tres de los cinco sinks describen su propio datasource sin decirles nada más,
+porque aquello a lo que escriben es lo que Grafana consulta: InfluxDB,
+Elasticsearch y el sink de PostgreSQL que conecta, cuyo DSN lleva el servidor,
+la base, el usuario y, cuando el propio DSN la escribe, la contraseña.
+
+Otros dos necesitan la dirección y nada más, porque escriben en un sitio que no
+es al que va una consulta: el sink de Prometheus se raspa en vez de recibir
+escrituras, y el de Graphite habla el puerto de ingesta mientras que Grafana
+pregunta a la API web, en otro puerto. Dales la dirección y el datasource se
+crea igual:
 
 ```yaml
 grafana:
@@ -93,10 +96,10 @@ grafana:
     url: http://prometheus:9090
 ```
 
-Al quinto tampoco se le puede decir. El sink SQL escribe sentencias a un
-fichero y nunca se conecta, así que no hay host, puerto, usuario ni contraseña
-en ninguna parte de la configuración con que construir un datasource. Ese, y
-cualquier datasource que prefieras gestionar tú, se nombra en su lugar:
+El que no se puede describir de ninguna manera es el sink SQL, el que escribe
+sentencias a un fichero: nunca se conecta, así que no hay host, puerto, usuario
+ni contraseña en ninguna parte de su configuración. Ese, y cualquier datasource
+que prefieras gestionar tú, se nombra en su lugar:
 
 ```yaml
 grafana:
@@ -120,10 +123,18 @@ Aquí no hay nada que asigne Grafana, así que no hay nada que leer de vuelta y
 escribir en tu configuración. Los dos uid salen del nombre del almacén, y la
 misma ejecución dos veces escribe en los mismos dos sitios:
 
-| Almacén         | uid del datasource          | uid del dashboard          |
-| --------------- | --------------------------- | -------------------------- |
-| `influxdb`      | `ghchronicle-influxdb`      | `ghchronicle-influxdb`     |
-| `elasticsearch` | `ghchronicle-elasticsearch` | `ghchronicle-elasticsearch`|
+| Almacén         | uid del dashboard           | Su datasource                  |
+| --------------- | --------------------------- | ------------------------------ |
+| `influxdb`      | `ghchronicle-influxdb`      | creado, desde el sink          |
+| `elasticsearch` | `ghchronicle-elasticsearch` | creado, desde el sink          |
+| `postgres`      | `ghchronicle-postgres`      | creado, desde el dsn           |
+| `prometheus`    | `ghchronicle-prometheus`    | creado, si le das la dirección |
+| `graphite`      | `ghchronicle-graphite`      | creado, si le das la dirección |
+
+Un datasource que esto crea toma el uid del dashboard, así que los dos son
+`ghchronicle-<almacén>`, y uno que nombres tú conserva el uid que ya tenga. El
+de Loki, cuando la dirección del sink explica dónde encontrarlo, es
+`ghchronicle-loki`.
 
 El datasource se crea la primera vez y se corrige después, y solo se comparan
 los campos que esto escribe, así que un tiempo de espera o una descripción que

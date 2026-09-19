@@ -79,8 +79,11 @@ to each datasource and each dashboard.
   address to use instead.
 </Aside>
 
-Two of the five sinks describe their own datasource with nothing else said,
-because what they write to is what Grafana queries: InfluxDB and Elasticsearch.
+Three of the five sinks describe their own datasource with nothing else said,
+because what they write to is what Grafana queries: InfluxDB, Elasticsearch,
+and the PostgreSQL sink that connects, whose DSN carries the server, the
+database, the user and, when the DSN itself writes one, the password.
+
 Two more need the address and nothing else, because they write somewhere that
 is not where a query goes: the Prometheus sink is scraped rather than written
 to, and the Graphite sink speaks the ingest port while Grafana asks the web API
@@ -93,10 +96,10 @@ grafana:
     url: http://prometheus:9090
 ```
 
-The fifth cannot be told either. The SQL sink writes statements to a file and
-never connects, so no host, port, user or password exists anywhere in the
-config to build a datasource out of. That one, and any datasource you would
-rather manage yourself, is named instead:
+What cannot be described at all is the SQL sink, the one that writes statements
+to a file: it never connects, so no host, port, user or password exists
+anywhere in its config. That one, and any datasource you would rather manage
+yourself, is named instead:
 
 ```yaml
 grafana:
@@ -121,10 +124,18 @@ Nothing here is assigned by Grafana, so there is nothing to read back out of it
 and write into your config. Both uids are worked out from the store's name, and
 the same run twice writes to the same two places:
 
-| Store           | Datasource uid              | Dashboard uid              |
-| --------------- | --------------------------- | -------------------------- |
-| `influxdb`      | `ghchronicle-influxdb`      | `ghchronicle-influxdb`     |
-| `elasticsearch` | `ghchronicle-elasticsearch` | `ghchronicle-elasticsearch`|
+| Store           | Dashboard uid               | Its datasource                  |
+| --------------- | --------------------------- | ------------------------------- |
+| `influxdb`      | `ghchronicle-influxdb`      | made, from the sink             |
+| `elasticsearch` | `ghchronicle-elasticsearch` | made, from the sink             |
+| `postgres`      | `ghchronicle-postgres`      | made, from the dsn              |
+| `prometheus`    | `ghchronicle-prometheus`    | made, once you give the address |
+| `graphite`      | `ghchronicle-graphite`      | made, once you give the address |
+
+A datasource this makes takes the dashboard's uid, so both are
+`ghchronicle-<store>`, and one you name yourself keeps whatever uid it has.
+A Loki datasource, when the sink's address explains where to find one, is
+`ghchronicle-loki`.
 
 The datasource is created the first time and corrected afterwards, and only the
 fields this writes are compared, so a timeout or a description you set on it
