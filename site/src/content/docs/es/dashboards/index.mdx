@@ -85,6 +85,43 @@ código, así que actualizar el binario actualiza el dashboard. Un fallo ahí
 avisa y la pasada sigue, porque las métricas de una hora sin recoger no se
 recuperan y un dashboard publicado al siguiente arranque sí.
 
+### Qué crea, y con qué nombres
+
+Aquí no hay nada que asigne Grafana, así que no hay nada que leer de vuelta y
+escribir en tu configuración. Los dos uid salen del nombre del almacén, y la
+misma ejecución dos veces escribe en los mismos dos sitios:
+
+| Almacén         | uid del datasource          | uid del dashboard          |
+| --------------- | --------------------------- | -------------------------- |
+| `influxdb`      | `ghchronicle-influxdb`      | `ghchronicle-influxdb`     |
+| `elasticsearch` | `ghchronicle-elasticsearch` | `ghchronicle-elasticsearch`|
+
+El datasource se crea la primera vez y se corrige después, y solo se comparan
+los campos que esto escribe, así que un tiempo de espera o una descripción que
+le hayas puesto tú se quedan como están. Uno que lleve credencial se escribe en
+cada ejecución, porque Grafana informa de qué secretos hay puestos y nunca de su
+valor: un token que rotes en la configuración no se puede ver desde fuera, y
+escribirlo es la única manera de asegurar que el datasource no sigue con el
+viejo.
+
+El dashboard se publica con `overwrite`, así que la segunda ejecución actualiza
+la primera en vez de añadir otra. Eso es lo que hace que `publish_on_start` se
+pueda dejar encendido.
+
+### Si el dashboard ya está en otro sitio
+
+Importar el JSON desde la interfaz conserva el uid que trae el fichero, así que
+un dashboard importado así es el que esto sobreescribe y no hay nada que hacer.
+Solo cambia si se le pidió a Grafana importarlo como nuevo, o si se le cambió el
+uid a mano: entonces el uid generado está libre, una publicación crea un segundo
+dashboard al lado del que se está mirando, y el que está abierto deja de ser el
+que se actualiza. Nombra el que ya existe y se escribe ese:
+
+```yaml
+grafana:
+  dashboard_uid: mi-dashboard-existente
+```
+
 ## Importar desde la interfaz
 
 <Steps>

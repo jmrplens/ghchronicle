@@ -283,3 +283,63 @@ func TestAGrafanaThatIsDownDoesNotStopTheCollector(t *testing.T) {
 func quietLogger() *slog.Logger {
 	return slog.New(slog.NewTextHandler(io.Discard, nil))
 }
+
+// TestItOverwritesOneDashboardRatherThanLeavingTwo. The generated document
+// carries the store's uid and the publish overwrites it, so running this twice
+// updates what is there. A reader whose dashboard already lives under another
+// uid says so and that one is written instead, because the alternative is a
+// second dashboard beside the one they have open.
+func TestItOverwritesOneDashboardRatherThanLeavingTwo(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name     string
+		override string
+		wantUID  string
+	}{
+		{"the one this generates", "", "ghchronicle-influxdb"},
+		{"one that already exists elsewhere", "imported-by-hand", "imported-by-hand"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			g := &grafanaStub{missing: true}
+			cfg := influxConfig(g.serve(t))
+			cfg.Grafana.DashboardUID = tc.override
+			var said strings.Builder
+			// Twice, because "it overwrites" is a claim about the second run.
+			for range 2 {
+				if err := publishDashboards(t.Context(), cfg, &said); err != nil {
+					t.Fatal(err)
+				}
+			}
+			published := publishedUIDs(t, g.writes)
+			if len(published) != 2 {
+				t.Fatalf("published %d dashboards, want 2 runs", len(published))
+			}
+			for _, uid := range published {
+				if uid != tc.wantUID {
+					t.Errorf("published uid %q, want %q every time", uid, tc.wantUID)
+				}
+			}
+		})
+	}
+}
+
+// publishedUIDs is the uid of every dashboard that was posted, and it fails
+// the test for any posted without asking to overwrite, since a publish that
+// does not overwrite is refused the second time.
+func publishedUIDs(t *testing.T, writes []map[string]any) []string {
+	t.Helper()
+	var out []string
+	for _, body := range writes {
+		doc, ok := body["dashboard"].(map[string]any)
+		if !ok {
+			continue
+		}
+		uid, _ := doc["uid"].(string)
+		out = append(out, uid)
+		if body["overwrite"] != true {
+			t.Error("it published without asking to overwrite, so a second run would be refused")
+		}
+	}
+	return out
+}

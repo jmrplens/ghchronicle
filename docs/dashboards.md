@@ -107,6 +107,42 @@ the code, so updating the binary updates the dashboard. A failure there warns
 and the sweep goes on, because the metrics of an hour spent not running cannot
 be recovered and a dashboard published on the next restart can.
 
+#### What it makes, and under which names
+
+Nothing here is assigned by Grafana, so there is nothing to read back out of it
+and write into your config. Both uids are worked out from the store's name, and
+the same run twice writes to the same two places:
+
+| Store           | Datasource uid              | Dashboard uid              |
+| --------------- | --------------------------- | -------------------------- |
+| `influxdb`      | `ghchronicle-influxdb`      | `ghchronicle-influxdb`     |
+| `elasticsearch` | `ghchronicle-elasticsearch` | `ghchronicle-elasticsearch`|
+
+The datasource is created the first time and corrected afterwards, and only the
+fields this writes are compared, so a timeout or a description you set on it
+yourself is left alone. One carrying a credential is written on every run,
+because Grafana reports which secrets are set and never their values: a token
+you rotate in the config cannot be seen from the outside, and writing it is the
+only way to be sure the datasource is not still using the old one.
+
+The dashboard is published with `overwrite`, so the second run updates the first
+rather than adding another. That is what makes `publish_on_start` safe to leave
+on.
+
+#### If the dashboard is already somewhere else
+
+Importing the JSON through the UI keeps the uid the file carries, so a dashboard
+imported that way is the one this writes over and there is nothing to do. It is
+only different if Grafana was asked to import it as new, or if the uid was
+changed by hand: then the generated uid is free, a publish makes a second
+dashboard beside the one being looked at, and the one open stops being the one
+updated. Name the existing one and it is written instead:
+
+```yaml
+grafana:
+  dashboard_uid: my-existing-dashboard
+```
+
 ### Importing from the UI
 
 1. In Grafana, go to **Dashboards**, then **New**, then **Import**.

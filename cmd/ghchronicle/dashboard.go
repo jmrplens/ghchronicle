@@ -82,12 +82,22 @@ func publishOne(ctx context.Context, client grafana.Client, cfg *config.Config,
 	fmt.Fprintf(out, "datasource %s answers: %s\n", uid, message)
 
 	doc := dashboards.Publishable(store, uid, logs)
+	// The document carries the store's own uid, and publishing overwrites
+	// whatever is at it, so two runs update one dashboard rather than leaving
+	// two. Somewhere the dashboard already lives under another uid, that is
+	// the one to write over: otherwise the reader keeps the dashboard they
+	// have open and this quietly updates a second one beside it.
+	at := store.UID
+	if override := cfg.Grafana.DashboardUID; override != "" {
+		at = override
+		doc["uid"] = override
+	}
 	path, err := client.PublishDashboard(ctx, doc, folder,
 		"published by ghchronicle, store "+store.Name, grafanaTimeout)
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(out, "dashboard %s published at %s\n", store.UID, client.URL+path)
+	fmt.Fprintf(out, "dashboard %s published at %s\n", at, client.URL+path)
 	return nil
 }
 

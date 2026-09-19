@@ -365,6 +365,7 @@ This page is a form that writes a configuration. What follows is the inventory i
   - `grafana.token`: string, a credential, like `${GRAFANA_TOKEN}`
   - `grafana.folder`: string, like `GitHub`
   - `grafana.publish_on_start`: bool, like `false`
+  - `grafana.dashboard_uid`: string, like `my-existing-dashboard`
   - `grafana.datasource`: a block of settings
   - `grafana.datasource.url`: string, like `http://influxdb:8181`
   - `grafana.datasource.uid`: string, like `ae3x9k2`

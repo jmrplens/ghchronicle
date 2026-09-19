@@ -339,6 +339,12 @@ log:
 #   # Omit it for Grafana's default folder.
 #   folder: GitHub
 #   publish_on_start: false
+#   # Write over the dashboard at this uid instead of the one named after the
+#   # store. Each generated dashboard carries its own uid, ghchronicle-<store>,
+#   # and every publish overwrites it, so two runs update one dashboard rather
+#   # than leaving two. This is only for a server where it already lives
+#   # somewhere else, imported as new or renamed by hand.
+#   dashboard_uid: my-existing-dashboard
 #   datasource:
 #     # The address Grafana reaches the store by, when that is not the address
 #     # the collector writes to. They differ more often than not: a collector

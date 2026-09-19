@@ -714,6 +714,12 @@
       "example": "false"
     },
     {
+      "key": "grafana.dashboard_uid",
+      "kind": "string",
+      "group": "run",
+      "example": "my-existing-dashboard"
+    },
+    {
       "key": "grafana.datasource",
       "kind": "block",
       "group": "run"

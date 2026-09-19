@@ -784,6 +784,7 @@ func (c *Config) resolveGrafana() {
 	}
 	c.Grafana.URL = expandEnv(c.Grafana.URL)
 	c.Grafana.Token = expandEnv(c.Grafana.Token)
+	c.Grafana.DashboardUID = expandEnv(c.Grafana.DashboardUID)
 	c.Grafana.Datasource.URL = expandEnv(c.Grafana.Datasource.URL)
 	c.Grafana.Datasource.UID = expandEnv(c.Grafana.Datasource.UID)
 	c.Grafana.Datasource.LokiUID = expandEnv(c.Grafana.Datasource.LokiUID)
@@ -1369,6 +1370,14 @@ type Grafana struct {
 	// dashboard is generated from the code, so this is what keeps a server
 	// from quietly falling behind the binary that feeds it.
 	PublishOnStart bool `yaml:"publish_on_start" ghc:"example=false"`
+	// DashboardUID writes over the dashboard at this uid instead of the one
+	// named after the store. The generated dashboards carry their own uid and
+	// every publish overwrites it, so this is only for a server where the
+	// dashboard already lives somewhere else: one imported through the UI with
+	// Grafana's "import as new" asked for, or one whose uid was changed by
+	// hand. Without it a second dashboard would appear beside the first and
+	// the one being looked at would stop being the one being updated.
+	DashboardUID string `yaml:"dashboard_uid" ghc:"example=my-existing-dashboard"`
 	// Datasource overrides what is otherwise read from the sink.
 	Datasource GrafanaDatasource `yaml:"datasource"`
 }
