@@ -1,12 +1,15 @@
 package main
 
 import (
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/jmrplens/ghchronicle/internal/config"
+	"github.com/jmrplens/ghchronicle/internal/ghapi"
 	"github.com/jmrplens/ghchronicle/internal/run"
 	"github.com/jmrplens/ghchronicle/test/e2e/fakegh"
 )
@@ -154,5 +157,67 @@ func TestSinceAndShownPathSayTheAwkwardCases(t *testing.T) {
 	}
 	if got := shownPath(""); !strings.Contains(got, "state_file") {
 		t.Errorf("with no state file it says %q, which does not tell the reader why there is no checkpoint", got)
+	}
+}
+
+// TestTheBackfillGoesBackAndThenStopsWhenAPassRecordsNothing drives the loop
+// itself, which afterPass only decides for.
+//
+// The checkpoint's scope names a family the configuration does not enable, so
+// there is always one left however many passes run. The first pass records the
+// families that do run, which is a gain and sends it back; the second records
+// nothing new, which is the obstacle that waiting does not clear, and it stops
+// and says so. That is every branch of the loop, the wait and the reprime
+// included, in a second.
+func TestTheBackfillGoesBackAndThenStopsWhenAPassRecordsNothing(t *testing.T) {
+	gh := fakegh.New(t, fixtures)
+	dir := t.TempDir()
+	cfg, err := config.LoadWith(writeConfig(t, dir, gh.URL(),
+		"groups: [account]\nsinks:\n  file:\n    path: "+filepath.Join(dir, "points.lp")+"\n"),
+		config.Relax{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A reserve of one, for the reason the end-to-end suite gives where it
+	// does the same: an unbounded walk against the fake spends down to the
+	// reserve and then parks for an hour waiting for a window that never turns
+	// over. The runner reads it from the configuration, not from the client.
+	cfg.GitHub.ReserveRate = 1
+	api := ghapi.New("test-token", 10*time.Second)
+	api.SetBaseURL(gh.URL())
+	api.SetReserve(1, true)
+
+	// A family nothing enables, so the walk can never finish covering it.
+	scope := run.ScopeOf(cfg, "")
+	scope.Families = append(scope.Families, "never-enabled")
+	progress, err := run.OpenProgress(cfg.BackfillProgressFile(), "test-build", scope, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var log strings.Builder
+	runner := &run.Runner{
+		Cfg: cfg, API: api, Sinks: nil, State: run.LoadState(cfg.StateFile),
+		Log:      slog.New(slog.NewTextHandler(&log, &slog.HandlerOptions{Level: slog.LevelInfo})),
+		Prime:    true,
+		Backfill: true,
+		Progress: progress,
+		// Bounded, and not for speed. An unbounded backfill walks billing back
+		// month by month until three answer empty, and the fake answers every
+		// month there is, so the walk never reaches an end to stop at.
+		BackfillSince: time.Now().AddDate(0, 0, -30),
+	}
+
+	if err = walkUntilDoneOrStuck(t.Context(), runner, time.Millisecond, runner.Log); err != nil {
+		t.Fatalf("the walk: %v\n%s", err, log.String())
+	}
+	said := log.String()
+	for _, want := range []string{
+		"waiting before going back for the families this pass left",
+		"this pass recorded nothing new",
+		"never-enabled",
+	} {
+		if !strings.Contains(said, want) {
+			t.Errorf("the log does not carry %q:\n%s", want, said)
+		}
 	}
 }

@@ -513,14 +513,14 @@ func TestExecuteCardSpeedReachesTheCardAndLeavesTheDefaultAlone(t *testing.T) {
 	}
 
 	// The default, asked for and left out, is one card.
-	if stated := draw(t, "stated", "-card-speed", "0.5"); stated != own {
+	if draw(t, "stated", "-card-speed", "0.5") != own {
 		t.Error("-card-speed 0.5 must draw exactly the card no -card-speed draws, to the byte")
 	}
 
 	// Same command, same bytes: a speed is one more input, not a source of
 	// variation, or a workflow that commits the card writes a diff out of
 	// nothing.
-	if again := draw(t, "slow-again", "-card-speed", "0"); again != draw(t, "slow", "-card-speed", "0") {
+	if draw(t, "slow-again", "-card-speed", "0") != draw(t, "slow", "-card-speed", "0") {
 		t.Error("the same card at the same speed must be written twice to the byte")
 	}
 }

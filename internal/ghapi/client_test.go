@@ -2576,3 +2576,23 @@ func TestGetTextIsBrakedLikeGetJSON(t *testing.T) {
 		t.Errorf("the server saw %d requests, want the brake to stop the second", n)
 	}
 }
+
+// TestTheErrorsSayWhatTheReaderHasToDecide.
+//
+// These two are the answers a caller sorts a 403 or a 502 into, and their
+// sentences are what a reader meets in the journal when a sweep goes wrong.
+// Neither message was exercised by anything: the types were built and matched
+// on, and the text nobody read could have said anything at all.
+func TestTheErrorsSayWhatTheReaderHasToDecide(t *testing.T) {
+	t.Parallel()
+	tooLarge := (&TooLargeError{Status: 502}).Error()
+	for _, want := range []string{"502", "too large"} {
+		if !strings.Contains(tooLarge, want) {
+			t.Errorf("the gateway message %q does not carry %q, and the remedy is a smaller page", tooLarge, want)
+		}
+	}
+	limited := (&RateLimitedError{Resource: "core", Reset: time.Unix(1_800_000_000, 0)}).Error()
+	if !strings.Contains(limited, "core") {
+		t.Errorf("the rate-limit message %q does not name the bucket that is spent", limited)
+	}
+}

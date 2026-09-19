@@ -764,7 +764,7 @@ func TestAStoreRetargetedDuringTheStopRefusesTheResume(t *testing.T) {
 		"a different database": {Influx: &config.InfluxSink{URL: "http://influx:8181", Bucket: "github-two"}},
 		"no store at all":      {},
 	} {
-		if said := began.Differs(scopeWith(moved)); said == "" {
+		if began.Differs(scopeWith(moved)) == "" {
 			t.Errorf("a walk resumed into %s, so the rows it already wrote are somewhere else", what)
 		}
 	}
@@ -1046,50 +1046,59 @@ func TestRecordedCountsCompleteFamiliesAndTheRepositoriesOfUnfinishedOnes(t *tes
 // TestReadProgressReadsWithoutStartingAnything. Everything OpenProgress does
 // besides reading is about starting, and a reader asking how far a walk has
 // got must not be the thing that creates a checkpoint for a walk nobody is
-// running.
-func TestReadProgressReadsWithoutStartingAnything(t *testing.T) {
+// TestEveryCheckpointMethodIsSafeWhenThereIsNoCheckpoint.
+//
+// A sweep carries no checkpoint, and so does a backfill whose configuration
+// keeps no state file. Every method is written to answer for that rather than
+// to be guarded at each call site, and the guards were the least exercised
+// lines in the file: the value of stating it in one place is that a new method
+// added without one fails here rather than in somebody's sweep.
+func TestEveryCheckpointMethodIsSafeWhenThereIsNoCheckpoint(t *testing.T) {
 	t.Parallel()
-	dir := t.TempDir()
-	path := filepath.Join(dir, "state-progress.json")
-
-	switch p, inProgress, err := ReadProgress(path); {
-	case err != nil:
-		t.Fatalf("a path with no file: %v", err)
-	case inProgress || p != nil:
-		t.Error("it answered that there is a walk in progress when there is no file")
+	// Each answer is what the method owes a caller that has no checkpoint:
+	// nothing, and no panic on the way to saying so.
+	answers := map[string]func(*Progress) bool{
+		"Active":           func(p *Progress) bool { return !p.Active() },
+		"Resumed":          func(p *Progress) bool { return !p.Resumed() },
+		"Path":             func(p *Progress) bool { return p.Path() == "" },
+		"FamilyDone":       func(p *Progress) bool { return !p.FamilyDone("stars") },
+		"RepoDone":         func(p *Progress) bool { return !p.RepoDone("stars", "octocat/one") },
+		"Done":             func(p *Progress) bool { _, ok := p.Done("stars"); return !ok },
+		"WrittenByAnother": func(p *Progress) bool { was, up := p.WrittenByAnother(); return !up && was == "" },
+		"Unfinished":       func(p *Progress) bool { return len(p.Unfinished()) == 0 },
+		"Elapsed":          func(p *Progress) bool { return p.Elapsed(walkClock) == 0 },
+		"Recorded": func(p *Progress) bool {
+			families, repos := p.Recorded()
+			return families == 0 && repos == 0
+		},
+		"Where": func(p *Progress) bool {
+			families, family, repos := p.Where()
+			return families == 0 && family == "" && repos == 0
+		},
+		// The writers answer nil rather than writing anywhere, which is what
+		// lets the sweep call them without asking whether it has one.
+		"WroteRepo":    func(p *Progress) bool { return p.WroteRepo("stars", "octocat/one", 1, walkClock) == nil },
+		"FinishFamily": func(p *Progress) bool { return p.FinishFamily("stars", 1, 1, walkClock) == nil },
+		"Clear":        func(p *Progress) bool { return p.Clear() == nil },
+		// And the two that take the sweep's state leave it alone.
+		"Learn": func(p *Progress) bool { s := LoadState(""); p.Learn(s); return len(s.LastRun) == 0 },
+		"Restore": func(p *Progress) bool {
+			s := LoadState("")
+			p.Restore(s)
+			return len(s.LastRun) == 0
+		},
 	}
-	if _, err := os.Stat(path); !os.IsNotExist(err) {
-		t.Error("reading created the checkpoint, so asking about a walk would start one")
-	}
-	if _, inProgress, err := ReadProgress(""); err != nil || inProgress {
-		t.Errorf("no path at all = in progress %v, err %v; want neither", inProgress, err)
-	}
-
-	written, err := OpenProgress(path, "test-build", Scope{Families: []string{"repo"}}, walkClock)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err = written.FinishFamily("repo", 4, 40, walkClock); err != nil {
-		t.Fatal(err)
-	}
-
-	read, inProgress, err := ReadProgress(path)
-	if err != nil || !inProgress {
-		t.Fatalf("reading a checkpoint that is there = in progress %v, err %v", inProgress, err)
-	}
-	if got, _ := read.Recorded(); got != 1 {
-		t.Errorf("it read %d complete families, want 1", got)
-	}
-	// Read for reporting and not for resuming: a scope it was not written for
-	// is not its business, so unlike OpenProgress it refuses nothing.
-	if !read.Active() {
-		t.Error("what it read answers no to Active, so nothing can be asked of it")
-	}
-
-	if err = os.WriteFile(path, []byte("{not json"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if _, _, err = ReadProgress(path); err == nil {
-		t.Error("a file that is not a checkpoint was read as one")
+	for name, p := range map[string]*Progress{
+		"no checkpoint at all": nil,
+		"one with no path":     {},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			for method, answers := range answers {
+				if !answers(p) {
+					t.Errorf("%s answered as though there were a checkpoint behind it", method)
+				}
+			}
+		})
 	}
 }

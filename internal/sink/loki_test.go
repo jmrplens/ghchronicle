@@ -733,3 +733,19 @@ func TestLokiCountsBothKindsOfDroppedEntryTogether(t *testing.T) {
 		t.Errorf("Write = %v, want two entries dropped older than an hour", err)
 	}
 }
+
+// TestTheDroppedMessageSaysHowManyAndHowOld.
+//
+// Loki refuses a whole push when one entry predates its
+// reject_old_samples_max_age, so this sink drops what is too old and reports
+// it rather than losing the push. The sentence is the only place a reader
+// learns that anything was dropped at all, and nothing exercised it.
+func TestTheDroppedMessageSaysHowManyAndHowOld(t *testing.T) {
+	t.Parallel()
+	got := (&DroppedError{N: 7, Older: time.Hour}).Error()
+	for _, want := range []string{"7", "1h"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("the message %q does not carry %q, so a reader cannot tell what was lost", got, want)
+		}
+	}
+}

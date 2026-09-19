@@ -204,7 +204,7 @@ func TestASweepThatFailedKeepsTheJobsItHadAlreadyCollected(t *testing.T) {
 	if err == nil {
 		t.Fatal("a job listing answered 502 and the sweep did not fail")
 	}
-	if got := len(only(t, points, "gh_workflow_job")); got == 0 {
+	if len(only(t, points, "gh_workflow_job")) == 0 {
 		t.Error("the 502 on the second run threw away the jobs of the first")
 	}
 	if _, kept := expanded[RunKey{ID: 1000163135, Attempt: 1}]; !kept || len(expanded) != 1 {
@@ -219,7 +219,7 @@ func TestASweepThatFailedKeepsTheJobsItHadAlreadyCollected(t *testing.T) {
 	if err == nil {
 		t.Fatal("the cache totals answered 502 and the sweep did not fail")
 	}
-	if got := len(only(t, points, "gh_workflow_run")); got == 0 {
+	if len(only(t, points, "gh_workflow_run")) == 0 {
 		t.Error("the 502 on the cache totals threw away the runs collected before it")
 	}
 	if len(expanded) != 3 {

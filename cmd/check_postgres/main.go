@@ -101,12 +101,20 @@ const usage = `usage: check_postgres [--dump <influxdb-datasource-uid>] <schema.
 func main() {
 	// Nothing here cancels the run, but psql and Grafana are both reached
 	// under one context so that a caller that wanted to could.
-	status, err := run(context.Background(), os.Args[1:], os.Stdout)
+	os.Exit(exit(context.Background(), os.Args[1:], os.Stdout, os.Stderr))
+}
+
+// exit is main without the exiting: it turns what run answers into the status
+// to leave with, and prints the error that stopped it. Separate so that the
+// one decision main used to hold, whether an error outranks the status, is
+// somewhere a test can reach.
+func exit(ctx context.Context, args []string, stdout, stderr io.Writer) int {
+	status, err := run(ctx, args, stdout)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		fmt.Fprintln(stderr, err)
+		return 1
 	}
-	os.Exit(status)
+	return status
 }
 
 // run is the whole command short of exiting: it answers with the status to exit

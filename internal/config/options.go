@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -457,19 +456,4 @@ func defaultValue(v reflect.Value) (string, bool) {
 	default:
 		return "", false
 	}
-}
-
-// OptionKeys is every setting's dotted path, sorted, for a caller that only
-// needs the inventory of names.
-func OptionKeys() ([]string, error) {
-	options, err := Options()
-	if err != nil {
-		return nil, err
-	}
-	out := make([]string, 0, len(options))
-	for _, o := range options {
-		out = append(out, o.Key)
-	}
-	slices.Sort(out)
-	return out, nil
 }

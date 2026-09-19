@@ -52,10 +52,10 @@ func TestARepositoryWhoseSecondCallFailsKeepsWhatItsFirstCollected(t *testing.T)
 		t.Fatalf("Once: %v\n%s", err, log)
 	}
 
-	if n := len(store.rows("gh_workflow_job")); n == 0 {
+	if len(store.rows("gh_workflow_job")) == 0 {
 		t.Error("the 502 on the second run's jobs threw away the jobs of the first")
 	}
-	if n := len(store.rows("gh_workflow_run")); n == 0 {
+	if len(store.rows("gh_workflow_run")) == 0 {
 		t.Error("the 502 on one run's jobs threw away the runs collected before it")
 	}
 	// Counted as failed, which with one repository is every repository, so
@@ -362,7 +362,7 @@ func TestAShutdownMidSweepStillSaysWhatRanBeforeIt(t *testing.T) {
 	if err := r.Once(ctx); err == nil {
 		t.Fatal("the sweep was canceled and Once reported success")
 	}
-	if n := len(store.rows("gh_collector_family")); n == 0 {
+	if len(store.rows("gh_collector_family")) == 0 {
 		t.Errorf("a shutdown mid-sweep delivered %d measurements and no self report",
 			len(store.points))
 	}

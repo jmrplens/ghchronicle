@@ -179,14 +179,3 @@ func (s *State) FirstSight(full string, now time.Time) bool {
 	s.FirstSaw[full] = now
 	return true
 }
-
-// Head returns the commit a repository was on at the last dependency diff, and
-// records the new one. An empty answer means there is no range yet, which is
-// the first sweep and is not an error.
-func (s *State) Head(full, head string) string {
-	previous := s.LastHead[full]
-	if head != "" {
-		s.LastHead[full] = head
-	}
-	return previous
-}

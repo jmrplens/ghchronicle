@@ -120,3 +120,81 @@ func isHTTPClient(expr ast.Expr) bool {
 	pkg, ok := sel.X.(*ast.Ident)
 	return ok && pkg.Name == "http"
 }
+
+// TestEveryCommandKeepsItsMainEmpty.
+//
+// Nine of the ten commands here report no coverage for main, and that is the
+// design rather than a gap: each one is `os.Exit(run(...))`, with the
+// arguments, the streams and the status passed in and handed back so a test
+// can drive every way the command ends. A main that cannot be entered without
+// ending the process is worth nothing to cover, as long as nothing is hiding
+// in it.
+//
+// This is what makes that last clause checkable. A main that grows a second
+// statement has grown something no test reaches, and it fails here rather than
+// shipping unexercised.
+func TestEveryCommandKeepsItsMainEmpty(t *testing.T) {
+	t.Parallel()
+	commands, err := filepath.Glob(filepath.Join("cmd", "*", "main.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(commands) < 5 {
+		t.Fatalf("found %d commands, which is too few to be the whole set", len(commands))
+	}
+	for _, path := range commands {
+		t.Run(path, func(t *testing.T) {
+			t.Parallel()
+			body := mainBody(t, path)
+			if body == nil {
+				t.Skipf("%s declares no main", path)
+			}
+			// No branching, which is the property that matters: a statement
+			// with no condition in it does one thing and a test of run covers
+			// the thing it does, while an `if` here is a decision nothing
+			// reaches. Counting statements instead would forbid the two mains
+			// that build a client from the environment before handing it over,
+			// which hide nothing.
+			if where := branchIn(body); where != nil {
+				t.Errorf("main branches at %T, and nothing a test can enter reaches it. "+
+					"Move the decision into run, or into a seam beside it", where)
+			}
+		})
+	}
+}
+
+// branchIn is the first control-flow statement anywhere inside the body, or
+// nil when there is none.
+func branchIn(body *ast.BlockStmt) ast.Node {
+	var found ast.Node
+	ast.Inspect(body, func(n ast.Node) bool {
+		if found != nil {
+			return false
+		}
+		switch n.(type) {
+		case *ast.IfStmt, *ast.ForStmt, *ast.RangeStmt, *ast.SwitchStmt,
+			*ast.TypeSwitchStmt, *ast.SelectStmt:
+			found = n
+			return false
+		}
+		return true
+	})
+	return found
+}
+
+// mainBody is the body of func main in the file at path, or nil when it has
+// none.
+func mainBody(t *testing.T, path string) *ast.BlockStmt {
+	t.Helper()
+	file, err := parser.ParseFile(token.NewFileSet(), path, nil, parser.SkipObjectResolution)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, decl := range file.Decls {
+		fn, ok := decl.(*ast.FuncDecl)
+		if ok && fn.Name.Name == "main" && fn.Recv == nil {
+			return fn.Body
+		}
+	}
+	return nil
+}
