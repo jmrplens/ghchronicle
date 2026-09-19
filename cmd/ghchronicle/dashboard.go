@@ -275,14 +275,35 @@ func datasourceFor(cfg *config.Config, store *dashboards.Store) (grafana.Datasou
 			"timeField": "time",
 		}
 		want.Secret = elasticSecret(sink)
+	case store.Name == "prometheus" && override.URL != "":
+		// The sink is scraped rather than written to, so it has no idea where
+		// the Prometheus server is. Told the address, there is nothing else to
+		// know: a Prometheus datasource is a URL.
+		want.URL = override.URL
+		want.JSON = map[string]any{"httpMethod": "POST"}
+	case store.Name == "graphite" && override.URL != "":
+		// Also told rather than derived, and for a sharper reason: the sink
+		// speaks the ingest port while Grafana queries the web API, which is a
+		// different port on the same host.
+		want.URL = override.URL
+		want.JSON = map[string]any{"graphiteVersion": "1.1"}
 	case override.UID != "":
 		// Adopted, so nothing here has to describe it.
 		return want, nil
+	case store.Name == "postgres":
+		// The one that cannot be told either. The SQL sink writes statements
+		// to a file and never connects, so there is no host, port, user or
+		// password anywhere in the config to build a datasource out of.
+		return want, errors.New(
+			"the sql sink writes statements to a file and never connects, so nothing here " +
+				"knows the server Grafana would query: create the datasource in Grafana and " +
+				"name it in grafana.datasource.uid",
+		)
 	default:
 		return want, fmt.Errorf(
-			"the %s sink does not know the address Grafana would query, so it cannot "+
-				"describe a datasource: create one in Grafana and name it in "+
-				"grafana.datasource.uid", store.Name,
+			"the %s sink does not know the address Grafana would query: set "+
+				"grafana.datasource.url to it, or create the datasource in Grafana and name "+
+				"it in grafana.datasource.uid", store.Name,
 		)
 	}
 	if want.URL == "" {

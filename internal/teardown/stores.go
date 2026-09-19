@@ -1,0 +1,204 @@
+package teardown
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"os"
+	"path/filepath"
+	"slices"
+	"strings"
+	"time"
+
+	"github.com/jmrplens/ghchronicle/internal/config"
+)
+
+// timeout bounds one call. Dropping a table can take a moment on a store that
+// is compacting, and nothing here is on the sweep's path.
+const timeout = 60 * time.Second
+
+// ── InfluxDB ────────────────────────────────────────────────────────────────
+
+type influx struct{ sink *config.InfluxSink }
+
+func (i *influx) Name() string { return "influxdb" }
+
+// Holds asks the catalog rather than guessing. A table this wrote and no
+// longer writes is still in information_schema, which is the whole point of
+// asking: those are the ones an uninstall is for.
+func (i *influx) Holds(ctx context.Context) ([]string, error) {
+	const q = "SELECT table_name FROM information_schema.tables " +
+		"WHERE table_schema = 'iox' ORDER BY table_name"
+	endpoint := strings.TrimSuffix(i.sink.URL, "/") + "/api/v3/query_sql?" + url.Values{
+		"db": {i.sink.Bucket}, "q": {q}, "format": {"json"},
+	}.Encode()
+	body, err := i.call(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, err
+	}
+	var rows []struct {
+		Name string `json:"table_name"`
+	}
+	if err = json.Unmarshal(body, &rows); err != nil {
+		return nil, fmt.Errorf("reading the table list: %w", err)
+	}
+	var out []string
+	for _, row := range rows {
+		if ours(row.Name) {
+			out = append(out, row.Name)
+		}
+	}
+	slices.Sort(out)
+	return out, nil
+}
+
+// Drop removes one table. InfluxDB 3 answers a table that is already gone with
+// a conflict, which is not a failure for something whose job is to make it be
+// gone.
+func (i *influx) Drop(ctx context.Context, item string) error {
+	if !ours(item) {
+		return fmt.Errorf("%s is not one of this project's tables", item)
+	}
+	endpoint := strings.TrimSuffix(i.sink.URL, "/") + "/api/v3/configure/table?" + url.Values{
+		"db": {i.sink.Bucket}, "table": {item},
+	}.Encode()
+	_, err := i.call(ctx, http.MethodDelete, endpoint, map[int]bool{http.StatusConflict: true})
+	return err
+}
+
+// call sends one request with the sink's credential and reads the answer.
+func (i *influx) call(ctx context.Context, method, endpoint string, tolerate map[int]bool) ([]byte, error) {
+	return send(ctx, method, endpoint, func(r *http.Request) {
+		if i.sink.Token != "" {
+			r.Header.Set("Authorization", "Bearer "+i.sink.Token)
+		}
+	}, tolerate)
+}
+
+// ── Elasticsearch ───────────────────────────────────────────────────────────
+
+type elastic struct{ sink *config.ElasticsearchSink }
+
+func (e *elastic) Name() string { return "elasticsearch" }
+
+// Holds lists the indices under the sink's prefix. The prefix is what the sink
+// writes under, so an index outside it was not put there by this.
+func (e *elastic) Holds(ctx context.Context) ([]string, error) {
+	endpoint := strings.TrimSuffix(e.sink.URL, "/") + "/_cat/indices/" +
+		url.PathEscape(e.sink.Prefix+"*") + "?format=json&h=index"
+	body, err := e.call(ctx, http.MethodGet, endpoint, map[int]bool{http.StatusNotFound: true})
+	if err != nil {
+		return nil, err
+	}
+	var rows []struct {
+		Index string `json:"index"`
+	}
+	if len(bytes.TrimSpace(body)) == 0 {
+		return nil, nil
+	}
+	if err = json.Unmarshal(body, &rows); err != nil {
+		return nil, fmt.Errorf("reading the index list: %w", err)
+	}
+	out := make([]string, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, row.Index)
+	}
+	slices.Sort(out)
+	return out, nil
+}
+
+// Drop deletes one index.
+func (e *elastic) Drop(ctx context.Context, item string) error {
+	if e.sink.Prefix == "" || !strings.HasPrefix(item, e.sink.Prefix) {
+		return fmt.Errorf("%s is not under the sink's prefix %q", item, e.sink.Prefix)
+	}
+	endpoint := strings.TrimSuffix(e.sink.URL, "/") + "/" + url.PathEscape(item)
+	_, err := e.call(ctx, http.MethodDelete, endpoint, map[int]bool{http.StatusNotFound: true})
+	return err
+}
+
+func (e *elastic) call(ctx context.Context, method, endpoint string, tolerate map[int]bool) ([]byte, error) {
+	return send(ctx, method, endpoint, func(r *http.Request) {
+		switch {
+		case e.sink.APIKey != "":
+			r.Header.Set("Authorization", "ApiKey "+e.sink.APIKey)
+		case e.sink.Username != "":
+			r.SetBasicAuth(e.sink.Username, e.sink.Password)
+		}
+	}, tolerate)
+}
+
+// ── The SQL sink ────────────────────────────────────────────────────────────
+
+// sqlFile is the SQL sink, which writes statements to a file rather than to a
+// server. There is nothing to connect to and nothing to drop: what this wrote
+// is the file, and its rotations.
+type sqlFile struct{ sink *config.SQLSink }
+
+func (s *sqlFile) Name() string { return "sql" }
+
+// Holds is the file and whatever rotations sit beside it.
+func (s *sqlFile) Holds(_ context.Context) ([]string, error) {
+	if s.sink.Path == "" {
+		return nil, nil
+	}
+	matches, err := filepath.Glob(s.sink.Path + "*")
+	if err != nil {
+		return nil, err
+	}
+	slices.Sort(matches)
+	return matches, nil
+}
+
+// Drop removes one of them. A file already gone is the outcome asked for.
+func (s *sqlFile) Drop(_ context.Context, item string) error {
+	if s.sink.Path == "" || !strings.HasPrefix(item, s.sink.Path) {
+		return fmt.Errorf("%s is not the file this sink writes", item)
+	}
+	if err := os.Remove(item); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return nil
+}
+
+// ── Shared ──────────────────────────────────────────────────────────────────
+
+// send makes one request, applies the caller's credential, and turns anything
+// that is not a success into an error carrying what the store said.
+func send(ctx context.Context, method, endpoint string,
+	auth func(*http.Request), tolerate map[int]bool,
+) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, method, endpoint, http.NoBody)
+	if err != nil {
+		return nil, err
+	}
+	auth(req)
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, err
+	}
+	if res.StatusCode >= 200 && res.StatusCode <= 299 || tolerate[res.StatusCode] {
+		return body, nil
+	}
+	return nil, fmt.Errorf("%s: %s", res.Status, trim(string(body), 200))
+}
+
+// trim keeps a store's complaint to one line's worth.
+func trim(s string, n int) string {
+	s = strings.TrimSpace(s)
+	if len(s) <= n {
+		return s
+	}
+	return s[:n] + "..."
+}

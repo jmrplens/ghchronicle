@@ -93,3 +93,17 @@ func DashboardPath(uid string) string { return "/api/dashboards/uid/" + uid }
 
 // DatasourcePath is where a datasource answers to its uid.
 func DatasourcePath(uid string) string { return datasourceByUID + uid }
+
+// Delete removes whatever is at a path, for dashboards and datasources alike.
+// A 404 is success: the caller asked for it not to be there.
+func (c Client) Delete(ctx context.Context, path string, timeout time.Duration) error {
+	res, err := c.Do(ctx, http.MethodDelete, path, nil, timeout)
+	if err != nil {
+		return err
+	}
+	if res.Status == http.StatusNotFound ||
+		(res.Status >= 200 && res.Status <= 299) {
+		return nil
+	}
+	return fmt.Errorf("deleting %s: %s", path, answerText(res))
+}

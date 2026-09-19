@@ -61,13 +61,24 @@ que hizo con cada datasource y cada dashboard.
   `grafana.datasource.url` es la dirección que usar en su lugar.
 </Aside>
 
-Dos de los cinco sinks saben describir su propio datasource, porque aquello a
-lo que escriben es lo que Grafana consulta: InfluxDB y Elasticsearch. Los otros
-tres no pueden, y ninguna lectura de sus ajustes lo encontraría. El sink de
-Prometheus se raspa en vez de recibir escrituras, el sink SQL escribe
-sentencias a un fichero en vez de a un servidor, y el de Graphite habla el
-puerto de ingesta, que no es la API a la que va una consulta. Para esos, crea
-el datasource en Grafana y nómbralo:
+Dos de los cinco sinks describen su propio datasource sin decirles nada más,
+porque aquello a lo que escriben es lo que Grafana consulta: InfluxDB y
+Elasticsearch. Otros dos necesitan la dirección y nada más, porque escriben en
+un sitio que no es al que va una consulta: el sink de Prometheus se raspa en
+vez de recibir escrituras, y el de Graphite habla el puerto de ingesta mientras
+que Grafana pregunta a la API web, en otro puerto. Dales la dirección y el
+datasource se crea igual:
+
+```yaml
+grafana:
+  datasource:
+    url: http://prometheus:9090
+```
+
+Al quinto tampoco se le puede decir. El sink SQL escribe sentencias a un
+fichero y nunca se conecta, así que no hay host, puerto, usuario ni contraseña
+en ninguna parte de la configuración con que construir un datasource. Ese, y
+cualquier datasource que prefieras gestionar tú, se nombra en su lugar:
 
 ```yaml
 grafana:
@@ -129,6 +140,41 @@ que se actualiza. Nombra el que ya existe y se escribe ese:
 grafana:
   dashboard_uid: mi-dashboard-existente
 ```
+
+### Quitarlo todo otra vez
+
+`-uninstall` quita lo que esto puso, y solo eso. Recibe la lista de qué quitar,
+y sin `-yes` no quita nada e imprime lo que quitaría, porque la alternativa es
+una orden mal tecleada que vacía un almacén.
+
+```sh
+ghchronicle -config config.yaml -uninstall all          # dice qué se iría
+ghchronicle -config config.yaml -uninstall all -yes     # y entonces se va
+```
+
+| Objetivo    | Qué se va                                                              |
+| ----------- | ---------------------------------------------------------------------- |
+| `dashboard` | Los dashboards que publicó, y un datasource que haya creado él          |
+| `data`      | Toda tabla del almacén cuyo nombre empiece por `gh_`                    |
+| `state`     | El fichero de estado, el libro de deduplicación y el punto de control   |
+| `all`       | Los tres de arriba                                                      |
+
+Un datasource nombrado en `grafana.datasource.uid` no se quita nunca: era de
+otro antes de que esto corriera y sigue siéndolo. Un objetivo que no reconoce
+se rechaza entero, en vez de ejecutar el resto de la lista sin él.
+
+Las tablas se le preguntan al almacén en vez de llevarlas compiladas. Una lista
+dentro del binario serían las mediciones que escribe esta versión, y las que
+merece la pena quitar son justo las que ya no escribe nadie: lo que recogía una
+versión anterior, o una familia apagada desde entonces. Preguntando aparecen.
+
+No todos los almacenes se pueden vaciar desde aquí, y los que no dicen por qué
+en vez de callarse, que se leería como que no hay nada que quitar. Graphite no
+ofrece borrado, así que sus ficheros whisper se quitan a mano. El sink de
+Prometheus se raspa en vez de recibir escrituras, así que no guardó nada que
+quitar. El fichero del sink SQL sí se borra, pero las filas que ya cargaste de
+ahí a una base de datos de verdad las cargaste tú y hay que quitarlas allí:
+este sink emite sentencias y nunca se conecta.
 
 ## Importar desde la interfaz
 

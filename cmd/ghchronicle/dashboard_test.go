@@ -575,3 +575,67 @@ func TestALeftoverCheckThatCannotRunSaysSoAndTheRunStillStands(t *testing.T) {
 		t.Errorf("output = %q, want the publish reported all the same", said.String())
 	}
 }
+
+// TestTheThreeSinksThatHaveToBeToldTheAddress. Two of them only need telling:
+// a Prometheus datasource is a URL, and a Graphite one is the web API's URL,
+// which is a different port from the ingest one the sink writes to. The third
+// cannot be told, because the SQL sink writes statements to a file and never
+// connects, so there is no server anywhere in the config.
+func TestTheThreeSinksThatHaveToBeToldTheAddress(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name    string
+		sinks   config.Sinks
+		url     string
+		wantURL string
+		says    string
+	}{
+		{
+			"prometheus, told",
+			config.Sinks{Prometheus: &config.PrometheusSink{Listen: ":9090"}},
+			"http://prometheus:9090", "http://prometheus:9090", "",
+		},
+		{
+			"graphite, told",
+			config.Sinks{Graphite: &config.GraphiteSink{Addr: "graphite:2003"}},
+			"http://graphite:8080", "http://graphite:8080", "",
+		},
+		{
+			"prometheus, not told",
+			config.Sinks{Prometheus: &config.PrometheusSink{Listen: ":9090"}},
+			"", "", "grafana.datasource.url",
+		},
+		{
+			"the sql sink, which cannot be told",
+			config.Sinks{
+				SQL: &config.SQLSink{Dialect: "postgres", Path: "/tmp/p.sql"},
+			},
+			"http://postgres:5432", "", "never connects",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			g := &grafanaStub{missing: true}
+			sinks := tc.sinks
+			cfg := &config.Config{
+				Sinks:   sinks,
+				Grafana: &config.Grafana{URL: g.serve(t), Token: "grafana-token"},
+			}
+			cfg.Grafana.Datasource.URL = tc.url
+			var said strings.Builder
+			err := publishDashboards(t.Context(), cfg, &said)
+			if tc.says != "" {
+				if err == nil || !strings.Contains(err.Error(), tc.says) {
+					t.Fatalf("err = %v, want it to carry %q", err, tc.says)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := g.writes[0]["url"]; got != tc.wantURL {
+				t.Errorf("url = %v, want %q", got, tc.wantURL)
+			}
+		})
+	}
+}

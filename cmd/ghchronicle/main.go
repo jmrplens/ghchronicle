@@ -101,6 +101,11 @@ type options struct {
 	list     bool
 	showVer  bool
 	backfill bool
+	// uninstall names what to take away, and yes is the word that makes it
+	// happen: without it the run prints the list and removes nothing, because
+	// the alternative is a typo that empties a store.
+	uninstall string
+	yes       bool
 	// publishDashboard reconciles the Grafana datasource and dashboard for
 	// every store this writes to, then exits. Like backfillStatus it asks
 	// GitHub nothing, so it needs no token.
@@ -145,6 +150,11 @@ func parseFlags(args []string, stderr io.Writer) (options, error) {
 		"reach as far back as each surface allows, waiting for the rate limit to reset rather than stopping")
 	fs.StringVar(&o.since, "backfill-since", "",
 		"bound the backfill: a date (2024-01-01), a duration (720h), days (90d) or years (2y); empty means no bound")
+	fs.StringVar(&o.uninstall, "uninstall", "",
+		"remove what this put in place and exit: "+strings.Join(uninstallTargets, ", ")+
+			", comma separated; prints the list and removes nothing without -yes")
+	fs.BoolVar(&o.yes, "yes", false,
+		"go ahead with -uninstall rather than only listing what it would remove")
 	fs.BoolVar(&o.publishDashboard, "publish-dashboard", false,
 		"publish the Grafana dashboard and the datasource it reads from, then exit; "+
 			"needs the grafana section of the config and asks GitHub nothing")
@@ -209,7 +219,7 @@ func execute(args []string, stdout, stderr io.Writer) {
 
 	cfg, err := config.LoadWith(o.path, config.Relax{
 		NoSinks: o.cardOnly,
-		NoToken: o.backfillStatus || o.publishDashboard,
+		NoToken: o.backfillStatus || o.publishDashboard || o.uninstall != "",
 	})
 	if err != nil {
 		fatal(stderr, err)
@@ -438,6 +448,9 @@ func reported(ctx context.Context, o options, cfg *config.Config,
 	case o.publishDashboard:
 		// This one asks GitHub nothing either. It talks to Grafana instead.
 		err = publishDashboards(ctx, cfg, stdout)
+	case o.uninstall != "":
+		// Nor this one, which takes away rather than collects.
+		err = uninstall(ctx, cfg, o.uninstall, o.yes, stdout)
 	case o.list:
 		err = listRepositories(ctx, api, cfg, stdout)
 	default:
