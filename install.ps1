@@ -142,6 +142,25 @@ function Add-ToUserPath {
   return $true
 }
 
+# On PATH is not the same as the one that runs, and on Windows the gap is
+# wider than anywhere else: the machine PATH is read before the user one this
+# script writes to, so a copy under Program Files, or an older `go install`
+# build, keeps answering to the name. Nothing above would say so, because the
+# line that reports the install names the file it just wrote, by its full path.
+# install.sh makes the same check for the same reason.
+function Show-ShadowWarning {
+  param([Parameter(Mandatory = $true)][string] $Directory)
+  $mine = Join-Path $Directory "$Binary.exe"
+  $running = (Get-Command $Binary -CommandType Application -ErrorAction SilentlyContinue |
+    Select-Object -First 1).Source
+  if (-not $running) { return }
+  if ($running -ieq $mine) { return }
+  Write-Step ''
+  Write-Step "warning: $Binary still runs $running, which comes earlier in your PATH."
+  Write-Step "         Remove it, or put $Directory first, or run $mine by its full path."
+  Write-Step ''
+}
+
 function Install-GhChronicle {
   $arch = Get-Architecture
   if (-not $Version) { $Version = Get-NewestVersion }
@@ -186,6 +205,7 @@ function Install-GhChronicle {
     if (Add-ToUserPath -Directory $target) {
       Write-Step "added $target to your PATH. Open a new terminal for other programs to see it."
     }
+    Show-ShadowWarning -Directory $target
   } finally {
     Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue
   }

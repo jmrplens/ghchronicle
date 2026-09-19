@@ -685,7 +685,10 @@ without installing anything, and there is no switch to skip that step.
 
 It then adds that directory to **your** PATH, the per-user one, so `ghchronicle`
 works by name. Programs already open keep the PATH they started with, so open a
-new terminal. Nothing is written outside your profile and no elevation is asked
+new terminal. Windows reads the machine PATH before the per-user one, so
+another `ghchronicle` installed for everyone, or an older `go install` build,
+can keep answering to the name after this finishes; the script says so when it
+finds one. Nothing is written outside your profile and no elevation is asked
 for: a machine-wide install belongs to an installer with a UAC prompt, not to a
 script read off the network.
 

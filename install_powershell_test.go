@@ -124,13 +124,14 @@ func prependToPath(environ []string, dir string) []string {
 // directory holding it. It is not a working program and does not need to be:
 // resolving a name against PATH reads the directory, it does not run what it
 // finds. Both spellings, because Windows resolves a bare name through PATHEXT
-// and finds the .exe, while PowerShell on Linux finds the executable file
-// named exactly as asked.
+// and finds the .exe, while PowerShell elsewhere finds the executable file
+// named exactly as asked, which is also why this needs stubMode rather than a
+// readable file.
 func decoy(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
 	for _, name := range []string{"ghchronicle", "ghchronicle.exe"} {
-		if err := os.WriteFile(filepath.Join(dir, name), []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte("#!/bin/sh\nexit 0\n"), stubMode); err != nil {
 			t.Fatal(err)
 		}
 	}

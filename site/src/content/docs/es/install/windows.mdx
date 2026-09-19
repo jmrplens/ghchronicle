@@ -26,7 +26,10 @@ instalar nada, y no hay parámetro para saltarse ese paso.
 
 Después añade ese directorio a **tu** PATH, el de usuario, para que
 `ghchronicle` funcione por nombre. Los programas ya abiertos conservan el PATH
-con el que arrancaron, así que abre una terminal nueva. No escribe nada fuera
+con el que arrancaron, así que abre una terminal nueva. Windows lee el PATH de
+máquina antes que el de usuario, así que otro `ghchronicle` instalado para todo
+el mundo, o una compilación vieja de `go install`, puede seguir respondiendo al
+nombre cuando esto termina; el script avisa cuando encuentra uno. No escribe nada fuera
 de tu perfil ni pide elevación: una instalación para toda la máquina es cosa de
 un instalador con su aviso de UAC, no de un script bajado de la red.
 
