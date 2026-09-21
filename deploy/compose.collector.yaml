@@ -1,0 +1,44 @@
+# ghchronicle, on its own.
+#
+# Put two lines in a .env file beside this one:
+#
+#   GITHUB_TOKEN=github_pat_...
+#   GITHUB_USER=your-login
+#
+# then `docker compose up -d`. It writes what it collects to its own
+# log, which is enough to watch it work. Point sinks at a store of your
+# own when you have one.
+
+name: ghchronicle
+
+services:
+
+  ghchronicle:
+    image: ghcr.io/jmrplens/ghchronicle
+    command: ["-config", "/config.yaml"]
+    restart: unless-stopped
+    environment:
+      GITHUB_TOKEN: ${GITHUB_TOKEN:?put your token in a .env file beside this}
+    volumes:
+      - state:/var/lib/ghchronicle
+    configs:
+      - source: ghchronicle
+        target: /config.yaml
+
+configs:
+  ghchronicle:
+    # The doubled $$ are deliberate. A single $ is read by compose, which
+    # would put the token into the file it hands the container; doubled,
+    # compose writes the reference through and the collector expands it from
+    # its own environment when it starts.
+    content: |
+      github:
+        token: $${GITHUB_TOKEN}
+      targets:
+        user: ${GITHUB_USER:?put the account to collect in a .env file beside this}
+      sinks:
+        stdout: true
+      state_file: /var/lib/ghchronicle/state.json
+
+volumes:
+  state:

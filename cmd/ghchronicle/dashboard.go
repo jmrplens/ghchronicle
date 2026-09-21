@@ -36,15 +36,20 @@ func publishDashboards(ctx context.Context, cfg *config.Config, out io.Writer) e
 	if settings == nil {
 		return errors.New("there is no grafana section in the config, so there is nowhere to publish to")
 	}
-	client := grafana.Client{URL: settings.URL, Token: settings.Token}
+	client := grafana.Client{
+		URL:      settings.URL,
+		Token:    settings.Token,
+		User:     settings.User,
+		Password: settings.Password,
+	}
 	if client.URL == "" {
 		client.URL = grafana.DefaultURL
 	}
 	// This writes to a live server. An anonymous request some Grafanas accept
 	// would publish under whoever the server thinks is asking, which is not a
 	// thing to do by accident.
-	if client.Token == "" {
-		return errors.New("grafana.token is empty, refusing to publish")
+	if client.Token == "" && client.User == "" {
+		return errors.New("grafana has neither a token nor a user, refusing to publish")
 	}
 
 	stores, err := storesToPublish(cfg)
@@ -150,7 +155,19 @@ func publishOne(ctx context.Context, client grafana.Client, cfg *config.Config,
 	if err != nil {
 		return fmt.Errorf("asking datasource %s whether it answers: %w", uid, err)
 	}
-	if !ok {
+	switch {
+	case ok:
+		fmt.Fprintf(out, "datasource %s answers: %s\n", uid, message)
+	case emptyStore(message):
+		// Reached, and holding nothing yet. That is what a store looks like
+		// on the first start of a stack that brought it up alongside this,
+		// since a database is made by the first write and the dashboard is
+		// published before the first sweep. Refusing here would mean a new
+		// deployment never gets its dashboard, which is the opposite of what
+		// this is for.
+		fmt.Fprintf(out, "note: %s has nothing in it yet (%s), which is what a store "+
+			"looks like before the first sweep. Publishing anyway.\n", uid, message)
+	default:
 		// Refusing here is the point of the probe. A dashboard published
 		// against a datasource Grafana cannot reach draws nothing, and the
 		// commonest cause is an address that is right for the collector and
@@ -159,8 +176,6 @@ func publishOne(ctx context.Context, client grafana.Client, cfg *config.Config,
 			"set grafana.datasource.url to the address Grafana reaches the store by, "+
 			"which is not always the one this writes to", uid, message)
 	}
-	fmt.Fprintf(out, "datasource %s answers: %s\n", uid, message)
-
 	doc := dashboards.Publishable(store, uid, logs)
 	// The document carries the store's own uid, and publishing overwrites
 	// whatever is at it, so two runs update one dashboard rather than leaving
@@ -306,16 +321,32 @@ func datasourceFor(cfg *config.Config, store *dashboards.Store,
 		want.URL = firstNonEmpty(override.URL, sink.URL)
 		want.Database = sink.Bucket
 		want.JSON = map[string]any{
-			"version":         "SQL",
-			"httpMode":        "POST",
-			"dbName":          sink.Bucket,
-			"httpHeaderName1": "Authorization",
+			"version":  "SQL",
+			"httpMode": "POST",
+			"dbName":   sink.Bucket,
+			// The SQL datasource queries over FlightSQL, which is gRPC and
+			// assumes TLS. A server reached over http does not have it, and
+			// the handshake fails with "first record does not look like a TLS
+			// handshake" rather than with anything about certificates.
+			//
+			// The key is insecureGrpc and not secureGrpc: the plugin ignores
+			// the one that reads like its opposite, so a datasource carrying
+			// secureGrpc=false still tried TLS and still failed. Taken from a
+			// datasource that demonstrably works rather than from a guess.
+			"insecureGrpc": !strings.HasPrefix(want.URL, "https://"),
+		}
+		if sink.Token != "" {
+			want.JSON["httpHeaderName1"] = "Authorization"
 		}
 		// Both places, because this plugin reads the token from one and the
-		// header from the other depending on the call.
-		want.Secret = map[string]string{
-			"token":            sink.Token,
-			"httpHeaderValue1": "Bearer " + sink.Token,
+		// header from the other depending on the call. A store started
+		// without auth has neither, and sending an empty header is what the
+		// store itself rejects as malformed.
+		if sink.Token != "" {
+			want.Secret = map[string]string{
+				"token":            sink.Token,
+				"httpHeaderValue1": "Bearer " + sink.Token,
+			}
 		}
 	case store.Name == "elasticsearch" && cfg.Sinks.Elasticsearch != nil:
 		sink := cfg.Sinks.Elasticsearch
@@ -533,4 +564,33 @@ func dsnSSLMode(dsn string) string {
 		return strings.ToLower(found[1])
 	}
 	return ""
+}
+
+// emptyStoreSigns are what a store that is there and holds nothing says. They
+// are the store's own words rather than a status, because a datasource plugin
+// reports both "I could not reach it" and "it has nothing" as one ERROR.
+var emptyStoreSigns = []string{
+	"database not found",
+	"table not found",
+	"index_not_found_exception",
+	"no such table",
+}
+
+// emptyStore says whether a health message is a store with nothing in it yet
+// rather than one that cannot be reached.
+//
+// The difference matters on exactly one day: the first. A store brought up
+// beside the collector has no database until the first write, and the
+// dashboard is published before the first sweep, so refusing here would mean a
+// new deployment never gets the dashboard it was set up to have. A store that
+// is genuinely unreachable says something else entirely, and that still stops
+// the run.
+func emptyStore(message string) bool {
+	lower := strings.ToLower(message)
+	for _, sign := range emptyStoreSigns {
+		if strings.Contains(lower, sign) {
+			return true
+		}
+	}
+	return false
 }

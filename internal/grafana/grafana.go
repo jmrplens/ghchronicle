@@ -34,10 +34,18 @@ import (
 // reason it exists.
 const DefaultURL = "http://localhost:3000"
 
-// Client is one Grafana, with the token that opens it.
+// Client is one Grafana, and what opens it.
 type Client struct {
 	URL   string
 	Token string
+	// User and Password are the other way in, for a Grafana that has no
+	// service account yet. A server brought up beside this one by a compose
+	// file is the case: it exists for the first time when the collector first
+	// asks, so there was nobody to make a token, and its admin credentials are
+	// the only thing that can be arranged in advance. A token is preferred
+	// wherever there is one, because it can be scoped and this cannot.
+	User     string
+	Password string
 }
 
 // New reads the address and the token from the environment. The token is only
@@ -100,8 +108,11 @@ func (c Client) Do(ctx context.Context, method, path string, body any,
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
-	if c.Token != "" {
+	switch {
+	case c.Token != "":
 		req.Header.Set("Authorization", "Bearer "+c.Token)
+	case c.User != "":
+		req.SetBasicAuth(c.User, c.Password)
 	}
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {

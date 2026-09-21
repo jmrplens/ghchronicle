@@ -316,6 +316,13 @@ check-layouts: ## Fail if the committed layout facts no longer match the registr
 config-options: ## Regenerate site/src/data/config-options.json from internal/config (cmd/gen_config)
 	go run ./cmd/gen_config
 
+compose: ## Regenerate the compose files the Docker page offers (cmd/gen_compose)
+	go run ./cmd/gen_compose
+
+check-compose: ## Fail if the committed compose files are not what the generator writes (offline)
+	@echo "=== deploy/*.yaml up to date ==="
+	go run ./cmd/gen_compose -check
+
 check-config-options: ## Fail if the committed configuration surface no longer matches the code (offline)
 	@echo "=== site/src/data/config-options.json up to date ==="
 	go run ./cmd/gen_config -check

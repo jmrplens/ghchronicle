@@ -1,0 +1,92 @@
+# ghchronicle, with InfluxDB and Grafana.
+#
+# Put two lines in a .env file beside this one:
+#
+#   GITHUB_TOKEN=github_pat_...
+#   GITHUB_USER=your-login
+#
+# then `docker compose up -d`. Grafana is on http://localhost:3000,
+# admin and the password below, with the dashboard already in it: the
+# collector publishes it on start and points it at the store beside it.
+
+name: ghchronicle
+
+services:
+
+  influxdb:
+    image: influxdb:3-core
+    # Without a credential, because a store that exists for the first time
+    # when the collector first writes to it has nobody to have made one.
+    command:
+      - influxdb3
+      - serve
+      - --node-id=node0
+      - --object-store=file
+      - --data-dir=/var/lib/influxdb3
+      - --without-auth
+    volumes:
+      - influx:/var/lib/influxdb3
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8181/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  grafana:
+    image: grafana/grafana:12.3.0
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-ghchronicle}
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana:/var/lib/grafana
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  ghchronicle:
+    image: ghcr.io/jmrplens/ghchronicle
+    command: ["-config", "/config.yaml"]
+    restart: unless-stopped
+    depends_on:
+      influxdb:
+        condition: service_healthy
+      grafana:
+        condition: service_healthy
+    environment:
+      GITHUB_TOKEN: ${GITHUB_TOKEN:?put your token in a .env file beside this}
+      GRAFANA_PASSWORD: ${GRAFANA_PASSWORD:-ghchronicle}
+    volumes:
+      - state:/var/lib/ghchronicle
+    configs:
+      - source: ghchronicle
+        target: /config.yaml
+
+configs:
+  ghchronicle:
+    # The doubled $$ are deliberate. A single $ is read by compose, which
+    # would put the token into the file it hands the container; doubled,
+    # compose writes the reference through and the collector expands it from
+    # its own environment when it starts.
+    content: |
+      github:
+        token: $${GITHUB_TOKEN}
+      targets:
+        user: ${GITHUB_USER:?put the account to collect in a .env file beside this}
+      sinks:
+        influxdb:
+          url: http://influxdb:8181
+          bucket: github
+      grafana:
+        url: http://grafana:3000
+        user: admin
+        password: $${GRAFANA_PASSWORD}
+        publish_on_start: true
+      state_file: /var/lib/ghchronicle/state.json
+
+volumes:
+  influx:
+  state:
+  grafana:

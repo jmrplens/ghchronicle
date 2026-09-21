@@ -171,6 +171,12 @@ jobs:
       - name: The committed configuration surface matches the code
         run: make check-config-options
 
+      # deploy/*.yaml is what the Docker page offers a reader to copy, so a
+      # compose that no longer matches the generator is a page promising a
+      # stack nobody brought up.
+      - name: The compose files match the generator
+        run: make check-compose
+
       # internal/config/testdata/config-cases.json is what the builder writes
       # for a set of answers, produced by the module the page itself runs. The
       # round-trip test in internal/config loads each one with the real parser,

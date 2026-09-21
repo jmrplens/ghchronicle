@@ -730,6 +730,19 @@
       "example": "${GRAFANA_TOKEN}"
     },
     {
+      "key": "grafana.user",
+      "kind": "string",
+      "group": "run",
+      "example": "admin"
+    },
+    {
+      "key": "grafana.password",
+      "kind": "string",
+      "group": "run",
+      "secret": true,
+      "example": "${GRAFANA_PASSWORD}"
+    },
+    {
       "key": "grafana.folder",
       "kind": "string",
       "group": "run",

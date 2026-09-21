@@ -155,7 +155,13 @@ func (i *Influx) post(ctx context.Context, body string) error {
 	if err != nil {
 		return err
 	}
-	req.Header.Set("Authorization", "Token "+i.Token)
+	// Only when there is one. A server started with --without-auth, which is
+	// what a local stack does so that nobody has to create a token before the
+	// first write, refuses "Token " with nothing after it as a malformed
+	// header rather than reading it as no credential at all.
+	if i.Token != "" {
+		req.Header.Set("Authorization", "Token "+i.Token)
+	}
 	req.Header.Set("Content-Type", "text/plain; charset=utf-8")
 
 	resp, err := i.client.Do(req)

@@ -4,6 +4,29 @@ description: La imagen distroless, qué hay que montar con escritura y un compos
 ---
 
 import { Tabs, TabItem, Aside } from "@astrojs/starlight/components";
+import ComposePicker from "../../../../components/ComposePicker.astro";
+
+Elige una pila, pon dos líneas en un `.env` al lado, y arráncala.
+
+<ComposePicker
+  store="Almacén"
+  grafana="Traer Grafana, con el dashboard ya dentro"
+  none="Ninguno, el colector solo"
+  hint="Cada combinación de aquí se levanta contra las imágenes de verdad antes de cada release."
+/>
+
+```sh
+docker compose up -d
+```
+
+Con Grafana está en `http://localhost:3000`, usuario `admin` y
+contraseña `ghchronicle` salvo que pongas `GRAFANA_PASSWORD`. El dashboard ya
+está ahí: el colector lo publica al arrancar y lo apunta al almacén de al lado,
+así que no hay nada que importar ni ningún datasource que rellenar.
+
+El resto de esta página es la imagen en sí, para quien la ejecute de otra manera.
+
+## Un contenedor, a mano
 
 ```sh
 docker run -d --name ghchronicle \

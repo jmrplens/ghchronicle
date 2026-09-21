@@ -800,6 +800,8 @@ func (c *Config) resolveGrafana() {
 	}
 	c.Grafana.URL = expandEnv(c.Grafana.URL)
 	c.Grafana.Token = expandEnv(c.Grafana.Token)
+	c.Grafana.User = expandEnv(c.Grafana.User)
+	c.Grafana.Password = expandEnv(c.Grafana.Password)
 	c.Grafana.DashboardUID = expandEnv(c.Grafana.DashboardUID)
 	c.Grafana.Datasource.URL = expandEnv(c.Grafana.Datasource.URL)
 	c.Grafana.Datasource.UID = expandEnv(c.Grafana.Datasource.UID)
@@ -1393,6 +1395,13 @@ func BuiltinEvery(fam string) (time.Duration, bool) {
 type Grafana struct {
 	URL   string `yaml:"url" ghc:"example=http://localhost:3000"`
 	Token string `yaml:"token" ghc:"secret,example=${GRAFANA_TOKEN}"`
+	// User and Password are the other way in, for a Grafana with no service
+	// account yet: one a compose file brings up beside this exists for the
+	// first time when the collector first asks. A token is used in preference
+	// wherever both are set, because a token can be scoped to publishing and
+	// an administrator cannot.
+	User     string `yaml:"user" ghc:"example=admin"`
+	Password string `yaml:"password" ghc:"secret,example=${GRAFANA_PASSWORD}"`
 	// Folder is the folder the dashboard goes in, by title, created when it is
 	// not there. Empty means Grafana's default folder.
 	Folder string `yaml:"folder" ghc:"example=GitHub"`

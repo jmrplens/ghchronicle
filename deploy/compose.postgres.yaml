@@ -1,0 +1,67 @@
+# ghchronicle, with PostgreSQL.
+#
+# Put two lines in a .env file beside this one:
+#
+#   GITHUB_TOKEN=github_pat_...
+#   GITHUB_USER=your-login
+#
+# then `docker compose up -d`. Nothing is published to Grafana;
+# the store is yours to point one at.
+
+name: ghchronicle
+
+services:
+
+  postgres:
+    image: postgres:18.6-alpine
+    environment:
+      POSTGRES_USER: ghchronicle
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ghchronicle}
+      POSTGRES_DB: ghchronicle
+    volumes:
+      # /var/lib/postgresql, not /var/lib/postgresql/data: the 18+ images
+      # moved where they keep the cluster, and a volume on the old path is
+      # refused outright with "in 18+, these Docker images are configured to
+      # store database data in a subdirectory".
+      - postgres:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ghchronicle"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  ghchronicle:
+    image: ghcr.io/jmrplens/ghchronicle
+    command: ["-config", "/config.yaml"]
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      GITHUB_TOKEN: ${GITHUB_TOKEN:?put your token in a .env file beside this}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ghchronicle}
+    volumes:
+      - state:/var/lib/ghchronicle
+    configs:
+      - source: ghchronicle
+        target: /config.yaml
+
+configs:
+  ghchronicle:
+    # The doubled $$ are deliberate. A single $ is read by compose, which
+    # would put the token into the file it hands the container; doubled,
+    # compose writes the reference through and the collector expands it from
+    # its own environment when it starts.
+    content: |
+      github:
+        token: $${GITHUB_TOKEN}
+      targets:
+        user: ${GITHUB_USER:?put the account to collect in a .env file beside this}
+      sinks:
+        postgres:
+          dsn: postgres://ghchronicle:$${POSTGRES_PASSWORD}@postgres:5432/ghchronicle?sslmode=disable
+      state_file: /var/lib/ghchronicle/state.json
+
+volumes:
+  postgres:
+  state:

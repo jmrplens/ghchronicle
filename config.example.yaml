@@ -345,6 +345,13 @@ log:
 # grafana:
 #   url: http://localhost:3000
 #   token: ${GRAFANA_TOKEN}
+#   # The other way in, for a Grafana with no service account yet: one a
+#   # compose file brings up beside this exists for the first time when the
+#   # collector first asks. A token is used in preference wherever both are
+#   # set, because a token can be scoped to publishing and an administrator
+#   # cannot.
+#   user: admin
+#   password: ${GRAFANA_PASSWORD}
 #   # The folder the dashboard goes in, by title, created if it is not there.
 #   # Omit it for Grafana's default folder.
 #   folder: GitHub

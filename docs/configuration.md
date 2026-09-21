@@ -346,6 +346,8 @@ This page is a form that writes a configuration. What follows is the inventory i
   - `grafana`: a block of settings
   - `grafana.url`: string, like `http://localhost:3000`
   - `grafana.token`: string, a credential, like `${GRAFANA_TOKEN}`
+  - `grafana.user`: string, like `admin`
+  - `grafana.password`: string, a credential, like `${GRAFANA_PASSWORD}`
   - `grafana.folder`: string, like `GitHub`
   - `grafana.publish_on_start`: bool, like `false`
   - `grafana.dashboard_uid`: string, like `my-existing-dashboard`
