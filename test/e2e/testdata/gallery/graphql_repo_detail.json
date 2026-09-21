@@ -39,7 +39,7 @@
       ]},
       "rulesets": {"nodes": [
         {"name": "Protect main", "target": "BRANCH", "enforcement": "ACTIVE",
-         "updatedAt": "2026-07-15T10:00:00Z",
+         "updatedAt": "@DAYS_AGO_58@T10:00:00Z",
          "rules": {"nodes": [
            {"type": "DELETION"}, {"type": "NON_FAST_FORWARD"},
            {"type": "PULL_REQUEST"}, {"type": "REQUIRED_STATUS_CHECKS"}

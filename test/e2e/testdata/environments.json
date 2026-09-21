@@ -1,6 +1,6 @@
 {
   "total_count": 1,
   "environments": [
-    {"id": 161088068, "name": "production", "url": "https://api.github.com/repos/octocat/hello-world/environments/production", "created_at": "2025-01-01T00:00:00Z", "updated_at": "2026-06-01T00:00:00Z"}
+    {"id": 161088068, "name": "production", "url": "https://api.github.com/repos/octocat/hello-world/environments/production", "created_at": "2025-01-01T00:00:00Z", "updated_at": "@DAYS_AGO_102@T00:00:00Z"}
   ]
 }

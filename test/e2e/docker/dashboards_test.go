@@ -713,7 +713,7 @@ func dashboardFrameAnswer(frame map[string]any) (values int, numbers []float64, 
 //     item with no way to open it. The GraphQL query asks every pull request
 //     for `url` and the two REST walks read `html_url`, so all three were the
 //     fixture answering without a field GitHub always sends. gh_fork.url on
-//     panel 102 was the sixth, closed on 2026-09-11 when the newest hundred
+//     panel 102 was the sixth, closed when the newest hundred
 //     forks moved into the audience batch: its fixture answers `url`, and the
 //     REST fixture gained `html_url` so the two roads could be held to the
 //     same rows;
@@ -743,7 +743,7 @@ func dashboardFrameAnswer(frame map[string]any) (values int, numbers []float64, 
 //     measurement is written from the repository list the sweep discovers, so
 //     it needs `targets.include_archived`, and this sweep's config leaves it
 //     off. The fixture does hold an archived repository, octocat/linguist,
-//     archivedAt 2026-08-29, and with that setting off it is never asked
+//     archived a fortnight back, and with that setting off it is never asked
 //     about. An account running the default filter is in exactly the same
 //     position, which is why the panel's own description names the setting.
 //   - gh_dependency and gh_dependency_change are the eighth and ninth, beside

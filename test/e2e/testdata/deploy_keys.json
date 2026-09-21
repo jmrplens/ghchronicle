@@ -1,4 +1,4 @@
 [
-  {"id": 1, "key": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExample", "url": "https://api.github.com/repos/octocat/hello-world/keys/1", "title": "deploy-bot", "verified": true, "created_at": "2025-03-01T00:00:00Z", "read_only": true, "added_by": "octocat", "last_used": "2026-09-01T00:00:00Z"},
+  {"id": 1, "key": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExample", "url": "https://api.github.com/repos/octocat/hello-world/keys/1", "title": "deploy-bot", "verified": true, "created_at": "2025-03-01T00:00:00Z", "read_only": true, "added_by": "octocat", "last_used": "@DAYS_AGO_10@T00:00:00Z"},
   {"id": 2, "key": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExample2", "url": "https://api.github.com/repos/octocat/hello-world/keys/2", "title": "ci-writer", "verified": true, "created_at": "2024-03-01T00:00:00Z", "read_only": false, "added_by": "octocat", "last_used": null}
 ]

@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/jmrplens/ghchronicle/test/e2e/fakegh"
 )
 
 // What a real InfluxDB 3 does with what the sink writes.
@@ -25,11 +27,18 @@ import (
 const (
 	// A star given on 1 March 2024 (testdata/stargazers_page1.json).
 	starGivenAt = "2024-03-01T10:00:00Z"
-	// A traffic day of 30 August 2026 (testdata/traffic_views.json).
-	trafficDayAt = "2026-08-30T00:00:00Z"
-	// A workflow run that finished on 7 September 2026
-	// (testdata/actions_runs.json).
-	runFinishedAt = "2026-09-07T10:04:10Z"
+)
+
+// The two the fixtures spell as offsets, resolved the way the fake resolves
+// them. A fixture that pins a calendar date drifts out of the window a
+// dashboard asks for as the weeks pass; one that counts back from today does
+// not, and an assertion that spelled the date by hand would be the thing left
+// behind.
+var (
+	// The traffic day carrying 120 views (testdata/traffic_views.json).
+	trafficDayAt = fakegh.DaysAgoDate(fakegh.TrafficDaysAgo) + "T00:00:00Z"
+	// The workflow run that finished at 10:04:10 (testdata/actions_runs.json).
+	runFinishedAt = fakegh.DaysAgoDate(fakegh.RunDaysAgo) + "T10:04:10Z"
 )
 
 // influxTimeLayout is how InfluxDB 3 renders a timestamp in its JSON answer:

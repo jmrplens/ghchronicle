@@ -1,7 +1,7 @@
 {
   "usageItems": [
     {
-      "date": "2026-09-01T00:00:00Z",
+      "date": "@DAYS_AGO_10@T00:00:00Z",
       "product": "Actions",
       "sku": "Actions Linux",
       "quantity": 214,
@@ -13,7 +13,7 @@
       "repositoryName": "hello-world"
     },
     {
-      "date": "2026-09-02T00:00:00Z",
+      "date": "@DAYS_AGO_9@T00:00:00Z",
       "product": "Copilot",
       "sku": "Copilot Individual",
       "quantity": 1,

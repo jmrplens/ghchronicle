@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/jmrplens/ghchronicle/test/e2e/fakegh"
 )
 
 func TestGraphiteSinkWritesPlaintextOverTCP(t *testing.T) {
@@ -39,7 +41,11 @@ func TestGraphiteSinkWritesPlaintextOverTCP(t *testing.T) {
 	// The path is the dashboard's contract, so one whole path is pinned:
 	// prefix, measurement without gh_, every tag value in tag key order
 	// (full_name, kind, owner, repo), then the field.
-	day := time.Date(2026, 8, 30, 0, 0, 0, 0, time.UTC).Unix()
+	// The traffic day the fixture spells as an offset, resolved the way the
+	// fake resolves it. Written out as a date it would stop being in the
+	// fixture a few weeks from now, and this assertion would be checking a day
+	// nothing was ever written for.
+	day := fakegh.DaysAgo(fakegh.TrafficDaysAgo).Unix()
 	want := fmt.Sprintf("github.traffic.octocat_hello-world.views.octocat.hello-world.count 120 %d", day)
 	if !slices.Contains(lines, want) {
 		t.Errorf("the traffic day did not arrive as %q; a sample of what did:\n%s",

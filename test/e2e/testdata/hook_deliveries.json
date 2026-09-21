@@ -1,4 +1,4 @@
 [
-  {"id": 555001, "guid": "0b989ba4-242f-11e5-81e1-c7b6966d2516", "delivered_at": "2026-09-07T09:15:01Z", "redelivery": false, "duration": 0.27, "status": "OK", "status_code": 200, "event": "push", "action": null, "installation_id": null, "repository_id": 1296269},
-  {"id": 555000, "guid": "0b989ba4-242f-11e5-81e1-c7b6966d2517", "delivered_at": "2026-09-06T14:06:30Z", "redelivery": true, "duration": 1.9, "status": "Forbidden", "status_code": 403, "event": "pull_request", "action": "closed", "installation_id": null, "repository_id": 1296269}
+  {"id": 555001, "guid": "0b989ba4-242f-11e5-81e1-c7b6966d2516", "delivered_at": "@DAYS_AGO_4@T09:15:01Z", "redelivery": false, "duration": 0.27, "status": "OK", "status_code": 200, "event": "push", "action": null, "installation_id": null, "repository_id": 1296269},
+  {"id": 555000, "guid": "0b989ba4-242f-11e5-81e1-c7b6966d2517", "delivered_at": "@DAYS_AGO_5@T14:06:30Z", "redelivery": true, "duration": 1.9, "status": "Forbidden", "status_code": 403, "event": "pull_request", "action": "closed", "installation_id": null, "repository_id": 1296269}
 ]

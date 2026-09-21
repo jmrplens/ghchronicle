@@ -13,6 +13,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/jmrplens/ghchronicle/test/e2e/fakegh"
 )
 
 // psqlClient is however psql can reach the local server on this machine. The
@@ -192,8 +194,12 @@ func loadIntoPostgres(t *testing.T, psql *psqlClient, sql string, wantTables, wa
 		}
 	})
 
+	// The traffic day the fixture spells as an offset, so this asks for the row
+	// the sweep actually wrote rather than for a date that leaves the fixture a
+	// few weeks from now.
 	queries := `SELECT count(*) FROM "gh_traffic";
-SELECT "count" FROM "gh_traffic" WHERE "kind" = 'views' AND "time" = '2026-08-30T00:00:00Z';
+SELECT "count" FROM "gh_traffic" WHERE "kind" = 'views' AND "time" = '` +
+		fakegh.DaysAgoDate(fakegh.TrafficDaysAgo) + `T00:00:00Z';
 SELECT count(*) FROM pg_tables WHERE schemaname = 'public';
 `
 	load := func(copies int) []string {

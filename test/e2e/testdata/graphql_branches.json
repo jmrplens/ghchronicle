@@ -11,28 +11,28 @@
                         "name": "chore/deps-update",
                         "target": {
                             "oid": "94f0e6c2b850736885f8e3f1a66fb5ba35bbee4f",
-                            "committedDate": "2026-09-10T08:28:06Z"
+                            "committedDate": "@DAYS_AGO_1@T08:28:06Z"
                         }
                     },
                     {
                         "name": "feat/identity-and-project-listings",
                         "target": {
                             "oid": "8cc50e282247d35caa8b16ff3ca6d40a198369e4",
-                            "committedDate": "2026-09-10T06:58:12Z"
+                            "committedDate": "@DAYS_AGO_1@T06:58:12Z"
                         }
                     },
                     {
                         "name": "fix/csp-discard-yandex-metrika",
                         "target": {
                             "oid": "50ec720e846558fc9ea9cbec2aa874247555e0bd",
-                            "committedDate": "2026-09-07T20:21:04Z"
+                            "committedDate": "@DAYS_AGO_4@T20:21:04Z"
                         }
                     },
                     {
                         "name": "main",
                         "target": {
                             "oid": "334feb2e99b2c6c358d3df50226cb92d6d84975b",
-                            "committedDate": "2026-09-06T09:01:39Z"
+                            "committedDate": "@DAYS_AGO_5@T09:01:39Z"
                         }
                     }
                 ]
@@ -56,7 +56,7 @@
                         "name": "main",
                         "target": {
                             "oid": "ff914a53bae3a969f8305347d59dc3808d4f12f5",
-                            "committedDate": "2026-09-02T23:20:00Z"
+                            "committedDate": "@DAYS_AGO_9@T23:20:00Z"
                         }
                     }
                 ]

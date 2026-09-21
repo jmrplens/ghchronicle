@@ -9,7 +9,7 @@
     ],
     "query_suite": "default",
     "threat_model": "remote",
-    "updated_at": "2026-07-26T02:55:11Z",
+    "updated_at": "@DAYS_AGO_47@T02:55:11Z",
     "schedule": "weekly",
     "runner_type": "standard",
     "runner_label": ""

@@ -4,8 +4,8 @@
     "name": "sha256:0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c4b5a69788796a5b4c3d2e1f0",
     "url": "https://api.github.com/users/octocat/packages/container/ghchronicle/versions/90001",
     "html_url": "https://github.com/users/octocat/packages/container/ghchronicle/90001",
-    "created_at": "2026-09-01T10:00:00Z",
-    "updated_at": "2026-09-01T10:00:00Z",
+    "created_at": "@DAYS_AGO_10@T10:00:00Z",
+    "updated_at": "@DAYS_AGO_10@T10:00:00Z",
     "metadata": {"package_type": "container", "container": {"tags": ["latest", "1.2.0"]}}
   },
   {
@@ -13,8 +13,8 @@
     "name": "sha256:aa11bb22cc33dd44ee55ff6600112233445566778899aabbccddeeff00112233",
     "url": "https://api.github.com/users/octocat/packages/container/ghchronicle/versions/90000",
     "html_url": "https://github.com/users/octocat/packages/container/ghchronicle/90000",
-    "created_at": "2026-08-01T10:00:00Z",
-    "updated_at": "2026-08-01T10:00:00Z",
+    "created_at": "@DAYS_AGO_41@T10:00:00Z",
+    "updated_at": "@DAYS_AGO_41@T10:00:00Z",
     "metadata": {"package_type": "container", "container": {"tags": []}}
   }
 ]

@@ -39,6 +39,17 @@ half the core requests of the first, and that `own_cost` on the
 `gh_rate_limit` row is the number of queries the process made rather than
 zero.
 
+A fixture never writes out a recent date. It spells one as an offset the fake
+resolves when it serves the file, `"@DAYS_AGO_12@T00:00:00Z"`, beside the
+`@NOW@`, `@TODAY@` and `@SOON@` it already resolved, and `@DAYS_AHEAD_n@` for
+whatever has to still be in the future. A dashboard asks for the last day, week
+or month, so a written-out date is correct only until it falls out of that
+window, and nothing announces the day it does: the release of 2.4.0 failed with
+four panels of every store answering nothing, twelve hours after the same suite
+had passed, because the day one pull request merged on had crossed `now-30d` in
+between. A test that has to name one of those days asks `fakegh.DaysAgo`, and a
+date written out by hand fails `TestNoFixtureWritesOutARecentDate` on the spot.
+
 That is the right test for a format, and it is fast enough to run while a sink
 is being changed. What it cannot catch is anything the receiver has an opinion
 about. A capture server answers 204 to everything. It has no column types, no

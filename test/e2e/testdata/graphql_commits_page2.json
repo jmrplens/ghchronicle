@@ -10,7 +10,7 @@
             "nodes": [
               {
                 "oid": "c3d4e5f60718293a4b5c6d7e8f9012345678901a",
-                "committedDate": "2026-08-01T08:00:00Z",
+                "committedDate": "@DAYS_AGO_41@T08:00:00Z",
                 "additions": 200,
                 "deletions": 120,
                 "changedFilesIfAvailable": 9,

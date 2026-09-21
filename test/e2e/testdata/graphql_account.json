@@ -22,7 +22,7 @@
       "isEmployee": false,
       "status": {
         "message": "Reviewing pull requests on Mondays",
-        "createdAt": "2026-08-20T09:00:00Z",
+        "createdAt": "@DAYS_AGO_22@T09:00:00Z",
         "indicatesLimitedAvailability": true
       },
       "pinnedItems": {"nodes": [
@@ -42,7 +42,7 @@
         "name": "sponsors-octocat",
         "isPublic": true,
         "createdAt": "2021-06-01T00:00:00Z",
-        "nextPayoutDate": "2026-10-01",
+        "nextPayoutDate": "@DAYS_AHEAD_20@",
         "activeGoal": {"kind": "MONTHLY_SPONSORSHIP_AMOUNT", "title": "Cover the CI bill", "targetValue": 50, "percentComplete": 30},
         "tiers": {
           "totalCount": 3,
@@ -61,7 +61,7 @@
         {"createdAt": "@TODAY@", "isActive": true, "isOneTimePayment": false, "privacyLevel": "PRIVATE", "sponsorEntity": null, "tier": {"name": "Backer", "monthlyPriceInCents": 500}}
       ]},
       "lists": {"totalCount": 2, "nodes": [
-        {"name": "Self-Hosted", "slug": "self-hosted", "isPrivate": false, "createdAt": "2024-02-03T08:55:02Z", "lastAddedAt": "2026-09-01T01:27:12Z", "items": {"totalCount": 6}},
+        {"name": "Self-Hosted", "slug": "self-hosted", "isPrivate": false, "createdAt": "2024-02-03T08:55:02Z", "lastAddedAt": "@DAYS_AGO_10@T01:27:12Z", "items": {"totalCount": 6}},
         {"name": "To Check", "slug": "to-check", "isPrivate": true, "createdAt": "2024-12-11T10:23:58Z", "lastAddedAt": "2024-12-11T10:23:59Z", "items": {"totalCount": 1}}
       ]},
       "contributionsCollection": {
@@ -75,13 +75,13 @@
           "totalContributions": 1105,
           "weeks": [
             {"contributionDays": [
-              {"date": "2026-08-30", "contributionCount": 0, "contributionLevel": "NONE"},
-              {"date": "2026-08-31", "contributionCount": 4, "contributionLevel": "FOURTH_QUARTILE"},
-              {"date": "2026-09-01", "contributionCount": 7, "contributionLevel": "FOURTH_QUARTILE"}
+              {"date": "@DAYS_AGO_12@", "contributionCount": 0, "contributionLevel": "NONE"},
+              {"date": "@DAYS_AGO_11@", "contributionCount": 4, "contributionLevel": "FOURTH_QUARTILE"},
+              {"date": "@DAYS_AGO_10@", "contributionCount": 7, "contributionLevel": "FOURTH_QUARTILE"}
             ]},
             {"contributionDays": [
-              {"date": "2026-09-06", "contributionCount": 2, "contributionLevel": "SECOND_QUARTILE"},
-              {"date": "2026-09-07", "contributionCount": 9, "contributionLevel": "FOURTH_QUARTILE"}
+              {"date": "@DAYS_AGO_5@", "contributionCount": 2, "contributionLevel": "SECOND_QUARTILE"},
+              {"date": "@DAYS_AGO_4@", "contributionCount": 9, "contributionLevel": "FOURTH_QUARTILE"}
             ]}
           ]
         },

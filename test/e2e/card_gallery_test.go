@@ -120,6 +120,19 @@ func TestCardGallery(t *testing.T) {
 func galleryAccount(t *testing.T) (work, cfg string) {
 	t.Helper()
 	gh := fakegh.New(t, "testdata", "testdata/gallery")
+	// The one fake in this repository whose clock is stopped. The pictures the
+	// docs show are committed under site/src/assets and compared byte for
+	// byte, so the data they are drawn from has to be the same data every day,
+	// while the fixtures themselves spell their dates as offsets precisely so
+	// that they move. Freezing here is what lets both be true. The day is the
+	// one those fixtures were written against.
+	gh.FreezeAt(fixtureDay)
 	work = t.TempDir()
 	return work, writeConfig(t, work, gh.URL(), "e2e-token", login, "")
 }
+
+// fixtureDay is the day the fixtures under testdata call "now". Their dates
+// are written as offsets from it, so resolving them against it gives back
+// exactly the dates they were authored with, which is what keeps the committed
+// cards identical from one day to the next.
+var fixtureDay = time.Date(2026, 9, 11, 0, 0, 0, 0, time.UTC)

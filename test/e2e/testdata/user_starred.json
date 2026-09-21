@@ -1,10 +1,10 @@
 [
   {
-    "starred_at": "2026-08-12T20:00:00Z",
+    "starred_at": "@DAYS_AGO_30@T20:00:00Z",
     "repo": {"id": 5001, "full_name": "golang/go", "language": "Go", "stargazers_count": 125000}
   },
   {
-    "starred_at": "2026-09-01T07:30:00Z",
+    "starred_at": "@DAYS_AGO_10@T07:30:00Z",
     "repo": {"id": 5002, "full_name": "influxdata/influxdb", "language": "Rust", "stargazers_count": 29000}
   }
 ]

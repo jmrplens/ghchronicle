@@ -6,6 +6,6 @@
     "events": ["push", "pull_request", "release"],
     "config": {"content_type": "json", "insecure_ssl": "0", "url": "https://hooks.example.com/github/8f3a2b1c-secret-path"},
     "created_at": "2025-01-01T00:00:00Z",
-    "updated_at": "2026-08-01T00:00:00Z"
+    "updated_at": "@DAYS_AGO_41@T00:00:00Z"
   }
 ]

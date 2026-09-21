@@ -38,6 +38,18 @@ la primera vez volvió 304 la segunda, que la segunda pasada cobró menos de la
 mitad de las peticiones core de la primera, y que `own_cost` en la fila
 `gh_rate_limit` es el número de consultas que hizo el proceso y no cero.
 
+Una fixture nunca escribe una fecha reciente. La deletrea como un desplazamiento
+que el falso resuelve al servir el fichero, `"@DAYS_AGO_12@T00:00:00Z"`, junto a
+los `@NOW@`, `@TODAY@` y `@SOON@` que ya resolvía, y `@DAYS_AHEAD_n@` para lo que
+tenga que seguir estando en el futuro. Un panel pide el último día, semana o mes,
+así que una fecha escrita a mano solo es correcta hasta que sale de esa ventana,
+y nada avisa del día en que lo hace: la release de 2.4.0 falló con cuatro paneles
+de cada almacén sin responder nada, doce horas después de que la misma suite
+pasara, porque entre medias el día en que se fusionó un pull request cruzó
+`now-30d`. Una prueba que necesite nombrar uno de esos días se lo pide a
+`fakegh.DaysAgo`, y una fecha escrita a mano hace fallar
+`TestNoFixtureWritesOutARecentDate` en el acto.
+
 Esa es la prueba correcta para un formato, y es lo bastante rápida para correr
 mientras se toca un destino. Lo que no puede detectar es nada sobre lo que el
 receptor tenga una opinión. Un servidor de captura responde 204 a todo. No

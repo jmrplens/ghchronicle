@@ -6,7 +6,8 @@ import (
 	"regexp"
 	"strings"
 	"testing"
-	"time"
+
+	"github.com/jmrplens/ghchronicle/test/e2e/fakegh"
 )
 
 // influxConfig is the sinks block for a run that writes to rec and nothing
@@ -133,7 +134,7 @@ func assertInfluxWrite(t *testing.T, r *capturedRequest) {
 // trafficDay finds the view count the fixture dates to 30 August 2026, which
 // is the one point whose whole journey the assertions below follow.
 func trafficDay(points []lpPoint) *lpPoint {
-	day := time.Date(2026, 8, 30, 0, 0, 0, 0, time.UTC).UnixNano()
+	day := fakegh.DaysAgo(fakegh.TrafficDaysAgo).UnixNano()
 	for i, p := range points {
 		if p.Measurement == "gh_traffic" && p.Tags["kind"] == "views" && p.Time == day {
 			return &points[i]

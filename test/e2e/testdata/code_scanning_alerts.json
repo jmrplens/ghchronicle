@@ -3,7 +3,7 @@
     "number": 5,
     "html_url": "https://github.com/octocat/hello-world/security/code-scanning/5",
     "state": "open",
-    "created_at": "2026-08-28T03:00:00Z",
+    "created_at": "@DAYS_AGO_14@T03:00:00Z",
     "rule": {"id": "go/path-injection", "severity": "error", "security_severity_level": "high", "description": "Uncontrolled data used in path expression"},
     "tool": {"name": "CodeQL", "version": "2.19.0"}
   },
@@ -11,7 +11,7 @@
     "number": 4,
     "html_url": "https://github.com/octocat/hello-world/security/code-scanning/4",
     "state": "open",
-    "created_at": "2026-08-28T03:00:00Z",
+    "created_at": "@DAYS_AGO_14@T03:00:00Z",
     "rule": {"id": "go/unused-variable", "severity": "warning", "security_severity_level": null, "description": "Unused variable"},
     "tool": {"name": "CodeQL", "version": "2.19.0"}
   }

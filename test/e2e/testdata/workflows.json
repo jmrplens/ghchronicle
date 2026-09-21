@@ -1,7 +1,7 @@
 {
   "total_count": 2,
   "workflows": [
-    {"id": 161335, "name": "CI", "path": ".github/workflows/ci.yml", "state": "active", "created_at": "2024-01-10T12:00:00Z", "updated_at": "2026-08-01T12:00:00Z"},
+    {"id": 161335, "name": "CI", "path": ".github/workflows/ci.yml", "state": "active", "created_at": "2024-01-10T12:00:00Z", "updated_at": "@DAYS_AGO_41@T12:00:00Z"},
     {"id": 161336, "name": "Nightly", "path": ".github/workflows/nightly.yml", "state": "disabled_manually", "created_at": "2024-02-01T12:00:00Z", "updated_at": "2026-05-01T12:00:00Z"}
   ]
 }

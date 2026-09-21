@@ -3,72 +3,72 @@
   "uniques": 92,
   "views": [
     {
-      "timestamp": "2026-08-25T00:00:00Z",
+      "timestamp": "@DAYS_AGO_17@T00:00:00Z",
       "count": 215,
       "uniques": 18
     },
     {
-      "timestamp": "2026-08-26T00:00:00Z",
+      "timestamp": "@DAYS_AGO_16@T00:00:00Z",
       "count": 162,
       "uniques": 21
     },
     {
-      "timestamp": "2026-08-27T00:00:00Z",
+      "timestamp": "@DAYS_AGO_15@T00:00:00Z",
       "count": 152,
       "uniques": 24
     },
     {
-      "timestamp": "2026-08-28T00:00:00Z",
+      "timestamp": "@DAYS_AGO_14@T00:00:00Z",
       "count": 226,
       "uniques": 34
     },
     {
-      "timestamp": "2026-08-29T00:00:00Z",
+      "timestamp": "@DAYS_AGO_13@T00:00:00Z",
       "count": 75,
       "uniques": 18
     },
     {
-      "timestamp": "2026-08-30T00:00:00Z",
+      "timestamp": "@DAYS_AGO_12@T00:00:00Z",
       "count": 76,
       "uniques": 15
     },
     {
-      "timestamp": "2026-08-31T00:00:00Z",
+      "timestamp": "@DAYS_AGO_11@T00:00:00Z",
       "count": 93,
       "uniques": 17
     },
     {
-      "timestamp": "2026-09-01T00:00:00Z",
+      "timestamp": "@DAYS_AGO_10@T00:00:00Z",
       "count": 238,
       "uniques": 19
     },
     {
-      "timestamp": "2026-09-02T00:00:00Z",
+      "timestamp": "@DAYS_AGO_9@T00:00:00Z",
       "count": 116,
       "uniques": 22
     },
     {
-      "timestamp": "2026-09-03T00:00:00Z",
+      "timestamp": "@DAYS_AGO_8@T00:00:00Z",
       "count": 217,
       "uniques": 37
     },
     {
-      "timestamp": "2026-09-04T00:00:00Z",
+      "timestamp": "@DAYS_AGO_7@T00:00:00Z",
       "count": 111,
       "uniques": 14
     },
     {
-      "timestamp": "2026-09-05T00:00:00Z",
+      "timestamp": "@DAYS_AGO_6@T00:00:00Z",
       "count": 55,
       "uniques": 14
     },
     {
-      "timestamp": "2026-09-06T00:00:00Z",
+      "timestamp": "@DAYS_AGO_5@T00:00:00Z",
       "count": 55,
       "uniques": 9
     },
     {
-      "timestamp": "2026-09-07T00:00:00Z",
+      "timestamp": "@DAYS_AGO_4@T00:00:00Z",
       "count": 148,
       "uniques": 15
     }

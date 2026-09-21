@@ -12,8 +12,8 @@
           {
             "title": "v2.0",
             "state": "OPEN",
-            "createdAt": "2026-06-01T00:00:00Z",
-            "dueOn": "2026-12-31T00:00:00Z",
+            "createdAt": "@DAYS_AGO_102@T00:00:00Z",
+            "dueOn": "@DAYS_AHEAD_111@T00:00:00Z",
             "closedAt": null,
             "progressPercentage": 37.5,
             "issues": {"totalCount": 8},
@@ -23,8 +23,8 @@
             "title": "v1.2",
             "state": "CLOSED",
             "createdAt": "2026-03-01T00:00:00Z",
-            "dueOn": "2026-08-01T00:00:00Z",
-            "closedAt": "2026-08-10T09:30:00Z",
+            "dueOn": "@DAYS_AGO_41@T00:00:00Z",
+            "closedAt": "@DAYS_AGO_32@T09:30:00Z",
             "progressPercentage": 100,
             "issues": {"totalCount": 12},
             "pullRequests": {"totalCount": 6}

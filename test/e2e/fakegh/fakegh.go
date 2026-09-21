@@ -199,6 +199,9 @@ type Server struct {
 	// perRepo answers for repositories other than hello-world; New sets it
 	// only when it is given an overlay.
 	perRepo bool
+	// now is what the fixtures' relative dates are resolved against. It is the
+	// real clock unless a suite froze it; see FreezeAt.
+	now func() time.Time
 
 	mu       sync.Mutex
 	requests []Request
@@ -241,6 +244,7 @@ func New(tb testing.TB, dir string, overlays ...string) *Server {
 	s := &Server{
 		tb: tb, bodies: bodies, used: map[string]int{},
 		perRepo: len(overlays) > 0, failing: map[string]int{},
+		now: func() time.Time { return time.Now().UTC() },
 	}
 	s.srv = httptest.NewServer(http.HandlerFunc(s.serve))
 	tb.Cleanup(s.srv.Close)
@@ -563,30 +567,49 @@ func (s *Server) render(name string) answer {
 		s.tb.Errorf("no fixture named %s", name)
 		return answer{status: http.StatusInternalServerError, cost: 1}
 	}
-	a := answer{status: http.StatusOK, etag: etagOf(body), cost: 1}
-	if !strings.HasSuffix(name, ".json") {
-		a.contentType = "text/plain; charset=utf-8"
-		if strings.HasSuffix(name, ".html") {
-			a.contentType = "text/html; charset=utf-8"
-		}
-		a.body = body
-		return a
+	// The tokens are replaced whatever the file is. A job log is plain text
+	// and every line of it starts with a timestamp the collector parses, so a
+	// fixture served without its tokens resolved reaches a collector as the
+	// literal "@DAYS_AGO_5@" and is read as the zero time, quietly.
+	a := answer{
+		status: http.StatusOK, etag: etagOf(body), cost: 1,
+		body: s.resolve(body),
 	}
-	a.contentType = jsonType
-	now := time.Now().UTC()
-	soon := now.Add(time.Hour)
-	rendered := strings.ReplaceAll(string(body), "@NOW@", now.Format(time.RFC3339))
-	rendered = strings.ReplaceAll(rendered, "@TODAY@", today())
-	rendered = strings.ReplaceAll(rendered, "@SOON_EPOCH@", strconv.FormatInt(soon.Unix(), 10))
-	rendered = strings.ReplaceAll(rendered, "@SOON@", soon.Format(time.RFC3339))
-	rendered = daysAgo.ReplaceAllStringFunc(rendered, agoDate)
-	a.body = []byte(rendered)
+	switch {
+	case strings.HasSuffix(name, ".json"):
+		a.contentType = jsonType
+	case strings.HasSuffix(name, ".html"):
+		a.contentType = "text/html; charset=utf-8"
+	default:
+		a.contentType = "text/plain; charset=utf-8"
+	}
 	return a
 }
 
-// daysAgo matches "@DAYS_AGO_12@", which becomes the date twelve days before
-// today, without a time, so a fixture spells the hour itself:
-// "@DAYS_AGO_12@T16:00:00Z".
+// resolve is a fixture with its tokens replaced: the moment this ran, the day
+// it ran on, and every date a fixture spelled as an offset from that day.
+//
+// "@TODAY@" is the start of that day and not the moment this ran because a
+// dated point carries its own date as part of its identity, so a fixture that
+// spells one "@NOW@" gives two sweeps of the same test two different points.
+// TestFileSinkWritesTheSamePointsInBothFormats caught that on a sponsorship
+// whose two renderings were sixteen seconds apart. The start of the day is
+// recent enough for any dashboard window and is the same string for both
+// sweeps, except across midnight, which is rare and loud.
+func (s *Server) resolve(body []byte) []byte {
+	now := s.now()
+	soon := now.Add(time.Hour)
+	today := now.Truncate(24 * time.Hour)
+	out := strings.ReplaceAll(string(body), "@NOW@", now.Format(time.RFC3339))
+	out = strings.ReplaceAll(out, "@TODAY@", today.Format(time.RFC3339))
+	out = strings.ReplaceAll(out, "@SOON_EPOCH@", strconv.FormatInt(soon.Unix(), 10))
+	out = strings.ReplaceAll(out, "@SOON@", soon.Format(time.RFC3339))
+	return []byte(daysAgoMarker.ReplaceAllStringFunc(out, s.agoDate))
+}
+
+// daysAgoMarker matches "@DAYS_AGO_12@" and "@DAYS_AHEAD_90@", which become
+// the date twelve days before or ninety days after the fake's today, without a
+// time, so a fixture spells the hour itself: "@DAYS_AGO_12@T16:00:00Z".
 //
 // A dashboard asks for the last day, week or month, and a fixture that writes
 // the date it was authored on drifts out of those windows one panel at a time.
@@ -594,19 +617,66 @@ func (s *Server) render(name string) answer {
 // and the next, and four panels of every store went blank with nothing having
 // changed in the code. Counting back from today keeps a fixture the same
 // distance from the present for as long as it exists, which is what the
-// fixture meant in the first place.
-var daysAgo = regexp.MustCompile(`@DAYS_AGO_(\d+)@`)
+// fixture meant in the first place. Ahead is the same argument pointed the
+// other way: an artifact that expires, a milestone that is due and a payout
+// that has not happened yet are all wrong once the day they name goes past.
+var daysAgoMarker = regexp.MustCompile(`@DAYS_(AGO|AHEAD)_(\d+)@`)
 
-// agoDate is that replacement. It counts whole days from the start of the
-// current UTC day for the reason today() gives: a point carries its own date,
-// so two sweeps of one test have to spell it identically.
-func agoDate(marker string) string {
-	n, err := strconv.Atoi(daysAgo.FindStringSubmatch(marker)[1])
+// agoDate is that replacement, against whatever clock this fake was given. It
+// counts whole days from the start of that day for the reason a dated point
+// gives: a point carries its own date, so two sweeps of one test have to spell
+// it identically.
+func (s *Server) agoDate(marker string) string {
+	m := daysAgoMarker.FindStringSubmatch(marker)
+	n, err := strconv.Atoi(m[2])
 	if err != nil {
+		// Unreachable through the regexp, which matches digits and nothing
+		// else, and said out loud rather than returned quietly: a marker served
+		// as itself is a fixture that arrives with "@DAYS_AGO_10@" where a date
+		// should be, and what fails then is a collector three packages away.
+		s.tb.Errorf("fixture marker %s: %v", marker, err)
 		return marker
 	}
-	return time.Now().UTC().Truncate(24*time.Hour).AddDate(0, 0, -n).Format(time.DateOnly)
+	if m[1] == "AGO" {
+		n = -n
+	}
+	return s.now().Truncate(24*time.Hour).AddDate(0, 0, n).Format(time.DateOnly)
 }
+
+// FreezeAt stops the fake's clock, so every relative date in its fixtures
+// resolves to the same day however long from now this runs.
+//
+// One suite needs this. The card gallery draws the pictures committed under
+// site/src/assets and a test compares them byte for byte, so the data behind
+// them has to be the same data every day; everywhere else the point of a
+// relative date is that it moves. Call it before the first request.
+func (s *Server) FreezeAt(at time.Time) {
+	s.now = at.UTC
+}
+
+// The offsets the fixtures spell their dates with, for the assertions that
+// have to name one. A test that wrote the date out instead would be checking a
+// day the fixture had stopped mentioning: that is how the release of 2.4.0
+// came to fail with four dashboard panels of every store answering nothing,
+// twelve hours after the same suite had passed.
+const (
+	// TrafficDaysAgo is the traffic day carrying 120 views (traffic_views.json).
+	TrafficDaysAgo = 12
+	// RunDaysAgo is the workflow run that finished at 10:04:10
+	// (actions_runs.json).
+	RunDaysAgo = 4
+)
+
+// DaysAgo is the UTC midnight n days before today, for a test that has to name
+// the day a fixture spelled as an offset. Resolving it here rather than
+// writing the date out is what stops the assertion and the fixture drifting
+// apart.
+func DaysAgo(n int) time.Time {
+	return time.Now().UTC().Truncate(24*time.Hour).AddDate(0, 0, -n)
+}
+
+// DaysAgoDate is that day as a fixture spells it.
+func DaysAgoDate(n int) string { return DaysAgo(n).Format(time.DateOnly) }
 
 // asHelloWorld reads a request for another of octocat's repositories as the
 // same request for hello-world, and returns the name it replaced. A request
@@ -626,16 +696,4 @@ func asHelloWorld(r *http.Request) (routed *http.Request, repo string) {
 		routed.URL.Path += "/" + suffix
 	}
 	return routed, name
-}
-
-// today is what "@TODAY@" becomes: the start of the current UTC day.
-//
-// A dated point carries its own date as part of its identity, so a fixture
-// that spells one "@NOW@" gives two sweeps of the same test two different
-// points. TestFileSinkWritesTheSamePointsInBothFormats caught that on a
-// sponsorship whose two renderings were sixteen seconds apart. The start of
-// the day is recent enough for any dashboard window and is the same string for
-// both sweeps, except across midnight, which is rare and loud.
-func today() string {
-	return time.Now().UTC().Truncate(24 * time.Hour).Format(time.RFC3339)
 }
