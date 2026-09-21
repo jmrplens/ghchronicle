@@ -292,56 +292,15 @@ Grafana is fine, because the uids differ per store and cannot collide.
 
 ### They are generated, never hand-edited
 
-`internal/dashboards` holds one ordered list of sections and panels, and
-every panel carries one query set per store. The generator picks one set and
-emits the JSON, so every file has the same panels in the same places with the
-same titles, and it refuses to write files whose layouts have drifted apart.
+One list of sections and panels produces all five, so a panel that is fixed is
+fixed everywhere and a store that is added inherits the lot. What that means
+for you is the part worth knowing: a dashboard edited in Grafana is yours until
+the next publish overwrites it, so keep changes in a copy under a uid of your
+own and name it in `grafana.dashboard_uid`.
 
-```sh
-go run ./cmd/gen_dashboards          # writes all five files
-go run ./cmd/gen_dashboards -check   # writes nothing, fails if they are stale
-```
-
-Edit `internal/dashboards/sections_*.go`, not the JSON. `panels.go` holds
-the panel constructors it uses, `query.go` the query helpers for each store,
-and `stores.go` only chooses a query set and a datasource.
-
-> **No builder is trusted without running the queries**
->
-> The raw database API accepts things the Grafana plugin then fails to render, so
-> the checkers go through Grafana's own query path where a datasource exists.
->
-> ```sh
-> GRAFANA_TOKEN=... go run ./cmd/check_dashboards influxdb <datasource-uid>
-> GRAFANA_TOKEN=... go run ./cmd/check_prometheus <metrics-dump> <datasource-uid>
-> go run ./cmd/check_postgres <schema.json>
-> ```
->
-> `check_dashboards` reports every panel as ok, empty, waiting or failing, and
-> its status follows that reading: a panel over a table the store has not created
-> is a family it has not collected yet, which fills itself, so it is reported as
-> `WAIT` and does not fail the run, while a panel naming a column the store has
-> not created is one nobody with that account's history can draw and fails it.
-> It can only answer that question on the two SQL stores: on Elasticsearch,
-> Prometheus and Graphite a missing field is not an error, the query answers
-> nothing, and the same defect arrives as an empty panel. Those three are covered
-> by the containerised suite instead, which runs every panel against stores where
-> every family has been written and fails on any panel error it does not
-> explicitly allow. The second kind of failure is why this is worth running
-> against a store holding a real account and not only against the fixture: a
-> column of these stores exists once a point has carried it, the fixture carries
-> every field of every measurement, and an account carries only what has happened
-> to it. A panel selecting a field the account has never written is refused
-> outright and Grafana draws "No data" with a corner badge nobody notices.
-> `check_prometheus` additionally checks each metric name against a live dump of
-> the exporter's own `/metrics`, because a typo in a metric name is not a syntax
-> error: PromQL parses it happily and returns nothing forever.
->
-> Both of them, and `cmd/publish_dashboard`, read two variables: `GRAFANA_TOKEN`
-> for the credential, and `GRAFANA_URL` for the server. The compiled-in default
-> is `http://localhost:3000`, which is the address Grafana itself ships with, so
-> anything else has to be named: the first symptom of not naming it is a
-> connection refused.
+How the generator works, and the checks that keep the committed files and the
+panels' own queries in step, are in
+[CONTRIBUTING](https://github.com/jmrplens/ghchronicle/blob/main/CONTRIBUTING.md).
 
 ### Publishing to the Grafana directory
 
@@ -696,8 +655,8 @@ the host of a webhook URL is stored, because the path usually carries a secret.
 One panel is text in the exported files, "Where failure output went",
 because the output of a failed job is text and belongs in a log store, and an
 importer may have none: a dashboard bound to one datasource cannot query two.
-Published to a Grafana that has a Loki datasource, with
-`cmd/publish_dashboard -loki <datasource-uid>`, the same panel draws the last
+Published to a Grafana with a Loki datasource, which the collector makes from
+a Loki sink or takes from `grafana.datasource.loki_uid`, the same panel draws the last
 lines of every failed job from Loki instead, newest first, with the workflow,
 job and run of each line in its logfmt tail. The repository variable is applied
 in the InfluxDB, PostgreSQL and Prometheus dashboards; the Graphite and

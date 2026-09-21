@@ -328,8 +328,8 @@ the host of a webhook URL is stored, because the path usually carries a secret.
 One panel is text in the exported files, "Where failure output went",
 because the output of a failed job is text and belongs in a log store, and an
 importer may have none: a dashboard bound to one datasource cannot query two.
-Published to a Grafana that has a Loki datasource, with
-`cmd/publish_dashboard -loki <datasource-uid>`, the same panel draws the last
+Published to a Grafana with a Loki datasource, which the collector makes from
+a Loki sink or takes from `grafana.datasource.loki_uid`, the same panel draws the last
 lines of every failed job from Loki instead, newest first, with the workflow,
 job and run of each line in its logfmt tail. The repository variable is applied
 in the InfluxDB, PostgreSQL and Prometheus dashboards; the Graphite and

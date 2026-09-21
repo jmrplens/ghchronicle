@@ -29,8 +29,40 @@ is archived anywhere unless you archive it.
 as a dated point, so a year from now the question "how fast were we merging in
 July" still has an answer.
 
+## Start
+
+Two commands on a machine of your own:
+
 ```sh
-ghchronicle -config config.yaml
+curl -fsSL https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.sh | bash
+ghchronicle -setup
+```
+
+The first takes the newest release and refuses anything whose checksum is not
+the one the release published. The second asks what a working configuration
+needs, checks each answer against the thing it names, and writes it: a token
+that cannot read the account says so there, not at the first sweep. It offers
+to set up a service too, and the installer offers to run it for you.
+
+On Windows, `irm https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.ps1 | iex`
+and then the same `-setup`.
+
+Or with Docker, where the whole stack comes up together:
+
+```sh
+# compose.yaml from https://jmrp.io/docs/ghchronicle/install/docker/
+printf 'GITHUB_TOKEN=github_pat_...\nGITHUB_USER=your-login\n' > .env
+docker compose up -d
+```
+
+Grafana is on `http://localhost:3000` with the dashboard already in it: the
+collector publishes it on start and points it at the store beside it, so there
+is nothing to import and no datasource to fill in. The
+[Docker page](https://jmrp.io/docs/ghchronicle/install/docker/) has one compose
+file per store, each brought up against the real images before a release.
+
+```sh
+ghchronicle -config config.yaml    # what the service ends up running
 ```
 
 ## What it draws
@@ -143,21 +175,10 @@ Import from the Grafana UI (Dashboards, New, Import) or with the API. They are
 generated from one specification by the scripts beside them; edit those rather
 than the JSON.
 
-## Install
+## The other ways in
 
-```sh
-curl -fsSL https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.sh | bash
-```
-
-or, in PowerShell on Windows:
-
-```powershell
-irm https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.ps1 | iex
-```
-
-Either one works out the platform, takes the newest release and refuses to
-install anything whose checksum is not the one the release published. Or build
-it yourself:
+[Start](#start) is the short one. The rest, for a machine where it does not
+apply. Build it yourself:
 
 ```sh
 go install github.com/jmrplens/ghchronicle/cmd/ghchronicle@latest

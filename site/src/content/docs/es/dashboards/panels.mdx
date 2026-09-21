@@ -347,7 +347,8 @@ Un panel es texto en los ficheros exportados, "Where failure output went",
 porque la salida de un job fallido es texto y su sitio es un almacén de logs, y
 quien importa el dashboard puede no tener ninguno: un dashboard atado a un solo
 datasource no puede consultar dos. Publicado en un Grafana que sí tiene un
-datasource de Loki, con `cmd/publish_dashboard -loki <datasource-uid>`, el mismo
+datasource de Loki, que el colector crea a partir de un sink de Loki o toma de
+`grafana.datasource.loki_uid`, el mismo
 panel dibuja las últimas líneas de cada job fallido leídas de Loki, las más
 recientes primero, con el workflow, el job y la ejecución de cada línea en su
 cola logfmt. La variable de repositorio se aplica en los dashboards de InfluxDB,

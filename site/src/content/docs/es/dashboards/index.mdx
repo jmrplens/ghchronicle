@@ -269,62 +269,15 @@ difieren por almacén y no pueden chocar.
 
 ## Son generados, nunca editados a mano
 
-`internal/dashboards` tiene una lista ordenada de secciones y paneles, y
-cada panel lleva un conjunto de consultas por almacén. El generador elige un
-conjunto y emite el JSON, así que todos los ficheros tienen los mismos paneles
-en los mismos sitios con los mismos títulos, y se niega a escribir ficheros
-cuyas disposiciones se hayan separado.
+Una sola lista de secciones y paneles produce los cinco, así que un panel
+arreglado queda arreglado en todos y un almacén que se añade los hereda. Lo que
+eso significa para ti es la parte que importa: un dashboard editado en Grafana
+es tuyo hasta que la siguiente publicación lo sobreescriba, así que guarda tus
+cambios en una copia con un uid propio y nómbrala en `grafana.dashboard_uid`.
 
-```sh
-go run ./cmd/gen_dashboards          # escribe los cinco ficheros
-go run ./cmd/gen_dashboards -check   # no escribe nada, falla si están caducos
-```
-
-Edita `internal/dashboards/sections_*.go`, no el JSON. `panels.go` tiene
-los constructores de panel que usa, `query.go` los ayudantes de consulta de
-cada almacén, y `stores.go` solo elige un conjunto de consultas y un
-datasource.
-
-<Aside type="note" title="Ningún generador se da por bueno sin ejecutar las consultas">
-La API cruda de la base de datos acepta cosas que luego el plugin de Grafana no
-sabe dibujar, así que los verificadores pasan por la propia ruta de consulta de
-Grafana allí donde existe un datasource.
-
-```sh
-GRAFANA_TOKEN=... go run ./cmd/check_dashboards influxdb <datasource-uid>
-GRAFANA_TOKEN=... go run ./cmd/check_prometheus <metrics-dump> <datasource-uid>
-go run ./cmd/check_postgres <schema.json>
-```
-
-`check_dashboards` informa de cada panel como correcto, vacío, en espera o
-fallido, y su estado sigue esa lectura: un panel sobre una tabla que el almacén
-no ha creado es una familia que aún no ha recogido y que se llenará sola, así
-que se informa como `WAIT` y no hace fallar la ejecución, mientras que un panel
-que nombra una columna que el almacén no ha creado es uno que nadie con el
-historial de esa cuenta puede dibujar y sí la hace fallar. Esa pregunta solo la puede responder en los dos almacenes SQL: en
-Elasticsearch, Prometheus y Graphite un campo que falta no es un error, la
-consulta no devuelve nada, y el mismo defecto llega como un panel vacío. De
-esos tres se encarga la suite en contenedores, que ejecuta todos los paneles
-contra almacenes donde se ha escrito cada familia y falla ante cualquier error
-de panel que no permita explícitamente. La segunda clase de fallo es la razón
-de ejecutarlo contra un almacén con una cuenta real y no solo contra el banco
-de pruebas: una columna de estos almacenes existe desde que un punto la ha
-llevado, el banco de pruebas lleva todos los campos de todas las medidas, y una
-cuenta solo lleva lo que le ha pasado. Un panel que selecciona un campo que la
-cuenta nunca ha escrito se rechaza entero y Grafana dibuja «Sin datos» con un
-distintivo en la esquina que nadie ve.
-`check_prometheus` comprueba además cada nombre de métrica contra un volcado
-real del propio `/metrics` del exportador, porque una errata en un nombre de
-métrica no es un error de sintaxis: PromQL la analiza tan contento y no
-devuelve nada para siempre.
-
-Los dos, y `cmd/publish_dashboard`, leen dos variables: `GRAFANA_TOKEN` para la
-credencial y `GRAFANA_URL` para el servidor. El valor compilado por omisión es
-`http://localhost:3000`, que es la dirección con la que viene Grafana, así que
-cualquier otra hay que nombrarla: el primer síntoma de no nombrarla es una
-conexión rechazada.
-
-</Aside>
+Cómo funciona el generador, y las comprobaciones que mantienen en paso los
+ficheros y las consultas de los paneles, están en
+[CONTRIBUTING](https://github.com/jmrplens/ghchronicle/blob/main/CONTRIBUTING.md).
 
 ## Publicar en el directorio de Grafana
 

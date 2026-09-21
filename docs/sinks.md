@@ -992,11 +992,12 @@ query is:
 
 The exported dashboards do not show it, because a dashboard bound to one
 datasource cannot query two and an importer may have no Loki: they carry a text
-panel, "Where failure output went", with that query. On a Grafana that has a
-Loki datasource, `cmd/publish_dashboard -loki <datasource-uid>` publishes the
-dashboard with the lines drawn from Loki in that panel's place, newest first,
-filtered by the dashboard's repository variable where the store's variable can
-be read as a regular expression. The steps are in `dashboards/PUBLISHING.md`.
+panel, "Where failure output went", with that query. Publishing the dashboard
+from the collector swaps that panel for the lines, newest first, filtered by
+the dashboard's repository variable where the store's variable can be read as
+a regular expression. A Loki sink whose address ends in `/loki/api/v1/push` is
+enough: the datasource is made from it. One writing anywhere else says so and
+takes a `grafana.datasource.loki_uid` instead.
 
 ### Where to go next
 

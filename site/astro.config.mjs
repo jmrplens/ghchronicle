@@ -492,6 +492,17 @@ export default defineConfig({
 							translations: { es: "Resolución de problemas" },
 							slug: "reference/troubleshooting",
 						},
+					],
+				},
+				{
+					// Not Reference. What is under Reference is looked up by
+					// somebody using this; what is here is only of use to
+					// somebody changing it, and a reader who wandered into the
+					// test layers looking for how to configure a sink was
+					// reading the wrong page for an honest reason.
+					label: "Working on it",
+					translations: { es: "Trabajar en ello" },
+					items: [
 						{
 							label: "The test layers",
 							translations: { es: "Las capas de prueba" },
