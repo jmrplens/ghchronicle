@@ -104,7 +104,17 @@ func writeServiceAt(ask *asker, answers setupAnswers, configPath, path string) e
 		if writeErr := os.WriteFile(envPath, []byte(env), 0o600); writeErr != nil {
 			return writeErr
 		}
-		ask.sayf("Wrote %s, which holds the credentials and is readable by you alone.", envPath)
+		ask.sayf("Wrote %s, which holds the credentials.", envPath)
+		// Said only where it is true. Go asks the operating system for a mode
+		// and Windows does not keep one: the file lands readable by everyone
+		// on the machine, and a line claiming otherwise would be worse than
+		// no line, because somebody would believe it.
+		if runtime.GOOS == "windows" {
+			ask.sayf("Windows does not take the permissions this asked for, so restrict it")
+			ask.sayf("yourself: right-click, Properties, Security, and remove everyone else.")
+		} else {
+			ask.sayf("Only you can read it.")
+		}
 	}
 	ask.sayf("")
 	ask.sayf("Start it with:")

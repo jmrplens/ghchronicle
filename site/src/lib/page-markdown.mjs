@@ -484,7 +484,9 @@ function composeMarkdown() {
 	return Object.entries(titles)
 		.map(([file, title]) => {
 			const body = readFileSync(join(deploy, file), "utf8").trimEnd();
-			return `**${title}**\n\n\`\`\`yaml\n${body}\n\`\`\``;
+			// A heading rather than bold text: the twin is linted, and emphasis
+			// standing in for a heading is what MD036 is about.
+			return `## ${title}\n\n\`\`\`yaml\n${body}\n\`\`\``;
 		})
 		.join("\n\n");
 }

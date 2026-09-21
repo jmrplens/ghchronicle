@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -352,23 +353,107 @@ func TestTheServiceFileAndItsCredentialsLandWithTheRightPermissions(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	for path, want := range map[string]os.FileMode{
-		unit:                                  serviceMode,
-		filepath.Join(dir, "ghchronicle.env"): 0o600,
-	} {
-		info, statErr := os.Stat(path)
-		if statErr != nil {
-			t.Fatalf("%s: %v", path, statErr)
-		}
-		if info.Mode().Perm() != want {
-			t.Errorf("%s is %v, want %v", filepath.Base(path), info.Mode().Perm(), want)
+	// Only where a mode means something. Windows keeps no POSIX permissions
+	// and Go's os package cannot set any, so the files land readable by
+	// everyone there; what this asserts on Windows is the line that says so,
+	// below, rather than a mode that was never applied.
+	if runtime.GOOS != "windows" {
+		for path, want := range map[string]os.FileMode{
+			unit:                                  serviceMode,
+			filepath.Join(dir, "ghchronicle.env"): 0o600,
+		} {
+			info, statErr := os.Stat(path)
+			if statErr != nil {
+				t.Fatalf("%s: %v", path, statErr)
+			}
+			if info.Mode().Perm() != want {
+				t.Errorf("%s is %v, want %v", filepath.Base(path), info.Mode().Perm(), want)
+			}
 		}
 	}
 	env, _ := os.ReadFile(filepath.Join(dir, "ghchronicle.env"))
 	if !strings.Contains(string(env), "INFLUX_TOKEN=influxsecret") {
 		t.Errorf("the credentials file does not carry the sink's token:\n%s", env)
 	}
-	if !strings.Contains(said.String(), "readable by you alone") {
-		t.Errorf("output = %q, want it to say what it just wrote and who can read it", said.String())
+	// What it says about who can read it has to be true on the system it is
+	// saying it on. Windows takes no permissions from this, so the line there
+	// tells the reader to set them rather than telling them they are set.
+	wants := "Only you can read it."
+	if runtime.GOOS == "windows" {
+		wants = "Windows does not take the permissions"
+	}
+	if !strings.Contains(said.String(), wants) {
+		t.Errorf("output = %q, want it to carry %q", said.String(), wants)
+	}
+}
+
+// TestAChoiceCanBeGivenByNameOrByNumber, since somebody who knows the answer
+// should not have to count down the list to give it.
+func TestAChoiceCanBeGivenByNameOrByNumber(t *testing.T) {
+	t.Parallel()
+	for _, answer := range []string{"2", "postgres", "POSTGRES", "\n"} {
+		var said strings.Builder
+		ask := newAsker(strings.NewReader(answer+"\n"), &said)
+		want := "postgres"
+		if answer == "\n" {
+			want = "influxdb" // the default, which is what an empty line takes
+		}
+		got, err := ask.pick("where", setupSinks())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got != want {
+			t.Errorf("answer %q gave %q, want %q", answer, got, want)
+		}
+	}
+}
+
+// TestAnAnswerThatIsNotOnTheListIsAskedAgain rather than taken as the default,
+// which would quietly collect into somewhere nobody chose.
+func TestAnAnswerThatIsNotOnTheListIsAskedAgain(t *testing.T) {
+	t.Parallel()
+	var said strings.Builder
+	ask := newAsker(strings.NewReader("mongodb\n9\npostgres\n"), &said)
+	got, err := ask.pick("where", setupSinks())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "postgres" {
+		t.Errorf("answer = %q, want the one that was on the list", got)
+	}
+	if strings.Count(said.String(), "not one of those") != 2 {
+		t.Errorf("output = %q, want it to have said so for each answer it did not know", said.String())
+	}
+}
+
+// TestTheListMarksTheDefault, so an empty line is not a guess.
+func TestTheListMarksTheDefault(t *testing.T) {
+	t.Parallel()
+	var said strings.Builder
+	ask := newAsker(strings.NewReader("\n"), &said)
+	if _, err := ask.pick("where", setupSinks()); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(said.String(), "* 1) influxdb") {
+		t.Errorf("output = %q, want the default marked in the list", said.String())
+	}
+}
+
+// TestASetupWithNowhereToAnswerFromRefuses, rather than reading a prompt into
+// a pipe and waiting for a line that is never coming.
+func TestASetupWithNowhereToAnswerFromRefuses(t *testing.T) {
+	t.Parallel()
+	// os.Stdin under `go test` is not a terminal, which is the case being
+	// described.
+	var said strings.Builder
+	err := setupFrom(t.Context(), options{}, os.Stdin, &said)
+	if err == nil {
+		t.Fatal("it started asking questions with nobody there")
+	}
+	if !strings.Contains(err.Error(), "not a terminal") {
+		t.Errorf("err = %v, want it to say why", err)
+	}
+	if said.String() != "" {
+		t.Errorf("it printed %q before refusing", said.String())
 	}
 }

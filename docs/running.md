@@ -1318,7 +1318,7 @@ Source: <https://jmrp.io/docs/ghchronicle/install/docker/>
 
 Pick a stack, put two lines in a `.env` file beside it, and start it.
 
-**InfluxDB and Grafana**
+### InfluxDB and Grafana
 
 ```yaml
 # ghchronicle, with InfluxDB and Grafana.
@@ -1415,7 +1415,7 @@ volumes:
   grafana:
 ```
 
-**InfluxDB**
+### InfluxDB
 
 ```yaml
 # ghchronicle, with InfluxDB.
@@ -1488,7 +1488,7 @@ volumes:
   state:
 ```
 
-**PostgreSQL and Grafana**
+### PostgreSQL and Grafana
 
 ```yaml
 # ghchronicle, with PostgreSQL and Grafana.
@@ -1586,7 +1586,7 @@ volumes:
   grafana:
 ```
 
-**PostgreSQL**
+### PostgreSQL
 
 ```yaml
 # ghchronicle, with PostgreSQL.
@@ -1658,7 +1658,7 @@ volumes:
   state:
 ```
 
-**The collector on its own**
+### The collector on its own
 
 ```yaml
 # ghchronicle, on its own.

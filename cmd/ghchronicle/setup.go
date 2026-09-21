@@ -129,7 +129,7 @@ func whoAmI(ctx context.Context, token, apiBase string) (string, error) {
 
 // askSink takes the destination and whatever it needs, and checks it answers.
 func askSink(ctx context.Context, ask *asker, answers *setupAnswers) error {
-	sink, err := ask.pick("Where should the numbers go?", setupSinks(), "influxdb")
+	sink, err := ask.pick("Where should the numbers go?", setupSinks())
 	if err != nil {
 		return err
 	}

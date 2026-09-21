@@ -155,7 +155,12 @@ type choice struct {
 
 // pick offers a numbered list and takes a number or the name itself, because
 // somebody who knows the answer should not have to count.
-func (a *asker) pick(question string, options []choice, fallback string) (string, error) {
+//
+// The first option is the default, which is why the order of the list is a
+// decision rather than an arrangement: it is the answer somebody gets by
+// pressing enter.
+func (a *asker) pick(question string, options []choice) (string, error) {
+	fallback := options[0].name
 	a.sayf("%s", question)
 	for i, option := range options {
 		marker := " "

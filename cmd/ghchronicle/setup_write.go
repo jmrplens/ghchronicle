@@ -13,6 +13,9 @@ import (
 
 // What the guided setup writes, and where.
 
+// configName is what the configuration is called wherever it lands.
+const configName = "config.yaml"
+
 // configDirMode is what the directory holding a configuration is created with.
 // The credentials live beside the file, so nobody else has any reason to walk
 // it, and gosec is right to ask.
@@ -43,16 +46,16 @@ func probe(ctx context.Context, url string) error {
 func defaultConfigPath() string {
 	if runtime.GOOS == "windows" {
 		if dir := os.Getenv("APPDATA"); dir != "" {
-			return filepath.Join(dir, "ghchronicle", "config.yaml")
+			return filepath.Join(dir, "ghchronicle", configName)
 		}
 	}
 	if os.Geteuid() == 0 {
-		return "/etc/ghchronicle/config.yaml"
+		return "/etc/ghchronicle/" + configName
 	}
 	if dir, err := os.UserConfigDir(); err == nil {
-		return filepath.Join(dir, "ghchronicle", "config.yaml")
+		return filepath.Join(dir, "ghchronicle", configName)
 	}
-	return "config.yaml"
+	return configName
 }
 
 // defaultStatePath is where what a sweep remembers belongs, beside the
