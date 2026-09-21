@@ -40,10 +40,10 @@ func TestItWritesEveryCombinationAndSaysHowMany(t *testing.T) {
 func TestCheckFailsOnAFileThatDrifted(t *testing.T) {
 	inRepoRoot(t)
 	var out, errs strings.Builder
-	if code := run([]string{"gen_compose"}, &out, &errs); code != 0 {
+	if run([]string{"gen_compose"}, &out, &errs) != 0 {
 		t.Fatal(errs.String())
 	}
-	if code := run([]string{"gen_compose", "-check"}, &out, &errs); code != 0 {
+	if run([]string{"gen_compose", "-check"}, &out, &errs) != 0 {
 		t.Fatalf("a check of what was just written failed: %s", errs.String())
 	}
 	edited := filepath.Join(deployDir, Combinations()[0].File)
@@ -52,7 +52,7 @@ func TestCheckFailsOnAFileThatDrifted(t *testing.T) {
 	}
 	out.Reset()
 	errs.Reset()
-	if code := run([]string{"gen_compose", "-check"}, &out, &errs); code == 0 {
+	if run([]string{"gen_compose", "-check"}, &out, &errs) == 0 {
 		t.Error("a file edited by hand passed the check")
 	}
 	if !strings.Contains(out.String(), Combinations()[0].File) {
