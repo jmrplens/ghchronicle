@@ -235,6 +235,16 @@ recorded in a public transparency log. That is what the two `--certificate`
 flags say, and why they are not optional: without them cosign would confirm
 that somebody signed the file, which is not the question.
 
+Then let it write the configuration:
+
+```sh
+ghchronicle -setup
+```
+
+It asks for a token and where the numbers go, checks each answer against the
+thing it names, and writes a `config.yaml` and, if you want one, a systemd
+unit. The installer above offers to run it as its last step.
+
 ### Put it on the PATH
 
 The archive holds three files and no directory, so extract it somewhere you
@@ -465,6 +475,17 @@ The signing is keyless: the identity being verified is the workflow that ran,
 recorded in a public transparency log, which is why the two `--certificate`
 flags are not optional. Without them cosign would confirm that somebody signed
 the file, which is not the question.
+
+Then let it write the configuration:
+
+```sh
+ghchronicle -setup
+```
+
+It asks for a token and where the numbers go, checks each answer against the
+thing it names, and writes a `config.yaml` and, if you want one, a launchd
+agent in `~/Library/LaunchAgents`. The installer above offers to run it as its
+last step.
 
 ### Put it on the PATH
 
@@ -717,6 +738,16 @@ nowhere to put them:
 The rest of this page is that same install done by hand, which is what to
 follow when you want to know exactly what landed where, or when you would
 rather not run a script you did not write.
+
+Then let it write the configuration:
+
+```powershell
+ghchronicle -setup
+```
+
+It asks for a token and where the numbers go, checks each answer against the
+thing it names, and writes a `config.yaml` under `%APPDATA%\ghchronicle` and,
+if you want one, a scheduled task you register with `schtasks`.
 
 ### What is different here
 

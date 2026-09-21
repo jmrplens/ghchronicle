@@ -122,6 +122,16 @@ recorded in a public transparency log. That is what the two `--certificate`
 flags say, and why they are not optional: without them cosign would confirm
 that somebody signed the file, which is not the question.
 
+Then let it write the configuration:
+
+```sh
+ghchronicle -setup
+```
+
+It asks for a token and where the numbers go, checks each answer against the
+thing it names, and writes a `config.yaml` and, if you want one, a systemd
+unit. The installer above offers to run it as its last step.
+
 ## Put it on the PATH
 
 The archive holds three files and no directory, so extract it somewhere you

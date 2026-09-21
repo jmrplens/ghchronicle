@@ -487,3 +487,75 @@ func TestTheInstallerSaysWhenAnOlderCopyStillWins(t *testing.T) {
 		})
 	}
 }
+
+// TestTheInstallerOffersTheGuidedSetup, and asks through /dev/tty rather than
+// standard input.
+//
+// The documented way to run this is `curl ... | bash`, where standard input is
+// the script itself: a `read` there swallows the rest of the script instead of
+// waiting for a person, which is the shape of bug that turns an install into a
+// half-run script with no error.
+func TestTheInstallerOffersTheGuidedSetup(t *testing.T) {
+	t.Parallel()
+	body := readInstaller(t)
+	if !strings.Contains(body, "-setup") {
+		t.Error("the installer never mentions the guided setup")
+	}
+	offer := section(t, body, "offer_setup()")
+	for _, want := range []string{"/dev/tty", "read -r answer < /dev/tty"} {
+		if !strings.Contains(offer, want) {
+			t.Errorf("offer_setup does not use %q, so `curl | bash` would read the script:\n%s",
+				want, offer)
+		}
+	}
+	// And the check is an open rather than a permission test: `[ -r /dev/tty ]`
+	// says yes on a machine with no controlling terminal and the open then
+	// fails, which broke every non-interactive install until this test caught
+	// it.
+	if !strings.Contains(offer, ": < /dev/tty") {
+		t.Errorf("offer_setup does not try to open the terminal before asking for one:\n%s", offer)
+	}
+	if strings.Contains(shellOnly(offer), "-r /dev/tty") {
+		t.Error("offer_setup tests permissions on /dev/tty, which is not the question")
+	}
+}
+
+// readInstaller is install.sh as text, for the tests that read it rather than
+// run it.
+func readInstaller(t *testing.T) string {
+	t.Helper()
+	body, err := os.ReadFile("install.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(body)
+}
+
+// shellOnly is the lines a shell would run, without the comments. A test about
+// what the script does must not be answered by a comment explaining what it
+// deliberately does not do.
+func shellOnly(body string) string {
+	var kept []string
+	for line := range strings.SplitSeq(body, "\n") {
+		if strings.HasPrefix(strings.TrimSpace(line), "#") {
+			continue
+		}
+		kept = append(kept, line)
+	}
+	return strings.Join(kept, "\n")
+}
+
+// section is the body of a shell function, for a test that wants to read one
+// rather than the whole file.
+func section(t *testing.T, body, opening string) string {
+	t.Helper()
+	start := strings.Index(body, opening)
+	if start < 0 {
+		t.Fatalf("no %s in the installer", opening)
+	}
+	end := strings.Index(body[start:], "\n}\n")
+	if end < 0 {
+		t.Fatalf("%s is not closed", opening)
+	}
+	return body[start : start+end]
+}

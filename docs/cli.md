@@ -17,6 +17,7 @@ ghchronicle -config /etc/ghchronicle/config.yaml
 
 | Flag              | Default       | What it does                                                                                                                               |
 | ----------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `-setup`          | off           | Ask what a working configuration needs, check each answer against the thing it names, and write it                                          |
 | `-config`         | `config.yaml` | Path to the configuration file                                                                                                             |
 | `-once`           | off           | Run one sweep and exit instead of scheduling; a family that is not due by its cadence is still skipped                                     |
 | `-list`           | off           | Print the repositories that would be collected, and which are set aside, then exit                                                         |

@@ -262,6 +262,35 @@ main() {
     say ""
   fi
   "${dir}/${BINARY}" -version
+  offer_setup "${dir}/${BINARY}"
+}
+
+# offer_setup points at the guided setup, and runs it when there is somebody
+# there to answer.
+#
+# The asking is done through /dev/tty rather than standard input, because the
+# documented way to run this is `curl ... | bash`, where standard input is the
+# script itself: a read there would swallow the rest of the script rather than
+# wait for a person. When there is no terminal at all the offer is a line to
+# read, which is the honest form of the same thing.
+offer_setup() {
+  local binary=$1 answer
+  say ""
+  # Opened rather than tested for. `[ -r /dev/tty ]` asks about permissions and
+  # says yes on a machine with no controlling terminal, where the open then
+  # fails with "No such device or address": a CI job, a container build, a
+  # provisioning run. Trying the open is the question actually being asked.
+  if ! : < /dev/tty 2> /dev/null; then
+    say "Next: ${BINARY} -setup writes a configuration, asking only what it"
+    say "      cannot work out and checking each answer as it goes."
+    return
+  fi
+  printf 'Set it up now? It asks for a token and where to put the data. [Y/n]: ' > /dev/tty
+  read -r answer < /dev/tty || answer=n
+  case "${answer:-y}" in
+    [Yy] | [Yy][Ee][Ss] | "") "$binary" -setup < /dev/tty ;;
+    *) say "Run ${BINARY} -setup when you are ready." ;;
+  esac
 }
 
 main "$@"

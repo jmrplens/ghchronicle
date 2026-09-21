@@ -50,6 +50,16 @@ The rest of this page is that same install done by hand, which is what to
 follow when you want to know exactly what landed where, or when you would
 rather not run a script you did not write.
 
+Then let it write the configuration:
+
+```powershell
+ghchronicle -setup
+```
+
+It asks for a token and where the numbers go, checks each answer against the
+thing it names, and writes a `config.yaml` under `%APPDATA%\ghchronicle` and,
+if you want one, a scheduled task you register with `schtasks`.
+
 ## What is different here
 
 Read this first. Four of the five lines below are the reason a command copied

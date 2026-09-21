@@ -9,6 +9,29 @@ Seis pasos y un fichero de configuración. La única decisión que merece
 pensarse antes de empezar es qué almacén guarda la historia, y se puede aplazar
 imprimiendo primero los puntos por la terminal.
 
+## El camino corto
+
+Si tienes una terminal, deja que pregunte:
+
+```sh
+ghchronicle -setup
+```
+
+Pide un token, le pregunta a GitHub de quién es, pregunta qué cuenta recoger y
+dónde poner los números, comprueba que ese sitio responde, ofrece el dashboard
+y ofrece dejarlo funcionando solo. Lo que escribe es un `config.yaml` que
+carga y, si pediste servicio, una unidad, un agente o una tarea programada
+según el sistema.
+
+Las credenciales nunca van en la configuración. Van a un fichero al lado que
+solo puedes leer tú, y la configuración las nombra.
+
+El instalador de arriba lo ofrece como último paso, así que en una máquina
+nueva los dos juntos son todo lo que hay que hacer.
+
+El resto de esta página es lo que escribe, para quien prefiera escribirlo a
+mano o quiera saber a qué acaba de decir que sí.
+
 ## De cero a la primera pasada
 
 <Steps>

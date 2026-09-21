@@ -124,6 +124,16 @@ ejecutó, anotado en un registro público de transparencia. Eso es lo que dicen
 las dos opciones `--certificate`, y por eso no son opcionales: sin ellas cosign
 confirmaría que alguien firmó el fichero, que no es la pregunta.
 
+Después deja que escriba la configuración:
+
+```sh
+ghchronicle -setup
+```
+
+Pide un token y dónde van los números, comprueba cada respuesta contra aquello
+que nombra, y escribe un `config.yaml` y, si lo quieres, una unidad de systemd.
+El instalador de arriba lo ofrece como último paso.
+
 ## Ponerlo en el PATH
 
 El archivo lleva tres ficheros y ningún directorio, así que descomprímelo donde

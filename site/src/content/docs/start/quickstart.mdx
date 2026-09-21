@@ -9,6 +9,29 @@ Six steps and a configuration file. The only decision worth thinking about
 before you start is which store keeps the history, and you can defer that by
 printing the points to the terminal first.
 
+## The short way
+
+If you have a terminal, let it ask:
+
+```sh
+ghchronicle -setup
+```
+
+It asks for a token, checks with GitHub who the token is, asks which account to
+collect and where to put the numbers, checks that the place answers, offers the
+dashboard and offers to set it up to run by itself. What it writes is a
+`config.yaml` that loads and, when you asked for a service, a unit, an agent or
+a scheduled task for whichever system this is.
+
+Credentials never go in the configuration. They go in a file beside it that
+only you can read, and the configuration refers to them by name.
+
+The installer above offers to run it as its last step, so on a new machine the
+two together are the whole of getting started.
+
+The rest of this page is what it writes, for a reader who would rather write it
+themselves or wants to know what they just agreed to.
+
 ## Zero to a first sweep
 
 <Steps>

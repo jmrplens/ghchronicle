@@ -101,6 +101,9 @@ type options struct {
 	list     bool
 	showVer  bool
 	backfill bool
+	// setup asks what a working configuration needs and writes it, which is
+	// the shortest honest answer to "how do I start".
+	setup bool
 	// uninstall names what to take away, and yes is the word that makes it
 	// happen: without it the run prints the list and removes nothing, because
 	// the alternative is a typo that empties a store.
@@ -150,6 +153,8 @@ func parseFlags(args []string, stderr io.Writer) (options, error) {
 		"reach as far back as each surface allows, waiting for the rate limit to reset rather than stopping")
 	fs.StringVar(&o.since, "backfill-since", "",
 		"bound the backfill: a date (2024-01-01), a duration (720h), days (90d) or years (2y); empty means no bound")
+	fs.BoolVar(&o.setup, "setup", false,
+		"ask what a working configuration needs, check each answer, and write it")
 	fs.StringVar(&o.uninstall, "uninstall", "",
 		"remove what this put in place and exit: "+strings.Join(uninstallTargets, ", ")+
 			", comma separated; prints the list and removes nothing without -yes")
@@ -217,6 +222,10 @@ func execute(args []string, stdout, stderr io.Writer) {
 		return
 	}
 
+	if ranBeforeConfig(o, stdout, stderr) {
+		return
+	}
+
 	cfg, err := config.LoadWith(o.path, config.Relax{
 		NoSinks: o.cardOnly,
 		NoToken: o.backfillStatus || o.publishDashboard || o.uninstall != "",
@@ -253,21 +262,7 @@ func execute(args []string, stdout, stderr io.Writer) {
 		return
 	}
 
-	// One sweep, one SVG. This is the shape a GitHub Action wants: run it on a
-	// schedule, commit the file into a profile README, and the card is drawn
-	// from the same points the databases get rather than from a second pass
-	// over the API.
-	var accumulator *render.Accumulator
-	if o.card != "" {
-		accumulator = render.NewAccumulator(cfg.Targets.User)
-		if o.cardOnly {
-			// Nothing else runs, so a card can be produced with no database
-			// configured at all.
-			sinks = []sink.Sink{accumulator}
-		} else {
-			sinks = append(sinks, accumulator)
-		}
-	}
+	accumulator, sinks := withCard(cfg, o, sinks)
 	defer func() {
 		for _, s := range sinks {
 			_ = s.Close()
@@ -436,6 +431,42 @@ func newAPI(cfg *config.Config, backfill bool, logger *slog.Logger) *ghapi.Clien
 // Together rather than as two branches of execute, which each new one would
 // grow by two: they have the same shape, they write to stdout, and the run
 // ends after them.
+// ranBeforeConfig handles the modes that come before the configuration is
+// read, and says whether one of them did.
+//
+// Only -setup so far, and its whole reason is that one: the ordinary time to
+// run it is when there is no configuration yet, so loading one first would
+// refuse the very case it exists for.
+func ranBeforeConfig(o options, stdout, stderr io.Writer) bool {
+	if !o.setup {
+		return false
+	}
+	if err := setupFrom(context.Background(), o, os.Stdin, stdout); err != nil {
+		fatal(stderr, err)
+	}
+	return true
+}
+
+// withCard adds the thing that draws the SVG to the destinations, when one
+// was asked for.
+//
+// One sweep, one SVG. This is the shape a GitHub Action wants: run it on a
+// schedule, commit the file into a profile README, and the card is drawn from
+// the same points the databases get rather than from a second pass over the
+// API.
+func withCard(cfg *config.Config, o options, sinks []sink.Sink) (*render.Accumulator, []sink.Sink) {
+	if o.card == "" {
+		return nil, sinks
+	}
+	accumulator := render.NewAccumulator(cfg.Targets.User)
+	if o.cardOnly {
+		// Nothing else runs, so a card can be produced with no database
+		// configured at all.
+		return accumulator, []sink.Sink{accumulator}
+	}
+	return accumulator, append(sinks, accumulator)
+}
+
 func reported(ctx context.Context, o options, cfg *config.Config,
 	api *ghapi.Client, stdout, stderr io.Writer,
 ) bool {
