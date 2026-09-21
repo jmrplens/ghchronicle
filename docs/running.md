@@ -41,14 +41,6 @@ keep it running once you are done watching it.
   Either one works out the platform, takes the newest release, and refuses to
   install anything whose checksum is not the one the release published.
 
-- **Go**
-
-  ```sh
-  go install github.com/jmrplens/ghchronicle/cmd/ghchronicle@latest
-  ```
-
-  Needs a Go toolchain, and builds from source at whatever the newest tag is.
-
 - **Release**
 
   Take the archive for your platform from the
@@ -60,6 +52,14 @@ keep it running once you are done watching it.
   tar -xzf ghchronicle_2.4.0_linux_amd64.tar.gz
   sudo install -m 755 ghchronicle /usr/local/bin/
   ```
+
+- **Go**
+
+  ```sh
+  go install github.com/jmrplens/ghchronicle/cmd/ghchronicle@latest
+  ```
+
+  Needs a Go toolchain, and builds from source at whatever the newest tag is.
 
 - **Container**
 

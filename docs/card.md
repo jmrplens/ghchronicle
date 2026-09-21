@@ -100,7 +100,7 @@ Empty means the layout's default set.
 
   This project's own README does exactly that with its cards.
 
-- **auto**
+- **auto (default)**
 
   Both palettes in one file, behind a `prefers-color-scheme` query inside the
   picture. The query follows the reader's operating system rather than the

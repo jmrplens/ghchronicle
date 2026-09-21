@@ -70,10 +70,16 @@ printing the points to the terminal first.
 
 1. **Install the binary.**
 
-    - **Go**
+    - **Script**
 
       ```sh
-      go install github.com/jmrplens/ghchronicle/cmd/ghchronicle@latest
+      curl -fsSL https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.sh | bash
+      ```
+
+      On Windows, in PowerShell:
+
+      ```powershell
+      irm https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.ps1 | iex
       ```
 
     - **Release**
@@ -86,6 +92,12 @@ printing the points to the terminal first.
 
       ```sh
       docker pull ghcr.io/jmrplens/ghchronicle
+      ```
+
+    - **Go**
+
+      ```sh
+      go install github.com/jmrplens/ghchronicle/cmd/ghchronicle@latest
       ```
 
 2. **Create a token** at `https://github.com/settings/tokens` and export it.

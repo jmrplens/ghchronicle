@@ -16,9 +16,15 @@ imprimiendo primero los puntos por la terminal.
 1. **Instala el binario.**
 
     <Tabs syncKey="install">
-      <TabItem label="Go">
+      <TabItem label="Script">
         ```sh
-        go install github.com/jmrplens/ghchronicle/cmd/ghchronicle@latest
+        curl -fsSL https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.sh | bash
+        ```
+
+        En Windows, desde PowerShell:
+
+        ```powershell
+        irm https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.ps1 | iex
         ```
       </TabItem>
       <TabItem label="Release">
@@ -29,6 +35,11 @@ imprimiendo primero los puntos por la terminal.
       <TabItem label="Contenedor">
         ```sh
         docker pull ghcr.io/jmrplens/ghchronicle
+        ```
+      </TabItem>
+      <TabItem label="Go">
+        ```sh
+        go install github.com/jmrplens/ghchronicle/cmd/ghchronicle@latest
         ```
       </TabItem>
     </Tabs>

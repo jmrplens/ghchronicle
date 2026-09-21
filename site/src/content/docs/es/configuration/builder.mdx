@@ -11,29 +11,6 @@ marcha: el `config.yaml` que lee una ejecución normal, el comando que lo
 ejecuta y el paso que un workflow le da a la Action compuesta. Las tres salen
 de un mismo conjunto de respuestas, y ninguna pide una credencial.
 
-## Por qué no puede desviarse
-
-Los controles no son una copia de los ajustes. `cmd/gen_config` exporta los
-propios tipos de `internal/config` a un fichero que la página lee, incluido el
-valor por omisión al que se resuelve cada clave, que mide validando una sonda en
-vez de repetir un número. `make check-config-options` falla cuando ese fichero
-deja de ser lo que produce el código, en la suite de análisis y en CI, así que
-el formulario no puede ofrecer un ajuste que el binario no tiene ni perderse uno
-que sí tiene.
-
-La dirección contraria también se comprueba, y su límite conviene decirlo en voz
-alta. Las configuraciones que este formulario escribe para los conjuntos de
-respuestas de `internal/config/testdata/config-cases.json` pasan por el parser
-real en las propias pruebas de `internal/config`, incluidas las formas que han
-hecho tropezar a alguien: una cadencia por familia bajo `every.families`, un
-`include_private` desactivado, un destino cuyas credenciales son referencias
-`${VAR}`, una ejecución de solo tarjeta sin ningún destino y respuestas que se
-espera que el parser rechace. Esos casos los genera el módulo que ejecuta esta
-página, así que no pueden ser una copia suya, y cada rama de ese módulo que
-puede cambiar lo que escribe tiene uno. Lo que el corpus no demuestra es el
-comportamiento que ningún conjunto de respuestas produce, y por eso el fichero
-que lo define enumera lo que no puede cubrir y por qué.
-
 ## Qué permite el formulario y rechaza el parser
 
 Un formulario es un formulario: un destino es una casilla y las claves sin las
