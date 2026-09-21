@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"time"
 )
@@ -44,16 +43,26 @@ func probe(ctx context.Context, url string) error {
 // place; anything else means the account's, because a setup that needs sudo to
 // answer its last question is one that fails at the end.
 func defaultConfigPath() string {
-	if runtime.GOOS == "windows" {
-		if dir := os.Getenv("APPDATA"); dir != "" {
-			return filepath.Join(dir, "ghchronicle", configName)
+	dir, err := os.UserConfigDir()
+	if err != nil {
+		dir = ""
+	}
+	return thisHost().configPath(dir)
+}
+
+// configPath is the same for a named machine, with the account's own
+// configuration directory passed in because only the process can ask for it.
+func (h host) configPath(userConfigDir string) string {
+	if h.goos == "windows" {
+		if h.appdata != "" {
+			return filepath.Join(h.appdata, "ghchronicle", configName)
 		}
 	}
-	if os.Geteuid() == 0 {
+	if h.root {
 		return "/etc/ghchronicle/" + configName
 	}
-	if dir, err := os.UserConfigDir(); err == nil {
-		return filepath.Join(dir, "ghchronicle", configName)
+	if userConfigDir != "" {
+		return filepath.Join(userConfigDir, "ghchronicle", configName)
 	}
 	return configName
 }
@@ -61,14 +70,22 @@ func defaultConfigPath() string {
 // defaultStatePath is where what a sweep remembers belongs, beside the
 // configuration for the same reason.
 func defaultStatePath() string {
-	if runtime.GOOS != "windows" && os.Geteuid() == 0 {
-		return "/var/lib/ghchronicle/state.json"
-	}
 	dir, err := os.UserConfigDir()
 	if err != nil {
+		dir = ""
+	}
+	return thisHost().statePath(dir)
+}
+
+// statePath is the same for a named machine.
+func (h host) statePath(userConfigDir string) string {
+	if h.root {
+		return "/var/lib/ghchronicle/state.json"
+	}
+	if userConfigDir == "" {
 		return "state.json"
 	}
-	return filepath.Join(dir, "ghchronicle", "state.json")
+	return filepath.Join(userConfigDir, "ghchronicle", "state.json")
 }
 
 // setupConfig is the file the answers come to. Written by hand rather than

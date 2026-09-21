@@ -274,3 +274,38 @@ func TestADatasourceNeedsAUIDAndAType(t *testing.T) {
 		t.Errorf("it called %v before checking what it had", a.asked)
 	}
 }
+
+// TestRemovingSomethingThatIsAlreadyGoneIsNotAFailure. Deleting is how the
+// collector clears a dashboard that a rename left behind, and the run that
+// clears it happens to be the one that already cleared it on the previous
+// start. A 404 there is the wanted end state, not an error to stop on.
+func TestRemovingSomethingThatIsAlreadyGoneIsNotAFailure(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name    string
+		status  int
+		wantErr bool
+	}{
+		{"it was there", http.StatusOK, false},
+		{"it had already gone", http.StatusNotFound, false},
+		{"Grafana would not", http.StatusInternalServerError, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			g := &answering{reply: func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(tc.status)
+				_, _ = io.WriteString(w, `{"message":"no"}`)
+			}}
+			err := g.serve(t).Delete(t.Context(), DatasourcePath("ghchronicle-influx"),
+				2*time.Second)
+			if tc.wantErr != (err != nil) {
+				t.Fatalf("Delete() error = %v, want an error: %v", err, tc.wantErr)
+			}
+			if len(g.asked) != 1 ||
+				!strings.HasPrefix(g.asked[0], "DELETE ") ||
+				!strings.HasSuffix(g.asked[0], "ghchronicle-influx") {
+				t.Errorf("it asked for %v, want one DELETE of that datasource", g.asked)
+			}
+		})
+	}
+}

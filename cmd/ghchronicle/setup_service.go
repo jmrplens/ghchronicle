@@ -20,10 +20,39 @@ import (
 // init system rather than the account that wrote it.
 const serviceMode = 0o644
 
+// host is the three things about a machine that decide where a service goes
+// and what it is called.
+//
+// Passed rather than read, so that the launchd agent and the Windows task are
+// exercised on whatever machine the tests run on. Reading runtime.GOOS inside
+// each of these meant two of the three paths were only ever compiled, and the
+// one thing worth knowing about a file for a system you are not on is whether
+// the code that writes it runs at all.
+type host struct {
+	goos    string
+	root    bool
+	home    string
+	appdata string
+}
+
+// thisHost is the machine this is running on.
+func thisHost() host {
+	home, _ := os.UserHomeDir()
+	return host{
+		goos:    runtime.GOOS,
+		root:    runtime.GOOS != "windows" && os.Geteuid() == 0,
+		home:    home,
+		appdata: os.Getenv("APPDATA"),
+	}
+}
+
 // serviceKind is what this system calls a thing that runs by itself, or "" for
 // one this does not know how to write.
-func serviceKind() string {
-	switch runtime.GOOS {
+func serviceKind() string { return thisHost().kind() }
+
+// kind is the same for a named machine.
+func (h host) kind() string {
+	switch h.goos {
 	case "linux":
 		return "a systemd service"
 	case "darwin":
@@ -36,20 +65,21 @@ func serviceKind() string {
 }
 
 // servicePath is where the file goes, per system and per whether this is root.
-func servicePath() string {
-	switch runtime.GOOS {
+func servicePath() string { return thisHost().servicePath() }
+
+// servicePath is the same for a named machine.
+func (h host) servicePath() string {
+	switch h.goos {
 	case "linux":
-		if os.Geteuid() == 0 {
+		if h.root {
 			return "/etc/systemd/system/ghchronicle.service"
 		}
-		home, _ := os.UserHomeDir()
-		return filepath.Join(home, ".config", "systemd", "user", "ghchronicle.service")
+		return filepath.Join(h.home, ".config", "systemd", "user", "ghchronicle.service")
 	case "darwin":
-		home, _ := os.UserHomeDir()
-		return filepath.Join(home, "Library", "LaunchAgents", "io.jmrp.ghchronicle.plist")
+		return filepath.Join(h.home, "Library", "LaunchAgents", "io.jmrp.ghchronicle.plist")
 	case "windows":
-		if dir := os.Getenv("APPDATA"); dir != "" {
-			return filepath.Join(dir, "ghchronicle", "ghchronicle-task.xml")
+		if h.appdata != "" {
+			return filepath.Join(h.appdata, "ghchronicle", "ghchronicle-task.xml")
 		}
 	}
 	return ""
@@ -128,9 +158,14 @@ func writeServiceAt(ask *asker, answers setupAnswers, configPath, path string) e
 // serviceFile is the unit, the agent or the task, and the commands that start
 // whichever it is.
 func serviceFile(binary, configPath, envPath, servicePath string) (body string, start []string) {
-	switch runtime.GOOS {
+	return thisHost().serviceFile(binary, configPath, envPath, servicePath)
+}
+
+// serviceFile is the same for a named machine.
+func (h host) serviceFile(binary, configPath, envPath, servicePath string) (body string, start []string) {
+	switch h.goos {
 	case "linux":
-		return systemdUnit(binary, configPath, envPath), systemdCommands()
+		return systemdUnit(binary, configPath, envPath, h), h.systemdCommands()
 	case "darwin":
 		return launchdPlist(binary, configPath, envPath), []string{
 			"launchctl load " + servicePath,
@@ -146,7 +181,7 @@ func serviceFile(binary, configPath, envPath, servicePath string) (body string, 
 // systemdUnit is the unit, with the hardening a collector can take: it reads a
 // token, writes one state file and talks to the network, so everything else
 // can be taken away from it.
-func systemdUnit(binary, configPath, envPath string) string {
+func systemdUnit(binary, configPath, envPath string, h host) string {
 	return fmt.Sprintf(`[Unit]
 Description=ghchronicle, GitHub metrics collector
 After=network-online.target
@@ -171,20 +206,20 @@ RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
 
 [Install]
 WantedBy=%s
-`, binary, configPath, envPath, filepath.Dir(defaultStatePath()), systemdTarget())
+`, binary, configPath, envPath, filepath.Dir(defaultStatePath()), h.systemdTarget())
 }
 
 // systemdTarget differs between a machine's own service and an account's.
-func systemdTarget() string {
-	if os.Geteuid() == 0 {
+func (h host) systemdTarget() string {
+	if h.root {
 		return "multi-user.target"
 	}
 	return "default.target"
 }
 
 // systemdCommands start it, as the machine or as the account.
-func systemdCommands() []string {
-	if os.Geteuid() == 0 {
+func (h host) systemdCommands() []string {
+	if h.root {
 		return []string{
 			"systemctl daemon-reload",
 			"systemctl enable --now ghchronicle",
