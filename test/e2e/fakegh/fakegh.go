@@ -43,6 +43,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -578,8 +579,33 @@ func (s *Server) render(name string) answer {
 	rendered = strings.ReplaceAll(rendered, "@TODAY@", today())
 	rendered = strings.ReplaceAll(rendered, "@SOON_EPOCH@", strconv.FormatInt(soon.Unix(), 10))
 	rendered = strings.ReplaceAll(rendered, "@SOON@", soon.Format(time.RFC3339))
+	rendered = daysAgo.ReplaceAllStringFunc(rendered, agoDate)
 	a.body = []byte(rendered)
 	return a
+}
+
+// daysAgo matches "@DAYS_AGO_12@", which becomes the date twelve days before
+// today, without a time, so a fixture spells the hour itself:
+// "@DAYS_AGO_12@T16:00:00Z".
+//
+// A dashboard asks for the last day, week or month, and a fixture that writes
+// the date it was authored on drifts out of those windows one panel at a time.
+// The day a pull request merged on crossed now-30d between one scheduled run
+// and the next, and four panels of every store went blank with nothing having
+// changed in the code. Counting back from today keeps a fixture the same
+// distance from the present for as long as it exists, which is what the
+// fixture meant in the first place.
+var daysAgo = regexp.MustCompile(`@DAYS_AGO_(\d+)@`)
+
+// agoDate is that replacement. It counts whole days from the start of the
+// current UTC day for the reason today() gives: a point carries its own date,
+// so two sweeps of one test have to spell it identically.
+func agoDate(marker string) string {
+	n, err := strconv.Atoi(daysAgo.FindStringSubmatch(marker)[1])
+	if err != nil {
+		return marker
+	}
+	return time.Now().UTC().Truncate(24*time.Hour).AddDate(0, 0, -n).Format(time.DateOnly)
 }
 
 // asHelloWorld reads a request for another of octocat's repositories as the

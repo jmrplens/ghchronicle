@@ -11,9 +11,9 @@
             "labels": {"totalCount": 2, "nodes": [{"name": "enhancement"}, {"name": "needs-review"}]},
             "state": "MERGED",
             "isDraft": false,
-            "createdAt": "2026-08-20T10:00:00Z",
-            "closedAt": "2026-08-22T16:00:00Z",
-            "mergedAt": "2026-08-22T16:00:00Z",
+            "createdAt": "@DAYS_AGO_18@T10:00:00Z",
+            "closedAt": "@DAYS_AGO_16@T16:00:00Z",
+            "mergedAt": "@DAYS_AGO_16@T16:00:00Z",
             "additions": 120,
             "deletions": 30,
             "changedFiles": 4,
@@ -28,13 +28,13 @@
                     "login": "bob"
                   },
                   "state": "APPROVED",
-                  "submittedAt": "2026-08-21T09:00:00Z",
+                  "submittedAt": "@DAYS_AGO_17@T09:00:00Z",
                   "url": "https://github.com/octocat/hello-world/pull/42#pullrequestreview-1100001"
                 },
                 {
                   "author": null,
                   "state": "COMMENTED",
-                  "submittedAt": "2026-08-21T11:30:00Z",
+                  "submittedAt": "@DAYS_AGO_17@T11:30:00Z",
                   "url": "https://github.com/octocat/hello-world/pull/42#pullrequestreview-1100002"
                 }
               ]
@@ -49,7 +49,7 @@
             "timelineItems": {
               "nodes": [
                 {
-                  "createdAt": "2026-08-21T09:00:00Z"
+                  "createdAt": "@DAYS_AGO_17@T09:00:00Z"
                 }
               ]
             },
@@ -90,7 +90,7 @@
                     "nodes": [
                       {
                         "databaseId": 3979413666,
-                        "createdAt": "2026-08-21T07:15:00Z",
+                        "createdAt": "@DAYS_AGO_17@T07:15:00Z",
                         "author": {
                           "login": "coderabbitai",
                           "__typename": "Bot"
@@ -112,7 +112,7 @@
                     "nodes": [
                       {
                         "databaseId": 3979413673,
-                        "createdAt": "2026-08-21T07:15:00Z",
+                        "createdAt": "@DAYS_AGO_17@T07:15:00Z",
                         "author": {
                           "login": "coderabbitai",
                           "__typename": "Bot"
@@ -132,7 +132,7 @@
                     "nodes": [
                       {
                         "databaseId": 3979413690,
-                        "createdAt": "2026-08-21T08:30:00Z",
+                        "createdAt": "@DAYS_AGO_17@T08:30:00Z",
                         "author": {
                           "login": "alice",
                           "__typename": "User"
@@ -152,7 +152,7 @@
             "labels": {"totalCount": 0, "nodes": []},
             "state": "OPEN",
             "isDraft": true,
-            "createdAt": "2026-09-05T08:00:00Z",
+            "createdAt": "@DAYS_AGO_2@T08:00:00Z",
             "closedAt": null,
             "mergedAt": null,
             "additions": 10,
@@ -198,7 +198,7 @@
                     "nodes": [
                       {
                         "databaseId": 3979413701,
-                        "createdAt": "2026-09-06T11:45:00Z",
+                        "createdAt": "@DAYS_AGO_1@T11:45:00Z",
                         "author": null
                       }
                     ]
@@ -226,8 +226,8 @@
             "url": "https://github.com/octocat/hello-world/issues/7",
             "number": 7,
             "state": "CLOSED",
-            "createdAt": "2026-08-01T12:00:00Z",
-            "closedAt": "2026-08-03T12:00:00Z",
+            "createdAt": "@DAYS_AGO_37@T12:00:00Z",
+            "closedAt": "@DAYS_AGO_35@T12:00:00Z",
             "author": {
               "login": "carol"
             },
@@ -278,7 +278,7 @@
             "url": "https://github.com/octocat/hello-world/issues/8",
             "number": 8,
             "state": "OPEN",
-            "createdAt": "2026-09-06T09:00:00Z",
+            "createdAt": "@DAYS_AGO_1@T09:00:00Z",
             "closedAt": null,
             "author": null,
             "comments": {

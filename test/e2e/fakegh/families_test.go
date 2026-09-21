@@ -3,6 +3,7 @@ package fakegh
 import (
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/jmrplens/ghchronicle/internal/config"
 )
@@ -77,5 +78,28 @@ func TestAnsweringIsTheCollectedFamiliesLessTheQuietOnes(t *testing.T) {
 		if _, quiet := Unanswered[f]; quiet {
 			t.Errorf("%s is in Answering and in Unanswered", f)
 		}
+	}
+}
+
+// TestAFixtureCountsBackFromToday. The pull request the fixtures merge is the
+// one four dashboard panels of every store are drawn from, and it has to stay
+// inside the window those panels ask for. Spelling the day it merged as an
+// offset is what keeps it there; spelling a date put it outside between one
+// scheduled run and the next, with nothing in the code having changed.
+func TestAFixtureCountsBackFromToday(t *testing.T) {
+	t.Parallel()
+	start := time.Now().UTC().Truncate(24 * time.Hour)
+	got := agoDate("@DAYS_AGO_16@")
+	want := start.AddDate(0, 0, -16).Format(time.DateOnly)
+	if got != want {
+		t.Errorf("agoDate(@DAYS_AGO_16@) = %q, want %q", got, want)
+	}
+	if got == start.Format(time.DateOnly) {
+		t.Error("it resolved to today, so the offset was not read at all")
+	}
+	// Whole days, not the moment this ran: a point carries its own date, and
+	// two sweeps of one test have to write the same one.
+	if agoDate("@DAYS_AGO_0@") != start.Format(time.DateOnly) {
+		t.Error("zero days ago is not the start of today")
 	}
 }
