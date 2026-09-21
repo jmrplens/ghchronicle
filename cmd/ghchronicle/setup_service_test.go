@@ -318,14 +318,17 @@ func TestATypedSecretIsOnlyHiddenWhereSomethingCanHideIt(t *testing.T) {
 	}
 }
 
-// TestWithNowhereToPutItTheSetupStillHasAnAnswer. A machine with neither
-// XDG_CONFIG_HOME nor HOME set, which is what a bare container gives, cannot
-// be asked where an account's configuration belongs. The setup writes into the
-// working directory rather than stopping, because the point of the guided run
-// is to end with a file that exists.
+// TestWithNowhereToPutItTheSetupStillHasAnAnswer. A machine that cannot say
+// where an account's configuration belongs, which is what a bare container
+// gives, gets the working directory rather than a refusal: the point of the
+// guided run is to end with a file that exists.
+//
+// All three variables, because each system reads a different one and clearing
+// only the two a unix uses leaves Windows answering from %AppData%.
 func TestWithNowhereToPutItTheSetupStillHasAnAnswer(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", "")
 	t.Setenv("HOME", "")
+	t.Setenv("APPDATA", "")
 	config, state := defaultConfigPath(), defaultStatePath()
 	// As root the machine's own place is the answer whatever the environment
 	// says, and it is an absolute one; for anybody else it is the directory
