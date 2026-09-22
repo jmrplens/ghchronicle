@@ -115,6 +115,9 @@ Every page also serves itself as markdown at its own path with `index.md` on
 the end, and [llms.txt](https://jmrp.io/docs/ghchronicle/llms.txt) indexes the
 lot. The copies under [docs/](docs/README.md) are generated from those pages.
 
+[CHANGELOG.md](CHANGELOG.md) says what changed in each release and what was
+left unproven; the notes on each tag say what landed.
+
 ## What it collects
 
 Ninety-two measurements across thirty-four families, covering every surface

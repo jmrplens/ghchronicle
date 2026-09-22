@@ -15,7 +15,8 @@
 #   coverage ─── sonarcloud
 #   docker (×2) ─── docker-build
 #   cross_platform (×3) ─── cross_platform_summary
-#   generated · golangci-lint · govulncheck · markdown · site-lint · hadolint
+#   generated · golangci-lint · govulncheck · markdown · site-lint
+#   hadolint · actionlint · shellcheck
 #   docs-audit ─── checks
 #                      └──► ci
 #
@@ -629,6 +630,28 @@ jobs:
       - name: Lint the installer and the Action's steps
         run: shellcheck install.sh scripts/*.sh
 
+  # The workflows themselves. Everything else here is linted by something; the
+  # files that decide what runs were the exception, and a typo in one of them
+  # is found by the run that does not happen rather than by a red job.
+  actionlint:
+    name: actionlint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Lint the workflows
+        uses: raven-actions/actionlint@3d39aea434753780c3b3d4a1a31c854b4dbf49d7  # v2.2.0
+        with:
+          # The version is pinned for the same reason every action here is by
+          # commit: a linter that changes under the repository turns a green
+          # branch red without a commit to blame it on.
+          version: 1.7.12
+          fail-on-error: true
+
   hadolint:
     name: hadolint
     runs-on: ubuntu-latest
@@ -783,6 +806,8 @@ jobs:
       - analyze-md
       - site-lint
       - hadolint
+      - actionlint
+      - shellcheck
       - docs-audit
       - coverage
       - compile

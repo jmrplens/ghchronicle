@@ -1263,18 +1263,30 @@ func TestMainRunsTheProcessCommandLine(t *testing.T) {
 	}
 	os.Args, os.Stdout = []string{"ghchronicle", "-version"}, w
 
+	// Drained while main runs, not after it. A pipe blocks its writer once the
+	// buffer fills, and how much that holds is the platform's business: 64 KiB
+	// here, less elsewhere. One line never reaches it, so reading afterwards
+	// would work today and go on working until somebody points this at a
+	// command that prints more, and then it hangs until the test times out on
+	// one operating system while passing in a second on another. The sibling
+	// project lost a thirty-minute Windows job to exactly that.
+	printed := make(chan string, 1)
+	go func() {
+		out, readErr := io.ReadAll(r)
+		if readErr != nil {
+			t.Errorf("reading what main printed: %v", readErr)
+		}
+		printed <- string(out)
+	}()
+
 	main()
 
 	os.Stdout = stdout
 	if err = w.Close(); err != nil {
 		t.Fatal(err)
 	}
-	printed, err := io.ReadAll(r)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if string(printed) != buildLine()+"\n" {
-		t.Errorf("main printed %q, want the build line", printed)
+	if out := <-printed; out != buildLine()+"\n" {
+		t.Errorf("main printed %q, want the build line", out)
 	}
 }
 
