@@ -467,7 +467,7 @@ panel, which is the place to copy from.
 
 #### Every measurement, alphabetically
 
-Ninety-one, each link landing on the table it is in.
+Ninety-two, each link landing on the table it is in.
 
 [`gh_account`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#account) · [`gh_account_total`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#account) ·
 [`gh_achievement`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#account) · [`gh_achievement_progress`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#account) ·

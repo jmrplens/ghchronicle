@@ -193,6 +193,27 @@ const CLAIMS = [
 		key: "measurements",
 		pattern: /^([A-Za-zá-ú ]+?) medidas\. Cada fila/m,
 	},
+	// The alphabetical index at the foot of the same page, and the README link
+	// to it. All three said ninety-one while the index under them listed
+	// ninety-two names, and nothing here looked at them.
+	{
+		file: `${docs}/collectors/measurements.mdx`,
+		locale: "en",
+		key: "measurements",
+		pattern: /^([A-Za-z-]+), each link landing on the table it is in\./m,
+	},
+	{
+		file: `${docs}/es/collectors/measurements.mdx`,
+		locale: "es",
+		key: "measurements",
+		pattern: /^([A-Za-zá-ú ]+?), y cada enlace cae en la tabla/m,
+	},
+	{
+		file: "../README.md",
+		locale: "en",
+		key: "measurements",
+		pattern: /\[the (\d+) measurements\]\(/,
+	},
 	{
 		file: `${docs}/sinks/index.mdx`,
 		locale: "en",
