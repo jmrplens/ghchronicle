@@ -27,7 +27,15 @@ const siteBase = "/ghchronicle";
 // already use. Every absolute link written OUTSIDE the site, the README, the
 // generated docs/, the issue templates, the dashboards, uses this one; the
 // site's own internal links stay relative and never see it.
-const publicDocs = "https://jmrp.io/docs/ghchronicle";
+//
+// Exported, and nothing in this file reads it. Its consumer is
+// scripts/gen-docs.mjs, which reads this declaration out of the file as text
+// rather than importing it, because importing this module would start Astro.
+// The export is what says out loud that the constant is used from outside;
+// without it the only honest reading is that it is dead, and deleting it
+// leaves gen-docs.mjs throwing "astro.config.mjs declares no public docs URL"
+// on the next `make docs`.
+export const publicDocs = "https://jmrp.io/docs/ghchronicle";
 
 /**
  * The newest git commit date for the file behind a sitemap URL, so
