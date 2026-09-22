@@ -91,6 +91,7 @@ is not.
       fixture for an account that has done none of the optional things; the one
       we have carries every field of every measurement, which is exactly why it
       cannot.
+
 - [ ] `cd site && pnpm run build && pnpm run lint` is green, which also holds
       the published counts to the code.
 - [ ] The documentation says what this version does, not what the last one did.

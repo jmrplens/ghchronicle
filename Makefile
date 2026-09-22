@@ -93,7 +93,6 @@ RACE_TIMEOUT ?= 60m
 # bundles, so `make mdlint` and the Markdown job in CI are the same linter.
 # Bump the two together.
 MARKDOWNLINT_CLI2_VERSION := 0.23.2
-MDLINT_GLOBS := "**/*.{md,mdx}" "\#plan" "\#node_modules"
 
 # Version from the VERSION file (single source of truth); commit and date from
 # git. Use shell `cat` (portable to GNU Make 3.81 on macOS; `$(file ...)` needs
@@ -423,11 +422,11 @@ tidy: ## Tidy go.mod and go.sum
 # .markdownlint-cli2.jsonc, which the CLI and the CI action both read.
 mdlint: ## Lint every Markdown and MDX file (markdownlint-cli2, as CI runs it)
 	@echo "=== markdownlint ==="
-	pnpm dlx markdownlint-cli2@$(MARKDOWNLINT_CLI2_VERSION) $(MDLINT_GLOBS)
+	pnpm dlx markdownlint-cli2@$(MARKDOWNLINT_CLI2_VERSION)
 
 mdlint-fix: ## Apply markdownlint's automatic fixes (writes files)
 	@echo "=== markdownlint --fix ==="
-	pnpm dlx markdownlint-cli2@$(MARKDOWNLINT_CLI2_VERSION) --fix $(MDLINT_GLOBS)
+	pnpm dlx markdownlint-cli2@$(MARKDOWNLINT_CLI2_VERSION) --fix
 
 check-doc-links: ## Check that every relative link in tracked Markdown and MDX resolves
 	@echo "=== documentation local links ==="
@@ -514,7 +513,7 @@ analyze-fix: ## Apply every automatic fix the analysis tools offer (writes files
 	@echo "[2/3] golangci-lint run --fix"
 	-golangci-lint run --fix $(PKGS)
 	@echo "[3/3] markdownlint --fix"
-	-pnpm dlx markdownlint-cli2@$(MARKDOWNLINT_CLI2_VERSION) --fix $(MDLINT_GLOBS)
+	-pnpm dlx markdownlint-cli2@$(MARKDOWNLINT_CLI2_VERSION) --fix
 	@echo "=== Fixes applied. Run 'make analyze' to verify. ==="
 
 sonar: ## Scan with SonarCloud locally (needs sonar-scanner and SONAR_TOKEN)

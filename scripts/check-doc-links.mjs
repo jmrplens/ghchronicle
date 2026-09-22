@@ -21,8 +21,7 @@ const trackedDocs = [
 			.split("\n")
 			.filter(Boolean),
 	),
-]
-	.filter((file) => !file.startsWith("plan/"));
+].filter((file) => !file.startsWith("plan/"));
 
 const issues = [];
 
@@ -83,8 +82,9 @@ function inlineLinks(line) {
 // failed this check, which is the checker being wrong about Markdown rather
 // than the sentence being wrong about the code.
 function withoutCodeSpans(line) {
-	return line.replace(/(`+)([^`]|[^`][\s\S]*?[^`])\1(?!`)/g, (span, fence, body) =>
-		fence + " ".repeat(body.length) + fence,
+	return line.replace(
+		/(`+)([^`]|[^`][\s\S]*?[^`])\1(?!`)/g,
+		(span, fence, body) => fence + " ".repeat(body.length) + fence,
 	);
 }
 

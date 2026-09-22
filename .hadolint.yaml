@@ -1,0 +1,14 @@
+# hadolint configuration, read by the CI job and by a hadolint run here, so
+# both Dockerfiles are held to one set of rules written down once instead of
+# to two copies of it inside the workflow.
+
+# A warning fails the build. Neither of these files is long: one is a build
+# stage and a distroless image, the other is a distroless image and a COPY.
+failure-threshold: warning
+
+# Nothing is ignored, and that is worth saying out loud. The workflow used to
+# pass ignore: DL3008,DL3018, the two rules about pinning apt and apk package
+# versions. Neither file installs a package with either tool: the build stage
+# is golang:alpine and runs only `go mod download` and `go build`, and what
+# ships is distroless plus the binary. The ignores had been carried over from
+# somewhere else and were suppressing nothing.

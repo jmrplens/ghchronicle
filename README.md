@@ -123,20 +123,20 @@ left unproven; the notes on each tag say what landed.
 Ninety-two measurements across thirty-four families, covering every surface
 a personal or organisation account exposes.
 
-| Area | What is kept |
-|---|---|
-| Traffic | Views, unique visitors and clones per day, referrers and paths. GitHub's window is 14 days; this rewrites it whole on every sweep, so a collector that was down for a day repairs itself on the next run |
-| Stars | One point per star, dated when it was given. The full stargazer walk happens once per repository; after that the newest hundred ride in one GraphQL query per ten repositories |
-| Repositories | Stars, forks, watchers, open issues, size, age, idle days, licence, visibility, languages by bytes, topics, community profile score |
-| Releases | Downloads per release and per asset, asset sizes, draft and prerelease state |
-| Pull requests | Per item: time to first review, time to merge, lines added and deleted, files changed, review rounds, comments, commits |
-| Issues | Per item: time to close, comments, reactions, label count |
-| Actions | Runs with duration and queue time, jobs, individual steps, workflows and their state, artifacts and their expiry, cache usage |
-| Security | Dependabot and code scanning alerts by severity, plus an explicit record of which features are switched on, so no data is distinguishable from no alerts |
-| Contributions | The whole profile calendar, one point per day at that day's date, plus totals and the per-repository commit breakdown |
-| Activity | The event feed and the notification inbox, both of which GitHub discards quickly |
-| Billing | Usage per day, product, SKU and repository, with gross, discount and net |
-| Account | Followers, following, packages, gists, social accounts, sponsors |
+| Area          | What is kept                                                                                                                                                                                             |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Traffic       | Views, unique visitors and clones per day, referrers and paths. GitHub's window is 14 days; this rewrites it whole on every sweep, so a collector that was down for a day repairs itself on the next run |
+| Stars         | One point per star, dated when it was given. The full stargazer walk happens once per repository; after that the newest hundred ride in one GraphQL query per ten repositories                           |
+| Repositories  | Stars, forks, watchers, open issues, size, age, idle days, licence, visibility, languages by bytes, topics, community profile score                                                                      |
+| Releases      | Downloads per release and per asset, asset sizes, draft and prerelease state                                                                                                                             |
+| Pull requests | Per item: time to first review, time to merge, lines added and deleted, files changed, review rounds, comments, commits                                                                                  |
+| Issues        | Per item: time to close, comments, reactions, label count                                                                                                                                                |
+| Actions       | Runs with duration and queue time, jobs, individual steps, workflows and their state, artifacts and their expiry, cache usage                                                                            |
+| Security      | Dependabot and code scanning alerts by severity, plus an explicit record of which features are switched on, so no data is distinguishable from no alerts                                                 |
+| Contributions | The whole profile calendar, one point per day at that day's date, plus totals and the per-repository commit breakdown                                                                                    |
+| Activity      | The event feed and the notification inbox, both of which GitHub discards quickly                                                                                                                         |
+| Billing       | Usage per day, product, SKU and repository, with gross, discount and net                                                                                                                                 |
+| Account       | Followers, following, packages, gists, social accounts, sponsors                                                                                                                                         |
 
 ## Where it writes
 
@@ -144,17 +144,17 @@ Eleven destinations, and more than one at a time is the normal arrangement. Ever
 is pushed: nothing here needs to be scraped, so the collector runs wherever it
 can reach its databases.
 
-| Store | Keeps | Good for |
-|---|---|---|
-| InfluxDB | the dated history | "how fast were we merging in July" |
-| PostgreSQL / TimescaleDB | the dated history, as SQL you pipe into `psql` | a Grafana user who has a Postgres and no InfluxDB |
-| Graphite | the dated history | an existing Graphite |
-| Elasticsearch / OpenSearch | the dated history, as documents | search across everything collected |
-| Prometheus | the current value | alerting, and a number on a wall |
-| OpenTelemetry | either, depending on the backend | an existing collector pipeline |
-| Loki | the events, as log lines | "what happened, in order" |
-| Telegraf | whatever Telegraf can reach | Kafka, Graphite, Datadog, anything with a Telegraf output |
-| File and stdout | line protocol or JSON | a shipper you already run, and a durable buffer |
+| Store                      | Keeps                                          | Good for                                                  |
+| -------------------------- | ---------------------------------------------- | --------------------------------------------------------- |
+| InfluxDB                   | the dated history                              | "how fast were we merging in July"                        |
+| PostgreSQL / TimescaleDB   | the dated history, as SQL you pipe into `psql` | a Grafana user who has a Postgres and no InfluxDB         |
+| Graphite                   | the dated history                              | an existing Graphite                                      |
+| Elasticsearch / OpenSearch | the dated history, as documents                | search across everything collected                        |
+| Prometheus                 | the current value                              | alerting, and a number on a wall                          |
+| OpenTelemetry              | either, depending on the backend               | an existing collector pipeline                            |
+| Loki                       | the events, as log lines                       | "what happened, in order"                                 |
+| Telegraf                   | whatever Telegraf can reach                    | Kafka, Graphite, Datadog, anything with a Telegraf output |
+| File and stdout            | line protocol or JSON                          | a shipper you already run, and a durable buffer           |
 
 The difference that decides which to use is dating. InfluxDB keys a point by
 measurement, tag set and timestamp, so replaying the same fourteen-day traffic

@@ -1,0 +1,70 @@
+# What Prettier owns in this repository, and what it does not.
+#
+# Everything not listed here is formatted and checked, including the Markdown
+# at the root and the workflow files. Before this file existed Prettier ran
+# only from site/, so a README edit went through no formatter at all, and the
+# first person to run it by hand reformatted twenty-eight lines of a table that
+# had never been through one.
+#
+# This is gitignore syntax: a # only starts a comment at the beginning of a
+# line. A trailing one is part of the pattern and silently matches nothing.
+
+# --- Not text this repository writes ---
+# .git holds rerere caches with conflict markers in them, which no parser can
+# read; with a directory argument Prettier walks into it.
+.git/
+node_modules/
+site/node_modules/
+site/dist/
+site/.astro/
+pnpm-lock.yaml
+plan/
+# Scratch directory some local tooling creates. Not part of the repository and
+# not in git, but it is in the working tree, so the linters find it.
+.superpowers/
+
+# --- Written by a generator, byte for byte, and held to it by a check ---
+# Two authorities over one file means whichever ran last wins, and only one of
+# them can read the Go types the file comes from.
+# cmd/gen_dashboards, checked by make check-dashboards
+dashboards/
+# cmd/gen_compose, checked by make check-compose
+deploy/compose.*.yaml
+# site/scripts/gen-docs.mjs, checked by pnpm docs:check
+docs/
+# cmd/gen_layouts, checked by make check-layouts
+site/src/data/layouts.json
+# cmd/gen_config, checked by make check-config-options
+site/src/data/config-options.json
+# cmd/gen_brand
+brand/
+
+# --- Fixtures: what GitHub actually answered ---
+# API responses kept as they arrived, so that a diff against what GitHub sends
+# is a diff and not a reformat. One of them, rate_limit.json, is not even valid
+# JSON: it carries @SOON_EPOCH@ where a number goes.
+test/e2e/testdata/
+test/e2e/docker/out/
+internal/collect/testdata/
+internal/config/testdata/
+
+# --- Formatted by hand, on purpose ---
+# The workflows carry comments that explain the job graph and line up with it,
+# and actionlint is their linter. The compose file the containerized suite runs
+# is the same kind of file. Reformatting either buys consistency and costs the
+# shape somebody wrote deliberately.
+.github/workflows/
+test/e2e/docker/docker-compose.yml
+# The example configuration is documentation that happens to parse: its
+# comments sit where they explain the key below them.
+config.example.yaml
+
+# --- Owned by another formatter ---
+# .astro is handled by astro check and eslint; no prettier-plugin-astro here.
+*.astro
+# The documentation content is Markdown in an MDX envelope and markdownlint
+# owns it. Prettier reflowed a fenced code block nested in a <TabItem> onto its
+# own opening fence line, which rendered the quickstart's install tab as an
+# empty code block; two authorities over one file made each formatter dirty the
+# other.
+site/src/content/docs/**/*.mdx

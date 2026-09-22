@@ -25,18 +25,18 @@ GitHub's Marketplace takes an Action from any public repository whose
 `action.yml` is at the root, so this repository qualifies as it stands.
 
 1. Push a tag (`vX.Y.Z`). The release workflow builds the binaries the Action
-    downloads.
+   downloads.
 2. Open the release on GitHub. It offers "Publish this Action to the GitHub
-    Marketplace"; tick it, accept the terms, and choose the categories
-    (Monitoring, and Utilities).
+   Marketplace"; tick it, accept the terms, and choose the categories
+   (Monitoring, and Utilities).
 3. Nothing: the release workflow moves the major tag so `@v2` keeps
-    resolving, in its last job, once the release has published.
+   resolving, in its last job, once the release has published.
 
-    Every Action in the Marketplace keeps such a tag. A workflow pinned to
-    `@v2` follows the patch releases without editing, because a `uses:` ref is
-    an exact git lookup and not a semver range: there is no resolution from
-    `v2` to the newest `v2.x.y`, which is why the pointer has to exist and has
-    to move.
+   Every Action in the Marketplace keeps such a tag. A workflow pinned to
+   `@v2` follows the patch releases without editing, because a `uses:` ref is
+   an exact git lookup and not a semver range: there is no resolution from
+   `v2` to the newest `v2.x.y`, which is why the pointer has to exist and has
+   to move.
 
 The listing name, description, icon and colour come from the `name`,
 `description` and `branding` keys of `action.yml`, and it takes them from the

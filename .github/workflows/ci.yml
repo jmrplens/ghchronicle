@@ -517,13 +517,10 @@ jobs:
         with:
           persist-credentials: false
 
+      # No globs here: .markdownlint-cli2.jsonc carries them, so this job, the
+      # mdlint target and an editor plugin all read the same set.
       - name: Lint Markdown and MDX
         uses: DavidAnson/markdownlint-cli2-action@21c1be1b93ad9ed58fa840aacc3f279cde2a72ff  # v24.2.0
-        with:
-          globs: |
-            **/*.{md,mdx}
-            #plan
-            #node_modules
 
       - name: Set up Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
@@ -627,8 +624,10 @@ jobs:
         with:
           persist-credentials: false
 
+      # Through the Makefile, so the file list lives in one place rather than
+      # in two that can drift apart.
       - name: Lint the installer and the Action's steps
-        run: shellcheck install.sh scripts/*.sh
+        run: make shellcheck
 
   # The workflows themselves. Everything else here is linted by something; the
   # files that decide what runs were the exception, and a typo in one of them
@@ -662,12 +661,13 @@ jobs:
         with:
           persist-credentials: false
 
+      # The threshold and the ignored rules are in .hadolint.yaml, which the
+      # action reads by itself, so both Dockerfiles are held to one set of
+      # rules written down once.
       - name: Lint the source-build Dockerfile
         uses: hadolint/hadolint-action@06be81baf89a55ffd0e24b8f04a4185738dd3387  # v3.5.0
         with:
           dockerfile: Dockerfile
-          failure-threshold: warning
-          ignore: DL3008,DL3018
 
       # The file the released images are built from, by GoReleaser. It is the
       # image a user actually pulls, so it is held to the same rules.
@@ -675,8 +675,6 @@ jobs:
         uses: hadolint/hadolint-action@06be81baf89a55ffd0e24b8f04a4185738dd3387  # v3.5.0
         with:
           dockerfile: docker/Dockerfile.goreleaser
-          failure-threshold: warning
-          ignore: DL3008,DL3018
 
   # Both platforms, each one built AND started. A multi-platform image is
   # assembled from cross-compiled binaries that nothing has executed, and

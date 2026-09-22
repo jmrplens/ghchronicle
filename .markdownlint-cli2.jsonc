@@ -1,39 +1,48 @@
 {
-    // markdownlint-cli2 configuration
-    // https://github.com/DavidAnson/markdownlint-cli2
-    // Run:  pnpm dlx markdownlint-cli2@0.23.2 "**/*.{md,mdx}" "#plan" "#node_modules"
-    // Fix:  pnpm dlx markdownlint-cli2@0.23.2 --fix "**/*.{md,mdx}" "#plan" "#node_modules"
-    // The rule set is the one gitlab-mcp-server runs, rule for rule, so the two
-    // repositories hold their documentation to the same standard.
-    "config": {
-        "default": true,
-        // MD013 - Line length: disabled (many tables and code blocks exceed 80 chars)
-        "MD013": false,
-        // MD010 - Hard tabs: disabled because MDX examples may preserve tab-sensitive snippets
-        "MD010": false,
-        // MD024 - Multiple headings with same content: allowed (common in changelogs, tool docs)
-        "MD024": false,
-        // MD025 - Single top-level heading: disabled (some docs have multiple H1 by design)
-        "MD025": false,
-        // MD033 - Inline HTML: allowed (Mermaid diagrams, badges, details/summary)
-        "MD033": false,
-        // MD041 - First line should be a top-level heading: disabled (files with front matter)
-        "MD041": false,
-        // MD046 - Code block style: disabled (tabbed and admonition syntax nests
-        // fenced blocks under indentation, which the linter misidentifies as
-        // "indented code blocks")
-        "MD046": false,
-        // MD060 - Table column style: disabled
-        "MD060": false,
-    },
-    // Directories and files to ignore
-    "ignores": [
-        "plan/**",
-        "**/node_modules/**",
-        "**/dist/**",
-        "vendor/**",
-        ".tmp-*/**"
-    ],
-    // Output settings
-    "noProgress": true,
+  // markdownlint-cli2 configuration
+  // https://github.com/DavidAnson/markdownlint-cli2
+  // The files it reads and the ones it skips are below, in "globs" and
+  // "ignores", so `make mdlint`, the CI job and an editor plugin all lint the
+  // same set. They used to be arguments repeated in the Makefile and in
+  // ci.yml, which is two places to forget.
+  //
+  // Run:  make mdlint
+  // Fix:  make mdlint-fix
+  // The rule set is the one gitlab-mcp-server runs, rule for rule, so the two
+  // repositories hold their documentation to the same standard.
+  "config": {
+    "default": true,
+    // MD013 - Line length: disabled (many tables and code blocks exceed 80 chars)
+    "MD013": false,
+    // MD010 - Hard tabs: disabled because MDX examples may preserve tab-sensitive snippets
+    "MD010": false,
+    // MD024 - Multiple headings with same content: allowed (common in changelogs, tool docs)
+    "MD024": false,
+    // MD025 - Single top-level heading: disabled (some docs have multiple H1 by design)
+    "MD025": false,
+    // MD033 - Inline HTML: allowed (Mermaid diagrams, badges, details/summary)
+    "MD033": false,
+    // MD041 - First line should be a top-level heading: disabled (files with front matter)
+    "MD041": false,
+    // MD046 - Code block style: disabled (tabbed and admonition syntax nests
+    // fenced blocks under indentation, which the linter misidentifies as
+    // "indented code blocks")
+    "MD046": false,
+    // MD060 - Table column style: disabled
+    "MD060": false,
+  },
+  // Every Markdown and MDX file in the repository.
+  "globs": ["**/*.{md,mdx}"],
+  // What is not this repository's prose: working notes, dependencies, build
+  // output, and the scratch directory some local tooling leaves in the tree.
+  "ignores": [
+    "plan/**",
+    "**/node_modules/**",
+    "**/dist/**",
+    "vendor/**",
+    ".tmp-*/**",
+    ".superpowers/**",
+  ],
+  // Output settings
+  "noProgress": true,
 }
