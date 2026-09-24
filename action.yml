@@ -13,7 +13,9 @@ inputs:
   token:
     description: >
       A personal access token. The automatic GITHUB_TOKEN is not enough for most
-      of what this collects: traffic needs push access to every repository and
+      of what this collects: traffic needs push access and, on a fine-grained
+      token, the repository permission Administration (read), which the
+      automatic token cannot be granted even for its own repository, and
       Dependabot alerts need the security_events scope.
     required: true
   config:

@@ -1,0 +1,78 @@
+---
+/**
+ * Starlight's footer, and under it who wrote the site, its licence, and where
+ * the release history is.
+ *
+ * Until now the author and the licence were stated only in the JSON-LD, which
+ * a reader never sees and a model reading the page as text weighs less than
+ * what the page itself says. This line says it on every page, in both
+ * languages.
+ *
+ * The name and the link are read from the canonical Person node that Head.astro
+ * already fetches for the graph (src/lib/identity.mjs memoizes it, so this adds
+ * no request), so the byline names the person the graph names, in its own
+ * words, and nothing about him is typed here.
+ *
+ * `<address>` holds the byline alone: it is the element for the contact
+ * information of the document, and a licence or a changelog link is not that.
+ * None of this is a landmark, so check-headings-labels.mjs sees no second
+ * unnamed footer beside Starlight's.
+ *
+ * The separators are text, hidden from assistive technology, rather than
+ * spacing: compressed HTML drops the whitespace between the three parts, and a
+ * page read as text then ran the author's name into "MIT licence".
+ *
+ * The stock footer is rendered, not copied, so a Starlight upgrade still
+ * reaches the edit link, the last-updated date and the pagination. The styles
+ * are in src/styles/footer.css.
+ */
+import Default from "@astrojs/starlight/components/Footer.astro";
+import { getCollection } from "astro:content";
+
+import { personNode } from "../../lib/identity.mjs";
+import { pagePath, routeOf } from "../../lib/site.mjs";
+
+const LICENCE = "https://github.com/jmrplens/ghchronicle/blob/main/LICENSE";
+
+const person = await personNode();
+const name = typeof person.name === "string" ? person.name : "";
+const home = typeof person.url === "string" ? person.url : "";
+if (!name || !home) {
+	throw new Error(
+		"Footer.astro: the canonical Person node has no name or no url, so the byline has nothing to say. src/lib/identity.mjs names the node.",
+	);
+}
+
+// A link built from a route is not seen by the links validator, which reads
+// the content and not the components, so the page it names is looked up in the
+// collection: a moved page fails the build here instead of leaving a footer
+// link to a 404 on every page.
+const { id, locale } = Astro.locals.starlightRoute;
+const changelogRoute = locale
+	? `${locale}/reference/changelog`
+	: "reference/changelog";
+const routes = new Set(
+	(await getCollection("docs")).map((entry) => routeOf(entry.id)),
+);
+if (!routes.has(changelogRoute)) {
+	throw new Error(
+		`Footer.astro: no page at /${changelogRoute}/, which the footer links on every page.`,
+	);
+}
+const onChangelog = id === changelogRoute;
+---
+
+<Default />
+<div class="ghc-colophon">
+	<address>
+		{Astro.locals.t("ghc.footer.byline")}{" "}
+		<a href={home} rel="author" translate="no">{name}</a>
+	</address><span aria-hidden="true">&nbsp;· </span><a
+		href={LICENCE}
+		rel="license">{Astro.locals.t("ghc.footer.licence")}</a
+	><span aria-hidden="true">&nbsp;· </span><a
+		href={pagePath(changelogRoute)}
+		aria-current={onChangelog ? "page" : undefined}
+		>{Astro.locals.t("ghc.footer.changelog")}</a
+	>
+</div>

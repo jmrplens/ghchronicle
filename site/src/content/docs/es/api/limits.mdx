@@ -1,17 +1,20 @@
 ---
 title: Lo que GitHub no da
 description: Los endpoints que se ha verificado que no funcionan en una cuenta personal, escritos para que nadie los vuelva a descubrir.
+searchTitle: Lo que la API de GitHub no da a una cuenta personal
 compactTables:
   - Endpoint
 ---
 
 import { Aside } from "@astrojs/starlight/components";
 
-Cada entrada de aquí se comprobó contra la API real. Está escrita para que nadie
+Cada entrada de aquí se comprobó contra la API real desde una cuenta personal, y
+la mayor parte no está en la documentación de GitHub, que describe lo que un endpoint
+debería devolver y no lo que devuelve. Está escrita para que nadie
 pierda una tarde volviendo a averiguarlo, y para que un panel que falta se pueda
 distinguir de un colector roto.
 
-## Estadísticas que no llegan nunca
+## ¿Por qué dos endpoints de estadísticas no responden nunca?
 
 `stats/code_frequency` y `stats/contributors` responden **202 con cuerpo vacío,
 indefinidamente**, en una cuenta personal. Un 202 normalmente significa "aún se
@@ -57,9 +60,28 @@ cuales sean los permisos del token.
 
 - **`workflows/{id}/timing`** devuelve 200 con un objeto `billable` siempre
   vacío. Parece la fuente de los minutos por workflow y no lo es.
-- **`stargazers/history`** devuelve solo las últimas treinta semanas. No
-  sustituye al recorrido de `starred_at`; se comprobó en tres repositorios.
+- **La lista de stargazers, para quien no administra ni colabora en el repositorio.**
+  [Desde julio de 2026](https://docs.github.com/es/rest/activity/starring#new-access-restrictions)
+  GitHub no la sirve a nadie más. REST responde 404, y `stargazers` en GraphQL
+  responde una lista vacía con `totalCount` 0 mientras `stargazerCount`, a su
+  lado, sigue dando el número real: medido en `cli/cli` y `octocat/Hello-World`
+  con un token con todos los permisos. Por eso ghchronicle dibuja la curva
+  fechada de estrellas solo donde el token tiene ese acceso, que siempre tiene
+  en los repositorios de la propia cuenta y en los de una organización que la
+  cuenta administra; uno nombrado en `targets.repos` o alcanzado por `targets.orgs`
+  sin él tiene su número de estrellas y no la curva.
 - **`/user/installations`** devuelve 403 sin una GitHub App.
+
+## El historial de estrellas que GitHub sirve a cualquiera
+
+[`stargazers/history`](https://docs.github.com/es/rest/activity/starring#get-repository-star-history)
+responde donde la lista de stargazers no lo hace. Lo sirve a cualquiera que
+pueda ver el repositorio, también sin autenticar: las estrellas dadas por día,
+agrupadas por semana, treinta semanas por página, con una cabecera `Link` que
+pagina hasta la primera semana del repositorio (medido en `cli/cli`: trece
+páginas, hasta 2019). No nombra a ningún stargazer, así que no puede sustituir
+a `gh_star`, que es una fila por estrella en el instante en que se dio y dice
+quién la dio. ghchronicle no lo llama hoy.
 
 ## GraphQL se equivoca con los paquetes
 

@@ -1,10 +1,13 @@
 ---
 title: Elasticsearch
 description: The bulk API, one index per measurement, and a document id that makes a rewrite replace rather than duplicate.
+searchTitle: Send GitHub metrics to Elasticsearch
 ---
 
 import { Aside, Tabs, TabItem } from "@astrojs/starlight/components";
 import stats from "../../../data/stats.json";
+
+The Elasticsearch sink sends ghchronicle's dated points to Elasticsearch or OpenSearch in bulk, one document per point.
 
 ```yaml
 sinks:

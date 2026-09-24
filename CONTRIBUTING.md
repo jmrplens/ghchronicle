@@ -9,7 +9,10 @@ the shorter, repository-side version of it.
 
 ## What this is, in one paragraph
 
-One Go binary with no dependencies beyond a YAML parser. It sweeps the GitHub
+One static Go binary with no runtime dependencies. Its direct dependencies are
+`gopkg.in/yaml.v3`, the PostgreSQL driver `github.com/jackc/pgx/v5`, and
+`golang.org/x/term` (over `golang.org/x/sys`) so that `-setup` can read a
+secret without echoing it; `go.mod` is the list. It sweeps the GitHub
 API on a schedule and writes each observation as a point stamped with the date
 the thing happened, not the date it was collected. That single rule is what
 makes re-collection converge instead of accumulating, and most of the design

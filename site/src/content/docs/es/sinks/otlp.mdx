@@ -1,9 +1,12 @@
 ---
 title: OpenTelemetry
-description: OTLP sobre HTTP con codificación JSON, y por qué raw vale false por omisión.
+description: "Enviar métricas de GitHub a un collector de OpenTelemetry o a Prometheus: OTLP sobre HTTP con codificación JSON, y por qué raw vale false por omisión."
+searchTitle: Métricas de GitHub por OpenTelemetry (OTLP)
 ---
 
 import { Aside, Tabs, TabItem } from "@astrojs/starlight/components";
+
+El destino OTLP empuja las métricas de ghchronicle a un collector de OpenTelemetry, o directamente a Prometheus por su receptor OTLP.
 
 ```yaml
 sinks:
@@ -21,8 +24,9 @@ sinks:
 OTLP sobre HTTP con **codificación JSON**, que todo receptor que merezca la pena
 acepta en el mismo endpoint. Es una decisión deliberada: JSON ocupa más en el
 cable, y mantiene un generador de código, un runtime de protobuf y sus
-dependencias transitivas fuera de una herramienta cuya lista entera de
-dependencias es un analizador de YAML.
+dependencias transitivas fuera del binario. Todos los destinos salvo
+PostgreSQL, que necesita su driver, hablan su protocolo solo con la biblioteca
+estándar.
 
 `endpoint` es la URL completa de la ruta de métricas, no una base. Las `headers`
 van en cada petición, que es donde corresponde una clave de API o un id de

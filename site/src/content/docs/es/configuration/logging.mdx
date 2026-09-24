@@ -1,12 +1,15 @@
 ---
 title: Registro
 description: Nivel, formato, el fichero rotatorio que nunca sustituye a la salida de error, y las dos líneas que merecen alerta.
+searchTitle: El registro de ghchronicle
 defaultColumns:
   - table: Clave
     default: Por omisión
 ---
 
 import { Aside } from "@astrojs/starlight/components";
+
+ghchronicle escribe su registro en la salida de error, y el bloque `log` fija el nivel, el formato y un fichero rotativo opcional.
 
 ```yaml
 log:

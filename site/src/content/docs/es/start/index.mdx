@@ -1,6 +1,7 @@
 ---
 title: Qué es
-description: Qué recoge ghchronicle y el problema que viene a resolver.
+description: "Qué recoge ghchronicle de GitHub y el problema que viene a resolver: un tráfico que dura catorce días y un feed de eventos de trescientos eventos y treinta días."
+searchTitle: Qué es ghchronicle y qué recoge
 sidebar:
   order: 1
 compactTables:
@@ -13,12 +14,19 @@ import stats from "../../../../data/stats.json";
 GitHub responde la mayoría de las preguntas sobre el presente y casi ninguna
 sobre el pasado.
 
-La API de tráfico sirve catorce días y olvida. El feed de actividad guarda los
-últimos trescientos eventos, sea cual sea su fecha. Las notificaciones leídas
-desaparecen en semanas. Los logs de los jobs se borran a los noventa días. La
-lista de estrellas dice cuándo se dio cada una, pero solo si se pregunta antes
-de que la lista sea lo bastante larga como para que recorrerla salga caro. Nada
-de eso queda archivado en ningún sitio salvo que uno lo archive.
+La [API de tráfico](https://docs.github.com/es/rest/metrics/traffic) sirve catorce días y
+olvida. El [feed de actividad](https://docs.github.com/es/rest/activity/events) guarda los
+últimos trescientos eventos, y ninguno de hace más de treinta días. La
+[bandeja de notificaciones](https://docs.github.com/es/subscriptions-and-notifications/concepts/about-notifications#notification-retention-policy)
+descarta toda notificación a los tres meses, leída o no, salvo que se haya
+guardado. Los
+[logs de los jobs](https://docs.github.com/es/repositories/managing-your-repositorys-settings-and-features/enabling-features-for-your-repository/managing-github-actions-settings-for-a-repository)
+se borran por omisión a los noventa días. La lista de estrellas dice cuándo se
+dio cada una, pero desde julio de 2026 solo a los
+[administradores y colaboradores](https://docs.github.com/es/rest/activity/starring#new-access-restrictions)
+del repositorio, y solo si se pregunta antes de que la lista sea lo bastante
+larga como para que recorrerla salga caro. Nada de eso queda archivado en
+ningún sitio salvo que uno lo archive.
 
 `ghchronicle` recorre esas superficies según un horario y escribe cada
 observación como un punto sellado con la fecha en que la cosa ocurrió de
@@ -29,7 +37,7 @@ en julio" siga teniendo respuesta.
 ghchronicle -config config.yaml
 ```
 
-Es un único binario de Go sin más dependencias que un analizador de YAML, y
+Es un único binario estático de Go sin dependencias en tiempo de ejecución, y
 envía por push a todos los almacenes que soporta, así que se ejecuta allí donde
 los alcance: un servidor, un contenedor, un workflow programado.
 

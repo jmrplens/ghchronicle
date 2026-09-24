@@ -161,7 +161,7 @@ const CLAIMS = [
 		file: `${docs}/collectors/index.mdx`,
 		locale: "en",
 		key: "families",
-		pattern: /^description: The ([a-z-]+) families,/m,
+		pattern: /^description: The ([a-z-]+) families of GitHub metrics/m,
 	},
 	{
 		file: `${docs}/collectors/index.mdx`,
@@ -173,7 +173,7 @@ const CLAIMS = [
 		file: `${docs}/es/collectors/index.mdx`,
 		locale: "es",
 		key: "families",
-		pattern: /^description: Las ([a-zá-ú ]+?) familias,/m,
+		pattern: /^description: Las ([a-zá-ú ]+?) familias de métricas/m,
 	},
 	{
 		file: `${docs}/es/collectors/index.mdx`,
@@ -218,7 +218,8 @@ const CLAIMS = [
 		file: `${docs}/sinks/index.mdx`,
 		locale: "en",
 		key: "sinks",
-		pattern: /^description: ([A-Za-z-]+) stores,/m,
+		pattern:
+			/^description: "?Where to store GitHub metrics: ([a-z-]+) stores,/m,
 	},
 	{
 		file: `${docs}/sinks/index.mdx`,
@@ -230,7 +231,8 @@ const CLAIMS = [
 		file: `${docs}/es/sinks/index.mdx`,
 		locale: "es",
 		key: "sinks",
-		pattern: /^description: ([A-Za-zá-ú]+) almacenes,/m,
+		pattern:
+			/^description: "?Dónde guardar las métricas de GitHub: ([a-zá-ú]+) almacenes,/m,
 	},
 	{
 		file: `${docs}/es/sinks/index.mdx`,

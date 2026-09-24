@@ -113,8 +113,8 @@ func activity(b *builder) []Panel {
 		panel("timeseries", "Events over time", box{W: 16, H: 8, X: 0, Y: 0}, []Target{sqlTS(perHour)}, &P{
 			Prom: []Target{hourly("sum by (type) (increase(github_events_total[1h]))", "{{type}}")},
 			Opts: mergeOpts(Opts{"bars": true, "stack": true}, hourBins), SQLOpts: seriesOpts,
-			Desc: "GitHub keeps only the last 300 events and drops the rest whatever their " +
-				"date, so this is only as complete as the sweep interval allowed. The eight " +
+			Desc: "GitHub keeps only the last 300 events, none older than thirty days, " +
+				"so this is only as complete as the sweep interval allowed. The eight " +
 				"busiest types in the range are named; the rest are `other`. " + bucketFollowsRange,
 			PromDesc: sinceStart,
 			GR:       []Target{grq(perBucket(events("events"), -2, "1h"))},

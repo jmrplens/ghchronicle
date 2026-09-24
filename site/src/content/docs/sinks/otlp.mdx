@@ -1,9 +1,12 @@
 ---
 title: OpenTelemetry
-description: OTLP over HTTP with the JSON encoding, and why raw is false by default.
+description: "Sending GitHub metrics to an OpenTelemetry collector or to Prometheus: OTLP over HTTP with the JSON encoding, and why raw is false by default."
+searchTitle: Send GitHub metrics over OpenTelemetry (OTLP)
 ---
 
 import { Aside, Tabs, TabItem } from "@astrojs/starlight/components";
+
+The OTLP sink pushes ghchronicle's metrics to an OpenTelemetry collector, or straight into Prometheus through its OTLP receiver.
 
 ```yaml
 sinks:
@@ -21,7 +24,8 @@ sinks:
 OTLP over HTTP with the **JSON encoding**, which every receiver worth using
 accepts on the same endpoint. That is a deliberate trade: JSON is larger on the
 wire, and it keeps a code generator, a protobuf runtime and their transitive
-dependencies out of a tool whose entire dependency list is one YAML parser.
+dependencies out of the binary. Every sink but PostgreSQL, which needs its
+driver, speaks its protocol with the standard library alone.
 
 `endpoint` is the full URL of the metrics path, not a base. `headers` go with
 every request, which is where an API key or a tenant id belongs. `service`

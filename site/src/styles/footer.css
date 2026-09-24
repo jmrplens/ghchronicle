@@ -1,0 +1,46 @@
+/* ============================================================
+ * footer.css, the line under Starlight's footer: who wrote the
+ * site, its licence, the release history (overrides/Footer.astro).
+ *
+ * The text is --sl-color-gray-3 on the page, the pair Starlight's own
+ * footer line already uses and check-contrast.mjs already measures,
+ * so this sheet adds no colour pair to gate. The links take that
+ * colour too and are told apart by their underline.
+ * ============================================================ */
+.ghc-colophon {
+	margin-top: 1.5rem;
+	padding-top: 1rem;
+	border-top: 1px solid var(--rb-border);
+	color: var(--sl-color-gray-3);
+	font-size: var(--sl-text-sm);
+	/* One run of text that wraps like a sentence. At 14 px this puts
+	 * wrapped lines 28 px apart, which keeps the links inside WCAG
+	 * 2.5.8's spacing exception on a phone without growing them: a
+	 * 24 px circle centred on each touches no other link and no other
+	 * circle. */
+	line-height: 2;
+}
+
+/* Inline so the byline and the two links read as one line, and not
+ * italic, which on this element reads as a quotation. */
+.ghc-colophon address {
+	display: inline;
+	font-style: normal;
+}
+
+.ghc-colophon a {
+	color: inherit;
+	text-decoration: underline;
+	text-underline-offset: 0.2em;
+}
+
+/* A link broken across two lines reads as two. At 390 px the English
+ * line broke the name after "Requena", and then "Release history"
+ * after "Release". */
+.ghc-colophon a {
+	white-space: nowrap;
+}
+
+.ghc-colophon a:hover {
+	color: var(--sl-color-white);
+}

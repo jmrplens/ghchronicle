@@ -53,8 +53,10 @@ The automatic `GITHUB_TOKEN` is not enough, and it is worth being specific
 about why rather than letting someone discover it as an empty dashboard:
 
 - **Traffic** (views, clones, referrers, paths) is only shown to a caller who
-  could push to the repository. The automatic token has that for the repository
-  the workflow runs in, and nothing else.
+  could push to the repository, and a fine-grained token also needs the
+  repository permission Administration (read). The automatic token cannot be
+  granted Administration, so it gets a 403 even in the repository the workflow
+  runs in.
 - **Dependabot and code scanning alerts** need `security_events`.
 - **Packages** need `read:packages`.
 - Everything account-wide (followers, contributions, billing, notifications,
@@ -63,9 +65,10 @@ about why rather than letting someone discover it as an empty dashboard:
 
 So: create a personal access token, store it as a repository secret, and pass
 it as the `token` input. A classic token needs `repo`, `read:user`,
-`read:org`, `read:packages` and `security_events`. A fine-grained token needs
-read access to the repositories plus the account permissions for followers,
-gists, packages and plan.
+`read:org`, `read:packages`, `security_events`, `read:public_key` and
+`read:gpg_key`. A fine-grained token needs read access to the repositories,
+including the repository permission Administration, plus the account
+permissions for followers, gists, packages, plan, Git SSH keys and GPG keys.
 
 A token is not needed at all if the only thing wanted is a card of public
 numbers, but the traffic and alert panels will be empty, and the log will say

@@ -8,16 +8,26 @@
 // `about` the software, and all three name the same publisher. Split across
 // documents those references still resolve, but only for a consumer that
 // bothers to merge them.
+//
+// scripts/check-structured-data.mjs reads every property below back out of the
+// build, and derives what each should be from the repository and the rendered
+// page rather than from this file.
+import { execFileSync } from "node:child_process";
+import { existsSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 import Default from "@astrojs/starlight/components/Head.astro";
 import { getCollection } from "astro:content";
 
+import { release } from "../../lib/changelog.mjs";
+import { faqEntries } from "../../lib/faq.mjs";
 import { PERSON_ID, personNode } from "../../lib/identity.mjs";
-import { safeJsonLd } from "../../lib/jsonld.mjs";
+import { inBothLanguages, safeJsonLd } from "../../lib/jsonld.mjs";
 import {
 	BASE,
 	ORIGIN,
 	localeOf,
 	pagePath,
+	pageUrl,
 	routeOf,
 	twinPath,
 	twinUrl,
@@ -28,6 +38,7 @@ const REPO = "https://github.com/jmrplens/ghchronicle";
 const SOFTWARE_ID = `${REPO}#software`;
 const SOURCE_ID = `${REPO}#source-code`;
 const WEBSITE_ID = `${ORIGIN}${BASE}/#website`;
+const MIT = "https://opensource.org/licenses/MIT";
 const OG_IMAGE = {
 	"@type": "ImageObject",
 	url: `${ORIGIN}${BASE}/og.png`,
@@ -35,40 +46,158 @@ const OG_IMAGE = {
 	height: 630,
 };
 
+const ENTRY_BY_ROUTE = new Map(
+	(await getCollection("docs")).map((entry) => [routeOf(entry.id), entry]),
+);
+
 // Routes that resolve to a page that was actually built. A breadcrumb assembles
 // one item per path segment, and a segment with no index page linked as an
 // `item` points a crawler at a 404, which invalidates the whole trail. Derived
 // from the collection so adding a section index later re-links it with no edit
 // here.
-const BUILT_ROUTES = new Set(
-	(await getCollection("docs")).map((entry) => routeOf(entry.id)),
-);
+const BUILT_ROUTES = new Set(ENTRY_BY_ROUTE.keys());
 
 const route = Astro.url.pathname
 	.slice(BASE.length)
 	.replace(/^\/+/, "")
 	.replace(/\/+$/, "");
 const locale = localeOf(route);
-const isHome = route === "" || route === "es";
+const isHomeRoute = (r: string) => r === "" || r === "es";
+const isHome = isHomeRoute(route);
 // Starlight emits the not-found page as dist/404.html, which GitHub Pages
 // serves with a real 404. Its canonical still points at a URL that does not
 // exist, so it is marked noindex and gets no document node: an error page is
 // not a document worth describing.
 const isNotFound = route === "404";
 
-const data = Astro.locals.starlightRoute.entry.data;
+const starlightRoute = Astro.locals.starlightRoute;
+const data = starlightRoute.entry.data;
 const title = data.title;
 const description = data.description ?? "";
-const canonical = `${ORIGIN}${pagePath(route)}`;
-const updated = Astro.locals.starlightRoute.lastUpdated?.toISOString();
+const canonical = pageUrl(route);
+const updated = starlightRoute.lastUpdated?.toISOString();
+
+/** The `@id` of a page's document node, the same on the page and on its translation. */
+const documentId = (r: string) =>
+	`${pageUrl(r)}#${isHomeRoute(r) ? "webpage" : "article"}`;
+
+/** The same page in the other language: "es/sinks/loki" for "sinks/loki", and back. */
+const translationRoute = (r: string) =>
+	localeOf(r) === "es" ? withoutLocale(r) : r ? `es/${r}` : "es";
+
+/**
+ * Standard output of one git command, or "" when git is missing, the checkout
+ * is not a repository, or the command fails. Every caller treats "" as "not
+ * known" and leaves its property out rather than guessing.
+ */
+function git(args: string[], cwd: string) {
+	try {
+		return execFileSync("git", args, {
+			cwd,
+			encoding: "utf8",
+			stdio: ["ignore", "pipe", "ignore"],
+		}).trim();
+	} catch {
+		return "";
+	}
+}
+
+// When this page's file first reached `main`: the committer date of the oldest
+// commit that added it, followed across renames. The committer date because
+// `main` takes squash-merged pull requests, and a page was published when its
+// merge landed, not when its first draft was written; it is also the clock
+// Starlight's `lastUpdated` reads, so `dateModified` compares with it. The
+// history begins at the public 1.0.0, so a page that has been there since then
+// carries that first commit's instant.
+//
+// A shallow clone would answer with its cut-off commit and date every page to
+// the day of the build, so there the property is left out and the schema check
+// fails the build for it; docs.yml checks out with `fetch-depth: 0`, which
+// `lastUpdated` needed already. The not-found page's file is virtual, and a
+// page not committed yet has no first commit, so neither claims a date.
+const sourceFile = starlightRoute.entry.filePath
+	? resolve(process.cwd(), starlightRoute.entry.filePath)
+	: undefined;
+const published = (() => {
+	if (isNotFound || !sourceFile || !existsSync(sourceFile)) return undefined;
+	const cwd = dirname(sourceFile);
+	if (git(["rev-parse", "--is-shallow-repository"], cwd) !== "false") {
+		return undefined;
+	}
+	const oldest = git(
+		["log", "--follow", "--diff-filter=A", "--format=%cI", "--", sourceFile],
+		cwd,
+	)
+		.split("\n")
+		.filter(Boolean)
+		.at(-1);
+	return oldest ? new Date(oldest).toISOString() : undefined;
+})();
+
+type SidebarEntry = (typeof starlightRoute.sidebar)[number];
+
+/**
+ * The label of the sidebar group that holds the current page, in the page's
+ * language: "Sinks" for /sinks/loki/, "Destinos" for its twin. The group
+ * rather than the first path segment, because the group is what a reader sees
+ * the page filed under. A page the sidebar does not list has no section.
+ */
+function sectionOf(
+	sidebar: SidebarEntry[],
+	group?: string,
+): string | undefined {
+	for (const entry of sidebar) {
+		if (entry.type === "link" && entry.isCurrent) return group;
+		if (entry.type === "group") {
+			const found = sectionOf(entry.entries, entry.label);
+			if (found) return found;
+		}
+	}
+	return undefined;
+}
+const section =
+	isHome || isNotFound ? undefined : sectionOf(starlightRoute.sidebar);
+
+// The same page in the other language, when it was built as a page of its own.
+// A fallback page (Starlight's English content served at a Spanish URL) is not
+// a translation of anything, so it names none and none names it. Embedded
+// rather than a bare `{"@id": …}`, because that page is a different document:
+// a consumer reading only this one still learns its URL, language and title.
+const counterpartRoute = translationRoute(route);
+const counterpart =
+	isNotFound || starlightRoute.isFallback
+		? undefined
+		: ENTRY_BY_ROUTE.get(counterpartRoute);
+const counterpartNode = counterpart && {
+	"@type": isHome ? "WebPage" : "TechArticle",
+	"@id": documentId(counterpartRoute),
+	...(isHome
+		? { name: counterpart.data.title }
+		: { headline: counterpart.data.title }),
+	url: pageUrl(counterpartRoute),
+	inLanguage: localeOf(counterpartRoute),
+};
+
+// What a voice assistant reads aloud: the page's name, then its opening. On a
+// landing that is the hero's tagline, because the body under it is a grid of
+// figures and links with no paragraph of prose; on a documentation page it is
+// the first paragraph at the top level of the content, not one inside an
+// aside, a card or a tab. Checked against the built HTML of every page by
+// scripts/check-structured-data.mjs, so a Starlight upgrade that renames a
+// class fails there instead of pointing the property at nothing.
+const speakable = isHome
+	? ["h1", ".hero .tagline"]
+	: ["h1", ".sl-markdown-content > p:first-of-type"];
 
 const website = {
 	"@type": "WebSite",
 	"@id": WEBSITE_ID,
 	name: "ghchronicle",
 	url: `${ORIGIN}${BASE}/`,
-	description:
-		"Documentation for ghchronicle: what it collects from GitHub, where it writes it, and how a point is dated.",
+	description: inBothLanguages({
+		en: "Documentation for ghchronicle: what it collects from GitHub, where it writes it, and how a point is dated.",
+		es: "Documentación de ghchronicle: qué recoge de GitHub, dónde lo escribe y cómo se fecha cada punto.",
+	}),
 	inLanguage: ["en", "es"],
 	image: OG_IMAGE,
 	publisher: { "@id": PERSON_ID },
@@ -79,16 +208,53 @@ const software = {
 	"@type": "SoftwareApplication",
 	"@id": SOFTWARE_ID,
 	name: "ghchronicle",
+	// The bare name is shared with Ghana Chronicles, a news account that
+	// publishes as @_GhChronicles and at ghchronicles.com, and a search for it
+	// returns both. The owner/name every install path uses (`docker pull`, the
+	// Action's `uses:`) and `disambiguatingDescription` say which one this is.
+	alternateName: "jmrplens/ghchronicle",
 	applicationCategory: "DeveloperApplication",
+	// What jmrp.io's projects.json states for this `@id`, so the two documents
+	// that describe the node agree on it.
+	applicationSubCategory: "Monitoring",
 	operatingSystem: "Linux, macOS, Windows",
 	url: REPO,
-	downloadUrl: `${REPO}/releases`,
+	// Where the same software is published, each read on 2026-09-24 and each
+	// answering 404 for a name that does not exist: the Action on the
+	// Marketplace, the image on GHCR and on Docker Hub, which jmrp.io's
+	// projects.json lists as well, and the module on pkg.go.dev. pkg.go.dev
+	// keys a page by module path, and the path carries the major since 2.4.1,
+	// the first tag go install could reach; the page without /v2 lists 1.0.0.
+	sameAs: [
+		"https://github.com/marketplace/actions/ghchronicle",
+		"https://github.com/jmrplens/ghchronicle/pkgs/container/ghchronicle",
+		"https://hub.docker.com/r/jmrplens/ghchronicle",
+		"https://pkg.go.dev/github.com/jmrplens/ghchronicle/v2",
+	],
+	// VERSION and its CHANGELOG.md heading, through src/lib/changelog.mjs: the
+	// number the binary reports and the day its tag was pushed. The first
+	// release's heading is when the software was first published, the current
+	// one's is when it last changed as far as a reader installing it can tell.
+	softwareVersion: release.version,
+	releaseNotes: release.notesUrl,
+	datePublished: release.firstDate,
+	dateModified: release.date,
+	// The latest release rather than one asset: each release carries an archive
+	// per platform, and no single URL names the one a given reader wants.
+	downloadUrl: `${REPO}/releases/latest`,
+	installUrl: pageUrl("install"),
 	softwareHelp: { "@type": "CreativeWork", url: `${ORIGIN}${BASE}/` },
-	description:
-		"Collects every metric GitHub exposes about an account and keeps it with the date it happened.",
+	description: inBothLanguages({
+		en: "Collects every metric GitHub exposes about an account and keeps it with the date it happened.",
+		es: "Recoge todas las métricas que GitHub expone sobre una cuenta y las guarda con la fecha en que ocurrieron.",
+	}),
+	disambiguatingDescription: inBothLanguages({
+		en: "The GitHub metrics collector published at github.com/jmrplens/ghchronicle: one Go binary that reads what the GitHub API exposes about an account and writes each observation, dated when it happened, to a store such as InfluxDB, Prometheus or Loki. Not a news publication, and not related to Ghana Chronicles.",
+		es: "El colector de métricas de GitHub publicado en github.com/jmrplens/ghchronicle: un único binario en Go que lee lo que la API de GitHub expone sobre una cuenta y escribe cada observación, fechada cuando ocurrió, en un almacén como InfluxDB, Prometheus o Loki. No es un medio de noticias ni tiene relación con Ghana Chronicles.",
+	}),
 	keywords:
 		"GitHub, metrics, time series, InfluxDB, Prometheus, Grafana, observability, Go",
-	license: "https://opensource.org/licenses/MIT",
+	license: MIT,
 	isAccessibleForFree: true,
 	offers: { "@type": "Offer", price: 0, priceCurrency: "USD" },
 	image: OG_IMAGE,
@@ -105,10 +271,22 @@ const sourceCode = {
 	"@id": SOURCE_ID,
 	name: "ghchronicle source code",
 	codeRepository: REPO,
-	programmingLanguage: "Go",
-	runtimePlatform: "Go",
-	license: "https://opensource.org/licenses/MIT",
-	isPartOf: { "@id": SOFTWARE_ID },
+	// Wikidata's Go, by its entity URI, so a consumer that knows the entity can
+	// place the language without matching a two-letter name.
+	programmingLanguage: {
+		"@type": "ComputerLanguage",
+		"@id": "http://www.wikidata.org/entity/Q37227",
+		name: "Go",
+		url: "https://go.dev/",
+	},
+	// No `runtimePlatform`. schema.org means a runtime or interpreter the code
+	// depends on ("Java v1, Python 2.3"), and the binary is static: it needs no
+	// Go installed to run. The systems it runs on are the software's
+	// `operatingSystem`, and `targetProduct` names the software, which says
+	// what `isPartOf` used to say backwards: this code is what that program is
+	// built from, not a part of it.
+	targetProduct: { "@id": SOFTWARE_ID },
+	license: MIT,
 	author: { "@id": PERSON_ID },
 	creator: { "@id": PERSON_ID },
 	maintainer: { "@id": PERSON_ID },
@@ -122,13 +300,21 @@ const document = isNotFound
 	? null
 	: {
 			"@type": isHome ? "WebPage" : "TechArticle",
-			"@id": `${canonical}#${isHome ? "webpage" : "article"}`,
+			"@id": documentId(route),
 			...(isHome ? { name: title } : { headline: title }),
 			...(description ? { description } : {}),
 			url: canonical,
 			mainEntityOfPage: canonical,
+			// A landing is about one thing, the software, so it is the landing's
+			// main entity as well as its subject.
+			...(isHome ? { mainEntity: { "@id": SOFTWARE_ID } } : {}),
+			...(section ? { articleSection: section } : {}),
 			inLanguage: locale,
 			image: OG_IMAGE,
+			speakable: {
+				"@type": "SpeakableSpecification",
+				cssSelector: speakable,
+			},
 			// The same page as markdown, which is what the <link rel="alternate">
 			// below announces to a browser. A consumer reading the graph gets the
 			// cheap representation without having to parse the expensive one first.
@@ -137,11 +323,20 @@ const document = isNotFound
 				encodingFormat: "text/markdown",
 				contentUrl: twinUrl(route),
 			},
-			// Git knows when a page last changed and nothing about when it was first
-			// published, so only `dateModified` is asserted. Deriving `datePublished`
-			// from the same value would have every page claim it was first published
-			// on the day it was last edited.
+			// Both from git, from the two ends of the file's history: its first
+			// commit (see `published`) and its last. Neither is derived from the
+			// other, so no page claims it was first published the day it was last
+			// edited.
+			...(published ? { datePublished: published } : {}),
 			...(updated ? { dateModified: updated } : {}),
+			// English pages are the source and Spanish ones the translation, which
+			// is the direction schema.org gives the two properties.
+			...(counterpartNode
+				? {
+						[locale === "es" ? "translationOfWork" : "workTranslation"]:
+							counterpartNode,
+					}
+				: {}),
 			author: { "@id": PERSON_ID },
 			publisher: { "@id": PERSON_ID },
 			isPartOf: { "@id": WEBSITE_ID },
@@ -220,6 +415,33 @@ const breadcrumb =
 				],
 			};
 
+// A page that answers questions in its headings says so in `faq`, and every
+// `##` heading that ends in a question mark becomes a Question whose answer is
+// the first paragraph under it, in a FAQPage beside the article. They are read
+// from the body so the structured data cannot say what the page does not:
+// src/lib/faq.mjs stops the build on markup it cannot reduce to plain text,
+// and scripts/check-structured-data.mjs holds each question and answer to the
+// h2 and the paragraph the build rendered.
+const faq =
+	data.faq && document
+		? {
+				"@type": "FAQPage",
+				"@id": `${canonical}#faq`,
+				url: canonical,
+				inLanguage: locale,
+				isPartOf: { "@id": document["@id"] },
+				about: { "@id": SOFTWARE_ID },
+				mainEntity: faqEntries(
+					Astro.locals.starlightRoute.entry.body ?? "",
+					Astro.locals.starlightRoute.entry.filePath ?? route,
+				).map(({ question, answer }) => ({
+					"@type": "Question",
+					name: question,
+					acceptedAnswer: { "@type": "Answer", text: answer },
+				})),
+			}
+		: null;
+
 const graph = {
 	"@context": "https://schema.org",
 	"@graph": [
@@ -232,8 +454,29 @@ const graph = {
 		sourceCode,
 		...(document ? [document] : []),
 		...(breadcrumb ? [breadcrumb] : []),
+		...(faq ? [faq] : []),
 	],
 };
+
+// The name a search result or a shared link shows. Starlight builds the
+// document title from `title`, which is the sidebar's short label, so a page
+// called "Loki" is announced as "Loki | ghchronicle" and the home as
+// "ghchronicle | ghchronicle". A page's `searchTitle` replaces it in the three
+// places that stand alone; the h1 and the sidebar keep `title`.
+const SITE_NAME = "ghchronicle";
+const searchTitle: string | undefined = data.searchTitle;
+const shownTitle = searchTitle
+	? searchTitle.includes(SITE_NAME)
+		? searchTitle
+		: `${searchTitle} | ${SITE_NAME}`
+	: undefined;
+const socialTitle = searchTitle ?? title;
+for (const entry of Astro.locals.starlightRoute.head) {
+	if (entry.tag === "title" && shownTitle) entry.content = shownTitle;
+	if (entry.tag === "meta" && entry.attrs?.property === "og:title") {
+		entry.attrs.content = socialTitle;
+	}
+}
 
 const llmsPath = locale === "es" ? `${BASE}/es/llms.txt` : `${BASE}/llms.txt`;
 const llmsFullPath =
@@ -243,6 +486,8 @@ const llmsFullPath =
 <Default />
 
 {isNotFound && <meta name="robots" content="noindex, follow" />}
+<meta name="twitter:title" content={socialTitle} />
+{description && <meta name="twitter:description" content={description} />}
 <script type="application/ld+json" is:inline set:html={safeJsonLd(graph)} />
 {
 	!isNotFound && (

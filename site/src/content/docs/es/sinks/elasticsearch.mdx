@@ -1,10 +1,13 @@
 ---
 title: Elasticsearch
 description: La API bulk, un índice por medida, y un id de documento que hace que una reescritura reemplace en vez de duplicar.
+searchTitle: Enviar métricas de GitHub a Elasticsearch
 ---
 
 import { Aside, Tabs, TabItem } from "@astrojs/starlight/components";
 import stats from "../../../../data/stats.json";
+
+El destino Elasticsearch envía los puntos fechados de ghchronicle a Elasticsearch u OpenSearch en bloque, un documento por punto.
 
 ```yaml
 sinks:

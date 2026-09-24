@@ -1,6 +1,7 @@
 ---
 title: Resumen
-description: Un SVG autocontenido para un README de perfil, dibujado con los mismos puntos que reciben las bases de datos.
+description: "La tarjeta de ghchronicle: un SVG autocontenido de la actividad en GitHub para un README de perfil, dibujado con los mismos puntos que reciben las bases de datos."
+searchTitle: Una tarjeta SVG de tu actividad en GitHub
 compactTables:
   - "-card-motion"
   - "-card-speed"
@@ -9,6 +10,8 @@ compactTables:
 import { Aside, Tabs, TabItem } from "@astrojs/starlight/components";
 
 import Card from "../../../../components/Card.astro";
+
+ghchronicle puede dibujar una tarjeta SVG autocontenida con la actividad en GitHub de una cuenta, para un README de perfil, a partir de los puntos que ya recoge.
 
 ```sh
 ghchronicle -config config.yaml -card card.svg -card-only

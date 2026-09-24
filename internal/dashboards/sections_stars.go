@@ -82,9 +82,12 @@ func stars(b *builder) []Panel {
 				"sum by (repo) (increase(github_stars_gained_total{%s}[1d]))", PF,
 			), "{{repo}}")},
 			Desc: "Each star is dated by when it was given, recovered once per repository " +
-				"with a full walk of the stargazer list and kept from then on. The eight " +
-				"repositories that gained the most in the range are named; the rest are " +
-				"`other`. " + bucketFollowsRange,
+				"with a full walk of the stargazer list and kept from then on. Since July " +
+				"2026 GitHub serves that list only to a repository's admins and " +
+				"collaborators, so a repository the token has no such access to is not " +
+				"here, only its count in Stars by repository. The eight repositories that " +
+				"gained the most in the range are named; the rest are `other`. " +
+				bucketFollowsRange,
 			PromDesc: sinceStart,
 			Opts:     mergeOpts(Opts{"bars": true, "stack": true}, dayBins),
 			SQLOpts:  seriesOpts,
@@ -95,7 +98,10 @@ func stars(b *builder) []Panel {
 			Prom: []Target{promq(fmt.Sprintf("sum(github_repo_stars{%s})", PF), legend("Stars"))},
 			Desc: "The star count as it climbed. The rows go all the way back to the first " +
 				"star, so widening the range shows more of the curve, and it holds its " +
-				"last value to the end of the range. " + bucketFollowsRange,
+				"last value to the end of the range. Where the curve is built from each " +
+				"star's date, only repositories whose stargazer list the token may read " +
+				"reach it: since July 2026 GitHub serves that list only to a repository's " +
+				"admins and collaborators. " + bucketFollowsRange,
 			Opts:     dayBins,
 			PromDesc: "In Prometheus the curve starts the day the exporter did.",
 			GR: []Target{grq(fmt.Sprintf(`alias(%s, "Stars")`,

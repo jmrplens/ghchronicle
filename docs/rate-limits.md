@@ -312,11 +312,13 @@ The endpoints that are verified not to work on a personal account, written down 
 
 Source: <https://jmrp.io/docs/ghchronicle/api/limits/>
 
-Every entry here was checked against the live API. It is written down so nobody
+Every entry here was checked against the live API from a personal account, and
+most of it is not in GitHub's documentation, which describes what an endpoint
+should return rather than what it does. It is written down so nobody
 spends an afternoon finding it out again, and so that a missing panel can be
 told apart from a broken collector.
 
-### Statistics that never arrive
+### Why do two statistics endpoints never answer?
 
 `stats/code_frequency` and `stats/contributors` answer **202 with an empty body,
 indefinitely**, on a personal account. A 202 normally means "still being
@@ -361,9 +363,29 @@ A personal account cannot see any of them, however the token is scoped.
 
 - **`workflows/{id}/timing`** returns 200 with an always-empty `billable`
   object. It looks like the source for per-workflow minutes and is not.
-- **`stargazers/history`** returns only the last thirty weeks. It does not
-  replace the `starred_at` walk; this was checked on three repositories.
+- **The stargazer list, to anyone but the repository's admins and collaborators.**
+  [Since July 2026](https://docs.github.com/en/rest/activity/starring#new-access-restrictions)
+  GitHub serves it to no one else. REST answers 404, and GraphQL's
+  `stargazers` answers an empty list with a `totalCount` of 0 while
+  `stargazerCount` beside it still gives the real number: measured on
+  `cli/cli` and `octocat/Hello-World` with a token holding every scope.
+  ghchronicle therefore draws the dated star curve only where the token has
+  that access, which it always has on the account's own repositories and on
+  those of an organisation the account administers; one named in
+  `targets.repos` or reached through `targets.orgs` without it gets its star
+  count and no curve.
 - **`/user/installations`** returns 403 without a GitHub App.
+
+### The star history GitHub serves to anyone
+
+[`stargazers/history`](https://docs.github.com/en/rest/activity/starring#get-repository-star-history)
+answers where the stargazer list does not. It serves anyone who can see the
+repository, unauthenticated too: the stars given per day, grouped by week,
+thirty weeks to a page, with a `Link` header that pages back to the
+repository's first week (measured on `cli/cli`: thirteen pages, back to 2019).
+It names no stargazers, so it cannot stand in for `gh_star`, which is one row
+per star at the instant it was given and says who gave it. ghchronicle does
+not call it today.
 
 ### GraphQL is wrong about packages
 

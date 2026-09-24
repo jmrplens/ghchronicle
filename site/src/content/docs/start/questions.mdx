@@ -1,0 +1,189 @@
+---
+title: Short answers
+description: "Twelve questions about keeping GitHub history with ghchronicle: traffic past 14 days, stars over time, backfill, Prometheus, organisations and cost."
+searchTitle: GitHub metrics history, in short answers
+faq: true
+---
+
+Each answer below is the short form of a page that has the detail, and links to
+it. Where an answer quotes GitHub rather than this project, it links to GitHub's
+own documentation.
+
+## How do I keep GitHub traffic data longer than 14 days?
+
+Collect it more often than every fourteen days and store each day under its own
+date. GitHub's [traffic API](https://docs.github.com/en/rest/metrics/traffic)
+serves views and clones per day for the last fourteen days only. ghchronicle's
+`traffic` family rereads the whole window every six hours by default and writes
+each day at that day's date, so the rows
+converge rather than pile up, and a collector that was down for a week loses
+nothing. Older days cannot be recovered: GitHub never kept them.
+
+The detail is in [what is collected](/ghchronicle/collectors/#audience) and
+[dating a point](/ghchronicle/how/dating/).
+
+## How do I track GitHub stars over time?
+
+Walk the stargazer list with the star media type, which gives the date of every
+star. ghchronicle's `stars` family does that on its first sweep, so the curve
+starts at the repository's first star, not on the day it was installed, and
+writes each star as a `gh_star` point dated when it was given. Since July 2026
+[GitHub serves that list only to a repository's admins and
+collaborators](https://docs.github.com/en/rest/activity/starring#new-access-restrictions);
+on any other repository ghchronicle collects the star count and no curve.
+
+The token always has that access on the account's own repositories and on
+those of an organisation its user administers. After the first walk,
+ghchronicle reads only the newest hundred stars per repository, ten
+repositories to a GraphQL query. GitHub's
+[`stargazers/history`](https://docs.github.com/en/rest/activity/starring#get-repository-star-history)
+endpoint answers anyone who can see the repository, even without a token, with
+stars per day grouped by week, thirty weeks to a page, paging back to the
+repository's first week: thirteen pages for `cli/cli`, back to 2019. It names
+no stargazers, and ghchronicle does not call it today. See [what is
+collected](/ghchronicle/collectors/#audience) and [what GitHub will not
+give](/ghchronicle/api/limits/).
+
+## Can I collect GitHub history from before I installed it?
+
+Mostly, with one deliberate run of `ghchronicle -config config.yaml -backfill`.
+It walks every enabled family until the API runs out, or back to the bound
+`-backfill-since` sets, waits for the rate limit to reset instead of skipping,
+and, stopped half way, carries on from its checkpoint when run again. Three
+things no backfill reaches: traffic older than fourteen days, the event feed
+past its three hundred events or thirty days, and job logs older than ninety
+days, joined from 1 October 2026 by workflow runs past the repository's
+retention period.
+
+The walk, its checkpoint and its bound are on [backfill](/ghchronicle/how/backfill/).
+
+## Can I archive GitHub notifications and the event feed?
+
+Yes, as long as the collector runs while they are still there. The `events`
+family keeps the account's activity feed, which GitHub serves up to three
+hundred events and none older than thirty days, and `notifs` keeps the inbox,
+which GitHub says holds notifications for three months unless they are saved.
+Both run every thirty minutes by default, each item a point dated when it
+happened, and a Loki sink turns them into log lines.
+
+GitHub states both windows in its documentation on [the event
+feed](https://docs.github.com/en/rest/activity/events) and [the
+inbox](https://docs.github.com/en/subscriptions-and-notifications/concepts/about-notifications#notification-retention-policy).
+The families are in [what is collected](/ghchronicle/collectors/#activity-and-cost),
+and the log lines in [Loki](/ghchronicle/sinks/loki/).
+
+## How long does GitHub keep workflow run history?
+
+From 1 October 2026, ninety days by default, according to GitHub's
+documentation. Logs and artifacts already had that default; from that date the
+repository's retention setting also deletes workflow runs, checks and commit
+statuses, which until then were kept for 400 days or more. A public repository
+can keep them between one and ninety days, a private one up to 400.
+ghchronicle's `actions` family writes every run with its jobs and steps, dated
+when it finished.
+
+GitHub's statement is under [retention for checks, workflow runs and
+artifacts](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/enabling-features-for-your-repository/managing-github-actions-settings-for-a-repository#configuring-the-retention-period-for-checks-workflow-runs-commit-statuses-artifacts-and-logs-in-your-repository).
+A [backfill](/ghchronicle/how/backfill/) walks every run GitHub still holds,
+back to `-backfill-since` when one is set, and expands each into its jobs, and
+into its steps while GitHub still serves them; from 1 October 2026 it can reach
+no further back than the repository's retention period, ninety days by default.
+
+## Can Prometheus store ghchronicle's history?
+
+No. Prometheus stamps a sample when it is scraped and refuses one much older:
+measured against Prometheus 3.14 with a thirty-minute out-of-order window, a
+sample dated two days back came back as HTTP 400. So the Prometheus exporter,
+and the OpenTelemetry sink with `raw: false`, serve current values reduced from
+the dated rows, which suits alerting. The history belongs in InfluxDB,
+PostgreSQL, Graphite or Elasticsearch, alongside Prometheus if you run both.
+
+The measurement and the reduction are on [dating a
+point](/ghchronicle/how/dating/#what-prometheus-structurally-cannot-hold).
+
+## Which database should I store GitHub metrics in?
+
+One that keys a row by its timestamp, because that is what lets the same
+fourteen days be rewritten on every sweep without duplicates. InfluxDB,
+PostgreSQL, Graphite and Elasticsearch all keep the dated history, and
+ghchronicle generates a Grafana dashboard for each of them and for Prometheus,
+which keeps current values only. Running more than one sink is the normal
+arrangement: a history store for the charts, Prometheus for alerts.
+
+Each store is weighed on [choosing a store](/ghchronicle/sinks/), and the
+dashboards are on [importing](/ghchronicle/dashboards/).
+
+## Why does stats/code_frequency always return 202?
+
+On a personal account, GitHub answers `stats/code_frequency` and
+`stats/contributors` with 202 and an empty body indefinitely. A 202 normally
+means the numbers are still being computed and a later request will get them;
+for these two, the next answer is another 202. ghchronicle does not call them:
+lines added and removed come from the commits collector instead, per commit,
+attributed to an author and dated to the commit.
+
+The ten-second check and the other endpoints that do not answer are on [what
+GitHub will not give](/ghchronicle/api/limits/).
+
+## Why does the GitHub traffic API return 403 with my token?
+
+Because traffic is gated on push access to the repository, not on being able
+to read it. GitHub [serves views and
+clones](https://docs.github.com/en/rest/metrics/traffic) only to someone who can
+push to the repository, and a fine-grained token also needs the repository
+permission [Administration
+(read)](https://docs.github.com/en/rest/metrics/traffic#get-repository-clones--fine-grained-access-tokens);
+without both, the answer is a 403. A workflow's automatic `GITHUB_TOKEN` cannot
+be granted Administration, so it gets a 403 even in the repository it runs in.
+ghchronicle records the 403 as unavailable and carries on, so the symptom is an
+empty traffic panel, not a failed sweep.
+
+Every scope and what its absence looks like is on [the
+token](/ghchronicle/start/token/).
+
+## Does it work with a GitHub organisation?
+
+For its repositories, yes: name the organisation under `targets.orgs` and its
+repositories are discovered and swept like the account's own, which needs the
+`read:org` scope. The account-wide families, the contribution calendar, the
+event feed, notifications, billing, packages and the outbound ones, need
+`targets.user` and describe a user. Organisation-only surfaces such as the audit
+log are not collected: the only organisation endpoint ghchronicle calls is the
+repository list.
+
+The keys are on [targets](/ghchronicle/configuration/targets/), and what an
+organisation has that a personal account cannot see is on [what GitHub will not
+give](/ghchronicle/api/limits/).
+
+## Can it run in GitHub Actions without a server?
+
+Yes, apart from the store it writes to. The repository ships a composite Action,
+`jmrplens/ghchronicle@v2`, which downloads a release binary and runs one sweep,
+a backfill or a card render. It needs a personal access token, because the
+automatic `GITHUB_TOKEN` lacks push access to other repositories, [cannot read
+traffic even in its
+own](https://docs.github.com/en/rest/metrics/traffic#get-repository-clones--fine-grained-access-tokens),
+and is not a user. A hosted runner keeps no state file between runs, so each
+run walks the stargazers again unless the state is cached.
+
+The modes, the inputs and the cache step are on [GitHub
+Actions](/ghchronicle/install/actions/).
+
+## Will it use up my GitHub API rate limit?
+
+Not by default. The collector never spends the last 500 calls of a budget, or a
+fifth of the bucket's limit when that is smaller, and a sweep skips a family
+with a warning rather than crossing that line, so whatever else shares the token
+keeps working. Every response is cached by its ETag, and a 304 Not Modified
+costs no quota at all, which is what makes short cadences affordable.
+
+The brake is on [rate limits](/ghchronicle/api/), and every family is priced on
+[cost of a sweep](/ghchronicle/api/cost/).
+
+## Where to go next
+
+- [Compared with the alternatives](/ghchronicle/start/compared/): KipHub
+  Traffic, repohistory, github-repo-stats, star-history and the Prometheus
+  exporters, cell by cell.
+- [Troubleshooting](/ghchronicle/reference/troubleshooting/): the messages that
+  look like errors and are not, and the ones that are.

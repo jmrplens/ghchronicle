@@ -1,6 +1,7 @@
 ---
 title: La línea de órdenes
-description: Las opciones, qué hace cada una y cuáles imprimen algo y salen.
+description: "La línea de órdenes de ghchronicle: las opciones, qué hace cada una y cuáles imprimen algo y salen."
+searchTitle: Opciones de línea de órdenes de ghchronicle
 defaultColumns:
   - table: Opción
     default: Por omisión
@@ -42,18 +43,23 @@ ghchronicle -config /etc/ghchronicle/config.yaml
 | `-card-speed`     | `0.5`         | A qué velocidad se reproduce un diseño animado, como decimal de 0 a 1. `0` es la animación más lenta y `1` la más rápida; `0.5` es el ritmo con el que siempre se han dibujado las tarjetas. `0` no es una tarjeta quieta, eso es `-card-motion off` |
 | `-card-layouts`   | apagada       | Imprime los diseños con los campos y los anchos que dibuja cada uno, y sale                                                               |
 
-## Las cuatro que imprimen y salen
+## Las cinco que imprimen y salen
 
-`-version`, `-groups`, `-card-layouts` y `-list` responden y paran. Las tres
-primeras no necesitan token ni configuración; `-list` lee la configuración y le
-pregunta a GitHub en qué repositorios se resuelven los objetivos, que es la
-forma barata de comprobar un cambio antes de gastar cuota en una pasada.
+`-version`, `-groups`, `-card-layouts`, `-list` y `-backfill-status` responden
+y paran. Las tres primeras no necesitan token ni configuración; `-list` lee la
+configuración y le pregunta a GitHub en qué repositorios se resuelven los
+objetivos, que es la forma barata de comprobar un cambio antes de gastar cuota
+en una pasada. `-backfill-status` lee la configuración para encontrar el
+[punto de control del relleno](/ghchronicle/es/how/backfill/#ver-hasta-dónde-ha-llegado)
+e imprime hasta dónde ha llegado ese recorrido; no le pregunta nada a GitHub,
+así que no necesita token.
 
 ```sh
 ghchronicle -version
 ghchronicle -groups
 ghchronicle -card-layouts
 ghchronicle -config config.yaml -list
+ghchronicle -config config.yaml -backfill-status
 ```
 
 ## Las tres formas de hacer una pasada

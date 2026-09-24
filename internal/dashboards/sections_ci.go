@@ -14,13 +14,27 @@ const (
 )
 
 // The coverage every job and step number is computed over. A sweep expands
-// the jobs of the newest runs only, and GitHub keeps job data for ninety
-// days, so these describe the runs that were expanded, never every run the
-// run count includes; said on each panel, since a median over a tenth of the
-// runs read as a median over all of them.
+// the jobs of the newest runs only, so these describe the runs that were
+// expanded, never every run the run count includes; said on each panel, since
+// a median over a tenth of the runs read as a median over all of them.
+//
+// A backfill expands every run GitHub still lists, and GitHub serves a run's
+// jobs for as long as it holds the run: measured on 2026-09-24, a run 278
+// days old listed every job with its times and runner, while job logs were a
+// 410 from ninety days. The runs themselves follow the retention period only
+// from 1 October 2026. Steps go sooner: the same day, every run created
+// before 12 April, about five and a half months back, listed its jobs with no
+// steps, and every later one with them. So the step panels say that they
+// reach less far back than the job panels.
 const expanded = "Over the runs whose jobs were expanded, which is the newest runs of each " +
-	"sweep and, after a backfill, the ninety days GitHub keeps jobs for; not every " +
-	"run the run count includes."
+	"sweep and, after a backfill, every run GitHub still holds, which from 1 October 2026 " +
+	"means the repository's retention period, ninety days by default; not every run the " +
+	"run count includes."
+
+// expandedSteps is expanded for the panels drawn from steps.
+const expandedSteps = expanded + " Steps reach less far back than jobs: GitHub stops " +
+	"serving a job's steps before the job itself, and measured in September 2026 it " +
+	"served none for runs older than about five and a half months."
 
 // declaredWorkflows is the declarations a run table joins to for the
 // workflow's own page: a run carries the file path under `workflow`, and the
@@ -432,7 +446,7 @@ func whereTheTimeGoes(b *builder) []Panel {
 					"series per step of every job, and their mean would say nothing "+
 					"about which step to look at. The jobs are in the table above."),
 			Opts: Opts{"sort": "Duration"},
-			Desc: expanded,
+			Desc: expandedSteps,
 			// The first column has no width: with all six fixed the table used
 			// seven hundred pixels of a full-width panel and left the rest blank.
 			Overrides: []any{
@@ -565,7 +579,7 @@ func whatKeepsFailing(b *builder) []Panel {
 					"the InfluxDB dashboard draws the same thing from rows."),
 			Opts: Opts{"sort": "Failures"},
 			Desc: "Which step, not which job. This is the question that otherwise gets answered " +
-				"by reading job logs, and it comes from a table already collected. " + expanded,
+				"by reading job logs, and it comes from a table already collected. " + expandedSteps,
 			PromDesc:  sinceStart,
 			Overrides: []any{width("Step", 200), barCell("Failures", "short", 120)},
 			GR:        failStepsGR, GRTF: failStepsGRtf, GRDesc: grSlot,

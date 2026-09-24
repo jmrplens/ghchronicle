@@ -1,6 +1,7 @@
 ---
 title: Qué se recoge
-description: Las treinta y cuatro familias, qué le pide cada una a GitHub y por qué existe cada una.
+description: Las treinta y cuatro familias de métricas de GitHub que recoge ghchronicle, qué le pide cada una a la API y por qué existe cada una.
+searchTitle: Qué recoge ghchronicle de GitHub
 ---
 
 import { Aside } from "@astrojs/starlight/components";
@@ -46,7 +47,12 @@ gráfica que se remonta años, no una que empieza el día en que se instaló el
 colector. Tras la primera pasada solo se leen las cien más nuevas, ya que las
 estrellas nuevas caen al final, y se leen para todos los repositorios a la vez
 en una consulta GraphQL por cada diez. Esa es la diferencia entre un punto y
-280 llamadas para un repositorio con 28.000 estrellas.
+280 llamadas para un repositorio con 28.000 estrellas. Desde julio de 2026
+GitHub sirve la lista solo a los administradores y colaboradores del
+repositorio, así que la curva se dibuja solo donde el token tiene ese acceso,
+que siempre tiene en los repositorios de la propia cuenta y en los de una
+organización que la cuenta administra; de cualquier otro se recoge el número de
+estrellas y no la curva (ver [lo que GitHub no da](/ghchronicle/es/api/limits/)).
 
 **`forks`** recoge quién hizo fork y cuándo. La instantánea del repositorio
 lleva un contador de forks, que dice cuántos pero nunca cuándo ni de quién. La
@@ -266,14 +272,14 @@ equivocados que parecerían exactamente igual de buenos.
 ## Actividad y coste
 
 **`events`** recoge el feed de actividad de la cuenta, la superficie más
-perecedera que tiene GitHub. Guarda aproximadamente los últimos trescientos
-eventos y descarta lo más viejo, sea cual sea su fecha, y nada más registra que
+perecedera que tiene GitHub. Guarda los últimos trescientos eventos, ninguno de
+hace más de treinta días, y nada más registra que
 un repositorio recibió una estrella, un fork, un seguimiento o un push en un
 minuto concreto.
 
 **`notifs`** recoge la bandeja de entrada. Como el feed de eventos es una
-ventana, no una historia: GitHub guarda las notificaciones no leídas alrededor
-de un año y las leídas mucho menos, y `per_page` se limita en silencio a 50 se
+ventana, no una historia: GitHub conserva las notificaciones de la bandeja tres
+meses salvo las guardadas, y `per_page` se limita en silencio a 50 se
 pida lo que se pida.
 
 **`billing`** recoge lo que la cuenta gastó realmente, día a día, por producto,

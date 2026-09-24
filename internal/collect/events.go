@@ -13,10 +13,11 @@ import (
 
 // Events collects the account's activity feed.
 //
-// This is the most perishable surface GitHub has: the feed keeps roughly the
-// last 300 events and drops anything older, whatever its date. Nothing else
-// records that a repository was starred, forked, watched or pushed to at a
-// given minute, so a sweep that misses the window loses the fact for good.
+// This is the most perishable surface GitHub has: the feed keeps the last 300
+// events, and none older than thirty days, which GitHub documents and a quiet
+// account shows: its feed is empty. Nothing else records that a repository
+// was starred, forked, watched or pushed to at a given minute, so a sweep that
+// misses the window loses the fact for good.
 // Every event becomes one point stamped at its own creation time, which makes
 // re-collection idempotent: the same event rewrites the same row.
 type Events struct {
@@ -146,8 +147,8 @@ func eventPoint(ev *eventRow) sink.Point {
 
 // Notifications collects the inbox.
 //
-// Like the event feed this is a window, not a history: GitHub keeps unread
-// notifications for about a year and read ones for far less, and `per_page` is
+// Like the event feed this is a window, not a history: GitHub keeps inbox
+// notifications for three months unless they are saved, and `per_page` is
 // silently capped at 50 whatever is asked for. Each notification is stamped at
 // its own update time, so what gets charted is when the thread last moved.
 type Notifications struct {

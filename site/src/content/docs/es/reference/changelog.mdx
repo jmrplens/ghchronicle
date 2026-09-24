@@ -1,0 +1,50 @@
+---
+title: Historial de versiones
+description: La versión actual de ghchronicle y su fecha, leídas al compilar de VERSION y CHANGELOG.md, lo que recoge ese fichero y dónde se publica cada versión.
+searchTitle: Historial de versiones de ghchronicle
+---
+
+import { release } from "../../../../lib/changelog.mjs";
+
+La versión actual de ghchronicle es la {release.version}, etiquetada el
+{release.date}. Ninguna de las dos está escrita a mano en esta página: el número
+se lee del fichero `VERSION` del repositorio al compilar el sitio, la fecha del
+encabezado que ese número lleva en `CHANGELOG.md`, y el sitio no compila si falta
+ese encabezado. Toda orden de instalación que nombra una versión la toma del
+mismo fichero.
+
+## Qué recoge el changelog
+
+Las notas de cada release se generan a partir de sus commits y dicen qué entró.
+[`CHANGELOG.md`](https://github.com/jmrplens/ghchronicle/blob/main/CHANGELOG.md)
+es para lo que ellas no pueden decir: por qué cambió algo, la medida que lo
+respalda y la parte que nadie verificó. Donde una afirmación suya se midió, dice
+sobre qué. Tiene una sección por versión, la más reciente primero, cada una
+encabezada por la versión y el día en que se subió su etiqueta. Está en inglés,
+como todo el repositorio fuera de este sitio.
+
+El sitio enlaza el fichero en vez de copiarlo, así que hay un solo historial que
+mantener. Las versiones siguen el
+[versionado semántico](https://semver.org/lang/es/), y un binario dice cuál es
+la suya con `ghchronicle -version`, una de
+[las cinco opciones que imprimen y salen](/ghchronicle/es/reference/cli/#las-cinco-que-imprimen-y-salen).
+
+## Dónde está cada versión
+
+- [Las releases de GitHub](https://github.com/jmrplens/ghchronicle/releases)
+  tienen cada etiqueta numerada con sus notas generadas y sus ficheros: un
+  archivo para Linux, macOS y Windows en amd64 y arm64, un SBOM SPDX por archivo
+  y `checksums.txt` sobre todos ellos. El fichero de sumas y cada SBOM llevan una
+  firma de cosign sin clave, y
+  [comprobar lo que has descargado](/ghchronicle/es/install/linux/#comprobar-lo-que-has-descargado)
+  tiene las órdenes. Una release con el nombre de una etiqueta mayor, como `v1`,
+  está ahí para el listado de la Action en el Marketplace y no lleva ficheros.
+- La imagen de contenedor, `ghcr.io/jmrplens/ghchronicle`, se etiqueta con la
+  versión de cada release precedida de una `v`, y con `latest`, para
+  `linux/amd64` y `linux/arm64`.
+- [El feed de releases](https://github.com/jmrplens/ghchronicle/releases.atom)
+  es la misma lista en Atom, para un lector de feeds.
+- La Action sigue a la versión mayor: `jmrplens/ghchronicle@v2` se resuelve a
+  través de una etiqueta `v2` que el flujo de release mueve a cada release 2.x
+  en cuanto sus ficheros están publicados. Ver
+  [GitHub Actions](/ghchronicle/es/install/actions/).

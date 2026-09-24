@@ -19,9 +19,10 @@ import (
 // OTLP writes metrics over OpenTelemetry's HTTP protocol.
 //
 // It speaks the JSON encoding rather than protobuf. That is a deliberate
-// trade: JSON is larger on the wire, and it removes a code generator, a
-// protobuf runtime and their transitive dependencies from a tool whose whole
-// dependency list is one YAML parser. Every OTLP receiver worth using accepts
+// trade: JSON is larger on the wire, and it keeps a code generator, a
+// protobuf runtime and their transitive dependencies out of a binary where
+// every sink but PostgreSQL, which needs its driver, speaks its protocol with
+// the standard library alone. Every OTLP receiver worth using accepts
 // `application/json` on the same endpoint.
 //
 // Whether the dated history survives depends entirely on the backend, and the

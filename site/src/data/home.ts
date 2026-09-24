@@ -83,12 +83,12 @@ export const en: HomeContent = {
 		panels: "/ghchronicle/dashboards/",
 	},
 	claim:
-		"Every one of them carries the date the thing happened, which is what makes a question about last July still have an answer.",
+		"Every point ghchronicle writes carries the date the thing happened, which is what makes a question about last July still have an answer.",
 	what: {
 		title: "What it is",
 		body: [
-			"GitHub answers most questions about the present and almost none about the past. The traffic API serves fourteen days and forgets. The activity feed keeps the last three hundred events, whatever their dates. Read notifications disappear. Job logs are deleted after ninety days.",
-			"<strong>ghchronicle</strong> sweeps those surfaces on a schedule and writes every observation as a dated point, into whichever database you already run. One Go binary, no dependencies beyond a YAML parser.",
+			"GitHub answers most questions about the present and almost none about the past. The traffic API serves fourteen days and forgets. The activity feed keeps the last three hundred events, and none older than thirty days. Inbox notifications are kept for three months unless they are saved. Job logs are deleted after ninety days by default.",
+			"<strong>ghchronicle</strong> sweeps those surfaces on a schedule and writes every observation as a dated point, into whichever database you already run. One static Go binary with no runtime dependencies.",
 		],
 	},
 	who: {
@@ -105,7 +105,7 @@ export const en: HomeContent = {
 		items: [
 			"Not a hosted service: it runs on your machine, with your token",
 			"Not a replacement for GitHub Insights, which answers about now",
-			"Not able to recover what GitHub has already dropped: it starts from the day you run it",
+			"Not able to recover what GitHub has already dropped: a backfill walks stars, pull requests and runs back as far as the API answers, but traffic older than fourteen days, events past the last three hundred or older than thirty days and job logs past the repository's retention period, ninety days by default, are gone for everyone",
 			"Not a badge generator, though it can draw one",
 		],
 	},
@@ -138,7 +138,7 @@ export const en: HomeContent = {
 			},
 			{
 				title: "Push",
-				body: "Nothing here is scraped. It pushes to InfluxDB, PostgreSQL, Graphite, Elasticsearch, Prometheus, OpenTelemetry, Loki, Telegraf, a file or anything Telegraf can reach, so it runs wherever it can reach them.",
+				body: "Everything but the Prometheus exporter is pushed: to InfluxDB, PostgreSQL, Graphite, Elasticsearch, Prometheus through its OTLP receiver, OpenTelemetry, Loki, Telegraf, a file or anything Telegraf can reach, so it runs wherever it can reach them.",
 			},
 			{
 				title: "Draw",
@@ -190,12 +190,12 @@ export const es: HomeContent = {
 		panels: "/ghchronicle/es/dashboards/",
 	},
 	claim:
-		"Cada una lleva la fecha en que ocurrió la cosa, que es lo que hace que una pregunta sobre julio pasado siga teniendo respuesta.",
+		"Cada punto que escribe ghchronicle lleva la fecha en que ocurrió la cosa, que es lo que hace que una pregunta sobre julio pasado siga teniendo respuesta.",
 	what: {
 		title: "Qué es",
 		body: [
-			"GitHub responde la mayoría de las preguntas sobre el presente y casi ninguna sobre el pasado. La API de tráfico sirve catorce días y olvida. El feed de actividad guarda los últimos trescientos eventos, sean de cuando sean. Las notificaciones leídas desaparecen. Los logs de los jobs se borran a los noventa días.",
-			"<strong>ghchronicle</strong> recorre esas superficies con una cadencia y escribe cada observación como un punto fechado, en la base de datos que ya tengas. Un binario de Go, sin más dependencia que un analizador de YAML.",
+			"GitHub responde la mayoría de las preguntas sobre el presente y casi ninguna sobre el pasado. La API de tráfico sirve catorce días y olvida. El feed de actividad guarda los últimos trescientos eventos, y ninguno de hace más de treinta días. Las notificaciones de la bandeja se conservan tres meses salvo que se guarden. Los logs de los jobs se borran por omisión a los noventa días.",
+			"<strong>ghchronicle</strong> recorre esas superficies con una cadencia y escribe cada observación como un punto fechado, en la base de datos que ya tengas. Un único binario estático de Go, sin dependencias en tiempo de ejecución.",
 		],
 	},
 	who: {
@@ -212,7 +212,7 @@ export const es: HomeContent = {
 		items: [
 			"No es un servicio alojado: corre en tu máquina, con tu token",
 			"No sustituye a GitHub Insights, que responde sobre el ahora",
-			"No recupera lo que GitHub ya ha descartado: empieza el día que lo ejecutas",
+			"No recupera lo que GitHub ya ha descartado: un relleno recorre estrellas, pull requests y ejecuciones hasta donde la API responda, pero el tráfico de más de catorce días, los eventos más allá de los últimos trescientos o de hace más de treinta días y los logs más antiguos que el periodo de retención del repositorio, noventa días por omisión, no los tiene nadie",
 			"No es un generador de insignias, aunque sepa dibujar una",
 		],
 	},
@@ -245,7 +245,7 @@ export const es: HomeContent = {
 			},
 			{
 				title: "Enviar por push",
-				body: "Aquí nada se recoge por scrape. Envía por push a InfluxDB, PostgreSQL, Graphite, Elasticsearch, Prometheus, OpenTelemetry, Loki, Telegraf, un fichero o cualquier cosa a la que llegue Telegraf, así que corre donde pueda alcanzarlos.",
+				body: "Todo salvo el exportador de Prometheus se envía por push: a InfluxDB, PostgreSQL, Graphite, Elasticsearch, Prometheus por su receptor OTLP, OpenTelemetry, Loki, Telegraf, un fichero o cualquier cosa a la que llegue Telegraf, así que corre donde pueda alcanzarlos.",
 			},
 			{
 				title: "Dibujar",

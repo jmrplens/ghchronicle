@@ -13,15 +13,16 @@
 // adding one to the content fails the build here instead of quietly deleting a
 // section from the twin that the HTML still shows.
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, posix } from "node:path";
 
 import figures from "../data/figures.json" with { type: "json" };
 import stats from "../data/stats.json" with { type: "json" };
 
 import { CARD_COMMAND_TEXT, cardCommand, cardStep } from "./card-command.mjs";
+import { release } from "./changelog.mjs";
 import { builderMarkdown } from "./config-build.mjs";
 import { factsOf } from "./layout-facts.mjs";
-import { localeOf, pageUrl } from "./site.mjs";
+import { BASE, ORIGIN, localeOf, pageUrl } from "./site.mjs";
 
 // Starlight's own default titles for an untitled aside, in the two locales the
 // site publishes. An aside whose title is left out renders one of these in the
@@ -109,7 +110,7 @@ const indentBy = (text, indent) =>
 // source of the expression. It did: `{stats.panels}` reached docs/, every
 // markdown twin and both llms-full.txt, where the number that should have
 // said one hundred and fifty two said nothing at all.
-const DATA = { stats };
+const DATA = { stats, release };
 
 // An expression of the shape a page writes: a name this file may know, and one
 // key of it.
@@ -409,7 +410,8 @@ function reduce(source, context) {
  *
  * The twin this file publishes and the plain-Markdown copy under docs/ are the
  * same reduction of the same source, so the two cannot come to say different
- * things; only what wraps the body differs. See site/scripts/gen-docs.mjs.
+ * things; only what wraps the body, and where its links point, differs. See
+ * site/scripts/gen-docs.mjs and absoluteTargets.
  *
  * @param {object} page
  * @param {string} page.body MDX body, without frontmatter
@@ -420,13 +422,24 @@ function reduce(source, context) {
 export function reduceBody({ body, file, locale }) {
 	const markdown = tidy(
 		resolveData(reduce(stripImports(body), { file, locale }), { file }),
-	).trim();
+	)
+		.replaceAll(VERSION_TOKEN, release.version)
+		.trim();
 	if (!markdown) throw new Error(`${file}: nothing left after reduction`);
 	return markdown;
 }
 
+// The token remark-version.mjs substitutes in the HTML. It is spelled here
+// rather than imported because that module finds VERSION from its own URL,
+// which inside the bundle is the output chunk; changelog.mjs reads the same
+// file from the working directory. Without this the twins and llms-full.txt
+// told a reader to download ghchronicle___VERSION___linux_amd64.tar.gz.
+const VERSION_TOKEN = "__VERSION__";
+
 /**
- * The markdown twin of one documentation page.
+ * The markdown twin of one documentation page: the reduction docs/ is
+ * generated from, with every link target made absolute (see absoluteTargets).
+ * gen-docs.mjs retargets the same reduction for a file read in a checkout.
  *
  * @param {object} page
  * @param {string} page.route the page route, "" for the English home
@@ -437,7 +450,10 @@ export function reduceBody({ body, file, locale }) {
  * @returns {string} the twin document
  */
 export function renderTwin({ route, title, description, body, file }) {
-	const markdown = reduceBody({ body, file, locale: localeOf(route) });
+	const markdown = absoluteTargets(
+		reduceBody({ body, file, locale: localeOf(route) }),
+		{ file, route },
+	);
 	return `${[
 		`# ${title}`,
 		"",
@@ -447,6 +463,109 @@ export function renderTwin({ route, title, description, body, file }) {
 		"",
 		markdown,
 	].join("\n")}\n`;
+}
+
+// Where a twin's relative targets point. The reduction keeps an asset's target
+// as the page wrote it, relative to the page's source file
+// (`../../../assets/dashboards/overview.png`), which is right for docs/, read
+// in a checkout. Served at /ghchronicle/dashboards/index.md the same target
+// resolves to a path the site does not serve, because the build hashes every
+// asset under /_astro/. So the twin names the source file in the repository,
+// the same file docs/ points at, as the bytes an image needs.
+const SOURCE_ROOT =
+	"https://raw.githubusercontent.com/jmrplens/ghchronicle/main";
+
+// A scheme, which is what separates a target somewhere else from one on this
+// site.
+const SCHEME = /^[a-z][a-z0-9+.-]*:/i;
+
+// A code span, which is text, or a link target with its optional title. A span
+// may wrap onto the next line, as these pages are wrapped at eighty columns,
+// but not across a blank one, which ends the paragraph; a run of backticks that
+// no run of the same length closes is literal text, and the scan moves past it.
+const TARGET_OR_CODE =
+	/(?<!`)(`+)(?!`)(?:[^\n]|\n(?![ \t]*\n))*?(?<!`)\1(?!`)|\]\(([^)\s]+)((?:\s+"[^"]*")?)\)/g;
+
+/**
+ * Every link and image target of a reduced page, made absolute.
+ *
+ * The twins are what llms-full.txt concatenates and what llms.txt sends a
+ * model to, and text copied off the site keeps no host to resolve
+ * `/ghchronicle/sinks/` against. A `#heading` is worse: in a file holding every
+ * page it names whichever page the file happens to put first (llms-full.txt
+ * carried 153 site-rooted targets and 92 bare fragments, GEO audit,
+ * 2026-09-24). So a site-rooted target gets the site's origin, the one the
+ * canonical links and the sitemap use; a fragment gets the page it was written
+ * on; a relative target gets its source file, see SOURCE_ROOT. Fenced code and
+ * code spans are text and are left alone. Any other target fails here, because
+ * it resolves nowhere a reader of the text can follow, and
+ * scripts/check-twins.mjs holds the build to the same rule.
+ *
+ * @param {string} markdown a reduced page body
+ * @param {{ file: string, route: string }} page the page's source path, as the
+ *   content collection reports it (`src/content/docs/sinks/loki.mdx`), and its
+ *   route
+ * @returns {string} the body with every target absolute
+ */
+function absoluteTargets(markdown, { file, route }) {
+	// From the repository root, whichever directory the caller counted from.
+	const dir = posix.dirname(`site/${file.replace(/^.*?\bsrc\//, "src/")}`);
+	/** @param {string} target @returns {string} */
+	const absolute = (target) => {
+		if (SCHEME.test(target)) return target;
+		if (target.startsWith("#")) return `${pageUrl(route)}${target}`;
+		// Rooted at the base path is a page of this site. Rooted anywhere else
+		// is outside it, where no page here means to send anybody, so it falls
+		// through to the error, as it does in gen-docs.mjs.
+		if (target.startsWith(`${BASE}/`)) return `${ORIGIN}${target}`;
+		if (target.startsWith("./") || target.startsWith("../")) {
+			const source = posix.join(dir, target);
+			if (!source.startsWith("../")) return `${SOURCE_ROOT}/${source}`;
+		}
+		throw new Error(
+			`${file}: the link target "${target}" points nowhere a reader of the markdown twin can follow. ` +
+				`Write it site-rooted (${BASE}/…), as a fragment, or relative with ./ or ../ to a file in the repository.`,
+		);
+	};
+	/** @param {string} prose a run of lines with no fenced code in it */
+	const rewrite = (prose) =>
+		prose.replaceAll(TARGET_OR_CODE, (whole, ticks, target, title) =>
+			ticks === undefined ? `](${absolute(target)}${title})` : whole,
+		);
+
+	/** @type {string | null} */
+	let fence = null;
+	/** @type {string[]} */
+	const out = [];
+	/** @type {string[]} */
+	let prose = [];
+	const flush = () => {
+		if (prose.length > 0) out.push(rewrite(prose.join("\n")));
+		prose = [];
+	};
+	for (const line of markdown.split("\n")) {
+		const marker = /^[ \t]*(`{3,}|~{3,})/.exec(line);
+		if (fence !== null) {
+			out.push(line);
+			if (
+				marker !== null &&
+				marker[1][0] === fence[0] &&
+				marker[1].length >= fence.length
+			) {
+				fence = null;
+			}
+			continue;
+		}
+		if (marker !== null) {
+			flush();
+			out.push(line);
+			fence = marker[1];
+			continue;
+		}
+		prose.push(line);
+	}
+	flush();
+	return out.join("\n");
 }
 
 /**

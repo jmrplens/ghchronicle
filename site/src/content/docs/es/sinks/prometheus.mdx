@@ -1,11 +1,14 @@
 ---
 title: Prometheus
-description: Un exportador, no un emisor, y qué le hace a cada medida la reducción a valores actuales.
+description: "Métricas de GitHub en Prometheus: un exportador, no un emisor, y qué le hace a cada medida la reducción a valores actuales."
+searchTitle: Métricas de GitHub en Prometheus
 compactTables:
   - Regla
 ---
 
 import { Aside } from "@astrojs/starlight/components";
+
+El destino Prometheus es un exportador que sirve el valor actual de cada métrica de GitHub para que Prometheus lo recoja.
 
 ```yaml
 sinks:
@@ -28,9 +31,9 @@ github_repo_stars{repo="ghchronicle",language="Go",visibility="public"} 283
 github_workflow_runs_count{repo="ghchronicle",conclusion="success"} 412
 ```
 
-## Qué no puede servir
+## ¿Puede Prometheus guardar la historia?
 
-La historia fechada, y no por elección. Prometheus sella una muestra en el
+No, y no por elección: no puede servir la historia fechada. Prometheus sella una muestra en el
 instante del scrape y rechaza cualquier cosa apreciablemente más vieja: medido
 contra Prometheus 3.14 con `--web.enable-otlp-receiver` y una ventana de
 desorden de treinta minutos, una muestra fechada dos días atrás vuelve como

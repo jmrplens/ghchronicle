@@ -16,6 +16,10 @@ is not.
       put the number in, so there is nothing else to edit and nothing to keep
       in step. Before this a release edited forty eight places by hand.
 
+- [ ] `CHANGELOG.md` has a `## X.Y.Z - YYYY-MM-DD` heading for it, dated the
+      day the tag is pushed. The site reads the release date from that heading
+      for its structured data and its release history page, and the site build
+      stops when VERSION has no heading to read.
 - [ ] `VERSION` and the tag agree. The release workflow's preflight job refuses
       the tag otherwise, and it is the first thing it checks.
 - [ ] A major bump changes the module path. It carries the major version,

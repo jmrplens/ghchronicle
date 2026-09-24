@@ -1,6 +1,7 @@
 ---
 title: Quickstart
-description: From nothing to a first sweep, and what that first sweep does that later ones do not.
+description: Install ghchronicle, point it at a database and run a first sweep of a GitHub account, and what that first sweep does that later ones do not.
+searchTitle: "ghchronicle quickstart: a first sweep"
 ---
 
 import { Steps, Tabs, TabItem, Aside } from "@astrojs/starlight/components";
@@ -137,9 +138,12 @@ themselves or wants to know what they just agreed to.
 
 Three things happen once, and they are why the first run is the expensive one.
 
-- The whole stargazer list is walked, page by page, so every star carries the
-  date it was given. After that, the newest hundred of every repository ride in
-  one GraphQL query per ten of them.
+- The whole stargazer list of every repository whose list the token may read
+  (since July 2026, only a repository's
+  [admins and collaborators](https://docs.github.com/en/rest/activity/starring#new-access-restrictions))
+  is walked, page by page, so every star carries the date it was given. After
+  that, the newest hundred of each of those repositories ride in one GraphQL
+  query per ten of them.
 - A month of workflow runs, so a fresh install does not chart a CI history that
   begins fifteen minutes ago. After that, twice the cadence, and never less
   than two hours.

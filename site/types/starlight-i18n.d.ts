@@ -7,5 +7,8 @@
 declare namespace StarlightApp {
 	interface I18n {
 		"ghc.breadcrumb.home": string;
+		"ghc.footer.byline": string;
+		"ghc.footer.licence": string;
+		"ghc.footer.changelog": string;
 	}
 }

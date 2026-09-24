@@ -1230,7 +1230,7 @@ const SINK_NAMES = {
 		stdout: "stdout",
 		telegraf: "Telegraf",
 		graphite: "Graphite",
-		sql: "PostgreSQL, a fichero",
+		sql: "PostgreSQL to a file",
 		postgres: "PostgreSQL",
 		elasticsearch: "Elasticsearch",
 	},
@@ -1243,7 +1243,7 @@ const SINK_NAMES = {
 		stdout: "stdout",
 		telegraf: "Telegraf",
 		graphite: "Graphite",
-		sql: "PostgreSQL, a fichero",
+		sql: "PostgreSQL a fichero",
 		postgres: "PostgreSQL",
 		elasticsearch: "Elasticsearch",
 	},
@@ -1258,6 +1258,12 @@ for (const sink of sinks) {
 		insist(
 			SINK_NAMES[locale][sink.key],
 			`sinks.${sink.key} has no ${locale} name in gen-figures.mjs`,
+		);
+		// The diagram joins these with commas, so a comma inside one reads as
+		// a second store: "PostgreSQL, a fichero, PostgreSQL" shipped that way.
+		insist(
+			!SINK_NAMES[locale][sink.key].includes(","),
+			`the ${locale} name of sinks.${sink.key} has a comma, which the diagram's list cannot tell from a separator`,
 		);
 	}
 }

@@ -1,6 +1,7 @@
 ---
 title: GitHub Actions
-description: The composite Action, its three modes, and the two things a hosted runner does not keep.
+description: "Running ghchronicle as a GitHub Action: the composite Action, its three modes, and the two things a hosted runner does not keep."
+searchTitle: Run ghchronicle as a GitHub Action
 defaultColumns:
   - table: Input
     default: Default
@@ -231,11 +232,12 @@ in the `<picture>` are relative to the README, so a `docs/README.md` points at
 ## Two things a hosted runner does not keep
 
 <Aside type="caution" title="The token must be a personal access token">
-  Traffic needs push access to *every* repository being collected, and the
-  automatic `GITHUB_TOKEN` has it only for the repository the workflow is
-  running in. It also has no `security_events`, no `read:packages`, and is not a
-  user, so nothing account-wide works with it. See [the
-  token](/ghchronicle/start/token/).
+  Traffic needs push access to *every* repository being collected and, on a
+  fine-grained token, the repository permission Administration (read); the
+  automatic `GITHUB_TOKEN` cannot be granted Administration, so it gets a 403
+  even in the repository the workflow runs in. It also has no
+  `security_events`, no `read:packages`, and is not a user, so nothing
+  account-wide works with it. See [the token](/ghchronicle/start/token/).
 </Aside>
 
 **The state file does not survive between runs.** Each run therefore does the

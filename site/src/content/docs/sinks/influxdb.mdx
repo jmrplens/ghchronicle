@@ -1,9 +1,12 @@
 ---
 title: InfluxDB
 description: The reference store for the dated history, why re-collection converges, and the one write error worth recognising.
+searchTitle: Send GitHub metrics to InfluxDB
 ---
 
 import { Aside } from "@astrojs/starlight/components";
+
+The InfluxDB sink writes every ghchronicle point, dated when it happened, to InfluxDB 2 or 3, and it is the store the dashboards are built against.
 
 ```yaml
 sinks:

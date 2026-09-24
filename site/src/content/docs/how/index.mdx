@@ -1,6 +1,7 @@
 ---
 title: The sweep
-description: What one pass over GitHub does, in what order, and why each family has its own cadence.
+description: What one ghchronicle sweep over the GitHub API does, in what order, and why each family of metrics has its own cadence.
+searchTitle: How a ghchronicle sweep works
 compactTables:
   - Family
 ---
@@ -25,7 +26,7 @@ flowchart TD
     B -- "no" --> S["Skip the family<br/>and warn"]
     B -- "yes" --> C["Collect"]
     C --> P["Dated points"]
-    P --> H["Destinations that keep the date<br/>InfluxDB, file, stdout, Telegraf, Graphite,<br/>PostgreSQL, a fichero, PostgreSQL,<br/>Elasticsearch"]
+    P --> H["Destinations that keep the date<br/>InfluxDB, file, stdout, Telegraf, Graphite,<br/>PostgreSQL to a file, PostgreSQL,<br/>Elasticsearch"]
     P --> L["Loki<br/>the twenty-two event renderings"]
     P --> RD["Reducer<br/>current values"]
     RD --> G["Prometheus<br/>OTLP, when raw: false"]

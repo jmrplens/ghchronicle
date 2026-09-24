@@ -9,6 +9,7 @@ import remarkVersion from "./src/lib/remark-version.mjs";
 import rehypeTables from "./src/lib/rehype-tables.mjs";
 import rehypeIntegerDimensions from "./src/lib/rehype-integer-dimensions.mjs";
 import rehypeDecodedFragments from "./src/lib/rehype-decoded-fragments.mjs";
+import { metaCsp } from "./src/lib/meta-csp.mjs";
 import fs from "node:fs";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -177,6 +178,9 @@ export default defineConfig({
 				Hero: "./src/components/overrides/Hero.astro",
 				// The @graph, the twin announcement and the llms links.
 				Head: "./src/components/overrides/Head.astro",
+				// Starlight's footer, then who wrote the page, the licence and
+				// the release history, in text a reader and a crawler both see.
+				Footer: "./src/components/overrides/Footer.astro",
 			},
 			head: [
 				// The social card. Starlight sets og:title and og:description
@@ -216,6 +220,21 @@ export default defineConfig({
 						href: "/ghchronicle/apple-touch-icon.png",
 					},
 				},
+				// GitHub Pages sets no response headers of a site's choosing, so a
+				// policy with a <meta> form is declared here. This value is what
+				// current browsers already apply when a page names none; written
+				// out, a page link followed to another origin carries this site's
+				// origin and never the path of the page it came from, whatever the
+				// browser's own default. The Content-Security-Policy is the other
+				// one, and it is not here because it hashes the scripts as built:
+				// src/lib/meta-csp.mjs writes it after the build.
+				{
+					tag: "meta",
+					attrs: {
+						name: "referrer",
+						content: "strict-origin-when-cross-origin",
+					},
+				},
 			],
 			social: [
 				{
@@ -241,6 +260,7 @@ export default defineConfig({
 				"./src/styles/tables.css",
 				"./src/styles/diagram.css",
 				"./src/styles/theme-images.css",
+				"./src/styles/footer.css",
 				// Last: focus rings and the skip link must win.
 				"./src/styles/a11y.css",
 			],
@@ -264,6 +284,16 @@ export default defineConfig({
 							label: "The token",
 							translations: { es: "El token" },
 							slug: "start/token",
+						},
+						{
+							label: "Compared with the alternatives",
+							translations: { es: "Comparado con las alternativas" },
+							slug: "start/compared",
+						},
+						{
+							label: "Short answers",
+							translations: { es: "Respuestas cortas" },
+							slug: "start/questions",
 						},
 					],
 				},
@@ -500,6 +530,11 @@ export default defineConfig({
 							translations: { es: "Resolución de problemas" },
 							slug: "reference/troubleshooting",
 						},
+						{
+							label: "Release history",
+							translations: { es: "Historial de versiones" },
+							slug: "reference/changelog",
+						},
 					],
 				},
 				{
@@ -521,10 +556,31 @@ export default defineConfig({
 			],
 		}),
 		sitemap({
-			serialize: (item) => ({
-				...item,
-				lastmod: getLastmod(new URL(item.url).pathname),
-			}),
+			// hreflang alternates in the sitemap too, the same three the HTML
+			// head carries: English, Spanish, and x-default at the English page.
+			// The integration pairs a URL with its twin by the path left after
+			// the locale segment, so /sinks/ and /es/sinks/ become one set, and
+			// writes no x-default of its own, so serialize adds it. A page
+			// without a twin gets no set, and is left with none.
+			i18n: { defaultLocale: "en", locales: { en: "en", es: "es" } },
+			serialize: (item) => {
+				const english = item.links?.find((link) => link.lang === "en");
+				return {
+					...item,
+					links:
+						english && item.links
+							? [...item.links, { url: english.url, lang: "x-default" }]
+							: item.links,
+					lastmod: getLastmod(new URL(item.url).pathname),
+				};
+			},
 		}),
+		// Last, so the policy is computed from the pages as they are served,
+		// after every other integration has written to them. Nothing to skip:
+		// this site declares no redirects, so every page in dist/ is a
+		// document. It needs a browser run whenever Starlight, Pagefind or an
+		// inline script changes, because a blocked script fails in the console
+		// and nowhere else; meta-csp.mjs says what to exercise.
+		metaCsp(),
 	],
 });

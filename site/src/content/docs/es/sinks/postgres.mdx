@@ -1,10 +1,13 @@
 ---
 title: PostgreSQL
 description: Sentencias INSERT que se pasan a psql, el esquema que declaran y por qué la cláusula de conflicto actualiza en vez de no hacer nada.
+searchTitle: Guardar métricas de GitHub en PostgreSQL
 ---
 
 import { Aside, Steps } from "@astrojs/starlight/components";
 import stats from "../../../../data/stats.json";
+
+Dos destinos llevan los puntos fechados de ghchronicle a PostgreSQL: uno escribe SQL en un fichero para cargarlo después, el otro conecta e inserta.
 
 ```yaml
 sinks:

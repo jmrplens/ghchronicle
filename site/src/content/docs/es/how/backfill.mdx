@@ -1,11 +1,14 @@
 ---
 title: Relleno histórico
 description: Un recorrido deliberado hasta el final de cada superficie, hasta dónde llega, y las tres cosas que ningún relleno alcanza.
+searchTitle: Rellenar la historia de GitHub
 compactTables:
   - Valor
 ---
 
 import { Aside } from "@astrojs/starlight/components";
+
+Un relleno histórico recorre cada superficie de GitHub hasta donde la API responda, una vez, para que la historia empiece antes de la primera pasada.
 
 ```sh
 ghchronicle -config config.yaml -backfill
@@ -204,9 +207,10 @@ bastante menos de una décima parte y ninguno de más de treinta días; jobs y
 pasos de una décima parte de las ejecuciones de workflows, así que la espera en
 cola, los jobs más lentos y los pasos que fallan se calcularon sobre esa décima
 parte. A dos años, _Pull requests merged_ marcaba una quinta parte de lo que
-decía _Pull requests merged, ever_. Estrellas, forks, releases, despliegues y
-alertas estaban completos, porque la primera pasada los recorre hasta el final
-de todos modos.
+decía _Pull requests merged, ever_. Estrellas y forks estaban completos, porque
+la primera pasada los recorre hasta el final de todos modos, y también
+releases, despliegues y alertas, porque ninguno de esos repositorios pasaba de
+los cien de cada uno que lee una pasada.
 
 ## Qué alcanza que una pasada no
 
@@ -214,20 +218,32 @@ de todos modos.
   familia en la que un relleno es cualitativamente distinto y no solo más
   ancho: sin él la serie de líneas cambiadas empieza el día en que instalaste el
   colector.
-- Dos años de ejecuciones de workflows, y cada ejecución expandida en sus jobs y
-  sus pasos.
+- Cada ejecución de workflow que GitHub todavía conserve, expandida en sus
+  jobs, y en sus pasos mientras GitHub los siga sirviendo. Medido el 24 de
+  septiembre de 2026, GitHub listaba todos los jobs de una ejecución de hace
+  278 días, pero ningún paso de las ejecuciones creadas antes del 12 de abril,
+  unos cinco meses y medio atrás.
 - Los repositorios archivados, enteros, diga lo que diga `include_archived`. Su
   historia es la historia de la cuenta y ya no se mueve, que es justo por lo
   que una pasada los deja fuera y por lo que un solo recorrido basta. Los forks
   quedan como estén configurados. Una pasada sigue escribiendo la única fila
   que tiene cada repositorio archivado, la fecha en que se archivó: el listado
   que ya paga dice cuáles, y una consulta por pasada de `totals` dice cuándo.
-- Todas las páginas de artefactos, veinte páginas de actividad del repositorio y
-  los análisis de code scanning.
-- Cien pull requests e issues por repositorio.
-- Las notificaciones leídas además de las no leídas.
-- Veinticuatro meses de facturación.
-- Cien entregas de webhook por hook.
+- Todas las pull requests e issues, en páginas de cincuenta, donde una pasada
+  lee lo que cambió desde la pasada anterior y una página entera al día.
+- Todas las páginas de artefactos, de actividad del repositorio y de análisis
+  de code scanning, donde una pasada lee cinco, dos y una.
+- Cada release, despliegue y discusión, y cada alerta de Dependabot y de code
+  scanning, donde una pasada lee la página más reciente de cada lista.
+- La bandeja entera, hilos leídos incluidos, donde una pasada lee los hilos no
+  leídos que se movieron y, una vez al día, veinte páginas de cincuenta con los
+  leídos.
+- Cada mes de facturación que GitHub todavía responda, hasta tres meses vacíos
+  seguidos, donde una pasada lee dos.
+- Las cien entregas de webhook más recientes de cada hook, donde una pasada lee
+  treinta.
+- Como mucho 500 logs de jobs fallidos por repositorio, ninguno de hace más de
+  noventa días, si `joblogs` tiene cadencia; una pasada lee como mucho diez.
 
 ## Qué no enciende
 
@@ -267,14 +283,19 @@ una familia más lenta, nunca como una línea.
 <Aside type="caution" title="Tres cosas no se pueden rellenar a ningún precio">
 Ninguna espera cambia esto, y son la razón de que el proyecto exista.
 
-- **El feed de eventos guarda trescientos eventos**, sea cual sea su fecha.
-  Pasado ese techo GitHub responde 422 "pagination is limited for this
-  resource", que el colector lee como el final de los datos.
+- **El feed de eventos guarda trescientos eventos**, y ninguno de hace más de
+  treinta días. Pasado ese techo GitHub responde 422 "pagination is limited
+  for this resource", que el colector lee como el final de los datos.
 - **El tráfico son catorce días.** Nada más viejo llegó nunca a guardarse en
   GitHub.
-- **Los logs de los jobs se borran a los noventa días** y responden 410 después,
-  mientras que los metadatos de la ejecución a la que pertenecen sobreviven
-  años.
+- **Los logs de los jobs se borran al acabar el periodo de retención del
+  repositorio**, noventa días por omisión, y responden 410 después. Un relleno
+  de `joblogs` solo pide los últimos noventa días, diga lo que diga el ajuste.
+  Las ejecuciones a las que pertenecen se guardaban cuatrocientos días o más;
+  desde el 1 de octubre de 2026 GitHub aplica el mismo ajuste de retención a
+  las propias ejecuciones: noventa días por omisión, como mucho noventa en un
+  repositorio público y hasta cuatrocientos en uno privado, así que un relleno
+  posterior a esa fecha solo llega tan atrás como ese ajuste.
 
 </Aside>
 

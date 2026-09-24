@@ -1,3 +1,6 @@
 {
-  "ghc.breadcrumb.home": "Inicio"
+  "ghc.breadcrumb.home": "Inicio",
+  "ghc.footer.byline": "Escrito y mantenido por",
+  "ghc.footer.licence": "Licencia MIT",
+  "ghc.footer.changelog": "Historial de versiones"
 }

@@ -1,9 +1,12 @@
 ---
 title: InfluxDB
 description: El almacén de referencia para la historia fechada, por qué volver a recoger converge, y el único error de escritura que conviene reconocer.
+searchTitle: Enviar métricas de GitHub a InfluxDB
 ---
 
 import { Aside } from "@astrojs/starlight/components";
+
+El destino InfluxDB escribe cada punto de ghchronicle, fechado cuando ocurrió, en InfluxDB 2 o 3, y es el almacén contra el que están hechos los dashboards.
 
 ```yaml
 sinks:

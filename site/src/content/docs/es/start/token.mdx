@@ -1,6 +1,7 @@
 ---
 title: El token
-description: Qué familias compra cada permiso, y por qué el GITHUB_TOKEN automático no basta.
+description: Qué familias de ghchronicle compra cada permiso del token de GitHub, y por qué el GITHUB_TOKEN automático de un workflow no basta.
+searchTitle: El token de GitHub que necesita ghchronicle y sus permisos
 ---
 
 import { Tabs, TabItem, Aside, Steps } from "@astrojs/starlight/components";
@@ -23,8 +24,10 @@ cuantos permisos que conviene entender en vez de limitarse a concederlos.
         `read:public_key` y `read:gpg_key` cubre todo lo que esto recoge.
       </TabItem>
       <TabItem label="Fine-grained">
-        Acceso de lectura a los repositorios, más los permisos de cuenta para
-        seguidores, gists, paquetes, plan, claves SSH de Git y claves GPG.
+        Acceso de lectura a los repositorios, incluido el permiso de
+        repositorio Administration, que es el que pide el tráfico, más los
+        permisos de cuenta para seguidores, gists, paquetes, plan, claves SSH de
+        Git y claves GPG.
       </TabItem>
     </Tabs>
 
@@ -44,16 +47,18 @@ cuantos permisos que conviene entender en vez de limitarse a concederlos.
 
 | Permiso                            | Sin él                                                                                                 |
 | ---------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| Acceso de escritura al repositorio | El tráfico es un 403. GitHub solo muestra visitas y clones a quien podría hacer push                   |
+| Acceso de escritura al repositorio, y Administration (lectura) en un token fine-grained | El tráfico es un 403. GitHub solo muestra visitas y clones a quien puede hacer push al repositorio |
 | `security_events`                  | Las alertas de Dependabot y de code scanning parecen exactamente un repositorio con la función apagada |
 | `read:packages`                    | El registro de contenedores es invisible. Las versiones de paquete cuestan una llamada por paquete     |
 | `read:user`                        | Faltan seguidores, contribuciones, gists y cuentas sociales                                            |
 | `read:org`                         | Los repositorios de una organización no se descubren                                                   |
 | `read:public_key`, `read:gpg_key`  | La familia `keys` no escribe nada, y no lo dice. Ningún otro permiso implica ninguno de los dos        |
 
-El del tráfico es el que sorprende. No es un permiso de lectura en absoluto:
-GitHub decide quién puede ver visitas y clones preguntando si quien llama
-podría hacer push, así que un token de solo lectura recibe un 403 en cada
+El del tráfico es el que sorprende, porque poder leer un repositorio no basta.
+GitHub solo muestra visitas y clones a quien puede hacer push al repositorio, y
+un token fine-grained necesita además el
+[permiso de repositorio Administration (lectura)](https://docs.github.com/es/rest/metrics/traffic#get-repository-clones--fine-grained-access-tokens);
+un token al que le falte cualquiera de los dos recibe un 403 en ese
 repositorio. El colector lo anota como "no disponible" y sigue, que es por lo
 que el síntoma es un panel de tráfico vacío y no una pasada fallida.
 
@@ -69,9 +74,11 @@ Un workflow recibe un `GITHUB_TOKEN` gratis. No basta para esto, y la razón
 merece decirse con precisión en vez de dejar que alguien la descubra como un
 dashboard vacío.
 
-- **Está limitado a un repositorio.** El tráfico necesita acceso de escritura a
-  _cada_ repositorio que se recoja. El token automático lo tiene para el
-  repositorio en el que corre el workflow, y para ninguno más.
+- **No puede leer el tráfico, ni siquiera el suyo.** El tráfico necesita acceso
+  de escritura a _cada_ repositorio que se recoja, y el token automático solo
+  lo tiene para el repositorio en el que corre el workflow. Incluso ahí recibe
+  un 403: GitHub pide además el permiso de repositorio Administration, que un
+  workflow no puede conceder a su token automático.
 - **No tiene `security_events`.** Las alertas de Dependabot y de code scanning
   le son invisibles.
 - **No tiene `read:packages`.** El registro de contenedores le es invisible.

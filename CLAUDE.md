@@ -5,12 +5,17 @@ Context for AI agents working in this repository.
 ## What this is
 
 `ghchronicle` collects every metric GitHub exposes about an account and writes
-each observation as a point dated when the thing happened. Go, single binary,
-no dependencies beyond `gopkg.in/yaml.v3`.
+each observation as a point dated when the thing happened. Go, single static
+binary. Its direct dependencies are `gopkg.in/yaml.v3`, the PostgreSQL driver
+`github.com/jackc/pgx/v5`, and `golang.org/x/term` (over `golang.org/x/sys`)
+so that `-setup` can read a secret without echoing it; `go.mod` is the list.
 
 The reason it exists: GitHub keeps almost nothing. Traffic is a rolling
-fourteen days, the event feed is the last three hundred events, read
-notifications vanish. If it is not collected while it is there, it is gone.
+fourteen days, the event feed is the last three hundred events of the past
+thirty days, inbox notifications go after three months unless saved, job logs
+after the repository's retention period (ninety days by default), and from
+1 October 2026 workflow runs follow that same retention. If it is not
+collected while it is there, it is gone.
 
 ## Layout
 
@@ -139,8 +144,24 @@ Verified, so nobody spends an afternoon on it again:
 - `/user/installations`: 403 without a GitHub App.
 - `workflows/{id}/timing`: 200 with an always-empty `billable`.
 - GraphQL reports zero packages while REST lists them. Packages come from REST.
-- `stargazers/history` returns only the last 30 weeks. It does not replace the
-  `starred_at` walk; this was checked on three repositories.
+- The stargazer list, since July 2026, to anyone but a repository's admins and
+  collaborators: REST answers 404 and GraphQL's `stargazers` answers an empty
+  list with `totalCount` 0, while `stargazerCount` still gives the real number
+  (measured on cli/cli and octocat/Hello-World with a token holding every
+  scope). So the dated star curve is drawn only where the token has that
+  access, which it always has on the account's own repositories and on those
+  of an organisation the account administers; elsewhere the star count is
+  collected and the curve is not.
+- `stargazers/history` is not limited to the last thirty weeks; thirty weeks
+  is its page size. It answers anyone who can see the repository,
+  unauthenticated too, with stars per day grouped by week, and its Link header
+  pages back to the repository's first week (cli/cli: 13 pages, back to 2019).
+  It names no stargazers. ghchronicle does not call it today.
+- The steps of old workflow runs. `runs/{id}/jobs` keeps listing every job
+  for as long as GitHub holds the run, but each job's `steps` comes back
+  empty for runs created before 12 April 2026 (measured 2026-09-24, about 166
+  days back; one snapshot, so whether it is a rolling window is not known).
+  A backfill writes those jobs with `steps` 0 and no `gh_workflow_step` rows.
 - The traffic window for a repository with no traffic is stale, not empty:
   GitHub keeps returning the last fourteen days that had data.
 

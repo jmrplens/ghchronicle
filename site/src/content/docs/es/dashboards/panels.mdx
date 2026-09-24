@@ -1,6 +1,7 @@
 ---
 title: Qué muestran
 description: Las diecisiete secciones y sus ciento cincuenta y cuatro paneles, una captura de cada una, y qué cambia cuando el almacén no puede responder.
+searchTitle: Qué muestran los dashboards de métricas de GitHub
 ---
 
 import { Aside } from "@astrojs/starlight/components";
@@ -121,8 +122,14 @@ van a `other`: de los diecisiete que ganaron alguna estrella en dos años, nueve
 ganaron entre una y tres, y diecisiete entradas de leyenda escondían un tercio
 del trazado. La curva acumulada se remonta a la primera estrella porque el recorrido
 de stargazers recogió cada una con su propio `starred_at`, no porque el colector
-lleve corriendo tanto tiempo. Los forks en el tiempo se dibujan igual desde
-`gh_fork`, cada fork con la fecha en que se hizo, así que también se remontan
+lleve corriendo tanto tiempo. Desde julio de 2026 GitHub solo sirve esa lista
+a los
+[administradores y colaboradores](https://docs.github.com/es/rest/activity/starring#new-access-restrictions)
+del repositorio, así que un repositorio al que el token no tiene ese acceso no
+tiene estrellas fechadas: falta en todos los paneles que se dibujan con ellas,
+y su número sigue apareciendo en Stars by repository. Los forks en el tiempo se
+dibujan como la curva de estrellas, desde `gh_fork`, cada fork con la fecha en
+que se hizo, así que también se remontan
 más allá del día en que arrancó el colector en vez de empezar en la primera
 instantánea. Las dos curvas se dibujan hasta los dos bordes del rango: un
 recuento acumulado sobre filas fechadas solo tiene punto donde hay fila, así
@@ -448,9 +455,9 @@ agrupan según el rango, no en una hora ni en un día fijos.
 ![La sección Activity: eventos por día y tipo, el donut de eventos por tipo encabezado por PushEvent con un 39 por ciento, eventos por repositorio, la tabla de notificaciones por motivo, notificaciones por día, las notificaciones más recientes, la tabla de trabajo fuera con pull requests e issues en repositorios de otras personas, el gráfico de lenguajes marcados como favoritos y la tabla de favoritos recientes](../../../../assets/dashboards/activity.png)
 
 Los eventos y las notificaciones son ventanas, no historias. GitHub guarda los
-últimos trescientos eventos sean de cuando sean y descarta rápido las
-notificaciones leídas, así que lo que queda guardado es lo que había cuando pasó
-la pasada.
+últimos trescientos eventos de los últimos treinta días y descarta las
+notificaciones a los tres meses salvo las guardadas, así que lo que queda
+almacenado es lo que había cuando pasó la pasada.
 
 El donut lleva la parte de cada tipo en su leyenda y no escribe nada sobre los
 sectores, porque Grafana omite la etiqueta del sector en el que no cabe y los

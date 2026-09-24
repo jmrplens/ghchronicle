@@ -17,6 +17,12 @@ import (
 // that goes back years, not one that starts the day the collector was
 // installed. Every star is written at the instant it was given.
 //
+// Where GitHub serves the list, that is. Since July 2026 it serves it only to
+// a repository's admins and collaborators: anyone else gets a 404 here, which
+// isSkippable files as nothing to collect, and an empty connection from the
+// GraphQL batch, so such a repository gets no star points and keeps only the
+// count its gh_repo row carries.
+//
 // This walk is the history, not the day to day. A repository is read whole the
 // first time it is seen, and again in a backfill; after that an ordinary sweep
 // never comes here, because the newest hundred stars of every repository

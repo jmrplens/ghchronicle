@@ -1443,7 +1443,7 @@
       "panels": [
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "Each star is dated by when it was given, recovered once per repository with a full walk of the stargazer list and kept from then on. The eight repositories that gained the most in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "Each star is dated by when it was given, recovered once per repository with a full walk of the stargazer list and kept from then on. Since July 2026 GitHub serves that list only to a repository's admins and collaborators, so a repository the token has no such access to is not here, only its count in Stars by repository. The eight repositories that gained the most in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -1504,7 +1504,7 @@
         },
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "The star count as it climbed. The rows go all the way back to the first star, so widening the range shows more of the curve, and it holds its last value to the end of the range. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "The star count as it climbed. The rows go all the way back to the first star, so widening the range shows more of the curve, and it holds its last value to the end of the range. Where the curve is built from each star's date, only repositories whose stargazer list the token may read reach it: since July 2026 GitHub serves that list only to a repository's admins and collaborators. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -4273,7 +4273,7 @@
       "panels": [
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "How many runs the range holds and how they ended. The success rate is the runs that succeeded as a share of the runs that succeeded or failed: a run canceled by a newer push under a concurrency group, or skipped by its own condition, decided nothing and is counted beside it as undecided rather than as a failure. The run duration is the median over the range and the queue wait is the time a job spent waiting for a runner, which only exists at job level, the run-level number folding the wait into the duration. Over the runs whose jobs were expanded, which is the newest runs of each sweep and, after a backfill, the ninety days GitHub keeps jobs for; not every run the run count includes. Last come the bytes the runs left behind, which are the artifacts the walk reached: GitHub lists thousands of them per repository and the walk stops at five hundred, so this is a floor wherever it did. \"Artifact storage counted\" below puts the two counts beside it.",
+          "description": "How many runs the range holds and how they ended. The success rate is the runs that succeeded as a share of the runs that succeeded or failed: a run canceled by a newer push under a concurrency group, or skipped by its own condition, decided nothing and is counted beside it as undecided rather than as a failure. The run duration is the median over the range and the queue wait is the time a job spent waiting for a runner, which only exists at job level, the run-level number folding the wait into the duration. Over the runs whose jobs were expanded, which is the newest runs of each sweep and, after a backfill, every run GitHub still holds, which from 1 October 2026 means the repository's retention period, ninety days by default; not every run the run count includes. Last come the bytes the runs left behind, which are the artifacts the walk reached: GitHub lists thousands of them per repository and the walk stops at five hundred, so this is a floor wherever it did. \"Artifact storage counted\" below puts the two counts beside it.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -4679,7 +4679,7 @@
         },
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "Over the runs whose jobs were expanded, which is the newest runs of each sweep and, after a backfill, the ninety days GitHub keeps jobs for; not every run the run count includes. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "Over the runs whose jobs were expanded, which is the newest runs of each sweep and, after a backfill, every run GitHub still holds, which from 1 October 2026 means the repository's retention period, ninety days by default; not every run the run count includes. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -4965,7 +4965,7 @@
         },
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "Over the runs whose jobs were expanded, which is the newest runs of each sweep and, after a backfill, the ninety days GitHub keeps jobs for; not every run the run count includes.",
+          "description": "Over the runs whose jobs were expanded, which is the newest runs of each sweep and, after a backfill, every run GitHub still holds, which from 1 October 2026 means the repository's retention period, ninety days by default; not every run the run count includes.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -5076,7 +5076,7 @@
         },
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "Over the runs whose jobs were expanded, which is the newest runs of each sweep and, after a backfill, the ninety days GitHub keeps jobs for; not every run the run count includes.",
+          "description": "Over the runs whose jobs were expanded, which is the newest runs of each sweep and, after a backfill, every run GitHub still holds, which from 1 October 2026 means the repository's retention period, ninety days by default; not every run the run count includes. Steps reach less far back than jobs: GitHub stops serving a job's steps before the job itself, and measured in September 2026 it served none for runs older than about five and a half months.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -5442,7 +5442,7 @@
         },
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "Which step, not which job. This is the question that otherwise gets answered by reading job logs, and it comes from a table already collected. Over the runs whose jobs were expanded, which is the newest runs of each sweep and, after a backfill, the ninety days GitHub keeps jobs for; not every run the run count includes.",
+          "description": "Which step, not which job. This is the question that otherwise gets answered by reading job logs, and it comes from a table already collected. Over the runs whose jobs were expanded, which is the newest runs of each sweep and, after a backfill, every run GitHub still holds, which from 1 October 2026 means the repository's retention period, ninety days by default; not every run the run count includes. Steps reach less far back than jobs: GitHub stops serving a job's steps before the job itself, and measured in September 2026 it served none for runs older than about five and a half months.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -8528,7 +8528,7 @@
           },
           "id": 94,
           "options": {
-            "content": "### Failed job output\n\nThe last lines of every job that failed are collected too, but they are text\nrather than measurements, so they go to a log store rather than here. With the\nLoki sink enabled, this is the query:\n\n```\n{job=\"ghchronicle\", kind=\"job_log\"} |= \"error\"\n```\n\nSet `every.joblogs` to switch the collection on. GitHub deletes job logs after\nninety days and answers 410 afterwards, so there is no backfilling them: what\nexists is what was captured while it was there.\n\nPublished to a Grafana that has a Loki datasource, with\n`cmd/publish_dashboard -loki \u003cdatasource-uid\u003e`, this panel shows those lines\ninstead of this note.\n",
+            "content": "### Failed job output\n\nThe last lines of every job that failed are collected too, but they are text\nrather than measurements, so they go to a log store rather than here. With the\nLoki sink enabled, this is the query:\n\n```\n{job=\"ghchronicle\", kind=\"job_log\"} |= \"error\"\n```\n\nSet `every.joblogs` to switch the collection on. GitHub deletes job logs after\nthe repository's retention period, ninety days by default, and answers 410\nafterwards, so an older log cannot be backfilled: what exists is what was\ncaptured while it was there.\n\nPublished to a Grafana that has a Loki datasource, with\n`cmd/publish_dashboard -loki \u003cdatasource-uid\u003e`, this panel shows those lines\ninstead of this note.\n",
             "mode": "markdown"
           },
           "targets": [],
@@ -12389,7 +12389,7 @@
       "panels": [
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "GitHub keeps only the last 300 events and drops the rest whatever their date, so this is only as complete as the sweep interval allowed. The eight busiest types in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "GitHub keeps only the last 300 events, none older than thirty days, so this is only as complete as the sweep interval allowed. The eight busiest types in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
           "fieldConfig": {
             "defaults": {
               "color": {

@@ -30,13 +30,14 @@ const TEXT = {
 		otherLanguages: "Other languages",
 		otherLabel: "Spanish documentation index",
 		otherNote: "the same documentation in Spanish, page for page",
-		machineReadable: "Machine-readable references",
 		intro: (repo) =>
 			`This is the index of the ghchronicle documentation site. Every entry links one page and carries that page's own description. Source, issues and releases live at ${repo}.`,
 		twinNote:
-			"Every page listed above is also served as markdown at its own path with `index.md` appended, which is the cheapest way to read one page as text.",
+			"Every page listed here is also served as markdown at its own path with `index.md` appended, which is the cheapest way to read one page as text.",
+		optionalNote:
+			"Skip this section when context is short; nothing above depends on it. Its pages serve somebody driving ghchronicle from another program or changing its code, and the full documentation repeats every page of this index in one file.",
 		fullLabel: "Full documentation",
-		full: "every English page concatenated, in this order",
+		full: "every English page concatenated, in the order of this index",
 	},
 	es: {
 		title: "Documentación de ghchronicle",
@@ -44,15 +45,25 @@ const TEXT = {
 		otherLanguages: "Otros idiomas",
 		otherLabel: "Índice de la documentación en inglés",
 		otherNote: "la misma documentación en inglés, página por página",
-		machineReadable: "Referencias legibles por máquina",
 		intro: (repo) =>
 			`Este es el índice del sitio de documentación de ghchronicle. Cada entrada enlaza una página y lleva la descripción de esa página. El código, las incidencias y las publicaciones están en ${repo}.`,
 		twinNote:
-			"Cada página de la lista se sirve también como markdown en su propia ruta con `index.md` al final, que es la forma más barata de leer una página como texto.",
+			"Cada página de esta lista se sirve también como markdown en su propia ruta con `index.md` al final, que es la forma más barata de leer una página como texto.",
+		optionalNote:
+			"Omite esta sección si el contexto es corto; nada de lo anterior depende de ella. Sus páginas sirven a quien maneja ghchronicle desde otro programa o cambia su código, y la documentación completa repite todas las páginas de este índice en un solo archivo.",
 		fullLabel: "Documentación completa",
-		full: "todas las páginas en español concatenadas, en este orden",
+		full: "todas las páginas en español concatenadas, en el orden de este índice",
 	},
 };
+
+// The pages an index lists under `## Optional`, the section llmstxt.org
+// reserves for what a reader short of context may skip. They are for somebody
+// calling ghchronicle from another program or changing it, not for somebody
+// deciding whether to run it or setting it up, and `optionalNote` above says
+// so in each locale: a slug added here is a sentence to reread there. A slug the
+// sidebar does not list fails the build, because it would otherwise be a page
+// quietly promoted back into the main list.
+const OPTIONAL = new Set(["reference/subprocess", "reference/testing"]);
 
 const REPO = "https://github.com/jmrplens/ghchronicle";
 
@@ -147,6 +158,33 @@ function assertSidebarCoversCollection(table, pages, locale) {
 	}
 }
 
+/**
+ * The sidebar with the OPTIONAL pages taken out of it, and those pages in the
+ * order the sidebar gives them. A group left with no page is dropped rather
+ * than printed as a heading over nothing.
+ *
+ * @param {{ label: string, slugs: string[] }[]} table
+ * @returns {{ core: { label: string, slugs: string[] }[], optional: string[] }}
+ */
+function splitOptional(table) {
+	const listed = table.flatMap((section) => section.slugs);
+	const unknown = [...OPTIONAL].filter((slug) => !listed.includes(slug));
+	if (unknown.length > 0) {
+		throw new Error(
+			`src/lib/llms.mjs: OPTIONAL names ${unknown.join(", ")}, which the sidebar does not list.`,
+		);
+	}
+	return {
+		core: table
+			.map((section) => ({
+				...section,
+				slugs: section.slugs.filter((slug) => !OPTIONAL.has(slug)),
+			}))
+			.filter((section) => section.slugs.length > 0),
+		optional: listed.filter((slug) => OPTIONAL.has(slug)),
+	};
+}
+
 /** "38 KB" / "1.2 MB", the way a reader decides whether to fetch something. */
 const humanSize = (bytes) =>
 	bytes >= 1024 * 1024
@@ -170,34 +208,41 @@ export async function renderIndex(locale) {
 	const otherPath = locale === "es" ? "llms.txt" : "es/llms.txt";
 	const fullPath = locale === "es" ? "es/llms-full.txt" : "llms-full.txt";
 	const url = (path) => `${pageUrl("")}${path}`;
+	/** @param {{ route: string, title: string, description: string }} page */
+	const entry = (page) =>
+		`- [${page.title}](${pageUrl(page.route)}): ${page.description}`;
+	const { core, optional } = splitOptional(table);
 
 	const lines = [`# ${text.title}`, "", `> ${home.description}`, ""];
 	const push = (...items) => lines.push(...items, "");
 
 	push(text.intro(REPO));
+	push(text.twinNote);
 	push(
 		`${text.home}: [${home.title}](${pageUrl(home.route)}): ${home.description}`,
 	);
 
-	for (const section of table) {
+	for (const section of core) {
 		push(`## ${section.label}`);
-		lines.push(
-			...section.slugs.map((slug) => {
-				const page = pages.get(slug);
-				return `- [${page.title}](${pageUrl(page.route)}): ${page.description}`;
-			}),
-			"",
-		);
+		lines.push(...section.slugs.map((slug) => entry(pages.get(slug))), "");
 	}
-
-	const fullSize = humanSize(Buffer.byteLength(await renderFull(locale)));
-	push(`## ${text.machineReadable}`);
-	push(`- [${text.fullLabel}](${url(fullPath)}) (${fullSize}): ${text.full}`);
-	push(text.twinNote);
 
 	push(`## ${text.otherLanguages}`);
 	lines.push(
 		`- [${text.otherLabel}](${url(otherPath)}): ${text.otherNote}`,
+		"",
+	);
+
+	// Last, and named in English in both files: the heading is a keyword of the
+	// llmstxt.org format rather than a label, and a reader that trims a long
+	// index looks for that word. The concatenation belongs here as well, since
+	// it repeats every page listed above.
+	const fullSize = humanSize(Buffer.byteLength(await renderFull(locale)));
+	push("## Optional");
+	push(text.optionalNote);
+	lines.push(
+		...optional.map((slug) => entry(pages.get(slug))),
+		`- [${text.fullLabel}](${url(fullPath)}) (${fullSize}): ${text.full}`,
 		"",
 	);
 
@@ -212,8 +257,12 @@ export async function renderIndex(locale) {
 }
 
 /**
- * One locale's /llms-full.txt: every page of that locale, in sidebar order,
- * as the same markdown its twin serves.
+ * One locale's /llms-full.txt: every page of that locale, in the order its
+ * index lists them, as the same markdown its twin serves.
+ *
+ * That is the sidebar's order with the OPTIONAL pages moved to the end, so a
+ * reader that stops early, or truncates the file to fit, loses the pages the
+ * index already says it may skip rather than whatever the sidebar puts last.
  *
  * @param {"en" | "es"} locale
  * @returns {Promise<string>}
@@ -223,7 +272,12 @@ export async function renderFull(locale) {
 	const pages = await pagesOf(locale);
 	assertSidebarCoversCollection(table, pages, locale);
 
-	const ordered = ["", ...table.flatMap((section) => section.slugs)];
+	const { core, optional } = splitOptional(table);
+	const ordered = [
+		"",
+		...core.flatMap((section) => section.slugs),
+		...optional,
+	];
 	return `${ordered
 		.map((slug) => renderTwin(pages.get(slug)))
 		.join("\n---\n\n")

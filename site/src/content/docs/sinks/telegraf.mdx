@@ -1,9 +1,12 @@
 ---
 title: Telegraf
-description: Line protocol posted to http_listener_v2, and the reason this is one sink instead of a hundred.
+description: "Sending GitHub metrics through Telegraf: line protocol posted to http_listener_v2, and the reason this is one sink instead of a hundred."
+searchTitle: Send GitHub metrics through Telegraf
 ---
 
 import { Aside } from "@astrojs/starlight/components";
+
+The Telegraf sink posts ghchronicle's points to Telegraf, which can forward them to any of the outputs Telegraf supports.
 
 ```yaml
 sinks:

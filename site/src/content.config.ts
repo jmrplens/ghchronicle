@@ -23,10 +23,21 @@ export const collections = {
 	// frontmatter shapes. Both `table` and `default` are fixed field names
 	// here, identical in every locale; only their values, which nobody
 	// compares, are the translation.
+	//
+	// `searchTitle` is the page's name where it stands alone: the document
+	// title, og:title and twitter:title. `title` stays what the sidebar and the
+	// h1 show, which is short on purpose, and "Loki" is a fine sidebar entry
+	// and a useless search result. The overridden Head appends the site name
+	// unless the searchTitle already says it.
+	//
+	// `faq` marks a page whose `## ...?` headings are questions answered by the
+	// paragraph under each; Head.astro publishes them as a FAQPage.
 	docs: defineCollection({
 		loader: docsLoader(),
 		schema: docsSchema({
 			extend: z.object({
+				searchTitle: z.string().optional(),
+				faq: z.boolean().optional(),
 				compactTables: z.array(z.string()).optional(),
 				defaultColumns: z
 					.array(z.object({ table: z.string(), default: z.string() }))
@@ -42,6 +53,9 @@ export const collections = {
 		schema: i18nSchema({
 			extend: z.object({
 				"ghc.breadcrumb.home": z.string().optional(),
+				"ghc.footer.byline": z.string().optional(),
+				"ghc.footer.licence": z.string().optional(),
+				"ghc.footer.changelog": z.string().optional(),
 			}),
 		}),
 	}),

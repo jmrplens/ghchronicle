@@ -68,6 +68,74 @@ function* files(dir, matches, prefix = "") {
 	}
 }
 
+// A link target a reader of the text cannot follow without knowing where the
+// text came from: rooted at a host it does not name, relative to a file it
+// does not have, or a fragment of whichever page a concatenation puts first.
+// The twins and the llms files are read as text, often after being copied off
+// the site, so every target in them has to carry its own origin; see
+// absoluteTargets in src/lib/page-markdown.mjs. Written again here rather than
+// imported, so a blind spot of the code that writes the targets is not also
+// one of the check that reads them.
+const SCHEME = /^[a-z][a-z0-9+.-]*:/i;
+
+/**
+ * The link and image targets of a markdown text that carry no scheme. Fenced
+ * code and code spans are text, and a path in them is not a link.
+ *
+ * @param {string} text
+ * @returns {string[]} the offending targets, in order
+ */
+function unanchoredTargets(text) {
+	const found = [];
+	let fence = null;
+	let prose = [];
+	const scan = () => {
+		const bare = prose
+			.join("\n")
+			.replaceAll(
+				/(?<!`)(`+)(?!`)(?:[^\n]|\n(?![ \t]*\n))*?(?<!`)\1(?!`)/g,
+				"",
+			);
+		for (const match of bare.matchAll(/\]\(([^)\s]+)/g)) {
+			if (!SCHEME.test(match[1])) found.push(match[1]);
+		}
+		prose = [];
+	};
+	for (const line of text.split("\n")) {
+		const marker = /^[ \t]*(`{3,}|~{3,})/.exec(line);
+		if (fence !== null) {
+			if (
+				marker !== null &&
+				marker[1][0] === fence[0] &&
+				marker[1].length >= fence.length
+			) {
+				fence = null;
+			}
+			continue;
+		}
+		if (marker !== null) {
+			scan();
+			fence = marker[1];
+			continue;
+		}
+		prose.push(line);
+	}
+	scan();
+	return found;
+}
+
+/** Fails a file that holds any target unanchoredTargets finds, naming the first few. */
+function checkTargets(name, text) {
+	const targets = unanchoredTargets(text);
+	if (targets.length > 0) {
+		fail(
+			`/${name} has ${targets.length} link target(s) with no origin, such as ${targets
+				.slice(0, 3)
+				.join(", ")}`,
+		);
+	}
+}
+
 // The not-found page is not a route: it is one file GitHub Pages serves for
 // every URL that does not exist. It has no twin, and no index lists it.
 const NOT_A_PAGE = new Set(["404.html"]);
@@ -96,6 +164,7 @@ if (only !== "llms") {
 				`/${twin} is empty or has no heading (${statSync(join(DIST, twin)).size} bytes)`,
 			);
 		}
+		checkTargets(twin, text);
 
 		// The announcement, which is how anything finds the twin without guessing
 		// the convention.
@@ -143,6 +212,7 @@ if (only !== "twins") {
 			fail(`/${index} is empty`);
 			continue;
 		}
+		checkTargets(index, text);
 		if (!index.endsWith("llms-full.txt")) {
 			const listed = [...text.matchAll(/\]\((https?:\/\/[^)]+)\)/g)].map(
 				(m) => m[1],

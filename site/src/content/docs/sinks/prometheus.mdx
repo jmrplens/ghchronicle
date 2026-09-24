@@ -1,11 +1,14 @@
 ---
 title: Prometheus
-description: An exporter, not a pusher, and what the reduction to current values does to each measurement.
+description: "GitHub metrics in Prometheus: an exporter, not a pusher, and what the reduction to current values does to each measurement."
+searchTitle: GitHub metrics in Prometheus
 compactTables:
   - Rule
 ---
 
 import { Aside } from "@astrojs/starlight/components";
+
+The Prometheus sink is an exporter that serves the current value of each GitHub metric for Prometheus to scrape.
 
 ```yaml
 sinks:
@@ -27,9 +30,9 @@ github_repo_stars{repo="ghchronicle",language="Go",visibility="public"} 283
 github_workflow_runs_count{repo="ghchronicle",conclusion="success"} 412
 ```
 
-## What it cannot serve
+## Can Prometheus keep the history?
 
-The dated history, and not by choice. Prometheus stamps a sample at scrape time
+No, and not by choice: it cannot serve the dated history. Prometheus stamps a sample at scrape time
 and rejects anything meaningfully older: measured against Prometheus 3.14 with
 `--web.enable-otlp-receiver` and a thirty-minute out-of-order window, a sample
 dated two days back comes back as **HTTP 400**.

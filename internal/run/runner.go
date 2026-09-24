@@ -949,7 +949,11 @@ func (r *Runner) noteCounts(points []sink.Point) {
 func (r *Runner) actions(now time.Time) collect.Actions {
 	if r.Backfill {
 		// Every run's jobs, however many requests that is. A backfill
-		// was asked to take as long as it takes.
+		// was asked to take as long as it takes. GitHub serves the jobs
+		// for as long as it holds the run, but not their steps: measured
+		// on 2026-09-24, a run 278 days old still listed every job with
+		// its times and runner, and every run created before 12 April,
+		// about five and a half months back, listed them with no steps.
 		return collect.Actions{Since: r.BackfillSince, Jobs: true, MaxJobRuns: 0, Walk: r.walk()}
 	}
 	every, _ := r.Cfg.Interval("actions")
@@ -1013,8 +1017,13 @@ func (r *Runner) jobLogs(now time.Time) collect.JobLogs {
 		every, _ := r.Cfg.Interval("joblogs")
 		return collect.JobLogs{Since: now.Add(-2 * every)}
 	}
-	// GitHub keeps logs for ninety days and answers 410 after that,
-	// so walking further would be paying for nothing.
+	// GitHub keeps logs for the repository's retention period, ninety days
+	// by default, at most ninety on a public repository and up to four
+	// hundred on a private one, and answers 410 after it: measured on
+	// 2026-09-24, a public repository's log answered at ninety days and
+	// was a 410 at ninety two. The walk stops at ninety whatever the
+	// setting, which is every log a public repository still has; a private
+	// repository kept longer loses the rest, since the setting is not read.
 	since := now.AddDate(0, 0, -90)
 	if r.BackfillSince.After(since) {
 		since = r.BackfillSince

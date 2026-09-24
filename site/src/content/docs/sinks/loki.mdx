@@ -1,9 +1,12 @@
 ---
 title: Loki
 description: The twenty-two measurements that are events rather than numbers, and the age horizon that keeps a push from being refused.
+searchTitle: Send GitHub events to Loki
 ---
 
 import { Aside } from "@astrojs/starlight/components";
+
+The Loki sink sends the GitHub activity that is an event rather than a number (a star, a release, a failed run) to Grafana Loki as log lines.
 
 ```yaml
 sinks:

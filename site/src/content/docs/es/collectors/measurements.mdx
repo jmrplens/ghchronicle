@@ -1,6 +1,7 @@
 ---
 title: Medidas
-description: Cada medida, sus etiquetas, sus campos y cómo se fecha cada una.
+description: Cada medida que ghchronicle escribe a partir de la API de GitHub, sus etiquetas, sus campos y cómo se fecha cada una.
+searchTitle: "Medidas de GitHub: etiquetas, campos y fechas"
 compactTables:
   - Fechado
 ---
@@ -503,6 +504,12 @@ más ejecuciones que eso se completa a veinte por pasada. Una ejecución se
 recuerda solo cuando la pasada que la listó ha terminado bien, porque el
 runner no conserva nada de un colector que falló a medias.
 
+Los jobs de una ejecución duran más que sus pasos. Medido el 24 de septiembre de
+2026, GitHub listaba todos los jobs de una ejecución de hace 278 días, con sus
+tiempos y su runner, y devolvía una lista de pasos vacía para toda ejecución
+creada antes del 12 de abril, unos cinco meses y medio atrás. Un relleno escribe
+esos jobs con `steps` a 0 y sin filas de `gh_workflow_step`.
+
 `retention_days` es la retención que un artefacto tuvo de verdad, que casi
 nunca es la configurada por omisión: ochenta y ocho de cada cien artefactos
 medidos vivían un día frente a un ajuste de noventa.
@@ -854,8 +861,8 @@ separarlos.
 | `gh_notification` | fechado, última actualización | `reason`, `private`, `subject_type`   | `is_unread`, `notifications`, `title`, `url` |
 
 Ambas son ventanas, no historias. GitHub guarda los últimos trescientos eventos
-sea cual sea su fecha y descarta rápido las notificaciones leídas. Lo que se
-captura es lo que había cuando corrió la pasada. `gh_event` no lleva actor,
+de los últimos treinta días, y descarta las notificaciones a los tres meses
+salvo las guardadas. Lo que se captura es lo que había cuando corrió la pasada. `gh_event` no lleva actor,
 porque el feed es el de la propia cuenta y el actor era el login en todas las
 filas; `action` y `ref_type` se escriben en todas las filas, `(none)` en un
 push. `is_unread` es un campo: leer un hilo no mueve su `updated_at`, así que la
@@ -1030,9 +1037,10 @@ leídas de Loki en el lugar de ese panel (ver
 
 Solo jobs fallidos, y solo las últimas cuarenta líneas de cada uno. La salida de
 un job correcto son miles de líneas que nadie va a leer, cada log cuesta una
-petición, y la cola es donde un fallo se explica. GitHub guarda los logs
-exactamente noventa días y responde 410 después, así que no hay forma de
-rellenarlos.
+petición, y la cola es donde un fallo se explica. GitHub borra los logs pasado
+el periodo de retención del repositorio, noventa días por omisión, y responde
+410 cuando ya no están; un relleno solo pide los últimos noventa días, diga lo
+que diga el ajuste, y como mucho 500 jobs fallidos por repositorio.
 
 `workflow` es aquí la misma ruta de fichero, por el mismo ayudante, así que una
 línea de log se une con la ejecución que la imprimió; y `branch` pasó a ser el

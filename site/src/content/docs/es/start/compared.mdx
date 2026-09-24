@@ -1,0 +1,174 @@
+---
+title: Comparado con las alternativas
+description: "ghchronicle junto a GitHub Insights, repohistory, github-repo-stats, star-history y los exportadores de Prometheus: qué guarda cada uno, cuánto y dónde."
+searchTitle: ghchronicle y otras herramientas de métricas de GitHub
+---
+
+import { Aside } from "@astrojs/starlight/components";
+import stats from "../../../../data/stats.json";
+
+Varias herramientas responden a una parte de lo que responde ghchronicle:
+guardar el tráfico de GitHub más allá de catorce días, dibujar la curva de
+estrellas o llevar recuentos de repositorios a Prometheus. Se diferencian en lo
+que cubren, en si una fila lleva la fecha en que ocurrió la cosa o el momento
+en que alguien miró, y en dónde acaban los datos. Esta página pone ocho de
+ellas junto a ghchronicle, dice de dónde sale cada celda y dice cuándo una de
+ellas es la mejor elección.
+
+## Qué guarda cada una
+
+| Herramienta | Qué cubre | Cuánto tiempo se guarda | Fechado, o un valor actual | Relleno |
+| ----------- | --------- | ----------------------- | -------------------------- | ------- |
+| [ghchronicle](/ghchronicle/es/collectors/) | {stats.families} familias: tráfico, estrellas, forks, ejecuciones de workflows con sus jobs y sus pasos, pull requests, issues, commits, el feed de eventos, notificaciones, alertas, facturación y más | mientras lo guarde el almacén al que escribe | fechado: cada punto en el momento en que ocurrió la cosa; una lista de diez sin fecha al inicio de su día UTC; un estado actual en la pasada | sí, `-backfill` recorre cada familia activada hasta donde responde la API, pero lee solo las cien entregas de webhook más recientes de cada hook y como mucho 500 logs de jobs fallidos por repositorio; no el tráfico de hace más de 14 días, el feed de eventos más allá del techo de GitHub, los logs de jobs de hace más de 90 días, las fechas de las estrellas de un repositorio cuya lista de stargazers el token no puede leer ni, desde el 2026-10-01, las ejecuciones de workflows más antiguas que el ajuste de retención del repositorio |
+| [El propio GitHub](https://docs.github.com/es/rest/metrics/traffic) | tráfico: visitas y clones por día, los diez principales referentes y rutas; el feed de eventos; la bandeja de notificaciones; ejecuciones, logs y artefactos de Actions | el tráfico, 14 días; el feed de eventos, hasta 300 eventos y 30 días; la bandeja, 3 meses salvo las marcadas como guardadas; logs y artefactos de Actions, 90 días por omisión, y desde el 2026-10-01 también las ejecuciones | visitas y clones por día; referentes y rutas como una sola lista de diez para los 14 días enteros | no aplica: no se sirve nada anterior a esas ventanas |
+| [KipHub Traffic](https://github.com/farique1/KipHub-Traffic/blob/711ccf7558bae756eed14accdf1b418cbe17c7f3/README.md) | solo tráfico: visitas y clones por día, y la lista de referentes de 14 días de GitHub | mientras se conserve su fichero JSON local | visitas y clones por día, fusionados en un solo fichero en cada descarga | no: su README dice que se descargue más a menudo que cada 14 días |
+| [repohistory](https://github.com/repohistory/repohistory/blob/9dd4ac28b42d372cdb91668e379569b0cc69d694/README.md) | tráfico: clones, visitas, referentes y páginas populares; historia de estrellas | desde el primer inicio de sesión en adelante | tráfico guardado por repositorio y fecha; estrellas en la fecha de cada una para las 400 páginas de 100 que lee como mucho, las 40.000 más antiguas, y el resto repartido por igual entre los días posteriores a la última leída y marcado como estimado | el tráfico no, empieza en el primer inicio de sesión; las estrellas, de la lista de stargazers de GitHub |
+| [github-repo-stats](https://github.com/jgehrcke/github-repo-stats/blob/ff48771cbb4324c3b77490bbfc26d6a5f3831cdb/README.md) | tráfico: visitas y clones por día, principales referentes y rutas; stargazers y forks a lo largo del tiempo | "un periodo arbitrariamente largo", como instantáneas diarias guardadas en git | una instantánea diaria del tráfico; estrellas y forks en la fecha de cada uno, y una instantánea diaria del número de estrellas que lleva la curva más allá de 40.000 | estrellas y forks sí, las estrellas hasta las 40.000 más antiguas, un tope que su código llama un límite de la API de GitHub; el tráfico no |
+| [grafana/github-traffic](https://github.com/grafana/github-traffic/blob/f3ab4e1cb5fbeb52983fd67e93a3118e1630e96e/README.md) | visitas y clones del día más reciente de la ventana, el número de estrellas, principales rutas y referentes, el límite de la API | no se indica: lo que guarde el Prometheus que lo lee | valores actuales, fijados en cada ejecución | ninguno en su código |
+| [promhippie/github_exporter](https://github.com/promhippie/github_exporter/blob/a9208c3a257a6605a01cf0b18637dd4fa28b4153/README.md) | repositorios, organizaciones y sus puestos, facturación, runners propios, estadísticas de administración; ejecuciones y jobs de workflows desde un webhook | ejecuciones y jobs guardados en su base de datos durante una ventana de purga, 24 horas por omisión; el resto no se indica | valores actuales; las horas de ejecuciones y jobs se exponen como valores de marca de tiempo | las ejecuciones y los jobs llegan solo por webhook, según ocurren; por lo demás no se indica |
+| [githubexporter/github-exporter](https://github.com/githubexporter/github-exporter/blob/eedff7e7d54326c9607faa8b2ffc28a0140685de/README.md) | por repositorio: estrellas, forks, watchers, issues abiertas, pull requests, tamaño, descargas de releases; el límite de la API | no se indica: lo que guarde el Prometheus que lo lee | valores actuales | no se indica |
+| [star-history.com](https://github.com/star-history/star-history/blob/608d0e39be441665c01cd6ac1fd01ca5ec1eaf39/README.md) | solo estrellas | no se guarda nada para ti: cada gráfico se dibuja desde la lista de stargazers de GitHub | fechado por el `starred_at` de una muestra de estrellas, no de cada una: por debajo de 15 páginas de 100 lee todas y se queda con unas quince estrellas espaciadas por igual (todas si son menos de 30); a partir de 15 páginas (16 en su API de SVG) lee ese número de páginas repartidas por la lista y se queda con la primera estrella de cada una; un último punto da el total de hoy | la curva entera, en cada dibujo |
+
+## Dónde se ejecuta y dónde escribe cada una
+
+| Herramienta | Se ejecuta como | Escribe en | Autoalojada |
+| ----------- | --------------- | ---------- | ----------- |
+| [ghchronicle](/ghchronicle/es/install/) | un único binario de Go para Linux, macOS y Windows; Docker; una unidad de systemd; una GitHub Action | InfluxDB, PostgreSQL, Graphite, Elasticsearch, Loki, OpenTelemetry, Telegraf, un fichero o stdout, y Prometheus solo como valores actuales; un dashboard de Grafana generado para cinco de ellos | sí |
+| El propio GitHub | github.com: los gráficos de Insights y la API REST; el gráfico de tráfico de un repositorio privado necesita GitHub Pro, Team o Enterprise Cloud | nada que sea tuyo | no aplica |
+| KipHub Traffic | un script de Python, con una ventana opcional de Dear PyGui, que se lanza a mano; último commit el 2024-02-16 | un fichero JSON en una carpeta local `JSONs` | sí, en tu propia máquina |
+| repohistory | un servicio alojado en repohistory.com, instalado como GitHub App, que recoge una vez al día; gratis para un repositorio, de pago para más | su propia base de datos de Supabase; exportación a CSV | el código es AGPL-3.0; ejecutar una copia propia no se indica |
+| github-repo-stats | una GitHub Action, una vez al día, un repositorio por job | ficheros CSV y un informe en HTML y PDF, con commit en una rama | sí, en las Actions de tu propio repositorio |
+| grafana/github-traffic | un contenedor Docker, en Python, cada hora por omisión; para un usuario o una organización | un endpoint de Prometheus en el puerto 8001; el dashboard 15000 de Grafana | sí |
+| promhippie/github_exporter | un binario de Go, paquetes DEB y RPM, contenedores; los colectores de webhook necesitan que sea accesible desde internet | un endpoint de Prometheus; Chai (el predeterminado en la mayoría de sus binarios publicados), SQLite, MySQL o PostgreSQL para los datos del webhook | sí |
+| githubexporter/github-exporter | un contenedor Docker, en Go, en el puerto 9171 | un endpoint de Prometheus | sí |
+| star-history.com | una web alojada, una extensión de Chrome y una API que dibuja el gráfico como SVG | una imagen para incrustar | alojada; la sección de desarrollo de su README la ejecuta en local |
+
+Las filas de las demás herramientas son lo que dice el README, la documentación
+o el código de cada una en el commit enlazado, leídos el 2026-09-24, con "no se
+indica" donde no dicen nada. Además de los README enlazados en la primera
+tabla, las celdas salen de estos ficheros:
+
+- repohistory en `9dd4ac2` (2026-03-04): el
+  [trabajo diario](https://github.com/repohistory/repohistory/blob/9dd4ac28b42d372cdb91668e379569b0cc69d694/.github/workflows/cron.yaml),
+  el [escritor del tráfico](https://github.com/repohistory/repohistory/blob/9dd4ac28b42d372cdb91668e379569b0cc69d694/web/src/utils/update-traffic.ts),
+  el [lector de estrellas](https://github.com/repohistory/repohistory/blob/9dd4ac28b42d372cdb91668e379569b0cc69d694/web/src/utils/repo/stars.ts),
+  la [página de precios](https://github.com/repohistory/repohistory/blob/9dd4ac28b42d372cdb91668e379569b0cc69d694/landing/app/pricing/page.tsx),
+  la [ruta de exportación](https://github.com/repohistory/repohistory/blob/9dd4ac28b42d372cdb91668e379569b0cc69d694/web/src/app/api/export/%5BrepoId%5D/route.ts)
+  y la [licencia](https://github.com/repohistory/repohistory/blob/9dd4ac28b42d372cdb91668e379569b0cc69d694/LICENSE).
+- github-repo-stats en `ff48771` (2026-07-10): el
+  [recolector](https://github.com/jgehrcke/github-repo-stats/blob/ff48771cbb4324c3b77490bbfc26d6a5f3831cdb/fetch.py),
+  cuyo recorrido de estrellas dice que devuelve "at most the oldest 40.000
+  stargazers (a GitHub HTTP API limitation)", y que lee el número de
+  estrellas en cada ejecución y lo guarda cuando ha cambiado, "for building
+  up a stargazer timeseries beyond said limit".
+- grafana/github-traffic en `f3ab4e1` (2026-05-25): su único
+  [fichero de código](https://github.com/grafana/github-traffic/blob/f3ab4e1cb5fbeb52983fd67e93a3118e1630e96e/github-traffic.py),
+  que fija cada gauge de tráfico con el último día de la ventana.
+- promhippie/github_exporter en `a9208c3` (2026-09-21): las
+  [métricas](https://github.com/promhippie/github_exporter/blob/a9208c3a257a6605a01cf0b18637dd4fa28b4153/docs/partials/metrics.md),
+  los [ajustes](https://github.com/promhippie/github_exporter/blob/a9208c3a257a6605a01cf0b18637dd4fa28b4153/docs/partials/envvars.md),
+  la [guía de uso](https://github.com/promhippie/github_exporter/blob/a9208c3a257a6605a01cf0b18637dd4fa28b4153/docs/content/usage.md),
+  los [almacenes](https://github.com/promhippie/github_exporter/tree/a9208c3a257a6605a01cf0b18637dd4fa28b4153/pkg/store),
+  la [base de datos predeterminada](https://github.com/promhippie/github_exporter/blob/a9208c3a257a6605a01cf0b18637dd4fa28b4153/pkg/command/command.go)
+  y los [binarios publicados](https://github.com/promhippie/github_exporter/blob/a9208c3a257a6605a01cf0b18637dd4fa28b4153/.goreleaser.yaml).
+- githubexporter/github-exporter en `eedff7e` (2026-06-09): la
+  [lista de métricas](https://github.com/githubexporter/github-exporter/blob/eedff7e7d54326c9607faa8b2ffc28a0140685de/METRICS.md)
+  y la [definición de métricas](https://github.com/githubexporter/github-exporter/blob/eedff7e7d54326c9607faa8b2ffc28a0140685de/exporter/metrics.go).
+- star-history en `608d0e3` (2026-09-12): el
+  [cargador del gráfico](https://github.com/star-history/star-history/blob/608d0e39be441665c01cd6ac1fd01ca5ec1eaf39/shared/common/chart.tsx),
+  el [cliente de la API](https://github.com/star-history/star-history/blob/608d0e39be441665c01cd6ac1fd01ca5ec1eaf39/shared/common/api.tsx)
+  y las [constantes del servidor de SVG](https://github.com/star-history/star-history/blob/608d0e39be441665c01cd6ac1fd01ca5ec1eaf39/backend/const.ts).
+- KipHub Traffic en `711ccf7` (2024-02-16): solo su README.
+
+La fila de GitHub sale de la documentación de GitHub, leída el mismo día:
+[el tráfico en la API REST](https://docs.github.com/es/rest/metrics/traffic),
+[el gráfico de tráfico](https://docs.github.com/es/repositories/viewing-activity-and-data-for-your-repository/viewing-traffic-to-a-repository),
+[el feed de eventos](https://docs.github.com/es/rest/activity/events),
+[la bandeja de notificaciones](https://docs.github.com/es/subscriptions-and-notifications/concepts/about-notifications#notification-retention-policy)
+y [la retención de Actions](https://docs.github.com/es/repositories/managing-your-repositorys-settings-and-features/enabling-features-for-your-repository/managing-github-actions-settings-for-a-repository#configuring-the-retention-period-for-checks-workflow-runs-commit-statuses-artifacts-and-logs-in-your-repository).
+La fila de ghchronicle sale de este sitio: [qué se
+recoge](/ghchronicle/es/collectors/), [la fecha del
+punto](/ghchronicle/es/how/dating/), [relleno
+histórico](/ghchronicle/es/how/backfill/), [elegir
+almacén](/ghchronicle/es/sinks/) y [formas de
+instalar](/ghchronicle/es/install/). Las herramientas de terceros cambian:
+comprueba sus páginas antes de fiarte de una celda.
+
+## Fechado, o un valor actual
+
+La columna que más separa a estas herramientas es la cuarta. Un exportador de
+Prometheus guarda un gauge, y la historia de un gauge son las muestras que
+Prometheus tomó de él, cada una sellada cuando la leyó. grafana/github-traffic
+fija su gauge de visitas con el día más reciente de los catorce, así que lo que
+Prometheus guarda es ese número tal como estaba en cada lectura, sellado con la
+hora de la lectura y no con el día que cuenta.
+
+Las herramientas que escriben ficheros o filas pueden guardar el día mismo.
+KipHub Traffic, repohistory y github-repo-stats guardan visitas y clones por
+día, que es la parte del tráfico que tiene fecha, y github-repo-stats y
+repohistory sacan las estrellas de la fecha en que se dio cada una. ghchronicle
+aplica la misma regla a cada superficie que lee, y esa regla es la razón de que
+su lado de Prometheus solo tenga valores actuales: Prometheus rechaza una
+muestra fechada días atrás, como mide [la fecha del
+punto](/ghchronicle/es/how/dating/#lo-que-prometheus-no-puede-sostener-por-construcción).
+
+## Las ventanas del propio GitHub
+
+Casi todas las herramientas de esta página existen por la segunda fila. El tráfico
+son catorce días. El feed de eventos sirve hasta trescientos eventos, ninguno de
+hace más de treinta días. La bandeja conserva las notificaciones tres meses, salvo
+las marcadas como guardadas. Los logs y los artefactos se borran a los noventa días por
+omisión, y la documentación de GitHub dice que desde el 1 de octubre de 2026 el
+mismo ajuste de retención borra también las ejecuciones de workflows, las
+comprobaciones y los estados de commit, que hasta entonces se conservaban 400
+días o más. Un repositorio público puede fijarlo entre uno y noventa días; uno
+privado, hasta 400.
+
+Lo que GitHub sirve en esas ventanas está completo mientras dura. Para una
+pregunta sobre las dos últimas semanas, los gráficos de Insights y la API REST
+son la herramienta adecuada.
+
+## Cuándo es mejor otra herramienta
+
+- **Un gráfico de estrellas para un README, y nada más.** star-history.com lo
+  dibuja a demanda desde la lista de stargazers de GitHub, sin nada que
+  ejecutar y nada que guardar. Desde julio de 2026 GitHub sirve esa lista solo
+  a los administradores y colaboradores del repositorio
+  ([su página de estrellas](https://docs.github.com/es/rest/activity/starring#new-access-restrictions)), y cómo dibuja star-history.com el gráfico de
+  cualquier otro no consta en la fuente fijada arriba. La tarjeta de ghchronicle es una función
+  secundaria y necesita un token y una ejecución.
+- **Tráfico de unos pocos repositorios, guardado en git, sin base de datos.**
+  github-repo-stats es un workflow diario con un job por repositorio, hace
+  commit de sus datos en una rama y publica un informe en HTML y PDF.
+  ghchronicle necesita un almacén en algún sitio al que llegue.
+- **Historia del tráfico sin ejecutar nada.** repohistory es un dashboard
+  alojado detrás de una GitHub App, gratis para un repositorio.
+- **Un recuento actual en un Prometheus que ya tienes.**
+  githubexporter/github-exporter y grafana/github-traffic son un contenedor cada
+  uno y se leen como cualquier otro objetivo. Si un recuento actual es todo lo
+  que quieres, son lo más pequeño que ejecutar.
+- **Runners propios, puestos de una organización o estadísticas de
+  administración.** promhippie/github_exporter tiene colectores para las tres
+  cosas, y ghchronicle no recoge ninguna.
+- **Tráfico en una sola máquina, sin ningún servidor.** KipHub Traffic lo
+  guarda en un fichero JSON y lo dibuja en una ventana de escritorio, siempre
+  que alguien lo ejecute cada quince días.
+
+<Aside type="note" title="Leído, no ejecutado">
+  Ninguna de las otras ocho herramientas se ejecutó para esta página. Cada
+  celda de sus filas es lo que dice su propio README, su documentación o su
+  código, leídos el 2026-09-24, y nada de ello es una medida. No se midió lo
+  que cuesta cada una en llamadas a la API, cómo se comporta en una cuenta de
+  cincuenta repositorios ni cómo se comparan sus cifras con las de ghchronicle
+  para el mismo día.
+</Aside>
+
+## Por dónde seguir
+
+- [Respuestas cortas](/ghchronicle/es/start/questions/): el tráfico más allá
+  de catorce días, las estrellas a lo largo del tiempo, Prometheus y las
+  organizaciones, en un párrafo cada una.
+- [La fecha del punto](/ghchronicle/es/how/dating/): la regla detrás de la
+  cuarta columna.
+- [Elegir almacén](/ghchronicle/es/sinks/): qué guarda cada destino de
+  ghchronicle.

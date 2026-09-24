@@ -8,9 +8,10 @@
 
 github:
   # A classic or fine-grained personal access token. Read scopes are enough,
-  # but traffic needs push access to the repository and Dependabot alerts need
-  # the security_events scope. Anything the token cannot see is recorded as
-  # unavailable rather than as a failure.
+  # but traffic needs push access to the repository (and, on a fine-grained
+  # token, the repository permission Administration: read), and Dependabot
+  # alerts need the security_events scope. Anything the token cannot see is
+  # recorded as unavailable rather than as a failure.
   token: ${GITHUB_TOKEN}
 
   # Calls never spent, so whatever else uses this token keeps working. The
@@ -266,8 +267,8 @@ every:
     stats: 12h        # GitHub recomputes these slowly anyway
     discussions: 2h
     account: 12h      # profile, contribution calendar, contribution totals
-    events: 30m       # the feed keeps only the last 300 events, whatever their date
-    notifs: 30m       # read notifications disappear quickly
+    events: 30m       # the feed keeps only the last 300 events, none older than 30 days
+    notifs: 30m       # GitHub keeps inbox notifications for three months unless they are saved
     billing: 6h
     profile: 12h      # packages, gists, social accounts
     outbound: 12h     # stars given, and work in other people's repositories

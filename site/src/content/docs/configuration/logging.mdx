@@ -1,12 +1,15 @@
 ---
 title: Logging
 description: Level, format, the rotating file that never replaces standard error, and the two lines worth alerting on.
+searchTitle: Logging in ghchronicle
 defaultColumns:
   - table: Key
     default: Default
 ---
 
 import { Aside } from "@astrojs/starlight/components";
+
+ghchronicle logs to standard error, and the `log` block sets the level, the format and an optional rotating file.
 
 ```yaml
 log:

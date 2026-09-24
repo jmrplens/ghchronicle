@@ -1,10 +1,13 @@
 ---
 title: Graphite
-description: El protocolo de texto plano sobre TCP, y la ruta métrica exacta, que es el contrato del dashboard.
+description: "Enviar métricas de GitHub a Graphite: el protocolo de texto plano sobre TCP, y la ruta métrica exacta, que es el contrato del dashboard."
+searchTitle: Enviar métricas de GitHub a Graphite
 ---
 
 import { Aside } from "@astrojs/starlight/components";
 import stats from "../../../../data/stats.json";
+
+El destino Graphite envía los campos numéricos de ghchronicle a Graphite por TCP, cada uno en la fecha en que ocurrió.
 
 ```yaml
 sinks:

@@ -1,6 +1,7 @@
 ---
 title: Measurements
-description: Every measurement, its tags, its fields, and how each one is dated.
+description: Every measurement ghchronicle writes from the GitHub API, its tags, its fields, and how each one is dated.
+searchTitle: "GitHub measurements: tags, fields and dates"
 compactTables:
   - Dating
 ---
@@ -489,6 +490,12 @@ sweep pays, not which runs get jobs: a window with more runs than that fills in
 twenty a sweep. A run is remembered only once the sweep that listed it
 succeeded, because the runner keeps nothing of a collector that failed partway.
 
+A run's jobs outlive their steps. Measured on 24 September 2026, GitHub listed
+every job of a run 278 days old, with its times and its runner, and gave every
+run created before 12 April, about five and a half months back, an empty step
+list. A backfill writes those jobs with `steps` at 0 and no `gh_workflow_step`
+rows for them.
+
 `retention_days` is the retention an artifact actually got, which is rarely the
 configured default: eighty-eight of a hundred artifacts measured lived one day
 against a setting of ninety.
@@ -829,8 +836,8 @@ the two can be told apart.
 | `gh_notification` | dated, last update | `reason`, `private`, `subject_type`   | `is_unread`, `notifications`, `title`, `url` |
 
 Both are windows, not histories. GitHub keeps the last three hundred events
-whatever their dates and discards read notifications quickly. What is captured
-is what was there when the sweep ran. `gh_event` carries no actor, since the
+of the past thirty days, and drops notifications after three months unless they
+are saved. What is captured is what was there when the sweep ran. `gh_event` carries no actor, since the
 feed is the account's own and the actor was the login on every row; `action`
 and `ref_type` are written on every row, `(none)` on a push. `is_unread` is a
 field: reading a thread does not move its `updated_at`, so the daily read with
@@ -998,8 +1005,10 @@ publishes the dashboard with the lines drawn from Loki in that panel's place
 
 Only failed jobs, and only the last forty lines of each. A successful job's
 output is thousands of lines nobody will read, each log costs a request, and
-the tail is where a failure explains itself. GitHub keeps logs for exactly
-ninety days and answers 410 after that, so there is no backfilling them.
+the tail is where a failure explains itself. GitHub deletes logs after the
+repository's retention period, ninety days by default, and answers 410 once
+they are gone; a backfill asks only for the last ninety days, whatever the
+setting, and at most 500 failed jobs per repository.
 
 `workflow` here is the same file path, through the same helper, so a log line
 joins to the run that printed it; and `branch` became the field `head_branch`

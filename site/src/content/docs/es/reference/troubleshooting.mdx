@@ -1,6 +1,7 @@
 ---
 title: Resolución de problemas
 description: Los mensajes que parecen errores y no lo son, los que sí lo son, y los datos que parecen mal y no lo están.
+searchTitle: Resolver problemas de ghchronicle
 ---
 
 import { Aside } from "@astrojs/starlight/components";
@@ -14,7 +15,8 @@ y sigue: un repositorio con una función apagada no debe detener la pasada de lo
 otros cuarenta.
 
 Si son _todos_ los repositorios y no uno, es el token. El tráfico necesita
-acceso de escritura; las alertas necesitan `security_events`. Ver
+acceso de escritura y, en un token fine-grained, el permiso de repositorio
+Administration (lectura); las alertas necesitan `security_events`. Ver
 [el token](/ghchronicle/es/start/token/).
 
 **Una función encendida y nada recogido de ella.** Code scanning activado esta
@@ -155,7 +157,7 @@ datos. El exportador sirve valores actuales, así que la ventana de tráfico de
 catorce días se colapsa a su día más reciente y la historia de estrellas al
 total actual. Ver [la fecha del punto](/ghchronicle/es/how/dating/).
 
-## No se escribe nada
+## ¿Por qué no se escribe nada?
 
 Ejecuta una pasada en primer plano y lee lo que dice. Después comprueba, en
 orden:
@@ -191,7 +193,7 @@ Una familia a la que aún no le toca sencillamente no aparece.
   [el fichero de estado](/ghchronicle/es/configuration/#state_file).
 </Aside>
 
-## Loki descarta entradas
+## ¿Por qué Loki descarta entradas?
 
 Busca la línea de depuración que las cuenta. Loki rechaza una entrada que esté
 más atrasada que su ventana de desorden respecto a la entrada más nueva que ya

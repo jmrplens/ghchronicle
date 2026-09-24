@@ -20,9 +20,10 @@ import (
 // duration of a failing job is a number; its last forty lines are the answer.
 //
 // Only failures, and only their tail. A successful job's output is thousands
-// of lines nobody will read, GitHub deletes logs after ninety days anyway, and
-// each one costs a request. Storing the tail of the failures is the whole
-// value at a fraction of the cost.
+// of lines nobody will read, GitHub deletes logs after the repository's
+// retention period anyway, ninety days by default, and each one costs a
+// request. Storing the tail of the failures is the whole value at a fraction
+// of the cost.
 type JobLogs struct {
 	// Since bounds which runs are considered.
 	Since time.Time
@@ -31,8 +32,9 @@ type JobLogs struct {
 	Tail int
 	// MaxJobs caps how many failed jobs are fetched per repository per sweep.
 	MaxJobs int
-	// Walk bounds the failed-run list. GitHub keeps logs for ninety days, so
-	// walking further is paying for 410s.
+	// Walk bounds the failed-run list. GitHub keeps logs for the repository's
+	// retention period, ninety days by default, so walking further is paying
+	// for 410s.
 	Walk Walk
 }
 
@@ -184,7 +186,7 @@ func logTailPoints(ctx context.Context, c *ghapi.Client, repo Repo, run *runRow,
 	text, err := c.GetText(ctx, fmt.Sprintf("/repos/%s/actions/jobs/%d/logs", repo.FullName, job.ID))
 	if err != nil {
 		if isSkippable(err) {
-			return nil, nil // GitHub deletes logs after ninety days
+			return nil, nil // GitHub deletes logs after the retention period
 		}
 		return nil, err
 	}

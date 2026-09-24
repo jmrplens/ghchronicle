@@ -97,7 +97,13 @@ const MANIFEST = [
 	{
 		file: "getting-started.md",
 		title: "Getting started",
-		routes: ["start", "start/quickstart", "start/token"],
+		routes: [
+			"start",
+			"start/quickstart",
+			"start/token",
+			"start/compared",
+			"start/questions",
+		],
 	},
 	{
 		file: "how-it-works.md",
@@ -170,19 +176,24 @@ const MANIFEST = [
 	{ file: "testing.md", routes: ["reference/testing"] },
 ];
 
-// The one page that is not documentation. Its copy lives in a typed object
-// rather than in prose (src/data/home.ts), the repository's own README opens
-// with the same pitch, and a landing reduced to Markdown is a list of links to
-// the pages docs/ already holds.
+// The pages that are not documentation. The landing's copy lives in a typed
+// object rather than in prose (src/data/home.ts), the repository's own README
+// opens with the same pitch, and a landing reduced to Markdown is a list of
+// links to the pages docs/ already holds. The release history page states
+// VERSION and points at CHANGELOG.md, which sits beside docs/ already.
 const NOT_IN_DOCS = new Map([
 	[
 		"",
 		"the landing page: the README opens with the same pitch, and the rest of it is links to pages docs/ already holds",
 	],
+	[
+		"reference/changelog",
+		"the release history page: it states VERSION and points at ../CHANGELOG.md, which NEIGHBOURS already names beside docs/",
+	],
 ]);
 
 // Named beside the generated files in the index, because the index is the
-// first page of docs/ and these two are where a reader is sent next. The
+// first page of docs/ and these three are where a reader is sent next. The
 // sentences are the ones docs/README.md carried before it was generated.
 const NEIGHBOURS = [
 	[
@@ -192,6 +203,10 @@ const NEIGHBOURS = [
 	[
 		"../dashboards/README.md",
 		"Importing and regenerating the five Grafana dashboards, one per store",
+	],
+	[
+		"../CHANGELOG.md",
+		"What changed in each release, why, and what was left unproven",
 	],
 ];
 
@@ -266,7 +281,8 @@ function readPages() {
  *
  * @param {string} target the target as the page writes it
  * @param {boolean} isImage whether it came from an image
- * @param {{ dir: string, route: string }} context the page it was written in
+ * @param {{ dir: string, file: string, route: string }} context the page it
+ *   was written in
  * @returns {string} the target as docs/ should carry it
  */
 function retarget(target, isImage, context) {
@@ -292,7 +308,14 @@ function retarget(target, isImage, context) {
 	if (target.startsWith(`${BASE}/`)) {
 		return `${PUBLIC}${target.slice(BASE.length)}`;
 	}
-	return target;
+	// Anything else resolves against wherever the file is read from: rooted
+	// outside the base path it is a link to GitHub's own root, and bare it is a
+	// file beside docs/<name>.md that nobody wrote. The markdown twins refuse
+	// the same targets, in absoluteTargets in src/lib/page-markdown.mjs.
+	throw new Error(
+		`${context.file}: the link target "${target}" points nowhere a reader of docs/ can follow. ` +
+			`Write it site-rooted (${BASE}/…), as a fragment, or relative with ./ or ../ to a file in the repository.`,
+	);
 }
 
 // A scheme, which is what separates a target somewhere else from a file in

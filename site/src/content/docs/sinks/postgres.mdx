@@ -1,10 +1,13 @@
 ---
 title: PostgreSQL
 description: INSERT statements you pipe into psql, the schema they declare, and why the conflict clause updates rather than does nothing.
+searchTitle: Store GitHub metrics in PostgreSQL
 ---
 
 import { Aside, Steps } from "@astrojs/starlight/components";
 import stats from "../../../data/stats.json";
+
+Two sinks put ghchronicle's dated points into PostgreSQL: one writes SQL to a file for a later load, the other connects and inserts.
 
 ```yaml
 sinks:

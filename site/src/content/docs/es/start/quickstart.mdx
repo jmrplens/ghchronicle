@@ -1,6 +1,7 @@
 ---
 title: Inicio rápido
-description: De cero a la primera pasada, y qué hace esa primera pasada que las siguientes no hacen.
+description: Instalar ghchronicle, apuntarlo a una base de datos y lanzar la primera pasada sobre una cuenta de GitHub, y qué hace esa primera pasada que las siguientes no hacen.
+searchTitle: "Inicio rápido de ghchronicle: la primera pasada"
 ---
 
 import { Steps, Tabs, TabItem, Aside } from "@astrojs/starlight/components";
@@ -139,9 +140,12 @@ mano o quiera saber a qué acaba de decir que sí.
 Tres cosas ocurren una sola vez, y son la razón de que la primera pasada sea la
 cara.
 
-- Se recorre entera la lista de estrellas, página a página, para que cada
-  estrella lleve la fecha en que se dio. Después, las cien más nuevas de cada
-  repositorio viajan en una consulta GraphQL por cada diez.
+- Se recorre entera, página a página, la lista de estrellas de cada
+  repositorio cuya lista el token puede leer (desde julio de 2026, solo los
+  [administradores y colaboradores](https://docs.github.com/es/rest/activity/starring#new-access-restrictions)
+  del repositorio), para que cada estrella lleve la fecha en que se dio.
+  Después, las cien más nuevas de cada uno de esos repositorios viajan en una
+  consulta GraphQL por cada diez.
 - Un mes de ejecuciones de workflows, para que una instalación nueva no dibuje
   una historia de CI que empieza hace quince minutos. Después, el doble de la
   cadencia, y nunca menos de dos horas.

@@ -1,10 +1,13 @@
 ---
 title: Graphite
-description: The plaintext protocol over TCP, and the exact metric path, which is the dashboard's contract.
+description: "Sending GitHub metrics to Graphite: the plaintext protocol over TCP, and the exact metric path, which is the dashboard's contract."
+searchTitle: Send GitHub metrics to Graphite
 ---
 
 import { Aside } from "@astrojs/starlight/components";
 import stats from "../../../data/stats.json";
+
+The Graphite sink sends ghchronicle's numeric fields to Graphite over TCP, each at the date the thing happened.
 
 ```yaml
 sinks:

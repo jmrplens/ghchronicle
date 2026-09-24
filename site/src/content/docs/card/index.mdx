@@ -1,6 +1,7 @@
 ---
 title: Overview
-description: A self-contained SVG for a profile README, drawn from the same points the databases receive.
+description: "The ghchronicle card: a self-contained SVG of GitHub activity for a profile README, drawn from the same points the databases receive."
+searchTitle: An SVG card of your GitHub activity
 compactTables:
   - "-card-motion"
   - "-card-speed"
@@ -9,6 +10,8 @@ compactTables:
 import { Aside, Tabs, TabItem } from "@astrojs/starlight/components";
 
 import Card from "../../../components/Card.astro";
+
+ghchronicle can draw a self-contained SVG card of an account's GitHub activity for a profile README, from the points it already collects.
 
 ```sh
 ghchronicle -config config.yaml -card card.svg -card-only

@@ -1,6 +1,7 @@
 ---
 title: What is collected
-description: The thirty-four families, what each one asks GitHub for, and the reason each exists.
+description: The thirty-four families of GitHub metrics ghchronicle collects, what each one asks the API for, and the reason each exists.
+searchTitle: What ghchronicle collects from GitHub
 ---
 
 import { Aside } from "@astrojs/starlight/components";
@@ -46,7 +47,12 @@ years, not one that starts the day the collector was installed. After the first
 sweep only the newest hundred are read, since new stars land at the end, and
 they are read for every repository at once in one GraphQL query per ten. That
 is the difference between one point and 280 calls for a repository with 28,000
-stars.
+stars. GitHub has served the list only to a repository's admins and
+collaborators since July 2026, so the curve is drawn only where the token has
+that access, which it always has on the account's own repositories and on those
+of an organisation the account administers; for any other the star count is
+collected and the curve is not (see
+[what GitHub will not give](/ghchronicle/api/limits/)).
 
 **`forks`** collects who forked and when. The repository snapshot carries a
 fork count, which says how many but never when or by whom. The list is walked
@@ -259,13 +265,13 @@ would look exactly like right ones.
 ## Activity and cost
 
 **`events`** collects the account's activity feed, the most perishable surface
-GitHub has. It keeps roughly the last three hundred events and drops anything
-older, whatever its date, and nothing else records that a repository was
+GitHub has. It keeps the last three hundred events, none older than thirty days,
+and nothing else records that a repository was
 starred, forked, watched or pushed to at a given minute.
 
 **`notifs`** collects the inbox. Like the event feed it is a window, not a
-history: GitHub keeps unread notifications for about a year and read ones for
-far less, and `per_page` is silently capped at 50 whatever is asked for.
+history: GitHub keeps inbox notifications for three months unless they are
+saved, and `per_page` is silently capped at 50 whatever is asked for.
 
 **`billing`** collects what the account actually spent, day by day, per
 product, SKU and repository, which is the only place that says which repository

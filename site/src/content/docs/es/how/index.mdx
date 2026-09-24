@@ -1,6 +1,7 @@
 ---
 title: La pasada
-description: Qué hace un recorrido por GitHub, en qué orden, y por qué cada familia tiene su propia cadencia.
+description: Qué hace una pasada de ghchronicle por la API de GitHub, en qué orden, y por qué cada familia de métricas tiene su propia cadencia.
+searchTitle: Cómo funciona una pasada de ghchronicle
 compactTables:
   - Familia
 ---
@@ -25,7 +26,7 @@ flowchart TD
     B -- "no" --> S["Saltar la familia<br/>y avisar"]
     B -- "sí" --> C["Recoger"]
     C --> P["Puntos fechados"]
-    P --> H["Destinos que conservan la fecha<br/>InfluxDB, fichero, stdout, Telegraf, Graphite,<br/>PostgreSQL, a fichero, PostgreSQL,<br/>Elasticsearch"]
+    P --> H["Destinos que conservan la fecha<br/>InfluxDB, fichero, stdout, Telegraf, Graphite,<br/>PostgreSQL a fichero, PostgreSQL,<br/>Elasticsearch"]
     P --> L["Loki<br/>las veintidós representaciones de evento"]
     P --> RD["Reductor<br/>valores actuales"]
     RD --> G["Prometheus<br/>OTLP, cuando raw: false"]

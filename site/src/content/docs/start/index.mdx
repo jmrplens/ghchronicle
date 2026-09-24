@@ -1,6 +1,7 @@
 ---
 title: What it is
-description: What ghchronicle collects, and the problem it exists to solve.
+description: "What ghchronicle collects from GitHub, and the problem it exists to solve: traffic kept for fourteen days, an event feed of three hundred events and thirty days."
+searchTitle: What ghchronicle is and what it collects
 sidebar:
   order: 1
 compactTables:
@@ -12,12 +13,17 @@ import stats from "../../../data/stats.json";
 
 GitHub answers most questions about the present and almost none about the past.
 
-The traffic API serves fourteen days and forgets. The activity feed keeps the
-last three hundred events, whatever their dates. Read notifications disappear
-within weeks. Job logs are deleted after ninety days. The star list will tell
-you when each star was given, but only if you ask before the list gets long
-enough to be expensive to walk. None of it is archived anywhere unless you
-archive it.
+The [traffic API](https://docs.github.com/en/rest/metrics/traffic) serves fourteen days and
+forgets. The [activity feed](https://docs.github.com/en/rest/activity/events) keeps the last
+three hundred events, and none older than thirty days. The
+[notification inbox](https://docs.github.com/en/subscriptions-and-notifications/concepts/about-notifications#notification-retention-policy)
+drops every notification after three months, read or not, unless it was saved.
+[Job logs](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/enabling-features-for-your-repository/managing-github-actions-settings-for-a-repository)
+are deleted after ninety days by default. The star list will tell
+you when each star was given, but since July 2026 only to a repository's
+[admins and collaborators](https://docs.github.com/en/rest/activity/starring#new-access-restrictions),
+and only if you ask before the list gets long enough to be expensive to walk.
+None of it is archived anywhere unless you archive it.
 
 `ghchronicle` sweeps those surfaces on a schedule and writes every observation
 as a point stamped with the date the thing actually happened, so a year from
@@ -27,8 +33,8 @@ now the question "how fast were we merging in July" still has an answer.
 ghchronicle -config config.yaml
 ```
 
-It is one Go binary with no dependencies beyond a YAML parser, and it pushes to
-every store it supports, so it runs wherever it can reach them: a server, a
+It is one static Go binary with no runtime dependencies, and it pushes to every
+store it supports, so it runs wherever it can reach them: a server, a
 container, a scheduled workflow.
 
 <Aside type="note" title="The card is not the point">

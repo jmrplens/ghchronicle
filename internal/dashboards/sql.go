@@ -124,8 +124,9 @@ Loki sink enabled, this is the query:
 ` + "```" + `
 
 Set ` + "`every.joblogs`" + ` to switch the collection on. GitHub deletes job logs after
-ninety days and answers 410 afterwards, so there is no backfilling them: what
-exists is what was captured while it was there.
+the repository's retention period, ninety days by default, and answers 410
+afterwards, so an older log cannot be backfilled: what exists is what was
+captured while it was there.
 
 Published to a Grafana that has a Loki datasource, with
 ` + "`cmd/publish_dashboard -loki <datasource-uid>`" + `, this panel shows those lines

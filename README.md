@@ -21,9 +21,10 @@ the date it happened.
 
 GitHub answers most questions about the present and almost none about the past.
 The traffic API serves fourteen days and forgets. The activity feed keeps three
-hundred events. Read notifications disappear. The star list will tell you when
-each star was given, but only if you ask before the list gets long. None of it
-is archived anywhere unless you archive it.
+hundred events, none older than thirty days. Inbox notifications are kept for
+three months unless they are saved. The star list will tell you when each star
+was given, but since July 2026 only to the repository's admins and
+collaborators. None of it is archived anywhere unless you archive it.
 
 `ghchronicle` sweeps those surfaces on a schedule and writes every observation
 as a dated point, so a year from now the question "how fast were we merging in
@@ -126,7 +127,7 @@ a personal or organisation account exposes.
 | Area          | What is kept                                                                                                                                                                                             |
 | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Traffic       | Views, unique visitors and clones per day, referrers and paths. GitHub's window is 14 days; this rewrites it whole on every sweep, so a collector that was down for a day repairs itself on the next run |
-| Stars         | One point per star, dated when it was given. The full stargazer walk happens once per repository; after that the newest hundred ride in one GraphQL query per ten repositories                           |
+| Stars         | One point per star, dated when it was given, where the token may read the stargazer list (since July 2026: admins, collaborators); elsewhere the count. Walked once, then the newest hundred by GraphQL  |
 | Repositories  | Stars, forks, watchers, open issues, size, age, idle days, licence, visibility, languages by bytes, topics, community profile score                                                                      |
 | Releases      | Downloads per release and per asset, asset sizes, draft and prerelease state                                                                                                                             |
 | Pull requests | Per item: time to first review, time to merge, lines added and deleted, files changed, review rounds, comments, commits                                                                                  |
@@ -134,15 +135,16 @@ a personal or organisation account exposes.
 | Actions       | Runs with duration and queue time, jobs, individual steps, workflows and their state, artifacts and their expiry, cache usage                                                                            |
 | Security      | Dependabot and code scanning alerts by severity, plus an explicit record of which features are switched on, so no data is distinguishable from no alerts                                                 |
 | Contributions | The whole profile calendar, one point per day at that day's date, plus totals and the per-repository commit breakdown                                                                                    |
-| Activity      | The event feed and the notification inbox, both of which GitHub discards quickly                                                                                                                         |
+| Activity      | The event feed, which GitHub caps at three hundred events and thirty days, and the notification inbox, which it keeps for three months unless saved                                                      |
 | Billing       | Usage per day, product, SKU and repository, with gross, discount and net                                                                                                                                 |
 | Account       | Followers, following, packages, gists, social accounts, sponsors                                                                                                                                         |
 
 ## Where it writes
 
-Eleven destinations, and more than one at a time is the normal arrangement. Everything
-is pushed: nothing here needs to be scraped, so the collector runs wherever it
-can reach its databases.
+Eleven destinations, and more than one at a time is the normal arrangement.
+Everything but the Prometheus exporter is pushed, and Prometheus itself can be
+fed through its OTLP receiver, so nothing here needs to be scraped and the
+collector runs wherever it can reach its databases.
 
 | Store                      | Keeps                                          | Good for                                                  |
 | -------------------------- | ---------------------------------------------- | --------------------------------------------------------- |
@@ -233,7 +235,9 @@ ghchronicle                # run on the configured schedule
 ```
 
 The token needs read access. Traffic additionally needs push access to the
-repository, Dependabot alerts need `security_events`, and the `keys` family
+repository and, on a fine-grained token, the repository permission
+Administration (read), which a workflow's automatic `GITHUB_TOKEN` cannot be
+granted; Dependabot alerts need `security_events`, and the `keys` family
 needs `read:public_key` and `read:gpg_key`, which no other scope implies.
 Anything the token
 cannot see is recorded as unavailable and skipped, not treated as a failure: a
@@ -278,8 +282,11 @@ an hour later for the families still missing, until a pass records nothing new
 or ten of them have run.
 
 Three things cannot be backfilled at any price, and the documentation says so
-rather than letting you find out: the event feed keeps three hundred events,
-traffic is fourteen days, and job logs are deleted after ninety.
+rather than letting you find out: the event feed keeps three hundred events
+and none older than thirty days, traffic is fourteen days, and job logs are
+deleted after the repository's retention period, ninety days by default. From
+1 October 2026 workflow runs follow that same retention setting, so a backfill
+reaches only the runs it still keeps.
 
 ## A card for a profile README
 

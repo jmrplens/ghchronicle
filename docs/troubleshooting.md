@@ -15,7 +15,8 @@ records the fact and moves on: a repository with a feature off must not stop
 the sweep for the other forty.
 
 If it is _every_ repository rather than one, it is the token. Traffic needs
-push access; alerts need `security_events`. See
+push access and, on a fine-grained token, the repository permission
+Administration (read); alerts need `security_events`. See
 [the token](https://jmrp.io/docs/ghchronicle/start/token/).
 
 **A feature switched on, and nothing collected from it.** Code scanning enabled
@@ -150,7 +151,7 @@ The exporter serves current values, so the fourteen-day traffic window collapses
 to its most recent day and the star history to the current total. See
 [dating a point](https://jmrp.io/docs/ghchronicle/how/dating/).
 
-## Nothing is being written
+## Why is nothing being written?
 
 Run one sweep in the foreground and read what it says. Then check, in order:
 
@@ -185,7 +186,7 @@ A family that is not due yet simply does not appear.
 > without it the next sweep has the photograph and no diff. See
 > [the state file](https://jmrp.io/docs/ghchronicle/configuration/#state_file).
 
-## Loki drops entries
+## Why does Loki drop entries?
 
 Look for the debug line counting them. Loki refuses an entry more than its
 out-of-order window behind the newest entry already in that stream, about two

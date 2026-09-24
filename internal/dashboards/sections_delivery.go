@@ -276,8 +276,9 @@ func accessConfiguration(b *builder) []Panel {
 				Selector: jobLogSelector,
 				Desc: "The last lines of every job that failed, from the Loki sink, newest " +
 					"first: the workflow, job and run of each line are in its logfmt tail, " +
-					"and the details of a line list them. GitHub deletes job logs after " +
-					"ninety days, so what is here is what was captured while it was there.",
+					"and the details of a line list them. GitHub deletes job logs after the " +
+					"repository's retention period, ninety days by default, so what is here " +
+					"is what was captured while it was there.",
 			},
 		}),
 		panel("table", "Webhooks configured", box{W: 12, H: 8, X: 0, Y: 24}, []Target{sqlT(

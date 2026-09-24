@@ -1,9 +1,12 @@
 ---
 title: Telegraf
-description: Line protocol enviado a http_listener_v2, y la razón de que esto sea un destino en vez de cien.
+description: "Enviar métricas de GitHub a través de Telegraf: line protocol enviado a http_listener_v2, y la razón de que esto sea un destino en vez de cien."
+searchTitle: Enviar métricas de GitHub a través de Telegraf
 ---
 
 import { Aside } from "@astrojs/starlight/components";
+
+El destino Telegraf envía los puntos de ghchronicle a Telegraf, que puede reenviarlos a cualquiera de las salidas que Telegraf soporta.
 
 ```yaml
 sinks:

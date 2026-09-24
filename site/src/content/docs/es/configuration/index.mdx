@@ -1,6 +1,7 @@
 ---
 title: El fichero
-description: Un fichero YAML, todos los valores expandibles desde el entorno, y para qué sirve cada bloque de primer nivel.
+description: "La configuración de ghchronicle: un fichero YAML, todos los valores expandibles desde el entorno, y para qué sirve cada bloque de primer nivel."
+searchTitle: El fichero de configuración de ghchronicle
 defaultColumns:
   - table: Clave
     default: Por omisión
@@ -9,6 +10,8 @@ compactTables:
 ---
 
 import { Aside, FileTree } from "@astrojs/starlight/components";
+
+ghchronicle lee un único fichero YAML, y el ejemplo documentado del repositorio es el punto de partida.
 
 ```sh
 cp config.example.yaml config.yaml

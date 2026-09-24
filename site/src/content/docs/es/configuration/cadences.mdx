@@ -1,9 +1,12 @@
 ---
 title: Cadencias
 description: Las tres capas del bloque every, la cadencia interna de cada familia, el aviso cuando una configuración la acelera, y el heartbeat.
+searchTitle: Cada cuánto se recoge cada métrica de GitHub
 ---
 
 import { Aside } from "@astrojs/starlight/components";
+
+Cada familia de métricas de GitHub se recoge con su propio intervalo, y el bloque `every` es donde se cambian esos intervalos.
 
 ```yaml
 every:
@@ -89,8 +92,8 @@ cambie de coste sin que esta tabla la siga rompe la compilación.
 | `ci`        | `joblogs`     | `0`         | apagada hasta que se la nombre: es texto y no una medida, cuesta una petición por fallo, y solo tiene sentido con un almacén de logs conectado    |
 | `collector` | `ratelimit`   | `15m`       | es gratis, y merece la pena tenerla a la resolución de la familia más rápida                                                                      |
 | `feeds`     | `activity`    | `30m`       | el log del repositorio guarda cien entradas, que cubrieron veintiséis horas en el repositorio más activo medido                                   |
-| `feeds`     | `events`      | `30m`       | el feed guarda los últimos trescientos eventos sean cuales sean sus fechas, así que esto es el tamaño de una ventana, no una velocidad            |
-| `feeds`     | `notifs`      | `30m`       | las notificaciones leídas desaparecen rápido, así que esto es el tamaño de una ventana, no una velocidad                                          |
+| `feeds`     | `events`      | `30m`       | el feed guarda los últimos trescientos eventos de los últimos treinta días, así que esto es el tamaño de una ventana, no una velocidad            |
+| `feeds`     | `notifs`      | `30m`       | GitHub conserva las notificaciones de la bandeja tres meses salvo las guardadas, pero cada hilo muestra solo su último movimiento, así que esto es el tamaño de una ventana, no una velocidad |
 | `repos`     | `branches`    | `24h`       | las ramas se crean y se borran todo el día, pero lo que responde la fila es cuáles están rancias ahora mismo, que es una pregunta diaria          |
 | `repos`     | `deps`        | `0`         | apagada hasta que se la nombre: el SBOM son 1,8 MB por repositorio y tiene su propio presupuesto de cien por minuto                                |
 | `repos`     | `inventory`   | `24h`       | cuatro peticiones core por repositorio, para ajustes que cambian solo cuando alguien los cambia                                                   |
@@ -184,11 +187,15 @@ Escribir `groups: []` se rechaza en lugar de leerse como "no recojas nada":
 omitir la clave es la forma de pedirlo todo, así que una lista vacía solo puede
 ser un error.
 
-Hay tres superficies que no se pueden recuperar después, se haga lo que se haga,
-y están en tres grupos distintos: el feed de eventos y las notificaciones leídas
-(`feeds`), la ventana de catorce días del tráfico (`audience`) y los logs de los
-jobs, que se borran a los noventa días (`ci`). Un día no recogido de esas es un
-día que no existe. Todo lo demás se puede rellenar luego con `-backfill`.
+Lo que GitHub borra no se puede recuperar después, se haga lo que se haga, y
+está en tres grupos distintos: el feed de eventos, que guarda trescientos
+eventos y ninguno de hace más de treinta días, y la bandeja, que conserva las
+notificaciones tres meses salvo las guardadas (`feeds`); la ventana de catorce
+días del tráfico (`audience`); y los logs de los jobs, que se borran al acabar
+el periodo de retención del repositorio, noventa días por omisión, y con ellos,
+desde el 1 de octubre de 2026, las propias ejecuciones de workflows (`ci`). Lo
+que GitHub borró antes de que ghchronicle lo leyera no existe en ninguna parte.
+Todo lo demás se puede rellenar luego con `-backfill`.
 
 <Aside type="caution" title="Los paneles de un grupo apagado darán error">
   Una medida que no se escribe nunca no existe como tabla, e InfluxDB 3 responde

@@ -1,6 +1,7 @@
 ---
 title: GitHub Actions
-description: La Action compuesta, sus tres modos y las dos cosas que un runner alojado no conserva.
+description: "ghchronicle como GitHub Action: la Action compuesta, sus tres modos y las dos cosas que un runner alojado no conserva."
+searchTitle: ghchronicle como GitHub Action
 defaultColumns:
   - table: Entrada
     default: Por omisión
@@ -235,11 +236,12 @@ apunta a `../generated/card.svg`.
 ## Dos cosas que un runner alojado no conserva
 
 <Aside type="caution" title="El token tiene que ser un token personal">
-  El tráfico necesita acceso de escritura a *cada* repositorio que se recoja, y
-  el `GITHUB_TOKEN` automático solo lo tiene para el repositorio en el que corre
-  el workflow. Tampoco tiene `security_events` ni `read:packages`, y no es un
-  usuario, así que nada de ámbito de cuenta funciona con él. Ver [el
-  token](/ghchronicle/es/start/token/).
+  El tráfico necesita acceso de escritura a *cada* repositorio que se recoja y,
+  en un token fine-grained, el permiso de repositorio Administration (lectura);
+  el `GITHUB_TOKEN` automático no puede recibir Administration, así que recibe
+  un 403 incluso en el repositorio en el que corre el workflow. Tampoco tiene
+  `security_events` ni `read:packages`, y no es un usuario, así que nada de
+  ámbito de cuenta funciona con él. Ver [el token](/ghchronicle/es/start/token/).
 </Aside>
 
 **El fichero de estado no sobrevive entre ejecuciones.** Cada ejecución vuelve

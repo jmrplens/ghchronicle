@@ -1,12 +1,15 @@
 ---
 title: Targets
 description: Which repositories a sweep touches, and why forks and archived repositories are excluded by default.
+searchTitle: Which GitHub repositories a sweep covers
 defaultColumns:
   - table: Key
     default: Default
 ---
 
 import { Aside } from "@astrojs/starlight/components";
+
+The `targets` block decides which GitHub repositories a sweep collects: an account's own, those of its organisations, and any named one.
 
 ```yaml
 targets:

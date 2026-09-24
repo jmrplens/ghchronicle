@@ -1,6 +1,7 @@
 ---
 title: The command line
-description: The flags, what each one does, and which of them print something and exit.
+description: "The ghchronicle command line: the flags, what each one does, and which of them print something and exit."
+searchTitle: ghchronicle command-line flags
 defaultColumns:
   - table: Flag
     default: Default
@@ -42,18 +43,23 @@ ghchronicle -config /etc/ghchronicle/config.yaml
 | `-card-speed`     | `0.5`         | How fast an animated layout plays, as a decimal from 0 to 1. `0` is the slowest animation and `1` the fastest; `0.5` is the pace every card has always been drawn at. `0` is not a still card, `-card-motion off` is |
 | `-card-layouts`   | off           | Print the layouts with the fields and the widths each draws, then exit                                                                     |
 
-## The four that print and exit
+## The five that print and exit
 
-`-version`, `-groups`, `-card-layouts` and `-list` answer and stop. The first
-three need no token and no configuration; `-list` reads the configuration and
-asks GitHub which repositories the targets resolve to, which is the cheap way
-to check a change before spending quota on a sweep.
+`-version`, `-groups`, `-card-layouts`, `-list` and `-backfill-status` answer
+and stop. The first three need no token and no configuration; `-list` reads the
+configuration and asks GitHub which repositories the targets resolve to, which
+is the cheap way to check a change before spending quota on a sweep.
+`-backfill-status` reads the configuration to find the
+[backfill checkpoint](/ghchronicle/how/backfill/#seeing-how-far-it-has-got)
+and prints how far that walk has got; it asks GitHub nothing, so it needs no
+token.
 
 ```sh
 ghchronicle -version
 ghchronicle -groups
 ghchronicle -card-layouts
 ghchronicle -config config.yaml -list
+ghchronicle -config config.yaml -backfill-status
 ```
 
 ## The three ways to run a sweep
