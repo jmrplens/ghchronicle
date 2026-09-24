@@ -646,9 +646,11 @@ func (s *Server) agoDate(marker string) string {
 // FreezeAt stops the fake's clock, so every relative date in its fixtures
 // resolves to the same day however long from now this runs.
 //
-// One suite needs this. The card gallery draws the pictures committed under
+// Two suites need this. The card gallery draws the pictures committed under
 // site/src/assets and a test compares them byte for byte, so the data behind
-// them has to be the same data every day; everywhere else the point of a
+// them has to be the same data every day. And the sweep test in internal/run
+// that runs two sweeps days apart needs the fixtures to stand still between
+// them, so that only the runner's clock moves. Everywhere else the point of a
 // relative date is that it moves. Call it before the first request.
 func (s *Server) FreezeAt(at time.Time) {
 	s.now = at.UTC

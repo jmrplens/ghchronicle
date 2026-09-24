@@ -423,7 +423,14 @@ func TestNoRowDatedInThePastMovesWithTheClock(t *testing.T) {
 	first := time.Date(2026, 9, 14, 9, 0, 0, 0, time.UTC)
 	sweep := func(at time.Time) []sink.Point {
 		got := &collector{}
-		r, _, log := fakeRunner(t, got)
+		r, fake, log := fakeRunner(t, got)
+		// The fake resolves its fixtures' relative dates against its own
+		// clock, the real one unless frozen. Left running, each real day
+		// between the fixtures being written and the test running pushed
+		// more of them past history, until the comparison covered fewer
+		// than a hundred rows. Both sweeps read the fixtures as of the
+		// first, so only the runner's clock moves.
+		fake.FreezeAt(first)
 		r.Now = func() time.Time { return at }
 		if err := r.Once(t.Context()); err != nil {
 			t.Fatalf("sweep at %s: %v\n%s", at, err, log)
