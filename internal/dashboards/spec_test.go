@@ -11,7 +11,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/jmrplens/ghchronicle/internal/grafana"
+	"github.com/jmrplens/ghchronicle/v2/internal/grafana"
 )
 
 // dashboardDir is where the exported files live, relative to this package.

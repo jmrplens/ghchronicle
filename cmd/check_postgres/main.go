@@ -39,8 +39,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jmrplens/ghchronicle/internal/dashboards"
-	"github.com/jmrplens/ghchronicle/internal/grafana"
+	"github.com/jmrplens/ghchronicle/v2/internal/dashboards"
+	"github.com/jmrplens/ghchronicle/v2/internal/grafana"
 )
 
 // db is the scratch database the schema is declared in. It is created and

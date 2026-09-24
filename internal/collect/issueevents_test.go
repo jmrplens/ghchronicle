@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jmrplens/ghchronicle/internal/sink"
+	"github.com/jmrplens/ghchronicle/v2/internal/sink"
 )
 
 // timelineFixtures answers the sweep's timeline query and the backfill's

@@ -44,7 +44,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/jmrplens/ghchronicle/internal/config"
+	"github.com/jmrplens/ghchronicle/v2/internal/config"
 )
 
 // defaultOut is where the site reads the file from, and defaultAction is the

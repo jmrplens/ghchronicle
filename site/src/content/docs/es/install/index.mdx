@@ -74,11 +74,12 @@ cómo dejarlo corriendo cuando termines de mirarlo.
   </TabItem>
   <TabItem label="Go">
     ```sh
-    go install github.com/jmrplens/ghchronicle/cmd/ghchronicle@latest
+    go install github.com/jmrplens/ghchronicle/v2/cmd/ghchronicle@latest
     ```
 
     Necesita una cadena de herramientas de Go, y compila desde fuente la
-    etiqueta más reciente.
+    etiqueta más reciente. El `/v2` es parte de la ruta: sin él, Go se queda
+    con la 1.0.0, la última versión cuya ruta de módulo acepta, y no avisa.
 
   </TabItem>
   <TabItem label="Contenedor">

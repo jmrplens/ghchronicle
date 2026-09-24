@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jmrplens/ghchronicle/internal/ghapi"
+	"github.com/jmrplens/ghchronicle/v2/internal/ghapi"
 )
 
 // The fake prices what it answers the way api.github.com does, so a suite

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jmrplens/ghchronicle/internal/ghapi"
+	"github.com/jmrplens/ghchronicle/v2/internal/ghapi"
 )
 
 // Filter says which repositories a sweep should touch.

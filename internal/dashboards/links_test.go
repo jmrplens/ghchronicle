@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jmrplens/ghchronicle/internal/grafana"
+	"github.com/jmrplens/ghchronicle/v2/internal/grafana"
 )
 
 // aliased matches the column a SQL statement selects under a name.

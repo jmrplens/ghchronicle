@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jmrplens/ghchronicle/internal/sink"
+	"github.com/jmrplens/ghchronicle/v2/internal/sink"
 )
 
 // TestLiveSinks is skipped unless GHC_LIVE_OTLP or GHC_LIVE_LOKI names an

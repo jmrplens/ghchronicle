@@ -5,7 +5,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/jmrplens/ghchronicle/internal/sink"
+	"github.com/jmrplens/ghchronicle/v2/internal/sink"
 )
 
 // Accumulator turns a sweep's points into a Card.

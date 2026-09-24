@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jmrplens/ghchronicle/internal/httpx"
+	"github.com/jmrplens/ghchronicle/v2/internal/httpx"
 )
 
 // Influx writes line protocol to InfluxDB 2 or 3 over the v2 write endpoint.

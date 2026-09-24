@@ -9,7 +9,7 @@
 [![Downloads](https://img.shields.io/github/downloads/jmrplens/ghchronicle/total?style=flat&label=Downloads)](https://github.com/jmrplens/ghchronicle/releases)
 [![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=jmrplens_ghchronicle&metric=alert_status)](https://sonarcloud.io/summary/overall?id=jmrplens_ghchronicle)
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=jmrplens_ghchronicle&metric=coverage)](https://sonarcloud.io/summary/overall?id=jmrplens_ghchronicle)
-[![Go Reference](https://pkg.go.dev/badge/github.com/jmrplens/ghchronicle.svg)](https://pkg.go.dev/github.com/jmrplens/ghchronicle)
+[![Go Reference](https://pkg.go.dev/badge/github.com/jmrplens/ghchronicle/v2.svg)](https://pkg.go.dev/github.com/jmrplens/ghchronicle/v2)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/jmrplens/ghchronicle?style=flat&logo=go&logoColor=white&label=Go)](go.mod)
 [![ghcr.io](https://img.shields.io/badge/ghcr.io-ghchronicle-2496ED?style=flat&logo=docker&logoColor=white)](https://github.com/jmrplens/ghchronicle/pkgs/container/ghchronicle)
 [![Docker Hub](https://img.shields.io/docker/v/jmrplens/ghchronicle?style=flat&logo=docker&logoColor=white&label=Docker%20Hub)](https://hub.docker.com/r/jmrplens/ghchronicle)
@@ -184,7 +184,7 @@ than the JSON.
 apply. Build it yourself:
 
 ```sh
-go install github.com/jmrplens/ghchronicle/cmd/ghchronicle@latest
+go install github.com/jmrplens/ghchronicle/v2/cmd/ghchronicle@latest
 ```
 
 or take a binary from the

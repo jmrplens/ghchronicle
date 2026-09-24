@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jmrplens/ghchronicle/internal/sink"
+	"github.com/jmrplens/ghchronicle/v2/internal/sink"
 )
 
 // searchAnswer serves the total_count a search query is for, so a test can

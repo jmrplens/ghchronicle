@@ -19,7 +19,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jmrplens/ghchronicle/test/e2e/racereport"
+	"github.com/jmrplens/ghchronicle/v2/test/e2e/racereport"
 )
 
 // This file is the shared machinery for the per-sink end-to-end tests: a

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jmrplens/ghchronicle/internal/ghapi"
+	"github.com/jmrplens/ghchronicle/v2/internal/ghapi"
 )
 
 // Repo identifies one repository across every collector.

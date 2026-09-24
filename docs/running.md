@@ -56,10 +56,12 @@ keep it running once you are done watching it.
 - **Go**
 
   ```sh
-  go install github.com/jmrplens/ghchronicle/cmd/ghchronicle@latest
+  go install github.com/jmrplens/ghchronicle/v2/cmd/ghchronicle@latest
   ```
 
   Needs a Go toolchain, and builds from source at whatever the newest tag is.
+  The `/v2` is part of the path: without it Go settles on 1.0.0, the last
+  release whose module path it accepts, and says nothing.
 
 - **Container**
 
@@ -310,7 +312,7 @@ find.
 - **go install**
 
   ```sh
-  go install github.com/jmrplens/ghchronicle/cmd/ghchronicle@latest
+  go install github.com/jmrplens/ghchronicle/v2/cmd/ghchronicle@latest
   ```
 
   Lands in `$(go env GOPATH)/bin`, which is `~/go/bin` unless you moved it,
@@ -652,7 +654,7 @@ so the Xcode command line tools are not needed for it.
 - **go install**
 
   ```sh
-  go install github.com/jmrplens/ghchronicle/cmd/ghchronicle@latest
+  go install github.com/jmrplens/ghchronicle/v2/cmd/ghchronicle@latest
   ```
 
   Lands in `$(go env GOPATH)/bin`, which is `~/go/bin` unless you moved it,
@@ -1092,7 +1094,7 @@ means no MSVC, no MinGW and no Windows SDK.
 - **go install**
 
   ```powershell
-  go install github.com/jmrplens/ghchronicle/cmd/ghchronicle@latest
+  go install github.com/jmrplens/ghchronicle/v2/cmd/ghchronicle@latest
   ```
 
   Lands in `$(go env GOPATH)\bin`, which is `%USERPROFILE%\go\bin` unless you
@@ -2106,7 +2108,7 @@ The same thing by hand, if you would rather not depend on it:
 - uses: actions/setup-go@v7
   with:
     go-version: stable
-- run: go install github.com/jmrplens/ghchronicle/cmd/ghchronicle@latest
+- run: go install github.com/jmrplens/ghchronicle/v2/cmd/ghchronicle@latest
 - run: ghchronicle -config .github/ghchronicle.yaml -card profile.svg -card-only
   env:
     GITHUB_TOKEN: ${{ secrets.GHCHRONICLE_TOKEN }}

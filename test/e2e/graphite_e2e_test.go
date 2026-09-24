@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jmrplens/ghchronicle/test/e2e/fakegh"
+	"github.com/jmrplens/ghchronicle/v2/test/e2e/fakegh"
 )
 
 func TestGraphiteSinkWritesPlaintextOverTCP(t *testing.T) {

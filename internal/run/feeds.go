@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/jmrplens/ghchronicle/internal/collect"
-	"github.com/jmrplens/ghchronicle/internal/sink"
+	"github.com/jmrplens/ghchronicle/v2/internal/collect"
+	"github.com/jmrplens/ghchronicle/v2/internal/sink"
 )
 
 // events reads the activity feed down to the page that carries the newest

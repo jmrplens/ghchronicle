@@ -3,7 +3,7 @@ package e2e
 import (
 	"testing"
 
-	"github.com/jmrplens/ghchronicle/test/e2e/fakegh"
+	"github.com/jmrplens/ghchronicle/v2/test/e2e/fakegh"
 )
 
 // The fake GitHub these tests collect from lives in test/e2e/fakegh, so the

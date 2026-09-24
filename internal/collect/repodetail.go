@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jmrplens/ghchronicle/internal/ghapi"
-	"github.com/jmrplens/ghchronicle/internal/sink"
+	"github.com/jmrplens/ghchronicle/v2/internal/ghapi"
+	"github.com/jmrplens/ghchronicle/v2/internal/sink"
 )
 
 // RepoDetail collects the parts of a repository that GraphQL will hand over in

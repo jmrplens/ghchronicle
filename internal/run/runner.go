@@ -7,10 +7,10 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/jmrplens/ghchronicle/internal/collect"
-	"github.com/jmrplens/ghchronicle/internal/config"
-	"github.com/jmrplens/ghchronicle/internal/ghapi"
-	"github.com/jmrplens/ghchronicle/internal/sink"
+	"github.com/jmrplens/ghchronicle/v2/internal/collect"
+	"github.com/jmrplens/ghchronicle/v2/internal/config"
+	"github.com/jmrplens/ghchronicle/v2/internal/ghapi"
+	"github.com/jmrplens/ghchronicle/v2/internal/sink"
 )
 
 // Runner owns one sweep of every collector that is due.

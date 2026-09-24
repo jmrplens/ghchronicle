@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jmrplens/ghchronicle/internal/render"
+	"github.com/jmrplens/ghchronicle/v2/internal/render"
 )
 
 // cardCommandBlock is a shell block in docs/card.md holding the command the

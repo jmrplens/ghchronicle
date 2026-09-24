@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jmrplens/ghchronicle/internal/sink"
+	"github.com/jmrplens/ghchronicle/v2/internal/sink"
 )
 
 // A 403 has no ETag, so without the memory every sweep pays to be told again

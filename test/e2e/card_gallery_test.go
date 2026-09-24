@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jmrplens/ghchronicle/internal/render"
-	"github.com/jmrplens/ghchronicle/test/e2e/fakegh"
+	"github.com/jmrplens/ghchronicle/v2/internal/render"
+	"github.com/jmrplens/ghchronicle/v2/test/e2e/fakegh"
 )
 
 // TestCardGallery renders one card per registered layout, from the fake

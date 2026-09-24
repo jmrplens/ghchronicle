@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jmrplens/ghchronicle/internal/ghapi"
-	"github.com/jmrplens/ghchronicle/internal/sink"
+	"github.com/jmrplens/ghchronicle/v2/internal/ghapi"
+	"github.com/jmrplens/ghchronicle/v2/internal/sink"
 )
 
 // reposPagesAsked lists the page numbers a path was asked for, in order, so a

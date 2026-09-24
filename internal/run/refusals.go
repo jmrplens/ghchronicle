@@ -3,7 +3,7 @@ package run
 import (
 	"time"
 
-	"github.com/jmrplens/ghchronicle/internal/collect"
+	"github.com/jmrplens/ghchronicle/v2/internal/collect"
 )
 
 // refusalsFor is the memory of "not available" answers for one family, made

@@ -14,8 +14,8 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/jmrplens/ghchronicle/internal/config"
-	"github.com/jmrplens/ghchronicle/internal/render"
+	"github.com/jmrplens/ghchronicle/v2/internal/config"
+	"github.com/jmrplens/ghchronicle/v2/internal/render"
 )
 
 // TestTheActionsDefaultConfigLeavesPrivateRepositoriesOut runs the script the

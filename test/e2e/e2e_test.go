@@ -25,8 +25,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jmrplens/ghchronicle/test/e2e/fakegh"
-	"github.com/jmrplens/ghchronicle/test/e2e/racereport"
+	"github.com/jmrplens/ghchronicle/v2/test/e2e/fakegh"
+	"github.com/jmrplens/ghchronicle/v2/test/e2e/racereport"
 )
 
 // binary is the path of the ghchronicle built by TestMain.

@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jmrplens/ghchronicle/internal/grafana"
+	"github.com/jmrplens/ghchronicle/v2/internal/grafana"
 )
 
 // The Link column, against the stores rather than against the file.

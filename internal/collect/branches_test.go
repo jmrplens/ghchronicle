@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jmrplens/ghchronicle/internal/sink"
+	"github.com/jmrplens/ghchronicle/v2/internal/sink"
 )
 
 // branchRepos are the two repositories graphql_branches.json was captured

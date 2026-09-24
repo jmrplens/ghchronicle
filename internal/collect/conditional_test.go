@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jmrplens/ghchronicle/internal/ghapi"
-	"github.com/jmrplens/ghchronicle/internal/sink"
-	"github.com/jmrplens/ghchronicle/test/e2e/fakegh"
+	"github.com/jmrplens/ghchronicle/v2/internal/ghapi"
+	"github.com/jmrplens/ghchronicle/v2/internal/sink"
+	"github.com/jmrplens/ghchronicle/v2/test/e2e/fakegh"
 )
 
 // The conditional-request cache stores what a collector decoded, encoded

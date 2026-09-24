@@ -17,8 +17,8 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/jmrplens/ghchronicle/internal/dashboards"
-	"github.com/jmrplens/ghchronicle/internal/grafana"
+	"github.com/jmrplens/ghchronicle/v2/internal/dashboards"
+	"github.com/jmrplens/ghchronicle/v2/internal/grafana"
 )
 
 // askedFor is every metric name the Prometheus dashboard asks for, sorted.

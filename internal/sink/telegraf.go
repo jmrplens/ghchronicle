@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jmrplens/ghchronicle/internal/httpx"
+	"github.com/jmrplens/ghchronicle/v2/internal/httpx"
 )
 
 // Telegraf posts line protocol to Telegraf's http_listener_v2 input.

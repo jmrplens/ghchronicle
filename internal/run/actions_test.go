@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jmrplens/ghchronicle/internal/collect"
-	"github.com/jmrplens/ghchronicle/internal/config"
-	"github.com/jmrplens/ghchronicle/test/e2e/fakegh"
+	"github.com/jmrplens/ghchronicle/v2/internal/collect"
+	"github.com/jmrplens/ghchronicle/v2/internal/config"
+	"github.com/jmrplens/ghchronicle/v2/test/e2e/fakegh"
 )
 
 // runListPages is what each run list request asked for, and jobListings how

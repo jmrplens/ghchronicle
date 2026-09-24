@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jmrplens/ghchronicle/internal/config"
-	"github.com/jmrplens/ghchronicle/internal/ghapi"
+	"github.com/jmrplens/ghchronicle/v2/internal/config"
+	"github.com/jmrplens/ghchronicle/v2/internal/ghapi"
 )
 
 // TestListMarksTheArchivedRepositoriesSetAside is the -list half of the

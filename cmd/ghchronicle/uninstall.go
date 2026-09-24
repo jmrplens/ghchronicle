@@ -10,9 +10,9 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/jmrplens/ghchronicle/internal/config"
-	"github.com/jmrplens/ghchronicle/internal/grafana"
-	"github.com/jmrplens/ghchronicle/internal/teardown"
+	"github.com/jmrplens/ghchronicle/v2/internal/config"
+	"github.com/jmrplens/ghchronicle/v2/internal/grafana"
+	"github.com/jmrplens/ghchronicle/v2/internal/teardown"
 )
 
 // The things an uninstall can take away, named on the command line.

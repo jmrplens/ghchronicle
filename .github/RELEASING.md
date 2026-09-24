@@ -18,6 +18,19 @@ is not.
 
 - [ ] `VERSION` and the tag agree. The release workflow's preflight job refuses
       the tag otherwise, and it is the first thing it checks.
+- [ ] A major bump changes the module path. It carries the major version,
+      `module github.com/jmrplens/ghchronicle/v2` in `go.mod`, so a v3 tag
+      needs `/v3` everywhere that path is written: every import, the
+      `go build` targets of the e2e harnesses, the three module settings of
+      `.golangci.yml`, the README's pkg.go.dev badge, and every documented
+      `go install` command and quoted error, in both languages.
+      `grep -rn 'jmrplens/ghchronicle/v2' --exclude-dir=node_modules .` lists
+      them. Go refuses a v2 or later tag whose `go.mod` path does not end in
+      that major, and `go install ...@latest` then settles quietly on the
+      newest tag it can accept: until the path said `/v2`, that was v1.0.0.
+      The preflight job now refuses such a tag. A tag already pushed keeps
+      the `go.mod` it was cut from, so the first release under a new path is
+      always a new tag.
 - [ ] `go build ./... && go vet ./... && go test -race ./...` and
       `golangci-lint run ./...` are green on `main`.
 - [ ] `go run ./cmd/gen_dashboards -check` writes nothing.
@@ -118,6 +131,18 @@ are set, and writes the release notes from the commit subjects.
       the SBOMs, and the notes read as notes.
 - [ ] `docker run --rm ghcr.io/jmrplens/ghchronicle:vX.Y.Z -version` prints the
       version. The workflow checks this too, and it is worth seeing once.
+- [ ] `go install` reaches the release. Asking the module mirror for the
+      exact version makes it fetch the tag now, and pkg.go.dev with it,
+      instead of whenever its cache of the last answer expires:
+
+      ```sh
+      GOPROXY=https://proxy.golang.org go list -m github.com/jmrplens/ghchronicle/v2@vX.Y.Z
+      export GOBIN="$(mktemp -d)" && go install github.com/jmrplens/ghchronicle/v2/cmd/ghchronicle@latest && "$GOBIN/ghchronicle" -version
+      ```
+
+      The last line must print X.Y.Z. It is the check that would have caught
+      five releases whose `go install ...@latest` installed 1.0.0.
+
 - [ ] The major tag moved. The workflow's last job does it, after the release
       has published, so this is a check and not a step:
 

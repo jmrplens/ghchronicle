@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jmrplens/ghchronicle/internal/config"
+	"github.com/jmrplens/ghchronicle/v2/internal/config"
 )
 
 // Progress is where a backfill has got to, written down often enough that a

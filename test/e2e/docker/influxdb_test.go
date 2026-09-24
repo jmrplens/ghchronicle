@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jmrplens/ghchronicle/test/e2e/fakegh"
+	"github.com/jmrplens/ghchronicle/v2/test/e2e/fakegh"
 )
 
 // What a real InfluxDB 3 does with what the sink writes.

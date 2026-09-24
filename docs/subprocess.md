@@ -13,7 +13,7 @@ Source: <https://jmrp.io/docs/ghchronicle/reference/subprocess/>
 > workaround for something you have missed; it is the interface.
 
 ```text
-main.go:6:2: use of internal package github.com/jmrplens/ghchronicle/internal/collect not allowed
+main.go:6:2: use of internal package github.com/jmrplens/ghchronicle/v2/internal/collect not allowed
 ```
 
 What exists instead is a binary that runs one sweep, writes one JSON object per

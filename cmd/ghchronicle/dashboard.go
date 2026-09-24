@@ -16,9 +16,9 @@ import (
 
 	"github.com/jackc/pgx/v5/pgconn"
 
-	"github.com/jmrplens/ghchronicle/internal/config"
-	"github.com/jmrplens/ghchronicle/internal/dashboards"
-	"github.com/jmrplens/ghchronicle/internal/grafana"
+	"github.com/jmrplens/ghchronicle/v2/internal/config"
+	"github.com/jmrplens/ghchronicle/v2/internal/dashboards"
+	"github.com/jmrplens/ghchronicle/v2/internal/grafana"
 )
 
 // grafanaTimeout bounds each call. Publishing a dashboard is one large POST

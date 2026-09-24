@@ -14,8 +14,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jmrplens/ghchronicle/internal/ghapi"
-	"github.com/jmrplens/ghchronicle/test/e2e/fakegh"
+	"github.com/jmrplens/ghchronicle/v2/internal/ghapi"
+	"github.com/jmrplens/ghchronicle/v2/test/e2e/fakegh"
 )
 
 // families is every name the probe prints a line under, in its order.

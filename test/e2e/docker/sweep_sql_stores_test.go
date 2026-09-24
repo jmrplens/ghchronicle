@@ -19,8 +19,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jmrplens/ghchronicle/test/e2e/fakegh"
-	"github.com/jmrplens/ghchronicle/test/e2e/racereport"
+	"github.com/jmrplens/ghchronicle/v2/test/e2e/fakegh"
+	"github.com/jmrplens/ghchronicle/v2/test/e2e/racereport"
 )
 
 // The sweep the InfluxDB and PostgreSQL assertions read back, and the fake

@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jmrplens/ghchronicle/internal/config"
+	"github.com/jmrplens/ghchronicle/v2/internal/config"
 )
 
 // influxServer answers the catalog query and records what was dropped.

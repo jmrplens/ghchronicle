@@ -12,11 +12,11 @@ import (
 const report = `==================
 WARNING: DATA RACE
 Read at 0x00c0001a4030 by goroutine 42:
-  github.com/jmrplens/ghchronicle/internal/sink.(*Prom).handle()
+  github.com/jmrplens/ghchronicle/v2/internal/sink.(*Prom).handle()
       /src/internal/sink/prom.go:114 +0x7c
 
 Previous write at 0x00c0001a4030 by goroutine 18:
-  github.com/jmrplens/ghchronicle/internal/sink.(*Prom).Write()
+  github.com/jmrplens/ghchronicle/v2/internal/sink.(*Prom).Write()
       /src/internal/sink/prom.go:98 +0x2d4
 
 Goroutine 42 (running) created at:

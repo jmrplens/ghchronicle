@@ -269,7 +269,7 @@ Lo mismo a mano, si prefieres no depender de ella:
 - uses: actions/setup-go@v7
   with:
     go-version: stable
-- run: go install github.com/jmrplens/ghchronicle/cmd/ghchronicle@latest
+- run: go install github.com/jmrplens/ghchronicle/v2/cmd/ghchronicle@latest
 - run: ghchronicle -config .github/ghchronicle.yaml -card profile.svg -card-only
   env:
     GITHUB_TOKEN: ${{ secrets.GHCHRONICLE_TOKEN }}

@@ -34,8 +34,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jmrplens/ghchronicle/internal/dashboards"
-	"github.com/jmrplens/ghchronicle/internal/grafana"
+	"github.com/jmrplens/ghchronicle/v2/internal/dashboards"
+	"github.com/jmrplens/ghchronicle/v2/internal/grafana"
 )
 
 // usage names the store as required. It could not be optional ahead of the

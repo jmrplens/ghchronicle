@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/jmrplens/ghchronicle/internal/sink"
+	"github.com/jmrplens/ghchronicle/v2/internal/sink"
 )
 
 func TestRepoCoreSnapshot(t *testing.T) {

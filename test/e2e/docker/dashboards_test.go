@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jmrplens/ghchronicle/internal/grafana"
+	"github.com/jmrplens/ghchronicle/v2/internal/grafana"
 )
 
 // The five dashboards, against the five stores one sweep loaded.

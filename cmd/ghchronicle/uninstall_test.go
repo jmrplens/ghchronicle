@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jmrplens/ghchronicle/internal/config"
+	"github.com/jmrplens/ghchronicle/v2/internal/config"
 )
 
 // teardownStub is a Grafana and an InfluxDB in one server, which is all the

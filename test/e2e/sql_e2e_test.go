@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jmrplens/ghchronicle/test/e2e/fakegh"
+	"github.com/jmrplens/ghchronicle/v2/test/e2e/fakegh"
 )
 
 // psqlClient is however psql can reach the local server on this machine. The

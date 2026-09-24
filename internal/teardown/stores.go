@@ -16,7 +16,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/jmrplens/ghchronicle/internal/config"
+	"github.com/jmrplens/ghchronicle/v2/internal/config"
 )
 
 // timeout bounds one call. Dropping a table can take a moment on a store that

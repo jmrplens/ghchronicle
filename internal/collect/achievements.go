@@ -13,9 +13,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jmrplens/ghchronicle/internal/ghapi"
-	"github.com/jmrplens/ghchronicle/internal/httpx"
-	"github.com/jmrplens/ghchronicle/internal/sink"
+	"github.com/jmrplens/ghchronicle/v2/internal/ghapi"
+	"github.com/jmrplens/ghchronicle/v2/internal/httpx"
+	"github.com/jmrplens/ghchronicle/v2/internal/sink"
 )
 
 // Achievements records the badges the profile page shows under its

@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/jmrplens/ghchronicle/internal/httpx"
+	"github.com/jmrplens/ghchronicle/v2/internal/httpx"
 )
 
 // OTLP writes metrics over OpenTelemetry's HTTP protocol.

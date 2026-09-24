@@ -52,7 +52,7 @@ export interface HomeContent {
 	};
 }
 
-const install = `go install github.com/jmrplens/ghchronicle/cmd/ghchronicle@latest`;
+const install = `go install github.com/jmrplens/ghchronicle/v2/cmd/ghchronicle@latest`;
 
 const config = `github:
   token: \${GITHUB_TOKEN}

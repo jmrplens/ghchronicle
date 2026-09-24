@@ -32,8 +32,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jmrplens/ghchronicle/internal/dashboards"
-	"github.com/jmrplens/ghchronicle/internal/grafana"
+	"github.com/jmrplens/ghchronicle/v2/internal/dashboards"
+	"github.com/jmrplens/ghchronicle/v2/internal/grafana"
 )
 
 // dsPrefix is what an exported dashboard uses in place of a datasource. Every

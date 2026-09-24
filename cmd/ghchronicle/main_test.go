@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jmrplens/ghchronicle"
-	"github.com/jmrplens/ghchronicle/internal/config"
+	"github.com/jmrplens/ghchronicle/v2"
+	"github.com/jmrplens/ghchronicle/v2/internal/config"
 )
 
 // TestResolveBuild verifies the precedence the release depends on: a value

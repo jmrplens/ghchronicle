@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jmrplens/ghchronicle/internal/ghapi"
+	"github.com/jmrplens/ghchronicle/v2/internal/ghapi"
 )
 
 // TestTheReasonAFailureIsFiledUnderIsBounded: the reason is a tag, and a tag

@@ -16,7 +16,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/jmrplens/ghchronicle/internal/config"
+	"github.com/jmrplens/ghchronicle/v2/internal/config"
 )
 
 // Prefix is the namespace every measurement this writes lives under, and so

@@ -120,7 +120,7 @@ themselves or wants to know what they just agreed to.
     - **Go**
 
       ```sh
-      go install github.com/jmrplens/ghchronicle/cmd/ghchronicle@latest
+      go install github.com/jmrplens/ghchronicle/v2/cmd/ghchronicle@latest
       ```
 
 2. **Create a token** at `https://github.com/settings/tokens` and export it.

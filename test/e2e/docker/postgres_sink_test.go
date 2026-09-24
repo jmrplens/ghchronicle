@@ -12,9 +12,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jmrplens/ghchronicle/internal/config"
-	"github.com/jmrplens/ghchronicle/internal/sink"
-	"github.com/jmrplens/ghchronicle/internal/teardown"
+	"github.com/jmrplens/ghchronicle/v2/internal/config"
+	"github.com/jmrplens/ghchronicle/v2/internal/sink"
+	"github.com/jmrplens/ghchronicle/v2/internal/teardown"
 )
 
 // What a real PostgreSQL does with what the connecting sink writes.

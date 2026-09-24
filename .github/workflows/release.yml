@@ -66,8 +66,20 @@ jobs:
             echo "::error::VERSION says ${FILE_V} but the tag is v${TAG_V}: the release binaries would report ${TAG_V} while a build from this tree reports ${FILE_V}. Update VERSION, or tag v${FILE_V}."
             exit 1
           fi
+          # Go refuses a v2 or later tag whose go.mod path does not end in
+          # its major, and `go install ...@latest` then settles in silence on
+          # the newest tag it can accept. Five releases went out that way,
+          # each one installing 1.0.0.
+          MAJOR="${TAG_V%%.*}"
+          MOD_PATH="$(awk '$1 == "module" {print $2; exit}' go.mod)"
+          WANT="github.com/jmrplens/ghchronicle"
+          if [ "${MAJOR}" -ge 2 ]; then WANT="${WANT}/v${MAJOR}"; fi
+          if [ "${MOD_PATH}" != "${WANT}" ]; then
+            echo "::error::go.mod says module ${MOD_PATH} but a v${MAJOR} tag needs ${WANT}: go install would never reach this release. Change the module path, every import and every documented go install command."
+            exit 1
+          fi
           echo "version=${TAG_V}" >> "$GITHUB_OUTPUT"
-          echo "releasing ${TAG_V}, VERSION and tag agree"
+          echo "releasing ${TAG_V}, VERSION, tag and module path agree"
 
   # The same workflow a maintainer runs by hand, called rather than copied, so
   # there is one harness and a fix to it cannot land in one copy and not the

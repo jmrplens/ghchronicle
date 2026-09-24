@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jmrplens/ghchronicle/internal/httpx"
+	"github.com/jmrplens/ghchronicle/v2/internal/httpx"
 )
 
 // Elasticsearch writes documents through the _bulk API, to Elasticsearch or

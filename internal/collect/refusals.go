@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/jmrplens/ghchronicle/internal/ghapi"
+	"github.com/jmrplens/ghchronicle/v2/internal/ghapi"
 )
 
 // Refusals remembers the endpoints that answered "not available", so that the

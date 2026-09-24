@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jmrplens/ghchronicle/internal/sink"
+	"github.com/jmrplens/ghchronicle/v2/internal/sink"
 )
 
 func TestBillingParsesRFC3339Dates(t *testing.T) {

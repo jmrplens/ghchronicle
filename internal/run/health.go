@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/jmrplens/ghchronicle/internal/collect"
+	"github.com/jmrplens/ghchronicle/v2/internal/collect"
 )
 
 // What this sweep can say about itself.

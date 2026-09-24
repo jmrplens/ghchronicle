@@ -1,4 +1,4 @@
-module github.com/jmrplens/ghchronicle
+module github.com/jmrplens/ghchronicle/v2
 
 go 1.27.1
 

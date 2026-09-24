@@ -3,7 +3,7 @@ package fakegh
 import (
 	"slices"
 
-	"github.com/jmrplens/ghchronicle/internal/config"
+	"github.com/jmrplens/ghchronicle/v2/internal/config"
 )
 
 // NotCollected is every family the suites deliberately leave out of the sweep,

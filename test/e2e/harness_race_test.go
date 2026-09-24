@@ -19,7 +19,7 @@ import "time"
 // and the exporter serving while a sweep writes can only be driven as a
 // process.
 func collectorBuildArgs(out string) []string {
-	return []string{"build", "-race", "-o", out, "github.com/jmrplens/ghchronicle/cmd/ghchronicle"}
+	return []string{"build", "-race", "-o", out, "github.com/jmrplens/ghchronicle/v2/cmd/ghchronicle"}
 }
 
 // collectorBuildTimeout bounds that build. A race build shares no object cache

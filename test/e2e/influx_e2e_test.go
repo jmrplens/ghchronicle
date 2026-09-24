@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jmrplens/ghchronicle/test/e2e/fakegh"
+	"github.com/jmrplens/ghchronicle/v2/test/e2e/fakegh"
 )
 
 // influxConfig is the sinks block for a run that writes to rec and nothing

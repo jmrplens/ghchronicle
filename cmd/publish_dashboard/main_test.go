@@ -9,7 +9,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/jmrplens/ghchronicle/internal/dashboards"
+	"github.com/jmrplens/ghchronicle/v2/internal/dashboards"
 )
 
 // grafanaStandIn is a Grafana that answers every request with one reply, and

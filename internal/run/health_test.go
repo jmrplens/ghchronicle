@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jmrplens/ghchronicle/internal/collect"
-	"github.com/jmrplens/ghchronicle/internal/sink"
+	"github.com/jmrplens/ghchronicle/v2/internal/collect"
+	"github.com/jmrplens/ghchronicle/v2/internal/sink"
 )
 
 // one is the single point of a measurement whose tags match, and a failure

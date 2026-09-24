@@ -10,7 +10,7 @@ import "time"
 // collectorBuildArgs returns the `go build` arguments for the collector under
 // test.
 func collectorBuildArgs(out string) []string {
-	return []string{"build", "-o", out, "github.com/jmrplens/ghchronicle/cmd/ghchronicle"}
+	return []string{"build", "-o", out, "github.com/jmrplens/ghchronicle/v2/cmd/ghchronicle"}
 }
 
 // collectorBuildTimeout bounds that build.

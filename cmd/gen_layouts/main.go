@@ -31,7 +31,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/jmrplens/ghchronicle/internal/render"
+	"github.com/jmrplens/ghchronicle/v2/internal/render"
 )
 
 // defaultOut is where the site reads the file from, relative to the repository

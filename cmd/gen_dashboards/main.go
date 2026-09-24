@@ -23,7 +23,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/jmrplens/ghchronicle/internal/dashboards"
+	"github.com/jmrplens/ghchronicle/v2/internal/dashboards"
 )
 
 func main() {

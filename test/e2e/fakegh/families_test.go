@@ -4,7 +4,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/jmrplens/ghchronicle/internal/config"
+	"github.com/jmrplens/ghchronicle/v2/internal/config"
 )
 
 // The lists in this package are the fourth kind of list in this repository to

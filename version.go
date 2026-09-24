@@ -9,10 +9,9 @@
 // nothing under cmd/ or internal/ can.
 //
 // Without this, a build nobody stamped reports "dev". That was true of every
-// image the plain Dockerfile produced and of every `go install
-// github.com/jmrplens/ghchronicle/cmd/ghchronicle@latest`, because the real
-// number only ever arrived through the release ldflags, and a plausible wrong
-// version is not something anyone notices.
+// image the plain Dockerfile produced and of every `go install` build, because
+// the real number only ever arrived through the release ldflags, and a
+// plausible wrong version is not something anyone notices.
 package ghchronicle
 
 import (

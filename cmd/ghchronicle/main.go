@@ -17,13 +17,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/jmrplens/ghchronicle"
-	"github.com/jmrplens/ghchronicle/internal/collect"
-	"github.com/jmrplens/ghchronicle/internal/config"
-	"github.com/jmrplens/ghchronicle/internal/ghapi"
-	"github.com/jmrplens/ghchronicle/internal/render"
-	"github.com/jmrplens/ghchronicle/internal/run"
-	"github.com/jmrplens/ghchronicle/internal/sink"
+	"github.com/jmrplens/ghchronicle/v2"
+	"github.com/jmrplens/ghchronicle/v2/internal/collect"
+	"github.com/jmrplens/ghchronicle/v2/internal/config"
+	"github.com/jmrplens/ghchronicle/v2/internal/ghapi"
+	"github.com/jmrplens/ghchronicle/v2/internal/render"
+	"github.com/jmrplens/ghchronicle/v2/internal/run"
+	"github.com/jmrplens/ghchronicle/v2/internal/sink"
 )
 
 // version, commit and date are stamped at build time with -ldflags
