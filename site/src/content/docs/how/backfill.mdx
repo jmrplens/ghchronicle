@@ -229,6 +229,11 @@ that a sweep reads.
   analyses, where a sweep reads five, two and one.
 - Every release, deployment and discussion, and every Dependabot and code
   scanning alert, where a sweep reads the newest page of each list.
+- Every page of every stargazer list, where a sweep reads the newest hundred
+  stars of a repository whose list it has walked whole once. Up to 2.5.0 a
+  first walk that failed was recorded as done, and a backfill read a recorded
+  list by its first and last pages, so the stars in between were never read;
+  a backfill now reaches them.
 - The whole inbox, read threads included, where a sweep reads the unread
   threads that moved and, once a day, twenty pages of fifty with the read ones.
 - Every month of billing GitHub still answers, until three empty months in a

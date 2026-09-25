@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"maps"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -42,6 +43,249 @@ func TestSummarizeCountsAndAverages(t *testing.T) {
 	}
 	if p.Fields["seconds_to_merge_mean"] != 200.0 {
 		t.Errorf("mean = %v, want 200", p.Fields["seconds_to_merge_mean"])
+	}
+}
+
+// TestAMeanIsOverTheItemsThatCarriedTheField pins the divisor of every mean the
+// count reduction publishes.
+//
+// A collector leaves a field out when it has no honest value for it, and every
+// case here is a series in which some items did. Divided by the count, those
+// items weighed in as zeros: 2.5.0 stopped writing `steps` on a job GitHub no
+// longer serves steps for, so that the mean would not fall, and the exporter
+// pulled it down all the same.
+func TestAMeanIsOverTheItemsThatCarriedTheField(t *testing.T) {
+	at := time.Date(2026, 9, 24, 12, 0, 0, 0, time.UTC)
+	cases := []struct {
+		name        string
+		measurement string
+		reduced     string
+		tags        map[string]string
+		// items is the fields of each point, all of which land in one series.
+		items []map[string]any
+		// want is every mean the series must publish, and absent the means
+		// it must not.
+		want   map[string]float64
+		absent []string
+	}{
+		{
+			// A job old enough to have lost its step list, and one GitHub
+			// gave no start time, beside two that have both.
+			name:        "workflow jobs",
+			measurement: "gh_workflow_job",
+			reduced:     "gh_workflow_jobs",
+			tags:        map[string]string{"repo": "a", "job_name": "build", "conclusion": "success"},
+			items: []map[string]any{
+				{"duration_seconds": 100, "success": true, "steps": 4, "queued_seconds": 10},
+				{"duration_seconds": 100, "success": true, "steps": 6, "queued_seconds": 30},
+				{"duration_seconds": 100, "success": true, "queued_seconds": 20},
+				{"duration_seconds": 100, "success": true},
+			},
+			want: map[string]float64{
+				"duration_seconds_mean": 100, "success_mean": 1, "steps_mean": 5, "queued_seconds_mean": 20,
+			},
+		},
+		{
+			// A first attempt carries its queue time and a re-run does not,
+			// because a re-run's created_at is the first attempt's.
+			name:        "workflow runs",
+			measurement: "gh_workflow_run",
+			reduced:     "gh_workflow_runs",
+			tags:        map[string]string{"repo": "a", "workflow": ".github/workflows/ci.yml", "conclusion": "success"},
+			items: []map[string]any{
+				{"duration_seconds": 60, "queued_seconds": 4},
+				{"duration_seconds": 120},
+			},
+			want: map[string]float64{"duration_seconds_mean": 90, "queued_seconds_mean": 4},
+		},
+		{
+			// ACTIVE and INACTIVE are one outcome, and each writes the other
+			// duration: a deployment still live has no seconds_live yet.
+			name:        "deployments",
+			measurement: "gh_deployment",
+			reduced:     "gh_deployments",
+			tags:        map[string]string{"repo": "a", "environment": "production"},
+			items: []map[string]any{
+				{"deployments": 1, "outcome": "success", "seconds_to_status": 110},
+				{"deployments": 1, "outcome": "success", "seconds_live": 8041},
+			},
+			want:   map[string]float64{"seconds_to_status_mean": 110, "seconds_live_mean": 8041},
+			absent: []string{"deployments_mean"},
+		},
+		{
+			// GitHub has no v3 vector for an advisory published with v4 only,
+			// and a score it does not have is left out rather than written 0.
+			name:        "dependabot alerts",
+			measurement: "gh_dependabot_alert_item",
+			reduced:     "gh_dependabot_alerts",
+			tags:        map[string]string{"repo": "a", "severity": "high"},
+			items: []map[string]any{
+				{"alerts": 1, "alert_state": "fixed", "cvss": 7.5, "seconds_to_resolve": 100},
+				{"alerts": 1, "alert_state": "fixed", "cvss_v4": 8.7, "seconds_to_resolve": 300},
+			},
+			want: map[string]float64{"cvss_mean": 7.5, "cvss_v4_mean": 8.7, "seconds_to_resolve_mean": 200},
+		},
+		{
+			// Nobody but a bot reviewed the second pull request, so it has a
+			// first review and no first human one.
+			name:        "pull requests",
+			measurement: "gh_pull_request",
+			reduced:     "gh_pull_requests",
+			tags:        map[string]string{"repo": "a", "state": "OPEN"},
+			items: []map[string]any{
+				{"churn": 10, "seconds_to_first_review": 5, "seconds_to_first_human_review": 7200},
+				{"churn": 30, "seconds_to_first_review": 7},
+			},
+			want: map[string]float64{
+				"churn_mean": 20, "seconds_to_first_review_mean": 6, "seconds_to_first_human_review_mean": 7200,
+			},
+		},
+		{
+			// A hidden tier leaves the amount unknown, not zero.
+			name:        "sponsorships",
+			measurement: "gh_sponsorship",
+			reduced:     "gh_sponsorships",
+			tags:        map[string]string{"user": "u", "direction": "sponsor"},
+			items: []map[string]any{
+				{"sponsorship": 1, "active": true, "one_time": false, "amount_cents": 500},
+				{"sponsorship": 1, "active": false, "one_time": false},
+			},
+			want:   map[string]float64{"amount_cents_mean": 500, "active_mean": 0.5, "one_time_mean": 0},
+			absent: []string{"sponsorship_mean"},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			points := make([]Point, 0, len(c.items))
+			for i, fields := range c.items {
+				tags := maps.Clone(c.tags)
+				tags["item"] = strconv.Itoa(i)
+				points = append(points, Point{
+					Measurement: c.measurement, Tags: tags, Fields: fields,
+					Time: at.Add(time.Duration(i) * time.Minute),
+				})
+			}
+			out := Summarize(points)
+			if len(out) != 1 || out[0].Measurement != c.reduced {
+				t.Fatalf("%d items of one series reduce to one %s, got %+v", len(c.items), c.reduced, out)
+			}
+			if out[0].Fields["count"] != len(c.items) {
+				t.Errorf("count = %v, want %d: every item is counted whatever it carries",
+					out[0].Fields["count"], len(c.items))
+			}
+			for _, f := range slices.Sorted(maps.Keys(c.want)) {
+				if got := out[0].Fields[f]; got != c.want[f] {
+					t.Errorf("%s = %v, want %v", f, got, c.want[f])
+				}
+			}
+			for _, f := range c.absent {
+				if got, published := out[0].Fields[f]; published {
+					t.Errorf("%s = %v is published, and must not be", f, got)
+				}
+			}
+		})
+	}
+}
+
+// TestAFieldWhoseAbsenceSaysNoIsAveragedOverEveryItem pins the exception: a
+// field a collector writes only when the answer is yes is a share over every
+// item, and averaged over the items that carried it, it would read 1 wherever
+// anything said yes. The dashboards show these three as shares.
+func TestAFieldWhoseAbsenceSaysNoIsAveragedOverEveryItem(t *testing.T) {
+	at := time.Date(2026, 9, 24, 12, 0, 0, 0, time.UTC)
+	cases := []struct {
+		measurement string
+		reduced     string
+		tags        map[string]string
+		items       []map[string]any
+		want        map[string]float64
+	}{
+		{
+			// One of four merged. seconds_to_merge beside it is a duration
+			// of the merged ones only, and stays one.
+			"gh_external_contribution", "gh_external_contributions",
+			map[string]string{"user": "u", "owner": "o", "repo": "r", "full_name": "o/r"},
+			[]map[string]any{
+				{"contributions": 1, "comments": 2, "merged": 1, "seconds_to_merge": 3600},
+				{"contributions": 1, "comments": 0},
+				{"contributions": 1, "comments": 4},
+				{"contributions": 1, "comments": 2},
+			},
+			map[string]float64{"merged_mean": 0.25, "seconds_to_merge_mean": 3600, "comments_mean": 2},
+		},
+		{
+			// A fork with no push date was never pushed to, so it did not
+			// advance; how long after the fork a push came is known only
+			// for the forks that have one.
+			"gh_fork", "gh_forks_seen",
+			map[string]string{"repo": "a"},
+			[]map[string]any{
+				{"forks": 1, "stars": 0, "advanced": true, "seconds_to_push": 600},
+				{"forks": 1, "stars": 0, "advanced": false, "seconds_to_push": -200},
+				{"forks": 1, "stars": 0},
+				{"forks": 1, "stars": 0},
+			},
+			map[string]float64{"advanced_mean": 0.25, "seconds_to_push_mean": 200},
+		},
+		{
+			// A run lists its pull requests only when it has any.
+			"gh_workflow_run", "gh_workflow_runs",
+			map[string]string{"repo": "a", "workflow": ".github/workflows/ci.yml", "conclusion": "success"},
+			[]map[string]any{
+				{"duration_seconds": 60, "pull_requests": 1, "pull_request": 7},
+				{"duration_seconds": 60},
+			},
+			map[string]float64{"pull_requests_mean": 0.5, "duration_seconds_mean": 60},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.measurement, func(t *testing.T) {
+			points := make([]Point, 0, len(c.items))
+			for i, fields := range c.items {
+				tags := maps.Clone(c.tags)
+				tags["item"] = strconv.Itoa(i)
+				points = append(points, Point{
+					Measurement: c.measurement, Tags: tags, Fields: fields,
+					Time: at.Add(time.Duration(i) * time.Minute),
+				})
+			}
+			out := Summarize(points)
+			if len(out) != 1 || out[0].Measurement != c.reduced {
+				t.Fatalf("%d items of one series reduce to one %s, got %+v", len(c.items), c.reduced, out)
+			}
+			for _, f := range slices.Sorted(maps.Keys(c.want)) {
+				if got := out[0].Fields[f]; got != c.want[f] {
+					t.Errorf("%s = %v, want %v", f, got, c.want[f])
+				}
+			}
+		})
+	}
+}
+
+// TestEveryFieldWhoseAbsenceSaysNoIsStillWritten holds absentIsZero to the
+// collectors. A field renamed in internal/collect would leave its entry here
+// naming nothing, and the new name would quietly be averaged over the items
+// that carried it, which for a marker written only on yes is 1 for ever.
+func TestEveryFieldWhoseAbsenceSaysNoIsStillWritten(t *testing.T) {
+	written := map[string]bool{}
+	for _, f := range fieldNamesInCollectors(t) {
+		written[f.name] = true
+	}
+	for _, m := range slices.Sorted(maps.Keys(promRules)) {
+		r := promRules[m]
+		for _, f := range r.absentIsZero {
+			if r.mode != count {
+				t.Errorf("%s lists %q in absentIsZero, which only a count reduction reads", m, f)
+			}
+			if notAveraged[f] {
+				t.Errorf("%s lists %q in absentIsZero, and notAveraged publishes no mean of it at all", m, f)
+			}
+			if !written[f] {
+				t.Errorf("%s lists %q in absentIsZero, and no collector writes a field of that name", m, f)
+			}
+		}
 	}
 }
 
@@ -610,9 +854,10 @@ func isAnyValuedMap(expr ast.Expr) bool {
 // answer are fields in every store that keys a row by its tags and its time,
 // because as tags they doubled the row the moment they changed. The exporter
 // stamps every gauge at the sweep, so it reads them back as labels: without
-// that, "alerts by state" and "time to resolve" could not be asked of
-// Prometheus at all, and the mean time to resolve would be diluted by every
-// alert still open.
+// that, "alerts by state" could not be asked of Prometheus at all, and the mean
+// time to resolve would mix the alerts fixed with the alerts dismissed. An
+// alert still open carries no time to resolve, so it no longer weighs in
+// either way: a mean is over the items that carried the field.
 func TestPromotedFieldsBecomeLabels(t *testing.T) {
 	at := time.Date(2026, 9, 1, 12, 0, 0, 0, time.UTC)
 	alert := func(number, state string, resolve any) Point {

@@ -31,6 +31,12 @@ BINARY="ghchronicle"
 COSIGN_IDENTITY='^https://github\.com/jmrplens/ghchronicle/\.github/workflows/release\.yml@refs/tags/v'
 COSIGN_ISSUER="https://token.actions.githubusercontent.com"
 
+# The oldest cosign that reads the bundle every release publishes, measured
+# against v2.5.0's: 2.4.1 and older answer "bundle does not contain cert for
+# verification" and exit 1, exactly as they would for a forged file, so a
+# cosign that old tells this script nothing about the signature.
+COSIGN_MINIMUM="2.4.2"
+
 # Named once so the advice this prints stays the command the documentation
 # gives, rather than a second spelling of it that can drift.
 SELF_URL="https://raw.githubusercontent.com/${REPO}/main/install.sh"
@@ -119,21 +125,64 @@ verify_checksum() {
 # what every install is held to; this answers the further question of whether
 # the checksum file itself came from the release workflow, and it is worth
 # doing when the tool is at hand rather than worth installing a tool for.
+#
+# Each way of not asking is said, so a reader never takes the checksum line for
+# the whole of what was checked. install.ps1 does the same, in the same words.
+#
+# A cosign too old to read the bundle is one of those ways, and is said as one
+# rather than refused: it cannot tell a genuine release from a forged one, so
+# its failure is no more evidence than a missing cosign. A cosign new enough
+# that still fails is refused, with what it said, because "tuf refresh failed"
+# from a machine that cannot reach Sigstore is not a forged file either, and
+# the reader is the one who can tell the two apart.
 verify_signature() {
-  local dir=$1 version=$2
-  command -v cosign >/dev/null 2>&1 || return 0
+  local dir=$1 version=$2 have said
+  command -v cosign >/dev/null 2>&1 || {
+    say "note: cosign is not on PATH, so only the checksum was verified"
+    return 0
+  }
   curl -fsSL -o "${dir}/checksums.txt.sigstore.json" \
     "${GHCHRONICLE_DOWNLOAD_BASE}/v${version}/checksums.txt.sigstore.json" || {
     say "note: this release publishes no signature bundle, so only the checksum was verified"
     return 0
   }
-  cosign verify-blob \
+  have=$(cosign_version)
+  if [ -n "$have" ] && older_than "$have" "$COSIGN_MINIMUM"; then
+    say "note: cosign ${have} cannot read this release's signature bundle (${COSIGN_MINIMUM} or newer can), so only the checksum was verified"
+    return 0
+  fi
+  said=$(cosign verify-blob \
     --bundle "${dir}/checksums.txt.sigstore.json" \
     --certificate-identity-regexp "$COSIGN_IDENTITY" \
     --certificate-oidc-issuer "$COSIGN_ISSUER" \
-    "${dir}/checksums.txt" >/dev/null 2>&1 ||
-    die "cosign could not verify that checksums.txt came from the release workflow. Do not use what was downloaded."
+    "${dir}/checksums.txt" 2>&1) ||
+    die "cosign did not confirm that checksums.txt came from the release workflow, so nothing was installed. What cosign said:
+${said}"
   say "signature verified with cosign"
+}
+
+# cosign_version is the version the cosign on PATH reports, as X.Y.Z, or
+# nothing when it reports none in that form. A build from source says
+# "devel", and is taken to be new enough: skipping the check for a version
+# nobody can read would be the one way to install past a signature that does
+# not verify.
+cosign_version() {
+  cosign version 2>/dev/null |
+    sed -n 's/^GitVersion:[[:space:]]*v\{0,1\}\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/p' |
+    head -n 1 || true
+}
+
+# older_than reports whether version $1 comes before version $2, both X.Y.Z.
+older_than() {
+  local -a a b
+  local i
+  IFS=. read -r -a a <<<"$1"
+  IFS=. read -r -a b <<<"$2"
+  for i in 0 1 2; do
+    if [ "${a[i]}" -lt "${b[i]}" ]; then return 0; fi
+    if [ "${a[i]}" -gt "${b[i]}" ]; then return 1; fi
+  done
+  return 1
 }
 
 # on_path reports whether a directory is already one the shell searches.
@@ -280,7 +329,13 @@ offer_setup() {
   # says yes on a machine with no controlling terminal, where the open then
   # fails with "No such device or address": a CI job, a container build, a
   # provisioning run. Trying the open is the question actually being asked.
-  if ! : < /dev/tty 2> /dev/null; then
+  #
+  # Inside a group, with stderr redirected on the group. A command's own
+  # redirections are made left to right, so in `: < /dev/tty 2> /dev/null` the
+  # open fails before stderr is moved, and bash reports the failure on the
+  # stderr the script was given: every such install ended with
+  # "/dev/tty: No such device or address".
+  if ! { : < /dev/tty; } 2> /dev/null; then
     say "Next: ${BINARY} -setup writes a configuration, asking only what it"
     say "      cannot work out and checking each answer as it goes."
     return

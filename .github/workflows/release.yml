@@ -20,9 +20,9 @@ permissions:
   id-token: write # keyless signing
 
 # Two tags pushed close together would race on the same release and on the
-# `latest` tag of both registries. cancel-in-progress stays false: a release
-# killed between the image push and the GitHub release leaves images published
-# that nothing announces.
+# `latest` tag of both registries, which the GoReleaser job moves last.
+# cancel-in-progress stays false: a release killed between the image push and
+# the GitHub release leaves images published that nothing announces.
 concurrency:
   group: ${{ github.workflow }}
   cancel-in-progress: false
@@ -41,7 +41,9 @@ jobs:
   # binaries and the image tags come from the git tag, while an image built
   # from a clone, and any unstamped build, reports the VERSION file the root
   # package embeds. If the two disagree the release ships a binary that lies
-  # about itself, so fail here instead.
+  # about itself, so fail here instead. The release notes are read here too,
+  # for the same reason: a tag with nothing to say is refused before anything
+  # is built rather than after it is published.
   preflight:
     name: Preflight
     runs-on: ubuntu-latest
@@ -50,6 +52,7 @@ jobs:
       contents: read
     outputs:
       version: ${{ steps.version.outputs.version }}
+      notes: ${{ steps.notes.outputs.notes }}
     steps:
       - name: Check out the repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
@@ -80,6 +83,59 @@ jobs:
           fi
           echo "version=${TAG_V}" >> "$GITHUB_OUTPUT"
           echo "releasing ${TAG_V}, VERSION, tag and module path agree"
+
+      # The release page carries CHANGELOG.md's section for the version, the
+      # part written for people, and not a list of commits. The GoReleaser job
+      # receives it through this job's output, so what it publishes is exactly
+      # the text checked here.
+      - name: Take the release notes from CHANGELOG.md
+        id: notes
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          notes="${RUNNER_TEMP}/release-notes.md"
+          # From the "## X.Y.Z - YYYY-MM-DD" heading to the next "## " heading
+          # outside a code fence. The heading itself stays behind, since the
+          # release is already titled vX.Y.Z and GitHub dates it, and so do the
+          # blank lines at either end.
+          awk -v v="${VERSION}" '
+            /^[[:space:]]*(```|~~~)/ { fence = !fence }
+            !fence && /^## / {
+              if (on) exit
+              if (index($0, "## " v " - ") == 1 && $0 ~ / - [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]$/) { on = 1; next }
+            }
+            on { line[++n] = $0 }
+            END {
+              first = 1
+              while (first <= n && line[first] ~ /^[[:space:]]*$/) first++
+              last = n
+              while (last >= first && line[last] ~ /^[[:space:]]*$/) last--
+              for (i = first; i <= last; i++) print line[i]
+            }
+          ' CHANGELOG.md > "${notes}"
+          if [ ! -s "${notes}" ]; then
+            echo "::error::CHANGELOG.md has no section under '## ${VERSION} - YYYY-MM-DD', or an empty one, and that section is the release notes. Write it, or tag the version it was written for."
+            exit 1
+          fi
+          # A relative link on the release page resolves against
+          # /releases/tag/, where nothing in this repository lives. Markdown
+          # has three ways to write one: inline, a reference definition, and
+          # an HTML href or src, and all three are looked at. A footnote
+          # definition, [^1]:, is not a link. A bare #fragment stays refused:
+          # it points into CHANGELOG.md, not into the release page.
+          link='\]\(<?[^)>[:space:]]+'
+          definition='^[[:space:]]{0,3}\[[^]^][^]]*\]:[[:space:]]*<?[^>[:space:]]+'
+          attribute="(href|src)=(\"[^\"]*|'[^']*)"
+          absolute="(\]\(<?|\]:[[:space:]]*<?|(href|src)=[\"'])(https?://|mailto:)"
+          if grep -noE "${link}|${definition}|${attribute}" "${notes}" | grep -vE "${absolute}"; then
+            echo "::error::the ${VERSION} section of CHANGELOG.md has the relative links listed above, which the release page would resolve against /releases/tag/. Make them absolute."
+            exit 1
+          fi
+          # A random delimiter, so no line of the section can end the value early.
+          delim="NOTES_$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')"
+          { echo "notes<<${delim}"; cat "${notes}"; echo "${delim}"; } >> "$GITHUB_OUTPUT"
+          echo "release notes: $(wc -l < "${notes}") lines from the ${VERSION} section of CHANGELOG.md"
 
   # The same workflow a maintainer runs by hand, called rather than copied, so
   # there is one harness and a fix to it cannot land in one copy and not the
@@ -116,8 +172,9 @@ jobs:
       - name: Check out the repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
-          # The changelog is derived from the commits since the previous tag,
-          # which a shallow clone does not contain.
+          # The compare link in the release notes runs from the previous tag,
+          # which GoReleaser finds by walking the history a shallow clone
+          # does not contain.
           fetch-depth: 0
           persist-credentials: false
 
@@ -227,11 +284,21 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      # Under the runner's temporary directory and not the checkout, because
+      # GoReleaser refuses to release from a dirty tree and an untracked file
+      # is enough to make it dirty.
+      - name: Write the release notes the preflight took
+        env:
+          NOTES: ${{ needs.preflight.outputs.notes }}
+        run: printf '%s\n' "${NOTES}" > "${RUNNER_TEMP}/release-notes.md"
+
+      # --release-notes replaces the list of commits GoReleaser would generate;
+      # release.footer in .goreleaser.yaml is still appended below it.
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94  # v7.2.3
         with:
           version: ${{ env.GORELEASER_VERSION }}
-          args: release --clean
+          args: release --clean --release-notes ${{ runner.temp }}/release-notes.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # The dockerhub entry in .goreleaser.yaml is gated on this variable
@@ -247,11 +314,43 @@ jobs:
       # because no variant was ever run. This also proves the tag, the
       # manifest and the stamped version agree, which is the whole point of
       # the preflight above.
-      - name: Run the published image on both architectures
+      #
+      # Before running anything, each image is held to its signature, the way
+      # a user is told to check it but with the exact identity rather than the
+      # regexp: this workflow at this tag, nothing else. Every image up to
+      # 2.5.0 was published unsigned and nothing noticed; `cosign verify`
+      # exits non-zero on "no signatures found", so that is now a failed
+      # release and not a quiet one.
+      #
+      # `latest` moves here, last, and only onto an image that passed both.
+      # It is what every documented `docker run` pulls, and GoReleaser used to
+      # push it with the version tag, before the signing and before this
+      # check, so a failure in either left it naming an image nobody had
+      # verified. A create from a single source with no annotation of its own
+      # copies the index byte for byte, so `latest` names the digest the
+      # signature covers, which the loop checks rather than assumes. A
+      # prerelease leaves it alone.
+      - name: Verify and run the published images, then move latest
         env:
           VERSION: ${{ needs.preflight.outputs.version }}
+          DOCKERHUB: ${{ steps.dockerhub.outputs.publish }}
         run: |
           set -euo pipefail
+          images=("ghcr.io/jmrplens/ghchronicle:v${VERSION}")
+          if [ "${DOCKERHUB}" = "true" ]; then
+            images+=("docker.io/jmrplens/ghchronicle:v${VERSION}")
+          fi
+          identity="https://github.com/jmrplens/ghchronicle/.github/workflows/release.yml@refs/tags/v${VERSION}"
+          for image in "${images[@]}"; do
+            if ! cosign verify \
+                --certificate-identity "${identity}" \
+                --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+                "${image}" > /dev/null; then
+              echo "::error::${image} carries no valid signature by ${identity}. The release is published and latest was not moved; see RELEASING.md, When something goes wrong."
+              exit 1
+            fi
+            echo "${image}: signed by ${identity}"
+          done
           for platform in linux/amd64 linux/arm64; do
             out="$(docker run --rm --pull=always --platform "${platform}" \
               "ghcr.io/jmrplens/ghchronicle:v${VERSION}" -version)"
@@ -259,10 +358,27 @@ jobs:
             case "${out}" in
               "ghchronicle ${VERSION} "*) ;;
               *)
-                echo "::error::the ${platform} image reports '${out}', expected version ${VERSION}"
+                echo "::error::the ${platform} image reports '${out}', expected version ${VERSION}. The release is published and latest was not moved."
                 exit 1
                 ;;
             esac
+          done
+          case "${VERSION}" in
+            *-*)
+              echo "${VERSION} is a prerelease, so latest stays where it was"
+              exit 0
+              ;;
+          esac
+          for image in "${images[@]}"; do
+            repo="${image%:*}"
+            docker buildx imagetools create --tag "${repo}:latest" "${image}"
+            want="$(docker buildx imagetools inspect --format '{{.Manifest.Digest}}' "${image}")"
+            got="$(docker buildx imagetools inspect --format '{{.Manifest.Digest}}' "${repo}:latest")"
+            if [ -z "${want}" ] || [ "${want}" != "${got}" ]; then
+              echo "::error::${repo}:latest names ${got:-nothing} and ${image} is ${want:-unreadable}, so the signature on the version tag does not cover latest."
+              exit 1
+            fi
+            echo "${repo}:latest now names ${want}, the digest signed as ${image}"
           done
 
   # The moving major tag, which is the only thing that makes
@@ -325,3 +441,22 @@ jobs:
               tag -f -a "${major}" "${commit}" -m "${major}"
           git push -f origin "refs/tags/${major}"
           echo "::notice::${major} now points at ${commit} (v${VERSION})"
+
+      # Listing a release in the Marketplace is the one step no token can take:
+      # GitHub asks for a 2FA confirmation that only its web page performs, and
+      # the releases API has no parameter for it. A release this workflow made
+      # and nobody ticked stays out of the listing's version menu, so the run
+      # ends by saying where the box is rather than trusting it to be recalled.
+      - name: Point at the Marketplace box
+        env:
+          VERSION: ${{ needs.preflight.outputs.version }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          edit="https://github.com/${REPO}/releases/edit/v${VERSION}"
+          echo "::notice title=Marketplace::list v${VERSION} in the Marketplace: ${edit} (the box is ticked; Update release)"
+          {
+            echo "### List v${VERSION} in the Marketplace"
+            echo
+            echo "Open [the release's edit page](${edit}), leave **Publish this Action to the GitHub Marketplace** ticked and press **Update release**. No token can do this for the workflow."
+          } >> "${GITHUB_STEP_SUMMARY}"

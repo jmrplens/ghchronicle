@@ -17,11 +17,19 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/jmrplens/ghchronicle/v2/internal/config"
+	"github.com/jmrplens/ghchronicle/v2/internal/httpx"
 )
 
 // timeout bounds one call. Dropping a table can take a moment on a store that
 // is compacting, and nothing here is on the sweep's path.
 const timeout = 60 * time.Second
+
+// client carries every call to a store, with a pool of its own rather than
+// http.DefaultClient's, for the reason internal/httpx gives: the tests here
+// run in parallel against httptest servers, and one of them closing its
+// server empties the process-wide pool under a request another test has in
+// flight, which then fails with nothing to say about itself.
+var client = &http.Client{Transport: httpx.OwnTransport()}
 
 // ── InfluxDB ────────────────────────────────────────────────────────────────
 
@@ -193,7 +201,7 @@ func send(ctx context.Context, method, endpoint string,
 		return nil, 0, reqErr
 	}
 	auth(req)
-	res, sendErr := http.DefaultClient.Do(req)
+	res, sendErr := client.Do(req)
 	if sendErr != nil {
 		return nil, 0, sendErr
 	}

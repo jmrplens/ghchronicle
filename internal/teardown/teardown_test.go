@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/http/httptrace"
 	"os"
 	"path/filepath"
 	"strings"
@@ -113,6 +114,35 @@ func TestAStoreThatWillNotAnswerIsReported(t *testing.T) {
 	store := &influx{sink: s.start(t)}
 	if _, err := store.Holds(t.Context()); err == nil {
 		t.Error("a store that failed was read as holding nothing")
+	}
+}
+
+// TestAStoreKeepsItsConnectionWhenTheSharedPoolIsEmptied: closing an
+// httptest server empties http.DefaultTransport's idle pool, which every
+// parallel test here does when it ends. A store drawing on that pool loses
+// its connection to whichever test ended last, and a request that was using
+// it fails for a reason that belongs to another test.
+func TestAStoreKeepsItsConnectionWhenTheSharedPoolIsEmptied(t *testing.T) {
+	t.Parallel()
+	shared, ok := http.DefaultTransport.(*http.Transport)
+	if !ok {
+		t.Fatalf("http.DefaultTransport is a %T, so this test cannot empty it", http.DefaultTransport)
+	}
+	s := &influxServer{tables: []string{"gh_repo"}}
+	store := &influx{sink: s.start(t)}
+	var reused []bool
+	ctx := httptrace.WithClientTrace(t.Context(), &httptrace.ClientTrace{
+		GotConn: func(info httptrace.GotConnInfo) { reused = append(reused, info.Reused) },
+	})
+	for range 2 {
+		if _, err := store.Holds(ctx); err != nil {
+			t.Fatal(err)
+		}
+		shared.CloseIdleConnections()
+	}
+	if len(reused) != 2 || !reused[1] {
+		t.Errorf("connections reused = %v, want the second call on the first call's "+
+			"connection although the shared pool was emptied between them", reused)
 	}
 }
 

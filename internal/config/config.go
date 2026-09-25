@@ -1441,10 +1441,13 @@ type GrafanaDatasource struct {
 	// try TLS and carry on without it, and Grafana's datasource either
 	// insists or refuses, so that case is chosen here rather than guessed.
 	SSLMode string `yaml:"sslmode" ghc:"example=require"`
-	// LokiUID is a Loki datasource that already exists. With one, the panel
-	// that would say where a failed job's output went reads the lines from it
-	// instead. It is adopted rather than made: the Loki sink writes to the
-	// push endpoint, and a datasource built from that address would be
-	// pointed at the half of the API that does not answer queries.
+	// LokiUID is a Loki datasource that already exists, which the failed job
+	// output panel reads the lines from and which is never written to.
+	// Without it, a Loki sink whose address ends in the push path gets one
+	// worked out from that address with the path dropped: a Loki datasource
+	// Grafana already has there is adopted, and otherwise ghchronicle-loki is
+	// made. This is for the cases that cannot be worked out, which are a sink
+	// that pushes somewhere else and a Grafana that reaches Loki by another
+	// address, and for a token that may not create or rewrite datasources.
 	LokiUID string `yaml:"loki_uid" ghc:"example=be7m1q4"`
 }

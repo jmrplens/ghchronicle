@@ -125,9 +125,13 @@ un panel de texto, "Where failure output went", con esa consulta. Publicar el
 dashboard desde el colector cambia ese panel por las líneas, las más recientes
 primero, filtradas por la variable de repositorio del dashboard allí donde la
 variable del almacén se puede leer como expresión regular. Basta con un sink de
-Loki cuya dirección termine en `/loki/api/v1/push`: el datasource se crea a
-partir de ella. Uno que escriba en otro sitio lo dice y toma un
-`grafana.datasource.loki_uid` en su lugar.
+Loki cuya dirección termine en `/loki/api/v1/push`: se adopta un datasource de
+Loki que Grafana ya tenga en esa dirección, sin la ruta, y si no lo hay el
+datasource se crea a partir de ella. Uno que escriba en otro sitio lo dice y
+toma un `grafana.datasource.loki_uid` en su lugar, y lo mismo un Grafana que
+llega a Loki por otra dirección. Un token que no puede crear el datasource
+cuesta este panel y nada más: la ejecución avisa una vez y publica todos los
+dashboards con la nota.
 
 ## Por dónde seguir
 

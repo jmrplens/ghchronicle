@@ -25,6 +25,8 @@ import (
 	"net/http"
 	"os"
 	"time"
+
+	"github.com/jmrplens/ghchronicle/v2/internal/httpx"
 )
 
 // DefaultURL is the Grafana these commands talk to unless GRAFANA_URL says
@@ -33,6 +35,13 @@ import (
 // anywhere else is named by the environment variable, which is the whole
 // reason it exists.
 const DefaultURL = "http://localhost:3000"
+
+// httpClient carries every call, with a pool of its own rather than
+// http.DefaultClient's, for the reason internal/httpx gives: the command's
+// tests publish in parallel against httptest servers, and one of them closing
+// its server empties the process-wide pool under a request another has in
+// flight, which then fails with nothing to say about itself.
+var httpClient = &http.Client{Transport: httpx.OwnTransport()}
 
 // Client is one Grafana, and what opens it.
 type Client struct {
@@ -114,7 +123,7 @@ func (c Client) Do(ctx context.Context, method, path string, body any,
 	case c.User != "":
 		req.SetBasicAuth(c.User, c.Password)
 	}
-	res, err := http.DefaultClient.Do(req)
+	res, err := httpClient.Do(req)
 	if err != nil {
 		return Response{}, err
 	}

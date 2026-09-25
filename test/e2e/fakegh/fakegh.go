@@ -683,12 +683,16 @@ func (s *Server) weekEpoch(marker string) string {
 // FreezeAt stops the fake's clock, so every relative date in its fixtures
 // resolves to the same day however long from now this runs.
 //
-// Two suites need this. The card gallery draws the pictures committed under
+// Three suites need this. The card gallery draws the pictures committed under
 // site/src/assets and a test compares them byte for byte, so the data behind
 // them has to be the same data every day. And the sweep test in internal/run
 // that runs two sweeps days apart needs the fixtures to stand still between
-// them, so that only the runner's clock moves. Everywhere else the point of a
-// relative date is that it moves. Call it before the first request.
+// them, so that only the runner's clock moves. The containerised suite's
+// check that a second sweep into one InfluxDB database adds no dated row needs
+// the same, for the same reason: its two fakes are two, and a UTC midnight
+// between them would date every fixture a day later. Everywhere else the
+// point of a relative date is that it moves. Call it before the first
+// request.
 func (s *Server) FreezeAt(at time.Time) {
 	s.now = at.UTC
 }

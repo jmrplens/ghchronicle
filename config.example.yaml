@@ -380,8 +380,11 @@ log:
 #     # Adopt a datasource that already exists instead of managing one named
 #     # after the store.
 #     uid: ae3x9k2
-#     # A Loki datasource that already exists. With one, the panel that would
-#     # say where a failed job's output went reads the lines from it instead.
-#     # It is adopted rather than made: the Loki sink writes to the push
-#     # endpoint, which is not the half of the API a query goes to.
+#     # A Loki datasource that already exists, which the failed job output
+#     # panel reads from and which is never written to. Without it, a Loki
+#     # sink whose url ends in /loki/api/v1/push gets one from that address
+#     # with the path dropped: a Loki datasource Grafana already has there is
+#     # adopted, and otherwise ghchronicle-loki is made. Name one here when
+#     # Grafana reaches Loki by another address, as it does from a container
+#     # network, or when the token may not create or rewrite datasources.
 #     loki_uid: be7m1q4

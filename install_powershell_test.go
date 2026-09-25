@@ -65,7 +65,10 @@ func fakeWindowsRelease(t *testing.T, corrupt bool) (name string, zipped []byte,
 	return name, zipped, checksums
 }
 
-func serveWindowsRelease(t *testing.T, name string, zipped []byte, checksums string) string {
+// serveWindowsRelease serves the zip and its checksum file, and the signature
+// bundle when signed. Unsigned for every test but the signature one, for the
+// reason fakeRelease.signed gives.
+func serveWindowsRelease(t *testing.T, name string, zipped []byte, checksums string, signed bool) string {
 	t.Helper()
 	mux := http.NewServeMux()
 	mux.HandleFunc("/v"+fakeVersion+"/"+name, func(w http.ResponseWriter, _ *http.Request) {
@@ -74,6 +77,9 @@ func serveWindowsRelease(t *testing.T, name string, zipped []byte, checksums str
 	mux.HandleFunc("/v"+fakeVersion+"/checksums.txt", func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte(checksums))
 	})
+	if signed {
+		serveBundle(mux)
+	}
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
 	return srv.URL
@@ -142,7 +148,7 @@ func TestTheWindowsInstallerPutsTheBinaryWhereItWasAsked(t *testing.T) {
 	t.Parallel()
 	name, zipped, checksums := fakeWindowsRelease(t, false)
 	dir := t.TempDir()
-	out, code := runWindowsInstaller(t, serveWindowsRelease(t, name, zipped, checksums), dir)
+	out, code := runWindowsInstaller(t, serveWindowsRelease(t, name, zipped, checksums, false), dir)
 	if code != 0 {
 		t.Fatalf("exit %d, want 0:\n%s", code, out)
 	}
@@ -154,7 +160,14 @@ func TestTheWindowsInstallerPutsTheBinaryWhereItWasAsked(t *testing.T) {
 	}
 	// The other half of the shadow warning below: nothing else answers to the
 	// name here, so a run that warns anyway would be crying wolf at every
-	// install there is.
+	// install there is. Unless something does: a machine that runs
+	// ghchronicle has one on PATH, and off Windows the installed .exe never
+	// answers to the bare name, so there the warning is right and this half
+	// has nothing to hold the run to.
+	if other, err := exec.LookPath("ghchronicle"); err == nil {
+		t.Logf("%s already answers to the name here, so the run was right to warn", other)
+		return
+	}
 	if strings.Contains(out, "warning:") {
 		t.Errorf("nothing else is on PATH, so this run had nothing to warn about:\n%s", out)
 	}
@@ -173,7 +186,7 @@ func TestTheWindowsInstallerSaysWhenAnotherCopyKeepsWinningTheName(t *testing.T)
 	dir := t.TempDir()
 	earlier := decoy(t)
 	out, code := runWindowsInstaller(t,
-		serveWindowsRelease(t, name, zipped, checksums), dir, earlier)
+		serveWindowsRelease(t, name, zipped, checksums, false), dir, earlier)
 	if code != 0 {
 		t.Fatalf("exit %d, want 0: a shadowed install is still an install:\n%s", code, out)
 	}
@@ -189,7 +202,7 @@ func TestTheWindowsInstallerRefusesAnArchiveThatDoesNotMatchItsChecksum(t *testi
 	t.Parallel()
 	name, zipped, checksums := fakeWindowsRelease(t, true)
 	dir := t.TempDir()
-	out, code := runWindowsInstaller(t, serveWindowsRelease(t, name, zipped, checksums), dir)
+	out, code := runWindowsInstaller(t, serveWindowsRelease(t, name, zipped, checksums, false), dir)
 	if code == 0 {
 		t.Fatalf("a tampered archive was installed:\n%s", out)
 	}
@@ -211,9 +224,29 @@ func TestTheWindowsInstallerReadsTheChecksumLineForTheArchiveAndNotItsSBOM(t *te
 		t.Fatal("this test needs a checksums file that also names the SBOM")
 	}
 	dir := t.TempDir()
-	out, code := runWindowsInstaller(t, serveWindowsRelease(t, name, zipped, checksums), dir)
+	out, code := runWindowsInstaller(t, serveWindowsRelease(t, name, zipped, checksums, false), dir)
 	if code != 0 {
 		t.Fatalf("exit %d, want 0. A checksums file naming the SBOM beside the archive is what "+
 			"every real release publishes:\n%s", code, out)
 	}
+}
+
+// TestTheWindowsInstallerChecksTheSignatureWhenCosignIsHere is install.sh's
+// signature test run through install.ps1: the same cases, the same stand-in,
+// and the same lines expected of it, because a reader on Windows is owed the
+// same check and the same account of how far it went.
+func TestTheWindowsInstallerChecksTheSignatureWhenCosignIsHere(t *testing.T) {
+	t.Parallel()
+	powershell(t)
+	runSignatureCases(t, func(t *testing.T, first string, signed bool) (string, int, string) {
+		t.Helper()
+		name, zipped, checksums := fakeWindowsRelease(t, false)
+		dir := t.TempDir()
+		var ahead []string
+		if first != "" {
+			ahead = append(ahead, first)
+		}
+		out, code := runWindowsInstaller(t, serveWindowsRelease(t, name, zipped, checksums, signed), dir, ahead...)
+		return out, code, filepath.Join(dir, "ghchronicle.exe")
+	})
 }

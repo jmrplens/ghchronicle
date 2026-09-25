@@ -24,8 +24,11 @@ against the checksum that release published, and puts the binary in
 `~/.local/bin` and `~/bin` that exists and is already on your `PATH`, and falls
 back to `~/.local/bin` when neither is. A checksum that does not match stops it
 without installing anything, and there is no flag to skip that step. When
-`cosign` is already on the machine it also verifies that the checksum file
-itself came from the release workflow. It ends by running what it installed, so
+`cosign` 2.4.2 or newer is already on the machine it also verifies that the
+checksum file itself came from the release workflow, and a signature cosign
+does not confirm stops it, with what cosign said. An older cosign cannot read
+the signature bundle, so then, as with no cosign at all, it says that only the
+checksum was verified. It ends by running what it installed, so
 the version you see is the file it just wrote, and it says so when another
 `ghchronicle` earlier in your `PATH` still wins the name.
 
@@ -101,7 +104,9 @@ the file, then verify the archive against the file.
     ```
 
 3. Check the checksum file itself, if you have
-   [cosign](https://docs.sigstore.dev/cosign/system_config/installation/).
+   [cosign](https://docs.sigstore.dev/cosign/system_config/installation/)
+   2.4.2 or newer. An older one cannot read the bundle and fails whatever the
+   file says.
 
     ```sh
     cosign verify-blob \
@@ -213,16 +218,17 @@ find.
     Lands in `$(go env GOPATH)/bin`, which is `~/go/bin` unless you moved it,
     and that directory has to be on your `PATH`.
 
-    A binary built this way reports its version but not its commit or its
-    build date:
-
-    ```text
-    ghchronicle __VERSION__ (commit unknown, built unknown)
-    ```
-
-    The version comes from the `VERSION` file the module embeds; the other two
+    A binary built this way has no commit or build date to report: those two
     are stamped by the release build and by nothing else, and a module
     downloaded through the proxy carries no checkout to read them from.
+    `-version` names what the build does record instead, the module version
+    the go command fetched and the Go release that compiled it:
+
+    ```text
+    ghchronicle __VERSION__ (module v__VERSION__, built with <go version>)
+    ```
+
+    The first version comes from the `VERSION` file the module embeds.
 
   </TabItem>
   <TabItem label="make">

@@ -20,6 +20,17 @@ is not.
       day the tag is pushed. The site reads the release date from that heading
       for its structured data and its release history page, and the site build
       stops when VERSION has no heading to read.
+
+      The section under it is the release notes, word for word: the release
+      workflow's preflight job cuts it out, from the heading to the next `## `
+      one, and GoReleaser publishes it above the pull, verification and
+      compare lines of `release.footer` in `.goreleaser.yaml`. There is no
+      list of commits; the compare link is where they are. The preflight job
+      refuses a tag whose section is missing or empty, and one whose section
+      has a relative link, inline, as a reference definition or in an HTML
+      `href` or `src`, which the release page would resolve against
+      `/releases/tag/`. Links there are absolute, or `mailto:`.
+
 - [ ] `VERSION` and the tag agree. The release workflow's preflight job refuses
       the tag otherwise, and it is the first thing it checks.
 - [ ] A major bump changes the module path. It carries the major version,
@@ -127,14 +138,41 @@ That runs `.github/workflows/release.yml`: the end-to-end and race suites, then
 GoReleaser, which builds the binaries for the three operating systems and two
 architectures, signs the checksums and the SBOMs with cosign keylessly, pushes
 the image to `ghcr.io`, pushes it to Docker Hub when the two Docker Hub secrets
-are set, and writes the release notes from the commit subjects.
+are set, signs each pushed image with the same keyless identity, and publishes
+the release with the `CHANGELOG.md` section as its notes. GoReleaser pushes
+only the version tag. The job then verifies each image's signature against that
+identity at this exact tag, runs the image on both architectures, and only then
+moves `latest` in each registry onto the same digest, checking that it did.
+Either check failing fails the release, and `latest` and the major tag stay on
+the previous release. A prerelease never moves `latest`.
 
 ## After the tag
 
 - [ ] The release page lists the archives, the checksums, the signatures and
-      the SBOMs, and the notes read as notes.
+      the SBOMs, and its notes are the `CHANGELOG.md` section followed by the
+      pull, verification and compare lines.
 - [ ] `docker run --rm ghcr.io/jmrplens/ghchronicle:vX.Y.Z -version` prints the
       version. The workflow checks this too, and it is worth seeing once.
+- [ ] The image verifies the way a user is told to verify it, from outside the
+      workflow and with cosign 3:
+
+      ```sh
+      cosign verify \
+        --certificate-identity-regexp 'https://github.com/jmrplens/ghchronicle/.github/workflows/release.yml@refs/tags/.*' \
+        --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+        ghcr.io/jmrplens/ghchronicle:vX.Y.Z > /dev/null
+      ```
+
+      It must end with the list of checks performed, not "no signatures
+      found"; the same for `docker.io/jmrplens/ghchronicle:vX.Y.Z` when Docker
+      Hub was published, and for `:latest` in each, which must name the same
+      digest. The workflow runs the same check with the exact identity. An
+      older cosign answers "no signatures found" for an image cosign 3 signed:
+      measured, cosign 2.6.1 finds the signature only with
+      `--new-bundle-format`, 2.5.0 not even then, and 2.4.2 does not know the
+      flag, so a failure here with anything but cosign 3 says nothing about
+      the image. Every image up to 2.5.0 is unsigned.
+
 - [ ] `go install` reaches the release. Asking the module mirror for the
       exact version makes it fetch the tag now, and pkg.go.dev with it,
       instead of whenever its cache of the last answer expires:
@@ -165,8 +203,15 @@ are set, and writes the release notes from the commit subjects.
       filter runs the old file. The preflight job refuses it, before anything
       is published, which is what it is for.
 
-- [ ] Publish the Action to the Marketplace from the release page, on a first
-      release. [ACTION.md](ACTION.md) has the steps and the categories.
+- [ ] List the release in the Marketplace: open its edit page (the release
+      run's summary links it), leave "Publish this Action to the GitHub
+      Marketplace" ticked and press "Update release". Every release, not only
+      the first: the listing's version menu holds only the releases ticked one
+      by one, and no token can tick it, because GitHub asks for a 2FA
+      confirmation only its web page performs. Never make a release of the
+      major tag to get `v2` into that menu: releases here are immutable, and an
+      immutable release locks its tag, so the major-tag job could never move
+      `v2` again. [ACTION.md](ACTION.md) has the categories.
 - [ ] Docker Hub: the description and the README of the repository there are
       not pushed by the workflow, so update them after the first tag and after
       any change to what the image expects.
@@ -184,3 +229,30 @@ A tag that failed halfway leaves images published that nothing announces, which
 is why the release concurrency group does not cancel in progress. Fix forward
 with a new patch tag rather than moving the failed one: a moved tag is a
 different binary under a name somebody may already have pinned.
+
+What a failure leaves depends on where it happened, and in every case `latest`
+and the major tag stay on the previous release, so nobody who follows either is
+sent to it:
+
+- **Signing failed.** GoReleaser stops before the release page. `vX.Y.Z` is
+  pushed to each registry and unsigned, and nothing names it. The next patch
+  tag is the release; the failed version stays unsigned, and is the one
+  exception to "every released image from 2.5.1 on is signed", which is why
+  that sentence says released.
+- **The verification or the run failed.** The release page is published and
+  the images are signed; what failed is that the signature did not verify with
+  the exact identity or an architecture did not start. Say so on the release
+  page, then fix forward.
+- **Moving `latest` failed.** Everything else passed. Move it by hand, with the
+  same command the step runs, from a machine logged in to the registry:
+
+  ```sh
+  docker buildx imagetools create --tag ghcr.io/jmrplens/ghchronicle:latest ghcr.io/jmrplens/ghchronicle:vX.Y.Z
+  ```
+
+  and the same for `docker.io/jmrplens/ghchronicle` when Docker Hub was
+  published, then check that `docker buildx imagetools inspect` prints the
+  same digest for both tags. The major tag did not move either, because its
+  job waits on this one: move it with the commands of the `major-tag` job in
+  `release.yml`. This is the one case where re-pointing a tag is the fix:
+  `latest` and `v2` promise nothing but the newest release.

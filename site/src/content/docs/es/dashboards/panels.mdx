@@ -156,7 +156,7 @@ un mes tranquilo era una línea del primer fork al último y nada a los lados, l
 que se lee como que la recogida se paró. Cada extremo lleva un bucket de cero,
 así que la línea mantiene su valor hasta el final del rango.
 
-![La sección Stars and forks: estrellas ganadas por día como barras por repositorio, la curva acumulada subiendo hasta 350, estrellas por repositorio como gráfico de barras, una tabla de estrellas recientes con marcas de tiempo y usuarios, y forks en el tiempo subiendo hasta 51](../../../../assets/dashboards/stars-and-forks.png)
+![La sección Stars and forks en un rango de mediados de junio a mediados de septiembre: Stars gained over time como barras diarias apiladas por repositorio para cli, docs-site, edge-cache, parser y telemetry, con los días de más estrellas en cuatro; Stars over time como una sola línea que sube despacio hasta 350, con una leyenda que marca una media de 309 y un máximo de 350; Stars by repository como barras horizontales, telemetry 148, cli 89, parser 62, edge-cache 37 y docs-site 14; Recent stars como una tabla de usuario, momento y repositorio, la más reciente dada el 12 de septiembre; y Forks over time subiendo despacio hasta 51, con una media de 47](../../../../assets/dashboards/stars-and-forks.png)
 
 Lee `gh_star_day`, `gh_star` y `gh_repo`.
 
@@ -372,14 +372,14 @@ Un panel es texto en los ficheros exportados, "Where failure output went",
 porque la salida de un job fallido es texto y su sitio es un almacén de logs, y
 quien importa el dashboard puede no tener ninguno: un dashboard atado a un solo
 datasource no puede consultar dos. Publicado en un Grafana que sí tiene un
-datasource de Loki, que el colector crea a partir de un sink de Loki o toma de
-`grafana.datasource.loki_uid`, el mismo
-panel dibuja las últimas líneas de cada job fallido leídas de Loki, las más
-recientes primero, con el workflow, el job y la ejecución de cada línea en su
-cola logfmt. La variable de repositorio se aplica en los dashboards de InfluxDB,
-PostgreSQL y Prometheus; las variables de Graphite y Elasticsearch usan el
-asterisco de glob como valor de "All", que no es una expresión regular, así que
-allí el panel muestra todos los repositorios y lo dice.
+datasource de Loki, que el colector adopta o crea a partir de un sink de Loki o
+toma de `grafana.datasource.loki_uid`, el mismo panel dibuja las últimas
+líneas de cada job fallido leídas de Loki, las más recientes primero, con el
+workflow, el job y la ejecución de cada línea en su cola logfmt. La variable de
+repositorio se aplica en los dashboards de InfluxDB, PostgreSQL y Prometheus;
+las variables de Graphite y Elasticsearch usan el asterisco de glob como valor
+de "All", que no es una expresión regular, así que allí el panel muestra todos
+los repositorios y lo dice.
 
 Los dos últimos son inventarios y no tráfico. "Webhooks configured" existe porque
 la tabla de endpoints se construye desde las entregas, así que un hook que nunca

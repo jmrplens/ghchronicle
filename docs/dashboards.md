@@ -85,13 +85,20 @@ to each datasource and each dashboard.
 
 > **What the token has to be allowed to do**
 >
-> Publishing a dashboard needs an Editor. Creating or correcting a datasource
-> needs `datasources:create`, which an Editor does not have: a token without it
-> gets as far as the dashboard and is refused on the datasource, saying which
-> permission is missing. So a service account that manages its own datasource
-> is an Admin, or an Editor granted that permission; one that only publishes
-> against a datasource named in `grafana.datasource.uid` is an Editor, because
-> adopting reads and never writes.
+> Publishing a dashboard needs an Editor. Creating a datasource needs
+> `datasources:create` and correcting one needs `datasources:write`, and an
+> Editor has neither: a token without them gets as far as the dashboard and is
+> refused on the datasource, saying which permission is missing. So a service
+> account that manages its own datasource is an Admin, or an Editor granted
+> both; one that only publishes against a datasource named in
+> `grafana.datasource.uid` is an Editor, because adopting reads and never
+> writes. The Loki datasource never stops a publish: with a Loki sink, an
+> Editor adopts a Loki datasource Grafana already has at the sink's address,
+> reads a `ghchronicle-loki` an earlier run made as it is, with a warning that
+> it could not be rewritten, and when there is neither the create is refused,
+> one warning says so, and the failed job output panel alone is left as its
+> note. `grafana.datasource.loki_uid` names the one to read and avoids the
+> question.
 
 <!-- -->
 
@@ -161,7 +168,11 @@ the same run twice writes to the same two places:
 A datasource this makes takes the dashboard's uid, so both are
 `ghchronicle-<store>`, and one you name yourself keeps whatever uid it has.
 A Loki datasource, when the sink's address explains where to find one, is
-`ghchronicle-loki`.
+`ghchronicle-loki`, unless Grafana already has a Loki datasource at that
+address and the sink has no `tenant_id`: that one is adopted and left as it
+is, since a Loki datasource with no tenant is its address and nothing else.
+With a tenant it is always made, because the tenant travels in a secret
+Grafana never hands back.
 
 The datasource is created the first time and corrected afterwards, and only the
 fields this writes are compared, so a timeout or a description you set on it
@@ -209,13 +220,14 @@ ghchronicle -config config.yaml -uninstall all -yes     # and then goes
 
 | Target      | What goes                                                            |
 | ----------- | -------------------------------------------------------------------- |
-| `dashboard` | The dashboards it published, and a datasource it created              |
+| `dashboard` | The dashboards it published, and the datasources it created           |
 | `data`      | Every table in the store whose name starts with `gh_`                 |
 | `state`     | The state file, the dedupe ledger and the backfill checkpoint         |
 | `all`       | The three above                                                       |
 
-A datasource named in `grafana.datasource.uid` is never removed: it was
-somebody else's before this ran and it stays theirs. A target it does not
+A datasource named in `grafana.datasource.uid` or `grafana.datasource.loki_uid`
+is never removed, and neither is a Loki datasource it adopted: each was
+somebody else's before this ran and stays theirs. A target it does not
 recognise is refused whole, rather than the rest of the list being carried out
 without it.
 
@@ -472,7 +484,7 @@ fork curve over a quiet month was a line from the first fork to the last and
 blank on either side, which reads as collection having stopped. Each end carries
 a bucket of zero, so the line holds its value to the end of the range.
 
-![The Stars and forks section: stars gained per day as bars per repository, the cumulative star curve rising to 350, stars by repository as a bar chart, a table of recent stars with timestamps and users, and forks over time rising to 51](../site/src/assets/dashboards/stars-and-forks.png)
+![The Stars and forks section over a range from mid-June to mid-September: Stars gained over time as daily bars stacked by repository for cli, docs-site, edge-cache, parser and telemetry, the busiest days at four; Stars over time as one line climbing slowly to 350, its legend reading a mean of 309 and a max of 350; Stars by repository as horizontal bars, telemetry 148, cli 89, parser 62, edge-cache 37 and docs-site 14; Recent stars as a table of user, moment and repository, the newest given on 12 September; and Forks over time climbing slowly to 51, with a mean of 47](../site/src/assets/dashboards/stars-and-forks.png)
 
 Reads `gh_star_day`, `gh_star` and `gh_repo`.
 
@@ -677,13 +689,14 @@ the host of a webhook URL is stored, because the path usually carries a secret.
 One panel is text in the exported files, "Where failure output went",
 because the output of a failed job is text and belongs in a log store, and an
 importer may have none: a dashboard bound to one datasource cannot query two.
-Published to a Grafana with a Loki datasource, which the collector makes from
-a Loki sink or takes from `grafana.datasource.loki_uid`, the same panel draws the last
-lines of every failed job from Loki instead, newest first, with the workflow,
-job and run of each line in its logfmt tail. The repository variable is applied
-in the InfluxDB, PostgreSQL and Prometheus dashboards; the Graphite and
-Elasticsearch variables name the glob star as their All value, which is not a
-regular expression, so there the panel shows every repository and says so.
+Published to a Grafana with a Loki datasource, which the collector adopts or
+makes from a Loki sink or takes from `grafana.datasource.loki_uid`, the same
+panel draws the last lines of every failed job from Loki instead, newest first,
+with the workflow, job and run of each line in its logfmt tail. The repository
+variable is applied in the InfluxDB, PostgreSQL and Prometheus dashboards; the
+Graphite and Elasticsearch variables name the glob star as their All value,
+which is not a regular expression, so there the panel shows every repository
+and says so.
 
 The last two are inventories rather than traffic. "Webhooks configured" exists
 because the endpoint table is built from deliveries, so a hook that has never

@@ -24,9 +24,12 @@ la suma de verificación que esa release publicó, y deja el binario en
 `/usr/local/bin` si tiene permiso de escritura. Si no lo tiene, coge el primero
 de `~/.local/bin` y `~/bin` que exista y ya esté en tu `PATH`, y recurre a
 `~/.local/bin` cuando no lo está ninguno. Una suma que no cuadra lo detiene sin
-instalar nada, y no hay opción para saltarse ese paso. Si `cosign` ya está en
-la máquina, verifica además que el propio fichero de sumas viene del workflow
-de release. Termina ejecutando lo que ha instalado, así que la versión que ves
+instalar nada, y no hay opción para saltarse ese paso. Si `cosign` 2.4.2 o
+posterior ya está en la máquina, verifica además que el propio fichero de sumas
+viene del workflow de release, y una firma que cosign no confirma lo detiene,
+con lo que dijo cosign. Un cosign más antiguo no sabe leer el bundle de la
+firma, así que entonces, como sin cosign, dice que solo se verificó la suma.
+Termina ejecutando lo que ha instalado, así que la versión que ves
 es la del fichero recién escrito, y avisa cuando otro `ghchronicle` anterior en
 tu `PATH` sigue ganando el nombre.
 
@@ -103,7 +106,9 @@ fichero y luego verifica el archivo contra el fichero.
     ```
 
 3. Comprueba el propio fichero de sumas, si tienes
-   [cosign](https://docs.sigstore.dev/cosign/system_config/installation/).
+   [cosign](https://docs.sigstore.dev/cosign/system_config/installation/)
+   2.4.2 o posterior. Uno más antiguo no sabe leer el bundle y falla diga lo
+   que diga el fichero.
 
     ```sh
     cosign verify-blob \
@@ -217,16 +222,17 @@ cabeceras que encontrar.
     Cae en `$(go env GOPATH)/bin`, que es `~/go/bin` salvo que lo hayas
     movido, y ese directorio tiene que estar en tu `PATH`.
 
-    Un binario hecho así informa de su versión pero no de su commit ni de su
-    fecha de compilación:
+    Un binario hecho así no tiene commit ni fecha de compilación de los que
+    informar: esas dos las sella la compilación de release y nada más, y un
+    módulo descargado por el proxy no lleva copia de trabajo de donde leerlas.
+    `-version` nombra en su lugar lo que la compilación sí registra, la versión
+    del módulo que descargó la orden go y la versión de Go que lo compiló:
 
     ```text
-    ghchronicle __VERSION__ (commit unknown, built unknown)
+    ghchronicle __VERSION__ (module v__VERSION__, built with <go version>)
     ```
 
-    La versión sale del fichero `VERSION` que el módulo incrusta; las otras dos
-    las sella la compilación de release y nada más, y un módulo descargado por
-    el proxy no lleva copia de trabajo de donde leerlas.
+    La primera versión sale del fichero `VERSION` que el módulo incrusta.
 
   </TabItem>
   <TabItem label="make">

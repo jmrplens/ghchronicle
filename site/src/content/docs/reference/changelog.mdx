@@ -15,13 +15,14 @@ the same file.
 
 ## What the changelog records
 
-The notes on each release are generated from its commits and say what landed.
 [`CHANGELOG.md`](https://github.com/jmrplens/ghchronicle/blob/main/CHANGELOG.md)
-is for what they cannot say: why a thing changed, the measurement behind it,
-and the part nobody verified. Where a claim in it was measured, it says on
-what. It has one section per release, newest first, each headed by the version
-and the day its tag was pushed. It is in English, like the whole repository
-outside this site.
+says what changed in each release, why, the measurement behind it, and the
+part nobody verified. Where a claim in it was measured, it says on what. It has
+one section per release, newest first, each headed by the version and the day
+its tag was pushed, and from 2.5.1 on that section is the release's notes on
+GitHub word for word, followed by the pull and verification commands and a
+link to the commits. It is in English, like the whole repository outside this
+site.
 
 The site links the file rather than copying it, so there is one history to
 keep. Versions follow [semantic versioning](https://semver.org/), and a binary
@@ -31,7 +32,7 @@ names its own with `ghchronicle -version`, one of
 ## Where each release is
 
 - [GitHub Releases](https://github.com/jmrplens/ghchronicle/releases) has every
-  numbered tag with its generated notes and its files: an archive for Linux,
+  numbered tag with its notes and its files: an archive for Linux,
   macOS and Windows on amd64 and arm64, an SPDX SBOM for each archive, and
   `checksums.txt` over all of them. The checksum file and every SBOM carry a
   keyless cosign signature, and
@@ -40,7 +41,11 @@ names its own with `ghchronicle -version`, one of
   for the Action's Marketplace listing and carries no files.
 - The container image, `ghcr.io/jmrplens/ghchronicle`, is tagged with each
   release's version behind a `v`, and with `latest`, for `linux/amd64` and
-  `linux/arm64`.
+  `linux/arm64`; `latest` moves onto a release's image only once the release
+  workflow has verified and run it. From 2.5.1 on it carries a keyless cosign signature by the
+  same workflow identity as the checksum file, and
+  [verify the image](/ghchronicle/install/docker/#verify-the-image) has the
+  command.
 - [The releases feed](https://github.com/jmrplens/ghchronicle/releases.atom) is
   the same list as Atom, for a feed reader.
 - The Action follows the major version: `jmrplens/ghchronicle@v2` resolves

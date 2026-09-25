@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"runtime/debug"
 	"strings"
 	"syscall"
@@ -43,8 +44,31 @@ var (
 	date    string
 )
 
+// self is what this binary says about itself, settled once from the stamps
+// above and from what the toolchain recorded.
+var self buildFacts
+
 func init() {
-	version, commit, date = resolveBuild(version, commit, date, debug.ReadBuildInfo)
+	self = resolveBuild(version, commit, date, debug.ReadBuildInfo)
+	// The rest of the command reads the release number by this name: the
+	// backfill checkpoint records it.
+	version = self.version
+}
+
+// buildFacts is where a binary came from, as far as it can tell.
+type buildFacts struct {
+	version, commit, date string
+	// module is the version the go command gave the main module, kept only
+	// when no commit is known. That is a `go install ...@v2.5.1`: the module
+	// arrives as a checksummed zip with no checkout in it, so there is no
+	// revision and no commit time to read, but the version that was asked for
+	// is recorded. For a pseudo-version (@main) it also names the commit and
+	// its time, in the go command's words rather than a guess of ours.
+	module string
+	// toolchain is the Go release that compiled a module build. A release is
+	// compiled by the Go its workflow pins; a `go install` by whatever the
+	// user has, which is the one fact about that binary nobody else knows.
+	toolchain string
 }
 
 // resolveBuild decides what this binary says about itself. A stamped value
@@ -52,44 +76,63 @@ func init() {
 // that can know a tag. Otherwise the version comes from the VERSION file the
 // root package embeds, and the commit and the date from the VCS stamps the
 // toolchain records in any build made inside a checkout, so an unstamped
-// `go build` or `go run` is honest rather than "dev".
+// `go build` is honest rather than "dev". With neither, the main module's
+// version is the best answer left. `go run`, `-buildvcs=false` and the plain
+// Dockerfile (whose context leaves .git out) record it as "(devel)", which
+// says nothing, so those still report nothing.
 func resolveBuild(ldVersion, ldCommit, ldDate string,
 	readBuildInfo func() (*debug.BuildInfo, bool),
-) (v, c, d string) {
-	v, c, d = ldVersion, ldCommit, ldDate
-	if v == "" {
-		v = ghchronicle.Version
+) buildFacts {
+	b := buildFacts{version: ldVersion, commit: ldCommit, date: ldDate}
+	if b.version == "" {
+		b.version = ghchronicle.Version
 	}
 	info, ok := readBuildInfo()
 	if !ok || info == nil {
-		return v, c, d
+		return b
 	}
 	for _, s := range info.Settings {
 		switch s.Key {
 		case "vcs.revision":
-			if c == "" {
-				c = s.Value
+			if b.commit == "" {
+				b.commit = s.Value
 			}
 		case "vcs.time":
-			if d == "" {
-				d = s.Value
+			if b.date == "" {
+				b.date = s.Value
 			}
 		}
 	}
-	return v, c, d
+	if b.commit == "" && info.Main.Version != "" && info.Main.Version != "(devel)" {
+		b.module = info.Main.Version
+		b.toolchain = info.GoVersion
+		if b.toolchain == "" {
+			b.toolchain = runtime.Version()
+		}
+	}
+	return b
 }
 
-// buildLine is what -version prints: one line, because a release smoke test
-// greps it and a bug report is pasted from it.
-func buildLine() string {
-	c, d := commit, date
+// line is what -version prints: one line, because a release smoke test greps
+// it and a bug report is pasted from it. The smoke tests match the leading
+// "ghchronicle <version> ", so every shape keeps it.
+func (b buildFacts) line() string {
+	if b.module != "" {
+		return fmt.Sprintf("ghchronicle %s (module %s, built with %s)", b.version, b.module, b.toolchain)
+	}
+	c, d := b.commit, b.date
 	if c == "" {
 		c = "unknown"
 	}
 	if d == "" {
 		d = "unknown"
 	}
-	return fmt.Sprintf("ghchronicle %s (commit %s, built %s)", version, c, d)
+	return fmt.Sprintf("ghchronicle %s (commit %s, built %s)", b.version, c, d)
+}
+
+// buildLine is the line for the running binary.
+func buildLine() string {
+	return self.line()
 }
 
 // options is what the command line asked for, once parseFlags has read it.

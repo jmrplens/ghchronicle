@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"sync/atomic"
@@ -36,6 +37,11 @@ type fakeRelease struct {
 	archiveName string
 	archive     []byte
 	checksums   string
+	// signed publishes a signature bundle beside the checksum file, as every
+	// real release since v1.0.0 does. Off by default, so a machine that has
+	// cosign runs the other tests against a release it can only say it could
+	// not verify, rather than against a stand-in bundle a real cosign refuses.
+	signed bool
 }
 
 func buildFakeRelease(t *testing.T, corrupt bool) fakeRelease {
@@ -124,6 +130,9 @@ func serveCounted(t *testing.T, rel fakeRelease, asked *atomic.Int32) string {
 		}
 		_, _ = w.Write([]byte(rel.checksums))
 	})
+	if rel.signed {
+		serveBundle(mux)
+	}
 	// Anything else is a 404, which is what asking for a version that was never
 	// released looks like.
 	srv := httptest.NewServer(mux)
@@ -149,6 +158,14 @@ func requireBash(t *testing.T) {
 
 func runInstaller(t *testing.T, base, dir string, args ...string) (string, int) {
 	t.Helper()
+	return runInstallerAhead(t, base, dir, "", args...)
+}
+
+// runInstallerAhead is runInstaller with first put ahead of everything else on
+// PATH, which is how a stand-in cosign is found before any real one. Empty
+// leaves PATH as it is.
+func runInstallerAhead(t *testing.T, base, dir, first string, args ...string) (string, int) {
+	t.Helper()
 	requireBash(t)
 	// Built up rather than spread into the call: the arguments are this
 	// file's own literals either way, and the spread form is what makes a
@@ -156,16 +173,20 @@ func runInstaller(t *testing.T, base, dir string, args ...string) (string, int) 
 	cmd := exec.CommandContext(t.Context(), "bash", "install.sh")
 	cmd.Args = append(cmd.Args, "--dir", dir)
 	cmd.Args = append(cmd.Args, args...)
+	path := os.Getenv("PATH")
+	if first != "" {
+		path = first + string(os.PathListSeparator) + path
+	}
 	cmd.Env = append(os.Environ(),
 		"GHCHRONICLE_DOWNLOAD_BASE="+base,
 		// Nothing here may reach the real API. A test that resolves the newest
 		// version over the network would start failing on release day.
 		"GHCHRONICLE_LATEST_URL="+base+"/no-such-api",
-		// PATH without cosign, so these exercise the path every plain machine
-		// takes. The signature branch is covered by having run it by hand
-		// against the published release, which is the only place a real
-		// bundle exists.
-		"PATH="+os.Getenv("PATH"))
+		// The signature branch is driven by a stand-in cosign, in
+		// TestTheInstallerChecksTheSignatureWhenCosignIsHere, and was run by
+		// hand against a published release, the only place a real bundle
+		// exists.
+		"PATH="+path)
 	out, _ := cmd.CombinedOutput()
 	return string(out), cmd.ProcessState.ExitCode()
 }
@@ -518,6 +539,301 @@ func TestTheInstallerOffersTheGuidedSetup(t *testing.T) {
 	if strings.Contains(shellOnly(offer), "-r /dev/tty") {
 		t.Error("offer_setup tests permissions on /dev/tty, which is not the question")
 	}
+}
+
+// TestTheInstallerSaysNothingAboutATerminalItDoesNotHave runs the whole install
+// with no controlling terminal, which is what a CI job, a container build and a
+// provisioning run have, and holds the output to the closing line alone.
+//
+// The probe used to be `: < /dev/tty 2> /dev/null`, which printed
+// "/dev/tty: No such device or address" at the end of every such install. A
+// simple command's redirections are made left to right, so the open failed
+// before stderr was pointed anywhere, and bash reported it on the stderr it
+// still had. Reading the script cannot tell the two spellings apart by eye,
+// which is why this runs it.
+//
+// setsid starts the script in a session of its own, and a new session has no
+// controlling terminal, so the test means the same thing when `go test` is run
+// from a terminal. Without setsid (macOS has none) the test runs only where the
+// process has no terminal to begin with, which is every CI runner.
+func TestTheInstallerSaysNothingAboutATerminalItDoesNotHave(t *testing.T) {
+	t.Parallel()
+	requireBash(t)
+	cmd := exec.CommandContext(t.Context(), "bash", "install.sh")
+	if _, err := exec.LookPath("setsid"); err == nil {
+		cmd = exec.CommandContext(t.Context(), "setsid", "bash", "install.sh")
+	} else if tty, openErr := os.Open("/dev/tty"); openErr == nil {
+		_ = tty.Close()
+		t.Skip("this process has a terminal, and there is no setsid here to run the installer without one")
+	}
+	// On PATH, so the run goes all the way to the offer of the guided setup,
+	// which is the only part of it that asks about a terminal.
+	dir := t.TempDir()
+	cmd.Args = append(cmd.Args, "--dir", dir, "--version", fakeVersion)
+	cmd.Env = append(os.Environ(),
+		"GHCHRONICLE_DOWNLOAD_BASE="+serveRelease(t, buildFakeRelease(t, false)),
+		"GHCHRONICLE_LATEST_URL=http://127.0.0.1:1/no-such-api",
+		"PATH="+dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	out, _ := cmd.CombinedOutput()
+
+	if code := cmd.ProcessState.ExitCode(); code != 0 {
+		t.Fatalf("exit %d, want 0:\n%s", code, out)
+	}
+	if !strings.Contains(string(out), "Next: ghchronicle -setup") {
+		t.Errorf("the run never reached the line it leaves when nobody is there to ask:\n%s", out)
+	}
+	if strings.Contains(string(out), "/dev/tty") {
+		t.Errorf("the run reports a terminal it only looked for, to a reader who has none:\n%s", out)
+	}
+}
+
+// fakeBundle stands in for checksums.txt.sigstore.json. Nothing reads what is
+// in it: the cosign these tests put on PATH is a stand-in too, and what is
+// under test is what an installer hands it and what it makes of the answer.
+const fakeBundle = `{"mediaType":"application/vnd.dev.sigstore.bundle.v0.3+json"}`
+
+// serveBundle adds the signature bundle to a fake release's routes.
+func serveBundle(mux *http.ServeMux) {
+	mux.HandleFunc("/v"+fakeVersion+"/checksums.txt.sigstore.json", func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(fakeBundle))
+	})
+}
+
+// cosignStub puts a stand-in cosign on a PATH directory of its own. Asked for
+// its version it answers the way a real one does, with a GitVersion line;
+// asked anything else it records the arguments to record, says why on stderr
+// when it fails, and exits with status. Windows finds a program through
+// PATHEXT, so there it is a .cmd, which records the argument line whole and
+// loses the carets cmd.exe reads as escapes; elsewhere it is a shell script,
+// one argument per line.
+func cosignStub(t *testing.T, status int, version string) (dir, record string) {
+	t.Helper()
+	dir = t.TempDir()
+	record = filepath.Join(dir, "record")
+	name := "cosign"
+	body := fmt.Sprintf("#!/bin/sh\n"+
+		"if [ \"$1\" = version ]; then printf 'GitVersion:    v%s\\n'; exit 0; fi\n"+
+		"printf '%%s\\n' \"$@\" > '%s'\n"+
+		"[ %d -eq 0 ] || echo '%s' >&2\n"+
+		"exit %d\n", version, record, status, cosignSays, status)
+	if runtime.GOOS == "windows" {
+		name = "cosign.cmd"
+		body = fmt.Sprintf("@echo off\r\n"+
+			"if \"%%1\"==\"version\" (\r\necho GitVersion:    v%s\r\nexit /b 0\r\n)\r\n"+
+			"echo %%* > \"%s\"\r\n"+
+			"if not %d==0 echo %s 1>&2\r\n"+
+			"exit /b %d\r\n", version, record, status, cosignSays, status)
+	}
+	if err := os.WriteFile(filepath.Join(dir, name), []byte(body), stubMode); err != nil {
+		t.Fatal(err)
+	}
+	return dir, record
+}
+
+// signer is the certificate identity and issuer a script hands to cosign, read
+// out of the script itself, so a test of what an installer passed compares it
+// with the script rather than with a third copy of the two strings.
+func signer(t *testing.T, file string, identity, issuer *regexp.Regexp) (id, iss string) {
+	t.Helper()
+	body, err := os.ReadFile(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, found := range []struct {
+		re  *regexp.Regexp
+		out *string
+	}{{identity, &id}, {issuer, &iss}} {
+		m := found.re.FindSubmatch(body)
+		if m == nil {
+			t.Fatalf("%s names no %s", file, found.re)
+		}
+		*found.out = string(m[1])
+	}
+	return id, iss
+}
+
+func shellSigner(t *testing.T) (id, iss string) {
+	t.Helper()
+	return signer(t, "install.sh",
+		regexp.MustCompile(`(?m)^COSIGN_IDENTITY='([^']+)'$`),
+		regexp.MustCompile(`(?m)^COSIGN_ISSUER="([^"]+)"$`))
+}
+
+// TestBothInstallersTrustTheSameSigner. install.ps1 took its cosign check from
+// install.sh, and a signer that differs between the two is a release one
+// platform refuses and the other accepts. The identity names the release
+// workflow by its path, so renaming that workflow fails here rather than at
+// the first install after the next release.
+func TestBothInstallersTrustTheSameSigner(t *testing.T) {
+	t.Parallel()
+	shID, shIss := shellSigner(t)
+	psID, psIss := signer(t, "install.ps1",
+		regexp.MustCompile(`(?m)^\$CosignIdentity = '([^']+)'`),
+		regexp.MustCompile(`(?m)^\$CosignIssuer = '([^']+)'`))
+	if shID != psID || shIss != psIss {
+		t.Errorf("install.sh trusts %s from %s and install.ps1 trusts %s from %s",
+			shID, shIss, psID, psIss)
+	}
+	if !strings.Contains(shID, `/\.github/workflows/release\.yml@refs/tags/`) {
+		t.Fatalf("the identity %s does not name the release workflow", shID)
+	}
+	if _, err := os.Stat(filepath.Join(".github", "workflows", "release.yml")); err != nil {
+		t.Errorf("the installers trust a certificate issued to .github/workflows/release.yml, "+
+			"and there is no such workflow to issue it: %v", err)
+	}
+}
+
+// cosignSays is what the stand-in writes to stderr when it fails, which a
+// refusal has to pass on: it is what tells a reader whether the signature did
+// not match or cosign could not reach Sigstore.
+const cosignSays = "Error: none of the expected identities matched what was in the certificate"
+
+// signatureCase is one answer to "was checksums.txt signed by the release
+// workflow", as an installer meets it.
+type signatureCase struct {
+	name string
+	// cosign is the stand-in's exit status, or -1 for no cosign on PATH.
+	cosign int
+	// version is what the stand-in says it is. Empty is the current release.
+	version string
+	// signed is whether the release publishes a bundle.
+	signed bool
+	// installs is whether the run ends with a binary in place.
+	installs bool
+	// says is the line that tells the reader which of these happened.
+	says string
+}
+
+var signatureCases = []signatureCase{
+	{
+		name: "cosign verifies it", cosign: 0, signed: true, installs: true,
+		says: "signature verified with cosign",
+	},
+	{
+		name: "cosign refuses it", cosign: 1, signed: true, installs: false,
+		says: "cosign did not confirm that checksums.txt came from the release workflow, " +
+			"so nothing was installed. What cosign said:",
+	},
+	{
+		// Measured with the real one against v2.5.0: 2.4.0 answers "bundle
+		// does not contain cert for verification" and exits 1, and used to be
+		// reported as a forged file.
+		name: "cosign too old to read the bundle", cosign: 1, version: "2.4.0",
+		signed: true, installs: true,
+		says: "note: cosign 2.4.0 cannot read this release's signature bundle " +
+			"(2.4.2 or newer can), so only the checksum was verified",
+	},
+	{
+		// A build from source says devel, and skipping the check for a
+		// version nobody can read would install past a failed one.
+		name: "cosign with no version to read", cosign: 1, version: "devel",
+		signed: true, installs: false,
+		says: "cosign did not confirm that checksums.txt came from the release workflow",
+	},
+	{
+		name: "no bundle to verify", cosign: 0, signed: false, installs: true,
+		says: "note: this release publishes no signature bundle, so only the checksum was verified",
+	},
+	{
+		name: "no cosign", cosign: -1, signed: true, installs: true,
+		says: "note: cosign is not on PATH, so only the checksum was verified",
+	},
+}
+
+// installFunc runs one installer with first ahead on PATH (empty for no
+// stand-in) against a release that does or does not publish a bundle, and
+// returns its output, its exit status and where a successful run leaves the
+// binary.
+type installFunc func(t *testing.T, first string, signed bool) (out string, code int, installed string)
+
+// runSignatureCases drives every signatureCase through one installer.
+func runSignatureCases(t *testing.T, install installFunc) {
+	t.Helper()
+	wantID, wantIss := shellSigner(t)
+	for _, tc := range signatureCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			first, record := "", ""
+			if tc.cosign >= 0 {
+				version := tc.version
+				if version == "" {
+					version = "3.1.3"
+				}
+				first, record = cosignStub(t, tc.cosign, version)
+			} else if found, err := exec.LookPath("cosign"); err == nil {
+				t.Skipf("cosign is on this machine's PATH (%s), so there is no run without it", found)
+			}
+			out, code, installed := install(t, first, tc.signed)
+			checkSignatureOutcome(t, tc, out, code, installed)
+			if record != "" {
+				checkCosignWasAsked(t, tc.signed && tc.version != "2.4.0", record, out, wantID, wantIss)
+			}
+			if code != 0 && !strings.Contains(out, cosignSays) {
+				t.Errorf("the refusal does not pass on what cosign said:\n%s", out)
+			}
+		})
+	}
+}
+
+// checkSignatureOutcome is what the reader sees: whether the run installed,
+// and the line that says how far the check went.
+func checkSignatureOutcome(t *testing.T, tc signatureCase, out string, code int, installed string) {
+	t.Helper()
+	if (code == 0) != tc.installs {
+		t.Fatalf("exit %d, and the run should install: %v\n%s", code, tc.installs, out)
+	}
+	if !strings.Contains(out, tc.says) {
+		t.Errorf("the run does not say %q:\n%s", tc.says, out)
+	}
+	if !strings.Contains(out, "checksum verified") {
+		t.Errorf("the checksum is checked before the signature whatever happens next:\n%s", out)
+	}
+	if _, err := os.Stat(installed); (err == nil) != tc.installs {
+		t.Errorf("a binary is in place: %v, want %v\n%s", err == nil, tc.installs, out)
+	}
+}
+
+// checkCosignWasAsked is what the stand-in cosign was handed: nothing when
+// there was no bundle or it is too old to read one, and otherwise the bundle,
+// the checksum file and the signer the installers agree on.
+func checkCosignWasAsked(t *testing.T, asked bool, record, out, wantID, wantIss string) {
+	t.Helper()
+	args, err := os.ReadFile(record)
+	if !asked {
+		if err == nil {
+			t.Errorf("cosign was asked to verify what it could not: %s", args)
+		}
+		return
+	}
+	if err != nil {
+		t.Fatalf("cosign was on PATH with a bundle to check and never ran: %v\n%s", err, out)
+	}
+	for _, want := range []string{
+		"verify-blob", "--bundle", "checksums.txt.sigstore.json",
+		"--certificate-identity-regexp", strings.TrimPrefix(wantID, "^"),
+		"--certificate-oidc-issuer", wantIss, "checksums.txt",
+	} {
+		if !strings.Contains(string(args), want) {
+			t.Errorf("cosign was not given %q:\n%s", want, args)
+		}
+	}
+}
+
+// TestTheInstallerChecksTheSignatureWhenCosignIsHere drives verify_signature
+// through each thing it can meet, with a stand-in cosign whose answer the test
+// chooses. A real cosign against the published bundle is the other half,
+// which no test can do without the network.
+func TestTheInstallerChecksTheSignatureWhenCosignIsHere(t *testing.T) {
+	t.Parallel()
+	requireBash(t)
+	runSignatureCases(t, func(t *testing.T, first string, signed bool) (string, int, string) {
+		t.Helper()
+		rel := buildFakeRelease(t, false)
+		rel.signed = signed
+		dir := t.TempDir()
+		out, code := runInstallerAhead(t, serveRelease(t, rel), dir, first, "--version", fakeVersion)
+		return out, code, filepath.Join(dir, "ghchronicle")
+	})
 }
 
 // readInstaller is install.sh as text, for the tests that read it rather than

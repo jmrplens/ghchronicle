@@ -60,10 +60,7 @@ func publishDashboards(ctx context.Context, cfg *config.Config, out io.Writer) e
 	if err != nil {
 		return fmt.Errorf("the folder %q: %w", settings.Folder, err)
 	}
-	logs, err := lokiDatasource(ctx, client, cfg, out)
-	if err != nil {
-		return err
-	}
+	logs := lokiDatasource(ctx, client, cfg, out)
 
 	written := map[string]bool{}
 	for _, store := range stores {
@@ -152,6 +149,10 @@ func publishOne(ctx context.Context, client grafana.Client, cfg *config.Config,
 		return err
 	}
 	ok, message, err := client.DatasourceHealth(ctx, uid, grafanaTimeout)
+	if _, refused := errors.AsType[*grafana.RefusedError](err); refused {
+		// It already says what was asked and which permission was missing.
+		return err
+	}
 	if err != nil {
 		return fmt.Errorf("asking datasource %s whether it answers: %w", uid, err)
 	}
@@ -211,7 +212,24 @@ func reconcileDatasource(ctx context.Context, client grafana.Client,
 		fmt.Fprintf(out, "datasource %s adopted as configured, left as it is\n", want.UID)
 		return want.UID, nil
 	}
+	// Made rather than adopted by address, unlike the Loki one. What a store's
+	// datasource reads is not its address: one InfluxDB, PostgreSQL or
+	// Elasticsearch serves many databases and indices, under credentials
+	// Grafana never shows, and the probe cannot tell a datasource that sees
+	// none of them from a store not written to yet, because "database not
+	// found" is how both answer. The one made here is also the one this keeps
+	// correct: its credential is rewritten every run and -uninstall removes
+	// it. grafana.datasource.uid is the way to use one that already exists,
+	// and it is a choice somebody made rather than one guessed at.
 	outcome, err := client.EnsureDatasource(ctx, want, grafanaTimeout)
+	if refused, ok := errors.AsType[*grafana.RefusedError](err); ok {
+		// Unlike the Loki one, this datasource is the one every panel reads,
+		// so there is nothing to publish without it. What there is, is a way
+		// round the permission, and the refusal is where to say so.
+		return "", fmt.Errorf("the datasource for %s: %w\ngrant the token %s, or create "+
+			"the datasource in Grafana and name it in grafana.datasource.uid, which "+
+			"is only ever read", store.Name, err, refused.Permission)
+	}
 	if err != nil {
 		return "", fmt.Errorf("the datasource for %s: %w", store.Name, err)
 	}
@@ -223,6 +241,9 @@ func reconcileDatasource(ctx context.Context, client grafana.Client,
 // somewhere else, so the datasource's address is this suffix removed.
 const lokiPushPath = "/loki/api/v1/push"
 
+// lokiDatasourceUID is the Loki datasource this makes when it makes one.
+const lokiDatasourceUID = "ghchronicle-loki"
+
 // lokiDatasource is the Loki datasource the failed job output panel reads
 // from, or "" to leave that panel as the note saying where the lines went.
 //
@@ -232,25 +253,30 @@ const lokiPushPath = "/loki/api/v1/push"
 // the difference between them is a fixed, documented suffix rather than
 // anything that has to be guessed. A sink writing somewhere else is the case
 // that cannot be derived, and only that one still needs the uid.
+//
+// Nothing it meets stops the publish. It feeds one panel, which has a note to
+// fall back to, and the token the documentation recommends for publishing may
+// read datasources and may not create them. Measured in production: that
+// refusal, returned as an error, abandoned every dashboard over that panel.
 func lokiDatasource(ctx context.Context, client grafana.Client, cfg *config.Config,
 	out io.Writer,
-) (string, error) {
+) string {
 	sink := cfg.Sinks.Loki
 	if sink == nil {
-		return "", nil
+		return ""
 	}
 	if uid := cfg.Grafana.Datasource.LokiUID; uid != "" {
-		return uid, nil
+		return uid
 	}
 	base, ok := strings.CutSuffix(strings.TrimSuffix(sink.URL, "/"), lokiPushPath)
 	if !ok {
 		fmt.Fprintf(out, "note: sinks.loki.url does not end in %s, so the address Grafana "+
 			"would query cannot be worked out from it. Name a Loki datasource in "+
 			"grafana.datasource.loki_uid to draw the failed job output.\n", lokiPushPath)
-		return "", nil
+		return ""
 	}
 	want := grafana.Datasource{
-		UID: "ghchronicle-loki", Name: "ghchronicle-loki", Type: "loki", URL: base,
+		UID: lokiDatasourceUID, Name: lokiDatasourceUID, Type: "loki", URL: base,
 	}
 	if sink.TenantID != "" {
 		// Loki calls it a tenant and reads it from this header; Grafana calls
@@ -258,12 +284,120 @@ func lokiDatasource(ctx context.Context, client grafana.Client, cfg *config.Conf
 		want.JSON = map[string]any{"httpHeaderName1": "X-Scope-OrgID"}
 		want.Secret = map[string]string{"httpHeaderValue1": sink.TenantID}
 	}
-	outcome, err := client.EnsureDatasource(ctx, want, grafanaTimeout)
-	if err != nil {
-		return "", fmt.Errorf("the Loki datasource: %w", err)
+	// Adopting rather than making is what keeps a second datasource for the
+	// same Loki out of a Grafana that already reads it, and it needs only the
+	// datasources:read the scoped token has. A Loki datasource with no tenant
+	// is its address and nothing else, so one already at that address is the
+	// datasource this would have made. With a tenant it is not: the tenant
+	// travels in a secret Grafana never hands back, so it is always made.
+	uid, outcome, err := client.EnsureDatasourceOrAdopt(ctx, want, grafanaTimeout)
+	// ghchronicle-loki is there and only rewriting it was refused. With a
+	// tenant that rewrite is asked for on every start, so the documented
+	// Editor token meets it on every start after an Admin run made the
+	// datasource. The datasource still reads what it read before, so the
+	// panel reads it too, rather than going back to the note beside it.
+	if refused, isRefused := errors.AsType[*grafana.RefusedError](err); isRefused &&
+		outcome == grafana.Updated && uid != "" {
+		fmt.Fprintln(out, staleLokiWarning(uid, refused))
+		return uid
 	}
-	fmt.Fprintf(out, "datasource %s (loki) %s\n", want.UID, outcome)
-	return want.UID, nil
+	if err != nil {
+		// A datasource the read found is one of the Loki datasources Grafana
+		// has, and the one the reader most likely wants named.
+		except := want.UID
+		if outcome == grafana.Updated {
+			except = ""
+		}
+		fmt.Fprintln(out, lokiWarning(ctx, client, want, except, err))
+		return ""
+	}
+	if outcome == grafana.Adopted {
+		fmt.Fprintf(out, "datasource %s (loki) adopted: it already reads %s, "+
+			"so %s was not made beside it\n", uid, want.URL, want.UID)
+		return uid
+	}
+	fmt.Fprintf(out, "datasource %s (loki) %s\n", uid, outcome)
+	return uid
+}
+
+// lokiWarning is the one line a Loki datasource that could not be had is
+// reported in: which datasource, what stopped it, what the dashboards got
+// instead, and the setting that avoids the question.
+//
+// When Grafana was willing to list what it has, the Loki datasources already
+// there are named. The case this was written for had one, under another uid
+// and at the address Grafana reaches Loki by on its container network, which
+// is not the address the collector pushes to, and its uid was the whole of
+// the fix. except is left out of that list, and is "" when the datasource
+// this would make is already there and belongs in it.
+//
+// It is printed before any store has been tried, so it speaks for the one
+// panel and nothing else: a store whose own datasource is refused next still
+// stops the publish, and a line promising every dashboard was followed, in
+// that case, by none.
+func lokiWarning(ctx context.Context, client grafana.Client, want grafana.Datasource,
+	except string, err error,
+) string {
+	var line strings.Builder
+	refused, isRefused := errors.AsType[*grafana.RefusedError](err)
+	if isRefused {
+		fmt.Fprintf(&line, "warning: the Loki datasource %s could not be set up, because "+
+			"this Grafana token lacks %s (%s was refused).", want.UID,
+			refused.Permission, refused.Call)
+	} else {
+		fmt.Fprintf(&line, "warning: the Loki datasource %s could not be set up: %v.",
+			want.UID, err)
+	}
+	line.WriteString(" Only the failed job output panel waits on it, and it is left as " +
+		"a note. To draw it, name a Loki datasource Grafana already has in " +
+		"grafana.datasource.loki_uid")
+	if isRefused {
+		fmt.Fprintf(&line, ", or grant the token %s", refused.Permission)
+	}
+	line.WriteString(".")
+	if others := lokiDatasourcesIn(ctx, client, except); others != "" {
+		line.WriteString(" The Loki datasources Grafana already has: " + others + ".")
+	}
+	return line.String()
+}
+
+// staleLokiWarning is the line for a ghchronicle-loki that is there and could
+// not be rewritten. The panel reads it as it is, which is what it read before
+// the token was scoped down, but nothing has checked that its address and
+// tenant are still the sink's, so the line says that, and how to stop asking.
+func staleLokiWarning(uid string, refused *grafana.RefusedError) string {
+	return fmt.Sprintf("warning: the Loki datasource %s is used as Grafana has it, because "+
+		"this Grafana token lacks %s (%s was refused), so its address and tenant may no "+
+		"longer be the sink's. Grant the token %s to keep it in step, or set "+
+		"grafana.datasource.loki_uid to %s to use it as it is without rewriting it.",
+		uid, refused.Permission, refused.Call, refused.Permission, uid)
+}
+
+// lokiDatasourcesIn names the Loki datasources Grafana has, other than
+// except, or says nothing when there are none or they cannot be listed. A
+// handful is enough to pick the right one out by its address.
+func lokiDatasourcesIn(ctx context.Context, client grafana.Client, except string) string {
+	all, err := client.Datasources(ctx, grafanaTimeout)
+	if err != nil {
+		return ""
+	}
+	const most = 3
+	var named []string
+	for _, ds := range all {
+		if ds.Type != "loki" || ds.UID == except {
+			continue
+		}
+		named = append(named, fmt.Sprintf("%s (%s, at %s)", ds.UID, ds.Name, ds.URL))
+	}
+	switch {
+	case len(named) == 0:
+		return ""
+	case len(named) > most:
+		return strings.Join(named[:most], ", ") +
+			fmt.Sprintf(" and %d more Loki datasources", len(named)-most)
+	default:
+		return strings.Join(named, ", ")
+	}
 }
 
 // storesToPublish is one store per metric sink configured, in a fixed order so
@@ -447,6 +581,12 @@ func publishOnStart(ctx context.Context, cfg *config.Config, o options, logger *
 		return
 	}
 	for line := range strings.SplitSeq(strings.TrimSpace(said.String()), "\n") {
+		// Something left undone that the run carried on past is a warning in
+		// the journal too, or the one line worth finding reads like the rest.
+		if strings.HasPrefix(line, "warning: ") {
+			logger.Warn("grafana", "did", line)
+			continue
+		}
 		logger.Info("grafana", "did", line)
 	}
 }

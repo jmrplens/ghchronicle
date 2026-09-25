@@ -42,8 +42,10 @@ Prometheus los convierte solo; al revés no puede.
 
 <Tabs syncKey="otlp-raw">
   <TabItem label="raw: false (por omisión)">
-    Envía los mismos valores actuales reducidos que el exportador de Prometheus.
-    Es seguro con cualquier backend, incluido el propio receptor OTLP de
+    Envía los mismos valores actuales reducidos que el exportador de Prometheus,
+    con [la misma reducción](/ghchronicle/es/sinks/prometheus/#la-reducción),
+    así que cada media se toma sobre los elementos que traían el campo. Es
+    seguro con cualquier backend, incluido el propio receptor OTLP de
     Prometheus, porque nada de la carga es más viejo que la pasada.
   </TabItem>
   <TabItem label="raw: true">

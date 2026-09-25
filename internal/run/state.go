@@ -18,8 +18,10 @@ import (
 //
 //   - last_run: when each family last ran, so a restart does not re-collect
 //     everything at once.
-//   - first_saw: when each repository was first seen, so the one-off full walk
-//     of the stargazer list happens once instead of every sweep.
+//   - first_saw: when each repository's one full walk of the stargazer list
+//     came back, so that walk happens once instead of every sweep. Written
+//     after the walk and only when it returned no error, so a walk a 502 cut
+//     short is done again by the next sweep.
 //   - history_read: when each repository's daily star history was last read
 //     back to the week it was created, so that walk happens once and a sweep
 //     reads only its newest page. Absent reads as never, which is what makes
@@ -36,9 +38,10 @@ type State struct {
 	LastRun  map[string]time.Time `json:"last_run"`
 	FirstSaw map[string]time.Time `json:"first_saw"`
 	// HistoryRead is when each repository's daily star history was last read
-	// whole. Written only after a walk that reached the end, unlike first_saw,
-	// which is written before its walk: a history cut short by a 502 is then
-	// read whole again on the next sweep rather than staying partial until
+	// whole. Written only after a walk that reached the end, which is a
+	// stricter test than first_saw's: a history cut short by a 502, and one
+	// cut short by a later page saying there is nothing here, is then read
+	// whole again on the next sweep rather than staying partial until
 	// somebody runs a backfill.
 	HistoryRead map[string]time.Time `json:"history_read"`
 	// LastHead is the commit each repository was on when the dependency diff
@@ -183,15 +186,24 @@ func (s *State) FullDue(family string, every time.Duration, now time.Time) bool 
 
 func (s *State) MarkFull(family string, now time.Time) { s.LastFull[family] = now }
 
-// FirstSight records a repository and reports whether this is the first time
-// it has ever been collected.
-func (s *State) FirstSight(full string, now time.Time) bool {
-	if _, ok := s.FirstSaw[full]; ok {
-		return false
-	}
-	s.FirstSaw[full] = now
-	return true
+// FirstSight reports whether a repository still owes its one full walk of the
+// stargazer list. It records nothing: MarkSeen does, once the walk came back.
+func (s *State) FirstSight(full string) bool {
+	_, seen := s.FirstSaw[full]
+	return !seen
 }
+
+// MarkSeen records that a repository's full walk of the stargazer list came
+// back. A list GitHub hides from the token comes back too, as a 404 the
+// collector reads as nothing to collect, and walking it again would find the
+// same.
+//
+// Only a walk that returned no error calls it. Recorded before the walk, as it
+// used to be, a first walk that a 502 cut short retired the repository all the
+// same: every later sweep read its newest hundred through the batch, and the
+// older stars stayed unread until somebody ran a backfill, which since 2.5.1
+// walks every stargazer list whole and before it did not.
+func (s *State) MarkSeen(full string, now time.Time) { s.FirstSaw[full] = now }
 
 // HistoryDue reports whether a repository's daily star history has never been
 // read whole, which a repository seen for the first time and every repository

@@ -21,6 +21,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/jmrplens/ghchronicle/v2/internal/httpx"
 )
 
 // The project name is fixed, and every compose command below carries it. The
@@ -61,6 +63,13 @@ const (
 // machine is worse than no suite, so this is generous rather than tight; the
 // number that matters is the one Start logs, not this bound.
 const readyTimeout = 5 * time.Minute
+
+// stackClient carries the harness's own requests to the stores and Grafana,
+// with a pool of its own rather than http.DefaultClient's, for the reason
+// internal/httpx gives: the suite's tests run in parallel, and one of them
+// closing an httptest server empties the process-wide pool under a request
+// the harness has in flight.
+var stackClient = &http.Client{Transport: httpx.OwnTransport()}
 
 // dockerBin is a variable rather than a constant so a machine with docker
 // somewhere unusual can point at it without editing the file.
@@ -440,7 +449,7 @@ func httpGet(path string) func(context.Context, string) error {
 		if err != nil {
 			return err
 		}
-		res, err := http.DefaultClient.Do(req)
+		res, err := stackClient.Do(req)
 		if err != nil {
 			return err
 		}
@@ -461,7 +470,7 @@ func telegrafReady(ctx context.Context, addr string) error {
 		return err
 	}
 	req.Header.Set("Content-Type", "text/plain")
-	res, err := http.DefaultClient.Do(req)
+	res, err := stackClient.Do(req)
 	if err != nil {
 		return err
 	}
@@ -610,7 +619,7 @@ func (s *Stack) targetUp(ctx context.Context, address string, since time.Time) e
 	if err != nil {
 		return err
 	}
-	res, err := http.DefaultClient.Do(req)
+	res, err := stackClient.Do(req)
 	if err != nil {
 		return err
 	}
@@ -684,7 +693,7 @@ func (s *Stack) grafanaPost(ctx context.Context, path string, body, into any) er
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.SetBasicAuth(grafanaUser, grafanaPassword)
-	res, err := http.DefaultClient.Do(req)
+	res, err := stackClient.Do(req)
 	if err != nil {
 		return err
 	}

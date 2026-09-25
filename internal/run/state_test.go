@@ -97,8 +97,12 @@ func TestAStateFileThatNullsItsMapsStillLoadsUsable(t *testing.T) {
 	s.Mark("traffic", now)
 	s.MarkFull("issues", now)
 	s.LastHead["o/n"] = "aaa"
-	if !s.FirstSight("o/n", now) || s.FirstSight("o/n", now) {
-		t.Error("a repository was not first seen exactly once")
+	if !s.FirstSight("o/n") {
+		t.Error("a repository nobody walked reads as walked")
+	}
+	s.MarkSeen("o/n", now)
+	if s.FirstSight("o/n") {
+		t.Error("a repository recorded as walked still reads as never walked")
 	}
 	s.MarkHistory("o/n", now)
 	if s.LastEvent != "42" {

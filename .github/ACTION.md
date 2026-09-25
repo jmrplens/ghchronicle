@@ -38,6 +38,17 @@ GitHub's Marketplace takes an Action from any public repository whose
    `v2` to the newest `v2.x.y`, which is why the pointer has to exist and has
    to move.
 
+There is no setting that names the current major version. The listing's
+version menu is the releases published through step 2, each ticked on its own,
+and a release the workflow created and nobody ticked is not in it: on
+2026-09-25 the menu held only `v1` while the newest release was `v2.5.0`. So
+tick the box on the numbered release, `vX.Y.Z`. Do not draft a release for the
+major tag to get it listed, which is how `v1` got there: a release with no
+binaries that is newer than the rest takes GitHub's latest flag, and the latest
+release is what `install.sh` and `install.ps1` install when given no version.
+`uses: jmrplens/ghchronicle@v2` works whatever the listing shows, because git
+resolves it and the Marketplace does not.
+
 The listing name, description, icon and colour come from the `name`,
 `description` and `branding` keys of `action.yml`, and it takes them from the
 `action.yml` of the newest published release rather than from `main`: a

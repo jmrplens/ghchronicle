@@ -358,6 +358,17 @@ Before serving, `Summarize` reduces each measurement according to a rule.
 A measurement with no rule is skipped, so a new collector cannot quietly flood
 the exporter with one series per star.
 
+Each mean is over the items that carried the field, not over the count. A
+collector leaves a field out when it has no honest value for it: a job with no
+start time has no `queued_seconds`, and a job GitHub no longer lists steps for
+has no `steps`. Counted as zeros, a sweep in which half the jobs had lost their
+steps would halve `github_workflow_jobs_steps_mean`. Three fields are the
+exception, because leaving them out is itself the answer: `merged` on an
+outside contribution is written only on a merge, `advanced` on a fork only when
+it has a push date, and `pull_requests` on a run only when it ran for any. Each
+of those is averaged over every item, so the mean of `merged` is the share of
+contributions merged rather than 1.
+
 The reducer also publishes `total`, a running distinct-item count per series.
 That is what lets a Prometheus dashboard say "per day" through `increase()`,
 since it has no rows to count.
@@ -491,9 +502,11 @@ Prometheus converts them itself; going the other way it cannot.
 
 - **raw: false (default)**
 
-  Sends the same reduced current values as the Prometheus exporter. Safe with
-  any backend, including Prometheus's own OTLP receiver, because nothing in
-  the payload is older than the sweep.
+  Sends the same reduced current values as the Prometheus exporter, made by
+  [the same reduction](https://jmrp.io/docs/ghchronicle/sinks/prometheus/#the-reduction), so each
+  mean is taken over the items that carried the field. Safe with any backend,
+  including Prometheus's own OTLP receiver, because nothing in the payload is
+  older than the sweep.
 
 - **raw: true**
 
@@ -1012,8 +1025,12 @@ panel, "Where failure output went", with that query. Publishing the dashboard
 from the collector swaps that panel for the lines, newest first, filtered by
 the dashboard's repository variable where the store's variable can be read as
 a regular expression. A Loki sink whose address ends in `/loki/api/v1/push` is
-enough: the datasource is made from it. One writing anywhere else says so and
-takes a `grafana.datasource.loki_uid` instead.
+enough: a Loki datasource Grafana already has at that address, with the path
+dropped, is adopted, and otherwise the datasource is made from it. One writing
+anywhere else says so and takes a `grafana.datasource.loki_uid` instead, and so
+does a Grafana that reaches Loki by another address. A token that may not make
+the datasource costs this panel and nothing else: the run warns once and
+publishes every dashboard with the note.
 
 ### Where to go next
 

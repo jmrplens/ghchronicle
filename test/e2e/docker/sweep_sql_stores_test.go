@@ -95,7 +95,7 @@ var (
 func sqlStoresRun(ctx context.Context, tb testing.TB, s *Stack) *sqlStoresSweep {
 	tb.Helper()
 	sweepOnce.Do(func() {
-		sweepShared, errSweep = sqlStoresSweepInto(ctx, tb, s, "sweep", s.InfluxDatabase)
+		sweepShared, errSweep = sqlStoresSweepInto(ctx, tb, s, "sweep", s.InfluxDatabase, time.Time{})
 	})
 	if errSweep != nil {
 		tb.Fatalf("the sweep the assertions read back never finished: %v", errSweep)
@@ -105,7 +105,16 @@ func sqlStoresRun(ctx context.Context, tb testing.TB, s *Stack) *sqlStoresSweep 
 
 // sqlStoresSweepInto runs one sweep into a named working directory and a named
 // InfluxDB database. Every caller past the first wants its own of both.
-func sqlStoresSweepInto(ctx context.Context, tb testing.TB, s *Stack, name, database string) (*sqlStoresSweep, error) {
+//
+// fakeNow, when it is not zero, is the instant the fake's fixtures are dated
+// from, instead of the moment each request arrives. A sweep that has to write
+// what an earlier one wrote passes that one's start: the fake is new for every
+// sweep and resolves its relative dates at request time, so without it a UTC
+// midnight between the two moves every traffic day, run, commit and star onto
+// a timestamp the first sweep never wrote.
+func sqlStoresSweepInto(ctx context.Context, tb testing.TB, s *Stack, name, database string,
+	fakeNow time.Time,
+) (*sqlStoresSweep, error) {
 	tb.Helper()
 	dir, err := sqlStoresWorkDir(name)
 	if err != nil {
@@ -122,6 +131,9 @@ func sqlStoresSweepInto(ctx context.Context, tb testing.TB, s *Stack, name, data
 		Database: database,
 	}
 	gh := newSQLStoresGitHub(tb)
+	if !fakeNow.IsZero() {
+		gh.FreezeAt(fakeNow)
+	}
 	cfg, err := sqlStoresConfig(sweep, s, gh.URL())
 	if err != nil {
 		return nil, err

@@ -237,6 +237,11 @@ los cien de cada uno que lee una pasada.
   de code scanning, donde una pasada lee cinco, dos y una.
 - Cada release, despliegue y discusión, y cada alerta de Dependabot y de code
   scanning, donde una pasada lee la página más reciente de cada lista.
+- Todas las páginas de cada lista de stargazers, donde una pasada lee las cien
+  estrellas más recientes de un repositorio cuya lista ya recorrió entera una
+  vez. Hasta la 2.5.0 un primer recorrido que fallaba se anotaba como hecho, y
+  un relleno leía una lista anotada por su primera y su última página, así que
+  las estrellas de en medio no se leían nunca; ahora un relleno llega a ellas.
 - La bandeja entera, hilos leídos incluidos, donde una pasada lee los hilos no
   leídos que se movieron y, una vez al día, veinte páginas de cincuenta con los
   leídos.

@@ -213,6 +213,13 @@ func TestPostgresKeepsTheDateOfTheEvent(t *testing.T) {
 // this sweep emitted, the zeros of the newest thirty weeks among them: those
 // are what an unstar is written back as, and a sink that skipped them would
 // leave a day that lost its star reading one forever.
+//
+// Exact both ways, and a UTC midnight cannot move it, which is what sets it
+// apart from the InfluxDB count: the file of this one sweep is the only one
+// the suite loads, the dashboards' replay included, so the store and the
+// points it is held to are the same sweep's output whatever day it ran on.
+// Loading a second sweep's file here would need the comparison InfluxDB
+// makes, of the days before the first sweep's own.
 func pgWantStarDays(ctx context.Context, t *testing.T, s *Stack, sweep *sqlStoresSweep) {
 	t.Helper()
 	points := sqlStoresPoints(t, sweep)

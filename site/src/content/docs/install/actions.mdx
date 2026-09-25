@@ -37,7 +37,7 @@ it downloads a release binary and calls it.
 | `card-width`      | `""`                 | Card width in pixels. Empty draws the layout at its own width; each one draws between two ends of its own, stated in its [section](/ghchronicle/card/layouts/). Only `activity-heatmap` spends the room on data, a whole year of the calendar at its far end |
 | `card-speed`      | `""`                 | How fast an animated layout plays, as a decimal from 0 to 1. Empty means 0.5, the pace every card has always been drawn at; below it the card is slower, above it faster, and every animated layout scales together. 0 is the slowest animation and not a still card, `card-motion: off` is |
 | `include-private` | `false`              | `true` counts private repositories when no config file is given. See the warning below |
-| `version`         | `latest`             | The release to install                                                                                            |
+| `version`         | `latest`             | The release to install: `latest` for the newest, or a release with or without its `v`, so `__VERSION__` and `v__VERSION__` are the same one. The major tag `v2` is what `uses:` takes, not a release, and is refused |
 
 ## The three modes
 

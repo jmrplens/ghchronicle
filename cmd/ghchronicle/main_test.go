@@ -6,6 +6,7 @@ import (
 	"io"
 	"log/slog"
 	"path/filepath"
+	"runtime"
 	"runtime/debug"
 	"slices"
 	"strings"
@@ -17,9 +18,10 @@ import (
 
 // TestResolveBuild verifies the precedence the release depends on: a value
 // stamped with -ldflags always wins, an unstamped version falls back to the
-// VERSION file the root package embeds rather than to "dev", and an unstamped
+// VERSION file the root package embeds rather than to "dev", an unstamped
 // commit and date come from the VCS stamps the toolchain records in any build
-// made inside a checkout.
+// made inside a checkout, and only when there is no commit at all does the
+// main module's version stand in for one.
 //
 // The stamped-wins case is the one that matters most and the one nothing else
 // can catch: a release names its version from the git tag, and if build info
@@ -27,75 +29,103 @@ import (
 // VERSION file it was compiled with instead of the tag it was cut from, with
 // no error anywhere.
 func TestResolveBuild(t *testing.T) {
-	buildInfo := func(settings ...debug.BuildSetting) func() (*debug.BuildInfo, bool) {
+	buildInfo := func(mainVersion string, settings ...debug.BuildSetting) func() (*debug.BuildInfo, bool) {
 		return func() (*debug.BuildInfo, bool) {
-			return &debug.BuildInfo{Settings: settings}, true
+			return &debug.BuildInfo{
+				GoVersion: "go1.27.1",
+				Main:      debug.Module{Path: "github.com/jmrplens/ghchronicle/v2", Version: mainVersion},
+				Settings:  settings,
+			}, true
 		}
 	}
-	vcs := buildInfo(
+	vcs := buildInfo("v2.5.0+dirty",
 		debug.BuildSetting{Key: "vcs.revision", Value: "cafe1234"},
 		debug.BuildSetting{Key: "vcs.time", Value: "2026-01-02T03:04:05Z"},
 	)
+	download := buildInfo("v2.5.1")
 
 	tests := []struct {
-		name                              string
-		ldVersion, ldCommit, ldDate       string
-		readInfo                          func() (*debug.BuildInfo, bool)
-		wantVersion, wantCommit, wantDate string
+		name                        string
+		ldVersion, ldCommit, ldDate string
+		readInfo                    func() (*debug.BuildInfo, bool)
+		want                        buildFacts
 	}{
 		{
-			name:        "nothing stamped inside a checkout",
-			readInfo:    vcs,
-			wantVersion: ghchronicle.Version,
-			wantCommit:  "cafe1234",
-			wantDate:    "2026-01-02T03:04:05Z",
+			name:     "nothing stamped inside a checkout",
+			readInfo: vcs,
+			want:     buildFacts{version: ghchronicle.Version, commit: "cafe1234", date: "2026-01-02T03:04:05Z"},
 		},
 		{
-			name:        "stamped values are never overridden",
-			ldVersion:   "9.9.9",
-			ldCommit:    "deadbeef",
-			ldDate:      "2020-12-31T23:59:59Z",
-			readInfo:    vcs,
-			wantVersion: "9.9.9",
-			wantCommit:  "deadbeef",
-			wantDate:    "2020-12-31T23:59:59Z",
+			name:      "stamped values are never overridden",
+			ldVersion: "9.9.9",
+			ldCommit:  "deadbeef",
+			ldDate:    "2020-12-31T23:59:59Z",
+			readInfo:  vcs,
+			want:      buildFacts{version: "9.9.9", commit: "deadbeef", date: "2020-12-31T23:59:59Z"},
 		},
 		{
-			name:        "a stamped version still takes the commit and date from VCS",
-			ldVersion:   "9.9.9",
-			readInfo:    vcs,
-			wantVersion: "9.9.9",
-			wantCommit:  "cafe1234",
-			wantDate:    "2026-01-02T03:04:05Z",
+			name:      "a stamped version still takes the commit and date from VCS",
+			ldVersion: "9.9.9",
+			readInfo:  vcs,
+			want:      buildFacts{version: "9.9.9", commit: "cafe1234", date: "2026-01-02T03:04:05Z"},
 		},
 		{
-			name:        "build info carrying no VCS settings",
-			readInfo:    buildInfo(debug.BuildSetting{Key: "-trimpath", Value: "true"}),
-			wantVersion: ghchronicle.Version,
+			name:     "a module download names its version and the Go that built it",
+			readInfo: download,
+			want:     buildFacts{version: ghchronicle.Version, module: "v2.5.1", toolchain: "go1.27.1"},
 		},
 		{
-			name:        "unavailable build info, which is what go run gets",
-			readInfo:    func() (*debug.BuildInfo, bool) { return nil, false },
-			wantVersion: ghchronicle.Version,
+			name:     "a pseudo-version is reported as the go command wrote it",
+			readInfo: buildInfo("v2.5.2-0.20260926101500-0123456789ab"),
+			want: buildFacts{
+				version: ghchronicle.Version, module: "v2.5.2-0.20260926101500-0123456789ab", toolchain: "go1.27.1",
+			},
 		},
 		{
-			name:        "nil build info returned with ok true",
-			readInfo:    func() (*debug.BuildInfo, bool) { return nil, true },
-			wantVersion: ghchronicle.Version,
+			name:      "a stamped version leaves the module to say where the source came from",
+			ldVersion: "9.9.9",
+			readInfo:  download,
+			want:      buildFacts{version: "9.9.9", module: "v2.5.1", toolchain: "go1.27.1"},
+		},
+		{
+			name:     "a stamped commit makes the module version redundant",
+			ldCommit: "deadbeef",
+			readInfo: download,
+			want:     buildFacts{version: ghchronicle.Version, commit: "deadbeef"},
+		},
+		{
+			name: "a module download whose build info has no Go version",
+			readInfo: func() (*debug.BuildInfo, bool) {
+				return &debug.BuildInfo{Main: debug.Module{Version: "v2.5.1"}}, true
+			},
+			want: buildFacts{version: ghchronicle.Version, module: "v2.5.1", toolchain: runtime.Version()},
+		},
+		{
+			name:     "a devel main module and no VCS, which is go run and -buildvcs=false",
+			readInfo: buildInfo("(devel)", debug.BuildSetting{Key: "-trimpath", Value: "true"}),
+			want:     buildFacts{version: ghchronicle.Version},
+		},
+		{
+			name:     "no main module version at all",
+			readInfo: buildInfo(""),
+			want:     buildFacts{version: ghchronicle.Version},
+		},
+		{
+			name:     "unavailable build info",
+			readInfo: func() (*debug.BuildInfo, bool) { return nil, false },
+			want:     buildFacts{version: ghchronicle.Version},
+		},
+		{
+			name:     "nil build info returned with ok true",
+			readInfo: func() (*debug.BuildInfo, bool) { return nil, true },
+			want:     buildFacts{version: ghchronicle.Version},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			v, c, d := resolveBuild(tt.ldVersion, tt.ldCommit, tt.ldDate, tt.readInfo)
-			if v != tt.wantVersion {
-				t.Errorf("version = %q, want %q", v, tt.wantVersion)
-			}
-			if c != tt.wantCommit {
-				t.Errorf("commit = %q, want %q", c, tt.wantCommit)
-			}
-			if d != tt.wantDate {
-				t.Errorf("date = %q, want %q", d, tt.wantDate)
+			if got := resolveBuild(tt.ldVersion, tt.ldCommit, tt.ldDate, tt.readInfo); got != tt.want {
+				t.Errorf("resolveBuild() = %+v, want %+v", got, tt.want)
 			}
 		})
 	}
@@ -115,22 +145,119 @@ func TestVersionIsTheTrimmedVersionFile(t *testing.T) {
 	}
 }
 
-// TestBuildLine verifies the single line -version prints, in both the shape a
-// release produces and the shape an unstamped build does. The release
-// workflow's post-publish smoke test matches on the "ghchronicle <version> "
-// prefix, so the leading two fields are a contract, not a formatting choice.
+// TestBuildLine pins the line -version prints for every way this binary is
+// built, from the build information each one really records (read with
+// `go version -m` on 2026-09-25) to the exact text. The stamped shapes are
+// what the release, the Makefile and the Dockerfile produce and must never
+// move; the module shape is what `go install ...@version` produces, which
+// said "commit unknown, built unknown" until 2.5.1 although it knows which
+// version it is. The release workflow's post-publish smoke test and CI's
+// image smoke test match on the "ghchronicle <version> " prefix, so every
+// shape keeps it.
 func TestBuildLine(t *testing.T) {
-	oldVersion, oldCommit, oldDate := version, commit, date
-	t.Cleanup(func() { version, commit, date = oldVersion, oldCommit, oldDate })
-
-	version, commit, date = "1.2.3", "abc1234", "2026-01-02T03:04:05Z"
-	if got, want := buildLine(), "ghchronicle 1.2.3 (commit abc1234, built 2026-01-02T03:04:05Z)"; got != want {
-		t.Errorf("buildLine() = %q, want %q", got, want)
+	const (
+		rev     = "30148b1b9d3389e49624e549a2e5d26691b2bed0"
+		revTime = "2026-09-25T09:24:02Z"
+	)
+	checkout := func(mainVersion, modified string) *debug.BuildInfo {
+		return &debug.BuildInfo{
+			GoVersion: "go1.27.1",
+			Main:      debug.Module{Path: "github.com/jmrplens/ghchronicle/v2", Version: mainVersion},
+			Settings: []debug.BuildSetting{
+				{Key: "-trimpath", Value: "true"},
+				{Key: "vcs", Value: "git"},
+				{Key: "vcs.revision", Value: rev},
+				{Key: "vcs.time", Value: revTime},
+				{Key: "vcs.modified", Value: modified},
+			},
+		}
+	}
+	// What the go command records for a main module built without VCS stamps:
+	// `go run`, `go build -buildvcs=false`, and a Docker context without .git.
+	devel := &debug.BuildInfo{
+		GoVersion: "go1.27.1",
+		Main:      debug.Module{Path: "github.com/jmrplens/ghchronicle/v2", Version: "(devel)"},
+		Settings:  []debug.BuildSetting{{Key: "-trimpath", Value: "true"}},
+	}
+	download := func(v string) *debug.BuildInfo {
+		return &debug.BuildInfo{
+			GoVersion: "go1.27.1",
+			Main: debug.Module{
+				Path:    "github.com/jmrplens/ghchronicle/v2",
+				Version: v,
+				Sum:     "h1:V5rCtRv1GdtWMKlbWfo9WU/840pV8BpadvhXVOkxsJ0=",
+			},
+			Settings: []debug.BuildSetting{{Key: "CGO_ENABLED", Value: "1"}},
+		}
 	}
 
-	version, commit, date = "1.2.3", "", ""
-	if got, want := buildLine(), "ghchronicle 1.2.3 (commit unknown, built unknown)"; got != want {
-		t.Errorf("buildLine() with nothing to report = %q, want %q", got, want)
+	tests := []struct {
+		name                        string
+		ldVersion, ldCommit, ldDate string
+		info                        *debug.BuildInfo
+		want                        string
+	}{
+		{
+			name:      "a release, stamped by GoReleaser from a clean checkout",
+			ldVersion: "2.5.1", ldCommit: "30148b1", ldDate: revTime,
+			info: checkout("v2.5.1", "false"),
+			want: "ghchronicle 2.5.1 (commit 30148b1, built 2026-09-25T09:24:02Z)",
+		},
+		{
+			name:      "make build, stamped from a tree with local changes",
+			ldVersion: "2.5.1", ldCommit: "30148b1", ldDate: revTime,
+			info: checkout("v2.5.1+dirty", "true"),
+			want: "ghchronicle 2.5.1 (commit 30148b1, built 2026-09-25T09:24:02Z)",
+		},
+		{
+			name:      "the Dockerfile with its build arguments, whose context has no .git",
+			ldVersion: "ci", ldCommit: rev, ldDate: revTime,
+			info: devel,
+			want: "ghchronicle ci (commit " + rev + ", built 2026-09-25T09:24:02Z)",
+		},
+		{
+			name: "go install of a tag, through the module proxy",
+			info: download("v2.5.1"),
+			want: "ghchronicle " + ghchronicle.Version + " (module v2.5.1, built with go1.27.1)",
+		},
+		{
+			name: "go install of a branch, which the go command names by pseudo-version",
+			info: download("v2.5.2-0.20260926101500-0123456789ab"),
+			want: "ghchronicle " + ghchronicle.Version +
+				" (module v2.5.2-0.20260926101500-0123456789ab, built with go1.27.1)",
+		},
+		{
+			name: "go build inside a checkout, unstamped",
+			info: checkout("v2.5.0+dirty", "true"),
+			want: "ghchronicle " + ghchronicle.Version + " (commit " + rev + ", built 2026-09-25T09:24:02Z)",
+		},
+		{
+			name: "a build that recorded nothing: go run, -buildvcs=false, the bare Dockerfile",
+			info: devel,
+			want: "ghchronicle " + ghchronicle.Version + " (commit unknown, built unknown)",
+		},
+		{
+			name: "a binary with no build information at all",
+			want: "ghchronicle " + ghchronicle.Version + " (commit unknown, built unknown)",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b := resolveBuild(tt.ldVersion, tt.ldCommit, tt.ldDate, func() (*debug.BuildInfo, bool) {
+				return tt.info, tt.info != nil
+			})
+			got := b.line()
+			if got != tt.want {
+				t.Errorf("line() = %q, want %q", got, tt.want)
+			}
+			if prefix := "ghchronicle " + b.version + " "; !strings.HasPrefix(got, prefix) {
+				t.Errorf("line() = %q, which the smoke tests cannot match: it does not start with %q", got, prefix)
+			}
+			if strings.Contains(got, "\n") {
+				t.Errorf("line() = %q spans more than one line", got)
+			}
+		})
 	}
 }
 

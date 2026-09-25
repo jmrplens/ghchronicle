@@ -41,9 +41,11 @@ Prometheus converts them itself; going the other way it cannot.
 
 <Tabs syncKey="otlp-raw">
   <TabItem label="raw: false (default)">
-    Sends the same reduced current values as the Prometheus exporter. Safe with
-    any backend, including Prometheus's own OTLP receiver, because nothing in
-    the payload is older than the sweep.
+    Sends the same reduced current values as the Prometheus exporter, made by
+    [the same reduction](/ghchronicle/sinks/prometheus/#the-reduction), so each
+    mean is taken over the items that carried the field. Safe with any backend,
+    including Prometheus's own OTLP receiver, because nothing in the payload is
+    older than the sweep.
   </TabItem>
   <TabItem label="raw: true">
     Sends the dated points. Whether they survive is entirely the backend's

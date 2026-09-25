@@ -22,7 +22,13 @@ irm https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.ps1 | ie
 It works out the architecture, takes the newest release, checks the archive
 against the checksum that release published, and puts `ghchronicle.exe` under
 `%LOCALAPPDATA%\Programs\ghchronicle`. A checksum that does not match stops it
-without installing anything, and there is no switch to skip that step.
+without installing anything, and there is no switch to skip that step. When
+`cosign` 2.4.2 or newer is already on your PATH it also verifies that the
+checksum file itself came from the release workflow, the same check
+`install.sh` makes, and a signature cosign does not confirm stops it, with what
+cosign said, so a machine that cannot reach Sigstore is not taken for a forged
+file. An older cosign cannot read the signature bundle, so then, as without
+`cosign` at all, it says that only the checksum was verified.
 
 It then adds that directory to **your** PATH, the per-user one, so `ghchronicle`
 works by name. Programs already open keep the PATH they started with, so open a
@@ -146,9 +152,10 @@ nothing.
     is convenient rather than a trap.
 
 2. Check the checksum file itself, if you have
-   [cosign](https://docs.sigstore.dev/cosign/system_config/installation/). The
-   command is the same one the release notes print, and the same one a Linux
-   or macOS reader runs.
+   [cosign](https://docs.sigstore.dev/cosign/system_config/installation/)
+   2.4.2 or newer; an older one cannot read the bundle and fails whatever the
+   file says. The command is the same one the release notes print, and the
+   same one a Linux or macOS reader runs.
 
     ```powershell
     cosign verify-blob `
@@ -426,9 +433,15 @@ means no MSVC, no MinGW and no Windows SDK.
 
     Lands in `$(go env GOPATH)\bin`, which is `%USERPROFILE%\go\bin` unless you
     moved it, and that directory has to be on your `Path`. A binary built this
-    way reports its version but not its commit or its build date, because those
-    two are stamped by the release build and a module downloaded through the
-    proxy carries no checkout to read them from.
+    way has no commit or build date to report: those two are stamped by the
+    release build, and a module downloaded through the proxy carries no
+    checkout to read them from. `-version` names what the build does record
+    instead, the module version the go command fetched and the Go release that
+    compiled it:
+
+    ```text
+    ghchronicle __VERSION__ (module v__VERSION__, built with <go version>)
+    ```
 
   </TabItem>
   <TabItem label="From a checkout">

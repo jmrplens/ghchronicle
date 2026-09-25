@@ -37,7 +37,7 @@ cadena de herramientas de Go: descarga un binario de release y lo llama.
 | `card-width`      | `""`                     | Ancho de la tarjeta en píxeles. Vacío dibuja el diseño con su propio ancho; cada uno dibuja entre dos extremos propios, que dice su [sección](/ghchronicle/es/card/layouts/). Solo `activity-heatmap` se gasta el sitio en datos, un año entero del calendario en su extremo lejano |
 | `card-speed`      | `""`                     | A qué velocidad se reproduce un diseño animado, como decimal de 0 a 1. Vacío significa 0.5, el ritmo con el que siempre se han dibujado las tarjetas; por debajo la tarjeta va más lenta y por encima más rápida, y todos los diseños animados se escalan juntos. 0 es la animación más lenta y no una tarjeta quieta, eso es `card-motion: off` |
 | `include-private` | `false`                  | `true` cuenta los repositorios privados cuando no se da fichero de configuración. Ver el aviso más abajo |
-| `version`         | `latest`                 | La release que instalar                                                                                                                               |
+| `version`         | `latest`                 | La release que instalar: `latest` para la más nueva, o una release con o sin su `v`, así que `__VERSION__` y `v__VERSION__` son la misma. La etiqueta mayor `v2` es lo que toma `uses:`, no una release, y se rechaza |
 
 ## Los tres modos
 

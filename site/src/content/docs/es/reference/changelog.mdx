@@ -15,13 +15,14 @@ mismo fichero.
 
 ## Qué recoge el changelog
 
-Las notas de cada release se generan a partir de sus commits y dicen qué entró.
 [`CHANGELOG.md`](https://github.com/jmrplens/ghchronicle/blob/main/CHANGELOG.md)
-es para lo que ellas no pueden decir: por qué cambió algo, la medida que lo
-respalda y la parte que nadie verificó. Donde una afirmación suya se midió, dice
-sobre qué. Tiene una sección por versión, la más reciente primero, cada una
-encabezada por la versión y el día en que se subió su etiqueta. Está en inglés,
-como todo el repositorio fuera de este sitio.
+dice qué cambió en cada versión, por qué, la medida que lo respalda y la parte
+que nadie verificó. Donde una afirmación suya se midió, dice sobre qué. Tiene
+una sección por versión, la más reciente primero, cada una encabezada por la
+versión y el día en que se subió su etiqueta, y desde la 2.5.1 esa sección es,
+palabra por palabra, las notas de la release en GitHub, seguidas de las órdenes
+para descargar y verificar y de un enlace a los commits. Está en inglés, como
+todo el repositorio fuera de este sitio.
 
 El sitio enlaza el fichero en vez de copiarlo, así que hay un solo historial que
 mantener. Las versiones siguen el
@@ -32,7 +33,7 @@ la suya con `ghchronicle -version`, una de
 ## Dónde está cada versión
 
 - [Las releases de GitHub](https://github.com/jmrplens/ghchronicle/releases)
-  tienen cada etiqueta numerada con sus notas generadas y sus ficheros: un
+  tienen cada etiqueta numerada con sus notas y sus ficheros: un
   archivo para Linux, macOS y Windows en amd64 y arm64, un SBOM SPDX por archivo
   y `checksums.txt` sobre todos ellos. El fichero de sumas y cada SBOM llevan una
   firma de cosign sin clave, y
@@ -41,7 +42,12 @@ la suya con `ghchronicle -version`, una de
   está ahí para el listado de la Action en el Marketplace y no lleva ficheros.
 - La imagen de contenedor, `ghcr.io/jmrplens/ghchronicle`, se etiqueta con la
   versión de cada release precedida de una `v`, y con `latest`, para
-  `linux/amd64` y `linux/arm64`.
+  `linux/amd64` y `linux/arm64`; `latest` pasa a la imagen de una release solo
+  cuando el workflow de release la ha verificado y ejecutado. Desde la 2.5.1
+  lleva una firma de cosign sin clave con la misma identidad de flujo que el
+  fichero de sumas, y
+  [verificar la imagen](/ghchronicle/es/install/docker/#verificar-la-imagen)
+  tiene la orden.
 - [El feed de releases](https://github.com/jmrplens/ghchronicle/releases.atom)
   es la misma lista en Atom, para un lector de feeds.
 - La Action sigue a la versión mayor: `jmrplens/ghchronicle@v2` se resuelve a

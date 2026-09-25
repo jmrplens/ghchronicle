@@ -290,15 +290,22 @@ func TestInfluxDBAcceptsTheSameSweepTwice(t *testing.T) {
 
 	// Dated rows only. What is stamped now is a new row on every sweep by
 	// design, so counting it would prove nothing either way.
-	before := datedRowCounts(ctx, t, s, first.Database)
+	before := datedRowCounts(ctx, t, s, first.Database, first.Started)
+	if before["gh_star_day"] == 0 {
+		t.Fatal("no day of the star history is older than the first sweep's own day, " +
+			"so its convergence is not being asked about")
+	}
 
-	second, err := sqlStoresSweepInto(ctx, t, s, "second", first.Database)
+	// The fixtures of the second sweep are dated from the first one's start,
+	// so a UTC midnight between the two moves only the runner's clock, which
+	// the cut on gh_star_day below allows for.
+	second, err := sqlStoresSweepInto(ctx, t, s, "second", first.Database, first.Started)
 	if err != nil {
 		t.Fatalf("the second sweep failed: %v", err)
 	}
 	assertInfluxWroteCleanly(t, second.Log)
 
-	after := datedRowCounts(ctx, t, s, first.Database)
+	after := datedRowCounts(ctx, t, s, first.Database, first.Started)
 	for table, n := range before {
 		if after[table] != n {
 			t.Errorf("%s held %.0f dated rows and holds %.0f after the second sweep: "+
@@ -342,11 +349,25 @@ func assertInfluxWroteCleanly(t *testing.T, log string) {
 // than added to them. The star history is the one every sweep rewrites on
 // purpose, thirty weeks of it, zeros included, so that an unstar reaches the
 // day the star was given: it converges only if each day lands on its own row.
-func datedRowCounts(ctx context.Context, t *testing.T, s *Stack, database string) map[string]float64 {
+//
+// Its days are counted only up to the first sweep's own UTC day, that day
+// left out. The second sweep's fake is frozen at the first sweep's start, so
+// the history is anchored to the same week, but it is cut at the runner's
+// clock, and a second sweep that ran after a UTC midnight writes the new day:
+// a row the first sweep had no day for, new by design and not by a day
+// missing its row. Every day the second sweep writes that is older
+// than the first sweep's own is one the first sweep wrote too, so below that
+// line the count moves only if a rewrite landed on a row of its own.
+func datedRowCounts(ctx context.Context, t *testing.T, s *Stack, database string, firstStarted time.Time) map[string]float64 {
 	t.Helper()
+	agreed := firstStarted.UTC().Truncate(24 * time.Hour).Format(time.RFC3339)
 	out := map[string]float64{}
 	for _, table := range []string{"gh_star", "gh_star_day", "gh_traffic", "gh_workflow_run", "gh_commit"} {
-		rows, err := influxSQL(ctx, s, database, fmt.Sprintf(`SELECT count(*) AS n FROM %q`, table))
+		query := fmt.Sprintf(`SELECT count(*) AS n FROM %q`, table)
+		if table == "gh_star_day" {
+			query += fmt.Sprintf(` WHERE time < '%s'`, agreed)
+		}
+		rows, err := influxSQL(ctx, s, database, query)
 		if err != nil {
 			t.Fatalf("counting %s: %v", table, err)
 		}
@@ -387,7 +408,7 @@ func TestInfluxDBRefusesAColumnThatChangesKind(t *testing.T) {
 	})
 
 	t.Run("the sink reports it and keeps the rest of the sweep", func(t *testing.T) {
-		sweep, err := sqlStoresSweepInto(ctx, t, s, "typeflip", database)
+		sweep, err := sqlStoresSweepInto(ctx, t, s, "typeflip", database, time.Time{})
 		if err != nil {
 			t.Fatalf("the sweep against the flipped database failed: %v", err)
 		}

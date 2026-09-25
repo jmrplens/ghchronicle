@@ -200,7 +200,10 @@ whole push. Raise `max_age` only alongside Loki's own
 and cannot make datasources. An Editor can do the first and not the second, so
 either give the service account that permission, make it an Admin, or let it
 adopt a datasource you made yourself by naming it in
-`grafana.datasource.uid`, which only ever reads.
+`grafana.datasource.uid`, which only ever reads. Correcting a datasource that
+is already there asks for `datasources:write` instead, with the same answers.
+That stops the run for the store's datasource, which every panel reads. For
+the Loki one it is only a warning, below.
 
 **`datasource ... does not answer: connection refused`.** Grafana reached the
 address and nothing was listening, which almost always means the address is
@@ -210,6 +213,12 @@ on the container network, and `127.0.0.1` there is the container. Put the
 address Grafana would use in `grafana.datasource.url`. The run refuses rather
 than publishing, because a dashboard against a datasource that cannot be
 reached draws nothing and says nothing about why.
+
+**`asking datasource ... whether it answers: ... datasources:query`.** The token
+may not query the datasource, which is not the same thing as a datasource that
+cannot reach its store, and the address is not what to change. Measured on
+Grafana 13, a service account with no role gets this and an Editor does not, so
+give it the Editor role.
 
 **`Invalid API key`.** The token reached Grafana as the characters
 `${GRAFANA_TOKEN}` rather than as a token, which means the variable is not set
@@ -243,11 +252,43 @@ five stores, and the sink you have is not one of them. A forwarding sink has no
 dashboard of its own because the dashboard belongs to wherever it forwards to,
 and `file`, `stdout` and `loki` are not metric stores.
 
+**`warning: the Loki datasource ghchronicle-loki could not be set up`.** The
+token may not make the Loki datasource the failed job output panel reads, and
+the line names the permission it lacks: `datasources:create` for an Editor,
+since the datasource is not there yet. Nothing else waits on it: that one
+panel is left as the note the exported files carry, and the dashboards are
+published as long as the store's own datasource is. Name a Loki datasource
+Grafana already has in `grafana.datasource.loki_uid`, or grant the permission.
+The line lists the Loki datasources Grafana has, with their addresses, because
+the one to name is often there already under an address the collector does not
+push to, such as Loki's name on Grafana's container network. 2.4.0 and 2.5.0
+stopped the whole publish here instead, with `the Loki datasource: writing
+datasource ghchronicle-loki`, and `loki_uid` is the fix for those too.
+
+**`warning: the Loki datasource ghchronicle-loki is used as Grafana has it`.**
+An earlier run with a token that could write datasources made it, and this
+token may not rewrite it: the line names `datasources:write`. A sink with a
+`tenant_id` asks for that rewrite on every start, because the tenant is a
+secret Grafana never hands back to compare, and so does a datasource whose
+address was changed by hand. The panel reads it as it is, so nothing is lost
+unless the sink has moved since. Grant the token `datasources:write` to keep
+its address and tenant in step with the sink, or set
+`grafana.datasource.loki_uid` to `ghchronicle-loki` to read it without trying.
+
+**`datasource ... (loki) adopted`.** Grafana already had a Loki datasource at
+the address the sink's push endpoint comes from, so the panel reads that one
+and no second one was made. Adopting only reads, so a token that may not create
+datasources gets this far. A sink with a `tenant_id` is never matched this way:
+the tenant travels in a secret Grafana never hands back, so nothing can tell
+whether the datasource at that address reads the same tenant, and one is made
+instead.
+
 **The failed job output panel is still a note.** That panel becomes the log
 lines when there is a Loki sink whose address ends in `/loki/api/v1/push`, which
 is what says where the query endpoint is. A sink writing anywhere else says so
 and leaves the panel alone; name a Loki datasource in
-`grafana.datasource.loki_uid`.
+`grafana.datasource.loki_uid`. A token that may not make the datasource leaves
+it too, with the warning above.
 
 **Nothing was published and nothing failed.** `publish_on_start` is off unless
 you turn it on, and it is skipped for `-once`, `-backfill` and `-card`, because

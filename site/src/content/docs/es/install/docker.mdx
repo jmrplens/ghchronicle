@@ -51,6 +51,47 @@ Dos consecuencias que conviene saber antes de depurarlo:
 - Todo lo que el contenedor escriba debe pertenecer al uid 65532 o ser
   escribible por él.
 
+## Verificar la imagen
+
+Toda imagen publicada desde la 2.5.1, que es toda imagen que nombra una página
+de release, va firmada con cosign, sin claves y con la misma identidad que el
+fichero de sumas que comprueban las demás instalaciones: el workflow de release
+de este repositorio, ejecutado para una etiqueta de release, anotado en un
+registro público de transparencia. Con
+[cosign](https://docs.sigstore.dev/cosign/system_config/installation/) 3:
+
+```sh
+cosign verify \
+  --certificate-identity-regexp 'https://github.com/jmrplens/ghchronicle/.github/workflows/release.yml@refs/tags/.*' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  ghcr.io/jmrplens/ghchronicle:v__VERSION__ > /dev/null
+```
+
+```text
+Verification for ghcr.io/jmrplens/ghchronicle:v__VERSION__ --
+The following checks were performed on each of these signatures:
+  - The cosign claims were validated
+  - Existence of the claims in the transparency log was verified offline
+  - The code-signing certificate was verified using trusted certificate authority certificates
+```
+
+La copia de Docker Hub, `docker.io/jmrplens/ghchronicle`, se verifica con la
+misma orden. Lo que cosign comprueba es un digest, no la etiqueta: sin
+`> /dev/null` imprime además, en JSON, el digest que verificó
+(`docker-manifest-digest`), y una imagen descargada como
+`ghcr.io/jmrplens/ghchronicle@sha256:...` es la verificada aunque una etiqueta
+se mueva después. `latest` se mueve al digest de una release lo último, cuando
+el workflow de release ya ha verificado la firma de ese digest y ha ejecutado la
+imagen en las dos arquitecturas, así que nunca nombra una imagen sin comprobar;
+una release que falla antes lo deja en la anterior.
+
+Usa cosign 3. Las firmas van en el formato de bundle que escribe, y un cosign
+más antiguo responde `no signatures found` para estas imágenes: medido, cosign
+2.6.1 encuentra la firma solo si se le pasa `--new-bundle-format`, la 2.5.0 no
+la encuentra ni así, y la 2.4.2 no conoce la opción. Las imágenes hasta la
+2.5.0 no llevan firma ninguna, así que para ellas esa respuesta es la
+verdadera.
+
 ## Qué tiene que ser escribible
 
 El fichero de configuración se monta de solo lectura. Cuatro cosas no:

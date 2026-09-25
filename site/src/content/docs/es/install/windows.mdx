@@ -23,7 +23,13 @@ irm https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.ps1 | ie
 Deduce la arquitectura, coge la release más nueva, comprueba el archivo contra
 la suma de verificación que esa release publicó, y deja `ghchronicle.exe` en
 `%LOCALAPPDATA%\Programs\ghchronicle`. Una suma que no cuadra lo detiene sin
-instalar nada, y no hay parámetro para saltarse ese paso.
+instalar nada, y no hay parámetro para saltarse ese paso. Si `cosign` 2.4.2 o
+posterior ya está en tu PATH, verifica además que el propio fichero de sumas
+viene del workflow de release, la misma comprobación que hace `install.sh`, y
+una firma que cosign no confirma lo detiene, con lo que dijo cosign, para que
+una máquina que no llega a Sigstore no se tome por un fichero falsificado. Un
+cosign más antiguo no sabe leer el bundle de la firma, así que entonces, como
+sin `cosign`, dice que solo se verificó la suma.
 
 Después añade ese directorio a **tu** PATH, el de usuario, para que
 `ghchronicle` funcione por nombre. Los programas ya abiertos conservan el PATH
@@ -147,9 +153,10 @@ modificador se acepta y no hace nada.
     trampa.
 
 2. Comprueba el propio fichero de sumas, si tienes
-   [cosign](https://docs.sigstore.dev/cosign/system_config/installation/). La
-   orden es la misma que imprimen las notas de la release, y la misma que
-   ejecuta quien lea la página de Linux o la de macOS.
+   [cosign](https://docs.sigstore.dev/cosign/system_config/installation/)
+   2.4.2 o posterior; uno más antiguo no sabe leer el bundle y falla diga lo
+   que diga el fichero. La orden es la misma que imprimen las notas de la
+   release, y la misma que ejecuta quien lea la página de Linux o la de macOS.
 
     ```powershell
     cosign verify-blob `
@@ -435,9 +442,15 @@ quiere decir sin MSVC, sin MinGW y sin SDK de Windows.
 
     Cae en `$(go env GOPATH)\bin`, que es `%USERPROFILE%\go\bin` salvo que lo
     hayas movido, y ese directorio tiene que estar en tu `Path`. Un binario
-    hecho así informa de su versión pero no de su commit ni de su fecha de
-    compilación, porque esas dos las sella la compilación de release y un
-    módulo descargado por el proxy no lleva copia de trabajo de donde leerlas.
+    hecho así no tiene commit ni fecha de compilación de los que informar: esas
+    dos las sella la compilación de release, y un módulo descargado por el
+    proxy no lleva copia de trabajo de donde leerlas. `-version` nombra en su
+    lugar lo que la compilación sí registra, la versión del módulo que descargó
+    la orden go y la versión de Go que lo compiló:
+
+    ```text
+    ghchronicle __VERSION__ (module v__VERSION__, built with <go version>)
+    ```
 
   </TabItem>
   <TabItem label="Desde una copia de trabajo">

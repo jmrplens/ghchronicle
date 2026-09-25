@@ -81,7 +81,10 @@ inputs:
     required: false
     default: "false"
   version:
-    description: The ghchronicle release to install. `latest` resolves the newest tag.
+    description: >
+      The ghchronicle release to install. `latest` resolves the newest one. A release is named
+      with or without its v: `2.5.1` and `v2.5.1` install the same one. The major tag `v2` is
+      what `uses:` takes, not a release, and is refused.
     required: false
     default: latest
 
@@ -115,9 +118,28 @@ runs:
             exit 1
           fi
         fi
+        # A release with or without its v, as install.sh and install.ps1 take
+        # it. The tag its files hang from always has one, and "2.5.0" used to
+        # go into the URL as typed and end in a 404 that did not say which
+        # spelling was wanted. The major tag is refused here rather than
+        # fetched: it is what `uses:` takes, and no binaries hang from it.
+        case ${VERSION#v} in
+          [0-9]*.[0-9]*.[0-9]*) VERSION="v${VERSION#v}" ;;
+          *)
+            echo "version must be latest, or a release such as 2.5.1 or v2.5.1, and \"$VERSION\" is neither. A major tag such as v2 is what uses: takes; it has no binaries to download." >&2
+            exit 2 ;;
+        esac
         os=$(uname -s | tr '[:upper:]' '[:lower:]')
         arch=$(uname -m); case "$arch" in x86_64) arch=amd64;; aarch64|arm64) arch=arm64;; esac
-        curl -fsSL "https://github.com/jmrplens/ghchronicle/releases/download/${VERSION}/ghchronicle_${VERSION#v}_${os}_${arch}.tar.gz" | tar -xz -C "$RUNNER_TEMP" ghchronicle
+        url="https://github.com/jmrplens/ghchronicle/releases/download/${VERSION}/ghchronicle_${VERSION#v}_${os}_${arch}.tar.gz"
+        # To a file and then unpacked, rather than piped into tar, so a release
+        # that does not exist is reported as that and not as a gzip error.
+        curl -fsSL -o "$RUNNER_TEMP/ghchronicle.tar.gz" "$url" || {
+          echo "no archive at $url. Check the version against https://github.com/jmrplens/ghchronicle/releases" >&2
+          exit 1
+        }
+        tar -xzf "$RUNNER_TEMP/ghchronicle.tar.gz" -C "$RUNNER_TEMP" ghchronicle
+        rm -f "$RUNNER_TEMP/ghchronicle.tar.gz"
         echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
 
     - name: Write a default configuration

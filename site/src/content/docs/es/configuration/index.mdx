@@ -98,8 +98,10 @@ Siete cosas, y borrar el fichero cuesta una distinta por cada una:
 
 - `last_run`, cuándo corrió cada familia por última vez. Sin él todas las
   familias vencen a la vez, así que la pasada siguiente es completa.
-- `first_saw`, cuándo se vio cada repositorio por primera vez. Sin él el
-  recorrido completo de la lista de stargazers se vuelve a hacer.
+- `first_saw`, cuándo se recorrió entera por primera vez la lista de
+  stargazers de cada repositorio. Solo se escribe tras un recorrido que volvió
+  sin error. Sin él el recorrido completo de la lista de stargazers se vuelve a
+  hacer.
 - `history_read`, cuándo se leyó entero por última vez el historial diario de
   estrellas de cada repositorio. Solo se escribe tras un recorrido que llegó al
   final del historial, no tras uno que un error o un 403 o 404 de una página

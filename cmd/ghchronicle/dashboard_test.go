@@ -1,12 +1,14 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"path"
 	"strings"
 	"testing"
 
@@ -25,8 +27,37 @@ type grafanaStub struct {
 	// brokenLookup makes the leftover check fail without touching the publish
 	// that precedes it.
 	brokenLookup bool
-	writes       []map[string]any
-	askedFor     []string
+	// listed is what GET /api/datasources answers: the datasources somebody
+	// else already made.
+	listed []map[string]any
+	// refuse says which datasource writes Grafana turns away with a 403, the
+	// way it does for a token that may publish dashboards and nothing more.
+	refuse func(body map[string]any) bool
+	// unreadable turns away every datasource read as well, which is a token
+	// with no role at all.
+	unreadable bool
+	// found is what a GET of one datasource answers, by uid, for a test that
+	// needs the datasource already there to say something in particular.
+	found map[string]map[string]any
+	// broken says which datasource writes Grafana answers with a 500, a
+	// failure that is not a refusal.
+	broken   func(body map[string]any) bool
+	writes   []map[string]any
+	askedFor []string
+}
+
+// refuseEveryDatasourceWrite is an Editor's token: dashboards yes, datasources
+// no. refuseLokiWrites refuses only the Loki datasource, so the stores can
+// still be made and every dashboard published.
+func refuseEveryDatasourceWrite(map[string]any) bool { return true }
+func refuseLokiWrites(body map[string]any) bool      { return body["type"] == "loki" }
+
+// forbidden is Grafana's answer to a call the token may not make, in its own
+// words, measured on 13.2.1.
+func forbidden(w http.ResponseWriter, permission string) {
+	w.WriteHeader(http.StatusForbidden)
+	_, _ = io.WriteString(w, `{"accessErrorId":"ACE0000000000","message":"You'll need additional `+
+		`permissions to perform this action. Permissions needed: `+permission+`","title":"Access denied"}`)
 }
 
 // has says whether the stub should answer a GET for this path.
@@ -45,42 +76,87 @@ func (g *grafanaStub) serve(t *testing.T) string {
 		g.askedFor = append(g.askedFor, r.Method+" "+r.URL.Path)
 		switch {
 		case strings.HasSuffix(r.URL.Path, "/health"):
-			if g.unwell {
-				w.WriteHeader(http.StatusBadRequest)
-				_, _ = io.WriteString(w, `{"status":"ERROR","message":"dial tcp: no route to host"}`)
-				return
-			}
-			_, _ = io.WriteString(w, `{"status":"OK","message":"reached it"}`)
+			g.health(w)
 		case r.Method == http.MethodGet && strings.Contains(r.URL.Path, "/api/dashboards/uid/"):
-			if g.brokenLookup {
-				w.WriteHeader(http.StatusInternalServerError)
-				_, _ = io.WriteString(w, `{"message":"database is locked"}`)
-				return
-			}
-			if !g.has(r.URL.Path) {
-				w.WriteHeader(http.StatusNotFound)
-				_, _ = io.WriteString(w, `{"message":"not found"}`)
-				return
-			}
-			_, _ = io.WriteString(w, `{"dashboard":{"uid":"x"}}`)
-		case r.Method == http.MethodGet && strings.Contains(r.URL.Path, "/api/datasources/"):
-			if g.missing && !g.has(r.URL.Path) {
-				w.WriteHeader(http.StatusNotFound)
-				_, _ = io.WriteString(w, `{"message":"not found"}`)
-				return
-			}
-			_, _ = io.WriteString(w, `{"uid":"ghchronicle-influxdb","type":"influxdb"}`)
+			g.dashboard(w, r)
+		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/api/datasources"):
+			g.datasource(w, r)
 		case r.Method == http.MethodGet:
 			_, _ = io.WriteString(w, `[]`)
 		default:
-			var body map[string]any
-			_ = json.NewDecoder(r.Body).Decode(&body)
-			g.writes = append(g.writes, body)
-			_, _ = io.WriteString(w, `{"status":"success","url":"/d/x/y","uid":"made"}`)
+			g.write(w, r)
 		}
 	}))
 	t.Cleanup(srv.Close)
 	return srv.URL
+}
+
+func (g *grafanaStub) health(w http.ResponseWriter) {
+	if g.unwell {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = io.WriteString(w, `{"status":"ERROR","message":"dial tcp: no route to host"}`)
+		return
+	}
+	_, _ = io.WriteString(w, `{"status":"OK","message":"reached it"}`)
+}
+
+func (g *grafanaStub) dashboard(w http.ResponseWriter, r *http.Request) {
+	if g.brokenLookup {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = io.WriteString(w, `{"message":"database is locked"}`)
+		return
+	}
+	if !g.has(r.URL.Path) {
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = io.WriteString(w, `{"message":"not found"}`)
+		return
+	}
+	_, _ = io.WriteString(w, `{"dashboard":{"uid":"x"}}`)
+}
+
+// datasource answers both reads: the list, and one datasource by uid.
+func (g *grafanaStub) datasource(w http.ResponseWriter, r *http.Request) {
+	switch {
+	case g.unreadable:
+		forbidden(w, "datasources:read")
+	case r.URL.Path == "/api/datasources":
+		listed := g.listed
+		if listed == nil {
+			listed = []map[string]any{}
+		}
+		if err := json.NewEncoder(w).Encode(listed); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+	case g.missing && !g.has(r.URL.Path):
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = io.WriteString(w, `{"message":"not found"}`)
+	case g.found[path.Base(r.URL.Path)] != nil:
+		if err := json.NewEncoder(w).Encode(g.found[path.Base(r.URL.Path)]); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+	default:
+		_, _ = io.WriteString(w, `{"uid":"ghchronicle-influxdb","type":"influxdb"}`)
+	}
+}
+
+func (g *grafanaStub) write(w http.ResponseWriter, r *http.Request) {
+	var body map[string]any
+	_ = json.NewDecoder(r.Body).Decode(&body)
+	if strings.HasPrefix(r.URL.Path, "/api/datasources") && g.refuse != nil && g.refuse(body) {
+		if r.Method == http.MethodPost {
+			forbidden(w, "datasources:create")
+		} else {
+			forbidden(w, "datasources:write")
+		}
+		return
+	}
+	if strings.HasPrefix(r.URL.Path, "/api/datasources") && g.broken != nil && g.broken(body) {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = io.WriteString(w, `{"message":"database is locked"}`)
+		return
+	}
+	g.writes = append(g.writes, body)
+	_, _ = io.WriteString(w, `{"status":"success","url":"/d/x/y","uid":"made"}`)
 }
 
 // influxConfig is a collector that writes to InfluxDB and is told about a
@@ -304,28 +380,40 @@ func TestTheDerivedLokiDatasourceDropsThePushPath(t *testing.T) {
 // logPanelTitle is the panel the Loki datasource swaps.
 const logPanelTitle = "Where failure output went"
 
-// logPanelKind is the type of the panel that carries a failed job's output.
-func logPanelKind(doc map[string]any) string {
-	title := logPanelTitle
-	var walk func(any) string
-	walk = func(panels any) string {
+// logPanel is the panel that carries a failed job's output, or nil.
+func logPanel(doc map[string]any) map[string]any {
+	var walk func(any) map[string]any
+	walk = func(panels any) map[string]any {
 		list, _ := panels.([]any)
 		for _, raw := range list {
 			panel, ok := raw.(map[string]any)
 			if !ok {
 				continue
 			}
-			if t, _ := panel["title"].(string); t == title {
-				kind, _ := panel["type"].(string)
-				return kind
+			if t, _ := panel["title"].(string); t == logPanelTitle {
+				return panel
 			}
-			if found := walk(panel["panels"]); found != "" {
+			if found := walk(panel["panels"]); found != nil {
 				return found
 			}
 		}
-		return ""
+		return nil
 	}
 	return walk(doc["panels"])
+}
+
+// logPanelKind is the type of the panel that carries a failed job's output.
+func logPanelKind(doc map[string]any) string {
+	kind, _ := logPanel(doc)["type"].(string)
+	return kind
+}
+
+// logPanelSource is the uid of the Loki datasource that panel reads, or ""
+// when it reads none.
+func logPanelSource(doc map[string]any) string {
+	source, _ := logPanel(doc)["datasource"].(map[string]any)
+	uid, _ := source["uid"].(string)
+	return uid
 }
 
 // TestPublishOnStartStaysOutOfAOneShotRun. Turning it on in a service unit did
@@ -922,5 +1010,434 @@ func TestALeftoverDatasourceWithNoDashboardIsStillNamed(t *testing.T) {
 	}
 	if !strings.Contains(said.String(), "(a datasource)") {
 		t.Errorf("output = %q, want a leftover datasource named as one", said.String())
+	}
+}
+
+// theirLoki is the Loki datasource the production Grafana already had when a
+// scoped token first met the derived one: another uid, at the address Grafana
+// reaches Loki by on its container network.
+func theirLoki(address string) map[string]any {
+	return map[string]any{
+		"uid": "cfbntsncufta8f", "name": "loki", "type": "loki", "url": address,
+		"access": "proxy", "jsonData": map[string]any{},
+	}
+}
+
+// lokiWrites is every datasource write of type loki.
+func lokiWrites(writes []map[string]any) []map[string]any {
+	var out []map[string]any
+	for _, body := range writes {
+		if body["type"] == "loki" {
+			out = append(out, body)
+		}
+	}
+	return out
+}
+
+// TestARefusedLokiDatasourceStillPublishesEveryDashboard, which is 2.5.0 in
+// production: a token that may publish dashboards and nothing else, a store
+// datasource adopted by uid, a Loki sink and no loki_uid. The Loki datasource
+// could not be created, and the whole publish went with it, although that
+// datasource feeds one panel that has a note to fall back to.
+func TestARefusedLokiDatasourceStillPublishesEveryDashboard(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name   string
+		g      *grafanaStub
+		stores func(*config.Config)
+		says   string
+	}{
+		{
+			"an Editor, with the store adopted",
+			&grafanaStub{missing: true, refuse: refuseEveryDatasourceWrite},
+			func(cfg *config.Config) { cfg.Grafana.Datasource.UID = "their-influxdb" },
+			"datasources:create",
+		},
+		{
+			"two stores, and only the Loki one refused",
+			&grafanaStub{missing: true, refuse: refuseLokiWrites},
+			func(cfg *config.Config) {
+				cfg.Sinks.Elasticsearch = &config.ElasticsearchSink{URL: "http://es:9200", Prefix: "ghc-"}
+			},
+			"datasources:create",
+		},
+		{
+			// A service account with no role may not even read datasources,
+			// so the refusal comes one call earlier and names another
+			// permission. The dashboard still goes; that the store's own
+			// datasource cannot be probed is a separate refusal, which the
+			// stub does not make here.
+			"a token that may not read datasources either",
+			&grafanaStub{missing: true, unreadable: true},
+			func(cfg *config.Config) { cfg.Grafana.Datasource.UID = "their-influxdb" },
+			"datasources:read",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			g := tc.g
+			g.listed = []map[string]any{theirLoki("http://loki:3100")}
+			cfg := influxConfig(g.serve(t))
+			cfg.Sinks.Loki = &config.LokiSink{URL: "http://192.168.0.40:50104/loki/api/v1/push"}
+			tc.stores(cfg)
+			var said strings.Builder
+			if err := publishDashboards(t.Context(), cfg, &said); err != nil {
+				t.Fatalf("the publish was abandoned over the Loki datasource: %v", err)
+			}
+			everyDashboardWithTheNote(t, cfg, g.writes)
+			out := said.String()
+			if n := strings.Count(out, "warning:"); n != 1 {
+				t.Errorf("warned %d times, want once:\n%s", n, out)
+			}
+			for _, want := range []string{"ghchronicle-loki", tc.says, "grafana.datasource.loki_uid"} {
+				if !strings.Contains(out, want) {
+					t.Errorf("output does not name %q:\n%s", want, out)
+				}
+			}
+		})
+	}
+}
+
+// everyDashboardWithTheNote holds a publish to one dashboard per store, each
+// with the failed output panel left as the note it falls back to.
+func everyDashboardWithTheNote(t *testing.T, cfg *config.Config, writes []map[string]any) {
+	t.Helper()
+	stores, err := storesToPublish(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if published := publishedUIDs(t, writes); len(published) != len(stores) {
+		t.Fatalf("published %v, want one dashboard for each of %d stores", published, len(stores))
+	}
+	for _, body := range writes {
+		doc, ok := body["dashboard"].(map[string]any)
+		if !ok {
+			continue
+		}
+		if got := logPanelKind(doc); got != "text" {
+			t.Errorf("%v: the failed output panel is a %q, want the note", doc["uid"], got)
+		}
+	}
+}
+
+// TestTheWarningNamesTheLokiDatasourcesGrafanaAlreadyHas. The one production
+// had was the fix, and nothing said it was there: its uid, name and address
+// are what a reader needs to tell it is the same Loki by another address.
+func TestTheWarningNamesTheLokiDatasourcesGrafanaAlreadyHas(t *testing.T) {
+	t.Parallel()
+	g := &grafanaStub{
+		missing: true, refuse: refuseLokiWrites,
+		listed: []map[string]any{theirLoki("http://loki:3100")},
+	}
+	cfg := influxConfig(g.serve(t))
+	cfg.Sinks.Loki = &config.LokiSink{URL: "http://192.168.0.40:50104/loki/api/v1/push"}
+	var said strings.Builder
+	if err := publishDashboards(t.Context(), cfg, &said); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(said.String(), "cfbntsncufta8f (loki, at http://loki:3100)") {
+		t.Errorf("output = %q, want the Loki datasource already there named", said.String())
+	}
+}
+
+// TestALokiDatasourceAtTheSinksAddressIsAdoptedWithNoWrite. One already reads
+// the Loki the sink writes to, so it is the datasource this would have made:
+// the panel reads it, and nothing is written, which is also what lets a token
+// that may only read datasources draw the lines.
+func TestALokiDatasourceAtTheSinksAddressIsAdoptedWithNoWrite(t *testing.T) {
+	t.Parallel()
+	g := &grafanaStub{
+		missing: true, refuse: refuseLokiWrites,
+		listed: []map[string]any{theirLoki("http://loki:3100/")},
+	}
+	cfg := influxConfig(g.serve(t))
+	cfg.Sinks.Loki = &config.LokiSink{URL: "http://loki:3100/loki/api/v1/push"}
+	var said strings.Builder
+	if err := publishDashboards(t.Context(), cfg, &said); err != nil {
+		t.Fatal(err)
+	}
+	if written := lokiWrites(g.writes); len(written) != 0 {
+		t.Errorf("wrote a Loki datasource beside the one there: %v", written)
+	}
+	doc := dashboardOf(t, g.writes)
+	if kind, uid := logPanelKind(doc), logPanelSource(doc); kind != "logs" || uid != "cfbntsncufta8f" {
+		t.Errorf("the failed output panel is a %q reading %q, want logs from the adopted one", kind, uid)
+	}
+	if !strings.Contains(said.String(), "cfbntsncufta8f (loki) adopted") {
+		t.Errorf("output = %q, want the adoption said", said.String())
+	}
+	if strings.Contains(said.String(), "warning:") {
+		t.Errorf("output = %q, want no warning where nothing went wrong", said.String())
+	}
+}
+
+// TestALokiDatasourceElsewhereIsNotAdopted. Another address is another server
+// as far as anything here can tell, and a tenant travels in a secret Grafana
+// never hands back, so neither is the datasource this would make: it makes its
+// own, and the panel reads that.
+func TestALokiDatasourceElsewhereIsNotAdopted(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name string
+		sink config.LokiSink
+		url  string
+	}{
+		{
+			"another address",
+			config.LokiSink{URL: "http://192.168.0.40:50104/loki/api/v1/push"},
+			"http://192.168.0.40:50104",
+		},
+		{
+			"the same address, for a tenant",
+			config.LokiSink{URL: "http://loki:3100/loki/api/v1/push", TenantID: "tenant-one"},
+			"http://loki:3100",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			g := &grafanaStub{missing: true, listed: []map[string]any{theirLoki("http://loki:3100")}}
+			cfg := influxConfig(g.serve(t))
+			sink := tc.sink
+			cfg.Sinks.Loki = &sink
+			var said strings.Builder
+			if err := publishDashboards(t.Context(), cfg, &said); err != nil {
+				t.Fatal(err)
+			}
+			written := lokiWrites(g.writes)
+			if len(written) != 1 || written[0]["uid"] != "ghchronicle-loki" || written[0]["url"] != tc.url {
+				t.Fatalf("Loki writes = %v, want ghchronicle-loki made at %s", written, tc.url)
+			}
+			if uid := logPanelSource(dashboardOf(t, g.writes)); uid != "ghchronicle-loki" {
+				t.Errorf("the failed output panel reads %q, want the one it made", uid)
+			}
+		})
+	}
+}
+
+// TestALokiDatasourceTheTokenMayNotRewriteIsStillRead. An Admin run made
+// ghchronicle-loki and the token was scoped down to an Editor afterwards. The
+// datasource is there and reads the right Loki, and only rewriting it is
+// refused: with a tenant that rewrite is asked for on every start, and a
+// datasource somebody corrected by hand differs from what would be written.
+// Both used to leave the panel as the note beside a datasource that worked.
+func TestALokiDatasourceTheTokenMayNotRewriteIsStillRead(t *testing.T) {
+	t.Parallel()
+	const sinkURL = "http://192.168.0.40:50104/loki/api/v1/push"
+	for _, tc := range []struct {
+		name  string
+		sink  config.LokiSink
+		there map[string]any
+	}{
+		{
+			"a sink with a tenant",
+			config.LokiSink{URL: sinkURL, TenantID: "tenant-one"},
+			map[string]any{
+				"uid": "ghchronicle-loki", "name": "ghchronicle-loki", "type": "loki",
+				"url": "http://192.168.0.40:50104", "access": "proxy",
+				"jsonData": map[string]any{"httpHeaderName1": "X-Scope-OrgID"},
+			},
+		},
+		{
+			"an address corrected by hand",
+			config.LokiSink{URL: sinkURL},
+			map[string]any{
+				"uid": "ghchronicle-loki", "name": "ghchronicle-loki", "type": "loki",
+				"url": "http://loki:3100", "access": "proxy", "jsonData": map[string]any{},
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			g := &grafanaStub{
+				missing: true, refuse: refuseLokiWrites,
+				present: map[string]bool{"ghchronicle-loki": true},
+				found:   map[string]map[string]any{"ghchronicle-loki": tc.there},
+				listed:  []map[string]any{tc.there},
+			}
+			cfg := influxConfig(g.serve(t))
+			sink := tc.sink
+			cfg.Sinks.Loki = &sink
+			var said strings.Builder
+			if err := publishDashboards(t.Context(), cfg, &said); err != nil {
+				t.Fatal(err)
+			}
+			doc := dashboardOf(t, g.writes)
+			if kind, uid := logPanelKind(doc), logPanelSource(doc); kind != "logs" || uid != "ghchronicle-loki" {
+				t.Errorf("the failed output panel is a %q reading %q, want logs from ghchronicle-loki", kind, uid)
+			}
+			out := said.String()
+			if n := strings.Count(out, "warning:"); n != 1 {
+				t.Errorf("warned %d times, want once:\n%s", n, out)
+			}
+			for _, want := range []string{"datasources:write", "grafana.datasource.loki_uid to ghchronicle-loki"} {
+				if !strings.Contains(out, want) {
+					t.Errorf("output does not name %q:\n%s", want, out)
+				}
+			}
+			if strings.Contains(out, "could not be set up") {
+				t.Errorf("output = %q, want the datasource in use said to be in use", out)
+			}
+		})
+	}
+}
+
+// TestALokiDatasourceThatCouldNotBeMadeIsStillTheNote. The other side of the
+// test above: a refused create leaves nothing to read, so the panel stays the
+// note, however much the datasource that failed to be made looks like one
+// that failed to be rewritten.
+func TestALokiDatasourceThatCouldNotBeMadeIsStillTheNote(t *testing.T) {
+	t.Parallel()
+	g := &grafanaStub{missing: true, refuse: refuseLokiWrites}
+	cfg := influxConfig(g.serve(t))
+	cfg.Sinks.Loki = &config.LokiSink{
+		URL: "http://192.168.0.40:50104/loki/api/v1/push", TenantID: "tenant-one",
+	}
+	var said strings.Builder
+	if err := publishDashboards(t.Context(), cfg, &said); err != nil {
+		t.Fatal(err)
+	}
+	everyDashboardWithTheNote(t, cfg, g.writes)
+	if !strings.Contains(said.String(), "datasources:create") {
+		t.Errorf("output = %q, want the refused create named", said.String())
+	}
+}
+
+// TestALokiDatasourceThatIsThereIsNamedWhenItCannotBeUsed. A rewrite that
+// failed for a reason other than the token is not one to read past, since
+// nothing says what state it left the datasource in; but ghchronicle-loki is
+// still one of the Loki datasources Grafana has, and the one most likely to
+// be the answer, so the list names it.
+func TestALokiDatasourceThatIsThereIsNamedWhenItCannotBeUsed(t *testing.T) {
+	t.Parallel()
+	there := map[string]any{
+		"uid": "ghchronicle-loki", "name": "ghchronicle-loki", "type": "loki",
+		"url": "http://192.168.0.40:50104", "access": "proxy", "jsonData": map[string]any{},
+	}
+	g := &grafanaStub{
+		missing: true, broken: refuseLokiWrites,
+		present: map[string]bool{"ghchronicle-loki": true},
+		found:   map[string]map[string]any{"ghchronicle-loki": there},
+		listed:  []map[string]any{there},
+	}
+	cfg := influxConfig(g.serve(t))
+	cfg.Sinks.Loki = &config.LokiSink{
+		URL: "http://192.168.0.40:50104/loki/api/v1/push", TenantID: "tenant-one",
+	}
+	var said strings.Builder
+	if err := publishDashboards(t.Context(), cfg, &said); err != nil {
+		t.Fatal(err)
+	}
+	everyDashboardWithTheNote(t, cfg, g.writes)
+	if !strings.Contains(said.String(), "ghchronicle-loki (ghchronicle-loki, at http://192.168.0.40:50104)") {
+		t.Errorf("output = %q, want ghchronicle-loki among the Loki datasources named", said.String())
+	}
+}
+
+// TestTheLokiWarningPromisesNothingAboutTheStores. It is printed before any
+// store has been tried. With no grafana.datasource.uid an Editor is refused
+// the store's datasource next, the publish stops, and a line saying every
+// dashboard was published all the same was followed by none.
+func TestTheLokiWarningPromisesNothingAboutTheStores(t *testing.T) {
+	t.Parallel()
+	g := &grafanaStub{missing: true, refuse: refuseEveryDatasourceWrite}
+	cfg := influxConfig(g.serve(t))
+	cfg.Sinks.Loki = &config.LokiSink{URL: "http://192.168.0.40:50104/loki/api/v1/push"}
+	var said strings.Builder
+	if err := publishDashboards(t.Context(), cfg, &said); err == nil {
+		t.Fatal("it published without the datasource every panel reads")
+	}
+	out := said.String()
+	if !strings.Contains(out, "grafana.datasource.loki_uid") {
+		t.Errorf("output = %q, want the Loki warning", out)
+	}
+	for _, promise := range []string{"is published", "published all the same", "Every dashboard"} {
+		if strings.Contains(out, promise) {
+			t.Errorf("output says %q, and nothing was published:\n%s", promise, out)
+		}
+	}
+}
+
+// TestTheWarningIsAWarningInTheJournal. At start-up the publish reports
+// through the logger, and a line saying something was left undone logged at
+// info reads like the dozen that say something was done.
+func TestTheWarningIsAWarningInTheJournal(t *testing.T) {
+	t.Parallel()
+	g := &grafanaStub{missing: true, refuse: refuseLokiWrites}
+	cfg := influxConfig(g.serve(t))
+	cfg.Grafana.PublishOnStart = true
+	cfg.Sinks.Loki = &config.LokiSink{URL: "http://loki:3100/loki/api/v1/push"}
+	var journal bytes.Buffer
+	publishOnStart(t.Context(), cfg, options{}, slog.New(slog.NewJSONHandler(&journal, nil)))
+	var warned, published bool
+	for line := range strings.SplitSeq(strings.TrimSpace(journal.String()), "\n") {
+		var entry map[string]any
+		if err := json.Unmarshal([]byte(line), &entry); err != nil {
+			t.Fatalf("%q: %v", line, err)
+		}
+		did, _ := entry["did"].(string)
+		switch {
+		case strings.Contains(did, "grafana.datasource.loki_uid"):
+			warned = true
+			if entry["level"] != "WARN" {
+				t.Errorf("the Loki warning was logged at %v, want WARN", entry["level"])
+			}
+		case strings.Contains(did, "published at"):
+			published = true
+			if entry["level"] != "INFO" {
+				t.Errorf("the publish was logged at %v, want INFO", entry["level"])
+			}
+		}
+		if strings.Contains(fmt.Sprint(entry["msg"]), "could not publish") {
+			t.Errorf("the publish was abandoned: %v", entry)
+		}
+	}
+	if !warned || !published {
+		t.Errorf("warned %v, published %v, want both:\n%s", warned, published, journal.String())
+	}
+}
+
+// TestARefusedStoreDatasourceSaysHowToDoWithoutIt. The store's datasource is
+// the one every panel reads, so there is nothing to publish without it, but a
+// token that may not make it can still publish against one named by uid, and
+// the refusal is the place to say so.
+func TestARefusedStoreDatasourceSaysHowToDoWithoutIt(t *testing.T) {
+	t.Parallel()
+	g := &grafanaStub{missing: true, refuse: refuseEveryDatasourceWrite}
+	cfg := influxConfig(g.serve(t))
+	var said strings.Builder
+	err := publishDashboards(t.Context(), cfg, &said)
+	if err == nil {
+		t.Fatal("it published without the datasource every panel reads")
+	}
+	for _, want := range []string{"datasources:create", "grafana.datasource.uid"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("err = %v, want it to name %q", err, want)
+		}
+	}
+}
+
+// TestAHealthCheckTheTokenMayNotMakeIsNotAnAddressProblem. Measured on Grafana
+// 13.2.1 with a service account that has no role: the probe is refused with
+// datasources:query, and the run used to say the datasource did not answer
+// and point at grafana.datasource.url, which was right all along.
+func TestAHealthCheckTheTokenMayNotMakeIsNotAnAddressProblem(t *testing.T) {
+	t.Parallel()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/health") {
+			forbidden(w, "datasources:query")
+			return
+		}
+		_, _ = io.WriteString(w, `[]`)
+	}))
+	t.Cleanup(srv.Close)
+	cfg := influxConfig(srv.URL)
+	cfg.Grafana.Datasource.UID = "their-influxdb"
+	var said strings.Builder
+	err := publishDashboards(t.Context(), cfg, &said)
+	if err == nil || !strings.Contains(err.Error(), "datasources:query") {
+		t.Fatalf("err = %v, want the refused permission named", err)
+	}
+	if strings.Contains(err.Error(), "grafana.datasource.url") {
+		t.Errorf("err = %v, want no advice about an address that was not the problem", err)
 	}
 }

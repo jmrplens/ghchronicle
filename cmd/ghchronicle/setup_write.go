@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/jmrplens/ghchronicle/v2/internal/httpx"
 )
 
 // What the guided setup writes, and where.
@@ -20,6 +22,10 @@ const configName = "config.yaml"
 // it, and gosec is right to ask.
 const configDirMode = 0o750
 
+// probeClient is the probe's own, with a pool of its own rather than
+// http.DefaultClient's, for the reason internal/httpx gives.
+var probeClient = &http.Client{Transport: httpx.OwnTransport()}
+
 // probe asks whether something is listening, with a short patience: this is a
 // courtesy check inside a conversation, and a person waiting thirty seconds
 // for it would rather it had not asked.
@@ -30,7 +36,7 @@ func probe(ctx context.Context, url string) error {
 	if err != nil {
 		return err
 	}
-	res, err := http.DefaultClient.Do(req)
+	res, err := probeClient.Do(req)
 	if err != nil {
 		return err
 	}

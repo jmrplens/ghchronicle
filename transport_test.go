@@ -26,6 +26,12 @@ import (
 // seventh: a rule that holds where somebody remembered to apply it is not a
 // rule, so it is asked of the source rather than of anybody's memory.
 //
+// http.DefaultClient, and the package-level http.Get, Head, Post and PostForm
+// that send through it, are the same pool reached without building anything,
+// and the rule missed them until 2.5.1: the Grafana client, the uninstall's
+// store calls, the setup's probe and the Docker suite's harness all sent
+// through it.
+//
 // Test files are left out. The pool a test shares is the same pool, but a test
 // that builds a client is usually driving an httptest server that hands one
 // out, and holding those to this would be noise rather than a rule.
@@ -49,8 +55,9 @@ func TestEveryHTTPClientBringsItsOwnTransport(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(offenders) > 0 {
-		t.Errorf("these build an http.Client with no Transport, so it shares the process-wide "+
-			"connection pool with every other client: %s. Give it httpx.OwnTransport(), or the "+
+		t.Errorf("these build an http.Client with no Transport, or send through "+
+			"http.DefaultClient, so they share the process-wide connection pool with every "+
+			"other client: %s. Give a client of their own httpx.OwnTransport(), or the "+
 			"transport of the client whose request it is carrying on",
 			strings.Join(offenders, ", "))
 	}
@@ -75,7 +82,8 @@ func isOwnSource(path string) bool {
 }
 
 // clientsWithoutTransport names each place in one file where an http.Client is
-// built with no Transport field.
+// built with no Transport field, or where a request goes out through the
+// shared client.
 func clientsWithoutTransport(path string) ([]string, error) {
 	fset := token.NewFileSet()
 	file, err := parser.ParseFile(fset, path, nil, parser.SkipObjectResolution)
@@ -84,13 +92,33 @@ func clientsWithoutTransport(path string) ([]string, error) {
 	}
 	var found []string
 	ast.Inspect(file, func(n ast.Node) bool {
-		lit, ok := n.(*ast.CompositeLit)
-		if ok && isHTTPClient(lit.Type) && !setsTransport(lit) {
-			found = append(found, fset.Position(lit.Pos()).String())
+		switch node := n.(type) {
+		case *ast.CompositeLit:
+			if isHTTPClient(node.Type) && !setsTransport(node) {
+				found = append(found, fset.Position(node.Pos()).String())
+			}
+		case *ast.SelectorExpr:
+			if sendsThroughTheSharedClient(node) {
+				found = append(found, fset.Position(node.Pos()).String())
+			}
 		}
 		return true
 	})
 	return found, nil
+}
+
+// sendsThroughTheSharedClient reports whether a selector is http.DefaultClient
+// or one of the package-level functions that send through it.
+func sendsThroughTheSharedClient(sel *ast.SelectorExpr) bool {
+	pkg, ok := sel.X.(*ast.Ident)
+	if !ok || pkg.Name != "http" {
+		return false
+	}
+	switch sel.Sel.Name {
+	case "DefaultClient", "Get", "Head", "Post", "PostForm":
+		return true
+	}
+	return false
 }
 
 // setsTransport reports whether a client literal names a Transport.

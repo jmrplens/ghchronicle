@@ -49,7 +49,7 @@ keep it running once you are done watching it.
   ship as `tar.gz` (`zip` on Windows).
 
   ```sh
-  tar -xzf ghchronicle_2.5.0_linux_amd64.tar.gz
+  tar -xzf ghchronicle_2.5.1_linux_amd64.tar.gz
   sudo install -m 755 ghchronicle /usr/local/bin/
   ```
 
@@ -142,15 +142,18 @@ against the checksum that release published, and puts the binary in
 `~/.local/bin` and `~/bin` that exists and is already on your `PATH`, and falls
 back to `~/.local/bin` when neither is. A checksum that does not match stops it
 without installing anything, and there is no flag to skip that step. When
-`cosign` is already on the machine it also verifies that the checksum file
-itself came from the release workflow. It ends by running what it installed, so
+`cosign` 2.4.2 or newer is already on the machine it also verifies that the
+checksum file itself came from the release workflow, and a signature cosign
+does not confirm stops it, with what cosign said. An older cosign cannot read
+the signature bundle, so then, as with no cosign at all, it says that only the
+checksum was verified. It ends by running what it installed, so
 the version you see is the file it just wrote, and it says so when another
 `ghchronicle` earlier in your `PATH` still wins the name.
 
 Pin a version, or choose where it goes:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.sh | VERSION=2.5.0 BIN_DIR=~/bin bash
+curl -fsSL https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.sh | VERSION=2.5.1 BIN_DIR=~/bin bash
 ```
 
 > **Reading it first is the whole point of a short script**
@@ -175,7 +178,7 @@ Release archives are named
 | `aarch64`          | `linux_arm64`       |
 
 ```sh
-VERSION=2.5.0
+VERSION=2.5.1
 arch=$(uname -m); case "$arch" in x86_64) arch=amd64 ;; aarch64) arch=arm64 ;; esac
 base=https://github.com/jmrplens/ghchronicle/releases/download/v$VERSION
 curl -fsSLO "$base/ghchronicle_${VERSION}_linux_${arch}.tar.gz"
@@ -213,11 +216,13 @@ the file, then verify the archive against the file.
     ```
 
     ```text
-    ghchronicle_2.5.0_linux_amd64.tar.gz: OK
+    ghchronicle_2.5.1_linux_amd64.tar.gz: OK
     ```
 
 3. Check the checksum file itself, if you have
-   [cosign](https://docs.sigstore.dev/cosign/system_config/installation/).
+   [cosign](https://docs.sigstore.dev/cosign/system_config/installation/)
+   2.4.2 or newer. An older one cannot read the bundle and fails whatever the
+   file says.
 
     ```sh
     cosign verify-blob \
@@ -281,7 +286,7 @@ meant to.
 the build date of that release.
 
 ```text
-ghchronicle 2.5.0 (commit <commit>, built <date>)
+ghchronicle 2.5.1 (commit <commit>, built <date>)
 ```
 
 ### Run it once
@@ -321,16 +326,17 @@ find.
   Lands in `$(go env GOPATH)/bin`, which is `~/go/bin` unless you moved it,
   and that directory has to be on your `PATH`.
 
-  A binary built this way reports its version but not its commit or its
-  build date:
-
-  ```text
-  ghchronicle 2.5.0 (commit unknown, built unknown)
-  ```
-
-  The version comes from the `VERSION` file the module embeds; the other two
+  A binary built this way has no commit or build date to report: those two
   are stamped by the release build and by nothing else, and a module
   downloaded through the proxy carries no checkout to read them from.
+  `-version` names what the build does record instead, the module version
+  the go command fetched and the Go release that compiled it:
+
+  ```text
+  ghchronicle 2.5.1 (module v2.5.1, built with <go version>)
+  ```
+
+  The first version comes from the `VERSION` file the module embeds.
 
 - **make**
 
@@ -387,15 +393,18 @@ against the checksum that release published, and puts the binary in
 `~/.local/bin` and `~/bin` that exists and is already on your `PATH`, and falls
 back to `~/.local/bin` when neither is. A checksum that does not match stops it
 without installing anything, and there is no flag to skip that step. When
-`cosign` is already on the machine it also verifies that the checksum file
-itself came from the release workflow. It ends by running what it installed, so
+`cosign` 2.4.2 or newer is already on the machine it also verifies that the
+checksum file itself came from the release workflow, and a signature cosign
+does not confirm stops it, with what cosign said. An older cosign cannot read
+the signature bundle, so then, as with no cosign at all, it says that only the
+checksum was verified. It ends by running what it installed, so
 the version you see is the file it just wrote, and it says so when another
 `ghchronicle` earlier in your `PATH` still wins the name.
 
 Pin a version, or choose where it goes:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.sh | VERSION=2.5.0 BIN_DIR=~/bin bash
+curl -fsSL https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.sh | VERSION=2.5.1 BIN_DIR=~/bin bash
 ```
 
 > **Reading it first is the whole point of a short script**
@@ -420,7 +429,7 @@ architecture.
 | `x86_64`           | Intel              | `darwin_amd64`      |
 
 ```sh
-VERSION=2.5.0
+VERSION=2.5.1
 arch=$(uname -m); case "$arch" in x86_64) arch=amd64 ;; esac
 base=https://github.com/jmrplens/ghchronicle/releases/download/v$VERSION
 curl -fsSLO "$base/ghchronicle_${VERSION}_darwin_${arch}.tar.gz"
@@ -458,11 +467,13 @@ signature over that file.
     ```
 
     ```text
-    ghchronicle_2.5.0_darwin_arm64.tar.gz: OK
+    ghchronicle_2.5.1_darwin_arm64.tar.gz: OK
     ```
 
 3. Check the checksum file itself, if you have
-   [cosign](https://docs.sigstore.dev/cosign/system_config/installation/).
+   [cosign](https://docs.sigstore.dev/cosign/system_config/installation/)
+   2.4.2 or newer. An older one cannot read the bundle and fails whatever the
+   file says.
 
     ```sh
     cosign verify-blob \
@@ -661,10 +672,15 @@ so the Xcode command line tools are not needed for it.
   ```
 
   Lands in `$(go env GOPATH)/bin`, which is `~/go/bin` unless you moved it,
-  and that directory has to be on your `PATH`. A binary built this way
-  reports its version but not its commit or its build date, because those
-  two are stamped by the release build and a module downloaded through the
-  proxy carries no checkout to read them from.
+  and that directory has to be on your `PATH`. A binary built this way has
+  no commit or build date to report: those two are stamped by the release
+  build, and a module downloaded through the proxy carries no checkout to
+  read them from. `-version` names what the build does record instead, the
+  module version the go command fetched and the Go release that compiled it:
+
+  ```text
+  ghchronicle 2.5.1 (module v2.5.1, built with <go version>)
+  ```
 
 - **make**
 
@@ -715,7 +731,13 @@ irm https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.ps1 | ie
 It works out the architecture, takes the newest release, checks the archive
 against the checksum that release published, and puts `ghchronicle.exe` under
 `%LOCALAPPDATA%\Programs\ghchronicle`. A checksum that does not match stops it
-without installing anything, and there is no switch to skip that step.
+without installing anything, and there is no switch to skip that step. When
+`cosign` 2.4.2 or newer is already on your PATH it also verifies that the
+checksum file itself came from the release workflow, the same check
+`install.sh` makes, and a signature cosign does not confirm stops it, with what
+cosign said, so a machine that cannot reach Sigstore is not taken for a forged
+file. An older cosign cannot read the signature bundle, so then, as without
+`cosign` at all, it says that only the checksum was verified.
 
 It then adds that directory to **your** PATH, the per-user one, so `ghchronicle`
 works by name. Programs already open keep the PATH they started with, so open a
@@ -731,7 +753,7 @@ takes parameters, which needs the slightly longer form because `iex` has
 nowhere to put them:
 
 ```powershell
-& ([scriptblock]::Create((irm https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.ps1))) -Version 2.5.0 -BinDir C:\tools -NoPathUpdate
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.ps1))) -Version 2.5.1 -BinDir C:\tools -NoPathUpdate
 ```
 
 > **Reading it first is the whole point of a short script**
@@ -793,7 +815,7 @@ rather than the shell:
 ```
 
 ```powershell
-$version = "2.5.0"
+$version = "2.5.1"
 $arch = if ($env:PROCESSOR_ARCHITECTURE -eq "ARM64") { "arm64" } else { "amd64" }
 $base = "https://github.com/jmrplens/ghchronicle/releases/download/v$version"
 $zip = "ghchronicle_${version}_windows_${arch}.zip"
@@ -837,9 +859,10 @@ nothing.
     is convenient rather than a trap.
 
 2. Check the checksum file itself, if you have
-   [cosign](https://docs.sigstore.dev/cosign/system_config/installation/). The
-   command is the same one the release notes print, and the same one a Linux
-   or macOS reader runs.
+   [cosign](https://docs.sigstore.dev/cosign/system_config/installation/)
+   2.4.2 or newer; an older one cannot read the bundle and fails whatever the
+   file says. The command is the same one the release notes print, and the
+   same one a Linux or macOS reader runs.
 
     ```powershell
     cosign verify-blob `
@@ -915,7 +938,7 @@ It answers with one line: the release number, then the commit and the build
 date of that release.
 
 ```text
-ghchronicle 2.5.0 (commit <commit>, built <date>)
+ghchronicle 2.5.1 (commit <commit>, built <date>)
 ```
 
 > **If Windows warns about the file**
@@ -1105,9 +1128,15 @@ means no MSVC, no MinGW and no Windows SDK.
 
   Lands in `$(go env GOPATH)\bin`, which is `%USERPROFILE%\go\bin` unless you
   moved it, and that directory has to be on your `Path`. A binary built this
-  way reports its version but not its commit or its build date, because those
-  two are stamped by the release build and a module downloaded through the
-  proxy carries no checkout to read them from.
+  way has no commit or build date to report: those two are stamped by the
+  release build, and a module downloaded through the proxy carries no
+  checkout to read them from. `-version` names what the build does record
+  instead, the module version the go command fetched and the Go release that
+  compiled it:
+
+  ```text
+  ghchronicle 2.5.1 (module v2.5.1, built with <go version>)
+  ```
 
 - **From a checkout**
 
@@ -1749,6 +1778,44 @@ Two consequences worth knowing before you debug it:
 - `docker exec ... sh` does not work. There is no `sh`. Read the logs instead.
 - Anything the container writes must be owned by, or writable by, uid 65532.
 
+### Verify the image
+
+Every released image from 2.5.1 on, which is every image a release page names,
+is signed with cosign, keylessly and by the same identity as the checksum file
+the other installs check: this repository's release workflow, run for a release
+tag, recorded in a public transparency log. With
+[cosign](https://docs.sigstore.dev/cosign/system_config/installation/) 3:
+
+```sh
+cosign verify \
+  --certificate-identity-regexp 'https://github.com/jmrplens/ghchronicle/.github/workflows/release.yml@refs/tags/.*' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  ghcr.io/jmrplens/ghchronicle:v2.5.1 > /dev/null
+```
+
+```text
+Verification for ghcr.io/jmrplens/ghchronicle:v2.5.1 --
+The following checks were performed on each of these signatures:
+  - The cosign claims were validated
+  - Existence of the claims in the transparency log was verified offline
+  - The code-signing certificate was verified using trusted certificate authority certificates
+```
+
+The Docker Hub copy, `docker.io/jmrplens/ghchronicle`, verifies with the same
+command. What cosign checks is a digest, not the tag: without `> /dev/null` it
+also prints, as JSON, the digest it verified (`docker-manifest-digest`), and an
+image pulled as `ghcr.io/jmrplens/ghchronicle@sha256:...` is the one verified
+however a tag moves afterwards. `latest` is moved onto a release's digest last,
+once the release workflow has verified that digest's signature and run the
+image on both architectures, so it never names an image that was not checked;
+a release that fails before then leaves it on the previous one.
+
+Use cosign 3. The signatures are in the bundle format it writes, and an older
+cosign answers `no signatures found` for these images: measured, cosign 2.6.1
+finds the signature only when given `--new-bundle-format`, 2.5.0 does not find
+it even then, and 2.4.2 does not know the flag. Images up to 2.5.0 carry no
+signature at all, so for them that answer is the true one.
+
 ### What has to be writable
 
 The config file is mounted read-only. Four things are not:
@@ -1889,7 +1956,7 @@ it downloads a release binary and calls it.
 | `card-width`      | `""`                 | Card width in pixels. Empty draws the layout at its own width; each one draws between two ends of its own, stated in its [section](https://jmrp.io/docs/ghchronicle/card/layouts/). Only `activity-heatmap` spends the room on data, a whole year of the calendar at its far end |
 | `card-speed`      | `""`                 | How fast an animated layout plays, as a decimal from 0 to 1. Empty means 0.5, the pace every card has always been drawn at; below it the card is slower, above it faster, and every animated layout scales together. 0 is the slowest animation and not a still card, `card-motion: off` is |
 | `include-private` | `false`              | `true` counts private repositories when no config file is given. See the warning below |
-| `version`         | `latest`             | The release to install                                                                                            |
+| `version`         | `latest`             | The release to install: `latest` for the newest, or a release with or without its `v`, so `2.5.1` and `v2.5.1` are the same one. The major tag `v2` is what `uses:` takes, not a release, and is refused |
 
 ### The three modes
 

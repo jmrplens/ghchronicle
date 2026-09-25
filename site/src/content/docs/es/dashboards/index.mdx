@@ -61,13 +61,20 @@ que hizo con cada datasource y cada dashboard.
 </Aside>
 
 <Aside type="note" title="Qué tiene que poder hacer el token">
-  Publicar un dashboard necesita Editor. Crear o corregir un datasource
-  necesita `datasources:create`, que un Editor no tiene: un token sin ese
-  permiso llega hasta el dashboard y es rechazado en el datasource, diciendo
-  cuál le falta. Así que una cuenta de servicio que gestione su propio
-  datasource es Admin, o un Editor con ese permiso concedido; una que solo
-  publique contra un datasource nombrado en `grafana.datasource.uid` es Editor,
-  porque adoptar lee y nunca escribe.
+  Publicar un dashboard necesita Editor. Crear un datasource necesita
+  `datasources:create` y corregirlo necesita `datasources:write`, y un Editor
+  no tiene ninguno de los dos: un token sin ellos llega hasta el dashboard y es
+  rechazado en el datasource, diciendo cuál le falta. Así que una cuenta de
+  servicio que gestione su propio datasource es Admin, o un Editor con los dos
+  concedidos; una que solo publique contra un datasource nombrado en
+  `grafana.datasource.uid` es Editor, porque adoptar lee y nunca escribe. El
+  datasource de Loki nunca detiene una publicación: con un sink de Loki, un
+  Editor adopta un datasource de Loki que Grafana ya tenga en la dirección del
+  sink, lee tal cual un `ghchronicle-loki` que creara una ejecución anterior,
+  con un aviso de que no pudo reescribirlo, y cuando no hay ninguno de los dos
+  la creación se rechaza, un aviso lo dice y solo el panel de la salida de los
+  jobs fallidos queda como su nota. `grafana.datasource.loki_uid` nombra el que
+  hay que leer y evita la pregunta.
 </Aside>
 
 <Aside type="caution" title="Grafana suele llegar al almacén por otra dirección">
@@ -135,7 +142,11 @@ misma ejecución dos veces escribe en los mismos dos sitios:
 Un datasource que esto crea toma el uid del dashboard, así que los dos son
 `ghchronicle-<almacén>`, y uno que nombres tú conserva el uid que ya tenga. El
 de Loki, cuando la dirección del sink explica dónde encontrarlo, es
-`ghchronicle-loki`.
+`ghchronicle-loki`, salvo que Grafana ya tenga un datasource de Loki en esa
+dirección y el sink no lleve `tenant_id`: ese se adopta y se deja como está,
+porque un datasource de Loki sin tenant es su dirección y nada más. Con tenant
+se crea siempre, porque el tenant viaja en un secreto que Grafana nunca
+devuelve.
 
 El datasource se crea la primera vez y se corrige después, y solo se comparan
 los campos que esto escribe, así que un tiempo de espera o una descripción que
@@ -184,13 +195,15 @@ ghchronicle -config config.yaml -uninstall all -yes     # y entonces se va
 
 | Objetivo    | Qué se va                                                              |
 | ----------- | ---------------------------------------------------------------------- |
-| `dashboard` | Los dashboards que publicó, y un datasource que haya creado él          |
+| `dashboard` | Los dashboards que publicó, y los datasources que haya creado él        |
 | `data`      | Toda tabla del almacén cuyo nombre empiece por `gh_`                    |
 | `state`     | El fichero de estado, el libro de deduplicación y el punto de control   |
 | `all`       | Los tres de arriba                                                      |
 
-Un datasource nombrado en `grafana.datasource.uid` no se quita nunca: era de
-otro antes de que esto corriera y sigue siéndolo. Un objetivo que no reconoce
+Un datasource nombrado en `grafana.datasource.uid` o en
+`grafana.datasource.loki_uid` no se quita nunca, ni tampoco un datasource de
+Loki que haya adoptado: cada uno era de otro antes de que esto corriera y sigue
+siéndolo. Un objetivo que no reconoce
 se rechaza entero, en vez de ejecutar el resto de la lista sin él.
 
 Las tablas se le preguntan al almacén en vez de llevarlas compiladas. Una lista

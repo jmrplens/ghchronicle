@@ -687,3 +687,216 @@ func actionInputDescription(t *testing.T, name string) string {
 	}
 	return in.Description
 }
+
+// TestTheActionInstallsTheReleaseItIsGivenWithOrWithoutItsV runs the Action's
+// install step exactly as action.yml carries it, with a stand-in curl and
+// uname on PATH, and checks the one download URL it builds for each way of
+// naming a release.
+//
+// The version input used to go into that URL as typed, so "2.5.0" asked for a
+// tag called 2.5.0, which does not exist, and the step failed with a 404 where
+// install.sh and install.ps1, given the same string, installed. A release is
+// the same release with or without its v in all three. The major tag is
+// refused by name before anything is fetched: it is what `uses:` takes, and
+// its release, where there is one, holds no binaries.
+func TestTheActionInstallsTheReleaseItIsGivenWithOrWithoutItsV(t *testing.T) {
+	if _, err := exec.LookPath("bash"); err != nil {
+		t.Skip("the Action's steps run in bash, and there is none here")
+	}
+	step := newInstallStep(t)
+	for _, tc := range []struct {
+		name, version string
+		installs      bool
+	}{
+		{"a release number", fakeVersion, true},
+		{"a release tag", "v" + fakeVersion, true},
+		{"the newest", "latest", true},
+		{"the major tag", "v9", false},
+		{"nothing at all", "", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			run := step.run(t, tc.version)
+			if !tc.installs {
+				run.checkRefused(t)
+				return
+			}
+			run.checkInstalled(t, step.want)
+		})
+	}
+}
+
+// installStep is the Action's install step written out to run, with the
+// stand-ins and the fake release it runs against.
+type installStep struct {
+	script, stubs, releases, archive string
+	// want is the one download URL every accepted spelling must end at.
+	want string
+}
+
+func newInstallStep(t *testing.T) installStep {
+	t.Helper()
+	work := t.TempDir()
+	rel := buildFakeReleaseFor(t, "linux", "amd64")
+	step := installStep{
+		script:   filepath.Join(work, "install-step.sh"),
+		stubs:    writeInstallStepStubs(t),
+		releases: filepath.Join(work, "releases.json"),
+		archive:  filepath.Join(work, rel.archiveName),
+		want:     "https://github.com/jmrplens/ghchronicle/releases/download/v" + fakeVersion + "/" + rel.archiveName,
+	}
+	// The trap the latest branch exists for: a release named after the moving
+	// major tag, newest by date, with nothing attached.
+	listing := `[{"tag_name": "v9", "assets": []}, {"tag_name": "v` + fakeVersion + `"}, {"tag_name": "v9.9.8"}]`
+	for path, body := range map[string][]byte{
+		step.script:   []byte(actionStep(t, "Install ghchronicle")),
+		step.releases: []byte(listing),
+		step.archive:  rel.archive,
+	} {
+		if err := os.WriteFile(path, body, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return step
+}
+
+// installRun is what one run of the install step left behind.
+type installRun struct {
+	version, out, temp string
+	code               int
+	// fetched is every URL the stand-in curl was asked for, in order.
+	fetched []string
+	// onPath is what the step added to the job's PATH.
+	onPath string
+}
+
+func (s installStep) run(t *testing.T, version string) installRun {
+	t.Helper()
+	temp := t.TempDir()
+	fetched := filepath.Join(temp, "fetched")
+	githubPath := filepath.Join(temp, "github_path")
+	// Built up rather than passed to the call, as runInstaller does: the path
+	// is this test's own temporary file either way.
+	cmd := exec.CommandContext(t.Context(), "bash")
+	cmd.Args = append(cmd.Args, s.script)
+	cmd.Env = append(os.Environ(),
+		"PATH="+s.stubs+string(os.PathListSeparator)+os.Getenv("PATH"),
+		"VERSION="+version,
+		"RUNNER_TEMP="+temp,
+		"GITHUB_PATH="+githubPath,
+		"FETCHED="+fetched,
+		"RELEASES="+s.releases,
+		"ARCHIVE="+s.archive,
+		"ARCHIVE_URL="+s.want)
+	out, _ := cmd.CombinedOutput()
+	asked, _ := os.ReadFile(fetched)
+	onPath, _ := os.ReadFile(githubPath)
+	return installRun{
+		version: version, out: string(out), temp: temp,
+		code:    cmd.ProcessState.ExitCode(),
+		fetched: strings.Fields(string(asked)),
+		onPath:  strings.TrimSpace(string(onPath)),
+	}
+}
+
+// checkRefused holds a refusal to naming both spellings that would have
+// worked, and to deciding before it fetched anything.
+func (r installRun) checkRefused(t *testing.T) {
+	t.Helper()
+	if r.code == 0 {
+		t.Fatalf("version %q installed something:\n%s", r.version, r.out)
+	}
+	for _, form := range []string{"2.5.1", "v2.5.1"} {
+		if !strings.Contains(r.out, form) {
+			t.Errorf("the refusal does not show the form %s that would have worked:\n%s", form, r.out)
+		}
+	}
+	if len(r.fetched) != 0 {
+		t.Errorf("it fetched after deciding the version names no release: %v", r.fetched)
+	}
+}
+
+// checkInstalled holds a run to the one URL, the binary in RUNNER_TEMP and
+// RUNNER_TEMP on the job's PATH.
+func (r installRun) checkInstalled(t *testing.T, want string) {
+	t.Helper()
+	if r.code != 0 {
+		t.Fatalf("version %q: exit %d, want 0\n%s\nfetched: %v", r.version, r.code, r.out, r.fetched)
+	}
+	if got := r.fetched[len(r.fetched)-1]; got != want {
+		t.Errorf("version %q downloaded %s, want %s", r.version, got, want)
+	}
+	if _, err := os.Stat(filepath.Join(r.temp, "ghchronicle")); err != nil {
+		t.Errorf("no binary in RUNNER_TEMP: %v\n%s", err, r.out)
+	}
+	if r.onPath != r.temp {
+		t.Errorf("the job's PATH gained %q, want %s", r.onPath, r.temp)
+	}
+}
+
+// writeInstallStepStubs puts a stand-in curl and uname on a PATH directory of
+// their own. uname answers as a Linux x86_64 runner whatever this machine is.
+// curl records every URL it is asked for to $FETCHED and answers the releases
+// listing with $RELEASES, $ARCHIVE_URL with $ARCHIVE, and anything else with
+// the 404 a tag that does not exist gets, to a file after -o or to stdout.
+func writeInstallStepStubs(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	stubs := map[string]string{
+		"uname": `#!/usr/bin/env bash
+case "$1" in -s) echo Linux ;; -m) echo x86_64 ;; esac
+`,
+		"curl": `#!/usr/bin/env bash
+out= url=
+while [ $# -gt 0 ]; do
+  case $1 in
+    -o) out=$2; shift 2 ;;
+    -*) shift ;;
+    *) url=$1; shift ;;
+  esac
+done
+printf '%s\n' "$url" >> "$FETCHED"
+case $url in
+  https://api.github.com/repos/jmrplens/ghchronicle/releases*) body=$RELEASES ;;
+  "$ARCHIVE_URL") body=$ARCHIVE ;;
+  *) echo "curl: (22) The requested URL returned error: 404" >&2; exit 22 ;;
+esac
+if [ -n "$out" ]; then cat "$body" > "$out"; else cat "$body"; fi
+`,
+	}
+	for name, body := range stubs {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(body), stubMode); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return dir
+}
+
+// actionStep is the script of one of the Action's steps, found by its name and
+// returned exactly as action.yml carries it.
+func actionStep(t *testing.T, name string) string {
+	t.Helper()
+	raw, err := os.ReadFile("action.yml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var doc struct {
+		Runs struct {
+			Steps []struct {
+				Name string `yaml:"name"`
+				Run  string `yaml:"run"`
+			} `yaml:"steps"`
+		} `yaml:"runs"`
+	}
+	if err = yaml.Unmarshal(raw, &doc); err != nil {
+		t.Fatalf("action.yml: %v", err)
+	}
+	var names []string
+	for _, step := range doc.Runs.Steps {
+		if step.Name == name {
+			return step.Run
+		}
+		names = append(names, step.Name)
+	}
+	t.Fatalf("action.yml has no step named %q; it has %q", name, names)
+	return ""
+}

@@ -89,42 +89,34 @@ signs:
       - --yes
     artifacts: sbom
 
+# The release notes are the section of CHANGELOG.md for the tag: the release
+# workflow cuts it out and passes it as --release-notes, and GoReleaser then
+# generates no list of commits at all. That list is dropped on purpose. The
+# repository squashes every pull request into one commit, so it was the pull
+# request titles again, under an "Other" heading because none of them carries
+# a conventional prefix, each behind a forty-character SHA; the section says
+# what changed, why, and what was not verified. The footer below keeps the
+# compare link, which is where the commits still are for whoever wants them.
+#
+# Not `disable: true`, which would look like the tidy way to say the same
+# thing: it skips the whole changelog pipe, the step that reads --release-notes
+# included, and the release goes out with the footer and nothing above it.
 changelog:
-  use: github
-  sort: asc
-  groups:
-    - title: Features
-      regexp: '^.*?feat(\([[:word:]]+\))??!?:.+$'
-      order: 0
-    - title: Bug fixes
-      regexp: '^.*?fix(\([[:word:]]+\))??!?:.+$'
-      order: 1
-    - title: Performance
-      regexp: '^.*?perf(\([[:word:]]+\))??!?:.+$'
-      order: 2
-    - title: Refactoring
-      regexp: '^.*?refactor(\([[:word:]]+\))??!?:.+$'
-      order: 3
-    - title: Documentation
-      regexp: '^.*?docs(\([[:word:]]+\))??!?:.+$'
-      order: 4
-    - title: Build and dependencies
-      regexp: '^.*?(build|chore|ci|deps)(\([[:word:]]+\))??!?:.+$'
-      order: 5
-    - title: Other
-      order: 99
-  filters:
-    exclude:
-      - "^test:"
-      - "^style:"
-      - Merge pull request
-      - Merge branch
+  disable: false
 
 # One entry per registry rather than one entry listing both, so that a missing
 # Docker Hub credential costs the Docker Hub image and nothing else: without
 # the split, a release on a repository whose secrets nobody has created yet
 # would fail after the binaries were already published. The cost is that the
 # image is built twice, once per entry.
+#
+# Only the version tag is pushed here. `latest`, which every documented
+# `docker run` pulls, is moved by the release workflow's last GoReleaser step,
+# onto the same digest, once that digest's signature has verified and the
+# image has run on both architectures. Pushed from here it would move with
+# the build, before the signing below, and a signing failure would leave
+# `latest` on an unsigned image in both registries with no release page to
+# say so.
 #
 # GoReleaser assembles the multi-architecture manifest itself, so there is no
 # docker_manifests block: on a real release it runs a single `buildx build
@@ -139,7 +131,6 @@ dockers_v2:
       - "ghcr.io/jmrplens/ghchronicle"
     tags:
       - "v{{ .Version }}"
-      - latest
     platforms:
       - linux/amd64
       - linux/arm64
@@ -182,13 +173,31 @@ dockers_v2:
       - "docker.io/jmrplens/ghchronicle"
     tags:
       - "v{{ .Version }}"
-      - latest
     platforms:
       - linux/amd64
       - linux/arm64
     dockerfile: docker/Dockerfile.goreleaser
     labels: *oci_labels
     annotations: *oci_annotations
+
+# The images are signed like the checksum file, keylessly and by the same
+# workflow identity, so one regexp verifies everything a release publishes.
+# GoReleaser runs this after the push and before it creates the GitHub
+# release, and a failure stops it there: an image that could not be signed
+# never gets a release page telling people to pull it, and `latest` is not
+# moved onto it, since the workflow moves that only after this. The version
+# tag is already pushed by then and stays, unsigned and unannounced. The
+# artifacts default to every pushed image:tag, which is one per entry. Cosign
+# pushes the signature beside the image with the credentials the workflow's
+# registry logins left, and a disabled dockerhub entry pushed nothing, so
+# there is nothing of it to sign.
+docker_signs:
+  - id: images
+    cmd: cosign
+    args:
+      - sign
+      - "${artifact}@${digest}"
+      - --yes
 
 release:
   github:
@@ -210,7 +219,15 @@ release:
     {{ if isEnvSet "DOCKERHUB_USERNAME" }}`docker pull jmrplens/ghchronicle:v{{ .Version }}`
     {{ end }}
 
-    **Verify the checksums** (keyless, no key to fetch):
+    **Verify the image** (keyless, the same identity as the checksums; needs cosign 3, since an older cosign answers `no signatures found` for these images, see https://jmrp.io/docs/ghchronicle/install/docker/#verify-the-image):
+    ```
+    cosign verify \
+      --certificate-identity-regexp 'https://github.com/jmrplens/ghchronicle/.github/workflows/release.yml@refs/tags/.*' \
+      --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+      ghcr.io/jmrplens/ghchronicle:v{{ .Version }}
+    ```
+
+    **Verify the checksums** (keyless, no key to fetch; cosign 2.4.2 or newer reads the bundle):
     ```
     cosign verify-blob \
       --certificate-identity-regexp 'https://github.com/jmrplens/ghchronicle/.github/workflows/release.yml@refs/tags/.*' \

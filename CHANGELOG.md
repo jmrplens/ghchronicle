@@ -2,13 +2,250 @@
 
 What changed in each release, why, and what was left unproven.
 
-The release notes on each tag are generated from the commits and say what
-landed. This file is for what they cannot say: the reason a thing changed, the
-measurement behind it, and the part nobody verified. Where a claim here was
-measured, it says on what.
+Each section says what changed, the reason it changed, the measurement behind
+it, and the part nobody verified. Where a claim here was measured, it says on
+what. From 2.5.1 on, a release's section is its notes on GitHub word for word,
+so every link in one is absolute; the release page adds the pull and
+verification commands and a link to the commits.
 
 Versions follow [semantic versioning](https://semver.org/). The dates are the
 day the tag was pushed.
+
+## 2.5.1 - 2026-09-25
+
+What releasing and deploying 2.5.0 turned up, fixed the same day: a publish
+that gave up over one panel, release notes nobody could read, images nobody
+had signed, and a handful of smaller things that said less than they should.
+
+- **Publishing no longer gives up over the Loki datasource.** Since 2.4.0, a
+  Grafana token that may publish dashboards and may not create datasources,
+  the Editor the documentation recommends, abandoned every dashboard when a
+  Loki sink was configured without `grafana.datasource.loki_uid`. The
+  publisher looked for its own `ghchronicle-loki`, found none, was refused
+  making it, and returned that refusal as the run's error, although Loki
+  feeds one panel, the failed job output. In production the run said "could
+  not publish the dashboard, carrying on without it" and published nothing.
+  It now warns once, naming `ghchronicle-loki`, the permission the token
+  lacks, `grafana.datasource.loki_uid`, and up to three Loki datasources
+  Grafana already has with their addresses, and publishes every dashboard
+  with that panel left as its note. The warning speaks for that panel alone,
+  since it is printed before any store is tried. A `ghchronicle-loki` an
+  earlier run made, which the token may read and may not rewrite, is read as
+  it is, with a warning naming `datasources:write` and `loki_uid`. A sink
+  with a `tenant_id` asks for that rewrite on every start, and so does a
+  datasource whose address was changed by hand, so an Admin run followed by
+  a token scoped down to an Editor met the refusal on every start after it.
+- **A Loki datasource Grafana already has at the sink's address is adopted.**
+  Before making `ghchronicle-loki`, the publisher lists what Grafana has and
+  adopts a Loki datasource at the address it works out from the sink, which
+  needs only `datasources:read` and writes nothing. Never for a sink with a
+  `tenant_id`: the tenant travels in a secret Grafana does not hand back, so
+  a datasource there could be reading another tenant. Store datasources are
+  still made rather than adopted by address, because one InfluxDB, PostgreSQL
+  or Elasticsearch serves many databases under credentials Grafana never
+  shows, and an address does not say which of them a datasource can see. A
+  health probe the token may not make now names `datasources:query` instead
+  of advising `grafana.datasource.url`, a refused store datasource names the
+  permission and `grafana.datasource.uid`, and a warning from a publish on
+  start reaches the journal as a warning.
+- **`-uninstall dashboard` removes `ghchronicle-loki`.** It removed only the
+  datasources named after a store, so the Loki one stayed while the
+  dashboards page said a datasource it created goes. One named in
+  `loki_uid`, and one it adopted, are left, like any datasource it did not
+  make.
+- **The release page carries this file's section for the version** instead
+  of GoReleaser's list of commits. That list filed all ten 2.5.0 commits
+  under "Other", sorted alphabetically, each behind a forty-character SHA,
+  because its groups expected conventional prefixes this repository does not
+  use, and the section written for the release never reached its page. The
+  preflight job now cuts the `## X.Y.Z - YYYY-MM-DD` section out and refuses
+  a tag without one, with an empty one, or with a relative link, written
+  inline, as a reference definition or in an HTML `href` or `src`, which the
+  release page would resolve against `/releases/tag/`. GoReleaser publishes
+  it above the pull lines, the verification commands and the compare link,
+  which is where the commits still are.
+- **The container images are signed, and `latest` waits for the check.** On
+  ghcr.io and on Docker Hub, with cosign, keylessly, by the same release
+  workflow identity as the checksum file, and the release job verifies each
+  image against that identity at its exact tag before it runs it, so an
+  unsigned image now fails the release. GoReleaser pushes only the version
+  tag. `latest`, which every documented `docker run` pulls, is moved onto the
+  same digest by the release job once both checks pass, so a release that
+  fails leaves it on the previous one rather than on an image nobody
+  verified; pushed with the version tag, it moved before the signing. Every
+  image up to 2.5.0 is unsigned.
+  [Verify the image](https://jmrp.io/docs/ghchronicle/install/docker/#verify-the-image)
+  has the command, which needs cosign 3: cosign 2.6.1 finds the signature
+  only with `--new-bundle-format`, cosign 2.5.0 not even then, and the
+  release page's footer now says so too.
+- **The Action takes `version` with or without its v.** `version: 2.5.0` went
+  into the download URL as typed and failed with a 404, while `v2.5.0`
+  worked. Both now install the same release. The major tag `v2` is refused by
+  name before anything is fetched, since it is what `uses:` takes and no
+  binaries hang from it, and a release that does not exist is reported as
+  missing rather than as a gzip error.
+- **`install.ps1` checks the signature too.** It verified the checksum and
+  stopped, while `install.sh` also verifies `checksums.txt` with cosign when
+  cosign is on PATH. It now does the same, with the identity and issuer
+  `install.sh` uses, which a test holds the two scripts to, and both
+  installers say when only the checksum was verified. Neither takes an old
+  or unreachable cosign for a forged file any more. A cosign older than
+  2.4.2 cannot read the bundle every release publishes and fails exactly as
+  it would on a forged file, which `install.sh` reported as "Do not use what
+  was downloaded"; both installers now say that cosign is too old and go on
+  on the checksum, as they do without one. A newer cosign that fails still
+  stops the install, and the refusal now quotes it, so "tuf refresh failed"
+  from a machine that cannot reach Sigstore reads as what it is.
+- **`install.sh` no longer ends with "/dev/tty: No such device or address"**
+  when it runs without a controlling terminal: a CI job, a container build, a
+  provisioning run. The probe's stderr redirection was made after the open it
+  was meant to silence; it now covers the open.
+- **A `go install` build says what it is.** It printed
+  `ghchronicle 2.5.0 (commit unknown, built unknown)`, because a module
+  download carries no checkout and so no commit or date. It now prints the
+  module version the go command fetched and the Go release that compiled it,
+  `ghchronicle 2.5.1 (module v2.5.1, built with go1.27.1)`. Every other
+  build prints the line it printed before, byte for byte.
+- **A Prometheus or OTLP mean is over the items that carried the field.** The
+  count reduction divided every summed field by the number of points in the
+  series, so a field a collector leaves out when it has no honest value
+  counted as a zero there. `steps` on a job GitHub no longer serves steps
+  for, which 2.5.0 stopped writing, and `queued_seconds` on a job with no
+  start time pulled `github_workflow_jobs_steps_mean` and
+  `github_workflow_jobs_queued_seconds_mean` down, as the 2.5.0 entry said,
+  and so did every other field written only when it has a value, the wait
+  for a first human review among them. Averaging over the items that carried
+  the field is what AVG does with a null in the SQL stores. Three
+  fields whose absence is itself the answer are still averaged over every
+  item, so their means stay shares: `merged` on an outside contribution,
+  `advanced` on a fork and `pull_requests` on a workflow run.
+- **A first stargazer walk that fails is walked whole again, and a backfill
+  walks every list whole.** The state file recorded a repository under
+  `first_saw` before its one full walk of the stargazer list, so a first walk
+  a 502 cut short retired the repository all the same: every later sweep read
+  only its newest hundred, through the batch, and the older stars stayed
+  unread for good, because a backfill read a recorded list by page one and
+  the last page too. It is recorded now only once the walk came back without
+  an error, as `history_read` already was, and a backfill walks every
+  stargazer list whole, recorded or not, so running one recovers a repository
+  an earlier release recorded after a walk that failed.
+- **Every HTTP client has a connection pool of its own.** The Grafana client,
+  the uninstall's store calls, the guided setup's probe and the containerised
+  suite's harness sent through `http.DefaultClient`, whose pool a parallel
+  test closing its httptest server empties under a request another test has
+  in flight. The source test that holds every `http.Client` literal to a
+  transport of its own now also refuses `http.DefaultClient` and the
+  `http.Get`, `Head`, `Post` and `PostForm` that send through it, which is
+  how these four went unnoticed.
+- **Two checks of the containerised suite no longer depend on the clock.** The
+  InfluxDB check that a second sweep adds no dated row counted `gh_star_day`
+  whole, and a second sweep after a UTC midnight writes the new day by
+  design; it now counts the days before the first sweep's own. The same
+  midnight also moved the other four tables it counts: each sweep had a fake
+  GitHub of its own on the live clock, so the second one dated every traffic
+  day, run, commit and star in the fixtures a day later, onto timestamps the
+  first never wrote. The second sweep's fake is now frozen at the first
+  sweep's start. The PostgreSQL star-day check loads one sweep and compares
+  exact sets, which a midnight cannot move, and now says so.
+- **The release run ends by linking the Marketplace box.** Listing a
+  release in the Marketplace's version menu takes a tick on its edit page,
+  and no token can give it: GitHub asks for a 2FA confirmation only the web
+  page performs, and the releases API has no parameter for it. 2.5.0 stayed
+  out of the menu until it was ticked by hand, so the last job of the release
+  run now leaves a notice and a line in the run's summary with that page's
+  address.
+- **Two things this file and the site said that were not so.** The 2.4.0
+  entry had `-setup` serving whoever arrived through Homebrew, and there is
+  no Homebrew channel; it now says a tarball. The stars screenshot's
+  description on the panels page described the picture it replaced.
+  `.github/ACTION.md` now also answers why the Marketplace listing offered
+  only `v1`: no setting names a major version, and the listing's version
+  menu is the releases ticked for the Marketplace one by one, which no
+  numbered release had been.
+
+Measured against a throwaway Grafana 13.2.1, with an Editor service account, a
+Prometheus datasource named in `grafana.datasource.uid`, and a Loki sink at an
+address Grafana has no datasource for: 2.5.0 ended with "Permissions needed:
+datasources:create" and exit 1, and this release warned, named the Loki
+datasource Grafana already had and its address, published the dashboard with
+the panel as text, and exited 0. With the sink at the address of that
+datasource it adopted it, the panel read it, and no `ghchronicle-loki` was
+made. A service account with no role is refused `datasources:read` on the list
+and `datasources:query` on the probe, and the run now ends naming the second.
+A new case of the containerised suite mints an Editor on its own Grafana and
+holds the publish to three outcomes: the note, the adoption, and a
+`ghchronicle-loki` an Admin made with a tenant, read as it is. On the same
+Grafana 13.2.1, a `ghchronicle-loki` an Admin token had made, for a sink with
+a `tenant_id` and then again with its address changed by hand in Grafana, was
+read as it was by an Editor: one warning naming `datasources:write`, exit 0,
+and the panel drawing logs from it. With an Editor, a Loki sink and an
+InfluxDB sink but no `grafana.datasource.uid`, the Loki warning is followed by
+the store's refusal and exit 1, and no longer promises every dashboard first.
+
+Measured with GoReleaser 2.18.1, in a full release of the 2.5.0 tree against a
+local registry and a stand-in for the GitHub API: the body posted was the
+2.5.0 section byte for byte above the footer, with no list of commits, and the
+images were signed by digest after the push and before the release was
+created, two signatures per digest while `latest` was still one of
+GoReleaser's tags, which cosign 3.1.3 verifies and cosign 2.6.1 finds only
+with `--new-bundle-format`. Moving `latest` from the version tag with
+`docker buildx imagetools create`, as the release job now does, was measured
+with buildx 0.37.0 against a local registry on a two-platform OCI index carrying
+index annotations, as GoReleaser pushes one: `latest` came out under the same
+digest, which is what lets the version tag's signature cover it.
+`changelog.disable: true`, the tidier-looking setting, published the footer
+and nothing above it, which is why the configuration keeps it false. The
+preflight's cut of the 2.5.0 section matches its lines in this file under mawk
+and gawk, and it refuses a missing section, an empty one and a relative link.
+Under GNU grep 3.11 it refuses a relative inline link, reference definition,
+`href` and `src`, and a bare `#fragment`, which points into this file and not
+at the release page, and it lets through absolute and `mailto:` links and a
+footnote definition. Against the published 2.5.0 release with cosign 3.1.3,
+both installers answered "signature verified with cosign", and both refused a
+copy whose `checksums.txt` had one line added, installing nothing. With cosign
+2.4.0, which exits 1 on that bundle where 2.4.2 verifies it, both installed
+2.5.0 on the checksum and said the cosign was too old to read the signature,
+where `install.sh` had refused it; with cosign 3.1.3 and Sigstore's TUF CDN
+unreachable, `install.sh` refused and quoted "tuf refresh failed". The
+Action's install step, run as written against GitHub, installed 2.5.0 from
+`2.5.0`, `v2.5.0` and `latest`, refused `v2`, and said there is no archive for
+`2.9.9`. `go install` of v2.5.0 through the public proxy printed the unknowns,
+a file proxy serving this tree as v2.5.1 printed the module line, and a
+GoReleaser-stamped build, `make build`, the Dockerfile with and without its
+build arguments and an unstamped build in a checkout print what they printed
+before.
+
+Not verified, and worth saying plainly:
+
+- The keyless signing of an image, and the move of `latest` inside the
+  release job. The first needs the Actions OIDC token, so the local release
+  signed with a key; the first proof of both is this release's own job,
+  which verifies each image before it runs it and checks the digest `latest`
+  lands on.
+- The production Grafana. It was fixed with `loki_uid` before any of this
+  was written, and the warning and the adoption were measured on a throwaway
+  one.
+- A token that may create datasources still makes `ghchronicle-loki` at the
+  sink's push address with the path dropped, which, where the collector
+  pushes to a published port and Grafana reaches Loki on a container network,
+  is an address Grafana may not reach, and nothing asks the Loki datasource
+  whether it answers. `loki_uid` is the answer there.
+- `install.ps1` ran under PowerShell 7.6.6 on Linux, not under Windows
+  PowerShell 5.1, so its handling there of what cosign writes to stderr is
+  reasoned rather than seen.
+- The Marketplace. That ticking the box on a numbered release puts it in the
+  listing's version menu is GitHub's documented behaviour; nobody has ticked
+  one yet.
+- How far the new divisor moves the Prometheus panels that read these means
+  on this account. The unit tests pin the divisor; no exporter was read
+  before and after.
+- A backfill walking a recorded stargazer list whole, against GitHub. A unit
+  test holds it to every page of a five-page list, where it read two; no
+  backfill has run with it, and its cost is one request per hundred stars,
+  the same as a repository's first sweep.
+- The containerised InfluxDB check across a real UTC midnight. It passed with
+  the second sweep's fake frozen, and the dates a frozen fake resolves do not
+  depend on the hour, but no run has straddled one.
 
 ## 2.5.0 - 2026-09-25
 
@@ -190,7 +427,7 @@ Not verified, and worth saying plainly:
 Installing this stopped being a reading exercise.
 
 - **`ghchronicle -setup`**, a guided install that lives in the binary rather
-  than in the install script, so it serves whoever arrived through Homebrew,
+  than in the install script, so it serves whoever arrived through a tarball,
   Docker or a zip on Windows just as well as whoever piped `install.sh` into a
   shell. It asks for a GitHub token, which account to collect, where to keep the
   data, whether to publish the dashboard, and whether to install a service, and

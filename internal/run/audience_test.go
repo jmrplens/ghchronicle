@@ -216,19 +216,22 @@ var historyAnchor = time.Date(2026, 9, 6, 0, 0, 0, 0, time.UTC)
 // starGitHub answers the stars family for every repository of owner o: a
 // daily star history of full pages thirty weeks each and then a short last
 // page of three, one star on the Monday of every week; a stargazer list of
-// one page holding listBody, empty when that is, or the status listStatus;
-// and an audience batch whose connections are empty, or an error when
-// batchFails. failPage is a page of the history that answers failStatus
-// instead, 502 when that is zero, or a spent budget when spent is set; zero
-// for none. Every REST request is counted by path.
+// one page holding listBody, empty when that is, or the status listStatus,
+// or when listPages is set that many pages of one star each, whose page
+// listFailPage answers 502; and an audience batch whose connections are
+// empty, or an error when batchFails. failPage is a page of the history that
+// answers failStatus instead, 502 when that is zero, or a spent budget when
+// spent is set; zero for none. Every REST request is counted by path.
 type starGitHub struct {
-	full       int
-	failPage   int
-	failStatus int
-	spent      bool
-	listStatus int
-	listBody   string
-	batchFails bool
+	full         int
+	failPage     int
+	failStatus   int
+	spent        bool
+	listStatus   int
+	listBody     string
+	listPages    int
+	listFailPage int
+	batchFails   bool
 
 	mu    sync.Mutex
 	asked map[string]int
@@ -247,6 +250,7 @@ func (g *starGitHub) handler(w http.ResponseWriter, req *http.Request) {
 	}
 	full, failPage, failStatus, spent := g.full, g.failPage, g.failStatus, g.spent
 	listStatus, listBody, batchFails := g.listStatus, g.listBody, g.batchFails
+	listPages, listFailPage := g.listPages, g.listFailPage
 	g.mu.Unlock()
 	switch {
 	case req.URL.Path == "/graphql":
@@ -255,6 +259,18 @@ func (g *starGitHub) handler(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 		_, _ = w.Write([]byte(`{"data":{"r0":{"stargazers":{"edges":[]}},"r1":{"stargazers":{"edges":[]}}}}`))
+	case strings.HasSuffix(req.URL.Path, "/stargazers") && listPages > 0:
+		page := 1
+		if p := req.URL.Query().Get("page"); p != "" {
+			page, _ = strconv.Atoi(p)
+		}
+		if page == listFailPage {
+			failHistory(w, http.StatusBadGateway, false)
+			return
+		}
+		w.Header().Set("Link", fmt.Sprintf(`<http://%s%s?per_page=100&page=%d>; rel="last"`,
+			req.Host, req.URL.Path, listPages))
+		_, _ = fmt.Fprintf(w, `[{"starred_at":"2026-08-%02dT10:00:00Z","user":{"login":"u%d"}}]`, page, page)
 	case strings.HasSuffix(req.URL.Path, "/stargazers"):
 		if listStatus != 0 {
 			http.Error(w, `{"message":"`+http.StatusText(listStatus)+`"}`, listStatus)
@@ -640,9 +656,9 @@ func TestAHiddenStargazerListStillHasItsDailyStars(t *testing.T) {
 // and either can fail while the other answers. The rows of the half that
 // answered still reach the sink, and the half that failed still counts the
 // repository as failed and leaves the family unmarked. A list that failed
-// uncounted is the worse loss of the two: FirstSight has recorded the
-// repository before the walk, so no later sweep walks that list whole again,
-// and without the count nothing would say it was cut short.
+// uncounted is the worse loss of the two: the family would be marked as run,
+// so the walk that is still owed waits a whole cadence for its next try, and
+// nothing would say it was cut short.
 func TestAFirstSightKeepsWhicheverHalfAnswered(t *testing.T) {
 	t.Parallel()
 	oneStar := `[{"starred_at":"2026-08-01T10:00:00Z","user":{"login":"u"}}]`
@@ -676,6 +692,93 @@ func TestAFirstSightKeepsWhicheverHalfAnswered(t *testing.T) {
 	}
 }
 
+// TestAStargazerWalkCutShortIsWalkedWholeAgain: the first sweep to see a
+// repository walks its whole stargazer list, and a 502 part way through
+// leaves the repository unrecorded, so the next sweep walks every page again
+// instead of handing the repository to the batch, which reads only the newest
+// hundred and would leave the older stars unread until somebody ran a
+// backfill, the one other thing that walks a list whole. Once a walk came back
+// whole the repository is recorded, and the sweep after that reads no list at
+// all.
+func TestAStargazerWalkCutShortIsWalkedWholeAgain(t *testing.T) {
+	t.Parallel()
+	g := &starGitHub{full: 0, listPages: 3, listFailPage: 2}
+	r, store := starsRunner(t, g)
+	r.repos = r.repos[:1]
+	if err := r.repoFamilies(t.Context(), time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if _, lists := g.historyRequests(); lists != 2 {
+		t.Fatalf("the first sweep asked %d pages of the list, want page one and the page that failed", lists)
+	}
+	if !r.State.FirstSight("o/a") {
+		t.Error("a walk a 502 cut short recorded the repository as walked whole")
+	}
+	if row := r.health.runs["stars"]; row == nil || row.Failed != 1 {
+		t.Errorf("the family row = %+v, want the repository counted as failed", row)
+	}
+	if _, marked := r.State.LastRun["stars"]; marked {
+		t.Error("a family whose one repository failed was marked as run")
+	}
+
+	g.mu.Lock()
+	g.listFailPage = 0
+	g.mu.Unlock()
+	g.forget()
+	due(r)
+	before := store.measured("gh_star")
+	if err := r.repoFamilies(t.Context(), time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	// Three, and not the two an ordinary read of page one and the last page
+	// would also come to, is what says the walk was whole.
+	if _, lists := g.historyRequests(); lists != 3 {
+		t.Errorf("the next sweep asked %d pages of the list, want all three", lists)
+	}
+	if n := store.measured("gh_star") - before; n != 3 {
+		t.Errorf("the next sweep sent %d gh_star rows, want one for each page", n)
+	}
+	if r.State.FirstSight("o/a") {
+		t.Error("the walk that came back whole was not recorded")
+	}
+
+	g.forget()
+	due(r)
+	if err := r.repoFamilies(t.Context(), time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if _, lists := g.historyRequests(); lists != 0 {
+		t.Errorf("the sweep after the whole walk asked %d pages of the list, which the batch serves now", lists)
+	}
+}
+
+// TestABackfillWalksARecordedStargazerListWhole. A repository 2.5.0 recorded
+// after a first walk that failed had its older stars unread, and a backfill,
+// which read a recorded list by page one and the last, never reached them.
+// Running one is what the release notes tell such a reader to do, so it has to
+// read every page, and leaves the record as it was.
+func TestABackfillWalksARecordedStargazerListWhole(t *testing.T) {
+	t.Parallel()
+	g := &starGitHub{full: 0, listPages: 5}
+	r, store := starsRunner(t, g)
+	r.repos = r.repos[:1]
+	seen := time.Now().AddDate(0, -1, 0)
+	r.State.MarkSeen("o/a", seen)
+	r.Backfill = true
+	if err := r.repoFamilies(t.Context(), time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if _, lists := g.historyRequests(); lists != 5 {
+		t.Errorf("the backfill of a recorded repository asked %d pages of its list, want all five", lists)
+	}
+	if n := store.measured("gh_star"); n != 5 {
+		t.Errorf("the backfill sent %d gh_star rows, want one for each page", n)
+	}
+	if got := r.State.FirstSaw["o/a"]; !got.Equal(seen) {
+		t.Errorf("first_saw moved from %v to %v; the backfill has nothing to record", seen, got)
+	}
+}
+
 // TestAFailedBatchAndAFailedHistoryCountARepositoryOnce: when the batch fails
 // it has already counted every repository it served, and the history of one
 // of them failing as well must not count that repository again. Counted
@@ -684,7 +787,7 @@ func TestAFirstSightKeepsWhicheverHalfAnswered(t *testing.T) {
 //
 // A repository seen for the first time in the same sweep is the other side of
 // that line: the batch never served it, so its failed history is the only
-// count it gets. Whether a repository was served is asked before FirstSight
+// count it gets. Whether a repository was served is asked before MarkSeen
 // records it; asked after, the new one reads as served, goes uncounted, and a
 // family whose batch and every history failed is marked as run.
 func TestAFailedBatchAndAFailedHistoryCountARepositoryOnce(t *testing.T) {

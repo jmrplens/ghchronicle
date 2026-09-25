@@ -207,6 +207,9 @@ más viejas en vez de perder el envío entero. Sube `max_age` solo junto al prop
 puede crear datasources. Un Editor puede lo primero y no lo segundo, así que
 dale ese permiso a la cuenta de servicio, hazla Admin, o deja que adopte un
 datasource creado por ti nombrándolo en `grafana.datasource.uid`, que solo lee.
+Corregir un datasource que ya está pide `datasources:write` en su lugar, con
+las mismas salidas. Eso detiene la ejecución para el datasource del almacén,
+que leen todos los paneles. Para el de Loki es solo un aviso, más abajo.
 
 **`datasource ... does not answer: connection refused`.** Grafana llegó a la
 dirección y no había nadie escuchando, que casi siempre significa que la
@@ -216,6 +219,12 @@ mismo almacén por su nombre en la red de contenedores, y `127.0.0.1` allí es e
 contenedor. Pon en `grafana.datasource.url` la dirección que usaría Grafana. La
 ejecución se niega en vez de publicar, porque un dashboard contra un datasource
 inalcanzable no dibuja nada y no dice por qué.
+
+**`asking datasource ... whether it answers: ... datasources:query`.** El token
+no puede consultar el datasource, que no es lo mismo que un datasource que no
+llega a su almacén, y la dirección no es lo que hay que cambiar. Medido en
+Grafana 13, una cuenta de servicio sin rol recibe esto y un Editor no, así que
+dale el rol de Editor.
 
 **`Invalid API key`.** El token llegó a Grafana como los caracteres
 `${GRAFANA_TOKEN}` y no como un token, lo que significa que la variable no está
@@ -249,11 +258,45 @@ cinco almacenes y el sink que tienes no es uno de ellos. Un sink que reenvía no
 tiene dashboard propio porque el dashboard pertenece al destino, y `file`,
 `stdout` y `loki` no son almacenes de métricas.
 
+**`warning: the Loki datasource ghchronicle-loki could not be set up`.** El
+token no puede crear el datasource de Loki del que lee el panel de la salida del
+trabajo fallido, y la línea nombra el permiso que le falta: `datasources:create`
+para un Editor, porque el datasource aún no está. Nada más espera por él: ese
+único panel queda como la nota que llevan los ficheros exportados, y los
+dashboards se publican siempre que se pueda el datasource del propio almacén.
+Nombra en `grafana.datasource.loki_uid` un datasource de Loki que Grafana ya
+tenga, o concede el permiso. La línea enumera los datasources de Loki que tiene Grafana,
+con sus direcciones, porque el que hay que nombrar suele estar ya ahí bajo una
+dirección a la que el colector no envía, como el nombre de Loki en la red de
+contenedores de Grafana. La 2.4.0 y la 2.5.0 detenían aquí toda la
+publicación, con `the Loki datasource: writing datasource ghchronicle-loki`, y
+`loki_uid` también lo arregla en ellas.
+
+**`warning: the Loki datasource ghchronicle-loki is used as Grafana has it`.**
+Lo creó una ejecución anterior con un token que podía escribir datasources, y
+este token no puede reescribirlo: la línea nombra `datasources:write`. Un sink
+con `tenant_id` pide esa reescritura en cada arranque, porque el tenant es un
+secreto que Grafana nunca devuelve para comparar, y también la pide un
+datasource cuya dirección se cambió a mano. El panel lo lee tal cual, así que
+no se pierde nada salvo que el sink se haya movido desde entonces. Concede al
+token `datasources:write` para mantener su dirección y su tenant al día con el
+sink, o pon `grafana.datasource.loki_uid` en `ghchronicle-loki` para leerlo
+sin intentarlo.
+
+**`datasource ... (loki) adopted`.** Grafana ya tenía un datasource de Loki en
+la dirección de la que sale el extremo de envío del sink, así que el panel lee
+ese y no se creó un segundo. Adoptar solo lee, así que un token que no puede
+crear datasources llega hasta aquí. Un sink con `tenant_id` nunca se empareja
+así: el tenant viaja en un secreto que Grafana nunca devuelve, así que nada
+puede saber si el datasource de esa dirección lee el mismo tenant, y se crea
+uno.
+
 **El panel de la salida del trabajo fallido sigue siendo una nota.** Ese panel
 pasa a ser las líneas cuando hay un sink de Loki cuya dirección termina en
 `/loki/api/v1/push`, que es lo que dice dónde está el extremo de consulta. Un
 sink que escriba en otro sitio lo dice y deja el panel como está; nombra un
-datasource de Loki en `grafana.datasource.loki_uid`.
+datasource de Loki en `grafana.datasource.loki_uid`. Un token que no puede
+crear el datasource también lo deja así, con el aviso de arriba.
 
 **No se publicó nada y no falló nada.** `publish_on_start` está apagado salvo
 que lo enciendas, y se salta en `-once`, `-backfill` y `-card`, porque

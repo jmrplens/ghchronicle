@@ -2,6 +2,7 @@ package grafana
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -70,6 +71,26 @@ func TestHealthTellsTheThreeAnswersApart(t *testing.T) {
 				t.Errorf("message = %q, want it to carry %q", message, tc.says)
 			}
 		})
+	}
+}
+
+// TestAHealthCheckTheTokenMayNotMakeIsARefusal, not a datasource that cannot
+// reach its store: that answer sends the reader to change an address that was
+// right all along.
+func TestAHealthCheckTheTokenMayNotMakeIsARefusal(t *testing.T) {
+	t.Parallel()
+	a := &answering{reply: func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = io.WriteString(w, `{"message":"You'll need additional permissions to perform `+
+			`this action. Permissions needed: datasources:query"}`)
+	}}
+	ok, _, err := a.serve(t).DatasourceHealth(t.Context(), "uid", 5*time.Second)
+	refused, isRefused := errors.AsType[*RefusedError](err)
+	if ok || !isRefused {
+		t.Fatalf("ok = %v, err = %v, want a refusal", ok, err)
+	}
+	if refused.Permission != "datasources:query" {
+		t.Errorf("permission = %q, want datasources:query", refused.Permission)
 	}
 }
 
@@ -155,7 +176,8 @@ func TestPublishDashboardReportsWhatGrafanaRefused(t *testing.T) {
 func TestOutcomeReadsAsALogLineWants(t *testing.T) {
 	t.Parallel()
 	for outcome, want := range map[Outcome]string{
-		Created: "created", Updated: "updated", Unchanged: "unchanged", Outcome(9): "unchanged",
+		Created: "created", Updated: "updated", Unchanged: "unchanged", Adopted: "adopted",
+		Outcome(9): "unchanged",
 	} {
 		if got := outcome.String(); got != want {
 			t.Errorf("Outcome(%d) = %q, want %q", outcome, got, want)

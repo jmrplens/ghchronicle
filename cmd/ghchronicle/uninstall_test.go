@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -150,6 +151,40 @@ func TestAnAdoptedDatasourceSurvivesAnUninstall(t *testing.T) {
 	}
 	if len(s.deleted) != 1 {
 		t.Errorf("deleted = %v, want the dashboard alone", s.deleted)
+	}
+}
+
+// TestTheLokiDatasourceItMadeGoesToo. It is made under a uid of its own rather
+// than a store's, which is how every uninstall up to 2.5.0 left it behind while
+// the table on the dashboards page said a datasource it created goes.
+func TestTheLokiDatasourceItMadeGoesToo(t *testing.T) {
+	t.Parallel()
+	s := &teardownStub{}
+	cfg := teardownConfig(t, s.serve(t))
+	cfg.Sinks.Loki = &config.LokiSink{URL: "http://loki:3100/loki/api/v1/push"}
+	var said strings.Builder
+	if err := uninstall(t.Context(), cfg, "dashboard", true, &said); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(s.deleted, "/api/datasources/uid/ghchronicle-loki") {
+		t.Errorf("deleted = %v, want the Loki datasource among them", s.deleted)
+	}
+}
+
+// TestALokiDatasourceItWasGivenStays, even when somebody gave theirs the name
+// this would have made: named in loki_uid, it was only ever read.
+func TestALokiDatasourceItWasGivenStays(t *testing.T) {
+	t.Parallel()
+	s := &teardownStub{}
+	cfg := teardownConfig(t, s.serve(t))
+	cfg.Sinks.Loki = &config.LokiSink{URL: "http://loki:3100/loki/api/v1/push"}
+	cfg.Grafana.Datasource.LokiUID = "ghchronicle-loki"
+	var said strings.Builder
+	if err := uninstall(t.Context(), cfg, "dashboard", true, &said); err != nil {
+		t.Fatal(err)
+	}
+	if slices.Contains(s.deleted, "/api/datasources/uid/ghchronicle-loki") {
+		t.Errorf("deleted = %v, and the Loki datasource was one it had only read", s.deleted)
 	}
 }
 

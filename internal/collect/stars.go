@@ -26,15 +26,19 @@ import (
 // counted per day by gh_star_day and nobody named.
 //
 // This walk is the history, not the day to day. A repository is read whole the
-// first time it is seen, and again in a backfill; after that an ordinary sweep
-// never comes here, because the newest hundred stars of every repository
+// first time it is seen, and again in every backfill; otherwise an ordinary
+// sweep never comes here, because the newest hundred stars of every repository
 // already walked ride in one GraphQL query per ten repositories. The batch is
-// in internal/run/audience.go, and internal/run/runner.go decides which of the
-// two a repository gets. Full off, which only a backfill of a repository
-// already walked produces, reads the last page alone, where new stars land.
+// in internal/run/audience.go, which also decides which of the two a
+// repository gets.
+//
+// Full off reads page one and the last page alone, where new stars land. It
+// was what a backfill of a repository already walked got, and it missed every
+// page in between, so since 2.5.1 nothing in the runner asks for it. It is
+// left in place, with its tests, rather than taken out in a patch release.
 type Stargazers struct {
 	// Full forces a complete walk. The runner sets it on first sight of a
-	// repository and then leaves it off.
+	// repository and in every backfill.
 	Full bool
 }
 

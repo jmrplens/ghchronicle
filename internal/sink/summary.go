@@ -2,6 +2,7 @@ package sink
 
 import (
 	"maps"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -25,7 +26,9 @@ import (
 //     "views over GitHub's 14-day window" a single number.
 //   - count: dated items. The points become a count plus the mean of each of
 //     their numeric fields, so "how many pull requests merged and how long they
-//     took" survives as two gauges instead of four hundred series.
+//     took" survives as two gauges instead of four hundred series. Each mean is
+//     over the points that carried the field, not over the whole series: see
+//     reduced.
 //   - skip: history that has no honest current value at all.
 //
 // Anything not named here is skipped rather than guessed at, so a new collector
@@ -61,6 +64,16 @@ type rule struct {
 	// by the past, so the same value can be a label without a row ever
 	// doubling, and it has to be one for "alerts by state" to exist at all.
 	labels []string
+	// absentIsZero lists the fields whose absence is itself an answer, no or
+	// none, rather than a value nobody knows. Every other field is averaged
+	// over the points that carried it, which would make the mean of a marker
+	// written only on a merge 1.0 wherever anything merged; these are
+	// averaged over every point in the series, which is what makes that mean
+	// the share merged. gh_external_contribution's `merged` is that marker,
+	// and gh_fork writes `advanced` only beside a push date, which a fork
+	// never pushed to does not have; the dashboards read the mean of each as
+	// a share of every contribution and of every fork.
+	absentIsZero []string
 }
 
 // The three tags that name a repository travel together wherever a rule keeps
@@ -134,6 +147,9 @@ var promRules = map[string]rule{
 	"gh_workflow_run": {
 		mode: count, as: "gh_workflow_runs",
 		keep: []string{"repo", "workflow", "conclusion"},
+		// A run lists the pull requests it ran for only when there are
+		// any, so a run without the field ran for none.
+		absentIsZero: []string{"pull_requests"},
 	},
 	"gh_workflow_job": {
 		mode: count, as: "gh_workflow_jobs",
@@ -203,9 +219,9 @@ var promRules = map[string]rule{
 	"gh_commit":                 {mode: count, as: "gh_commits", keep: []string{"repo", "author", "signature"}, labels: []string{"gate"}},
 	"gh_repo_activity":          {mode: count, as: "gh_repo_activities", keep: []string{"repo", "activity"}},
 	"gh_code_scanning_analysis": {mode: count, as: "gh_code_scanning_analyses", keep: []string{"repo", "tool"}},
-	"gh_fork":                   {mode: count, as: "gh_forks_seen", keep: []string{"repo"}},
+	"gh_fork":                   {mode: count, as: "gh_forks_seen", keep: []string{"repo"}, absentIsZero: []string{"advanced"}},
 	"gh_star_given":             {mode: count, as: "gh_stars_given", keep: []string{"user"}},
-	"gh_external_contribution":  {mode: count, as: "gh_external_contributions", keep: []string{"user", "owner", "repo", "full_name"}},
+	"gh_external_contribution":  {mode: count, as: "gh_external_contributions", keep: []string{"user", "owner", "repo", "full_name"}, absentIsZero: []string{"merged"}},
 	"gh_dependabot_alert_item":  {mode: count, as: "gh_dependabot_alerts", keep: []string{"repo", "severity"}, labels: []string{"alert_state"}},
 	"gh_label":                  {mode: keepLast, keep: []string{"repo", "label"}},
 	"gh_milestone":              {mode: keepLast, keep: []string{"repo", "milestone", "state"}},
@@ -363,6 +379,11 @@ type acc struct {
 	total       int
 	newest      time.Time
 	last        map[string]any
+	// carried is, per field, how many of the n points had a number for it,
+	// which is what a mean divides by; absentIsZero is the rule's list of
+	// the fields that divide by n instead.
+	carried      map[string]int
+	absentIsZero []string
 }
 
 // Reducer turns batches of dated points into current-state gauges, and
@@ -424,14 +445,17 @@ type series struct {
 
 // at returns the accumulator for one reduced series, creating it on the first
 // point that lands in it.
-func (s *series) at(key, name string, mode reduce, tags map[string]string) *acc {
+func (s *series) at(key, name string, r rule, tags map[string]string) *acc {
 	if a, seen := s.byKey[key]; seen {
 		return a
 	}
 	if s.byKey == nil {
 		s.byKey = map[string]*acc{}
 	}
-	a := &acc{measurement: name, mode: mode, tags: tags, fields: map[string]float64{}}
+	a := &acc{
+		measurement: name, mode: r.mode, tags: tags,
+		fields: map[string]float64{}, carried: map[string]int{}, absentIsZero: r.absentIsZero,
+	}
 	s.byKey[key] = a
 	s.order = append(s.order, key)
 	return a
@@ -453,7 +477,7 @@ func (rd *Reducer) fold(s *series, p Point) bool {
 	promote(tags, p.Fields, r.labels)
 	key := name + "|" + tagKey(tags)
 
-	a := s.at(key, name, r.mode, tags)
+	a := s.at(key, name, r, tags)
 	a.n++
 	switch r.mode {
 	case keepLast:
@@ -534,12 +558,14 @@ func (rd *Reducer) countDistinct(key string, p Point) int {
 	return rd.totals[key]
 }
 
-// addNumbers adds every numeric field into the running total. A string field
-// has no total, so it is passed over rather than coerced.
+// addNumbers adds every numeric field into the running total, and counts the
+// point as one that carried it. A string field has no total, so it is passed
+// over rather than coerced.
 func (a *acc) addNumbers(fields map[string]any) {
 	for f, v := range fields {
 		if n, ok := numeric(v); ok {
 			a.fields[f] += n
+			a.carried[f]++
 		}
 	}
 }
@@ -570,13 +596,25 @@ func (a *acc) reduced() map[string]any {
 		// The count itself, then the mean of each number the items carried.
 		// A sum of "seconds to merge" would be meaningless; the average is
 		// the thing a maintainer reads.
+		//
+		// Over the items that carried the number, not over the count. A
+		// collector leaves a field out when it has no honest value: a job
+		// with no start time has no queue time, and one GitHub stopped
+		// serving steps for has no step count. Dividing by the count read
+		// every such item as a zero, so a series of jobs half of which had
+		// lost their steps published half their mean number of steps. It is
+		// also what AVG does with a null in the SQL stores.
 		fields["count"] = a.n
 		fields["total"] = a.total
 		for f, total := range a.fields {
 			if notAveraged[f] {
 				continue // a marker or an identifier: see notAveraged
 			}
-			fields[f+"_mean"] = total / float64(a.n)
+			over := a.carried[f]
+			if slices.Contains(a.absentIsZero, f) {
+				over = a.n
+			}
+			fields[f+"_mean"] = total / float64(over)
 		}
 	default:
 		for f, total := range a.fields {

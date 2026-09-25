@@ -155,6 +155,16 @@ func dashboardRemovals(ctx context.Context, cfg *config.Config) ([]removal, erro
 			found = append(found, *item)
 		}
 	}
+	// The Loki datasource is made under a uid of its own rather than a
+	// store's, so the loop above never reaches it. Only this makes that uid:
+	// one adopted from Grafana keeps the uid it had and is not looked for,
+	// and one named in loki_uid is somebody else's even under this name.
+	if cfg.Sinks.Loki != nil && cfg.Grafana.Datasource.LokiUID != lokiDatasourceUID {
+		if item := existing(ctx, client, "datasource",
+			grafana.DatasourcePath(lokiDatasourceUID), lokiDatasourceUID); item != nil {
+			found = append(found, *item)
+		}
+	}
 	return found, nil
 }
 

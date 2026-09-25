@@ -39,7 +39,7 @@ func (r *Runner) audience(ctx context.Context, family string, now time.Time) ([]
 // anyone who can read the repository, and it costs one request a sweep, most
 // of them a 304 that GitHub does not charge.
 func (r *Runner) audienceWalk(ctx context.Context, family string, repo collect.Repo, now time.Time) ([]sink.Point, error) {
-	// Asked once, before the walk: FirstSight below changes the answer.
+	// Asked once, before the walk: MarkSeen below changes the answer.
 	rest := r.walksInREST(family, repo)
 	if family == "forks" {
 		if !rest {
@@ -50,10 +50,23 @@ func (r *Runner) audienceWalk(ctx context.Context, family string, repo collect.R
 	var list []sink.Point
 	var listErr error
 	if rest {
-		// The full paginated walk happens the first time a repository is seen
-		// and never again: after that only the last page can have changed.
-		full := r.State.FirstSight(repo.FullName, now)
-		list, listErr = collect.Stargazers{Full: full}.Collect(ctx, r.API, repo, now)
+		// The full paginated walk happens the first time a repository is seen,
+		// and in a backfill; an ordinary sweep of a repository already walked
+		// reads the newest hundred through the batch instead. Recorded only
+		// once the walk returned no error, so one that failed part way is
+		// walked whole again by the next sweep, as starHistory does for the
+		// history.
+		//
+		// A backfill walks a recorded repository whole as well. Before 2.5.1 a
+		// first walk that failed recorded the repository all the same, and a
+		// backfill read its list by page one and the last, so nothing ever
+		// reached the stars in between; walking every list whole is what a
+		// backfill is asked for, and the only way to get those back.
+		full := r.State.FirstSight(repo.FullName)
+		list, listErr = collect.Stargazers{Full: full || r.Backfill}.Collect(ctx, r.API, repo, now)
+		if full && listErr == nil {
+			r.State.MarkSeen(repo.FullName, now)
+		}
 	}
 	history, historyErr := r.starHistory(ctx, repo, now)
 	if historyErr != nil && !rest && r.batchFailed(family) && !rateLimited(historyErr) {
@@ -114,8 +127,10 @@ func rateLimited(err error) bool {
 
 // walksInREST reports whether this sweep reads a repository's star or fork
 // list page by page through REST rather than in the batch, which only serves
-// the newest hundred: a backfill always; for stars, a repository never seen
-// before, whose whole history is read once; for forks, the first sweep of a
+// the newest hundred: a backfill always, and for stars a backfill reads every
+// page of every list, recorded or not; for stars, a repository whose full
+// walk of the list has not come back yet, which is read whole once, and again
+// after a first walk that failed; for forks, the first sweep of a
 // fresh install, which is the one time a repository with more than a hundred
 // forks has rows the batch would never reach, and any repository the batch
 // of this sweep found holding more than that hundred, whose older forks the
@@ -126,8 +141,7 @@ func (r *Runner) walksInREST(family string, repo collect.Repo) bool {
 	}
 	switch family {
 	case "stars":
-		_, seen := r.State.FirstSaw[repo.FullName]
-		return !seen
+		return r.State.FirstSight(repo.FullName)
 	case "forks":
 		_, ran := r.State.LastRun[family]
 		return !ran || r.forkOverflow[repo.FullName]

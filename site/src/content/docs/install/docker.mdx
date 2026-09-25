@@ -50,6 +50,44 @@ Two consequences worth knowing before you debug it:
 - `docker exec ... sh` does not work. There is no `sh`. Read the logs instead.
 - Anything the container writes must be owned by, or writable by, uid 65532.
 
+## Verify the image
+
+Every released image from 2.5.1 on, which is every image a release page names,
+is signed with cosign, keylessly and by the same identity as the checksum file
+the other installs check: this repository's release workflow, run for a release
+tag, recorded in a public transparency log. With
+[cosign](https://docs.sigstore.dev/cosign/system_config/installation/) 3:
+
+```sh
+cosign verify \
+  --certificate-identity-regexp 'https://github.com/jmrplens/ghchronicle/.github/workflows/release.yml@refs/tags/.*' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  ghcr.io/jmrplens/ghchronicle:v__VERSION__ > /dev/null
+```
+
+```text
+Verification for ghcr.io/jmrplens/ghchronicle:v__VERSION__ --
+The following checks were performed on each of these signatures:
+  - The cosign claims were validated
+  - Existence of the claims in the transparency log was verified offline
+  - The code-signing certificate was verified using trusted certificate authority certificates
+```
+
+The Docker Hub copy, `docker.io/jmrplens/ghchronicle`, verifies with the same
+command. What cosign checks is a digest, not the tag: without `> /dev/null` it
+also prints, as JSON, the digest it verified (`docker-manifest-digest`), and an
+image pulled as `ghcr.io/jmrplens/ghchronicle@sha256:...` is the one verified
+however a tag moves afterwards. `latest` is moved onto a release's digest last,
+once the release workflow has verified that digest's signature and run the
+image on both architectures, so it never names an image that was not checked;
+a release that fails before then leaves it on the previous one.
+
+Use cosign 3. The signatures are in the bundle format it writes, and an older
+cosign answers `no signatures found` for these images: measured, cosign 2.6.1
+finds the signature only when given `--new-bundle-format`, 2.5.0 does not find
+it even then, and 2.4.2 does not know the flag. Images up to 2.5.0 carry no
+signature at all, so for them that answer is the true one.
+
 ## What has to be writable
 
 The config file is mounted read-only. Four things are not:

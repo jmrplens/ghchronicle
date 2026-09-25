@@ -8,7 +8,9 @@
   checksum file, and refuse to install anything whose SHA-256 is not the one
   the release published. There is no switch to skip that. A script piped into
   a shell is the least inspectable way to install anything, so the one thing it
-  must not do is trust what it just downloaded.
+  must not do is trust what it just downloaded. When cosign 2.4.2 or newer is
+  on PATH it also verifies that the checksum file came from the release
+  workflow, and refuses when cosign does not confirm it.
 
   Written for Windows PowerShell 5.1 as well as PowerShell 7, because 5.1 is
   the one already on the machine: no null-coalescing, no ternaries, no
@@ -44,6 +46,16 @@ $DownloadBase = $env:GHCHRONICLE_DOWNLOAD_BASE
 if (-not $DownloadBase) { $DownloadBase = "https://github.com/$Repo/releases/download" }
 $LatestUrl = $env:GHCHRONICLE_LATEST_URL
 if (-not $LatestUrl) { $LatestUrl = "https://api.github.com/repos/$Repo/releases/latest" }
+
+# The workflow that signs a release, as the certificate records it. The same
+# two values install.sh passes, so the two installers accept exactly the same
+# signer; a test holds them to each other.
+$CosignIdentity = '^https://github\.com/jmrplens/ghchronicle/\.github/workflows/release\.yml@refs/tags/v'
+$CosignIssuer = 'https://token.actions.githubusercontent.com'
+
+# The oldest cosign that reads the bundle every release publishes. install.sh
+# names the same one and says how it was found.
+$CosignMinimum = [version]'2.4.2'
 
 # 5.1 on Windows Server 2016 and older Windows 10 negotiates TLS 1.0 by
 # default, which github.com has not accepted for years: without this the first
@@ -102,6 +114,64 @@ function Assert-Checksum {
   if ($actual.ToLowerInvariant() -ne $wanted.ToLowerInvariant()) {
     throw "$Archive does not match the checksum the release published. Do not use it."
   }
+}
+
+# Assert-Signature runs only when cosign is already here, as install.sh's
+# verify_signature does. The checksum above is what every install is held to;
+# this answers the further question of whether the checksum file itself came
+# from the release workflow, and it is worth doing when the tool is at hand
+# rather than worth installing a tool for. Each way of not asking is said, in
+# install.sh's words, so the checksum line is never taken for the whole check.
+# A cosign too old to read the bundle is one of those ways, and a newer one
+# that fails is refused with what it said, for install.sh's reasons.
+function Assert-Signature {
+  param([string]$Directory, [string]$Release)
+  $cosign = Get-Command cosign -CommandType Application -ErrorAction SilentlyContinue |
+    Select-Object -First 1
+  if (-not $cosign) {
+    Write-Step 'note: cosign is not on PATH, so only the checksum was verified'
+    return
+  }
+  $bundle = Join-Path $Directory 'checksums.txt.sigstore.json'
+  try {
+    Invoke-WebRequest -Uri "$DownloadBase/v$Release/checksums.txt.sigstore.json" `
+      -OutFile $bundle -UseBasicParsing
+  } catch {
+    Write-Step 'note: this release publishes no signature bundle, so only the checksum was verified'
+    return
+  }
+  $have = Get-CosignVersion -Cosign $cosign.Source
+  if ($have -and $have -lt $CosignMinimum) {
+    Write-Step "note: cosign $have cannot read this release's signature bundle ($CosignMinimum or newer can), so only the checksum was verified"
+    return
+  }
+  # Continue for the rest of this function only. Windows PowerShell 5.1 turns
+  # each line a native program writes to a redirected stderr into an error
+  # record, and under Stop the first one throws; cosign reports success on
+  # stderr, so a signature that verified would fail the install. The exit
+  # status is the answer. Each record is turned back into the line it came
+  # from, so a refusal quotes cosign rather than PowerShell's wrapping of it.
+  $ErrorActionPreference = 'Continue'
+  $said = (& $cosign.Source verify-blob `
+    --bundle $bundle `
+    --certificate-identity-regexp $CosignIdentity `
+    --certificate-oidc-issuer $CosignIssuer `
+    (Join-Path $Directory 'checksums.txt') 2>&1 | ForEach-Object { "$_" }) -join "`n"
+  if ($LASTEXITCODE -ne 0) {
+    throw "cosign did not confirm that checksums.txt came from the release workflow, so nothing was installed. What cosign said:`n$said"
+  }
+  Write-Step 'signature verified with cosign'
+}
+
+# Get-CosignVersion is the version the cosign at this path reports, or $null
+# when it reports none as X.Y.Z; a build from source says "devel", and is then
+# taken to be new enough, as install.sh takes it.
+function Get-CosignVersion {
+  param([string]$Cosign)
+  $ErrorActionPreference = 'Continue'
+  $text = (& $Cosign version 2>$null | ForEach-Object { "$_" }) -join "`n"
+  if ($text -match '(?m)^GitVersion:\s*v?(\d+\.\d+\.\d+)') { return [version]$Matches[1] }
+  return $null
 }
 
 function Get-TargetDirectory {
@@ -190,6 +260,7 @@ function Install-GhChronicle {
 
     Assert-Checksum -Directory $work -Archive $archive
     Write-Step 'checksum verified'
+    Assert-Signature -Directory $work -Release $Version
 
     Expand-Archive -LiteralPath (Join-Path $work $archive) -DestinationPath (Join-Path $work 'x') -Force
     $exe = Join-Path (Join-Path $work 'x') "$Binary.exe"

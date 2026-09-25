@@ -59,6 +59,18 @@ Antes de servir, `Summarize` reduce cada medida según una regla.
 Una medida sin regla se salta, así que un colector nuevo no puede inundar en
 silencio el exportador con una serie por estrella.
 
+Cada media es sobre los elementos que traían el campo, no sobre el recuento. Un
+colector omite un campo cuando no tiene un valor honesto para él: un job sin
+hora de inicio no tiene `queued_seconds`, y un job del que GitHub ya no lista
+los pasos no tiene `steps`. Contados como ceros, una pasada en la que la mitad
+de los jobs hubiera perdido sus pasos dejaría `github_workflow_jobs_steps_mean`
+en la mitad. Tres campos son la excepción, porque omitirlos ya es la respuesta:
+`merged` en una contribución externa solo se escribe al fusionarse, `advanced`
+en un fork solo cuando tiene fecha de push, y `pull_requests` en una ejecución
+solo cuando se lanzó por alguno. Cada uno de ellos se promedia sobre todos los
+elementos, así que la media de `merged` es la proporción de contribuciones
+fusionadas y no 1.
+
 El reductor publica además `total`, un recuento acumulado de elementos
 distintos por serie. Eso es lo que permite que un dashboard de Prometheus diga
 "por día" mediante `increase()`, ya que no tiene filas que contar.

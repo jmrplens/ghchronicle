@@ -123,8 +123,12 @@ panel, "Where failure output went", with that query. Publishing the dashboard
 from the collector swaps that panel for the lines, newest first, filtered by
 the dashboard's repository variable where the store's variable can be read as
 a regular expression. A Loki sink whose address ends in `/loki/api/v1/push` is
-enough: the datasource is made from it. One writing anywhere else says so and
-takes a `grafana.datasource.loki_uid` instead.
+enough: a Loki datasource Grafana already has at that address, with the path
+dropped, is adopted, and otherwise the datasource is made from it. One writing
+anywhere else says so and takes a `grafana.datasource.loki_uid` instead, and so
+does a Grafana that reaches Loki by another address. A token that may not make
+the datasource costs this panel and nothing else: the run warns once and
+publishes every dashboard with the note.
 
 ## Where to go next
 

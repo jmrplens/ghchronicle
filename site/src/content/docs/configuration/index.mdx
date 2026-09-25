@@ -97,8 +97,9 @@ Seven things, and deleting the file costs a different one for each:
 
 - `last_run`, when each family last ran. Without it every family is due at once,
   so the next sweep is a full one.
-- `first_saw`, when each repository was first seen. Without it the one-off full
-  walk of the stargazer list is done again.
+- `first_saw`, when each repository's stargazer list was first walked whole.
+  It is written only after a walk that came back without an error. Without it
+  the one-off full walk of the stargazer list is done again.
 - `history_read`, when each repository's daily star history was last read
   whole. It is written only after a walk that reached the end of the history,
   not after one an error or a later page's 403 or 404 cut short. Without
