@@ -205,6 +205,24 @@ export default defineConfig({
 						content: "https://jmrplens.github.io/ghchronicle/og.png",
 					},
 				},
+				// Ownership proofs for Google Search Console and Bing Webmaster
+				// Tools, for the https://jmrplens.github.io/ghchronicle/ property.
+				// Both read them from the property's home page and re-check them
+				// later, so they stay. Public by design: neither is a credential.
+				{
+					tag: "meta",
+					attrs: {
+						name: "google-site-verification",
+						content: "4Hx_PJ1seU_BgKfWpo_FA7_Hkh7GeYVNrvnvzqCjF0Q",
+					},
+				},
+				{
+					tag: "meta",
+					attrs: {
+						name: "msvalidate.01",
+						content: "7574EB3B44624C239F14920DBC34EE25",
+					},
+				},
 				{
 					tag: "link",
 					attrs: {
