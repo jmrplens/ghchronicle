@@ -223,14 +223,21 @@ func TestASchemaThatFailsIsReportedAsSuch(t *testing.T) {
 	}
 }
 
+// sudoNotFound is what exec.LookPath answers when no sudo is on PATH, in the
+// platform's own words: Windows names the variable %PATH% where the others
+// write $PATH.
+func sudoNotFound() string {
+	return (&exec.Error{Name: "sudo", Err: exec.ErrNotFound}).Error()
+}
+
 // TestPsqlThatCannotStartStopsTheRun covers the three ways the database is
 // never reached: no sudo at all, a CREATE DATABASE that is refused, and a psql
 // that is gone by the time the script is sent.
 func TestPsqlThatCannotStartStopsTheRun(t *testing.T) {
 	t.Run("no sudo", func(t *testing.T) {
 		t.Setenv("PATH", t.TempDir())
-		if _, _, err := checkRun(t, schemaFile(t)); err == nil || !strings.Contains(err.Error(), "executable file not found") {
-			t.Errorf("err = %v, want sudo named as missing", err)
+		if _, _, err := checkRun(t, schemaFile(t)); err == nil || err.Error() != sudoNotFound() {
+			t.Errorf("err = %v, want %q: the lookup's own words, naming sudo", err, sudoNotFound())
 		}
 	})
 	t.Run("the database is refused", func(t *testing.T) {
@@ -247,8 +254,8 @@ func TestPsqlThatCannotStartStopsTheRun(t *testing.T) {
 	})
 	t.Run("psql is gone before the script", func(t *testing.T) {
 		fakePsql(t, "", "vanish")
-		if _, _, err := checkRun(t, schemaFile(t)); err == nil || !strings.Contains(err.Error(), "executable file not found") {
-			t.Errorf("err = %v, want the missing program named", err)
+		if _, _, err := checkRun(t, schemaFile(t)); err == nil || err.Error() != sudoNotFound() {
+			t.Errorf("err = %v, want %q: the missing program named", err, sudoNotFound())
 		}
 	})
 }
@@ -290,11 +297,13 @@ func TestRunReadsItsArguments(t *testing.T) {
 // TestMainExitsWithWhatRunAnswers runs main in a process of its own, because
 // main is where an error turns into a message on stderr and an exit status of
 // one, and a status into the exit itself: a usage asked for leaves cleanly
-// with nothing on stderr, and a missing schema file says why and fails.
+// with nothing on stderr, a missing schema file says why and fails, and so
+// does a machine with no sudo to find.
 //
 // The process is this package built as the program it is, found on PATH by its
 // own name the way the stand-in for sudo is, and built before PATH is narrowed
-// to it because the build needs the go command.
+// to it because the build needs the go command. Nothing else is on that PATH,
+// so a run that gets as far as PostgreSQL finds no sudo.
 func TestMainExitsWithWhatRunAnswers(t *testing.T) {
 	dir := t.TempDir()
 	program := filepath.Join(dir, "check_postgres")
@@ -314,6 +323,7 @@ func TestMainExitsWithWhatRunAnswers(t *testing.T) {
 	}{
 		{"the usage", []string{"--help"}, 0, usage + "\n", ""},
 		{"no schema file", nil, 1, "", "no schema file given\n" + usage + "\n"},
+		{"no sudo", []string{schemaFile(t)}, 1, "", sudoNotFound() + "\n"},
 	} {
 		args := tc.args
 		t.Run(tc.name, func(t *testing.T) {

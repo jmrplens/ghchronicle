@@ -331,6 +331,14 @@ func composeCmd(ctx context.Context, args []string, stdout, stderr io.Writer) in
 	if !proceed {
 		return status
 	}
+	// rsvg-convert is run by the absolute path exec.LookPath answers rather
+	// than by a name exec would search PATH for (Sonar go:S4036). It is looked
+	// up once, before the loop, so a machine without librsvg hears so before
+	// the first SVG is replaced rather than after, with a stale PNG beside it.
+	rsvg, lookErr := exec.LookPath("rsvg-convert")
+	if lookErr != nil {
+		return fail(stderr, lookErr)
+	}
 	for _, t := range targets {
 		// The background is only ever opened, so it is cleaned here, once,
 		// where it is built. The two paths below are also printed, and pyJoin
@@ -350,7 +358,7 @@ func composeCmd(ctx context.Context, args []string, stdout, stderr io.Writer) in
 		// bare names from the table above, so nothing off the command line
 		// reaches its argument list.
 		width, svgName, pngName := strconv.Itoa(t.w), t.name+".svg", t.name+".png"
-		cmd := exec.CommandContext(ctx, "rsvg-convert", "-w", width, svgName, "-o", pngName)
+		cmd := exec.CommandContext(ctx, rsvg, "-w", width, svgName, "-o", pngName)
 		cmd.Dir = dir
 		cmd.Stdout = stdout
 		cmd.Stderr = stderr

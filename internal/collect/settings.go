@@ -3,7 +3,9 @@ package collect
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/jmrplens/ghchronicle/v2/internal/ghapi"
@@ -210,18 +212,35 @@ func deployKeyPoints(ctx context.Context, c *ghapi.Client, repo Repo, base map[s
 	return points, nil
 }
 
-// hostOf keeps the host of a webhook URL and drops the rest, which usually
-// carries a secret in the path.
+// hostOf keeps the host of a webhook URL, with its port, and drops the rest.
+// The path usually carries a secret, and it is not the only part that can:
+// credentials written into the URL as user:token@ and a token in its query
+// would each land in the tag if the host were cut out of the string by hand,
+// so it is net/url that parses the authority, parts the userinfo from the
+// host and checks the port. An authority it refuses gives nothing, because
+// guessing where its host ends is how a secret reaches the tag.
+//
+// It is handed the authority alone, cut off at the first "/", "?" or "#",
+// which is where RFC 3986 and url.Parse both end it. Parsing the whole value
+// would lose the host to a "%" that escapes nothing in the path or the
+// fragment, where the end of the host is not in doubt.
+//
+// The authority starts after "://" only when that comes before any "/", "?",
+// "#" or "@". Past one of those it is inside a path, a query or a fragment,
+// or after userinfo, and the value has no scheme: a value with no scheme is
+// still a host followed by a path, and its authority starts at the first
+// character. A value that begins with "/" has an empty one, and gives nothing.
 func hostOf(raw string) string {
-	s := raw
-	for _, prefix := range []string{"https://", "http://"} {
-		if len(s) > len(prefix) && s[:len(prefix)] == prefix {
-			s = s[len(prefix):]
-			break
-		}
+	authority := raw
+	if scheme, rest, found := strings.Cut(raw, "://"); found && !strings.ContainsAny(scheme, "/?#@") {
+		authority = rest
 	}
-	if i := indexOf(s, "/"); i >= 0 {
-		s = s[:i]
+	for _, end := range []string{"/", "?", "#"} {
+		authority, _, _ = strings.Cut(authority, end)
 	}
-	return s
+	u, err := url.Parse("//" + authority)
+	if err != nil {
+		return ""
+	}
+	return u.Host
 }

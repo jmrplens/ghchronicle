@@ -21,8 +21,8 @@ const brandDir = "../../brand"
 // builds out of testdata/rsvg-convert.
 var rasterizer string
 
-// rasterizerName is the name the stand-in has to have for PATH to find it as
-// the rsvg-convert gen_brand runs by bare name: that name everywhere but
+// rasterizerName is the name the stand-in has to have for the exec.LookPath
+// gen_brand makes to find it on PATH as rsvg-convert: that name everywhere but
 // Windows, where exec.LookPath only finds a program through an extension
 // PATHEXT lists.
 func rasterizerName() string {
@@ -182,9 +182,27 @@ func TestComposeReproducesTheCommittedFiles(t *testing.T) {
 	}
 }
 
-// TestComposeStopsAtTheFirstFailure covers the three things compose depends
-// on: the background, a place to write the SVG, and the rasterizer.
+// TestComposeStopsAtTheFirstFailure covers the things compose depends on: a
+// rasterizer to find, the background, a place to write the SVG, and a
+// rasterizer that does its job.
 func TestComposeStopsAtTheFirstFailure(t *testing.T) {
+	t.Run("no rasterizer on PATH", func(t *testing.T) {
+		dir := withBackgrounds(t)
+		t.Setenv("PATH", t.TempDir())
+		status, stdout, stderr := genBrand(t, "compose", "-out", dir)
+		notFound := (&exec.Error{Name: "rsvg-convert", Err: exec.ErrNotFound}).Error()
+		if status != 1 || stdout != "" || stderr != "gen_brand: "+notFound+"\n" {
+			t.Errorf("compose = %d, stdout %q, stderr %q, want %q: the lookup's own words, naming rsvg-convert",
+				status, stdout, stderr, "gen_brand: "+notFound+"\n")
+		}
+		// Looked up before the loop, so no SVG is replaced with nothing to
+		// cut its PNG from.
+		for _, tgt := range targets {
+			if _, err := os.Stat(filepath.Join(dir, tgt.name+".svg")); !os.IsNotExist(err) {
+				t.Errorf("%s.svg: %v, want it never written", tgt.name, err)
+			}
+		}
+	})
 	t.Run("a background that is not there", func(t *testing.T) {
 		dir := withBackgrounds(t)
 		if err := os.Remove(filepath.Join(dir, targets[0].background)); err != nil {

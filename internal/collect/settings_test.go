@@ -234,3 +234,56 @@ func TestHostOf(t *testing.T) {
 		}
 	}
 }
+
+// TestAWebhookHostNeverCarriesItsCredentials pins what the host tag keeps and
+// what it leaves behind. A token written into the URL as userinfo, or into its
+// query or fragment, is as much a secret as the path; the port is part of the
+// host, because two hooks on one machine behind two ports are two receivers.
+// A value with no scheme is still a host and a path, including one whose host
+// url.Parse alone would read as a scheme, and an authority url.Parse refuses
+// gives nothing rather than a guess at where its host ends.
+//
+// The fragment follows the host directly: behind a path, the hand-rolled cut
+// at the first "/" this replaced dropped it too, so the case pinned nothing.
+func TestAWebhookHostNeverCarriesItsCredentials(t *testing.T) {
+	t.Parallel()
+	for raw, want := range map[string]string{
+		"https://user:token@hooks.example.com/github/secret":         "hooks.example.com",
+		"https://token@hooks.example.com:8443/hook":                  "hooks.example.com:8443",
+		"user:token@hooks.example.com/github/secret":                 "hooks.example.com",
+		"user:token@hooks.example.com/cb?next=https://other.example": "hooks.example.com",
+		"https://hooks.example.com?token=secret":                     "hooks.example.com",
+		"https://hooks.example.com#secret":                           "hooks.example.com",
+		"http://[2001:db8::1]:8080/hook":                             "[2001:db8::1]:8080",
+		"10.0.0.5:8080/hook":                                         "10.0.0.5:8080",
+		"localhost:8080/hook":                                        "localhost:8080",
+		"example.com":                                                "example.com",
+		"https://hooks.example.com:notaport/secret":                  "",
+	} {
+		if got := hostOf(raw); got != want {
+			t.Errorf("hostOf(%q) = %q, want %q", raw, got, want)
+		}
+	}
+}
+
+// TestAWebhookHostIsItsAuthorityWhateverFollows pins where the host is read
+// from: after a scheme however it is spelled, up to the first "/", "?" or "#".
+// A "://" further on, in the path, query or fragment of a value with no
+// scheme, does not make one, and a "%" that escapes nothing past the host
+// does not cost the tag a host whose end is not in doubt.
+func TestAWebhookHostIsItsAuthorityWhateverFollows(t *testing.T) {
+	t.Parallel()
+	for raw, want := range map[string]string{
+		"HTTPS://hooks.example.com/secret":                "hooks.example.com",
+		"ftp://hooks.example.com/secret":                  "hooks.example.com",
+		"hooks.example.com/cb?next=https://other.example": "hooks.example.com",
+		"hooks.example.com/relay/https://other.example/x": "hooks.example.com",
+		"localhost:8080/hook#https://other.example":       "localhost:8080",
+		"https://hooks.example.com/100%/secret":           "hooks.example.com",
+		"https://hooks.example.com:8443/hook#%zz":         "hooks.example.com:8443",
+	} {
+		if got := hostOf(raw); got != want {
+			t.Errorf("hostOf(%q) = %q, want %q", raw, got, want)
+		}
+	}
+}

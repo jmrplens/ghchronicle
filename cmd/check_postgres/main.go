@@ -211,8 +211,18 @@ func buildScript(schema []string, queries []query) (script, literals []string, e
 // stream keeps each error behind the marker of the statement that caused it.
 func explain(ctx context.Context, script []string) (string, error) {
 	psql := func(database, stdin string, extra ...string) (output string, err error) {
+		// sudo is run by the absolute path exec.LookPath answers rather than
+		// by a name exec would search PATH for (Sonar go:S4036). It is looked
+		// up on every call, not once for the run: a sudo gone between two
+		// calls then fails here, as the *exec.Error explain reads as psql not
+		// starting, where a path found earlier would fail to start as an
+		// *fs.PathError and pass for a script that ran and printed nothing.
+		sudo, err := exec.LookPath("sudo")
+		if err != nil {
+			return "", err
+		}
 		argv := append([]string{"-u", "postgres", "psql", "-X", "-q", "-d", database}, extra...)
-		cmd := exec.CommandContext(ctx, "sudo", argv...)
+		cmd := exec.CommandContext(ctx, sudo, argv...)
 		var out strings.Builder
 		cmd.Stdin = strings.NewReader(stdin)
 		// The same writer for both is what makes os/exec hand the child one
