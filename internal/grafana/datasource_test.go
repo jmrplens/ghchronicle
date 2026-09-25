@@ -456,7 +456,7 @@ func TestARefusalNamesThePermissionTheCallNeeded(t *testing.T) {
 				t.Fatal("the refusal was not reported")
 			}
 			var refused *RefusedError
-			if got := errors.As(err, &refused); got != (tc.permission != "") {
+			if errors.As(err, &refused) != (tc.permission != "") {
 				t.Fatalf("err = %v (%T), want a refusal: %v", err, err, tc.permission != "")
 			}
 			if refused != nil && refused.Permission != tc.permission {
