@@ -24,6 +24,10 @@ const (
 	pageDark = "#0e1316"
 )
 
+// ogImage is the og:image's file name, the same in the brand directory, where
+// compose writes it, and in the site, which serves it.
+const ogImage = "og.png"
+
 // The favicon's two opacity ramps, one per theme, shared by the per-theme
 // files mark writes and the one file icons writes that carries both.
 var (
@@ -302,7 +306,7 @@ func rasterJobs() []rasterJob {
 // hundred kilobytes with a mean difference under one level in 255, and the
 // file as it is otherwise, with a note saying so.
 func optimizedOG(ctx context.Context, brand, work string, stdout io.Writer) ([]byte, error) {
-	source, err := os.ReadFile(filepath.Clean(filepath.Join(brand, "og.png")))
+	source, err := os.ReadFile(filepath.Clean(filepath.Join(brand, ogImage)))
 	if err != nil {
 		return nil, err
 	}
@@ -324,12 +328,12 @@ func optimizedOG(ctx context.Context, brand, work string, stdout io.Writer) ([]b
 		return nil, writeErr
 	}
 	cmd := exec.CommandContext(ctx, quant, "--quality=80-95", "--speed=1", "--strip", "--force",
-		"--output", "og.png", "--", "og-source.png")
+		"--output", ogImage, "--", "og-source.png")
 	cmd.Dir = work
 	out, runErr := cmd.CombinedOutput()
 	switch {
 	case runErr == nil:
-		return root.ReadFile("og.png")
+		return root.ReadFile(ogImage)
 	case belowQuality(runErr):
 		fmt.Fprintln(stdout, "note: pngquant could not keep og.png above the quality asked for, so it is copied as it is")
 		return source, nil
@@ -420,7 +424,7 @@ func iconsCmd(ctx context.Context, args []string, stdout, stderr io.Writer) int 
 	if err != nil {
 		return fail(stderr, err)
 	}
-	files = append(files, namedFile{"og.png", og})
+	files = append(files, namedFile{ogImage, og})
 
 	if err = os.MkdirAll(filepath.Clean(outDir), 0o750); err != nil {
 		return fail(stderr, err)
