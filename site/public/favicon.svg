@@ -1,13 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="ghchronicle">
-  <g fill="#3fb950">
-    <rect x="8.00" y="8.00" width="12.00" height="12.00" rx="3.60" opacity="0.2"/>
-    <rect x="24.00" y="8.00" width="12.00" height="12.00" rx="3.60" opacity="0.42"/>
-    <rect x="40.00" y="8.00" width="12.00" height="12.00" rx="3.60" opacity="1"/>
-    <rect x="8.00" y="24.00" width="12.00" height="12.00" rx="3.60" opacity="0.42"/>
-    <rect x="24.00" y="24.00" width="12.00" height="12.00" rx="3.60" opacity="1"/>
-    <rect x="40.00" y="24.00" width="12.00" height="12.00" rx="3.60" opacity="0.42"/>
-    <rect x="8.00" y="40.00" width="12.00" height="12.00" rx="3.60" opacity="1"/>
-    <rect x="24.00" y="40.00" width="12.00" height="12.00" rx="3.60" opacity="0.42"/>
-    <rect x="40.00" y="40.00" width="12.00" height="12.00" rx="3.60" opacity="0.2"/>
+  <style>g{fill:#1a7f37}.d1{opacity:0.5}.d2{opacity:0.3}@media (prefers-color-scheme:dark){g{fill:#3fb950}.d1{opacity:0.42}.d2{opacity:0.2}}</style>
+  <g>
+    <rect x="8.00" y="8.00" width="12.00" height="12.00" rx="3.60" class="d2"/>
+    <rect x="24.00" y="8.00" width="12.00" height="12.00" rx="3.60" class="d1"/>
+    <rect x="40.00" y="8.00" width="12.00" height="12.00" rx="3.60" class="d0"/>
+    <rect x="8.00" y="24.00" width="12.00" height="12.00" rx="3.60" class="d1"/>
+    <rect x="24.00" y="24.00" width="12.00" height="12.00" rx="3.60" class="d0"/>
+    <rect x="40.00" y="24.00" width="12.00" height="12.00" rx="3.60" class="d1"/>
+    <rect x="8.00" y="40.00" width="12.00" height="12.00" rx="3.60" class="d0"/>
+    <rect x="24.00" y="40.00" width="12.00" height="12.00" rx="3.60" class="d1"/>
+    <rect x="40.00" y="40.00" width="12.00" height="12.00" rx="3.60" class="d2"/>
   </g>
 </svg>

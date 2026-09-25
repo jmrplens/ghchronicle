@@ -11,6 +11,7 @@
 //
 //	go run ./cmd/gen_brand mark       # the mark and the favicon, per theme
 //	go run ./cmd/gen_brand compose    # the banner, the social image and the og:image
+//	go run ./cmd/gen_brand icons -out site/public  # what the site serves to name itself
 //	go run ./cmd/gen_brand mark -out brand
 //
 // The mark family is pure text. The compose family reads a background raster
@@ -80,6 +81,8 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		return markCmd(args[1:], stdout, stderr)
 	case "compose":
 		return composeCmd(ctx, args[1:], stdout, stderr)
+	case "icons":
+		return iconsCmd(ctx, args[1:], stdout, stderr)
 	case "-h", "-help", "--help", "help":
 		usage(stdout)
 		return 0
@@ -97,6 +100,10 @@ func usage(w io.Writer) {
 
   mark      the mark and the favicon, one file per theme
   compose   the banner, the social image and the og:image, SVG and PNG
+  icons     what the documentation site serves to name itself: the favicon
+            in SVG and ICO, the touch and manifest icons, the web manifest
+            and the og:image (icons also takes -brand dir, where og.png is
+            read from, brand by default)
 
 -out defaults to the working directory, and for compose it is also where the
 background rasters are read from.
@@ -168,6 +175,21 @@ func repr(v float64) string {
 // mark draws the grid. Row 0 is the top, so the diagonal rises left to right
 // when the solid cell of column c sits at row (cells - 1 - c).
 func mark(color string, ramp []string, cells int, gap float64) string {
+	return fmt.Sprintf(
+		`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %d %d" width="%d" height="%d" role="img" aria-label=%q>`+"\n"+
+			`  <g fill=%q>`+"\n"+"%s\n  </g>\n</svg>\n",
+		markCanvas, markCanvas, markCanvas, markCanvas, brandName, color,
+		strings.Join(markCells(cells, gap, func(d int) string {
+			return fmt.Sprintf("opacity=%q", ramp[min(d, len(ramp)-1)])
+		}), "\n"),
+	)
+}
+
+// markCells is the grid's cells on the mark's own canvas, one rect per line,
+// each closed by what paint says for its distance from the diagonal: an
+// opacity for the mark, a class for the favicon, whose opacity changes with
+// the color scheme.
+func markCells(cells int, gap float64, paint func(distance int) string) []string {
 	span := float64(markCanvas) - 2*markPad
 	step := span / float64(cells)
 	side := step - gap
@@ -176,20 +198,14 @@ func mark(color string, ramp []string, cells int, gap float64) string {
 		for c := range cells {
 			x := markPad + float64(c)*step
 			y := markPad + float64(r)*step
-			d := abs(cells - 1 - r - c)
-			op := ramp[min(d, len(ramp)-1)]
 			out = append(out, fmt.Sprintf(
-				`    <rect x=%q y=%q width=%q height=%q rx=%q opacity=%q/>`,
-				fixed(x), fixed(y), fixed(side), fixed(side), fixed(side*markRadius), op,
+				`    <rect x=%q y=%q width=%q height=%q rx=%q %s/>`,
+				fixed(x), fixed(y), fixed(side), fixed(side), fixed(side*markRadius),
+				paint(abs(cells-1-r-c)),
 			))
 		}
 	}
-	return fmt.Sprintf(
-		`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %d %d" width="%d" height="%d" role="img" aria-label=%q>`+"\n"+
-			`  <g fill=%q>`+"\n"+"%s\n  </g>\n</svg>\n",
-		markCanvas, markCanvas, markCanvas, markCanvas, brandName, color,
-		strings.Join(out, "\n"),
-	)
+	return out
 }
 
 func markCmd(args []string, stdout, stderr io.Writer) int {
@@ -210,8 +226,8 @@ func markCmd(args []string, stdout, stderr io.Writer) int {
 		// The mark, one file per theme.
 		{"mark-dark.svg", mark(dark, rampDark, 5, 2)},
 		{"mark-light.svg", mark(light, rampLight, 5, 2)},
-		{"favicon-dark.svg", mark(dark, []string{"1", "0.42", "0.2"}, 3, 4)},
-		{"favicon-light.svg", mark(light, []string{"1", "0.5", "0.3"}, 3, 4)},
+		{"favicon-dark.svg", mark(dark, faviconRampDark, 3, 4)},
+		{"favicon-light.svg", mark(light, faviconRampLight, 3, 4)},
 	}
 	for _, f := range files {
 		if err := os.WriteFile(filepath.Clean(filepath.Join(dir, f.name)), []byte(f.svg), 0o600); err != nil {

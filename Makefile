@@ -21,7 +21,7 @@
 	mdlint mdlint-fix check-doc-links docs check-docs \
 	probe gen-dashboards check-dashboards check-dashboards-live shellcheck \
 	check-prometheus check-postgres publish-dashboard \
-	gen-brand gen-brand-compose \
+	gen-brand gen-brand-compose gen-brand-icons \
 	site-install site-dev site-build site-check site-analyze site-preview \
 	docker-build install-tools tools-versions release-check
 
@@ -571,6 +571,16 @@ gen-brand: ## Regenerate the mark and the favicons (cmd/gen_brand mark)
 gen-brand-compose: ## Regenerate the banner, social and og images (cmd/gen_brand compose, needs rsvg-convert)
 	@command -v rsvg-convert >/dev/null 2>&1 || { echo "make gen-brand-compose: rsvg-convert is not installed, and the PNGs that ship are rendered with it"; exit 2; }
 	go run ./cmd/gen_brand compose -out $(BRAND_DIR)
+
+# What the documentation site serves to name itself, written straight into
+# site/public: the favicon in SVG and ICO, the touch and manifest icons, the web
+# manifest, and brand/og.png through pngquant when it is installed. Run after
+# gen-brand-compose when the og image changed. cmd/gen_brand's tests hold the
+# files it wrote to their sizes, the maskable icon to its safe zone, and the
+# favicon and the manifest to what this target would write now.
+gen-brand-icons: ## Regenerate the site's favicons, app icons, web manifest and og image (cmd/gen_brand icons, needs rsvg-convert)
+	@command -v rsvg-convert >/dev/null 2>&1 || { echo "make gen-brand-icons: rsvg-convert is not installed, and the icons are rendered with it"; exit 2; }
+	go run ./cmd/gen_brand icons -out site/public -brand $(BRAND_DIR)
 
 probe: ## Run the collectors against one repository and print the line protocol, writing nothing (cmd/probe)
 	@test -n "$$GITHUB_TOKEN" || echo "note: GITHUB_TOKEN is not set, so this runs against the unauthenticated rate limit"

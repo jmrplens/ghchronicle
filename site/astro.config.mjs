@@ -38,6 +38,12 @@ const siteBase = "/ghchronicle";
 // on the next `make docs`.
 export const publicDocs = "https://jmrp.io/docs/ghchronicle";
 
+// What og.png shows, for the readers and previews that cannot see it. It is
+// the image brand/og.svg draws, so a change to the tagline there is a change
+// here.
+const socialImageAlt =
+	"The ghchronicle mark, a five by five grid of green cells brightest along the rising diagonal, beside the name and the line: Every metric GitHub will give, kept with the date it happened";
+
 /**
  * The newest git commit date for the file behind a sitemap URL, so
  * `sitemap-0.xml` carries a real per-page `<lastmod>`. Starlight omits it.
@@ -192,8 +198,16 @@ export default defineConfig({
 						content: "https://jmrplens.github.io/ghchronicle/og.png",
 					},
 				},
+				{
+					tag: "meta",
+					attrs: { property: "og:image:type", content: "image/png" },
+				},
 				{ tag: "meta", attrs: { property: "og:image:width", content: "1200" } },
 				{ tag: "meta", attrs: { property: "og:image:height", content: "630" } },
+				{
+					tag: "meta",
+					attrs: { property: "og:image:alt", content: socialImageAlt },
+				},
 				{
 					tag: "meta",
 					attrs: { name: "twitter:card", content: "summary_large_image" },
@@ -205,6 +219,13 @@ export default defineConfig({
 						content: "https://jmrplens.github.io/ghchronicle/og.png",
 					},
 				},
+				{
+					tag: "meta",
+					attrs: { name: "twitter:image:alt", content: socialImageAlt },
+				},
+				// The light theme's green, the brand color the sibling sites put
+				// here, and the web manifest's theme_color too.
+				{ tag: "meta", attrs: { name: "theme-color", content: "#1a7f37" } },
 				// Ownership proofs for Google Search Console and Bing Webmaster
 				// Tools, for the https://jmrplens.github.io/ghchronicle/ property.
 				// Both read them from the property's home page and re-check them
@@ -223,12 +244,20 @@ export default defineConfig({
 						content: "7574EB3B44624C239F14920DBC34EE25",
 					},
 				},
+				// Icons, every one written by `go run ./cmd/gen_brand icons -out
+				// site/public` from the mark. The SVG favicon is Starlight's own
+				// (`favicon` above), which emits its link itself and carries a
+				// prefers-color-scheme rule; these are what that option cannot
+				// express: the .ico for clients that ask for /favicon.ico by name,
+				// holding the three sizes its sizes attribute lists, the touch
+				// icon an iOS home screen reads instead of both, and the web
+				// manifest, which lists the home screen and maskable icons.
 				{
 					tag: "link",
 					attrs: {
 						rel: "icon",
 						href: "/ghchronicle/favicon.ico",
-						sizes: "32x32",
+						sizes: "16x16 32x32 48x48",
 					},
 				},
 				{
@@ -237,6 +266,10 @@ export default defineConfig({
 						rel: "apple-touch-icon",
 						href: "/ghchronicle/apple-touch-icon.png",
 					},
+				},
+				{
+					tag: "link",
+					attrs: { rel: "manifest", href: "/ghchronicle/manifest.webmanifest" },
 				},
 				// GitHub Pages sets no response headers of a site's choosing, so a
 				// policy with a <meta> form is declared here. This value is what

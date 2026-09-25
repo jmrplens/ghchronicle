@@ -1,0 +1,36 @@
+{
+  "name": "ghchronicle documentation",
+  "short_name": "ghchronicle",
+  "description": "Every metric GitHub will give, kept with the date it happened",
+  "start_url": "/ghchronicle/",
+  "scope": "/ghchronicle/",
+  "display": "standalone",
+  "background_color": "#0e1316",
+  "theme_color": "#1a7f37",
+  "icons": [
+    {
+      "src": "/ghchronicle/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/ghchronicle/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/ghchronicle/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/ghchronicle/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
