@@ -108,7 +108,10 @@ const EXECUTABLE_TYPES = new Set([
 	"text/ecmascript",
 ]);
 
-const SCRIPT = /<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi;
+// An end tag may carry anything before its ">": "</script foo>" and
+// "</script\t\n>" both close the element, so the pattern has to accept them
+// or it would read past a script into the markup after it.
+const SCRIPT = /<script\b([^>]*)>([\s\S]*?)<\/script\b[^>]*>/gi;
 const CHARSET = /<meta\s+charset=["']?utf-8["']?\s*\/?>/i;
 
 /**
