@@ -310,10 +310,16 @@ func optimizedOG(ctx context.Context, brand, work string, stdout io.Writer) ([]b
 	if err != nil {
 		return nil, err
 	}
-	quant, found := onPath("pngquant")
-	if !found {
+	// Absent is an answer here, not an error. Found only relative to the
+	// working directory (exec.ErrDot) is refused rather than skipped: that is
+	// someone else's program sitting where pngquant was expected.
+	quant, lookErr := exec.LookPath("pngquant")
+	switch {
+	case errors.Is(lookErr, exec.ErrNotFound):
 		fmt.Fprintln(stdout, "note: pngquant is not on PATH, so og.png is copied as compose wrote it")
 		return source, nil
+	case lookErr != nil:
+		return nil, lookErr
 	}
 	// Copied into the scratch directory and quantized there by two fixed
 	// names, the way rsvg-convert is run, so nothing off the command line
@@ -340,13 +346,6 @@ func optimizedOG(ctx context.Context, brand, work string, stdout io.Writer) ([]b
 	default:
 		return nil, fmt.Errorf("pngquant og.png: %w: %s", runErr, bytes.TrimSpace(out))
 	}
-}
-
-// onPath is the absolute path exec.LookPath finds for a program, and whether
-// it found one: a program that is not there is an answer here, not an error.
-func onPath(name string) (string, bool) {
-	path, err := exec.LookPath(name)
-	return path, err == nil
 }
 
 // belowQuality is pngquant's exit status 99, "the result would fall below the

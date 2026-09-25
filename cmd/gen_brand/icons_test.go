@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"image"
 	"image/png"
@@ -12,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -166,6 +168,34 @@ func TestIconsWritesNothingUntilEveryRasterExists(t *testing.T) {
 			t.Errorf("the output directory: %v, want it never made", err)
 		}
 	})
+}
+
+// TestOGRefusesAPngquantOnlyTheWorkingDirectoryHolds covers the one lookup
+// failure that is not "absent": a pngquant exec.LookPath finds only relative
+// to the working directory is somebody else's program, so it is refused
+// rather than run or quietly skipped.
+func TestOGRefusesAPngquantOnlyTheWorkingDirectoryHolds(t *testing.T) {
+	brand := t.TempDir()
+	if err := os.WriteFile(filepath.Join(brand, ogImage), []byte("og"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	name := "pngquant"
+	if runtime.GOOS == "windows" {
+		name += ".exe"
+	}
+	// Any program will do, so the stand-in for rsvg-convert is linked in
+	// under pngquant's name: a link keeps the mode that makes it one.
+	here := t.TempDir()
+	if err := os.Link(filepath.Join(rasterizer, rasterizerName()), filepath.Join(here, name)); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(here)
+	t.Setenv("PATH", ".")
+	var stdout strings.Builder
+	og, err := optimizedOG(t.Context(), brand, t.TempDir(), &stdout)
+	if !errors.Is(err, exec.ErrDot) || og != nil || stdout.Len() != 0 {
+		t.Errorf("optimizedOG = %d bytes, %v, stdout %q, want exec.ErrDot and nothing said", len(og), err, stdout.String())
+	}
 }
 
 // TestIconsReadsItsArguments covers the two flags in both spellings and the
