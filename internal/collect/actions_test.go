@@ -854,4 +854,104 @@ func TestActionsJobWithoutARunnerKeepsEveryTag(t *testing.T) {
 	if job.Tags["runner_group"] != noneTag || job.Tags["labels"] != noneTag {
 		t.Errorf("a job that never ran must still carry both tags, got %v", job.Tags)
 	}
+	// Canceled before a runner took it, it ran no steps, and that zero is a
+	// fact: only a job that ran to an end has had its steps withheld.
+	if !hasField(job, "steps") || fieldInt(t, job, "steps") != 0 {
+		t.Errorf("a job canceled before it ran must keep steps 0, got %v", job.Fields)
+	}
+}
+
+// stepsJobs is a run whose jobs GitHub has stopped serving the steps of, beside
+// the two shapes whose count still means what it says: a job that ran and
+// lists its steps, and a skipped job, which ran none.
+const stepsJobs = `{"total_count": 5, "jobs": [
+  {"name": "old-pass", "status": "completed", "conclusion": "success", "run_attempt": 1,
+   "started_at": "2026-03-02T10:00:35Z", "completed_at": "2026-03-02T10:03:00Z", "steps": []},
+  {"name": "old-fail", "status": "completed", "conclusion": "failure", "run_attempt": 1,
+   "started_at": "2026-03-02T10:00:35Z", "completed_at": "2026-03-02T10:02:00Z", "steps": []},
+  {"name": "old-timeout", "status": "completed", "conclusion": "timed_out", "run_attempt": 1,
+   "started_at": "2026-03-02T10:00:35Z", "completed_at": "2026-03-02T16:00:35Z", "steps": []},
+  {"name": "skipped", "status": "completed", "conclusion": "skipped", "run_attempt": 1,
+   "started_at": "2026-03-02T10:00:05Z", "completed_at": "2026-03-02T10:00:05Z", "steps": []},
+  {"name": "listed", "status": "completed", "conclusion": "success", "run_attempt": 1,
+   "started_at": "2026-09-07T10:00:35Z", "completed_at": "2026-09-07T10:03:00Z",
+   "steps": [
+     {"name": "one", "number": 1, "conclusion": "success", "started_at": "2026-09-07T10:00:35Z", "completed_at": "2026-09-07T10:01:00Z"},
+     {"name": "two", "number": 2, "conclusion": "success", "started_at": "2026-09-07T10:01:00Z", "completed_at": "2026-09-07T10:02:50Z"},
+     {"name": "three", "number": 3, "conclusion": "success", "started_at": "2026-09-07T10:02:50Z", "completed_at": "2026-09-07T10:03:00Z"}
+   ]}
+]}`
+
+// TestActionsJobWhoseStepsGitHubDroppedHasNoStepCount reads the one shape where
+// an empty steps list is not a fact about the job. Measured on 2026-09-24:
+// every job of a run created before about 12 April came back with its times,
+// runner and conclusion but an empty steps list, while every later run's jobs
+// carried theirs. A job that ran to success, failure or a timeout ran at least
+// one step, so zero there is GitHub's retention talking, and written as a
+// count it pulls every mean of steps toward zero for as far back as the
+// backfill reached. A skipped job runs none (measured: 0 steps), so its zero
+// is the truth and stays.
+func TestActionsJobWhoseStepsGitHubDroppedHasNoStepCount(t *testing.T) {
+	t.Parallel()
+	f := newFixtureServer(t)
+	f.file("/repos/octocat/hello-world/actions/runs", "actions_runs.json")
+	f.handle("/repos/octocat/hello-world/actions/runs/1000163135/jobs", func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(stepsJobs))
+	})
+	points, err := Actions{Jobs: true, MaxJobRuns: 1, Walk: Walk{Pages: 1}}.Collect(ctx(t), f.Client, testRepo, testNow)
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkPoints(t, points)
+	for _, name := range []string{"old-pass", "old-fail", "old-timeout"} {
+		job := find(t, points, "gh_workflow_job", map[string]string{"job_name": name})
+		if hasField(job, "steps") {
+			t.Errorf("%s ran and lists no steps, yet wrote steps %v", name, job.Fields["steps"])
+		}
+		// Only the count goes: the job is still a job, with its duration.
+		if !hasField(job, "duration_seconds") {
+			t.Errorf("%s lost its duration with its steps: %v", name, job.Fields)
+		}
+	}
+	for name, want := range map[string]int64{"skipped": 0, "listed": 3} {
+		job := find(t, points, "gh_workflow_job", map[string]string{"job_name": name})
+		if !hasField(job, "steps") {
+			t.Errorf("%s wrote no steps, want %d", name, want)
+			continue
+		}
+		if got := fieldInt(t, job, "steps"); got != want {
+			t.Errorf("%s wrote steps %d, want %d", name, got, want)
+		}
+	}
+	if n := len(only(t, points, "gh_workflow_step")); n != 3 {
+		t.Errorf("got %d step points, want the 3 the listed job carries", n)
+	}
+}
+
+// TestOnlyAJobThatRanToAnEndHasItsEmptyStepsWithheld holds stepsWithheld to
+// its contract over every conclusion the jobs endpoint documents, and the
+// empty one a null decodes to. The fixtures carry five of them, so a withheld
+// set widened to neutral or action_required would pass every other test,
+// and a job whose zero may be the truth would silently lose its count.
+func TestOnlyAJobThatRanToAnEndHasItsEmptyStepsWithheld(t *testing.T) {
+	t.Parallel()
+	withheld := map[string]bool{"success": true, "failure": true, "timed_out": true}
+	// GitHub's spelling, assembled because the linter's dictionary is American
+	// and would correct it to a value no job carries.
+	cancelledJob := "cancel" + "led"
+	for _, conclusion := range []string{
+		"success", "failure", "timed_out", "neutral", cancelledJob, "skipped", "action_required", "",
+		// A run's conclusion and a check suite's, never a job's. They stand
+		// for one GitHub may add: nothing says such a job ran a step, so its
+		// zero is kept until somebody measures otherwise.
+		"startup_failure", "stale",
+	} {
+		if got := stepsWithheld(conclusion, 0); got != withheld[conclusion] {
+			t.Errorf("an empty steps list concluded %q: withheld %v, want %v", conclusion, got, withheld[conclusion])
+		}
+		// A listed step is GitHub still serving them, whatever the job did.
+		if stepsWithheld(conclusion, 1) {
+			t.Errorf("a job concluded %q that lists a step had its count withheld", conclusion)
+		}
+	}
 }

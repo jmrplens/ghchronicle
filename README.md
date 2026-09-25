@@ -108,7 +108,7 @@ each one draws and how to put one in a profile README.
 The full documentation is at
 **<https://jmrp.io/docs/ghchronicle/>**, in English and Spanish:
 [quickstart](https://jmrp.io/docs/ghchronicle/start/quickstart/),
-[the 92 measurements](https://jmrp.io/docs/ghchronicle/collectors/measurements/),
+[the 93 measurements](https://jmrp.io/docs/ghchronicle/collectors/measurements/),
 [choosing a store](https://jmrp.io/docs/ghchronicle/sinks/),
 [the cost of a sweep](https://jmrp.io/docs/ghchronicle/api/cost/) and
 [troubleshooting](https://jmrp.io/docs/ghchronicle/reference/troubleshooting/).
@@ -121,23 +121,23 @@ left unproven; the notes on each tag say what landed.
 
 ## What it collects
 
-Ninety-two measurements across thirty-four families, covering every surface
+Ninety-three measurements across thirty-four families, covering every surface
 a personal or organisation account exposes.
 
-| Area          | What is kept                                                                                                                                                                                             |
-| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Traffic       | Views, unique visitors and clones per day, referrers and paths. GitHub's window is 14 days; this rewrites it whole on every sweep, so a collector that was down for a day repairs itself on the next run |
-| Stars         | One point per star, dated when it was given, where the token may read the stargazer list (since July 2026: admins, collaborators); elsewhere the count. Walked once, then the newest hundred by GraphQL  |
-| Repositories  | Stars, forks, watchers, open issues, size, age, idle days, licence, visibility, languages by bytes, topics, community profile score                                                                      |
-| Releases      | Downloads per release and per asset, asset sizes, draft and prerelease state                                                                                                                             |
-| Pull requests | Per item: time to first review, time to merge, lines added and deleted, files changed, review rounds, comments, commits                                                                                  |
-| Issues        | Per item: time to close, comments, reactions, label count                                                                                                                                                |
-| Actions       | Runs with duration and queue time, jobs, individual steps, workflows and their state, artifacts and their expiry, cache usage                                                                            |
-| Security      | Dependabot and code scanning alerts by severity, plus an explicit record of which features are switched on, so no data is distinguishable from no alerts                                                 |
-| Contributions | The whole profile calendar, one point per day at that day's date, plus totals and the per-repository commit breakdown                                                                                    |
-| Activity      | The event feed, which GitHub caps at three hundred events and thirty days, and the notification inbox, which it keeps for three months unless saved                                                      |
-| Billing       | Usage per day, product, SKU and repository, with gross, discount and net                                                                                                                                 |
-| Account       | Followers, following, packages, gists, social accounts, sponsors                                                                                                                                         |
+| Area          | What is kept                                                                                                                                                                                                                           |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Traffic       | Views, unique visitors and clones per day, referrers and paths. GitHub's window is 14 days; this rewrites it whole on every sweep, so a collector that was down for a day repairs itself on the next run                               |
+| Stars         | Stars per day for every repository, from GitHub's daily star history, back to the first. Where the token may read the stargazer list (since July 2026: admins, collaborators), one point per star as well, naming who gave it and when |
+| Repositories  | Stars, forks, watchers, open issues, size, age, idle days, licence, visibility, languages by bytes, topics, community profile score                                                                                                    |
+| Releases      | Downloads per release and per asset, asset sizes, draft and prerelease state                                                                                                                                                           |
+| Pull requests | Per item: time to first review, time to merge, lines added and deleted, files changed, review rounds, comments, commits                                                                                                                |
+| Issues        | Per item: time to close, comments, reactions, label count                                                                                                                                                                              |
+| Actions       | Runs with duration and queue time, jobs, individual steps, workflows and their state, artifacts and their expiry, cache usage                                                                                                          |
+| Security      | Dependabot and code scanning alerts by severity, plus an explicit record of which features are switched on, so no data is distinguishable from no alerts                                                                               |
+| Contributions | The whole profile calendar, one point per day at that day's date, plus totals and the per-repository commit breakdown                                                                                                                  |
+| Activity      | The event feed, which GitHub caps at three hundred events and thirty days, and the notification inbox, which it keeps for three months unless saved                                                                                    |
+| Billing       | Usage per day, product, SKU and repository, with gross, discount and net                                                                                                                                                               |
+| Account       | Followers, following, packages, gists, social accounts, sponsors                                                                                                                                                                       |
 
 ## Where it writes
 

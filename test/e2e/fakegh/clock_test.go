@@ -62,3 +62,44 @@ func TestDaysAgoIsWhatATestAssertsWith(t *testing.T) {
 		}
 	}
 }
+
+// TestAWeekEpochIsTheSundayOfTheFakesWeek: the star history labels each week
+// with the Unix second its Sunday starts at in UTC, and the fixture's weeks
+// have to be the weeks of the fake's own present, counted back whole.
+func TestAWeekEpochIsTheSundayOfTheFakesWeek(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name   string
+		at     time.Time
+		marker string
+		want   time.Time
+	}{
+		{
+			name: "a Friday afternoon", marker: "@WEEK_EPOCH_0@",
+			at:   time.Date(2026, 9, 11, 13, 45, 0, 0, time.UTC),
+			want: time.Date(2026, 9, 6, 0, 0, 0, 0, time.UTC),
+		},
+		{
+			name: "two weeks back", marker: "@WEEK_EPOCH_2@",
+			at:   time.Date(2026, 9, 11, 13, 45, 0, 0, time.UTC),
+			want: time.Date(2026, 8, 23, 0, 0, 0, 0, time.UTC),
+		},
+		// The Sunday itself is its own week's start, not the week before's.
+		{
+			name: "just past a Sunday's midnight", marker: "@WEEK_EPOCH_0@",
+			at:   time.Date(2026, 9, 13, 0, 30, 0, 0, time.UTC),
+			want: time.Date(2026, 9, 13, 0, 0, 0, 0, time.UTC),
+		},
+		{
+			name: "the last moment of a Saturday", marker: "@WEEK_EPOCH_1@",
+			at:   time.Date(2026, 9, 12, 23, 59, 59, 0, time.UTC),
+			want: time.Date(2026, 8, 30, 0, 0, 0, 0, time.UTC),
+		},
+	} {
+		s := &Server{tb: t}
+		s.FreezeAt(tc.at)
+		if got, want := s.weekEpoch(tc.marker), strconv.FormatInt(tc.want.Unix(), 10); got != want {
+			t.Errorf("%s: %s = %s, want %s (%s)", tc.name, tc.marker, got, want, tc.want.Format(time.DateOnly))
+		}
+	}
+}

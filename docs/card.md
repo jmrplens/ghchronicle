@@ -48,8 +48,9 @@ With `-card-only` it also leaves the [state
 file](https://jmrp.io/docs/ghchronicle/configuration/#state_file) exactly as it found it. Nothing
 that run collected reached a store, so nothing it learned may tell the next
 collection that a family is already done. It still reads the file, which is
-what lets it skip the one-off walk of the star history: what the state
-remembers makes the sweep cheaper, never the card smaller.
+what lets it skip the one-off walks of the stargazer list and of the daily star
+history: what the state remembers makes the sweep cheaper, never the card
+smaller.
 
 So a card, a second card and a collection can all share one `state_file`, and
 each of them is the whole account.

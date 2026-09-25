@@ -86,6 +86,7 @@ func restCollectors(now time.Time) []struct {
 		{"Security", repo(&Security{})},
 		{"Settings", repo(&Settings{})},
 		{"Stargazers", repo(&Stargazers{Full: true})},
+		{"StarHistory", repo(&StarHistory{Walk: Unbounded})},
 		{"Traffic", repo(&Traffic{})},
 	}
 }

@@ -186,7 +186,7 @@ rows by the number of repositories `-list` prints and you have your own.
 | traffic     | 6h      | 4 core per repo | 0 core | views, clones, referrers, paths; the fourteen-day window is a 304 until it moves |
 | repo        | 1h      | 3 core per repo, 2 pt per 10 repos | 0 core for a repo that did not change, 2 pt per 10 repos | the repository, its community profile and one page of releases each; languages, topics, rulesets and branch protection ride in one GraphQL query per ten repositories |
 | branches    | 24h     | 1 pt per 14 repos | 1 pt per 14 repos | one query per fourteen repositories |
-| stars       | 6h      | 1 core per repo | 1 pt per 10 repos | the full walk through REST the first time a repository is seen, then the newest hundred of every repository in one GraphQL query per ten, about a kilobyte per repository; a restart with a state file starts at that query. Before the round the last page was asked of every repository on every sweep, all but one of them 304 |
+| stars       | 6h      | 1 core per repo, plus 1 core per 30 weeks of its life | 1 pt per 10 repos, plus 1 core per repo, usually a free 304 | the full walk through REST the first time a repository is seen, then the newest hundred of every repository in one GraphQL query per ten, about a kilobyte per repository; a restart with a state file starts at that query. Before the round the last page was asked of every repository on every sweep, all but one of them 304. The daily star history came after the round and is not in its figures: 1 core per repository, a 304 unless a day of the last thirty weeks gained or lost a star or a week began; its first read is a page per thirty weeks of the repository's life, 180 pages for the nineteen starred repositories of the account measured, once |
 | issues      | 1h      | up to 8 pt per repo | 1 to 2 pt per repo | before the round: a page of fifty with ten review threads each, 8 points, which the gateway refused with a 502 once a sweep on the busiest repository. Now: 2 points of GraphQL per repo for what changed in two cadences, ten at a time (1 point where the repository holds five or fewer), and once a UTC day a whole page sized to the repository from the last totals (5, 10, 20 or 50 cost 1, 2, 3 or 8). The sweep that carries the daily page is the expensive one, and the busiest repositories still draw the gateway's 502 or 504 at fifty once a day and are retried at twenty-five |
 | issueevents | 1h      | several pt per repo for the month, plus 1 core per stacked pull request in it | 1 pt per repo, 0 to 1 core | before the round: one page of a hundred events each, up to a megabyte per repository because every event embeds its whole issue; a 304 on all but the repository that moved. Now: one GraphQL query per repository, the timeline of the ten most recently updated issues and ten pull requests for the events of the last two cadences (1 pt, 2 to 6 KB, a second page only when more than ten items moved), plus one core per pull request in a stack, whose `added_to_stack` event the timeline cannot name; thirty days on a first sweep, once, which is minutes rather than seconds where the pull requests are nearly all stacked, because almost every one updated in the month takes the per-issue road for its `added_to_stack`; a steady sweep is a point per repository and one such read at most. And from a cadence before the last run after a gap, so a stopped process does not leave its hours out of the series. Measured against the list over a week of two repositories: every event of every type agrees, field for field, except a commit referencing an issue nobody has touched, 3 of 2,217, which does not move the issue and so is not asked for. A backfill walks `/issues/{n}/events` per item instead of the list, 1.4 KB compressed per twelve events against 45 KB per event |
 | actions     | 15m     | a month of runs per repo, plus 1 core per run | 1 core per repo that had a run, plus 1 per run completed since | before the round: pages of a hundred runs reaching a month back, a job list per run, and the caches and workflows of every repository, which was three fifths of the cold sweep's bytes, and those job lists again on every sweep, nearly all of them 304. Now: pages of 30, one on a quiet repository and up to 7 while they come full of runs newer than the window, plus one per run not yet expanded, jobs listed once per attempt, at most 20 new runs a sweep; pages of 100 on the first sweep and in a backfill. Measured over three sweeps of one process, the second is the one that pays the fill-in, because the page of thirty is a new URL for every repository and holds runs the first sweep's twenty did not cover; from there a sweep costs one page per repository that had a run and one job list per run completed since, so what it costs is how many runs the account completes |
@@ -287,10 +287,11 @@ empty, which is the honest reading. See
 
 ### Reading the arithmetic for your own account
 
-A first sweep is the expensive one: the full stargazer walk, a month of
-workflow runs, and (with `every.history` set) every past year's contribution
-calendar. After that, multiply the per-repository rows above by the number of
-repositories `-list` prints, and divide the hourly budget by the cadence.
+A first sweep is the expensive one: the full stargazer walk, the whole daily
+star history of every repository, a month of workflow runs, and (with
+`every.history` set) every past year's contribution calendar. After that,
+multiply the per-repository rows above by the number of repositories `-list`
+prints, and divide the hourly budget by the cadence.
 
 A [card](https://jmrp.io/docs/ghchronicle/card/) is priced as a cold sweep whatever the cadences
 say: the run collects every family, because every number it draws comes from
@@ -369,23 +370,36 @@ A personal account cannot see any of them, however the token is scoped.
   `stargazers` answers an empty list with a `totalCount` of 0 while
   `stargazerCount` beside it still gives the real number: measured on
   `cli/cli` and `octocat/Hello-World` with a token holding every scope.
-  ghchronicle therefore draws the dated star curve only where the token has
-  that access, which it always has on the account's own repositories and on
-  those of an organisation the account administers; one named in
-  `targets.repos` or reached through `targets.orgs` without it gets its star
-  count and no curve.
+  ghchronicle therefore writes `gh_star`, who starred and when to the second,
+  only where the token has that access, which it always has on the account's
+  own repositories and on those of an organisation the account administers;
+  one named in `targets.repos` or reached through `targets.orgs` without it
+  has its stars counted per day from the history below, and nobody named.
 - **`/user/installations`** returns 403 without a GitHub App.
 
-### The star history GitHub serves to anyone
+### The star history github.com serves to anyone
 
 [`stargazers/history`](https://docs.github.com/en/rest/activity/starring#get-repository-star-history)
 answers where the stargazer list does not. It serves anyone who can see the
 repository, unauthenticated too: the stars given per day, grouped by week,
-thirty weeks to a page, with a `Link` header that pages back to the
+thirty weeks to a page, which is both the default and the most `per_page` allows
+(a smaller one is honoured, a larger one is cut to thirty), paging back to the
 repository's first week (measured on `cli/cli`: thirteen pages, back to 2019).
 It names no stargazers, so it cannot stand in for `gh_star`, which is one row
-per star at the instant it was given and says who gave it. ghchronicle does
-not call it today.
+per star at the instant it was given and says who gave it. It can stand in for
+the count, and ghchronicle reads it for every repository it collects, writes it
+as `gh_star_day` and draws from it the panels that count stars by day in every
+store but Prometheus, which cannot hold a history and still counts `gh_star`.
+
+Three things about it were measured rather than read in its documentation. The
+days are GitHub's calendar days in America/Los_Angeles, under a `week` labelled
+as Sunday 00:00 UTC: against the stargazer lists of nineteen repositories, the
+Pacific day matched all 440 stars and the UTC day did not. It counts the
+repository's current stargazers, each on the day they starred, so an unstar
+takes a star off a day in the past rather than the day it happened. And a 304
+answer to it carries no `Link` header, where a 200 carries `next` and `last`,
+so the walk reads no `Link` at all and stops at a page shorter than thirty
+weeks or an empty one.
 
 ### GraphQL is wrong about packages
 

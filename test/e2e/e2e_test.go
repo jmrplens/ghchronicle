@@ -236,6 +236,7 @@ func TestOnceAgainstFakeGitHub(t *testing.T) {
 	assertOneShapeNamesEveryRepository(t, points)
 	assertTheForkWasFiltered(t, points)
 	assertDatingRulesSurvived(t, points)
+	assertStarDaysWereWritten(t, points, time.Now())
 	assertAchievementProgressAgreesWithThePage(t, points, out)
 	assertStateRecordsTheSweep(t, readState(t, filepath.Join(dir, "state.json")))
 
@@ -511,6 +512,53 @@ func assertDatingRulesSurvived(t *testing.T, points []point) {
 				t.Errorf("job log line kept an escape code: %q", s)
 			}
 		}
+	}
+}
+
+// historyStars is how many stars the daily history fixture counts
+// (testdata/stargazers_history.json): one on this week's Sunday and three on
+// last week's Monday and Wednesday.
+const historyStars = 4
+
+// assertStarDaysWereWritten: the daily star history reached the sink, which
+// the family coverage above cannot say, because it names one measurement per
+// family and the stars family's is gh_star. Every day is stamped at the start
+// of its date, is about the repository and nothing else, and none is ahead of
+// the sweep; and the days add up to the stars the fixture counts, each day
+// once, whatever a store would keep of a day written twice.
+func assertStarDaysWereWritten(t *testing.T, points []point, sweptBy time.Time) {
+	t.Helper()
+	days := map[string]float64{}
+	for _, p := range points {
+		if p.Measurement != "gh_star_day" {
+			continue
+		}
+		at, err := time.Parse(time.RFC3339Nano, p.Time)
+		if err != nil || !strings.HasSuffix(p.Time, "T00:00:00Z") {
+			t.Errorf("a star day stamped %s, want the start of a UTC date", p.Time)
+			continue
+		}
+		if at.After(sweptBy) {
+			t.Errorf("a star day ahead of the sweep was written: %s", p.Time)
+		}
+		if len(p.Tags) != 3 || p.Tags["full_name"] != "octocat/hello-world" {
+			t.Errorf("a star day tagged %v, want the repository's three tags alone", p.Tags)
+		}
+		stars, isNumber := p.Fields["stars"].(float64)
+		if !isNumber || len(p.Fields) != 1 {
+			t.Errorf("a star day with fields %v, want stars alone", p.Fields)
+		}
+		days[p.Time] = stars
+	}
+	if len(days) == 0 {
+		t.Fatal("no gh_star_day point was written")
+	}
+	total := 0.0
+	for _, stars := range days {
+		total += stars
+	}
+	if total != historyStars {
+		t.Errorf("the star days add up to %v, want the fixture's %d", total, historyStars)
 	}
 }
 

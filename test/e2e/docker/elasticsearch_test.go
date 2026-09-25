@@ -101,6 +101,24 @@ func TestElasticsearchKeepsTheDateOfTheEvent(t *testing.T) {
 		}
 	})
 
+	t.Run("a day of the star history keeps its own day", func(t *testing.T) {
+		// One document per repository and day, and exactly one: the id is
+		// the tags and the time, so the thirty weeks every sweep rewrites
+		// overwrite their own documents rather than adding a copy that the
+		// sum in Stars gained over time would count again.
+		for _, want := range starDays(t, pushPoints(t, sweep)) {
+			doc := esOne(ctx, t, s, "gh_star_day",
+				esTerm("full_name.keyword", want.Tags["full_name"]), esAt(want.Time))
+			esWantNumber(t, doc, "stars", starCount(want))
+			esWantString(t, doc, "owner", want.Tags["owner"])
+			esWantString(t, doc, "repo", want.Tags["repo"])
+			if !atMidnight(esTimeOf(t, doc)) {
+				t.Errorf("a day of %s is stamped %s, not at the start of the day",
+					want.Tags["full_name"], esTimeOf(t, doc).Format(time.RFC3339Nano))
+			}
+		}
+	})
+
 	t.Run("a current-state gauge is stamped when the sweep looked", func(t *testing.T) {
 		doc := esNewest(ctx, t, s, "gh_repo")
 		esWantNumber(t, doc, "stars", 80)
@@ -117,7 +135,7 @@ func TestElasticsearchKeepsTheDateOfTheEvent(t *testing.T) {
 		// The failure this is written against is a store that stamps a
 		// document when it receives it. It would put every one of these
 		// inside the sweep window, and every one of them belongs before it.
-		for _, measurement := range []string{"gh_star", "gh_traffic", "gh_workflow_run"} {
+		for _, measurement := range []string{"gh_star", "gh_star_day", "gh_traffic", "gh_workflow_run"} {
 			body := map[string]any{"size": 0, "query": map[string]any{
 				"range": map[string]any{"@timestamp": map[string]any{
 					"gte": sweep.Started.Format(time.RFC3339),

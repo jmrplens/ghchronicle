@@ -10,8 +10,8 @@ import (
 
 // State is what a sweep has to remember between runs.
 //
-// Six things, and deleting the file costs a different thing for each of them.
-// Five of the six cost only rate limit, because what is collected again
+// Seven things, and deleting the file costs a different thing for each of
+// them. Six of the seven cost only rate limit, because what is collected again
 // overwrites what is already stored. last_head is the one that loses
 // something: the dependency changes between the head it held and the next one
 // are read from a range that nothing can name once the head is gone.
@@ -19,7 +19,11 @@ import (
 //   - last_run: when each family last ran, so a restart does not re-collect
 //     everything at once.
 //   - first_saw: when each repository was first seen, so the one-off full walk
-//     of the star history happens once instead of every sweep.
+//     of the stargazer list happens once instead of every sweep.
+//   - history_read: when each repository's daily star history was last read
+//     back to the week it was created, so that walk happens once and a sweep
+//     reads only its newest page. Absent reads as never, which is what makes
+//     the first sweep after an upgrade read every history whole.
 //   - last_head: the commit each repository was on when the dependency diff
 //     last ran. Without it the next sweep has only the photograph, no diff.
 //   - last_full: when each family that normally reads what changed last read a
@@ -31,6 +35,12 @@ type State struct {
 	path     string
 	LastRun  map[string]time.Time `json:"last_run"`
 	FirstSaw map[string]time.Time `json:"first_saw"`
+	// HistoryRead is when each repository's daily star history was last read
+	// whole. Written only after a walk that reached the end, unlike first_saw,
+	// which is written before its walk: a history cut short by a 502 is then
+	// read whole again on the next sweep rather than staying partial until
+	// somebody runs a backfill.
+	HistoryRead map[string]time.Time `json:"history_read"`
 	// LastHead is the commit each repository was on when the dependency diff
 	// last ran, which is what makes the next diff a range rather than a guess.
 	LastHead map[string]string `json:"last_head"`
@@ -50,7 +60,7 @@ type State struct {
 func LoadState(path string) *State {
 	s := &State{
 		path: path, LastRun: map[string]time.Time{}, FirstSaw: map[string]time.Time{},
-		LastHead: map[string]string{}, LastFull: map[string]time.Time{},
+		HistoryRead: map[string]time.Time{}, LastHead: map[string]string{}, LastFull: map[string]time.Time{},
 	}
 	b, err := os.ReadFile(path)
 	if err != nil {
@@ -62,6 +72,9 @@ func LoadState(path string) *State {
 	}
 	if s.FirstSaw == nil {
 		s.FirstSaw = map[string]time.Time{}
+	}
+	if s.HistoryRead == nil {
+		s.HistoryRead = map[string]time.Time{}
 	}
 	if s.LastHead == nil {
 		s.LastHead = map[string]string{}
@@ -179,3 +192,15 @@ func (s *State) FirstSight(full string, now time.Time) bool {
 	s.FirstSaw[full] = now
 	return true
 }
+
+// HistoryDue reports whether a repository's daily star history has never been
+// read whole, which a repository seen for the first time and every repository
+// of a state file older than the field both answer yes to.
+func (s *State) HistoryDue(full string) bool {
+	_, read := s.HistoryRead[full]
+	return !read
+}
+
+// MarkHistory records that a repository's daily star history was read back to
+// its first week. Only a walk that got there calls it.
+func (s *State) MarkHistory(full string, now time.Time) { s.HistoryRead[full] = now }

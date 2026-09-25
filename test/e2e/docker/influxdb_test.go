@@ -41,6 +41,41 @@ var (
 	runFinishedAt = fakegh.DaysAgoDate(fakegh.RunDaysAgo) + "T10:04:10Z"
 )
 
+// starDays is the sweep's own days of the star history that hold a star
+// (testdata/stargazers_history.json). That fixture spells its weeks as offsets
+// from the fake's current week, so the dates move with the calendar, and they
+// are read from what the sweep emitted rather than typed here for the reason
+// the two above are derived. Only the days that hold a star: the days of zero
+// are real rows too, but a count that was lost or read from the wrong row can
+// come back as a zero, and it cannot come back as the right number of stars.
+func starDays(tb testing.TB, points []sqlStoresPoint) []sqlStoresPoint {
+	tb.Helper()
+	var out []sqlStoresPoint
+	for _, p := range points {
+		if p.Measurement == "gh_star_day" && starCount(p) > 0 {
+			out = append(out, p)
+		}
+	}
+	if len(out) == 0 {
+		tb.Fatal("the sweep emitted no day of the star history with a star in it, " +
+			"so no store can be asked whether it kept one")
+	}
+	return out
+}
+
+// starCount is a day's stars as the file sink wrote them.
+func starCount(p sqlStoresPoint) float64 {
+	n, _ := p.Fields["stars"].(float64)
+	return n
+}
+
+// atMidnight reports whether an instant is the start of a UTC day, which is
+// where the collector stamps every day of the star history whatever hour
+// GitHub's own calendar day begins at.
+func atMidnight(at time.Time) bool {
+	return at.Equal(at.UTC().Truncate(24 * time.Hour))
+}
+
 // influxTimeLayout is how InfluxDB 3 renders a timestamp in its JSON answer:
 // UTC, no zone suffix, fractional seconds only when it has any.
 const influxTimeLayout = "2006-01-02T15:04:05.999999999"
@@ -94,6 +129,10 @@ func TestInfluxDBKeepsTheDateOfTheEvent(t *testing.T) {
 		}
 	})
 
+	t.Run("a day of the star history keeps its own day", func(t *testing.T) {
+		influxWantStarDays(ctx, t, s, sweep)
+	})
+
 	t.Run("a current-state gauge is stamped when the sweep looked", func(t *testing.T) {
 		// Newest first: a stack that is kept between runs still holds the
 		// gauge rows earlier sweeps wrote, and each of those was stamped
@@ -119,8 +158,11 @@ func TestInfluxDBKeepsTheDateOfTheEvent(t *testing.T) {
 	t.Run("nothing dated was restamped with the sweep's clock", func(t *testing.T) {
 		// The failure this is written against is a sink or a store that keeps
 		// the moment of the write. It would put every one of these rows inside
-		// the sweep window, and every one of them belongs before it.
-		for _, table := range []string{"gh_star", "gh_traffic", "gh_workflow_run"} {
+		// the sweep window, and every one of them belongs before it. The star
+		// history is held to it as well: its newest day is today, stamped at
+		// midnight, and a day after the sweep's clock is one GitHub has not
+		// counted yet.
+		for _, table := range []string{"gh_star", "gh_star_day", "gh_traffic", "gh_workflow_run"} {
 			rows, err := influxSQL(ctx, s, sweep.Database,
 				fmt.Sprintf(`SELECT count(*) AS n FROM %q WHERE time >= '%s'`,
 					table, sweep.Started.Format(time.RFC3339)))
@@ -132,6 +174,55 @@ func TestInfluxDBKeepsTheDateOfTheEvent(t *testing.T) {
 			}
 		}
 	})
+}
+
+// influxWantStarDays holds the store to the sweep's own days of the star
+// history: one row per repository and day, stamped at the start of the day
+// and carrying the day's count. A stack kept between runs holds the days
+// earlier runs wrote as well, each at its own date, so every day this sweep
+// emitted has to be there and nothing is said about the rest.
+func influxWantStarDays(ctx context.Context, t *testing.T, s *Stack, sweep *sqlStoresSweep) {
+	t.Helper()
+	rows, err := influxAwaitRow(ctx, s, sweep.Database,
+		`SELECT * FROM gh_star_day WHERE stars > 0 ORDER BY time`)
+	if err != nil {
+		t.Fatalf("no day of the star history arrived: %v", err)
+	}
+	for _, want := range starDays(t, sqlStoresPoints(t, sweep)) {
+		at, parseErr := time.Parse(time.RFC3339Nano, want.Time)
+		if parseErr != nil {
+			t.Fatalf("the sweep's own date %q: %v", want.Time, parseErr)
+		}
+		if !atMidnight(at) {
+			t.Errorf("the sweep stamped a day of %s at %s, not at the start of the day",
+				want.Tags["full_name"], want.Time)
+		}
+		row := influxRowOf(t, rows, want.Tags["full_name"], at)
+		if row == nil {
+			t.Errorf("%s has no row for %s, the day the sweep gave %v stars",
+				want.Tags["full_name"], want.Time, starCount(want))
+			continue
+		}
+		wantNumber(t, row, "stars", starCount(want))
+		wantString(t, row, "owner", want.Tags["owner"])
+		wantString(t, row, "repo", want.Tags["repo"])
+		// The history names nobody, and a stargazer tag here would be a
+		// series per person, which is what gh_star is for.
+		if user, _ := row["user"].(string); user != "" {
+			t.Errorf("a day of the star history carries user = %q", user)
+		}
+	}
+}
+
+// influxRowOf is the row of one repository at one instant, or nil.
+func influxRowOf(t *testing.T, rows []map[string]any, fullName string, at time.Time) map[string]any {
+	t.Helper()
+	for _, row := range rows {
+		if row["full_name"] == fullName && timeOf(t, row).Equal(at) {
+			return row
+		}
+	}
+	return nil
 }
 
 // TestInfluxDBTypedEveryColumnTheWayTheSinkMeantIt reads the schema InfluxDB
@@ -248,11 +339,13 @@ func assertInfluxWroteCleanly(t *testing.T, log string) {
 
 // datedRowCounts counts the rows of the measurements whose timestamps the
 // fixtures pin, so a second sweep can be shown to have rewritten them rather
-// than added to them.
+// than added to them. The star history is the one every sweep rewrites on
+// purpose, thirty weeks of it, zeros included, so that an unstar reaches the
+// day the star was given: it converges only if each day lands on its own row.
 func datedRowCounts(ctx context.Context, t *testing.T, s *Stack, database string) map[string]float64 {
 	t.Helper()
 	out := map[string]float64{}
-	for _, table := range []string{"gh_star", "gh_traffic", "gh_workflow_run", "gh_commit"} {
+	for _, table := range []string{"gh_star", "gh_star_day", "gh_traffic", "gh_workflow_run", "gh_commit"} {
 		rows, err := influxSQL(ctx, s, database, fmt.Sprintf(`SELECT count(*) AS n FROM %q`, table))
 		if err != nil {
 			t.Fatalf("counting %s: %v", table, err)

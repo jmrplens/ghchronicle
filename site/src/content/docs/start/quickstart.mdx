@@ -138,12 +138,15 @@ themselves or wants to know what they just agreed to.
 
 Three things happen once, and they are why the first run is the expensive one.
 
-- The whole stargazer list of every repository whose list the token may read
-  (since July 2026, only a repository's
+- The daily star history of every repository, whatever the token may see, is
+  read back to the repository's first week, and the whole stargazer list of
+  every repository whose list the token may read (since July 2026, only a
+  repository's
   [admins and collaborators](https://docs.github.com/en/rest/activity/starring#new-access-restrictions))
-  is walked, page by page, so every star carries the date it was given. After
-  that, the newest hundred of each of those repositories ride in one GraphQL
-  query per ten of them.
+  is walked, page by page, so each of those stars carries the moment it was
+  given and who gave it. After that, the history is one request per repository
+  for its newest thirty weeks, usually a free 304, and the newest hundred stars
+  of each readable list ride in one GraphQL query per ten repositories.
 - A month of workflow runs, so a fresh install does not chart a CI history that
   begins fifteen minutes ago. After that, twice the cadence, and never less
   than two hours.
@@ -165,10 +168,10 @@ it costs.
 
 <Aside type="caution" title="Keep the state file">
   `state_file` is what remembers where each family got to, and
-  [six things live in it](/ghchronicle/configuration/#state_file). Delete it and
-  the next sweep re-collects everything, which costs quota and nothing else for
-  five of the six; the sixth is the commit each dependency diff starts from, and
-  the changes in the gap are not collected again.
+  [seven things live in it](/ghchronicle/configuration/#state_file). Delete it
+  and the next sweep re-collects everything, which costs quota and nothing else
+  for six of the seven; the seventh is the commit each dependency diff starts
+  from, and the changes in the gap are not collected again.
 </Aside>
 
 ## Where to go next

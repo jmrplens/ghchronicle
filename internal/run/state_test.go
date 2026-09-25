@@ -88,7 +88,7 @@ func stateStruct(t *testing.T) (string, *ast.StructType) {
 func TestAStateFileThatNullsItsMapsStillLoadsUsable(t *testing.T) {
 	t.Parallel()
 	path := filepath.Join(t.TempDir(), "state.json")
-	nulled := `{"last_run":null,"first_saw":null,"last_head":null,"last_full":null,"last_event":"42"}`
+	nulled := `{"last_run":null,"first_saw":null,"history_read":null,"last_head":null,"last_full":null,"last_event":"42"}`
 	if err := os.WriteFile(path, []byte(nulled), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -100,6 +100,7 @@ func TestAStateFileThatNullsItsMapsStillLoadsUsable(t *testing.T) {
 	if !s.FirstSight("o/n", now) || s.FirstSight("o/n", now) {
 		t.Error("a repository was not first seen exactly once")
 	}
+	s.MarkHistory("o/n", now)
 	if s.LastEvent != "42" {
 		t.Errorf("LastEvent = %q, want what the file said beside the nulls", s.LastEvent)
 	}
@@ -195,5 +196,38 @@ func TestAWholeReadIsDueTheMomentItsIntervalHasPassed(t *testing.T) {
 		if got := s.FullDue("notifs", fullInboxEvery, tc.at); got != tc.due {
 			t.Errorf("%s after the last whole read: due = %t, want %t", tc.name, got, tc.due)
 		}
+	}
+}
+
+// TestAStateFromBeforeTheStarHistoryReadsEveryHistoryOnce: a state file
+// written before history_read existed has repositories in first_saw and no
+// history_read at all, and that has to read as "never read whole" for every
+// one of them, so the first sweep after the upgrade reads each history back
+// to its first week. Once recorded, the record survives the file.
+func TestAStateFromBeforeTheStarHistoryReadsEveryHistoryOnce(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "state.json")
+	older := `{"last_run":{"stars":"2026-09-12T10:00:00Z"},"first_saw":{"o/a":"2026-01-01T00:00:00Z"}}`
+	if err := os.WriteFile(path, []byte(older), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	s := LoadState(path)
+	if !s.HistoryDue("o/a") || !s.HistoryDue("o/never-seen") {
+		t.Fatal("a state without history_read did not read as every history unread")
+	}
+	now := time.Date(2026, 9, 12, 10, 0, 0, 0, time.UTC)
+	s.MarkHistory("o/a", now)
+	if s.HistoryDue("o/a") {
+		t.Error("a history recorded as read whole is still due")
+	}
+	if err := s.Save(); err != nil {
+		t.Fatal(err)
+	}
+	saved := LoadState(path)
+	if saved.HistoryDue("o/a") || !saved.HistoryRead["o/a"].Equal(now) {
+		t.Errorf("history_read after a save = %v, want o/a at %s", saved.HistoryRead, now)
+	}
+	if !saved.HistoryDue("o/b") {
+		t.Error("a repository never read reads as read")
 	}
 }

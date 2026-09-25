@@ -2,7 +2,8 @@
 //
 // It serves the fixtures under test/e2e/testdata on the paths the collectors
 // ask for, for one account (octocat) with one repository (hello-world). Every
-// fixture is a real response shape; the only liberty is four tokens.
+// fixture is a real response shape; the only liberty is the tokens below,
+// every one of them a date counted from the fake's own clock.
 //
 //   - "@NOW@" becomes the current time, so a family that only looks at the last
 //     few minutes still finds something: job logs, for one, are fetched for runs
@@ -14,6 +15,12 @@
 //     Unix seconds. A rate limit window that has already closed is not a window,
 //     and a fixed one would publish a reset years in the past and a negative
 //     countdown with it.
+//   - "@DAYS_AGO_n@" and "@DAYS_AHEAD_n@" become the date n days either side of
+//     today, so a fixture stays the same distance from the present; see
+//     daysAgoMarker.
+//   - "@WEEK_EPOCH_n@" becomes the Unix second of Sunday 00:00 UTC n weeks
+//     before the current week's, which is how the daily star history labels
+//     its weeks; see weekEpochMarker.
 //
 // It prices what it answers the way api.github.com does, so a suite can say
 // what a sweep cost and hold the number: every REST fixture carries one ETag,
@@ -86,6 +93,7 @@ var rest = map[string]string{
 	repoPath + "/topics":                            "repo_topics.json",
 	repoPath + "/releases":                          "releases.json",
 	repoPath + "/stargazers":                        "stargazers_page1.json",
+	repoPath + "/stargazers/history":                "stargazers_history.json",
 	repoPath + "/actions/runs/1000163135/jobs":      "actions_jobs.json",
 	repoPath + "/actions/runs/1000163134/jobs":      "actions_jobs_failed.json",
 	repoPath + "/actions/cache/usage":               "actions_cache.json",
@@ -604,6 +612,7 @@ func (s *Server) resolve(body []byte) []byte {
 	out = strings.ReplaceAll(out, "@TODAY@", today.Format(time.RFC3339))
 	out = strings.ReplaceAll(out, "@SOON_EPOCH@", strconv.FormatInt(soon.Unix(), 10))
 	out = strings.ReplaceAll(out, "@SOON@", soon.Format(time.RFC3339))
+	out = weekEpochMarker.ReplaceAllStringFunc(out, s.weekEpoch)
 	return []byte(daysAgoMarker.ReplaceAllStringFunc(out, s.agoDate))
 }
 
@@ -641,6 +650,34 @@ func (s *Server) agoDate(marker string) string {
 		n = -n
 	}
 	return s.now().Truncate(24*time.Hour).AddDate(0, 0, n).Format(time.DateOnly)
+}
+
+// weekEpochMarker matches "@WEEK_EPOCH_2@", which becomes the week two before
+// the fake's current one as the star history spells a week: the Unix second
+// of its Sunday at 00:00 UTC, a bare number rather than a date.
+//
+// A token rather than a number written out for the reason the day offsets
+// have one, and more so: a week is a row in every star panel, and a literal
+// epoch drifts out of the window a dashboard asks for without anything in
+// the fixture looking like a date. TestNoFixtureWritesOutARecentEpoch is the
+// guard that makes a written-out one fail.
+var weekEpochMarker = regexp.MustCompile(`@WEEK_EPOCH_(\d+)@`)
+
+// weekEpoch is that replacement, against whatever clock this fake was given.
+// It starts from the day, not the moment, so two sweeps of one test in the
+// same week spell every week identically.
+func (s *Server) weekEpoch(marker string) string {
+	m := weekEpochMarker.FindStringSubmatch(marker)
+	n, err := strconv.Atoi(m[1])
+	if err != nil {
+		// Unreachable through the regexp, and said out loud for the reason
+		// agoDate gives.
+		s.tb.Errorf("fixture marker %s: %v", marker, err)
+		return marker
+	}
+	today := s.now().Truncate(24 * time.Hour)
+	sunday := today.AddDate(0, 0, -int(today.Weekday())-7*n)
+	return strconv.FormatInt(sunday.Unix(), 10)
 }
 
 // FreezeAt stops the fake's clock, so every relative date in its fixtures

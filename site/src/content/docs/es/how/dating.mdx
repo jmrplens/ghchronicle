@@ -136,10 +136,10 @@ distintos vistos por serie. Eso es lo que permite que un dashboard de
 Prometheus responda "por día", mediante `increase()` sobre un contador
 monótono, ya que no tiene filas que contar.
 
-### Las diez que no se sirven nunca
+### Las once que no se sirven nunca
 
-Diez de las medidas llevan `skip`, así que un exportador de Prometheus y un
-backend OTLP con `raw: false` no las ven nunca. Siete son historia, dos son
+Once de las medidas llevan `skip`, así que un exportador de Prometheus y un
+backend OTLP con `raw: false` no las ven nunca. Ocho son historia, dos son
 tamaño y una es texto:
 
 | Medida                     | Por qué                                                                                        |
@@ -152,6 +152,7 @@ tamaño y una es texto:
 | `gh_job_log`               | Texto, no un número. Su sitio es un almacén de logs                                            |
 | `gh_package_version`       | Historia. La fecha de publicación de cada tag; su recuento ya es un campo de `gh_package`        |
 | `gh_release_asset`         | Tamaño. Una serie por cada fichero publicado alguna vez                                        |
+| `gh_star_day`              | Historia. Estrellas por día, corregidas hacia atrás cuando se quita una estrella dada en las últimas treinta semanas; el recuento es `gh_repo.stars` |
 | `gh_traffic_path`          | Historia. Las rutas por día                                                                    |
 | `gh_workflow_step`         | Historia. Los tiempos por paso                                                                 |
 
@@ -183,7 +184,11 @@ alguna vez. Es un campo.
 **Las filas semanales se anclan a la semana, no a hoy.** `gh_commits_week` se
 sella en el domingo con el que empieza cada semana. Una pasada del martes y otra
 del viernes tienen que caer en la misma fila, o cada relectura escribe una
-segunda copia del año.
+segunda copia del año. `gh_star_day` se ancla igual, cada día la `week` que
+devuelve GitHub más su índice. El día es el día natural del propio GitHub en
+America/Los_Angeles, medido y no documentado, y la fila se sella a las 00:00 UTC
+de esa fecha, así que una estrella dada una mañana europea puede quedar un día
+antes del instante que le da `gh_star`.
 
 **Prometheus reserva algunos nombres de etiqueta.** Una etiqueta llamada `job` o
 `instance` choca con las etiquetas del scrape, y el receptor OTLP la sobrescribe

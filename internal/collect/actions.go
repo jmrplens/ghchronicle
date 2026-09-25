@@ -530,7 +530,6 @@ func (a Actions) jobsFor(ctx context.Context, c *ghapi.Client, repo Repo, r *run
 		}
 		fields := map[string]any{
 			"duration_seconds": int(j.CompletedAt.Sub(j.StartedAt).Seconds()),
-			"steps":            len(j.Steps),
 			"success":          j.Conclusion == "success",
 			// Pairs a job with the run it belongs to, and a retried job with
 			// the commit it retried. Both unbounded, both fields, for the same
@@ -547,6 +546,9 @@ func (a Actions) jobsFor(ctx context.Context, c *ghapi.Client, repo Repo, r *run
 		}
 		if !j.CreatedAt.IsZero() && !j.StartedAt.IsZero() {
 			fields["queued_seconds"] = int(j.StartedAt.Sub(j.CreatedAt).Seconds())
+		}
+		if !stepsWithheld(j.Conclusion, len(j.Steps)) {
+			fields["steps"] = len(j.Steps)
 		}
 		points = append(points, sink.Point{
 			Measurement: "gh_workflow_job",
@@ -600,6 +602,28 @@ func (a Actions) jobsFor(ctx context.Context, c *ghapi.Client, repo Repo, r *run
 		}
 	}
 	return points, nil
+}
+
+// stepsWithheld reports whether a job's empty steps list is GitHub's
+// retention rather than a count, in which case the job writes no steps field.
+//
+// GitHub stops serving a job's steps long before the job itself: measured on
+// 2026-09-24, every job of a run created before about 12 April listed its
+// times, runner and conclusion over an empty steps list, and every later
+// run's jobs listed theirs. A job that finished as success, failure or
+// timed_out ran at least one step, so its empty list says nothing, and a zero
+// written for it drags every mean of steps toward nothing as far back as a
+// backfill reached. A skipped job runs none (measured) and a canceled one can
+// stop before its first, so their zero may be the truth and is kept.
+func stepsWithheld(conclusion string, listed int) bool {
+	if listed > 0 {
+		return false
+	}
+	switch conclusion {
+	case "success", "failure", "timed_out":
+		return true
+	}
+	return false
 }
 
 // Artifacts collects what the workflows left behind.

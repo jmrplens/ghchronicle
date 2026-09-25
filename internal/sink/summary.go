@@ -152,9 +152,18 @@ var promRules = map[string]rule{
 	"gh_sponsorship": {mode: count, as: "gh_sponsorships", keep: []string{"user", "direction"}},
 
 	// History with no current value: the calendar, the weekly commit series,
-	// per-day traffic paths, per-artifact rows and the per-step timings.
+	// the daily star history, per-day traffic paths, per-artifact rows and the
+	// per-step timings.
+	//
+	// The star history in particular cannot be counted the way gh_star is. A
+	// day's row is a number of stars, which a distinct-item count would weigh
+	// as one; an unstar lowers a past day, which total would read as a counter
+	// reset; and the first read would put years into a single increase().
+	// github_repo_stars, from gh_repo, is already every repository's current
+	// count, whether or not the token may read the list.
 	"gh_contribution_day": {mode: skip},
 	"gh_commits_week":     {mode: skip},
+	"gh_star_day":         {mode: skip},
 	"gh_traffic_path":     {mode: skip},
 	"gh_artifact":         {mode: skip},
 	"gh_workflow_step":    {mode: skip},

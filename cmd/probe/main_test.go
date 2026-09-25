@@ -20,7 +20,7 @@ import (
 
 // families is every name the probe prints a line under, in its order.
 var families = []string{
-	"traffic", "repo", "stars", "account", "pulls", "actions", "artifacts", "activity",
+	"traffic", "repo", "stars", "starhistory", "account", "pulls", "actions", "artifacts", "activity",
 	"discuss", "billing", "profile", "commits", "activity2", "analyses", "forks",
 	"planning", "outbound", "history", "settings", "rulesets", "joblogs", "events", "notifs",
 }
@@ -158,7 +158,7 @@ func TestProbeReportsAFailingCollectorAndGoesOn(t *testing.T) {
 		t.Fatalf("probe = %d, want failed collectors reported rather than fatal", status)
 	}
 	for _, family := range families {
-		if !strings.Contains(out.String(), fmt.Sprintf("%-9s ERROR ", family)) {
+		if !strings.Contains(out.String(), fmt.Sprintf("%-11s ERROR ", family)) {
 			t.Errorf("no ERROR line for %s:\n%s", family, out.String())
 		}
 	}

@@ -46,7 +46,7 @@ func run(ctx context.Context, c *ghapi.Client, args []string, dump string, stdou
 	for _, col := range collectors(ctx, c, repo, now) {
 		pts, err := col.run()
 		if err != nil {
-			fmt.Fprintf(stdout, "%-9s ERROR %v\n", col.name, err)
+			fmt.Fprintf(stdout, "%-11s ERROR %v\n", col.name, err)
 			continue
 		}
 		if dump == col.name {
@@ -54,7 +54,7 @@ func run(ctx context.Context, c *ghapi.Client, args []string, dump string, stdou
 				fmt.Fprintln(stdout, sink.LineProtocol(pt))
 			}
 		}
-		fmt.Fprintf(stdout, "%-9s %4d points", col.name, len(pts))
+		fmt.Fprintf(stdout, "%-11s %4d points", col.name, len(pts))
 		if len(pts) > 0 {
 			fmt.Fprintf(stdout, "  | %s", truncate(sink.LineProtocol(pts[0]), 120))
 		}
@@ -79,6 +79,9 @@ func collectors(ctx context.Context, c *ghapi.Client, repo collect.Repo, now tim
 		{"repo", func() ([]sink.Point, error) { return collect.RepoCore{}.Collect(ctx, c, repo, now) }},
 		{"stars", func() ([]sink.Point, error) {
 			return collect.Stargazers{Full: true}.Collect(ctx, c, repo, now)
+		}},
+		{"starhistory", func() ([]sink.Point, error) {
+			return collect.StarHistory{Walk: collect.Unbounded}.Collect(ctx, c, repo, now)
 		}},
 		{"account", func() ([]sink.Point, error) {
 			return collect.Account{Login: repo.Owner}.Collect(ctx, c, now)

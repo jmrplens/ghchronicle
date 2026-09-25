@@ -742,6 +742,180 @@ func TestCumulativeCurvesSpanTheWholeRange(t *testing.T) {
 	}
 }
 
+// preRange is the scalar subquery a running count starts from: what the rows
+// dated before the range add up to.
+var preRange = regexp.MustCompile(`\(SELECT (.+?) FROM (\w+) WHERE time < \$__timeFrom\(\)`)
+
+// TestASummedClimbStartsFromZeroRatherThanNull: the star curve adds up
+// gh_star_day's `stars` where it used to count gh_star's rows. COUNT over no
+// rows is 0, SUM over no rows is NULL, and NULL plus the running sum is NULL
+// at every point, so a range that begins before a repository's first star
+// drew nothing at all. Every climb whose start is a SUM has to COALESCE it.
+func TestASummedClimbStartsFromZeroRatherThanNull(t *testing.T) {
+	t.Parallel()
+	for _, store := range []string{"influxdb", "postgres"} {
+		summed := 0
+		for title, p := range rendered(t, store) {
+			targets, _ := p["targets"].([]any)
+			for _, raw := range targets {
+				target, _ := raw.(map[string]any)
+				sql, _ := target["rawSql"].(string)
+				for _, m := range preRange.FindAllStringSubmatch(sql, -1) {
+					start := m[1]
+					if start == "COUNT(*)" {
+						continue
+					}
+					summed++
+					if !strings.HasPrefix(start, "COALESCE(") || !strings.HasSuffix(start, ", 0)") {
+						t.Errorf("%s %q starts its curve from %s, which is NULL on a range "+
+							"with nothing before it and blanks the whole curve", store, title, start)
+					}
+				}
+			}
+		}
+		if summed == 0 {
+			t.Errorf("%s: no climb starts from a sum, so this checked nothing; the star "+
+				"curve is meant to add up gh_star_day", store)
+		}
+	}
+}
+
+// TestTheForkClimbIsTheStatementItWas: the climb was generalised so the star
+// curve could sum a day's count, and the forks, one row per fork, pass
+// COUNT(*) on both sides. The five dashboard files are what a user imports,
+// so the generalisation must not have touched a byte of the fork curve.
+func TestTheForkClimbIsTheStatementItWas(t *testing.T) {
+	t.Parallel()
+	want := map[string]string{
+		"influxdb": `SELECT time, (SELECT COUNT(*) FROM gh_fork WHERE time < $__timeFrom() ` +
+			`AND repo IN (${repo:singlequote})) + SUM(n) OVER (ORDER BY time) AS "Forks" FROM ` +
+			`(SELECT time, SUM(n) AS n FROM (SELECT $__dateBin(time) AS time, COUNT(*) AS n ` +
+			`FROM gh_fork WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) GROUP BY 1 ` +
+			`UNION ALL SELECT $__timeFrom(), 0 UNION ALL SELECT $__timeTo(), 0) a GROUP BY 1) x ` +
+			`ORDER BY time`,
+		"postgres": `SELECT time, (SELECT COUNT(*) FROM gh_fork WHERE time < $__timeFrom() ` +
+			`AND repo IN (${repo:sqlstring})) + SUM(n) OVER (ORDER BY time) AS "Forks" FROM ` +
+			`(SELECT time, SUM(n) AS n FROM (SELECT $__timeGroupAlias(time, $__interval), ` +
+			`COUNT(*) AS n FROM gh_fork WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring}) ` +
+			`GROUP BY 1 UNION ALL SELECT $__unixEpochFrom(), 0 UNION ALL SELECT $__unixEpochTo(), 0) ` +
+			`a GROUP BY 1) x ORDER BY time`,
+	}
+	for store, sql := range want {
+		if got := sqlOf(t, mustPanel(t, rendered(t, store), "Forks over time")); got != sql {
+			t.Errorf("%s: the fork curve changed:\n got %s\nwant %s", store, got, sql)
+		}
+	}
+}
+
+// readsStar and readsStarDay tell the two star measurements apart in any
+// store's query: a table or index name in SQL and Elasticsearch, a path in
+// Graphite. gh_star is followed by something that cannot continue a name,
+// so gh_star_day, gh_star_given and gh_star_list are not it.
+var (
+	readsStar    = regexp.MustCompile(`\bgh_star(?:[^_a-z0-9]|$)|\bgithub\.star\.`)
+	readsStarDay = regexp.MustCompile(`\bgh_star_day\b|\bgithub\.star_day\.`)
+)
+
+// inRangeStarDay is the aggregate a climb over gh_star_day takes per time
+// bucket inside the range, the n its running SUM(n) OVER adds up.
+var inRangeStarDay = regexp.MustCompile(`(\w+\([^()]*\)) AS n FROM gh_star_day WHERE \$__timeFilter\(time\)`)
+
+// TestTheStarCountsReadTheDailyHistory: since July 2026 GitHub serves the
+// stargazer list behind gh_star only to a repository's admins and
+// collaborators, and gh_star_day is the daily history it serves for every
+// repository. The two panels that count stars read the history wherever the
+// store can hold it, and Recent stars keeps gh_star, the only measurement
+// that names who starred, except in Graphite, which keeps no names and
+// counts from the history too.
+func TestTheStarCountsReadTheDailyHistory(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		store, title string
+		day, star    bool
+	}{
+		{"influxdb", "Stars gained over time", true, false},
+		{"influxdb", "Stars over time", true, false},
+		{"influxdb", "Recent stars", false, true},
+		{"postgres", "Stars gained over time", true, false},
+		{"postgres", "Stars over time", true, false},
+		{"postgres", "Recent stars", false, true},
+		{"graphite", "Stars gained over time", true, false},
+		{"graphite", "Recent stars", true, false},
+		{"elasticsearch", "Stars gained over time", true, false},
+		{"elasticsearch", "Recent stars", false, true},
+		// Graphite cannot add the stars from before the range to a sum
+		// inside it, and no Elasticsearch pipeline has been validated for
+		// it, so both keep the per-sweep reading of gh_repo.
+		{"graphite", "Stars over time", false, false},
+		{"elasticsearch", "Stars over time", false, false},
+	} {
+		raw := asJSON(t, mustPanel(t, rendered(t, c.store), c.title)["targets"])
+		if got := readsStarDay.MatchString(raw); got != c.day {
+			t.Errorf("%s %q reads gh_star_day: %v, want %v: %s", c.store, c.title, got, c.day, raw)
+		}
+		if got := readsStar.MatchString(raw); got != c.star {
+			t.Errorf("%s %q reads gh_star: %v, want %v: %s", c.store, c.title, got, c.star, raw)
+		}
+	}
+	// A day of the history is a count, so every store adds it up rather
+	// than counting the rows, which would give a day of three stars one.
+	for _, store := range []string{"influxdb", "postgres"} {
+		if sql := sqlOf(t, mustPanel(t, rendered(t, store), "Stars gained over time")); !strings.Contains(sql, "SUM(stars)") {
+			t.Errorf("%s counts the days rather than adding up their stars: %s", store, sql)
+		}
+	}
+	// The running total has two aggregates, and a SUM(stars) anywhere in it
+	// would be satisfied by the start alone, which
+	// TestASummedClimbStartsFromZeroRatherThanNull holds. This is the climb
+	// inside the range. Counting rows there costs more than on the panel
+	// above: page one of every history stores each day of its thirty weeks,
+	// zeros included, so a repository without a single star would climb by
+	// one a day.
+	for _, store := range []string{"influxdb", "postgres"} {
+		sql := sqlOf(t, mustPanel(t, rendered(t, store), "Stars over time"))
+		m := inRangeStarDay.FindStringSubmatch(sql)
+		switch {
+		case m == nil:
+			t.Errorf("%s: Stars over time adds nothing up from gh_star_day inside the range: %s", store, sql)
+		case m[1] != "SUM(stars)":
+			t.Errorf("%s: Stars over time climbs by %s a bucket rather than adding up its stars: %s", store, m[1], sql)
+		}
+	}
+	es := asJSON(t, mustPanel(t, rendered(t, "elasticsearch"), "Stars gained over time")["targets"])
+	if !strings.Contains(es, `{"field":"stars","id":`) || !strings.Contains(es, `"type":"sum"`) {
+		t.Errorf("Elasticsearch counts the days rather than adding up their stars: %s", es)
+	}
+	gr := asJSON(t, mustPanel(t, rendered(t, "graphite"), "Stars gained over time")["targets"])
+	if strings.Contains(gr, "isNonNull") {
+		t.Errorf("Graphite turns each day into a 1 before summing it: %s", gr)
+	}
+	// Prometheus has neither: the reduction skips gh_star_day, a history with
+	// no current value, so the exporter's count of gh_star is what it has.
+	for _, title := range []string{"Stars gained over time", "Recent stars"} {
+		raw := asJSON(t, mustPanel(t, rendered(t, "prometheus"), title)["targets"])
+		if !strings.Contains(raw, "github_stars_gained_total") || strings.Contains(raw, "star_day") {
+			t.Errorf("Prometheus %q no longer reads the stars gained the exporter publishes: %s", title, raw)
+		}
+	}
+}
+
+// TestNoPanelCountsAStarTwice: gh_star and gh_star_day hold the same stars
+// twice over, on different days (the history buckets by GitHub's Pacific
+// calendar day, gh_star by the UTC instant) and with different memories (an
+// unstar is taken off the history and kept in gh_star). A panel that read
+// both would count every star a repository has twice, so none may.
+func TestNoPanelCountsAStarTwice(t *testing.T) {
+	t.Parallel()
+	for _, store := range Names() {
+		for title, p := range rendered(t, store) {
+			raw := asJSON(t, p["targets"])
+			if readsStar.MatchString(raw) && readsStarDay.MatchString(raw) {
+				t.Errorf("%s %q reads both gh_star and gh_star_day: %s", store, title, raw)
+			}
+		}
+	}
+}
+
 // TestEveryPanelReadingTheArtifactSizeSaysWhatItIsOver is the gate on a
 // number that is right and reads as something else.
 //

@@ -65,7 +65,7 @@ family carries its own.
 | `billing`       | 6h      | Usage per day, product, SKU and repository                     |
 | `planning`      | 6h      | Labels and milestones                                          |
 | `settings`      | 6h      | Webhooks and their deliveries, environments, deploy keys       |
-| `stars`         | 6h      | The stargazer walk once, then the newest hundred               |
+| `stars`         | 6h      | Stars per day for every repository, and the stargazer walk once, then the newest hundred |
 | `traffic`       | 6h      | The whole 14-day window, rewritten                             |
 | `account`       | 12h     | Profile, contribution calendar, contribution totals            |
 | `forks`         | 12h     | Who forked, and when                                            |
@@ -111,12 +111,13 @@ level=WARN msg="family failed everywhere, not marking it as run" family=security
 
 ### The state file
 
-`state_file` holds [six things](https://jmrp.io/docs/ghchronicle/configuration/#state_file), and
+`state_file` holds [seven things](https://jmrp.io/docs/ghchronicle/configuration/#state_file), and
 the two a sweep is judged by are when each family last ran and when each
 repository was first seen.
 
-The second is what makes the one-off full walk of the star history happen once
-instead of on every sweep. It is written through a temporary file and renamed,
+The second is what makes the one-off full walk of the stargazer list happen
+once instead of on every sweep, as `history_read` does for the daily star
+history. It is written through a temporary file and renamed,
 so a crash mid-write cannot leave a truncated state that would trigger a full
 re-collection.
 
@@ -275,10 +276,10 @@ The reducer also publishes `total`, a running count of distinct items seen per
 series. That is what lets a Prometheus dashboard answer "per day" at all, through
 `increase()` over a monotonic counter, since it has no rows to count.
 
-#### The ten that are never served
+#### The eleven that are never served
 
-Ten of the measurements carry `skip`, so a Prometheus exporter and an OTLP
-backend with `raw: false` never see them. Seven are history, two are size, and
+Eleven of the measurements carry `skip`, so a Prometheus exporter and an OTLP
+backend with `raw: false` never see them. Eight are history, two are size, and
 one is text:
 
 | Measurement                | Why                                                                                   |
@@ -291,6 +292,7 @@ one is text:
 | `gh_job_log`               | Text, not a number. It belongs in a log store                                         |
 | `gh_package_version`       | History. The publication date of every tag; the count of them is a field on `gh_package` |
 | `gh_release_asset`         | Size. One series per file ever published                                              |
+| `gh_star_day`              | History. Stars per day, revised backwards when a star given in the last thirty weeks is taken back; the count is `gh_repo.stars` |
 | `gh_traffic_path`          | History. The per-day paths                                                            |
 | `gh_workflow_step`         | History. The per-step timings                                                         |
 
@@ -321,7 +323,11 @@ series for every job ever executed. It is a field.
 **Weekly rows are anchored to the week, not to today.** `gh_commits_week` is
 stamped at the Sunday that starts each week. A sweep on Tuesday and one on
 Friday have to land on the same row, or every re-read writes a second copy of
-the year.
+the year. `gh_star_day` is anchored the same way, each day the `week` GitHub
+returns plus its index. The day is GitHub's own calendar day in
+America/Los_Angeles, measured rather than documented, and the row is stamped at
+00:00 UTC of that date, so a star given on a European morning can sit a day
+before the instant `gh_star` gives it.
 
 **Prometheus reserves some tag names.** A tag called `job` or `instance`
 collides with the scrape labels, and the OTLP receiver overwrites it with the
@@ -539,7 +545,9 @@ that a sweep reads.
 - Every workflow run GitHub still holds, each expanded into its jobs, and into
   its steps while GitHub still serves them. Measured on 24 September 2026,
   GitHub listed every job of a run 278 days old, but no steps for any run
-  created before 12 April, about five and a half months back.
+  created before 12 April, about five and a half months back. Such a job, if
+  it finished as success, failure or timed out, is written with no `steps`
+  field rather than a 0, since it ran at least one.
 - The archived repositories, in full, whatever `include_archived` says. Their
   history is the account's history and it never moves again, which is exactly
   why a sweep leaves them out and why one walk of them is enough. Forks stay

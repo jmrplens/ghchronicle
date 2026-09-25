@@ -213,7 +213,7 @@ with a smaller body limit.
 Everything dated, which is most of the project:
 
 - The traffic of a particular Tuesday, months later.
-- The star curve since the first star, drawn from one row per star.
+- The star curve since the first star, drawn from one row per repository and day.
 - The merge time of a pull request closed in July.
 - Lines added and removed per commit, per author, over years.
 
@@ -369,9 +369,10 @@ release assets one per file ever published. Measured, together they were **four
 fifths of the exporter's entire output**. Both are drawn properly by the
 InfluxDB dashboard.
 
-Eight more are skipped for a reason other than size, seven of them as history
-and one as text, so ten measurements in all never reach the exporter. The list, with the reason for each, is on
-[dating a point](https://jmrp.io/docs/ghchronicle/how/dating/#the-ten-that-are-never-served).
+Nine more are skipped for a reason other than size, eight of them as history
+and one as text, so eleven measurements in all never reach the exporter. The
+list, with the reason for each, is on
+[dating a point](https://jmrp.io/docs/ghchronicle/how/dating/#the-eleven-that-are-never-served).
 
 The exporter holds only what the last sweep collected, and for workflow runs
 that is the newest thirty per repository between builds: an ordinary sweep

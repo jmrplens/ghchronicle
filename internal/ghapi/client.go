@@ -40,10 +40,11 @@ type Client struct {
 	// test server. GraphQL lives at base + "/graphql" on all three.
 	base string
 
-	// cache holds the ETag and the body of the URLs fetched, so a repeat
-	// request can ask GitHub "only if it changed". A 304 answer costs no rate
-	// limit at all and the stored body is replayed, which is what lets the
-	// collectors run often without paying for it. It is bounded; see cache.
+	// cache holds the ETag, the body and the Link header of the URLs
+	// fetched, so a repeat request can ask GitHub "only if it changed". A 304
+	// answer costs no rate limit at all and the stored body is replayed, which
+	// is what lets the collectors run often without paying for it. It is
+	// bounded; see cache.
 	mu    sync.Mutex
 	cache *cache
 
@@ -156,15 +157,19 @@ func (c *Client) Rates() map[string]RateState {
 // account this was written for: 52 repositories with every family forced on
 // every sweep, which is the shape the bound has to survive. The first sweep
 // leaves 915 entries and 114,662,719 bytes charged; three sweeps leave 922 and
-// 114,807,379, which is the high-water mark the test pins. Each sweep after
-// the first adds only two to five entries and 18 to 124 KB, because nearly
-// every URL a sweep asks for is the one it asked for last time; the growth is
-// the few that carry a moving window in the query string. At the one minute
-// cadence this is meant for that is 1440 sweeps a day, so three to seven
-// thousand entries and 26 to 178 MB a day accumulating on top of the sweep's
-// own footprint with nothing to remove any of it. A fortnight of that is
-// several gigabytes of bodies held for answers no collector will ask for
-// again.
+// 114,807,379, which is the high-water mark the test pins. Those were charged
+// before an entry held its Link and at an overhead of 200 (see
+// cacheEntryOverhead). The same entries now charge 56 bytes more each, 51,632
+// across the 922, plus the Link of each paginated answer, at most four page
+// URLs: under one percent of the total even if every entry carried one, which
+// moves nothing below. Each sweep after the first adds only two to five
+// entries and 18 to 124 KB, because nearly every URL a sweep asks for is the
+// one it asked for last time; the growth is the few that carry a moving
+// window in the query string. At the one minute cadence this is meant for
+// that is 1440 sweeps a day, so three to seven thousand entries and 26 to 178
+// MB a day accumulating on top of the sweep's own footprint with nothing to
+// remove any of it. A fortnight of that is several gigabytes of bodies held
+// for answers no collector will ask for again.
 //
 // 256 MB is 2.3 times the measured sweep, and the headroom is the whole point.
 // A limit under one sweep's live set is not a smaller cache but no cache:
@@ -190,15 +195,23 @@ const DefaultCacheBytes = 256 << 20
 // is a few hundred bytes of body behind a ninety byte URL, and without this
 // the bound would be measuring about half of that entry's memory.
 //
-// Measured, not guessed: entries whose URL, ETag and body are all empty cost
-// 131 bytes each in HeapAlloc at two hundred thousand of them on this Go
-// version, and 151 at the 922 one sweep holds, the difference being where the
-// map's capacity happens to land. That is the map slot, the container/list
-// element and the conditional struct, whose 56 bytes are allocated one at a
-// time and so round up to a 64 byte size class. The URL and the ETag are
-// counted separately below. Two hundred rounds the measured range up, so the
-// accounting errs towards charging more than the entry costs and never less.
-const cacheEntryOverhead = 200
+// Measured, not guessed, on 2026-09-25 with Go 1.27.1: entries whose ETag,
+// body and Link are empty, keyed by URLs allocated before the count started,
+// cost between 198 and 253 bytes each in HeapAlloc across forty-one sizes
+// from 100 to 235,000 entries, and 251 at the 922 one sweep holds, the spread
+// being where the map's capacity happens to land. That is the map slot, whose
+// key is a string and a reflect.Type, the container/list element, and the
+// conditional struct, whose 88 bytes are allocated one at a time and so round
+// up to a 96 byte size class. The URL, the ETag, the body and the Link are
+// counted separately below. Two hundred and fifty-six rounds the measured
+// range up, so the accounting errs towards charging more than the entry costs
+// and never less.
+//
+// It was two hundred, measured when the key was the URL alone and the struct
+// held no Link. The type in the key had already taken the real cost past it
+// at most sizes, to between 182 and 237 at the same forty-one, and the Link's
+// string header is the other sixteen bytes.
+const cacheEntryOverhead = 256
 
 // cacheKey names an entry: the URL, and the type its body was decoded into.
 //
@@ -224,6 +237,13 @@ type cacheKey struct {
 // the bytes GitHub sent (see replayable), so it is a fraction of the wire
 // size.
 //
+// The Link header the body came with is kept beside it, because a 304 does
+// not repeat it. Measured on 2026-09-25 against /stargazers/history: the 200
+// for page 1 carries rel="next" and rel="last", and the 304 for the same page
+// carries no Link at all. Every walk that finds its next page there, a page
+// number or a cursor, would otherwise read a page 1 answered from memory as a
+// list with no second page.
+//
 // One entry rather than two maps because the two are only useful together. An
 // ETag whose body has been dropped still asks GitHub "only if it changed", and
 // when GitHub answers 304 there is nothing to replay: GetJSON returns no rows
@@ -236,10 +256,11 @@ type conditional struct {
 	key  cacheKey
 	etag string
 	body []byte
+	link string
 }
 
 func (e *conditional) size() int {
-	return len(e.key.url) + len(e.etag) + len(e.body) + cacheEntryOverhead
+	return len(e.key.url) + len(e.etag) + len(e.body) + len(e.link) + cacheEntryOverhead
 }
 
 // cache is a byte-bounded LRU over those pairs.
@@ -312,22 +333,26 @@ func pairAt(el *list.Element) *conditional {
 	return e
 }
 
-// get returns the pair stored for key and marks it as the most recently used.
-func (k *cache) get(key cacheKey) (etag string, body []byte) {
+// get returns the pair stored for key, and the Link header its body came
+// with, and marks it as the most recently used.
+func (k *cache) get(key cacheKey) (etag string, body []byte, link string) {
 	el, ok := k.entries[key]
 	if !ok {
-		return "", nil
+		return "", nil, ""
 	}
 	e := pairAt(el)
 	if e == nil {
-		return "", nil
+		return "", nil, ""
 	}
 	k.order.MoveToFront(el)
-	return e.etag, e.body
+	return e.etag, e.body, e.link
 }
 
-// put stores the pair for key and evicts until the total fits again.
-func (k *cache) put(key cacheKey, etag string, body []byte) {
+// put stores the pair for key, with the Link header the body came with, and
+// evicts until the total fits again. The Link is not half of the pair: an
+// answer with no Link is a list of one page, or no list, and is stored as
+// such, which also forgets a Link an older body of the same URL came with.
+func (k *cache) put(key cacheKey, etag string, body []byte, link string) {
 	if etag == "" || len(body) == 0 {
 		// Half a pair is worse than none. An ETag with no body would be asked
 		// with and then answered by a 304 carrying nothing to replay, which
@@ -337,7 +362,7 @@ func (k *cache) put(key cacheKey, etag string, body []byte) {
 		k.drop(key)
 		return
 	}
-	e := &conditional{key: key, etag: etag, body: body}
+	e := &conditional{key: key, etag: etag, body: body, link: link}
 	if e.size() > k.limit {
 		// Nothing else would fit beside it, so keeping it would mean emptying
 		// the cache for one page. Paying for that page again is the cheaper
@@ -511,8 +536,9 @@ func (e *NotReadyError) Error() string { return e.Path + ": still being computed
 
 // GetJSON fetches path (relative to the REST base) into out.
 //
-// It returns the response's Link header so a caller can paginate, and reports
-// whether the answer came from the ETag cache.
+// It returns the response's Link header so a caller can paginate, the one
+// stored with the body when the answer is a 304 that brought none, and
+// reports whether the answer came from the ETag cache.
 func (c *Client) GetJSON(ctx context.Context, path string, out any, accept string) (link string, cached bool, err error) {
 	url := path
 	if strings.HasPrefix(path, "/") {
@@ -544,7 +570,7 @@ func (c *Client) GetJSON(ctx context.Context, path string, out any, accept strin
 	// type decoding the same URL holds only what that type kept.
 	key := cacheKey{url: url, typ: reflect.TypeOf(out)}
 	c.mu.Lock()
-	tag, saved := c.cache.get(key)
+	tag, saved, savedLink := c.cache.get(key)
 	c.mu.Unlock()
 	if len(saved) > 0 {
 		req.Header.Set("If-None-Match", tag)
@@ -566,10 +592,18 @@ func (c *Client) GetJSON(ctx context.Context, path string, out any, accept strin
 		if len(saved) == 0 {
 			return "", true, nil
 		}
-		if out == nil {
-			return resp.Header.Get("Link"), true, nil
+		// GitHub's 304 carries no Link, so the one read with the body is
+		// replayed with it. A 304 that did carry one would be the server's
+		// newer word on the stored answer, which RFC 9111 has a cache take
+		// over the stored header, so that one is reported instead.
+		link = resp.Header.Get("Link")
+		if link == "" {
+			link = savedLink
 		}
-		return resp.Header.Get("Link"), true, json.Unmarshal(saved, out)
+		if out == nil {
+			return link, true, nil
+		}
+		return link, true, json.Unmarshal(saved, out)
 	case http.StatusAccepted:
 		return "", false, &NotReadyError{Path: path}
 	case http.StatusForbidden, http.StatusNotFound, http.StatusTooManyRequests:
@@ -596,12 +630,13 @@ func (c *Client) GetJSON(ctx context.Context, path string, out any, accept strin
 			return "", false, fmt.Errorf("%s: %w", path, err)
 		}
 	}
+	link = resp.Header.Get("Link")
 	if fresh := resp.Header.Get("ETag"); fresh != "" {
 		c.mu.Lock()
-		c.cache.put(key, fresh, replayable(raw, out))
+		c.cache.put(key, fresh, replayable(raw, out), link)
 		c.mu.Unlock()
 	}
-	return resp.Header.Get("Link"), false, nil
+	return link, false, nil
 }
 
 // replayable is the body stored beside an ETag: what the caller decoded,
@@ -688,7 +723,7 @@ func (c *Client) GetTextAs(ctx context.Context, path, accept string) (string, er
 	// nil too, but nothing asks the same URL both ways.
 	key := cacheKey{url: url}
 	c.mu.Lock()
-	tag, saved := c.cache.get(key)
+	tag, saved, _ := c.cache.get(key)
 	c.mu.Unlock()
 	if len(saved) > 0 {
 		req.Header.Set("If-None-Match", tag)
@@ -746,8 +781,10 @@ func (c *Client) GetTextAs(ctx context.Context, path, accept string) (string, er
 	// Straight from the API, not from the storage a redirect led to: the
 	// final request is the one asked for exactly when nothing redirected.
 	if fresh := resp.Header.Get("ETag"); fresh != "" && resp.Request.URL.String() == url {
+		// No Link: GetText returns none, so storing one would charge the
+		// bound for a header nothing can read back.
 		c.mu.Lock()
-		c.cache.put(key, fresh, b)
+		c.cache.put(key, fresh, b, "")
 		c.mu.Unlock()
 	}
 	return string(b), nil

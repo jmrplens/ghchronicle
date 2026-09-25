@@ -10,18 +10,20 @@ import (
 	"github.com/jmrplens/ghchronicle/v2/internal/sink"
 )
 
-// Stargazers reconstructs the star curve from its beginning.
+// Stargazers records who starred a repository and the instant each of them
+// did.
 //
 // The stargazers endpoint returns a `starred_at` per user when asked with the
-// star media type, so the entire history is available on first run: a chart
-// that goes back years, not one that starts the day the collector was
-// installed. Every star is written at the instant it was given.
+// star media type, so the entire list is available on first run. Every star is
+// written at the instant it was given. The star counts the dashboards draw
+// from rows come from StarHistory, which every repository gets; only
+// Prometheus, which skips the history, still counts these.
 //
 // Where GitHub serves the list, that is. Since July 2026 it serves it only to
 // a repository's admins and collaborators: anyone else gets a 404 here, which
 // isSkippable files as nothing to collect, and an empty connection from the
-// GraphQL batch, so such a repository gets no star points and keeps only the
-// count its gh_repo row carries.
+// GraphQL batch, so such a repository gets no gh_star points, its stars
+// counted per day by gh_star_day and nobody named.
 //
 // This walk is the history, not the day to day. A repository is read whole the
 // first time it is seen, and again in a backfill; after that an ordinary sweep

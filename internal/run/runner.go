@@ -74,8 +74,10 @@ type Runner struct {
 	// writing any of them would make the next real collection skip or narrow
 	// a read whose data went into a picture and nowhere else. Field by field:
 	// last_run would make a family not due and skip it outright; first_saw
-	// would retire the one-off full walk of a repository's star history, which
-	// no later sweep does again; last_head would move the dependency diff's
+	// would retire the one-off full walk of a repository's stargazer list,
+	// which no later sweep does again; history_read would do the same to the
+	// one whole read of its daily star history, leaving every later sweep on
+	// the newest page; last_head would move the dependency diff's
 	// base past changes no range can name afterwards; last_full would spend
 	// the day's whole-page read of the pull requests nobody touched;
 	// last_notified would cut the inbox window past threads the stores never
@@ -760,9 +762,11 @@ func (r *Runner) repoFamily(ctx context.Context, family string, repo collect.Rep
 	case "repo":
 		return collect.RepoCore{Walk: r.walk()}.Collect(ctx, r.API, repo, now)
 	case "stars", "forks":
-		// The REST walks: a repository's whole star history the first time
+		// The REST walks: a repository's whole stargazer list the first time
 		// it is seen, the forks of a fresh install, and every backfill. The
-		// batch above reads the newest hundred of both otherwise.
+		// batch above reads the newest hundred of both otherwise. Stars also
+		// reads every repository's daily star history here, batched or not,
+		// because that is where the dated star counts come from.
 		return r.audienceWalk(ctx, family, repo, now)
 	case "issues":
 		return r.pulls(repo, now).Collect(ctx, r.API, repo, now)

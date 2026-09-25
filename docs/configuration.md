@@ -75,7 +75,7 @@ github:
 | `token`        | required             | A classic or fine-grained personal access token                                                                                             |
 | `reserve_rate` | `500`                | Calls never spent, so whatever else uses the token keeps working. A non-positive value falls back to the default                            |
 | `timeout`      | `30s`                | Per request. GraphQL over a large account can be slow. A Go duration; anything unparseable or not positive falls back to the default        |
-| `base_url`     | api.github.com       | A GitHub Enterprise instance uses `https://<host>/api/v3`                                                                                   |
+| `base_url`     | api.github.com       | A GitHub Enterprise instance uses `https://<host>/api/v3`. GitHub Enterprise Server does not serve the daily star history, so there [`gh_star_day`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#stars-and-forks) and the star-count panels drawn from it stay empty |
 | `web_url`      | derived from the API | The site the profile page is on, read by `achievements` without the token. Needed only when `base_url` is a proxy in front of the API |
 
 The reserve is scaled per bucket; see [rate limits](https://jmrp.io/docs/ghchronicle/api/).
@@ -86,12 +86,17 @@ The reserve is scaled per bucket; see [rate limits](https://jmrp.io/docs/ghchron
 state_file: /var/lib/ghchronicle/state.json
 ```
 
-Six things, and deleting the file costs a different one for each:
+Seven things, and deleting the file costs a different one for each:
 
 - `last_run`, when each family last ran. Without it every family is due at once,
   so the next sweep is a full one.
 - `first_saw`, when each repository was first seen. Without it the one-off full
-  walk of the star history is done again.
+  walk of the stargazer list is done again.
+- `history_read`, when each repository's daily star history was last read
+  whole. It is written only after a walk that reached the end of the history,
+  not after one an error or a later page's 403 or 404 cut short. Without
+  it that history is read whole again, a page per thirty weeks of the
+  repository's life.
 - `last_head`, the commit each repository was on when the dependency diff last
   ran. Without it the dependency changes in the gap are gone: the next sweep
   has the photograph and no diff.
@@ -103,13 +108,13 @@ Six things, and deleting the file costs a different one for each:
 - `last_event`, the newest event the feed had. Without it empty reads the whole
   feed.
 
-Five of the six cost only quota, because what is collected again is keyed by
+Six of the seven cost only quota, because what is collected again is keyed by
 measurement, tags and timestamp and overwrites what is already stored.
 `last_head` is the one that loses something: the dependency changes between the
 head it held and the next one are read from a range that nothing can name once
 the head is gone.
 
-A run with `-card-only` writes none of the six. Its points reach [the
+A run with `-card-only` writes none of the seven. Its points reach [the
 card](https://jmrp.io/docs/ghchronicle/card/) and no store, so a mark it left behind would make the
 next collection skip a family, or narrow a read, whose data went into a picture
 and nowhere else. It reads the file as any other run does.
@@ -621,7 +626,7 @@ the same membership.
 | `account`   | `profile`     | `12h`   | packages, gists and social accounts, all of them edited by hand                                                                                  |
 | `account`   | `totals`      | `12h`   | twice a day is plenty for a number that only grows                                                                                              |
 | `audience`  | `forks`       | `12h`   | the whole list fits in one page, and a fork is a rare event                                                                                      |
-| `audience`  | `stars`       | `6h`    | the full stargazer walk happens once; after that the newest hundred ride in one GraphQL query per ten repositories                               |
+| `audience`  | `stars`       | `6h`    | the full stargazer walk happens once; after that the newest hundred ride in one GraphQL query per ten repositories, and the daily star history is one request per repository, usually a free 304 |
 | `audience`  | `traffic`     | `6h`    | the fourteen-day window is rewritten whole each time, so a missed sweep repairs itself on the next one                                           |
 | `ci`        | `actions`     | `15m`   | a workflow run is over in minutes, and its queue time is only worth watching while it is happening                                               |
 | `ci`        | `artifacts`   | `1h`    | artifacts appear with the run that made them and expire on a scale of days                                                                       |
@@ -747,10 +752,11 @@ filled in later with `-backfill`.
 The dashboard sections are not aligned to the groups either, so a group
 switched off empties some panels of several sections rather than one section
 cleanly. `Stars and forks` reads `gh_repo` from `repos` as well as `gh_star`
-from `audience`; `Code` reads `gh_workflow_run` from `ci` and `gh_repo_activity`
-from `feeds` alongside its own commits; `Inventory` reads from `repos` and
-`account`, and its licence panels read `gh_dependency_license`, which is family
-`deps` and ships switched off whether or not `repos` is selected.
+and `gh_star_day` from `audience`; `Code` reads `gh_workflow_run` from `ci` and
+`gh_repo_activity` from `feeds` alongside its own commits; `Inventory` reads
+from `repos` and `account`, and its licence panels read `gh_dependency_license`,
+which is family `deps` and ships switched off whether or not `repos` is
+selected.
 
 ### What `0` means
 

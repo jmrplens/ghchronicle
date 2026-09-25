@@ -76,12 +76,13 @@ const (
 	grSlot = "In Graphite two facts landing in the same storage slot of one series are " +
 		"reduced to one point, so the medians are over what the storage kept."
 	grRange    = "Graphite answers only inside the dashboard range, so years outside it are missing."
-	grSnapshot = "In Graphite the curve is the daily star count as collected, so it starts the day the collector did."
+	grSnapshot = "In Graphite the curve is the repositories' star count as each sweep read it, " +
+		"so it starts the day the collector did and sits at GitHub's count."
 	grWorst    = "Graphite has no percentile of a bucket, so the upper line is the worst of each bucket."
 	grPerRepo  = "Graphite keeps the identity in the path, so this is the count per repository over the range."
 	esRange    = "Elasticsearch answers only inside the dashboard range, so years outside it are missing."
-	esSnapshot = "In Elasticsearch the curve is the daily star count as collected, so it starts " +
-		"the day the collector did: " + esStackNote
+	esSnapshot = "In Elasticsearch the curve is the repositories' star count as each sweep read " +
+		"it, so it sits at GitHub's count and starts the day the collector did: " + esStackNote
 	// How a per-repository snapshot becomes one curve in Elasticsearch: see
 	// esSnapshotStack in query.go.
 	esStackNote = "one series per repository, its largest reading of the day, stacked so the " +

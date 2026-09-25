@@ -65,23 +65,38 @@ cuales sean los permisos del token.
   GitHub no la sirve a nadie más. REST responde 404, y `stargazers` en GraphQL
   responde una lista vacía con `totalCount` 0 mientras `stargazerCount`, a su
   lado, sigue dando el número real: medido en `cli/cli` y `octocat/Hello-World`
-  con un token con todos los permisos. Por eso ghchronicle dibuja la curva
-  fechada de estrellas solo donde el token tiene ese acceso, que siempre tiene
-  en los repositorios de la propia cuenta y en los de una organización que la
-  cuenta administra; uno nombrado en `targets.repos` o alcanzado por `targets.orgs`
-  sin él tiene su número de estrellas y no la curva.
+  con un token con todos los permisos. Por eso ghchronicle escribe `gh_star`,
+  quién dio la estrella y cuándo al segundo, solo donde el token tiene ese
+  acceso, que siempre tiene en los repositorios de la propia cuenta y en los de
+  una organización que la cuenta administra; uno nombrado en `targets.repos` o
+  alcanzado por `targets.orgs` sin él tiene sus estrellas contadas por día con
+  el historial de abajo, y a nadie nombrado.
 - **`/user/installations`** devuelve 403 sin una GitHub App.
 
-## El historial de estrellas que GitHub sirve a cualquiera
+## El historial de estrellas que github.com sirve a cualquiera
 
 [`stargazers/history`](https://docs.github.com/es/rest/activity/starring#get-repository-star-history)
 responde donde la lista de stargazers no lo hace. Lo sirve a cualquiera que
 pueda ver el repositorio, también sin autenticar: las estrellas dadas por día,
-agrupadas por semana, treinta semanas por página, con una cabecera `Link` que
-pagina hasta la primera semana del repositorio (medido en `cli/cli`: trece
-páginas, hasta 2019). No nombra a ningún stargazer, así que no puede sustituir
-a `gh_star`, que es una fila por estrella en el instante en que se dio y dice
-quién la dio. ghchronicle no lo llama hoy.
+agrupadas por semana, treinta semanas por página, el valor por defecto y el
+máximo que admite `per_page` (uno menor se respeta, uno mayor se recorta a
+treinta), paginando hasta la primera semana del repositorio (medido en
+`cli/cli`: trece páginas, hasta 2019). No nombra a ningún stargazer, así que no
+puede sustituir a `gh_star`, que es una fila por estrella en el instante en que
+se dio y dice quién la dio. Sí puede sustituir al recuento, y ghchronicle lo lee
+para cada repositorio que recoge, lo escribe como `gh_star_day` y dibuja con él
+los paneles que cuentan estrellas por día en todos los almacenes menos
+Prometheus, que no puede guardar un historial y sigue contando `gh_star`.
+
+Tres cosas de él se midieron en lugar de leerse en su documentación. Los días
+son días naturales de GitHub en America/Los_Angeles, bajo una `week` etiquetada
+como domingo a las 00:00 UTC: contra las listas de stargazers de diecinueve
+repositorios, el día del Pacífico acertó en las 440 estrellas y el día UTC no.
+Cuenta los stargazers actuales del repositorio, cada uno en el día en que marcó
+la estrella, así que quitar una estrella la saca de un día del pasado y no del
+día en que ocurrió. Y un 304 suyo no lleva cabecera `Link`, mientras que un 200
+lleva `next` y `last`, así que el recorrido no lee `Link` en absoluto y se
+detiene en una página de menos de treinta semanas o en una vacía.
 
 ## GraphQL se equivoca con los paquetes
 

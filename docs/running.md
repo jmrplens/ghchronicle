@@ -49,7 +49,7 @@ keep it running once you are done watching it.
   ship as `tar.gz` (`zip` on Windows).
 
   ```sh
-  tar -xzf ghchronicle_2.4.0_linux_amd64.tar.gz
+  tar -xzf ghchronicle_2.5.0_linux_amd64.tar.gz
   sudo install -m 755 ghchronicle /usr/local/bin/
   ```
 
@@ -150,7 +150,7 @@ the version you see is the file it just wrote, and it says so when another
 Pin a version, or choose where it goes:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.sh | VERSION=2.4.0 BIN_DIR=~/bin bash
+curl -fsSL https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.sh | VERSION=2.5.0 BIN_DIR=~/bin bash
 ```
 
 > **Reading it first is the whole point of a short script**
@@ -175,7 +175,7 @@ Release archives are named
 | `aarch64`          | `linux_arm64`       |
 
 ```sh
-VERSION=2.4.0
+VERSION=2.5.0
 arch=$(uname -m); case "$arch" in x86_64) arch=amd64 ;; aarch64) arch=arm64 ;; esac
 base=https://github.com/jmrplens/ghchronicle/releases/download/v$VERSION
 curl -fsSLO "$base/ghchronicle_${VERSION}_linux_${arch}.tar.gz"
@@ -213,7 +213,7 @@ the file, then verify the archive against the file.
     ```
 
     ```text
-    ghchronicle_2.4.0_linux_amd64.tar.gz: OK
+    ghchronicle_2.5.0_linux_amd64.tar.gz: OK
     ```
 
 3. Check the checksum file itself, if you have
@@ -281,7 +281,7 @@ meant to.
 the build date of that release.
 
 ```text
-ghchronicle 2.4.0 (commit <commit>, built <date>)
+ghchronicle 2.5.0 (commit <commit>, built <date>)
 ```
 
 ### Run it once
@@ -325,7 +325,7 @@ find.
   build date:
 
   ```text
-  ghchronicle 2.4.0 (commit unknown, built unknown)
+  ghchronicle 2.5.0 (commit unknown, built unknown)
   ```
 
   The version comes from the `VERSION` file the module embeds; the other two
@@ -395,7 +395,7 @@ the version you see is the file it just wrote, and it says so when another
 Pin a version, or choose where it goes:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.sh | VERSION=2.4.0 BIN_DIR=~/bin bash
+curl -fsSL https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.sh | VERSION=2.5.0 BIN_DIR=~/bin bash
 ```
 
 > **Reading it first is the whole point of a short script**
@@ -420,7 +420,7 @@ architecture.
 | `x86_64`           | Intel              | `darwin_amd64`      |
 
 ```sh
-VERSION=2.4.0
+VERSION=2.5.0
 arch=$(uname -m); case "$arch" in x86_64) arch=amd64 ;; esac
 base=https://github.com/jmrplens/ghchronicle/releases/download/v$VERSION
 curl -fsSLO "$base/ghchronicle_${VERSION}_darwin_${arch}.tar.gz"
@@ -458,7 +458,7 @@ signature over that file.
     ```
 
     ```text
-    ghchronicle_2.4.0_darwin_arm64.tar.gz: OK
+    ghchronicle_2.5.0_darwin_arm64.tar.gz: OK
     ```
 
 3. Check the checksum file itself, if you have
@@ -731,7 +731,7 @@ takes parameters, which needs the slightly longer form because `iex` has
 nowhere to put them:
 
 ```powershell
-& ([scriptblock]::Create((irm https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.ps1))) -Version 2.4.0 -BinDir C:\tools -NoPathUpdate
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.ps1))) -Version 2.5.0 -BinDir C:\tools -NoPathUpdate
 ```
 
 > **Reading it first is the whole point of a short script**
@@ -793,7 +793,7 @@ rather than the shell:
 ```
 
 ```powershell
-$version = "2.4.0"
+$version = "2.5.0"
 $arch = if ($env:PROCESSOR_ARCHITECTURE -eq "ARM64") { "arm64" } else { "amd64" }
 $base = "https://github.com/jmrplens/ghchronicle/releases/download/v$version"
 $zip = "ghchronicle_${version}_windows_${arch}.zip"
@@ -915,7 +915,7 @@ It answers with one line: the release number, then the commit and the build
 date of that release.
 
 ```text
-ghchronicle 2.4.0 (commit <commit>, built <date>)
+ghchronicle 2.5.0 (commit <commit>, built <date>)
 ```
 
 > **If Windows warns about the file**
@@ -2090,8 +2090,9 @@ in the `<picture>` are relative to the README, so a `docs/README.md` points at
 > account-wide works with it. See [the token](https://jmrp.io/docs/ghchronicle/start/token/).
 
 **The state file does not survive between runs.** Each run therefore does the
-full stargazer walk again. On a small account that is a handful of calls; on an
-account with many stars, cache it:
+full stargazer walk again, and reads every repository's daily star history
+whole, a page per thirty weeks of its life. On a small account that is a
+handful of calls; on an account with many stars or old repositories, cache it:
 
 ```yaml
 - uses: actions/cache@v4
@@ -2102,7 +2103,7 @@ account with many stars, cache it:
 ```
 
 and point `state_file` at `~/.ghchronicle/state.json` in the config. A `card`
-mode run reads a restored state file, which is what lets it skip the walk, and
+mode run reads a restored state file, which is what lets it skip both walks, and
 never writes one back: it delivers its points to the card and to no store, so
 nothing it learned may tell the next collection that a family is already done.
 What fills the cache is a `once` or `backfill` step.

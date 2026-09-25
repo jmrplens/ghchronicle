@@ -6,7 +6,7 @@ searchTitle: What ghchronicle collects from GitHub
 
 import { Aside } from "@astrojs/starlight/components";
 
-Thirty-four families, ninety-two measurements. This page is what each family
+Thirty-four families, ninety-three measurements. This page is what each family
 is _for_; the [measurements reference](/ghchronicle/collectors/measurements/)
 is every tag and field.
 
@@ -40,18 +40,25 @@ Referrers and popular paths are different: the API returns a top-ten snapshot
 with no dates at all, so they are stamped at the start of the UTC day and read
 as "who was sending traffic when we asked".
 
-**`stars`** reconstructs the star curve from its beginning. The stargazers
-endpoint returns a `starred_at` per user when asked with the star media type,
-so the entire history is available on the first run: a chart that goes back
-years, not one that starts the day the collector was installed. After the first
-sweep only the newest hundred are read, since new stars land at the end, and
-they are read for every repository at once in one GraphQL query per ten. That
-is the difference between one point and 280 calls for a repository with 28,000
-stars. GitHub has served the list only to a repository's admins and
-collaborators since July 2026, so the curve is drawn only where the token has
-that access, which it always has on the account's own repositories and on those
-of an organisation the account administers; for any other the star count is
-collected and the curve is not (see
+**`stars`** reconstructs the star curve from its beginning, from two endpoints.
+GitHub's daily star history gives the stars a repository gained on each day,
+back to the week it was created, to anyone who can see the repository, so it is
+read for every repository the sweep collects and written as `gh_star_day`: whole
+on the first sweep, and after that one request for the newest thirty weeks, a
+free 304 unless one of their days gained or lost a star or a new week began.
+The daily star bars count it in every store but Prometheus, and in InfluxDB and
+PostgreSQL so does the star curve, so the entire history is there after the
+first run: a chart that goes back years, not one that starts the day the
+collector was installed. GitHub Enterprise Server does not serve the history,
+so there those panels stay empty. The stargazer list says who.
+Asked with the star media type it returns a `starred_at` per user, written as
+`gh_star`, walked in full once; after that only the newest hundred are read,
+since new stars land at the end, and they are read for every repository at once
+in one GraphQL query per ten. That is the difference between one point and 280
+calls for a repository with 28,000 stars. GitHub has served the list only to a
+repository's admins and collaborators since July 2026, which the account always
+is on its own repositories and on those of an organisation it administers; any
+other repository has its stars counted per day and nobody named (see
 [what GitHub will not give](/ghchronicle/api/limits/)).
 
 **`forks`** collects who forked and when. The repository snapshot carries a

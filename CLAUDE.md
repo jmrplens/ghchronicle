@@ -90,7 +90,13 @@ a newest-first list has gone past it. The runner hands `Walk{}` to a sweep and
 their own handling, found by running it: Dependabot refuses `page=` and pages
 by cursor, and the GraphQL gateway answers a hundred pull requests with their
 reviews with an HTML 502 after ten seconds (`ghapi.TooLargeError`), so `Pulls`
-halves its page and retries on the same cursor.
+halves its page and retries on the same cursor. The star history is handed
+`collect.Unbounded` instead until the state file records `history_read` for
+the repository, which only a walk that reached the end of the history sets
+(`StarHistory.Read` says whether it did), so the first sweep after upgrading
+and any walk cut short, by an error or by a 403 or 404 past page one, read the
+whole history once. A 404 on page one, which is every repository on GitHub
+Enterprise Server, leaves it unset too.
 
 **A `url` field is absolute or it is absent.** Around fifty measurements carry
 one, and every table selects it as a column called Link. The column itself is
@@ -128,7 +134,8 @@ Workflow jobs are tagged `job_name`.
 **Weekly rows are anchored to the week, not to today.** `gh_commits_week` is
 stamped at the Sunday that starts each week. A sweep on Tuesday and one on
 Friday have to land on the same row, or every re-read writes a second copy of
-the year.
+the year. `gh_star_day` is anchored the same way, to the `week` the API
+returns plus the day's index, never to the clock.
 
 ## What GitHub will not give a personal account
 
@@ -148,20 +155,44 @@ Verified, so nobody spends an afternoon on it again:
   collaborators: REST answers 404 and GraphQL's `stargazers` answers an empty
   list with `totalCount` 0, while `stargazerCount` still gives the real number
   (measured on cli/cli and octocat/Hello-World with a token holding every
-  scope). So the dated star curve is drawn only where the token has that
-  access, which it always has on the account's own repositories and on those
-  of an organisation the account administers; elsewhere the star count is
-  collected and the curve is not.
+  scope). So `gh_star`, who starred and when to the second, exists only where
+  the token has that access, which it always has on the account's own
+  repositories and on those of an organisation the account administers. The
+  dated star counts come from `stargazers/history` below, which every
+  repository gets.
 - `stargazers/history` is not limited to the last thirty weeks; thirty weeks
-  is its page size. It answers anyone who can see the repository,
-  unauthenticated too, with stars per day grouped by week, and its Link header
-  pages back to the repository's first week (cli/cli: 13 pages, back to 2019).
-  It names no stargazers. ghchronicle does not call it today.
+  is its page size, which is both the default and the most `per_page` allows
+  (a smaller `per_page` is honoured, a larger one is cut to thirty), so the
+  walk sends none and a shorter page is the last one. It answers anyone who can see
+  the repository, unauthenticated too, with stars per day grouped by week,
+  and pages back to the repository's first week (cli/cli: 13 pages, back to
+  2019). It names no stargazers. ghchronicle reads it for every repository as
+  `gh_star_day`, and in every store that keeps rows (InfluxDB, PostgreSQL,
+  Graphite, Elasticsearch) the per-day star panels, and the InfluxDB and
+  PostgreSQL star curve, read that and not `gh_star`. Prometheus cannot: its
+  `promRules` entry for `gh_star_day` is skip, so its Stars gained still
+  counts `gh_star` through `github_stars_gained_total`, on purpose. `gh_star`
+  also still supplies the names in Recent stars. No panel counts from both,
+  so a repository with both cannot be counted twice. The days are
+  America/Los_Angeles calendar days under a `week` labelled Sunday 00:00 UTC
+  (measured against the lists of nineteen repositories, 440 stars: no
+  mismatch by Pacific day, while by UTC day 38 of one repository's 127 days
+  disagree), and each is stamped at 00:00 UTC of its date. It counts today's stargazers
+  by the day each one starred, so an unstar rewrites a past day: page 1, the
+  thirty weeks a sweep re-reads, is written with its zero days so the drop is
+  applied, and older pages write only days with stars, because zero rows back
+  to each repository's creation multiply InfluxDB 3 Core's file count in a
+  backfill. A 304 carries no Link header, which is why ghapi's cache keeps
+  the Link of the 200 beside its body and replays it, and why this walk reads
+  no Link at all and stops on a short or empty page instead.
 - The steps of old workflow runs. `runs/{id}/jobs` keeps listing every job
   for as long as GitHub holds the run, but each job's `steps` comes back
   empty for runs created before 12 April 2026 (measured 2026-09-24, about 166
   days back; one snapshot, so whether it is a rolling window is not known).
-  A backfill writes those jobs with `steps` 0 and no `gh_workflow_step` rows.
+  A job that completed as success, failure or timed out ran at least one
+  step, so the collector writes it with no `steps` field when that list is
+  empty, and no `gh_workflow_step` rows. Any other job keeps `steps` as the
+  list's length: a skipped job really has 0.
 - The traffic window for a repository with no traffic is stale, not empty:
   GitHub keeps returning the last fourteen days that had data.
 

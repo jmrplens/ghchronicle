@@ -23,25 +23,31 @@ El detalle está en [qué se recoge](/ghchronicle/es/collectors/#audiencia) y en
 
 ## ¿Cómo sigo las estrellas de GitHub a lo largo del tiempo?
 
-Recorriendo la lista de stargazers con el tipo de medio de estrellas, que da la
-fecha de cada estrella. La familia `stars` de ghchronicle lo hace en su primera
-pasada, así que la curva empieza en la primera estrella del repositorio y no el
-día en que se instaló, y escribe cada estrella como un punto `gh_star` fechado
-cuando se dio. Desde julio de 2026 [GitHub solo sirve esa lista a los
-administradores y colaboradores del
-repositorio](https://docs.github.com/es/rest/activity/starring#new-access-restrictions);
-en cualquier otro, ghchronicle recoge el número de estrellas y no la curva.
+Leyendo el historial diario de estrellas de GitHub, que da las estrellas que
+ganó un repositorio cada día, hasta la semana en que se creó, a cualquiera que
+pueda ver el repositorio. La familia `stars` de ghchronicle lo lee entero en su
+primera pasada, para cada repositorio que recoge, y escribe cada día como un
+punto `gh_star_day`, así que la curva empieza en la primera estrella del
+repositorio y no el día en que se instaló, y un repositorio cuya lista de
+stargazers GitHub oculta al token tiene igualmente su curva diaria. Donde el
+token puede leer esa lista, la familia también la recorre con el tipo de medio
+de estrellas y escribe cada estrella como un punto `gh_star`, fechado al
+segundo y con el nombre de quien la dio. Desde julio de 2026 [GitHub solo sirve
+la lista a los administradores y colaboradores del
+repositorio](https://docs.github.com/es/rest/activity/starring#new-access-restrictions).
 
 El token siempre tiene ese acceso en los repositorios de la propia cuenta y en
-los de una organización que su usuario administra. Tras el primer recorrido,
-ghchronicle solo lee las cien estrellas más nuevas de cada repositorio, diez
-repositorios por consulta GraphQL. El endpoint
+los de una organización que su usuario administra. Tras la primera pasada,
+ghchronicle pide las treinta semanas más nuevas de cada historial, una petición
+por repositorio y casi siempre un 304 gratis, y las cien estrellas más nuevas
+de cada lista que puede leer, diez repositorios por consulta GraphQL. El
+historial es el endpoint
 [`stargazers/history`](https://docs.github.com/es/rest/activity/starring#get-repository-star-history)
-de GitHub responde a cualquiera que pueda ver el repositorio, incluso sin token,
-con las estrellas por día agrupadas por semana, treinta semanas por página, y
-pagina hacia atrás hasta la primera semana del repositorio: trece páginas en
-`cli/cli`, hasta 2019. No nombra a ningún stargazer, y ghchronicle hoy no lo
-llama. Ver [qué se recoge](/ghchronicle/es/collectors/#audiencia) y [lo que
+de GitHub: estrellas por día agrupadas por semana, treinta semanas por página,
+paginando hacia atrás hasta la primera semana del repositorio, trece páginas en
+`cli/cli`, hasta 2019. Sus días son días naturales del Pacífico, y cuenta los
+stargazers de hoy, así que quitar una estrella la saca del día en que se dio.
+Ver [qué se recoge](/ghchronicle/es/collectors/#audiencia) y [lo que
 GitHub no da](/ghchronicle/es/api/limits/).
 
 ## ¿Puedo recoger la historia de GitHub de antes de instalarlo?
@@ -168,8 +174,8 @@ porque el `GITHUB_TOKEN` automático no tiene acceso de push a otros
 repositorios, [no puede leer el tráfico ni siquiera del
 suyo](https://docs.github.com/es/rest/metrics/traffic#get-repository-clones--fine-grained-access-tokens)
 y no es un usuario. Un runner alojado no conserva el fichero de estado entre
-ejecuciones, así que cada una vuelve a recorrer los stargazers salvo que el
-estado se guarde en caché.
+ejecuciones, así que cada una vuelve a recorrer los stargazers y el historial
+de estrellas entero salvo que el estado se guarde en caché.
 
 Los modos, las entradas y el paso de caché están en [GitHub
 Actions](/ghchronicle/es/install/actions/).

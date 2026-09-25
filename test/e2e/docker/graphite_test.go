@@ -201,6 +201,23 @@ func TestGraphiteKeepsTheDateOfTheEvent(t *testing.T) {
 			at, 220)
 	})
 
+	t.Run("a day of the star history keeps its own day", func(t *testing.T) {
+		// One series per repository rather than one per stargazer, which is
+		// what lets the star panels sum a path instead of counting a
+		// wildcard of people, and each day in the slot of its own date with
+		// the day's count as the value. The path is built from the table the
+		// panels index by, so a repository node in the wrong place fails
+		// here as well as in the depth tests above.
+		table := graphiteTable(t)
+		for _, want := range starDays(t, pushPoints(t, sweep)) {
+			path, ok := graphitePathOf([]sqlStoresPoint{want}, table["gh_star_day"])
+			if !ok {
+				t.Fatalf("a day of the star history carries no number: %v", want)
+			}
+			graphiteWantPoint(ctx, t, s, path, graphiteWhen(t, want.Time), starCount(want))
+		}
+	})
+
 	// The other half, and the half a positive assertion cannot make. Asking
 	// only whether the point is in its own slot passes just as well when the
 	// sink also wrote it at the moment of the sweep, and it passes outright
@@ -209,6 +226,12 @@ func TestGraphiteKeepsTheDateOfTheEvent(t *testing.T) {
 	// second `go test` is a workflow this repository documents. So the dated
 	// paths are also asked what they hold from the moment the sweep began,
 	// which for an event that happened years ago has to be nothing.
+	//
+	// The star history is not asked. Its newest day is today at 00:00 UTC,
+	// which is the hourly slot the sweep itself falls in whenever it runs in
+	// the first hour of a UTC day, so the question would fail on the clock
+	// rather than on the sink; the SQL and Elasticsearch suites, which keep
+	// the instant, ask it instead.
 	t.Run("nothing dated was restamped with the sweep's clock", func(t *testing.T) {
 		for _, path := range []string{
 			"github.star.octocat_hello-world.octocat.hello-world.alice.starred",

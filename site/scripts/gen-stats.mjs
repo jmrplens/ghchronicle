@@ -123,7 +123,7 @@ const NUMBER_WORDS = {
 		10: "ten",
 		11: "eleven",
 		34: "thirty-four",
-		92: "ninety-two",
+		93: "ninety-three",
 		154: "one hundred and fifty four",
 	},
 	es: {
@@ -131,7 +131,7 @@ const NUMBER_WORDS = {
 		10: "diez",
 		11: "once",
 		34: "treinta y cuatro",
-		92: "noventa y dos",
+		93: "noventa y tres",
 		154: "ciento cincuenta y cuatro",
 	},
 };

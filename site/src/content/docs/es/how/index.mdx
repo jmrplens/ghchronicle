@@ -65,7 +65,7 @@ las lentas o perdería las rápidas, así que cada familia lleva la suya.
 | `billing`       | 6h          | Uso por día, producto, SKU y repositorio                            |
 | `planning`      | 6h          | Etiquetas e hitos                                                   |
 | `settings`      | 6h          | Webhooks y sus entregas, entornos, claves de despliegue            |
-| `stars`         | 6h          | El recorrido de la lista de estrellas una vez, luego las cien más nuevas |
+| `stars`         | 6h          | Estrellas por día de cada repositorio, y el recorrido de la lista de estrellas una vez, luego las cien más nuevas |
 | `traffic`       | 6h          | La ventana entera de 14 días, reescrita                            |
 | `account`       | 12h         | Perfil, calendario de contribuciones, totales                       |
 | `forks`         | 12h         | Quién hizo fork, y cuándo                                           |
@@ -112,12 +112,13 @@ level=WARN msg="family failed everywhere, not marking it as run" family=security
 
 ## El fichero de estado
 
-`state_file` guarda [seis cosas](/ghchronicle/es/configuration/#state_file), y
+`state_file` guarda [siete cosas](/ghchronicle/es/configuration/#state_file), y
 las dos por las que se juzga una pasada son cuándo corrió cada familia por
 última vez y cuándo se vio cada repositorio por primera vez.
 
-Lo segundo es lo que hace que el recorrido completo de la historia de estrellas
-ocurra una vez y no en cada pasada. Se escribe a través de un fichero temporal
+Lo segundo es lo que hace que el recorrido completo de la lista de stargazers
+ocurra una vez y no en cada pasada, como hace `history_read` con el historial
+diario de estrellas. Se escribe a través de un fichero temporal
 y se renombra, así que una caída a mitad de escritura no puede dejar un estado
 truncado que provocaría una recolección completa.
 

@@ -45,7 +45,7 @@ container, a scheduled workflow.
 | --------------- | ------------------------------------------------------------------------------------------------------ |
 | **family**      | One collector, named in the configuration: `actions`, `stars`, `issues`. There are 34                |
 | **group**       | A named set of families, for switching a whole area on or off: `ci`, `security`, `audience`. There are 8 |
-| **measurement** | One kind of row in the store, named `gh_*`: `gh_star`, `gh_workflow_run`. There are 92               |
+| **measurement** | One kind of row in the store, named `gh_*`: `gh_star`, `gh_workflow_run`. There are 93               |
 | **point**       | One row: a measurement, its tags, its fields and the date the thing happened                         |
 | **sweep**       | One pass over the families that are due, which is what the process does on a loop                    |
 | **backfill**    | A run with `-backfill`, which walks the history instead of the increment                             |
@@ -196,12 +196,15 @@ themselves or wants to know what they just agreed to.
 
 Three things happen once, and they are why the first run is the expensive one.
 
-- The whole stargazer list of every repository whose list the token may read
-  (since July 2026, only a repository's
+- The daily star history of every repository, whatever the token may see, is
+  read back to the repository's first week, and the whole stargazer list of
+  every repository whose list the token may read (since July 2026, only a
+  repository's
   [admins and collaborators](https://docs.github.com/en/rest/activity/starring#new-access-restrictions))
-  is walked, page by page, so every star carries the date it was given. After
-  that, the newest hundred of each of those repositories ride in one GraphQL
-  query per ten of them.
+  is walked, page by page, so each of those stars carries the moment it was
+  given and who gave it. After that, the history is one request per repository
+  for its newest thirty weeks, usually a free 304, and the newest hundred stars
+  of each readable list ride in one GraphQL query per ten repositories.
 - A month of workflow runs, so a fresh install does not chart a CI history that
   begins fifteen minutes ago. After that, twice the cadence, and never less
   than two hours.
@@ -224,10 +227,10 @@ it costs.
 > **Keep the state file**
 >
 > `state_file` is what remembers where each family got to, and
-> [six things live in it](https://jmrp.io/docs/ghchronicle/configuration/#state_file). Delete it and
-> the next sweep re-collects everything, which costs quota and nothing else for
-> five of the six; the sixth is the commit each dependency diff starts from, and
-> the changes in the gap are not collected again.
+> [seven things live in it](https://jmrp.io/docs/ghchronicle/configuration/#state_file). Delete it
+> and the next sweep re-collects everything, which costs quota and nothing else
+> for six of the seven; the seventh is the commit each dependency diff starts
+> from, and the changes in the gap are not collected again.
 
 ### Where to go next
 
@@ -348,7 +351,7 @@ from, and says when one of them is the better choice.
 
 | Tool | What it covers | How long it is kept | Dated, or a current value | Backfill |
 | ---- | -------------- | ------------------- | ------------------------- | -------- |
-| [ghchronicle](https://jmrp.io/docs/ghchronicle/collectors/) | 34 families: traffic, stars, forks, workflow runs with their jobs and steps, pull requests, issues, commits, the event feed, notifications, alerts, billing and more | as long as the store it writes to keeps it | dated: each point at the moment the thing happened; a top-ten list with no date at the start of its UTC day; a current state at the sweep | yes, `-backfill` walks every enabled family back as far as the API answers, but reads only the newest hundred webhook deliveries per hook and at most 500 failed job logs per repository; not traffic older than 14 days, the event feed past GitHub's ceiling, job logs older than 90 days, the star dates of a repository whose stargazer list the token cannot read, or, from 2026-10-01, workflow runs older than the repository's retention setting |
+| [ghchronicle](https://jmrp.io/docs/ghchronicle/collectors/) | 34 families: traffic, stars, forks, workflow runs with their jobs and steps, pull requests, issues, commits, the event feed, notifications, alerts, billing and more | as long as the store it writes to keeps it | dated: each point at the moment the thing happened; a top-ten list with no date at the start of its UTC day; a current state at the sweep | yes, `-backfill` walks every enabled family back as far as the API answers, but reads only the newest hundred webhook deliveries per hook and at most 500 failed job logs per repository; not traffic older than 14 days, the event feed past GitHub's ceiling, job logs older than 90 days, the names and exact times of the stars of a repository whose stargazer list the token cannot read (its stars are kept per day instead), or, from 2026-10-01, workflow runs older than the repository's retention setting |
 | [GitHub itself](https://docs.github.com/en/rest/metrics/traffic) | traffic: views and clones per day, the top ten referrers and paths; the event feed; the notification inbox; Actions runs, logs and artifacts | traffic 14 days; the event feed up to 300 events and 30 days; the inbox 3 months unless saved; Actions logs and artifacts 90 days by default, and from 2026-10-01 workflow runs too | views and clones by day; referrers and paths as one top-ten list for the whole 14 days | not applicable: nothing older than those windows is served |
 | [KipHub Traffic](https://github.com/farique1/KipHub-Traffic/blob/711ccf7558bae756eed14accdf1b418cbe17c7f3/README.md) | traffic only: views and clones per day, and GitHub's 14-day referrer list | as long as its local JSON file is kept | views and clones by day, merged into one file on every fetch | no: its README says to fetch more often than every 14 days |
 | [repohistory](https://github.com/repohistory/repohistory/blob/9dd4ac28b42d372cdb91668e379569b0cc69d694/README.md) | traffic: clones, views, referrers and popular pages; star history | from the first sign-in on | traffic stored per repository and date; stars at the date of each one for the 400 pages of 100 it reads at most, the oldest 40,000, and the rest spread evenly over the days after the last one read and marked estimated | traffic no, it starts at the first sign-in; stars from GitHub's stargazer list |
@@ -520,23 +523,28 @@ The detail is in [what is collected](https://jmrp.io/docs/ghchronicle/collectors
 
 ### How do I track GitHub stars over time?
 
-Walk the stargazer list with the star media type, which gives the date of every
-star. ghchronicle's `stars` family does that on its first sweep, so the curve
-starts at the repository's first star, not on the day it was installed, and
-writes each star as a `gh_star` point dated when it was given. Since July 2026
-[GitHub serves that list only to a repository's admins and
-collaborators](https://docs.github.com/en/rest/activity/starring#new-access-restrictions);
-on any other repository ghchronicle collects the star count and no curve.
+Read GitHub's daily star history, which gives the stars a repository gained
+on each day, back to the week it was created, to anyone who can see the
+repository. ghchronicle's `stars` family reads it whole on its first sweep, for
+every repository it collects, and writes each day as a `gh_star_day` point, so
+the curve starts at the repository's first star, not on the day it was
+installed, and a repository whose stargazer list GitHub hides from the token
+still gets its daily curve. Where the token may read that list, the family also
+walks it with the star media type and writes each star as a `gh_star` point,
+dated to the second and naming who gave it. Since July 2026 [GitHub serves the
+list only to a repository's admins and
+collaborators](https://docs.github.com/en/rest/activity/starring#new-access-restrictions).
 
 The token always has that access on the account's own repositories and on
-those of an organisation its user administers. After the first walk,
-ghchronicle reads only the newest hundred stars per repository, ten
-repositories to a GraphQL query. GitHub's
+those of an organisation its user administers. After the first sweep,
+ghchronicle asks for the newest thirty weeks of each history, one request per
+repository and usually a free 304, and the newest hundred stars of each list
+it may read, ten repositories to a GraphQL query. The history is GitHub's
 [`stargazers/history`](https://docs.github.com/en/rest/activity/starring#get-repository-star-history)
-endpoint answers anyone who can see the repository, even without a token, with
-stars per day grouped by week, thirty weeks to a page, paging back to the
-repository's first week: thirteen pages for `cli/cli`, back to 2019. It names
-no stargazers, and ghchronicle does not call it today. See [what is
+endpoint: stars per day grouped by week, thirty weeks to a page, paging back to
+the repository's first week, thirteen pages for `cli/cli`, back to 2019. Its
+days are Pacific calendar days, and it counts today's stargazers, so an unstar
+takes a star off the day it was given. See [what is
 collected](https://jmrp.io/docs/ghchronicle/collectors/#audience) and [what GitHub will not
 give](https://jmrp.io/docs/ghchronicle/api/limits/).
 
@@ -660,7 +668,8 @@ automatic `GITHUB_TOKEN` lacks push access to other repositories, [cannot read
 traffic even in its
 own](https://docs.github.com/en/rest/metrics/traffic#get-repository-clones--fine-grained-access-tokens),
 and is not a user. A hosted runner keeps no state file between runs, so each
-run walks the stargazers again unless the state is cached.
+run walks the stargazers and the whole star history again unless the state is
+cached.
 
 The modes, the inputs and the cache step are on [GitHub
 Actions](https://jmrp.io/docs/ghchronicle/install/actions/).

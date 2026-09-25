@@ -1,0 +1,5 @@
+[
+  {"week": @WEEK_EPOCH_0@, "total": 1, "days": [1, 0, 0, 0, 0, 0, 0]},
+  {"week": @WEEK_EPOCH_1@, "total": 3, "days": [0, 1, 0, 2, 0, 0, 0]},
+  {"week": @WEEK_EPOCH_2@, "total": 0, "days": [0, 0, 0, 0, 0, 0, 0]}
+]

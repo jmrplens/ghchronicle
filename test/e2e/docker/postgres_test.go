@@ -175,6 +175,10 @@ func TestPostgresKeepsTheDateOfTheEvent(t *testing.T) {
 		wantColumns(t, row, runFinishedAt, "220", "t")
 	})
 
+	t.Run("a day of the star history keeps its own day", func(t *testing.T) {
+		pgWantStarDays(ctx, t, s, sweep)
+	})
+
 	t.Run("a current-state gauge is stamped when the sweep looked", func(t *testing.T) {
 		row := pgRow(ctx, t, s, `SELECT `+pgUTCTime+`, "stars", "forks" FROM "gh_repo"`)
 		if row[1] != "80" || row[2] != "9" {
@@ -194,7 +198,7 @@ func TestPostgresKeepsTheDateOfTheEvent(t *testing.T) {
 	})
 
 	t.Run("nothing dated was restamped with the sweep's clock", func(t *testing.T) {
-		for _, table := range []string{"gh_star", "gh_traffic", "gh_workflow_run"} {
+		for _, table := range []string{"gh_star", "gh_star_day", "gh_traffic", "gh_workflow_run"} {
 			row := pgRow(ctx, t, s, fmt.Sprintf(`SELECT count(*) FROM %q WHERE "time" >= '%s'::timestamptz`,
 				table, sweep.Started.Format(time.RFC3339)))
 			if row[0] != "0" {
@@ -202,6 +206,55 @@ func TestPostgresKeepsTheDateOfTheEvent(t *testing.T) {
 			}
 		}
 	})
+}
+
+// pgWantStarDays holds the table to the sweep's own days of the star history.
+// The tables are dropped before the load, so the store holds exactly the days
+// this sweep emitted, the zeros of the newest thirty weeks among them: those
+// are what an unstar is written back as, and a sink that skipped them would
+// leave a day that lost its star reading one forever.
+func pgWantStarDays(ctx context.Context, t *testing.T, s *Stack, sweep *sqlStoresSweep) {
+	t.Helper()
+	points := sqlStoresPoints(t, sweep)
+	starDays(t, points)
+	want := map[string]string{}
+	for _, p := range points {
+		if p.Measurement != "gh_star_day" {
+			continue
+		}
+		at, err := time.Parse(time.RFC3339Nano, p.Time)
+		if err != nil {
+			t.Fatalf("the sweep's own date %q: %v", p.Time, err)
+		}
+		key := p.Tags["full_name"] + "|" + p.Tags["owner"] + "|" + p.Tags["repo"] + "|" +
+			at.UTC().Format(time.RFC3339)
+		want[key] = strconv.FormatFloat(starCount(p), 'f', -1, 64)
+	}
+	out, err := s.Psql(ctx, `SELECT "full_name", "owner", "repo", `+pgUTCTime+`, "stars"
+		FROM "gh_star_day"`)
+	if err != nil {
+		t.Fatalf("reading the star history back: %v\n%s", err, out)
+	}
+	got := map[string]string{}
+	for _, row := range psqlRows(out) {
+		if len(row) != 5 {
+			t.Fatalf("a row of %d columns, want 5: %v", len(row), row)
+		}
+		if !strings.HasSuffix(row[3], "T00:00:00Z") {
+			t.Errorf("%s holds a day stamped %s, not at the start of the day", row[0], row[3])
+		}
+		got[strings.Join(row[:4], "|")] = row[4]
+	}
+	for key, stars := range want {
+		if got[key] != stars {
+			t.Errorf("%s holds %q stars, and the sweep wrote %s", key, got[key], stars)
+		}
+	}
+	for key := range got {
+		if _, emitted := want[key]; !emitted {
+			t.Errorf("%s is in the store and the sweep never wrote it", key)
+		}
+	}
 }
 
 // TestPostgresConvergesOnASecondLoad is the property the primary key buys: the
@@ -216,7 +269,7 @@ func TestPostgresConvergesOnASecondLoad(t *testing.T) {
 
 	// The row count after the first load is the file's own INSERT count, which
 	// is what proves nothing was silently skipped on the way in.
-	for _, table := range []string{"gh_traffic", "gh_star", "gh_workflow_run", "gh_commits_week"} {
+	for _, table := range []string{"gh_traffic", "gh_star", "gh_star_day", "gh_workflow_run", "gh_commits_week"} {
 		row := pgRow(ctx, t, s, fmt.Sprintf(`SELECT count(*) FROM %q`, table))
 		if got, want := row[0], strconv.Itoa(load.inserts[table]); got != want {
 			t.Errorf("%s holds %s rows and the file inserts %s", table, got, want)

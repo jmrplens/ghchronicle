@@ -83,7 +83,7 @@ github:
 | `token`        | obligatoria         | Un token personal clásico o fine-grained                                                                                                                 |
 | `reserve_rate` | `500`               | Llamadas que no se gastan nunca, para que lo demás que use el token siga funcionando. Un valor no positivo cae al valor por defecto                      |
 | `timeout`      | `30s`               | Por petición. GraphQL sobre una cuenta grande puede ser lento. Una duración de Go; lo que no se pueda interpretar o no sea positivo cae al valor por defecto |
-| `base_url`     | api.github.com      | Una instancia de GitHub Enterprise usa `https://<host>/api/v3`                                                                                           |
+| `base_url`     | api.github.com      | Una instancia de GitHub Enterprise usa `https://<host>/api/v3`. GitHub Enterprise Server no sirve el historial diario de estrellas, así que allí [`gh_star_day`](/ghchronicle/es/collectors/measurements/#estrellas-y-forks) y los paneles que cuentan estrellas a partir de ella quedan vacíos |
 | `web_url`      | derivada de la API  | El sitio donde está la página de perfil, que `achievements` lee sin el token. Solo hace falta cuando `base_url` es un proxy delante de la API |
 
 La reserva se escala por cubo; ver [límites de la API](/ghchronicle/es/api/).
@@ -94,12 +94,17 @@ La reserva se escala por cubo; ver [límites de la API](/ghchronicle/es/api/).
 state_file: /var/lib/ghchronicle/state.json
 ```
 
-Seis cosas, y borrar el fichero cuesta una distinta por cada una:
+Siete cosas, y borrar el fichero cuesta una distinta por cada una:
 
 - `last_run`, cuándo corrió cada familia por última vez. Sin él todas las
   familias vencen a la vez, así que la pasada siguiente es completa.
 - `first_saw`, cuándo se vio cada repositorio por primera vez. Sin él el
-  recorrido completo de la historia de estrellas se vuelve a hacer.
+  recorrido completo de la lista de stargazers se vuelve a hacer.
+- `history_read`, cuándo se leyó entero por última vez el historial diario de
+  estrellas de cada repositorio. Solo se escribe tras un recorrido que llegó al
+  final del historial, no tras uno que un error o un 403 o 404 de una página
+  posterior cortó. Sin él ese historial se vuelve a leer entero, una página por cada
+  treinta semanas de vida del repositorio.
 - `last_head`, el commit en que estaba cada repositorio cuando corrió el diff
   de dependencias. Sin él los cambios de dependencias del hueco se pierden: la
   pasada siguiente tiene la fotografía y no el diff.
@@ -111,13 +116,13 @@ Seis cosas, y borrar el fichero cuesta una distinta por cada una:
 - `last_event`, el evento más reciente que tenía el feed. Sin él vacío lee el
   feed entero.
 
-Cinco de las seis cuestan solo cuota, porque lo que se vuelve a recoger se
+Seis de las siete cuestan solo cuota, porque lo que se vuelve a recoger se
 indexa por medida, etiquetas y marca de tiempo y sobrescribe lo que ya está
 guardado. `last_head` es la que pierde algo: los cambios de dependencias entre
 la cabeza que tenía y la siguiente se leen de un rango que nadie puede nombrar
 una vez que la cabeza ha desaparecido.
 
-Una pasada con `-card-only` no escribe ninguna de las seis. Sus puntos llegan a
+Una pasada con `-card-only` no escribe ninguna de las siete. Sus puntos llegan a
 [la tarjeta](/ghchronicle/es/card/) y a ningún almacén, así que una marca suya
 haría que la siguiente recogida se saltara una familia, o estrechara una
 lectura, cuyos datos fueron a parar a una imagen y a ningún otro sitio. El

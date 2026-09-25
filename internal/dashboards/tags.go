@@ -119,6 +119,7 @@ var tags = map[string][]string{
 	"gh_sponsors_tier":            {"tier", "user"},
 	"gh_sponsorship":              {"direction", "sponsorable", "user"},
 	"gh_star":                     {"full_name", "owner", "repo", "user"},
+	"gh_star_day":                 {"full_name", "owner", "repo"},
 	"gh_star_given":               {"full_name", "language", "owner", "repo", "user"},
 	"gh_star_list":                {"list", "user"},
 	"gh_traffic":                  {"full_name", "kind", "owner", "repo"},

@@ -222,7 +222,9 @@ los cien de cada uno que lee una pasada.
   jobs, y en sus pasos mientras GitHub los siga sirviendo. Medido el 24 de
   septiembre de 2026, GitHub listaba todos los jobs de una ejecución de hace
   278 días, pero ningún paso de las ejecuciones creadas antes del 12 de abril,
-  unos cinco meses y medio atrás.
+  unos cinco meses y medio atrás. Un job así, si terminó en éxito, en fallo o
+  por tiempo agotado, se escribe sin el campo `steps` en lugar de con un 0, ya
+  que ejecutó al menos uno.
 - Los repositorios archivados, enteros, diga lo que diga `include_archived`. Su
   historia es la historia de la cuenta y ya no se mueve, que es justo por lo
   que una pasada los deja fuera y por lo que un solo recorrido basta. Los forks

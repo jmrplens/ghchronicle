@@ -84,6 +84,28 @@ func TestSummarizeSkipsHistory(t *testing.T) {
 	}
 }
 
+// TestTheDailyStarHistoryIsNotAGauge: a day of the star history is a number of
+// stars that an unstar can lower after the fact, so neither a current value
+// nor a distinct-item count of it means anything, and it reaches neither the
+// exporter nor OTLP. The current count is gh_repo's.
+func TestTheDailyStarHistoryIsNotAGauge(t *testing.T) {
+	day := time.Date(2026, 9, 6, 0, 0, 0, 0, time.UTC)
+	var pts []Point
+	for i, stars := range []int{2, 0, 1} {
+		pts = append(pts, Point{
+			Measurement: "gh_star_day",
+			Tags:        map[string]string{"full_name": "o/a", "owner": "o", "repo": "a"},
+			Fields:      map[string]any{"stars": stars}, Time: day.AddDate(0, 0, i),
+		})
+	}
+	if out := Summarize(pts); len(out) != 0 {
+		t.Fatalf("the daily star history was reduced to %+v, want nothing", out)
+	}
+	if star := promRules["gh_star_day"]; star.mode != skip {
+		t.Errorf("gh_star_day reduces with mode %v, want skip", star.mode)
+	}
+}
+
 func TestSummarizeIgnoresUnknownMeasurements(t *testing.T) {
 	out := Summarize([]Point{{
 		Measurement: "gh_something_new",

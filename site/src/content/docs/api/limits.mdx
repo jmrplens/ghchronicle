@@ -65,23 +65,36 @@ A personal account cannot see any of them, however the token is scoped.
   `stargazers` answers an empty list with a `totalCount` of 0 while
   `stargazerCount` beside it still gives the real number: measured on
   `cli/cli` and `octocat/Hello-World` with a token holding every scope.
-  ghchronicle therefore draws the dated star curve only where the token has
-  that access, which it always has on the account's own repositories and on
-  those of an organisation the account administers; one named in
-  `targets.repos` or reached through `targets.orgs` without it gets its star
-  count and no curve.
+  ghchronicle therefore writes `gh_star`, who starred and when to the second,
+  only where the token has that access, which it always has on the account's
+  own repositories and on those of an organisation the account administers;
+  one named in `targets.repos` or reached through `targets.orgs` without it
+  has its stars counted per day from the history below, and nobody named.
 - **`/user/installations`** returns 403 without a GitHub App.
 
-## The star history GitHub serves to anyone
+## The star history github.com serves to anyone
 
 [`stargazers/history`](https://docs.github.com/en/rest/activity/starring#get-repository-star-history)
 answers where the stargazer list does not. It serves anyone who can see the
 repository, unauthenticated too: the stars given per day, grouped by week,
-thirty weeks to a page, with a `Link` header that pages back to the
+thirty weeks to a page, which is both the default and the most `per_page` allows
+(a smaller one is honoured, a larger one is cut to thirty), paging back to the
 repository's first week (measured on `cli/cli`: thirteen pages, back to 2019).
 It names no stargazers, so it cannot stand in for `gh_star`, which is one row
-per star at the instant it was given and says who gave it. ghchronicle does
-not call it today.
+per star at the instant it was given and says who gave it. It can stand in for
+the count, and ghchronicle reads it for every repository it collects, writes it
+as `gh_star_day` and draws from it the panels that count stars by day in every
+store but Prometheus, which cannot hold a history and still counts `gh_star`.
+
+Three things about it were measured rather than read in its documentation. The
+days are GitHub's calendar days in America/Los_Angeles, under a `week` labelled
+as Sunday 00:00 UTC: against the stargazer lists of nineteen repositories, the
+Pacific day matched all 440 stars and the UTC day did not. It counts the
+repository's current stargazers, each on the day they starred, so an unstar
+takes a star off a day in the past rather than the day it happened. And a 304
+answer to it carries no `Link` header, where a 200 carries `next` and `last`,
+so the walk reads no `Link` at all and stops at a page shorter than thirty
+weeks or an empty one.
 
 ## GraphQL is wrong about packages
 

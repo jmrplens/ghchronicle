@@ -24,23 +24,28 @@ The detail is in [what is collected](/ghchronicle/collectors/#audience) and
 
 ## How do I track GitHub stars over time?
 
-Walk the stargazer list with the star media type, which gives the date of every
-star. ghchronicle's `stars` family does that on its first sweep, so the curve
-starts at the repository's first star, not on the day it was installed, and
-writes each star as a `gh_star` point dated when it was given. Since July 2026
-[GitHub serves that list only to a repository's admins and
-collaborators](https://docs.github.com/en/rest/activity/starring#new-access-restrictions);
-on any other repository ghchronicle collects the star count and no curve.
+Read GitHub's daily star history, which gives the stars a repository gained
+on each day, back to the week it was created, to anyone who can see the
+repository. ghchronicle's `stars` family reads it whole on its first sweep, for
+every repository it collects, and writes each day as a `gh_star_day` point, so
+the curve starts at the repository's first star, not on the day it was
+installed, and a repository whose stargazer list GitHub hides from the token
+still gets its daily curve. Where the token may read that list, the family also
+walks it with the star media type and writes each star as a `gh_star` point,
+dated to the second and naming who gave it. Since July 2026 [GitHub serves the
+list only to a repository's admins and
+collaborators](https://docs.github.com/en/rest/activity/starring#new-access-restrictions).
 
 The token always has that access on the account's own repositories and on
-those of an organisation its user administers. After the first walk,
-ghchronicle reads only the newest hundred stars per repository, ten
-repositories to a GraphQL query. GitHub's
+those of an organisation its user administers. After the first sweep,
+ghchronicle asks for the newest thirty weeks of each history, one request per
+repository and usually a free 304, and the newest hundred stars of each list
+it may read, ten repositories to a GraphQL query. The history is GitHub's
 [`stargazers/history`](https://docs.github.com/en/rest/activity/starring#get-repository-star-history)
-endpoint answers anyone who can see the repository, even without a token, with
-stars per day grouped by week, thirty weeks to a page, paging back to the
-repository's first week: thirteen pages for `cli/cli`, back to 2019. It names
-no stargazers, and ghchronicle does not call it today. See [what is
+endpoint: stars per day grouped by week, thirty weeks to a page, paging back to
+the repository's first week, thirteen pages for `cli/cli`, back to 2019. Its
+days are Pacific calendar days, and it counts today's stargazers, so an unstar
+takes a star off the day it was given. See [what is
 collected](/ghchronicle/collectors/#audience) and [what GitHub will not
 give](/ghchronicle/api/limits/).
 
@@ -164,7 +169,8 @@ automatic `GITHUB_TOKEN` lacks push access to other repositories, [cannot read
 traffic even in its
 own](https://docs.github.com/en/rest/metrics/traffic#get-repository-clones--fine-grained-access-tokens),
 and is not a user. A hosted runner keeps no state file between runs, so each
-run walks the stargazers again unless the state is cached.
+run walks the stargazers and the whole star history again unless the state is
+cached.
 
 The modes, the inputs and the cache step are on [GitHub
 Actions](/ghchronicle/install/actions/).

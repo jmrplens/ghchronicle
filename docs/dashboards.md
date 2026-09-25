@@ -438,25 +438,43 @@ Stars gained over time, the cumulative curve, stars by repository, the fifty
 most recent stars with the user and the moment, and forks over time. The eight
 repositories that gained the most in the range are named and the rest are
 `other`: of the seventeen that gained a star in two years here, nine gained
-between one and three, and seventeen legend entries hid a third of the plot. The cumulative
-curve reaches back to the first star because the stargazer walk collected each
-one with its own `starred_at`, not because the collector has been running that
-long. Since July 2026 GitHub serves that list only to a repository's
+between one and three, and seventeen legend entries hid a third of the plot.
+
+Stars gained over time counts `gh_star_day`, GitHub's daily star history, and
+so does the cumulative curve in InfluxDB and PostgreSQL; ghchronicle reads the
+history whole on the first sweep for every repository, except against GitHub
+Enterprise Server, which does not serve it. So the curve reaches back to the first star without the collector
+having run that long, and a repository whose stargazer list GitHub hides from
+the token is counted with the rest: since July 2026 GitHub serves that list only
+to a repository's
 [admins and collaborators](https://docs.github.com/en/rest/activity/starring#new-access-restrictions),
-so a repository the token has no such access to has no dated stars: it is
-missing from every panel drawn from them, and its count still shows in Stars by
-repository. Forks over time is drawn the way the star curve is, from
-`gh_fork`, each fork dated when it was made, so it too reaches back past the day the collector started
-rather than beginning at the first snapshot. Both curves are drawn to both
-edges of the range: a running count over dated rows has a point only where a
-row is, so a fork curve over a quiet month was a line from the first fork to
-the last and blank on either side, which reads as collection having stopped.
-Each end carries a bucket of zero, so the line holds its value to the end of
-the range.
+and the history to anyone who can see the repository. Each day is GitHub's
+Pacific calendar day, so a star given on a European morning can sit a day before
+the moment Recent stars shows, and an unstar of a star given in the last thirty
+weeks is taken off the day it was given. The curve usually sits at the count
+GitHub shows or a little below it, since that count also includes accounts
+GitHub no longer lists, but a star given more than thirty weeks ago and later
+taken back can stay in it, so it can also sit above: only a backfill that
+reaches back to its day lowers that day, and only while the day holds another
+star. Recent stars names people, so it reads `gh_star`, and a repository whose
+list is hidden has its stars in the two panels above it and no names there.
+Prometheus still counts Stars gained and Recent stars from the stargazer list,
+so only where the token may read it, while its Stars over time is the current
+count of every repository; in Graphite and Elasticsearch the curve is the
+repositories' star count as each sweep read it, and starts the day the collector
+did.
+
+Forks over time is a running count as well, from `gh_fork`, each fork dated when
+it was made, so it too reaches back past the day the collector started rather
+than beginning at the first snapshot. Both curves are drawn to both edges of the
+range: a running count over dated rows has a point only where a row is, so a
+fork curve over a quiet month was a line from the first fork to the last and
+blank on either side, which reads as collection having stopped. Each end carries
+a bucket of zero, so the line holds its value to the end of the range.
 
 ![The Stars and forks section: stars gained per day as bars per repository, the cumulative star curve rising to 350, stars by repository as a bar chart, a table of recent stars with timestamps and users, and forks over time rising to 51](../site/src/assets/dashboards/stars-and-forks.png)
 
-Reads `gh_star` and `gh_repo`.
+Reads `gh_star_day`, `gh_star` and `gh_repo`.
 
 ### Contributions
 

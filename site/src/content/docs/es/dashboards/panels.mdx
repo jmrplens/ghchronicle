@@ -120,27 +120,45 @@ las cincuenta estrellas más recientes con el usuario y el momento, y forks en e
 tiempo. Se nombran los ocho repositorios que más ganaron en el rango y el resto
 van a `other`: de los diecisiete que ganaron alguna estrella en dos años, nueve
 ganaron entre una y tres, y diecisiete entradas de leyenda escondían un tercio
-del trazado. La curva acumulada se remonta a la primera estrella porque el recorrido
-de stargazers recogió cada una con su propio `starred_at`, no porque el colector
-lleve corriendo tanto tiempo. Desde julio de 2026 GitHub solo sirve esa lista
-a los
+del trazado.
+
+Stars gained over time cuenta `gh_star_day`, el historial diario de estrellas
+de GitHub, y también la curva acumulada en InfluxDB y PostgreSQL; ghchronicle
+lee el historial entero en la primera pasada para cada repositorio, salvo con
+GitHub Enterprise Server, que no lo sirve. Así la curva se remonta a la primera estrella sin que el
+colector lleve corriendo tanto tiempo, y un repositorio cuya lista de stargazers
+GitHub oculta al token se cuenta con los demás: desde julio de 2026 GitHub solo
+sirve esa lista a los
 [administradores y colaboradores](https://docs.github.com/es/rest/activity/starring#new-access-restrictions)
-del repositorio, así que un repositorio al que el token no tiene ese acceso no
-tiene estrellas fechadas: falta en todos los paneles que se dibujan con ellas,
-y su número sigue apareciendo en Stars by repository. Los forks en el tiempo se
-dibujan como la curva de estrellas, desde `gh_fork`, cada fork con la fecha en
-que se hizo, así que también se remontan
-más allá del día en que arrancó el colector en vez de empezar en la primera
-instantánea. Las dos curvas se dibujan hasta los dos bordes del rango: un
-recuento acumulado sobre filas fechadas solo tiene punto donde hay fila, así
-que una curva de forks sobre un mes tranquilo era una línea del primer fork al
-último y nada a los lados, lo que se lee como que la recogida se paró. Cada
-extremo lleva un bucket de cero, así que la línea mantiene su valor hasta el
-final del rango.
+del repositorio, y el historial a cualquiera que pueda ver el repositorio. Cada
+día es el día natural del Pacífico de GitHub, así que una estrella dada una
+mañana europea puede quedar un día antes del momento que muestra Recent stars, y
+quitar una estrella dada en las últimas treinta semanas la saca del día en que
+se dio. La curva suele quedar en el número que muestra GitHub o un poco por
+debajo, ya que ese número también cuenta cuentas que GitHub ya no lista, pero
+una estrella dada hace más de treinta semanas y retirada después puede seguir en
+ella, así que también puede quedar por encima: solo un backfill que llegue hasta
+su día rebaja ese día, y solo mientras el día conserve otra estrella. Recent
+stars nombra a personas, así que lee `gh_star`, y un repositorio cuya lista está
+oculta tiene sus estrellas en los dos paneles de encima y ningún nombre ahí.
+Prometheus sigue contando Stars gained y Recent stars desde la lista de
+stargazers, así que solo donde el token puede leerla, mientras que su Stars over
+time es el número actual de cada repositorio; en Graphite y Elasticsearch la
+curva es el número de estrellas de los repositorios tal como lo leyó cada
+pasada, y empieza el día en que arrancó el colector.
+
+Los forks en el tiempo son también un recuento acumulado, desde `gh_fork`, cada
+fork con la fecha en que se hizo, así que también se remontan más allá del día
+en que arrancó el colector en vez de empezar en la primera instantánea. Las dos
+curvas se dibujan hasta los dos bordes del rango: un recuento acumulado sobre
+filas fechadas solo tiene punto donde hay fila, así que una curva de forks sobre
+un mes tranquilo era una línea del primer fork al último y nada a los lados, lo
+que se lee como que la recogida se paró. Cada extremo lleva un bucket de cero,
+así que la línea mantiene su valor hasta el final del rango.
 
 ![La sección Stars and forks: estrellas ganadas por día como barras por repositorio, la curva acumulada subiendo hasta 350, estrellas por repositorio como gráfico de barras, una tabla de estrellas recientes con marcas de tiempo y usuarios, y forks en el tiempo subiendo hasta 51](../../../../assets/dashboards/stars-and-forks.png)
 
-Lee `gh_star` y `gh_repo`.
+Lee `gh_star_day`, `gh_star` y `gh_repo`.
 
 ## Contributions
 

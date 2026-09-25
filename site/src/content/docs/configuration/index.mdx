@@ -82,7 +82,7 @@ github:
 | `token`        | required             | A classic or fine-grained personal access token                                                                                             |
 | `reserve_rate` | `500`                | Calls never spent, so whatever else uses the token keeps working. A non-positive value falls back to the default                            |
 | `timeout`      | `30s`                | Per request. GraphQL over a large account can be slow. A Go duration; anything unparseable or not positive falls back to the default        |
-| `base_url`     | api.github.com       | A GitHub Enterprise instance uses `https://<host>/api/v3`                                                                                   |
+| `base_url`     | api.github.com       | A GitHub Enterprise instance uses `https://<host>/api/v3`. GitHub Enterprise Server does not serve the daily star history, so there [`gh_star_day`](/ghchronicle/collectors/measurements/#stars-and-forks) and the star-count panels drawn from it stay empty |
 | `web_url`      | derived from the API | The site the profile page is on, read by `achievements` without the token. Needed only when `base_url` is a proxy in front of the API |
 
 The reserve is scaled per bucket; see [rate limits](/ghchronicle/api/).
@@ -93,12 +93,17 @@ The reserve is scaled per bucket; see [rate limits](/ghchronicle/api/).
 state_file: /var/lib/ghchronicle/state.json
 ```
 
-Six things, and deleting the file costs a different one for each:
+Seven things, and deleting the file costs a different one for each:
 
 - `last_run`, when each family last ran. Without it every family is due at once,
   so the next sweep is a full one.
 - `first_saw`, when each repository was first seen. Without it the one-off full
-  walk of the star history is done again.
+  walk of the stargazer list is done again.
+- `history_read`, when each repository's daily star history was last read
+  whole. It is written only after a walk that reached the end of the history,
+  not after one an error or a later page's 403 or 404 cut short. Without
+  it that history is read whole again, a page per thirty weeks of the
+  repository's life.
 - `last_head`, the commit each repository was on when the dependency diff last
   ran. Without it the dependency changes in the gap are gone: the next sweep
   has the photograph and no diff.
@@ -110,13 +115,13 @@ Six things, and deleting the file costs a different one for each:
 - `last_event`, the newest event the feed had. Without it empty reads the whole
   feed.
 
-Five of the six cost only quota, because what is collected again is keyed by
+Six of the seven cost only quota, because what is collected again is keyed by
 measurement, tags and timestamp and overwrites what is already stored.
 `last_head` is the one that loses something: the dependency changes between the
 head it held and the next one are read from a range that nothing can name once
 the head is gone.
 
-A run with `-card-only` writes none of the six. Its points reach [the
+A run with `-card-only` writes none of the seven. Its points reach [the
 card](/ghchronicle/card/) and no store, so a mark it left behind would make the
 next collection skip a family, or narrow a read, whose data went into a picture
 and nowhere else. It reads the file as any other run does.

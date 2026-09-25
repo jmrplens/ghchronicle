@@ -241,8 +241,9 @@ in the `<picture>` are relative to the README, so a `docs/README.md` points at
 </Aside>
 
 **The state file does not survive between runs.** Each run therefore does the
-full stargazer walk again. On a small account that is a handful of calls; on an
-account with many stars, cache it:
+full stargazer walk again, and reads every repository's daily star history
+whole, a page per thirty weeks of its life. On a small account that is a
+handful of calls; on an account with many stars or old repositories, cache it:
 
 ```yaml
 - uses: actions/cache@v4
@@ -253,7 +254,7 @@ account with many stars, cache it:
 ```
 
 and point `state_file` at `~/.ghchronicle/state.json` in the config. A `card`
-mode run reads a restored state file, which is what lets it skip the walk, and
+mode run reads a restored state file, which is what lets it skip both walks, and
 never writes one back: it delivers its points to the card and to no store, so
 nothing it learned may tell the next collection that a family is already done.
 What fills the cache is a `once` or `backfill` step.

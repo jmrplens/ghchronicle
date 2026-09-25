@@ -1486,7 +1486,7 @@
       "panels": [
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Each star is dated by when it was given, recovered once per repository with a full walk of the stargazer list and kept from then on. Since July 2026 GitHub serves that list only to a repository's admins and collaborators, so a repository the token has no such access to is not here, only its count in Stars by repository. The eight repositories that gained the most in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "Stars per day from GitHub's daily star history, which it serves for every repository whatever the token may see of its stargazers. Each day is GitHub's Pacific calendar day, so a star given in a European morning can sit a day before the UTC date it was given. An unstar of a star given in the last thirty weeks is taken off the day it was given. Against GitHub Enterprise Server, which does not serve the history, the bars are empty. The eight repositories that gained the most in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -1538,7 +1538,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "consolidateBy(groupByNode(summarize(isNonNull(github.star.*.*.$repo.*.starred), \"1d\", \"sum\"), 4, \"sum\"), \"sum\")",
+              "target": "consolidateBy(groupByNode(summarize(github.star_day.*.*.$repo.stars, \"1d\", \"sum\"), 4, \"sum\"), \"sum\")",
               "textEditor": true
             }
           ],
@@ -1547,7 +1547,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "The star count as it climbed. The rows go all the way back to the first star, so widening the range shows more of the curve, and it holds its last value to the end of the range. Where the curve is built from each star's date, only repositories whose stargazer list the token may read reach it: since July 2026 GitHub serves that list only to a repository's admins and collaborators. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year. In Graphite the curve is the daily star count as collected, so it starts the day the collector did.",
+          "description": "The star count as it climbed, holding its last value to the end of the range. In InfluxDB and PostgreSQL it is rebuilt from GitHub's daily star history for every repository, back to the first star, so widening the range shows more of it. There it usually sits at or a little below the star count GitHub shows, since that count also includes accounts GitHub no longer lists, but a star given more than thirty weeks ago and later taken back can stay in it, so it can also sit above. Against GitHub Enterprise Server, which does not serve the history, the curve is empty in those two stores. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year. In Graphite the curve is the repositories' star count as each sweep read it, so it starts the day the collector did and sits at GitHub's count.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -1684,7 +1684,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "The newest stargazers, one row each. Graphite has no way to sort by date, so this is the stars gained per repository over the range instead. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "The newest stargazers, one row each. A repository whose stargazer list GitHub hides from this token (since July 2026 it serves the list only to a repository's admins and collaborators) has its stars in the panels above and no names here. Graphite has no way to sort by date, so this is the stars gained per repository over the range instead, from the daily star history, which counts every repository. GitHub Enterprise Server does not serve that history, so against it this table is empty. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -1778,7 +1778,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(groupByNode(isNonNull(github.star.*.*.$repo.*.starred), 4, \"sum\"))",
+              "target": "removeEmptySeries(groupByNode(github.star_day.*.*.$repo.stars, 4, \"sum\"))",
               "textEditor": true
             }
           ],
@@ -1810,7 +1810,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "The fork count as it climbed, rebuilt from each fork's own date the way the star curve is, so it reaches back to the first fork rather than to the day the collector started, and holds its last value to the end of the range. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year. In Graphite the curve is the daily fork count as collected, so it starts the day the collector did.",
+          "description": "The fork count as it climbed, a running count of the forks each dated when it was made, so it reaches back to the first fork rather than to the day the collector started, and holds its last value to the end of the range. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year. In Graphite the curve is the daily fork count as collected, so it starts the day the collector did.",
           "fieldConfig": {
             "defaults": {
               "color": {

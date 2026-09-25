@@ -180,9 +180,9 @@ A family that is not due yet simply does not appear.
 
 > **Deleting the state file costs quota, and one thing more**
 >
-> It remembers six things, and five of them cost only quota when they go: what
+> It remembers seven things, and six of them cost only quota when they go: what
 > is collected again is keyed by measurement, tags and timestamp and overwrites.
-> The sixth, `last_head`, is the commit each dependency diff started from, and
+> The seventh, `last_head`, is the commit each dependency diff started from, and
 > without it the next sweep has the photograph and no diff. See
 > [the state file](https://jmrp.io/docs/ghchronicle/configuration/#state_file).
 

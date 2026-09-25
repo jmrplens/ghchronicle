@@ -245,8 +245,10 @@ apunta a `../generated/card.svg`.
 </Aside>
 
 **El fichero de estado no sobrevive entre ejecuciones.** Cada ejecución vuelve
-por tanto a recorrer entera la lista de estrellas. En una cuenta pequeña son un
-puñado de llamadas; en una cuenta con muchas estrellas, guárdalo en caché:
+por tanto a recorrer entera la lista de estrellas, y lee entero el historial
+diario de estrellas de cada repositorio, una página por cada treinta semanas de
+su vida. En una cuenta pequeña son un puñado de llamadas; en una cuenta con
+muchas estrellas o con repositorios antiguos, guárdalo en caché:
 
 ```yaml
 - uses: actions/cache@v4
@@ -258,7 +260,7 @@ puñado de llamadas; en una cuenta con muchas estrellas, guárdalo en caché:
 
 y apunta `state_file` a `~/.ghchronicle/state.json` en la configuración. Una
 pasada en modo `card` lee el estado restaurado, que es lo que le permite
-saltarse el recorrido, y nunca lo vuelve a escribir: entrega sus puntos a la
+saltarse los dos recorridos, y nunca lo vuelve a escribir: entrega sus puntos a la
 tarjeta y a ningún almacén, así que nada de lo que aprendió puede decirle a la
 siguiente recogida que una familia ya está hecha. Quien llena la caché es un
 paso `once` o `backfill`.

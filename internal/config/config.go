@@ -601,7 +601,7 @@ var defaultEvery = map[string]family{
 	},
 	"stars": {
 		every: 6 * time.Hour, group: "audience",
-		why: "the full stargazer walk happens once; after that the newest hundred ride in one GraphQL query per ten repositories",
+		why: "the full stargazer walk happens once; after that the newest hundred ride in one GraphQL query per ten repositories, and the daily star history is one request per repository, usually a free 304",
 	},
 	"actions": {
 		every: 15 * time.Minute, group: "ci",

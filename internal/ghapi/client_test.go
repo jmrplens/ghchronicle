@@ -110,11 +110,11 @@ func TestCacheTreatsAForeignElementAsEmpty(t *testing.T) {
 	odd, gone, stray := cacheKey{url: "/odd"}, cacheKey{url: "/gone"}, cacheKey{url: "/stray"}
 	k.entries[odd] = k.order.PushFront("not a pair")
 
-	if etag, body := k.get(odd); etag != "" || body != nil {
+	if etag, body, _ := k.get(odd); etag != "" || body != nil {
 		t.Errorf("get = %q, %q, want nothing stored", etag, body)
 	}
-	k.put(odd, `"v1"`, []byte("{}"))
-	if etag, _ := k.get(odd); etag != `"v1"` {
+	k.put(odd, `"v1"`, []byte("{}"), "")
+	if etag, _, _ := k.get(odd); etag != `"v1"` {
 		t.Errorf("a put over the foreign element must store the pair, got etag %q", etag)
 	}
 
@@ -130,7 +130,7 @@ func TestCacheTreatsAForeignElementAsEmpty(t *testing.T) {
 	if k.order.Len() != before-1 {
 		t.Error("evict must remove the least recently used element whatever it held")
 	}
-	if etag, _ := k.get(odd); etag != `"v1"` {
+	if etag, _, _ := k.get(odd); etag != `"v1"` {
 		t.Error("evicting the foreign element must leave the real pair alone")
 	}
 	// The index must not keep pointing at the element evict removed: a put
@@ -139,7 +139,7 @@ func TestCacheTreatsAForeignElementAsEmpty(t *testing.T) {
 	if _, indexed := k.entries[stray]; indexed {
 		t.Error("evict must forget the URL of the element it removed whatever it held")
 	}
-	k.put(stray, `"v2"`, []byte("{}"))
+	k.put(stray, `"v2"`, []byte("{}"), "")
 	if k.order.Len() != before {
 		t.Errorf("a put after the eviction must join the recency order, order has %d, want %d", k.order.Len(), before)
 	}
@@ -301,6 +301,132 @@ func TestNotModifiedWithoutAStoredBody(t *testing.T) {
 	if err != nil || !cached || out["keep"] != 1 {
 		t.Errorf("err=%v cached=%v out=%v", err, cached, out)
 	}
+}
+
+// TestA304ReplaysTheLinkItsBodyCameWith: GitHub sends no Link header with a
+// 304. Measured on 2026-09-25 against /stargazers/history: the 200 for page 1
+// carries rel="next" and rel="last", and the 304 for the same page carries
+// neither. Every walk that reads its next page from Link used to take a page
+// 1 answered from the cache for a list of one page: Stargazers read nothing
+// past it, and the activity log's and Dependabot's cursors stopped there. The
+// Link belongs to the answer the ETag validates, so it is stored with the
+// body and replayed with it.
+func TestA304ReplaysTheLinkItsBodyCameWith(t *testing.T) {
+	t.Parallel()
+	const (
+		pages = `<https://api.github.com/repositories/1/stargazers?per_page=100&page=2>; rel="next", ` +
+			`<https://api.github.com/repositories/1/stargazers?per_page=100&page=7>; rel="last"`
+		newer = `<https://api.github.com/repositories/1/stargazers?per_page=100&page=2>; rel="next", ` +
+			`<https://api.github.com/repositories/1/stargazers?per_page=100&page=8>; rel="last"`
+	)
+	for _, tc := range []struct {
+		name    string
+		answers []linkAnswer
+		want    []string
+	}{
+		{
+			name:    "a 304 with no Link replays the one its body came with",
+			answers: []linkAnswer{{true, pages}, {false, ""}, {false, ""}},
+			want:    []string{pages, pages, pages},
+		},
+		{
+			// A header a 304 does carry is the server's newer word on the
+			// stored answer, which is what RFC 9111 has a cache do with it.
+			name:    "a 304 that carries a Link reports that one",
+			answers: []linkAnswer{{true, pages}, {false, newer}},
+			want:    []string{pages, newer},
+		},
+		{
+			// The list shrank to one page. The entry is the latest 200's, so
+			// a Link that described an older body must not outlive it.
+			name:    "a 200 with no Link leaves none to replay",
+			answers: []linkAnswer{{true, pages}, {true, ""}, {false, ""}},
+			want:    []string{pages, "", ""},
+		},
+	} {
+		// A call that decodes nothing stores the wire body and answers its
+		// 304 on a path of its own, so both are held to the same Link.
+		for _, decoded := range []bool{true, false} {
+			t.Run(fmt.Sprintf("%s/decoded=%v", tc.name, decoded), func(t *testing.T) {
+				t.Parallel()
+				c, _ := newTestClient(t, serveLinkAnswers(t, tc.answers))
+				if got := readLinks(t, c, tc.answers, decoded); !reflect.DeepEqual(got, tc.want) {
+					t.Errorf("the calls reported the Links\n%q\nwant\n%q", got, tc.want)
+				}
+			})
+		}
+	}
+}
+
+// linkAnswer is one response of the sequence serveLinkAnswers plays: a 200
+// with a new ETag and body when modified, a 304 otherwise. Either carries
+// link as its Link header when it is not empty.
+type linkAnswer struct {
+	modified bool
+	link     string
+}
+
+// serveLinkAnswers answers the nth request with answers[n-1], and fails a
+// 304 sent to a request that did not ask conditionally: the client would
+// have nothing stored to replay, so that 304 would test nothing.
+func serveLinkAnswers(t *testing.T, answers []linkAnswer) http.HandlerFunc {
+	t.Helper()
+	var calls atomic.Int32
+	return func(w http.ResponseWriter, r *http.Request) {
+		n := int(calls.Add(1))
+		if n > len(answers) {
+			t.Errorf("request %d was not expected", n)
+			return
+		}
+		a := answers[n-1]
+		if a.link != "" {
+			w.Header().Set("Link", a.link)
+		}
+		if a.modified {
+			w.Header().Set("ETag", fmt.Sprintf(`"v%d"`, n))
+			_, _ = fmt.Fprintf(w, `[{"week":%d,"total":1}]`, n)
+			return
+		}
+		if r.Header.Get("If-None-Match") == "" {
+			t.Errorf("request %d is answered 304 but was asked unconditionally", n)
+		}
+		w.WriteHeader(http.StatusNotModified)
+	}
+}
+
+// readLinks makes one call per answer and returns the Link each reported. A
+// decoded call is also held to the value it replays, which has to be the one
+// the last 200 decoded, so the Link cannot come back right beside a body that
+// came back wrong.
+func readLinks(t *testing.T, c *Client, answers []linkAnswer, decoded bool) []string {
+	t.Helper()
+	type week struct {
+		Week int `json:"week"`
+	}
+	var links []string
+	var stored []week
+	for i, a := range answers {
+		var weeks []week
+		var out any
+		if decoded {
+			out = &weeks
+		}
+		link, cached, err := c.GetJSON(context.Background(), "/repos/o/n/stargazers?per_page=100", out, "")
+		if err != nil {
+			t.Fatalf("call %d: %v", i+1, err)
+		}
+		if cached == a.modified {
+			t.Errorf("call %d reported cached=%v, and it was answered modified=%v", i+1, cached, a.modified)
+		}
+		if decoded && !a.modified && !reflect.DeepEqual(weeks, stored) {
+			t.Errorf("call %d replayed %+v, want the stored %+v", i+1, weeks, stored)
+		}
+		if a.modified {
+			stored = weeks
+		}
+		links = append(links, link)
+	}
+	return links
 }
 
 func TestRateLimitsAreTrackedPerBucket(t *testing.T) {
@@ -1839,10 +1965,11 @@ func TestOneURLDecodedIntoTwoTypesReplaysEachItsOwnValue(t *testing.T) {
 func TestAnEntryIsChargedWhatItHoldsPlusTheOverhead(t *testing.T) {
 	t.Parallel()
 	k := newCache(1 << 20)
-	k.put(cacheKey{url: "/repos/o/n"}, `"v1"`, []byte(`{"n":1}`))
-	want := len("/repos/o/n") + len(`"v1"`) + len(`{"n":1}`) + cacheEntryOverhead
+	const link = `<https://api.github.com/repos/o/n?page=2>; rel="next"`
+	k.put(cacheKey{url: "/repos/o/n"}, `"v1"`, []byte(`{"n":1}`), link)
+	want := len("/repos/o/n") + len(`"v1"`) + len(`{"n":1}`) + len(link) + cacheEntryOverhead
 	if k.bytes != want {
-		t.Errorf("one entry is charged %d bytes, want %d: the URL, the ETag, the body and the overhead", k.bytes, want)
+		t.Errorf("one entry is charged %d bytes, want %d: the URL, the ETag, the body, the Link and the overhead", k.bytes, want)
 	}
 }
 
@@ -1857,23 +1984,23 @@ func TestTheLimitIsInclusive(t *testing.T) {
 	one := (&conditional{key: a, etag: `"1"`, body: body}).size()
 
 	whole := newCache(one)
-	whole.put(a, `"1"`, body)
-	if etag, _ := whole.get(a); etag != `"1"` {
+	whole.put(a, `"1"`, body, "")
+	if etag, _, _ := whole.get(a); etag != `"1"` {
 		t.Errorf("an entry exactly the size of the limit was not stored: %+v", whole)
 	}
 
 	k := newCache(2 * one)
-	k.put(a, `"1"`, body)
-	k.put(b, `"1"`, body)
+	k.put(a, `"1"`, body, "")
+	k.put(b, `"1"`, body, "")
 	if len(k.entries) != 2 || k.bytes != 2*one || k.evicted != 0 {
 		t.Errorf("two entries filling the limit exactly left %d entries, %d bytes and %d evictions, want 2, %d and 0",
 			len(k.entries), k.bytes, k.evicted, 2*one)
 	}
-	k.put(c, `"1"`, body)
+	k.put(c, `"1"`, body, "")
 	if len(k.entries) != 2 || k.evicted != 1 {
 		t.Errorf("a third entry left %d entries after %d evictions, want 2 after exactly 1", len(k.entries), k.evicted)
 	}
-	if etag, _ := k.get(a); etag != "" {
+	if etag, _, _ := k.get(a); etag != "" {
 		t.Error("the entry evicted must be the least recently used, /a")
 	}
 }
@@ -1890,8 +2017,8 @@ func TestSetCacheLimitKeepsWhatStillFits(t *testing.T) {
 	one := (&conditional{key: a, etag: `"1"`, body: body}).size()
 
 	k := newCache(1 << 20)
-	k.put(a, `"1"`, body)
-	k.put(b, `"1"`, body)
+	k.put(a, `"1"`, body, "")
+	k.put(b, `"1"`, body, "")
 	for _, limit := range []int{4 * one, 2 * one} {
 		k.setLimit(limit)
 		if len(k.entries) != 2 || k.bytes != 2*one || k.evicted != 0 {
@@ -1904,10 +2031,10 @@ func TestSetCacheLimitKeepsWhatStillFits(t *testing.T) {
 		t.Errorf("a limit one byte short left %d entries, %d bytes and %d evictions, want 1, %d and exactly 1",
 			len(k.entries), k.bytes, k.evicted, one)
 	}
-	if etag, _ := k.get(a); etag != "" {
+	if etag, _, _ := k.get(a); etag != "" {
 		t.Error("the entry evicted must be the least recently used, /a")
 	}
-	if etag, _ := k.get(b); etag != `"1"` {
+	if etag, _, _ := k.get(b); etag != `"1"` {
 		t.Error("the entry that still fits, /b, must be kept")
 	}
 }
@@ -1947,9 +2074,9 @@ func TestHalfAPairForgetsTheWholeEntry(t *testing.T) {
 			t.Parallel()
 			k := newCache(1 << 20)
 			key := cacheKey{url: "/a"}
-			k.put(key, `"v1"`, []byte(`{"n":1}`))
-			k.put(key, tc.etag, tc.body)
-			if etag, body := k.get(key); etag != "" || body != nil {
+			k.put(key, `"v1"`, []byte(`{"n":1}`), "")
+			k.put(key, tc.etag, tc.body, "")
+			if etag, body, _ := k.get(key); etag != "" || body != nil {
 				t.Errorf("get = %q, %q, want the old pair forgotten", etag, body)
 			}
 			if len(k.entries) != 0 || k.order.Len() != 0 || k.bytes != 0 {

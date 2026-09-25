@@ -8,7 +8,7 @@ The thirty-four families of GitHub metrics ghchronicle collects, what each one a
 
 Source: <https://jmrp.io/docs/ghchronicle/collectors/>
 
-Thirty-four families, ninety-two measurements. This page is what each family
+Thirty-four families, ninety-three measurements. This page is what each family
 is _for_; the [measurements reference](https://jmrp.io/docs/ghchronicle/collectors/measurements/)
 is every tag and field.
 
@@ -42,18 +42,25 @@ Referrers and popular paths are different: the API returns a top-ten snapshot
 with no dates at all, so they are stamped at the start of the UTC day and read
 as "who was sending traffic when we asked".
 
-**`stars`** reconstructs the star curve from its beginning. The stargazers
-endpoint returns a `starred_at` per user when asked with the star media type,
-so the entire history is available on the first run: a chart that goes back
-years, not one that starts the day the collector was installed. After the first
-sweep only the newest hundred are read, since new stars land at the end, and
-they are read for every repository at once in one GraphQL query per ten. That
-is the difference between one point and 280 calls for a repository with 28,000
-stars. GitHub has served the list only to a repository's admins and
-collaborators since July 2026, so the curve is drawn only where the token has
-that access, which it always has on the account's own repositories and on those
-of an organisation the account administers; for any other the star count is
-collected and the curve is not (see
+**`stars`** reconstructs the star curve from its beginning, from two endpoints.
+GitHub's daily star history gives the stars a repository gained on each day,
+back to the week it was created, to anyone who can see the repository, so it is
+read for every repository the sweep collects and written as `gh_star_day`: whole
+on the first sweep, and after that one request for the newest thirty weeks, a
+free 304 unless one of their days gained or lost a star or a new week began.
+The daily star bars count it in every store but Prometheus, and in InfluxDB and
+PostgreSQL so does the star curve, so the entire history is there after the
+first run: a chart that goes back years, not one that starts the day the
+collector was installed. GitHub Enterprise Server does not serve the history,
+so there those panels stay empty. The stargazer list says who.
+Asked with the star media type it returns a `starred_at` per user, written as
+`gh_star`, walked in full once; after that only the newest hundred are read,
+since new stars land at the end, and they are read for every repository at once
+in one GraphQL query per ten. That is the difference between one point and 280
+calls for a repository with 28,000 stars. GitHub has served the list only to a
+repository's admins and collaborators since July 2026, which the account always
+is on its own repositories and on those of an organisation it administers; any
+other repository has its stars counted per day and nobody named (see
 [what GitHub will not give](https://jmrp.io/docs/ghchronicle/api/limits/)).
 
 **`forks`** collects who forked and when. The repository snapshot carries a
@@ -294,7 +301,7 @@ Every measurement ghchronicle writes from the GitHub API, its tags, its fields, 
 
 Source: <https://jmrp.io/docs/ghchronicle/collectors/measurements/>
 
-Ninety-two measurements. Each row says how a point is dated, because that is
+Ninety-three measurements. Each row says how a point is dated, because that is
 the thing that decides which questions it can answer.
 
 ### How to read the tables
@@ -472,7 +479,7 @@ panel, which is the place to copy from.
 
 #### Every measurement, alphabetically
 
-Ninety-two, each link landing on the table it is in.
+Ninety-three, each link landing on the table it is in.
 
 [`gh_account`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#account) · [`gh_account_total`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#account) ·
 [`gh_achievement`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#account) · [`gh_achievement_progress`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#account) ·
@@ -525,8 +532,9 @@ Ninety-two, each link landing on the table it is in.
 [`gh_security_feature`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#security) · [`gh_security_setting`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#security) ·
 [`gh_social_account`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#account) · [`gh_sponsors_listing`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#account) ·
 [`gh_sponsors_tier`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#account) · [`gh_sponsorship`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#account) ·
-[`gh_star`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#stars-and-forks) · [`gh_star_given`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#stars-and-forks) ·
-[`gh_star_list`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#account) · [`gh_traffic`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#audience) ·
+[`gh_star`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#stars-and-forks) · [`gh_star_day`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#stars-and-forks) ·
+[`gh_star_given`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#stars-and-forks) · [`gh_star_list`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#account) ·
+[`gh_traffic`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#audience) ·
 [`gh_traffic_path`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#audience) · [`gh_traffic_referrer`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#audience) ·
 [`gh_webhook`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#configuration-and-delivery) ·
 [`gh_webhook_delivery`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#configuration-and-delivery) ·
@@ -554,8 +562,61 @@ which is why they are a snapshot rather than a series.
 | Measurement     | Dated                            | Tags                       | Fields                                                 |
 | --------------- | -------------------------------- | -------------------------- | ------------------------------------------------------ |
 | `gh_star` | dated, when the star was given | `user` | `starred`, `url`, `user_url` |
+| `gh_star_day` | dated, one point per day: the Pacific day, at 00:00 UTC | | `stars` |
 | `gh_star_given` | dated                            | `user`, `language` | `stars`, `repo_stars`, `url`                           |
 | `gh_fork`       | dated, when the fork was created | `by`                       | `forks`, `stars`, `seconds_to_push`, `advanced`, `url` |
+
+`gh_star_day` is the stars a repository gained on each day, read from GitHub's
+[star history](https://docs.github.com/en/rest/activity/starring#get-repository-star-history)
+for every repository a sweep collects, whatever the token may see of its
+stargazers. It names nobody, so it carries no tag of its own and no `url`:
+`gh_star` is the row per star, with who gave it and the second, and it exists
+only where the token may read the stargazer list, which since July 2026 means a
+repository's admins and collaborators. No panel reads both, so a repository
+with both is counted once, and the panels that count stars from rows read
+`gh_star_day`, so one whose list is hidden is counted all the same.
+
+A day is GitHub's own calendar day in America/Los_Angeles, and its row is
+stamped at 00:00 UTC of that date, as a `gh_contribution_day` row is stamped at
+00:00 UTC of its own. Measured against the stargazer lists of nineteen
+repositories, 440 stars, the Pacific day matched every one, and the UTC day put
+38 of one repository's 127 days wrong. So a star given on a
+European morning can sit a day before the date `gh_star` gives it. Each day is
+anchored to the week the API returns, never to the clock, no day after the sweep
+is written, and today may be written as 0 before it has begun in Pacific time,
+to be corrected by the next sweep.
+
+The count is the repository's current stargazers, each on the day they starred,
+so an unstar takes the star off the day it was given rather than the day it was
+taken back. A sweep reads the newest thirty weeks, one page, and writes every
+day of them, zeros included, so a day that drops from one to none is rewritten
+the next time. Older pages are read on a repository's first sight, once after
+upgrading to 2.5.0, and in a backfill; the state file records a whole read as
+`history_read`, and only after a walk that reached the end of the history, so a
+walk cut short, by an error or by a later page answering 403 or 404, is read
+whole again on the next sweep. Those pages write only the days that have stars:
+zero rows back to each repository's creation would multiply the files InfluxDB 3
+opens, and a day older than thirty weeks that lost its only star therefore keeps
+it, the way `gh_star` keeps every star it ever saw. The sum usually sits at
+`gh_repo.stars` or a little below it, since that count also includes accounts
+GitHub no longer lists: one short on three of those nineteen repositories. A
+star given more than thirty weeks ago and taken back after the history was read
+can make it sit above: only a backfill that reaches back to its day lowers that
+day, and only while the day holds another star, so one that was its day's only
+star stays for good. Prometheus and an OTLP backend with `raw: false` never see
+it: an unstar lowers a past day, which no counter can do, and
+`github_repo_stars` already carries every repository's current count.
+
+GitHub Enterprise Server does not serve the star history: its REST API, checked
+against 3.21 and 3.22, has the stargazer list and no `stargazers/history`.
+There every repository answers it with a 404, which is read as nothing to
+collect, so `gh_star_day` stays empty, and so do the panels that count stars
+from it: Stars gained over time and Stars over time in InfluxDB and the SQL
+stores, Stars gained over time in Graphite and Elasticsearch, and Graphite's
+Recent stars. Recent stars still lists names from `gh_star` in the other
+stores, and Prometheus still counts from it. A history that answered 404 is not
+recorded as read, so a server that starts serving it has each repository's
+history read whole on the next sweep.
 
 `gh_star_given` is the outbound direction: what this account starred in other
 people's repositories. `advanced` on a fork separates a real derivative from a
@@ -779,8 +840,13 @@ succeeded, because the runner keeps nothing of a collector that failed partway.
 A run's jobs outlive their steps. Measured on 24 September 2026, GitHub listed
 every job of a run 278 days old, with its times and its runner, and gave every
 run created before 12 April, about five and a half months back, an empty step
-list. A backfill writes those jobs with `steps` at 0 and no `gh_workflow_step`
-rows for them.
+list. A job that finished as success, failure or timed out ran at least one
+step, so when its list comes back empty it is written with no `steps` field
+rather than with a 0 that says it had none, and with no `gh_workflow_step` rows:
+a zero there would pull every mean of `steps` toward nothing as far back as a
+backfill reached. Every other job keeps `steps` as the length of its list,
+because its zero can be true: a skipped job runs no step (measured), and a
+cancelled one can stop before its first.
 
 `retention_days` is the retention an artifact actually got, which is rarely the
 configured default: eighty-eight of a hundred artifacts measured lived one day

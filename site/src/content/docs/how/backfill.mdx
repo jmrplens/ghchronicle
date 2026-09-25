@@ -214,7 +214,9 @@ that a sweep reads.
 - Every workflow run GitHub still holds, each expanded into its jobs, and into
   its steps while GitHub still serves them. Measured on 24 September 2026,
   GitHub listed every job of a run 278 days old, but no steps for any run
-  created before 12 April, about five and a half months back.
+  created before 12 April, about five and a half months back. Such a job, if
+  it finished as success, failure or timed out, is written with no `steps`
+  field rather than a 0, since it ran at least one.
 - The archived repositories, in full, whatever `include_archived` says. Their
   history is the account's history and it never moves again, which is exactly
   why a sweep leaves them out and why one walk of them is enough. Forks stay

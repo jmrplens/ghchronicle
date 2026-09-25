@@ -84,7 +84,7 @@ cambie de coste sin que esta tabla la siga rompe la compilación.
 | `account`   | `profile`     | `12h`       | paquetes, gists y cuentas sociales, todo ello editado a mano                                                                                      |
 | `account`   | `totals`      | `12h`       | dos veces al día sobra para un número que solo crece                                                                                              |
 | `audience`  | `forks`       | `12h`       | la lista entera cabe en una página, y un fork es un suceso raro                                                                                   |
-| `audience`  | `stars`       | `6h`        | el recorrido completo ocurre una vez; después las cien estrellas más nuevas viajan en una consulta GraphQL por cada diez repositorios             |
+| `audience`  | `stars`       | `6h`        | el recorrido completo ocurre una vez; después las cien estrellas más nuevas viajan en una consulta GraphQL por cada diez repositorios, y el historial diario de estrellas es una petición por repositorio, casi siempre un 304 gratis |
 | `audience`  | `traffic`     | `6h`        | la ventana de catorce días se reescribe entera cada vez, así que una pasada perdida se repara en la siguiente                                     |
 | `ci`        | `actions`     | `15m`       | una ejecución de workflow termina en minutos, y su tiempo en cola solo merece verse mientras ocurre                                                |
 | `ci`        | `artifacts`   | `1h`        | los artefactos aparecen con la ejecución que los hizo y caducan en escala de días                                                                 |
@@ -211,10 +211,10 @@ Todo lo demás se puede rellenar luego con `-backfill`.
 Las secciones de los dashboards tampoco están alineadas con los grupos, así que
 un grupo apagado vacía algunos paneles de varias secciones en lugar de una
 sección entera. `Stars and forks` lee `gh_repo` de `repos` además de `gh_star`
-de `audience`; `Code` lee `gh_workflow_run` de `ci` y `gh_repo_activity` de
-`feeds` junto a sus propios commits; `Inventory` lee de `repos` y de `account`, y
-sus paneles de licencias leen `gh_dependency_license`, que es la familia `deps` y
-viene apagada se seleccione `repos` o no.
+y `gh_star_day` de `audience`; `Code` lee `gh_workflow_run` de `ci` y
+`gh_repo_activity` de `feeds` junto a sus propios commits; `Inventory` lee de
+`repos` y de `account`, y sus paneles de licencias leen `gh_dependency_license`,
+que es la familia `deps` y viene apagada se seleccione `repos` o no.
 
 ## Qué significa `0`
 

@@ -81,13 +81,21 @@ func TestExporterReducesTheSweepToWhatIsTrueNow(t *testing.T) {
 	})
 
 	t.Run("nothing that has no honest current value is on the page", func(t *testing.T) {
-		// The contribution calendar and the weekly commit series are history:
-		// there is no "now" for them, and the reduction skips them rather
-		// than guessing. A name appearing here means a rule changed.
-		for _, name := range []string{"github_contribution_day_", "github_commits_week_"} {
+		// The contribution calendar, the weekly commit series and the daily
+		// star history are history: there is no "now" for them, and the
+		// reduction skips them rather than guessing. A name appearing here
+		// means a rule changed. The star history would be the costliest to
+		// get wrong: counted, its first read would put years of stars into
+		// one increase(), and an unstar lowering a past day would read as a
+		// counter reset. The current count is github_repo_stars already.
+		for _, name := range []string{"github_contribution_day_", "github_commits_week_", "github_star_day_"} {
 			if strings.Contains(page, "\n"+name) {
 				t.Errorf("%s is on the page, though its measurement is skipped by the reduction", name)
 			}
+		}
+		// Absent only counts if the sweep had some to leave out.
+		if len(promSelect(points, "gh_star_day", nil)) == 0 {
+			t.Error("the exporter's sweep collected no gh_star_day, so its absence from the page proves nothing")
 		}
 	})
 }
@@ -114,6 +122,16 @@ func TestPrometheusScrapesTheExporter(t *testing.T) {
 		}
 		if samples[0].value != 80 {
 			t.Errorf("github_repo_stars = %v, want 80", samples[0].value)
+		}
+	})
+
+	t.Run("the star history is not a series", func(t *testing.T) {
+		// Asked after the subtest above has seen a scrape land, so an empty
+		// answer means the exporter left it out rather than that Prometheus
+		// had not scraped yet.
+		if samples := promQuery(ctx, t, s, `{__name__=~"github_star_day_.*"}`); len(samples) != 0 {
+			t.Errorf("Prometheus holds %d series of the daily star history, which the "+
+				"reduction skips: %v", len(samples), samples)
 		}
 	})
 

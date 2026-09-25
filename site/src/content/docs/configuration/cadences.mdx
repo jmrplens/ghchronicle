@@ -83,7 +83,7 @@ the same membership.
 | `account`   | `profile`     | `12h`   | packages, gists and social accounts, all of them edited by hand                                                                                  |
 | `account`   | `totals`      | `12h`   | twice a day is plenty for a number that only grows                                                                                              |
 | `audience`  | `forks`       | `12h`   | the whole list fits in one page, and a fork is a rare event                                                                                      |
-| `audience`  | `stars`       | `6h`    | the full stargazer walk happens once; after that the newest hundred ride in one GraphQL query per ten repositories                               |
+| `audience`  | `stars`       | `6h`    | the full stargazer walk happens once; after that the newest hundred ride in one GraphQL query per ten repositories, and the daily star history is one request per repository, usually a free 304 |
 | `audience`  | `traffic`     | `6h`    | the fourteen-day window is rewritten whole each time, so a missed sweep repairs itself on the next one                                           |
 | `ci`        | `actions`     | `15m`   | a workflow run is over in minutes, and its queue time is only worth watching while it is happening                                               |
 | `ci`        | `artifacts`   | `1h`    | artifacts appear with the run that made them and expire on a scale of days                                                                       |
@@ -212,10 +212,11 @@ filled in later with `-backfill`.
 The dashboard sections are not aligned to the groups either, so a group
 switched off empties some panels of several sections rather than one section
 cleanly. `Stars and forks` reads `gh_repo` from `repos` as well as `gh_star`
-from `audience`; `Code` reads `gh_workflow_run` from `ci` and `gh_repo_activity`
-from `feeds` alongside its own commits; `Inventory` reads from `repos` and
-`account`, and its licence panels read `gh_dependency_license`, which is family
-`deps` and ships switched off whether or not `repos` is selected.
+and `gh_star_day` from `audience`; `Code` reads `gh_workflow_run` from `ci` and
+`gh_repo_activity` from `feeds` alongside its own commits; `Inventory` reads
+from `repos` and `account`, and its licence panels read `gh_dependency_license`,
+which is family `deps` and ships switched off whether or not `repos` is
+selected.
 
 ## What `0` means
 

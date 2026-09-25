@@ -254,7 +254,7 @@ every:
   families:
     traffic: 6h       # GitHub's window is 14 days and is rewritten whole each time
     repo: 1h          # stars, forks, languages, topics, releases
-    stars: 6h         # walked whole once per repository, then the newest hundred in a GraphQL batch
+    stars: 6h         # list walked whole once, then the newest hundred by GraphQL; history's newest page, usually a 304
     issues: 1h        # pull requests, issues and reviews, per item
     commits: 1h       # lines changed and signature state, per commit
     actions: 15m      # the only family with a per-minute rhythm
@@ -316,7 +316,8 @@ every:
 #   since: 2y
 
 # What a sweep remembers between runs: when each family last ran, which
-# repositories have already had their one-off full star walk, the commit each
+# repositories have already had their one-off full stargazer walk and which
+# their one whole read of the daily star history, the commit each
 # dependency diff starts from, when each family last read a whole page instead
 # of what changed, where the notification window was cut, and the newest event
 # the feed had. Deleting it makes the next sweep take every one of those from

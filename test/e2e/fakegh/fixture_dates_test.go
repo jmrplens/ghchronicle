@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -58,6 +59,46 @@ func TestNoFixtureWritesOutARecentDate(t *testing.T) {
 	}
 }
 
+// epoch is a number the width of a Unix second in this century's first half:
+// ten digits, standing alone. Most such numbers in the fixtures are ids, and
+// the window below is what tells the two apart.
+var epoch = regexp.MustCompile(`\b1\d{9}\b`)
+
+// TestNoFixtureWritesOutARecentEpoch is the same guard for the dates the ISO
+// pattern cannot see. The star history labels its weeks with Unix seconds, a
+// fixture that wrote one out would leave every star panel's window the way
+// the pull request left the thirty days, and a ten-digit number reads like
+// any other id.
+//
+// Both sides of today, unlike the ISO guard: a written-out epoch ahead of the
+// present is as much a countdown as one behind it, and ids that happen to
+// read as a year far from either are left alone, which is what the window is
+// for. The run ids of the actions fixtures read as 2001, the job ids as 2033.
+func TestNoFixtureWritesOutARecentEpoch(t *testing.T) {
+	t.Parallel()
+	now := time.Now().UTC()
+	for name, body := range everyFixture(t) {
+		for _, written := range epoch.FindAllString(string(body), -1) {
+			seconds, err := strconv.ParseInt(written, 10, 64)
+			if err != nil {
+				continue
+			}
+			at := time.Unix(seconds, 0).UTC()
+			if at.Before(now.Add(-recentEnoughToDrift)) || at.After(now.Add(recentEnoughToDrift)) {
+				continue
+			}
+			t.Errorf("%s writes out %s, which is %s; spell a week as %s so it stays where the "+
+				"fixture meant it", name, written, at.Format(time.DateOnly), weekOffsetFor(at))
+		}
+	}
+}
+
+// weekOffsetFor is the week marker an epoch should have been written as.
+func weekOffsetFor(at time.Time) string {
+	weeks := max(int(time.Since(at).Hours()/24/7), 0)
+	return fmt.Sprintf("@WEEK_EPOCH_%d@", weeks)
+}
+
 // offsetFor is the marker a date should have been written as.
 func offsetFor(at time.Time) string {
 	days := int(time.Since(at).Hours() / 24)
@@ -76,7 +117,7 @@ func TestEveryMarkerInTheFixturesIsOneTheFakeResolves(t *testing.T) {
 	marker := regexp.MustCompile(`@[A-Z0-9_]+@`)
 	for name, body := range everyFixture(t) {
 		for _, m := range marker.FindAllString(string(body), -1) {
-			if daysAgoMarker.MatchString(m) || slices.Contains(known, m) {
+			if daysAgoMarker.MatchString(m) || weekEpochMarker.MatchString(m) || slices.Contains(known, m) {
 				continue
 			}
 			t.Errorf("%s carries %s, which nothing resolves", name, m)
@@ -85,7 +126,7 @@ func TestEveryMarkerInTheFixturesIsOneTheFakeResolves(t *testing.T) {
 	// And the ones it does know are still known: a token renamed in resolve
 	// without being renamed in the fixtures fails here rather than in a sweep.
 	s := &Server{tb: t, now: time.Now().UTC}
-	for _, token := range append(known, "@DAYS_AGO_3@") {
+	for _, token := range append(known, "@DAYS_AGO_3@", "@WEEK_EPOCH_1@") {
 		if got := string(s.resolve([]byte(token))); strings.Contains(got, "@") {
 			t.Errorf("%s came back as %q", token, got)
 		}

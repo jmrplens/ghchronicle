@@ -8,7 +8,7 @@ compactTables:
 
 import { Aside } from "@astrojs/starlight/components";
 
-Noventa y dos medidas. Cada fila dice cómo se fecha un punto, porque eso es
+Noventa y tres medidas. Cada fila dice cómo se fecha un punto, porque eso es
 lo que decide qué preguntas puede responder.
 
 ## Cómo leer las tablas
@@ -192,7 +192,7 @@ almacén para cada panel, que es el sitio del que copiar.
 
 ### Todas las medidas, por orden alfabético
 
-Noventa y dos, y cada enlace cae en la tabla en la que está.
+Noventa y tres, y cada enlace cae en la tabla en la que está.
 
 [`gh_account`](#cuenta) · [`gh_account_total`](#cuenta) ·
 [`gh_achievement`](#cuenta) · [`gh_achievement_progress`](#cuenta) ·
@@ -243,8 +243,9 @@ Noventa y dos, y cada enlace cae en la tabla en la que está.
 [`gh_security_feature`](#seguridad) · [`gh_security_setting`](#seguridad) ·
 [`gh_social_account`](#cuenta) · [`gh_sponsors_listing`](#cuenta) ·
 [`gh_sponsors_tier`](#cuenta) · [`gh_sponsorship`](#cuenta) ·
-[`gh_star`](#estrellas-y-forks) · [`gh_star_given`](#estrellas-y-forks) ·
-[`gh_star_list`](#cuenta) · [`gh_traffic`](#audiencia) ·
+[`gh_star`](#estrellas-y-forks) · [`gh_star_day`](#estrellas-y-forks) ·
+[`gh_star_given`](#estrellas-y-forks) · [`gh_star_list`](#cuenta) ·
+[`gh_traffic`](#audiencia) ·
 [`gh_traffic_path`](#audiencia) · [`gh_traffic_referrer`](#audiencia) ·
 [`gh_webhook`](#configuración-y-entrega) ·
 [`gh_webhook_delivery`](#configuración-y-entrega) ·
@@ -272,8 +273,67 @@ por eso son una instantánea y no una serie.
 | Medida          | Fechado                            | Etiquetas                  | Campos                                                 |
 | --------------- | ---------------------------------- | -------------------------- | ------------------------------------------------------ |
 | `gh_star` | fechado, cuando se dio la estrella | `user` | `starred`, `url`, `user_url` |
+| `gh_star_day` | fechado, un punto por día: el día del Pacífico, a las 00:00 UTC | | `stars` |
 | `gh_star_given` | fechado                            | `user`, `language` | `stars`, `repo_stars`, `url`                           |
 | `gh_fork`       | fechado, cuando se creó el fork    | `by`                       | `forks`, `stars`, `seconds_to_push`, `advanced`, `url` |
+
+`gh_star_day` son las estrellas que ganó un repositorio cada día, leídas del
+[historial de estrellas](https://docs.github.com/es/rest/activity/starring#get-repository-star-history)
+de GitHub para cada repositorio que recoge una pasada, vea lo que vea el token
+de sus stargazers. No nombra a nadie, así que no lleva etiqueta propia ni `url`:
+`gh_star` es la fila por estrella, con quién la dio y el segundo, y solo existe
+donde el token puede leer la lista de stargazers, lo que desde julio de 2026
+significa los administradores y colaboradores del repositorio. Ningún panel lee
+las dos, así que un repositorio que tiene ambas se cuenta una vez, y los paneles
+que cuentan estrellas a partir de filas leen `gh_star_day`, así que uno cuya
+lista está oculta se cuenta igual.
+
+Un día es el día natural del propio GitHub en America/Los_Angeles, y su fila se
+sella a las 00:00 UTC de esa fecha, como una fila de `gh_contribution_day` se
+sella a las 00:00 UTC de la suya. Medido contra las listas de stargazers de
+diecinueve repositorios, 440 estrellas, el día del Pacífico acertó en todas, y
+el día UTC equivocaba 38 de los 127 días de un repositorio. Así que una estrella
+dada una mañana europea puede quedar un día antes de la fecha que le da
+`gh_star`. Cada día se ancla a la semana que devuelve la API, nunca al reloj, no
+se escribe ningún día posterior a la pasada, y hoy puede escribirse como 0 antes
+de que haya empezado en la hora del Pacífico, para que lo corrija la pasada
+siguiente.
+
+La cuenta son los stargazers actuales del repositorio, cada uno en el día en que
+marcó la estrella, así que quitar una estrella la saca del día en que se dio, no
+del día en que se retiró. Una pasada lee las treinta semanas más nuevas, una
+página, y escribe todos sus días, ceros incluidos, así que un día que baja de
+una a ninguna se reescribe la vez siguiente. Las páginas más antiguas se leen la
+primera vez que se ve un repositorio, una vez tras actualizar a 2.5.0 y en un
+backfill; el fichero de estado registra una lectura entera como `history_read`,
+y solo tras un recorrido que llegó al final del historial, así que un recorrido
+cortado, por un error o por una página posterior que responde 403 o 404, se
+vuelve a leer entero en la pasada siguiente. Esas páginas escriben solo los días
+que tienen estrellas: filas a cero hasta la creación de cada repositorio
+multiplicarían los ficheros que abre InfluxDB 3, y por eso un día de hace más de
+treinta semanas que perdió su única estrella la conserva, igual que `gh_star`
+conserva cada estrella que vio alguna vez. La suma suele quedar en
+`gh_repo.stars` o un poco por debajo, ya que ese número también cuenta cuentas
+que GitHub ya no lista: una menos en tres de esos diecinueve repositorios. Una
+estrella dada hace más de treinta semanas y retirada después de leer el
+historial puede dejarla por encima: solo un backfill que llegue hasta su día
+rebaja ese día, y solo mientras el día conserve otra estrella, así que si era la
+única estrella de su día se queda para siempre. Prometheus y un backend OTLP con
+`raw: false` no la ven nunca: quitar una estrella baja un día pasado, cosa que
+ningún contador puede hacer, y `github_repo_stars` ya lleva el número actual de
+cada repositorio.
+
+GitHub Enterprise Server no sirve el historial de estrellas: su API REST,
+comprobada en 3.21 y 3.22, tiene la lista de stargazers y no
+`stargazers/history`. Allí cada repositorio lo responde con un 404, que se lee
+como nada que recoger, así que `gh_star_day` queda vacía, y con ella los
+paneles que cuentan estrellas a partir de ella: Stars gained over time y Stars
+over time en InfluxDB y en los almacenes SQL, Stars gained over time en
+Graphite y Elasticsearch, y Recent stars en Graphite. Recent stars sigue
+listando nombres de `gh_star` en los demás almacenes, y Prometheus sigue
+contando a partir de ella. Un historial que respondió 404 no se registra como
+leído, así que un servidor que empiece a servirlo tiene el historial de cada
+repositorio leído entero en la pasada siguiente.
 
 `gh_star_given` es la dirección saliente: lo que esta cuenta marcó en
 repositorios ajenos. `advanced` en un fork separa un derivado real de un
@@ -507,8 +567,14 @@ runner no conserva nada de un colector que falló a medias.
 Los jobs de una ejecución duran más que sus pasos. Medido el 24 de septiembre de
 2026, GitHub listaba todos los jobs de una ejecución de hace 278 días, con sus
 tiempos y su runner, y devolvía una lista de pasos vacía para toda ejecución
-creada antes del 12 de abril, unos cinco meses y medio atrás. Un relleno escribe
-esos jobs con `steps` a 0 y sin filas de `gh_workflow_step`.
+creada antes del 12 de abril, unos cinco meses y medio atrás. Un job que terminó
+en éxito, en fallo o por tiempo agotado ejecutó al menos un paso, así que cuando
+su lista llega vacía se escribe sin el campo `steps`, en lugar de con un 0 que
+diría que no tuvo ninguno, y sin filas de `gh_workflow_step`: ese cero
+arrastraría hacia nada toda media de `steps` hasta donde llegó un relleno. Todo
+otro job conserva `steps` como la longitud de su lista, porque su cero puede ser
+cierto: un job omitido no ejecuta ningún paso (medido), y uno cancelado puede
+pararse antes del primero.
 
 `retention_days` es la retención que un artefacto tuvo de verdad, que casi
 nunca es la configurada por omisión: ochenta y ocho de cada cien artefactos

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -488,5 +489,64 @@ func TestNoRowDatedInThePastMovesWithTheClock(t *testing.T) {
 		t.Errorf("the two sweeps wrote %d and %d past-dated rows and agree on %d: "+
 			"a row whose identity moves with the clock is a tag or a timestamp taken from it",
 			len(before), len(after), shared)
+	}
+}
+
+// TestNoStarDayMovesWithTheClock is the gate above for the daily star
+// history, with the fake frozen at each sweep's own clock rather than both at
+// the first's. The history labels its weeks from the present, the way GitHub
+// does, so this is the fake moving the way GitHub would: a Monday sweep and a
+// Thursday sweep of one week have to write the same row for every day before
+// that Monday, and neither may write a day after its own moment.
+func TestNoStarDayMovesWithTheClock(t *testing.T) {
+	t.Parallel()
+	monday := time.Date(2026, 9, 14, 9, 0, 0, 0, time.UTC)
+	thursday := monday.AddDate(0, 0, 3)
+	sweep := func(at time.Time) []sink.Point {
+		got := &collector{}
+		r, fake, log := fakeRunner(t, got)
+		fake.FreezeAt(at)
+		r.Cfg.Every = everyOnly("stars")
+		if err := r.Cfg.Validate(); err != nil {
+			t.Fatal(err)
+		}
+		r.Now = func() time.Time { return at }
+		if err := r.Once(t.Context()); err != nil {
+			t.Fatalf("sweep at %s: %v\n%s", at, err, log)
+		}
+		var days []sink.Point
+		for _, p := range got.points {
+			if p.Measurement != "gh_star_day" {
+				continue
+			}
+			if p.Time.After(at) {
+				t.Errorf("the sweep at %s wrote the day %s", at, p.Time.Format(time.DateOnly))
+			}
+			days = append(days, p)
+		}
+		return days
+	}
+	history := monday.Truncate(24 * time.Hour)
+	past := func(points []sink.Point) map[string]string {
+		out := map[string]string{}
+		for _, p := range points {
+			if p.Time.Before(history) {
+				out[p.Time.Format(time.DateOnly)] = sink.LineProtocol(p)
+			}
+		}
+		return out
+	}
+	early, late := sweep(monday), sweep(thursday)
+	before, after := past(early), past(late)
+	// The fixture's three weeks up to the Sunday before the Monday.
+	if len(before) != 15 {
+		t.Fatalf("the Monday sweep wrote %d days before itself, want the fixture's fifteen", len(before))
+	}
+	if !maps.Equal(before, after) {
+		t.Errorf("the days before the Monday moved between a Monday and a Thursday sweep:\n%v\n%v", before, after)
+	}
+	if len(late)-len(early) != 3 {
+		t.Errorf("the Thursday sweep wrote %d days and the Monday one %d, want the three days between them more",
+			len(late), len(early))
 	}
 }
