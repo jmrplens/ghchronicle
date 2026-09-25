@@ -17,34 +17,35 @@ import (
 // reproduce byte for byte.
 const brandDir = "../../brand"
 
-// rasterizer is the directory holding the stand-in for rsvg-convert TestMain
-// builds out of testdata/rsvg-convert.
-var rasterizer string
+// rasterizer and quantizer are the directories holding the stand-ins for
+// rsvg-convert and pngquant TestMain builds out of testdata, one each, so a
+// test chooses which of the two gen_brand finds on PATH.
+var rasterizer, quantizer string
 
-// rasterizerName is the name the stand-in has to have for the exec.LookPath
-// gen_brand makes to find it on PATH as rsvg-convert: that name everywhere but
+// programName is the name a stand-in has to have for the exec.LookPath
+// gen_brand makes to find it on PATH as name: that name everywhere but
 // Windows, where exec.LookPath only finds a program through an extension
 // PATHEXT lists.
-func rasterizerName() string {
+func programName(name string) string {
 	if runtime.GOOS == "windows" {
-		return "rsvg-convert.exe"
+		return name + ".exe"
 	}
-	return "rsvg-convert"
+	return name
 }
 
-// TestMain builds the stand-in for rsvg-convert once, for the tests of the
-// compose family. A real one would make the PNGs, which is slow, needs
-// librsvg, and proves nothing about this command that the SVG does not.
+// TestMain builds the stand-ins for rsvg-convert and pngquant once. Real ones
+// would make the PNGs, which is slow, needs librsvg, and proves nothing about
+// this command that the SVG does not.
 func TestMain(m *testing.M) {
-	os.Exit(runWithRasterizer(m))
+	os.Exit(runWithStandIns(m))
 }
 
-// runWithRasterizer builds the stand-in, runs the tests and cleans up after
+// runWithStandIns builds the stand-ins, runs the tests and cleans up after
 // them.
-func runWithRasterizer(m *testing.M) int {
-	dir, err := os.MkdirTemp("", "gen-brand-rasterizer")
+func runWithStandIns(m *testing.M) int {
+	dir, err := os.MkdirTemp("", "gen-brand-stand-ins")
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "create a build directory for the stand-in: %v\n", err)
+		fmt.Fprintf(os.Stderr, "create a build directory for the stand-ins: %v\n", err)
 		return 1
 	}
 	defer func() { _ = os.RemoveAll(dir) }()
@@ -52,13 +53,18 @@ func runWithRasterizer(m *testing.M) int {
 	// m.Run.
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
-	path := filepath.Join(dir, rasterizerName())
-	build := exec.CommandContext(ctx, "go", "build", "-o", path, "./testdata/rsvg-convert")
-	if out, buildErr := build.CombinedOutput(); buildErr != nil {
-		fmt.Fprintf(os.Stderr, "build testdata/rsvg-convert: %v\n%s", buildErr, out)
-		return 1
+	for _, standIn := range []struct {
+		name string
+		dir  *string
+	}{{"rsvg-convert", &rasterizer}, {"pngquant", &quantizer}} {
+		*standIn.dir = filepath.Join(dir, standIn.name)
+		path := filepath.Join(*standIn.dir, programName(standIn.name))
+		build := exec.CommandContext(ctx, "go", "build", "-o", path, "./testdata/"+standIn.name)
+		if out, buildErr := build.CombinedOutput(); buildErr != nil {
+			fmt.Fprintf(os.Stderr, "build testdata/%s: %v\n%s", standIn.name, buildErr, out)
+			return 1
+		}
 	}
-	rasterizer = dir
 	return m.Run()
 }
 

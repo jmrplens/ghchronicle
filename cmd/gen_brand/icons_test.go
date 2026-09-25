@@ -13,7 +13,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -170,6 +169,37 @@ func TestIconsWritesNothingUntilEveryRasterExists(t *testing.T) {
 	})
 }
 
+// TestOGGoesThroughPngquantWhenItIsThere covers the three ways pngquant can
+// end: its output served, the original kept with a note when it cannot hold
+// the quality asked for, and a failure that names it with its own words.
+func TestOGGoesThroughPngquantWhenItIsThere(t *testing.T) {
+	brand := t.TempDir()
+	if err := os.WriteFile(filepath.Join(brand, ogImage), []byte("og"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", quantizer)
+	const kept = "note: pngquant could not keep og.png above the quality asked for, so it is copied as it is\n"
+	for _, c := range []struct {
+		name, exit, want, note, err string
+	}{
+		{"quantized", "", "quantized og", "", ""},
+		{"below the quality asked for", "99", "og", kept, ""},
+		{"refused", "1", "", "", "pngquant og.png: exit status 1: pngquant: refused as asked"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			t.Setenv("FAKEPNGQUANT_EXIT", c.exit)
+			var stdout strings.Builder
+			og, err := optimizedOG(t.Context(), brand, t.TempDir(), &stdout)
+			if (err == nil) != (c.err == "") || (err != nil && err.Error() != c.err) {
+				t.Errorf("error = %v, want %q", err, c.err)
+			}
+			if string(og) != c.want || stdout.String() != c.note {
+				t.Errorf("optimizedOG = %q, stdout %q, want %q and %q", og, stdout.String(), c.want, c.note)
+			}
+		})
+	}
+}
+
 // TestOGRefusesAPngquantOnlyTheWorkingDirectoryHolds covers the one lookup
 // failure that is not "absent": a pngquant exec.LookPath finds only relative
 // to the working directory is somebody else's program, so it is refused
@@ -179,14 +209,11 @@ func TestOGRefusesAPngquantOnlyTheWorkingDirectoryHolds(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(brand, ogImage), []byte("og"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	name := "pngquant"
-	if runtime.GOOS == "windows" {
-		name += ".exe"
-	}
-	// Any program will do, so the stand-in for rsvg-convert is linked in
-	// under pngquant's name: a link keeps the mode that makes it one.
+	// The stand-in is linked in rather than written, because a link keeps
+	// the mode that makes it a program exec.LookPath will find.
+	name := programName("pngquant")
 	here := t.TempDir()
-	if err := os.Link(filepath.Join(rasterizer, rasterizerName()), filepath.Join(here, name)); err != nil {
+	if err := os.Link(filepath.Join(quantizer, name), filepath.Join(here, name)); err != nil {
 		t.Fatal(err)
 	}
 	t.Chdir(here)
