@@ -382,7 +382,7 @@ func TestTheStarHistoryIsReadWholeOnceAndThenByItsNewestPage(t *testing.T) {
 	if lists != 2 {
 		t.Errorf("the first sweep read %d stargazer lists, want both walked once", lists)
 	}
-	if n := store.measured("gh_star_day"); n == 0 {
+	if store.measured("gh_star_day") == 0 {
 		t.Fatal("no gh_star_day row reached the sink")
 	}
 
