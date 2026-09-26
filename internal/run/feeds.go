@@ -44,7 +44,7 @@ const fullInboxEvery = 24 * time.Hour
 // backfill, and when the state has no window to cut from, which is what a
 // first sweep and an older state file both look like.
 func (r *Runner) notifications(ctx context.Context, now time.Time) ([]sink.Point, error) {
-	full := r.Backfill || r.State.LastNotified.IsZero() || r.State.FullDue("notifs", fullInboxEvery, now)
+	full := r.Backfill || r.State.LastNotified.IsZero() || r.State.FullDue("notifs", fullInboxEvery-r.slack(), now)
 	inbox := &collect.Notifications{All: full, Walk: r.walk()}
 	if !full {
 		every, _ := r.Cfg.Interval("notifs")

@@ -49,7 +49,7 @@ keep it running once you are done watching it.
   ship as `tar.gz` (`zip` on Windows).
 
   ```sh
-  tar -xzf ghchronicle_2.5.1_linux_amd64.tar.gz
+  tar -xzf ghchronicle_2.5.2_linux_amd64.tar.gz
   sudo install -m 755 ghchronicle /usr/local/bin/
   ```
 
@@ -153,7 +153,7 @@ the version you see is the file it just wrote, and it says so when another
 Pin a version, or choose where it goes:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.sh | VERSION=2.5.1 BIN_DIR=~/bin bash
+curl -fsSL https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.sh | VERSION=2.5.2 BIN_DIR=~/bin bash
 ```
 
 > **Reading it first is the whole point of a short script**
@@ -178,7 +178,7 @@ Release archives are named
 | `aarch64`          | `linux_arm64`       |
 
 ```sh
-VERSION=2.5.1
+VERSION=2.5.2
 arch=$(uname -m); case "$arch" in x86_64) arch=amd64 ;; aarch64) arch=arm64 ;; esac
 base=https://github.com/jmrplens/ghchronicle/releases/download/v$VERSION
 curl -fsSLO "$base/ghchronicle_${VERSION}_linux_${arch}.tar.gz"
@@ -216,7 +216,7 @@ the file, then verify the archive against the file.
     ```
 
     ```text
-    ghchronicle_2.5.1_linux_amd64.tar.gz: OK
+    ghchronicle_2.5.2_linux_amd64.tar.gz: OK
     ```
 
 3. Check the checksum file itself, if you have
@@ -286,7 +286,7 @@ meant to.
 the build date of that release.
 
 ```text
-ghchronicle 2.5.1 (commit <commit>, built <date>)
+ghchronicle 2.5.2 (commit <commit>, built <date>)
 ```
 
 ### Run it once
@@ -333,7 +333,7 @@ find.
   the go command fetched and the Go release that compiled it:
 
   ```text
-  ghchronicle 2.5.1 (module v2.5.1, built with <go version>)
+  ghchronicle 2.5.2 (module v2.5.2, built with <go version>)
   ```
 
   The first version comes from the `VERSION` file the module embeds.
@@ -404,7 +404,7 @@ the version you see is the file it just wrote, and it says so when another
 Pin a version, or choose where it goes:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.sh | VERSION=2.5.1 BIN_DIR=~/bin bash
+curl -fsSL https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.sh | VERSION=2.5.2 BIN_DIR=~/bin bash
 ```
 
 > **Reading it first is the whole point of a short script**
@@ -429,7 +429,7 @@ architecture.
 | `x86_64`           | Intel              | `darwin_amd64`      |
 
 ```sh
-VERSION=2.5.1
+VERSION=2.5.2
 arch=$(uname -m); case "$arch" in x86_64) arch=amd64 ;; esac
 base=https://github.com/jmrplens/ghchronicle/releases/download/v$VERSION
 curl -fsSLO "$base/ghchronicle_${VERSION}_darwin_${arch}.tar.gz"
@@ -467,7 +467,7 @@ signature over that file.
     ```
 
     ```text
-    ghchronicle_2.5.1_darwin_arm64.tar.gz: OK
+    ghchronicle_2.5.2_darwin_arm64.tar.gz: OK
     ```
 
 3. Check the checksum file itself, if you have
@@ -679,7 +679,7 @@ so the Xcode command line tools are not needed for it.
   module version the go command fetched and the Go release that compiled it:
 
   ```text
-  ghchronicle 2.5.1 (module v2.5.1, built with <go version>)
+  ghchronicle 2.5.2 (module v2.5.2, built with <go version>)
   ```
 
 - **make**
@@ -753,7 +753,7 @@ takes parameters, which needs the slightly longer form because `iex` has
 nowhere to put them:
 
 ```powershell
-& ([scriptblock]::Create((irm https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.ps1))) -Version 2.5.1 -BinDir C:\tools -NoPathUpdate
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.ps1))) -Version 2.5.2 -BinDir C:\tools -NoPathUpdate
 ```
 
 > **Reading it first is the whole point of a short script**
@@ -815,7 +815,7 @@ rather than the shell:
 ```
 
 ```powershell
-$version = "2.5.1"
+$version = "2.5.2"
 $arch = if ($env:PROCESSOR_ARCHITECTURE -eq "ARM64") { "arm64" } else { "amd64" }
 $base = "https://github.com/jmrplens/ghchronicle/releases/download/v$version"
 $zip = "ghchronicle_${version}_windows_${arch}.zip"
@@ -938,7 +938,7 @@ It answers with one line: the release number, then the commit and the build
 date of that release.
 
 ```text
-ghchronicle 2.5.1 (commit <commit>, built <date>)
+ghchronicle 2.5.2 (commit <commit>, built <date>)
 ```
 
 > **If Windows warns about the file**
@@ -1135,7 +1135,7 @@ means no MSVC, no MinGW and no Windows SDK.
   compiled it:
 
   ```text
-  ghchronicle 2.5.1 (module v2.5.1, built with <go version>)
+  ghchronicle 2.5.2 (module v2.5.2, built with <go version>)
   ```
 
 - **From a checkout**
@@ -1790,11 +1790,11 @@ tag, recorded in a public transparency log. With
 cosign verify \
   --certificate-identity-regexp 'https://github.com/jmrplens/ghchronicle/.github/workflows/release.yml@refs/tags/.*' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-  ghcr.io/jmrplens/ghchronicle:v2.5.1 > /dev/null
+  ghcr.io/jmrplens/ghchronicle:v2.5.2 > /dev/null
 ```
 
 ```text
-Verification for ghcr.io/jmrplens/ghchronicle:v2.5.1 --
+Verification for ghcr.io/jmrplens/ghchronicle:v2.5.2 --
 The following checks were performed on each of these signatures:
   - The cosign claims were validated
   - Existence of the claims in the transparency log was verified offline
@@ -1956,7 +1956,7 @@ it downloads a release binary and calls it.
 | `card-width`      | `""`                 | Card width in pixels. Empty draws the layout at its own width; each one draws between two ends of its own, stated in its [section](https://jmrp.io/docs/ghchronicle/card/layouts/). Only `activity-heatmap` spends the room on data, a whole year of the calendar at its far end |
 | `card-speed`      | `""`                 | How fast an animated layout plays, as a decimal from 0 to 1. Empty means 0.5, the pace every card has always been drawn at; below it the card is slower, above it faster, and every animated layout scales together. 0 is the slowest animation and not a still card, `card-motion: off` is |
 | `include-private` | `false`              | `true` counts private repositories when no config file is given. See the warning below |
-| `version`         | `latest`             | The release to install: `latest` for the newest, or a release with or without its `v`, so `2.5.1` and `v2.5.1` are the same one. The major tag `v2` is what `uses:` takes, not a release, and is refused |
+| `version`         | `latest`             | The release to install: `latest` for the newest, or a release with or without its `v`, so `2.5.2` and `v2.5.2` are the same one. The major tag `v2` is what `uses:` takes, not a release, and is refused |
 
 ### The three modes
 

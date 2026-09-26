@@ -35,16 +35,24 @@ import (
 type Totals struct {
 	Login string
 	Repos []Repo
-	// Archived is the archived repositories the filter set aside, which get
-	// one row and one query between them: the date each was archived, as
-	// gh_repo_archived. Nothing else is asked about them, because nothing
-	// else about an archived repository moves. The listing that set them
-	// aside cannot supply the date itself: REST carries no archived_at, and
-	// its updated_at is not it either, measured on 2026-09-12 against the
-	// GraphQL archivedAt of the same repositories, two seconds to eight
-	// minutes later on five of them. The query is asked on every totals
-	// sweep, one point at the family's cadence, because the rows are the
-	// same rows each time and the exporters keep only what is rewritten.
+	// Archived is the archived repositories the filter set aside. Their
+	// history is not walked, because none of it moves again, but each gets
+	// two rows from one query per archivedBatch of them: the date it was
+	// archived, as gh_repo_archived, and its lifetime row, as gh_repo_total.
+	//
+	// The second is there because an archived repository is still starred,
+	// unstarred and forked. Up to 2.5.1 only a backfill wrote it, once, and
+	// on 2026-09-26 the only row jmrplens/FFT2octave had, from the backfill
+	// of 2026-09-18, said 4 stars where GitHub said 3. gh_repo_total is the
+	// table the account's star and fork totals are read from, so a
+	// repository missing from it is missing from them.
+	//
+	// The listing that set them aside cannot supply the archive date: REST
+	// carries no archived_at, and its updated_at is not it either, measured
+	// on 2026-09-12 against the GraphQL archivedAt of the same repositories,
+	// two seconds to eight minutes later on five of them. Both rows are
+	// asked for on every totals sweep, one point a batch at the family's
+	// cadence, because the exporters keep only what is rewritten.
 	Archived []Repo
 	// Batch is how many repositories go into one GraphQL query. Zero means
 	// ten. The gateway gives up on a query it cannot finish in about ten
@@ -83,7 +91,12 @@ func (t Totals) searchCounts() []searchCount {
 		issues("issues_opened", issuesByAuthor+login),
 		issues("issues_closed", issuesByAuthor+login+" is:closed"),
 		issues("issues_elsewhere", issuesByAuthor+login+" -user:"+login),
-		issues("commented_elsewhere", "commenter:"+login+" -author:"+login),
+		// The same elsewhere as the two above. It was -author:, which kept
+		// every thread the account commented on in its own repositories, a
+		// Dependabot pull request included: measured on 2026-09-26, 125
+		// where this reads 55, 103 of the 125 at home and 54 of those
+		// Dependabot's.
+		issues("commented_elsewhere", "commenter:"+login+" -user:"+login),
 		{field: "repositories", kind: "REPOSITORY", query: "user:" + login},
 	}
 }
@@ -116,8 +129,11 @@ func countsQuery(counts []searchCount) string {
 // of a page of one.
 const commitsSearch = "/search/commits?per_page=1&q="
 
-const totalsFragment = `
-fragment totals on Repository {
+// lifetimeFields is what a gh_repo_total row is made of: the counts a
+// repository's whole life comes to and the flags the row is tagged with. Both
+// fragments below carry it, so a repository set aside for being archived gets
+// the same row as one the sweep collects, field for field.
+const lifetimeFields = `
   nameWithOwner url databaseId createdAt pushedAt isFork isArchived archivedAt isPrivate
   diskUsage stargazerCount forkCount
   watchers { totalCount }
@@ -132,7 +148,10 @@ fragment totals on Repository {
   milestones { totalCount }
   branches: refs(refPrefix: "refs/heads/") { totalCount }
   tags: refs(refPrefix: "refs/tags/") { totalCount }
-  defaultBranchRef { target { ... on Commit { history { totalCount } } } }
+  defaultBranchRef { target { ... on Commit { history { totalCount } } } }`
+
+const totalsFragment = `
+fragment totals on Repository {` + lifetimeFields + `
   isSecurityPolicyEnabled hasVulnerabilityAlertsEnabled
   forkingAllowed hasDiscussionsEnabled hasIssuesEnabled
   hasWikiEnabled hasSponsorshipsEnabled isBlankIssuesEnabled
@@ -254,7 +273,7 @@ func (t Totals) Collect(ctx context.Context, c *ghapi.Client, now time.Time) ([]
 	points = append(points, repoPoints...)
 	failed = errors.Join(failed, err)
 
-	archivedPoints, err := archivedDates(ctx, c, t.Archived)
+	archivedPoints, err := archivedTotals(ctx, c, t.Archived, now)
 	points = append(points, archivedPoints...)
 	failed = errors.Join(failed, err)
 
@@ -460,23 +479,30 @@ func isIssueTemplateFile(name string) bool {
 }
 
 // archivedFragment is the whole of what an archived repository set aside by
-// the filter is asked: enough for its gh_repo_archived row and not a
-// connection more. Four scalars per alias is why one query can carry every
-// archived repository of an account at once where totalsFragment takes ten.
+// the filter is asked: its lifetime row, which carries the date it was
+// archived as well, and nothing about its settings. gh_repo_policy is what a
+// repository lets people do, and an archived one lets nobody do anything.
 const archivedFragment = `
-fragment archived on Repository { nameWithOwner url createdAt archivedAt }`
+fragment archived on Repository {` + lifetimeFields + `
+}`
 
-// archivedBatch is how many of them go into that query. The gateway's ten
-// second ceiling is what caps totalsFragment at ten aliases, and fifty of
-// these scalars are a fraction of one of those; aliasBatch still halves on a
-// refusal, so a bigger batch costs a retry and never a repository.
-const archivedBatch = 50
+// archivedBatch is how many of them go into that query. The counts are what
+// the gateway's ten second ceiling is spent on. Measured on 2026-09-26
+// against the fifty most starred archived repositories of google and of
+// microsoft, at cost 1 every time: the lifetime row of fifty at once answered
+// once in 9.2 seconds and was refused twice with the gateway's 502 after 10.7
+// and 11.1, twenty five answered in 5.6 to 6.7, and the account's own
+// eighteen in 3.6 to 4.1. The same fifty asked for the scalars and the
+// watchers alone answered in a second. aliasBatch still halves on a refusal,
+// so a batch the gateway gives up on costs a retry and never a repository.
+const archivedBatch = 25
 
-// archivedDates writes the archive row of repositories the sweep does not
-// otherwise collect. Every alias decodes into repoTotals, of which the query
-// fills the four fields archived reads, so the row is the same row a
-// collected repository gets from its own totals batch.
-func archivedDates(ctx context.Context, c *ghapi.Client, repos []Repo) ([]sink.Point, error) {
+// archivedTotals writes the rows of the repositories the sweep does not
+// otherwise collect. Every alias decodes into repoTotals and each row is made
+// by the method that makes it for a collected repository, so an archived
+// repository set aside reads the same as one include_archived collects, less
+// its gh_repo_policy.
+func archivedTotals(ctx context.Context, c *ghapi.Client, repos []Repo, now time.Time) ([]sink.Point, error) {
 	if len(repos) == 0 {
 		return nil, nil
 	}
@@ -485,6 +511,7 @@ func archivedDates(ctx context.Context, c *ghapi.Client, repos []Repo) ([]sink.P
 	}
 	var points []sink.Point
 	failed := aliasBatch(ctx, c, repos, archivedBatch, build, func(repo Repo, rt repoTotals) {
+		points = append(points, rt.point(repo, now))
 		if point, isArchived := rt.archived(repo); isArchived {
 			points = append(points, point)
 		}

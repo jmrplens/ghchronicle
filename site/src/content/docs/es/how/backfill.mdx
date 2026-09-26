@@ -228,11 +228,40 @@ los cien de cada uno que lee una pasada.
 - Los repositorios archivados, enteros, diga lo que diga `include_archived`. Su
   historia es la historia de la cuenta y ya no se mueve, que es justo por lo
   que una pasada los deja fuera y por lo que un solo recorrido basta. Los forks
-  quedan como estén configurados. Una pasada sigue escribiendo la única fila
-  que tiene cada repositorio archivado, la fecha en que se archivó: el listado
-  que ya paga dice cuáles, y una consulta por pasada de `totals` dice cuándo.
+  quedan como estén configurados. Lo que sí sigue moviéndose en un repositorio
+  archivado, sus estrellas, sus forks y sus watchers, una pasada lo lee sin
+  relleno: el listado que ya paga dice qué repositorios están archivados, y
+  cada pasada de `totals` pregunta por todos ellos, una consulta por cada
+  veinticinco, por dos filas de cada uno. Una es `gh_repo_archived`, fechada
+  cuando se archivó el repositorio. La otra es su `gh_repo_total`, sellada en
+  la pasada como la de un repositorio recogido, y esa es la fila de la que se
+  leen los totales de estrellas y forks de la cuenta.
 - Todas las pull requests e issues, en páginas de cincuenta, donde una pasada
   lee lo que cambió desde la pasada anterior y una página entera al día.
+- Todas las pull requests e issues que la cuenta abrió en repositorios ajenos
+  y que ya se fusionaron o se cerraron, en páginas de cien ordenadas por
+  cuándo se movió cada una por última vez, donde una pasada lee cada uno de
+  los tres estados cerrados hasta una cadencia antes de la pasada anterior.
+  Eso le basta a una pasada porque fusionar o cerrar sube el elemento arriba
+  del todo, por mucho tiempo que haga que se abrió, y es una página salvo que
+  en ese tiempo se hayan movido más de cien elementos; una pasada que leía una
+  página y ni una más perdía el elemento que cien actualizaciones posteriores,
+  un bot que bloquea hilos viejos o un reetiquetado, habían empujado a la
+  segunda. Las que siguen abiertas no se acotan ni
+  por página ni por fecha: cada pasada las lee todas, porque cada una recibe
+  una fila por cada día que sigue abierta. En la 2.5.1 y anteriores cada una de
+  las cinco búsquedas leía sus cien más recientes y paraba, igual en una
+  pasada que en un relleno.
+
+  GitHub sirve mil resultados de cualquier búsqueda y ni uno más, así que una
+  cuenta que pase de mil en uno de esos estados conserva los mil que se
+  movieron más recientemente. Eso se dice en el log, una vez por recuento, en
+  lugar de dejar que se note en dos paneles que no cuadran:
+
+  ```text
+  level=WARN msg="outbound search read fewer items than it counts, GitHub serves a thousand at most" kind=pull_request state=merged count=2860 read=1000
+  ```
+
 - Todas las páginas de artefactos, de actividad del repositorio y de análisis
   de code scanning, donde una pasada lee cinco, dos y una.
 - Cada release, despliegue y discusión, y cada alerta de Dependabot y de code

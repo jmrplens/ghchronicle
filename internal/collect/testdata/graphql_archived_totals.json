@@ -1,0 +1,118 @@
+{
+  "data": {
+    "r0": {
+      "nameWithOwner": "jmrplens/FFT2octave",
+      "url": "https://github.com/jmrplens/FFT2octave",
+      "databaseId": 359178320,
+      "createdAt": "2021-04-18T15:17:01Z",
+      "pushedAt": "2026-06-29T12:29:55Z",
+      "isFork": false,
+      "isArchived": true,
+      "archivedAt": "2026-07-11T11:41:12Z",
+      "isPrivate": false,
+      "diskUsage": 33,
+      "stargazerCount": 3,
+      "forkCount": 1,
+      "watchers": {
+        "totalCount": 1
+      },
+      "issuesOpen": {
+        "totalCount": 0
+      },
+      "issuesClosed": {
+        "totalCount": 0
+      },
+      "pullsOpen": {
+        "totalCount": 0
+      },
+      "pullsMerged": {
+        "totalCount": 3
+      },
+      "pullsClosed": {
+        "totalCount": 0
+      },
+      "releases": {
+        "totalCount": 0
+      },
+      "discussions": {
+        "totalCount": 0
+      },
+      "labels": {
+        "totalCount": 9
+      },
+      "milestones": {
+        "totalCount": 0
+      },
+      "branches": {
+        "totalCount": 1
+      },
+      "tags": {
+        "totalCount": 0
+      },
+      "defaultBranchRef": {
+        "target": {
+          "history": {
+            "totalCount": 16
+          }
+        }
+      }
+    },
+    "r1": {
+      "nameWithOwner": "jmrplens/SetFigPaper",
+      "url": "https://github.com/jmrplens/SetFigPaper",
+      "databaseId": 263818255,
+      "createdAt": "2020-05-14T04:52:45Z",
+      "pushedAt": "2026-08-22T12:26:55Z",
+      "isFork": false,
+      "isArchived": true,
+      "archivedAt": "2026-08-22T12:26:56Z",
+      "isPrivate": false,
+      "diskUsage": 2789,
+      "stargazerCount": 11,
+      "forkCount": 4,
+      "watchers": {
+        "totalCount": 1
+      },
+      "issuesOpen": {
+        "totalCount": 0
+      },
+      "issuesClosed": {
+        "totalCount": 0
+      },
+      "pullsOpen": {
+        "totalCount": 0
+      },
+      "pullsMerged": {
+        "totalCount": 1
+      },
+      "pullsClosed": {
+        "totalCount": 0
+      },
+      "releases": {
+        "totalCount": 0
+      },
+      "discussions": {
+        "totalCount": 0
+      },
+      "labels": {
+        "totalCount": 9
+      },
+      "milestones": {
+        "totalCount": 0
+      },
+      "branches": {
+        "totalCount": 1
+      },
+      "tags": {
+        "totalCount": 0
+      },
+      "defaultBranchRef": {
+        "target": {
+          "history": {
+            "totalCount": 95
+          }
+        }
+      }
+    }
+  }
+}

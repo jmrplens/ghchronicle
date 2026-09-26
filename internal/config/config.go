@@ -668,8 +668,8 @@ var defaultEvery = map[string]family{
 		why: "labels and milestones are edited by hand, a few times a week at most",
 	},
 	"outbound": {
-		every: 12 * time.Hour, group: "account",
-		why: "stars given and work in other people's repositories move at the speed of a person",
+		every: 1 * time.Hour, group: "account",
+		why: "stars given, work in other people's repositories and the answers accepted there, for about nine GraphQL points a pass, so the hour costs nothing that shows and an answer accepted this afternoon is on the dashboard this afternoon",
 	},
 	"issueevents": {
 		every: 1 * time.Hour, group: "work",

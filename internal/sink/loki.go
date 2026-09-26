@@ -200,9 +200,7 @@ var lokiEvents = map[string]lokiEvent{
 	"gh_job_log": {kind: "job_log", message: func(p Point) string {
 		return fieldOf(p, "line")
 	}},
-	"gh_external_contribution": {kind: "external_contribution", message: func(p Point) string {
-		return fmt.Sprintf("%s merged %s#%s", tagOf(p, "user"), tagOf(p, "full_name"), tagOf(p, "number"))
-	}},
+	"gh_external_contribution": {kind: "external_contribution", message: contributionMessage},
 	// The environment is what a reader is looking for here, so it goes in the
 	// sentence rather than only in the logfmt tail: "which of my environments
 	// moved, and did it come up" is the question a deployment log answers.
@@ -231,6 +229,46 @@ var lokiEvents = map[string]lokiEvent{
 		return fmt.Sprintf("ruleset %s of %s saved by %s %s", tagOf(p, "ruleset"),
 			tagOf(p, "full_name"), tagOf(p, "actor_type"), fieldOf(p, "actor_id"))
 	}},
+}
+
+// contributionState is what the outbound searches fix about an item: which
+// search found it, and whether GitHub says it was merged.
+type contributionState struct {
+	kind, state string
+	merged      bool
+}
+
+// contributionPredicates is what can truthfully be said about an item the
+// account opened in someone else's repository, by the combinations the five
+// outbound searches produce. The account opened the item, and that is all the
+// row says it did: who merged or closed it is not in the row, and in someone
+// else's repository it is usually a maintainer, so those are said of the item
+// and not put in the account's name. An open item is stamped at the start of
+// each day it is seen open, one line a day, so its sentence says it is open,
+// which is true every day, and not that it was opened, which is true on one
+// of them.
+var contributionPredicates = map[contributionState]string{
+	{"pull_request", "open", false}:   "is open",
+	{"pull_request", "merged", true}:  "was merged",
+	{"pull_request", "closed", false}: "was closed without merging",
+	{"issue", "open", false}:          "is open",
+	{"issue", "closed", false}:        "was closed",
+}
+
+// contributionMessage renders a sentence only where the state tag and the
+// merged field agree. Every line used to say "merged", open issues included,
+// and a sentence a reader has to check against the logfmt tail is worse than
+// none, so any other combination names the item and says nothing about it.
+// GitHub itself does not produce one: measured on 2026-09-26, the 33 items of
+// the merged search all had mergedAt, and none of the 69 of the other four.
+func contributionMessage(p Point) string {
+	kind := tagOf(p, "kind")
+	merged, _ := numeric(p.Fields["merged"])
+	item := tagOf(p, "full_name") + "#" + tagOf(p, "number")
+	if predicate, ok := contributionPredicates[contributionState{kind, tagOf(p, "state"), merged != 0}]; ok {
+		return fmt.Sprintf("%s's %s %s %s", tagOf(p, "user"), strings.ReplaceAll(kind, "_", " "), item, predicate)
+	}
+	return fmt.Sprintf("%s's contribution %s", tagOf(p, "user"), item)
 }
 
 // lokiNotEvents is the other half of the decision lokiEvents records: the

@@ -25,11 +25,11 @@ Most specific wins. A family's own entry beats its group's, a group's beats
 through to the layer below it, so a file with only `families:` in it behaves
 exactly as it always did. The value is a Go duration: `30s`, `15m`, `2h`, `36h`.
 
-| Layer              | Reaches                            | Written as              |
-| ------------------ | ---------------------------------- | ----------------------- |
-| `every.families`   | one family                         | `families: {keys: 24h}` |
-| `every.groups`     | every family of one group          | `groups: {ci: 1m}`      |
-| `every.default`    | every family neither above names   | `default: 15m`          |
+| Layer              | Reaches                             | Written as              |
+| ------------------ | ----------------------------------- | ----------------------- |
+| `every.families`   | one family                          | `families: {keys: 24h}` |
+| `every.groups`     | every family of one group           | `groups: {ci: 1m}`      |
+| `every.default`    | every family neither above names    | `default: 15m`          |
 | the built-in table | every family none of the above name | nothing                 |
 
 They are three keys of a nested block rather than three flat ones because a
@@ -72,42 +72,42 @@ against the code in both directions, so a family added, moved or re-costed
 without this table following it fails the build. `ghchronicle -groups` prints
 the same membership.
 
-| Group       | Family        | Default | Why that value                                                                                                                                  |
-| ----------- | ------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `account`   | `account`     | `12h`   | the contribution calendar changes once a day, and the whole family costs one GraphQL point                                                       |
-| `account`   | `achievements` | `24h`  | the badges on the public profile page, read from the page itself because no API lists them, and the distance to each badge's next tier from the API beside; a badge is earned over weeks and the day costs one page and some thirty GraphQL points |
-| `account`   | `billing`     | `6h`    | GitHub updates the usage report a few times a day at most                                                                                       |
-| `account`   | `history`     | `0`     | off until asked for by name: it walks every past year and the year so far, and the rows are idempotent                                           |
-| `account`   | `keys`        | `24h`   | an SSH or GPG key changes when somebody changes it, and what matters is its expiry date, not the hour it was noticed                             |
-| `account`   | `outbound`    | `12h`   | stars given and work in other people's repositories move at the speed of a person                                                                |
-| `account`   | `profile`     | `12h`   | packages, gists and social accounts, all of them edited by hand                                                                                  |
-| `account`   | `totals`      | `12h`   | twice a day is plenty for a number that only grows                                                                                              |
-| `audience`  | `forks`       | `12h`   | the whole list fits in one page, and a fork is a rare event                                                                                      |
-| `audience`  | `stars`       | `6h`    | the full stargazer walk happens once; after that the newest hundred ride in one GraphQL query per ten repositories, and the daily star history is one request per repository, usually a free 304 |
-| `audience`  | `traffic`     | `6h`    | the fourteen-day window is rewritten whole each time, so a missed sweep repairs itself on the next one                                           |
-| `ci`        | `actions`     | `15m`   | a workflow run is over in minutes, and its queue time is only worth watching while it is happening                                               |
-| `ci`        | `artifacts`   | `1h`    | artifacts appear with the run that made them and expire on a scale of days                                                                       |
-| `ci`        | `deployments` | `1h`    | the surface a delivery dashboard reads, and the newest page is cheap: one GraphQL point per five repositories                                    |
-| `ci`        | `joblogs`     | `0`     | off until asked for by name: it is text rather than a measurement, it costs a request per failure, and it only makes sense with a log store attached |
-| `collector` | `ratelimit`   | `15m`   | free, and worth having at the resolution of the busiest family                                                                                  |
-| `feeds`     | `activity`    | `30m`   | the repository log holds a hundred entries, which covered twenty-six hours on the busiest repository measured                                    |
-| `feeds`     | `events`      | `30m`   | the feed keeps the last three hundred events of the past thirty days, so this is the size of a window, not a speed                                  |
-| `feeds`     | `notifs`      | `30m`   | GitHub keeps inbox notifications for three months unless they are saved, but each thread shows only its latest move, so this is the size of a window, not a speed |
-| `repos`     | `branches`    | `24h`   | branches are created and deleted all day, but the question the row answers is which are stale right now, which is a daily one                    |
-| `repos`     | `deps`        | `0`     | off until asked for by name: the SBOM is 1.8 MB per repository and has its own budget of a hundred a minute                                       |
-| `repos`     | `inventory`   | `24h`   | four core requests per repository, for settings that change only when somebody changes them                                                      |
-| `repos`     | `policyfiles` | `24h`   | SECURITY.md, CODEOWNERS, dependabot.yml and FUNDING.yml move about once a quarter                                                                |
-| `repos`     | `repo`        | `1h`    | stars, forks, languages and topics move slowly, and this is one request per repository                                                           |
-| `repos`     | `rulesets`    | `24h`   | a ruleset is edited a few times a year, every version keeps its own date, and both requests answer 304 until somebody edits one                  |
-| `repos`     | `settings`    | `6h`    | webhooks, rulesets, environments and deploy keys change only when somebody changes them                                                          |
-| `security`  | `analyses`    | `6h`    | GitHub prunes code scanning analyses, and a repository produces a handful a day                                                                  |
-| `security`  | `security`    | `1h`    | an alert is something to act on today, and the list of open ones is short                                                                        |
-| `work`      | `commits`     | `1h`    | one request per commit, so the cost follows how much was pushed rather than how often this asks                                                  |
-| `work`      | `discussions` | `2h`    | a discussion is answered over hours or days, and few repositories have any                                                                       |
-| `work`      | `issueevents` | `1h`    | the timeline of what moved in two cadences, one GraphQL point a repository, so the hour is how soon a transition is worth seeing                                                            |
-| `work`      | `issues`      | `1h`    | one request per item, so the cost follows how much is open rather than how often this asks                                                       |
-| `work`      | `planning`    | `6h`    | labels and milestones are edited by hand, a few times a week at most                                                                             |
-| `work`      | `stats`       | `12h`   | GitHub recomputes these slowly anyway, so asking more often returns the same numbers                                                             |
+| Group       | Family         | Default | Why that value                                                                                                                                                                                                                                     |
+| ----------- | -------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `account`   | `account`      | `12h`   | the contribution calendar changes once a day, and the whole family costs one GraphQL point                                                                                                                                                         |
+| `account`   | `achievements` | `24h`   | the badges on the public profile page, read from the page itself because no API lists them, and the distance to each badge's next tier from the API beside; a badge is earned over weeks and the day costs one page and some thirty GraphQL points |
+| `account`   | `billing`      | `6h`    | GitHub updates the usage report a few times a day at most                                                                                                                                                                                          |
+| `account`   | `history`      | `0`     | off until asked for by name: it walks every past year and the year so far, and the rows are idempotent                                                                                                                                             |
+| `account`   | `keys`         | `24h`   | an SSH or GPG key changes when somebody changes it, and what matters is its expiry date, not the hour it was noticed                                                                                                                               |
+| `account`   | `outbound`     | `1h`    | stars given, work in other people's repositories and the answers accepted there, for about nine GraphQL points a pass, so the hour costs nothing that shows and an answer accepted this afternoon is on the dashboard this afternoon               |
+| `account`   | `profile`      | `12h`   | packages, gists and social accounts, all of them edited by hand                                                                                                                                                                                    |
+| `account`   | `totals`       | `12h`   | twice a day is plenty for a number that only grows                                                                                                                                                                                                 |
+| `audience`  | `forks`        | `12h`   | the whole list fits in one page, and a fork is a rare event                                                                                                                                                                                        |
+| `audience`  | `stars`        | `6h`    | the full stargazer walk happens once; after that the newest hundred ride in one GraphQL query per ten repositories, and the daily star history is one request per repository, usually a free 304                                                   |
+| `audience`  | `traffic`      | `6h`    | the fourteen-day window is rewritten whole each time, so a missed sweep repairs itself on the next one                                                                                                                                             |
+| `ci`        | `actions`      | `15m`   | a workflow run is over in minutes, and its queue time is only worth watching while it is happening                                                                                                                                                 |
+| `ci`        | `artifacts`    | `1h`    | artifacts appear with the run that made them and expire on a scale of days                                                                                                                                                                         |
+| `ci`        | `deployments`  | `1h`    | the surface a delivery dashboard reads, and the newest page is cheap: one GraphQL point per five repositories                                                                                                                                      |
+| `ci`        | `joblogs`      | `0`     | off until asked for by name: it is text rather than a measurement, it costs a request per failure, and it only makes sense with a log store attached                                                                                               |
+| `collector` | `ratelimit`    | `15m`   | free, and worth having at the resolution of the busiest family                                                                                                                                                                                     |
+| `feeds`     | `activity`     | `30m`   | the repository log holds a hundred entries, which covered twenty-six hours on the busiest repository measured                                                                                                                                      |
+| `feeds`     | `events`       | `30m`   | the feed keeps the last three hundred events of the past thirty days, so this is the size of a window, not a speed                                                                                                                                 |
+| `feeds`     | `notifs`       | `30m`   | GitHub keeps inbox notifications for three months unless they are saved, but each thread shows only its latest move, so this is the size of a window, not a speed                                                                                  |
+| `repos`     | `branches`     | `24h`   | branches are created and deleted all day, but the question the row answers is which are stale right now, which is a daily one                                                                                                                      |
+| `repos`     | `deps`         | `0`     | off until asked for by name: the SBOM is 1.8 MB per repository and has its own budget of a hundred a minute                                                                                                                                        |
+| `repos`     | `inventory`    | `24h`   | four core requests per repository, for settings that change only when somebody changes them                                                                                                                                                        |
+| `repos`     | `policyfiles`  | `24h`   | SECURITY.md, CODEOWNERS, dependabot.yml and FUNDING.yml move about once a quarter                                                                                                                                                                  |
+| `repos`     | `repo`         | `1h`    | stars, forks, languages and topics move slowly, and this is one request per repository                                                                                                                                                             |
+| `repos`     | `rulesets`     | `24h`   | a ruleset is edited a few times a year, every version keeps its own date, and both requests answer 304 until somebody edits one                                                                                                                    |
+| `repos`     | `settings`     | `6h`    | webhooks, rulesets, environments and deploy keys change only when somebody changes them                                                                                                                                                            |
+| `security`  | `analyses`     | `6h`    | GitHub prunes code scanning analyses, and a repository produces a handful a day                                                                                                                                                                    |
+| `security`  | `security`     | `1h`    | an alert is something to act on today, and the list of open ones is short                                                                                                                                                                          |
+| `work`      | `commits`      | `1h`    | one request per commit, so the cost follows how much was pushed rather than how often this asks                                                                                                                                                    |
+| `work`      | `discussions`  | `2h`    | a discussion is answered over hours or days, and few repositories have any                                                                                                                                                                         |
+| `work`      | `issueevents`  | `1h`    | the timeline of what moved in two cadences, one GraphQL point a repository, so the hour is how soon a transition is worth seeing                                                                                                                   |
+| `work`      | `issues`       | `1h`    | one request per item, so the cost follows how much is open rather than how often this asks                                                                                                                                                         |
+| `work`      | `planning`     | `6h`    | labels and milestones are edited by hand, a few times a week at most                                                                                                                                                                               |
+| `work`      | `stats`        | `12h`   | GitHub recomputes these slowly anyway, so asking more often returns the same numbers                                                                                                                                                               |
 
 ## The warning when a cadence is faster than the value is worth
 
@@ -160,16 +160,16 @@ Naming any group turns the rest off: their families are never requested and
 their measurements are never written. `ghchronicle -groups` prints the list,
 which is:
 
-| Group       | Families                                                                 |
-| ----------- | ------------------------------------------------------------------------ |
-| `audience`  | `forks`, `stars`, `traffic`                                              |
+| Group       | Families                                                                                 |
+| ----------- | ---------------------------------------------------------------------------------------- |
+| `audience`  | `forks`, `stars`, `traffic`                                                              |
 | `account`   | `account`, `achievements`, `billing`, `history`, `keys`, `outbound`, `profile`, `totals` |
-| `repos`     | `branches`, `deps`, `inventory`, `policyfiles`, `repo`, `rulesets`, `settings`       |
-| `work`      | `commits`, `discussions`, `issueevents`, `issues`, `planning`, `stats`   |
-| `ci`        | `actions`, `artifacts`, `deployments`, `joblogs`                         |
-| `security`  | `analyses`, `security`                                                   |
-| `feeds`     | `activity`, `events`, `notifs`                                           |
-| `collector` | `ratelimit`                                                              |
+| `repos`     | `branches`, `deps`, `inventory`, `policyfiles`, `repo`, `rulesets`, `settings`           |
+| `work`      | `commits`, `discussions`, `issueevents`, `issues`, `planning`, `stats`                   |
+| `ci`        | `actions`, `artifacts`, `deployments`, `joblogs`                                         |
+| `security`  | `analyses`, `security`                                                                   |
+| `feeds`     | `activity`, `events`, `notifs`                                                           |
+| `collector` | `ratelimit`                                                                              |
 
 The top-level `groups` and `every.groups` are different questions about the
 same eight names: the first decides whether a group is collected at all, the
@@ -204,9 +204,9 @@ filled in later with `-backfill`.
   no rows. The dashboards are generated once, for the full set of metrics, so
   every panel fed by a group you turned off shows that error. It is expected.
   They are a demonstration of what the collector can chart, not a view that
-  reshapes itself around your configuration. PostgreSQL and Elasticsearch
-  behave the same way; Prometheus and Graphite have no schema to miss, so the
-  same panels there read No data instead.
+  reshapes itself around your configuration. PostgreSQL and Elasticsearch behave
+  the same way; Prometheus and Graphite have no schema to miss, so the same
+  panels there read No data instead.
 </Aside>
 
 The dashboard sections are not aligned to the groups either, so a group
@@ -282,6 +282,14 @@ wakes hourly and finds nothing due. Set it when you
 want the loop itself under control, which is almost always a test run. It is
 the only way to turn the loop faster than that one minute floor, because the
 floor exists to survive a mistyped cadence and an explicit heartbeat is not one.
+
+A family is due on the first tick at which its cadence has elapsed, to within
+half a tick. The loop reads the clock a few milliseconds after it wakes, by an
+amount that changes from tick to tick, and without that margin a family whose
+cadence is a whole number of ticks waited one tick more about half the time:
+before 2.5.2 the quarter hour families ran every 24 minutes on average and the
+hourly ones every 69. Half a tick absorbs that and never lets a family run a
+tick early.
 
 A heartbeat **longer** than the shortest cadence holds that family back, and
 start-up says so:

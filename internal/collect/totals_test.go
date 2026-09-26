@@ -4,9 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"net/http"
 	"regexp"
+	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -38,7 +41,7 @@ var searchCountsByQuery = map[string]int{
 	"type:issue author:octocat":                      167,
 	"type:issue author:octocat is:closed":            137,
 	"type:issue author:octocat -user:octocat":        27,
-	"commenter:octocat -author:octocat":              113,
+	"commenter:octocat -user:octocat":                113,
 	"user:octocat":                                   35,
 }
 
@@ -215,6 +218,32 @@ func TestTotalsAsksGitHubToDoTheCounting(t *testing.T) {
 		if got := fieldInt(t, repo, field); got != want {
 			t.Errorf("%s = %d, want %d", field, got, want)
 		}
+	}
+}
+
+// Every count that says elsewhere means outside the repositories the account
+// owns, which is what -user: leaves out. commented_elsewhere once said
+// -author: instead, which kept every thread the owner answered at home and
+// counted 125 where the rule of the other two counts 55. The number of them
+// is checked too, so renaming a field cannot leave this test with nothing to
+// look at.
+func TestTotalsCountsEveryElsewhereOutsideTheAccountsRepositories(t *testing.T) {
+	t.Parallel()
+	const login = "octocat"
+	var elsewhere []string
+	for _, sc := range (Totals{Login: login}).searchCounts() {
+		if !strings.HasSuffix(sc.field, "_elsewhere") {
+			continue
+		}
+		elsewhere = append(elsewhere, sc.field)
+		if !slices.Contains(strings.Fields(sc.query), "-user:"+login) {
+			t.Errorf("%s searches %q, which does not leave out %s's own repositories with -user:%s",
+				sc.field, sc.query, login, login)
+		}
+	}
+	want := []string{"pulls_merged_elsewhere", "issues_elsewhere", "commented_elsewhere"}
+	if !slices.Equal(elsewhere, want) {
+		t.Errorf("elsewhere counts = %v, want %v", elsewhere, want)
 	}
 }
 
@@ -452,10 +481,9 @@ func TestTotalsDatesTheArchiveAtTheMomentItHappened(t *testing.T) {
 
 // TestTotalsDatesTheArchiveOfRepositoriesSetAside is the sweep's half of
 // the archive: the repositories the filter set aside get their
-// gh_repo_archived row from one query of four scalars each, and nothing
-// else, because nothing else about an archived repository moves. The
-// listing cannot supply the date: REST carries no archived_at, and its
-// updated_at was measured two seconds to eight minutes after archivedAt.
+// gh_repo_archived row and their lifetime row from one query, and nothing
+// else. The listing cannot supply the date: REST carries no archived_at, and
+// its updated_at was measured two seconds to eight minutes after archivedAt.
 func TestTotalsDatesTheArchiveOfRepositoriesSetAside(t *testing.T) {
 	t.Parallel()
 	f := totalsFixture(t)
@@ -466,18 +494,7 @@ func TestTotalsDatesTheArchiveOfRepositoriesSetAside(t *testing.T) {
 			answerCounts(f.t, w, query)
 		case strings.Contains(query, "fragment archived on Repository"):
 			archivedQueries = append(archivedQueries, query)
-			data := map[string]any{}
-			for i := 0; strings.Contains(query, fmt.Sprintf("r%d:", i)); i++ {
-				data[fmt.Sprintf("r%d", i)] = map[string]any{
-					"nameWithOwner": fmt.Sprintf("octocat/a%d", i),
-					"url":           fmt.Sprintf("https://github.com/octocat/a%d", i),
-					"createdAt":     "2020-05-14T00:00:00Z",
-					"archivedAt":    fmt.Sprintf("2026-08-29T15:22:%02dZ", 31+i),
-				}
-			}
-			if err := json.NewEncoder(w).Encode(map[string]any{"data": data}); err != nil {
-				t.Errorf("answer the archive query: %v", err)
-			}
+			answerArchived(t, w, query)
 		default:
 			totalsQueries = append(totalsQueries, query)
 			answerTotals(f.t, w, query)
@@ -495,13 +512,19 @@ func TestTotalsDatesTheArchiveOfRepositoriesSetAside(t *testing.T) {
 	}
 	checkPoints(t, points)
 
-	// One query for both, and it asks for nothing but the four scalars: the
-	// lifetime fragment's connections are what make ten the ceiling there.
+	// One query for both, carrying the lifetime row and none of the settings
+	// gh_repo_policy is made of.
 	if len(archivedQueries) != 1 {
 		t.Fatalf("%d archive queries for 2 repositories set aside, want 1", len(archivedQueries))
 	}
-	if q := archivedQueries[0]; !strings.Contains(q, "r1:") || strings.Contains(q, "totalCount") {
-		t.Errorf("the archive query must alias every repository and carry no connection:\n%s", q)
+	q := archivedQueries[0]
+	if !strings.Contains(q, "r1:") || !strings.Contains(q, lifetimeFields) {
+		t.Errorf("the archive query must alias every repository and ask for its lifetime row:\n%s", q)
+	}
+	for _, setting := range []string{"isSecurityPolicyEnabled", "codeowners", "issueTemplates", "branchProtectionRules"} {
+		if strings.Contains(q, setting) {
+			t.Errorf("the archive query asks for %s, which only gh_repo_policy reads:\n%s", setting, q)
+		}
 	}
 	if len(totalsQueries) != 1 || strings.Contains(totalsQueries[0], `name: "a0"`) {
 		t.Errorf("the lifetime batch must carry the collected repository only, got %d: %v", len(totalsQueries), totalsQueries)
@@ -523,9 +546,67 @@ func TestTotalsDatesTheArchiveOfRepositoriesSetAside(t *testing.T) {
 	}
 }
 
+// answerArchived answers an archive query for however many repositories it
+// aliases, each archived a second after the one before.
+func answerArchived(t *testing.T, w http.ResponseWriter, query string) {
+	t.Helper()
+	data := map[string]any{}
+	for i := 0; strings.Contains(query, fmt.Sprintf("r%d:", i)); i++ {
+		data[fmt.Sprintf("r%d", i)] = map[string]any{
+			"nameWithOwner": fmt.Sprintf("octocat/a%d", i),
+			"url":           fmt.Sprintf("https://github.com/octocat/a%d", i),
+			"createdAt":     "2020-05-14T00:00:00Z",
+			"archivedAt":    fmt.Sprintf("2026-08-29T15:22:%02dZ", 31+i),
+			"isArchived":    true, "stargazerCount": 5 + i,
+		}
+	}
+	if err := json.NewEncoder(w).Encode(map[string]any{"data": data}); err != nil {
+		t.Errorf("answer the archive query: %v", err)
+	}
+}
+
+// TestTotalsAsksAboutTwentyFiveArchivedRepositoriesAtATime: twenty five to a
+// query and no more. The counts are what the gateway's ten seconds go on, and
+// measured on 2026-09-26 a query of fifty was refused two times in three,
+// which aliasBatch survives by halving, at ten seconds lost each time.
+func TestTotalsAsksAboutTwentyFiveArchivedRepositoriesAtATime(t *testing.T) {
+	t.Parallel()
+	f := totalsFixture(t)
+	var mu sync.Mutex
+	var archivedQueries []string
+	f.graphQL(func(w http.ResponseWriter, _ *http.Request, query string, _ map[string]any) {
+		switch {
+		case isCountsQuery(query):
+			answerCounts(f.t, w, query)
+		case strings.Contains(query, "fragment archived on Repository"):
+			mu.Lock()
+			archivedQueries = append(archivedQueries, query)
+			mu.Unlock()
+			answerArchived(t, w, query)
+		default:
+			answerTotals(f.t, w, query)
+		}
+	})
+	many := make([]Repo, 26)
+	for i := range many {
+		name := fmt.Sprintf("a%d", i)
+		many[i] = Repo{Owner: "octocat", Name: name, FullName: "octocat/" + name, Archived: true}
+	}
+	if _, err := (Totals{Archived: many}).Collect(ctx(t), f.Client, testNow); err != nil {
+		t.Fatal(err)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if len(archivedQueries) != 2 || !strings.Contains(archivedQueries[0], "r24:") ||
+		strings.Contains(archivedQueries[0], "r25:") {
+		t.Errorf("26 repositories set aside took %d archive queries, want 2, of 25 and 1", len(archivedQueries))
+	}
+}
+
 // checkSetAsideRows is the half of the test above about the rows: each
 // repository set aside gets the archive row, dated as GraphQL dates it, and
-// no lifetime row, because it is not collected.
+// its lifetime row, stamped at the sweep, and no row of any other kind,
+// because nothing else about it is collected.
 func checkSetAsideRows(t *testing.T, points []sink.Point, aside []Repo) {
 	t.Helper()
 	for i, repo := range aside {
@@ -536,11 +617,178 @@ func checkSetAsideRows(t *testing.T, points []sink.Point, aside []Repo) {
 		if got := fieldInt(t, row, "age_days_at_archive"); got != 2298 {
 			t.Errorf("%s age_days_at_archive = %d, want 2298", repo.FullName, got)
 		}
+		total := find(t, points, "gh_repo_total", map[string]string{"full_name": repo.FullName, "archived": "true"})
+		if !total.Time.Equal(testNow) {
+			t.Errorf("%s lifetime row stamped %s, want the sweep's %s", repo.FullName, total.Time, testNow)
+		}
+		if got := fieldInt(t, total, "stars"); got != int64(5+i) {
+			t.Errorf("%s stars = %d, want the %d GraphQL answered", repo.FullName, got, 5+i)
+		}
 		for _, p := range points {
-			if p.Measurement != "gh_repo_archived" && p.Tags["full_name"] == repo.FullName {
+			if p.Tags["full_name"] != repo.FullName {
+				continue
+			}
+			if p.Measurement != "gh_repo_archived" && p.Measurement != "gh_repo_total" {
 				t.Errorf("%s was set aside and still got a %s row", repo.FullName, p.Measurement)
 			}
 		}
+	}
+}
+
+// TestTotalsCountsTheStarsOfRepositoriesSetAside is issue #78. A repository
+// set aside for being archived is still starred, unstarred and forked, and
+// up to 2.5.1 a sweep wrote its gh_repo_archived row and nothing else, so its
+// stars and forks were whatever the last backfill had said: on 2026-09-26
+// jmrplens/FFT2octave's only row, from the backfill of 2026-09-18, said 4
+// stars where GitHub said 3. gh_repo_total is the table the account's totals
+// are read from. graphql_archived_totals.json is the archive query's answer
+// for two of that account's archived repositories, recorded on 2026-09-26,
+// and graphql_issue_templates.json answers the live one.
+func TestTotalsCountsTheStarsOfRepositoriesSetAside(t *testing.T) {
+	t.Parallel()
+	f := newFixtureServer(t)
+	var archivedQueries, totalsQueries []string
+	f.graphQL(func(w http.ResponseWriter, _ *http.Request, query string, _ map[string]any) {
+		if strings.Contains(query, "fragment archived on Repository") {
+			archivedQueries = append(archivedQueries, query)
+			f.writeSelected(w, "graphql_archived_totals.json", query)
+			return
+		}
+		totalsQueries = append(totalsQueries, query)
+		f.write(w, "graphql_issue_templates.json")
+	})
+	live := Repo{Owner: "jmrplens", Name: "gitlab-mcp-server", FullName: "jmrplens/gitlab-mcp-server"}
+	aside := []Repo{
+		{Owner: "jmrplens", Name: "FFT2octave", FullName: "jmrplens/FFT2octave", Archived: true},
+		{Owner: "jmrplens", Name: "SetFigPaper", FullName: "jmrplens/SetFigPaper", Archived: true},
+	}
+	points, err := Totals{Repos: []Repo{live}, Archived: aside}.Collect(ctx(t), f.Client, testNow)
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkPoints(t, points)
+
+	liveRow := find(t, points, "gh_repo_total", map[string]string{"full_name": live.FullName})
+	for full, want := range map[string]map[string]int64{
+		"jmrplens/FFT2octave":  {"stars": 3, "forks": 1, "watchers": 1, "commits": 16, "pulls_merged": 3},
+		"jmrplens/SetFigPaper": {"stars": 11, "forks": 4, "watchers": 1, "commits": 95, "pulls_merged": 1},
+	} {
+		checkSetAsideLifetimeRow(t, points, full, want, liveRow)
+	}
+
+	// Nothing else is asked about them: the one query that names them is
+	// the archive query, the lifetime batch of the collected repositories
+	// does not, and no REST request was made at all.
+	if len(archivedQueries) != 1 || len(totalsQueries) != 1 {
+		t.Fatalf("%d archive and %d lifetime queries, want one of each", len(archivedQueries), len(totalsQueries))
+	}
+	for _, repo := range aside {
+		if strings.Contains(totalsQueries[0], `name: "`+repo.Name+`"`) {
+			t.Errorf("the lifetime batch of the collected repositories asks about %s", repo.FullName)
+		}
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for _, r := range f.requests {
+		if r.Path != "/graphql" {
+			t.Errorf("%s %s asked for a family the sweep leaves archived repositories out of", r.Method, r.Path)
+		}
+	}
+}
+
+// checkSetAsideLifetimeRow is the row half of the test above: the archived
+// repository's gh_repo_total carries the counts GitHub answered, is stamped
+// at the sweep like the live row beside it, since a lifetime row is a current
+// state and the account's totals read the newest one, and has the tag and
+// field names a collected repository's row has, so every panel that reads
+// the live rows reads these without knowing they are different. Its settings
+// were not asked for, so it has no gh_repo_policy.
+func checkSetAsideLifetimeRow(t *testing.T, points []sink.Point, full string, want map[string]int64, liveRow sink.Point) {
+	t.Helper()
+	row := find(t, points, "gh_repo_total", map[string]string{
+		"full_name": full, "archived": "true", "fork": "false", "visibility": "public",
+	})
+	for field, n := range want {
+		if got := fieldInt(t, row, field); got != n {
+			t.Errorf("%s %s = %d, want %d", full, field, got, n)
+		}
+	}
+	if !row.Time.Equal(testNow) {
+		t.Errorf("%s lifetime row stamped %s, want the sweep's %s", full, row.Time, testNow)
+	}
+	if got, live := slices.Sorted(maps.Keys(row.Tags)), slices.Sorted(maps.Keys(liveRow.Tags)); !slices.Equal(got, live) {
+		t.Errorf("%s is tagged %v, a collected repository %v", full, got, live)
+	}
+	if got, live := slices.Sorted(maps.Keys(row.Fields)), slices.Sorted(maps.Keys(liveRow.Fields)); !slices.Equal(got, live) {
+		t.Errorf("%s carries %v, a collected repository %v", full, got, live)
+	}
+	for _, p := range points {
+		if p.Tags["full_name"] == full && p.Measurement == "gh_repo_policy" {
+			t.Errorf("%s was set aside and still got its settings asked for", full)
+		}
+	}
+}
+
+// TestTotalsWritesTheSameLifetimeRowForARepositorySetAside: set aside or
+// collected, an archived repository's gh_repo_total is the same line, byte
+// for byte, from the same recording. The two paths decode through the same
+// method, so what can make them differ is what each query asks for, and the
+// server here answers each with the fields it selects and no others, as
+// GitHub does. An archive query cut down to the scalars and the watchers, the
+// cheaper query #78 weighed, would write every archived repository with no
+// commits, merged pull requests, issues, releases, branches or tags, since a
+// count GraphQL was not asked for decodes as zero, and nothing else would
+// say so.
+func TestTotalsWritesTheSameLifetimeRowForARepositorySetAside(t *testing.T) {
+	t.Parallel()
+	f := newFixtureServer(t)
+	f.graphQL(func(w http.ResponseWriter, _ *http.Request, query string, _ map[string]any) {
+		f.writeSelected(w, "graphql_archived_totals.json", query)
+	})
+	repos := []Repo{
+		{Owner: "jmrplens", Name: "FFT2octave", FullName: "jmrplens/FFT2octave", Archived: true},
+		{Owner: "jmrplens", Name: "SetFigPaper", FullName: "jmrplens/SetFigPaper", Archived: true},
+	}
+	collected, err := Totals{Repos: repos}.Collect(ctx(t), f.Client, testNow)
+	if err != nil {
+		t.Fatal(err)
+	}
+	setAside, err := Totals{Archived: repos}.Collect(ctx(t), f.Client, testNow)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, repo := range repos {
+		want := sink.LineProtocol(find(t, collected, "gh_repo_total", map[string]string{"full_name": repo.FullName}))
+		got := sink.LineProtocol(find(t, setAside, "gh_repo_total", map[string]string{"full_name": repo.FullName}))
+		if got != want {
+			t.Errorf("%s set aside:\n got %s\nwant %s", repo.FullName, got, want)
+		}
+	}
+}
+
+// writeSelected answers a GraphQL query with a recorded answer cut down to
+// what the query selects: each repository keeps a field only where the query
+// names it, as a field or as an alias. A recording holds every field the
+// lifetime row is made of, and a query that stopped asking for one must not
+// be handed it anyway.
+func (f *fixtureServer) writeSelected(w http.ResponseWriter, name, query string) {
+	var answer struct {
+		Data map[string]map[string]any `json:"data"`
+	}
+	if err := json.Unmarshal(fixture(f.t, name), &answer); err != nil {
+		f.t.Errorf("read %s: %v", name, err)
+		return
+	}
+	for _, repo := range answer.Data {
+		for key := range repo {
+			if !regexp.MustCompile(`\b` + regexp.QuoteMeta(key) + `\b`).MatchString(query) {
+				delete(repo, key)
+			}
+		}
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	if err := json.NewEncoder(w).Encode(answer); err != nil {
+		f.t.Errorf("answer from %s: %v", name, err)
 	}
 }
 

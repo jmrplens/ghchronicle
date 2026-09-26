@@ -1,0 +1,61 @@
+{
+  "data": {
+    "r0": {
+      "nameWithOwner": "octocat/spoon-knife",
+      "url": "https://github.com/octocat/spoon-knife",
+      "databaseId": 1300192,
+      "createdAt": "2021-04-18T15:17:01Z",
+      "pushedAt": "@DAYS_AGO_80@T12:29:55Z",
+      "isFork": false,
+      "isArchived": true,
+      "archivedAt": "@DAYS_AGO_77@T11:41:12Z",
+      "isPrivate": false,
+      "diskUsage": 33,
+      "stargazerCount": 3,
+      "forkCount": 1,
+      "watchers": {
+        "totalCount": 1
+      },
+      "issuesOpen": {
+        "totalCount": 0
+      },
+      "issuesClosed": {
+        "totalCount": 0
+      },
+      "pullsOpen": {
+        "totalCount": 0
+      },
+      "pullsMerged": {
+        "totalCount": 3
+      },
+      "pullsClosed": {
+        "totalCount": 0
+      },
+      "releases": {
+        "totalCount": 0
+      },
+      "discussions": {
+        "totalCount": 0
+      },
+      "labels": {
+        "totalCount": 9
+      },
+      "milestones": {
+        "totalCount": 0
+      },
+      "branches": {
+        "totalCount": 1
+      },
+      "tags": {
+        "totalCount": 0
+      },
+      "defaultBranchRef": {
+        "target": {
+          "history": {
+            "totalCount": 16
+          }
+        }
+      }
+    }
+  }
+}
