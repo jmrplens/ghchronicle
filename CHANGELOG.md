@@ -11,6 +11,291 @@ verification commands and a link to the commits.
 Versions follow [semantic versioning](https://semver.org/). The dates are the
 day the tag was pushed.
 
+## 2.6.0 - 2026-09-27
+
+Built on 2.5.2, which made every family run at the cadence it states, this
+release runs ten of them at the cadences their measured cost allows and adds
+what a reader of the store asked for and could not get: how large a
+contribution elsewhere was and whether its repository is private, the moment
+each release was published, an answer accepted after its comment left the
+newest hundred, and an open security alert however old it is. A release now
+reaches Loki once, at its publication, where every release was sent again
+every hour, and a PostgreSQL database an earlier release made takes the new
+fields, which it would have refused.
+
+- **Outbound rows say how large the change was and whether the repository
+  is private.** `gh_external_contribution` said where a contribution went and
+  what became of it, and nothing about the change or the repository, although
+  the search it comes from returns both. A page that renders this work for
+  others had to ask the API again for every pull request, and had no way to
+  leave out an organisation's private repositories: the searches run with the
+  account's token, and those come back beside the public ones. Each row now
+  carries `private`, from the repository's `isPrivate`, and a pull request
+  carries `additions`, `deletions` and `changed_files`, the names
+  `gh_pull_request` uses; an issue carries none of the three.
+  `gh_issue_comment` and `gh_discussion_comment` carry `private` as well, so
+  every outbound measurement can leave private work out. They are fields and not tags, so no row already stored gains a second
+  identity, and none of them moves once an item is closed, which is what lets
+  them sit on a row dated when it closed. Every open item has them from the
+  first sweep after the upgrade; an item closed before it has them once a
+  backfill reads it again.
+  ([#79](https://github.com/jmrplens/ghchronicle/issues/79))
+- **The upstream repository's stars are a row of their own,
+  `gh_upstream_repo`.** They were asked for on each contribution, as
+  `repo_stars`, and are not there because that row is dated when the item
+  closed: a count that moves nearly every day would rewrite a row of the past
+  each time it moved, and in InfluxDB 3 an old partition with it. The new
+  measurement is one row per repository the searches reached in the pass,
+  stamped at the sweep, tagged `full_name`, `owner` and `repo`, with `stars`,
+  `forks`, `private`, the primary `language` when GitHub detects one, and the
+  repository's page. The Prometheus exporter keeps its newest reading per
+  repository, as it does for `gh_pinned_item`. The "Work elsewhere" table
+  gains a Stars column, the newest of these rows inside the range, joined onto
+  each item in InfluxDB and PostgreSQL and merged by full name in Prometheus;
+  Graphite and Elasticsearch cannot join two measurements in one table and say
+  so in the panel. Until the first `outbound` pass of this release writes the
+  measurement, which is within the hour, InfluxDB and PostgreSQL refuse that
+  table rather than leave the column empty, as the
+  [troubleshooting page](https://jmrp.io/docs/ghchronicle/reference/troubleshooting/)
+  now says. A repository whose items are all closed, and further back than the
+  page a sweep reads, keeps the row of the last sweep that read one of them, or
+  of the last backfill.
+- **Every release is dated at its publication, in `gh_release_published`.**
+  `gh_release` is stamped at the sweep, because its downloads move, and
+  carried the release's age as whole days counted back from it. The
+  publication itself was stored nowhere, and the floored age cannot give it
+  back: the date it reconstructs is a day late for any release published later
+  in the day than the sweep ran, so jmrplens/libgen-mcp v2.0.1, published
+  2026-09-23T18:28Z, read as the 24th. The new measurement is one row per
+  release at its `published_at`, tagged `tag`, with `published` at 1,
+  `prerelease` and the release's page, so counting releases per month is a sum
+  and the latest stable release is the newest row with `prerelease` false. It
+  costs no request, since the release list already carries the date.
+  `prerelease` is a field here where it is a tag on `gh_release`: a
+  pre-release is promoted by unticking the box on the published release, and
+  as a tag the promotion would have been a second row at the same instant,
+  which the sum counts twice. The exporter skips the measurement as history,
+  as it does `gh_package_version`, since `gh_release` already serves a series
+  per release. The first sweep after the upgrade dates the releases on the
+  page it reads, and a
+  [backfill](https://jmrp.io/docs/ghchronicle/how/backfill/) dates the rest.
+  ([#80](https://github.com/jmrplens/ghchronicle/issues/80))
+- **A draft carries no `age_days`.** GitHub sends a draft with `published_at`
+  null, and the age measured from Go's zero time saturated at 106751 days on
+  every draft row, beside a real maximum of 271 for the 159 published releases
+  of the account measured, which skewed anything that averaged or ordered the
+  field without leaving drafts out first. A draft has not been published, so
+  it writes no `gh_release_published` row either. No panel read the field.
+- **Loki gets each release once, at its publication, instead of every
+  release every hour.** The `release` stream was rendered from `gh_release`,
+  stamped at the sweep, so every `repo` pass pushed every release again as
+  `release TAG of OWNER/REPO, N downloads`. Measured on 2.5.1 in production,
+  over 30.9 hours and 27 `repo` passes, that was 4,313 of the 10,467 lines the
+  sink sent, 41 per cent and about 3,355 a day: 160 releases 27 times each, in
+  428 distinct texts, for the 2 releases actually published in those hours.
+  The line now comes from `gh_release_published`, as
+  `published release TAG of OWNER/REPO`, or `published prerelease`, at the
+  second the release was published, which on that window is 2 lines. The
+  stream keeps `kind="release"`, so a query written against it still reads
+  it, and the download counts stay in the metrics store, where a gauge
+  belongs. Lines already in Loki keep what they said.
+- **The release stream looks back a `repo` cadence.** Dated at the
+  publication, a release is first seen by the `repo` pass after it, so one
+  published just after a pass read its repository is a whole cadence old when
+  the next pass writes, plus however late that pass runs, and `max_age`, an
+  hour by default like the cadence, would have left it out for good. That
+  stream alone now looks back the `repo` cadence plus `max_age`: two hours at
+  the defaults, seven with `repo: 6h`, and never more than six days, a day
+  short of the week Loki's `reject_old_samples_max_age` allows. Loki refuses
+  an old line only for being behind a newer one in its stream, which the sink
+  still checks against what it sent before. A release published in the hour
+  before a pass is sent by that pass and again by the next, the same line at
+  the same instant, which Loki keeps once. Under `-once` the cadence that
+  matters is the schedule that runs the binary, so `every.families.repo`
+  should say it. The sink also stopped judging a push against the push's own
+  newest entry: it sends each stream oldest first, which Loki takes whole, and
+  that rule would have dropped the older of two releases one pass carried.
+- **Loki's out-of-order window is an hour, and the pages say so.** The Loki
+  and troubleshooting pages, the configuration's comment and
+  `config.example.yaml` gave it as about two hours, and told whoever raised
+  `max_age` to raise `out_of_order_time_window` with it, which is a Prometheus
+  setting. The window is half of the ingester's `max_chunk_age`, an hour by
+  default, and that is the setting they now name. `max_age` keeps its default
+  of an hour, which is that window.
+- **An answer accepted late is read.** A sweep reads the newest hundred
+  discussion comments the account wrote, and a comment's `is_answer` was
+  refreshed only while it was inside that window, which is measured in
+  comments and not in time: an answer accepted after its comment had left it
+  was written as an answer only by a backfill. On 2026-09-26 the account had
+  108 comments and 15 accepted answers, one accepted fourteen days after it
+  was written, and the newest hundred no longer held one of the 15. The
+  `outbound` family now also reads
+  `viewer.repositoryDiscussionComments(onlyAnswers: true)`, which lists the
+  comments that are their discussion's accepted answer whatever their age,
+  walked back from the newest end: five pages on a sweep and every page in a
+  backfill, a GraphQL point a page. An answer both reads return is written
+  once, because the write ledger does not dedupe within a batch and the
+  exporter would count it, and weigh its upvotes, twice. The comment walks
+  also hand up the rows they read before an error now, as the searches
+  already did, so a failed answer walk does not cost the newest hundred.
+  ([#81](https://github.com/jmrplens/ghchronicle/issues/81))
+- **An open security alert is counted however old it is.** A sweep reads the
+  newest page of each alert list, a hundred alerts in every state, and took
+  `open_alerts` on `gh_security_feature` and the per-severity `open` of
+  `gh_dependabot_alert` and `gh_code_scanning_alert` from that page. An alert
+  still open behind a hundred newer ones that were fixed was not counted, so
+  such a repository read 0 open in the Security panels of all five stores,
+  the number a reader is most likely to repeat. When a walk stops with alerts
+  still behind it, a full page on a sweep or the date bound of a backfill, the
+  list is now read again with `state=open`, to its end, Dependabot by cursor
+  and code scanning by page, and the counts come from that. The item rows are
+  unchanged. The extra requests are conditional like every other page, and a
+  refusal of them is taken as being about the walk rather than the
+  repository: the counts fall back to the page, and the feature is not
+  recorded as switched off nor the refusal remembered for a day. A list
+  shorter than a page, and a backfill that walked the whole list, ask nothing
+  more, so on the account measured two lists pay for it, code scanning on
+  jmrplens/Cloudflare-DNS-Updater and Dependabot on jmrplens/jmrp.io.
+  ([#82](https://github.com/jmrplens/ghchronicle/issues/82))
+- **Code scanning's `alerts` is the repository's total.** When the page comes
+  back full, it is read from the last page GitHub declares for a page of one
+  alert: 1,393 on jmrplens/Cloudflare-DNS-Updater, where a sweep wrote 100.
+  A 304 carries no Link header, and the client replays the one its 200 came
+  with. Dependabot's list pages by cursor and declares no last page, so there
+  `alerts` stays the rows read, and the measurements page now says that 100
+  on a sweep means a hundred or more; a backfill that walks the whole list
+  writes the total.
+- **Ten families run more often.** `events`, `notifs` and `activity` every
+  quarter of an hour instead of every half, `deployments` every half hour
+  instead of every hour, `stars`, `billing` and `analyses` every hour instead
+  of every six, `account` and `totals` every hour instead of every twelve, and
+  `discussions` every hour instead of every two. Their extra passes are
+  answered almost entirely by 304s, which are free, or cost a handful of
+  GraphQL points, and several of them change far more often than they were
+  read: the event feed had moved in 43 of 46 half hours, and the billing
+  report's month in progress answered 200 to all 46 six-hourly conditional
+  reads since 2026-09-13. Costed from the request log of the production
+  process from 2026-09-25 12:58Z to 2026-09-26 19:50Z, over 37 repositories
+  and with each family's first pass left out so that every pass counted had a
+  warm ETag cache, they add about 250 billable `core` requests and 500 GraphQL
+  points a day, 0.2 and 0.4 per cent of what the two hourly budgets of 5,000
+  allow in a day, and 22 search requests. The points are mostly `deployments`,
+  eight a pass, and `totals`, six; the `core` requests mostly `activity`,
+  `events` and `analyses`, which are charged only for what moved. With the
+  half tick of 2.5.2 these are the cadences the families really run at, and
+  the shortest is still a quarter of an hour, so the tick does not move. A
+  configuration that names one of them under `every.families` keeps what it
+  names. The Overview's archived stars, which a range shorter than the
+  `totals` cadence can leave out, now need a range of an hour rather than
+  twelve.
+  ([#93](https://github.com/jmrplens/ghchronicle/issues/93))
+- **The reasons the start-up warning quotes are the ones measured.** Each
+  family's `why`, which the warning about a cadence set far shorter than the
+  built-in one quotes, now says what a pass costs and how fast the data moves.
+  Five were not so, and are corrected whether or not their cadence changed:
+  `commits` is one GraphQL point per repository whatever was pushed, and 961 of
+  999 answers held no commit, where it said a request per commit; `issues` is
+  one query per repository at one or two points, up to about nine once a day
+  for a whole page, where it said a request per item; `repo` is three REST
+  requests per repository and two points per ten, where it said one request;
+  `rulesets` answers 304 only with a warm cache, since the ETag cache lives in
+  memory and none of the 43 requests after a restart was conditional; and
+  `billing` had changed at every read, where it said a few times a day at
+  most. No family ships at two hours any more, and that rung stays on the
+  ladder the warning's factor of four is worked out from, since it is where
+  one step down from six hours lands.
+- **PostgreSQL takes a field an earlier release never wrote.** The SQL file
+  sink and the PostgreSQL sink declared a table the first time a process, or a
+  rotated file, met its measurement, as a `CREATE TABLE IF NOT EXISTS` with
+  every column of that batch, and that statement does nothing at all to a
+  table an earlier release made. A field the earlier release did not write
+  reached the `INSERT` with no column, and PostgreSQL refused the statement
+  and the batch around it, on every write after it, since the sink took the
+  table as declared. This release adds fields to three measurements that have
+  tables already. The `CREATE TABLE` now declares the time and the tags, which
+  are the key, and each field follows as
+  `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`, which means the same thing to a
+  new table and to one any earlier release made. The PostgreSQL sink reads
+  the catalog the first time its process meets a table and adds only the
+  columns it lacks, because PostgreSQL takes an `ALTER TABLE`'s exclusive
+  lock before it checks `IF NOT EXISTS`, so one per field on every restart
+  would wait behind each Grafana query reading the table and hold up every
+  query after it. A statement the server refuses is sent again on the next
+  write rather than taken as done. The file says every field, since a
+  replayed file cannot ask, and psql prints a notice for each column a table
+  already has.
+
+Measured on 2026-09-26 against the live API with this account's token: the
+five outbound searches cost a point a page with every new field and without
+them, over 102 items in 51 repositories, the answer growing from 35.9 KB to
+52.9 KB, and the three comment walks a point a page with `isPrivate` and
+without it. `onlyAnswers` exists on github.com and in the schema of GHES 3.17,
+the oldest published, lists oldest first like the unfiltered connection, and
+costs a point a page, and the 14 answers inside the newest hundred came back
+byte for byte the same from both queries. On jmrplens/Cloudflare-DNS-Updater
+the `rel="last"` page of `per_page=1` reads 1,393 code scanning alerts, the
+1,393 distinct alerts a backfill wrote; run live, two of the account's alert
+lists fill their first page, both of their open lists are empty, and a second
+read answered every extra request 304. In the proxy log the cadences were
+costed from, a `core` request answered 304 left `x-ratelimit-used` where the
+request before it in the same rate window had put it 11,692 times out of
+11,771, and the star histories answered 304 to 184 of 185 conditional reads
+and `activity` to 2,320 of 2,356. Against Loki 3.7.7 with its default limits,
+a stream holding an entry five minutes old took one 55 minutes old and
+refused one 75 minutes old; an entry two hours old into a stream with nothing
+newer was taken, one six days old was taken and one eight days old refused
+with "timestamp too old"; a line sent twice at the same instant came back
+once, again after its chunk was flushed; and one push of entries from 23
+hours, 12 hours and a minute ago into an empty stream was taken whole.
+Against PostgreSQL 18.6: a `gh_external_contribution` table written by one
+sink, then a second sink process writing two more fields, answered
+`column "additions" of relation "gh_external_contribution" does not exist` and
+wrote nothing, and with each field declared as a column of its own the same
+sequence wrote the row. With a reader holding a table,
+`CREATE TABLE IF NOT EXISTS` returned in 0.4 ms and the catalog read in 15 ms,
+while an `ADD COLUMN IF NOT EXISTS` for a column already there waited until a
+one second `lock_timeout` refused it and a `SELECT` behind it waited 3
+seconds; a restarted sink with a `lock_timeout` of 500 ms wrote in 32 ms.
+
+Each change in behaviour carries a test shown to fail against the code before
+it: the draft's age, the promoted release, the Loki line and its lookback, the
+answer past the newest hundred, the column an earlier process never wrote, the
+exporter's reading of an upstream repository, the open alert behind a hundred
+fixed ones, and a day of ticks at the built-in cadences, which fails on all
+ten against the old table. The new fields are held by the outbound golden
+file, and the release lookback by a test of the binary against the fake
+GitHub as well as the sink's own.
+
+Not verified, and worth saying plainly:
+
+- None of it has run in production. The cost of the new cadences is projected
+  from 2.5.1's request log, not read from 2.6.0 running them, and the first
+  day after the upgrade is the first reading of it. The same is true of the
+  release lines in Loki, the accepted answers and `gh_upstream_repo`.
+- The release lookback was measured against Loki 3.7.7 with its default
+  limits. A Loki with another `max_chunk_age`, or a
+  `reject_old_samples_max_age` shorter than a week, was not tried, and the
+  six-day cap assumes the week.
+- An open alert behind a hundred fixed ones has been counted against the
+  collector's fixtures only; the fake GitHub's alert lists are shorter than a
+  page. On this account neither list that fills its page has an open alert,
+  so the live reading is 0 either way.
+- `private` true on a contribution or an upstream repository has been seen in
+  fixtures only: none of the 51 repositories this account's searches reach is
+  private, although one of its newest hundred issue comments sits in a private
+  one.
+- Whether GitHub gives a release taken back to a draft a new `published_at`
+  when it is published again was not seen. If it does, the release has two
+  rows and the sum counts it twice; the distinct tags of a repository are the
+  exact count.
+- A sweep reads the newest five hundred accepted answers. On an account with
+  more, an older comment accepted late is still found only by a backfill; no
+  such account was tried.
+- Left out rather than unproven: Dependabot's `alerts` stays what a sweep
+  read, since a total would take a walk of the whole list, and no panel reads
+  `gh_release_published` yet, because a releases-per-month panel renumbers
+  every later panel the containerised suite names by position.
+
 ## 2.5.2 - 2026-09-26
 
 Four things the store said that GitHub did not, each found by reading one
