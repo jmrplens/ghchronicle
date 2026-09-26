@@ -896,9 +896,12 @@ edición bifurcaría la única serie de la cuenta.
 
 `gh_issue_comment` y `gh_discussion_comment` se leen desde el extremo más
 reciente de sus conexiones, que listan de más antiguo a más nuevo: la única
-página de una pasada son los cien comentarios más recientes, y un comentario
-que pasó a ser la respuesta aceptada después de escribirse se vuelve a ver en
-la siguiente pasada.
+página de una pasada son los cien comentarios más recientes. Después se leen
+aparte las respuestas aceptadas de la cuenta, las quinientas más recientes en
+una pasada y todas en un relleno, así que un comentario aceptado como
+respuesta cuando ya había salido de esos cien se escribe igualmente con
+`is_answer` a true en la siguiente pasada. Un comentario que devuelven las dos
+lecturas se escribe una sola vez.
 
 `gh_contribution_year` tiene una fila por año pasado, fechada el treinta y uno
 de diciembre, y una por el año en curso, que se pide en cada ejecución desde el

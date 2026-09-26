@@ -345,20 +345,24 @@ func (o Outbound) Collect(ctx context.Context, c *ghapi.Client, now time.Time) (
 		}
 	}
 
-	// Comments and discussion answers, anywhere. Both come from `viewer`, one
-	// GraphQL point each, and both see other people's repositories, which is
-	// the half of the work that owning no repository there makes invisible.
+	// Comments and discussion answers, anywhere. Both come from `viewer`, a
+	// GraphQL point a page, and both see other people's repositories, which
+	// is the half of the work that owning no repository there makes
+	// invisible.
 	for _, collect := range []func(context.Context, *ghapi.Client, time.Time) ([]sink.Point, error){
 		o.discussionComments, o.issueComments,
 	} {
+		// Kept whatever the error, as the searches' are: the accepted
+		// answers are a second walk, and one failing leaves the newest
+		// hundred read before it.
 		pts, err := collect(ctx, c, now)
+		points = append(points, pts...)
 		if err != nil {
 			if isSkippable(err) {
 				continue
 			}
 			return points, err
 		}
-		points = append(points, pts...)
 	}
 	return points, nil
 }
@@ -543,10 +547,11 @@ func (n *discussionCommentNode) point(login, repo string) sink.Point {
 	}
 }
 
-const discussionCommentsQuery = `
-query($last: Int!, $before: String) {
-  viewer {
-    repositoryDiscussionComments(last: $last, before: $before) {
+// discussionCommentPage is what both walks of the account's discussion
+// comments ask of a page. One text for both, because a comment the two see
+// has to render to one row: a field only one of them asked for would be a
+// zero value on the other's copy of it.
+const discussionCommentPage = `
       totalCount
       pageInfo { hasPreviousPage startCursor }
       nodes {
@@ -561,7 +566,22 @@ query($last: Int!, $before: String) {
           category { name isAnswerable }
           repository { nameWithOwner }
         }
-      }
+      }`
+
+const discussionCommentsQuery = `
+query($last: Int!, $before: String) {
+  viewer {
+    repositoryDiscussionComments(last: $last, before: $before) {` + discussionCommentPage + `
+    }
+  }
+}`
+
+// discussionAnswersQuery is the same connection filtered to the comments that
+// are their discussion's accepted answer, whatever their age.
+const discussionAnswersQuery = `
+query($last: Int!, $before: String) {
+  viewer {
+    repositoryDiscussionComments(last: $last, before: $before, onlyAnswers: true) {` + discussionCommentPage + `
     }
   }
 }`
@@ -600,10 +620,43 @@ type discussionCommentConnection struct {
 // the whole list, and a comment that became the accepted answer after that
 // was never seen again. last: 100 with before is the newest hundred, and a
 // backfill walks back from there until the API runs out or Since is passed.
+//
+// Reading from the end moved that boundary rather than removing it: the
+// newest hundred is a window measured in comments, and an answer can be
+// accepted after its comment has left it. Measured on 2026-09-26, one answer
+// waited fourteen days, and the newest hundred of this account's 108
+// comments no longer held one of its 15 accepted answers. So the accepted
+// answers are then read on their own, the same connection with onlyAnswers,
+// which lists them oldest first like the rest and is read from the same end:
+// five pages on a sweep, where the ones that matter are the recent ones, and
+// every page on a backfill, whose date bound they do not take, since a sweep
+// reads its five whatever their dates and a backfill is not to read less.
+// An answer the first walk rendered is not rendered again. The store would
+// keep one row of the two, but both reach the sinks in one batch, which the
+// ledger does not dedupe within, and the exporter would count it twice.
 func (o Outbound) discussionComments(ctx context.Context, c *ghapi.Client, _ time.Time) ([]sink.Point, error) {
 	var points []sink.Point
+	seen := map[int64]bool{}
+	render := func(n *discussionCommentNode) {
+		seen[n.DatabaseID] = true
+		points = append(points, n.point(o.Login, n.Discussion.Repository.NameWithOwner))
+	}
+	if err := viewerDiscussionComments(ctx, c, discussionCommentsQuery, o.Walk.limit(1), o.Walk, render); err != nil {
+		return points, err
+	}
+	err := viewerDiscussionComments(ctx, c, discussionAnswersQuery, o.Walk.limit(5), Walk{}, func(n *discussionCommentNode) {
+		if !seen[n.DatabaseID] {
+			render(n)
+		}
+	})
+	return points, err
+}
+
+// viewerDiscussionComments walks one query of the account's discussion
+// comments back from its newest page, handing each comment to visit, until
+// the pages run out, most have been read, or a page begins past walk's bound.
+func viewerDiscussionComments(ctx context.Context, c *ghapi.Client, query string, most int, walk Walk, visit func(*discussionCommentNode)) error {
 	before := ""
-	most := o.Walk.limit(1)
 	for page := 1; page <= most; page++ {
 		var res struct {
 			Viewer struct {
@@ -614,21 +667,20 @@ func (o Outbound) discussionComments(ctx context.Context, c *ghapi.Client, _ tim
 		if before != "" {
 			vars["before"] = before
 		}
-		if err := c.GraphQL(ctx, discussionCommentsQuery, vars, &res); err != nil {
-			return points, err
+		if err := c.GraphQL(ctx, query, vars, &res); err != nil {
+			return err
 		}
 		cs := res.Viewer.Comments
 		for i := range cs.Nodes {
-			n := &cs.Nodes[i]
-			points = append(points, n.point(o.Login, n.Discussion.Repository.NameWithOwner))
+			visit(&cs.Nodes[i])
 		}
 		// The page is oldest first, so its first node is the oldest seen.
-		if !cs.PageInfo.HasPreviousPage || len(cs.Nodes) == 0 || o.Walk.past(cs.Nodes[0].CreatedAt) {
-			break
+		if !cs.PageInfo.HasPreviousPage || len(cs.Nodes) == 0 || walk.past(cs.Nodes[0].CreatedAt) {
+			return nil
 		}
 		before = cs.PageInfo.StartCursor
 	}
-	return points, nil
+	return nil
 }
 
 const issueCommentsQuery = `

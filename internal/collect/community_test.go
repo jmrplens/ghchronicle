@@ -152,6 +152,10 @@ func outboundFixture(t *testing.T, searches *[]string, starred *[]map[string]any
 					t.Errorf("query does not ask for %s:\n%s", field, query)
 				}
 			}
+			if strings.Contains(query, "onlyAnswers: true") {
+				f.write(w, "viewer_discussion_answers.json")
+				return
+			}
 			f.write(w, "viewer_discussion_comments.json")
 		default:
 			f.write(w, "viewer_issue_comments.json")
@@ -487,9 +491,11 @@ func TestOutboundStarredStopsAtTheBackfillBound(t *testing.T) {
 // page from the front never sees a comment left this morning. The sweep asks
 // for the last hundred; a backfill walks back with before from the page's
 // startCursor, and stops once the oldest comment of a page is past Since.
+// The accepted answers are the same connection filtered, and are read from
+// the same end.
 func TestOutboundCommentsAreReadFromTheNewestEnd(t *testing.T) {
 	t.Parallel()
-	var discussion, issue []map[string]any
+	var discussion, issue, answers []map[string]any
 	f := newFixtureServer(t)
 	f.graphQL(func(w http.ResponseWriter, _ *http.Request, query string, vars map[string]any) {
 		switch {
@@ -497,6 +503,9 @@ func TestOutboundCommentsAreReadFromTheNewestEnd(t *testing.T) {
 			f.write(w, "graphql_starred.json")
 		case strings.Contains(query, "search(type: ISSUE"):
 			f.write(w, "graphql_search_issues.json")
+		case strings.Contains(query, "onlyAnswers: true"):
+			answers = append(answers, vars)
+			f.write(w, "viewer_discussion_answers.json")
 		case strings.Contains(query, "repositoryDiscussionComments"):
 			discussion = append(discussion, vars)
 			if vars["before"] == nil {
@@ -516,7 +525,7 @@ func TestOutboundCommentsAreReadFromTheNewestEnd(t *testing.T) {
 	if _, err := (Outbound{Login: "octocat"}).Collect(ctx(t), f.Client, testNow); err != nil {
 		t.Fatal(err)
 	}
-	for name, seen := range map[string][]map[string]any{"discussion": discussion, "issue": issue} {
+	for name, seen := range map[string][]map[string]any{"discussion": discussion, "issue": issue, "answer": answers} {
 		if len(seen) != 1 || seen[0]["last"] != float64(100) || seen[0]["first"] != nil || seen[0]["before"] != nil {
 			t.Errorf("a sweep's %s comments query = %v, want last: 100 and no cursor", name, seen)
 		}
@@ -538,6 +547,141 @@ func TestOutboundCommentsAreReadFromTheNewestEnd(t *testing.T) {
 	}
 	if len(discussion) != 1 {
 		t.Errorf("a backfill since September asked %d discussion pages, want to stop at the page whose oldest comment is 2024", len(discussion))
+	}
+}
+
+// answersFixture serves the newest page of comments as one with older pages
+// behind it, which a sweep does not read, and the accepted answers through
+// answer, recording the text of both queries.
+func answersFixture(t *testing.T, answer func(w http.ResponseWriter, vars map[string]any)) (f *fixtureServer, newest, answers *string) {
+	t.Helper()
+	newest, answers = new(string), new(string)
+	f = newFixtureServer(t)
+	f.graphQL(func(w http.ResponseWriter, _ *http.Request, query string, vars map[string]any) {
+		switch {
+		case strings.Contains(query, "starredRepositories(first:"):
+			f.write(w, "graphql_starred.json")
+		case strings.Contains(query, "search(type: ISSUE"):
+			f.write(w, "graphql_search_issues.json")
+		case strings.Contains(query, "onlyAnswers: true"):
+			*answers = query
+			answer(w, vars)
+		case strings.Contains(query, "repositoryDiscussionComments"):
+			*newest = query
+			b := strings.Replace(string(fixture(t, "viewer_discussion_comments.json")), `"hasPreviousPage": false`, `"hasPreviousPage": true`, 1)
+			_, _ = w.Write([]byte(b))
+		default:
+			f.write(w, "viewer_issue_comments.json")
+		}
+	})
+	return f, newest, answers
+}
+
+// The newest hundred is a window measured in comments, and an answer can be
+// accepted after its comment has left it: measured on 2026-09-26, one was
+// accepted fourteen days after it was written, and the account's newest
+// hundred of 108 comments no longer held one of its 15 accepted answers. A
+// sweep reads the accepted answers on their own, so an answer older than the
+// newest page is written with is_answer=true, dated when it was written like
+// every other comment; and one both walks see is written once, since a
+// second copy in the same batch would be counted twice by the exporter and
+// averaged twice into its upvotes.
+func TestAnAnswerAcceptedPastTheNewestHundredIsRead(t *testing.T) {
+	t.Parallel()
+	f, newest, answers := answersFixture(t, func(w http.ResponseWriter, _ map[string]any) {
+		_, _ = w.Write(fixture(t, "viewer_discussion_answers.json"))
+	})
+	points, err := Outbound{Login: "octocat"}.Collect(ctx(t), f.Client, testNow)
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkPoints(t, points)
+
+	late := find(t, points, "gh_discussion_comment", map[string]string{"comment": "7654321"})
+	if late.Tags["is_answer"] != "true" || late.Tags["own"] != "false" || late.Tags["full_name"] != "someone/else" ||
+		late.Tags["number"] != "57" || fieldInt(t, late, "answers") != 1 {
+		t.Errorf("the answer accepted past the newest hundred = %v %v", late.Tags, late.Fields)
+	}
+	if want := time.Date(2023, 11, 20, 16, 30, 0, 0, time.UTC); !late.Time.Equal(want) {
+		t.Errorf("stamped %s, want when the comment was written, %s", late.Time, want)
+	}
+	if late.Fields["url"] != "https://github.com/someone/else/discussions/57#discussioncomment-7654321" ||
+		late.Fields["answered_by"] != "octocat" || late.Fields["discussion_answered"] != true {
+		t.Errorf("the thread's context did not come with it: %v", late.Fields)
+	}
+
+	comments := only(t, points, "gh_discussion_comment")
+	both := 0
+	for _, p := range comments {
+		if p.Tags["comment"] == "18283966" {
+			both++
+		}
+	}
+	if both != 1 || len(comments) != 4 {
+		t.Errorf("the answer both walks see was written %d times among %d comments, want once among 4", both, len(comments))
+	}
+
+	// One selection for both, which is what makes the answer both walks see
+	// the same row: a field one of them forgot would be a zero on half of it.
+	_, newestNodes, _ := strings.Cut(*newest, "pageInfo")
+	_, answerNodes, _ := strings.Cut(*answers, "pageInfo")
+	if newestNodes == "" || newestNodes != answerNodes {
+		t.Errorf("the two walks ask for different comments:\n%s\n%s", *newest, *answers)
+	}
+}
+
+// The accepted answers are read back from the newest, to the end or to five
+// pages on a sweep, and a backfill's date bound does not stop them: a sweep
+// reads its pages whatever their dates, and a backfill reads no less.
+func TestTheAcceptedAnswersAreReadPastTheirFirstPage(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name  string
+		walk  Walk
+		more  func(before any) bool
+		pages int
+	}{
+		{"a sweep, to the end", Walk{}, func(before any) bool { return before == nil }, 2},
+		{"a backfill since last week, to the end", Walk{Pages: -1, Since: testNow.AddDate(0, 0, -7)}, func(before any) bool { return before == nil }, 2},
+		{"a sweep, to its bound", Walk{}, func(any) bool { return true }, 5},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			var asked []map[string]any
+			f, _, _ := answersFixture(t, func(w http.ResponseWriter, vars map[string]any) {
+				asked = append(asked, vars)
+				b := string(fixture(t, "viewer_discussion_answers.json"))
+				if tc.more(vars["before"]) {
+					b = strings.Replace(b, `"hasPreviousPage": false`, `"hasPreviousPage": true`, 1)
+				}
+				_, _ = w.Write([]byte(b))
+			})
+			if _, err := (Outbound{Login: "octocat", Walk: tc.walk}).Collect(ctx(t), f.Client, testNow); err != nil {
+				t.Fatal(err)
+			}
+			if len(asked) != tc.pages {
+				t.Fatalf("asked %d pages of accepted answers, want %d", len(asked), tc.pages)
+			}
+			if asked[0]["last"] != float64(100) || asked[0]["before"] != nil || asked[1]["before"] != "Y3Vyc29yOnYyOpHOAHTMsQ==" {
+				t.Errorf("answer queries = %v, want the newest hundred and then back from its startCursor", asked)
+			}
+		})
+	}
+}
+
+// A walk of the accepted answers that fails is the family's failure, and the
+// newest hundred read before it are still rows the store does not have.
+func TestAFailedAnswerWalkKeepsTheNewestComments(t *testing.T) {
+	t.Parallel()
+	f, _, _ := answersFixture(t, func(w http.ResponseWriter, _ map[string]any) {
+		_, _ = w.Write([]byte(accountInternalError))
+	})
+	points, err := Outbound{Login: "octocat"}.Collect(ctx(t), f.Client, testNow)
+	if err == nil || !strings.Contains(err.Error(), "INTERNAL") {
+		t.Fatalf("err = %v, want the failed answer walk reported", err)
+	}
+	if got := len(byMeasurement(points)["gh_discussion_comment"]); got != 3 {
+		t.Errorf("kept %d comments of the newest page, want its 3", got)
 	}
 }
 

@@ -3,67 +3,41 @@
     "viewer": {
       "login": "octocat",
       "repositoryDiscussionComments": {
-        "totalCount": 3,
+        "totalCount": 2,
         "pageInfo": {
           "hasPreviousPage": false,
-          "startCursor": "Y3Vyc29yOjE="
+          "startCursor": "Y3Vyc29yOnYyOpHOAHTMsQ=="
         },
         "nodes": [
           {
-            "createdAt": "2024-04-02T01:00:00Z",
-            "isAnswer": false,
-            "upvoteCount": 1,
-            "url": "https://github.com/ThrowTheSwitch/Ceedling/discussions/867#discussioncomment-9876543",
-            "databaseId": 9876543,
+            "createdAt": "2023-11-20T16:30:00Z",
+            "isAnswer": true,
+            "upvoteCount": 2,
+            "url": "https://github.com/someone/else/discussions/57#discussioncomment-7654321",
+            "databaseId": 7654321,
             "discussion": {
-              "number": 867,
-              "title": "Cannot find the generated mocks",
-              "createdAt": "2024-04-01T01:59:12Z",
+              "number": 57,
+              "title": "Build fails on arm64",
+              "createdAt": "2023-11-19T09:00:00Z",
               "isAnswered": true,
-              "answerChosenAt": "2024-04-03T01:59:12Z",
+              "answerChosenAt": "2026-09-22T09:19:47Z",
               "answerChosenBy": {
-                "login": "lapo4719"
+                "login": "someone"
               },
               "answer": {
                 "author": {
-                  "login": "mvandervoord"
+                  "login": "octocat"
                 }
               },
-              "closed": true,
-              "closedAt": "2024-04-04T01:59:12Z",
-              "stateReason": "RESOLVED",
+              "closed": false,
+              "closedAt": null,
+              "stateReason": null,
               "category": {
                 "name": "Q&A",
                 "isAnswerable": true
               },
               "repository": {
-                "nameWithOwner": "ThrowTheSwitch/Ceedling"
-              }
-            }
-          },
-          {
-            "createdAt": "2026-08-19T09:00:00Z",
-            "isAnswer": false,
-            "upvoteCount": 0,
-            "url": "https://github.com/octocat/hello-world/discussions/4#discussioncomment-18200001",
-            "databaseId": 18200001,
-            "discussion": {
-              "number": 4,
-              "title": "Roadmap",
-              "createdAt": "2026-08-18T09:00:00Z",
-              "isAnswered": false,
-              "answerChosenAt": null,
-              "answerChosenBy": null,
-              "answer": null,
-              "closed": false,
-              "closedAt": null,
-              "stateReason": null,
-              "category": {
-                "name": "Ideas",
-                "isAnswerable": false
-              },
-              "repository": {
-                "nameWithOwner": "octocat/hello-world"
+                "nameWithOwner": "someone/else"
               }
             }
           },

@@ -230,7 +230,9 @@ account while REST lists them.
 measures what the account owns; this measures what it reads and what it
 contributes to: the stars it gave, and the pull requests it opened in other
 people's repositories. All of it is GraphQL, one point a page: the starred
-list, five issue searches and the two comment walks. A sweep reads every page
+list, five issue searches, the two comment walks and the accepted answers the
+account wrote, which are read apart from the comments so that an answer
+accepted weeks after it was written is not missed. A sweep reads every page
 of the two searches for what is still open, and the other three, which are
 ordered by what moved last, back to a cadence before the sweep before: their
 first page, unless more than a hundred items moved in that time. A backfill

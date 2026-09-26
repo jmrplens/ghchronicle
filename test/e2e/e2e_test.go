@@ -237,6 +237,7 @@ func TestOnceAgainstFakeGitHub(t *testing.T) {
 	assertTheForkWasFiltered(t, points)
 	assertDatingRulesSurvived(t, points)
 	assertStarDaysWereWritten(t, points, time.Now())
+	assertAcceptedAnswersWereRead(t, points)
 	assertAchievementProgressAgreesWithThePage(t, points, out)
 	assertStateRecordsTheSweep(t, readState(t, filepath.Join(dir, "state.json")))
 
@@ -559,6 +560,27 @@ func assertStarDaysWereWritten(t *testing.T, points []point, sweptBy time.Time) 
 	}
 	if total != historyStars {
 		t.Errorf("the star days add up to %v, want the fixture's %d", total, historyStars)
+	}
+}
+
+// assertAcceptedAnswersWereRead: the accepted answers are a walk of their own
+// beside the newest page of discussion comments. The fake's answers hold one
+// comment older than that page, which reaches the sink only through them,
+// and one the page holds too, which reaches it once.
+func assertAcceptedAnswersWereRead(t *testing.T, points []point) {
+	t.Helper()
+	written := map[string]int{}
+	for _, p := range points {
+		if p.Measurement != "gh_discussion_comment" {
+			continue
+		}
+		written[p.Tags["comment"]]++
+		if p.Tags["comment"] == "7654321" && (p.Tags["is_answer"] != "true" || p.Fields["answers"] != float64(1)) {
+			t.Errorf("the answer older than the newest page was written as %v %v", p.Tags, p.Fields)
+		}
+	}
+	if written["7654321"] != 1 || written["18283966"] != 1 {
+		t.Errorf("discussion comments written %v, want the older answer and the one both walks see once each", written)
 	}
 }
 

@@ -232,7 +232,9 @@ account while REST lists them.
 measures what the account owns; this measures what it reads and what it
 contributes to: the stars it gave, and the pull requests it opened in other
 people's repositories. All of it is GraphQL, one point a page: the starred
-list, five issue searches and the two comment walks. A sweep reads every page
+list, five issue searches, the two comment walks and the accepted answers the
+account wrote, which are read apart from the comments so that an answer
+accepted weeks after it was written is not missed. A sweep reads every page
 of the two searches for what is still open, and the other three, which are
 ordered by what moved last, back to a cadence before the sweep before: their
 first page, unless more than a hundred items moved in that time. A backfill
@@ -1163,8 +1165,11 @@ account's one series.
 
 `gh_issue_comment` and `gh_discussion_comment` are read from the newest end
 of their connections, which list oldest first: a sweep's one page is the
-hundred newest comments, and a comment that became the accepted answer after
-it was first written is seen again on the next sweep.
+hundred newest comments. The account's accepted answers are then read on
+their own, the newest five hundred on a sweep and all of them in a backfill,
+so a comment accepted as the answer after it left that hundred is still
+written with `is_answer` true on the next sweep. A comment both reads return
+is written once.
 
 `gh_contribution_year` has one row per past year, dated the thirty-first of
 December, and one for the year in progress, asked for on every run from the

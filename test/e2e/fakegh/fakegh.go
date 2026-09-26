@@ -157,6 +157,9 @@ var graphQL = []struct{ marker, fixture string }{
 	{"fragment deploypage on DeploymentConnection", "graphql_deployments.json"},
 	{"fragment policyfiles on Repository", "graphql_policy_files.json"},
 	{"fragment audience on Repository", "graphql_audience.json"},
+	// The accepted answers are the comments connection filtered, so the
+	// filter is the marker, and it has to come before the connection's.
+	{"onlyAnswers: true", "graphql_discussion_answers.json"},
 	{"repositoryDiscussionComments", "graphql_discussion_comments.json"},
 	// The two queries of the achievements family are named, so the name is
 	// the marker: the counts also search ISSUE and the walk also pages a
