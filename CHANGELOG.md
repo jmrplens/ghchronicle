@@ -11,6 +11,175 @@ verification commands and a link to the commits.
 Versions follow [semantic versioning](https://semver.org/). The dates are the
 day the tag was pushed.
 
+## 2.5.2 - 2026-09-26
+
+Four things the store said that GitHub did not, each found by reading one
+beside the other on the account this collects: a Loki line that called every
+contribution merged, a count of threads commented elsewhere that was mostly
+at home, five searches that stopped at a hundred, and archived repositories
+whose stars froze at the last backfill.
+
+- **A Loki line says what happened to the contribution.** The rendering of
+  `gh_external_contribution` read the user, the repository and the number and
+  nothing else, so every line said `USER merged OWNER/REPO#N`: open issues,
+  open pull requests and pull requests closed without merging included. An
+  item still open is stamped at the start of each day it is seen open, so
+  each of them added a false "merged" line a day, and production held 36 in
+  26 hours, 23 of them for issues. The sentence now follows the `kind` and
+  `state` tags and the `merged` field: `USER's pull request OWNER/REPO#N` is
+  open, was merged or was closed without merging, and `USER's issue
+  OWNER/REPO#N` is open or was closed. Merging and closing are said of the
+  item rather than put in the account's name, because the row does not say
+  who did either, and in someone else's repository it is usually a
+  maintainer. An open item says it is open, not that it was opened, since
+  its line comes back every day it stays open: still one a day, because the
+  sink keeps no state. A combination where the state and the field disagree,
+  which the five searches do not produce, reads
+  `USER's contribution OWNER/REPO#N` and leaves the rest to the logfmt tail.
+  Lines already in Loki keep what they said.
+- **`commented_elsewhere` leaves out the account's own repositories, and
+  drops on upgrade.** It was searched as `commenter:LOGIN -author:LOGIN`,
+  which leaves out the threads the account opened but not the repositories
+  it owns, so every issue it answered and every Dependabot pull request it
+  commented on at home counted as work in other people's. Its two siblings,
+  `pulls_merged_elsewhere` and `issues_elsewhere`, already meant outside the
+  account's repositories, with `-user:LOGIN`, and the Lifetime panel
+  described all three that way. The query is now
+  `commenter:LOGIN -user:LOGIN`, the same rule. The field keeps its name, so
+  in every store the series drops by the difference on the first `totals`
+  sweep after the upgrade: from 125 to 55 on the account it was measured on,
+  where 103 of the 125 were in its own repositories and 54 of those were
+  Dependabot's. Search counts an issue or a pull request once however many
+  comments the account left on it, so the Lifetime tile now reads "Threads
+  commented elsewhere", and the panel's description says what the two
+  outside numbers count.
+- **The outbound searches read past their first hundred.** The five searches
+  behind `gh_external_contribution` asked for one page of a hundred and never
+  read a cursor, on a sweep or on a backfill. An account past a hundred items
+  in a state kept the newest hundred by creation date, an old pull request
+  merged later never got its merged row because it was no longer among them,
+  and `gh_account_total.pulls_merged_elsewhere`, which is GitHub's own count,
+  disagreed with the table beside it. Nothing failed, so nothing said so. The
+  two open states are now read to the end on every sweep, newest created
+  first, since each open item gets a row for every day it stays open. The
+  three closed states are ordered by what moved last, `sort:updated-desc`,
+  because a merge or a close moves an item to the top however old it is: a
+  sweep reads each back to a cadence before the previous outbound sweep, and
+  a backfill until the pages run out or reach `backfill.since`. A page count
+  would not have done for a sweep, since a hundred later updates, a bot
+  locking old threads or a relabel, carry the item that closed onto a page
+  nobody reads. GitHub serves a thousand results of any search and no more,
+  so an account past a thousand in one state keeps the thousand that moved
+  most recently, and the log now says so at warning, once per count, with
+  the kind, the state, the count and what was read. A search that fails part
+  way keeps the pages that answered. It costs a GraphQL point a page, so a
+  sweep still spends eight until an account has more than a hundred open of
+  a kind or more than a hundred move between two sweeps. Open items come
+  back on the first sweep after the upgrade; an item closed before it that
+  2.5.1 never read takes a
+  [backfill](https://jmrp.io/docs/ghchronicle/how/backfill/), since a sweep
+  reads back only to the one before it.
+- **Archived repositories' stars and forks reach the account's totals on
+  every sweep.** With `include_archived` off, the default, a sweep sets
+  archived repositories aside and wrote only their `gh_repo_archived` row.
+  Their `gh_repo` and `gh_repo_total` came from a backfill, once, stamped at
+  the backfill, so their stars and forks froze there and left every panel
+  once that instant left the range, and an install that never ran a backfill
+  never had them. It rested on the premise that nothing about an archived
+  repository moves, and people still star, unstar and fork them: on
+  2026-09-26 jmrplens/FFT2octave's only row, from the backfill of 2026-09-18,
+  said 4 stars where GitHub said 3, and the seventeen archived repositories
+  the default filter sets aside on that account held 80 stars and 24 forks
+  the Overview left out. The query every `totals` sweep already sent for
+  their archive dates now also asks for the fields `gh_repo_total` is made
+  of, and each gets that row beside its `gh_repo_archived`: the tags and
+  fields a collected repository's row has, `archived` true, stamped at the
+  sweep. Their history is still not walked, and a sweep writes them no
+  `gh_repo` and no `gh_repo_policy`. The counts cost the gateway time, so the
+  query carries twenty five repositories rather than fifty: a GraphQL point
+  per twenty five archived repositories per `totals` sweep.
+- **The Overview and "Every repository, ever" count them, in all five
+  stores.** The Overview's stars and forks read a live repository's newest
+  `gh_repo`, as before, and an archived one's newest `gh_repo_total`, one row
+  per full name, so two owners' repositories of the same name are two, and
+  one archived while the collector runs is counted once rather than under
+  both its live row and its archived one. Under All the sums include the
+  archived repositories the picker does not list, so on upgrade the tiles
+  rise by what those hold, 80 stars and 24 forks on the account above; with
+  repositories picked, those alone are counted, and a range shorter than the
+  `totals` cadence, twelve hours by default, can leave the archived rows out.
+  "Every repository, ever" lists them under All with their current counts,
+  and a repository archived inside the range is one row flagged archived in
+  every store, where Elasticsearch, Graphite and Prometheus drew it twice.
+  The picker still lists live repositories only, because it reads `gh_repo`;
+  since the SQL stores' All expands to that list, their filter lets the
+  archived rows through when the variable's text is "All". In
+  Elasticsearch the two sums also gained the repository filter they lacked.
+
+Measured on 2026-09-26. The 36 Loki lines are production's stream over the
+26 hours before the fix, and the five searches on this account answered 33
+merged pull requests, all with `mergedAt`, and 69 items in the other four
+states, none with it. `commented_elsewhere` read 125 through REST and through
+the GraphQL alias the collector sends, and 55 with `-user:`; of the 102
+threads the account had opened elsewhere, 33 count, because the opening post
+is not a comment. On the searches: GitHub's default order is newest created
+first, the same hundred in the same order as `sort:created-desc`, and
+`sort:updated-desc` is honoured; 53 of the first hundred of one account's
+closed issues by `updated-desc` had been opened before the oldest of the
+first hundred by creation and closed after it, one opened in 2014 and closed
+on 1 September 2026; 2,860 merged pull requests answered ten pages of a
+hundred, with no item twice, and then no next page; `closedAt` was not after
+`updatedAt` on any of 1,000 merged pull requests, and was on one of 373
+closed unmerged, by a day, in 2011. The index's copy of `updatedAt` can lag
+the item's own by years, facebook/flow pull requests updated in 2019 sorting
+among 2017, which only makes the bound read a page more. Against the fifty
+most starred archived repositories of google and of microsoft, at cost 1
+every time, the lifetime row of fifty at once answered once in 9.2 seconds
+and was refused twice with the gateway's 502 after 10.7 and 11.1, twenty five
+answered in 5.6 to 6.7, this account's eighteen archived repositories, its
+one archived fork among them, in 3.6 to 4.1, and the same fifty asked for the
+scalars and the watchers alone in about a second.
+
+Every fix carries a test shown to fail against the code before it. The
+containerised suite gained a case against InfluxDB 3: a sweep sets an
+archived repository aside, and the Overview's own SQL counts its stars under
+All and not with the live repositories picked, and "Every repository, ever"
+lists it, archived, with its stars.
+
+Not verified, and worth saying plainly:
+
+- None of it has run in production. The Loki sentences, the step down in
+  `commented_elsewhere` and the archived rows are what the tests and the
+  readings above say they will be; the first sweep after this upgrade is the
+  first reading of them in a store.
+- The walk past a hundred, by the collector against GitHub. This account has
+  33, 15, 11, 24 and 19 items in the five states, so its sweeps still read a
+  page each. The pages were read with `gh` on other accounts, and the walk is
+  held to them by unit tests and by the binary against the fake GitHub.
+- The thousand is reported, not worked around. Splitting a search by
+  `created:` ranges would reach past it and was not done, and the warning has
+  fired against the fake GitHub only.
+- An open state is walked by an offset cursor, so an item that leaves it
+  while a walk of more than one page is under way moves every later item up
+  by one, and one of them can miss that sweep and be read by the next. That
+  is read from the cursor, not seen.
+- That Grafana renders `${repo:text}` as "All" when All is selected, which the
+  SQL stores' filter rests on, is read from `@grafana/scenes` and from
+  `templateSrv` before it, not seen in a browser: the checkers and the
+  containerised suite render the variables themselves. A Grafana that
+  answered anything else would leave the archived rows out under All, as
+  2.5.1 did, and count nothing twice.
+- The Prometheus and Graphite sums were checked by evaluators of their query
+  languages written for the test, over a made-up account with two owners'
+  `.github`, a repository archived while the collector ran and one set aside
+  after a backfill. The containerised suite runs them against the real
+  stores, but only InfluxDB has counted an archived repository's stars
+  there.
+- Twenty five archived repositories to a query was measured on the heaviest
+  of two organisations. A heavier batch meets the gateway's 502, which halves
+  it and retries, so it costs a query and never a repository, but no account
+  has been seen needing it.
+
 ## 2.5.1 - 2026-09-25
 
 What releasing and deploying 2.5.0 turned up, fixed the same day: a publish
