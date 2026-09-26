@@ -747,8 +747,24 @@ contar en GitHub.
 distinguibles. Sin ella, un repositorio con Dependabot apagado es idéntico a uno
 sin nada que arreglar. `enabled` se lee de la primera página completa del
 listado, que responde 403 cuando la función está apagada y, en code scanning,
-404 cuando todavía no se ha analizado nada. `alerts` cuenta lo que leyó la
-pasada, que es una página, o sea cien como mucho, y no el total del repositorio.
+404 cuando todavía no se ha analizado nada.
+
+`open_alerts`, y `open` en `gh_dependabot_alert` y `gh_code_scanning_alert`,
+cuentan todas las alertas del repositorio que siguen abiertas, por antiguas que
+sean. Una pasada lee la página más reciente de cada lista, cien alertas en
+cualquier estado, y cuando esa página vuelve llena la lista se lee otra vez con
+`state=open`, hasta el final, y las cuentas salen de ahí. Una alerta que sigue
+abierta detrás de cien más recientes ya corregidas se cuenta; hasta la 2.5.2 no
+se contaba.
+
+`alerts` no es el mismo número en las dos funciones. En code scanning es el
+total del repositorio: cuando la página vuelve llena es la última página que
+GitHub declara para una página de una sola alerta, que en un repositorio dio
+1.393 donde la página decía 100. La lista de Dependabot pagina por cursor y no
+declara última página, así que ahí `alerts` es lo que leyó la pasada: 100 en una
+pasada quiere decir cien o más, y un backfill que recorre la lista entera
+escribe el total. Las dos medidas de ítem son las alertas que leyó el recorrido
+en ambos casos, y quedan completas tras un backfill.
 
 ## Cuenta
 

@@ -1019,8 +1019,23 @@ them for 1,700 rows, whether or not GitHub had anything new to say.
 Without it, a repository with Dependabot switched off looks exactly like one
 with nothing to fix. `enabled` is read from the first full page of the listing,
 which answers 403 when the feature is off and, for code scanning, 404 when
-nothing has been analysed yet. `alerts` counts what the sweep read, which is one
-page, so at most a hundred, rather than the repository's total.
+nothing has been analysed yet.
+
+`open_alerts`, and `open` on `gh_dependabot_alert` and `gh_code_scanning_alert`,
+count every alert of the repository that is still open, however old. A sweep
+reads the newest page of each list, a hundred alerts in every state, and when
+that page comes back full the list is read again with `state=open`, to its end,
+and the counts are taken from that. An alert still open behind a hundred newer
+ones that were fixed is counted; up to 2.5.2 it was not.
+
+`alerts` is not the same number for both features. For code scanning it is the
+repository's total: when the page comes back full it is the last page GitHub
+declares for a page of one alert, which on one repository read 1,393 where the
+page had said 100. Dependabot's list pages by cursor and declares no last page,
+so there `alerts` is what the sweep read: 100 on a sweep means a hundred or
+more, and a backfill that walks the whole list writes the total. The two item
+measurements are the alerts the walk read either way, and complete after a
+backfill.
 
 ### Account
 

@@ -895,37 +895,43 @@ func reposDependabotPage(t *testing.T, w http.ResponseWriter, n int, cursor stri
 // TestTheDependabotWalkEndsOnEachOfItsFourSignals pins every way the cursor
 // walk stops: a full page with no cursor, a short page with one, a page past
 // the backfill bound, and the walk's own cap. Each case is a full walk made
-// to look like it should go on, so only the one signal can end it.
+// to look like it should go on, so only the one signal can end it. The first
+// two are the end of the list; the last two leave alerts behind, which is
+// what sends the open counts to the open alerts alone.
 func TestTheDependabotWalkEndsOnEachOfItsFourSignals(t *testing.T) {
 	t.Parallel()
+	const path = "/repos/octocat/hello-world/dependabot/alerts"
 	old := testNow.AddDate(0, 0, -30)
 	for _, tc := range []struct {
-		name  string
-		walk  Walk
-		serve func(w http.ResponseWriter)
-		calls int
+		name        string
+		walk        Walk
+		serve       func(w http.ResponseWriter)
+		calls, open int
 	}{
 		{"a full page without a cursor", Walk{Pages: 3}, func(w http.ResponseWriter) {
 			reposDependabotPage(t, w, 100, "", old)
-		}, 1},
+		}, 1, 0},
 		{"a short page with a cursor", Walk{Pages: 3}, func(w http.ResponseWriter) {
 			reposDependabotPage(t, w, 5, "cursor-2", old)
-		}, 1},
+		}, 1, 0},
 		{"a full page past the bound", Walk{Pages: 3, Since: testNow.AddDate(0, 0, -7)}, func(w http.ResponseWriter) {
 			reposDependabotPage(t, w, 100, "cursor-2", old)
-		}, 1},
+		}, 1, 1},
 		{"the cap", Walk{Pages: 2}, func(w http.ResponseWriter) {
 			reposDependabotPage(t, w, 100, "cursor-2", old)
-		}, 2},
+		}, 2, 1},
 	} {
 		f := newFixtureServer(t)
-		f.handle("/repos/octocat/hello-world/dependabot/alerts", func(w http.ResponseWriter, _ *http.Request) { tc.serve(w) })
+		f.handle(path, listOnly(func(w http.ResponseWriter, _ *http.Request) { tc.serve(w) }))
 		points, err := Security{Walk: tc.walk}.Collect(ctx(t), f.Client, testRepo, testNow)
 		if err != nil {
 			t.Fatalf("%s: %v", tc.name, err)
 		}
-		if n := len(f.calls("/repos/octocat/hello-world/dependabot/alerts")); n != tc.calls {
+		if n := len(listCalls(f, path)); n != tc.calls {
 			t.Errorf("%s: made %d Dependabot calls, want %d", tc.name, n, tc.calls)
+		}
+		if n := len(openCalls(f, path)); n != tc.open {
+			t.Errorf("%s: asked for the open alerts %d times, want %d", tc.name, n, tc.open)
 		}
 		dep := find(t, points, "gh_security_feature", map[string]string{"feature": "dependabot"})
 		if dep.Fields["enabled"] != true {
@@ -966,6 +972,13 @@ func TestAlertWalksKeepWhatWasReadAtThePaginationCeiling(t *testing.T) {
 			t.Errorf("%s = %v, want enabled with the 100 alerts of the page before the ceiling", feature, p.Fields)
 		}
 	}
+	// The end of the data is the end of the list, so there is nothing past
+	// it for the open alerts to be read from.
+	for _, path := range []string{"/repos/octocat/hello-world/dependabot/alerts", "/repos/octocat/hello-world/code-scanning/alerts"} {
+		if n := len(listCalls(f, path)); n != len(f.calls(path)) {
+			t.Errorf("%s: %d of %d requests were not for the list itself", path, len(f.calls(path))-n, len(f.calls(path)))
+		}
+	}
 }
 
 // TestTheCodeScanningWalkReadsPastAFullPageUpToItsCap pins that a full page of
@@ -977,7 +990,7 @@ func TestTheCodeScanningWalkReadsPastAFullPageUpToItsCap(t *testing.T) {
 	serve := func(t *testing.T, sizes map[string]int) *fixtureServer {
 		t.Helper()
 		f := newFixtureServer(t)
-		f.handle(path, func(w http.ResponseWriter, r *http.Request) {
+		f.handle(path, listOnly(func(w http.ResponseWriter, r *http.Request) {
 			page := r.URL.Query().Get("page")
 			n, ok := sizes[page]
 			if !ok {
@@ -987,7 +1000,7 @@ func TestTheCodeScanningWalkReadsPastAFullPageUpToItsCap(t *testing.T) {
 			_, _ = w.Write(repeat(t, "code_scanning_alerts.json", "", n, func(i int, row map[string]any) {
 				row["number"] = number*1000 + i
 			}))
-		})
+		}))
 		return f
 	}
 
@@ -1007,8 +1020,12 @@ func TestTheCodeScanningWalkReadsPastAFullPageUpToItsCap(t *testing.T) {
 	if _, cappedErr := (Security{Walk: Walk{Pages: 2}}).Collect(ctx(t), capped.Client, testRepo, testNow); cappedErr != nil {
 		t.Fatal(cappedErr)
 	}
-	if got := reposPagesAsked(capped, path); !slices.Equal(got, []string{"1", "2"}) {
-		t.Errorf("asked for pages %v, want the two the cap allows", got)
+	var asked []string
+	for _, r := range listCalls(capped, path) {
+		asked = append(asked, r.Query["page"])
+	}
+	if !slices.Equal(asked, []string{"1", "2"}) {
+		t.Errorf("asked for pages %v, want the two the cap allows", asked)
 	}
 
 	broken := newFixtureServer(t)
