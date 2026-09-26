@@ -233,6 +233,25 @@ los cien de cada uno que lee una pasada.
   que ya paga dice cuáles, y una consulta por pasada de `totals` dice cuándo.
 - Todas las pull requests e issues, en páginas de cincuenta, donde una pasada
   lee lo que cambió desde la pasada anterior y una página entera al día.
+- Todas las pull requests e issues que la cuenta abrió en repositorios ajenos
+  y que ya se fusionaron o se cerraron, en páginas de cien ordenadas por
+  cuándo se movió cada una por última vez, donde una pasada lee la primera
+  página de cada uno de los tres estados cerrados. Esa primera página le basta
+  a una pasada porque fusionar o cerrar sube el elemento arriba del todo, por
+  mucho tiempo que haga que se abrió. Las que siguen abiertas no se acotan ni
+  por página ni por fecha: cada pasada las lee todas, porque cada una recibe
+  una fila por cada día que sigue abierta. En la 2.5.1 y anteriores cada una de
+  las cinco búsquedas leía sus cien más recientes y paraba, igual en una
+  pasada que en un relleno.
+
+  GitHub sirve mil resultados de cualquier búsqueda y ni uno más, así que una
+  cuenta que pase de mil en uno de esos estados conserva los mil que se
+  movieron más recientemente. Eso se dice en el log, una vez por recuento, en
+  lugar de dejar que se note en dos paneles que no cuadran:
+
+  ```text
+  level=WARN msg="outbound search read fewer items than it counts, GitHub serves a thousand at most" kind=pull_request state=merged count=2860 read=1000
+  ```
 - Todas las páginas de artefactos, de actividad del repositorio y de análisis
   de code scanning, donde una pasada lee cinco, dos y una.
 - Cada release, despliegue y discusión, y cada alerta de Dependabot y de code

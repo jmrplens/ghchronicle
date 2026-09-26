@@ -231,8 +231,11 @@ account while REST lists them.
 **`outbound`** is the other half of everything else here. Every other family
 measures what the account owns; this measures what it reads and what it
 contributes to: the stars it gave, and the pull requests it opened in other
-people's repositories. All of it is GraphQL, one point a query: the starred
-list, five issue searches and the two comment walks.
+people's repositories. All of it is GraphQL, one point a page: the starred
+list, five issue searches and the two comment walks. A sweep reads every page
+of the two searches for what is still open, and the first page of the other
+three, which are ordered by what moved last; a backfill reads those three to
+the end as well.
 
 **`totals`** asks GitHub for the numbers that are true since the beginning:
 pull requests merged ever, commits ever, issues opened ever, and the whole life
@@ -752,6 +755,21 @@ spells it, with the `[bot]` suffix, on every measurement.
 `gh_discussion` counts comments and replies apart: comments answer the
 discussion, replies answer those, and GitHub's own number on the page is the
 two added together.
+
+`gh_external_contribution` is the work the account did in repositories it does
+not own, from five searches, one per `kind` and `state`: pull requests
+`merged`, `open` and `closed` unmerged, and issues `open` and `closed`. An item
+still open is rewritten at the start of every day it stays open, so a sweep
+reads both open states whole. A closed item is written once, stamped when it
+closed, so the three closed states are read by when each item last moved: a
+sweep reads the first hundred of each, which holds whatever merged or closed
+since the sweep before however long ago it was opened, and a backfill reads
+on until the pages run out or reach `backfill.since`. GitHub serves a thousand
+results of any search and no more, so an account past a thousand in one state
+has the thousand that moved most recently, and the log says so at warning.
+`gh_account_total.pulls_merged_elsewhere` and `issues_elsewhere` are GitHub's
+own counts and are right whatever the cap. An item that was open and later
+closed keeps its `open` rows beside the closed one, since `state` is a tag.
 
 ### Continuous integration
 

@@ -1,6 +1,8 @@
 package collect
 
 import (
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"slices"
 	"strings"
@@ -323,10 +325,21 @@ func checkSearchesAreScoped(t *testing.T, searches []string) {
 		}
 	}
 	// The state a search is for is a qualifier of the query, which is the
-	// only way search will separate merged from closed.
-	if !slices.Contains(searches, "is:pr is:merged author:octocat -user:octocat") ||
-		!slices.Contains(searches, "is:pr is:closed is:unmerged author:octocat -user:octocat") {
-		t.Errorf("searches = %q", searches)
+	// only way search will separate merged from closed. The order is named
+	// in every one: a closed state by when it last moved, so what closed
+	// since the last sweep is on its first page however old it is, and an
+	// open one by when it was opened, which is the order a walk to the end
+	// cannot lose an item to.
+	for _, want := range []string{
+		"is:pr is:merged author:octocat -user:octocat sort:updated-desc",
+		"is:pr is:open author:octocat -user:octocat sort:created-desc",
+		"is:pr is:closed is:unmerged author:octocat -user:octocat sort:updated-desc",
+		"is:issue is:open author:octocat -user:octocat sort:created-desc",
+		"is:issue is:closed author:octocat -user:octocat sort:updated-desc",
+	} {
+		if !slices.Contains(searches, want) {
+			t.Errorf("no search %q among %q", want, searches)
+		}
 	}
 }
 
@@ -525,5 +538,297 @@ func TestOutboundCommentsAreReadFromTheNewestEnd(t *testing.T) {
 	}
 	if len(discussion) != 1 {
 		t.Errorf("a backfill since September asked %d discussion pages, want to stop at the page whose oldest comment is 2024", len(discussion))
+	}
+}
+
+// outboundStates is every outbound search by its qualifiers, with the state
+// its rows are tagged with and whether it is read whole on every sweep.
+var outboundStates = []struct {
+	filter, kind, state string
+	open                bool
+}{
+	{"is:pr is:merged", "pull_request", "merged", false},
+	{"is:pr is:open", "pull_request", "open", true},
+	{"is:pr is:closed is:unmerged", "pull_request", "closed", false},
+	{"is:issue is:open", "issue", "open", true},
+	{"is:issue is:closed", "issue", "closed", false},
+}
+
+// outboundPage is one page of an outbound search as GraphQL answers it.
+func outboundPage(t *testing.T, count int, next bool, cursor string, nodes ...map[string]any) []byte {
+	t.Helper()
+	b, err := json.Marshal(map[string]any{"data": map[string]any{"search": map[string]any{
+		"issueCount": count,
+		"pageInfo":   map[string]any{"hasNextPage": next, "endCursor": cursor},
+		"nodes":      nodes,
+	}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return b
+}
+
+// searchNode is one item of a search page, last updated at updated, and
+// closed then unless the search is for an open state.
+func searchNode(number int, updated string, open bool) map[string]any {
+	n := map[string]any{
+		"number": number, "title": fmt.Sprintf("Item %d", number),
+		"url":       fmt.Sprintf("https://github.com/someone/else/pull/%d", number),
+		"createdAt": "2026-01-05T10:00:00Z", "updatedAt": updated, "closedAt": nil,
+		"comments":   map[string]any{"totalCount": 0},
+		"repository": map[string]any{"nameWithOwner": "someone/else"},
+	}
+	if !open {
+		n["closedAt"] = updated
+	}
+	return n
+}
+
+// pageOneCursor is the endCursor of the first page twoPageSearches serves,
+// spelled the way GitHub spells it: an offset, "cursor:2".
+const pageOneCursor = "Y3Vyc29yOjI="
+
+// twoPageSearches is a fake whose every outbound search has two pages: items
+// 1 and 2, the second last updated at pageOneEnds, then item 3 of June. It
+// records the variables each search was asked with, by its qualifiers.
+func twoPageSearches(t *testing.T, pageOneEnds string) (*fixtureServer, map[string][]map[string]any) {
+	t.Helper()
+	asked := map[string][]map[string]any{}
+	f := newFixtureServer(t)
+	f.graphQL(func(w http.ResponseWriter, _ *http.Request, query string, vars map[string]any) {
+		switch {
+		case strings.Contains(query, "search(type: ISSUE"):
+			q, _ := vars["query"].(string)
+			filter, _, _ := strings.Cut(q, " author:")
+			asked[filter] = append(asked[filter], vars)
+			open := strings.Contains(filter, "is:open")
+			if vars["after"] == nil {
+				_, _ = w.Write(outboundPage(t, 3, true, pageOneCursor,
+					searchNode(1, "2026-09-05T10:00:00Z", open), searchNode(2, pageOneEnds, open)))
+				return
+			}
+			_, _ = w.Write(outboundPage(t, 3, false, "Y3Vyc29yOjM=", searchNode(3, "2026-06-01T10:00:00Z", open)))
+		case strings.Contains(query, "starredRepositories(first:"):
+			f.write(w, "graphql_starred.json")
+		case strings.Contains(query, "repositoryDiscussionComments"):
+			f.write(w, "viewer_discussion_comments.json")
+		default:
+			f.write(w, "viewer_issue_comments.json")
+		}
+	})
+	return f, asked
+}
+
+// pagesAsked checks how many pages of each search were asked for, and that
+// every page after the first carried the cursor the one before it ended on.
+func pagesAsked(t *testing.T, asked map[string][]map[string]any, want func(open bool) int) {
+	t.Helper()
+	for _, s := range outboundStates {
+		seen := asked[s.filter]
+		if len(seen) != want(s.open) {
+			t.Errorf("%q was asked for %d pages, want %d", s.filter, len(seen), want(s.open))
+			continue
+		}
+		if seen[0]["after"] != nil {
+			t.Errorf("%q started from %v, want the first page", s.filter, seen[0]["after"])
+		}
+		if len(seen) > 1 && seen[1]["after"] != pageOneCursor {
+			t.Errorf("%q asked its second page after %v, want the first page's cursor %s", s.filter, seen[1]["after"], pageOneCursor)
+		}
+	}
+}
+
+// A search is walked by its cursor, which is what issue #76 was about: every
+// search used to ask for one page of a hundred and stop, so an account past a
+// hundred items of a state lost the rest, silently. A backfill with no bound
+// reads every state to the end, and the rows of every page carry the state
+// of the search they came from.
+func TestOutboundSearchFollowsTheCursor(t *testing.T) {
+	t.Parallel()
+	f, asked := twoPageSearches(t, "2026-08-01T10:00:00Z")
+	var warned []string
+	o := Outbound{Login: "octocat", Walk: Unbounded, Warn: func(msg string, _ ...any) { warned = append(warned, msg) }}
+	points, err := o.Collect(ctx(t), f.Client, testNow)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pagesAsked(t, asked, func(bool) int { return 2 })
+	for _, s := range outboundStates {
+		for _, number := range []string{"1", "2", "3"} {
+			find(t, points, "gh_external_contribution", map[string]string{"kind": s.kind, "state": s.state, "number": number})
+		}
+	}
+	if got := len(only(t, points, "gh_external_contribution")); got != 15 {
+		t.Errorf("got %d contributions, want 3 items from each of 5 searches", got)
+	}
+	// Three counted and three read: a walk that reached its count says
+	// nothing.
+	if len(warned) != 0 {
+		t.Errorf("a walk that read everything it counts warned %q", warned)
+	}
+}
+
+// A sweep reads the first page of a closed state, which holds whatever closed
+// since the last one because it is ordered by when the item last moved, and
+// every page of an open state, whose rows are rewritten each day for every
+// item still open.
+func TestASweepReadsOnePageOfAClosedStateAndEveryPageOfAnOpenOne(t *testing.T) {
+	t.Parallel()
+	f, asked := twoPageSearches(t, "2026-08-01T10:00:00Z")
+	points, err := Outbound{Login: "octocat"}.Collect(ctx(t), f.Client, testNow)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pagesAsked(t, asked, func(open bool) int {
+		if open {
+			return 2
+		}
+		return 1
+	})
+	for _, s := range outboundStates {
+		want := 2
+		if s.open {
+			want = 3
+		}
+		got := 0
+		for _, p := range only(t, points, "gh_external_contribution") {
+			if p.Tags["kind"] == s.kind && p.Tags["state"] == s.state {
+				got++
+			}
+		}
+		if got != want {
+			t.Errorf("%q wrote %d rows on a sweep, want %d", s.filter, got, want)
+		}
+	}
+}
+
+// A backfill bounded by backfill.since stops a closed state at the first page
+// whose last item moved before the bound: closing an item moves it, so
+// nothing further down the list closed inside the bound. An open state is not
+// bounded by a date at all, since its row is today's.
+func TestABackfillStopsAClosedSearchAtThePagePastSince(t *testing.T) {
+	t.Parallel()
+	since := time.Date(2026, 8, 15, 0, 0, 0, 0, time.UTC)
+
+	// Page one ends on the first of August, before the bound.
+	f, asked := twoPageSearches(t, "2026-08-01T10:00:00Z")
+	if _, err := (Outbound{Login: "octocat", Walk: Walk{Pages: -1, Since: since}}).Collect(ctx(t), f.Client, testNow); err != nil {
+		t.Fatal(err)
+	}
+	pagesAsked(t, asked, func(open bool) int {
+		if open {
+			return 2
+		}
+		return 1
+	})
+
+	// Page one ends on the twentieth, inside it: the walk goes on.
+	f, asked = twoPageSearches(t, "2026-08-20T10:00:00Z")
+	if _, err := (Outbound{Login: "octocat", Walk: Walk{Pages: -1, Since: since}}).Collect(ctx(t), f.Client, testNow); err != nil {
+		t.Fatal(err)
+	}
+	pagesAsked(t, asked, func(bool) int { return 2 })
+}
+
+// GitHub serves a thousand results of any search and then says there is no
+// next page, while the count still says how many there are: measured on
+// 2026-09-26, 2,860 merged pull requests answered ten pages and stopped. A
+// walk that runs out of pages before it runs out of count says so through
+// Warn, since nothing fails and the rows past the cap are simply missing. A
+// sweep that stops a closed state at its own page limit says nothing about
+// it: there was a next page, and the sweep chose not to read it.
+func TestAnOutboundSearchPastTheCapIsSaid(t *testing.T) {
+	t.Parallel()
+	type warning struct {
+		msg  string
+		args []any
+	}
+	for _, tc := range []struct {
+		name string
+		walk Walk
+		next bool
+		want []string
+	}{
+		{"out of pages on a backfill", Unbounded, false, []string{"merged", "open", "closed", "open", "closed"}},
+		{"out of pages on a sweep", Walk{}, false, []string{"merged", "open", "closed", "open", "closed"}},
+		// The open states still run out, being read to the end whatever
+		// the walk; the closed ones stop at the sweep's one page.
+		{"stopped at the sweep's page", Walk{}, true, []string{"open", "open"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			f := newFixtureServer(t)
+			f.graphQL(func(w http.ResponseWriter, _ *http.Request, query string, vars map[string]any) {
+				switch {
+				case strings.Contains(query, "search(type: ISSUE"):
+					q, _ := vars["query"].(string)
+					open := strings.Contains(q, "is:open")
+					// Only a closed state is told there is more, so what
+					// stops it is the walk and not the answer.
+					next := tc.next && !open
+					_, _ = w.Write(outboundPage(t, 1500, next, pageOneCursor,
+						searchNode(1, "2026-09-05T10:00:00Z", open), searchNode(2, "2026-09-01T10:00:00Z", open)))
+				case strings.Contains(query, "starredRepositories(first:"):
+					f.write(w, "graphql_starred.json")
+				case strings.Contains(query, "repositoryDiscussionComments"):
+					f.write(w, "viewer_discussion_comments.json")
+				default:
+					f.write(w, "viewer_issue_comments.json")
+				}
+			})
+			var warned []warning
+			o := Outbound{Login: "octocat", Walk: tc.walk, Warn: func(msg string, args ...any) {
+				warned = append(warned, warning{msg, args})
+			}}
+			if _, err := o.Collect(ctx(t), f.Client, testNow); err != nil {
+				t.Fatal(err)
+			}
+			var states []string
+			for _, w := range warned {
+				if !strings.Contains(w.msg, "a thousand at most") {
+					t.Errorf("warned %q, want it to name GitHub's cap", w.msg)
+				}
+				if len(w.args) != 8 || w.args[0] != "kind" || w.args[2] != "state" ||
+					w.args[4] != "count" || w.args[5] != 1500 || w.args[6] != "read" || w.args[7] != 2 {
+					t.Errorf("warned with %v, want the kind, the state, the count and what was read", w.args)
+					continue
+				}
+				states = append(states, w.args[3].(string))
+			}
+			if !slices.Equal(states, tc.want) {
+				t.Errorf("warned for %q, want %q", states, tc.want)
+			}
+		})
+	}
+}
+
+// A search that fails part way keeps the pages that answered: they are rows
+// the store does not have, and the failure is still the family's.
+func TestAnOutboundSearchThatFailsPartWayKeepsItsPages(t *testing.T) {
+	t.Parallel()
+	f := newFixtureServer(t)
+	f.graphQL(func(w http.ResponseWriter, _ *http.Request, query string, vars map[string]any) {
+		switch {
+		case strings.Contains(query, "search(type: ISSUE") && vars["after"] != nil:
+			_, _ = w.Write([]byte(accountInternalError))
+		case strings.Contains(query, "search(type: ISSUE"):
+			_, _ = w.Write(outboundPage(t, 3, true, pageOneCursor,
+				searchNode(1, "2026-09-05T10:00:00Z", false), searchNode(2, "2026-09-01T10:00:00Z", false)))
+		default:
+			f.write(w, "graphql_starred.json")
+		}
+	})
+	points, err := Outbound{Login: "octocat", Walk: Unbounded}.Collect(ctx(t), f.Client, testNow)
+	if err == nil {
+		t.Fatal("a search that failed on its second page was not reported")
+	}
+	merged := 0
+	for _, p := range byMeasurement(points)["gh_external_contribution"] {
+		if p.Tags["state"] == "merged" {
+			merged++
+		}
+	}
+	if merged != 2 {
+		t.Errorf("kept %d rows of the merged search's first page, want both", merged)
 	}
 }

@@ -556,6 +556,24 @@ that a sweep reads.
   and one query per `totals` sweep says when.
 - Every pull request and issue, in pages of fifty, where a sweep reads what
   changed since the sweep before and one whole page a day.
+- Every pull request and issue the account opened in other people's
+  repositories that has since been merged or closed, in pages of a hundred
+  ordered by when each one last moved, where a sweep reads the first page of
+  each of the three closed states. That first page is enough for a sweep
+  because a merge or a close moves the item to the top, however long ago it
+  was opened. The ones still open are bounded by neither a page nor a date:
+  every sweep reads them all, since each one gets a row for every day it stays
+  open. In 2.5.1 and earlier each of the five searches read its newest
+  hundred and stopped, on a sweep and on a backfill alike.
+
+  GitHub serves a thousand results of any search and no more, so an account
+  past a thousand in one of those states keeps the thousand that moved most
+  recently. That is said in the log, once per count, rather than left to show
+  as two panels that disagree:
+
+  ```text
+  level=WARN msg="outbound search read fewer items than it counts, GitHub serves a thousand at most" kind=pull_request state=merged count=2860 read=1000
+  ```
 - Every page of artifacts, of repository activity and of code scanning
   analyses, where a sweep reads five, two and one.
 - Every release, deployment and discussion, and every Dependabot and code

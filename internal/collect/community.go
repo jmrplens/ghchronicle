@@ -224,6 +224,10 @@ func (Planning) Collect(ctx context.Context, c *ghapi.Client, repo Repo, now tim
 type Outbound struct {
 	Login string
 	Walk  Walk
+	// Warn is where a search that stopped short of its own count is said:
+	// GitHub serves a thousand results of any search and no more, and the
+	// rows past that are missing without anything failing. Nil means silence.
+	Warn func(msg string, args ...any)
 }
 
 // starredQuery is the stars the account gave, newest first, which is the
@@ -241,23 +245,74 @@ query($first: Int!, $after: String) {
   }
 }`
 
-// outboundSearchQuery is one issue search, a page of a hundred, with the
-// fields a contribution row is made of and nothing else.
+// outboundSearchQuery is one page of an issue search, a hundred items with the
+// fields a contribution row is made of, and what it takes to read the next:
+// the cursor, and the count the walk is held against when the pages run out.
 const outboundSearchQuery = `
-query($query: String!) {
-  search(type: ISSUE, first: 100, query: $query) {
+query($query: String!, $after: String) {
+  search(type: ISSUE, first: 100, after: $after, query: $query) {
+    issueCount
+    pageInfo { hasNextPage endCursor }
     nodes {
       ... on Issue {
-        number title url createdAt closedAt
+        number title url createdAt updatedAt closedAt
         comments { totalCount } repository { nameWithOwner }
       }
       ... on PullRequest {
-        number title url createdAt closedAt mergedAt
+        number title url createdAt updatedAt closedAt mergedAt
         comments { totalCount } repository { nameWithOwner }
       }
     }
   }
 }`
+
+// outboundSearch is one of the searches Collect runs: the state it stands for
+// and the qualifiers that select it.
+type outboundSearch struct {
+	kind, state, filter string
+	// open is a state an item is still in today. Its row is stamped at the
+	// start of each day it stays there, so every one of them is read on
+	// every sweep, however old it is.
+	open bool
+}
+
+// outboundSearches are the searches, one per state rather than one for
+// everything, because the state is the interesting part and search will not
+// return it any other way: a pull request that was merged, one that is still
+// open, one that was closed unmerged and an issue opened elsewhere are
+// different facts about the same person.
+var outboundSearches = []outboundSearch{
+	{kind: "pull_request", state: "merged", filter: "is:pr is:merged"},
+	{kind: "pull_request", state: "open", filter: "is:pr is:open", open: true},
+	{kind: "pull_request", state: "closed", filter: "is:pr is:closed is:unmerged"},
+	{kind: "issue", state: "open", filter: "is:issue is:open", open: true},
+	{kind: "issue", state: "closed", filter: "is:issue is:closed"},
+}
+
+// outboundSearchPage is one answer of outboundSearchQuery.
+type outboundSearchPage struct {
+	Search struct {
+		IssueCount int            `json:"issueCount"`
+		PageInfo   pageInfo       `json:"pageInfo"`
+		Nodes      []outboundItem `json:"nodes"`
+	} `json:"search"`
+}
+
+// outboundItem is a pull request or an issue the account opened in somebody
+// else's repository.
+type outboundItem struct {
+	Number     int        `json:"number"`
+	Title      string     `json:"title"`
+	URL        string     `json:"url"`
+	CreatedAt  time.Time  `json:"createdAt"`
+	UpdatedAt  time.Time  `json:"updatedAt"`
+	ClosedAt   *time.Time `json:"closedAt"`
+	MergedAt   *time.Time `json:"mergedAt"`
+	Comments   count      `json:"comments"`
+	Repository struct {
+		NameWithOwner string `json:"nameWithOwner"`
+	} `json:"repository"`
+}
 
 func (o Outbound) Collect(ctx context.Context, c *ghapi.Client, now time.Time) ([]sink.Point, error) {
 	// Stars given, each dated when it was given.
@@ -269,26 +324,17 @@ func (o Outbound) Collect(ctx context.Context, c *ghapi.Client, now time.Time) (
 	// Work in repositories the account does not own. Nothing else sees it: it
 	// is not in this account's repositories, and the event feed forgets it in
 	// three days.
-	//
-	// Four searches rather than one, because the state is the interesting part
-	// and search will not return it any other way: a pull request that was
-	// merged, one that is still open, one that was closed unmerged and an
-	// issue opened elsewhere are four different facts about the same person.
-	for _, q := range []struct{ kind, state, query string }{
-		{"pull_request", "merged", "is:pr is:merged"},
-		{"pull_request", "open", "is:pr is:open"},
-		{"pull_request", "closed", "is:pr is:closed is:unmerged"},
-		{"issue", "open", "is:issue is:open"},
-		{"issue", "closed", "is:issue is:closed"},
-	} {
-		pts, err := o.search(ctx, c, q.kind, q.state, q.query, now)
+	for _, s := range outboundSearches {
+		// Kept whether or not the walk failed part way: the pages that
+		// answered are rows the store does not have yet.
+		pts, err := o.search(ctx, c, s, now)
+		points = append(points, pts...)
 		if err != nil {
 			if isSkippableGraphQL(err) {
 				continue
 			}
 			return points, err
 		}
-		points = append(points, pts...)
 	}
 
 	// Comments and discussion answers, anywhere. Both come from `viewer`, one
@@ -759,60 +805,106 @@ func (o Outbound) starred(ctx context.Context, c *ghapi.Client) ([]sink.Point, e
 	return points, nil
 }
 
-// search runs one issue search scoped to other people's repositories.
+// search walks one issue search scoped to other people's repositories.
 //
-// One GraphQL point a search, out of the same bucket as the rest of the
-// sweep. The REST search API this came from has a budget of its own, thirty a
+// One GraphQL point a page, out of the same bucket as the rest of the sweep.
+// The REST search API this came from has a budget of its own, thirty a
 // minute, but a page of a hundred items there is a hundred bodies, users and
 // label lists for the seven fields a row is made of, and never a 304: a
 // contribution search was 100 KB uncompressed against 8 KB here.
-func (o Outbound) search(ctx context.Context, c *ghapi.Client, kind, state, filter string, now time.Time) ([]sink.Point, error) {
-	var res struct {
-		Search struct {
-			Nodes []struct {
-				Number     int        `json:"number"`
-				Title      string     `json:"title"`
-				URL        string     `json:"url"`
-				CreatedAt  time.Time  `json:"createdAt"`
-				ClosedAt   *time.Time `json:"closedAt"`
-				MergedAt   *time.Time `json:"mergedAt"`
-				Comments   count      `json:"comments"`
-				Repository struct {
-					NameWithOwner string `json:"nameWithOwner"`
-				} `json:"repository"`
-			} `json:"nodes"`
-		} `json:"search"`
+//
+// The order is asked for rather than left to GitHub, whose default is newest
+// created first (measured on 2026-09-26: the same hundred, in the same order,
+// as sort:created-desc).
+//
+// A closed state is read by when it last moved. Its row is written once, when
+// the item closes, and what a sweep has to catch is the item that closed since
+// the last one, which newest created first leaves behind as soon as the item
+// is older than a page: measured on 2026-09-26, 53 of the first hundred of one
+// account's closed issues by updated-desc had been opened before the oldest of
+// the first hundred by creation and closed after it, one of them opened in
+// 2014 and closed on 1 September 2026. So a sweep reads the Walk's pages, one
+// by default, and a backfill reads until the pages run out or a page ends
+// past Since. Closing an item moves its updatedAt, so nothing after that page
+// closed inside the bound: measured that day, closedAt was not after
+// updatedAt on any of 1,000 merged pull requests, and on one of 373 closed
+// unmerged, by a day in 2011. The order is the search index's copy of
+// updatedAt and can lag the item's own by years (facebook/flow pull requests
+// updated in 2019 sort among 2017), but a copy is never ahead of what it
+// copies, so the bound errs towards a page more and never stops short.
+//
+// An open state is read whole on every sweep, by creation date. The cursor is
+// an offset ("cursor:100"), so an order an item moves in whenever somebody
+// comments can carry it from an unread page onto a read one and skip it for
+// the day; newest created first moves an item only when one is opened or
+// leaves the state.
+func (o Outbound) search(ctx context.Context, c *ghapi.Client, s outboundSearch, now time.Time) ([]sink.Point, error) {
+	order, most := "sort:updated-desc", o.Walk.limit(1)
+	if s.open {
+		order, most = "sort:created-desc", Unbounded.limit(0)
 	}
-	vars := map[string]any{"query": fmt.Sprintf("%s author:%s -user:%s", filter, o.Login, o.Login)}
-	if err := c.GraphQL(ctx, outboundSearchQuery, vars, &res); err != nil {
-		return nil, err
-	}
+	vars := map[string]any{"query": fmt.Sprintf("%s author:%s -user:%s %s", s.filter, o.Login, o.Login, order)}
 	var points []sink.Point
-	for i := range res.Search.Nodes {
-		it := &res.Search.Nodes[i]
-		// Dated when it closed, or at the start of the day while it is still
-		// open, so an open item rewrites one row a day instead of one an hour.
-		stamp := now.UTC().Truncate(24 * time.Hour)
-		if it.ClosedAt != nil {
-			stamp = *it.ClosedAt
+	read := 0
+	for page := 1; page <= most; page++ {
+		var res outboundSearchPage
+		if err := c.GraphQL(ctx, outboundSearchQuery, vars, &res); err != nil {
+			return points, err
 		}
-		fields := withURL(map[string]any{
-			"contributions": 1, "title": it.Title, "comments": it.Comments.TotalCount,
-			"seconds_open": int(stamp.Sub(it.CreatedAt).Seconds()),
-		}, it.URL)
-		if it.MergedAt != nil {
-			fields["merged"] = 1
-			fields["seconds_to_merge"] = int(it.MergedAt.Sub(it.CreatedAt).Seconds())
+		found := &res.Search
+		for i := range found.Nodes {
+			points = append(points, o.contribution(&found.Nodes[i], s, now))
 		}
-		points = append(points, sink.Point{
-			Measurement: "gh_external_contribution",
-			Tags: merge(fullNameTags(it.Repository.NameWithOwner), map[string]string{
-				"user":   o.Login,
-				"number": strconv.Itoa(it.Number), "kind": kind, "state": state,
-			}),
-			Fields: fields,
-			Time:   stamp,
-		})
+		read += len(found.Nodes)
+		if !found.PageInfo.HasNextPage {
+			// The pages ran out before the count did, which is how GitHub's
+			// cap looks from here: measured on 2026-09-26, 2,860 merged pull
+			// requests answered ten pages of a hundred and then no next page.
+			// Nothing fails, so this line is the only place it shows.
+			if found.IssueCount > read {
+				o.warn("outbound search read fewer items than it counts, GitHub serves a thousand at most",
+					"kind", s.kind, "state", s.state, "count", found.IssueCount, "read", read)
+			}
+			break
+		}
+		if len(found.Nodes) == 0 || (!s.open && o.Walk.past(found.Nodes[len(found.Nodes)-1].UpdatedAt)) {
+			break
+		}
+		vars["after"] = found.PageInfo.EndCursor
 	}
 	return points, nil
+}
+
+// contribution is the row of one item of a search.
+func (o Outbound) contribution(it *outboundItem, s outboundSearch, now time.Time) sink.Point {
+	// Dated when it closed, or at the start of the day while it is still
+	// open, so an open item rewrites one row a day instead of one an hour.
+	stamp := now.UTC().Truncate(24 * time.Hour)
+	if it.ClosedAt != nil {
+		stamp = *it.ClosedAt
+	}
+	fields := withURL(map[string]any{
+		"contributions": 1, "title": it.Title, "comments": it.Comments.TotalCount,
+		"seconds_open": int(stamp.Sub(it.CreatedAt).Seconds()),
+	}, it.URL)
+	if it.MergedAt != nil {
+		fields["merged"] = 1
+		fields["seconds_to_merge"] = int(it.MergedAt.Sub(it.CreatedAt).Seconds())
+	}
+	return sink.Point{
+		Measurement: "gh_external_contribution",
+		Tags: merge(fullNameTags(it.Repository.NameWithOwner), map[string]string{
+			"user":   o.Login,
+			"number": strconv.Itoa(it.Number), "kind": s.kind, "state": s.state,
+		}),
+		Fields: fields,
+		Time:   stamp,
+	}
+}
+
+// warn reports through Warn when there is one.
+func (o Outbound) warn(msg string, args ...any) {
+	if o.Warn != nil {
+		o.Warn(msg, args...)
+	}
 }

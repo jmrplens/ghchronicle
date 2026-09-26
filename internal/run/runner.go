@@ -133,11 +133,11 @@ type Runner struct {
 	// per sweep for as long as the parser lags.
 	markupWarned bool
 
-	// achievementsSaid is every warning the achievements family has already
-	// given, by its text: a count that is a floor and a tier the page
-	// disagrees with are true for weeks, and one line each is what the log
-	// needs to say so.
-	achievementsSaid map[string]bool
+	// said is every warning a family has already given through warnOnce, by
+	// its text: a count that is a floor, a tier the page disagrees with and a
+	// search past GitHub's cap are true for weeks, and one line each is what
+	// the log needs to say so.
+	said map[string]bool
 
 	// forkOverflow is every repository the forks batch of this sweep found
 	// holding more forks than the hundred it reads, which the REST walk then
@@ -337,8 +337,12 @@ func (r *Runner) accountFamilies(ctx context.Context, now time.Time) {
 	r.family(ctx, "profile", now, func() ([]sink.Point, error) {
 		return collect.Profile{Login: user, Walk: r.walk()}.Collect(ctx, r.API, now)
 	})
+	// A search whose pages run out before its count does has met GitHub's
+	// cap of a thousand results, and the rows past it are missing with nothing
+	// failing. Said once per count: the open states are read whole on every
+	// sweep, and an account past the cap stays past it.
 	r.family(ctx, "outbound", now, func() ([]sink.Point, error) {
-		return collect.Outbound{Login: user, Walk: r.walk()}.Collect(ctx, r.API, now)
+		return collect.Outbound{Login: user, Walk: r.walk(), Warn: r.warnOnce}.Collect(ctx, r.API, now)
 	})
 	// The whole green-squares history of every past year, for one point of
 	// GraphQL each, and the year so far as a daily snapshot. Disabled by
@@ -361,7 +365,7 @@ func (r *Runner) accountFamilies(ctx context.Context, now time.Time) {
 	r.family(ctx, "achievements", now, func() ([]sink.Point, error) {
 		a := collect.Achievements{
 			Login: user, WebBase: collect.WebBaseFor(r.Cfg.GitHub.BaseURL, r.Cfg.GitHub.WebURL),
-			Warn: r.achievementsWarn,
+			Warn: r.warnOnce,
 		}
 		points, err := a.Collect(ctx, r.API, now)
 		if collect.IsMarkupError(err) {
@@ -372,7 +376,7 @@ func (r *Runner) accountFamilies(ctx context.Context, now time.Time) {
 			return nil, nil
 		}
 		for _, d := range collect.Disagreements(points) {
-			r.achievementsWarn("achievement tier disagrees with the profile page, its rule may have changed", "badge", d)
+			r.warnOnce("achievement tier disagrees with the profile page, its rule may have changed", "badge", d)
 		}
 		return points, err
 	})
@@ -1036,19 +1040,19 @@ func (r *Runner) jobLogs(now time.Time) collect.JobLogs {
 }
 
 // family runs one account-wide collector if it is due and within budget.
-// achievementsWarn logs one line per distinct warning of the achievements
-// family. The key is the message and its arguments rendered as text, so the
+// warnOnce logs one line per distinct warning a collector hands back through
+// its Warn. The key is the message and its arguments rendered as text, so the
 // same floor or the same disagreement is one line however many days it holds,
 // and a new count or a new badge is a new line.
-func (r *Runner) achievementsWarn(msg string, args ...any) {
+func (r *Runner) warnOnce(msg string, args ...any) {
 	key := fmt.Sprint(append([]any{msg}, args...)...)
-	if r.achievementsSaid[key] {
+	if r.said[key] {
 		return
 	}
-	if r.achievementsSaid == nil {
-		r.achievementsSaid = map[string]bool{}
+	if r.said == nil {
+		r.said = map[string]bool{}
 	}
-	r.achievementsSaid[key] = true
+	r.said[key] = true
 	r.Log.Warn(msg, args...)
 }
 

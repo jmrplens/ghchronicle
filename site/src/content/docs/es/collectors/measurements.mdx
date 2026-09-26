@@ -473,6 +473,24 @@ sufijo `[bot]`, en todas las medidas.
 responden a la discusión, las respuestas responden a esos, y el número que
 GitHub enseña en la página es la suma de los dos.
 
+`gh_external_contribution` es el trabajo que la cuenta hizo en repositorios que
+no son suyos, sacado de cinco búsquedas, una por `kind` y `state`: pull
+requests `merged`, `open` y `closed` sin fusionar, e issues `open` y `closed`.
+Un elemento que sigue abierto se reescribe al principio de cada día que sigue
+abierto, así que una pasada lee enteros los dos estados abiertos. Un elemento
+cerrado se escribe una vez, fechado cuando se cerró, así que los tres estados
+cerrados se leen por cuándo se movió cada elemento por última vez: una pasada
+lee los cien primeros de cada uno, que contienen lo que se fusionó o se cerró
+desde la pasada anterior por mucho tiempo que haga que se abrió, y un relleno
+sigue leyendo hasta que se acaban las páginas o llegan a `backfill.since`.
+GitHub sirve mil resultados de cualquier búsqueda y ni uno más, así que una
+cuenta que pase de mil en un estado tiene los mil que se movieron más
+recientemente, y el log lo dice como aviso.
+`gh_account_total.pulls_merged_elsewhere` e `issues_elsewhere` son los
+recuentos del propio GitHub y aciertan pase lo que pase con ese tope. Un
+elemento que estuvo abierto y luego se cerró conserva sus filas `open` junto a
+la cerrada, porque `state` es una etiqueta.
+
 ## Integración continua
 
 | Medida                   | Fechado              | Etiquetas                                                                 | Campos                                                                                                                                                  |

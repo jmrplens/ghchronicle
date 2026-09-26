@@ -229,8 +229,11 @@ account while REST lists them.
 **`outbound`** is the other half of everything else here. Every other family
 measures what the account owns; this measures what it reads and what it
 contributes to: the stars it gave, and the pull requests it opened in other
-people's repositories. All of it is GraphQL, one point a query: the starred
-list, five issue searches and the two comment walks.
+people's repositories. All of it is GraphQL, one point a page: the starred
+list, five issue searches and the two comment walks. A sweep reads every page
+of the two searches for what is still open, and the first page of the other
+three, which are ordered by what moved last; a backfill reads those three to
+the end as well.
 
 **`totals`** asks GitHub for the numbers that are true since the beginning:
 pull requests merged ever, commits ever, issues opened ever, and the whole life
