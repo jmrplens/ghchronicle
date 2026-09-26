@@ -265,11 +265,11 @@ minute against core's five thousand. Responses are cached by ETag, and a 304
 costs no quota at all, which is what makes short cadences affordable.
 
 Each family has its own cadence because they move at very different speeds:
-workflow runs every fifteen minutes, the contribution calendar every twelve
-hours. The cheapest thing here by far is GraphQL: one query returns the full
-366-day contribution calendar, every contribution total, the per-repository
-commit breakdown and the social counts, for one point of a five thousand point
-budget.
+workflow runs every fifteen minutes, the contribution calendar every hour, the
+account's SSH and GPG keys once a day. The cheapest thing here by far is
+GraphQL: one query returns the full 366-day contribution calendar, every
+contribution total, the per-repository commit breakdown and the social counts,
+for one point of a five thousand point budget.
 
 A backfill is the opposite intention and says so: `-backfill` walks every
 surface to the end, bounded by a date you choose or by nothing at all, and when

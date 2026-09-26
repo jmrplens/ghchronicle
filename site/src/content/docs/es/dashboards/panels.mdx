@@ -58,7 +58,7 @@ por estar archivado no recibe fila de `gh_repo` de ninguna pasada, así que el
 selector deja de ofrecerlo cuando el último relleno histórico queda atrás, pero
 la gente sigue dándole estrellas y haciéndole fork y cada pasada de `totals`
 vuelve a leer sus contadores. Con All seleccionado las sumas lo incluyen, y un
-rango más corto que la cadencia de `totals`, doce horas por omisión, puede
+rango más corto que la cadencia de `totals`, una hora por omisión, puede
 dejar fuera su fila. Elegir repositorios cuenta solo esos. Cada repositorio
 cuenta una vez, por su nombre completo: dos repositorios del mismo nombre de
 dos dueños son dos, y uno archivado mientras el recolector funciona no se
@@ -640,8 +640,8 @@ captura de arriba es anterior a ambos. El primero lista todos los colectores
 que corrieron en el rango, qué los detuvo cuando algo lo hizo, en cuántos
 barridos corrieron y cuántos repositorios se les preguntaron; una familia sin
 fila ahí no corrió en absoluto. El motivo es columna aparte para que los dos
-tipos de fallo se ordenen por separado: un presupuesto de búsqueda agotado dos
-veces al día no es el 502 que le costó a un repositorio su historia, y una
+tipos de fallo se ordenen por separado: un presupuesto de búsqueda agotado
+no es el 502 que le costó a un repositorio su historia, y una
 familia que tuvo ambos tiene una fila de cada. El segundo es una fila por cada
 repositorio que un colector no pudo recoger, el más reciente primero, con lo
 que respondió GitHub.

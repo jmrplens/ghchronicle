@@ -1366,8 +1366,8 @@ it is still starred, unstarred and forked, so the `totals` family writes its
 tags and fields a collected repository's row has, `archived` true, stamped at
 the sweep. Up to 2.5.1 only a backfill wrote it, once, and on 2026-09-26 one
 such row said 4 stars where GitHub said 3. A live repository's stars and forks
-on the Overview still come from `gh_repo`, which a sweep writes every hour
-where `totals` writes every twelve. It gets no `gh_repo_policy`. That
+on the Overview still come from `gh_repo`, the row the Inventory table and the
+card read too. It gets no `gh_repo_policy`. That
 query asks about twenty five repositories at a time: measured the same day,
 the gateway answered the lifetime row of fifty archived repositories once in
 9.2 seconds and refused it twice after about eleven, and answered twenty five

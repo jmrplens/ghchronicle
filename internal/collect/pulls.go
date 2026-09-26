@@ -682,7 +682,7 @@ func (c ItemCounts) Most() int { return max(c.Pulls, c.Issues) }
 // family emitted, keyed by full name, and writes them over into.
 //
 // The page below is sized from these rather than from a query of its own
-// because the numbers are already on their way to the sinks twice a day, and
+// because the numbers are already on their way to the sinks every hour, and
 // gh_repo_total is a wire format a dashboard reads, so its field names are
 // the ones here that cannot drift.
 func ReadItemCounts(points []sink.Point, into map[string]ItemCounts) {

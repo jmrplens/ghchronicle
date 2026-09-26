@@ -45,7 +45,7 @@ days. The collector records what it is told.
 
 **A family that never appears in the log.** It is not due yet. With a
 twelve-hour cadence, half a day of logs can legitimately never mention
-`account`.
+`stats`.
 
 ## Things that are errors
 

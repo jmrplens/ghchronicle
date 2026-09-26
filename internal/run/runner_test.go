@@ -223,7 +223,7 @@ func TestASweepSkipsFamiliesOutsideTheSelection(t *testing.T) {
 }
 
 // TestTheTickFollowsTheSelection: the sweep tick is the shortest enabled
-// cadence, so dropping the two fifteen-minute groups lengthens it. This is a
+// cadence, so dropping the three fifteen-minute groups lengthens it. This is a
 // consequence of the design rather than a feature, and it is pinned here
 // because internal/run computes it from the same narrowed map and was not
 // changed to do so.
@@ -240,7 +240,7 @@ func TestTheTickFollowsTheSelection(t *testing.T) {
 
 	var kept []string
 	for _, group := range config.Groups() {
-		if group != "ci" && group != "collector" {
+		if group != "ci" && group != "collector" && group != "feeds" {
 			kept = append(kept, group)
 		}
 	}
@@ -251,8 +251,8 @@ func TestTheTickFollowsTheSelection(t *testing.T) {
 	if err := narrowed.Cfg.Validate(); err != nil {
 		t.Fatal(err)
 	}
-	if got := narrowed.shortestInterval(); got != 30*time.Minute {
-		t.Errorf("without ci and collector the tick = %s, want 30m", got)
+	if got := narrowed.shortestInterval(); got != time.Hour {
+		t.Errorf("without ci, collector and feeds the tick = %s, want 1h", got)
 	}
 }
 

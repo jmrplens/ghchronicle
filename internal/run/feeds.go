@@ -33,7 +33,7 @@ func (r *Runner) events(ctx context.Context, login string, now time.Time) ([]sin
 // unread threads only, so a thread read without a reply leaves that listing
 // rather than coming back with the tag changed, and only a read with all=true
 // lists it again, with unread false and the same updated_at. Once a day bounds
-// both to a day, at twenty pages a day instead of twenty every thirty minutes.
+// both to a day, at twenty pages a day instead of twenty every quarter hour.
 // Without all=true the daily read would rewrite the same unread rows and
 // nothing would ever say a thread was read, which is half of the metric.
 const fullInboxEvery = 24 * time.Hour

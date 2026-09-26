@@ -835,11 +835,12 @@ func (r *Runner) repoFamily(ctx context.Context, family string, repo collect.Rep
 // pull requests at all. So the page is sized from the last lifetime totals
 // where they are known, and never smaller than the repository, which is what
 // makes the daily page exactly the page of fifty it replaces on every
-// repository that had fewer than fifty. The totals are up to twelve hours
-// old, so a repository that crossed a page size since they ran holds more
-// than the page asked for: the daily pass is allowed one page more, which it
-// only takes when the first came back full with more behind it. A page of
-// fifty is never followed; fifty is where today's read stopped too.
+// repository that had fewer than fifty. The totals are up to an hour old by
+// default, and older where a configuration slows them down, so a repository
+// that crossed a page size since they ran holds more than the page asked
+// for: the daily pass is allowed one page more, which it only takes when the
+// first came back full with more behind it. A page of fifty is never
+// followed; fifty is where today's read stopped too.
 func (r *Runner) pulls(repo collect.Repo, now time.Time) collect.Pulls {
 	if r.Backfill {
 		// Fifty, not the hundred this used to ask for. A pull request now

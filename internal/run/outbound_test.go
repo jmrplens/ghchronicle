@@ -22,7 +22,7 @@ import (
 // out before its count does is one warning per process, naming the kind and
 // the state, and the family is neither failed nor left unmarked. The open
 // states are read whole on every sweep, so without the dedupe this would be
-// two lines every twelve hours for as long as the account stays past the cap.
+// two lines every hour for as long as the account stays past the cap.
 func TestAnOutboundSearchPastTheCapIsSaidOnce(t *testing.T) {
 	t.Parallel()
 	r := sweepRunner(t, func(w http.ResponseWriter, req *http.Request) {

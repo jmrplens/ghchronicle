@@ -257,32 +257,32 @@ every:
   families:
     traffic: 6h       # GitHub's window is 14 days and is rewritten whole each time
     repo: 1h          # stars, forks, languages, topics, releases
-    stars: 6h         # list walked whole once, then the newest hundred by GraphQL; history's newest page, usually a 304
+    stars: 1h         # list walked whole once, then the newest hundred by GraphQL; history's newest page, usually a 304
     issues: 1h        # pull requests, issues and reviews, per item
     commits: 1h       # lines changed and signature state, per commit
     actions: 15m      # the only family with a per-minute rhythm
     artifacts: 1h
-    activity: 30m     # the repository log, where a force push is recorded
-    analyses: 6h      # code scanning runs, which GitHub prunes
+    activity: 15m     # the repository log, where a force push is recorded
+    analyses: 1h      # code scanning runs, which GitHub prunes
     security: 1h
     forks: 12h        # the whole list fits in one page
     planning: 6h      # labels and milestones
     stats: 12h        # GitHub recomputes these slowly anyway
-    discussions: 2h
-    account: 12h      # profile, contribution calendar, contribution totals
-    events: 30m       # the feed keeps only the last 300 events, none older than 30 days
-    notifs: 30m       # GitHub keeps inbox notifications for three months unless they are saved
-    billing: 6h
+    discussions: 1h
+    account: 1h       # profile, contribution calendar, contribution totals
+    events: 15m       # the feed keeps only the last 300 events, none older than 30 days
+    notifs: 15m       # GitHub keeps inbox notifications for three months unless they are saved
+    billing: 1h
     profile: 12h      # packages, gists, social accounts
     outbound: 1h      # stars given, work in other people's repositories, answers accepted there
     settings: 6h      # webhooks and their deliveries, rulesets, environments, keys
     branches: 24h     # one row per live branch, and how old its tip is
     inventory: 24h    # workflow token policy, secret ages, code scanning setup
-    deployments: 1h   # deployments and their outcome, dated when they were created
+    deployments: 30m  # deployments and their outcome, dated when they were created
     policyfiles: 24h  # SECURITY.md, CODEOWNERS, dependabot.yml, FUNDING.yml
     rulesets: 24h     # every saved version of every ruleset, dated when it was saved
     issueevents: 1h   # labelled, closed, reopened: the transitions a state does not keep
-    totals: 12h       # the lifetime counts, asked of GitHub rather than added up here
+    totals: 1h        # the lifetime counts, asked of GitHub rather than added up here
     keys: 24h         # the account's SSH and GPG keys, and when they expire
     achievements: 24h # the profile's badges, read off the public profile page (no API lists them), and how far each is from its next tier
     ratelimit: 15m    # the collector's own budget, in all fifteen buckets; costs nothing

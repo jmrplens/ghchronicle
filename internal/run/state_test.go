@@ -4,8 +4,10 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -246,6 +248,44 @@ func TestAStateFromBeforeTheStarHistoryReadsEveryHistoryOnce(t *testing.T) {
 // families ran every 24 minutes on average and the hourly ones every 69.
 func TestAFamilyRunsOnEveryTickItsCadenceReaches(t *testing.T) {
 	t.Parallel()
+	r, tick := builtinRunner(t)
+	families := []string{"actions", "events", "repo", "traffic"}
+	runs := runsInADay(r, tick, families)
+	for _, family := range families {
+		every, _ := r.Cfg.Interval(family)
+		if want := int(24 * time.Hour / every); runs[family] != want {
+			t.Errorf("%s, every %s, ran %d times in a day of %s ticks, want %d", family, every, runs[family], tick, want)
+		}
+	}
+}
+
+// TestADayRunsTheCheapFamiliesAsOftenAsDecided is the cadence change of #93
+// as the loop carries it out: a day of ticks at the built-in cadences runs
+// each of the ten families whose extra passes the production audit costed at
+// next to nothing the number of times that was decided, and the tick stays at
+// the quarter hour, so no other family moves. The numbers are written out
+// rather than derived from the table, because deriving them would pass
+// whatever the table said.
+func TestADayRunsTheCheapFamiliesAsOftenAsDecided(t *testing.T) {
+	t.Parallel()
+	want := map[string]int{
+		"events": 96, "notifs": 96, "activity": 96, "deployments": 48,
+		"stars": 24, "billing": 24, "analyses": 24, "account": 24, "totals": 24, "discussions": 24,
+	}
+	r, tick := builtinRunner(t)
+	runs := runsInADay(r, tick, slices.Sorted(maps.Keys(want)))
+	for family, n := range want {
+		if runs[family] != n {
+			every, _ := r.Cfg.Interval(family)
+			t.Errorf("%s ran %d times in a day at its built-in %s, want %d", family, runs[family], every, n)
+		}
+	}
+}
+
+// builtinRunner is a runner on the built-in cadences and no store, and the
+// tick its loop would take from them.
+func builtinRunner(t *testing.T) (*Runner, time.Duration) {
+	t.Helper()
 	cfg := &config.Config{GitHub: config.GitHub{Token: "t"}, Targets: config.Targets{User: "u"}, AllowNoSinks: true}
 	if err := cfg.Validate(); err != nil {
 		t.Fatalf("Validate: %v", err)
@@ -255,15 +295,19 @@ func TestAFamilyRunsOnEveryTickItsCadenceReaches(t *testing.T) {
 	if tick != 15*time.Minute {
 		t.Fatalf("tick = %s, want the quarter hour the built-in cadences give", tick)
 	}
+	return r, tick
+}
+
+// runsInADay sweeps a day of ticks and counts how often each family was due.
+func runsInADay(r *Runner, tick time.Duration, families []string) map[string]int {
 	start := time.Date(2026, 9, 26, 0, 0, 0, 0, time.UTC)
 	runs := map[string]int{}
-	const ticks = 96 // a day
-	for i := range ticks {
+	for i := range int(24 * time.Hour / tick) {
 		// Late by 3 ms on even ticks and 1 ms on odd ones, so every other
 		// gap between two sweeps is 2 ms short of a tick.
 		late := time.Millisecond * time.Duration(1+2*((i+1)%2))
 		now := start.Add(time.Duration(i)*tick + late)
-		for _, family := range []string{"actions", "events", "repo", "traffic"} {
+		for _, family := range families {
 			every, _ := r.Cfg.Interval(family)
 			if r.due(family, every, now) {
 				runs[family]++
@@ -271,10 +315,5 @@ func TestAFamilyRunsOnEveryTickItsCadenceReaches(t *testing.T) {
 			}
 		}
 	}
-	for _, family := range []string{"actions", "events", "repo", "traffic"} {
-		every, _ := r.Cfg.Interval(family)
-		if want := int(ticks * tick / every); runs[family] != want {
-			t.Errorf("%s, every %s, ran %d times in a day of %s ticks, want %d", family, every, runs[family], tick, want)
-		}
-	}
+	return runs
 }

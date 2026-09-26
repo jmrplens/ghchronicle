@@ -52,7 +52,7 @@ default filter sets aside for being archived gets no `gh_repo` row from a sweep,
 so the picker stops offering it once the last backfill is behind it, but people
 still star and fork it and every `totals` sweep reads its counts again. With
 All selected the sums include it, and a range shorter than the `totals`
-cadence, twelve hours by default, can leave its row out. Picking repositories
+cadence, an hour by default, can leave its row out. Picking repositories
 counts those alone. Each repository counts once, by its full name: two owners'
 repositories of the same name are two, and one archived while the collector
 runs is not counted under both its live row and its archived one. The
@@ -609,7 +609,7 @@ the capture above predates both. The first lists every collector that ran in
 the range, what stopped it where something did, how many sweeps it ran in and
 how many repositories it was asked about; a family with no row there did not run
 at all. The reason is a column of its own so that the two kinds of failure sort
-apart: a search budget spent twice a day is not the 502 that cost a repository
+apart: a spent search budget is not the 502 that cost a repository
 its history, and a family that met both has a row for each. The second is one
 row per repository one collector could not collect, newest first, with what
 GitHub answered. An empty second table is the
