@@ -84,9 +84,16 @@ func TestTheDDLGoesOncePerMeasurement(t *testing.T) {
 	shapes := sqlShapes(points)
 	p := NewPostgres("postgres://ignored", 100)
 
+	// The table, then each of its four fields, which is what reaches a table
+	// an earlier release created without some of them.
 	first := p.pendingDDL(points, shapes)
-	if len(first) != 1 || !strings.HasPrefix(first[0], `CREATE TABLE IF NOT EXISTS "gh_repo"`) {
-		t.Fatalf("first batch = %v, want one CREATE TABLE for the one measurement", first)
+	if len(first) != 5 || !strings.HasPrefix(first[0], `CREATE TABLE IF NOT EXISTS "gh_repo"`) {
+		t.Fatalf("first batch = %v, want one CREATE TABLE for the one measurement and its fields", first)
+	}
+	for _, ddl := range first[1:] {
+		if !strings.HasPrefix(ddl, `ALTER TABLE "gh_repo" ADD COLUMN IF NOT EXISTS `) {
+			t.Errorf("first batch declares %q, want each field added to the table", ddl)
+		}
 	}
 	if again := p.pendingDDL(points, shapes); len(again) != 0 {
 		t.Errorf("second batch = %v, want nothing: the table was declared already", again)

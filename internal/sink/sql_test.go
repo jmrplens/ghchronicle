@@ -37,12 +37,39 @@ func TestSQLDeclaresTheTableOnceAndUpserts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := `CREATE TABLE IF NOT EXISTS "gh_repo" ("time" TIMESTAMPTZ NOT NULL, "repo" TEXT NOT NULL DEFAULT '', "user" TEXT NOT NULL DEFAULT '', "archived" BOOLEAN, "license" TEXT, "pushed_at" TIMESTAMPTZ, "ratio" DOUBLE PRECISION, "stars" BIGINT, PRIMARY KEY ("time", "repo", "user"));
+	want := `CREATE TABLE IF NOT EXISTS "gh_repo" ("time" TIMESTAMPTZ NOT NULL, "repo" TEXT NOT NULL DEFAULT '', "user" TEXT NOT NULL DEFAULT '', PRIMARY KEY ("time", "repo", "user"));
+ALTER TABLE "gh_repo" ADD COLUMN IF NOT EXISTS "archived" BOOLEAN;
+ALTER TABLE "gh_repo" ADD COLUMN IF NOT EXISTS "license" TEXT;
+ALTER TABLE "gh_repo" ADD COLUMN IF NOT EXISTS "pushed_at" TIMESTAMPTZ;
+ALTER TABLE "gh_repo" ADD COLUMN IF NOT EXISTS "ratio" DOUBLE PRECISION;
+ALTER TABLE "gh_repo" ADD COLUMN IF NOT EXISTS "stars" BIGINT;
 INSERT INTO "gh_repo" ("time", "repo", "user", "archived", "license", "pushed_at", "ratio", "stars") VALUES ('2023-11-14T22:13:20Z'::timestamptz, 'a', 'o''reilly', FALSE, 'mit', '2023-11-14T22:13:20Z'::timestamptz, 0.5, 3) ON CONFLICT ("time", "repo", "user") DO UPDATE SET "archived" = EXCLUDED."archived", "license" = EXCLUDED."license", "pushed_at" = EXCLUDED."pushed_at", "ratio" = EXCLUDED."ratio", "stars" = EXCLUDED."stars";
 INSERT INTO "gh_repo" ("time", "repo", "user", "stars") VALUES ('2023-11-14T22:13:20Z'::timestamptz, 'b', '', 4) ON CONFLICT ("time", "repo", "user") DO UPDATE SET "stars" = EXCLUDED."stars";
 `
 	if got := buf.String(); got != want {
 		t.Errorf("sql =\n%s\nwant\n%s", got, want)
+	}
+}
+
+// TestAFieldAnEarlierProcessNeverWroteStillGetsItsColumn: a process declares
+// every table afresh, and CREATE TABLE IF NOT EXISTS does nothing to the one
+// an earlier release left, so a field that release did not write reached the
+// INSERT with no column to land in. PostgreSQL refused the statement, and the
+// batch around it: measured on 2026-09-26 against PostgreSQL 18.6, "column
+// "additions" of relation "gh_external_contribution" does not exist". Every
+// field is added with IF NOT EXISTS the first time a process declares the
+// table, which means the same thing to a table made a minute ago and to one
+// made by a release a year old.
+func TestAFieldAnEarlierProcessNeverWroteStillGetsItsColumn(t *testing.T) {
+	t.Parallel()
+	before := &sqlShape{tags: []string{"repo"}, fields: map[string]string{"v": "BIGINT"}}
+	after := &sqlShape{tags: []string{"repo"}, fields: map[string]string{"v": "BIGINT", "private": "BOOLEAN"}}
+	newSQLSchema().declare("gh_x", before)
+	restarted := strings.Join(newSQLSchema().declare("gh_x", after), "\n")
+	for _, col := range []string{`"private" BOOLEAN;`, `"v" BIGINT;`} {
+		if !strings.Contains(restarted, `ALTER TABLE "gh_x" ADD COLUMN IF NOT EXISTS `+col) {
+			t.Errorf("a restarted process does not add %s to a table it did not create:\n%s", col, restarted)
+		}
 	}
 }
 

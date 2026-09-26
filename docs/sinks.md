@@ -642,7 +642,10 @@ what makes a rewrite of the fourteen-day traffic window converge instead of
 accumulate.
 
 ```sql
-CREATE TABLE IF NOT EXISTS "gh_traffic" ("time" TIMESTAMPTZ NOT NULL, "full_name" TEXT NOT NULL DEFAULT '', "kind" TEXT NOT NULL DEFAULT '', "owner" TEXT NOT NULL DEFAULT '', "repo" TEXT NOT NULL DEFAULT '', "count" BIGINT, "uniques" BIGINT, "url" TEXT, PRIMARY KEY ("time", "full_name", "kind", "owner", "repo"));
+CREATE TABLE IF NOT EXISTS "gh_traffic" ("time" TIMESTAMPTZ NOT NULL, "full_name" TEXT NOT NULL DEFAULT '', "kind" TEXT NOT NULL DEFAULT '', "owner" TEXT NOT NULL DEFAULT '', "repo" TEXT NOT NULL DEFAULT '', PRIMARY KEY ("time", "full_name", "kind", "owner", "repo"));
+ALTER TABLE "gh_traffic" ADD COLUMN IF NOT EXISTS "count" BIGINT;
+ALTER TABLE "gh_traffic" ADD COLUMN IF NOT EXISTS "uniques" BIGINT;
+ALTER TABLE "gh_traffic" ADD COLUMN IF NOT EXISTS "url" TEXT;
 INSERT INTO "gh_traffic" ("time", "full_name", "kind", "owner", "repo", "count", "uniques", "url") VALUES ('2026-09-07T00:00:00Z'::timestamptz, 'acme/telemetry', 'views', 'acme', 'telemetry', 41, 12, 'https://github.com/acme/telemetry/graphs/traffic') ON CONFLICT ("time", "full_name", "kind", "owner", "repo") DO UPDATE SET "count" = EXCLUDED."count", "uniques" = EXCLUDED."uniques", "url" = EXCLUDED."url";
 ```
 
@@ -655,10 +658,15 @@ INSERT INTO "gh_traffic" ("time", "full_name", "kind", "owner", "repo", "count",
 ### How the declarations arrive
 
 The `CREATE TABLE IF NOT EXISTS` is emitted the first time a measurement is
-seen in a file, with the union of the columns that batch carries. A column that
-turns up in a later batch arrives as `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`.
-A rotated file starts its declarations again, so any one file can be replayed
-on its own.
+seen in a file, or by a connecting sink's process, with the time and the tags
+the key is made of. Each field of the union that batch carries follows it as
+`ALTER TABLE ... ADD COLUMN IF NOT EXISTS`, and so does a field that turns up
+in a later batch. The fields are never in the `CREATE TABLE`, because that
+statement does nothing to a table an earlier release made: a field the release
+did not write would reach the `INSERT` with no column, and PostgreSQL refuses
+the statement and the batch around it. Adding each column if it is missing
+means the same thing to a new table and an old one. A rotated file starts its
+declarations again, so any one file can be replayed on its own.
 
 A tag first seen after the table was declared cannot join the primary key
 without rewriting it, so it becomes a plain column. That only happens when a
