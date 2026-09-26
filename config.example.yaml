@@ -274,7 +274,7 @@ every:
     notifs: 30m       # GitHub keeps inbox notifications for three months unless they are saved
     billing: 6h
     profile: 12h      # packages, gists, social accounts
-    outbound: 12h     # stars given, and work in other people's repositories
+    outbound: 1h      # stars given, work in other people's repositories, answers accepted there
     settings: 6h      # webhooks and their deliveries, rulesets, environments, keys
     branches: 24h     # one row per live branch, and how old its tip is
     inventory: 24h    # workflow token policy, secret ages, code scanning setup

@@ -17,7 +17,8 @@ Four things the store said that GitHub did not, each found by reading one
 beside the other on the account this collects: a Loki line that called every
 contribution merged, a count of threads commented elsewhere that was mostly
 at home, five searches that stopped at a hundred, and archived repositories
-whose stars froze at the last backfill.
+whose stars froze at the last backfill. And the outbound family, which
+costs next to nothing, now runs every hour.
 
 - **A Loki line says what happened to the contribution.** The rendering of
   `gh_external_contribution` read the user, the repository and the number and
@@ -79,6 +80,17 @@ whose stars froze at the last backfill.
   2.5.1 never read takes a
   [backfill](https://jmrp.io/docs/ghchronicle/how/backfill/), since a sweep
   reads back only to the one before it.
+- **`outbound` runs every hour, not every twelve.** A pass is about nine
+  GraphQL points and no REST: 8 measured in production on 2026-09-26 (the
+  starred list, the five searches, the two comment walks, about 126 KB), so
+  the hour is some 200 points a day out of 5,000 an hour, where the busiest
+  hour of that day spent 1,813. The rows it rewrites are skipped by the
+  write ledger unless they changed, and an open item is stamped at the start
+  of its day, so the extra passes write almost nothing. What they buy is
+  time: on that day four answers were accepted after the one pass of the
+  morning, and the dashboard showed 11 accepted answers for the rest of the
+  day where GitHub showed 15. A configuration that already names
+  `outbound` under `every.families` keeps what it names.
 - **Archived repositories' stars and forks reach the account's totals on
   every sweep.** With `include_archived` off, the default, a sweep sets
   archived repositories aside and wrote only their `gh_repo_archived` row.

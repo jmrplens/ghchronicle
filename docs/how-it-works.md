@@ -46,42 +46,42 @@ list of forks changes a few times a year. One interval for all of them would
 either waste the rate limit on the slow ones or lose the fast ones, so each
 family carries its own.
 
-| Family          | Default | Collects                                                       |
-| --------------- | ------- | -------------------------------------------------------------- |
-| `actions`       | 15m     | Workflow runs, jobs, steps, the Actions cache                  |
-| `ratelimit`     | 15m     | What the collector has left to spend, in each budget            |
-| `activity`      | 30m     | The repository activity log, where a force push is recorded    |
-| `events`        | 30m     | The account event feed, which keeps only the last 300          |
-| `notifs`        | 30m     | The notification inbox                                          |
-| `artifacts`     | 1h      | Artifacts and their expiry                                      |
-| `commits`       | 1h      | Lines changed and signature state, per commit                  |
-| `deployments`   | 1h      | Deployments and their environments, batched over every repository |
-| `issueevents`   | 1h      | The timeline of what moved: labels, assignments, transitions   |
-| `issues`        | 1h      | Pull requests, issues and reviews, per item                    |
-| `repo`          | 1h      | Stars, forks, languages, topics, releases, rulesets            |
-| `security`      | 1h      | Dependabot and code scanning alerts                            |
-| `discussions`   | 2h      | The forum half of a repository                                 |
-| `analyses`      | 6h      | Code scanning analyses, which GitHub prunes                    |
-| `billing`       | 6h      | Usage per day, product, SKU and repository                     |
-| `planning`      | 6h      | Labels and milestones                                          |
-| `settings`      | 6h      | Webhooks and their deliveries, environments, deploy keys       |
-| `stars`         | 6h      | Stars per day for every repository, and the stargazer walk once, then the newest hundred |
-| `traffic`       | 6h      | The whole 14-day window, rewritten                             |
-| `account`       | 12h     | Profile, contribution calendar, contribution totals            |
-| `forks`         | 12h     | Who forked, and when                                            |
-| `outbound`      | 12h     | Stars given, and work in other people's repositories           |
-| `profile`       | 12h     | Packages, gists, social accounts                               |
-| `stats`         | 12h     | Commits per week, the punch card, the workflow definitions     |
-| `totals`        | 12h     | The lifetime numbers, asked of GitHub rather than added up here |
-| `achievements`  | 24h     | The profile badges, and the distance to each next tier         |
-| `branches`      | 24h     | Which branches are live and how stale each tip is              |
-| `inventory`     | 24h     | What a workflow's own token may do, both secret stores, default code scanning |
-| `keys`          | 24h     | The account's SSH and GPG keys, and when each expires          |
-| `policyfiles`   | 24h     | SECURITY.md, CODEOWNERS, dependabot.yml and FUNDING.yml        |
-| `rulesets`      | 24h     | Every version of every ruleset's changelog                     |
-| `deps`          | off     | The dependency SBOM of each repository, and what changed       |
-| `history`       | off     | Each year's contribution calendar, the current one included    |
-| `joblogs`       | off     | The tail of every failed job's log                             |
+| Family         | Default | Collects                                                                                 |
+| -------------- | ------- | ---------------------------------------------------------------------------------------- |
+| `actions`      | 15m     | Workflow runs, jobs, steps, the Actions cache                                            |
+| `ratelimit`    | 15m     | What the collector has left to spend, in each budget                                     |
+| `activity`     | 30m     | The repository activity log, where a force push is recorded                              |
+| `events`       | 30m     | The account event feed, which keeps only the last 300                                    |
+| `notifs`       | 30m     | The notification inbox                                                                   |
+| `artifacts`    | 1h      | Artifacts and their expiry                                                               |
+| `commits`      | 1h      | Lines changed and signature state, per commit                                            |
+| `deployments`  | 1h      | Deployments and their environments, batched over every repository                        |
+| `issueevents`  | 1h      | The timeline of what moved: labels, assignments, transitions                             |
+| `issues`       | 1h      | Pull requests, issues and reviews, per item                                              |
+| `repo`         | 1h      | Stars, forks, languages, topics, releases, rulesets                                      |
+| `security`     | 1h      | Dependabot and code scanning alerts                                                      |
+| `discussions`  | 2h      | The forum half of a repository                                                           |
+| `analyses`     | 6h      | Code scanning analyses, which GitHub prunes                                              |
+| `billing`      | 6h      | Usage per day, product, SKU and repository                                               |
+| `planning`     | 6h      | Labels and milestones                                                                    |
+| `settings`     | 6h      | Webhooks and their deliveries, environments, deploy keys                                 |
+| `stars`        | 6h      | Stars per day for every repository, and the stargazer walk once, then the newest hundred |
+| `traffic`      | 6h      | The whole 14-day window, rewritten                                                       |
+| `account`      | 12h     | Profile, contribution calendar, contribution totals                                      |
+| `forks`        | 12h     | Who forked, and when                                                                     |
+| `outbound`     | 1h      | Stars given, and work in other people's repositories                                     |
+| `profile`      | 12h     | Packages, gists, social accounts                                                         |
+| `stats`        | 12h     | Commits per week, the punch card, the workflow definitions                               |
+| `totals`       | 12h     | The lifetime numbers, asked of GitHub rather than added up here                          |
+| `achievements` | 24h     | The profile badges, and the distance to each next tier                                   |
+| `branches`     | 24h     | Which branches are live and how stale each tip is                                        |
+| `inventory`    | 24h     | What a workflow's own token may do, both secret stores, default code scanning            |
+| `keys`         | 24h     | The account's SSH and GPG keys, and when each expires                                    |
+| `policyfiles`  | 24h     | SECURITY.md, CODEOWNERS, dependabot.yml and FUNDING.yml                                  |
+| `rulesets`     | 24h     | Every version of every ruleset's changelog                                               |
+| `deps`         | off     | The dependency SBOM of each repository, and what changed                                 |
+| `history`      | off     | Each year's contribution calendar, the current one included                              |
+| `joblogs`      | off     | The tail of every failed job's log                                                       |
 
 Setting any of them to `0` switches it off entirely. See
 [cadences](https://jmrp.io/docs/ghchronicle/configuration/cadences/).
