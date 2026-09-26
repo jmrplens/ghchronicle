@@ -85,36 +85,55 @@ pull request de 2024.
 
 Pero el límite que de verdad muerde es el otro. Loki también rechaza una entrada
 que esté más atrasada que su ventana de desorden respecto a la entrada más nueva
-que ya hay en ese stream, unas dos horas por omisión.
+que ya hay en ese stream, que es la mitad del `max_chunk_age` del ingester, una
+hora por omisión.
 
 **Medido contra un Loki 3 real**: una vez que el stream tenía una entrada de las
-19:14, una de las 00:35 del mismo día volvió como "entry too far behind".
+19:14, una de las 00:35 del mismo día volvió como "entry too far behind". Contra
+Loki 3.7.7 con sus límites por omisión, un stream con una entrada de hace cinco
+minutos aceptó una de hace 55 minutos y rechazó una de hace 75.
 
-Así que el horizonte se aplica de tres formas:
+Así que el horizonte se aplica de dos formas:
 
 1. contra el reloj de pared,
-2. contra la entrada más nueva de cada stream dentro del lote,
-3. contra la entrada más nueva que se ha enviado antes a ese stream.
+2. contra la entrada más nueva que se ha enviado antes a ese stream.
+
+Dentro de un mismo envío nada va atrasado, porque el destino envía cada stream
+de la más vieja a la más nueva y Loki juzga cada entrada contra la más nueva
+anterior a ella: un envío con entradas de hace 23 horas, 12 horas y un minuto a
+un stream vacío se aceptó entero.
 
 Lo que cae fuera se deja fuera y se cuenta, a nivel de depuración, en vez de
 costar el envío entero.
 
-`max_age` vale una hora por omisión, que está dentro de la ventana por defecto
-de Loki. Súbelo solo si has subido `out_of_order_time_window` a juego.
+`max_age` vale una hora por omisión, que es la ventana por defecto de Loki.
+Súbelo solo si has subido a juego el `max_chunk_age` de Loki, ya que la ventana
+es la mitad.
 
-Una release es el evento que muestra lo que cuesta el horizonte. Su línea se
-genera a partir de `gh_release_published`, en el momento en que se publicó la
-release. Antes salía de `gh_release`, que se sella en la pasada porque sus
-descargas se mueven, así que cada pasada de repositorios volvía a enviar todas
-las releases: 3.360 líneas en un día en la cuenta en la que se midió, un tercio
-de todo lo que envió el destino. Fechada en la publicación, el stream tiene una
-línea por release, la que envía la primera pasada de `repo` que la ve, siempre
-que esa pasada escriba dentro de `max_age` desde ella. Con ambos en su hora por
-omisión, una release se queda sin línea solo cuando esa pasada escribe más de
-una hora después de la publicación: una release publicada después de que una
-pasada haya leído su repositorio y antes de que esa misma pasada escriba, como
-mucho cuarenta segundos en esa cuenta, o una publicada justo antes de una
-pasada que se retrasa. Está en el almacén de métricas en cualquier caso.
+Una release es el evento que muestra lo que cuesta el horizonte, y el único
+stream que mira más atrás. Su línea se genera a partir de
+`gh_release_published`, en el momento en que se publicó la release. Antes salía
+de `gh_release`, que se sella en la pasada porque sus descargas se mueven, así
+que cada pasada de repositorios volvía a enviar todas las releases: 3.360 líneas
+en un día en la cuenta en la que se midió, un tercio de todo lo que envió el
+destino. Fechada en la publicación, una release la ve primero la pasada de
+`repo` siguiente, así que una publicada justo después de que una pasada leyera
+su repositorio tiene una cadencia entera cuando escribe la siguiente pasada, más
+lo que esa pasada se retrase: un tick que perdió, las familias más lentas que
+corrieron antes, un reinicio. Con `repo` y `max_age` en su hora por omisión,
+`max_age` por sí solo dejaba fuera esa release, y cada pasada posterior solo la
+veía más vieja.
+
+Así que el stream de releases mira atrás la cadencia de `repo` más `max_age`:
+dos horas por omisión, siete con `repo: 6h`, y nunca más de seis días, un día
+menos que la semana que permite `reject_old_samples_max_age`. Loki solo rechaza
+una línea vieja por ir atrasada respecto a una más nueva de su stream, que es lo
+que la segunda comprobación de arriba sigue haciendo. Una release publicada en
+la hora anterior a una pasada la envía esa pasada y otra vez la siguiente, la
+misma línea en el mismo instante, que Loki guarda una sola vez. Con `-once` la
+cadencia que cuenta es la del calendario que lanza el binario, así que pon
+`every.families.repo` a ese valor. La release está en el almacén de métricas en
+cualquier caso.
 
 ## Para qué no sirve Loki
 

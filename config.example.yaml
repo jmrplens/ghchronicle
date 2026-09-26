@@ -137,10 +137,11 @@ sinks:
   #     job: ghchronicle
   #   # How far behind an entry may be, one hour unless named. Loki refuses
   #   # one that is more than its out-of-order window behind the newest entry
-  #   # in the same stream, about two hours by default, and much of this
-  #   # history is older than that on purpose. What falls outside is left out
-  #   # rather than costing the whole push, which is why the default is an
-  #   # hour and not a day. Raise it only alongside out_of_order_time_window.
+  #   # in the same stream, half of its max_chunk_age and so an hour by
+  #   # default, and much of this history is older than that on purpose. What
+  #   # falls outside is left out rather than costing the whole push, which is
+  #   # why the default is an hour and not a day. Raise it only alongside
+  #   # max_chunk_age. Releases look back the repo cadence on top of it.
   #   max_age: 1h
 
   # A rotating file, for a setup that already runs a log shipper. Also the

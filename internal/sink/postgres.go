@@ -3,6 +3,7 @@ package sink
 import (
 	"context"
 	"fmt"
+	"maps"
 	"slices"
 	"strconv"
 	"strings"
@@ -95,38 +96,99 @@ func (p *Postgres) Write(ctx context.Context, points []Point) (int, error) {
 		return 0, err
 	}
 	shapes := sqlShapes(points)
-	if err := p.declareAll(ctx, points, shapes); err != nil {
+	if err := p.declareAll(ctx, poolSchema{p.pool}, points, shapes); err != nil {
 		return 0, err
 	}
 	return p.upsertAll(ctx, points, shapes)
 }
 
-// pendingDDL is what the tables need before this batch can land, once per
+// schemaConn is what declaring a table asks of the database: to run a
+// statement, and to say which columns a table already has. An interface so
+// that what is sent, and what a failed statement leaves recorded, can be read
+// without a server.
+type schemaConn interface {
+	exec(ctx context.Context, ddl string) error
+	columns(ctx context.Context, table string) (map[string]string, error)
+}
+
+// poolSchema is schemaConn over the sink's own pool.
+type poolSchema struct{ pool *pgxpool.Pool }
+
+func (c poolSchema) exec(ctx context.Context, ddl string) error {
+	_, err := c.pool.Exec(ctx, ddl)
+	return err
+}
+
+// columns reads the table the CREATE TABLE IF NOT EXISTS just named, in the
+// schema that statement created it in or found it in.
+func (c poolSchema) columns(ctx context.Context, table string) (map[string]string, error) {
+	rows, err := c.pool.Query(ctx, `SELECT column_name, data_type FROM information_schema.columns `+
+		`WHERE table_schema = current_schema() AND table_name = $1`, table)
+	if err != nil {
+		return nil, err
+	}
+	out := map[string]string{}
+	var name, typ string
+	_, err = pgx.ForEachRow(rows, []any{&name, &typ}, func() error {
+		out[name] = typ
+		return nil
+	})
+	return out, err
+}
+
+// declareAll makes each measurement's table ready for this batch, once per
 // measurement rather than once per point: unlike the file, a connection does
 // not rotate underneath and forget what it was told.
 //
-// Deciding and doing are separate so that what is decided can be read without
-// a server to do it against.
-func (p *Postgres) pendingDDL(points []Point, shapes map[string]*sqlShape) []string {
-	var out []string
-	seen := map[string]bool{}
-	for _, point := range points {
-		if seen[point.Measurement] {
-			continue
-		}
-		seen[point.Measurement] = true
-		out = append(out, p.schema.declare(point.Measurement, shapes[point.Measurement])...)
-	}
-	return out
-}
-
-// declareAll runs what pendingDDL decided.
-func (p *Postgres) declareAll(ctx context.Context, points []Point,
+// The first time a process meets a table it asks which columns the table
+// already has, and adds only the ones it lacks. Sending ADD COLUMN IF NOT
+// EXISTS for every field, which is what the file says, cost a restart one
+// ACCESS EXCLUSIVE lock per field on every table: PostgreSQL takes that lock
+// before it checks IF NOT EXISTS, so each statement waited for any Grafana
+// query reading the table, and every query after it waited behind it.
+// Measured on 2026-09-27 against PostgreSQL 18.6 with a reader holding the
+// table open: CREATE TABLE IF NOT EXISTS returned in 0.4 ms and the catalog
+// read in 15 ms, an ADD COLUMN IF NOT EXISTS for a column already there hit a
+// one second lock_timeout, and a SELECT sent behind that ALTER waited 3 s,
+// until the reader finished. A restarted sink with lock_timeout=500 in its
+// DSN failed its first write that way, and then its next one, on a table the
+// failed batch had recorded as declared and never created; declaring from the
+// catalog, its first write took 32 ms.
+//
+// A column is recorded only once the server has taken the statement that adds
+// it, and a table only once it exists and has been read. A statement that
+// fails, to a lock_timeout, a statement_timeout or a dropped connection, is
+// then sent again on the next write rather than taken as done, which had left
+// every INSERT naming that column refused until the process restarted.
+func (p *Postgres) declareAll(ctx context.Context, conn schemaConn, points []Point,
 	shapes map[string]*sqlShape,
 ) error {
-	for _, ddl := range p.pendingDDL(points, shapes) {
-		if _, err := p.pool.Exec(ctx, ddl); err != nil {
-			return fmt.Errorf("%s: %w", strings.TrimSuffix(ddl, ";"), err)
+	seen := map[string]bool{}
+	for _, point := range points {
+		m := point.Measurement
+		if seen[m] {
+			continue
+		}
+		seen[m] = true
+		sh := shapes[m]
+		tbl := p.schema.tables[m]
+		if tbl == nil {
+			fresh, create := newSQLTable(m, sh)
+			if err := conn.exec(ctx, create); err != nil {
+				return fmt.Errorf("%s: %w", strings.TrimSuffix(create, ";"), err)
+			}
+			existing, err := conn.columns(ctx, m)
+			if err != nil {
+				return fmt.Errorf("reading the columns of %s: %w", ident(m), err)
+			}
+			maps.Copy(fresh.cols, existing)
+			p.schema.tables[m], tbl = fresh, fresh
+		}
+		for _, c := range tbl.missing(m, sh) {
+			if err := conn.exec(ctx, c.ddl); err != nil {
+				return fmt.Errorf("%s: %w", strings.TrimSuffix(c.ddl, ";"), err)
+			}
+			tbl.cols[c.name] = c.typ
 		}
 	}
 	return nil
@@ -144,8 +206,8 @@ type row struct {
 // rowsFor is every point that has a row to write, turned into one. A point
 // with no field worth a column is not one, the rule the line protocol applies.
 //
-// Separate from sending for pendingDDL's reason: this is the part worth
-// reading, and reading it needs no server.
+// Separate from sending, because this is the part worth reading, and reading
+// it needs no server.
 func (p *Postgres) rowsFor(points []Point, shapes map[string]*sqlShape) []row {
 	out := make([]row, 0, len(points))
 	for _, point := range points {

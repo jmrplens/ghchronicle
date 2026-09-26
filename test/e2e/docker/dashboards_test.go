@@ -691,14 +691,17 @@ func dashboardFrameAnswer(frame map[string]any) (values int, numbers []float64, 
 // that does not exist, so a panel selecting a field this account has never had
 // a value for does not come back empty: it comes back broken. PostgreSQL fails
 // the same way for a missing table, and for a field the sink never saw, but not
-// for the eight `url` entries below, because the SQL sink declares the column
-// in its DDL and leaves it null while the InfluxDB line protocol drops an empty
-// string and never creates it.
+// for the eight `url` fields below, because each of those measurements writes
+// its url as an empty string when the fixture has none: the SQL sink declares
+// the column and leaves it null, while the InfluxDB line protocol drops an
+// empty string and never creates it. A measurement that writes its url through
+// withURL carries no url at all when GitHub sent none, and then PostgreSQL has
+// no column either.
 //
 // Which of these a real account would meet is worth separating:
 //
 //   - `url` is absent from those fixtures and never absent from GitHub, so the
-//     eight are thin fixtures rather than a defect a user would see. Six more
+//     eight are thin fixtures rather than a defect a user would see. Seven more
 //     stood here until the fixtures gained the url GitHub always sends.
 //     gh_repo.url on panel 157 and gh_repo_total.url on panel 23 went first:
 //     both reached InfluxDB as an empty string, which the line protocol drops,
@@ -716,7 +719,11 @@ func dashboardFrameAnswer(frame map[string]any) (values int, numbers []float64, 
 //     panel 102 was the sixth, closed when the newest hundred
 //     forks moved into the audience batch: its fixture answers `url`, and the
 //     REST fixture gained `html_url` so the two roads could be held to the
-//     same rows;
+//     same rows. gh_release.url on panel 94 was the seventh, and the one that
+//     broke PostgreSQL as well: once gh_release wrote its url through withURL,
+//     a fixture release with no `html_url` wrote no url at all, so the column
+//     was missing from both stores and "Downloads by release" and "Release
+//     assets" were refused by each;
 //   - gh_account_total.commits comes from the commit search, which this fake
 //     GitHub does not answer;
 //   - seconds_to_resolve exists only on a resolved alert, and every code
@@ -775,7 +782,6 @@ var dashboardMissing = map[string]map[int]string{
 		70:  "gh_milestone.url",
 		75:  "gh_issue_event",
 		86:  "gh_environment.url",
-		94:  "gh_release.url",
 		95:  "gh_release_asset.url",
 		96:  "gh_release_asset.url",
 		103: "gh_code_scanning_alert_item.seconds_to_resolve",

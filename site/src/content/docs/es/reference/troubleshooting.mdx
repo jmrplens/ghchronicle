@@ -129,10 +129,16 @@ crea una columna la primera vez que una fila la trae, así que una consulta que
 nombra una que ninguna fila ha escrito falla al planificarse. Una versión que
 añade un campo le hace eso a una base ya existente hasta que la familia que lo
 escribe hace una pasada: `gh_fork.seconds_to_push` y
-`gh_artifact_total.live_count` son las dos que añade esta versión, que nombran
-los paneles Forks y "Artifact storage counted", y la familia `forks` corre cada
-doce horas. Espera esa pasada, fuerza una con `-once`, o publica los dashboards
-después. Las demás columnas que pueden faltar están en
+`gh_artifact_total.live_count` fueron dos, que nombran los paneles Forks y
+"Artifact storage counted", y la familia `forks` corre cada doce horas. Una
+versión que añade una medida con la que un panel hace un join le hace lo mismo
+al panel entero, también en PostgreSQL, donde lo que falta es la tabla y no la
+columna: la tabla "Work elsewhere" hace un join con `gh_upstream_repo` para las
+estrellas de cada repositorio, y hasta que la primera pasada de `outbound` de la
+versión nueva la escribe, que es dentro de una hora, los dos almacenes rechazan
+la tabla en vez de dejar vacía su columna Stars. Espera esa pasada, fuerza una
+con `-once`, o publica los dashboards después. Las demás columnas que pueden
+faltar están en
 [Columnas que solo existen una vez escritas](/ghchronicle/es/collectors/measurements/#columnas-que-solo-existen-una-vez-escritas).
 
 **La gráfica de tráfico solo llega catorce días atrás.** Eso es una primera
@@ -197,9 +203,10 @@ Una familia a la que aún no le toca sencillamente no aparece.
 
 Busca la línea de depuración que las cuenta. Loki rechaza una entrada que esté
 más atrasada que su ventana de desorden respecto a la entrada más nueva que ya
-hay en ese stream, unas dos horas por omisión, así que el destino deja fuera las
-más viejas en vez de perder el envío entero. Sube `max_age` solo junto al propio
-`out_of_order_time_window` de Loki. Ver [Loki](/ghchronicle/es/sinks/loki/).
+hay en ese stream, la mitad del `max_chunk_age` del ingester y así una hora por
+omisión, así que el destino deja fuera las más viejas en vez de perder el envío
+entero. Sube `max_age` solo junto al propio `max_chunk_age` de Loki. Ver
+[Loki](/ghchronicle/es/sinks/loki/).
 
 ## Publicar el dashboard
 

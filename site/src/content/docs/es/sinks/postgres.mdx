@@ -99,6 +99,18 @@ cada columna si falta significa lo mismo para una tabla nueva y para una
 antigua. Un fichero rotado empieza otra vez sus declaraciones, así que
 cualquier fichero se puede reproducir por su cuenta.
 
+El sink que conecta no envía todos esos `ALTER TABLE`. Pregunta al catálogo qué
+columnas tiene ya una tabla la primera vez que su proceso se encuentra con ella,
+y añade solo las que le faltan. PostgreSQL toma el bloqueo exclusivo de un
+`ALTER TABLE` antes de comprobar `IF NOT EXISTS`, así que uno por campo en cada
+arranque esperaba a cada consulta de Grafana que leía la tabla y retenía todas
+las que llegaban detrás. **Medido contra PostgreSQL 18.6** con un lector que
+mantenía una tabla abierta: `CREATE TABLE IF NOT EXISTS` respondió en menos de
+un milisegundo, mientras que un `ADD COLUMN IF NOT EXISTS` de una columna que ya
+existía esperó hasta que un `lock_timeout` de un segundo lo rechazó, y un
+`SELECT` detrás de él esperó tres segundos. Una sentencia que el servidor
+rechaza se envía otra vez en la escritura siguiente en vez de darse por hecha.
+
 Una etiqueta vista por primera vez después de declarar la tabla no puede
 unirse a la clave primaria sin reescribirla, así que se convierte en una columna
 normal. Eso solo ocurre cuando un colector cambia su conjunto de etiquetas entre

@@ -360,7 +360,7 @@ y cada reescritura costaba un fichero en la partición del propio fork.
 | `gh_repo_archived` | fechado, al archivarse el repositorio | | `archived`, `age_days_at_archive`, `url` |
 | `gh_release`        | ahora   | `tag`, `draft`, `prerelease`                                              | `downloads`, `assets`, `age_days`, `url`                                                                                                              |
 | `gh_release_asset` | diario | `tag`, `asset` | `downloads`, `size_bytes`, `digest`, `content_type`, `uploader`, `age_days`, `url` |
-| `gh_release_published` | fechado, al publicarse | `tag`, `prerelease` | `published`, `url` |
+| `gh_release_published` | fechado, al publicarse | `tag` | `published`, `prerelease`, `url` |
 
 `open_issues` es el campo de GitHub y GitHub cuenta las pull requests dentro.
 Usa `gh_issue` para contar issues.
@@ -372,8 +372,15 @@ medida por la que agrupar un calendario de releases o de la que leer "la
 `age_days` son días enteros truncados contados hacia atrás desde la pasada: la
 fecha que reconstruye llega un día tarde para toda release publicada más tarde
 dentro del día que la hora de la pasada. `published` vale 1 en todas las
-filas, así que contar releases es una suma. Un borrador no tiene publicación,
-así que no escribe fila aquí, y su fila de `gh_release` no lleva `age_days`:
+filas, así que contar releases es una suma. `prerelease` es aquí un campo,
+donde en `gh_release` es una etiqueta: una pre-release se promueve desmarcando
+la casilla en la release ya publicada, y como etiqueta una promoción que
+conserve la fecha de la publicación escribiría una segunda fila en el mismo
+instante, que la suma contaría dos veces. Una release que vuelve a borrador y se
+publica de nuevo escribe una segunda fila si GitHub le da un `published_at`
+nuevo, así que la cuenta exacta son los valores distintos de `tag` de cada
+repositorio. Un borrador no tiene publicación, así que no escribe fila aquí, y
+su fila de `gh_release` no lleva `age_days`:
 GitHub envía un borrador con `published_at` a null, y la edad medida desde la
 nada valía 106751 días en cada fila de borrador. La primera pasada tras
 actualizar fecha la página de releases que lee; `-backfill` fecha el resto.

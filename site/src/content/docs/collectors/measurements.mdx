@@ -351,7 +351,7 @@ partition.
 | `gh_repo_archived` | dated, when the repository was archived | | `archived`, `age_days_at_archive`, `url` |
 | `gh_release`        | now   | `tag`, `draft`, `prerelease`                                              | `downloads`, `assets`, `age_days`, `url`                                                                                                              |
 | `gh_release_asset` | daily | `tag`, `asset` | `downloads`, `size_bytes`, `digest`, `content_type`, `uploader`, `age_days`, `url` |
-| `gh_release_published` | dated, when published | `tag`, `prerelease` | `published`, `url` |
+| `gh_release_published` | dated, when published | `tag` | `published`, `prerelease`, `url` |
 
 `open_issues` is GitHub's field and GitHub counts pull requests in it. Use
 `gh_issue` to count issues.
@@ -362,7 +362,13 @@ stable release" from, the newest row with `prerelease` false. `gh_release`
 stays stamped at the sweep, because its downloads move, and its `age_days` is
 floored to whole days counted back from the sweep: the date it reconstructs is
 a day late for any release published later in the day than the sweep ran.
-`published` is 1 on every row, so counting releases is a sum. A draft has no
+`published` is 1 on every row, so counting releases is a sum. `prerelease` is a
+field here, where it is a tag on `gh_release`: a pre-release is promoted by
+unticking the box on the published release, and as a tag a promotion that
+keeps the publication's date would write a second row at the same instant,
+which the sum would count twice. A release taken back to a draft and published
+again writes a second row if GitHub gives it a new `published_at`, so the exact
+count is the distinct `tag` values of each repository. A draft has no
 publication, so it writes no row here, and its `gh_release` row carries no
 `age_days`: GitHub sends a draft with `published_at` null, and the age measured
 from nothing held 106751 days on every draft row. The first sweep after an

@@ -31,31 +31,28 @@ func newSQLSchema() *sqlSchema { return &sqlSchema{tables: map[string]*sqlTable{
 func (s *sqlSchema) forget() { s.tables = map[string]*sqlTable{} }
 
 // declare is the statements a measurement needs before its points can land,
-// and none when the destination already knows the shape.
+// and none when the destination already knows the shape. Each column is
+// recorded as it is said, which is right for text: a statement written to the
+// file is as declared as the file will ever make it. A connection records one
+// only once the server has taken it, which is Postgres.declareAll.
 func (s *sqlSchema) declare(measurement string, sh *sqlShape) []string {
+	var out []string
 	tbl := s.tables[measurement]
 	if tbl == nil {
-		return s.create(measurement, sh)
+		var create string
+		tbl, create = newSQLTable(measurement, sh)
+		s.tables[measurement] = tbl
+		out = append(out, create)
 	}
-	var out []string
-	// A tag first seen after the table was declared cannot join the primary
-	// key without rewriting it, so it becomes a plain column. That only
-	// happens when a collector changes its tag set between sweeps.
-	for _, t := range sh.tags {
-		if _, known := tbl.cols[t]; known {
-			continue
-		}
-		tbl.cols[t] = "TEXT"
-		out = append(out, fmt.Sprintf(
-			"ALTER TABLE %s ADD COLUMN IF NOT EXISTS %s TEXT NOT NULL DEFAULT '';",
-			ident(measurement), ident(t),
-		))
+	for _, c := range tbl.missing(measurement, sh) {
+		tbl.cols[c.name] = c.typ
+		out = append(out, c.ddl)
 	}
-	return append(out, addFields(measurement, tbl, sh)...)
+	return out
 }
 
-// create is the first statements for a measurement, and records what they
-// said: the table as its key, and then each field.
+// newSQLTable is the first statement for a measurement, and the table it
+// declares: the time and the tags, which are the key, and nothing else.
 //
 // The fields are not in the CREATE TABLE. A process declares every table
 // afresh, and CREATE TABLE IF NOT EXISTS does nothing at all to the one an
@@ -63,13 +60,13 @@ func (s *sqlSchema) declare(measurement string, sh *sqlShape) []string {
 // INSERT with no column to land in, and PostgreSQL refused the statement and
 // the batch around it. Measured on 2026-09-26 against PostgreSQL 18.6: a
 // table written by one sink, then a second sink with two more fields, "column
-// "additions" of relation "gh_external_contribution" does not exist". ADD
-// COLUMN IF NOT EXISTS means the same thing to a table made a moment ago and
-// to one made a year before. The key is the one part the CREATE can settle
-// for good, since a tag that joins it later is a change to the key rather
-// than a column, and no statement here can make that.
-func (s *sqlSchema) create(measurement string, sh *sqlShape) []string {
-	tbl := &sqlTable{
+// "additions" of relation "gh_external_contribution" does not exist". Each
+// field follows as an ADD COLUMN, which the file says for every field and a
+// connection only for the ones the table lacks. The key is the one part the
+// CREATE can settle for good, since a tag that joins it later is a change to
+// the key rather than a column, and no statement here can make that.
+func newSQLTable(measurement string, sh *sqlShape) (tbl *sqlTable, create string) {
+	tbl = &sqlTable{
 		key:  append([]string{"time"}, sh.tags...),
 		cols: map[string]string{"time": "TIMESTAMPTZ"},
 	}
@@ -81,21 +78,40 @@ func (s *sqlSchema) create(measurement string, sh *sqlShape) []string {
 		fmt.Fprintf(&b, ", %s TEXT NOT NULL DEFAULT ''", ident(t))
 	}
 	fmt.Fprintf(&b, ", PRIMARY KEY (%s));", identList(tbl.key))
-	s.tables[measurement] = tbl
-	return append([]string{b.String()}, addFields(measurement, tbl, sh)...)
+	return tbl, b.String()
 }
 
-// addFields is an ADD COLUMN for every field of the shape the table has not
-// been told about yet, and records each.
-func addFields(measurement string, tbl *sqlTable, sh *sqlShape) []string {
-	var out []string
+// sqlColumn is one column a table has not been told about: its name, its
+// type, and the statement that adds it.
+type sqlColumn struct {
+	name, typ, ddl string
+}
+
+// missing is an ADD COLUMN for every column of the shape this table does not
+// know yet, the tags first and then the fields, and records none of them.
+//
+// A tag first seen after the table was declared cannot join the primary key
+// without rewriting it, so it becomes a plain column. That only happens when a
+// collector changes its tag set between sweeps.
+func (tbl *sqlTable) missing(measurement string, sh *sqlShape) []sqlColumn {
+	var out []sqlColumn
+	for _, t := range sh.tags {
+		if _, known := tbl.cols[t]; known {
+			continue
+		}
+		out = append(out, sqlColumn{t, "TEXT", fmt.Sprintf(
+			"ALTER TABLE %s ADD COLUMN IF NOT EXISTS %s TEXT NOT NULL DEFAULT '';",
+			ident(measurement), ident(t),
+		)})
+	}
 	for _, f := range sortedKeys3(sh.fields) {
 		if _, known := tbl.cols[f]; known {
 			continue
 		}
-		tbl.cols[f] = sh.fields[f]
-		out = append(out, fmt.Sprintf("ALTER TABLE %s ADD COLUMN IF NOT EXISTS %s %s;",
-			ident(measurement), ident(f), sh.fields[f]))
+		out = append(out, sqlColumn{f, sh.fields[f], fmt.Sprintf(
+			"ALTER TABLE %s ADD COLUMN IF NOT EXISTS %s %s;",
+			ident(measurement), ident(f), sh.fields[f],
+		)})
 	}
 	return out
 }

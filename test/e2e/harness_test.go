@@ -37,9 +37,21 @@ import (
 // them, joblogs and history included.
 func writeSinkConfig(t *testing.T, dir, base, sinks string) string {
 	t.Helper()
+	return writeSinkConfigAt(t, dir, base, sinks, nil)
+}
+
+// writeSinkConfigAt is writeSinkConfig with the families in cadences at a
+// cadence of their own, for a test about what a sink derives from one. A
+// fresh state file still makes the first sweep collect every family.
+func writeSinkConfigAt(t *testing.T, dir, base, sinks string, cadences map[string]string) string {
+	t.Helper()
 	var every strings.Builder
 	for _, f := range families {
-		fmt.Fprintf(&every, "    %s: 1m\n", f)
+		d, ok := cadences[f]
+		if !ok {
+			d = "1m"
+		}
+		fmt.Fprintf(&every, "    %s: %s\n", f, d)
 	}
 	cfg := fmt.Sprintf(`github:
   token: e2e-token

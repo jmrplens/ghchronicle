@@ -124,11 +124,16 @@ which `live_count` counts.
 a column the first time a row carries it, so a query naming one that no row has
 written fails at planning. A release that adds a field does that to an existing
 database until the family that writes it has swept once: `gh_fork.seconds_to_push`
-and `gh_artifact_total.live_count` are the two this release adds, which the
-Forks and "Artifact storage counted" panels name, and the `forks` family runs
-every twelve hours. Either wait for that sweep, force one with `-once`, or
-publish the dashboards after it. The other columns a database can lack are
-listed under [Columns that exist only once written](https://jmrp.io/docs/ghchronicle/collectors/measurements/#columns-that-exist-only-once-written).
+and `gh_artifact_total.live_count` were two, which the Forks and "Artifact
+storage counted" panels name, and the `forks` family runs every twelve hours. A
+release that adds a measurement a panel joins does the same to the whole panel,
+in PostgreSQL as well, where the table rather than the column is missing: the
+"Work elsewhere" table joins `gh_upstream_repo` for each repository's stars, and
+until the first `outbound` pass of the new version writes it, which is within an
+hour, both stores refuse the table rather than leave its Stars column empty.
+Either wait for that sweep, force one with `-once`, or publish the dashboards
+after it. The other columns a database can lack are listed under
+[Columns that exist only once written](https://jmrp.io/docs/ghchronicle/collectors/measurements/#columns-that-exist-only-once-written).
 
 **The traffic chart only goes back fourteen days.** That is a first sweep. The
 window is rewritten day by day on every sweep, so the series extends as the
@@ -189,10 +194,10 @@ A family that is not due yet simply does not appear.
 ## Why does Loki drop entries?
 
 Look for the debug line counting them. Loki refuses an entry more than its
-out-of-order window behind the newest entry already in that stream, about two
-hours by default, so the sink leaves the older ones out rather than losing the
-whole push. Raise `max_age` only alongside Loki's own
-`out_of_order_time_window`. See [Loki](https://jmrp.io/docs/ghchronicle/sinks/loki/).
+out-of-order window behind the newest entry already in that stream, half of the
+ingester's `max_chunk_age` and so one hour by default, so the sink leaves the
+older ones out rather than losing the whole push. Raise `max_age` only alongside
+Loki's own `max_chunk_age`. See [Loki](https://jmrp.io/docs/ghchronicle/sinks/loki/).
 
 ## Publishing the dashboard
 

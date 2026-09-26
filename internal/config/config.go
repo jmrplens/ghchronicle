@@ -270,9 +270,10 @@ type LokiSink struct {
 	// MaxAge drops entries older than this. Loki refuses a whole push when one
 	// entry predates its reject_old_samples_max_age, a week by default, and
 	// much of what this collects is older than that on purpose. The tighter
-	// limit is the out-of-order window, about two hours, which is why the
-	// sink settles on an hour rather than a day. Match it to your Loki.
-	// Empty means the sink's own default, one hour.
+	// limit is the out-of-order window, half the ingester's max_chunk_age and
+	// so an hour by default, which is why the sink settles on an hour rather
+	// than a day. Match it to your Loki. Empty means the sink's own default,
+	// one hour.
 	MaxAge string `yaml:"max_age" ghc:"example=1h"`
 }
 

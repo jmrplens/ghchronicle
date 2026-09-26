@@ -12,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5"
+
 	"github.com/jmrplens/ghchronicle/v2/internal/config"
 	"github.com/jmrplens/ghchronicle/v2/internal/sink"
 	"github.com/jmrplens/ghchronicle/v2/internal/teardown"
@@ -115,6 +117,74 @@ func TestThePostgresSinkWritesWhatTheFileSinkWouldHaveSaid(t *testing.T) {
 	}
 	if want := "<null>|<null>"; strings.TrimSpace(other) != want {
 		t.Errorf("row = %q, want %q", strings.TrimSpace(other), want)
+	}
+}
+
+// TestARestartedPostgresSinkDoesNotWaitForAReader is a new process writing to
+// tables an earlier one made while Grafana reads them. The sink used to send
+// ADD COLUMN IF NOT EXISTS for every field of every table it met, and
+// PostgreSQL takes that statement's ACCESS EXCLUSIVE lock before it checks
+// whether the column is there, so under a lock_timeout the first write failed
+// behind a reader, and the table it had recorded as declared on the way was
+// never declared again. The catalog says which columns exist, and a column
+// that exists is not altered at all.
+func TestARestartedPostgresSinkDoesNotWaitForAReader(t *testing.T) {
+	ctx := context.Background()
+	s := Start(t)
+	drop := "DROP TABLE IF EXISTS gh_sinkreader, gh_sinkreader_new;"
+	if _, err := s.Psql(ctx, drop); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _, _ = s.Psql(context.Background(), drop) })
+	at := time.Date(2026, 9, 19, 12, 0, 0, 0, time.UTC)
+	points := func(stars int) []sink.Point {
+		return []sink.Point{
+			{
+				Measurement: "gh_sinkreader", Time: at, Tags: map[string]string{"full_name": "a/b"},
+				Fields: map[string]any{"stars": stars, "forks": 2},
+			},
+			{
+				Measurement: "gh_sinkreader_new", Time: at, Tags: map[string]string{"full_name": "a/b"},
+				Fields: map[string]any{"count": 1},
+			},
+		}
+	}
+	earlier := sink.NewPostgres(pgSinkDSN(s), 100)
+	if _, err := earlier.Write(ctx, points(1)[:1]); err != nil {
+		t.Fatal(err)
+	}
+	_ = earlier.Close()
+
+	reader, err := pgx.Connect(ctx, pgSinkDSN(s))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = reader.Close(context.Background()) })
+	tx, err := reader.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = tx.Exec(ctx, "SELECT count(*) FROM gh_sinkreader"); err != nil {
+		t.Fatal(err)
+	}
+	restarted := sink.NewPostgres(pgSinkDSN(s)+"&lock_timeout=500", 100)
+	t.Cleanup(func() { _ = restarted.Close() })
+	if _, err = restarted.Write(ctx, points(5)); err != nil {
+		t.Errorf("a restarted sink failed behind a reader: %v", err)
+	}
+	if err = tx.Rollback(ctx); err != nil {
+		t.Fatal(err)
+	}
+	// Whatever the first write did, the next one has to land in both tables.
+	if _, err = restarted.Write(ctx, points(7)); err != nil {
+		t.Fatalf("the write after the reader finished: %v", err)
+	}
+	got, err := s.Psql(ctx, `SELECT (SELECT stars FROM gh_sinkreader) || '|' || (SELECT count FROM gh_sinkreader_new);`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "7|1"; strings.TrimSpace(got) != want {
+		t.Errorf("rows = %q, want %q", strings.TrimSpace(got), want)
 	}
 }
 

@@ -1029,6 +1029,49 @@ func TestTheLokiSinkKeepsAnHourWhenTheConfigSaysNothing(t *testing.T) {
 	}
 }
 
+// TestTheReleaseStreamLooksBackOneRepoCadence reads the lookback the Loki sink
+// is built with from the repo cadence the configuration resolves, the default
+// hour and a slower one, since the release line is dated at the publication
+// and the first pass to see a release is the one after it.
+func TestTheReleaseStreamLooksBackOneRepoCadence(t *testing.T) {
+	logger, _ := newLogger(config.Log{Level: "error"}, io.Discard)
+	for _, tc := range []struct {
+		families map[string]string
+		want     time.Duration
+	}{
+		{nil, 2 * time.Hour},
+		{map[string]string{"repo": "6h"}, 7 * time.Hour},
+	} {
+		cfg := &config.Config{
+			GitHub:  config.GitHub{Token: "t"},
+			Targets: config.Targets{User: "octocat"},
+			Every:   config.Every{Families: tc.families},
+			Sinks: config.Sinks{
+				Loki:       &config.LokiSink{URL: "http://loki:3100/loki/api/v1/push"},
+				DedupeFile: "off",
+			},
+		}
+		if err := cfg.Validate(); err != nil {
+			t.Fatal(err)
+		}
+		built, err := buildSinks(cfg, logger, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		loki, ok := built[0].(*sink.Loki)
+		if !ok {
+			t.Fatalf("built %s, want the loki sink", sinkNames(built))
+		}
+		if got := loki.Lookback["release"]; got != tc.want {
+			t.Errorf("every.families %v: the release stream looks back %v, want %v", tc.families, got, tc.want)
+		}
+		if len(loki.Lookback) != 1 {
+			t.Errorf("lookbacks %v, want the release stream's alone", loki.Lookback)
+		}
+		closeAll(t, built)
+	}
+}
+
 // TestBuildSinksWithTheLedgerOff builds the sinks without the ledger, which
 // is what dedupe_file: off asks for, and the plain stdout sink.
 func TestBuildSinksWithTheLedgerOff(t *testing.T) {

@@ -3,14 +3,14 @@
 # Two limits are deliberately not Loki's defaults, and the difference is the
 # whole reason this file exists. Loki refuses an entry older than
 # reject_old_samples_max_age, a week, and refuses one more than its
-# out-of-order window behind the newest entry already in that stream, about
-# two hours. Half of what this tool collects is older than both on purpose: a
-# star from 2020, a pull request from 2024.
+# out-of-order window behind the newest entry already in that stream, half of
+# max_chunk_age and so an hour. Half of what this tool collects is older than
+# both on purpose: a star from 2020, a pull request from 2024.
 #
 # In production the sink's own max_age is what keeps inside those windows, and
-# test/e2e already proves it applies that horizon three ways. Here the windows
-# are opened instead, so that a test asserting "the store kept the date of the
-# event" is answered by the store rather than by a rejection.
+# test/e2e already proves it applies that horizon. Here the windows are opened
+# instead, so that a test asserting "the store kept the date of the event" is
+# answered by the store rather than by a rejection.
 auth_enabled: false
 
 server:

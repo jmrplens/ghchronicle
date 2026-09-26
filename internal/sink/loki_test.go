@@ -179,35 +179,33 @@ func TestLokiRefusesToFallBehindItsOwnStream(t *testing.T) {
 	}
 }
 
-func TestLokiKeepsTheSpreadInsideOneBatch(t *testing.T) {
-	var got lokiPush
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		raw, _ := io.ReadAll(r.Body)
-		_ = json.Unmarshal(raw, &got)
-		w.WriteHeader(http.StatusNoContent)
-	}))
-	defer srv.Close()
-
+// TestLokiSendsABatchWiderThanTheWindowOldestFirst holds admit to what Loki
+// does with one push, which is not what this sink used to assume. It judged
+// every entry of a batch against the batch's own newest and dropped what was
+// more than MaxAge behind it; Loki judges each entry against the newest one
+// before it, and push sends a stream oldest first. Measured against Loki
+// 3.7.7 with its default limits: a push of entries from 23 hours, 12 hours and
+// a minute ago into an empty stream was taken whole. Only a lookback can make
+// a batch wider than MaxAge, and there the old rule lost the older of two
+// releases one pass carried.
+func TestLokiSendsABatchWiderThanTheWindowOldestFirst(t *testing.T) {
+	rec, url := newLokiRecorder(t, 0)
 	now := time.Now()
-	// The rule has to be applied within the batch as well. Loki takes the
-	// newest entry of the push and judges the rest against it, so a batch
-	// spanning a day fails on its own first push without this.
-	_, err := NewLoki(srv.URL, "", nil, 0, 20*time.Minute, 0).Write(context.Background(), []Point{
-		{
-			Measurement: "gh_star", Tags: map[string]string{"user": "new"},
-			Fields: map[string]any{"starred": 1}, Time: now,
-		},
-		{
-			Measurement: "gh_star", Tags: map[string]string{"user": "old"},
-			Fields: map[string]any{"starred": 1}, Time: now.Add(-40 * time.Minute),
-		},
-	})
-	var dropped *DroppedError
-	if !errors.As(err, &dropped) || dropped.N != 1 {
-		t.Fatalf("err = %v, want one entry dropped", err)
+	l := NewLoki(url, "", nil, 0, time.Hour, 0)
+	l.Lookback = map[string]time.Duration{"release": 7 * time.Hour}
+	fresh, missed := now.Add(-10*time.Minute), now.Add(-5*time.Hour-50*time.Minute)
+	if _, err := l.Write(context.Background(), []Point{
+		releaseAt("v2.0.0", fresh), releaseAt("v1.9.0", missed),
+	}); err != nil {
+		t.Fatalf("Write = %v, want both releases sent", err)
 	}
-	if len(got.Streams) != 1 || len(got.Streams[0].Values) != 1 {
-		t.Errorf("expected exactly the newest entry, got %+v", got.Streams)
+	if len(rec.pushes) != 1 || len(rec.pushes[0].Streams) != 1 {
+		t.Fatalf("pushes = %+v, want one stream", rec.pushes)
+	}
+	values := rec.pushes[0].Streams[0].Values
+	if len(values) != 2 || values[0][0] != strconv.FormatInt(missed.UnixNano(), 10) ||
+		values[1][0] != strconv.FormatInt(fresh.UnixNano(), 10) {
+		t.Errorf("the release stream carries %v, want the two releases oldest first", values)
 	}
 }
 
@@ -673,13 +671,13 @@ func TestLokiRendersAReleaseOnceAtItsPublication(t *testing.T) {
 		},
 		{
 			Measurement: "gh_release_published",
-			Tags:        map[string]string{"tag": "v1.2.0", "full_name": "o/r", "prerelease": "false"},
-			Fields:      map[string]any{"published": 1}, Time: stable,
+			Tags:        map[string]string{"tag": "v1.2.0", "full_name": "o/r"},
+			Fields:      map[string]any{"published": 1, "prerelease": false}, Time: stable,
 		},
 		{
 			Measurement: "gh_release_published",
-			Tags:        map[string]string{"tag": "v1.3.0-rc1", "full_name": "o/r", "prerelease": "true"},
-			Fields:      map[string]any{"published": 1}, Time: candidate,
+			Tags:        map[string]string{"tag": "v1.3.0-rc1", "full_name": "o/r"},
+			Fields:      map[string]any{"published": 1, "prerelease": true}, Time: candidate,
 		},
 	})
 	if err != nil {
@@ -710,6 +708,85 @@ func TestLokiRendersAReleaseOnceAtItsPublication(t *testing.T) {
 		if line := stream.Values[i][1]; !strings.HasPrefix(line, w.sentence) {
 			t.Errorf("line %d = %q, want it to read %q", i, line, w.sentence)
 		}
+	}
+}
+
+// TestLokiLooksBackOneCadenceForARelease is what issue #80 asked for once the
+// release line moved to the publication. The first repo pass to see a release
+// is the one after it was published, so with repo and max_age both at the
+// hour a release published just after a pass read its repository was more
+// than an hour old when the next pass wrote, and the wall clock left it out,
+// on every pass after that as well. The lookback buildSinks gives the stream
+// is the repo cadence plus max_age: a release published a cadence minus a
+// minute before the write arrives, and so does one published just after the
+// previous pass read the repository, when this pass runs a quarter of an hour
+// late, the tick it can lose.
+func TestLokiLooksBackOneCadenceForARelease(t *testing.T) {
+	now := time.Now()
+	points := []Point{
+		releaseAt("v1.0.0", now.Add(-59*time.Minute)),
+		releaseAt("v1.1.0", now.Add(-75*time.Minute)),
+		// Older than the lookback, so gone whatever the cadence: it was
+		// either sent by an earlier pass or published before max_age allows.
+		releaseAt("v0.9.0", now.Add(-2*time.Hour-time.Minute)),
+		// Other streams keep MaxAge.
+		starAt("late", now.Add(-75*time.Minute)),
+	}
+	sent := func(l *Loki) (tags []string, dropped int) {
+		rec, url := newLokiRecorder(t, 0)
+		l.URL = url
+		_, err := l.Write(context.Background(), points)
+		if d, ok := errors.AsType[*DroppedError](err); ok {
+			dropped = d.N
+		} else if err != nil {
+			t.Fatal(err)
+		}
+		for _, push := range rec.pushes {
+			for _, s := range push.Streams {
+				for _, v := range s.Values {
+					tags = append(tags, strings.Fields(v[1])[2])
+				}
+			}
+		}
+		return tags, dropped
+	}
+
+	l := NewLoki("", "", nil, 0, time.Hour, 0)
+	l.Lookback = map[string]time.Duration{"release": time.Hour + time.Hour}
+	if got, dropped := sent(l); !slices.Equal(got, []string{"v1.1.0", "v1.0.0"}) || dropped != 2 {
+		t.Errorf("with the lookback, sent %v and dropped %d, want both releases inside it and the rest dropped", got, dropped)
+	}
+	// The same points with no lookback, which is what the stream had before.
+	if got, dropped := sent(NewLoki("", "", nil, 0, time.Hour, 0)); !slices.Equal(got, []string{"v1.0.0"}) || dropped != 3 {
+		t.Errorf("without a lookback, sent %v and dropped %d, want only the release inside max_age", got, dropped)
+	}
+}
+
+// TestALookbackStopsShortOfTheWeekLokiRefuses caps a lookback however long the
+// cadence behind it, because Loki answers a whole push with a 400 when one
+// entry is older than reject_old_samples_max_age, a week by default, and a
+// max_age set longer is still the operator's own.
+func TestALookbackStopsShortOfTheWeekLokiRefuses(t *testing.T) {
+	l := NewLoki("", "", nil, 0, time.Hour, 0)
+	l.Lookback = map[string]time.Duration{"release": 30 * 24 * time.Hour}
+	if got := l.horizon("release"); got != lokiOldest {
+		t.Errorf("a month of lookback reaches back %v, want the cap %v", got, lokiOldest)
+	}
+	if got := l.horizon("star"); got != time.Hour {
+		t.Errorf("a stream with no lookback reaches back %v, want max_age", got)
+	}
+	l.MaxAge = 10 * 24 * time.Hour
+	if got := l.horizon("release"); got != l.MaxAge {
+		t.Errorf("with max_age past the cap the release reaches back %v, want max_age", got)
+	}
+}
+
+// releaseAt is one publication, rendered on the release stream.
+func releaseAt(tag string, at time.Time) Point {
+	return Point{
+		Measurement: "gh_release_published",
+		Tags:        map[string]string{"tag": tag, "full_name": "o/r"},
+		Fields:      map[string]any{"published": 1, "prerelease": false}, Time: at,
 	}
 }
 
@@ -835,9 +912,12 @@ func TestLokiJudgesAPushByTheNewestEntryAlreadySent(t *testing.T) {
 func TestLokiCountsBothKindsOfDroppedEntryTogether(t *testing.T) {
 	_, url := newLokiRecorder(t, 0)
 	now := time.Now()
-	_, err := NewLoki(url, "", nil, 0, time.Hour, 0).Write(context.Background(), []Point{
-		starAt("ahead", now.Add(90*time.Minute)),
-		starAt("behind", now.Add(-10*time.Minute)),
+	l := NewLoki(url, "", nil, 0, time.Hour, 0)
+	if _, err := l.Write(context.Background(), []Point{starAt("ahead", now.Add(20*time.Minute))}); err != nil {
+		t.Fatal(err)
+	}
+	_, err := l.Write(context.Background(), []Point{
+		starAt("behind", now.Add(-50*time.Minute)),
 		starAt("old", now.AddDate(0, 0, -2)),
 	})
 	var dropped *DroppedError

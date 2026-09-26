@@ -1,6 +1,7 @@
 package collect
 
 import (
+	"fmt"
 	"net/http"
 	"testing"
 	"time"
@@ -134,18 +135,22 @@ func checkReleasePublications(t *testing.T, points []sink.Point) {
 		t.Fatalf("got %d publications, want one for each of the two releases that are not drafts", got)
 	}
 	for _, want := range []struct {
-		tag, prerelease string
-		at              time.Time
+		tag        string
+		prerelease bool
+		at         time.Time
 	}{
-		{"v1.2.0", "false", time.Date(2026, 8, 10, 9, 30, 0, 0, time.UTC)},
-		{"v1.3.0-rc1", "true", time.Date(2026, 9, 1, 9, 5, 0, 0, time.UTC)},
+		{"v1.2.0", false, time.Date(2026, 8, 10, 9, 30, 0, 0, time.UTC)},
+		{"v1.3.0-rc1", true, time.Date(2026, 9, 1, 9, 5, 0, 0, time.UTC)},
 	} {
 		p := find(t, points, "gh_release_published", map[string]string{"tag": want.tag})
 		if !p.Time.Equal(want.at) {
 			t.Errorf("%s stamped %s, want its publication %s", want.tag, p.Time, want.at)
 		}
-		if p.Tags["prerelease"] != want.prerelease || p.Tags["full_name"] != "octocat/hello-world" {
+		if p.Tags["full_name"] != "octocat/hello-world" {
 			t.Errorf("%s tags = %v", want.tag, p.Tags)
+		}
+		if p.Fields["prerelease"] != want.prerelease {
+			t.Errorf("%s prerelease = %v, want the field %v", want.tag, p.Fields["prerelease"], want.prerelease)
 		}
 		// Every row here is a release that is not a draft, so the tag would
 		// hold the same value on all of them and only deepen the path.
@@ -158,6 +163,38 @@ func checkReleasePublications(t *testing.T, points []sink.Point) {
 		if url := "https://github.com/octocat/hello-world/releases/tag/" + want.tag; p.Fields["url"] != url {
 			t.Errorf("%s url = %v, want %s", want.tag, p.Fields["url"], url)
 		}
+	}
+}
+
+// TestAPromotedReleaseIsStillOneRow unticks the pre-release box on a release
+// already published, which is how a pre-release is promoted: the publication
+// keeps its date and only the flag moves. Every store keys a row by
+// measurement, tags and time, so with the flag as a tag the promotion wrote a
+// second row beside the first at the same instant, and counting publications
+// counted the release twice. As a field the second sweep rewrites the row it
+// wrote the first time.
+func TestAPromotedReleaseIsStillOneRow(t *testing.T) {
+	t.Parallel()
+	identity := func(prerelease bool) string {
+		f := newFixtureServer(t)
+		f.file("/repos/octocat/hello-world", "repo.json")
+		f.handle("/repos/octocat/hello-world/releases", func(w http.ResponseWriter, _ *http.Request) {
+			_, _ = w.Write(repeat(t, "releases.json", "", 1, func(_ int, row map[string]any) {
+				row["prerelease"] = prerelease
+			}))
+		})
+		points, err := RepoCore{}.Collect(ctx(t), f.Client, testRepo, testNow)
+		if err != nil {
+			t.Fatal(err)
+		}
+		p := find(t, points, "gh_release_published", map[string]string{"tag": "v1.2.0"})
+		if p.Fields["prerelease"] != prerelease {
+			t.Errorf("prerelease = %v, want %v", p.Fields["prerelease"], prerelease)
+		}
+		return fmt.Sprintf("%s %v %s", p.Measurement, p.Tags, p.Time)
+	}
+	if before, after := identity(true), identity(false); before != after {
+		t.Errorf("promoting the release moved its row:\n before %s\n after  %s", before, after)
 	}
 }
 

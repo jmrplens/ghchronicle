@@ -279,13 +279,20 @@ func releasePoints(ctx context.Context, c *ghapi.Client, repo Repo, base map[str
 		// gh_release pushed every release again on every pass. A draft has
 		// not been published and writes nothing, so no `draft` tag either:
 		// it would hold one value on every row.
+		//
+		// `prerelease` is a field, not the tag it is on gh_release. The box
+		// can be unticked on a release already published, which is how a
+		// pre-release is promoted, and as a tag a promotion that keeps the
+		// publication's date would be a second row at the same instant for
+		// ever, counted twice by every count of releases. gh_release can
+		// keep the tag because its date moves with every sweep.
 		points = append(points, sink.Point{
 			Measurement: "gh_release_published",
-			Tags: merge(base, map[string]string{
-				"tag": rel.TagName, "prerelease": boolTag(rel.Prerelease),
-			}),
-			Fields: withURL(map[string]any{"published": 1}, rel.HTMLURL),
-			Time:   rel.PublishedAt,
+			Tags:        merge(base, map[string]string{"tag": rel.TagName}),
+			Fields: withURL(map[string]any{
+				"published": 1, "prerelease": rel.Prerelease,
+			}, rel.HTMLURL),
+			Time: rel.PublishedAt,
 		})
 	}
 	return points, nil
