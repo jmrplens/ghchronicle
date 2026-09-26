@@ -581,6 +581,7 @@ that a sweep reads.
   ```text
   level=WARN msg="outbound search read fewer items than it counts, GitHub serves a thousand at most" kind=pull_request state=merged count=2860 read=1000
   ```
+
 - Every page of artifacts, of repository activity and of code scanning
   analyses, where a sweep reads five, two and one.
 - Every release, deployment and discussion, and every Dependabot and code
