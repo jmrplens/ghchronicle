@@ -131,9 +131,19 @@ var lokiEvents = map[string]lokiEvent{
 	"gh_fork": {kind: "fork", message: func(p Point) string {
 		return fmt.Sprintf("%s forked %s", tagOf(p, "by"), tagOf(p, "full_name"))
 	}},
-	"gh_release": {kind: "release", message: func(p Point) string {
-		return fmt.Sprintf("release %s of %s, %s downloads",
-			tagOf(p, "tag"), tagOf(p, "full_name"), fieldOf(p, "downloads"))
+	// The publication, not gh_release. That row is stamped at the sweep
+	// because its download count moves, so rendered it pushed every release
+	// again on every repository pass: 3,360 lines in a day on the account
+	// this was measured on, a third of everything the sink sent, each one
+	// saying a release had happened at the hour of a pass. The download count
+	// is a gauge, and the stream keeps its name so a query written against it
+	// still reads it.
+	"gh_release_published": {kind: "release", message: func(p Point) string {
+		what := "release"
+		if tagOf(p, "prerelease") == "true" {
+			what = "prerelease"
+		}
+		return fmt.Sprintf("published %s %s of %s", what, tagOf(p, "tag"), tagOf(p, "full_name"))
 	}},
 	"gh_package_version": {kind: "package", message: func(p Point) string {
 		return fmt.Sprintf("published %s:%s", tagOf(p, "package"), tagOf(p, "tag"))

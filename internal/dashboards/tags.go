@@ -98,6 +98,7 @@ var tags = map[string][]string{
 	"gh_rate_limit":               {"resource"},
 	"gh_release":                  {"draft", "full_name", "owner", "prerelease", "repo", "tag"},
 	"gh_release_asset":            {"asset", "full_name", "owner", "repo", "tag"},
+	"gh_release_published":        {"full_name", "owner", "prerelease", "repo", "tag"},
 	"gh_repo":                     {"archived", "default_branch", "fork", "full_name", "language", "license", "owner", "repo", "visibility"},
 	"gh_repo_activity":            {"activity", "actor", "full_name", "owner", "repo"},
 	"gh_repo_community":           {"full_name", "owner", "repo"},

@@ -8,7 +8,7 @@ compactTables:
 
 import { Aside } from "@astrojs/starlight/components";
 
-Noventa y tres medidas. Cada fila dice cómo se fecha un punto, porque eso es
+Noventa y cuatro medidas. Cada fila dice cómo se fecha un punto, porque eso es
 lo que decide qué preguntas puede responder.
 
 ## Cómo leer las tablas
@@ -192,7 +192,7 @@ almacén para cada panel, que es el sitio del que copiar.
 
 ### Todas las medidas, por orden alfabético
 
-Noventa y tres, y cada enlace cae en la tabla en la que está.
+Noventa y cuatro, y cada enlace cae en la tabla en la que está.
 
 [`gh_account`](#cuenta) · [`gh_account_total`](#cuenta) ·
 [`gh_achievement`](#cuenta) · [`gh_achievement_progress`](#cuenta) ·
@@ -231,7 +231,8 @@ Noventa y tres, y cada enlace cae en la tabla en la que está.
 [`gh_policy_file`](#configuración-y-entrega) · [`gh_profile_flag`](#cuenta) ·
 [`gh_pull_request`](#desarrollo) · [`gh_pull_request_review`](#desarrollo) ·
 [`gh_rate_limit`](#configuración-y-entrega) · [`gh_release`](#repositorios) ·
-[`gh_release_asset`](#repositorios) · [`gh_repo`](#repositorios) ·
+[`gh_release_asset`](#repositorios) ·
+[`gh_release_published`](#repositorios) · [`gh_repo`](#repositorios) ·
 [`gh_repo_activity`](#integración-continua) ·
 [`gh_repo_archived`](#repositorios) · [`gh_repo_community`](#repositorios) ·
 [`gh_repo_created`](#cuenta) · [`gh_repo_language`](#repositorios) ·
@@ -358,9 +359,23 @@ y cada reescritura costaba un fichero en la partición del propio fork.
 | `gh_repo_archived` | fechado, al archivarse el repositorio | | `archived`, `age_days_at_archive`, `url` |
 | `gh_release`        | ahora   | `tag`, `draft`, `prerelease`                                              | `downloads`, `assets`, `age_days`, `url`                                                                                                              |
 | `gh_release_asset` | diario | `tag`, `asset` | `downloads`, `size_bytes`, `digest`, `content_type`, `uploader`, `age_days`, `url` |
+| `gh_release_published` | fechado, al publicarse | `tag`, `prerelease` | `published`, `url` |
 
 `open_issues` es el campo de GitHub y GitHub cuenta las pull requests dentro.
 Usa `gh_issue` para contar issues.
+
+`gh_release_published` es cuándo se publicó cada release, al segundo, y es la
+medida por la que agrupar un calendario de releases o de la que leer "la
+última release estable", la fila más nueva con `prerelease` a false.
+`gh_release` sigue sellada en la pasada, porque sus descargas se mueven, y su
+`age_days` son días enteros truncados contados hacia atrás desde la pasada: la
+fecha que reconstruye llega un día tarde para toda release publicada más tarde
+dentro del día que la hora de la pasada. `published` vale 1 en todas las
+filas, así que contar releases es una suma. Un borrador no tiene publicación,
+así que no escribe fila aquí, y su fila de `gh_release` no lleva `age_days`:
+GitHub envía un borrador con `published_at` a null, y la edad medida desde la
+nada valía 106751 días en cada fila de borrador. La primera pasada tras
+actualizar fecha la página de releases que lee; `-backfill` fecha el resto.
 
 La `url` de `gh_release_asset` es la dirección de descarga del binario, no una
 página: seguirla baja el fichero. Los assets son inventario, anclados al inicio

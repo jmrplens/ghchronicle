@@ -8,7 +8,7 @@ The thirty-four families of GitHub metrics ghchronicle collects, what each one a
 
 Source: <https://jmrp.io/docs/ghchronicle/collectors/>
 
-Thirty-four families, ninety-three measurements. This page is what each family
+Thirty-four families, ninety-four measurements. This page is what each family
 is _for_; the [measurements reference](https://jmrp.io/docs/ghchronicle/collectors/measurements/)
 is every tag and field.
 
@@ -309,7 +309,7 @@ Every measurement ghchronicle writes from the GitHub API, its tags, its fields, 
 
 Source: <https://jmrp.io/docs/ghchronicle/collectors/measurements/>
 
-Ninety-three measurements. Each row says how a point is dated, because that is
+Ninety-four measurements. Each row says how a point is dated, because that is
 the thing that decides which questions it can answer.
 
 ### How to read the tables
@@ -487,7 +487,7 @@ panel, which is the place to copy from.
 
 #### Every measurement, alphabetically
 
-Ninety-three, each link landing on the table it is in.
+Ninety-four, each link landing on the table it is in.
 
 [`gh_account`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#account) · [`gh_account_total`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#account) ·
 [`gh_achievement`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#account) · [`gh_achievement_progress`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#account) ·
@@ -526,7 +526,8 @@ Ninety-three, each link landing on the table it is in.
 [`gh_profile_flag`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#account) · [`gh_pull_request`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#development) ·
 [`gh_pull_request_review`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#development) ·
 [`gh_rate_limit`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#configuration-and-delivery) · [`gh_release`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#repositories) ·
-[`gh_release_asset`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#repositories) · [`gh_repo`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#repositories) ·
+[`gh_release_asset`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#repositories) ·
+[`gh_release_published`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#repositories) · [`gh_repo`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#repositories) ·
 [`gh_repo_activity`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#continuous-integration) ·
 [`gh_repo_archived`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#repositories) · [`gh_repo_community`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#repositories) ·
 [`gh_repo_created`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#account) · [`gh_repo_language`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#repositories) ·
@@ -650,9 +651,22 @@ partition.
 | `gh_repo_archived` | dated, when the repository was archived | | `archived`, `age_days_at_archive`, `url` |
 | `gh_release`        | now   | `tag`, `draft`, `prerelease`                                              | `downloads`, `assets`, `age_days`, `url`                                                                                                              |
 | `gh_release_asset` | daily | `tag`, `asset` | `downloads`, `size_bytes`, `digest`, `content_type`, `uploader`, `age_days`, `url` |
+| `gh_release_published` | dated, when published | `tag`, `prerelease` | `published`, `url` |
 
 `open_issues` is GitHub's field and GitHub counts pull requests in it. Use
 `gh_issue` to count issues.
+
+`gh_release_published` is when each release was published, to the second, and
+it is the one to group by for a calendar of releases or to read "the latest
+stable release" from, the newest row with `prerelease` false. `gh_release`
+stays stamped at the sweep, because its downloads move, and its `age_days` is
+floored to whole days counted back from the sweep: the date it reconstructs is
+a day late for any release published later in the day than the sweep ran.
+`published` is 1 on every row, so counting releases is a sum. A draft has no
+publication, so it writes no row here, and its `gh_release` row carries no
+`age_days`: GitHub sends a draft with `published_at` null, and the age measured
+from nothing held 106751 days on every draft row. The first sweep after an
+upgrade dates the page of releases it reads; `-backfill` dates the rest.
 
 The `url` on `gh_release_asset` is the asset's download address, not a page:
 following it fetches the binary. The assets are inventory, anchored to the

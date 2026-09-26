@@ -276,10 +276,10 @@ The reducer also publishes `total`, a running count of distinct items seen per
 series. That is what lets a Prometheus dashboard answer "per day" at all, through
 `increase()` over a monotonic counter, since it has no rows to count.
 
-#### The eleven that are never served
+#### The twelve that are never served
 
-Eleven of the measurements carry `skip`, so a Prometheus exporter and an OTLP
-backend with `raw: false` never see them. Eight are history, two are size, and
+Twelve of the measurements carry `skip`, so a Prometheus exporter and an OTLP
+backend with `raw: false` never see them. Nine are history, two are size, and
 one is text:
 
 | Measurement                | Why                                                                                   |
@@ -292,6 +292,7 @@ one is text:
 | `gh_job_log`               | Text, not a number. It belongs in a log store                                         |
 | `gh_package_version`       | History. The publication date of every tag; the count of them is a field on `gh_package` |
 | `gh_release_asset`         | Size. One series per file ever published                                              |
+| `gh_release_published`     | History. The publication date of every release; `gh_release` is already a series per release |
 | `gh_star_day`              | History. Stars per day, revised backwards when a star given in the last thirty weeks is taken back; the count is `gh_repo.stars` |
 | `gh_traffic_path`          | History. The per-day paths                                                            |
 | `gh_workflow_step`         | History. The per-step timings                                                         |

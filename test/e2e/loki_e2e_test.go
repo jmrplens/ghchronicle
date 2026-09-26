@@ -3,9 +3,14 @@ package e2e
 import (
 	"encoding/json"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/jmrplens/ghchronicle/v2/test/e2e/fakegh"
 )
 
 type lokiStream struct {
@@ -81,10 +86,48 @@ func TestLokiSinkPushesEventsAsLogLines(t *testing.T) {
 		}
 	}
 
-	for _, want := range []string{"workflow_run", "star", "commit", "event"} {
+	for _, want := range []string{"workflow_run", "star", "commit", "event", "release"} {
 		if kinds[want] == 0 {
 			t.Errorf("no %s entries were pushed; kinds seen: %v", want, sortedNames(kinds))
 		}
+	}
+	assertReleasesAtPublication(t, reqs)
+}
+
+// assertReleasesAtPublication holds the release stream to the moments the
+// fixtures' releases were published, and to nothing else. The line used to
+// come from gh_release, stamped at the sweep, so each repository pass pushed
+// every release again at the moment of that pass, and the stream read in
+// order said a release had happened every hour.
+func assertReleasesAtPublication(t *testing.T, reqs []capturedRequest) {
+	t.Helper()
+	published := map[int64]string{
+		fakegh.DaysAgo(32).Add(9*time.Hour + 30*time.Minute).UnixNano(): "published release v1.2.0 of ",
+		fakegh.DaysAgo(10).Add(9*time.Hour + 5*time.Minute).UnixNano():  "published prerelease v1.3.0-rc1 of ",
+	}
+	seen := map[int64]bool{}
+	for _, r := range reqs {
+		for _, s := range decodeLoki(t, r.Body).Streams {
+			if s.Stream["kind"] != "release" {
+				continue
+			}
+			for _, v := range s.Values {
+				at, _ := strconv.ParseInt(v[0], 10, 64)
+				sentence, ok := published[at]
+				if !ok {
+					t.Errorf("a release line is stamped %s, which is no publication in the fixtures: %s",
+						time.Unix(0, at).UTC().Format(time.RFC3339Nano), v[1])
+					continue
+				}
+				if !strings.HasPrefix(v[1], sentence) {
+					t.Errorf("the line at %s reads %q, want %q", time.Unix(0, at).UTC().Format(time.RFC3339), v[1], sentence)
+				}
+				seen[at] = true
+			}
+		}
+	}
+	if len(seen) != len(published) {
+		t.Errorf("the release stream holds %d of the fixtures' %d publications", len(seen), len(published))
 	}
 }
 
@@ -160,7 +203,7 @@ func assertLokiEntry(t *testing.T, kind, entry string) {
 // failure.
 func TestLokiDropsWhatItWouldBeRefusedFor(t *testing.T) {
 	t.Parallel()
-	gh := newFakeGitHub(t)
+	gh := fakegh.New(t, "testdata", releasedJustNowOverlay(t))
 	rec := newCapture(t, nil)
 	dir := t.TempDir()
 	cfg := writeSinkConfig(t, dir, gh.URL(), `  loki:
@@ -175,9 +218,49 @@ func TestLokiDropsWhatItWouldBeRefusedFor(t *testing.T) {
 	if strings.Contains(out, "sink write failed") {
 		t.Errorf("a drop was reported as a failure:\n%s", out)
 	}
-	// What is inside the horizon still goes: the fixtures date one workflow
-	// run at the moment of the run.
+	// What is inside the horizon still goes, and the overlay's release is the
+	// entry inside it. The base fixtures have none: what went here before was
+	// gh_release, stamped at the sweep and so inside any horizon, which is the
+	// line a release stopped being rendered as.
 	if lokiEntryCount(t, rec) == 0 {
 		t.Errorf("the horizon dropped everything, including the entries inside it")
 	}
+	sent := false
+	for _, r := range rec.Accepted() {
+		for _, s := range decodeLoki(t, r.Body).Streams {
+			for _, v := range s.Values {
+				sent = sent || strings.HasPrefix(v[1], "published release v1.4.0 of octocat/hello-world ")
+			}
+		}
+	}
+	if !sent {
+		t.Errorf("the release published a moment ago is not among the entries sent")
+	}
+}
+
+// releasedJustNowOverlay is the base release list with one more release,
+// published at the fake's own present.
+func releasedJustNowOverlay(t *testing.T) string {
+	t.Helper()
+	raw, err := os.ReadFile(filepath.Join("testdata", "releases.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var releases []map[string]any
+	if err = json.Unmarshal(raw, &releases); err != nil {
+		t.Fatalf("releases.json: %v", err)
+	}
+	releases = append(releases, map[string]any{
+		"id": 3, "tag_name": "v1.4.0", "name": "v1.4.0", "draft": false, "prerelease": false,
+		"created_at": "@NOW@", "published_at": "@NOW@", "assets": []any{},
+	})
+	body, err := json.Marshal(releases)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	if err = os.WriteFile(filepath.Join(dir, "releases.json"), body, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return dir
 }

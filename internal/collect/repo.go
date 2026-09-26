@@ -225,8 +225,9 @@ func releasePoints(ctx context.Context, c *ghapi.Client, repo Repo, base map[str
 	// after eleven hours. One row per asset per day still answers "downloads
 	// per day", by the difference between two days, and the newest row is
 	// still the value. The release itself stays stamped at the sweep: it is
-	// one row per release, and the Loki line it renders as is the one dated
-	// event a sweep is sure to produce.
+	// one row per release, and its download count moves, so dated at the
+	// publication it would rewrite that old partition on every sweep. The
+	// publication is the row that carries the date.
 	day := now.UTC().Truncate(24 * time.Hour)
 	var points []sink.Point
 	for _, rel := range releases {
@@ -251,17 +252,40 @@ func releasePoints(ctx context.Context, c *ghapi.Client, repo Repo, base map[str
 				Time: day,
 			})
 		}
+		fields := map[string]any{"downloads": total, "assets": len(rel.Assets)}
+		// A draft comes with published_at null, and an age measured from Go's
+		// zero time saturates: every draft row held 106751 days, beside a real
+		// maximum of 271 on the account it was measured on, and skewed anything
+		// that averaged the field without filtering drafts out first.
+		published := !rel.Draft && !rel.PublishedAt.IsZero()
+		if published {
+			fields["age_days"] = int(now.Sub(rel.PublishedAt).Hours() / 24)
+		}
 		points = append(points, sink.Point{
 			Measurement: "gh_release",
 			Tags: merge(base, map[string]string{
 				"tag": rel.TagName, "prerelease": boolTag(rel.Prerelease), "draft": boolTag(rel.Draft),
 			}),
-			Fields: map[string]any{
-				"downloads": total, "assets": len(rel.Assets),
-				"age_days": int(now.Sub(rel.PublishedAt).Hours() / 24),
-				"url":      rel.HTMLURL,
-			},
-			Time: now,
+			Fields: withURL(fields, rel.HTMLURL),
+			Time:   now,
+		})
+		if !published {
+			continue
+		}
+		// The publication, dated when it happened, which the floored age
+		// cannot give back: counted from the sweep, a release published later
+		// in the day than the sweep ran lands a day late. It is what a
+		// calendar of releases groups by, and what Loki renders, once, where
+		// gh_release pushed every release again on every pass. A draft has
+		// not been published and writes nothing, so no `draft` tag either:
+		// it would hold one value on every row.
+		points = append(points, sink.Point{
+			Measurement: "gh_release_published",
+			Tags: merge(base, map[string]string{
+				"tag": rel.TagName, "prerelease": boolTag(rel.Prerelease),
+			}),
+			Fields: withURL(map[string]any{"published": 1}, rel.HTMLURL),
+			Time:   rel.PublishedAt,
 		})
 	}
 	return points, nil

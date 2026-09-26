@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -646,9 +647,69 @@ func TestNewLokiFillsInOnlyWhatWasLeftOut(t *testing.T) {
 // TestLokiRendersAnAbsentFieldAsNothing leaves the gap a missing field makes
 // visible in the sentence rather than printing Go's <nil>.
 func TestLokiRendersAnAbsentFieldAsNothing(t *testing.T) {
-	p := Point{Measurement: "gh_release", Tags: map[string]string{"tag": "v1", "full_name": "o/r"}}
-	if got := lokiEvents["gh_release"].message(p); got != "release v1 of o/r,  downloads" {
+	p := Point{Measurement: "gh_code_scanning_analysis", Tags: map[string]string{
+		"tool": "CodeQL", "full_name": "o/r", "ref": "refs/heads/main",
+	}}
+	if got := lokiEvents["gh_code_scanning_analysis"].message(p); got != "CodeQL analyzed o/r (refs/heads/main):  results" {
 		t.Errorf("message = %q", got)
+	}
+}
+
+// TestLokiRendersAReleaseOnceAtItsPublication is the Loki half of issue #80.
+// The release line used to be rendered from gh_release, which is stamped at
+// the sweep because its download count moves, so every repository pass pushed
+// every release again: 160 lines an hour on the account that measured it, a
+// third of all the sink sent in a day, each saying what the hour before had
+// said. The publication is the event, and it has a date of its own.
+func TestLokiRendersAReleaseOnceAtItsPublication(t *testing.T) {
+	rec, url := newLokiRecorder(t, 0)
+	now := time.Now()
+	stable, candidate := now.Add(-20*time.Minute), now.Add(-10*time.Minute)
+	_, err := NewLoki(url, "", nil, 0, 0, 0).Write(context.Background(), []Point{
+		{
+			Measurement: "gh_release",
+			Tags:        map[string]string{"tag": "v1.2.0", "full_name": "o/r", "draft": "false", "prerelease": "false"},
+			Fields:      map[string]any{"downloads": 16, "assets": 2}, Time: now,
+		},
+		{
+			Measurement: "gh_release_published",
+			Tags:        map[string]string{"tag": "v1.2.0", "full_name": "o/r", "prerelease": "false"},
+			Fields:      map[string]any{"published": 1}, Time: stable,
+		},
+		{
+			Measurement: "gh_release_published",
+			Tags:        map[string]string{"tag": "v1.3.0-rc1", "full_name": "o/r", "prerelease": "true"},
+			Fields:      map[string]any{"published": 1}, Time: candidate,
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rec.pushes) != 1 || len(rec.pushes[0].Streams) != 1 {
+		t.Fatalf("pushes = %+v, want one stream", rec.pushes)
+	}
+	stream := rec.pushes[0].Streams[0]
+	if stream.Stream["kind"] != "release" {
+		t.Errorf("kind = %q, want release, the label a query written before this change filters on", stream.Stream["kind"])
+	}
+	want := []struct {
+		at       time.Time
+		sentence string
+	}{
+		{stable, "published release v1.2.0 of o/r "},
+		{candidate, "published prerelease v1.3.0-rc1 of o/r "},
+	}
+	if len(stream.Values) != len(want) {
+		t.Fatalf("the release stream holds %d lines, want one per publication and none for the sweep's row: %v",
+			len(stream.Values), stream.Values)
+	}
+	for i, w := range want {
+		if got := stream.Values[i][0]; got != strconv.FormatInt(w.at.UnixNano(), 10) {
+			t.Errorf("line %d stamped %s, want the publication %d", i, got, w.at.UnixNano())
+		}
+		if line := stream.Values[i][1]; !strings.HasPrefix(line, w.sentence) {
+			t.Errorf("line %d = %q, want it to read %q", i, line, w.sentence)
+		}
 	}
 }
 

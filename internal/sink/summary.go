@@ -197,6 +197,10 @@ var promRules = map[string]rule{
 	// The publication date of every container tag is history; the count of
 	// them is already a field on gh_package.
 	"gh_package_version": {mode: skip},
+	// So is the publication date of every release, and gh_release already
+	// serves a series per release, so how many there are is a count of
+	// those.
+	"gh_release_published": {mode: skip},
 
 	// Text, not a number. It goes to a log store.
 	"gh_job_log": {mode: skip},

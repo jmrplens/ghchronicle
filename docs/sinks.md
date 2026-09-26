@@ -380,10 +380,10 @@ release assets one per file ever published. Measured, together they were **four
 fifths of the exporter's entire output**. Both are drawn properly by the
 InfluxDB dashboard.
 
-Nine more are skipped for a reason other than size, eight of them as history
-and one as text, so eleven measurements in all never reach the exporter. The
+Ten more are skipped for a reason other than size, nine of them as history
+and one as text, so twelve measurements in all never reach the exporter. The
 list, with the reason for each, is on
-[dating a point](https://jmrp.io/docs/ghchronicle/how/dating/#the-eleven-that-are-never-served).
+[dating a point](https://jmrp.io/docs/ghchronicle/how/dating/#the-twelve-that-are-never-served).
 
 The exporter holds only what the last sweep collected, and for workflow runs
 that is the newest thirty per repository between builds: an ordinary sweep
@@ -1001,6 +1001,19 @@ the whole push.
 
 `max_age` defaults to one hour, which is inside Loki's default window. Raise it
 only if you have raised `out_of_order_time_window` to match.
+
+A release is the event that shows what the horizon costs. Its line is rendered
+from `gh_release_published`, at the moment the release was published. It used
+to come from `gh_release`, which is stamped at the sweep because its downloads
+move, so every repository pass pushed every release again: 3,360 lines in a day
+on the account this was measured on, a third of everything the sink sent. Dated
+at the publication, the stream holds one line per release, sent by the first
+`repo` pass to see it, provided that pass writes within `max_age` of it. With
+both at their default hour, a release misses its line only when that pass
+writes more than an hour after the publication: a release published after a
+pass has read its repository and before the same pass writes, at most forty
+seconds on that account, or one published just before a pass that runs late.
+It is in the metrics store either way.
 
 ### What Loki is not for
 

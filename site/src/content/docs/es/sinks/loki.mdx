@@ -102,6 +102,20 @@ costar el envío entero.
 `max_age` vale una hora por omisión, que está dentro de la ventana por defecto
 de Loki. Súbelo solo si has subido `out_of_order_time_window` a juego.
 
+Una release es el evento que muestra lo que cuesta el horizonte. Su línea se
+genera a partir de `gh_release_published`, en el momento en que se publicó la
+release. Antes salía de `gh_release`, que se sella en la pasada porque sus
+descargas se mueven, así que cada pasada de repositorios volvía a enviar todas
+las releases: 3.360 líneas en un día en la cuenta en la que se midió, un tercio
+de todo lo que envió el destino. Fechada en la publicación, el stream tiene una
+línea por release, la que envía la primera pasada de `repo` que la ve, siempre
+que esa pasada escriba dentro de `max_age` desde ella. Con ambos en su hora por
+omisión, una release se queda sin línea solo cuando esa pasada escribe más de
+una hora después de la publicación: una release publicada después de que una
+pasada haya leído su repositorio y antes de que esa misma pasada escriba, como
+mucho cuarenta segundos en esa cuenta, o una publicada justo antes de una
+pasada que se retrasa. Está en el almacén de métricas en cualquier caso.
+
 ## Para qué no sirve Loki
 
 Para la historia fechada. De eso se encarga un almacén de métricas, y por eso

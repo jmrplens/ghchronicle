@@ -108,7 +108,7 @@ each one draws and how to put one in a profile README.
 The full documentation is at
 **<https://jmrp.io/docs/ghchronicle/>**, in English and Spanish:
 [quickstart](https://jmrp.io/docs/ghchronicle/start/quickstart/),
-[the 93 measurements](https://jmrp.io/docs/ghchronicle/collectors/measurements/),
+[the 94 measurements](https://jmrp.io/docs/ghchronicle/collectors/measurements/),
 [choosing a store](https://jmrp.io/docs/ghchronicle/sinks/),
 [the cost of a sweep](https://jmrp.io/docs/ghchronicle/api/cost/) and
 [troubleshooting](https://jmrp.io/docs/ghchronicle/reference/troubleshooting/).
@@ -121,7 +121,7 @@ left unproven; the notes on each tag say what landed.
 
 ## What it collects
 
-Ninety-three measurements across thirty-four families, covering every surface
+Ninety-four measurements across thirty-four families, covering every surface
 a personal or organisation account exposes.
 
 | Area          | What is kept                                                                                                                                                                                                                           |
