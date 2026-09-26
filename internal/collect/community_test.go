@@ -138,6 +138,10 @@ func outboundFixture(t *testing.T, searches *[]string, starred *[]map[string]any
 				q, _ := vars["query"].(string)
 				*searches = append(*searches, q)
 			}
+			// The fixture answers every field whether or not it was asked
+			// for, so what the query selects is checked here or nowhere.
+			wantSelected(t, query, "additions", "deletions", "changedFiles",
+				"stargazerCount", "forkCount", "isPrivate", "url primaryLanguage { name }")
 			f.write(w, "graphql_search_issues.json")
 		case strings.Contains(query, "repositoryDiscussionComments"):
 			// gh_discussion_comment is written by two collectors from two
@@ -145,23 +149,31 @@ func outboundFixture(t *testing.T, searches *[]string, starred *[]map[string]any
 			// repoactivity_test: a selection added to one and not the other
 			// gives the measurement two shapes, and half its rows would
 			// answer "was this thread ever answered" with a zero value.
-			for _, field := range []string{
-				"answerChosenBy", "answer {", "closed", "stateReason", "isAnswerable",
-			} {
-				if !strings.Contains(query, field) {
-					t.Errorf("query does not ask for %s:\n%s", field, query)
-				}
-			}
+			// isPrivate is the exception: the other one has it from the
+			// listing that found the repository, and asks for nothing.
+			wantSelected(t, query, "answerChosenBy", "answer {", "closed", "stateReason",
+				"isAnswerable", "repository { nameWithOwner isPrivate }")
 			if strings.Contains(query, "onlyAnswers: true") {
 				f.write(w, "viewer_discussion_answers.json")
 				return
 			}
 			f.write(w, "viewer_discussion_comments.json")
 		default:
+			wantSelected(t, query, "repository { nameWithOwner isPrivate }")
 			f.write(w, "viewer_issue_comments.json")
 		}
 	})
 	return f
+}
+
+// wantSelected fails for every selection the query does not make.
+func wantSelected(t *testing.T, query string, selections ...string) {
+	t.Helper()
+	for _, sel := range selections {
+		if !strings.Contains(query, sel) {
+			t.Errorf("query does not ask for %s:\n%s", sel, query)
+		}
+	}
 }
 
 func TestOutbound(t *testing.T) {
@@ -176,14 +188,16 @@ func TestOutbound(t *testing.T) {
 	}
 	checkPoints(t, points)
 	wantMeasurements(t, points, "gh_star_given", "gh_external_contribution",
-		"gh_discussion_comment", "gh_issue_comment")
+		"gh_upstream_repo", "gh_discussion_comment", "gh_issue_comment")
 
 	checkOutboundComments(t, points)
 	checkStarsGiven(t, points, starred)
 	checkSearchesAreScoped(t, searches)
 	checkExternalContributions(t, points)
+	checkUpstreamRepositories(t, points)
 	// The rows are the ones the REST paths wrote for the same three stars and
-	// two items, recorded before the move to GraphQL.
+	// two items, recorded before the move to GraphQL, with the size and the
+	// visibility the REST search never read added to the contributions.
 	checkGolden(t, "outbound", points, "gh_star_given", "gh_external_contribution")
 }
 
@@ -208,6 +222,28 @@ func checkOutboundComments(t *testing.T, points []sink.Point) {
 	comment := find(t, points, "gh_issue_comment", map[string]string{"full_name": "torvalds/linux"})
 	if comment.Tags["own"] != "false" || comment.Tags["number"] != "42" {
 		t.Errorf("issue comment = %v", comment.Tags)
+	}
+	checkCommentsSayWhetherPrivate(t, points)
+}
+
+// checkCommentsSayWhetherPrivate reads the repository's visibility off every
+// comment row. `own` does not answer it: the account's own repositories are
+// private and public alike, and an organisation's private repository is not
+// the account's own at all.
+func checkCommentsSayWhetherPrivate(t *testing.T, points []sink.Point) {
+	t.Helper()
+	for _, m := range []string{"gh_issue_comment", "gh_discussion_comment"} {
+		for _, p := range only(t, points, m) {
+			want := p.Tags["full_name"] == "octocat/hello-world"
+			if got, ok := p.Fields["private"].(bool); !ok || got != want {
+				t.Errorf("%s in %s: private = %v, want %v", m, p.Tags["full_name"], p.Fields["private"], want)
+			}
+		}
+	}
+	// The accepted answer only the second walk reads carries it as well.
+	late := find(t, points, "gh_discussion_comment", map[string]string{"comment": "7654321"})
+	if late.Fields["private"] != false {
+		t.Errorf("an answer from the answers walk = %v", late.Fields)
 	}
 }
 
@@ -371,6 +407,105 @@ func checkExternalContributions(t *testing.T, points []sink.Point) {
 	}
 	if hasField(open, "merged") {
 		t.Error("an issue is never merged")
+	}
+	checkContributionSizeAndVisibility(t, merged, open)
+}
+
+// checkContributionSizeAndVisibility reads the two facts about an item that do
+// not move once it is closed: how large the change was, and whether the
+// repository it went to is private, which is what lets a consumer leave
+// private work out of anything it shows to others.
+func checkContributionSizeAndVisibility(t *testing.T, merged, open sink.Point) {
+	t.Helper()
+	if fieldInt(t, merged, "additions") != 167 || fieldInt(t, merged, "deletions") != 12 ||
+		fieldInt(t, merged, "changed_files") != 6 {
+		t.Errorf("a pull request carries its size: %v", merged.Fields)
+	}
+	if merged.Fields["private"] != false || open.Fields["private"] != true {
+		t.Errorf("private = %v and %v, want false on someone/else and true on another/project",
+			merged.Fields["private"], open.Fields["private"])
+	}
+	for _, name := range []string{"additions", "deletions", "changed_files"} {
+		if hasField(open, name) {
+			t.Errorf("an issue has no diff, and carries %s: %v", name, open.Fields)
+		}
+	}
+	// The star count moves every day, and this row is dated when the item
+	// closed: on it, every move would rewrite a partition of the past.
+	for _, p := range []sink.Point{merged, open} {
+		for _, name := range []string{"stars", "repo_stars", "forks", "language"} {
+			if hasField(p, name) {
+				t.Errorf("gh_external_contribution carries %s, a current state of the repository: %v", name, p.Fields)
+			}
+		}
+	}
+}
+
+// checkUpstreamRepositories reads the repositories the searches reached, one
+// row each however many items and searches named it, stamped at the sweep
+// because every number on it is the repository as it stands now.
+func checkUpstreamRepositories(t *testing.T, points []sink.Point) {
+	t.Helper()
+	upstream := only(t, points, "gh_upstream_repo")
+	if len(upstream) != 2 {
+		t.Fatalf("got %d upstream repositories from 10 items in 5 searches, want the 2 distinct ones", len(upstream))
+	}
+	for _, p := range upstream {
+		if !p.Time.Equal(testNow) {
+			t.Errorf("%s stamped %s, want the sweep %s", p.Tags["full_name"], p.Time, testNow)
+		}
+		if len(p.Tags) != 3 {
+			t.Errorf("%s tags = %v, want the repository's three and nothing else", p.Tags["full_name"], p.Tags)
+		}
+	}
+	upstreamGo := find(t, points, "gh_upstream_repo", map[string]string{
+		"full_name": "someone/else", "owner": "someone", "repo": "else",
+	})
+	if fieldInt(t, upstreamGo, "stars") != 5152 || fieldInt(t, upstreamGo, "forks") != 555 ||
+		upstreamGo.Fields["private"] != false || upstreamGo.Fields["language"] != "Go" ||
+		upstreamGo.Fields["url"] != "https://github.com/someone/else" {
+		t.Errorf("someone/else = %v", upstreamGo.Fields)
+	}
+	// GitHub answers primaryLanguage null for a repository it detects no
+	// language in, and a field says nothing rather than an empty string.
+	private := find(t, points, "gh_upstream_repo", map[string]string{"full_name": "another/project"})
+	if private.Fields["private"] != true || fieldInt(t, private, "stars") != 21 || hasField(private, "language") {
+		t.Errorf("another/project = %v", private.Fields)
+	}
+}
+
+// A search that fails after others answered still leaves the repositories
+// those reached: their contributions are handed up with the error, and the
+// row that says what each of those repositories is goes with them.
+func TestOutboundKeepsTheUpstreamRepositoriesOfAFailedSweep(t *testing.T) {
+	t.Parallel()
+	searched := 0
+	f := newFixtureServer(t)
+	f.graphQL(func(w http.ResponseWriter, _ *http.Request, query string, _ map[string]any) {
+		switch {
+		case strings.Contains(query, "starredRepositories(first:"):
+			f.write(w, "graphql_starred.json")
+		case strings.Contains(query, "search(type: ISSUE"):
+			searched++
+			if searched > 1 {
+				_, _ = w.Write([]byte(accountInternalError))
+				return
+			}
+			f.write(w, "graphql_search_issues.json")
+		default:
+			t.Errorf("the comments were read after a search failed: %s", query)
+		}
+	})
+	points, err := Outbound{Login: "octocat"}.Collect(ctx(t), f.Client, testNow)
+	if err == nil {
+		t.Fatal("a failed search was not reported")
+	}
+	if got := len(only(t, points, "gh_external_contribution")); got != 2 {
+		t.Errorf("got %d contributions, want the first search's 2", got)
+	}
+	upstream := only(t, points, "gh_upstream_repo")
+	if len(upstream) != 2 {
+		t.Errorf("got %d upstream repositories, want the 2 the first search reached", len(upstream))
 	}
 }
 

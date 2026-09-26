@@ -12539,7 +12539,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "Pull requests and issues opened in repositories this account does not own, with the state each ended in. Nothing else sees them: they are not in these repositories and the event feed forgets them in three days. Seen is the row's own date, which for an open item is the day it was last seen open; Opened is when it was opened. Prometheus keeps the repository only, so this is contributions per repository over the range, the share merged and the mean comments. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date. The Prometheus exporter carries no url, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "Pull requests and issues opened in repositories this account does not own, with the state each ended in. Nothing else sees them: they are not in these repositories and the event feed forgets them in three days. Seen is the row's own date, which for an open item is the day it was last seen open; Opened is when it was opened. Stars is the repository's own count at the last sweep inside the range. Prometheus keeps the repository only, so this is contributions per repository over the range, the share merged and the mean comments, beside the stars at the last sweep. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date. The Prometheus exporter carries no url, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -12630,6 +12630,22 @@
                   {
                     "id": "custom.width",
                     "value": 100
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Stars"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "short"
+                  },
+                  {
+                    "id": "custom.width",
+                    "value": 90
                   }
                 ]
               },
@@ -12736,6 +12752,15 @@
               "instant": true,
               "range": false,
               "refId": "C"
+            },
+            {
+              "datasource": "${DS_PROMETHEUS}",
+              "editorMode": "code",
+              "expr": "max by (full_name) (github_upstream_repo_stars)",
+              "format": "table",
+              "instant": true,
+              "range": false,
+              "refId": "D"
             }
           ],
           "title": "Work elsewhere",
@@ -12760,6 +12785,7 @@
                   "Value #A": "Contributions",
                   "Value #B": "Merged",
                   "Value #C": "Comments",
+                  "Value #D": "Stars",
                   "full_name": "Repository"
                 }
               }

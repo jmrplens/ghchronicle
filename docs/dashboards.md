@@ -833,8 +833,15 @@ each star was given. Whether the projects are small or famous is a different
 question from how many there are, so the second table carries their own star
 counts.
 
-Reads `gh_event`, `gh_notification`, `gh_external_contribution` and
-`gh_star_given`.
+The table of work elsewhere carries the same number for the repositories the
+account contributed to: each one's star count at the newest sweep inside the
+range, from `gh_upstream_repo`, joined onto every item in the InfluxDB and
+PostgreSQL dashboards and beside every repository in the Prometheus one.
+Graphite and Elasticsearch cannot join two measurements in one panel and leave
+the column out, saying so.
+
+Reads `gh_event`, `gh_notification`, `gh_external_contribution`,
+`gh_upstream_repo` and `gh_star_given`.
 
 ### Inventory
 

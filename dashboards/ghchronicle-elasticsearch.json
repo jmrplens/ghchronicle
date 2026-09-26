@@ -18684,7 +18684,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "Pull requests and issues opened in repositories this account does not own, with the state each ended in. Nothing else sees them: they are not in these repositories and the event feed forgets them in three days. Seen is the row's own date, which for an open item is the day it was last seen open; Opened is when it was opened.",
+          "description": "Pull requests and issues opened in repositories this account does not own, with the state each ended in. Nothing else sees them: they are not in these repositories and the event feed forgets them in three days. Seen is the row's own date, which for an open item is the day it was last seen open; Opened is when it was opened. Stars is the repository's own count at the last sweep inside the range. Elasticsearch lists the contributions' own documents and cannot join the repository's stars, which are documents of another index, onto them.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -18775,6 +18775,22 @@
                   {
                     "id": "custom.width",
                     "value": 100
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Stars"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "short"
+                  },
+                  {
+                    "id": "custom.width",
+                    "value": 90
                   }
                 ]
               },

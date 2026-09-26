@@ -12,7 +12,7 @@
             "databaseId": 7654321,
             "isAnswer": true,
             "upvoteCount": 2,
-            "discussion": {"number": 57, "title": "Build fails on arm64", "repository": {"nameWithOwner": "someone/else"}}
+            "discussion": {"number": 57, "title": "Build fails on arm64", "repository": {"nameWithOwner": "someone/else", "isPrivate": false}}
           },
           {
             "createdAt": "@DAYS_AGO_6@T10:00:00Z",
@@ -20,7 +20,7 @@
             "databaseId": 18283966,
             "isAnswer": true,
             "upvoteCount": 3,
-            "discussion": {"number": 118, "title": "How do I bind a second port", "repository": {"nameWithOwner": "fosrl/pangolin"}}
+            "discussion": {"number": 118, "title": "How do I bind a second port", "repository": {"nameWithOwner": "fosrl/pangolin", "isPrivate": false}}
           }
         ]
       }

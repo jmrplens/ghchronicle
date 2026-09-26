@@ -37,7 +37,8 @@
                 "isAnswerable": true
               },
               "repository": {
-                "nameWithOwner": "someone/else"
+                "nameWithOwner": "someone/else",
+                "isPrivate": false
               }
             }
           },
@@ -69,7 +70,8 @@
                 "isAnswerable": true
               },
               "repository": {
-                "nameWithOwner": "fosrl/pangolin"
+                "nameWithOwner": "fosrl/pangolin",
+                "isPrivate": false
               }
             }
           }

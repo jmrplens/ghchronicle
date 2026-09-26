@@ -334,7 +334,7 @@ func (d Discussions) Collect(ctx context.Context, c *ghapi.Client, repo Repo, _ 
 			return points, err
 		}
 		nodes := res.Repository.Discussions.Nodes
-		points = append(points, discussionPoints(nodes, base, repo.FullName, d.Login)...)
+		points = append(points, discussionPoints(nodes, base, repo, d.Login)...)
 		pi := res.Repository.Discussions.PageInfo
 		if !pi.HasNextPage || len(nodes) == 0 || d.Walk.past(nodes[len(nodes)-1].UpdatedAt) {
 			break
@@ -344,7 +344,7 @@ func (d Discussions) Collect(ctx context.Context, c *ghapi.Client, repo Repo, _ 
 	return points, nil
 }
 
-func discussionPoints(nodes []discussionNode, base map[string]string, full, user string) []sink.Point {
+func discussionPoints(nodes []discussionNode, base map[string]string, repo Repo, user string) []sink.Point {
 	var points []sink.Point
 	for i := range nodes {
 		d := &nodes[i]
@@ -402,12 +402,12 @@ func discussionPoints(nodes []discussionNode, base map[string]string, full, user
 		// anyone else's, and not the reply to a reply, which is where most of
 		// the back and forth in a thread happens.
 		for _, cm := range d.Comments.Nodes {
-			points = append(points, discussionComment(user, full, d, threadComment{
+			points = append(points, discussionComment(user, repo, d, threadComment{
 				ID: cm.DatabaseID, By: login(cm.Author), URL: cm.URL,
 				Upvotes: cm.UpvoteCount, IsAnswer: cm.IsAnswer, When: cm.CreatedAt,
 			}))
 			for _, rp := range cm.Replies.Nodes {
-				points = append(points, discussionComment(user, full, d, threadComment{
+				points = append(points, discussionComment(user, repo, d, threadComment{
 					ID: rp.DatabaseID, ReplyTo: cm.DatabaseID, By: login(rp.Author),
 					URL: rp.URL, Upvotes: rp.UpvoteCount, When: rp.CreatedAt,
 				}))
@@ -437,10 +437,14 @@ type threadComment struct {
 // discussionComment renders one comment or reply with the identity the
 // account-wide walk gives the same thing, so the two converge on one row
 // instead of writing two.
-func discussionComment(user, full string, d *discussionNode, c threadComment) sink.Point {
+func discussionComment(user string, repo Repo, d *discussionNode, c threadComment) sink.Point {
+	full := repo.FullName
 	fields := map[string]any{
 		"comments": 1, "upvotes": c.Upvotes, "title": d.Title,
 		"answers": boolInt(c.IsAnswer), "url": c.URL,
+		// The account walk reads this off the comment's repository; here the
+		// listing that found the repository has already said it.
+		"private": repo.Private,
 	}
 	if c.ReplyTo != 0 {
 		fields["reply_to"] = c.ReplyTo

@@ -12878,7 +12878,7 @@
         },
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "Pull requests and issues opened in repositories this account does not own, with the state each ended in. Nothing else sees them: they are not in these repositories and the event feed forgets them in three days. Seen is the row's own date, which for an open item is the day it was last seen open; Opened is when it was opened.",
+          "description": "Pull requests and issues opened in repositories this account does not own, with the state each ended in. Nothing else sees them: they are not in these repositories and the event feed forgets them in three days. Seen is the row's own date, which for an open item is the day it was last seen open; Opened is when it was opened. Stars is the repository's own count at the last sweep inside the range.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -12975,6 +12975,22 @@
               {
                 "matcher": {
                   "id": "byName",
+                  "options": "Stars"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "short"
+                  },
+                  {
+                    "id": "custom.width",
+                    "value": 90
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
                   "options": "Repository"
                 },
                 "properties": [
@@ -13029,7 +13045,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT full_name AS \"Repository\", time - seconds_open * INTERVAL '1 second' AS \"Opened\", time AS \"Seen\", kind AS \"Kind\", state AS \"State\", title AS \"Title\", comments AS \"Comments\", url AS \"Link\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, kind, number ORDER BY time DESC) AS rn FROM gh_external_contribution WHERE $__timeFilter(time)) x WHERE rn = 1 ORDER BY time DESC LIMIT 40",
+              "rawSql": "SELECT x.full_name AS \"Repository\", x.time - x.seconds_open * INTERVAL '1 second' AS \"Opened\", x.time AS \"Seen\", x.kind AS \"Kind\", x.state AS \"State\", x.title AS \"Title\", u.stars AS \"Stars\", x.comments AS \"Comments\", x.url AS \"Link\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, kind, number ORDER BY time DESC) AS rn FROM gh_external_contribution WHERE $__timeFilter(time)) x LEFT JOIN (SELECT full_name, stars, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn FROM gh_upstream_repo WHERE $__timeFilter(time)) u ON u.full_name = x.full_name AND u.rn = 1 WHERE x.rn = 1 ORDER BY x.time DESC LIMIT 40",
               "refId": "A"
             }
           ],

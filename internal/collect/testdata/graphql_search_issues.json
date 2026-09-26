@@ -12,8 +12,18 @@
           "updatedAt": "2026-07-14T10:00:00Z",
           "closedAt": "2026-07-14T10:00:00Z",
           "mergedAt": "2026-07-14T10:00:00Z",
+          "additions": 167,
+          "deletions": 12,
+          "changedFiles": 6,
           "comments": {"totalCount": 3},
-          "repository": {"nameWithOwner": "someone/else"}
+          "repository": {
+            "nameWithOwner": "someone/else",
+            "stargazerCount": 5152,
+            "forkCount": 555,
+            "isPrivate": false,
+            "url": "https://github.com/someone/else",
+            "primaryLanguage": {"name": "Go"}
+          }
         },
         {
           "number": 9,
@@ -23,7 +33,14 @@
           "updatedAt": "2026-09-05T10:00:00Z",
           "closedAt": null,
           "comments": {"totalCount": 0},
-          "repository": {"nameWithOwner": "another/project"}
+          "repository": {
+            "nameWithOwner": "another/project",
+            "stargazerCount": 21,
+            "forkCount": 4,
+            "isPrivate": true,
+            "url": "https://github.com/another/project",
+            "primaryLanguage": null
+          }
         }
       ]
     }

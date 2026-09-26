@@ -37,7 +37,8 @@
                 "isAnswerable": true
               },
               "repository": {
-                "nameWithOwner": "ThrowTheSwitch/Ceedling"
+                "nameWithOwner": "ThrowTheSwitch/Ceedling",
+                "isPrivate": false
               }
             }
           },
@@ -63,7 +64,8 @@
                 "isAnswerable": false
               },
               "repository": {
-                "nameWithOwner": "octocat/hello-world"
+                "nameWithOwner": "octocat/hello-world",
+                "isPrivate": true
               }
             }
           },
@@ -95,7 +97,8 @@
                 "isAnswerable": true
               },
               "repository": {
-                "nameWithOwner": "fosrl/pangolin"
+                "nameWithOwner": "fosrl/pangolin",
+                "isPrivate": false
               }
             }
           }

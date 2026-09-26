@@ -238,6 +238,7 @@ func TestOnceAgainstFakeGitHub(t *testing.T) {
 	assertDatingRulesSurvived(t, points)
 	assertStarDaysWereWritten(t, points, time.Now())
 	assertAcceptedAnswersWereRead(t, points)
+	assertOutboundSaysWhereTheWorkWent(t, points)
 	assertAchievementProgressAgreesWithThePage(t, points, out)
 	assertStateRecordsTheSweep(t, readState(t, filepath.Join(dir, "state.json")))
 
@@ -584,6 +585,49 @@ func assertAcceptedAnswersWereRead(t *testing.T, points []point) {
 	}
 }
 
+// assertOutboundSaysWhereTheWorkWent: every outbound row says whether its
+// repository is private, a pull request says how large it was, and each
+// repository the searches reached has one row of its own, stamped at the
+// sweep, with the star count that would move a closed contribution's row of
+// the past if it were written there.
+func assertOutboundSaysWhereTheWorkWent(t *testing.T, points []point) {
+	t.Helper()
+	upstream := map[string]point{}
+	for _, p := range points {
+		switch p.Measurement {
+		case "gh_upstream_repo":
+			if _, twice := upstream[p.Tags["full_name"]]; twice {
+				t.Errorf("%s has two gh_upstream_repo rows in one sweep", p.Tags["full_name"])
+			}
+			upstream[p.Tags["full_name"]] = p
+		case "gh_external_contribution", "gh_issue_comment", "gh_discussion_comment":
+			if _, ok := p.Fields["private"].(bool); !ok {
+				t.Errorf("%s in %s carries no private: %v", p.Measurement, p.Tags["full_name"], p.Fields)
+			}
+			// The fake answers every search with the same page, so the pull
+			// request is found by its number rather than by its state.
+			if p.Measurement == "gh_external_contribution" && p.Tags["number"] == "118" &&
+				(p.Fields["additions"] != float64(167) || p.Fields["changed_files"] != float64(6)) {
+				t.Errorf("the pull request carries no size: %v", p.Fields)
+			}
+			if _, stars := p.Fields["stars"]; stars {
+				t.Errorf("%s carries the repository's stars on a dated row: %v", p.Measurement, p.Fields)
+			}
+		}
+	}
+	if len(upstream) != 2 {
+		t.Fatalf("gh_upstream_repo rows for %v, want someone/else and another/project", sortedNames(upstream))
+	}
+	goRepo := upstream["someone/else"]
+	if goRepo.Fields["stars"] != float64(5152) || goRepo.Fields["private"] != false ||
+		goRepo.Fields["url"] != "https://github.com/someone/else" {
+		t.Errorf("someone/else = %v", goRepo.Fields)
+	}
+	if at, err := time.Parse(time.RFC3339Nano, goRepo.Time); err != nil || time.Since(at) > time.Hour {
+		t.Errorf("gh_upstream_repo stamped %s, want the sweep", goRepo.Time)
+	}
+}
+
 // noRepository is collect.noneTag as it reaches a sink: what all three tags
 // carry on a row that is about no repository at all.
 const noRepository = "(none)"
@@ -671,7 +715,7 @@ func assertOneShapeNamesEveryRepository(t *testing.T, points []point) {
 	// naming none of them for a year with nothing failing.
 	for _, m := range []string{
 		"gh_repo", "gh_event", "gh_notification", "gh_star_given",
-		"gh_external_contribution", "gh_issue_comment", "gh_discussion_comment",
+		"gh_external_contribution", "gh_upstream_repo", "gh_issue_comment", "gh_discussion_comment",
 		"gh_package", "gh_pinned_item", "gh_contribution_repo", "gh_billing_usage",
 	} {
 		switch {

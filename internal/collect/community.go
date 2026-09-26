@@ -3,6 +3,8 @@ package collect
 import (
 	"context"
 	"fmt"
+	"maps"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -253,6 +255,17 @@ query($first: Int!, $after: String) {
   }
 }`
 
+// upstreamSelection is what both halves of outboundSearchQuery read of the
+// repository an item went to: its name for the row's tags, and the rest for
+// gh_upstream_repo. Scalars on a node the search already returns, so they cost
+// nothing: measured on 2026-09-26 over the five searches of this account, 102
+// items in 51 repositories, rateLimit.cost was 1 a page with them and the
+// pull request's size and without all of them, and the five answers grew
+// from 35.9 KB to 52.9 KB.
+const upstreamSelection = `repository {
+          nameWithOwner stargazerCount forkCount isPrivate url primaryLanguage { name }
+        }`
+
 // outboundSearchQuery is one page of an issue search, a hundred items with the
 // fields a contribution row is made of, and what it takes to read the next:
 // the cursor, and the count the walk is held against when the pages run out.
@@ -264,11 +277,14 @@ query($query: String!, $after: String) {
     nodes {
       ... on Issue {
         number title url createdAt updatedAt closedAt
-        comments { totalCount } repository { nameWithOwner }
+        comments { totalCount }
+        ` + upstreamSelection + `
       }
       ... on PullRequest {
         number title url createdAt updatedAt closedAt mergedAt
-        comments { totalCount } repository { nameWithOwner }
+        additions deletions changedFiles
+        comments { totalCount }
+        ` + upstreamSelection + `
       }
     }
   }
@@ -309,17 +325,34 @@ type outboundSearchPage struct {
 // outboundItem is a pull request or an issue the account opened in somebody
 // else's repository.
 type outboundItem struct {
-	Number     int        `json:"number"`
-	Title      string     `json:"title"`
-	URL        string     `json:"url"`
-	CreatedAt  time.Time  `json:"createdAt"`
-	UpdatedAt  time.Time  `json:"updatedAt"`
-	ClosedAt   *time.Time `json:"closedAt"`
-	MergedAt   *time.Time `json:"mergedAt"`
-	Comments   count      `json:"comments"`
-	Repository struct {
-		NameWithOwner string `json:"nameWithOwner"`
-	} `json:"repository"`
+	Number    int        `json:"number"`
+	Title     string     `json:"title"`
+	URL       string     `json:"url"`
+	CreatedAt time.Time  `json:"createdAt"`
+	UpdatedAt time.Time  `json:"updatedAt"`
+	ClosedAt  *time.Time `json:"closedAt"`
+	MergedAt  *time.Time `json:"mergedAt"`
+	// The size of the change, which only the PullRequest half asks for. An
+	// issue answers without the keys, and nil is what keeps that from
+	// reading as a pull request that changed nothing.
+	Additions    *int               `json:"additions"`
+	Deletions    *int               `json:"deletions"`
+	ChangedFiles *int               `json:"changedFiles"`
+	Comments     count              `json:"comments"`
+	Repository   upstreamRepository `json:"repository"`
+}
+
+// upstreamRepository is the repository an outbound item went to, as
+// upstreamSelection reads it.
+type upstreamRepository struct {
+	NameWithOwner string `json:"nameWithOwner"`
+	Stars         int    `json:"stargazerCount"`
+	Forks         int    `json:"forkCount"`
+	IsPrivate     bool   `json:"isPrivate"`
+	URL           string `json:"url"`
+	Language      *struct {
+		Name string `json:"name"`
+	} `json:"primaryLanguage"`
 }
 
 func (o Outbound) Collect(ctx context.Context, c *ghapi.Client, now time.Time) ([]sink.Point, error) {
@@ -332,18 +365,20 @@ func (o Outbound) Collect(ctx context.Context, c *ghapi.Client, now time.Time) (
 	// Work in repositories the account does not own. Nothing else sees it: it
 	// is not in this account's repositories, and the event feed forgets it in
 	// three days.
+	upstream := map[string]upstreamRepository{}
 	for _, s := range outboundSearches {
 		// Kept whether or not the walk failed part way: the pages that
 		// answered are rows the store does not have yet.
-		pts, err := o.search(ctx, c, s, now)
+		pts, err := o.search(ctx, c, s, now, upstream)
 		points = append(points, pts...)
 		if err != nil {
 			if isSkippableGraphQL(err) {
 				continue
 			}
-			return points, err
+			return append(points, upstreamPoints(upstream, now)...), err
 		}
 	}
+	points = append(points, upstreamPoints(upstream, now)...)
 
 	// Comments and discussion answers, anywhere. Both come from `viewer`, a
 	// GraphQL point a page, and both see other people's repositories, which
@@ -411,9 +446,7 @@ type discussionThread struct {
 		// question nobody answered.
 		IsAnswerable bool `json:"isAnswerable"`
 	} `json:"category"`
-	Repository struct {
-		NameWithOwner string `json:"nameWithOwner"`
-	} `json:"repository"`
+	Repository commentedRepository `json:"repository"`
 }
 
 // discussionAnswer is the comment chosen as the answer, read only for who
@@ -527,6 +560,7 @@ func (n *discussionCommentNode) point(login, repo string) sink.Point {
 		// answers without grouping by a tag.
 		"answers": boolInt(n.IsAnswer),
 		"url":     n.URL,
+		"private": n.Discussion.Repository.IsPrivate,
 	}
 	n.context().addTo(fields)
 	return sink.Point{
@@ -564,7 +598,7 @@ const discussionCommentPage = `
           answer { author { login } }
           closed closedAt stateReason
           category { name isAnswerable }
-          repository { nameWithOwner }
+          repository { nameWithOwner isPrivate }
         }
       }`
 
@@ -691,7 +725,7 @@ query($last: Int!, $before: String) {
       pageInfo { hasPreviousPage startCursor }
       nodes {
         createdAt url
-        issue { number repository { nameWithOwner } }
+        issue { number repository { nameWithOwner isPrivate } }
       }
     }
   }
@@ -716,10 +750,24 @@ type issueCommentNode struct {
 // where it is: the repository is what tells a comment left in the account's own
 // work from one left in a stranger's.
 type commentedIssue struct {
-	Number     int `json:"number"`
-	Repository struct {
-		NameWithOwner string `json:"nameWithOwner"`
-	} `json:"repository"`
+	Number     int                 `json:"number"`
+	Repository commentedRepository `json:"repository"`
+}
+
+// commentedRepository is where a comment was left, as both account-wide comment
+// walks read it.
+//
+// Whether it is private travels with the comment for the reason it does on
+// gh_external_contribution: the walks are authenticated and see private
+// repositories beside public ones, and `own` does not tell them apart, since
+// the account's own repositories can be private or public and an
+// organisation's are not the account's own at all.
+// Measured on 2026-09-26: one of the newest hundred issue comments sits in a
+// private repository, and asking costs nothing, rateLimit.cost 1 a page for
+// all three walks with it and without it.
+type commentedRepository struct {
+	NameWithOwner string `json:"nameWithOwner"`
+	IsPrivate     bool   `json:"isPrivate"`
 }
 
 // issueComments records every comment the account left on an issue or a pull
@@ -761,8 +809,10 @@ func (o Outbound) issueComments(ctx context.Context, c *ghapi.Client, _ time.Tim
 					"own":    boolTag(isOwn(repo, o.Login)),
 					"number": strconv.Itoa(n.Issue.Number),
 				}),
-				Fields: map[string]any{"comments": 1, "url": n.URL},
-				Time:   n.CreatedAt,
+				Fields: map[string]any{
+					"comments": 1, "url": n.URL, "private": n.Issue.Repository.IsPrivate,
+				},
+				Time: n.CreatedAt,
 			})
 		}
 		if !cs.PageInfo.HasPreviousPage || len(cs.Nodes) == 0 || o.Walk.past(cs.Nodes[0].CreatedAt) {
@@ -900,7 +950,12 @@ func (o Outbound) starred(ctx context.Context, c *ghapi.Client) ([]sink.Point, e
 // comments can carry it from an unread page onto a read one and skip it for
 // the day; newest created first moves an item only when one is opened or
 // leaves the state.
-func (o Outbound) search(ctx context.Context, c *ghapi.Client, s outboundSearch, now time.Time) ([]sink.Point, error) {
+//
+// Every repository an item went to is recorded in upstream, by name, for the
+// row upstreamPoints writes about it once the searches are done.
+func (o Outbound) search(ctx context.Context, c *ghapi.Client, s outboundSearch, now time.Time,
+	upstream map[string]upstreamRepository,
+) ([]sink.Point, error) {
 	walk := o.Walk
 	if !o.Moved.IsZero() {
 		walk = Walk{Pages: -1, Since: o.Moved}
@@ -919,7 +974,11 @@ func (o Outbound) search(ctx context.Context, c *ghapi.Client, s outboundSearch,
 		}
 		found := &res.Search
 		for i := range found.Nodes {
-			points = append(points, o.contribution(&found.Nodes[i], s, now))
+			it := &found.Nodes[i]
+			points = append(points, o.contribution(it, s, now))
+			if name := it.Repository.NameWithOwner; name != "" {
+				upstream[name] = it.Repository
+			}
 		}
 		read += len(found.Nodes)
 		if !found.PageInfo.HasNextPage {
@@ -952,10 +1011,25 @@ func (o Outbound) contribution(it *outboundItem, s outboundSearch, now time.Time
 	fields := withURL(map[string]any{
 		"contributions": 1, "title": it.Title, "comments": it.Comments.TotalCount,
 		"seconds_open": int(stamp.Sub(it.CreatedAt).Seconds()),
+		// The search is authenticated, so an organisation's private
+		// repository comes back beside the public ones, and this is what
+		// tells a consumer which rows it must not show to anyone else. A
+		// field, because a new tag would give every row already written a
+		// second identity beside it.
+		"private": it.Repository.IsPrivate,
 	}, it.URL)
 	if it.MergedAt != nil {
 		fields["merged"] = 1
 		fields["seconds_to_merge"] = int(it.MergedAt.Sub(it.CreatedAt).Seconds())
+	}
+	// The names gh_pull_request uses for the account's own pull requests, so
+	// work here and work elsewhere are measured the same way.
+	for name, n := range map[string]*int{
+		"additions": it.Additions, "deletions": it.Deletions, "changed_files": it.ChangedFiles,
+	} {
+		if n != nil {
+			fields[name] = *n
+		}
 	}
 	return sink.Point{
 		Measurement: "gh_external_contribution",
@@ -966,6 +1040,46 @@ func (o Outbound) contribution(it *outboundItem, s outboundSearch, now time.Time
 		Fields: fields,
 		Time:   stamp,
 	}
+}
+
+// upstreamPoints is one row per repository the searches reached, stamped at
+// the sweep.
+//
+// The star count is what a reader weighs "merged into X" by, and the only
+// other one in the store, gh_star_given.repo_stars, exists where the account
+// happened to star the repository: measured on 2026-09-26, 2 of the 18 that
+// hold this account's 33 merged pull requests. It is a measurement of its own
+// rather than a field of gh_external_contribution because it is the
+// repository as it stands now, and that row is dated when the item closed: a
+// count that moves nearly every day would rewrite a row of the past each
+// time, at the cost of a file in that row's old partition. Here a move is a
+// row of today.
+//
+// A repository is read as often as a search reads an item in it. A closed
+// search reads its first page on every sweep, and on this account none of the
+// three holds more than a page (33, 11 and 19 items), so all 51 are here every
+// hour; an account with more has the ones past that page refreshed when one
+// of their items moves, or by a backfill.
+func upstreamPoints(upstream map[string]upstreamRepository, now time.Time) []sink.Point {
+	points := make([]sink.Point, 0, len(upstream))
+	for _, name := range slices.Sorted(maps.Keys(upstream)) {
+		r := upstream[name]
+		fields := withURL(map[string]any{
+			"stars": r.Stars, "forks": r.Forks, "private": r.IsPrivate,
+		}, r.URL)
+		// A field: GitHub recomputes it as the code changes, so as a tag it
+		// would open a second series for the repository the day it did.
+		if r.Language != nil {
+			setNonEmpty(fields, "language", r.Language.Name)
+		}
+		points = append(points, sink.Point{
+			Measurement: "gh_upstream_repo",
+			Tags:        fullNameTags(name),
+			Fields:      fields,
+			Time:        now,
+		})
+	}
+	return points
 }
 
 // warn reports through Warn when there is one.

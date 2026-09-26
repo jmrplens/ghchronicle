@@ -110,6 +110,11 @@ var promRules = map[string]rule{
 	// The lists the stars given are filed into: a daily snapshot anchored
 	// like the tiers, so the newest reading per list is the whole answer.
 	"gh_star_list": {mode: keepLast, keep: []string{"user", "list"}},
+	// The repositories the outbound contributions went to, stamped at the
+	// sweep, so the newest reading is the whole answer, the way
+	// gh_pinned_item's is: a series per repository the account has worked
+	// in, which grows only as the account reaches a new one.
+	"gh_upstream_repo": {mode: keepLast, keep: []string{"owner", "repo", "full_name"}},
 
 	// Repository snapshots.
 	"gh_repo": {mode: keepLast, keep: []string{

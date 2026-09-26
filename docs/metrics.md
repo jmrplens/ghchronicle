@@ -8,7 +8,7 @@ The thirty-four families of GitHub metrics ghchronicle collects, what each one a
 
 Source: <https://jmrp.io/docs/ghchronicle/collectors/>
 
-Thirty-four families, ninety-four measurements. This page is what each family
+Thirty-four families, ninety-five measurements. This page is what each family
 is _for_; the [measurements reference](https://jmrp.io/docs/ghchronicle/collectors/measurements/)
 is every tag and field.
 
@@ -230,8 +230,9 @@ account while REST lists them.
 
 **`outbound`** is the other half of everything else here. Every other family
 measures what the account owns; this measures what it reads and what it
-contributes to: the stars it gave, and the pull requests it opened in other
-people's repositories. All of it is GraphQL, one point a page: the starred
+contributes to: the stars it gave, the pull requests it opened in other
+people's repositories, and those repositories themselves, how many stars each
+has and whether it is private. All of it is GraphQL, one point a page: the starred
 list, five issue searches, the two comment walks and the accepted answers the
 account wrote, which are read apart from the comments so that an answer
 accepted weeks after it was written is not missed. A sweep reads every page
@@ -309,7 +310,7 @@ Every measurement ghchronicle writes from the GitHub API, its tags, its fields, 
 
 Source: <https://jmrp.io/docs/ghchronicle/collectors/measurements/>
 
-Ninety-four measurements. Each row says how a point is dated, because that is
+Ninety-five measurements. Each row says how a point is dated, because that is
 the thing that decides which questions it can answer.
 
 ### How to read the tables
@@ -487,7 +488,7 @@ panel, which is the place to copy from.
 
 #### Every measurement, alphabetically
 
-Ninety-four, each link landing on the table it is in.
+Ninety-five, each link landing on the table it is in.
 
 [`gh_account`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#account) · [`gh_account_total`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#account) ·
 [`gh_achievement`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#account) · [`gh_achievement_progress`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#account) ·
@@ -545,6 +546,7 @@ Ninety-four, each link landing on the table it is in.
 [`gh_star_given`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#stars-and-forks) · [`gh_star_list`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#account) ·
 [`gh_traffic`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#audience) ·
 [`gh_traffic_path`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#audience) · [`gh_traffic_referrer`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#audience) ·
+[`gh_upstream_repo`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#development) ·
 [`gh_webhook`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#configuration-and-delivery) ·
 [`gh_webhook_delivery`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#configuration-and-delivery) ·
 [`gh_workflow`](https://jmrp.io/docs/ghchronicle/collectors/measurements/#continuous-integration) ·
@@ -703,7 +705,8 @@ is the one kind with no row.
 | `gh_discussion` | dated, when created | `category`, `answerable`, `author`, `number` | `has_answer`, `comments`, `replies`, `reactions`, `upvotes`, `closed`, `state_reason`, `seconds_to_answer`, `seconds_to_close`, `title`, `url` |
 | `gh_label`                 | daily                               | `label`                                                  | `issues`, `pull_requests`, `used`, `url`                                                                                                                   |
 | `gh_milestone`             | daily                               | `milestone`, `state`                                     | `progress`, `issues`, `pull_requests`, `days_to_due`, `seconds_to_close`, `url`                                                                            |
-| `gh_external_contribution` | dated                               | `user`, `number`, `kind`, `state`                | `contributions`, `merged`, `title`, `comments`, `seconds_to_merge`, `seconds_open`, `url`                                                                  |
+| `gh_external_contribution` | dated                               | `user`, `number`, `kind`, `state`                | `contributions`, `merged`, `private`, `additions`, `deletions`, `changed_files`, `title`, `comments`, `seconds_to_merge`, `seconds_open`, `url`                                                                  |
+| `gh_upstream_repo` | now | | `stars`, `forks`, `private`, `language`, `url` |
 
 `gh_commit` is what replaces `stats/code_frequency`, which returns 202 with an
 empty body forever on a personal account. `signature` is `unsigned` when there
@@ -792,6 +795,28 @@ has the thousand that moved most recently, and the log says so at warning.
 `gh_account_total.pulls_merged_elsewhere` and `issues_elsewhere` are GitHub's
 own counts and are right whatever the cap. An item that was open and later
 closed keeps its `open` rows beside the closed one, since `state` is a tag.
+
+`private` says whether the repository the item went to is private. The
+searches run with the account's token, so an organisation's private
+repositories come back beside the public ones, and this field is what lets a
+page shown to others leave them out; a field and not a tag, so it added no
+second identity to rows already stored. A pull request carries `additions`,
+`deletions` and `changed_files`, the names `gh_pull_request` uses, and an issue
+carries none of the three. All of it comes on the nodes the searches already
+return, and measured on 2026-09-26 the query costs one point a page with it as
+without it.
+
+`gh_upstream_repo` is the repository side of the same searches: one row per
+repository they reached in the pass, stamped at the sweep, with its `stars`,
+`forks`, primary `language` and `private`, and its page. The star count is not
+on `gh_external_contribution` because that row is dated when the item closed,
+and a count that moves nearly every day would rewrite a row of the past each
+time. The "Work elsewhere" table joins the newest of these rows inside the range
+onto each item as Stars. A repository gets a row whenever a search reads an
+item in it: each open state is read whole on every sweep, and each closed state
+from its most recent page, so a repository whose only items are closed and
+further back than that page keeps the row of the last sweep that read one of
+them, or of the last backfill.
 
 ### Continuous integration
 
@@ -1024,8 +1049,8 @@ page, so at most a hundred, rather than the repository's total.
 | `gh_account_total`       | now                                  |                                                                       | `pulls_opened`, `pulls_merged`, `pulls_open_now`, `pulls_merged_elsewhere`, `pulls_reviewed`, `issues_opened`, `issues_closed`, `issues_elsewhere`, `commented_elsewhere`, `commits`, `repositories`, `url`                                                                               |
 | `gh_repo_created`        | dated, when created                  | `fork`                                                        | `created`, `private`, `url`                                                                                                                                                                                                                                                               |
 | `gh_key`                 | daily                                | `kind` (ssh, gpg), `key`                                              | `keys`, `age_days`, `days_since_use`, `never_used`, `days_to_expiry`, `verified`, `revoked`, `can_sign`, `emails`, `url`                                                                                                                                                                  |
-| `gh_discussion_comment` | dated | `own`, `is_answer`, `is_reply`, `author`, `comment`, `number` | `comments`, `answers`, `upvotes`, `title`, `reply_to`, `discussion_answered`, `discussion_answerable`, `discussion_closed`, `answered_by`, `answer_chosen_by`, `state_reason`, `category`, `seconds_to_answer`, `seconds_to_close`, `url` |
-| `gh_issue_comment`       | dated                                | `own`, `number`                                               | `comments`, `url`                                                                                                                                                                                                                                                                         |
+| `gh_discussion_comment` | dated | `own`, `is_answer`, `is_reply`, `author`, `comment`, `number` | `comments`, `answers`, `upvotes`, `title`, `reply_to`, `private`, `discussion_answered`, `discussion_answerable`, `discussion_closed`, `answered_by`, `answer_chosen_by`, `state_reason`, `category`, `seconds_to_answer`, `seconds_to_close`, `url` |
+| `gh_issue_comment`       | dated                                | `own`, `number`                                               | `comments`, `private`, `url`                                                                                                                                                                                                                                                                         |
 
 `following` is the profile's own number, and it counts organisations as well as
 people. GraphQL's `following` connection counts only users, which on this
@@ -1183,7 +1208,10 @@ hundred newest comments. The account's accepted answers are then read on
 their own, the newest five hundred on a sweep and all of them in a backfill,
 so a comment accepted as the answer after it left that hundred is still
 written with `is_answer` true on the next sweep. A comment both reads return
-is written once.
+is written once. Both carry `private`, whether the repository the comment was
+left in is private, for the reason `gh_external_contribution` does: `own` does
+not say it, since the account's own repositories can be private or public and
+an organisation's are not the account's own at all.
 
 `gh_contribution_year` has one row per past year, dated the thirty-first of
 December, and one for the year in progress, asked for on every run from the

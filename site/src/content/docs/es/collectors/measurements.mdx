@@ -8,7 +8,7 @@ compactTables:
 
 import { Aside } from "@astrojs/starlight/components";
 
-Noventa y cuatro medidas. Cada fila dice cómo se fecha un punto, porque eso es
+Noventa y cinco medidas. Cada fila dice cómo se fecha un punto, porque eso es
 lo que decide qué preguntas puede responder.
 
 ## Cómo leer las tablas
@@ -192,7 +192,7 @@ almacén para cada panel, que es el sitio del que copiar.
 
 ### Todas las medidas, por orden alfabético
 
-Noventa y cuatro, y cada enlace cae en la tabla en la que está.
+Noventa y cinco, y cada enlace cae en la tabla en la que está.
 
 [`gh_account`](#cuenta) · [`gh_account_total`](#cuenta) ·
 [`gh_achievement`](#cuenta) · [`gh_achievement_progress`](#cuenta) ·
@@ -248,6 +248,7 @@ Noventa y cuatro, y cada enlace cae en la tabla en la que está.
 [`gh_star_given`](#estrellas-y-forks) · [`gh_star_list`](#cuenta) ·
 [`gh_traffic`](#audiencia) ·
 [`gh_traffic_path`](#audiencia) · [`gh_traffic_referrer`](#audiencia) ·
+[`gh_upstream_repo`](#desarrollo) ·
 [`gh_webhook`](#configuración-y-entrega) ·
 [`gh_webhook_delivery`](#configuración-y-entrega) ·
 [`gh_workflow`](#integración-continua) ·
@@ -412,7 +413,8 @@ de forks por omisión es el único tipo sin fila.
 | `gh_discussion` | fechado, al crearse | `category`, `answerable`, `author`, `number` | `has_answer`, `comments`, `replies`, `reactions`, `upvotes`, `closed`, `state_reason`, `seconds_to_answer`, `seconds_to_close`, `title`, `url` |
 | `gh_label`                 | diario                                            | `label`                                                  | `issues`, `pull_requests`, `used`, `url`                                                                                                                   |
 | `gh_milestone`             | diario                                            | `milestone`, `state`                                     | `progress`, `issues`, `pull_requests`, `days_to_due`, `seconds_to_close`, `url`                                                                            |
-| `gh_external_contribution` | fechado                                           | `user`, `number`, `kind`, `state`                | `contributions`, `merged`, `title`, `comments`, `seconds_to_merge`, `seconds_open`, `url`                                                                  |
+| `gh_external_contribution` | fechado                                           | `user`, `number`, `kind`, `state`                | `contributions`, `merged`, `private`, `additions`, `deletions`, `changed_files`, `title`, `comments`, `seconds_to_merge`, `seconds_open`, `url`                                                                  |
+| `gh_upstream_repo` | ahora | | `stars`, `forks`, `private`, `language`, `url` |
 
 `gh_commit` es lo que sustituye a `stats/code_frequency`, que devuelve 202 con
 cuerpo vacío para siempre en una cuenta personal. `signature` vale `unsigned`
@@ -508,6 +510,29 @@ recientemente, y el log lo dice como aviso.
 recuentos del propio GitHub y aciertan pase lo que pase con ese tope. Un
 elemento que estuvo abierto y luego se cerró conserva sus filas `open` junto a
 la cerrada, porque `state` es una etiqueta.
+
+`private` dice si el repositorio al que fue el elemento es privado. Las
+búsquedas se hacen con el token de la cuenta, así que los repositorios
+privados de una organización vuelven junto a los públicos, y este campo es lo
+que permite a una página que ven otros dejarlos fuera; es un campo y no una
+etiqueta, así que no dio una segunda identidad a las filas ya guardadas. Una
+pull request lleva `additions`, `deletions` y `changed_files`, los nombres que
+usa `gh_pull_request`, y un issue no lleva ninguno de los tres. Todo viene en
+los nodos que las búsquedas ya devuelven, y medido el 2026-09-26 la consulta
+cuesta un punto por página con ello igual que sin ello.
+
+`gh_upstream_repo` es el lado del repositorio de esas mismas búsquedas: una
+fila por repositorio al que llegaron en la pasada, fechada en la pasada, con
+sus `stars`, sus `forks`, su `language` principal y `private`, y su página. El
+recuento de estrellas no está en `gh_external_contribution` porque esa fila
+está fechada cuando se cerró el elemento, y un recuento que se mueve casi cada
+día reescribiría una fila del pasado cada vez. La tabla "Work elsewhere" une a
+cada elemento la más reciente de estas filas dentro del rango, como Stars. Un
+repositorio tiene fila siempre que una búsqueda lee un elemento suyo: cada
+estado abierto se lee entero en cada pasada, y cada estado cerrado desde su
+página más reciente, así que un repositorio cuyos elementos están todos
+cerrados y más atrás que esa página conserva la fila de la última pasada que
+leyó uno de ellos, o del último relleno.
 
 ## Integración continua
 
@@ -752,8 +777,8 @@ pasada, que es una página, o sea cien como mucho, y no el total del repositorio
 | `gh_account_total`       | ahora                                    |                                                                       | `pulls_opened`, `pulls_merged`, `pulls_open_now`, `pulls_merged_elsewhere`, `pulls_reviewed`, `issues_opened`, `issues_closed`, `issues_elsewhere`, `commented_elsewhere`, `commits`, `repositories`, `url`                                                                               |
 | `gh_repo_created`        | fechado, al crearse                      | `fork`                                                        | `created`, `private`, `url`                                                                                                                                                                                                                                                               |
 | `gh_key`                 | diario                                   | `kind` (ssh, gpg), `key`                                              | `keys`, `age_days`, `days_since_use`, `never_used`, `days_to_expiry`, `verified`, `revoked`, `can_sign`, `emails`, `url`                                                                                                                                                                  |
-| `gh_discussion_comment` | fechado | `own`, `is_answer`, `is_reply`, `author`, `comment`, `number` | `comments`, `answers`, `upvotes`, `title`, `reply_to`, `discussion_answered`, `discussion_answerable`, `discussion_closed`, `answered_by`, `answer_chosen_by`, `state_reason`, `category`, `seconds_to_answer`, `seconds_to_close`, `url` |
-| `gh_issue_comment`       | fechado                                  | `own`, `number`                                               | `comments`, `url`                                                                                                                                                                                                                                                                         |
+| `gh_discussion_comment` | fechado | `own`, `is_answer`, `is_reply`, `author`, `comment`, `number` | `comments`, `answers`, `upvotes`, `title`, `reply_to`, `private`, `discussion_answered`, `discussion_answerable`, `discussion_closed`, `answered_by`, `answer_chosen_by`, `state_reason`, `category`, `seconds_to_answer`, `seconds_to_close`, `url` |
+| `gh_issue_comment`       | fechado                                  | `own`, `number`                                               | `comments`, `private`, `url`                                                                                                                                                                                                                                                                         |
 
 `following` es el número del propio perfil, y cuenta organizaciones además de
 personas. La conexión `following` de GraphQL cuenta solo usuarios, que en esta
@@ -916,7 +941,11 @@ aparte las respuestas aceptadas de la cuenta, las quinientas más recientes en
 una pasada y todas en un relleno, así que un comentario aceptado como
 respuesta cuando ya había salido de esos cien se escribe igualmente con
 `is_answer` a true en la siguiente pasada. Un comentario que devuelven las dos
-lecturas se escribe una sola vez.
+lecturas se escribe una sola vez. Las dos medidas llevan `private`, si el
+repositorio en el que se dejó el comentario es privado, por la misma razón que
+`gh_external_contribution`: `own` no lo dice, porque los repositorios propios
+de la cuenta pueden ser de las dos clases y los de una organización no son
+propios.
 
 `gh_contribution_year` tiene una fila por año pasado, fechada el treinta y uno
 de diciembre, y una por el año en curso, que se pide en cada ejecución desde el

@@ -522,8 +522,15 @@ que dio esta cuenta, no las que recibió, por lenguaje y por proyecto, fechadas
 cuando dio cada una. Si los proyectos son pequeños o famosos es otra pregunta
 distinta de cuántos son, así que la segunda tabla lleva sus propias estrellas.
 
-Lee `gh_event`, `gh_notification`, `gh_external_contribution` y
-`gh_star_given`.
+La tabla del trabajo en otros repositorios lleva ese mismo número para los
+repositorios a los que contribuyó la cuenta: las estrellas de cada uno en la
+pasada más reciente dentro del rango, de `gh_upstream_repo`, unidas a cada
+elemento en los dashboards de InfluxDB y PostgreSQL y junto a cada repositorio
+en el de Prometheus. Graphite y Elasticsearch no pueden unir dos medidas en un
+panel y dejan la columna fuera, diciéndolo.
+
+Lee `gh_event`, `gh_notification`, `gh_external_contribution`,
+`gh_upstream_repo` y `gh_star_given`.
 
 ## Inventory
 

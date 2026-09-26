@@ -126,6 +126,7 @@ var tags = map[string][]string{
 	"gh_traffic":                  {"full_name", "kind", "owner", "repo"},
 	"gh_traffic_path":             {"full_name", "owner", "path", "repo"},
 	"gh_traffic_referrer":         {"full_name", "owner", "referrer", "repo"},
+	"gh_upstream_repo":            {"full_name", "owner", "repo"},
 	"gh_webhook":                  {"active", "full_name", "hook", "host", "owner", "repo"},
 	"gh_webhook_delivery":         {"code", "event", "full_name", "hook", "host", "ok", "owner", "repo", "status"},
 	"gh_workflow":                 {"full_name", "owner", "path", "repo", "state", "workflow"},

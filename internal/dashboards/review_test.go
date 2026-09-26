@@ -627,6 +627,9 @@ func TestNewFieldsAreShown(t *testing.T) {
 		"Open the longest":             {`title AS "Title"`, `label_names AS "Labels"`},
 		"Largest merged pull requests": {`title AS "Title"`, `label_names AS "Labels"`, `author_association AS "Association"`},
 		"Time to resolve an alert":     {`summary AS "Advisory"`, `COALESCE(cvss_v4, cvss) AS "CVSS"`, `alert_state AS "Outcome"`},
+		// The stars come from the row stamped at the sweep, never from the
+		// contribution's own row, which is dated when the item closed.
+		"Work elsewhere": {`u.stars AS "Stars"`, `FROM gh_upstream_repo WHERE $__timeFilter(time)) u`},
 	} {
 		sql := sqlOf(t, mustPanel(t, panels, title))
 		for _, c := range cols {
