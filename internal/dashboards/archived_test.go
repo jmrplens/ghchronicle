@@ -1,6 +1,7 @@
 package dashboards
 
 import (
+	"regexp"
 	"strings"
 	"testing"
 
@@ -9,11 +10,11 @@ import (
 
 // TestArchivedRepositoriesSetAsideReachTheAccountTotals is issue #78 on the
 // dashboards. A repository the default filter sets aside for being archived
-// has a gh_repo_total row from every totals sweep and no gh_repo row at all,
-// and the repository picker lists what gh_repo holds. So the stars and forks
-// beside the repository count, and the table of every repository, read
-// gh_repo_total, and with All selected they let an archived row through in
-// every store.
+// has a gh_repo_total row from every totals sweep and no gh_repo row from a
+// sweep, and the repository picker lists what gh_repo holds. So the stars and
+// forks beside the repository count read an archived repository's
+// gh_repo_total, the table of every repository reads gh_repo_total whole, and
+// with All selected both let an archived row through in every store.
 //
 // Each query is rendered the way the dashboard checker renders it, with All
 // selected over a picker that lists one live repository, which is the picker
@@ -53,11 +54,13 @@ func checkArchivedAdmitted(t *testing.T, store string, vars grafana.Vars, p map[
 		if left := grafana.Unrendered(target); len(left) > 0 {
 			t.Errorf("%s %q leaves %v unrendered", store, p["title"], left)
 		}
-		for _, want := range []string{reads, admits} {
-			if !strings.Contains(text, want) {
-				t.Errorf("%s %q, rendered under All, lacks %s, so an archived repository "+
-					"set aside is not in it:\n%s", store, p["title"], want, text)
-			}
+		if !strings.Contains(text, reads) {
+			t.Errorf("%s %q, rendered under All, does not read %s, so an archived repository "+
+				"set aside is not in it:\n%s", store, p["title"], reads, text)
+		}
+		if !admits.MatchString(text) {
+			t.Errorf("%s %q, rendered under All, lacks %s, so an archived repository "+
+				"set aside is not in it:\n%s", store, p["title"], admits, text)
 		}
 	}
 	if checked == 0 {
@@ -68,16 +71,20 @@ func checkArchivedAdmitted(t *testing.T, store string, vars grafana.Vars, p map[
 // archivedAdmitted is, for one store, the measurement a query has to read to
 // see the archived repositories set aside, and the repository filter as it
 // renders under All, which has to let them through.
-func archivedAdmitted(store string) (reads, admits string) {
+func archivedAdmitted(store string) (reads string, admits *regexp.Regexp) {
+	literal := func(s string) *regexp.Regexp { return regexp.MustCompile(regexp.QuoteMeta(s)) }
 	switch store {
 	case "influxdb", "postgres":
-		return "FROM gh_repo_total", "OR (archived = 'true' AND 'All' = 'All')"
+		return "FROM gh_repo_total", literal("OR (archived = 'true' AND 'All' = 'All')")
 	case "prometheus":
-		return "github_repo_total_", `repo=~\".*\"`
+		return "github_repo_total_", literal(`repo=~\".*\"`)
 	case "graphite":
-		return "github.repo_total.*.*.*.*.*.", "github.repo_total.*.*.*.*.*."
+		// The archived flag is a wildcard, or pinned to true where the live
+		// repositories come from gh_repo, and every node after it, the
+		// repository's among them, is a wildcard.
+		return "github.repo_total.", regexp.MustCompile(`github\.repo_total\.(\*|true)(\.\*){5}\.`)
 	default:
-		return "_index:ghchronicle-gh_repo_total", "repo.keyword:*"
+		return "_index:ghchronicle-gh_repo_total", literal("repo.keyword:*")
 	}
 }
 

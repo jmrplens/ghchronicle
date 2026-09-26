@@ -344,7 +344,9 @@ func (r *Runner) accountFamilies(ctx context.Context, now time.Time) {
 	// failing. Said once per count: the open states are read whole on every
 	// sweep, and an account past the cap stays past it.
 	r.family(ctx, "outbound", now, func() ([]sink.Point, error) {
-		return collect.Outbound{Login: user, Walk: r.walk(), Warn: r.warnOnce}.Collect(ctx, r.API, now)
+		return collect.Outbound{
+			Login: user, Walk: r.walk(), Moved: r.outboundMoved(now), Warn: r.warnOnce,
+		}.Collect(ctx, r.API, now)
 	})
 	// The whole green-squares history of every past year, for one point of
 	// GraphQL each, and the year so far as a daily snapshot. Disabled by
@@ -870,6 +872,26 @@ func (r *Runner) pulls(repo collect.Repo, now time.Time) collect.Pulls {
 	// the next page whenever more than ten were, so a mass relabel is a
 	// longer walk rather than a lost row.
 	return collect.Pulls{First: min(first, 10), Walk: collect.Walk{Pages: -1, Since: since}}
+}
+
+// outboundMoved is how far back a sweep's closed outbound searches read: a
+// cadence before the outbound sweep before this one, the margin the pull
+// request walk above keeps too, and two cadences when there is no record of
+// one. A closed item moves to the top of its search when it closes, so reading
+// back to there catches every item closed since, however long the collector
+// was down and however many other items moved in between; a page count alone
+// lost the one that a hundred later updates pushed onto the second page. A
+// backfill's Walk carries its own bound, so it gets none.
+func (r *Runner) outboundMoved(now time.Time) time.Time {
+	if r.Backfill {
+		return time.Time{}
+	}
+	every, _ := r.Cfg.Interval("outbound")
+	since := now.Add(-2 * every)
+	if last, ran := r.State.LastRun["outbound"]; ran && last.Before(since) {
+		since = last.Add(-every)
+	}
+	return since
 }
 
 // discussionPoints collects the discussions of a repository whose forum is

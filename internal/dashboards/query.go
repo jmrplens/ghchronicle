@@ -24,11 +24,13 @@ const (
 	ESF = "repo.keyword:${repo:lucene}"
 )
 
-// RFA is RF for gh_repo_total, the one measurement a repository set aside for
-// being archived writes to. The picker lists the repositories with a gh_repo
-// row, which a repository set aside never has, so RF would leave every one of
-// them out of the account's totals. Under All an archived row passes as well;
-// with repositories picked, only those do, as everywhere else.
+// RFA is RF for gh_repo_total, the one measurement a sweep writes for a
+// repository set aside for being archived. The picker of the SQL stores lists
+// the repositories with a gh_repo row in the last seven days, and no sweep
+// writes one for a repository set aside: only a backfill does, so a week after
+// the last one RF would leave every one of them out of the account's totals.
+// Under All an archived row passes as well; with repositories picked, only
+// those do, as everywhere else.
 //
 // "All" is the variable's text rather than its value, because the SQL
 // variables have no allValue and All expands to the list itself: the text
@@ -504,6 +506,14 @@ func idx(m string) string { return "ghchronicle-" + m }
 // one datasource over ghchronicle-* serves every panel, then the filters.
 func lq(m string, clauses ...string) string {
 	return strings.Join(append([]string{"_index:" + idx(m)}, clauses...), " AND ")
+}
+
+// liveOrArchivedES is liveOrArchived's documents: a live repository's out of
+// gh_repo and an archived one's out of gh_repo_total, in one query so that a
+// terms bucket per full_name takes the newest of either.
+func liveOrArchivedES() string {
+	return fmt.Sprintf("((_index:%s AND archived.keyword:false) OR (_index:%s AND archived.keyword:true)) AND %s",
+		idx("gh_repo"), idx("gh_repo_total"), ESF)
 }
 
 func esq(m string, metrics, buckets []any, ref string, where []string, alias string) Target {

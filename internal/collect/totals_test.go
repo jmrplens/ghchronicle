@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -493,19 +494,7 @@ func TestTotalsDatesTheArchiveOfRepositoriesSetAside(t *testing.T) {
 			answerCounts(f.t, w, query)
 		case strings.Contains(query, "fragment archived on Repository"):
 			archivedQueries = append(archivedQueries, query)
-			data := map[string]any{}
-			for i := 0; strings.Contains(query, fmt.Sprintf("r%d:", i)); i++ {
-				data[fmt.Sprintf("r%d", i)] = map[string]any{
-					"nameWithOwner": fmt.Sprintf("octocat/a%d", i),
-					"url":           fmt.Sprintf("https://github.com/octocat/a%d", i),
-					"createdAt":     "2020-05-14T00:00:00Z",
-					"archivedAt":    fmt.Sprintf("2026-08-29T15:22:%02dZ", 31+i),
-					"isArchived":    true, "stargazerCount": 5 + i,
-				}
-			}
-			if err := json.NewEncoder(w).Encode(map[string]any{"data": data}); err != nil {
-				t.Errorf("answer the archive query: %v", err)
-			}
+			answerArchived(t, w, query)
 		default:
 			totalsQueries = append(totalsQueries, query)
 			answerTotals(f.t, w, query)
@@ -529,7 +518,7 @@ func TestTotalsDatesTheArchiveOfRepositoriesSetAside(t *testing.T) {
 		t.Fatalf("%d archive queries for 2 repositories set aside, want 1", len(archivedQueries))
 	}
 	q := archivedQueries[0]
-	if !strings.Contains(q, "r1:") || !strings.Contains(q, "stargazerCount") {
+	if !strings.Contains(q, "r1:") || !strings.Contains(q, lifetimeFields) {
 		t.Errorf("the archive query must alias every repository and ask for its lifetime row:\n%s", q)
 	}
 	for _, setting := range []string{"isSecurityPolicyEnabled", "codeowners", "issueTemplates", "branchProtectionRules"} {
@@ -554,6 +543,63 @@ func TestTotalsDatesTheArchiveOfRepositoriesSetAside(t *testing.T) {
 	}
 	if len(archivedQueries) != 0 {
 		t.Errorf("an empty set-aside list still cost %d queries", len(archivedQueries))
+	}
+}
+
+// answerArchived answers an archive query for however many repositories it
+// aliases, each archived a second after the one before.
+func answerArchived(t *testing.T, w http.ResponseWriter, query string) {
+	t.Helper()
+	data := map[string]any{}
+	for i := 0; strings.Contains(query, fmt.Sprintf("r%d:", i)); i++ {
+		data[fmt.Sprintf("r%d", i)] = map[string]any{
+			"nameWithOwner": fmt.Sprintf("octocat/a%d", i),
+			"url":           fmt.Sprintf("https://github.com/octocat/a%d", i),
+			"createdAt":     "2020-05-14T00:00:00Z",
+			"archivedAt":    fmt.Sprintf("2026-08-29T15:22:%02dZ", 31+i),
+			"isArchived":    true, "stargazerCount": 5 + i,
+		}
+	}
+	if err := json.NewEncoder(w).Encode(map[string]any{"data": data}); err != nil {
+		t.Errorf("answer the archive query: %v", err)
+	}
+}
+
+// TestTotalsAsksAboutTwentyFiveArchivedRepositoriesAtATime: twenty five to a
+// query and no more. The counts are what the gateway's ten seconds go on, and
+// measured on 2026-09-26 a query of fifty was refused two times in three,
+// which aliasBatch survives by halving, at ten seconds lost each time.
+func TestTotalsAsksAboutTwentyFiveArchivedRepositoriesAtATime(t *testing.T) {
+	t.Parallel()
+	f := totalsFixture(t)
+	var mu sync.Mutex
+	var archivedQueries []string
+	f.graphQL(func(w http.ResponseWriter, _ *http.Request, query string, _ map[string]any) {
+		switch {
+		case isCountsQuery(query):
+			answerCounts(f.t, w, query)
+		case strings.Contains(query, "fragment archived on Repository"):
+			mu.Lock()
+			archivedQueries = append(archivedQueries, query)
+			mu.Unlock()
+			answerArchived(t, w, query)
+		default:
+			answerTotals(f.t, w, query)
+		}
+	})
+	many := make([]Repo, 26)
+	for i := range many {
+		name := fmt.Sprintf("a%d", i)
+		many[i] = Repo{Owner: "octocat", Name: name, FullName: "octocat/" + name, Archived: true}
+	}
+	if _, err := (Totals{Archived: many}).Collect(ctx(t), f.Client, testNow); err != nil {
+		t.Fatal(err)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if len(archivedQueries) != 2 || !strings.Contains(archivedQueries[0], "r24:") ||
+		strings.Contains(archivedQueries[0], "r25:") {
+		t.Errorf("26 repositories set aside took %d archive queries, want 2, of 25 and 1", len(archivedQueries))
 	}
 }
 
@@ -605,7 +651,7 @@ func TestTotalsCountsTheStarsOfRepositoriesSetAside(t *testing.T) {
 	f.graphQL(func(w http.ResponseWriter, _ *http.Request, query string, _ map[string]any) {
 		if strings.Contains(query, "fragment archived on Repository") {
 			archivedQueries = append(archivedQueries, query)
-			f.write(w, "graphql_archived_totals.json")
+			f.writeSelected(w, "graphql_archived_totals.json", query)
 			return
 		}
 		totalsQueries = append(totalsQueries, query)
@@ -685,13 +731,19 @@ func checkSetAsideLifetimeRow(t *testing.T, points []sink.Point, full string, wa
 
 // TestTotalsWritesTheSameLifetimeRowForARepositorySetAside: set aside or
 // collected, an archived repository's gh_repo_total is the same line, byte
-// for byte, from the same answer. The archive query and the lifetime batch
-// share the fields the row is made of, and this is what holds them to it.
+// for byte, from the same recording. The two paths decode through the same
+// method, so what can make them differ is what each query asks for, and the
+// server here answers each with the fields it selects and no others, as
+// GitHub does. An archive query cut down to the scalars and the watchers, the
+// cheaper query #78 weighed, would write every archived repository with no
+// commits, merged pull requests, issues, releases, branches or tags, since a
+// count GraphQL was not asked for decodes as zero, and nothing else would
+// say so.
 func TestTotalsWritesTheSameLifetimeRowForARepositorySetAside(t *testing.T) {
 	t.Parallel()
 	f := newFixtureServer(t)
-	f.graphQL(func(w http.ResponseWriter, _ *http.Request, _ string, _ map[string]any) {
-		f.write(w, "graphql_archived_totals.json")
+	f.graphQL(func(w http.ResponseWriter, _ *http.Request, query string, _ map[string]any) {
+		f.writeSelected(w, "graphql_archived_totals.json", query)
 	})
 	repos := []Repo{
 		{Owner: "jmrplens", Name: "FFT2octave", FullName: "jmrplens/FFT2octave", Archived: true},
@@ -711,6 +763,32 @@ func TestTotalsWritesTheSameLifetimeRowForARepositorySetAside(t *testing.T) {
 		if got != want {
 			t.Errorf("%s set aside:\n got %s\nwant %s", repo.FullName, got, want)
 		}
+	}
+}
+
+// writeSelected answers a GraphQL query with a recorded answer cut down to
+// what the query selects: each repository keeps a field only where the query
+// names it, as a field or as an alias. A recording holds every field the
+// lifetime row is made of, and a query that stopped asking for one must not
+// be handed it anyway.
+func (f *fixtureServer) writeSelected(w http.ResponseWriter, name, query string) {
+	var answer struct {
+		Data map[string]map[string]any `json:"data"`
+	}
+	if err := json.Unmarshal(fixture(f.t, name), &answer); err != nil {
+		f.t.Errorf("read %s: %v", name, err)
+		return
+	}
+	for _, repo := range answer.Data {
+		for key := range repo {
+			if !regexp.MustCompile(`\b` + regexp.QuoteMeta(key) + `\b`).MatchString(query) {
+				delete(repo, key)
+			}
+		}
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	if err := json.NewEncoder(w).Encode(answer); err != nil {
+		f.t.Errorf("answer from %s: %v", name, err)
 	}
 }
 

@@ -29,9 +29,9 @@ const repositoriesCreatedDesc = "A trailing year at a time, whatever the row abo
 //
 // Its SQL filters by RFA and not RF for the reason the last sentence gives:
 // the repositories set aside for being archived have a row in gh_repo_total
-// from every totals sweep and none in gh_repo, which is what the picker
-// lists, so RF would leave the Archived column false on every row of the
-// account it was added for.
+// from every totals sweep and none in gh_repo from a sweep, and gh_repo is
+// what the picker lists, so a week after the last backfill RF would leave the
+// Archived column false on every row of the account it was added for.
 const everyRepositoryDesc = "The whole life of each repository in one row: not what " +
 	"happened in the dashboard range, but everything there has ever been. " + forksIncluded +
 	" Sorted by commits, a fork of a busy project outranks anything the account wrote, " +
@@ -42,6 +42,58 @@ const everyRepositoryDesc = "The whole life of each repository in one row: not w
 	"selected the archived repositories the picker does not list are here too, with " +
 	"their current counts: the default filter walks none of their history, but every " +
 	"totals sweep reads this row of each of them again."
+
+// everyRepositoryTwins is what "Every repository, ever" asks the three stores
+// that do not speak SQL, out here for the reason everyRepositoryDesc is.
+//
+// One row per repository in every store, a repository archived inside the
+// range included. It has rows under both values of the archived tag then, the
+// live ones until the archive and the archived ones after it, and since a
+// sweep began writing the archived ones for a repository the filter sets
+// aside that is every archive under the default filter, not only under
+// include_archived. The SQL stores group by the name and take MAX(archived),
+// which is true for such a repository, and the other three do the same in
+// their own terms: the archived row where a repository has one. Graphite
+// groups by full_name and then names the row by the short name the other
+// stores show, naming the series by those two nodes before it groups them so
+// that the grouping reads a name of two nodes and not the path inside
+// keepLastValue; Elasticsearch keeps the one archived bucket that sorts last,
+// true; Prometheus takes the archived series, and a live one only for a
+// repository that has no archived one.
+func everyRepositoryTwins(b *builder) *P {
+	rt := "gh_repo_total"
+	gr, grtf := gTbl(rowsOf(fmt.Sprintf(`groupByNodes(%s, "max", 0, 1)`,
+		rowsOf(fmt.Sprintf("keepLastValue(%s)", rp(rt, "commits")), gn(rt, "full_name"), gn(rt, "repo"))), 1),
+		"Repository", []col{{"lastNotNull", "Commits"}})
+	es, estf := esTbl(rt, []any{
+		b.tm("repo", 500), b.tmURL(), b.tm("fork", 2), b.tm("archived", 1, "_key", "desc"),
+	},
+		[]any{b.mNewest("commits", "pulls_merged", "issues", "releases", "stars", "branches", "tags")},
+		[]named{
+			{"repo.keyword", "Repository"},
+			{"url.keyword", "Link"},
+			{"fork.keyword", "Fork"},
+			{"archived.keyword", "Archived"},
+			{"commits", "Commits"},
+			{"pulls_merged", "Merged"},
+			{"issues", "Issues"},
+			{"releases", "Releases"},
+			{"stars", "Stars"},
+			{"branches", "Branches"},
+			{"tags", "Tags"},
+		},
+		[]string{ESF})
+	var prom []Target
+	for i, field := range []string{
+		"commits", "pulls_merged", "issues", "releases", "stars", "branches", "tags",
+	} {
+		archived := fmt.Sprintf(`github_repo_total_%s{archived="true",%s}`, field, PF)
+		prom = append(prom, promTbl(fmt.Sprintf(
+			"%s or (github_repo_total_%s{%s} unless on (full_name) %s)", archived, field, PF, archived,
+		), string(rune('A'+i))))
+	}
+	return &P{Prom: prom, GR: gr, GRTF: grtf, ES: es, ESTF: estf}
+}
 
 // ── Lifetime ────────────────────────────────────────────────────────────────
 
@@ -78,37 +130,7 @@ func lifetime(b *builder) []Panel {
 		` MAX(url) AS "Link"` +
 		" FROM gh_repo_total WHERE $__timeFilter(time) AND " + RFA +
 		" GROUP BY 1 ORDER BY 2 DESC"
-	rt := "gh_repo_total"
-
-	reposGR, reposGRtf := gTbl(rowsOf(fmt.Sprintf("keepLastValue(%s)", rp(rt, "commits")),
-		gn(rt, "repo")), "Repository", []col{{"lastNotNull", "Commits"}})
-	reposES, reposEStf := esTbl(rt, []any{
-		b.tm("repo", 500), b.tmURL(), b.tm("fork", 2), b.tm("archived", 2),
-	},
-		[]any{b.mNewest("commits", "pulls_merged", "issues", "releases", "stars", "branches", "tags")},
-		[]named{
-			{"repo.keyword", "Repository"},
-			{"url.keyword", "Link"},
-			{"fork.keyword", "Fork"},
-			{"archived.keyword", "Archived"},
-			{"commits", "Commits"},
-			{"pulls_merged", "Merged"},
-			{"issues", "Issues"},
-			{"releases", "Releases"},
-			{"stars", "Stars"},
-			{"branches", "Branches"},
-			{"tags", "Tags"},
-		},
-		[]string{ESF})
-
-	var promRepos []Target
-	for i, field := range []string{
-		"commits", "pulls_merged", "issues", "releases", "stars", "branches", "tags",
-	} {
-		promRepos = append(promRepos, promTbl(
-			fmt.Sprintf("github_repo_total_%s{%s}", field, PF), string(rune('A'+i)),
-		))
-	}
+	twins := everyRepositoryTwins(b)
 
 	// The two dated measurements on the row below sit years outside any range a
 	// reader picks for the rest of the page, so both tables name their own
@@ -199,7 +221,7 @@ func lifetime(b *builder) []Panel {
 		}),
 		panel("table", "Every repository, ever", box{W: 24, H: 12, X: 0, Y: 5},
 			[]Target{sqlT(repos)}, &P{
-				Prom: promRepos,
+				Prom: twins.Prom,
 				PromTF: merged(map[string]string{
 					"repo": "Repository", "fork": "Fork", "archived": "Archived",
 					panelValueA: "Commits", panelValueB: "Merged",
@@ -213,8 +235,8 @@ func lifetime(b *builder) []Panel {
 				Overrides: []any{
 					linkOn("Repository"), width("Fork", 70), width("Archived", 90),
 				},
-				GR: reposGR, GRTF: reposGRtf, GRDesc: grSlot,
-				ES: reposES, ESTF: reposEStf,
+				GR: twins.GR, GRTF: twins.GRTF, GRDesc: grSlot,
+				ES: twins.ES, ESTF: twins.ESTF,
 			}),
 		// The description leads with the window rather than explaining it in
 		// the middle. The row above this says Lifetime and the panel beside it

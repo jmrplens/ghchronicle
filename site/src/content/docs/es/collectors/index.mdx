@@ -239,9 +239,10 @@ lo que la cuenta posee; esta mide lo que lee y a lo que contribuye: las
 estrellas que dio, y las pull requests que abrió en repositorios ajenos. Todo
 es GraphQL, un punto por página: la lista de estrellas dadas, cinco búsquedas
 de issues y los dos recorridos de comentarios. Una pasada lee todas las páginas
-de las dos búsquedas de lo que sigue abierto, y la primera página de las otras
-tres, que van ordenadas por lo que se movió último; un relleno lee también esas
-tres hasta el final.
+de las dos búsquedas de lo que sigue abierto, y las otras tres, que van
+ordenadas por lo que se movió último, hasta una cadencia antes de la pasada
+anterior: su primera página, salvo que en ese tiempo se hayan movido más de
+cien elementos. Un relleno lee también esas tres hasta el final.
 
 **`totals`** le pide a GitHub los números que son ciertos desde el principio:
 pull requests fusionadas alguna vez, commits totales, issues abiertas alguna

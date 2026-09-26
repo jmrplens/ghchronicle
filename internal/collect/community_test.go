@@ -593,6 +593,14 @@ const pageOneCursor = "Y3Vyc29yOjI="
 // records the variables each search was asked with, by its qualifiers.
 func twoPageSearches(t *testing.T, pageOneEnds string) (*fixtureServer, map[string][]map[string]any) {
 	t.Helper()
+	return twoPageSearchesClosed(t, pageOneEnds, pageOneEnds)
+}
+
+// twoPageSearchesClosed is twoPageSearches with the item page one ends on
+// closed at closed rather than when it last moved: one closed long ago and
+// commented on since sits as high in the list as one closed yesterday.
+func twoPageSearchesClosed(t *testing.T, pageOneEnds, closed string) (*fixtureServer, map[string][]map[string]any) {
+	t.Helper()
 	asked := map[string][]map[string]any{}
 	f := newFixtureServer(t)
 	f.graphQL(func(w http.ResponseWriter, _ *http.Request, query string, vars map[string]any) {
@@ -603,8 +611,12 @@ func twoPageSearches(t *testing.T, pageOneEnds string) (*fixtureServer, map[stri
 			asked[filter] = append(asked[filter], vars)
 			open := strings.Contains(filter, "is:open")
 			if vars["after"] == nil {
+				last := searchNode(2, pageOneEnds, open)
+				if !open {
+					last["closedAt"] = closed
+				}
 				_, _ = w.Write(outboundPage(t, 3, true, pageOneCursor,
-					searchNode(1, "2026-09-05T10:00:00Z", open), searchNode(2, pageOneEnds, open)))
+					searchNode(1, "2026-09-05T10:00:00Z", open), last))
 				return
 			}
 			_, _ = w.Write(outboundPage(t, 3, false, "Y3Vyc29yOjM=", searchNode(3, "2026-06-01T10:00:00Z", open)))
@@ -668,8 +680,7 @@ func TestOutboundSearchFollowsTheCursor(t *testing.T) {
 	}
 }
 
-// A sweep reads the first page of a closed state, which holds whatever closed
-// since the last one because it is ordered by when the item last moved, and
+// A sweep with no Moved bound reads the first page of a closed state, and
 // every page of an open state, whose rows are rewritten each day for every
 // item still open.
 func TestASweepReadsOnePageOfAClosedStateAndEveryPageOfAnOpenOne(t *testing.T) {
@@ -728,6 +739,50 @@ func TestABackfillStopsAClosedSearchAtThePagePastSince(t *testing.T) {
 		t.Fatal(err)
 	}
 	pagesAsked(t, asked, func(bool) int { return 2 })
+
+	// Page one ends on an item closed on the first of August, before the
+	// bound, and commented on since, on the first of September. The list is
+	// in the order items last moved, so what comes after it can have closed
+	// inside the bound, and the walk goes on: stopped by when that item
+	// closed, which #76 itself suggested, it would lose them.
+	f, asked = twoPageSearchesClosed(t, "2026-09-01T10:00:00Z", "2026-08-01T10:00:00Z")
+	if _, err := (Outbound{Login: "octocat", Walk: Walk{Pages: -1, Since: since}}).Collect(ctx(t), f.Client, testNow); err != nil {
+		t.Fatal(err)
+	}
+	pagesAsked(t, asked, func(bool) int { return 2 })
+}
+
+// A sweep's closed states read back to Moved, which the runner sets a cadence
+// before the sweep before, and not to a page count. A hundred items that moved
+// after one closed, a bot locking old threads, a relabel, a week the collector
+// was down, carry it to the second page, and a sweep that read one page lost
+// it for good. The bound is when an item last moved, as the backfill's is, so
+// one closed before the bound and commented on after it does not stop the walk.
+func TestASweepReadsAClosedStateBackToTheSweepBefore(t *testing.T) {
+	t.Parallel()
+	moved := time.Date(2026, 8, 15, 0, 0, 0, 0, time.UTC)
+	for _, tc := range []struct {
+		name, ends, closed string
+		closedPages        int
+	}{
+		{"page one ends after it", "2026-08-20T10:00:00Z", "2026-08-20T10:00:00Z", 2},
+		{"page one ends before it", "2026-08-01T10:00:00Z", "2026-08-01T10:00:00Z", 1},
+		{"page one ends on an item closed before it and moved after", "2026-09-01T10:00:00Z", "2026-08-01T10:00:00Z", 2},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			f, asked := twoPageSearchesClosed(t, tc.ends, tc.closed)
+			if _, err := (Outbound{Login: "octocat", Moved: moved}).Collect(ctx(t), f.Client, testNow); err != nil {
+				t.Fatal(err)
+			}
+			pagesAsked(t, asked, func(open bool) int {
+				if open {
+					return 2
+				}
+				return tc.closedPages
+			})
+		})
+	}
 }
 
 // GitHub serves a thousand results of any search and then says there is no

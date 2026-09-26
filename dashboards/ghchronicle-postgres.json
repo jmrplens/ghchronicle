@@ -64,7 +64,7 @@
     },
     {
       "datasource": "${DS_POSTGRES}",
-      "description": "Public repositories of the account, and the current stars and forks of the selected ones, summed over the newest row of each repository rather than over every row in the range. With All selected that includes the archived repositories the picker does not list: people still star and fork them, and each totals sweep reads their counts again, so the stars beside the repository count are the stars of the same repositories.",
+      "description": "Public repositories of the account, and the current stars and forks of the selected ones, summed over the newest row of each repository rather than over every row in the range. With All selected that includes the archived repositories the default filter sets aside, which the picker stops listing once the last backfill is behind it: people still star and fork them, and each totals sweep reads their counts again, twelve hours apart by default, so a range shorter than that can leave them out. Each repository counts once, by its full name. The repository count is GitHub's own count of the account's public repositories and not the set the sums are taken over: those are the repositories the sweeps collect and the archived ones above, private ones included, and forks left out unless `include_forks` is on.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -120,7 +120,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT SUM(stars) AS \"Stars\", SUM(forks) AS \"Forks\" FROM (SELECT repo, stars, forks FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo ORDER BY time DESC) AS rn FROM gh_repo_total WHERE $__timeFilter(time) AND (repo IN (${repo:sqlstring}) OR (archived = 'true' AND '${repo:text}' = 'All'))) x WHERE rn = 1)",
+          "rawSql": "SELECT SUM(stars) AS \"Stars\", SUM(forks) AS \"Forks\" FROM (SELECT full_name, stars, forks FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn FROM (SELECT time, full_name, stars, forks FROM gh_repo WHERE $__timeFilter(time) AND archived = 'false' AND repo IN (${repo:sqlstring}) UNION ALL SELECT time, full_name, stars, forks FROM gh_repo_total WHERE $__timeFilter(time) AND archived = 'true' AND (repo IN (${repo:sqlstring}) OR (archived = 'true' AND '${repo:text}' = 'All'))) u) x WHERE rn = 1)",
           "refId": "B"
         }
       ],
@@ -388,7 +388,7 @@
         },
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "The whole life of each repository in one row: not what happened in the dashboard range, but everything there has ever been. The repository picker holds every repository the account can see, its forks and its archived ones alongside its own, so a count here is over all of them until the picker is narrowed. Sorted by commits, a fork of a busy project outranks anything the account wrote, 370,296 commits against 3,385 on the account this was measured on, so the table opens with the account's own repositories first and the forks under them, both ranked by commits. The fork and archived flags are columns here rather than a filter, the title being what it is, and a click on either sorts by it. With All selected the archived repositories the picker does not list are here too, with their current counts: the default filter walks none of their history, but every totals sweep reads this row of each of them again.",
+          "description": "The whole life of each repository in one row: not what happened in the dashboard range, but everything there has ever been. The repository picker holds the repositories the sweeps collect: forks too when `include_forks` is on, and archived ones when `include_archived` is on and for a while after a backfill, which collects them either way. A count here is over every repository the picker holds until it is narrowed. Sorted by commits, a fork of a busy project outranks anything the account wrote, 370,296 commits against 3,385 on the account this was measured on, so the table opens with the account's own repositories first and the forks under them, both ranked by commits. The fork and archived flags are columns here rather than a filter, the title being what it is, and a click on either sorts by it. With All selected the archived repositories the picker does not list are here too, with their current counts: the default filter walks none of their history, but every totals sweep reads this row of each of them again.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -5845,7 +5845,7 @@
       "panels": [
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "How many commits landed in the window, how many lines each way, and what share carried a signature GitHub could verify. A commit with no signature at all is a different fact from one whose signature failed to verify, and both are counted separately in the chart below. The repository picker holds every repository the account can see, its forks and its archived ones alongside its own, so a count here is over all of them until the picker is narrowed. This panel keeps its own range of ninety days whatever the page is set to. Every commit is a row of its own in the store, and at about ten months of them the query is refused for opening too many files, which the reader would see as an empty panel rather than as an error.",
+          "description": "How many commits landed in the window, how many lines each way, and what share carried a signature GitHub could verify. A commit with no signature at all is a different fact from one whose signature failed to verify, and both are counted separately in the chart below. The repository picker holds the repositories the sweeps collect: forks too when `include_forks` is on, and archived ones when `include_archived` is on and for a while after a backfill, which collects them either way. A count here is over every repository the picker holds until it is narrowed. This panel keeps its own range of ninety days whatever the page is set to. Every commit is a row of its own in the store, and at about ten months of them the query is refused for opening too many files, which the reader would see as an empty panel rather than as an error.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -6095,7 +6095,7 @@
         },
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "The twenty authors with the most commits in the window. The repository picker holds every repository the account can see, its forks and its archived ones alongside its own, so a count here is over all of them until the picker is narrowed. On an account with forks of busy projects the upstream authors are the top of this table, which is the honest answer to the question as asked: narrow the picker to read it as the account's own work. This panel keeps its own range of ninety days whatever the page is set to. Every commit is a row of its own in the store, and at about ten months of them the query is refused for opening too many files, which the reader would see as an empty panel rather than as an error.",
+          "description": "The twenty authors with the most commits in the window. The repository picker holds the repositories the sweeps collect: forks too when `include_forks` is on, and archived ones when `include_archived` is on and for a while after a backfill, which collects them either way. A count here is over every repository the picker holds until it is narrowed. On an account with forks of busy projects the upstream authors are the top of this table, which is the honest answer to the question as asked: narrow the picker to read it as the account's own work. This panel keeps its own range of ninety days whatever the page is set to. Every commit is a row of its own in the store, and at about ten months of them the query is refused for opening too many files, which the reader would see as an empty panel rather than as an error.",
           "fieldConfig": {
             "defaults": {
               "custom": {

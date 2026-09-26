@@ -64,7 +64,7 @@
     },
     {
       "datasource": "${DS_PROMETHEUS}",
-      "description": "Public repositories of the account, and the current stars and forks of the selected ones, summed over the newest row of each repository rather than over every row in the range. With All selected that includes the archived repositories the picker does not list: people still star and fork them, and each totals sweep reads their counts again, so the stars beside the repository count are the stars of the same repositories.",
+      "description": "Public repositories of the account, and the current stars and forks of the selected ones, summed over the newest row of each repository rather than over every row in the range. With All selected that includes the archived repositories the default filter sets aside, which the picker stops listing once the last backfill is behind it: people still star and fork them, and each totals sweep reads their counts again, twelve hours apart by default, so a range shorter than that can leave them out. Each repository counts once, by its full name. The repository count is GitHub's own count of the account's public repositories and not the set the sums are taken over: those are the repositories the sweeps collect and the archived ones above, private ones included, and forks left out unless `include_forks` is on.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -119,7 +119,7 @@
         {
           "datasource": "${DS_PROMETHEUS}",
           "editorMode": "code",
-          "expr": "sum(max by (full_name) (github_repo_total_stars{repo=~\"$repo\"}))",
+          "expr": "sum(max by (full_name) (github_repo_stars{archived=\"false\",repo=~\"$repo\"} or github_repo_total_stars{archived=\"true\",repo=~\"$repo\"}))",
           "instant": true,
           "legendFormat": "Stars",
           "range": false,
@@ -128,7 +128,7 @@
         {
           "datasource": "${DS_PROMETHEUS}",
           "editorMode": "code",
-          "expr": "sum(max by (full_name) (github_repo_total_forks{repo=~\"$repo\"}))",
+          "expr": "sum(max by (full_name) (github_repo_forks{archived=\"false\",repo=~\"$repo\"} or github_repo_total_forks{archived=\"true\",repo=~\"$repo\"}))",
           "instant": true,
           "legendFormat": "Forks",
           "range": false,
@@ -530,7 +530,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "The whole life of each repository in one row: not what happened in the dashboard range, but everything there has ever been. The repository picker holds every repository the account can see, its forks and its archived ones alongside its own, so a count here is over all of them until the picker is narrowed. Sorted by commits, a fork of a busy project outranks anything the account wrote, 370,296 commits against 3,385 on the account this was measured on, so the table opens with the account's own repositories first and the forks under them, both ranked by commits. The fork and archived flags are columns here rather than a filter, the title being what it is, and a click on either sorts by it. With All selected the archived repositories the picker does not list are here too, with their current counts: the default filter walks none of their history, but every totals sweep reads this row of each of them again. The Prometheus exporter carries no url, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "The whole life of each repository in one row: not what happened in the dashboard range, but everything there has ever been. The repository picker holds the repositories the sweeps collect: forks too when `include_forks` is on, and archived ones when `include_archived` is on and for a while after a backfill, which collects them either way. A count here is over every repository the picker holds until it is narrowed. Sorted by commits, a fork of a busy project outranks anything the account wrote, 370,296 commits against 3,385 on the account this was measured on, so the table opens with the account's own repositories first and the forks under them, both ranked by commits. The fork and archived flags are columns here rather than a filter, the title being what it is, and a click on either sorts by it. With All selected the archived repositories the picker does not list are here too, with their current counts: the default filter walks none of their history, but every totals sweep reads this row of each of them again. The Prometheus exporter carries no url, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -602,7 +602,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "github_repo_total_commits{repo=~\"$repo\"}",
+              "expr": "github_repo_total_commits{archived=\"true\",repo=~\"$repo\"} or (github_repo_total_commits{repo=~\"$repo\"} unless on (full_name) github_repo_total_commits{archived=\"true\",repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -611,7 +611,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "github_repo_total_pulls_merged{repo=~\"$repo\"}",
+              "expr": "github_repo_total_pulls_merged{archived=\"true\",repo=~\"$repo\"} or (github_repo_total_pulls_merged{repo=~\"$repo\"} unless on (full_name) github_repo_total_pulls_merged{archived=\"true\",repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -620,7 +620,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "github_repo_total_issues{repo=~\"$repo\"}",
+              "expr": "github_repo_total_issues{archived=\"true\",repo=~\"$repo\"} or (github_repo_total_issues{repo=~\"$repo\"} unless on (full_name) github_repo_total_issues{archived=\"true\",repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -629,7 +629,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "github_repo_total_releases{repo=~\"$repo\"}",
+              "expr": "github_repo_total_releases{archived=\"true\",repo=~\"$repo\"} or (github_repo_total_releases{repo=~\"$repo\"} unless on (full_name) github_repo_total_releases{archived=\"true\",repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -638,7 +638,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "github_repo_total_stars{repo=~\"$repo\"}",
+              "expr": "github_repo_total_stars{archived=\"true\",repo=~\"$repo\"} or (github_repo_total_stars{repo=~\"$repo\"} unless on (full_name) github_repo_total_stars{archived=\"true\",repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -647,7 +647,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "github_repo_total_branches{repo=~\"$repo\"}",
+              "expr": "github_repo_total_branches{archived=\"true\",repo=~\"$repo\"} or (github_repo_total_branches{repo=~\"$repo\"} unless on (full_name) github_repo_total_branches{archived=\"true\",repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -656,7 +656,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "github_repo_total_tags{repo=~\"$repo\"}",
+              "expr": "github_repo_total_tags{archived=\"true\",repo=~\"$repo\"} or (github_repo_total_tags{repo=~\"$repo\"} unless on (full_name) github_repo_total_tags{archived=\"true\",repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -5350,7 +5350,7 @@
       "panels": [
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "How many commits landed in the window, how many lines each way, and what share carried a signature GitHub could verify. A commit with no signature at all is a different fact from one whose signature failed to verify, and both are counted separately in the chart below. The repository picker holds every repository the account can see, its forks and its archived ones alongside its own, so a count here is over all of them until the picker is narrowed. This panel keeps its own range of ninety days whatever the page is set to. Every commit is a row of its own in the store, and at about ten months of them the query is refused for opening too many files, which the reader would see as an empty panel rather than as an error. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date. In Prometheus this counts the collector's last sweep, not the dashboard range.",
+          "description": "How many commits landed in the window, how many lines each way, and what share carried a signature GitHub could verify. A commit with no signature at all is a different fact from one whose signature failed to verify, and both are counted separately in the chart below. The repository picker holds the repositories the sweeps collect: forks too when `include_forks` is on, and archived ones when `include_archived` is on and for a while after a backfill, which collects them either way. A count here is over every repository the picker holds until it is narrowed. This panel keeps its own range of ninety days whatever the page is set to. Every commit is a row of its own in the store, and at about ten months of them the query is refused for opening too many files, which the reader would see as an empty panel rather than as an error. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date. In Prometheus this counts the collector's last sweep, not the dashboard range.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -5644,7 +5644,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "The twenty authors with the most commits in the window. The repository picker holds every repository the account can see, its forks and its archived ones alongside its own, so a count here is over all of them until the picker is narrowed. On an account with forks of busy projects the upstream authors are the top of this table, which is the honest answer to the question as asked: narrow the picker to read it as the account's own work. This panel keeps its own range of ninety days whatever the page is set to. Every commit is a row of its own in the store, and at about ten months of them the query is refused for opening too many files, which the reader would see as an empty panel rather than as an error. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date. In Prometheus this is the mean over the collector's last sweep, not a median over the dashboard range.",
+          "description": "The twenty authors with the most commits in the window. The repository picker holds the repositories the sweeps collect: forks too when `include_forks` is on, and archived ones when `include_archived` is on and for a while after a backfill, which collects them either way. A count here is over every repository the picker holds until it is narrowed. On an account with forks of busy projects the upstream authors are the top of this table, which is the honest answer to the question as asked: narrow the picker to read it as the account's own work. This panel keeps its own range of ninety days whatever the page is set to. Every commit is a row of its own in the store, and at about ten months of them the query is refused for opening too many files, which the reader would see as an empty panel rather than as an error. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date. In Prometheus this is the mean over the collector's last sweep, not a median over the dashboard range.",
           "fieldConfig": {
             "defaults": {
               "custom": {

@@ -224,6 +224,14 @@ func (Planning) Collect(ctx context.Context, c *ghapi.Client, repo Repo, now tim
 type Outbound struct {
 	Login string
 	Walk  Walk
+	// Moved bounds a sweep's closed searches by time rather than by page:
+	// each reads until a page ends on an item that last moved before it,
+	// however many pages that takes. The runner sets it a cadence before the
+	// previous outbound sweep, which is what lets a sweep promise every item
+	// closed since that one, whatever else moved in between. Zero reads the
+	// Walk's pages, one by default, and a backfill leaves it zero because its
+	// Walk carries the bound.
+	Moved time.Time
 	// Warn is where a search that stopped short of its own count is said:
 	// GitHub serves a thousand results of any search and no more, and the
 	// rows past that are missing without anything failing. Nil means silence.
@@ -823,9 +831,11 @@ func (o Outbound) starred(ctx context.Context, c *ghapi.Client) ([]sink.Point, e
 // is older than a page: measured on 2026-09-26, 53 of the first hundred of one
 // account's closed issues by updated-desc had been opened before the oldest of
 // the first hundred by creation and closed after it, one of them opened in
-// 2014 and closed on 1 September 2026. So a sweep reads the Walk's pages, one
-// by default, and a backfill reads until the pages run out or a page ends
-// past Since. Closing an item moves its updatedAt, so nothing after that page
+// 2014 and closed on 1 September 2026. So a sweep reads until a page ends past
+// Moved, and a backfill until the pages run out or a page ends past Since; a
+// page count alone would not do, since a hundred items that moved after one
+// closed, a bot locking old threads or a relabel, carry it to a page nobody
+// reads. Closing an item moves its updatedAt, so nothing after that page
 // closed inside the bound: measured that day, closedAt was not after
 // updatedAt on any of 1,000 merged pull requests, and on one of 373 closed
 // unmerged, by a day in 2011. The order is the search index's copy of
@@ -839,7 +849,11 @@ func (o Outbound) starred(ctx context.Context, c *ghapi.Client) ([]sink.Point, e
 // the day; newest created first moves an item only when one is opened or
 // leaves the state.
 func (o Outbound) search(ctx context.Context, c *ghapi.Client, s outboundSearch, now time.Time) ([]sink.Point, error) {
-	order, most := "sort:updated-desc", o.Walk.limit(1)
+	walk := o.Walk
+	if !o.Moved.IsZero() {
+		walk = Walk{Pages: -1, Since: o.Moved}
+	}
+	order, most := "sort:updated-desc", walk.limit(1)
 	if s.open {
 		order, most = "sort:created-desc", Unbounded.limit(0)
 	}
@@ -867,7 +881,7 @@ func (o Outbound) search(ctx context.Context, c *ghapi.Client, s outboundSearch,
 			}
 			break
 		}
-		if len(found.Nodes) == 0 || (!s.open && o.Walk.past(found.Nodes[len(found.Nodes)-1].UpdatedAt)) {
+		if len(found.Nodes) == 0 || (!s.open && walk.past(found.Nodes[len(found.Nodes)-1].UpdatedAt)) {
 			break
 		}
 		vars["after"] = found.PageInfo.EndCursor

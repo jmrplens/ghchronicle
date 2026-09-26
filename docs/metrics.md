@@ -233,9 +233,10 @@ measures what the account owns; this measures what it reads and what it
 contributes to: the stars it gave, and the pull requests it opened in other
 people's repositories. All of it is GraphQL, one point a page: the starred
 list, five issue searches and the two comment walks. A sweep reads every page
-of the two searches for what is still open, and the first page of the other
-three, which are ordered by what moved last; a backfill reads those three to
-the end as well.
+of the two searches for what is still open, and the other three, which are
+ordered by what moved last, back to a cadence before the sweep before: their
+first page, unless more than a hundred items moved in that time. A backfill
+reads those three to the end as well.
 
 **`totals`** asks GitHub for the numbers that are true since the beginning:
 pull requests merged ever, commits ever, issues opened ever, and the whole life
@@ -765,9 +766,11 @@ not own, from five searches, one per `kind` and `state`: pull requests
 still open is rewritten at the start of every day it stays open, so a sweep
 reads both open states whole. A closed item is written once, stamped when it
 closed, so the three closed states are read by when each item last moved: a
-sweep reads the first hundred of each, which holds whatever merged or closed
-since the sweep before however long ago it was opened, and a backfill reads
-on until the pages run out or reach `backfill.since`. GitHub serves a thousand
+sweep reads each back to a cadence before the sweep before, which holds
+whatever merged or closed since then however long ago it was opened and however
+many other items moved in between, and is one page of a hundred unless more
+than a hundred did. A backfill reads on until the pages run out or reach
+`backfill.since`. GitHub serves a thousand
 results of any search and no more, so an account past a thousand in one state
 has the thousand that moved most recently, and the log says so at warning.
 `gh_account_total.pulls_merged_elsewhere` and `issues_elsewhere` are GitHub's
@@ -1292,15 +1295,17 @@ same query at no extra cost and is a second, independent reading of the switch
 repository's own setting, the other is whether the listing actually answered.
 Two sources that disagree is the case worth seeing.
 
-`gh_repo_total` is the table the account's star and fork totals are read from,
-on the Overview and in _Every repository, ever_, rather than `gh_repo`. The two
-differ for one kind of repository. One the default filter sets aside for being
-archived has no `gh_repo` row, since no family walks it, but it is still
-starred, unstarred and forked, so the `totals` family writes its
+`gh_repo_total` is where an archived repository's stars and forks are read
+from, on the Overview and in _Every repository, ever_, and `gh_repo` is not.
+One the default filter sets aside for being archived gets no `gh_repo` row from
+a sweep, since no family walks it, and has only the one a backfill wrote, but
+it is still starred, unstarred and forked, so the `totals` family writes its
 `gh_repo_total` on every sweep from the query that dates its archive: the same
 tags and fields a collected repository's row has, `archived` true, stamped at
 the sweep. Up to 2.5.1 only a backfill wrote it, once, and on 2026-09-26 one
-such row said 4 stars where GitHub said 3. It gets no `gh_repo_policy`. That
+such row said 4 stars where GitHub said 3. A live repository's stars and forks
+on the Overview still come from `gh_repo`, which a sweep writes every hour
+where `totals` writes every twelve. It gets no `gh_repo_policy`. That
 query asks about twenty five repositories at a time: measured the same day,
 the gateway answered the lifetime row of fifty archived repositories once in
 9.2 seconds and refused it twice after about eleven, and answered twenty five

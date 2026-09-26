@@ -382,11 +382,19 @@ column, sixteen tiles were four screens of single numbers and four groups are
 one. The repository variable beside them filters every section at once. Stars
 and forks add up the newest row per repository rather than every row in the
 range, because both are current state and a sum over the range would count
-every sweep. They are read from `gh_repo_total`, and with All selected that
-includes the archived repositories the default filter sets aside, which the
-picker does not list: nothing walks their history, but people still star and
-fork them, and every `totals` sweep reads their counts again. Picking
-repositories counts those alone.
+every sweep. A live repository's row is its `gh_repo`, which a sweep writes
+every hour, and an archived one's is its `gh_repo_total`. A repository the
+default filter sets aside for being archived gets no `gh_repo` row from a sweep,
+so the picker stops offering it once the last backfill is behind it, but people
+still star and fork it and every `totals` sweep reads its counts again. With
+All selected the sums include it, and a range shorter than the `totals`
+cadence, twelve hours by default, can leave its row out. Picking repositories
+counts those alone. Each repository counts once, by its full name: two owners'
+repositories of the same name are two, and one archived while the collector
+runs is not counted under both its live row and its archived one. The
+repository count beside the sums is GitHub's own count of the account's public
+repositories, which is a different set: it has the public forks the default
+filter leaves out, and none of the private repositories the sums include.
 
 ![The Overview row: the repository picker and the 90 day range across the top, the ghchronicle badge with its Docs and Source buttons, then four tile groups reading 5 repositories with 350 stars and 51 forks, 37.5 thousand views with 21.1 thousand unique visitors and 19.6 thousand clones, 117 followers and 58 following with 4 sponsors and 2 sponsored, and an account with 3.22 thousand contributions over 7.78 years](../site/src/assets/dashboards/overview.png)
 
@@ -398,7 +406,8 @@ was read against, one repository was cloned 135,683 times in a fortnight by
 itself is two panels of the Audience section. The capture above predates that
 change and still reads "clones".
 
-Reads `gh_account`, `gh_repo_total`, `gh_traffic` and `gh_contributions_total`.
+Reads `gh_account`, `gh_repo`, `gh_repo_total`, `gh_traffic` and
+`gh_contributions_total`.
 
 ### Lifetime
 
@@ -425,15 +434,19 @@ that would open more than its file limit, forty thousand where this was
 measured, and "how many ever" from a row per fact is exactly that query.
 
 "Every repository, ever" lists every repository the picker holds, forks and
-archived ones included, since that is what the title says. It is ranked by
+archived ones included when the sweeps collect them, since that is what the
+title says. It is ranked by
 commits, which on an account with forks of busy projects means somebody else's
 history outranks everything the account wrote: 370,296 commits against 3,385
 where this was read. So the fork and archived flags are columns, and the table
 opens sorted by the first of them and then by commits, which puts the account's
 own repositories on the first screen and the forks under them without leaving
 one out. With All selected it lists the archived repositories the default
-filter sets aside as well, with their current counts, although the picker does
-not offer them: the same row of each is read again on every `totals` sweep.
+filter sets aside as well, with their current counts, whether or not the picker
+offers them: a sweep writes them no `gh_repo` row, which is what the picker
+lists, but the same row of each is read again on every `totals` sweep. A
+repository archived inside the range has rows from before the archive and
+after it, and is still one row in every store, flagged archived.
 
 Reads `gh_account_total` and `gh_repo_total`.
 

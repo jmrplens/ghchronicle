@@ -126,31 +126,44 @@ func overview(b *builder) []Panel {
 	// count is the account's own. In Elasticsearch the per-repository rows
 	// are summed by the panel, and the one account row sums to itself.
 	//
-	// From gh_repo_total rather than gh_repo: a repository the filter set
-	// aside for being archived has no gh_repo row, but it has this one from
-	// every totals sweep, and people still star and fork it. Measured on
-	// 2026-09-26 against the account of issue #78: the seventeen archived
-	// repositories its filter sets aside held 80 stars and 24 forks that the
-	// tile left out, beside a repository count that counted the fifteen
-	// public ones. Under All every store lets their rows through, the
-	// SQL ones by RFA and the rest by a wildcard; with repositories picked,
-	// only those count, and the picker does not list archived ones.
+	// A live repository's row is its gh_repo and an archived one's its
+	// gh_repo_total. A repository the filter sets aside for being archived
+	// gets no gh_repo row from a sweep, but it gets a gh_repo_total from every
+	// totals sweep, and people still star and fork it. Measured on 2026-09-26
+	// against the account of issue #78: the seventeen archived repositories
+	// its filter sets aside held 80 stars and 24 forks that the tile left out.
+	// Not gh_repo_total for every repository, though: that family runs every
+	// twelve hours and gh_repo every hour, so the live stars would lag the
+	// Inventory table and the card by up to half a day and a range of six
+	// hours would hold none of them. Under All every store lets the archived
+	// rows through, the SQL ones by RFA and the rest by a wildcard; with
+	// repositories picked, only those count.
+	//
+	// One row per full_name and not per repo, which is a name two owners can
+	// both use: alice/.github and acme/.github are two repositories with stars
+	// of their own. The SQL stores and Elasticsearch keep the newest row of
+	// each. Prometheus and Graphite cannot say which of two series is newer,
+	// so they keep the larger, and that is what stops a repository archived
+	// while the collector runs from counting twice, once under the live
+	// series it had, which keepLastValue holds up until it leaves the range
+	// and the OTLP sink until the process restarts, and once under the
+	// archived one.
 	rt := "gh_repo_total"
-	reposES, reposEStf := esTbl(rt, []any{b.tm("repo", 500)},
+	reposES, reposEStf := esTbl(rt, []any{b.tm("full_name", 500)},
 		[]any{b.mNewest("stars", "forks")},
-		[]named{{"stars", "Stars"}, {"forks", "Forks"}}, []string{ESF})
-	// One series per repository before the sum, in the two stores that key a
-	// series by its tags: a repository archived while the collector runs has
-	// its live series and its archived one side by side, the Graphite one
-	// held up by keepLastValue until it leaves the range and the OTLP one
-	// until the process restarts, and summed as they come it would count
-	// twice. The SQL stores and Elasticsearch already take the newest row of
-	// each repository.
+		[]named{{"stars", "Stars"}, {"forks", "Forks"}}, nil)
+	reposES[0].Query = liveOrArchivedES()
 	oneEach := func(field string) string {
-		return fmt.Sprintf("sum(max by (full_name) (github_repo_total_%s{%s}))", field, PF)
+		return fmt.Sprintf(`sum(max by (full_name) (github_repo_%[1]s{archived="false",%[2]s}`+
+			` or github_repo_total_%[1]s{archived="true",%[2]s}))`, field, PF)
 	}
 	oneEachGR := func(field string) string {
-		return fmt.Sprintf(`sumSeries(groupByNode(keepLastValue(%s), %d, "max"))`, rp(rt, field), gn(rt, "repo"))
+		named := func(m, archived string) string {
+			return fmt.Sprintf("aliasByNode(keepLastValue(%s), %d)",
+				rp(m, field, "archived", archived), gn(m, "full_name"))
+		}
+		return fmt.Sprintf(`sumSeries(groupByNode(group(%s, %s), 0, "max"))`,
+			named("gh_repo", "false"), named(rt, "true"))
 	}
 	countES, countEStf := esTbl("gh_account", []any{b.one()}, []any{b.mNewest("public_repos")},
 		[]named{{"public_repos", "Repositories"}}, nil)
@@ -178,7 +191,7 @@ func overview(b *builder) []Panel {
 				overviewNewestRow),
 			{Kind: "sql", Format: "table", Ref: "B", SQL: `SELECT SUM(stars) AS "Stars",` +
 				` SUM(forks) AS "Forks" FROM (` +
-				latestRowOf(rt, []string{"stars", "forks"}, "$__timeFilter(time)", RFA) + ")"},
+				liveOrArchived([]string{"stars", "forks"}) + ")"},
 		}, &P{
 			Prom: []Target{
 				promNamed("A", "Repositories", "github_account_public_repos"),
@@ -188,9 +201,15 @@ func overview(b *builder) []Panel {
 			Desc: "Public repositories of the account, and the current stars and forks of " +
 				"the selected ones, summed over the newest row of each repository rather " +
 				"than over every row in the range. With All selected that includes the " +
-				"archived repositories the picker does not list: people still star and " +
-				"fork them, and each totals sweep reads their counts again, so the stars " +
-				"beside the repository count are the stars of the same repositories.",
+				"archived repositories the default filter sets aside, which the picker " +
+				"stops listing once the last backfill is behind it: people still star and " +
+				"fork them, and each totals sweep reads their counts again, twelve hours " +
+				"apart by default, so a range shorter than that can leave them out. Each " +
+				"repository counts once, by its full name. The repository count is GitHub's " +
+				"own count of the account's public repositories and not the set the sums " +
+				"are taken over: those are the repositories the sweeps collect and the " +
+				"archived ones above, private ones included, and forks left out unless " +
+				"`include_forks` is on.",
 			GR: []Target{
 				grNamed("A", "Repositories", gp("gh_account", "public_repos")),
 				grNamed("B", "Stars", oneEachGR("stars")),

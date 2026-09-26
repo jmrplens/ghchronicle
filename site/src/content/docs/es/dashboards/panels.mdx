@@ -51,12 +51,22 @@ teléfono, donde cada panel es una columna, dieciséis tarjetas eran cuatro
 pantallas de cifras sueltas y cuatro grupos son una. La variable de repositorio
 que hay al lado filtra todas las secciones a la vez. Estrellas y forks suman la
 fila más reciente de cada repositorio y no todas las del rango, porque ambas son
-estado actual y una suma sobre el rango contaría cada pasada. Se leen de
-`gh_repo_total`, y con All seleccionado eso incluye los repositorios archivados
-que el filtro por omisión aparta, que el selector no ofrece: nadie recorre su
-historia, pero la gente sigue dándoles estrellas y haciéndoles fork, y cada
-pasada de `totals` vuelve a leer sus contadores. Elegir repositorios cuenta
-solo esos.
+estado actual y una suma sobre el rango contaría cada pasada. La fila de un
+repositorio vivo es su `gh_repo`, que una pasada escribe cada hora, y la de uno
+archivado es su `gh_repo_total`. Un repositorio que el filtro por omisión aparta
+por estar archivado no recibe fila de `gh_repo` de ninguna pasada, así que el
+selector deja de ofrecerlo cuando el último relleno histórico queda atrás, pero
+la gente sigue dándole estrellas y haciéndole fork y cada pasada de `totals`
+vuelve a leer sus contadores. Con All seleccionado las sumas lo incluyen, y un
+rango más corto que la cadencia de `totals`, doce horas por omisión, puede
+dejar fuera su fila. Elegir repositorios cuenta solo esos. Cada repositorio
+cuenta una vez, por su nombre completo: dos repositorios del mismo nombre de
+dos dueños son dos, y uno archivado mientras el recolector funciona no se
+cuenta a la vez por su fila viva y por la archivada. El recuento de
+repositorios junto a las sumas es el que da GitHub de los repositorios públicos
+de la cuenta, que es otro conjunto: tiene los forks públicos que el filtro por
+omisión deja fuera, y ninguno de los repositorios privados que las sumas
+incluyen.
 
 ![La fila Overview: el selector de repositorio y el rango de 90 días en la parte superior, el distintivo de ghchronicle con sus botones Docs y Source, y luego cuatro grupos de tarjetas con 5 repositorios, 350 estrellas y 51 forks; 37,5 mil visitas, 21,1 mil visitantes únicos y 19,6 mil clones; 117 seguidores, 58 seguidos, 4 patrocinadores y 2 patrocinados; y una cuenta con 3,22 mil contribuciones y 7,78 años de antigüedad](../../../../assets/dashboards/overview.png)
 
@@ -68,7 +78,8 @@ clonadores, y 186 K junto a 2,89 K visitas se lee como audiencia. El recuento
 está en dos paneles de la sección Audience. La captura de arriba es anterior a
 ese cambio y todavía pone "clones".
 
-Lee `gh_account`, `gh_repo_total`, `gh_traffic` y `gh_contributions_total`.
+Lee `gh_account`, `gh_repo`, `gh_repo_total`, `gh_traffic` y
+`gh_contributions_total`.
 
 ## Lifetime
 
@@ -95,7 +106,8 @@ abra más ficheros que su tope, cuarenta mil donde esto se midió, y "cuántas e
 total" a partir de una fila por hecho es exactamente esa consulta.
 
 "Every repository, ever" lista todos los repositorios que tiene el selector,
-forks y archivados incluidos, porque eso es lo que dice el título. Se ordena
+forks y archivados incluidos cuando las pasadas los recogen, porque eso es lo
+que dice el título. Se ordena
 por commits, lo que en una cuenta con forks de proyectos concurridos significa
 que la historia de otra persona supera a todo lo que ha escrito la cuenta:
 370.296 commits frente a 3.385 donde se leyó esto. Así que las marcas de fork y
@@ -103,8 +115,11 @@ archivado son columnas, y la tabla se abre ordenada por la primera y luego por
 commits, lo que pone los repositorios propios en la primera pantalla y los
 forks debajo sin dejar ninguno fuera. Con All seleccionado lista también los
 repositorios archivados que el filtro por omisión aparta, con sus contadores
-actuales, aunque el selector no los ofrezca: la misma fila de cada uno se
-vuelve a leer en cada pasada de `totals`.
+actuales, los ofrezca o no el selector: ninguna pasada les escribe fila de
+`gh_repo`, que es lo que lista el selector, pero la misma fila de cada uno se
+vuelve a leer en cada pasada de `totals`. Un repositorio archivado dentro del
+rango tiene filas de antes del archivado y de después, y sigue siendo una fila
+en todos los almacenes, marcada como archivada.
 
 Lee `gh_account_total` y `gh_repo_total`.
 

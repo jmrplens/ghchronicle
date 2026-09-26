@@ -13,8 +13,9 @@ import (
 
 // TestAnArchivedRepositorySetAsideReachesTheAccountTotals is issue #78 in the
 // store it was reported against. A repository the default filter sets aside
-// for being archived is never in the repository picker, which lists what
-// gh_repo holds, and up to 2.5.1 its stars and forks were in the Overview's
+// for being archived gets no gh_repo row from a sweep, so it is not in the
+// repository picker, which lists what gh_repo holds, and up to 2.5.1 its
+// stars and forks were in the Overview's
 // sum and in "Every repository, ever" only as long as a backfill's one row
 // stayed in the range. Here a sweep sets one aside, InfluxDB 3 holds what it
 // wrote, and the two panels' own SQL, rendered the way a dashboard renders
@@ -39,9 +40,12 @@ func TestAnArchivedRepositorySetAsideReachesTheAccountTotals(t *testing.T) {
 	if len(picker) == 0 || slices.Contains(picker, aside) {
 		t.Fatalf("the picker lists %v, want the live repositories and not %s", picker, aside)
 	}
+	// The live repositories' stars as the Overview reads them, out of the
+	// gh_repo a sweep writes every hour; the archived one's out of its
+	// gh_repo_total, the one row of it there is.
 	var liveStars float64
 	for _, p := range points {
-		if p.Measurement == "gh_repo_total" && slices.Contains(picker, p.Tags["repo"]) {
+		if p.Measurement == "gh_repo" && slices.Contains(picker, p.Tags["repo"]) {
 			liveStars += p.Fields["stars"].(float64)
 		}
 	}

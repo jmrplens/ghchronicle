@@ -562,10 +562,13 @@ that a sweep reads.
   changed since the sweep before and one whole page a day.
 - Every pull request and issue the account opened in other people's
   repositories that has since been merged or closed, in pages of a hundred
-  ordered by when each one last moved, where a sweep reads the first page of
-  each of the three closed states. That first page is enough for a sweep
-  because a merge or a close moves the item to the top, however long ago it
-  was opened. The ones still open are bounded by neither a page nor a date:
+  ordered by when each one last moved, where a sweep reads each of the three
+  closed states back to a cadence before the sweep before. That is enough for
+  a sweep because a merge or a close moves the item to the top, however long
+  ago it was opened, and it is one page unless more than a hundred items
+  moved in that time; a sweep that read one page and no more lost the item
+  that a hundred later updates, a bot locking old threads or a relabel, had
+  pushed onto the second. The ones still open are bounded by neither a page nor a date:
   every sweep reads them all, since each one gets a row for every day it stays
   open. In 2.5.1 and earlier each of the five searches read its newest
   hundred and stopped, on a sweep and on a backfill alike.

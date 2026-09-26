@@ -46,13 +46,16 @@ targets:
   exclude: []
 
   # Forks and archived repositories are off by default. A fork's traffic is
-  # almost always zero and an archived repository cannot change, so collecting
-  # them spends the rate limit on rows that never move. An archived repository
-  # left out still gets the one row it has, the date it was archived: the
-  # listing a sweep already pays for says which, and one GraphQL query per
-  # totals sweep says when. And a -backfill collects archived repositories in
-  # full whatever this says, because their history never moves again and one
-  # walk is enough.
+  # almost always zero, and an archived repository takes no more work: its
+  # stars, forks and watchers can still move, and those are read anyway, but
+  # nothing else can, so collecting either spends the rate limit on rows that
+  # never move. An archived repository left out still gets two rows from every
+  # totals sweep: gh_repo_archived, dated when it was archived, and
+  # gh_repo_total, its lifetime counts as they stand, stamped at the sweep. The
+  # listing a sweep already pays for says which repositories are archived, and
+  # one GraphQL query per twenty five of them asks the rest. And a -backfill
+  # collects archived repositories in full whatever this says, because their
+  # history never moves again and one walk is enough.
   include_forks: false
   include_archived: false
 
