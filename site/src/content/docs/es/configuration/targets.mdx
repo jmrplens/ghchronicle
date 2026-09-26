@@ -69,20 +69,25 @@ peticiones.
   clones por repositorio, y para un fork que nadie visita eso son catorce días
   de ceros por pasada. Cuesta cuatro llamadas por repositorio para no aprender
   nada.
-- **Un repositorio archivado no puede cambiar.** Sus estrellas todavía pueden
-  moverse, pero nada más, y recogerlo gasta el presupuesto en filas que ya no se
-  mueven.
+- **Un repositorio archivado ya no da trabajo.** Sus estrellas, sus forks y
+  sus watchers todavía pueden moverse, y esos se leen de todos modos, como se
+  explica abajo. Nada más puede, y recogerlo gasta el presupuesto en filas que
+  ya no se mueven.
 
 Actívalos cuando la suposición no valga en tu caso. Un fork en el que de verdad
 desarrollas es un repositorio real con tráfico real, y `repos` es la forma de
 nombrarlo sin recoger también los cuarenta marcadores.
 
 Apagado no es invisible, por dos vías. Un repositorio archivado sigue teniendo
-la única fila que le corresponde, `gh_repo_archived`, fechada en el instante en
-que se archivó: el listado que una pasada ya paga dice qué repositorios están
-archivados, y la familia `totals` pregunta la fecha de todos en una consulta a
-su propia cadencia, así que la tabla _Repositories archived_ existe desde la
-primera pasada y cuesta un punto por pasada de `totals` después. Y un
+dos filas en cada pasada de `totals`: `gh_repo_archived`, fechada en el
+instante en que se archivó, y `gh_repo_total`, sus contadores de toda la vida
+tal como están, estrellas y forks incluidos, sellada en la pasada. El listado
+que una pasada ya paga dice qué repositorios están archivados, y la familia
+`totals` pregunta por todos en una consulta por cada veinticinco a su propia
+cadencia, así que la tabla _Repositories archived_ existe desde la primera
+pasada, los totales de estrellas y forks de la cuenta los cuentan, y el coste
+es un punto por cada veinticinco repositorios archivados en cada pasada de
+`totals`. Y un
 [relleno histórico](/ghchronicle/es/how/backfill/) recoge los repositorios
 archivados enteros diga lo que diga esta clave, porque su historia es la
 historia de la cuenta y basta con recorrerla una vez. Los forks quedan como

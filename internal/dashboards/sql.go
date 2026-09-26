@@ -85,10 +85,18 @@ func latestPerRepo(fields []string) string {
 // latestPerRepoWithin is the same with the window named, for the one caller
 // that must not take the page's: see repoFlagsJoin.
 func latestPerRepoWithin(fields []string, window string) string {
+	return latestRowOf("gh_repo", fields, window, RF)
+}
+
+// latestRowOf is the most recent row of each repository in a snapshot table,
+// for a table other than gh_repo or a filter other than RF. Partitioned by
+// the repository alone, so a repository whose tags changed, archived or made
+// public, is still one row: the newest.
+func latestRowOf(table string, fields []string, window, filter string) string {
 	return fmt.Sprintf("SELECT repo, %s FROM ("+
 		"SELECT *, ROW_NUMBER() OVER (PARTITION BY repo ORDER BY time DESC) AS rn"+
-		" FROM gh_repo WHERE %s AND %s) x WHERE rn = 1",
-		strings.Join(fields, ", "), window, RF)
+		" FROM %s WHERE %s AND %s) x WHERE rn = 1",
+		strings.Join(fields, ", "), table, window, filter)
 }
 
 // latestSumSQL is the sum of a snapshot field, one row per partition, newest

@@ -248,7 +248,9 @@ file limit, forty thousand where this was measured. Search reports a total for
 any query and GraphQL reports one for any connection, so one query of ten
 aliased searches, one REST search for
 the commit count and one batched query give a number that is one row and is
-right on the first sweep of a fresh install.
+right on the first sweep of a fresh install. The archived repositories the
+default filter sets aside are in it too, from the query that dates their
+archive, so their stars and forks stay in the account's totals.
 
 **`ratelimit`** is the only measurement the collector takes of itself: what is
 left in each of GitHub's fifteen independent budgets and when each resets.
@@ -661,10 +663,11 @@ than a state: dated at `archivedAt`, a clear-out is visible as the batch it
 was, and a live repository produces no row at all, so counting the rows is
 counting the archive. It does not need `include_archived`. The listing a sweep
 already pays for says which repositories are archived, and the `totals` family
-asks the date of all of them in one GraphQL query of four scalars per
-repository, on every `totals` sweep: one point at that cadence, and the rows
-it rewrites are the same rows, which is what an exporter that keeps only what
-is rewritten needs; the listing cannot supply the date itself, since REST
+asks the date of all of them, beside their lifetime row, in one GraphQL query
+per twenty five repositories, on every `totals` sweep: a point per twenty five
+at that cadence, and the rows it rewrites are the same rows, which is what an
+exporter that keeps only what is rewritten needs; the listing cannot supply the
+date itself, since REST
 carries no `archived_at` and its `updated_at` was measured two seconds to
 eight minutes after the archive. An archived fork under the default fork rule
 is the one kind with no row.
@@ -1288,6 +1291,20 @@ same query at no extra cost and is a second, independent reading of the switch
 `gh_security_feature{feature="dependabot"}.enabled` reports: one is the
 repository's own setting, the other is whether the listing actually answered.
 Two sources that disagree is the case worth seeing.
+
+`gh_repo_total` is the table the account's star and fork totals are read from,
+on the Overview and in _Every repository, ever_, rather than `gh_repo`. The two
+differ for one kind of repository. One the default filter sets aside for being
+archived has no `gh_repo` row, since no family walks it, but it is still
+starred, unstarred and forked, so the `totals` family writes its
+`gh_repo_total` on every sweep from the query that dates its archive: the same
+tags and fields a collected repository's row has, `archived` true, stamped at
+the sweep. Up to 2.5.1 only a backfill wrote it, once, and on 2026-09-26 one
+such row said 4 stars where GitHub said 3. It gets no `gh_repo_policy`. That
+query asks about twenty five repositories at a time: measured the same day,
+the gateway answered the lifetime row of fifty archived repositories once in
+9.2 seconds and refused it twice after about eleven, and answered twenty five
+in under seven.
 
 The three dependency measurements are off by default. The SBOM is one call and
 a megabyte or two per repository, and only the aggregate is kept: a single

@@ -64,7 +64,7 @@
     },
     {
       "datasource": "${DS_PROMETHEUS}",
-      "description": "Public repositories of the account, and the current stars and forks of the selected ones, summed over the newest row of each repository rather than over every row in the range.",
+      "description": "Public repositories of the account, and the current stars and forks of the selected ones, summed over the newest row of each repository rather than over every row in the range. With All selected that includes the archived repositories the picker does not list: people still star and fork them, and each totals sweep reads their counts again, so the stars beside the repository count are the stars of the same repositories.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -119,7 +119,7 @@
         {
           "datasource": "${DS_PROMETHEUS}",
           "editorMode": "code",
-          "expr": "sum(github_repo_stars{repo=~\"$repo\"})",
+          "expr": "sum(max by (full_name) (github_repo_total_stars{repo=~\"$repo\"}))",
           "instant": true,
           "legendFormat": "Stars",
           "range": false,
@@ -128,7 +128,7 @@
         {
           "datasource": "${DS_PROMETHEUS}",
           "editorMode": "code",
-          "expr": "sum(github_repo_forks{repo=~\"$repo\"})",
+          "expr": "sum(max by (full_name) (github_repo_total_forks{repo=~\"$repo\"}))",
           "instant": true,
           "legendFormat": "Forks",
           "range": false,
@@ -530,7 +530,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "The whole life of each repository in one row: not what happened in the dashboard range, but everything there has ever been. The repository picker holds every repository the account can see, its forks and its archived ones alongside its own, so a count here is over all of them until the picker is narrowed. Sorted by commits, a fork of a busy project outranks anything the account wrote, 370,296 commits against 3,385 on the account this was measured on, so the table opens with the account's own repositories first and the forks under them, both ranked by commits. The fork and archived flags are columns here rather than a filter, the title being what it is, and a click on either sorts by it. The Prometheus exporter carries no url, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "The whole life of each repository in one row: not what happened in the dashboard range, but everything there has ever been. The repository picker holds every repository the account can see, its forks and its archived ones alongside its own, so a count here is over all of them until the picker is narrowed. Sorted by commits, a fork of a busy project outranks anything the account wrote, 370,296 commits against 3,385 on the account this was measured on, so the table opens with the account's own repositories first and the forks under them, both ranked by commits. The fork and archived flags are columns here rather than a filter, the title being what it is, and a click on either sorts by it. With All selected the archived repositories the picker does not list are here too, with their current counts: the default filter walks none of their history, but every totals sweep reads this row of each of them again. The Prometheus exporter carries no url, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {

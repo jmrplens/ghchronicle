@@ -24,6 +24,22 @@ const (
 	ESF = "repo.keyword:${repo:lucene}"
 )
 
+// RFA is RF for gh_repo_total, the one measurement a repository set aside for
+// being archived writes to. The picker lists the repositories with a gh_repo
+// row, which a repository set aside never has, so RF would leave every one of
+// them out of the account's totals. Under All an archived row passes as well;
+// with repositories picked, only those do, as everywhere else.
+//
+// "All" is the variable's text rather than its value, because the SQL
+// variables have no allValue and All expands to the list itself: the text
+// formatter answers "All" whenever All is selected (MultiValueVariable's
+// getValueText in @grafana/scenes, and templateSrv before it), and a list of
+// names joined by " + " otherwise. A GitHub repository name cannot hold a
+// quote, so the text cannot break out of the literal. The other three stores
+// need nothing of the kind: their All is a wildcard, and a wildcard matches
+// the archived repositories already.
+const RFA = "(" + RF + " OR (archived = 'true' AND '${repo:text}' = 'All'))"
+
 // Stores names each store as the prose refers to it.
 var Stores = map[string]string{
 	"influxdb":      "InfluxDB",

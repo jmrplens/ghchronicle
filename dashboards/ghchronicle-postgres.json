@@ -64,7 +64,7 @@
     },
     {
       "datasource": "${DS_POSTGRES}",
-      "description": "Public repositories of the account, and the current stars and forks of the selected ones, summed over the newest row of each repository rather than over every row in the range.",
+      "description": "Public repositories of the account, and the current stars and forks of the selected ones, summed over the newest row of each repository rather than over every row in the range. With All selected that includes the archived repositories the picker does not list: people still star and fork them, and each totals sweep reads their counts again, so the stars beside the repository count are the stars of the same repositories.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -120,7 +120,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT SUM(stars) AS \"Stars\", SUM(forks) AS \"Forks\" FROM (SELECT repo, stars, forks FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo ORDER BY time DESC) AS rn FROM gh_repo WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1)",
+          "rawSql": "SELECT SUM(stars) AS \"Stars\", SUM(forks) AS \"Forks\" FROM (SELECT repo, stars, forks FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo ORDER BY time DESC) AS rn FROM gh_repo_total WHERE $__timeFilter(time) AND (repo IN (${repo:sqlstring}) OR (archived = 'true' AND '${repo:text}' = 'All'))) x WHERE rn = 1)",
           "refId": "B"
         }
       ],
@@ -388,7 +388,7 @@
         },
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "The whole life of each repository in one row: not what happened in the dashboard range, but everything there has ever been. The repository picker holds every repository the account can see, its forks and its archived ones alongside its own, so a count here is over all of them until the picker is narrowed. Sorted by commits, a fork of a busy project outranks anything the account wrote, 370,296 commits against 3,385 on the account this was measured on, so the table opens with the account's own repositories first and the forks under them, both ranked by commits. The fork and archived flags are columns here rather than a filter, the title being what it is, and a click on either sorts by it.",
+          "description": "The whole life of each repository in one row: not what happened in the dashboard range, but everything there has ever been. The repository picker holds every repository the account can see, its forks and its archived ones alongside its own, so a count here is over all of them until the picker is narrowed. Sorted by commits, a fork of a busy project outranks anything the account wrote, 370,296 commits against 3,385 on the account this was measured on, so the table opens with the account's own repositories first and the forks under them, both ranked by commits. The fork and archived flags are columns here rather than a filter, the title being what it is, and a click on either sorts by it. With All selected the archived repositories the picker does not list are here too, with their current counts: the default filter walks none of their history, but every totals sweep reads this row of each of them again.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -492,7 +492,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT repo AS \"Repository\", MAX(commits) AS \"Commits\", MAX(fork) AS \"Fork\", MAX(archived) AS \"Archived\", MAX(pulls_merged) AS \"Merged\", MAX(issues) AS \"Issues\", MAX(releases) AS \"Releases\", MAX(stars) AS \"Stars\", MAX(branches) AS \"Branches\", MAX(tags) AS \"Tags\", MAX(url) AS \"Link\" FROM gh_repo_total WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring}) GROUP BY 1 ORDER BY 2 DESC",
+              "rawSql": "SELECT repo AS \"Repository\", MAX(commits) AS \"Commits\", MAX(fork) AS \"Fork\", MAX(archived) AS \"Archived\", MAX(pulls_merged) AS \"Merged\", MAX(issues) AS \"Issues\", MAX(releases) AS \"Releases\", MAX(stars) AS \"Stars\", MAX(branches) AS \"Branches\", MAX(tags) AS \"Tags\", MAX(url) AS \"Link\" FROM gh_repo_total WHERE $__timeFilter(time) AND (repo IN (${repo:sqlstring}) OR (archived = 'true' AND '${repo:text}' = 'All')) GROUP BY 1 ORDER BY 2 DESC",
               "refId": "A"
             }
           ],

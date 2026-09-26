@@ -46,7 +46,11 @@ column, sixteen tiles were four screens of single numbers and four groups are
 one. The repository variable beside them filters every section at once. Stars
 and forks add up the newest row per repository rather than every row in the
 range, because both are current state and a sum over the range would count
-every sweep.
+every sweep. They are read from `gh_repo_total`, and with All selected that
+includes the archived repositories the default filter sets aside, which the
+picker does not list: nothing walks their history, but people still star and
+fork them, and every `totals` sweep reads their counts again. Picking
+repositories counts those alone.
 
 ![The Overview row: the repository picker and the 90 day range across the top, the ghchronicle badge with its Docs and Source buttons, then four tile groups reading 5 repositories with 350 stars and 51 forks, 37.5 thousand views with 21.1 thousand unique visitors and 19.6 thousand clones, 117 followers and 58 following with 4 sponsors and 2 sponsored, and an account with 3.22 thousand contributions over 7.78 years](../../../assets/dashboards/overview.png)
 
@@ -58,7 +62,7 @@ was read against, one repository was cloned 135,683 times in a fortnight by
 itself is two panels of the Audience section. The capture above predates that
 change and still reads "clones".
 
-Reads `gh_account`, `gh_repo`, `gh_traffic` and `gh_contributions_total`.
+Reads `gh_account`, `gh_repo_total`, `gh_traffic` and `gh_contributions_total`.
 
 ## Lifetime
 
@@ -91,7 +95,9 @@ history outranks everything the account wrote: 370,296 commits against 3,385
 where this was read. So the fork and archived flags are columns, and the table
 opens sorted by the first of them and then by commits, which puts the account's
 own repositories on the first screen and the forks under them without leaving
-one out.
+one out. With All selected it lists the archived repositories the default
+filter sets aside as well, with their current counts, although the picker does
+not offer them: the same row of each is read again on every `totals` sweep.
 
 Reads `gh_account_total` and `gh_repo_total`.
 

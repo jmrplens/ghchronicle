@@ -220,9 +220,13 @@ that a sweep reads.
 - The archived repositories, in full, whatever `include_archived` says. Their
   history is the account's history and it never moves again, which is exactly
   why a sweep leaves them out and why one walk of them is enough. Forks stay
-  as configured. A sweep still writes the one row each archived repository
-  has, the date it was archived: the listing it already pays for says which,
-  and one query per `totals` sweep says when.
+  as configured. What does still move on an archived repository, its stars,
+  forks and watchers, a sweep reads without a backfill: the listing it already
+  pays for says which repositories are archived, and every `totals` sweep asks
+  about all of them, one query per twenty five, for two rows each. One is
+  `gh_repo_archived`, dated when the repository was archived. The other is its
+  `gh_repo_total`, stamped at the sweep like a collected repository's, and
+  that is the row the account's star and fork totals are read from.
 - Every pull request and issue, in pages of fifty, where a sweep reads what
   changed since the sweep before and one whole page a day.
 - Every pull request and issue the account opened in other people's

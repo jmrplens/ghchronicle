@@ -26,13 +26,22 @@ const repositoriesCreatedDesc = "A trailing year at a time, whatever the row abo
 // everyRepositoryDesc is what the widest table on the dashboard says about
 // itself, out here rather than at its call site so that the function building
 // the section stays inside the maintainability the linter holds it to.
+//
+// Its SQL filters by RFA and not RF for the reason the last sentence gives:
+// the repositories set aside for being archived have a row in gh_repo_total
+// from every totals sweep and none in gh_repo, which is what the picker
+// lists, so RF would leave the Archived column false on every row of the
+// account it was added for.
 const everyRepositoryDesc = "The whole life of each repository in one row: not what " +
 	"happened in the dashboard range, but everything there has ever been. " + forksIncluded +
 	" Sorted by commits, a fork of a busy project outranks anything the account wrote, " +
 	"370,296 commits against 3,385 on the account this was measured on, so the table " +
 	"opens with the account's own repositories first and the forks under them, both " +
 	"ranked by commits. The fork and archived flags are columns here rather than a " +
-	"filter, the title being what it is, and a click on either sorts by it."
+	"filter, the title being what it is, and a click on either sorts by it. With All " +
+	"selected the archived repositories the picker does not list are here too, with " +
+	"their current counts: the default filter walks none of their history, but every " +
+	"totals sweep reads this row of each of them again."
 
 // ── Lifetime ────────────────────────────────────────────────────────────────
 
@@ -67,7 +76,7 @@ func lifetime(b *builder) []Panel {
 		// MAX(url) rather than grouping by it: a repository renamed inside
 		// the range has two urls and is still one row.
 		` MAX(url) AS "Link"` +
-		" FROM gh_repo_total WHERE $__timeFilter(time) AND " + RF +
+		" FROM gh_repo_total WHERE $__timeFilter(time) AND " + RFA +
 		" GROUP BY 1 ORDER BY 2 DESC"
 	rt := "gh_repo_total"
 

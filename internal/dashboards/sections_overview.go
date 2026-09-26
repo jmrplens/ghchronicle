@@ -125,9 +125,33 @@ func overview(b *builder) []Panel {
 	// Stars and forks add up the newest row per repository; the repository
 	// count is the account's own. In Elasticsearch the per-repository rows
 	// are summed by the panel, and the one account row sums to itself.
-	reposES, reposEStf := esTbl("gh_repo", []any{b.tm("repo", 500)},
+	//
+	// From gh_repo_total rather than gh_repo: a repository the filter set
+	// aside for being archived has no gh_repo row, but it has this one from
+	// every totals sweep, and people still star and fork it. Measured on
+	// 2026-09-26 against the account of issue #78: the seventeen archived
+	// repositories its filter sets aside held 80 stars and 24 forks that the
+	// tile left out, beside a repository count that counted the fifteen
+	// public ones. Under All every store lets their rows through, the
+	// SQL ones by RFA and the rest by a wildcard; with repositories picked,
+	// only those count, and the picker does not list archived ones.
+	rt := "gh_repo_total"
+	reposES, reposEStf := esTbl(rt, []any{b.tm("repo", 500)},
 		[]any{b.mNewest("stars", "forks")},
-		[]named{{"stars", "Stars"}, {"forks", "Forks"}}, nil)
+		[]named{{"stars", "Stars"}, {"forks", "Forks"}}, []string{ESF})
+	// One series per repository before the sum, in the two stores that key a
+	// series by its tags: a repository archived while the collector runs has
+	// its live series and its archived one side by side, the Graphite one
+	// held up by keepLastValue until it leaves the range and the OTLP one
+	// until the process restarts, and summed as they come it would count
+	// twice. The SQL stores and Elasticsearch already take the newest row of
+	// each repository.
+	oneEach := func(field string) string {
+		return fmt.Sprintf("sum(max by (full_name) (github_repo_total_%s{%s}))", field, PF)
+	}
+	oneEachGR := func(field string) string {
+		return fmt.Sprintf(`sumSeries(groupByNode(keepLastValue(%s), %d, "max"))`, rp(rt, field), gn(rt, "repo"))
+	}
 	countES, countEStf := esTbl("gh_account", []any{b.one()}, []any{b.mNewest("public_repos")},
 		[]named{{"public_repos", "Repositories"}}, nil)
 	reposES[0].Ref = "B"
@@ -153,20 +177,24 @@ func overview(b *builder) []Panel {
 			sqlT(`SELECT public_repos AS "Repositories" FROM gh_account` +
 				overviewNewestRow),
 			{Kind: "sql", Format: "table", Ref: "B", SQL: `SELECT SUM(stars) AS "Stars",` +
-				` SUM(forks) AS "Forks" FROM (` + latestPerRepo([]string{"stars", "forks"}) + ")"},
+				` SUM(forks) AS "Forks" FROM (` +
+				latestRowOf(rt, []string{"stars", "forks"}, "$__timeFilter(time)", RFA) + ")"},
 		}, &P{
 			Prom: []Target{
 				promNamed("A", "Repositories", "github_account_public_repos"),
-				promNamed("B", "Stars", fmt.Sprintf("sum(github_repo_stars{%s})", PF)),
-				promNamed("C", "Forks", fmt.Sprintf("sum(github_repo_forks{%s})", PF)),
+				promNamed("B", "Stars", oneEach("stars")),
+				promNamed("C", "Forks", oneEach("forks")),
 			},
 			Desc: "Public repositories of the account, and the current stars and forks of " +
 				"the selected ones, summed over the newest row of each repository rather " +
-				"than over every row in the range.",
+				"than over every row in the range. With All selected that includes the " +
+				"archived repositories the picker does not list: people still star and " +
+				"fork them, and each totals sweep reads their counts again, so the stars " +
+				"beside the repository count are the stars of the same repositories.",
 			GR: []Target{
 				grNamed("A", "Repositories", gp("gh_account", "public_repos")),
-				grNamed("B", "Stars", latestSum(rp("gh_repo", "stars"))),
-				grNamed("C", "Forks", latestSum(rp("gh_repo", "forks"))),
+				grNamed("B", "Stars", oneEachGR("stars")),
+				grNamed("C", "Forks", oneEachGR("forks")),
 			},
 			ES: append(countES, reposES...), ESTF: append(countEStf, reposEStf...),
 			ESOpts: Opts{"calc": "sum"},

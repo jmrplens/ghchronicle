@@ -67,20 +67,23 @@ Both defaults exist for the same reason, which is the rate limit.
 - **A fork's traffic is almost always zero.** GitHub reports views and clones
   per repository, and for a fork that nobody visits, that is fourteen days of
   zeroes per sweep. It costs four calls per repository to learn nothing.
-- **An archived repository cannot change.** Its stars can still move, but
-  nothing else can, and collecting it spends the budget on rows that never
-  move again.
+- **An archived repository takes no more work.** Its stars, forks and
+  watchers can still move, and those are read anyway, as below. Nothing else
+  can, and collecting it spends the budget on rows that never move again.
 
 Turn either on when the assumption does not hold for you. A fork you actually
 develop in is a real repository with real traffic, and `repos` is the way to
 name that one without also collecting the forty bookmarks.
 
-Off is not invisible, on two counts. An archived repository still gets the one
-row it has, `gh_repo_archived`, dated the instant it was archived: the listing
-a sweep already pays for says which repositories are archived, and the
-`totals` family asks the date of all of them in one query at its own cadence,
-so the _Repositories archived_ table exists from the first sweep and costs one
-point per `totals` sweep after it. And a [backfill](/ghchronicle/how/backfill/) collects archived
+Off is not invisible, on two counts. An archived repository still gets two
+rows from every `totals` sweep: `gh_repo_archived`, dated the instant it was
+archived, and `gh_repo_total`, its lifetime counts as they stand, stars and
+forks included, stamped at the sweep. The listing a sweep already pays for
+says which repositories are archived, and the `totals` family asks about all
+of them in one query per twenty five at its own cadence, so the _Repositories
+archived_ table exists from the first sweep, the account's star and fork
+totals count them, and the cost is a point per twenty five archived
+repositories per `totals` sweep. And a [backfill](/ghchronicle/how/backfill/) collects archived
 repositories in full whatever this key says, because their history is the
 account's history and one walk of it is enough. Forks stay as configured in
 both cases: an archived fork under `include_forks: false` has no row.

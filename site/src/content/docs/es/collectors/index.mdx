@@ -254,7 +254,9 @@ su tope, cuarenta mil donde esto se midió. La búsqueda devuelve un total para
 cualquier consulta y GraphQL uno para cualquier conexión, así que una consulta
 de diez búsquedas con alias, una búsqueda REST para el contador de commits y una
 consulta en lote dan un número que es una sola fila y que ya es correcto en la
-primera pasada de una instalación nueva.
+primera pasada de una instalación nueva. Los repositorios archivados que el
+filtro por omisión aparta también están, desde la consulta que fecha su
+archivado, así que sus estrellas y forks siguen en los totales de la cuenta.
 
 **`ratelimit`** es la única medida que el colector toma de sí mismo: lo que
 queda en cada uno de los quince presupuestos independientes de GitHub y cuándo

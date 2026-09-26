@@ -374,9 +374,10 @@ vez de un estado: fechada en `archivedAt`, una limpieza se ve como la tanda que
 fue, y un repositorio vivo no produce fila alguna, así que contar las filas es
 contar el archivo. No necesita `include_archived`. El listado que una pasada ya
 paga dice qué repositorios están archivados, y la familia `totals` pregunta la
-fecha de todos ellos en una consulta GraphQL de cuatro escalares por
-repositorio, en cada pasada de `totals`: un punto a esa cadencia, y las filas
-que reescribe son las mismas filas, que es lo que necesita un exportador que
+fecha de todos ellos, junto a su fila de toda la vida, en una consulta GraphQL
+por cada veinticinco repositorios, en cada pasada de `totals`: un punto por
+cada veinticinco a esa cadencia, y las filas que reescribe son las mismas
+filas, que es lo que necesita un exportador que
 solo guarda lo que se reescribe; el listado no puede dar la fecha por sí
 mismo, porque REST no lleva `archived_at` y su `updated_at` se midió entre dos
 segundos y ocho minutos después del archivado. Un fork archivado bajo la regla
@@ -1029,6 +1030,21 @@ misma consulta sin coste añadido y es una segunda lectura, independiente, del
 mismo interruptor que informa `gh_security_feature{feature="dependabot"}.enabled`:
 uno es el ajuste del propio repositorio, el otro es si el listado respondió de
 verdad. Que las dos fuentes discrepen es el caso que merece verse.
+
+`gh_repo_total` es la tabla de la que se leen los totales de estrellas y forks
+de la cuenta, en el Overview y en _Every repository, ever_, y no `gh_repo`. Las
+dos difieren en un tipo de repositorio. El que el filtro por omisión aparta por
+estar archivado no tiene fila en `gh_repo`, porque ninguna familia lo recorre,
+pero sigue recibiendo y perdiendo estrellas y forks, así que la familia
+`totals` escribe su `gh_repo_total` en cada pasada desde la consulta que fecha
+su archivado: las mismas etiquetas y campos que la fila de un repositorio
+recogido, `archived` a true, sellada en la pasada. Hasta la 2.5.1 solo un
+relleno histórico la escribía, una vez, y el 2026-09-26 una de esas filas decía
+4 estrellas donde GitHub decía 3. No recibe `gh_repo_policy`. Esa consulta
+pregunta por veinticinco repositorios cada vez: medido ese mismo día, la
+pasarela respondió a la fila de toda la vida de cincuenta repositorios
+archivados una vez en 9,2 segundos y la rechazó dos veces pasados unos once, y
+respondió a veinticinco en menos de siete.
 
 Las tres medidas de dependencias están apagadas por omisión. El SBOM es una
 llamada y un mega o dos por repositorio, y solo se guarda el agregado: una sola

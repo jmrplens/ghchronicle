@@ -723,7 +723,9 @@ func TestTotalsKeepsTheArchiveRowsThatAnswered(t *testing.T) {
 
 // A repository set aside that GraphQL says is not archived, or archived at
 // no instant, has no archive row; one with no creation date has its row
-// without the age it cannot compute.
+// without the age it cannot compute. The lifetime row is written either way,
+// tagged as GraphQL tags it: a repository unarchived between the listing and
+// the query is still one of the account's, and the next listing collects it.
 func TestArchiveRowNeedsADateToStandOn(t *testing.T) {
 	t.Parallel()
 	for body, want := range map[string]bool{
@@ -748,8 +750,8 @@ func TestArchiveRowNeedsADateToStandOn(t *testing.T) {
 		_, _ = w.Write([]byte(`{"data":{"r0":{"nameWithOwner":"octocat/a0","archivedAt":null}}}`))
 	})
 	points, err := Totals{Archived: []Repo{accountRepo("a0")}}.Collect(ctx(t), f.Client, testNow)
-	if err != nil || len(points) != 0 {
-		t.Errorf("got %d points and %v, want no row for a repository that is not archived", len(points), err)
+	if err != nil || len(points) != 1 || points[0].Measurement != "gh_repo_total" || points[0].Tags["archived"] != "false" {
+		t.Errorf("got %v and %v, want its lifetime row alone, tagged as not archived, and no archive row", points, err)
 	}
 }
 

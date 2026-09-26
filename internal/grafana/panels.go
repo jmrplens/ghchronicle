@@ -1,6 +1,7 @@
 package grafana
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"maps"
@@ -182,6 +183,11 @@ type Vars struct {
 	// verbatim, formatter and all, so a variable that has one never expands to
 	// a list: the Graphite and Prometheus dashboards ask for `*` and `.*`.
 	AllValue string
+	// Text is what ${repo:text} becomes: the variable's text, which is "All"
+	// when All is selected and the names picked, joined by " + ", when it is
+	// not. Left empty it is All's, the selection every checker renders; a
+	// test of what a panel does with repositories picked sets it.
+	Text string
 	// TimeFilter is what $__timeFilter(time) becomes. Left empty the macro
 	// stays in the query for the datasource to expand, which is what the
 	// PostgreSQL plugin does with it and with $__timeGroupAlias.
@@ -202,9 +208,17 @@ var repoTokens = []struct{ token, format string }{
 	{"${repo:singlequote}", "singlequote"},
 	{"${repo:sqlstring}", "sqlstring"},
 	{"${repo:lucene}", "lucene"},
+	{"${repo:text}", "text"},
 	{"${repo}", "glob"},
 	{"$repo", "glob"},
 }
+
+// allText is what the text formatter makes of All. Grafana names All by its
+// text whatever the variable's allValue: @grafana/scenes' getValueText
+// answers it whenever All is selected, and templateSrv before scenes set it
+// in place of the selection's text and skipped the allValue for this format
+// alone.
+const allText = "All"
 
 // Apply renders one target. Everything it does not know about is left alone
 // for the datasource plugin, which is what expands $__timeGroupAlias and
@@ -237,7 +251,10 @@ func (v Vars) text(s string) string {
 			continue
 		}
 		value := v.AllValue
-		if value == "" {
+		switch {
+		case r.format == "text":
+			value = cmp.Or(v.Text, allText)
+		case value == "":
 			value = repoList(v.Repos, r.format)
 		}
 		s = strings.ReplaceAll(s, r.token, value)

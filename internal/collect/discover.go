@@ -42,8 +42,10 @@ type Discovery struct {
 // Discover lists the repositories to collect.
 //
 // Forks and archived repositories are excluded by default: a fork's traffic is
-// almost always zero and an archived repository cannot change, so including
+// almost always zero and an archived repository takes no more work, so walking
 // them by default would spend most of the rate limit on rows that never move.
+// What does still move on an archived one, its stars, forks and watchers, the
+// totals family reads for every repository in Discovery.Archived instead.
 func Discover(ctx context.Context, c *ghapi.Client, f *Filter) (Discovery, error) {
 	seen := map[string]bool{}
 	aside := map[string]bool{}

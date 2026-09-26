@@ -116,6 +116,19 @@ func sqlStoresSweepInto(ctx context.Context, tb testing.TB, s *Stack, name, data
 	fakeNow time.Time,
 ) (*sqlStoresSweep, error) {
 	tb.Helper()
+	gh := newSQLStoresGitHub(tb)
+	if !fakeNow.IsZero() {
+		gh.FreezeAt(fakeNow)
+	}
+	return sqlStoresSweepWith(ctx, tb, s, name, database, gh)
+}
+
+// sqlStoresSweepWith is the same sweep against a fake the caller started, for
+// one that needs an account the base fixtures do not describe.
+func sqlStoresSweepWith(ctx context.Context, tb testing.TB, s *Stack, name, database string,
+	gh *fakegh.Server,
+) (*sqlStoresSweep, error) {
+	tb.Helper()
 	dir, err := sqlStoresWorkDir(name)
 	if err != nil {
 		return nil, err
@@ -129,10 +142,6 @@ func sqlStoresSweepInto(ctx context.Context, tb testing.TB, s *Stack, name, data
 		SQL:      filepath.Join(dir, "points.sql"),
 		Points:   filepath.Join(dir, "points.jsonl"),
 		Database: database,
-	}
-	gh := newSQLStoresGitHub(tb)
-	if !fakeNow.IsZero() {
-		gh.FreezeAt(fakeNow)
 	}
 	cfg, err := sqlStoresConfig(sweep, s, gh.URL())
 	if err != nil {

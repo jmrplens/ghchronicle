@@ -297,12 +297,14 @@ func (r *Runner) accountFamilies(ctx context.Context, now time.Time) {
 	})
 	// The lifetime numbers, asked of GitHub rather than added up here, so a
 	// tile that wants "ever" reads one row instead of scanning a table.
-	// The archived repositories set aside ride along here, for the one row
-	// each has, the date it was archived, and every totals sweep asks it
-	// again: one GraphQL query for all of them, at this family's cadence,
-	// and the rows it rewrites are the same rows, so every store converges
-	// on them the way it does on a collected archived repository's. Asking
-	// once and remembering it was tried, and it is what the exporters cannot
+	// The archived repositories set aside ride along here, for the two rows
+	// each has: the date it was archived, and its lifetime row with the
+	// stars and forks it still gains and loses. Every totals sweep asks for
+	// both again, one GraphQL query per twenty five of them at this family's
+	// cadence: the archive row is the same row each time, so every store
+	// converges on it, and the lifetime row is stamped at the sweep like a
+	// collected repository's, so the account's totals count it. Asking once
+	// and remembering it was tried, and it is what the exporters cannot
 	// hold: the Prometheus exporter drops a series not rewritten within a
 	// day, and the OTLP state keeps the newest batch per series, so the count
 	// of archived repositories would have expired, or become the one newly
