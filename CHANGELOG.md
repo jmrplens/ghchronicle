@@ -27,14 +27,14 @@ whose stars froze at the last backfill.
   each of them added a false "merged" line a day, and production held 36 in
   26 hours, 23 of them for issues. The sentence now follows the `kind` and
   `state` tags and the `merged` field: `USER's pull request OWNER/REPO#N` is
-  open, was merged or was closed without merging, and `USER's issue
-  OWNER/REPO#N` is open or was closed. Merging and closing are said of the
-  item rather than put in the account's name, because the row does not say
-  who did either, and in someone else's repository it is usually a
-  maintainer. An open item says it is open, not that it was opened, since
-  its line comes back every day it stays open: still one a day, because the
-  sink keeps no state. A combination where the state and the field disagree,
-  which the five searches do not produce, reads
+  open, was merged or was closed without merging, and
+  `USER's issue OWNER/REPO#N` is open or was closed. Merging and closing are
+  said of the item rather than put in the account's name, because the row
+  does not say who did either, and in someone else's repository it is
+  usually a maintainer. An open item says it is open, not that it was
+  opened, since its line comes back every day it stays open: still one a
+  day, because the sink keeps no state. A combination where the state and
+  the field disagree, which the five searches do not produce, reads
   `USER's contribution OWNER/REPO#N` and leaves the rest to the logfmt tail.
   Lines already in Loki keep what they said.
 - **`commented_elsewhere` leaves out the account's own repositories, and
