@@ -630,7 +630,7 @@
       "panels": [
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "Every pull request this account has had merged, anywhere, and every one it has reviewed, including in repositories it does not own; the public commits attributed to it, from the commit search index; the issues it opened; and the two numbers a sweep over one's own repositories cannot see at all, pull requests merged and comments left in other people's repositories. All counted by GitHub's own search rather than by adding up rows.",
+          "description": "Every pull request this account has had merged, anywhere, and every one it has reviewed, including in repositories it does not own; the public commits attributed to it, from the commit search index; the issues it opened; and the two numbers a sweep over one's own repositories cannot see at all, both about repositories the account does not own: its pull requests merged there, and the issues and pull requests it commented on there, each counted once however many comments it left. All counted by GitHub's own search rather than by adding up rows.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -719,7 +719,7 @@
                 "excludeByName": {},
                 "indexByName": {},
                 "renameByName": {
-                  "Top Metrics commented_elsewhere": "Comments elsewhere",
+                  "Top Metrics commented_elsewhere": "Threads commented elsewhere",
                   "Top Metrics commits": "Commits",
                   "Top Metrics issues_opened": "Issues opened",
                   "Top Metrics pulls_merged": "Pull requests merged",

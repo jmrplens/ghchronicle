@@ -867,6 +867,22 @@ wrong one for a lifetime count. GitHub counts them itself, in one search request
 each, so the number is one row and is right on the first sweep of a fresh
 install.
 
+The three fields that end in `_elsewhere` share one meaning of elsewhere: in a
+repository the account does not own, since the search qualifier `-user:LOGIN`
+leaves out the ones it does, so an organisation's repositories count as
+elsewhere even when the account belongs to it. `pulls_merged_elsewhere` is its pull
+requests merged there and `issues_elsewhere` the issues it opened there.
+`commented_elsewhere` is the issues and pull requests there that carry at least
+one comment of its own (`commenter:LOGIN -user:LOGIN`): threads, not comments,
+each counted once however many it left. One it opened counts only if it also
+commented, since the opening post is not a comment: measured on 2026-09-26, 33
+of the 102 threads the account had opened elsewhere. In 2.5.1 and earlier it
+was `commenter:LOGIN -author:LOGIN`, which left out the threads the account
+opened and kept every one in its own repositories: 125 where the definition
+above gives 55 on the account this was read against, 103 of them at home and 54
+of those Dependabot pull requests. A store holding rows from before the upgrade
+sees the series drop by that difference on the first sweep after it.
+
 `gh_dependency_change` writes a row on every sweep of the `deps` family, not
 only when a dependency moved: a range with no change, a head that did not move
 and the first sweep, which has no base yet, each write one row with `change`

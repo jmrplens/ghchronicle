@@ -427,7 +427,7 @@
       "panels": [
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "Every pull request this account has had merged, anywhere, and every one it has reviewed, including in repositories it does not own; the public commits attributed to it, from the commit search index; the issues it opened; and the two numbers a sweep over one's own repositories cannot see at all, pull requests merged and comments left in other people's repositories. All counted by GitHub's own search rather than by adding up rows.",
+          "description": "Every pull request this account has had merged, anywhere, and every one it has reviewed, including in repositories it does not own; the public commits attributed to it, from the commit search index; the issues it opened; and the two numbers a sweep over one's own repositories cannot see at all, both about repositories the account does not own: its pull requests merged there, and the issues and pull requests it commented on there, each counted once however many comments it left. All counted by GitHub's own search rather than by adding up rows.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -520,7 +520,7 @@
               "editorMode": "code",
               "expr": "github_account_total_commented_elsewhere",
               "instant": true,
-              "legendFormat": "Comments elsewhere",
+              "legendFormat": "Threads commented elsewhere",
               "range": false,
               "refId": "F"
             }

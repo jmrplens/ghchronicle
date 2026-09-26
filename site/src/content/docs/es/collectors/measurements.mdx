@@ -898,6 +898,23 @@ en julio" y la equivocada para un total de por vida. GitHub los cuenta él mismo
 con una petición de búsqueda cada uno, así que el número es una fila y es
 correcto en la primera pasada de una instalación recién hecha.
 
+Los tres campos que acaban en `_elsewhere` comparten un mismo sentido de fuera:
+en un repositorio que no es de la cuenta, porque el calificador de búsqueda
+`-user:LOGIN` deja fuera los que sí lo son, así que los repositorios de una
+organización cuentan como fuera aunque la cuenta pertenezca a ella.
+`pulls_merged_elsewhere` son sus pull requests fusionadas allí e
+`issues_elsewhere` las issues que abrió allí. `commented_elsewhere` son las
+issues y pull requests de allí que llevan al menos un comentario suyo
+(`commenter:LOGIN -user:LOGIN`): hilos, no comentarios, cada uno contado una
+vez por muchos que dejara. Uno que abrió solo cuenta si además comentó, porque
+el mensaje inicial no es un comentario: medido el 2026-09-26, 33 de los 102
+hilos que la cuenta había abierto fuera. En la 2.5.1 y anteriores era
+`commenter:LOGIN -author:LOGIN`, que dejaba fuera los hilos que abrió la cuenta
+y contaba todos los de sus propios repositorios: 125 donde la definición de
+arriba da 55 en la cuenta con la que se leyó esto, 103 de ellos en casa y 54 de
+esos pull requests de Dependabot. Un almacén con filas de antes de actualizar
+ve la serie bajar esa diferencia en la primera pasada después.
+
 `gh_dependency_change` escribe una fila en cada pasada de la familia `deps`, no
 solo cuando una dependencia se movió: un rango sin cambios, una cabeza que no
 se movió y la primera pasada, que aún no tiene base, escriben cada uno una fila

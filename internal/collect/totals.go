@@ -83,7 +83,12 @@ func (t Totals) searchCounts() []searchCount {
 		issues("issues_opened", issuesByAuthor+login),
 		issues("issues_closed", issuesByAuthor+login+" is:closed"),
 		issues("issues_elsewhere", issuesByAuthor+login+" -user:"+login),
-		issues("commented_elsewhere", "commenter:"+login+" -author:"+login),
+		// The same elsewhere as the two above. It was -author:, which kept
+		// every thread the account commented on in its own repositories, a
+		// Dependabot pull request included: measured on 2026-09-26, 125
+		// where this reads 55, 103 of the 125 at home and 54 of those
+		// Dependabot's.
+		issues("commented_elsewhere", "commenter:"+login+" -user:"+login),
 		{field: "repositories", kind: "REPOSITORY", query: "user:" + login},
 	}
 }

@@ -175,15 +175,18 @@ func lifetime(b *builder) []Panel {
 			{"commits", "Commits"},
 			{"issues_opened", "Issues opened"},
 			{"pulls_merged_elsewhere", "Merged elsewhere"},
-			{"commented_elsewhere", "Comments elsewhere"},
+			// Threads, not comments: search counts each issue or pull request
+			// once however many comments the account left on it.
+			{"commented_elsewhere", "Threads commented elsewhere"},
 		}, &P{
 			Desc: "Every pull request this account has had merged, anywhere, and every one " +
 				"it has reviewed, including in repositories it does not own; the public " +
 				"commits attributed to it, from the commit search index; the issues it " +
 				"opened; and the two numbers a sweep over one's own repositories cannot " +
-				"see at all, pull requests merged and comments left in other people's " +
-				"repositories. All counted by GitHub's own search rather than by adding " +
-				"up rows.",
+				"see at all, both about repositories the account does not own: its pull " +
+				"requests merged there, and the issues and pull requests it commented on " +
+				"there, each counted once however many comments it left. All counted by " +
+				"GitHub's own search rather than by adding up rows.",
 		}),
 		panel("table", "Every repository, ever", box{W: 24, H: 12, X: 0, Y: 5},
 			[]Target{sqlT(repos)}, &P{

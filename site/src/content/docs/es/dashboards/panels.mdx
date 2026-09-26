@@ -69,10 +69,16 @@ Lee `gh_account`, `gh_repo`, `gh_traffic` y `gh_contributions_total`.
 
 Seis cifras que son ciertas desde que existe la cuenta, en un solo panel, y una
 fila por repositorio con su vida entera: pull requests fusionadas y revisadas alguna vez,
-commits totales, issues abiertas, lo fusionado en repositorios ajenos y lo
-comentado allí.
+commits totales, issues abiertas, lo fusionado en repositorios ajenos y en
+cuántos hilos se comentó allí.
 
 ![La sección Lifetime: un grupo de tarjetas con 1,18 mil pull requests fusionadas, 386 revisadas, 6,68 mil commits, 148 issues abiertas, 27 fusionadas fuera y 96 comentarios fuera; la tabla de todos los repositorios de siempre con commits, fusionadas, issues, releases, estrellas, ramas y etiquetas; y debajo los repositorios creados, el único repositorio archivado y las ejecuciones de workflow de siempre como una barra por repositorio](../../../../assets/dashboards/lifetime.png)
+
+La última tarjeta cuenta hilos y no comentarios, cada issue o pull request una
+vez por muchos comentarios que dejara la cuenta en ella, y solo en repositorios
+que no son suyos, el mismo fuera que la tarjeta de al lado. La captura de
+arriba es anterior a ambas cosas: su tarjeta pone "Comments elsewhere", y sus
+96 incluían hilos de los repositorios propios de la cuenta.
 
 Todas las demás secciones cuentan filas dentro del rango del dashboard. Estas no:
 las cuenta GitHub, en una búsqueda o un campo de GraphQL cada una, y el colector

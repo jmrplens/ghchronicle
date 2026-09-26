@@ -65,9 +65,15 @@ Reads `gh_account`, `gh_repo`, `gh_traffic` and `gh_contributions_total`.
 Six numbers that are true since the account began, in one panel, and one row
 per repository with its whole life in it: pull requests merged and reviewed
 ever, commits ever, issues opened, what was merged in other people's
-repositories and what was commented there.
+repositories and how many threads were commented on there.
 
 ![The Lifetime section: a tile group reading 1.18 thousand pull requests merged, 386 reviewed, 6.68 thousand commits, 148 issues opened, 27 merged elsewhere and 96 comments elsewhere, the table of every repository ever with commits, merges, issues, releases, stars, branches and tags, and below it the repositories created, the single archived repository and workflow runs ever as a bar per repository](../../../assets/dashboards/lifetime.png)
+
+The last tile counts threads rather than comments, each issue or pull request
+once however many comments the account left on it, and only in repositories it
+does not own, the same elsewhere as the tile beside it. The capture above
+predates both: its tile reads "Comments elsewhere", and its 96 included threads
+in the account's own repositories.
 
 Every other section counts rows inside the dashboard range. These do not:
 GitHub counts them itself, in one search request or one GraphQL field each, and

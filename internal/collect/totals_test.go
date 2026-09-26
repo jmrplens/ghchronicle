@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -38,7 +39,7 @@ var searchCountsByQuery = map[string]int{
 	"type:issue author:octocat":                      167,
 	"type:issue author:octocat is:closed":            137,
 	"type:issue author:octocat -user:octocat":        27,
-	"commenter:octocat -author:octocat":              113,
+	"commenter:octocat -user:octocat":                113,
 	"user:octocat":                                   35,
 }
 
@@ -215,6 +216,32 @@ func TestTotalsAsksGitHubToDoTheCounting(t *testing.T) {
 		if got := fieldInt(t, repo, field); got != want {
 			t.Errorf("%s = %d, want %d", field, got, want)
 		}
+	}
+}
+
+// Every count that says elsewhere means outside the repositories the account
+// owns, which is what -user: leaves out. commented_elsewhere once said
+// -author: instead, which kept every thread the owner answered at home and
+// counted 125 where the rule of the other two counts 55. The number of them
+// is checked too, so renaming a field cannot leave this test with nothing to
+// look at.
+func TestTotalsCountsEveryElsewhereOutsideTheAccountsRepositories(t *testing.T) {
+	t.Parallel()
+	const login = "octocat"
+	var elsewhere []string
+	for _, sc := range (Totals{Login: login}).searchCounts() {
+		if !strings.HasSuffix(sc.field, "_elsewhere") {
+			continue
+		}
+		elsewhere = append(elsewhere, sc.field)
+		if !slices.Contains(strings.Fields(sc.query), "-user:"+login) {
+			t.Errorf("%s searches %q, which does not leave out %s's own repositories with -user:%s",
+				sc.field, sc.query, login, login)
+		}
+	}
+	want := []string{"pulls_merged_elsewhere", "issues_elsewhere", "commented_elsewhere"}
+	if !slices.Equal(elsewhere, want) {
+		t.Errorf("elsewhere counts = %v, want %v", elsewhere, want)
 	}
 }
 
