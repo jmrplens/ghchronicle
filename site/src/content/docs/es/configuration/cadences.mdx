@@ -282,6 +282,14 @@ prueba. Es la única forma de hacer girar el bucle más rápido que ese suelo de
 minuto, porque el suelo existe para sobrevivir a una cadencia mal tecleada y un
 heartbeat explícito no lo es.
 
+Una familia toca en el primer tic en que su cadencia ha pasado, con medio tic
+de margen. El bucle lee el reloj unos milisegundos después de despertar, en una
+cantidad que cambia de un tic a otro, y sin ese margen una familia cuya cadencia
+es un número entero de tics esperaba un tic de más la mitad de las veces: antes
+de la 2.5.2 las familias de cuarto de hora corrían cada 24 minutos de media y
+las horarias cada 69. Medio tic absorbe eso y nunca deja correr a una familia un
+tic antes de tiempo.
+
 Un heartbeat **más largo** que la cadencia más corta frena a esa familia, y el
 arranque lo dice:
 

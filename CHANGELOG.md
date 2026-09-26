@@ -18,7 +18,8 @@ beside the other on the account this collects: a Loki line that called every
 contribution merged, a count of threads commented elsewhere that was mostly
 at home, five searches that stopped at a hundred, and archived repositories
 whose stars froze at the last backfill. And the outbound family, which
-costs next to nothing, now runs every hour.
+costs next to nothing, now runs every hour, and every family runs at the
+cadence it states, which about half the time it did not.
 
 - **A Loki line says what happened to the contribution.** The rendering of
   `gh_external_contribution` read the user, the repository and the number and
@@ -91,6 +92,24 @@ costs next to nothing, now runs every hour.
   morning, and the dashboard showed 11 accepted answers for the rest of the
   day where GitHub showed 15. A configuration that already names
   `outbound` under `every.families` keeps what it names.
+- **A family runs at its cadence, not a tick after it about half the time.**
+  A family was due when its interval had elapsed to the nanosecond, and the
+  loop reads the sweep's clock a few milliseconds after its ticker wakes it,
+  by an amount that changes from tick to tick. Whenever one sweep was less
+  late than the one before, the two were a hair less than a tick apart and
+  every family whose cadence is a whole number of ticks waited a whole tick
+  more. In production, over 30.85 hours and 122 sweeps before this release,
+  the quarter hour families ran every 24 minutes on average, 41 of 77 gaps
+  being 30 minutes, the half hour ones every 39 and the hourly ones every 69;
+  `actions` ran 56 times in the 22 hours of 2026-09-26 it was watched where
+  88 were due. A family is now due to within half a tick, which absorbs any
+  such lateness and cannot let it run a tick early, and the inbox's daily
+  full read takes the same margin. Running at the stated cadences costs what
+  the cost tables already say, which is more than the service spent: about
+  450 GraphQL points and 400 to 750 core requests a day more on the account
+  measured, and some 20,000 InfluxDB rows a day more, most of them the rows
+  `actions` stamps at every pass.
+  ([#85](https://github.com/jmrplens/ghchronicle/issues/85))
 - **Archived repositories' stars and forks reach the account's totals on
   every sweep.** With `include_archived` off, the default, a sweep sets
   archived repositories aside and wrote only their `gh_repo_archived` row.
@@ -160,6 +179,9 @@ lists it, archived, with its stars.
 
 Not verified, and worth saying plainly:
 
+- The cadences at the half tick, in production. The test sweeps a day of
+  ticks whose lateness alternates by two milliseconds and counts the passes;
+  the gaps the journal shows after the upgrade are the first reading of it.
 - None of it has run in production. The Loki sentences, the step down in
   `commented_elsewhere` and the archived rows are what the tests and the
   readings above say they will be; the first sweep after this upgrade is the

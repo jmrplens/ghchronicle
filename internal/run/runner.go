@@ -420,7 +420,7 @@ var batchOnlyFamilies = map[string]bool{
 func (r *Runner) repoFamilies(ctx context.Context, now time.Time) error {
 	for _, family := range perRepoFamilies {
 		every, enabled := r.Cfg.Interval(family)
-		if !enabled || (!r.prime && !r.State.Due(family, every, now)) {
+		if !enabled || (!r.prime && !r.due(family, every, now)) {
 			continue
 		}
 		// A family the interrupted walk finished is not run again. Its rows
@@ -1085,7 +1085,7 @@ func (r *Runner) family(ctx context.Context, name string, now time.Time, run fun
 		return
 	}
 	every, enabled := r.Cfg.Interval(name)
-	if !enabled || (!r.prime && !r.State.Due(name, every, now)) {
+	if !enabled || (!r.prime && !r.due(name, every, now)) {
 		return
 	}
 	// Already written by the walk this run resumes. An account family is its
@@ -1355,6 +1355,26 @@ func (r *Runner) Serve(ctx context.Context) error {
 			}
 		}
 	}
+}
+
+// due reports whether a family's interval has elapsed, to within half a tick.
+//
+// The loop wakes on a ticker and reads the sweep's clock after it wakes, a
+// little late by an amount that changes from tick to tick, so two sweeps a
+// tick apart can be a few milliseconds less than a tick apart. Asked to the
+// millisecond, a family whose cadence is a whole number of ticks then waited
+// one tick more about half the time: in production on 2026-09-26 the quarter
+// hour families ran every 24 minutes on average, the half hour ones every 39
+// and the hourly ones every 69. Half a tick absorbs any such lateness and
+// still cannot let a family run a tick before its interval.
+func (r *Runner) due(family string, every time.Duration, now time.Time) bool {
+	return r.State.Due(family, every-r.slack(), now)
+}
+
+// slack is half a tick: how early a sweep may find an interval elapsed.
+func (r *Runner) slack() time.Duration {
+	tick, _ := r.tick()
+	return tick / 2
 }
 
 // tick is how often the loop wakes to ask which families are due, and where

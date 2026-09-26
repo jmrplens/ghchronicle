@@ -826,6 +826,14 @@ want the loop itself under control, which is almost always a test run. It is
 the only way to turn the loop faster than that one minute floor, because the
 floor exists to survive a mistyped cadence and an explicit heartbeat is not one.
 
+A family is due on the first tick at which its cadence has elapsed, to within
+half a tick. The loop reads the clock a few milliseconds after it wakes, by an
+amount that changes from tick to tick, and without that margin a family whose
+cadence is a whole number of ticks waited one tick more about half the time:
+before 2.5.2 the quarter hour families ran every 24 minutes on average and the
+hourly ones every 69. Half a tick absorbs that and never lets a family run a
+tick early.
+
 A heartbeat **longer** than the shortest cadence holds that family back, and
 start-up says so:
 
