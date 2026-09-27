@@ -69,7 +69,11 @@ their language.
 Stars and forks are **summed from the repositories the sweep collected**,
 because GitHub's account endpoint reports neither total. That means excluding
 forks or archived repositories in `targets` is visible on the card too, which
-is the honest reading rather than a hidden discrepancy.
+is the honest reading rather than a hidden discrepancy. Each repository counts
+once, by its full name, as the Overview counts it: two owners' repositories of
+the same name, a user's `.github` and an organisation's, are two repositories,
+and the top repositories can show that name twice. Up to 2.6.0 the card went
+by the short name, and one of the two replaced the other.
 
 That sum is the one place the card and the dashboard's
 [Overview](/ghchronicle/dashboards/panels/#overview) part. The card adds up

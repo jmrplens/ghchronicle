@@ -69,7 +69,12 @@ más estrellas junto a su lenguaje.
 Las estrellas y los forks se **suman de los repositorios que recogió la pasada**,
 porque el endpoint de cuenta de GitHub no informa de ninguno de los dos totales.
 Eso significa que excluir forks o archivados en `targets` se nota también en la
-tarjeta, que es la lectura honesta y no una discrepancia oculta.
+tarjeta, que es la lectura honesta y no una discrepancia oculta. Cada
+repositorio cuenta una vez, por su nombre completo, como lo cuenta el Overview:
+dos repositorios del mismo nombre de dueños distintos, el `.github` de un
+usuario y el de una organización, son dos repositorios, y los repositorios con
+más estrellas pueden mostrar ese nombre dos veces. Hasta la 2.6.0 la tarjeta
+iba por el nombre corto, y uno de los dos sustituía al otro.
 
 Esa suma es el único punto en el que la tarjeta y el
 [Overview](/ghchronicle/es/dashboards/panels/#overview) del dashboard se
