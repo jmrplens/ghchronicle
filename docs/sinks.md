@@ -302,7 +302,7 @@ SELECT time, "count" FROM gh_traffic WHERE kind = 'views' AND repo = 'ghchronicl
 
 ### Where to go next
 
-- [Choosing a store](https://jmrp.io/docs/ghchronicle/sinks/) compares InfluxDB with the other nine,
+- [Choosing a store](https://jmrp.io/docs/ghchronicle/sinks/) compares InfluxDB with the others,
   and holds the write ledger every one of them shares.
 - [The dashboards](https://jmrp.io/docs/ghchronicle/dashboards/) says which of the five is drawn
   against which store, and what a panel a store cannot answer becomes.
@@ -466,7 +466,7 @@ the port publication decide who can reach it.
 
 ### Where to go next
 
-- [Choosing a store](https://jmrp.io/docs/ghchronicle/sinks/) compares Prometheus with the other nine,
+- [Choosing a store](https://jmrp.io/docs/ghchronicle/sinks/) compares Prometheus with the others,
   and holds the write ledger every one of them shares.
 - [The dashboards](https://jmrp.io/docs/ghchronicle/dashboards/) says which of the five is drawn
   against which store, and what a panel a store cannot answer becomes.
@@ -577,7 +577,7 @@ Prometheus, and the constraint follows the data rather than the protocol.
 
 ### Where to go next
 
-- [Choosing a store](https://jmrp.io/docs/ghchronicle/sinks/) compares OpenTelemetry with the other nine,
+- [Choosing a store](https://jmrp.io/docs/ghchronicle/sinks/) compares OpenTelemetry with the others,
   and holds the write ledger every one of them shares.
 - [The dashboards](https://jmrp.io/docs/ghchronicle/dashboards/) says which of the five is drawn
   against which store, and what a panel a store cannot answer becomes.
@@ -731,7 +731,7 @@ one, with every query translated to PostgreSQL against this schema.
 
 ### Where to go next
 
-- [Choosing a store](https://jmrp.io/docs/ghchronicle/sinks/) compares PostgreSQL with the other nine,
+- [Choosing a store](https://jmrp.io/docs/ghchronicle/sinks/) compares PostgreSQL with the others,
   and holds the write ledger every one of them shares.
 - [The dashboards](https://jmrp.io/docs/ghchronicle/dashboards/) says which of the five is drawn
   against which store, and what a panel a store cannot answer becomes.
@@ -821,7 +821,7 @@ prefix is the first node of every path.
 
 ### Where to go next
 
-- [Choosing a store](https://jmrp.io/docs/ghchronicle/sinks/) compares Graphite with the other nine,
+- [Choosing a store](https://jmrp.io/docs/ghchronicle/sinks/) compares Graphite with the others,
   and holds the write ledger every one of them shares.
 - [The dashboards](https://jmrp.io/docs/ghchronicle/dashboards/) says which of the five is drawn
   against which store, and what a panel a store cannot answer becomes.
@@ -927,7 +927,7 @@ OpenSearch works through the same plugin.
 
 ### Where to go next
 
-- [Choosing a store](https://jmrp.io/docs/ghchronicle/sinks/) compares Elasticsearch with the other nine,
+- [Choosing a store](https://jmrp.io/docs/ghchronicle/sinks/) compares Elasticsearch with the others,
   and holds the write ledger every one of them shares.
 - [The dashboards](https://jmrp.io/docs/ghchronicle/dashboards/) says which of the five is drawn
   against which store, and what a panel a store cannot answer becomes.
@@ -1094,7 +1094,7 @@ publishes every dashboard with the note.
 
 ### Where to go next
 
-- [Choosing a store](https://jmrp.io/docs/ghchronicle/sinks/) compares Loki with the other nine,
+- [Choosing a store](https://jmrp.io/docs/ghchronicle/sinks/) compares Loki with the others,
   and holds the write ledger every one of them shares.
 - [The dashboards](https://jmrp.io/docs/ghchronicle/dashboards/) says which of the five is drawn
   against which store, and what a panel a store cannot answer becomes.
@@ -1179,7 +1179,7 @@ One sweep, both destinations, and the collector knows about neither.
 
 ### Where to go next
 
-- [Choosing a store](https://jmrp.io/docs/ghchronicle/sinks/) compares Telegraf with the other nine,
+- [Choosing a store](https://jmrp.io/docs/ghchronicle/sinks/) compares Telegraf with the others,
   and holds the write ledger every one of them shares.
 - [The dashboards](https://jmrp.io/docs/ghchronicle/dashboards/) says which of the five is drawn
   against which store, and what a panel a store cannot answer becomes.
@@ -1328,7 +1328,7 @@ two clothes: the process is deliberately allowed to write almost nowhere.
 
 ### Where to go next
 
-- [Choosing a store](https://jmrp.io/docs/ghchronicle/sinks/) compares the file sink with the other nine,
+- [Choosing a store](https://jmrp.io/docs/ghchronicle/sinks/) compares the file sink with the others,
   and holds the write ledger every one of them shares.
 - [The dashboards](https://jmrp.io/docs/ghchronicle/dashboards/) says which of the five is drawn
   against which store, and what a panel a store cannot answer becomes.
