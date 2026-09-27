@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -239,6 +240,75 @@ func TestTheJobsOfAPassNoSinkTookAreListedAgain(t *testing.T) {
 	}
 }
 
+// TestTheJobsOfAPassCutShortAreListedAgainAfterARestart: a stop in the middle
+// of an actions pass leaves the runs whose jobs it listed remembered in the
+// process, though no sink has seen those jobs, since the pass never reached
+// its write. The command saves the cache file however the run ended, so what
+// the file keeps is the runs of the last pass every sink took, and the process
+// after it lists those jobs again. Kept, they would be runs no sweep lists the
+// jobs of again, and jobs no store ever holds.
+func TestTheJobsOfAPassCutShortAreListedAgainAfterARestart(t *testing.T) {
+	t.Parallel()
+	ctx, stop := context.WithCancel(t.Context())
+	var listed atomic.Int32
+	finished := time.Now().Add(-time.Hour).UTC().Format(time.RFC3339)
+	handler := func(w http.ResponseWriter, req *http.Request) {
+		switch req.URL.Path {
+		case "/repos/o/a/actions/runs":
+			_, _ = fmt.Fprintf(w, `{"total_count":1,"workflow_runs":[{"id":11,"run_attempt":1,"status":"completed",`+
+				`"conclusion":"success","path":".github/workflows/ci.yml","updated_at":%q,"created_at":%q}]}`, finished, finished)
+		case "/repos/o/a/actions/runs/11/jobs":
+			listed.Add(1)
+			_, _ = w.Write([]byte(`{"total_count":0,"jobs":[]}`))
+		case "/repos/o/a/actions/cache/usage":
+			// The shutdown arrives after the jobs are in hand and before the
+			// first repository is done, as a signal does.
+			stop()
+			http.NotFound(w, req)
+		default:
+			http.NotFound(w, req)
+		}
+	}
+	cacheFile := filepath.Join(t.TempDir(), "state-cache.bin")
+	process := func() *Runner {
+		r := sweepRunner(t, handler)
+		r.Cfg.Every = everyOnly("actions")
+		if err := r.Cfg.Validate(); err != nil {
+			t.Fatal(err)
+		}
+		r.repos = []collect.Repo{{Owner: "o", Name: "a", FullName: "o/a"}, {Owner: "o", Name: "b", FullName: "o/b"}}
+		r.Sinks, r.CacheFile = []sink.Sink{&captured{name: "store"}}, cacheFile
+		r.loadCache(time.Now())
+		return r
+	}
+
+	first := process()
+	if err := first.repoFamilies(ctx, time.Now()); !errors.Is(err, context.Canceled) {
+		t.Fatalf("the pass ended with %v, want the stop", err)
+	}
+	if _, remembered := first.expanded[collect.RunKey{ID: 11, Attempt: 1}]; !remembered {
+		t.Fatal("the process does not remember the run whose jobs it listed, so this proves nothing")
+	}
+	if err := first.SaveCache(); err != nil {
+		t.Fatal(err)
+	}
+	head, _, err := readCache(cacheFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(head.Expanded) != 0 {
+		t.Errorf("the cache file keeps %+v from a pass cut short before any sink saw it, want no run", head.Expanded)
+	}
+
+	second := process()
+	if err = second.repoFamilies(context.Background(), time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if n := listed.Load(); n != 2 {
+		t.Errorf("the jobs were listed %d times across the two processes, want again after the stop", n)
+	}
+}
+
 // TestTotalsRunFirstWhenNothingSizesThePullRequestPage is the promise the
 // comment on counts made and only a primed sweep kept: a first sweep with no
 // counts runs totals before the pull requests even when totals is not due,
@@ -365,6 +435,44 @@ func TestTheCacheFileKeepsWhatWasAskedForLately(t *testing.T) {
 	}
 }
 
+// TestASavedCacheFileKeepsWithinItsBounds holds the bounds where the file is
+// written rather than in the helper that applies them: of what the client
+// holds, an answer nothing asked for within the horizon and one larger than
+// an answer may be are left out of the file saveCache writes. They are what
+// keeps the file near the 31 MB it was sized at, where the cache in memory
+// held 99 MB after five and a half days.
+func TestASavedCacheFileKeepsWithinItsBounds(t *testing.T) {
+	t.Parallel()
+	r := pullsRunner(t)
+	r.CacheFile = filepath.Join(t.TempDir(), "state-cache.bin")
+	now, horizon := time.Now(), r.cacheHorizon()
+	answer := func(path string, body []byte, used time.Time) ghapi.Answer {
+		return ghapi.Answer{URL: "https://api.github.com" + path, ETag: `"` + path + `"`, Body: body, Used: used.Unix()}
+	}
+	if taken := r.API.Restore([]ghapi.Answer{
+		answer("/recent", []byte(`{}`), now.Add(-horizon+time.Hour)),
+		answer("/huge", bytes.Repeat([]byte("x"), cacheMaxAnswer+1), now),
+		answer("/stale", []byte(`{}`), now.Add(-horizon-time.Hour)),
+	}); taken != 3 {
+		t.Fatalf("the client took %d of the three answers, so this proves nothing", taken)
+	}
+	r.cacheDirty = true
+	if err := r.SaveCache(); err != nil {
+		t.Fatal(err)
+	}
+	_, answers, err := readCache(r.CacheFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var kept []string
+	for _, a := range answers {
+		kept = append(kept, strings.TrimPrefix(a.URL, "https://api.github.com"))
+	}
+	if got := strings.Join(kept, " "); got != "/recent" {
+		t.Errorf("the file keeps %q, want the answer asked for within the %s horizon and no larger than %d bytes", got, horizon, cacheMaxAnswer)
+	}
+}
+
 // TestTheHorizonIsTwiceTheLongestCadence: the longest cadence is the one
 // every entry has to outlive, twice it leaves room for a pass that was
 // skipped, and a configuration of short cadences still keeps a day.
@@ -471,5 +579,98 @@ func TestACacheFileThatCannotBeWrittenIsReportedOncePerInterval(t *testing.T) {
 	}
 	if n := strings.Count(log.String(), "cache file not saved"); n != 1 {
 		t.Errorf("three families after a save that failed said so %d times, want once:\n%s", n, log)
+	}
+}
+
+// oneRunServer answers one completed run on o/n and its one job, and counts
+// the listings of that job.
+func oneRunServer(listed *atomic.Int32) http.HandlerFunc {
+	return func(w http.ResponseWriter, req *http.Request) {
+		finished := time.Now().Add(-time.Hour).UTC().Format(time.RFC3339)
+		switch {
+		case strings.HasSuffix(req.URL.Path, "/actions/runs"):
+			_, _ = fmt.Fprintf(w, `{"total_count":1,"workflow_runs":[{"id":11,"run_attempt":1,"status":"completed",`+
+				`"conclusion":"success","path":".github/workflows/ci.yml","updated_at":%q,"created_at":%q}]}`,
+				finished, time.Now().Add(-2*time.Hour).UTC().Format(time.RFC3339))
+		case strings.HasSuffix(req.URL.Path, "/runs/11/jobs"):
+			listed.Add(1)
+			_, _ = fmt.Fprintf(w, `{"total_count":1,"jobs":[{"id":21,"run_id":11,"run_attempt":1,"name":"build",`+
+				`"status":"completed","conclusion":"success","started_at":%q,"completed_at":%q,"steps":[]}]}`,
+				time.Now().Add(-90*time.Minute).UTC().Format(time.RFC3339), finished)
+		default:
+			http.NotFound(w, req)
+		}
+	}
+}
+
+// actionsProcess is one process that runs one actions pass against handler,
+// writing to sinks, with the cache file at cacheFile read first.
+func actionsProcess(t *testing.T, handler http.HandlerFunc, cacheFile string, refill bool, sinks ...sink.Sink) *Runner {
+	t.Helper()
+	r := sweepRunner(t, handler)
+	r.Cfg.Every = everyOnly("actions")
+	if err := r.Cfg.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	r.Sinks, r.CacheFile, r.Refill = sinks, cacheFile, refill
+	r.loadCache(time.Now())
+	if err := r.repoFamilies(context.Background(), time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	return r
+}
+
+// TestAStoreFilledAgainIsOfferedTheJobsOfTheRunsRemembered: the runs the cache
+// file keeps are a claim that every store holds their jobs, and no sweep lists
+// the jobs of a run it remembers. A store wiped and filled again, by deleting
+// the write ledger and restarting as the documentation says, and a store added
+// since the file was written hold none of them, so for both the runs are not
+// recalled and their jobs reach the store with the runs. Recalled, the refilled
+// store got gh_workflow_run and no gh_workflow_job for every run of the window.
+func TestAStoreFilledAgainIsOfferedTheJobsOfTheRunsRemembered(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name   string
+		refill bool
+		added  bool
+		jobs   bool
+	}{
+		{name: "the same store with the ledger read"},
+		{name: "a store filled again", refill: true, jobs: true},
+		{name: "a store added", added: true, jobs: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			var listed atomic.Int32
+			cacheFile := filepath.Join(t.TempDir(), "state-cache.bin")
+			process := func(refill bool, sinks ...sink.Sink) *Runner {
+				return actionsProcess(t, oneRunServer(&listed), cacheFile, refill, sinks...)
+			}
+			first := process(false, &captured{name: "influxdb"})
+			if err := first.SaveCache(); err != nil {
+				t.Fatal(err)
+			}
+			if listed.Load() != 1 {
+				t.Fatalf("the first process listed the jobs %d times, want once", listed.Load())
+			}
+
+			store := &captured{name: "influxdb"}
+			sinks := []sink.Sink{store}
+			if tc.added {
+				store = &captured{name: "postgres"}
+				sinks = append(sinks, store)
+			}
+			process(tc.refill, sinks...)
+			if got := listed.Load() == 2; got != tc.jobs {
+				t.Errorf("the second process listed the jobs %d times in all, want them listed again %v", listed.Load(), tc.jobs)
+			}
+			if got := store.measured("gh_workflow_job") == 1; got != tc.jobs {
+				t.Errorf("the store the second process wrote to got %d jobs, want the run's job %v",
+					store.measured("gh_workflow_job"), tc.jobs)
+			}
+			if store.measured("gh_workflow_run") != 1 {
+				t.Errorf("the store got %d runs, want the one", store.measured("gh_workflow_run"))
+			}
+		})
 	}
 }

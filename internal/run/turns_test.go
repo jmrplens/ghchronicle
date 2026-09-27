@@ -394,3 +394,119 @@ func TestAPrimedRestartKeepsTheTurnsTheFamiliesHad(t *testing.T) {
 		}
 	})
 }
+
+// accountTurnsRunner is a loop's runner over the fake GitHub, on a quarter
+// hour heartbeat, collecting only the families given, at the cadences given,
+// with its clock at *at. Its sweeps are driven one by one with Once, so each
+// runs the account families through Runner.family, the way Serve runs them.
+func accountTurnsRunner(t *testing.T, families map[string]string, at *time.Time) (*Runner, *lockedBuffer) {
+	t.Helper()
+	r, fake, log := fakeRunner(t)
+	// The profile page the achievements family reads is the fake's too.
+	r.Cfg.GitHub.BaseURL = fake.URL()
+	r.Cfg.Every = config.Every{Default: "0", Families: families}
+	r.Cfg.Heartbeat = "15m"
+	if err := r.Cfg.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	r.Prime, r.serving = false, true
+	r.Now = func() time.Time { return *at }
+	return r, log
+}
+
+// TestAccountFamiliesTakeTurnsToo: three of the built-in families of six hours
+// or more ask about the account and not about a repository, achievements,
+// keys and profile, and they reach the sweep through Runner.family rather than
+// the per-repository loop. All three due at once start one a sweep, the
+// shortest cadence first, and are left with three different last_run values.
+func TestAccountFamiliesTakeTurnsToo(t *testing.T) {
+	t.Parallel()
+	at := time.Now().UTC().Truncate(time.Second)
+	first := at
+	r, log := accountTurnsRunner(t, map[string]string{"achievements": "24h", "keys": "24h", "profile": "12h"}, &at)
+	for range 3 {
+		if err := r.Once(t.Context()); err != nil {
+			t.Fatalf("Once: %v\n%s", err, log)
+		}
+		at = at.Add(15 * time.Minute)
+	}
+	for i, family := range []string{"profile", "achievements", "keys"} {
+		if got, want := r.State.LastRun[family], first.Add(time.Duration(i)*15*time.Minute); !got.Equal(want) {
+			t.Errorf("%s started %s after the first sweep, want %s", family, got.Sub(first), want.Sub(first))
+		}
+	}
+}
+
+// TestAPrimedRestartLeavesTheAccountFamiliesTheirTurns is
+// TestAPrimedRestartKeepsTheTurnsTheFamiliesHad for the families that ask
+// about the account: the primed first sweep runs all three and marks only the
+// one that was due, so the other two keep the last_run they had instead of
+// sharing the restart's.
+func TestAPrimedRestartLeavesTheAccountFamiliesTheirTurns(t *testing.T) {
+	t.Parallel()
+	at := time.Now().UTC().Truncate(time.Second)
+	r, log := accountTurnsRunner(t, map[string]string{"achievements": "24h", "keys": "24h", "profile": "12h"}, &at)
+	r.Prime = true
+	had := map[string]time.Time{
+		"profile": at.Add(-12 * time.Hour), "achievements": at.Add(-2 * time.Hour), "keys": at.Add(-3 * time.Hour),
+	}
+	for family, last := range had {
+		r.State.Mark(family, last)
+	}
+	if err := r.Once(t.Context()); err != nil {
+		t.Fatalf("Once: %v\n%s", err, log)
+	}
+	if !strings.Contains(log.String(), "first sweep after start-up") {
+		t.Fatalf("the sweep was not the primed one:\n%s", log)
+	}
+	for family, want := range map[string]time.Time{"profile": at, "achievements": had["achievements"], "keys": had["keys"]} {
+		if got := r.State.LastRun[family]; !got.Equal(want) {
+			t.Errorf("%s last ran %s from the primed sweep, want %s", family, got.Sub(at), want.Sub(at))
+		}
+	}
+}
+
+// TestTotalsWaitingItsTurnStillSizeThePullRequestPage: a first sweep with no
+// page sizes runs totals before the pull requests it sizes, and that holds
+// when totals, at a day, is due beside a slow family more overdue than it and
+// so would wait its turn. It runs anyway, and the other family starts too.
+func TestTotalsWaitingItsTurnStillSizeThePullRequestPage(t *testing.T) {
+	t.Parallel()
+	at := time.Now().UTC().Truncate(time.Second)
+	r, log := accountTurnsRunner(t, map[string]string{"totals": "24h", "profile": "12h", "issues": "1h"}, &at)
+	if err := r.Once(t.Context()); err != nil {
+		t.Fatalf("Once: %v\n%s", err, log)
+	}
+	if !strings.Contains(log.String(), "starting=profile waiting=totals") {
+		t.Fatalf("totals was not the family waiting its turn, so this proves nothing:\n%s", log)
+	}
+	if len(r.counts) == 0 {
+		t.Errorf("totals waited its turn and the pull requests ran with no page sizes:\n%s", log)
+	}
+	if last := r.State.LastRun["profile"]; !last.Equal(at) {
+		t.Errorf("profile last ran at %s, want the one sweep", last)
+	}
+}
+
+// TestAnAccountFamilyWithNoAccountTakesNoTurn: a configuration that names
+// repositories alone has no login for the account families to ask about, so
+// one of them at six hours never runs, and it must not take the turn a
+// per-repository family of a day would have had.
+func TestAnAccountFamilyWithNoAccountTakesNoTurn(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		r, log := turnsRunner(t)
+		r.Cfg.Every = config.Every{Default: "0", Families: map[string]string{"profile": "6h", "rulesets": "24h"}}
+		if err := r.Cfg.Validate(); err != nil {
+			t.Fatal(err)
+		}
+		first := time.Now()
+		serveFor(t, r, time.Minute)
+		if at := r.State.LastRun["rulesets"]; !at.Equal(first) {
+			t.Errorf("rulesets last ran at %v, want the first sweep at %v:\n%s", at, first, log)
+		}
+		if _, ran := r.State.LastRun["profile"]; ran {
+			t.Error("profile ran with no account to ask about")
+		}
+	})
+}

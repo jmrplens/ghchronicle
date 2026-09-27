@@ -409,13 +409,19 @@ func cachePoints(ctx context.Context, c *ghapi.Client, repo Repo, base map[strin
 		return points, err
 	}
 
-	entries, err := cacheEntries(ctx, c, repo, w)
+	entries, whole, err := cacheEntries(ctx, c, repo, w)
 	if err != nil {
 		// The totals row above is already in hand, and the listing failing
 		// does not make it less true. What the listing gave before it failed
 		// is not written: summed, it would be a part of each cache, written
 		// over the whole of it that the day's earlier passes stored.
 		return points, err
+	}
+	if !whole {
+		// The listing changed under the walk, so a row could be a part of
+		// its cache, as it would after a failure. It is not one, and the
+		// day's next pass writes the rows.
+		return points, nil
 	}
 	return append(points, cacheRows(entries, base, now)...), nil
 }
@@ -430,30 +436,47 @@ type cacheEntry struct {
 	LastAccessedAt time.Time `json:"last_accessed_at"`
 }
 
-// cacheEntries walks the cache listing, a hundred entries a page.
+// cacheEntries walks the cache listing, a hundred entries a page, newest
+// created first, and says whether what it read is the listing whole.
 //
-// Past the first page because one page is the most recently used hundred,
-// not the cache: measured on 2026-09-27, jmrplens/ghchronicle listed 118
-// entries and jmrplens/mikroscope 232. The listing is ordered by last use, so
-// an entry used between two requests moves to the front and pushes the one
-// that ended a page onto the next, where it is read again; the id is what
-// keeps it from being counted twice. A page costs nothing while the listing
-// has not changed, and it seldom has: from 2026-09-25 12:58Z to 2026-09-27
-// 01:39Z the account's listings answered 304 to 3,059 of 3,256 requests.
-func cacheEntries(ctx context.Context, c *ghapi.Client, repo Repo, w Walk) ([]cacheEntry, error) {
+// Past the first page because one page is a hundred entries, not the cache:
+// measured on 2026-09-27, jmrplens/ghchronicle listed 118 entries and
+// jmrplens/mikroscope 232. A page costs nothing while the listing has not
+// changed, and it seldom has: from 2026-09-25 12:58Z to 2026-09-27 01:39Z the
+// account's listings answered 304 to 3,059 of 3,256 requests.
+//
+// The pages are numbered, so an entry that changes place between two
+// requests moves every entry behind it one place along, and at the next page
+// one of them is read twice or not at all. GitHub's own order is by last use,
+// which every cache hit changes: an entry restored between two requests went
+// to the front, and an entry of the pages still to read was never read. Newest
+// created first, a hit moves nothing. A new entry goes to the front, onto a
+// page already read, and pushes the entry that ended it onto the next one
+// again, where the id keeps it from being counted twice. A deletion pulls
+// the entries behind it up, and one of them is never read. So the walk is
+// whole when it read, once each, as many entries as the first page said the
+// listing held, and what it read is then the listing as that request found
+// it. A walk that stops at its cap or on a refusal is taken as it is, as the
+// other walks take theirs.
+func cacheEntries(ctx context.Context, c *ghapi.Client, repo Repo, w Walk) ([]cacheEntry, bool, error) {
 	var entries []cacheEntry
 	seen := map[int64]bool{}
 	most := w.limit(10)
+	listed, ended := 0, false
 	for page := 1; page <= most; page++ {
 		var res struct {
+			Total  int          `json:"total_count"`
 			Caches []cacheEntry `json:"actions_caches"`
 		}
-		path := fmt.Sprintf("/repos/%s/actions/caches?per_page=100&page=%d", repo.FullName, page)
+		path := fmt.Sprintf("/repos/%s/actions/caches?per_page=100&page=%d&sort=created_at&direction=desc", repo.FullName, page)
 		if _, _, err := c.GetJSON(ctx, path, &res, ""); err != nil {
 			if isSkippable(err) || isPaginationLimit(err) {
 				break
 			}
-			return nil, err
+			return nil, false, err
+		}
+		if page == 1 {
+			listed = res.Total
 		}
 		for _, e := range res.Caches {
 			if !seen[e.ID] {
@@ -462,10 +485,11 @@ func cacheEntries(ctx context.Context, c *ghapi.Client, repo Repo, w Walk) ([]ca
 			}
 		}
 		if len(res.Caches) < 100 {
+			ended = true
 			break
 		}
 	}
-	return entries, nil
+	return entries, !ended || len(entries) == listed, nil
 }
 
 // cacheRows is one row per cache on each ref, its entries summed into it.

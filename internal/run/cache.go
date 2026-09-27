@@ -12,6 +12,7 @@ import (
 	"maps"
 	"os"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/jmrplens/ghchronicle/v2/internal/collect"
@@ -100,7 +101,9 @@ type cacheHeader struct {
 	Counts   map[string]collect.ItemCounts
 	Refusals map[string][]collect.Refused
 	Expanded []expandedRun
-	Answers  int
+	// Stores is the sinks the jobs of Expanded were offered to, by name.
+	Stores  []string
+	Answers int
 }
 
 // expandedRun is one workflow run attempt whose jobs were written, and when
@@ -168,9 +171,22 @@ func (r *Runner) loadCache(now time.Time) {
 		m.Recall(list)
 		refused += len(m.Standing())
 	}
+	// The runs are a claim that every store holds their jobs. A store being
+	// filled again does not (see Refill), and nor does one added since the
+	// file was written, which the ledger, keyed by sink, offers everything.
 	r.expanded = make(map[collect.RunKey]time.Time, len(head.Expanded))
-	for _, run := range head.Expanded {
-		r.expanded[collect.RunKey{ID: run.ID, Attempt: run.Attempt}] = time.Unix(run.Listed, 0)
+	switch stores := r.storeNames(); {
+	case len(head.Expanded) == 0:
+	case r.Refill:
+		r.Log.Info("no write ledger remembers what the stores hold, listing the jobs of the runs the cache file remembers again",
+			"runs", len(head.Expanded))
+	case !subset(stores, head.Stores):
+		r.Log.Info("a store was added since the cache file was written, listing the jobs of the runs it remembers again",
+			"stores", strings.Join(stores, ","), "written_to", strings.Join(head.Stores, ","), "runs", len(head.Expanded))
+	default:
+		for _, run := range head.Expanded {
+			r.expanded[collect.RunKey{ID: run.ID, Attempt: run.Attempt}] = time.Unix(run.Listed, 0)
+		}
 	}
 	r.expandedKept = maps.Clone(r.expanded)
 	r.Log.Info("cache file read", "file", r.CacheFile, "written", head.Written.Format(time.RFC3339),
@@ -251,6 +267,7 @@ func (r *Runner) saveCache() error {
 		Counts:   r.counts,
 		Refusals: r.standingRefusals(),
 		Expanded: listedSince(r.expandedKept, now.Add(-horizon)),
+		Stores:   r.storeNames(),
 	}
 	if err := writeCache(r.CacheFile, &head, answers); err != nil {
 		return err
@@ -259,6 +276,27 @@ func (r *Runner) saveCache() error {
 	r.Log.Debug("cache file saved", "file", r.CacheFile, "answers", len(answers),
 		"runs", len(head.Expanded), "took", time.Since(wall).Round(time.Millisecond).String())
 	return nil
+}
+
+// storeNames is the names of the sinks this runner writes to, sorted, each
+// once.
+func (r *Runner) storeNames() []string {
+	names := make([]string, 0, len(r.Sinks))
+	for _, s := range r.Sinks {
+		names = append(names, s.Name())
+	}
+	slices.Sort(names)
+	return slices.Compact(names)
+}
+
+// subset reports whether every name in some is in all.
+func subset(some, all []string) bool {
+	for _, name := range some {
+		if !slices.Contains(all, name) {
+			return false
+		}
+	}
+	return true
 }
 
 // standingRefusals is every family's refusals whose day has not ended.

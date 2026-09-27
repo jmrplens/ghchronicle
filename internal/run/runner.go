@@ -93,6 +93,14 @@ type Runner struct {
 	// is what a runner nobody gave a file gets. Every run reads it, and every
 	// run but a card-only one and a backfill writes it: see saveCache.
 	CacheFile string
+	// Refill says that no write ledger remembers what the stores hold at
+	// this start, so every point is offered to them again, which is how a
+	// wiped store is filled again. The runs CacheFile remembers are then not
+	// recalled, and their jobs are listed and offered with the rest:
+	// recalled, no sweep would list them again, and the store would hold
+	// every run of the window without its jobs. The command sets it: see its
+	// ledgerForgot.
+	Refill bool
 	// cacheLoaded is whether CacheFile has been read, which happens once, at
 	// the first sweep. cacheSaved is when it was last written, and
 	// cacheDirty whether a family has run since.

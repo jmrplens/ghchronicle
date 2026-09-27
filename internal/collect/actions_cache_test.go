@@ -1,6 +1,7 @@
 package collect
 
 import (
+	"cmp"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -8,6 +9,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -124,16 +126,19 @@ func TestActionsCacheEntriesOfOneCacheOnOneRefAreOneRow(t *testing.T) {
 }
 
 // TestActionsCacheRowsDoNotDependOnTheListingOrder serves the same entries in
-// the opposite order. GitHub lists them by last use, and an entry used between
-// two pages moves, so the row has to be the same whichever page each entry
-// arrived on: a row that changed with the order would be a new value to write
-// on every pass that saw nothing new.
+// the opposite order, with two entries of one cache on one ref last used at
+// the same instant. The row has to be the same whichever page each entry
+// arrived on, `key` included: a row that changed with the order would be a
+// new value to write on a pass that saw nothing new. The tie is what the id
+// is for, and the newer id is the one the row names in both orders.
 func TestActionsCacheRowsDoNotDependOnTheListingOrder(t *testing.T) {
 	t.Parallel()
+	const newer = "codeql-overlay-base-database-1-d953d79b74456ce0-python-2.27.1-03c98ef912a921acf88122e355668982b233ba79-36241304048-1"
+	tied := tiedCaches(t, fixture(t, "actions_caches_codeql.json"), 8150218760, 8138470109)
 	listing := func(reverse bool) []sink.Point {
 		t.Helper()
 		f := cacheFixtureServer(t, func(w http.ResponseWriter, _ *http.Request) {
-			body := fixture(t, "actions_caches_codeql.json")
+			body := tied
 			if reverse {
 				body = reversedCaches(t, body)
 			}
@@ -142,6 +147,10 @@ func TestActionsCacheRowsDoNotDependOnTheListingOrder(t *testing.T) {
 		points, err := Actions{}.Collect(ctx(t), f.Client, testRepo, testNow)
 		if err != nil {
 			t.Fatal(err)
+		}
+		row := find(t, points, "gh_actions_cache_entry", map[string]string{"cache": codeQLCache, "ref": "refs/heads/main"})
+		if row.Fields["key"] != newer {
+			t.Errorf("reversed %v: key = %v, want the newer id's of the two used at once, %s", reverse, row.Fields["key"], newer)
 		}
 		return byMeasurement(points)["gh_actions_cache_entry"]
 	}
@@ -160,6 +169,40 @@ func TestActionsCacheRowsDoNotDependOnTheListingOrder(t *testing.T) {
 	if a, b := lines(forward), lines(backward); !slices.Equal(a, b) {
 		t.Errorf("the rows changed with the order of the listing:\n%s\nagainst\n%s", strings.Join(a, "\n"), strings.Join(b, "\n"))
 	}
+}
+
+// tiedCaches is a cache listing in which the entry with id other was last
+// used at the same instant as the one with id to.
+func tiedCaches(t *testing.T, body []byte, to, other int64) []byte {
+	t.Helper()
+	var listing struct {
+		Total  int              `json:"total_count"`
+		Caches []map[string]any `json:"actions_caches"`
+	}
+	if err := json.Unmarshal(body, &listing); err != nil {
+		t.Fatal(err)
+	}
+	var used any
+	for _, e := range listing.Caches {
+		if e["id"] == float64(to) {
+			used = e["last_accessed_at"]
+		}
+	}
+	tied := 0
+	for _, e := range listing.Caches {
+		if e["id"] == float64(other) {
+			e["last_accessed_at"] = used
+			tied++
+		}
+	}
+	if used == nil || tied != 1 {
+		t.Fatalf("the listing has no entries %d and %d to tie", to, other)
+	}
+	out, err := json.Marshal(listing)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return out
 }
 
 // reversedCaches is a cache listing with its entries in the opposite order.
@@ -213,11 +256,11 @@ func TestAnIdlePassOffersTheLedgerNothingNew(t *testing.T) {
 }
 
 // cachePage is n cache entries of one cache on main, ids counting down from
-// first and each used a minute before the one above it, the way GitHub lists
-// them.
-func cachePage(t *testing.T, n int, first int64) []byte {
+// first and each created and used a minute before the one above it, the way
+// GitHub lists them newest created first, from a listing of listed entries.
+func cachePage(t *testing.T, n int, first int64, listed int) []byte {
 	t.Helper()
-	return repeat(t, "actions_caches_codeql.json", "actions_caches", n, func(i int, row map[string]any) {
+	page := repeat(t, "actions_caches_codeql.json", "actions_caches", n, func(i int, row map[string]any) {
 		id := first - int64(i)
 		used := testNow.Add(-time.Duration(first-id) * time.Minute)
 		row["id"] = id
@@ -226,6 +269,79 @@ func cachePage(t *testing.T, n int, first int64) []byte {
 		row["created_at"] = used.Format(time.RFC3339)
 		row["size_in_bytes"] = 1000
 	})
+	var body map[string]any
+	if err := json.Unmarshal(page, &body); err != nil {
+		t.Fatal(err)
+	}
+	body["total_count"] = listed
+	out, err := json.Marshal(body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return out
+}
+
+// storedCache is one entry of the cache a cacheListing holds.
+type storedCache struct {
+	id            int64
+	created, used time.Time
+}
+
+// storedCaches is n entries of one cache on main, ids 1 to n, the lower the
+// id the more recently it was created and used, a minute apart.
+func storedCaches(n int) []storedCache {
+	out := make([]storedCache, 0, n)
+	for id := int64(1); id <= int64(n); id++ {
+		at := testNow.Add(-time.Duration(id) * time.Minute)
+		out = append(out, storedCache{id: id, created: at, used: at})
+	}
+	return out
+}
+
+// cacheListing serves a repository's cache the way GitHub pages it: in the
+// order the request asks for, by last use when it asks for none, from what
+// is stored at the moment of the request. After each page it serves it
+// hands what is stored to between, which returns what is stored for the next
+// request, so a test can change the cache between two pages.
+func cacheListing(t *testing.T, stored []storedCache, between func(page int, stored []storedCache) []storedCache) http.HandlerFunc {
+	t.Helper()
+	var mu sync.Mutex
+	return func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		defer mu.Unlock()
+		q := r.URL.Query()
+		order := slices.Clone(stored)
+		by := func(e storedCache) time.Time { return e.used }
+		if q.Get("sort") == "created_at" {
+			by = func(e storedCache) time.Time { return e.created }
+		}
+		slices.SortStableFunc(order, func(a, b storedCache) int { return by(b).Compare(by(a)) })
+		if q.Get("direction") == "asc" {
+			slices.Reverse(order)
+		}
+		page, _ := strconv.Atoi(q.Get("page"))
+		perPage, _ := strconv.Atoi(q.Get("per_page"))
+		page, perPage = max(page, 1), cmp.Or(perPage, 30)
+		lo := min((page-1)*perPage, len(order))
+		hi := min(lo+perPage, len(order))
+		rows := make([]map[string]any, 0, hi-lo)
+		for _, e := range order[lo:hi] {
+			rows = append(rows, map[string]any{
+				"id": e.id, "ref": "refs/heads/main", "size_in_bytes": 1000,
+				"key":              codeQLCache + "-d953d79b74456ce0-python-2.27.1-" + strconv.FormatInt(e.id, 16),
+				"created_at":       e.created.Format(time.RFC3339Nano),
+				"last_accessed_at": e.used.Format(time.RFC3339Nano),
+			})
+		}
+		body, err := json.Marshal(map[string]any{"total_count": len(order), "actions_caches": rows})
+		if err != nil {
+			t.Error(err)
+		}
+		_, _ = w.Write(body)
+		if between != nil {
+			stored = between(page, stored)
+		}
+	}
 }
 
 // cachePagesAsked is the page of every listing request, in order.
@@ -241,37 +357,85 @@ func cachePagesAsked(f *fixtureServer) []string {
 // entries than a page holds. Measured on 2026-09-27, jmrplens/ghchronicle
 // listed 118 and jmrplens/mikroscope 232 against a page of a hundred, and the
 // rows of both were the most recently used hundred.
-//
-// The second page opens with the entry the first ended on, which is what an
-// entry used between the two requests does to a list ordered by last use: it
-// moves to the front and pushes everything behind it down one place. Counted
-// on both pages it would be one entry too many and its bytes twice.
 func TestActionsCacheListingIsReadPastItsFirstPage(t *testing.T) {
 	t.Parallel()
-	f := cacheFixtureServer(t, func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Query().Get("page") {
-		case "", "1":
-			_, _ = w.Write(cachePage(t, 100, 1000))
-		case "2":
-			_, _ = w.Write(cachePage(t, 19, 901))
-		default:
-			t.Errorf("asked for page %s after a short page", r.URL.Query().Get("page"))
-			_, _ = w.Write([]byte(`{"total_count": 0, "actions_caches": []}`))
-		}
-	})
+	f := cacheFixtureServer(t, cacheListing(t, storedCaches(118), nil))
 	points, err := Actions{}.Collect(ctx(t), f.Client, testRepo, testNow)
 	if err != nil {
 		t.Fatal(err)
 	}
 	row := find(t, points, "gh_actions_cache_entry", map[string]string{"cache": codeQLCache})
 	if got := fieldInt(t, row, "caches"); got != 118 {
-		t.Errorf("caches = %d, want the 118 distinct entries of both pages", got)
+		t.Errorf("caches = %d, want the 118 entries of both pages", got)
 	}
 	if got := fieldInt(t, row, "size_bytes"); got != 118*1000 {
 		t.Errorf("size_bytes = %d, want %d", got, 118*1000)
 	}
 	if got := cachePagesAsked(f); !slices.Equal(got, []string{"1", "2"}) {
 		t.Errorf("asked for pages %v, want 1 and 2", got)
+	}
+}
+
+// TestActionsCacheListingThatChangesWhileReadIsNotWrittenShort changes the
+// cache between the first page and the second, the way a busy repository's
+// does, and holds each row to the whole of its cache or to no row at all.
+//
+// The listing's pages are numbered, so an entry that changes place between
+// two of them moves every entry behind it. In the order GitHub lists by
+// default, last use, a cache hit on an entry of the second page took it to
+// the front: the entry that ended the first page was read again, the dedupe
+// dropped it, and the one that was hit was never read, so the row said 149
+// entries of the 150 there were. A new entry, newest created, lands on the
+// page already read and loses nothing. A deletion loses an entry in any
+// order, and the pass that sees one writes the totals row and no cache row,
+// and reports no failure, since the day's next pass writes the row whole.
+func TestActionsCacheListingThatChangesWhileReadIsNotWrittenShort(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name   string
+		change func([]storedCache) []storedCache
+		caches int64 // zero is no row
+	}{
+		{"an entry of the second page used", func(stored []storedCache) []storedCache {
+			stored[129].used = testNow
+			return stored
+		}, 150},
+		{"an entry saved", func(stored []storedCache) []storedCache {
+			return append(stored, storedCache{id: 1000, created: testNow, used: testNow})
+		}, 150},
+		{"an entry of the first page deleted", func(stored []storedCache) []storedCache {
+			return slices.Delete(stored, 49, 50)
+		}, 0},
+	} {
+		f := cacheFixtureServer(t, cacheListing(t, storedCaches(150), func(page int, stored []storedCache) []storedCache {
+			if page == 1 {
+				return tc.change(stored)
+			}
+			return stored
+		}))
+		points, err := Actions{}.Collect(ctx(t), f.Client, testRepo, testNow)
+		if err != nil {
+			t.Fatalf("%s: %v", tc.name, err)
+		}
+		if len(byMeasurement(points)["gh_actions_cache"]) != 1 {
+			t.Errorf("%s: the totals row did not survive the listing", tc.name)
+		}
+		rows := byMeasurement(points)["gh_actions_cache_entry"]
+		if tc.caches == 0 {
+			if len(rows) > 0 {
+				t.Errorf("%s: wrote %v from a listing an entry left while it was read", tc.name, rows[0].Fields)
+			}
+			continue
+		}
+		if len(rows) != 1 {
+			t.Fatalf("%s: %d rows, want the one cache", tc.name, len(rows))
+		}
+		if got := fieldInt(t, rows[0], "caches"); got != tc.caches {
+			t.Errorf("%s: caches = %d, want %d", tc.name, got, tc.caches)
+		}
+		if got := fieldInt(t, rows[0], "size_bytes"); got != tc.caches*1000 {
+			t.Errorf("%s: size_bytes = %d, want %d", tc.name, got, tc.caches*1000)
+		}
 	}
 }
 
@@ -289,7 +453,7 @@ func TestActionsCacheWalkIsBounded(t *testing.T) {
 	} {
 		f := cacheFixtureServer(t, func(w http.ResponseWriter, r *http.Request) {
 			page, _ := strconv.Atoi(r.URL.Query().Get("page"))
-			_, _ = w.Write(cachePage(t, 100, int64(100000-100*page)))
+			_, _ = w.Write(cachePage(t, 100, int64(100000-100*page), 100000))
 		})
 		points, err := Actions{CacheWalk: tc.walk}.Collect(ctx(t), f.Client, testRepo, testNow)
 		if err != nil {
@@ -329,7 +493,7 @@ func TestActionsCacheWalkEndsOrFailsAsTheOtherWalksDo(t *testing.T) {
 				_, _ = fmt.Fprintf(w, `{"message": %q}`, tc.message)
 				return
 			}
-			_, _ = w.Write(cachePage(t, 100, 1000))
+			_, _ = w.Write(cachePage(t, 100, 1000, 150))
 		})
 		points, err := Actions{}.Collect(ctx(t), f.Client, testRepo, testNow)
 		if (err != nil) != tc.fails {

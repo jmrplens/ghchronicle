@@ -299,7 +299,7 @@ func execute(args []string, stdout, stderr io.Writer) {
 	// serve nobody, and starting one collides with the port a long-running
 	// instance already holds. The push sinks all still run.
 	oneShot := o.once || o.backfill || o.card != ""
-	sinks, err := buildSinks(cfg, logger, oneShot)
+	sinks, ledger, err := buildSinks(cfg, logger, oneShot)
 	if err != nil {
 		fatal(stderr, err)
 		return
@@ -315,6 +315,7 @@ func execute(args []string, stdout, stderr io.Writer) {
 	publishOnStart(ctx, cfg, o, logger)
 
 	runner := newRunner(cfg, api, sinks, logger, &o)
+	runner.Refill = ledgerForgot(cfg, ledger)
 	switch {
 	case o.backfill:
 		err = runBackfill(ctx, runner, cfg, accumulator, &o, logger)
@@ -903,7 +904,47 @@ func cardOptions(o *options, theme string) *render.Options {
 	}
 }
 
-func buildSinks(cfg *config.Config, log *slog.Logger, oneShot bool) ([]sink.Sink, error) {
+// ledgerForgot reports whether no write ledger remembers what the stores hold
+// at this start, so that every point is offered to them again: a run that ends
+// with its sweep opens none, `dedupe_file: off` and a store's own `dedupe:
+// false` keep none for it, and a ledger file that was deleted, which is how a
+// wiped store is filled again, reads empty. See run.Runner's Refill for what
+// the runner does with it.
+func ledgerForgot(cfg *config.Config, ledger *sink.Ledger) bool {
+	if ledger == nil || ledger.Len() == 0 {
+		return true
+	}
+	s := cfg.Sinks
+	var own []*bool
+	if s.Influx != nil {
+		own = append(own, s.Influx.Dedupe)
+	}
+	if s.Telegraf != nil {
+		own = append(own, s.Telegraf.Dedupe)
+	}
+	if s.Graphite != nil {
+		own = append(own, s.Graphite.Dedupe)
+	}
+	if s.SQL != nil {
+		own = append(own, s.SQL.Dedupe)
+	}
+	if s.Postgres != nil {
+		own = append(own, s.Postgres.Dedupe)
+	}
+	if s.Elasticsearch != nil {
+		own = append(own, s.Elasticsearch.Dedupe)
+	}
+	for _, on := range own {
+		if !config.Enabled(on) {
+			return true
+		}
+	}
+	return false
+}
+
+// buildSinks builds the configured sinks, and hands back the write ledger they
+// share, nil when this run opens none.
+func buildSinks(cfg *config.Config, log *slog.Logger, oneShot bool) ([]sink.Sink, *sink.Ledger, error) {
 	var out []sink.Sink
 
 	// One ledger, shared by the stores that keep history. It answers per sink,
@@ -962,7 +1003,7 @@ func buildSinks(cfg *config.Config, log *slog.Logger, oneShot bool) ([]sink.Sink
 		// Started here rather than lazily, so a port already in use is an
 		// error at start-up instead of a silently missing exporter.
 		if err := exporter.Start(); err != nil {
-			return nil, fmt.Errorf("prometheus exporter: %w", err)
+			return nil, nil, fmt.Errorf("prometheus exporter: %w", err)
 		}
 		out = append(out, exporter)
 	}
@@ -998,7 +1039,7 @@ func buildSinks(cfg *config.Config, log *slog.Logger, oneShot bool) ([]sink.Sink
 			out = append(out, sink.NewStdout())
 		}
 	}
-	return out, nil
+	return out, ledger, nil
 }
 
 // writeCard renders the SVG through a temporary file, so a reader watching the

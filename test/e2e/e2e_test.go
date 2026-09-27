@@ -271,8 +271,9 @@ func TestTheSecondSweepIsPricedByTheCache(t *testing.T) {
 	gh := newFakeGitHub(t)
 	dir := t.TempDir()
 	// Cadences shorter than the tick, so every tick is a sweep with every
-	// family due, in the one process whose cache the first sweep filled:
-	// -once twice would be two processes and two empty caches.
+	// family due, in the one process whose cache the first sweep filled. Two
+	// -once runs would price the cache file as well, which is
+	// TestARestartKeepsWhatTheCacheLearned's to do.
 	cfg := writeConfigWithCadence(t, dir, gh.URL(), "e2e-token", login, "1s", "heartbeat: 2s\n")
 
 	p := serveInBackground(t, cfg)
@@ -298,6 +299,7 @@ func TestTheSecondSweepIsPricedByTheCache(t *testing.T) {
 		t.Fatalf("the second sweep asked the fake nothing; the first asked %d", len(first))
 	}
 	assertRepeatsWereRevalidated(t, first, second)
+	assertNothingMovedWasLeftUnread(t, second, p.Output())
 	core1, gql1 := sweepCost(first)
 	core2, gql2 := sweepCost(second)
 	t.Logf("first sweep: %d core, %d graphql; second sweep: %d core, %d graphql", core1, gql1, core2, gql2)
@@ -305,6 +307,30 @@ func TestTheSecondSweepIsPricedByTheCache(t *testing.T) {
 		t.Errorf("the second sweep charged %d core requests against the first sweep's %d: fewer than half of the first sweep's URLs came back 304", core2, core1)
 	}
 	assertOwnSpendWasPriced(t, readPoints(t, filepath.Join(dir, "points.jsonl")))
+}
+
+// assertNothingMovedWasLeftUnread holds a sweep after the first to the
+// movement query: the fake's one repository was last pushed to four days ago
+// and its items touched a day ago, both before a window of two one second
+// cadences, so the sweep asks once what moved, reads no commit history, and
+// says in the log what it left unread.
+func assertNothingMovedWasLeftUnread(t *testing.T, sweep []fakegh.Request, output string) {
+	t.Helper()
+	moved, history := 0, 0
+	for _, req := range sweep {
+		switch {
+		case strings.Contains(req.GraphQL, "fragment moved on Repository"):
+			moved++
+		case strings.Contains(req.GraphQL, "history("):
+			history++
+		}
+	}
+	if moved != 1 || history != 0 {
+		t.Errorf("the second sweep sent %d movement queries and %d commit history queries, want the one and none", moved, history)
+	}
+	if !strings.Contains(output, "repositories left unread") {
+		t.Errorf("the second sweep did not say what it left unread:\n%s", output)
+	}
 }
 
 // TestARestartKeepsWhatTheCacheLearned is the same price across a restart:

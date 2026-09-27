@@ -225,7 +225,9 @@ func coauthoredCount(t *testing.T, got *kept) any {
 // only for the pull requests merged since, and adds them. The day a pass is
 // made on is walked again by the next one, since pull requests are still
 // merged into it after the pass: the pull request merged on the 12th is in
-// both walks and counted once.
+// both walks and counted once. A backfill walks the whole history again
+// instead and starts the count over from it, which is how a count that fell,
+// a pull request whose repository went private, is set right.
 func TestTheCoauthoredCountIsAddedToAcrossARestart(t *testing.T) {
 	t.Parallel()
 	page, err := os.ReadFile(filepath.Join("..", "..", "test", "e2e", "testdata", "achievements_page.html"))
@@ -245,12 +247,22 @@ func TestTheCoauthoredCountIsAddedToAcrossARestart(t *testing.T) {
 			{"2026-09-13T09:00:00Z", false},
 			{"2026-09-13T10:00:00Z", true},
 		},
+		// The whole history as a backfill on the 14th finds it: the pull
+		// request of the 3rd is gone.
+		"2026-09-01..2026-09-14": {
+			{"2026-09-11T23:59:00Z", true},
+			{"2026-09-12T08:00:00Z", true},
+			{"2026-09-12T20:00:00Z", true},
+			{"2026-09-13T10:00:00Z", true},
+			{"2026-09-14T09:00:00Z", true},
+		},
 	}}
 	path := filepath.Join(t.TempDir(), "state.json")
-	pass := func(at time.Time) *kept {
+	pass := func(at time.Time, backfill ...bool) *kept {
 		t.Helper()
 		got := &kept{}
 		r := sweepRunner(t, gh.handler)
+		r.Backfill = len(backfill) > 0 && backfill[0]
 		r.Sinks = []sink.Sink{got}
 		r.Cfg.Targets.User = "octocat"
 		r.Cfg.Every = everyOnly("achievements")
@@ -292,5 +304,15 @@ func TestTheCoauthoredCountIsAddedToAcrossARestart(t *testing.T) {
 	}
 	if state.Coauthored.Count != 4 || !state.Coauthored.Through.Equal(time.Date(2026, 9, 12, 0, 0, 0, 0, time.UTC)) {
 		t.Errorf("the state file keeps %+v, want 4 through the 12th: the 13th is still being merged into", state.Coauthored)
+	}
+
+	// Added to, the 14th would be the 4 kept and the 2 of the 13th and the
+	// 14th, 6; walked whole, it is the 5 the history now holds.
+	walk := pass(time.Date(2026, 9, 14, 12, 0, 0, 0, time.UTC), true)
+	if got := gh.walked(); got[len(got)-1] != "2026-09-01..2026-09-14" {
+		t.Errorf("the backfill asked for %q, want the whole history, merged:2026-09-01..2026-09-14", got[len(got)-1])
+	}
+	if got := coauthoredCount(t, walk); got != 5 {
+		t.Errorf("the backfill counted %v, want the 5 the whole history holds now", got)
 	}
 }

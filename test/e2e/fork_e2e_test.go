@@ -29,10 +29,10 @@ const (
 // and the repo family asked each for a community profile GitHub never serves
 // a fork, a 404 with no ETag and so charged in full every time.
 //
-// Two sweeps of one process, because the memory of a refusal lives in the
-// process, like the ETag cache, and a second -once would be a second empty
-// one. The repository itself is still read on both: it is what gh_repo is
-// made of.
+// Two sweeps of one process, so the second answers from what the first
+// learned as the process holds it, with no save and load of the cache file
+// between them: that is TestARestartKeepsWhatTheCacheLearned's to hold. The
+// repository itself is still read on both: it is what gh_repo is made of.
 func TestANamedForkIsNotAskedWhatIsAlreadyKnown(t *testing.T) {
 	t.Parallel()
 	gh := fakegh.New(t, "testdata", namedForkOverlay(t))

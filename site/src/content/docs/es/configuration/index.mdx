@@ -185,6 +185,14 @@ Medido en el servicio del autor el 2026-09-26, los primeros 38 minutos tras un
 reinicio gastaron 1.092 peticiones core cobradas en pasadas que costaban unas 66
 con la caché caliente.
 
+Las ejecuciones son la afirmación de que cada almacén tiene sus jobs, así que un
+arranque no las recupera donde eso no se sabe: donde ningún registro de
+escrituras recuerda lo que tienen los almacenes, que es lo que pasa al borrar el
+registro para volver a llenar un almacén vaciado, con `dedupe_file: off` o con
+el `dedupe: false` de un almacén, y en una ejecución que termina con su pasada;
+y donde se ha añadido un destino desde que se escribió el fichero. Sus jobs se
+vuelven a listar entonces y se ofrecen otra vez con todos los demás puntos.
+
 Se escribe como mucho cada cinco minutos mientras el recolector corre, y una vez
 más cuando se para, se pare como se pare. Una pasada con `-card-only` lo lee y
 no lo escribe, por la misma razón por la que deja en paz el fichero de estado.

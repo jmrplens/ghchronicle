@@ -634,7 +634,9 @@ Una ejecución queda recordada solo cuando todos los almacenes aceptaron la
 pasada que listó sus jobs: una pasada que un almacén rechazó olvida sus
 ejecuciones, y la siguiente las vuelve a listar y a escribir. El fichero guarda
 una ejecución mientras el listado la siga devolviendo, y la olvida con el mismo
-horizonte que una respuesta que ya nadie pide.
+horizonte que una respuesta que ya nadie pide. Un arranque que no encuentra un
+registro de escrituras que diga lo que tienen los almacenes, o que encuentra un
+almacén añadido desde entonces, no recupera ninguna y vuelve a listar sus jobs.
 
 Los jobs de una ejecución duran más que sus pasos. Medido el 24 de septiembre de
 2026, GitHub listaba todos los jobs de una ejecución de hace 278 días, con sus
@@ -701,7 +703,11 @@ almacén se quedaba con la última que se escribía: el 2026-09-26 las quince
 cachés de CodeQL en main de jmrplens/jmrplens, 57,9 MB entre todas, quedaron
 guardadas como una de 3,8 MB. El listado se lee en páginas de cien entradas,
 hasta diez, donde antes se paraba en la primera: el 2026-09-27 dos
-repositorios de la cuenta tenían 118 y 232 entradas.
+repositorios de la cuenta tenían 118 y 232 entradas. Se lee de la creada más
+recientemente a la más antigua, un orden que un acierto de caché no cambia, y
+una pasada que lee menos entradas de las que el listado decía tener, porque una
+se borró entre dos de sus páginas, no escribe la fila: la escribe la siguiente
+pasada del día.
 
 ## Seguridad
 

@@ -909,7 +909,7 @@ func TestNoSinkCountsAPointItCannotStore(t *testing.T) {
 		t.Run(dump, func(t *testing.T) {
 			dir := t.TempDir()
 			logger, _ := newLogger(config.Log{Level: "error"}, io.Discard)
-			built, err := buildSinks(everySinkConfig(t, dir, dump), logger, false)
+			built, _, err := buildSinks(everySinkConfig(t, dir, dump), logger, false)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -952,6 +952,52 @@ func countUnstorable(t *testing.T, built []sink.Sink) int {
 	return dumps
 }
 
+// TestTheRunnerIsToldWhenNoLedgerRemembersTheStores: the runs the cache file
+// remembers keep their jobs from being listed again, which is right only
+// while a write ledger says what the stores hold. Deleting the ledger is how
+// the documentation has a wiped store filled again, and a store with no ledger
+// of its own, or a run that opens none, is offered every point every time; in
+// each of those the runner is told, and lists the jobs with the rest.
+func TestTheRunnerIsToldWhenNoLedgerRemembersTheStores(t *testing.T) {
+	remembers := sink.LoadLedger("", 0, 0)
+	_, commit := remembers.Reserve("influxdb", []sink.Point{{
+		Measurement: "gh_repo", Fields: map[string]any{"stars": 1}, Time: time.Now(),
+	}})
+	commit()
+	off := false
+	influx := func(dedupe *bool) *config.Config {
+		return &config.Config{Sinks: config.Sinks{Influx: &config.InfluxSink{URL: "http://influx:8181", Dedupe: dedupe}}}
+	}
+	for _, tc := range []struct {
+		name   string
+		cfg    *config.Config
+		ledger *sink.Ledger
+		want   bool
+	}{
+		{"a ledger that remembers", influx(nil), remembers, false},
+		{"a run that opens no ledger", influx(nil), nil, true},
+		{"a ledger file deleted", influx(nil), sink.LoadLedger(filepath.Join(t.TempDir(), "state-written.bin"), 0, 0), true},
+		{"a store that keeps no ledger", influx(&off), remembers, true},
+	} {
+		if got := ledgerForgot(tc.cfg, tc.ledger); got != tc.want {
+			t.Errorf("%s: ledgerForgot = %v, want %v", tc.name, got, tc.want)
+		}
+	}
+
+	cfg := everySinkConfig(t, t.TempDir(), "json")
+	logger, _ := newLogger(config.Log{Level: "error"}, io.Discard)
+	for oneShot, want := range map[bool]bool{true: false, false: true} {
+		built, ledger, err := buildSinks(cfg, logger, oneShot)
+		if err != nil {
+			t.Fatal(err)
+		}
+		closeAll(t, built)
+		if (ledger != nil) != want {
+			t.Errorf("one-shot %v: buildSinks handed back the ledger %v, want one %v", oneShot, ledger != nil, want)
+		}
+	}
+}
+
 // TestBuildSinksBuildsEveryConfiguredSink configures all ten sinks and gets
 // ten, the exporter left out of a one-shot run, and a point written through
 // each HTTP store that refuses it logged in the command's own words.
@@ -961,7 +1007,7 @@ func TestBuildSinksBuildsEveryConfiguredSink(t *testing.T) {
 	var logs syncBuffer
 	logger, _ := newLogger(config.Log{Level: "debug"}, &logs)
 
-	oneShot, err := buildSinks(cfg, logger, true)
+	oneShot, _, err := buildSinks(cfg, logger, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -971,7 +1017,7 @@ func TestBuildSinksBuildsEveryConfiguredSink(t *testing.T) {
 	}
 	closeAll(t, oneShot)
 
-	serving, err := buildSinks(cfg, logger, false)
+	serving, _, err := buildSinks(cfg, logger, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1015,7 +1061,7 @@ func TestTheLokiSinkKeepsAnHourWhenTheConfigSaysNothing(t *testing.T) {
 		DedupeFile: "off",
 	}}
 	logger, _ := newLogger(config.Log{Level: "error"}, io.Discard)
-	built, err := buildSinks(cfg, logger, false)
+	built, _, err := buildSinks(cfg, logger, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1054,7 +1100,7 @@ func TestTheReleaseStreamLooksBackOneRepoCadence(t *testing.T) {
 		if err := cfg.Validate(); err != nil {
 			t.Fatal(err)
 		}
-		built, err := buildSinks(cfg, logger, false)
+		built, _, err := buildSinks(cfg, logger, false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1078,7 +1124,7 @@ func TestBuildSinksWithTheLedgerOff(t *testing.T) {
 	cfg := &config.Config{Sinks: config.Sinks{Stdout: true, DedupeFile: "off"}}
 	var logs syncBuffer
 	logger, _ := newLogger(config.Log{Level: "debug"}, &logs)
-	got, err := buildSinks(cfg, logger, false)
+	got, _, err := buildSinks(cfg, logger, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1107,7 +1153,7 @@ func TestBuildSinksWritesJSONToStdoutOnlyWhenAskedFor(t *testing.T) {
 	} {
 		t.Run("stdout_format "+tc.format, func(t *testing.T) {
 			cfg := &config.Config{Sinks: config.Sinks{Stdout: true, StdoutFormat: tc.format, DedupeFile: "off"}}
-			built, err := buildSinks(cfg, logger, true)
+			built, _, err := buildSinks(cfg, logger, true)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -1146,7 +1192,7 @@ func TestBuildSinksSkipsTheLedgerOnlyForASinkThatRefusesIt(t *testing.T) {
 				Telegraf:   &config.TelegrafSink{URL: url + "/telegraf", Batch: 10, Dedupe: tc.dedupe},
 				DedupeFile: filepath.Join(t.TempDir(), "written.bin"),
 			}}
-			built, err := buildSinks(cfg, logger, false)
+			built, _, err := buildSinks(cfg, logger, false)
 			if err != nil {
 				t.Fatal(err)
 			}

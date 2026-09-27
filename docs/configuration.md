@@ -172,6 +172,14 @@ Measured on the author's service on 2026-09-26, the first 38 minutes after a
 restart spent 1,092 charged core requests on passes that cost about 66 with the
 cache warm.
 
+The runs are a claim that every store holds their jobs, so a start does not
+recall them where that is not known: where no write ledger remembers what the
+stores hold, which is the case once the ledger is deleted to fill a wiped store
+again, with `dedupe_file: off` or a store's own `dedupe: false`, and in a run
+that ends with its sweep; and where a destination has been added since the file
+was written. Their jobs are then listed and offered again with every other
+point.
+
 It is written at most every five minutes while the collector runs, and once more
 when it stops, however it stops. A run with `-card-only` reads it and does not
 write it, for the reason it leaves the state file alone. A `-backfill` reads it

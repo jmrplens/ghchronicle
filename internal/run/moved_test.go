@@ -165,6 +165,31 @@ func TestARepositoryNothingMovedInIsNotAsked(t *testing.T) {
 	}
 }
 
+// TestEachFamilyAsksOfTheMoveItReads: commits reads the default branch and
+// the other two read issues and pull requests, so each is skipped on its own
+// half of the answer. A repository pushed to with no item touched has its
+// commits read and nothing else, and one whose items moved with no push the
+// reverse. Asked of the other half, a push with no issue activity, or a
+// comment with no push, would be left unread until it fell out of the two
+// cadences every window reaches back, and then for good.
+func TestEachFamilyAsksOfTheMoveItReads(t *testing.T) {
+	t.Parallel()
+	now := time.Now().UTC().Truncate(time.Second)
+	fake := &movedFake{moved: map[string]string{
+		"pushed":    movement(now.Add(-time.Second), now.Add(-time.Hour)),
+		"discussed": movement(now.Add(-time.Hour), now.Add(-time.Second)),
+	}}
+	r := movedRunner(t, fake, now, false, "pushed", "discussed")
+	if err := r.Once(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	for family, want := range map[string]string{"commits": "pushed", "issues": "discussed", "issueevents": "discussed"} {
+		if got := fake.asked[family]; len(got) != 1 || got[0] != want {
+			t.Errorf("%s asked about %v, want only %s", family, got, want)
+		}
+	}
+}
+
 // TestTheDailyPageIsReadWhateverMoved: the whole page of the day exists for
 // the open items nobody touches, so a repository nothing moved in is exactly
 // the one it is for.

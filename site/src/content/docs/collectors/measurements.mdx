@@ -607,7 +607,9 @@ which runs get jobs: a window with more runs than that fills in twenty a sweep.
 A run is remembered only once every store has taken the pass that listed its
 jobs: a pass a store refused forgets its runs, and the next one lists and
 writes them again. The file keeps a run while the listing keeps returning it,
-and forgets it on the same horizon as an answer nobody asks for any more.
+and forgets it on the same horizon as an answer nobody asks for any more. A
+start that finds no write ledger to say what the stores hold, or a store added
+since, recalls none of them and lists their jobs again.
 
 A run's jobs outlive their steps. Measured on 24 September 2026, GitHub listed
 every job of a run 278 days old, with its times and its runner, and gave every
@@ -671,7 +673,10 @@ kept whichever was written last: on 2026-09-26 the fifteen CodeQL caches on
 main of jmrplens/jmrplens, 57.9 MB between them, were stored as one of 3.8 MB.
 The listing is read a hundred entries a page, up to ten pages, where it used to
 stop at the first: on 2026-09-27 two repositories of the account held 118 and
-232 entries.
+232 entries. It is read newest created first, an order a cache hit does not
+change, and a pass that reads fewer entries than the listing said it held,
+because one was deleted between two of its pages, writes no row: the day's next
+pass writes it.
 
 ## Security
 
