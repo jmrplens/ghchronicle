@@ -252,14 +252,15 @@ Una [tarjeta](/ghchronicle/es/card/) ejecuta todas las familias digan lo que
 digan las cadencias, porque cada número que dibuja sale de esa única pasada,
 así que N tarjetas son N pasadas, y un workflow que dibuja tres paga tres. Su
 GraphQL es el de una pasada entera cada vez, porque GraphQL no lleva ETag. Sus
-peticiones REST son las de la columna en frío solo la primera vez: una
-ejecución con `state_file` lee el fichero de caché que tiene al lado y pregunta
+peticiones REST son las de la columna en frío solo la primera vez: toda
+ejecución lee el fichero de caché que hay junto a su `state_file` y pregunta
 con los validadores guardados allí, así que desde la segunda tarjeta una página
-que no cambió es un 304 gratis. Una ejecución sin fichero de estado las paga en
-frío cada vez, y lo mismo la Action sin `config:`, que empieza cada ejecución
-con un directorio de estado propio. Una ejecución `-card-only` lee el fichero
-de caché y nunca lo escribe, así que solo va en caliente cuando otra ejecución
-mantiene ese fichero.
+que no cambió es un 304 gratis. Una ejecución cuyo fichero de estado no se
+conserva de una ejecución a la siguiente las paga en frío cada vez: un
+contenedor sin nada montado donde va el fichero, o la Action sin `config:`, que
+empieza cada ejecución con un directorio de estado propio. Una ejecución
+`-card-only` lee el fichero de caché y nunca lo escribe, así que solo va en
+caliente cuando otra ejecución mantiene ese fichero.
 
 La señal de que la suma salió mal es un aviso, no una conjetura:
 

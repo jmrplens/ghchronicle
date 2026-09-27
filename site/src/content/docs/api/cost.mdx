@@ -242,10 +242,11 @@ A [card](/ghchronicle/card/) runs every family whatever the cadences say,
 because every number it draws comes from that one sweep, so N cards are N
 sweeps, and a workflow drawing three of them pays three. Its GraphQL is a whole
 sweep's every time, since GraphQL has no ETag. Its REST requests are the cold
-column's only the first time: a run with a `state_file` reads the cache file
-beside it and asks with the validators stored there, so from the second card
-on a page that did not change is a free 304. A run without a state file pays
-them cold every time, and so does the Action given no `config:`, which starts
+column's only the first time: every run reads the cache file beside its
+`state_file` and asks with the validators stored there, so from the second card
+on a page that did not change is a free 304. A run whose state file is not kept
+from one run to the next pays them cold every time: a container with nothing
+mounted where the file goes, or the Action given no `config:`, which starts
 each run with a state directory of its own. A `-card-only` run reads the cache
 file and never writes it, so it is warm only when another run keeps that file.
 
