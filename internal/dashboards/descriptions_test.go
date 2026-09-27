@@ -19,6 +19,49 @@ func descriptionOf(p map[string]any) string {
 	return desc
 }
 
+// TestWorkElsewhereListsEachItemOnce: Elasticsearch listed the newest forty
+// documents of gh_external_contribution, and an open item is a document for
+// every day it was seen open, so one pull request filled a row per day and
+// pushed the older items off the table. Each item is a bucket now, read from
+// its newest document. The shared description said the event feed forgets
+// these items in three days, where the feed keeps its last three hundred
+// events of thirty; and Prometheus, which has no Seen or Opened column and
+// reads the stars as they stand, inherited sentences about both.
+func TestWorkElsewhereListsEachItemOnce(t *testing.T) {
+	t.Parallel()
+	for _, store := range AllStores() {
+		p := panelOf(t, store.Build(nil), "Work elsewhere", "table")
+		desc := descriptionOf(p)
+		if strings.Contains(desc, "three days") || !strings.Contains(desc, "last three hundred events") {
+			t.Errorf("%s: Work elsewhere says the event feed forgets an item in three days: %q", store.Name, desc)
+		}
+		switch store.Name {
+		case "prometheus":
+			if !strings.Contains(desc, "no Seen or Opened column") ||
+				!strings.Contains(desc, "at the end of the range") {
+				t.Errorf("prometheus: Work elsewhere does not say which of the columns described "+
+					"it lacks and what its Stars is: %q", desc)
+			}
+		case "elasticsearch":
+			targets := targetList(p)
+			buckets, _ := targets[0].(map[string]any)["bucketAggs"].([]any)
+			want := []any{
+				"full_name.keyword", "kind.keyword", "number.keyword", "@timestamp",
+				"state.keyword", "title.keyword", "url.keyword",
+			}
+			if fields := bucketFieldsOf(buckets); !slices.Equal(fields, want) {
+				t.Fatalf("elasticsearch: Work elsewhere buckets by %v, want %v: each item, then "+
+					"its newest document", fields, want)
+			}
+			settings, _ := buckets[3].(map[string]any)["settings"].(map[string]any)
+			if settings["size"] != "1" || settings["orderBy"] != "_key" || settings["order"] != "desc" {
+				t.Errorf("elasticsearch: the timestamp bucket of Work elsewhere keeps %v, want "+
+					"the one newest", settings)
+			}
+		}
+	}
+}
+
 // TestEveryArtifactFloorNamesBothCauses: the three panels that say the
 // artifact size is a floor blamed the five page cap alone. Since 2.6.0 a walk
 // cut short by a failed page writes the pages it read, with a Walked short of

@@ -12792,7 +12792,7 @@
         },
         {
           "datasource": "${DS_INFLUXDB}",
-          "description": "Pull requests and issues opened in repositories this account does not own, with the state each ended in. Nothing else sees them: they are not in these repositories and the event feed forgets them in three days. Seen is the row's own date, which for an open item is the day it was last seen open; Opened is when it was opened. Stars is the repository's own count at the last sweep inside the range.",
+          "description": "Pull requests and issues opened in repositories this account does not own, with the state each ended in. Nothing else sees them: they are not in these repositories, and the event feed keeps only its last three hundred events, none older than thirty days. Seen is the row's own date, which for an open item is the day it was last seen open; Opened is when it was opened. Stars is the repository's own count at the last sweep inside the range.",
           "fieldConfig": {
             "defaults": {
               "custom": {
