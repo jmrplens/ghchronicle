@@ -23,7 +23,8 @@ package dashboards
 // because it is not a tag any more: an artifact's expiry, a commit's gate,
 // an alert's state and the reason it closed, an issue's resolution, holder,
 // milestone and parent, whether a pull request is a draft and what its
-// reviewers decided, whether a discussion has its answer. Each of those opened
+// reviewers decided, whether a discussion has its answer, and whether a
+// discussion comment is the accepted one. Each of those opened
 // a second series at the same instant the day it changed, and each is a field
 // now, under a new name; a Graphite panel that wants one of them cannot have
 // it by path, and says so.
@@ -75,7 +76,7 @@ var tags = map[string][]string{
 	"gh_deploy_key":               {"full_name", "key", "owner", "read_only", "repo"},
 	"gh_deployment":               {"deployment", "environment", "full_name", "owner", "repo", "task"},
 	"gh_discussion":               {"answerable", "author", "category", "full_name", "number", "owner", "repo"},
-	"gh_discussion_comment":       {"author", "comment", "full_name", "is_answer", "is_reply", "number", "own", "owner", "repo", "user"},
+	"gh_discussion_comment":       {"author", "comment", "full_name", "is_reply", "number", "own", "owner", "repo", "user"},
 	"gh_environment":              {"environment", "full_name", "owner", "repo"},
 	"gh_external_contribution":    {"full_name", "kind", "number", "owner", "repo", "state", "user"},
 	"gh_fork":                     {"by", "full_name", "owner", "repo"},
@@ -134,4 +135,20 @@ var tags = map[string][]string{
 	"gh_workflow_run":             {"actor", "conclusion", "event", "full_name", "owner", "repo", "workflow"},
 	"gh_workflow_run_total":       {"full_name", "owner", "repo"},
 	"gh_workflow_step":            {"attempt", "conclusion", "full_name", "job_name", "owner", "repo", "step", "workflow"},
+}
+
+// formerTags is the tag set a measurement was written with before one of its
+// tags became a field, for the Graphite panels that read it. A path's depth is
+// its tag count, so what an earlier release wrote is a path one node deeper
+// than anything built from the table above matches, and a Graphite keeps
+// those files until somebody deletes them. A panel over such a measurement
+// reads every shape its paths have had, one row per item, until then:
+// shapesOf lists them.
+//
+// Only the tags differ between two shapes of one measurement, never the leaf
+// names, which are its fields and did not move.
+var formerTags = map[string][]string{
+	// is_answer, until 2.6.1, when the accepted answer became the answers
+	// field alone.
+	"gh_discussion_comment": {"author", "comment", "full_name", "is_answer", "is_reply", "number", "own", "owner", "repo", "user"},
 }

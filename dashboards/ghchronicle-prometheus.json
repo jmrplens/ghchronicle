@@ -7312,7 +7312,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "Discussions are the one surface where the work is almost entirely in other people's repositories: gh_discussion sees three rows inside this account, and this sees sixty six across twenty six repositories. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date.",
+          "description": "Discussions are the one surface where the work is almost entirely in other people's repositories: gh_discussion sees three rows inside this account, and this sees sixty six across twenty six repositories. Each comment counts once, however many rows a store holds of it, which Answers elsewhere explains. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date.",
           "fieldConfig": {
             "defaults": {
               "custom": {

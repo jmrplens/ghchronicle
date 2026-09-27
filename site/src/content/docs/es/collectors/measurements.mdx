@@ -150,11 +150,33 @@ campo en la primera escritura: `gh_artifact.expired` es `live`,
 de `gh_pull_request` son `is_draft` y `decision`, `gh_discussion.answered` es
 `has_answer`, `gh_pull_request_review.state` es `review_state`,
 `gh_deployment.state` es `outcome` y `gh_notification.unread` es `is_unread`.
+`gh_discussion_comment.is_answer`, que 2.6.1 dejó de escribir, no necesitó
+nombre nuevo: es el campo `answers` que ya traía cada fila de esa medida, 1
+para la respuesta aceptada y 0 para cualquier otro comentario.
 `state` en una pull request, una issue y una contribución externa sigue siendo
 etiqueta porque su fecha se mueve con él: la fila abierta se sella al inicio
 del día y la cerrada cuando se cerró. El exportador de Prometheus
 vuelve a leer los valores degradados como `labels` de Prometheus; Graphite, que
 no guarda texto, no puede agrupar por ellos y sus paneles lo dicen.
+
+**Un almacén escrito antes de 2.6.1 y después guarda `gh_discussion_comment`
+con dos formas.** Un comentario que una versión anterior leyó antes de que lo
+aceptaran y otra vez después son dos filas en el mismo instante, una por cada
+valor de `is_answer`, y cada comentario que una pasada de 2.6.1 vuelve a leer
+gana una tercera fila sin esa etiqueta. Las dos tablas del dashboard sobre esta medida leen una fila por
+comentario en todos los almacenes, aceptado si cualquiera de sus filas lo dice,
+así que una respuesta aceptada antes de 2.6.1 y retirada después sigue
+apareciendo como aceptada. Borrar la medida y lanzar un `-backfill` deja una fila
+por comentario: la tabla en InfluxDB 3 y en PostgreSQL, las rutas
+`github.discussion_comment` en Graphite, el índice
+`ghchronicle-gh_discussion_comment` en Elasticsearch. El destino PostgreSQL
+que se conecta sigue escribiendo en una tabla creada por una versión
+anterior, resolviendo el conflicto sobre la clave de esa misma tabla, y sus
+filas nuevas llevan la cadena vacía en `is_answer`. El fichero SQL no puede
+conocer esa clave, así que, reproducido contra una tabla así, sus sentencias de
+`gh_discussion_comment` se rechazan mientras el resto del fichero se carga,
+hasta que se borre la tabla. El exportador de Prometheus no conserva nada entre
+reinicios y cuenta cada comentario una sola vez.
 
 ### De una fila a una consulta
 
@@ -825,7 +847,7 @@ en ambos casos, y quedan completas tras un backfill.
 | `gh_account_total`       | ahora                                    |                                                                       | `pulls_opened`, `pulls_merged`, `pulls_open_now`, `pulls_merged_elsewhere`, `pulls_reviewed`, `issues_opened`, `issues_closed`, `issues_elsewhere`, `commented_elsewhere`, `commits`, `repositories`, `url`                                                                               |
 | `gh_repo_created`        | fechado, al crearse                      | `fork`                                                        | `created`, `private`, `url`                                                                                                                                                                                                                                                               |
 | `gh_key`                 | diario                                   | `kind` (ssh, gpg), `key`                                              | `keys`, `age_days`, `days_since_use`, `never_used`, `days_to_expiry`, `verified`, `revoked`, `can_sign`, `emails`, `url`                                                                                                                                                                  |
-| `gh_discussion_comment` | fechado | `own`, `is_answer`, `is_reply`, `author`, `comment`, `number` | `comments`, `answers`, `upvotes`, `title`, `reply_to`, `private`, `discussion_answered`, `discussion_answerable`, `discussion_closed`, `answered_by`, `answer_chosen_by`, `state_reason`, `category`, `seconds_to_answer`, `seconds_to_close`, `url` |
+| `gh_discussion_comment` | fechado | `own`, `is_reply`, `author`, `comment`, `number` | `comments`, `answers`, `upvotes`, `title`, `reply_to`, `private`, `discussion_answered`, `discussion_answerable`, `discussion_closed`, `answered_by`, `answer_chosen_by`, `state_reason`, `category`, `seconds_to_answer`, `seconds_to_close`, `url` |
 | `gh_issue_comment`       | fechado                                  | `own`, `number`                                               | `comments`, `private`, `url`                                                                                                                                                                                                                                                                         |
 
 `following` es el número del propio perfil, y cuenta organizaciones además de
@@ -997,7 +1019,7 @@ página de una pasada son los cien comentarios más recientes. Después se leen
 aparte las respuestas aceptadas de la cuenta, las quinientas más recientes en
 una pasada y todas en un relleno, así que un comentario aceptado como
 respuesta cuando ya había salido de esos cien se escribe igualmente con
-`is_answer` a true en la siguiente pasada. Un comentario que devuelven las dos
+`answers` a 1 en la siguiente pasada. Un comentario que devuelven las dos
 lecturas se escribe una sola vez. Las dos medidas llevan `private`, si el
 repositorio en el que se dejó el comentario es privado, por la misma razón que
 `gh_external_contribution`: `own` no lo dice, porque los repositorios propios

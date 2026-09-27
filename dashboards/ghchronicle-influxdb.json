@@ -7696,7 +7696,7 @@
         },
         {
           "datasource": "${DS_INFLUXDB}",
-          "description": "Discussions are the one surface where the work is almost entirely in other people's repositories: gh_discussion sees three rows inside this account, and this sees sixty six across twenty six repositories.",
+          "description": "Discussions are the one surface where the work is almost entirely in other people's repositories: gh_discussion sees three rows inside this account, and this sees sixty six across twenty six repositories. Each comment counts once, however many rows a store holds of it, which Answers elsewhere explains.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -7780,7 +7780,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT full_name AS \"Repository\", SUM(answers) AS \"Accepted answers\", COUNT(*) AS \"Comments\", SUM(upvotes) AS \"Upvotes\" FROM gh_discussion_comment WHERE $__timeFilter(time) GROUP BY 1 ORDER BY 2 DESC, 3 DESC LIMIT 20",
+              "rawSql": "SELECT full_name AS \"Repository\", SUM(answers) AS \"Accepted answers\", COUNT(*) AS \"Comments\", SUM(upvotes) AS \"Upvotes\" FROM (SELECT full_name, answers, upvotes, ROW_NUMBER() OVER (PARTITION BY comment ORDER BY answers DESC, upvotes DESC) AS rn FROM gh_discussion_comment WHERE $__timeFilter(time)) x WHERE rn = 1 GROUP BY 1 ORDER BY 2 DESC, 3 DESC LIMIT 20",
               "refId": "A"
             }
           ],
@@ -7789,7 +7789,7 @@
         },
         {
           "datasource": "${DS_INFLUXDB}",
-          "description": "Every comment this account left in a discussion of a repository it does not own, newest first and whatever the range; Accepted says whether the maintainer marked it the answer. The link opens the comment in its thread.",
+          "description": "Every comment this account left in a discussion of a repository it does not own, newest first and whatever the range; Accepted says whether the maintainer marked it the answer. The link opens the comment in its thread. One row per comment, accepted when any of its rows says so. Until 2.6.1 whether a comment was accepted was part of its row's identity, so a store written before then holds a comment read before and after it was accepted as two rows, and one written by 2.6.0 and 2.6.1 holds a third without that part. An answer accepted before 2.6.1 and taken back since reads accepted until gh_discussion_comment is dropped and filled again with a backfill.",
           "fieldConfig": {
             "defaults": {
               "custom": {

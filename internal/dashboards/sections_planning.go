@@ -238,18 +238,6 @@ func discussionAndComments(b *builder) []Panel {
 		" ORDER BY time DESC, comments DESC) AS rn FROM gh_discussion" +
 		" WHERE " + wholeHistory + " AND " + RF + planningNewestRow +
 		" ORDER BY 2 DESC LIMIT 50"
-	// The comments this account left in discussions of repositories it does
-	// not own, and whether each was marked the accepted answer. The comment
-	// is dated when it was written; the link opens it in its thread. One row
-	// per comment: is_answer is a tag, so a comment seen before the
-	// maintainer accepted it and again after is two rows at one instant,
-	// and the one whose answers field says accepted is the later state.
-	elsewhere := `SELECT title AS "Title", time AS "When", full_name AS "Repository",` +
-		` answers AS "Accepted", url AS "Link" FROM (SELECT *, ROW_NUMBER() OVER` +
-		" (PARTITION BY comment ORDER BY answers DESC) AS rn FROM gh_discussion_comment" +
-		" WHERE " + wholeHistory + " AND own = 'false') x WHERE rn = 1" +
-		" ORDER BY 2 DESC LIMIT 50"
-	dcc := "gh_discussion_comment"
 	latestGR, latestGRtf := gTbl(rowsOf(gp(dc, "comments"), gn(dc, "repo"), gn(dc, "number"),
 		gn(dc, "category")), "Repository, number, category", []col{{"lastNotNull", "Comments"}})
 	latestES, latestEStf := b.esRaw(dc, 50, []named{
@@ -261,16 +249,6 @@ func discussionAndComments(b *builder) []Panel {
 		{"has_answer", "Answered"},
 		{"url", "Link"},
 	}, []string{ESF})
-	elsewhereGR, elsewhereGRtf := gTbl(rowsOf(gp(dcc, "comments", "own", "false"), gn(dcc, "full_name"),
-		gn(dcc, "number"), gn(dcc, "is_answer")),
-		"Repository, number, accepted", []col{{"lastNotNull", "Comments"}})
-	elsewhereES, elsewhereEStf := b.esRaw(dcc, 50, []named{
-		{"title", "Title"},
-		{panelESTime, "When"},
-		{"full_name", "Repository"},
-		{"is_answer", "Accepted"},
-		{"url", "Link"},
-	}, []string{"own:false"})
 	perItem := "The exporter reduces discussions to counts per category and comments to " +
 		"counts per repository; no item survives, and the title and the url are strings."
 	grPerItem := "Graphite keeps no strings, so neither the title nor the url exists there."
@@ -299,17 +277,7 @@ func discussionAndComments(b *builder) []Panel {
 	commentsES, commentsEStf := esTbl("gh_issue_comment", []any{b.tm("full_name", 20)}, []any{b.mCount()},
 		[]named{{panelFullNameField, "Repository"}, {"n", "Comments"}}, nil)
 
-	answersGR, answersGRtf := gTbl(rowsOf(countOf(gp("gh_discussion_comment", "comments")),
-		gn("gh_discussion_comment", "full_name")), "Repository", []col{{"sum", "Comments"}})
-	answersES, answersEStf := esTbl("gh_discussion_comment", []any{b.tm("full_name", 20)},
-		[]any{b.mCount(), b.mSum("answers"), b.mSum("upvotes")},
-		[]named{
-			{panelFullNameField, "Repository"},
-			{"n", "Comments"},
-			{"a", "Accepted answers"},
-			{"u", "Upvotes"},
-		}, nil)
-	return []Panel{
+	return append([]Panel{
 		panel("table", "Discussions", box{W: 8, H: 8, X: 0, Y: 16}, []Target{sqlT(disc)}, &P{
 			Prom: []Target{
 				promTbl(fmt.Sprintf("sum by (category, has_answer) (increase(github_discussions_total{%s}[$__range]))", PF), "A"),
@@ -389,41 +357,181 @@ func discussionAndComments(b *builder) []Panel {
 			GR:        commentsGR, GRTF: commentsGRtf, GRDesc: grSlot,
 			ES: commentsES, ESTF: commentsEStf,
 		}),
-		panel("table", "Discussion answers", box{W: 8, H: 8, X: 0, Y: 32}, []Target{sqlT(
-			`SELECT full_name AS "Repository", SUM(answers) AS "Accepted answers",` +
-				` COUNT(*) AS "Comments", SUM(upvotes) AS "Upvotes"` +
-				" FROM gh_discussion_comment WHERE $__timeFilter(time)" +
-				" GROUP BY 1 ORDER BY 2 DESC, 3 DESC LIMIT 20",
-		)}, &P{
+	}, answersGiven(b, perItem, grPerItem)...)
+}
+
+// answersGiven is the two tables over gh_discussion_comment: the comments of
+// the range per repository, and the ones left in other people's discussions
+// one by one, with whether each was accepted. Both read one row per comment
+// in every shape a store can hold the measurement in, which is most of what
+// they are made of, so they are built here and not among the discussions.
+func answersGiven(b *builder, perItem, grPerItem string) []Panel {
+	// The comments this account left in discussions of repositories it does
+	// not own, and whether each was marked the accepted answer. The comment
+	// is dated when it was written; the link opens it in its thread.
+	//
+	// One row per comment, accepted when any of its rows says so. Until 2.6.1
+	// the accepted answer was also the tag is_answer, so a comment read
+	// before the maintainer accepted it and again after is two rows at one
+	// instant, and a store written by 2.6.0 and by 2.6.1 holds a third, the
+	// comment without the tag, until the measurement is dropped and filled
+	// again. The field answers is on every row of every shape, and the tag is
+	// named nowhere: after that drop no row carries it, and InfluxDB 3 refuses
+	// a query naming a column no row has.
+	elsewhere := `SELECT title AS "Title", time AS "When", full_name AS "Repository",` +
+		` answers AS "Accepted", url AS "Link" FROM (SELECT *, ROW_NUMBER() OVER` +
+		" (PARTITION BY comment ORDER BY answers DESC) AS rn FROM gh_discussion_comment" +
+		" WHERE " + wholeHistory + " AND own = 'false') x WHERE rn = 1" +
+		" ORDER BY 2 DESC LIMIT 50"
+	// The comments of the range per repository, one row per comment for the
+	// same reason: counted row by row, a comment read before and after it was
+	// accepted was two comments and two accepted answers.
+	answersSQL := `SELECT full_name AS "Repository", SUM(answers) AS "Accepted answers",` +
+		` COUNT(*) AS "Comments", SUM(upvotes) AS "Upvotes" FROM (SELECT full_name,` +
+		" answers, upvotes, ROW_NUMBER() OVER (PARTITION BY comment ORDER BY answers DESC," +
+		" upvotes DESC) AS rn FROM gh_discussion_comment WHERE $__timeFilter(time)) x" +
+		" WHERE rn = 1 GROUP BY 1 ORDER BY 2 DESC, 3 DESC LIMIT 20"
+	dcc := "gh_discussion_comment"
+	// What the list of comments says about the rows it is made of; the
+	// table of counts points at it, since in Prometheus it has no rows to
+	// speak of.
+	onceEach := "One row per comment, accepted when any of its rows says so. Until 2.6.1 " +
+		"whether a comment was accepted was part of its row's identity, so a store written " +
+		"before then holds a comment read before and after it was accepted as two rows, and " +
+		"one written by 2.6.0 and 2.6.1 holds a third without that part. An answer accepted " +
+		"before 2.6.1 and taken back since reads accepted until gh_discussion_comment is " +
+		"dropped and filled again with a backfill."
+	// Graphite keeps the paths of both shapes, one node apart in depth, so
+	// each comment is read in both and the two series of one comment are
+	// joined by its name before the row is named by repository and number.
+	elsewhereGR, elsewhereGRtf := gTbl(rowsOf(fmt.Sprintf(`groupByNodes(%s, "max", 0, 1, 2)`,
+		everyShape(dcc, "answers", []string{"full_name", "number", "comment"}, "own", "false")), 0, 1),
+		"Repository, number", []col{{"lastNotNull", "Accepted"}})
+	// Elasticsearch keeps a document per shape, since a document's id is its
+	// tags and its time, and a raw query cannot collapse them; the table does,
+	// one row per comment, and then keeps the newest fifty.
+	elsewhereES, elsewhereEStf := b.esRaw(dcc, 100, []named{
+		{"title", "Title"},
+		{panelESTime, "When"},
+		{"full_name", "Repository"},
+		{"answers", "Accepted"},
+		{"url", "Link"},
+		{"comment", "Comment"},
+	}, []string{"own:false"})
+	elsewhereEStf = append(elsewhereEStf, onePerComment(50)...)
+	// One series per comment across both shapes, then the comments of each
+	// repository added up, bucket by bucket.
+	answersGR, answersGRtf := gTbl(fmt.Sprintf(`groupByNode(isNonNull(groupByNodes(%s, "max", 0, 1)), 0, "sum")`,
+		everyShape(dcc, "comments", []string{"full_name", "comment"})),
+		"Repository", []col{{"sum", "Comments"}})
+	// A bucket per comment inside each repository's, each the largest of its
+	// documents, and the table adds them up per repository: a sum over the
+	// documents counted a comment once per shape it was written in.
+	answersES, answersEStf := esTbl(dcc, []any{b.tm("full_name", 20), b.tm("comment", 1000)},
+		[]any{b.mMax("answers"), b.mMax("upvotes")},
+		[]named{
+			{panelFullNameField, "Repository"},
+			{"comment.keyword", "Comment"},
+			{"a", "Accepted"},
+			{"u", "Up"},
+		}, nil, perRepositoryFromComments()...)
+	return []Panel{
+		panel("table", "Discussion answers", box{W: 8, H: 8, X: 0, Y: 32}, []Target{sqlT(answersSQL)}, &P{
 			Prom:   []Target{promTbl("topk(20, sum by (repo) (increase(github_discussion_comments_total[$__range])))")},
 			PromTF: []any{organize(map[string]string{"repo": "Repository", "Value": "Comments"}, nil, nil)},
 			Opts:   Opts{"sort": "Accepted answers"},
 			Desc: "Discussions are the one surface where the work is almost entirely in other " +
 				"people's repositories: gh_discussion sees three rows inside this account, " +
-				"and this sees sixty six across twenty six repositories.",
+				"and this sees sixty six across twenty six repositories. Each comment counts " +
+				"once, however many rows a store holds of it, which Answers elsewhere explains.",
 			PromDesc:  sinceStart,
 			Overrides: []any{barCell("Comments", "short", 120)},
 			GR:        answersGR, GRTF: answersGRtf, GRDesc: grSlot,
 			ES: answersES, ESTF: answersEStf,
+			ESDesc: "In Elasticsearch each comment is a bucket inside its repository's, " +
+				"a thousand at most per repository, and the table adds the buckets up.",
 		}),
 		panel("table", "Answers elsewhere", box{W: 16, H: 8, X: 8, Y: 32}, []Target{sqlT(elsewhere)}, &P{
 			PromNote: cannot("the newest fifty comments this account left in other people's "+
 				"discussions, whether each was accepted as the answer, and a link to each.",
 				perItem),
-			GRDesc: "Graphite names each row repository, number and whether the comment was " +
-				"accepted from the path. " + grPerItem + " " + grRows,
+			GRDesc: "Graphite names each row by repository and number from the path, and " +
+				"Accepted is the comment's answers leaf. " + grPerItem + " " + grRows,
 			Desc: "Every comment this account left in a discussion of a repository it does " +
 				"not own, newest first and whatever the range; Accepted says whether the " +
-				"maintainer marked it the answer. The link opens the comment in its thread.",
+				"maintainer marked it the answer. The link opens the comment in its thread. " +
+				onceEach,
 			Opts: Opts{"sort": "When"},
 			Overrides: []any{
 				when("When"), repoColumn(),
 				profileBool("Accepted", 100), linkOn("Title"),
 			},
 			GR: elsewhereGR, GRTF: elsewhereGRtf,
-			ES: elsewhereES, ESTF: elsewhereEStf, ESDesc: esNewest + " " + esRange,
-			ESOver: []any{width("Accepted", 100)},
+			ES: elsewhereES, ESTF: elsewhereEStf,
+			ESDesc: "In Elasticsearch this reads the newest hundred documents and keeps the " +
+				"newest fifty comments among them. " + esRange,
 		}),
+	}
+}
+
+// onePerComment folds the rows of Answers elsewhere in Elasticsearch, a raw
+// document each, into one per comment, accepted when any of its documents
+// says so, and keeps the newest `limit`. A document's id is its tags and its
+// time, so a comment read before 2.6.1, when whether it was accepted was a
+// tag, and again since is a document in each shape, and one accepted before
+// then two in the old one. The documents come newest first and a comment's
+// share one timestamp, so the first of each group is as good as any and the
+// groups come out in the documents' order.
+func onePerComment(limit int) []any {
+	take := func(how string) map[string]any {
+		return map[string]any{"operation": "aggregate", "aggregations": []any{how}}
+	}
+	return []any{
+		map[string]any{"id": "groupBy", "options": map[string]any{"fields": map[string]any{
+			"Comment":    map[string]any{"operation": "groupby", "aggregations": []any{}},
+			"Title":      take("first"),
+			"When":       take("first"),
+			"Repository": take("first"),
+			"Accepted":   take("max"),
+			"Link":       take("first"),
+		}}},
+		map[string]any{"id": "organize", "options": map[string]any{
+			"excludeByName": map[string]any{"Comment": true},
+			"indexByName": map[string]any{
+				"Title (first)": 0, "When (first)": 1, "Repository (first)": 2,
+				"Accepted (max)": 3, "Link (first)": 4,
+			},
+			"renameByName": map[string]any{
+				"Title (first)": "Title", "When (first)": "When", "Repository (first)": "Repository",
+				"Accepted (max)": "Accepted", "Link (first)": "Link",
+			},
+		}},
+		map[string]any{"id": "limit", "options": map[string]any{"limitField": limit}},
+	}
+}
+
+// perRepositoryFromComments adds up Discussion answers in Elasticsearch, whose
+// query answers a row per comment inside each repository, the largest of the
+// comment's documents, into a row per repository: a sum over the documents
+// themselves counted a comment once per shape it was written in, for the
+// reason onePerComment gives.
+func perRepositoryFromComments() []any {
+	return []any{
+		map[string]any{"id": "groupBy", "options": map[string]any{"fields": map[string]any{
+			"Repository": map[string]any{"operation": "groupby", "aggregations": []any{}},
+			"Comment":    map[string]any{"operation": "aggregate", "aggregations": []any{"count"}},
+			"Accepted":   map[string]any{"operation": "aggregate", "aggregations": []any{"sum"}},
+			"Up":         map[string]any{"operation": "aggregate", "aggregations": []any{"sum"}},
+		}}},
+		map[string]any{"id": "organize", "options": map[string]any{
+			"excludeByName": map[string]any{},
+			"indexByName": map[string]any{
+				"Repository": 0, "Accepted (sum)": 1, "Comment (count)": 2, "Up (sum)": 3,
+			},
+			"renameByName": map[string]any{
+				"Accepted (sum)": "Accepted answers", "Comment (count)": "Comments", "Up (sum)": "Upvotes",
+			},
+		}},
 	}
 }
 

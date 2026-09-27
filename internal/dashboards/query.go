@@ -370,12 +370,18 @@ func pgOf(qs []Target) []Target {
 
 // gp is the path of one field: a wildcard for every tag not pinned by name.
 func gp(m, field string, fixed ...string) string {
+	return gpIn(tagsOf(m), m, field, fixed...)
+}
+
+// gpIn is gp over one of the tag sets the measurement's paths have had, which
+// shapesOf lists, rather than over the one it is written with now.
+func gpIn(shape []string, m, field string, fixed ...string) string {
 	pinned := map[string]string{}
 	for i := 0; i+1 < len(fixed); i += 2 {
 		pinned[fixed[i]] = fixed[i+1]
 	}
 	parts := []string{"github", strings.TrimPrefix(m, "gh_")}
-	for _, tag := range tagsOf(m) {
+	for _, tag := range shape {
 		if v, ok := pinned[tag]; ok {
 			parts = append(parts, v)
 		} else {
@@ -391,8 +397,11 @@ func rp(m, field string, fixed ...string) string {
 }
 
 // gn is the node index of a tag, for groupByNode and aliasByNode.
-func gn(m, tag string) int {
-	for i, t := range tagsOf(m) {
+func gn(m, tag string) int { return gnIn(tagsOf(m), m, tag) }
+
+// gnIn is gn in one of the shapes shapesOf lists.
+func gnIn(shape []string, m, tag string) int {
+	for i, t := range shape {
 		if t == tag {
 			return 2 + i
 		}
@@ -406,6 +415,36 @@ func tagsOf(m string) []string {
 		panic("no tag list for " + m)
 	}
 	return t
+}
+
+// shapesOf is every tag set a measurement's paths have had, the one it is
+// written with now first: see formerTags.
+func shapesOf(m string) [][]string {
+	out := [][]string{tagsOf(m)}
+	if former, ok := formerTags[m]; ok {
+		out = append(out, former)
+	}
+	return out
+}
+
+// everyShape is one field of a measurement in every shape its paths have had,
+// each series named by the tags asked for, so that series of two depths carry
+// names of one and a grouping by those nodes joins them: the same item written
+// before and after a tag became a field is then one series. The pinned tags
+// are pinned in each shape.
+func everyShape(m, field string, names []string, fixed ...string) string {
+	var parts []string
+	for _, shape := range shapesOf(m) {
+		nodes := make([]int, len(names))
+		for i, name := range names {
+			nodes[i] = gnIn(shape, m, name)
+		}
+		parts = append(parts, rowsOf(gpIn(shape, m, field, fixed...), nodes...))
+	}
+	if len(parts) == 1 {
+		return parts[0]
+	}
+	return "group(" + strings.Join(parts, ", ") + ")"
 }
 
 // events is the path of one gh_event field. The collector writes `action` and

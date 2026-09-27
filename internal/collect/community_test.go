@@ -3,6 +3,7 @@ package collect
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"net/http"
 	"slices"
 	"strings"
@@ -208,7 +209,7 @@ func checkOutboundComments(t *testing.T, points []sink.Point) {
 	// A comment in someone else's repository is the fact nothing else here
 	// sees, so which side of that line it falls on is a tag.
 	answer := find(t, points, "gh_discussion_comment", map[string]string{"full_name": "fosrl/pangolin"})
-	if answer.Tags["own"] != "false" || answer.Tags["is_answer"] != "true" || fieldInt(t, answer, "answers") != 1 {
+	if answer.Tags["own"] != "false" || fieldInt(t, answer, "answers") != 1 {
 		t.Errorf("accepted answer elsewhere = %v %v", answer.Tags, answer.Fields)
 	}
 	if want := time.Date(2026, 9, 5, 10, 0, 0, 0, time.UTC); !answer.Time.Equal(want) {
@@ -249,7 +250,7 @@ func checkCommentsSayWhetherPrivate(t *testing.T, points []sink.Point) {
 
 // checkDiscussionContext reads what the thread says about itself, which is the
 // only thing that separates a question nobody answered from one somebody else
-// answered: both comments carry is_answer=false.
+// answered: both comments carry answers=0.
 func checkDiscussionContext(t *testing.T, points []sink.Point) {
 	t.Helper()
 	checkOwnAcceptedAnswer(t, points)
@@ -286,7 +287,7 @@ func checkOwnAcceptedAnswer(t *testing.T, points []sink.Point) {
 func checkAnsweredBySomebodyElse(t *testing.T, points []sink.Point) {
 	t.Helper()
 	lost := find(t, points, "gh_discussion_comment", map[string]string{"full_name": "ThrowTheSwitch/Ceedling"})
-	if lost.Tags["is_answer"] != "false" || fieldInt(t, lost, "answers") != 0 {
+	if fieldInt(t, lost, "answers") != 0 {
 		t.Errorf("a comment that did not win is still not the answer: %v %v", lost.Tags, lost.Fields)
 	}
 	if lost.Fields["discussion_answered"] != true || lost.Fields["answered_by"] != "mvandervoord" {
@@ -717,7 +718,7 @@ func answersFixture(t *testing.T, answer func(w http.ResponseWriter, vars map[st
 // accepted fourteen days after it was written, and the account's newest
 // hundred of 108 comments no longer held one of its 15 accepted answers. A
 // sweep reads the accepted answers on their own, so an answer older than the
-// newest page is written with is_answer=true, dated when it was written like
+// newest page is written with answers=1, dated when it was written like
 // every other comment; and one both walks see is written once, since a
 // second copy in the same batch would be counted twice by the exporter and
 // averaged twice into its upvotes.
@@ -733,7 +734,7 @@ func TestAnAnswerAcceptedPastTheNewestHundredIsRead(t *testing.T) {
 	checkPoints(t, points)
 
 	late := find(t, points, "gh_discussion_comment", map[string]string{"comment": "7654321"})
-	if late.Tags["is_answer"] != "true" || late.Tags["own"] != "false" || late.Tags["full_name"] != "someone/else" ||
+	if late.Tags["own"] != "false" || late.Tags["full_name"] != "someone/else" ||
 		late.Tags["number"] != "57" || fieldInt(t, late, "answers") != 1 {
 		t.Errorf("the answer accepted past the newest hundred = %v %v", late.Tags, late.Fields)
 	}
@@ -1164,5 +1165,45 @@ func TestAnOutboundSearchThatFailsPartWayKeepsItsPages(t *testing.T) {
 	}
 	if merged != 2 {
 		t.Errorf("kept %d rows of the merged search's first page, want both", merged)
+	}
+}
+
+// TestAcceptingAnAnswerLeavesTheCommentItsIdentity: a maintainer accepts an
+// answer days after it was written, and can take it back, so whether a
+// comment is the answer moves after the row's own date. Until 2.6.1 it was
+// also the tag is_answer, and every store that keys a row by its tags and its
+// time kept the comment read before it was accepted beside the one read
+// after, at the same instant, for ever. Both walks that write the
+// measurement now give a comment the same tags and time whatever its answer
+// says, and carry the answer in the `answers` field alone.
+func TestAcceptingAnAnswerLeavesTheCommentItsIdentity(t *testing.T) {
+	t.Parallel()
+	written := time.Date(2026, 9, 5, 10, 0, 0, 0, time.UTC)
+	renders := map[string]func(accepted bool) sink.Point{
+		"the account walk": func(accepted bool) sink.Point {
+			n := discussionCommentNode{CreatedAt: written, IsAnswer: accepted, DatabaseID: 11, URL: "https://github.com/o/r/discussions/7#discussioncomment-11"}
+			n.Discussion.Number, n.Discussion.IsAnswered = 7, accepted
+			n.Discussion.Repository.NameWithOwner = "o/r"
+			return n.point("octocat", "o/r")
+		},
+		"the repository walk": func(accepted bool) sink.Point {
+			d := &discussionNode{Number: 7, IsAnswered: accepted}
+			return discussionComment("octocat", Repo{Owner: "o", Name: "r", FullName: "o/r"}, d,
+				threadComment{ID: 11, By: "someone", IsAnswer: accepted, When: written})
+		},
+	}
+	for walk, render := range renders {
+		before, after := render(false), render(true)
+		if !maps.Equal(before.Tags, after.Tags) || !before.Time.Equal(after.Time) {
+			t.Errorf("%s: accepting the answer moved the comment from %v at %s to %v at %s",
+				walk, before.Tags, before.Time, after.Tags, after.Time)
+		}
+		if _, tagged := after.Tags["is_answer"]; tagged {
+			t.Errorf("%s: is_answer is still a tag: %v", walk, after.Tags)
+		}
+		if before.Fields["answers"] != 0 || after.Fields["answers"] != 1 {
+			t.Errorf("%s: answers = %v before and %v after, want 0 and 1",
+				walk, before.Fields["answers"], after.Fields["answers"])
+		}
 	}
 }

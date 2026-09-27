@@ -681,7 +681,10 @@ func assertCacheRowsAddUpToTheTotals(t *testing.T, points []point) {
 // assertAcceptedAnswersWereRead: the accepted answers are a walk of their own
 // beside the newest page of discussion comments. The fake's answers hold one
 // comment older than that page, which reaches the sink only through them,
-// and one the page holds too, which reaches it once.
+// and one the page holds too, which reaches it once. Whether a comment is the
+// answer is the answers field and no tag: it moves after the comment's date,
+// and as the tag is_answer, until 2.6.1, it gave an accepted comment a second
+// identity.
 func assertAcceptedAnswersWereRead(t *testing.T, points []point) {
 	t.Helper()
 	written := map[string]int{}
@@ -690,7 +693,10 @@ func assertAcceptedAnswersWereRead(t *testing.T, points []point) {
 			continue
 		}
 		written[p.Tags["comment"]]++
-		if p.Tags["comment"] == "7654321" && (p.Tags["is_answer"] != "true" || p.Fields["answers"] != float64(1)) {
+		if _, tagged := p.Tags["is_answer"]; tagged {
+			t.Errorf("comment %s carries is_answer as a tag: %v", p.Tags["comment"], p.Tags)
+		}
+		if p.Tags["comment"] == "7654321" && p.Fields["answers"] != float64(1) {
 			t.Errorf("the answer older than the newest page was written as %v %v", p.Tags, p.Fields)
 		}
 	}

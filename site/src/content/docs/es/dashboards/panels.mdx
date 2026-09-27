@@ -397,7 +397,11 @@ orden de magnitud a las discusiones de dentro de la cuenta. Junto al recuento
 por repositorio de comentarios en discusiones, los comentarios mismos: cada uno
 dejado en una discusión de un repositorio ajeno, del más reciente al más
 antiguo, con si el mantenedor lo aceptó como respuesta y un enlace al
-comentario en su hilo.
+comentario en su hilo. Las dos leen una fila por comentario en todos los
+almacenes, aceptado si cualquiera de sus filas lo dice, porque un almacén
+escrito antes de 2.6.1 y después puede guardar un comentario en más de una
+fila, por la razón que da
+[Cómo leer las tablas](/ghchronicle/es/collectors/measurements/#cómo-leer-las-tablas).
 
 Lee `gh_label`, `gh_milestone`, `gh_fork`, `gh_discussion`, `gh_issue_event`,
 `gh_issue_comment` y `gh_discussion_comment`.

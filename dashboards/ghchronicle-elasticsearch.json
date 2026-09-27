@@ -11185,7 +11185,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "Discussions are the one surface where the work is almost entirely in other people's repositories: gh_discussion sees three rows inside this account, and this sees sixty six across twenty six repositories.",
+          "description": "Discussions are the one surface where the work is almost entirely in other people's repositories: gh_discussion sees three rows inside this account, and this sees sixty six across twenty six repositories. Each comment counts once, however many rows a store holds of it, which Answers elsewhere explains. In Elasticsearch each comment is a bucket inside its repository's, a thousand at most per repository, and the table adds the buckets up.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -11277,23 +11277,30 @@
                     "size": "20"
                   },
                   "type": "terms"
+                },
+                {
+                  "field": "comment.keyword",
+                  "id": "254",
+                  "settings": {
+                    "min_doc_count": "1",
+                    "order": "desc",
+                    "orderBy": "_count",
+                    "size": "1000"
+                  },
+                  "type": "terms"
                 }
               ],
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "254",
-                  "type": "count"
-                },
-                {
                   "field": "answers",
                   "id": "255",
-                  "type": "sum"
+                  "type": "max"
                 },
                 {
                   "field": "upvotes",
                   "id": "256",
-                  "type": "sum"
+                  "type": "max"
                 }
               ],
               "query": "_index:ghchronicle-gh_discussion_comment",
@@ -11309,10 +11316,56 @@
                 "excludeByName": {},
                 "indexByName": {},
                 "renameByName": {
-                  "Count": "Comments",
-                  "Sum answers": "Accepted answers",
-                  "Sum upvotes": "Upvotes",
+                  "Max answers": "Accepted",
+                  "Max upvotes": "Up",
+                  "comment.keyword": "Comment",
                   "full_name.keyword": "Repository"
+                }
+              }
+            },
+            {
+              "id": "groupBy",
+              "options": {
+                "fields": {
+                  "Accepted": {
+                    "aggregations": [
+                      "sum"
+                    ],
+                    "operation": "aggregate"
+                  },
+                  "Comment": {
+                    "aggregations": [
+                      "count"
+                    ],
+                    "operation": "aggregate"
+                  },
+                  "Repository": {
+                    "aggregations": [],
+                    "operation": "groupby"
+                  },
+                  "Up": {
+                    "aggregations": [
+                      "sum"
+                    ],
+                    "operation": "aggregate"
+                  }
+                }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Accepted (sum)": 1,
+                  "Comment (count)": 2,
+                  "Repository": 0,
+                  "Up (sum)": 3
+                },
+                "renameByName": {
+                  "Accepted (sum)": "Accepted answers",
+                  "Comment (count)": "Comments",
+                  "Up (sum)": "Upvotes"
                 }
               }
             }
@@ -11321,7 +11374,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "Every comment this account left in a discussion of a repository it does not own, newest first and whatever the range; Accepted says whether the maintainer marked it the answer. The link opens the comment in its thread. In Elasticsearch this lists the newest 500 documents and the panel sorts them. Elasticsearch answers only inside the dashboard range, so years outside it are missing.",
+          "description": "Every comment this account left in a discussion of a repository it does not own, newest first and whatever the range; Accepted says whether the maintainer marked it the answer. The link opens the comment in its thread. One row per comment, accepted when any of its rows says so. Until 2.6.1 whether a comment was accepted was part of its row's identity, so a store written before then holds a comment read before and after it was accepted as two rows, and one written by 2.6.0 and 2.6.1 holds a third without that part. An answer accepted before 2.6.1 and taken back since reads accepted until gh_discussion_comment is dropped and filled again with a backfill. In Elasticsearch this reads the newest hundred documents and keeps the newest fifty comments among them. Elasticsearch answers only inside the dashboard range, so years outside it are missing.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -11422,18 +11475,6 @@
               {
                 "matcher": {
                   "id": "byName",
-                  "options": "Accepted"
-                },
-                "properties": [
-                  {
-                    "id": "custom.width",
-                    "value": 100
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byName",
                   "options": "Link"
                 },
                 "properties": [
@@ -11478,7 +11519,7 @@
                   "id": "257",
                   "settings": {
                     "order": "desc",
-                    "size": "50",
+                    "size": "100",
                     "useTimeRange": true
                   },
                   "type": "raw_data"
@@ -11497,25 +11538,97 @@
                 "excludeByName": {},
                 "includeByName": {
                   "@timestamp": true,
+                  "answers": true,
+                  "comment": true,
                   "full_name": true,
-                  "is_answer": true,
                   "title": true,
                   "url": true
                 },
                 "indexByName": {
                   "@timestamp": 1,
+                  "answers": 3,
+                  "comment": 5,
                   "full_name": 2,
-                  "is_answer": 3,
                   "title": 0,
                   "url": 4
                 },
                 "renameByName": {
                   "@timestamp": "When",
+                  "answers": "Accepted",
+                  "comment": "Comment",
                   "full_name": "Repository",
-                  "is_answer": "Accepted",
                   "title": "Title",
                   "url": "Link"
                 }
+              }
+            },
+            {
+              "id": "groupBy",
+              "options": {
+                "fields": {
+                  "Accepted": {
+                    "aggregations": [
+                      "max"
+                    ],
+                    "operation": "aggregate"
+                  },
+                  "Comment": {
+                    "aggregations": [],
+                    "operation": "groupby"
+                  },
+                  "Link": {
+                    "aggregations": [
+                      "first"
+                    ],
+                    "operation": "aggregate"
+                  },
+                  "Repository": {
+                    "aggregations": [
+                      "first"
+                    ],
+                    "operation": "aggregate"
+                  },
+                  "Title": {
+                    "aggregations": [
+                      "first"
+                    ],
+                    "operation": "aggregate"
+                  },
+                  "When": {
+                    "aggregations": [
+                      "first"
+                    ],
+                    "operation": "aggregate"
+                  }
+                }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Comment": true
+                },
+                "indexByName": {
+                  "Accepted (max)": 3,
+                  "Link (first)": 4,
+                  "Repository (first)": 2,
+                  "Title (first)": 0,
+                  "When (first)": 1
+                },
+                "renameByName": {
+                  "Accepted (max)": "Accepted",
+                  "Link (first)": "Link",
+                  "Repository (first)": "Repository",
+                  "Title (first)": "Title",
+                  "When (first)": "When"
+                }
+              }
+            },
+            {
+              "id": "limit",
+              "options": {
+                "limitField": 50
               }
             }
           ],

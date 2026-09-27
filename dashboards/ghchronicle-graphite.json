@@ -7783,7 +7783,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Discussions are the one surface where the work is almost entirely in other people's repositories: gh_discussion sees three rows inside this account, and this sees sixty six across twenty six repositories. In Graphite two facts landing in the same storage slot of one series are reduced to one point, so the medians are over what the storage kept.",
+          "description": "Discussions are the one surface where the work is almost entirely in other people's repositories: gh_discussion sees three rows inside this account, and this sees sixty six across twenty six repositories. Each comment counts once, however many rows a store holds of it, which Answers elsewhere explains. In Graphite two facts landing in the same storage slot of one series are reduced to one point, so the medians are over what the storage kept.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -7866,7 +7866,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(aliasByNode(sumSeries(isNonNull(github.discussion_comment.*.*.*.*.*.*.*.*.*.*.comments)), 4))",
+              "target": "removeEmptySeries(groupByNode(isNonNull(groupByNodes(group(aliasByNode(github.discussion_comment.*.*.*.*.*.*.*.*.*.comments, 4, 3), aliasByNode(github.discussion_comment.*.*.*.*.*.*.*.*.*.*.comments, 4, 3)), \"max\", 0, 1)), 0, \"sum\"))",
               "textEditor": true
             }
           ],
@@ -7898,7 +7898,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Every comment this account left in a discussion of a repository it does not own, newest first and whatever the range; Accepted says whether the maintainer marked it the answer. The link opens the comment in its thread. Graphite names each row repository, number and whether the comment was accepted from the path. Graphite keeps no strings, so neither the title nor the url exists there. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "Every comment this account left in a discussion of a repository it does not own, newest first and whatever the range; Accepted says whether the maintainer marked it the answer. The link opens the comment in its thread. One row per comment, accepted when any of its rows says so. Until 2.6.1 whether a comment was accepted was part of its row's identity, so a store written before then holds a comment read before and after it was accepted as two rows, and one written by 2.6.0 and 2.6.1 holds a third without that part. An answer accepted before 2.6.1 and taken back since reads accepted until gh_discussion_comment is dropped and filled again with a backfill. Graphite names each row by repository and number from the path, and Accepted is the comment's answers leaf. Graphite keeps no strings, so neither the title nor the url exists there. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -8008,7 +8008,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(aliasByNode(github.discussion_comment.*.*.*.*.*.*.false.*.*.*.comments, 4, 7, 5))",
+              "target": "removeEmptySeries(aliasByNode(groupByNodes(group(aliasByNode(github.discussion_comment.*.*.*.*.*.false.*.*.*.answers, 4, 6, 3), aliasByNode(github.discussion_comment.*.*.*.*.*.*.false.*.*.*.answers, 4, 7, 3)), \"max\", 0, 1, 2), 0, 1))",
               "textEditor": true
             }
           ],
@@ -8030,8 +8030,8 @@
                 "excludeByName": {},
                 "indexByName": {},
                 "renameByName": {
-                  "Field": "Repository, number, accepted",
-                  "Last *": "Comments"
+                  "Field": "Repository, number",
+                  "Last *": "Accepted"
                 }
               }
             }

@@ -373,7 +373,11 @@ the account by more than an order of magnitude when this was measured. Beside
 the per-repository count of discussion comments, the comments themselves: every
 one left in a discussion of somebody else's repository, newest first, with
 whether the maintainer accepted it as the answer and a link to the comment in
-its thread.
+its thread. Both read one row per comment in every store, accepted when any of
+its rows says so, since a store written before 2.6.1 and since can hold a
+comment in more than one row, for the reason
+[How to read the tables](/ghchronicle/collectors/measurements/#how-to-read-the-tables)
+gives.
 
 Reads `gh_label`, `gh_milestone`, `gh_fork`, `gh_discussion`, `gh_issue_event`,
 `gh_issue_comment` and `gh_discussion_comment`.

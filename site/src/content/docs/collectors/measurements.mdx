@@ -144,11 +144,31 @@ is `live`, `gh_commit.checks` is `gate`, `state` on both alert items is
 and `review_decision` are `is_draft` and `decision`,
 `gh_discussion.answered` is `has_answer`, `gh_pull_request_review.state` is
 `review_state`, `gh_deployment.state` is `outcome` and `gh_notification.unread`
-is `is_unread`. `state` on a pull request, an issue and an external
+is `is_unread`. `gh_discussion_comment.is_answer`, which 2.6.1 stopped writing,
+needed no new name: it is the `answers` field every row of that measurement
+already carried, 1 for the accepted answer and 0 for any other comment.
+`state` on a pull request, an issue and an external
 contribution stays a tag because its date moves with it: the open row is
 stamped at the start of the day and the closed row when it closed.
 The Prometheus exporter reads the demoted values back as labels; Graphite,
 which keeps no strings, cannot group by them and its panels say so.
+
+**A store written before 2.6.1 and since holds `gh_discussion_comment` in two
+shapes.** A comment an earlier release read before it was accepted and again
+after is two rows at one instant, one per value of `is_answer`, and every
+comment a 2.6.1 sweep reads again gains a third row without the tag. The two dashboard tables over
+the measurement read one row per comment in every store, accepted when any of
+its rows says so, so an answer accepted before 2.6.1 and taken back since
+still reads accepted. Dropping the measurement and running a `-backfill` leaves
+one row per comment: the table in InfluxDB 3 and in PostgreSQL, the
+`github.discussion_comment` paths in Graphite, the
+`ghchronicle-gh_discussion_comment` index in Elasticsearch. The PostgreSQL
+sink that connects keeps writing into a table an earlier release made,
+conflicting on that table's own key, and its new rows hold the empty string
+for `is_answer`. The SQL file cannot know that key, so replayed into such a
+table its `gh_discussion_comment` statements are refused while the rest of
+the file loads, until the table is dropped. The Prometheus exporter keeps
+nothing across a restart and counts each comment once.
 
 ### From a row to a query
 
@@ -790,7 +810,7 @@ backfill.
 | `gh_account_total`       | now                                  |                                                                       | `pulls_opened`, `pulls_merged`, `pulls_open_now`, `pulls_merged_elsewhere`, `pulls_reviewed`, `issues_opened`, `issues_closed`, `issues_elsewhere`, `commented_elsewhere`, `commits`, `repositories`, `url`                                                                               |
 | `gh_repo_created`        | dated, when created                  | `fork`                                                        | `created`, `private`, `url`                                                                                                                                                                                                                                                               |
 | `gh_key`                 | daily                                | `kind` (ssh, gpg), `key`                                              | `keys`, `age_days`, `days_since_use`, `never_used`, `days_to_expiry`, `verified`, `revoked`, `can_sign`, `emails`, `url`                                                                                                                                                                  |
-| `gh_discussion_comment` | dated | `own`, `is_answer`, `is_reply`, `author`, `comment`, `number` | `comments`, `answers`, `upvotes`, `title`, `reply_to`, `private`, `discussion_answered`, `discussion_answerable`, `discussion_closed`, `answered_by`, `answer_chosen_by`, `state_reason`, `category`, `seconds_to_answer`, `seconds_to_close`, `url` |
+| `gh_discussion_comment` | dated | `own`, `is_reply`, `author`, `comment`, `number` | `comments`, `answers`, `upvotes`, `title`, `reply_to`, `private`, `discussion_answered`, `discussion_answerable`, `discussion_closed`, `answered_by`, `answer_chosen_by`, `state_reason`, `category`, `seconds_to_answer`, `seconds_to_close`, `url` |
 | `gh_issue_comment`       | dated                                | `own`, `number`                                               | `comments`, `private`, `url`                                                                                                                                                                                                                                                                         |
 
 `following` is the profile's own number, and it counts organisations as well as
@@ -956,7 +976,7 @@ of their connections, which list oldest first: a sweep's one page is the
 hundred newest comments. The account's accepted answers are then read on
 their own, the newest five hundred on a sweep and all of them in a backfill,
 so a comment accepted as the answer after it left that hundred is still
-written with `is_answer` true on the next sweep. A comment both reads return
+written with `answers` 1 on the next sweep. A comment both reads return
 is written once. Both carry `private`, whether the repository the comment was
 left in is private, for the reason `gh_external_contribution` does: `own` does
 not say it, since the account's own repositories can be private or public and

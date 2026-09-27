@@ -264,8 +264,12 @@ var promRules = map[string]rule{
 	"gh_repo_created": {mode: count, as: "gh_repos_created", keep: []string{"user", "fork"}},
 
 	// Comments, wherever they were left. `own` is what separates the work in
-	// one's own repositories from the work in everybody else's.
-	"gh_discussion_comment": {mode: count, as: "gh_discussion_comments", keep: []string{"user", "own", "is_answer"}},
+	// one's own repositories from the work in everybody else's. Whether a
+	// comment is the accepted answer is not a label: it was the tag is_answer
+	// until 2.6.1, and a comment accepted while the exporter ran was then an
+	// item of two series, counted in both. The `answers` field's mean is the
+	// share accepted.
+	"gh_discussion_comment": {mode: count, as: "gh_discussion_comments", keep: []string{"user", "own"}},
 	"gh_issue_comment":      {mode: count, as: "gh_issue_comments", keep: []string{"user", "own"}},
 	// Checks that are not Actions: the gate nothing else in here can see.
 	"gh_commit_check": {mode: count, as: "gh_commit_checks", keep: []string{"repo", "app", "conclusion"}},
