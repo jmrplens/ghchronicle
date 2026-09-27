@@ -27,7 +27,7 @@ const securityFrom = " FROM "
 // securitySetupBy keeps the identity of a code scanning setup on the
 // Prometheus side: three queries group by the same four labels so the merge
 // lines their columns up on one row per repository.
-const securitySetupBy = "max by (repo, state, query_suite, schedule) "
+const securitySetupBy = "max by (full_name, repo, state, query_suite, schedule) "
 
 // What this section calls its numbers and its columns wherever they appear.
 // One value reaches a panel from five stores and each of them has to name it
@@ -267,8 +267,8 @@ func openAlerts(b *builder) []Panel {
 		}),
 		panel("table", "Security features", box{W: 12, H: 8, X: 12, Y: 4}, []Target{sqlT(feats)}, &P{
 			Prom: []Target{
-				promTbl(fmt.Sprintf("sum by (repo, feature) (github_security_feature_enabled{%s})", PF), "A"),
-				promTbl(fmt.Sprintf("sum by (repo, feature) (github_security_feature_open_alerts{%s})", PF), "B"),
+				promTbl(fmt.Sprintf("sum by (full_name, repo, feature) (github_security_feature_enabled{%s})", PF), "A"),
+				promTbl(fmt.Sprintf("sum by (full_name, repo, feature) (github_security_feature_open_alerts{%s})", PF), "B"),
 			},
 			PromTF: merged(map[string]string{
 				"repo": "Repository", "feature": "Feature", inventoryValueCol + "A": "Enabled",
@@ -389,8 +389,7 @@ func scanningAndResolution(b *builder) []Panel {
 		[]named{{"severity.keyword", "Severity"}, {"n", "Alerts"}, {"t", securityResolveTime}},
 		[]string{ESF, "NOT alert_state:open"})
 
-	resGR, resGRtf := gTbl(fmt.Sprintf(`groupByNodes(%s, "avg", %d, %d, %d)`,
-		rp(di, "seconds_to_resolve"), gn(di, "repo"), gn(di, "severity"), gn(di, "package")),
+	resGR, resGRtf := gTbl(grGroupBy(rp(di, "seconds_to_resolve"), di, "avg", "repo", "severity", "package"),
 		"Repository, severity, package", []col{{"count", "Alerts"}, {"median", securityResolveTime}})
 	// The documents themselves: the advisory text is a string, and a
 	// top_metrics over a string panics the plugin.
@@ -421,7 +420,7 @@ func scanningAndResolution(b *builder) []Panel {
 	// requires the metric to be its own direct child, and this one sits four
 	// buckets deeper, so Elasticsearch would refuse the order path outright.
 	oldestES, oldestEStf := esTbl(di,
-		[]any{b.tm("repo", 50), b.tm("number", 25), b.tm("severity", 5), b.tm("package", 5), b.tmURL()},
+		append(b.tmRepo(50), b.tm("number", 25), b.tm("severity", 5), b.tm("package", 5), b.tmURL()),
 		[]any{b.metric("min", "@timestamp", nil)},
 		[]named{
 			{inventoryRepoTerm, "Repository"},
@@ -430,14 +429,13 @@ func scanningAndResolution(b *builder) []Panel {
 			{"package.keyword", "What"},
 			{"url.keyword", "Link"},
 			{"m", "Raised"},
-		}, []string{ESF, "alert_state:open"})
+		}, []string{ESF, "alert_state:open"}, hideColumns(panelFullNameField))
 
-	toolGR, toolGRtf := gTbl(fmt.Sprintf(
-		`limit(sortBy(groupByNodes(%s, "sum", %d, %d), "sum", true), 25)`,
-		rp(an, "results"), gn(an, "tool"), gn(an, "repo"),
+	toolGR, toolGRtf := gTbl(fmt.Sprintf(`limit(sortBy(%s, "sum", true), 25)`,
+		grGroupBy(rp(an, "results"), an, "sum", "tool", "repo"),
 	),
 		"Tool, repository", []col{{"sum", "Results"}})
-	toolES, toolEStf := esTbl(an, []any{b.tm("tool", 10), b.tm("repo", 50)},
+	toolES, toolEStf := esTbl(an, append([]any{b.tm("tool", 10)}, b.tmRepo(50)...),
 		[]any{b.mCount(), b.mSum("results"), b.mMax("rules")},
 		[]named{
 			{"tool.keyword", "Tool"},
@@ -445,7 +443,7 @@ func scanningAndResolution(b *builder) []Panel {
 			{"n", "Runs"},
 			{"r", "Results"},
 			{"u", "Rules"},
-		}, []string{ESF})
+		}, []string{ESF}, hideColumns(panelFullNameField))
 
 	return []Panel{
 		panel("timeseries", "Code scanning runs", box{W: 12, H: 8, X: 0, Y: 12}, []Target{sqlTS(analyses)}, &P{
@@ -513,11 +511,11 @@ func scanningAndResolution(b *builder) []Panel {
 			`SELECT tool AS "Tool", SUM(results) AS "Results", repo AS "Repository",` +
 				` COUNT(*) AS "Runs", MAX(rules) AS "Rules"` +
 				" FROM gh_code_scanning_analysis WHERE $__timeFilter(time) AND " + RF +
-				" GROUP BY 1, 3 ORDER BY 2 DESC LIMIT 25",
+				" GROUP BY 1, full_name, 3 ORDER BY 2 DESC LIMIT 25",
 		)}, &P{
 			Prom: []Target{
-				promTbl(fmt.Sprintf("sum by (tool, repo) (increase(github_code_scanning_analyses_total{%s}[$__range]))", PF), "A"),
-				promTbl(fmt.Sprintf("avg by (tool, repo) (github_code_scanning_analyses_results_mean{%s})", PF), "B"),
+				promTbl(fmt.Sprintf("sum by (tool, full_name, repo) (increase(github_code_scanning_analyses_total{%s}[$__range]))", PF), "A"),
+				promTbl(fmt.Sprintf("avg by (tool, full_name, repo) (github_code_scanning_analyses_results_mean{%s})", PF), "B"),
 			},
 			PromTF: merged(map[string]string{
 				"tool": "Tool", "repo": "Repository", inventoryValueCol + "A": "Runs", inventoryValueCol + "B": "Results",
@@ -588,7 +586,7 @@ func posture(b *builder) []Panel {
 
 	settings := `SELECT repo AS "Repository", setting AS "Setting", status AS "Status",` +
 		` CAST(enabled AS INT) AS "Enabled" FROM (` +
-		"SELECT *, ROW_NUMBER() OVER (PARTITION BY repo, setting ORDER BY time DESC) AS rn" +
+		"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, setting ORDER BY time DESC) AS rn" +
 		securityFrom + ss + ciInRange + RF + deliveryNewestRow +
 		// The ones that are off first. Ordered by repository name the table
 		// opened on whatever sorts first alphabetically, which on the account
@@ -599,17 +597,17 @@ func posture(b *builder) []Panel {
 	setup := `SELECT repo AS "Repository", state AS "State", query_suite AS "Query suite",` +
 		` schedule AS "Schedule", languages AS "Languages",` +
 		` days_since_change AS "Last changed" FROM (` +
-		"SELECT *, ROW_NUMBER() OVER (PARTITION BY repo ORDER BY time DESC) AS rn" +
+		"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn" +
 		securityFrom + csu + ciInRange + RF + deliveryNewestRow +
 		" ORDER BY 1"
 	policy := `SELECT repo AS "Repository", permissions AS "Permissions",` +
 		` CAST(can_approve_pr AS INT) AS "Can approve pull requests" FROM (` +
-		"SELECT *, ROW_NUMBER() OVER (PARTITION BY repo ORDER BY time DESC) AS rn" +
+		"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn" +
 		securityFrom + ap + ciInRange + RF + deliveryNewestRow +
 		" ORDER BY 1"
 	secrets := `SELECT secret AS "Secret", days_since_rotation AS "Last rotated",` +
 		` age_days AS "Age", repo AS "Repository", kind AS "Kind" FROM (` +
-		"SELECT *, ROW_NUMBER() OVER (PARTITION BY repo, kind, secret ORDER BY time DESC) AS rn" +
+		"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, kind, secret ORDER BY time DESC) AS rn" +
 		securityFrom + sc + ciInRange + RF + deliveryNewestRow +
 		" ORDER BY 2 DESC"
 
@@ -635,14 +633,14 @@ func posture(b *builder) []Panel {
 	// inside the newest document it is the newest reading. The status is below
 	// that document, so a setting whose status changed inside the range is one
 	// row, as it is in the SQL twin.
-	setES, setEStf := esTbl(ss, []any{b.tm("repo", 500), b.tm("setting", 10), b.newestDoc(), b.tm("status", 5)},
+	setES, setEStf := esTbl(ss, append(b.tmRepo(500), b.tm("setting", 10), b.newestDoc(), b.tm("status", 5)),
 		[]any{b.mMax("enabled")},
 		[]named{
 			{inventoryRepoTerm, "Repository"},
 			{"setting.keyword", "Setting"},
 			{"status.keyword", "Status"},
 			{"e", "Enabled"},
-		}, []string{ESF}, hideColumns(panelESTime))
+		}, []string{ESF}, hideColumns(panelFullNameField, panelESTime))
 	// Both numbers are deliberately absent on some rows: GitHub sends no
 	// change date for a setup it has never changed, and a repository that
 	// answers 403 has neither that nor a language count. So they are asked for
@@ -651,9 +649,9 @@ func posture(b *builder) []Panel {
 	// top_metrics appends nothing at all and the panel dies with `frame has
 	// different field lengths`. The SQL twin reads one row per repository, so
 	// the state, suite and schedule are of that document too.
-	csuES, csuEStf := esTbl(csu, []any{
-		b.tm("repo", 500), b.newestDoc(), b.tm("state", 5), b.tm("query_suite", 10), b.tm("schedule", 10),
-	}, []any{b.mMax("languages"), b.mMax("days_since_change")},
+	csuES, csuEStf := esTbl(csu, append(b.tmRepo(500),
+		b.newestDoc(), b.tm("state", 5), b.tm("query_suite", 10), b.tm("schedule", 10),
+	), []any{b.mMax("languages"), b.mMax("days_since_change")},
 		[]named{
 			{inventoryRepoTerm, "Repository"},
 			{"state.keyword", "State"},
@@ -661,21 +659,21 @@ func posture(b *builder) []Panel {
 			{"schedule.keyword", "Schedule"},
 			{"l", "Languages"},
 			{"d", deliveryLastChanged},
-		}, []string{ESF}, hideColumns(panelESTime))
-	apES, apEStf := esTbl(ap, []any{b.tm("repo", 500), b.newestDoc(), b.tm("permissions", 5)},
+		}, []string{ESF}, hideColumns(panelFullNameField, panelESTime))
+	apES, apEStf := esTbl(ap, append(b.tmRepo(500), b.newestDoc(), b.tm("permissions", 5)),
 		[]any{b.mMax("can_approve_pr")},
 		[]named{
 			{inventoryRepoTerm, "Repository"},
 			{"permissions.keyword", "Permissions"},
 			{"c", securityCanApprovePR},
-		}, []string{ESF}, hideColumns(panelESTime))
+		}, []string{ESF}, hideColumns(panelFullNameField, panelESTime))
 	// The newest reading, and here with a top_metrics: `days_since_rotation`
 	// climbs with the secret's age until somebody rotates the credential and
 	// then restarts at zero, so a max over the range would hand back the value
 	// from the day before the rotation, closing the gap between the two columns
 	// and hiding the only rotation the panel exists to show. Both fields are
 	// written on every point, so there is no absent value to shorten the frame.
-	scES, scEStf := esTbl(sc, []any{b.tm("repo", 500), b.tm("kind", 5), b.tm("secret", 500)},
+	scES, scEStf := esTbl(sc, append(b.tmRepo(500), b.tm("kind", 5), b.tm("secret", 500)),
 		[]any{b.mNewest("age_days", "days_since_rotation")},
 		[]named{
 			{inventoryRepoTerm, "Repository"},
@@ -683,12 +681,12 @@ func posture(b *builder) []Panel {
 			{"secret.keyword", "Secret"},
 			{"a", "Age"},
 			{"r", securityLastRotated},
-		}, []string{ESF})
+		}, []string{ESF}, hideColumns(panelFullNameField))
 
 	return []Panel{
 		panel("table", "Security settings", box{W: 12, H: 12, X: 0, Y: 41}, []Target{sqlT(settings)}, &P{
 			Prom: []Target{promTbl(fmt.Sprintf(
-				"max by (repo, setting, status) (github_security_setting_enabled{%s})", PF,
+				"max by (full_name, repo, setting, status) (github_security_setting_enabled{%s})", PF,
 			))},
 			PromTF: []any{organize(map[string]string{
 				"repo": "Repository", "setting": "Setting", "status": "Status",
@@ -745,7 +743,7 @@ func posture(b *builder) []Panel {
 		}),
 		panel("table", "Workflow token permissions", box{W: 12, H: 7, X: 0, Y: 53}, []Target{sqlT(policy)}, &P{
 			Prom: []Target{promTbl(fmt.Sprintf(
-				"max by (repo, permissions) (github_actions_policy_can_approve_pr{%s})", PF,
+				"max by (full_name, repo, permissions) (github_actions_policy_can_approve_pr{%s})", PF,
 			))},
 			PromTF: []any{organize(map[string]string{
 				"repo": "Repository", "permissions": "Permissions",
@@ -766,8 +764,8 @@ func posture(b *builder) []Panel {
 		panel("table", "Secret rotation", box{W: 12, H: 7, X: 12, Y: 53},
 			[]Target{sqlT(secrets)}, &P{
 				Prom: []Target{
-					promTbl(fmt.Sprintf("max by (repo, kind, secret) (github_secret_age_days{%s})", PF), "A"),
-					promTbl(fmt.Sprintf("max by (repo, kind, secret) (github_secret_days_since_rotation{%s})", PF), "B"),
+					promTbl(fmt.Sprintf("max by (full_name, repo, kind, secret) (github_secret_age_days{%s})", PF), "A"),
+					promTbl(fmt.Sprintf("max by (full_name, repo, kind, secret) (github_secret_days_since_rotation{%s})", PF), "B"),
 				},
 				PromTF: merged(map[string]string{
 					"repo": "Repository", "kind": "Kind", "secret": "Secret",

@@ -29,16 +29,16 @@ func labelsMilestonesAndForks(b *builder) []Panel {
 	labels := `SELECT label AS "Label", used AS "Used", repo AS "Repository",` +
 		` issues AS "Issues", pull_requests AS "Pull requests", url AS "Link" FROM (` +
 		"SELECT repo, label, used, issues, pull_requests, url, ROW_NUMBER() OVER (" +
-		"PARTITION BY repo, label ORDER BY time DESC) AS rn FROM gh_label" +
+		"PARTITION BY full_name, label ORDER BY time DESC) AS rn FROM gh_label" +
 		" WHERE $__timeFilter(time) AND " + RF + planningNewestRow +
 		" ORDER BY 2 DESC LIMIT 25"
 	miles := `SELECT milestone AS "Milestone", progress AS "Progress", repo AS "Repository",` +
 		` state AS "State", issues AS "Issues",` +
 		` pull_requests AS "Pull requests", url AS "Link" FROM (` +
-		"SELECT *, ROW_NUMBER() OVER (PARTITION BY repo, milestone ORDER BY time DESC) AS rn" +
+		"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, milestone ORDER BY time DESC) AS rn" +
 		" FROM gh_milestone WHERE $__timeFilter(time) AND " + RF + planningNewestRow +
 		" ORDER BY 2 DESC LIMIT 25"
-	forks := topSeries("gh_fork", "repo", "1", "forks", RF)
+	forks := topRepoSeries("gh_fork", "1", "forks", RF)
 	// Idle is computed rather than stored: the row is dated when the fork was
 	// created and `seconds_to_push` says how long after that its last push
 	// came, so the time since that push is the row's own age less that. The
@@ -57,7 +57,7 @@ func labelsMilestonesAndForks(b *builder) []Panel {
 	labelsGR, labelsGRtf := gTbl(rowsOf(fmt.Sprintf(
 		`limit(sortByMaxima(keepLastValue(%s)), 25)`, rp(lb, "used"),
 	), gn(lb, "repo"), gn(lb, "label")), "Repository, label", []col{{"lastNotNull", "Used"}})
-	labelsES, labelsEStf := esTbl(lb, []any{b.tm("repo", 50), b.tm("label", 25), b.tmURL()},
+	labelsES, labelsEStf := esTbl(lb, append(b.tmRepo(50), b.tm("label", 25), b.tmURL()),
 		[]any{b.mNewest("used", "issues", "pull_requests")},
 		[]named{
 			{panelRepoField, "Repository"},
@@ -66,12 +66,12 @@ func labelsMilestonesAndForks(b *builder) []Panel {
 			{"used", "Used"},
 			{"issues", "Issues"},
 			{"pull_requests", planningPullRequests},
-		}, []string{ESF})
+		}, []string{ESF}, hideColumns(panelFullNameField))
 
 	milesGR, milesGRtf := gTbl(topRows(rp(ms, "progress"), 25,
 		gn(ms, "repo"), gn(ms, "milestone"), gn(ms, "state")),
 		"Milestone", []col{{"lastNotNull", "Progress"}})
-	milesES, milesEStf := esTbl(ms, []any{b.tm("repo", 50), b.tm("milestone", 25), b.tm("state", 5), b.tmURL()},
+	milesES, milesEStf := esTbl(ms, append(b.tmRepo(50), b.tm("milestone", 25), b.tm("state", 5), b.tmURL()),
 		[]any{b.mNewest("progress", "issues", "pull_requests")},
 		[]named{
 			{panelRepoField, "Repository"},
@@ -81,7 +81,7 @@ func labelsMilestonesAndForks(b *builder) []Panel {
 			{"progress", "Progress"},
 			{"issues", "Issues"},
 			{"pull_requests", planningPullRequests},
-		}, []string{ESF})
+		}, []string{ESF}, hideColumns(panelFullNameField))
 
 	// Neither store can subtract the row's own date from now, so both show
 	// the static number instead: how long after the fork its last push came.
@@ -98,15 +98,15 @@ func labelsMilestonesAndForks(b *builder) []Panel {
 	return []Panel{
 		panel("table", "Labels", box{W: 12, H: 8, X: 0, Y: 0}, []Target{sqlT(labels)}, &P{
 			Prom: func() []Target {
-				rank := fmt.Sprintf("max by (repo, label) (github_label_used{%s})", PF)
+				rank := fmt.Sprintf("max by (full_name, repo, label) (github_label_used{%s})", PF)
 				return []Target{
 					promTbl(promTop(25, rank), "A"),
 					promTbl(promWithin(25, fmt.Sprintf(
-						"max by (repo, label) (github_label_issues{%s})", PF,
-					), rank, "repo", "label"), "B"),
+						"max by (full_name, repo, label) (github_label_issues{%s})", PF,
+					), rank, "full_name", "repo", "label"), "B"),
 					promTbl(promWithin(25, fmt.Sprintf(
-						"max by (repo, label) (github_label_pull_requests{%s})", PF,
-					), rank, "repo", "label"), "C"),
+						"max by (full_name, repo, label) (github_label_pull_requests{%s})", PF,
+					), rank, "full_name", "repo", "label"), "C"),
 				}
 			}(),
 			PromTF: merged(map[string]string{
@@ -127,9 +127,9 @@ func labelsMilestonesAndForks(b *builder) []Panel {
 		}),
 		panel("table", "Milestones", box{W: 12, H: 8, X: 12, Y: 0}, []Target{sqlT(miles)}, &P{
 			Prom: []Target{
-				promTbl(fmt.Sprintf("sum by (repo, milestone, state) (github_milestone_progress{%s})", PF), "A"),
-				promTbl(fmt.Sprintf("sum by (repo, milestone, state) (github_milestone_issues{%s})", PF), "B"),
-				promTbl(fmt.Sprintf("sum by (repo, milestone, state) (github_milestone_pull_requests{%s})", PF), "C"),
+				promTbl(fmt.Sprintf("sum by (full_name, repo, milestone, state) (github_milestone_progress{%s})", PF), "A"),
+				promTbl(fmt.Sprintf("sum by (full_name, repo, milestone, state) (github_milestone_issues{%s})", PF), "B"),
+				promTbl(fmt.Sprintf("sum by (full_name, repo, milestone, state) (github_milestone_pull_requests{%s})", PF), "C"),
 			},
 			PromTF: merged(map[string]string{
 				"repo": "Repository", "milestone": "Milestone", "state": "State",
@@ -151,7 +151,7 @@ func labelsMilestonesAndForks(b *builder) []Panel {
 		}),
 		panel("timeseries", "Forks gained over time", box{W: 12, H: 8, X: 0, Y: 8}, []Target{sqlTS(forks)}, &P{
 			Prom: []Target{daily(fmt.Sprintf(
-				"sum by (repo) (increase(github_forks_seen_total{%s}[1d]))", PF,
+				"sum by (full_name, repo) (increase(github_forks_seen_total{%s}[1d]))", PF,
 			), "{{repo}}")},
 			Opts:    mergeOpts(Opts{"bars": true, "stack": true}, dayBins),
 			SQLOpts: seriesOpts,
@@ -159,14 +159,14 @@ func labelsMilestonesAndForks(b *builder) []Panel {
 				"never says. The eight repositories that gained the most in the range are " +
 				"named; the rest are `other`. " + bucketFollowsRange,
 			PromDesc: sinceStart,
-			GR:       []Target{grq(perBucket("isNonNull("+rp(fk, "forks")+")", gn(fk, "repo")))},
+			GR:       []Target{grq(perRepoBucket("isNonNull("+rp(fk, "forks")+")", fk))},
 			ES:       []Target{b.esDaily(fk, b.mCount(), "repo", "", []string{ESF}, "")},
 		}),
 		panel("table", "Forks", box{W: 12, H: 8, X: 12, Y: 8}, []Target{sqlT(forkTbl)}, &P{
 			Prom: []Target{
-				promTbl(fmt.Sprintf("sum by (repo) (increase(github_forks_seen_total{%s}[$__range]))", PF), "A"),
-				promTbl(fmt.Sprintf("avg by (repo) (github_forks_seen_advanced_mean{%s})", PF), "B"),
-				promTbl(fmt.Sprintf("avg by (repo) (github_forks_seen_seconds_to_push_mean{%s})", PF), "C"),
+				promTbl(fmt.Sprintf("sum by (full_name, repo) (increase(github_forks_seen_total{%s}[$__range]))", PF), "A"),
+				promTbl(fmt.Sprintf("avg by (full_name, repo) (github_forks_seen_advanced_mean{%s})", PF), "B"),
+				promTbl(fmt.Sprintf("avg by (full_name, repo) (github_forks_seen_seconds_to_push_mean{%s})", PF), "C"),
 			},
 			PromTF: merged(map[string]string{
 				"repo": "Repository", panelValueA: "Forks", panelValueB: planningPushedTo,
@@ -234,7 +234,7 @@ func discussionAndComments(b *builder) []Panel {
 	latest := `SELECT title AS "Title", time AS "Opened", repo AS "Repository",` +
 		` category AS "Category", comments AS "Comments",` +
 		` CASE WHEN answerable = 'false' THEN NULL WHEN has_answer THEN 1 ELSE 0 END AS "Answered",` +
-		` url AS "Link" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo, number` +
+		` url AS "Link" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, number` +
 		" ORDER BY time DESC, comments DESC) AS rn FROM gh_discussion" +
 		" WHERE " + wholeHistory + " AND " + RF + planningNewestRow +
 		" ORDER BY 2 DESC LIMIT 50"
@@ -271,9 +271,12 @@ func discussionAndComments(b *builder) []Panel {
 
 	// Both of these are mostly other people's repositories, so the row names
 	// one in full: `repo` is the short name on every measurement now, and two
-	// owners using the same one would be one row here.
-	commentsGR, commentsGRtf := gTbl(rowsOf(countOf(gp("gh_issue_comment", "comments")),
-		gn("gh_issue_comment", "full_name")), "Repository", []col{{"sum", "Comments"}})
+	// owners using the same one would be one row here. Each comment is a 1
+	// added up per repository; countOf added every comment into one series
+	// first, and the table drew that as one row.
+	commentsGR, commentsGRtf := gTbl(fmt.Sprintf(`groupByNode(isNonNull(%s), %d, "sum")`,
+		gp("gh_issue_comment", "comments"), gn("gh_issue_comment", "full_name")),
+		"Repository", []col{{"sum", "Comments"}})
 	commentsES, commentsEStf := esTbl("gh_issue_comment", []any{b.tm("full_name", 20)}, []any{b.mCount()},
 		[]named{{panelFullNameField, "Repository"}, {"n", "Comments"}}, nil)
 
@@ -337,7 +340,7 @@ func discussionAndComments(b *builder) []Panel {
 				"no other measurement at all. The eight commonest in the range are named; " +
 				"the rest are `other`. " + bucketFollowsRange,
 			PromDesc: sinceStart,
-			GR: []Target{grq(perBucket(countOf(rp("gh_issue_event", "events")),
+			GR: []Target{grq(perBucket("isNonNull("+rp("gh_issue_event", "events")+")",
 				gn("gh_issue_event", "event")))},
 			ES: []Target{b.esDaily("gh_issue_event", b.mCount(), "event", "", []string{ESF}, "")},
 		}),
@@ -347,8 +350,8 @@ func discussionAndComments(b *builder) []Panel {
 				" FROM gh_issue_comment WHERE $__timeFilter(time)" +
 				" GROUP BY 1 ORDER BY 2 DESC LIMIT 20",
 		)}, &P{
-			Prom:   []Target{promTbl("topk(20, sum by (repo) (increase(github_issue_comments_total[$__range])))")},
-			PromTF: []any{organize(map[string]string{"repo": "Repository", "Value": "Comments"}, nil, nil)},
+			Prom:   []Target{promTbl("topk(20, sum by (full_name) (increase(github_issue_comments_total[$__range])))")},
+			PromTF: []any{organize(map[string]string{"full_name": "Repository", "Value": "Comments"}, nil, nil)},
 			Opts:   Opts{"sort": "Comments"},
 			Desc: "Comments on issues and pull requests, in any repository. The ones outside " +
 				"this account are the half a sweep over one's own repositories cannot see.",
@@ -437,8 +440,8 @@ func answersGiven(b *builder, perItem, grPerItem string) []Panel {
 		}, nil, perRepositoryFromComments()...)
 	return []Panel{
 		panel("table", "Discussion answers", box{W: 8, H: 8, X: 0, Y: 32}, []Target{sqlT(answersSQL)}, &P{
-			Prom:   []Target{promTbl("topk(20, sum by (repo) (increase(github_discussion_comments_total[$__range])))")},
-			PromTF: []any{organize(map[string]string{"repo": "Repository", "Value": "Comments"}, nil, nil)},
+			Prom:   []Target{promTbl("topk(20, sum by (full_name) (increase(github_discussion_comments_total[$__range])))")},
+			PromTF: []any{organize(map[string]string{"full_name": "Repository", "Value": "Comments"}, nil, nil)},
 			Opts:   Opts{"sort": "Accepted answers"},
 			Desc: "Discussions are the one surface where the work is almost entirely in other " +
 				"people's repositories: gh_discussion sees three rows inside this account, " +

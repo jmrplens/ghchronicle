@@ -53,7 +53,7 @@ func inventory(b *builder) []Panel {
 // GitHub keeps on them.
 func repositoryList(b *builder) []Panel {
 	langs := `SELECT language AS "Language", SUM(bytes) AS "Bytes" FROM (` +
-		"SELECT repo, language, bytes, ROW_NUMBER() OVER (PARTITION BY repo, language" +
+		"SELECT language, bytes, ROW_NUMBER() OVER (PARTITION BY full_name, language" +
 		" ORDER BY time DESC) AS rn FROM gh_repo_language WHERE $__timeFilter(time) AND " + RF +
 		") x WHERE rn = 1 GROUP BY 1 ORDER BY 2 DESC LIMIT 12"
 	repoFields := []string{
@@ -90,13 +90,13 @@ func repositoryList(b *builder) []Panel {
 	health := `SELECT c.repo AS "Repository", c.health_percentage AS "Community profile", ` +
 		strings.Join(healthCols, ", ") + `, p.issue_templates AS "Issue templates",` +
 		` CAST(c.has_pull_request_template AS INT) AS "PR template", c.url AS "Link"` +
-		" FROM (SELECT repo, health_percentage, url, " + strings.Join(hasFields, ", ") +
-		", has_pull_request_template, ROW_NUMBER() OVER (PARTITION BY repo" +
+		" FROM (SELECT full_name, repo, health_percentage, url, " + strings.Join(hasFields, ", ") +
+		", has_pull_request_template, ROW_NUMBER() OVER (PARTITION BY full_name" +
 		" ORDER BY time DESC) AS rn FROM gh_repo_community WHERE $__timeFilter(time) AND " + RF +
-		") c LEFT JOIN (SELECT repo, issue_templates, ROW_NUMBER() OVER (PARTITION BY repo" +
+		") c LEFT JOIN (SELECT full_name, issue_templates, ROW_NUMBER() OVER (PARTITION BY full_name" +
 		" ORDER BY time DESC) AS rn FROM gh_repo_policy WHERE $__timeFilter(time) AND " + RF +
-		") p ON p.repo = c.repo AND p.rn = 1 WHERE c.rn = 1 ORDER BY 2 DESC"
-	repoBy := "repo, language, visibility, license"
+		") p ON p.full_name = c.full_name AND p.rn = 1 WHERE c.rn = 1 ORDER BY 2 DESC"
+	repoBy := "full_name, repo, language, visibility, license"
 	repoCols := []named{
 		{"stars", "Stars"},
 		{"forks", "Forks"},
@@ -113,28 +113,28 @@ func repositoryList(b *builder) []Panel {
 		`limit(sortByMaxima(groupByNode(keepLastValue(%s), %d, "sum")), 12)`,
 		rp(rl, "bytes"), gn(rl, "language"),
 	), "Language", []col{{"lastNotNull", "Bytes"}})
-	langsES, langsEStf := esTbl(rl, []any{b.tm("language", 12), b.tm("repo", 500)},
+	langsES, langsEStf := esTbl(rl, []any{b.tm("language", 12), b.tm("full_name", 500)},
 		[]any{b.mNewest("bytes")},
-		[]named{{"language.keyword", "Language"}, {inventoryRepoTerm, "Repository"}, {"b", "Bytes"}},
+		[]named{{"language.keyword", "Language"}, {"b", "Bytes"}},
 		[]string{ESF}, groupSum("Language", "Bytes", "Language", "Bytes")...)
 
 	var healthProm []Target
 	healthProm = append(healthProm, promTbl(fmt.Sprintf(
-		"sum by (repo) (github_repo_community_health_percentage{%s})", PF,
+		"sum by (full_name, repo) (github_repo_community_health_percentage{%s})", PF,
 	), "A"))
 	healthRename := map[string]string{"repo": "Repository", inventoryValueCol + "A": inventoryCommunityScore}
 	for i, f := range healthFiles {
 		ref := string(rune('B' + i))
 		healthProm = append(healthProm, promTbl(fmt.Sprintf(
-			"max by (repo) (github_repo_community_has_%s{%s})", f, PF,
+			"max by (full_name, repo) (github_repo_community_has_%s{%s})", f, PF,
 		), ref))
 		healthRename[inventoryValueCol+ref] = healthNames[i]
 	}
 	// The join Prometheus makes: the merge transformation lines the two
 	// families up on the repo label, so the count sits beside the flags.
 	healthProm = append(healthProm,
-		promTbl(fmt.Sprintf("max by (repo) (github_repo_policy_issue_templates{%s})", PF), "F"),
-		promTbl(fmt.Sprintf("max by (repo) (github_repo_community_has_pull_request_template{%s})", PF), "G"),
+		promTbl(fmt.Sprintf("max by (full_name, repo) (github_repo_policy_issue_templates{%s})", PF), "F"),
+		promTbl(fmt.Sprintf("max by (full_name, repo) (github_repo_community_has_pull_request_template{%s})", PF), "G"),
 	)
 	healthRename[inventoryValueCol+"F"] = inventoryIssueTemplates
 	healthRename[inventoryValueCol+"G"] = inventoryPRTemplate
@@ -171,8 +171,8 @@ func repositoryList(b *builder) []Panel {
 	healthESMetrics = append(healthESMetrics, b.mMax("has_issue_template"), b.mMax("has_pull_request_template"))
 	healthESNames = append(healthESNames, named{"has_issue_template", "Issue template"},
 		named{"has_pull_request_template", inventoryPRTemplate}, named{inventoryURLTerm, "Link"})
-	healthES, healthEStf := esTbl(rc, []any{b.tm("repo", 500), b.newestDoc(), b.tmURL()}, healthESMetrics,
-		healthESNames, []string{ESF}, hideColumns(panelESTime))
+	healthES, healthEStf := esTbl(rc, append(b.tmRepo(500), b.newestDoc(), b.tmURL()), healthESMetrics,
+		healthESNames, []string{ESF}, hideColumns(panelFullNameField, panelESTime))
 
 	var reposProm []Target
 	reposRename := map[string]string{
@@ -197,10 +197,9 @@ func repositoryList(b *builder) []Panel {
 	reposGR, reposGRtf := gTbl(rowsOf(rp("gh_repo", "stars"), gn("gh_repo", "repo"),
 		gn("gh_repo", "language"), gn("gh_repo", "visibility"), gn("gh_repo", "license")),
 		"Repository, language, visibility, license", []col{{"lastNotNull", "Stars"}})
-	reposES, reposEStf := esTbl("gh_repo", []any{
-		b.tm("repo", 500), b.tm("language", 1),
-		b.tm("visibility", 1), b.tm("license", 1), b.tmURL(),
-	}, []any{b.mNewest(repoFieldNames...)},
+	reposES, reposEStf := esTbl("gh_repo", append(b.tmRepo(500),
+		b.tm("language", 1), b.tm("visibility", 1), b.tm("license", 1), b.tmURL(),
+	), []any{b.mNewest(repoFieldNames...)},
 		append([]named{
 			{inventoryRepoTerm, "Repository"},
 			{"language.keyword", "Language"},
@@ -208,7 +207,7 @@ func repositoryList(b *builder) []Panel {
 			{"license.keyword", "License"},
 			{inventoryURLTerm, "Link"},
 		}, repoCols...),
-		[]string{ESF})
+		[]string{ESF}, hideColumns(panelFullNameField))
 
 	return []Panel{
 		panel("barchart", "Code by language", box{W: 12, H: 8, X: 0, Y: 0}, []Target{sqlT(langs)}, &P{
@@ -273,7 +272,7 @@ func repositoryList(b *builder) []Panel {
 // repositories: the topics they are filed under, the packages and gists, and
 // the container tags each release pushed.
 func whatTheyPublish(b *builder) []Panel {
-	topics := `SELECT topic AS "Topic", COUNT(DISTINCT repo) AS "Repositories",` +
+	topics := `SELECT topic AS "Topic", COUNT(DISTINCT full_name) AS "Repositories",` +
 		` url AS "Link"` +
 		" FROM gh_repo_topic WHERE $__timeFilter(time) AND " + RF +
 		" GROUP BY 1, 3 ORDER BY 2 DESC LIMIT 30"
@@ -296,7 +295,7 @@ func whatTheyPublish(b *builder) []Panel {
 		`limit(sortByMaxima(groupByNode(keepLastValue(%s), %d, "sum")), 30)`,
 		rp(rt, "present"), gn(rt, "topic"),
 	), "Topic", []col{{"lastNotNull", "Repositories"}})
-	topicRepos := b.mUniq("repo")
+	topicRepos := b.mUniq("full_name")
 	topicsES, topicsEStf := esTbl(rt, []any{b.tmBy("topic", 30, topicRepos), b.tmURL()}, []any{topicRepos},
 		[]named{{"topic.keyword", "Topic"}, {inventoryURLTerm, "Link"}, {"r", "Repositories"}}, []string{ESF})
 
@@ -427,7 +426,7 @@ func settingsAndKeys(b *builder) []Panel {
 	// are booleans, and a top_metrics reads a boolean back as the string
 	// "true", which panics Grafana's Elasticsearch plugin and takes the whole
 	// panel with it.
-	polES, polEStf := esTbl("gh_repo_policy", []any{b.tm("repo", 500), b.newestDoc(), b.tmURL()},
+	polES, polEStf := esTbl("gh_repo_policy", append(b.tmRepo(500), b.newestDoc(), b.tmURL()),
 		[]any{
 			b.mMax("security_policy"), b.mMax("delete_branch_on_merge"), b.mMax("auto_merge"),
 			b.mMax("branch_protection_rules"), b.mMax("issue_templates"),
@@ -442,7 +441,7 @@ func settingsAndKeys(b *builder) []Panel {
 			{"branch_protection_rules", inventoryProtectionRules},
 			{"issue_templates", inventoryIssueTemplates},
 			{"codeowners_errors", "CODEOWNERS errors"},
-		}, []string{ESF}, hideColumns(panelESTime))
+		}, []string{ESF}, hideColumns(panelFullNameField, panelESTime))
 
 	keysGR, keysGRtf := gTbl(rowsOf(inventoryKeepLast+gp("gh_key", "days_since_use")+")",
 		gn("gh_key", "key"), gn("gh_key", "kind")), "Key, kind",
@@ -470,7 +469,7 @@ func settingsAndKeys(b *builder) []Panel {
 		rp("gh_dependency_license", "packages"), gn("gh_dependency_license", "license"),
 	),
 		"License", []col{{"lastNotNull", "Packages"}})
-	licES, licEStf := esTbl("gh_dependency_license", []any{b.tm("license", 12), b.tm("repo", 500)},
+	licES, licEStf := esTbl("gh_dependency_license", []any{b.tm("license", 12), b.tm("full_name", 500)},
 		[]any{b.mNewest("packages")},
 		[]named{{"license.keyword", "License"}, {"packages", "Packages"}}, []string{ESF},
 		groupSum("License", "Packages", "License", "Packages")...)
@@ -514,12 +513,12 @@ func settingsAndKeys(b *builder) []Panel {
 				" ORDER BY 1",
 		)}, &P{
 			Prom: []Target{
-				promTbl(fmt.Sprintf("max by (repo) (github_repo_policy_security_policy{%s})", PF), "A"),
-				promTbl(fmt.Sprintf("max by (repo) (github_repo_policy_delete_branch_on_merge{%s})", PF), "B"),
-				promTbl(fmt.Sprintf("max by (repo) (github_repo_policy_auto_merge{%s})", PF), "C"),
-				promTbl(fmt.Sprintf("max by (repo) (github_repo_policy_branch_protection_rules{%s})", PF), "D"),
-				promTbl(fmt.Sprintf("max by (repo) (github_repo_policy_issue_templates{%s})", PF), "E"),
-				promTbl(fmt.Sprintf("max by (repo) (github_repo_policy_codeowners_errors{%s})", PF), "F"),
+				promTbl(fmt.Sprintf("max by (full_name, repo) (github_repo_policy_security_policy{%s})", PF), "A"),
+				promTbl(fmt.Sprintf("max by (full_name, repo) (github_repo_policy_delete_branch_on_merge{%s})", PF), "B"),
+				promTbl(fmt.Sprintf("max by (full_name, repo) (github_repo_policy_auto_merge{%s})", PF), "C"),
+				promTbl(fmt.Sprintf("max by (full_name, repo) (github_repo_policy_branch_protection_rules{%s})", PF), "D"),
+				promTbl(fmt.Sprintf("max by (full_name, repo) (github_repo_policy_issue_templates{%s})", PF), "E"),
+				promTbl(fmt.Sprintf("max by (full_name, repo) (github_repo_policy_codeowners_errors{%s})", PF), "F"),
 			},
 			PromTF: merged(map[string]string{
 				"repo": "Repository", inventoryValueCol + "A": inventorySecurityPolicy,
@@ -577,7 +576,7 @@ func settingsAndKeys(b *builder) []Panel {
 		panel("barchart", "Dependencies by license", box{W: 12, H: 7, X: 12, Y: 43}, []Target{sqlT(
 			otherRows(`SELECT license AS "License", SUM(packages) AS "Packages",`+
 				" ROW_NUMBER() OVER (ORDER BY SUM(packages) DESC) AS rn FROM ("+
-				"SELECT license, packages, ROW_NUMBER() OVER (PARTITION BY repo, license"+
+				"SELECT license, packages, ROW_NUMBER() OVER (PARTITION BY full_name, license"+
 				" ORDER BY time DESC) AS rn FROM gh_dependency_license"+
 				ciInRange+RF+") x WHERE rn = 1"+
 				" GROUP BY 1", "License", "Packages", 8),
@@ -623,7 +622,7 @@ func settingsAndKeys(b *builder) []Panel {
 				` COUNT(DISTINCT license) AS "License",` +
 				` COUNT(DISTINCT language) AS "Language",` +
 				` COUNT(DISTINCT repo_id) AS "Identity", MAX(url) AS "Link"` +
-				" FROM gh_repo WHERE $__timeFilter(time) AND " + RF + " GROUP BY 1" +
+				" FROM gh_repo WHERE $__timeFilter(time) AND " + RF + " GROUP BY full_name, repo" +
 				" HAVING COUNT(DISTINCT visibility) > 1 OR COUNT(DISTINCT archived) > 1" +
 				" OR COUNT(DISTINCT default_branch) > 1 OR COUNT(DISTINCT license) > 1" +
 				" OR COUNT(DISTINCT language) > 1 ORDER BY 1",
@@ -689,7 +688,7 @@ func policyAndDependencies(b *builder) []Panel {
 		` CAST(present AS INT) AS "Present", path AS "Path",` +
 		` changes AS "Changes", url AS "Link" FROM (` +
 		"SELECT repo, file, present, path, changes, url," +
-		" ROW_NUMBER() OVER (PARTITION BY repo, file ORDER BY time DESC) AS rn" +
+		" ROW_NUMBER() OVER (PARTITION BY full_name, file ORDER BY time DESC) AS rn" +
 		// The missing files first: ordered by repository the table showed six
 		// rows of whichever repository sorts first, out of 228.
 		" FROM " + pf + " " + everSince + ") x WHERE rn = 1 ORDER BY 3, 1, 2"
@@ -709,10 +708,10 @@ func policyAndDependencies(b *builder) []Panel {
 	ecosystems := `SELECT repo AS "Repository", blocks AS "Blocks", ecosystem AS "Ecosystem",` +
 		` "interval" AS "Interval" FROM (` +
 		`SELECT repo, ecosystem, "interval", blocks, time,` +
-		" MAX(time) OVER (PARTITION BY repo) AS newest" +
+		" MAX(time) OVER (PARTITION BY full_name) AS newest" +
 		" FROM " + de + " " + everSince + ") x WHERE time = newest ORDER BY 1, 2"
 	packages := `SELECT ecosystem AS "Ecosystem", SUM(packages) AS "Packages" FROM (` +
-		"SELECT ecosystem, packages, ROW_NUMBER() OVER (PARTITION BY repo, ecosystem" +
+		"SELECT ecosystem, packages, ROW_NUMBER() OVER (PARTITION BY full_name, ecosystem" +
 		" ORDER BY time DESC) AS rn FROM " + dep +
 		ciInRange + RF + ") x WHERE rn = 1" +
 		" GROUP BY 1 ORDER BY 2 DESC LIMIT 12"
@@ -739,7 +738,7 @@ func policyAndDependencies(b *builder) []Panel {
 	// bucket below that document, which costs no rows because one document
 	// has one path.
 	policyES, policyEStf := esTbl(pf,
-		[]any{b.tm("repo", 500), b.tm("file", 10), b.newestDoc(), b.tm("path", 50), b.tmURL()},
+		append(b.tmRepo(500), b.tm("file", 10), b.newestDoc(), b.tm("path", 50), b.tmURL()),
 		[]any{b.mMax("present"), b.mMax("changes")},
 		[]named{
 			{inventoryRepoTerm, "Repository"},
@@ -748,7 +747,7 @@ func policyAndDependencies(b *builder) []Panel {
 			{inventoryURLTerm, "Link"},
 			{"present", "Present"},
 			{"changes", "Changes"},
-		}, []string{ESF}, hideColumns(panelESTime))
+		}, []string{ESF}, hideColumns(panelFullNameField, panelESTime))
 
 	ecoGR, ecoGRtf := gTbl(rowsOf(inventoryKeepLast+rp(de, "blocks")+")",
 		gn(de, "repo"), gn(de, "ecosystem"), gn(de, "interval")),
@@ -756,21 +755,21 @@ func policyAndDependencies(b *builder) []Panel {
 	// The newest version of each file, as the SQL twin reads it: each
 	// repository's newest timestamp, then the blocks stamped at it.
 	ecoES, ecoEStf := esTbl(de,
-		[]any{b.tm("repo", 500), b.newestDoc(), b.tm("ecosystem", 20), b.tm("interval", 10)},
+		append(b.tmRepo(500), b.newestDoc(), b.tm("ecosystem", 20), b.tm("interval", 10)),
 		[]any{b.mMax("blocks")},
 		[]named{
 			{inventoryRepoTerm, "Repository"},
 			{"ecosystem.keyword", "Ecosystem"},
 			{"interval.keyword", "Interval"},
 			{"blocks", "Blocks"},
-		}, []string{ESF}, hideColumns(panelESTime))
+		}, []string{ESF}, hideColumns(panelFullNameField, panelESTime))
 
 	packGR, packGRtf := gTbl(fmt.Sprintf(
 		`sortByMaxima(groupByNode(keepLastValue(%s), %d, "sum"))`,
 		rp(dep, "packages"), gn(dep, "ecosystem"),
 	),
 		"Ecosystem", []col{{"lastNotNull", "Packages"}})
-	packES, packEStf := esTbl(dep, []any{b.tm("ecosystem", 12), b.tm("repo", 500)},
+	packES, packEStf := esTbl(dep, []any{b.tm("ecosystem", 12), b.tm("full_name", 500)},
 		[]any{b.mNewest("packages")},
 		[]named{{"ecosystem.keyword", "Ecosystem"}, {"packages", "Packages"}}, []string{ESF},
 		groupSum("Ecosystem", "Packages", "Ecosystem", "Packages")...)
@@ -799,8 +798,8 @@ func policyAndDependencies(b *builder) []Panel {
 	return []Panel{
 		panel("table", "Policy files", box{W: 12, H: 12, X: 0, Y: 57}, []Target{sqlT(policy)}, &P{
 			Prom: []Target{
-				promTbl(fmt.Sprintf("max by (repo, file) (github_policy_file_present{%s})", PF), "A"),
-				promTbl(fmt.Sprintf("max by (repo, file) (github_policy_file_changes{%s})", PF), "B"),
+				promTbl(fmt.Sprintf("max by (full_name, repo, file) (github_policy_file_present{%s})", PF), "A"),
+				promTbl(fmt.Sprintf("max by (full_name, repo, file) (github_policy_file_changes{%s})", PF), "B"),
 			},
 			PromTF: merged(map[string]string{
 				"repo": "Repository", "file": "File",
@@ -831,7 +830,7 @@ func policyAndDependencies(b *builder) []Panel {
 		}),
 		panel("table", "Dependabot ecosystems", box{W: 12, H: 12, X: 12, Y: 57}, []Target{sqlT(ecosystems)}, &P{
 			Prom: []Target{promTbl(fmt.Sprintf(
-				"max by (repo, ecosystem, interval) (github_dependabot_ecosystem_blocks{%s})", PF,
+				"max by (full_name, repo, ecosystem, interval) (github_dependabot_ecosystem_blocks{%s})", PF,
 			))},
 			PromTF: []any{organize(map[string]string{
 				"repo": "Repository", "ecosystem": "Ecosystem",

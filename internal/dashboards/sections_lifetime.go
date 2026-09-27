@@ -181,10 +181,11 @@ func lifetime(b *builder) []Panel {
 	// newest row per repository is the count; adding the range up would
 	// multiply it by however many sweeps landed in the range.
 	// Ten bars and the rest folded: twenty two labels in eight units of height
-	// were seven pixels each and overlapped.
-	runsEver := otherRows(`SELECT repo AS "Repository", runs AS "Runs",`+
+	// were seven pixels each and overlapped. A repository is a bar by its full
+	// name and named by repoNameSQL, since the fold groups by the label.
+	runsEver := otherRows(`SELECT `+repoNameSQL+` AS "Repository", runs AS "Runs",`+
 		" ROW_NUMBER() OVER (ORDER BY runs DESC) AS rn FROM ("+
-		"SELECT repo, runs, ROW_NUMBER() OVER (PARTITION BY repo ORDER BY time DESC) AS rn"+
+		"SELECT repo, full_name, runs, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn"+
 		" FROM gh_workflow_run_total WHERE $__timeFilter(time) AND "+RF+
 		") x WHERE rn = 1", "Repository", "Runs", 10)
 	rcr, rar, wrt := "gh_repo_created", "gh_repo_archived", "gh_workflow_run_total"
@@ -197,8 +198,8 @@ func lifetime(b *builder) []Panel {
 	// ones it does not: forks and private repositories that include_forks off
 	// never discovers. Filtering by that list would hide exactly the rows the
 	// panel exists for.
-	createdGR, createdGRtf := gTbl(fmt.Sprintf(`groupByNode(isNonNull(%s), %d, "sum")`,
-		gp(rcr, "created"), gn(rcr, "repo")), "Repository", []col{{"sum", "Created"}})
+	createdGR, createdGRtf := gTbl(grGroupBy(fmt.Sprintf("isNonNull(%s)", gp(rcr, "created")), rcr, "sum", "repo"),
+		"Repository", []col{{"sum", "Created"}})
 	// esRaw rather than a bucket aggregation, and that is what makes the two
 	// string columns possible: `fork` and `private` reach Grafana as the
 	// document's own values, where a top_metrics over either would hand the
@@ -224,8 +225,9 @@ func lifetime(b *builder) []Panel {
 
 	runsGR, runsGRtf := gTbl(rowsOf(fmt.Sprintf("keepLastValue(%s)", rp(wrt, "runs")),
 		gn(wrt, "repo")), "Repository", []col{{"lastNotNull", "Runs"}})
-	runsES, runsEStf := esTbl(wrt, []any{b.tm("repo", 500)}, []any{b.mNewest("runs")},
-		[]named{{"repo.keyword", "Repository"}, {"runs", "Runs"}}, []string{ESF})
+	runsES, runsEStf := esTbl(wrt, b.tmRepo(500), []any{b.mNewest("runs")},
+		[]named{{"repo.keyword", "Repository"}, {"runs", "Runs"}}, []string{ESF},
+		hideColumns(panelFullNameField))
 
 	return []Panel{
 		fieldGroup(b, "gh_account_total", "Since the account began", box{W: 24, H: 5, X: 0, Y: 0}, []named{
@@ -344,7 +346,7 @@ func lifetime(b *builder) []Panel {
 		}),
 		panel("barchart", "Workflow runs, ever", box{W: 8, H: 8, X: 16, Y: 17}, []Target{sqlT(runsEver)}, &P{
 			Prom: []Target{promTbl(fmt.Sprintf(
-				"topk(10, max by (repo) (github_workflow_run_total_runs{%s}))", PF,
+				"topk(10, max by (full_name, repo) (github_workflow_run_total_runs{%s}))", PF,
 			))},
 			PromDesc: "Prometheus shows the ten and folds nothing.",
 			PromTF: []any{organize(map[string]string{

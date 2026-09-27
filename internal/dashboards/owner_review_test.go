@@ -280,7 +280,7 @@ func TestDiscussionsAreListedOneByOne(t *testing.T) {
 	for title, want := range map[string][]string{
 		"Latest discussions": {
 			`title AS "Title"`, `category AS "Category"`, `comments AS "Comments"`,
-			`url AS "Link"`, "INTERVAL '30 years'", "PARTITION BY repo, number ORDER BY time DESC, comments DESC",
+			`url AS "Link"`, "INTERVAL '30 years'", "PARTITION BY full_name, number ORDER BY time DESC, comments DESC",
 			"WHEN answerable = 'false' THEN NULL WHEN has_answer THEN 1 ELSE 0 END",
 		},
 		// One row per comment, whichever of its rows says accepted: until

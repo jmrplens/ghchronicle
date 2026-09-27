@@ -32,6 +32,18 @@ than all of them.
   says so. No capture on this page is of a real account.
 </Aside>
 
+A repository is told apart by its full name on every panel. Two owners can give
+a repository the same name, as an account and an organization it belongs to
+each keep a `.github`, and a query that grouped, joined, counted or took the
+newest row by the short name alone made the two one: "Open the longest" listed
+`alice/x#5` and `acme/x#5` as one pull request, and every chart per repository
+drew them as one series. Since 2.6.1 every store keys a repository by its full
+name, and the exporter keeps the full name on every gauge that names one. A
+table still shows the short name, so the two are two rows of one name, and the
+repository picker still filters by it. A chart in InfluxDB and PostgreSQL names
+a series by its short name unless two repositories in the range share it, and
+then by their full names; the other three stores name both by the short name.
+
 ## Overview
 
 A masthead rather than a panel: the mark, large and centered, the name under

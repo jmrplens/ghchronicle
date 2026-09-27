@@ -328,7 +328,7 @@ func TestOpenItemsAreReadFromTheirNewestRow(t *testing.T) {
 	panels := rendered(t, "influxdb")
 	for _, title := range []string{"Open the longest", "Open issues the longest"} {
 		sql := sqlOf(t, mustPanel(t, panels, title))
-		if !strings.Contains(sql, "PARTITION BY repo, number ORDER BY time DESC") ||
+		if !strings.Contains(sql, "PARTITION BY full_name, number ORDER BY time DESC") ||
 			!strings.Contains(sql, "x.rn = 1 AND x.state = 'OPEN'") {
 			t.Errorf("%s filters the open rows before taking the newest: %s", title, sql)
 		}

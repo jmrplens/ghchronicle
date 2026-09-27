@@ -108,13 +108,15 @@ func assertWorkflowRunsWereReduced(t *testing.T, byName map[string][]promSample)
 	}
 	for _, s := range runs {
 		// The tags the rule keeps became labels, and the ones it drops are
-		// what stops the series count exploding.
-		if s.Labels["repo"] != "hello-world" {
-			t.Errorf("github_workflow_runs_count labels = %v, want the repository tag", s.Labels)
+		// what stops the series count exploding. The repository is the three
+		// tags that name it, which add no series: by the short name alone two
+		// owners' repositories of one name were one.
+		if s.Labels["repo"] != "hello-world" || s.Labels["full_name"] != "octocat/hello-world" {
+			t.Errorf("github_workflow_runs_count labels = %v, want the repository's tags", s.Labels)
 		}
 		for k := range s.Labels {
 			switch k {
-			case "repo", "workflow", "conclusion":
+			case "owner", "repo", "full_name", "workflow", "conclusion":
 			default:
 				t.Errorf("label %q survived the reduction: %v", k, s.Labels)
 			}

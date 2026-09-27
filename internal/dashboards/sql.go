@@ -47,9 +47,40 @@ func topSeries(table, tag, field, alias, where string) string {
 		topSeriesKept, tag, alias, tag, tag, timeBin, tag, field, field, tag, table, where)
 }
 
+// topRepoSeries is topSeries with a series per repository: each summed,
+// ranked and kept by its full name, and named by repoNameSQL. With `repo` as
+// the tag, two owners' repositories of one name were one series and one rank,
+// their days added together. The name is taken a level below the buckets,
+// over the rows themselves, because a window is not something a statement can
+// group by. `field` is 1 for a panel that counts rows.
+func topRepoSeries(table, field, alias, where string) string {
+	cols := "time, full_name, " + repoNameSQL + " AS name"
+	if field != "1" {
+		cols += ", " + field
+	}
+	return fmt.Sprintf("SELECT time, CASE WHEN rk <= %d THEN name ELSE 'other' END AS series,"+
+		" SUM(v) AS %s FROM (SELECT time, name, v,"+
+		" DENSE_RANK() OVER (ORDER BY total DESC, full_name) AS rk"+
+		" FROM (SELECT %s, full_name, name, SUM(%s) AS v, SUM(SUM(%s)) OVER (PARTITION BY full_name) AS total"+
+		" FROM (SELECT %s FROM %s WHERE $__timeFilter(time) AND %s) n GROUP BY 1, 2, 3) y) x"+
+		" GROUP BY 1, 2 HAVING SUM(v) > 0 ORDER BY 1",
+		topSeriesKept, alias, timeBin, field, field, cols, table, where)
+}
+
 // topSeriesKept is how many series a stacked panel names before folding the
 // rest: eight names and a remainder is what a legend a phone wide can show.
 const topSeriesKept = 8
+
+// repoNameSQL names a repository where the name is what tells two series or
+// two bars apart: by its short name, and by its full name when two owners'
+// repositories among the rows share the short one. A series is named by a
+// string, so two of one name are one series in the SQL stores, and a bar
+// chart that folds its tail into `other` groups by the label it draws. The
+// short name is what every other chart and table on the page shows, and an
+// account with no such pair never sees a full name here; one with alice/x
+// and acme/x sees the two.
+const repoNameSQL = "CASE WHEN MIN(full_name) OVER (PARTITION BY repo) =" +
+	" MAX(full_name) OVER (PARTITION BY repo) THEN repo ELSE full_name END"
 
 // agoSQL is a timestamp column less a column of seconds, which is how a row
 // dated when it was last seen gives the day it was opened. DataFusion refuses
@@ -91,10 +122,12 @@ func latestPerRepoWithin(fields []string, window string) string {
 // latestRowOf is the most recent row of each repository in a snapshot table,
 // for a table other than gh_repo or a filter other than RF. Partitioned by
 // the repository alone, so a repository whose tags changed, archived or made
-// public, is still one row: the newest.
+// public, is still one row: the newest. The repository is its full name, so
+// two owners' repositories of one name are two rows, and each row carries
+// both names, the short one for a table to show.
 func latestRowOf(table string, fields []string, window, filter string) string {
-	return fmt.Sprintf("SELECT repo, %s FROM ("+
-		"SELECT *, ROW_NUMBER() OVER (PARTITION BY repo ORDER BY time DESC) AS rn"+
+	return fmt.Sprintf("SELECT repo, full_name, %s FROM ("+
+		"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn"+
 		" FROM %s WHERE %s AND %s) x WHERE rn = 1",
 		strings.Join(fields, ", "), table, window, filter)
 }
@@ -160,8 +193,10 @@ instead of this note.
 // ── The repository's own flags ──────────────────────────────────────────────
 
 // repoFlagsJoin hangs `fork` and `archived` on a table of something else,
-// under the alias `f`, matched on the repository name. `on` is the column of
-// the outer query the repository is named by.
+// under the alias `f`, matched on the repository's full name. `on` is the
+// alias of the outer query's table, whose full_name is matched: by the short
+// name, alice/x's flags were hung on acme/x's rows as well, and an archived
+// one of the two hid the other's.
 //
 // Only gh_repo carries either: both are tags there and no other measurement
 // has them at all. Reading them costs a join, which is why the panels that
@@ -192,7 +227,7 @@ instead of this note.
 func repoFlagsJoin(on string) string {
 	return " LEFT JOIN (" +
 		latestPerRepoWithin([]string{"fork", "archived"}, wholeHistory) +
-		") f ON f.repo = " + on
+		") f ON f.full_name = " + on + ".full_name"
 }
 
 // The predicates that go with it.

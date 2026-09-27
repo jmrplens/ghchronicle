@@ -516,7 +516,7 @@ func profileStanding(b *builder) []Panel {
 	// list of both dialects.
 	pins := `SELECT "position" AS "Position", repo AS "Item", kind AS "Kind",` +
 		` stars AS "Stars", days_since_push AS "Idle", url AS "Link" FROM (` +
-		"SELECT *, ROW_NUMBER() OVER (PARTITION BY repo ORDER BY time DESC) AS rn" +
+		"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn" +
 		profileFrom + pi + " WHERE $__timeFilter(time)) x WHERE rn = 1 ORDER BY 1"
 	// Two columns and the link. The measurement carries a third field, the
 	// days since the availability status was set, but on one row of eight,
@@ -554,7 +554,7 @@ func profileStanding(b *builder) []Panel {
 	// keeps its row with two empty cells, and taken inside the pin's newest
 	// document it is the newest reading: `days_since_push` resets to 0 on a
 	// push, and the largest of the range was the staleness from before it.
-	pinES, pinEStf := esTbl(pi, []any{b.tm("repo", 20), b.newestDoc(), b.tm("kind", 5), b.tm("url", 20)},
+	pinES, pinEStf := esTbl(pi, append(b.tmRepo(20), b.newestDoc(), b.tm("kind", 5), b.tm("url", 20)),
 		[]any{b.mNewest("position"), b.mMax("stars"), b.mMax("days_since_push")},
 		[]named{
 			{"repo.keyword", "Item"},
@@ -563,7 +563,7 @@ func profileStanding(b *builder) []Panel {
 			{"position", "Position"},
 			{"stars", "Stars"},
 			{"days_since_push", "Idle"},
-		}, nil, hideColumns(panelESTime), sortAsc("Position"))
+		}, nil, hideColumns(panelFullNameField, panelESTime), sortAsc("Position"))
 
 	flagGR, flagGRtf := gTbl(rowsOf(profileKeepLast+gp(pf, "enabled")+")", gn(pf, "flag")),
 		"Flag", []col{{"lastNotNull", "Enabled"}})
@@ -593,9 +593,9 @@ func profileStanding(b *builder) []Panel {
 		// showed six of.
 		panel("table", "Pinned items", box{W: 12, H: 10, X: 0, Y: 14}, []Target{sqlT(pins)}, &P{
 			Prom: []Target{
-				promTbl("max by (repo) (github_pinned_item_position)", "A"),
-				promTbl("max by (repo) (github_pinned_item_stars)", "B"),
-				promTbl("max by (repo) (github_pinned_item_days_since_push)", "C"),
+				promTbl("max by (full_name, repo) (github_pinned_item_position)", "A"),
+				promTbl("max by (full_name, repo) (github_pinned_item_stars)", "B"),
+				promTbl("max by (full_name, repo) (github_pinned_item_days_since_push)", "C"),
 			},
 			PromTF: append(merged(map[string]string{
 				"repo": "Item", panelValueA: "Position", panelValueB: "Stars",

@@ -768,7 +768,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT \"Repository\", \"Runs\" FROM (SELECT CASE WHEN rn \u003c= 10 THEN \"Repository\" ELSE 'other' END AS \"Repository\", SUM(\"Runs\") AS \"Runs\", MIN(rn) AS o FROM (SELECT repo AS \"Repository\", runs AS \"Runs\", ROW_NUMBER() OVER (ORDER BY runs DESC) AS rn FROM (SELECT repo, runs, ROW_NUMBER() OVER (PARTITION BY repo ORDER BY time DESC) AS rn FROM gh_workflow_run_total WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE rn = 1) z GROUP BY 1) w ORDER BY o",
+              "rawSql": "SELECT \"Repository\", \"Runs\" FROM (SELECT CASE WHEN rn \u003c= 10 THEN \"Repository\" ELSE 'other' END AS \"Repository\", SUM(\"Runs\") AS \"Runs\", MIN(rn) AS o FROM (SELECT CASE WHEN MIN(full_name) OVER (PARTITION BY repo) = MAX(full_name) OVER (PARTITION BY repo) THEN repo ELSE full_name END AS \"Repository\", runs AS \"Runs\", ROW_NUMBER() OVER (ORDER BY runs DESC) AS rn FROM (SELECT repo, full_name, runs, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn FROM gh_workflow_run_total WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE rn = 1) z GROUP BY 1) w ORDER BY o",
               "refId": "A"
             }
           ],
@@ -842,7 +842,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "time_series",
               "rawQuery": true,
-              "rawSql": "SELECT time, CASE WHEN rk \u003c= 8 THEN repo ELSE 'other' END AS series, SUM(v) AS views FROM (SELECT time, repo, v, DENSE_RANK() OVER (ORDER BY total DESC, repo) AS rk FROM (SELECT $__dateBin(time) AS time, repo, SUM(count) AS v, SUM(SUM(count)) OVER (PARTITION BY repo) AS total FROM gh_traffic WHERE $__timeFilter(time) AND kind = 'views' AND repo IN (${repo:singlequote}) GROUP BY 1, 2) y) x GROUP BY 1, 2 HAVING SUM(v) \u003e 0 ORDER BY 1",
+              "rawSql": "SELECT time, CASE WHEN rk \u003c= 8 THEN name ELSE 'other' END AS series, SUM(v) AS views FROM (SELECT time, name, v, DENSE_RANK() OVER (ORDER BY total DESC, full_name) AS rk FROM (SELECT $__dateBin(time) AS time, full_name, name, SUM(count) AS v, SUM(SUM(count)) OVER (PARTITION BY full_name) AS total FROM (SELECT time, full_name, CASE WHEN MIN(full_name) OVER (PARTITION BY repo) = MAX(full_name) OVER (PARTITION BY repo) THEN repo ELSE full_name END AS name, count FROM gh_traffic WHERE $__timeFilter(time) AND kind = 'views' AND repo IN (${repo:singlequote})) n GROUP BY 1, 2, 3) y) x GROUP BY 1, 2 HAVING SUM(v) \u003e 0 ORDER BY 1",
               "refId": "A"
             }
           ],
@@ -902,7 +902,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "time_series",
               "rawQuery": true,
-              "rawSql": "SELECT time, CASE WHEN rk \u003c= 8 THEN repo ELSE 'other' END AS series, SUM(v) AS unique FROM (SELECT time, repo, v, DENSE_RANK() OVER (ORDER BY total DESC, repo) AS rk FROM (SELECT $__dateBin(time) AS time, repo, SUM(uniques) AS v, SUM(SUM(uniques)) OVER (PARTITION BY repo) AS total FROM gh_traffic WHERE $__timeFilter(time) AND kind = 'views' AND repo IN (${repo:singlequote}) GROUP BY 1, 2) y) x GROUP BY 1, 2 HAVING SUM(v) \u003e 0 ORDER BY 1",
+              "rawSql": "SELECT time, CASE WHEN rk \u003c= 8 THEN name ELSE 'other' END AS series, SUM(v) AS unique FROM (SELECT time, name, v, DENSE_RANK() OVER (ORDER BY total DESC, full_name) AS rk FROM (SELECT $__dateBin(time) AS time, full_name, name, SUM(uniques) AS v, SUM(SUM(uniques)) OVER (PARTITION BY full_name) AS total FROM (SELECT time, full_name, CASE WHEN MIN(full_name) OVER (PARTITION BY repo) = MAX(full_name) OVER (PARTITION BY repo) THEN repo ELSE full_name END AS name, uniques FROM gh_traffic WHERE $__timeFilter(time) AND kind = 'views' AND repo IN (${repo:singlequote})) n GROUP BY 1, 2, 3) y) x GROUP BY 1, 2 HAVING SUM(v) \u003e 0 ORDER BY 1",
               "refId": "A"
             }
           ],
@@ -962,7 +962,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "time_series",
               "rawQuery": true,
-              "rawSql": "SELECT time, CASE WHEN rk \u003c= 8 THEN repo ELSE 'other' END AS series, SUM(v) AS clones FROM (SELECT time, repo, v, DENSE_RANK() OVER (ORDER BY total DESC, repo) AS rk FROM (SELECT $__dateBin(time) AS time, repo, SUM(count) AS v, SUM(SUM(count)) OVER (PARTITION BY repo) AS total FROM gh_traffic WHERE $__timeFilter(time) AND kind = 'clones' AND repo IN (${repo:singlequote}) GROUP BY 1, 2) y) x GROUP BY 1, 2 HAVING SUM(v) \u003e 0 ORDER BY 1",
+              "rawSql": "SELECT time, CASE WHEN rk \u003c= 8 THEN name ELSE 'other' END AS series, SUM(v) AS clones FROM (SELECT time, name, v, DENSE_RANK() OVER (ORDER BY total DESC, full_name) AS rk FROM (SELECT $__dateBin(time) AS time, full_name, name, SUM(count) AS v, SUM(SUM(count)) OVER (PARTITION BY full_name) AS total FROM (SELECT time, full_name, CASE WHEN MIN(full_name) OVER (PARTITION BY repo) = MAX(full_name) OVER (PARTITION BY repo) THEN repo ELSE full_name END AS name, count FROM gh_traffic WHERE $__timeFilter(time) AND kind = 'clones' AND repo IN (${repo:singlequote})) n GROUP BY 1, 2, 3) y) x GROUP BY 1, 2 HAVING SUM(v) \u003e 0 ORDER BY 1",
               "refId": "A"
             }
           ],
@@ -1097,7 +1097,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT referrer AS \"Referrer\", SUM(count) AS \"Views\", SUM(uniques) AS \"Unique\", MAX(referrer_url) AS \"Link\" FROM (SELECT repo, referrer, count, uniques, referrer_url, ROW_NUMBER() OVER (PARTITION BY repo, referrer ORDER BY time DESC) AS rn FROM gh_traffic_referrer WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE rn = 1 GROUP BY 1 ORDER BY 2 DESC LIMIT 25",
+              "rawSql": "SELECT referrer AS \"Referrer\", SUM(count) AS \"Views\", SUM(uniques) AS \"Unique\", MAX(referrer_url) AS \"Link\" FROM (SELECT referrer, count, uniques, referrer_url, ROW_NUMBER() OVER (PARTITION BY full_name, referrer ORDER BY time DESC) AS rn FROM gh_traffic_referrer WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE rn = 1 GROUP BY 1 ORDER BY 2 DESC LIMIT 25",
               "refId": "A"
             }
           ],
@@ -1244,7 +1244,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT path AS \"Path\", SUM(count) AS \"Views\", SUM(uniques) AS \"Unique\", MAX(title) AS \"Title\", url AS \"Link\" FROM (SELECT repo, path, title, count, uniques, url, ROW_NUMBER() OVER (PARTITION BY repo, path ORDER BY time DESC) AS rn FROM gh_traffic_path WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE rn = 1 GROUP BY 1, 5 ORDER BY 2 DESC LIMIT 25",
+              "rawSql": "SELECT path AS \"Path\", SUM(count) AS \"Views\", SUM(uniques) AS \"Unique\", MAX(title) AS \"Title\", url AS \"Link\" FROM (SELECT path, title, count, uniques, url, ROW_NUMBER() OVER (PARTITION BY full_name, path ORDER BY time DESC) AS rn FROM gh_traffic_path WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE rn = 1 GROUP BY 1, 5 ORDER BY 2 DESC LIMIT 25",
               "refId": "A"
             }
           ],
@@ -1403,7 +1403,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT repo AS \"Repository\", SUM(CASE WHEN kind = 'clones' THEN count ELSE 0 END) * 1.0 / NULLIF(SUM(CASE WHEN kind = 'clones' THEN uniques ELSE 0 END), 0) AS \"Clones each\", SUM(CASE WHEN kind = 'clones' THEN count ELSE 0 END) AS \"Clones\", SUM(CASE WHEN kind = 'clones' THEN uniques ELSE 0 END) AS \"Cloners\", SUM(CASE WHEN kind = 'views' THEN count ELSE 0 END) AS \"Views\", MAX(url) AS \"Link\" FROM gh_traffic WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) GROUP BY 1 ORDER BY 2 DESC",
+              "rawSql": "SELECT repo AS \"Repository\", SUM(CASE WHEN kind = 'clones' THEN count ELSE 0 END) * 1.0 / NULLIF(SUM(CASE WHEN kind = 'clones' THEN uniques ELSE 0 END), 0) AS \"Clones each\", SUM(CASE WHEN kind = 'clones' THEN count ELSE 0 END) AS \"Clones\", SUM(CASE WHEN kind = 'clones' THEN uniques ELSE 0 END) AS \"Cloners\", SUM(CASE WHEN kind = 'views' THEN count ELSE 0 END) AS \"Views\", MAX(url) AS \"Link\" FROM gh_traffic WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) GROUP BY full_name, repo ORDER BY 2 DESC",
               "refId": "A"
             }
           ],
@@ -1477,7 +1477,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "time_series",
               "rawQuery": true,
-              "rawSql": "SELECT time, CASE WHEN rk \u003c= 8 THEN repo ELSE 'other' END AS series, SUM(v) AS stars FROM (SELECT time, repo, v, DENSE_RANK() OVER (ORDER BY total DESC, repo) AS rk FROM (SELECT $__dateBin(time) AS time, repo, SUM(stars) AS v, SUM(SUM(stars)) OVER (PARTITION BY repo) AS total FROM gh_star_day WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) GROUP BY 1, 2) y) x GROUP BY 1, 2 HAVING SUM(v) \u003e 0 ORDER BY 1",
+              "rawSql": "SELECT time, CASE WHEN rk \u003c= 8 THEN name ELSE 'other' END AS series, SUM(v) AS stars FROM (SELECT time, name, v, DENSE_RANK() OVER (ORDER BY total DESC, full_name) AS rk FROM (SELECT $__dateBin(time) AS time, full_name, name, SUM(stars) AS v, SUM(SUM(stars)) OVER (PARTITION BY full_name) AS total FROM (SELECT time, full_name, CASE WHEN MIN(full_name) OVER (PARTITION BY repo) = MAX(full_name) OVER (PARTITION BY repo) THEN repo ELSE full_name END AS name, stars FROM gh_star_day WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) n GROUP BY 1, 2, 3) y) x GROUP BY 1, 2 HAVING SUM(v) \u003e 0 ORDER BY 1",
               "refId": "A"
             }
           ],
@@ -1593,7 +1593,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT \"Repository\", \"Stars\" FROM (SELECT CASE WHEN rn \u003c= 12 THEN \"Repository\" ELSE 'other' END AS \"Repository\", SUM(\"Stars\") AS \"Stars\", MIN(rn) AS o FROM (SELECT repo AS \"Repository\", stars AS \"Stars\", ROW_NUMBER() OVER (ORDER BY stars DESC) AS rn FROM (SELECT repo, stars FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo ORDER BY time DESC) AS rn FROM gh_repo WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE rn = 1) WHERE stars \u003e 0) z GROUP BY 1) w ORDER BY o",
+              "rawSql": "SELECT \"Repository\", \"Stars\" FROM (SELECT CASE WHEN rn \u003c= 12 THEN \"Repository\" ELSE 'other' END AS \"Repository\", SUM(\"Stars\") AS \"Stars\", MIN(rn) AS o FROM (SELECT CASE WHEN MIN(full_name) OVER (PARTITION BY repo) = MAX(full_name) OVER (PARTITION BY repo) THEN repo ELSE full_name END AS \"Repository\", stars AS \"Stars\", ROW_NUMBER() OVER (ORDER BY stars DESC) AS rn FROM (SELECT repo, full_name, stars FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn FROM gh_repo WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE rn = 1) WHERE stars \u003e 0) z GROUP BY 1) w ORDER BY o",
               "refId": "A"
             }
           ],
@@ -3496,7 +3496,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT repo AS \"Repository\", COUNT(*) AS \"Merged\", approx_percentile_cont(seconds_to_merge, 0.5) AS \"Time to merge\", approx_percentile_cont(churn, 0.5) AS \"Lines changed\" FROM gh_pull_request WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) AND number IS NOT NULL AND state = 'MERGED' GROUP BY 1 ORDER BY 2 DESC",
+              "rawSql": "SELECT repo AS \"Repository\", COUNT(*) AS \"Merged\", approx_percentile_cont(seconds_to_merge, 0.5) AS \"Time to merge\", approx_percentile_cont(churn, 0.5) AS \"Lines changed\" FROM gh_pull_request WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) AND number IS NOT NULL AND state = 'MERGED' GROUP BY full_name, repo ORDER BY 2 DESC",
               "refId": "A"
             }
           ],
@@ -3837,7 +3837,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT x.number AS \"Number\", x.seconds_open AS \"Open for\", x.repo AS \"Repository\", x.title AS \"Title\", x.author AS \"Author\", x.label_names AS \"Labels\", x.comments AS \"Comments\", x.reviews AS \"Reviews\", f.fork AS \"Fork\", x.url AS \"Link\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo, number ORDER BY time DESC) AS rn FROM gh_pull_request WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) AND number IS NOT NULL) x LEFT JOIN (SELECT repo, fork, archived FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo ORDER BY time DESC) AS rn FROM gh_repo WHERE time \u003e now() - INTERVAL '30 years' AND repo IN (${repo:singlequote})) x WHERE rn = 1) f ON f.repo = x.repo WHERE x.rn = 1 AND x.state = 'OPEN' AND COALESCE(f.archived, 'false') \u003c\u003e 'true' ORDER BY x.seconds_open DESC LIMIT 25",
+              "rawSql": "SELECT x.number AS \"Number\", x.seconds_open AS \"Open for\", x.repo AS \"Repository\", x.title AS \"Title\", x.author AS \"Author\", x.label_names AS \"Labels\", x.comments AS \"Comments\", x.reviews AS \"Reviews\", f.fork AS \"Fork\", x.url AS \"Link\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, number ORDER BY time DESC) AS rn FROM gh_pull_request WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) AND number IS NOT NULL) x LEFT JOIN (SELECT repo, full_name, fork, archived FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn FROM gh_repo WHERE time \u003e now() - INTERVAL '30 years' AND repo IN (${repo:singlequote})) x WHERE rn = 1) f ON f.full_name = x.full_name WHERE x.rn = 1 AND x.state = 'OPEN' AND COALESCE(f.archived, 'false') \u003c\u003e 'true' ORDER BY x.seconds_open DESC LIMIT 25",
               "refId": "A"
             }
           ],
@@ -3985,7 +3985,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT x.number AS \"Number\", x.seconds_open AS \"Open for\", x.repo AS \"Repository\", x.author AS \"Author\", x.comments AS \"Comments\", x.label_names AS \"Labels\", f.fork AS \"Fork\", x.url AS \"Link\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo, number ORDER BY time DESC) AS rn FROM gh_issue WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) AND number IS NOT NULL) x LEFT JOIN (SELECT repo, fork, archived FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo ORDER BY time DESC) AS rn FROM gh_repo WHERE time \u003e now() - INTERVAL '30 years' AND repo IN (${repo:singlequote})) x WHERE rn = 1) f ON f.repo = x.repo WHERE x.rn = 1 AND x.state = 'OPEN' AND COALESCE(f.archived, 'false') \u003c\u003e 'true' ORDER BY x.seconds_open DESC LIMIT 25",
+              "rawSql": "SELECT x.number AS \"Number\", x.seconds_open AS \"Open for\", x.repo AS \"Repository\", x.author AS \"Author\", x.comments AS \"Comments\", x.label_names AS \"Labels\", f.fork AS \"Fork\", x.url AS \"Link\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, number ORDER BY time DESC) AS rn FROM gh_issue WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) AND number IS NOT NULL) x LEFT JOIN (SELECT repo, full_name, fork, archived FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn FROM gh_repo WHERE time \u003e now() - INTERVAL '30 years' AND repo IN (${repo:singlequote})) x WHERE rn = 1) f ON f.full_name = x.full_name WHERE x.rn = 1 AND x.state = 'OPEN' AND COALESCE(f.archived, 'false') \u003c\u003e 'true' ORDER BY x.seconds_open DESC LIMIT 25",
               "refId": "A"
             }
           ],
@@ -4198,7 +4198,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT number AS \"Pull request\", SUM(1 - resolved) AS \"Unresolved\", repo AS \"Repository\", COUNT(*) AS \"Threads\", SUM(outdated * (1 - resolved)) AS \"Outdated\", SUM(comments * (1 - resolved)) AS \"Comments\" FROM gh_review_thread WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) GROUP BY 1, 3 ORDER BY 2 DESC LIMIT 25",
+              "rawSql": "SELECT number AS \"Pull request\", SUM(1 - resolved) AS \"Unresolved\", repo AS \"Repository\", COUNT(*) AS \"Threads\", SUM(outdated * (1 - resolved)) AS \"Outdated\", SUM(comments * (1 - resolved)) AS \"Comments\" FROM gh_review_thread WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) GROUP BY 1, full_name, 3 ORDER BY 2 DESC LIMIT 25",
               "refId": "A"
             }
           ],
@@ -4729,7 +4729,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "time_series",
               "rawQuery": true,
-              "rawSql": "SELECT time, CASE WHEN rk \u003c= 8 THEN repo ELSE 'other' END AS series, SUM(live_bytes) AS bytes FROM (SELECT time, repo, live_bytes, DENSE_RANK() OVER (ORDER BY newest DESC, repo) AS rk FROM (SELECT $__dateBin(time) AS time, repo, live_bytes, ROW_NUMBER() OVER (PARTITION BY $__dateBin(time), repo ORDER BY time DESC) AS rn, FIRST_VALUE(live_bytes) OVER (PARTITION BY repo ORDER BY time DESC) AS newest FROM gh_artifact_total WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) y WHERE rn = 1) x GROUP BY 1, 2 HAVING SUM(live_bytes) \u003e 0 ORDER BY 1",
+              "rawSql": "SELECT time, CASE WHEN rk \u003c= 8 THEN name ELSE 'other' END AS series, SUM(live_bytes) AS bytes FROM (SELECT time, name, live_bytes, DENSE_RANK() OVER (ORDER BY newest DESC, full_name) AS rk FROM (SELECT $__dateBin(time) AS time, full_name, CASE WHEN MIN(full_name) OVER (PARTITION BY repo) = MAX(full_name) OVER (PARTITION BY repo) THEN repo ELSE full_name END AS name, live_bytes, ROW_NUMBER() OVER (PARTITION BY $__dateBin(time), full_name ORDER BY time DESC) AS rn, FIRST_VALUE(live_bytes) OVER (PARTITION BY full_name ORDER BY time DESC) AS newest FROM gh_artifact_total WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) y WHERE rn = 1) x GROUP BY 1, 2 HAVING SUM(live_bytes) \u003e 0 ORDER BY 1",
               "refId": "A"
             }
           ],
@@ -4892,7 +4892,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT REPLACE(workflow, '.github/workflows/', '') AS \"Workflow\", COUNT(*) AS \"Runs\", r.repo AS \"Repository\", SUM(CASE WHEN conclusion \u003c\u003e 'success' THEN 1 ELSE 0 END) AS \"Not successful\", approx_percentile_cont(duration_seconds, 0.5) AS \"Duration\", MAX(w.url) AS \"Link\" FROM gh_workflow_run r LEFT JOIN (SELECT repo, path, MAX(url) AS url FROM gh_workflow WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) GROUP BY 1, 2) w ON w.repo = r.repo AND w.path = r.workflow WHERE $__timeFilter(time) AND r.repo IN (${repo:singlequote}) GROUP BY 1, 3 ORDER BY 2 DESC LIMIT 30",
+              "rawSql": "SELECT REPLACE(workflow, '.github/workflows/', '') AS \"Workflow\", COUNT(*) AS \"Runs\", r.repo AS \"Repository\", SUM(CASE WHEN conclusion \u003c\u003e 'success' THEN 1 ELSE 0 END) AS \"Not successful\", approx_percentile_cont(duration_seconds, 0.5) AS \"Duration\", MAX(w.url) AS \"Link\" FROM gh_workflow_run r LEFT JOIN (SELECT full_name, path, MAX(url) AS url FROM gh_workflow WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) GROUP BY 1, 2) w ON w.full_name = r.full_name AND w.path = r.workflow WHERE $__timeFilter(time) AND r.repo IN (${repo:singlequote}) GROUP BY 1, r.full_name, 3 ORDER BY 2 DESC LIMIT 30",
               "refId": "A"
             }
           ],
@@ -5002,7 +5002,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT job_name AS \"Job\", approx_percentile_cont(duration_seconds, 0.5) AS \"Duration\", repo AS \"Repository\", COUNT(*) AS \"Times run\", MAX(duration_seconds) AS \"Worst\" FROM gh_workflow_job WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) GROUP BY 1, 3 ORDER BY 2 DESC LIMIT 30",
+              "rawSql": "SELECT job_name AS \"Job\", approx_percentile_cont(duration_seconds, 0.5) AS \"Duration\", repo AS \"Repository\", COUNT(*) AS \"Times run\", MAX(duration_seconds) AS \"Worst\" FROM gh_workflow_job WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) GROUP BY 1, full_name, 3 ORDER BY 2 DESC LIMIT 30",
               "refId": "A"
             }
           ],
@@ -5124,7 +5124,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT step AS \"Step\", approx_percentile_cont(duration_seconds, 0.5) AS \"Duration\", job_name AS \"Job\", repo AS \"Repository\", COUNT(*) AS \"Times run\", MAX(duration_seconds) AS \"Worst\" FROM gh_workflow_step WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) GROUP BY 1, 3, 4 ORDER BY 2 DESC LIMIT 30",
+              "rawSql": "SELECT step AS \"Step\", approx_percentile_cont(duration_seconds, 0.5) AS \"Duration\", job_name AS \"Job\", repo AS \"Repository\", COUNT(*) AS \"Times run\", MAX(duration_seconds) AS \"Worst\" FROM gh_workflow_step WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) GROUP BY 1, 3, full_name, 4 ORDER BY 2 DESC LIMIT 30",
               "refId": "A"
             }
           ],
@@ -5226,7 +5226,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT repo AS \"Repository\", SUM(CASE WHEN conclusion \u003c\u003e 'success' THEN duration_seconds ELSE 0 END) AS \"Wasted\", SUM(duration_seconds) AS \"Total\", 100.0 * SUM(CASE WHEN conclusion \u003c\u003e 'success' THEN duration_seconds ELSE 0 END) / NULLIF(SUM(duration_seconds), 0) AS \"Share\" FROM gh_workflow_run WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) GROUP BY 1 ORDER BY 2 DESC",
+              "rawSql": "SELECT repo AS \"Repository\", SUM(CASE WHEN conclusion \u003c\u003e 'success' THEN duration_seconds ELSE 0 END) AS \"Wasted\", SUM(duration_seconds) AS \"Total\", 100.0 * SUM(CASE WHEN conclusion \u003c\u003e 'success' THEN duration_seconds ELSE 0 END) / NULLIF(SUM(duration_seconds), 0) AS \"Share\" FROM gh_workflow_run WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) GROUP BY full_name, repo ORDER BY 2 DESC",
               "refId": "A"
             }
           ],
@@ -5365,7 +5365,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT r.repo AS \"Repository\", SUM(CASE WHEN conclusion \u003c\u003e 'success' THEN 1 ELSE 0 END) AS \"Failures\", workflow AS \"Workflow\", COUNT(*) AS \"Runs\", 100.0 * SUM(CASE WHEN conclusion \u003c\u003e 'success' THEN 1 ELSE 0 END) / COUNT(*) AS \"Failure rate\", MAX(w.url) AS \"Link\" FROM gh_workflow_run r LEFT JOIN (SELECT repo, path, MAX(url) AS url FROM gh_workflow WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) GROUP BY 1, 2) w ON w.repo = r.repo AND w.path = r.workflow WHERE $__timeFilter(time) AND r.repo IN (${repo:singlequote}) GROUP BY 1, 3 HAVING SUM(CASE WHEN conclusion \u003c\u003e 'success' THEN 1 ELSE 0 END) \u003e 3 ORDER BY 5 DESC, 2 DESC LIMIT 20",
+              "rawSql": "SELECT r.repo AS \"Repository\", SUM(CASE WHEN conclusion \u003c\u003e 'success' THEN 1 ELSE 0 END) AS \"Failures\", workflow AS \"Workflow\", COUNT(*) AS \"Runs\", 100.0 * SUM(CASE WHEN conclusion \u003c\u003e 'success' THEN 1 ELSE 0 END) / COUNT(*) AS \"Failure rate\", MAX(w.url) AS \"Link\" FROM gh_workflow_run r LEFT JOIN (SELECT full_name, path, MAX(url) AS url FROM gh_workflow WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) GROUP BY 1, 2) w ON w.full_name = r.full_name AND w.path = r.workflow WHERE $__timeFilter(time) AND r.repo IN (${repo:singlequote}) GROUP BY 1, r.full_name, 3 HAVING SUM(CASE WHEN conclusion \u003c\u003e 'success' THEN 1 ELSE 0 END) \u003e 3 ORDER BY 5 DESC, 2 DESC LIMIT 20",
               "refId": "A"
             }
           ],
@@ -5470,7 +5470,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT step AS \"Step\", COUNT(*) AS \"Failures\", repo AS \"Repository\" FROM gh_workflow_step WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) AND conclusion = 'failure' GROUP BY 1, 3 ORDER BY 2 DESC LIMIT 20",
+              "rawSql": "SELECT step AS \"Step\", COUNT(*) AS \"Failures\", repo AS \"Repository\" FROM gh_workflow_step WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) AND conclusion = 'failure' GROUP BY 1, full_name, 3 ORDER BY 2 DESC LIMIT 20",
               "refId": "A"
             }
           ],
@@ -5585,7 +5585,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT w.repo AS \"Repository\", w.workflow AS \"Workflow\", w.state AS \"State\", f.fork AS \"Fork\", w.url AS \"Link\" FROM (SELECT DISTINCT repo, workflow, path, state, url FROM gh_workflow WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) w LEFT JOIN (SELECT DISTINCT repo, workflow FROM gh_workflow_run WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) r ON w.repo = r.repo AND w.path = r.workflow LEFT JOIN (SELECT repo, fork, archived FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo ORDER BY time DESC) AS rn FROM gh_repo WHERE time \u003e now() - INTERVAL '30 years' AND repo IN (${repo:singlequote})) x WHERE rn = 1) f ON f.repo = w.repo WHERE r.workflow IS NULL AND COALESCE(f.archived, 'false') \u003c\u003e 'true' ORDER BY 1, 2",
+              "rawSql": "SELECT w.repo AS \"Repository\", w.workflow AS \"Workflow\", w.state AS \"State\", f.fork AS \"Fork\", w.url AS \"Link\" FROM (SELECT DISTINCT full_name, repo, workflow, path, state, url FROM gh_workflow WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) w LEFT JOIN (SELECT DISTINCT full_name, workflow FROM gh_workflow_run WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) r ON w.full_name = r.full_name AND w.path = r.workflow LEFT JOIN (SELECT repo, full_name, fork, archived FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn FROM gh_repo WHERE time \u003e now() - INTERVAL '30 years' AND repo IN (${repo:singlequote})) x WHERE rn = 1) f ON f.full_name = w.full_name WHERE r.workflow IS NULL AND COALESCE(f.archived, 'false') \u003c\u003e 'true' ORDER BY 1, 2",
               "refId": "A"
             }
           ],
@@ -5644,7 +5644,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "time_series",
               "rawQuery": true,
-              "rawSql": "SELECT time, CASE WHEN rk \u003c= 8 THEN repo ELSE 'other' END AS series, SUM(v) AS bytes FROM (SELECT time, repo, v, DENSE_RANK() OVER (ORDER BY total DESC, repo) AS rk FROM (SELECT $__dateBin(time) AS time, repo, SUM(size_bytes) AS v, SUM(SUM(size_bytes)) OVER (PARTITION BY repo) AS total FROM gh_artifact WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) GROUP BY 1, 2) y) x GROUP BY 1, 2 HAVING SUM(v) \u003e 0 ORDER BY 1",
+              "rawSql": "SELECT time, CASE WHEN rk \u003c= 8 THEN name ELSE 'other' END AS series, SUM(v) AS bytes FROM (SELECT time, name, v, DENSE_RANK() OVER (ORDER BY total DESC, full_name) AS rk FROM (SELECT $__dateBin(time) AS time, full_name, name, SUM(size_bytes) AS v, SUM(SUM(size_bytes)) OVER (PARTITION BY full_name) AS total FROM (SELECT time, full_name, CASE WHEN MIN(full_name) OVER (PARTITION BY repo) = MAX(full_name) OVER (PARTITION BY repo) THEN repo ELSE full_name END AS name, size_bytes FROM gh_artifact WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) n GROUP BY 1, 2, 3) y) x GROUP BY 1, 2 HAVING SUM(v) \u003e 0 ORDER BY 1",
               "refId": "A"
             }
           ],
@@ -6690,7 +6690,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT c.repo AS \"Repository\", c.time AS \"When\", c.author AS \"Author\", c.headline AS \"Commit\", r.failures AS \"Failed runs\", r.run_number AS \"Run number\", c.url AS \"Link\", r.url AS \"Run\" FROM (SELECT repo, author, time, oid, headline, url FROM gh_commit WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) AND gate = 'FAILURE') c JOIN (SELECT repo, head_sha, COUNT(*) AS failures, MAX(url) AS url, MAX(run_number) AS run_number FROM gh_workflow_run WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) AND conclusion \u003c\u003e 'success' GROUP BY 1, 2) r ON c.repo = r.repo AND c.oid = r.head_sha ORDER BY 2 DESC LIMIT 25",
+              "rawSql": "SELECT c.repo AS \"Repository\", c.time AS \"When\", c.author AS \"Author\", c.headline AS \"Commit\", r.failures AS \"Failed runs\", r.run_number AS \"Run number\", c.url AS \"Link\", r.url AS \"Run\" FROM (SELECT full_name, repo, author, time, oid, headline, url FROM gh_commit WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) AND gate = 'FAILURE') c JOIN (SELECT full_name, head_sha, COUNT(*) AS failures, MAX(url) AS url, MAX(run_number) AS run_number FROM gh_workflow_run WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) AND conclusion \u003c\u003e 'success' GROUP BY 1, 2) r ON c.full_name = r.full_name AND c.oid = r.head_sha ORDER BY 2 DESC LIMIT 25",
               "refId": "A"
             }
           ],
@@ -6852,7 +6852,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT label AS \"Label\", used AS \"Used\", repo AS \"Repository\", issues AS \"Issues\", pull_requests AS \"Pull requests\", url AS \"Link\" FROM (SELECT repo, label, used, issues, pull_requests, url, ROW_NUMBER() OVER (PARTITION BY repo, label ORDER BY time DESC) AS rn FROM gh_label WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE rn = 1 ORDER BY 2 DESC LIMIT 25",
+              "rawSql": "SELECT label AS \"Label\", used AS \"Used\", repo AS \"Repository\", issues AS \"Issues\", pull_requests AS \"Pull requests\", url AS \"Link\" FROM (SELECT repo, label, used, issues, pull_requests, url, ROW_NUMBER() OVER (PARTITION BY full_name, label ORDER BY time DESC) AS rn FROM gh_label WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE rn = 1 ORDER BY 2 DESC LIMIT 25",
               "refId": "A"
             }
           ],
@@ -7011,7 +7011,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT milestone AS \"Milestone\", progress AS \"Progress\", repo AS \"Repository\", state AS \"State\", issues AS \"Issues\", pull_requests AS \"Pull requests\", url AS \"Link\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo, milestone ORDER BY time DESC) AS rn FROM gh_milestone WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE rn = 1 ORDER BY 2 DESC LIMIT 25",
+              "rawSql": "SELECT milestone AS \"Milestone\", progress AS \"Progress\", repo AS \"Repository\", state AS \"State\", issues AS \"Issues\", pull_requests AS \"Pull requests\", url AS \"Link\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, milestone ORDER BY time DESC) AS rn FROM gh_milestone WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE rn = 1 ORDER BY 2 DESC LIMIT 25",
               "refId": "A"
             }
           ],
@@ -7071,7 +7071,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "time_series",
               "rawQuery": true,
-              "rawSql": "SELECT time, CASE WHEN rk \u003c= 8 THEN repo ELSE 'other' END AS series, SUM(v) AS forks FROM (SELECT time, repo, v, DENSE_RANK() OVER (ORDER BY total DESC, repo) AS rk FROM (SELECT $__dateBin(time) AS time, repo, SUM(1) AS v, SUM(SUM(1)) OVER (PARTITION BY repo) AS total FROM gh_fork WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) GROUP BY 1, 2) y) x GROUP BY 1, 2 HAVING SUM(v) \u003e 0 ORDER BY 1",
+              "rawSql": "SELECT time, CASE WHEN rk \u003c= 8 THEN name ELSE 'other' END AS series, SUM(v) AS forks FROM (SELECT time, name, v, DENSE_RANK() OVER (ORDER BY total DESC, full_name) AS rk FROM (SELECT $__dateBin(time) AS time, full_name, name, SUM(1) AS v, SUM(SUM(1)) OVER (PARTITION BY full_name) AS total FROM (SELECT time, full_name, CASE WHEN MIN(full_name) OVER (PARTITION BY repo) = MAX(full_name) OVER (PARTITION BY repo) THEN repo ELSE full_name END AS name FROM gh_fork WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) n GROUP BY 1, 2, 3) y) x GROUP BY 1, 2 HAVING SUM(v) \u003e 0 ORDER BY 1",
               "refId": "A"
             }
           ],
@@ -7534,7 +7534,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT title AS \"Title\", time AS \"Opened\", repo AS \"Repository\", category AS \"Category\", comments AS \"Comments\", CASE WHEN answerable = 'false' THEN NULL WHEN has_answer THEN 1 ELSE 0 END AS \"Answered\", url AS \"Link\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo, number ORDER BY time DESC, comments DESC) AS rn FROM gh_discussion WHERE time \u003e now() - INTERVAL '30 years' AND repo IN (${repo:singlequote})) x WHERE rn = 1 ORDER BY 2 DESC LIMIT 50",
+              "rawSql": "SELECT title AS \"Title\", time AS \"Opened\", repo AS \"Repository\", category AS \"Category\", comments AS \"Comments\", CASE WHEN answerable = 'false' THEN NULL WHEN has_answer THEN 1 ELSE 0 END AS \"Answered\", url AS \"Link\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, number ORDER BY time DESC, comments DESC) AS rn FROM gh_discussion WHERE time \u003e now() - INTERVAL '30 years' AND repo IN (${repo:singlequote})) x WHERE rn = 1 ORDER BY 2 DESC LIMIT 50",
               "refId": "A"
             }
           ],
@@ -8210,7 +8210,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT host AS \"Endpoint\", SUM(CASE WHEN ok = 'false' THEN 1 ELSE 0 END) AS \"Failed\", COUNT(*) AS \"Deliveries\", repo AS \"Repository\", SUM(CASE WHEN redelivery THEN 1 ELSE 0 END) AS \"Retried\", approx_percentile_cont(duration_seconds, 0.5) AS \"Latency\" FROM gh_webhook_delivery WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) GROUP BY 1, 4 ORDER BY 2 DESC, 3 DESC LIMIT 25",
+              "rawSql": "SELECT host AS \"Endpoint\", SUM(CASE WHEN ok = 'false' THEN 1 ELSE 0 END) AS \"Failed\", COUNT(*) AS \"Deliveries\", repo AS \"Repository\", SUM(CASE WHEN redelivery THEN 1 ELSE 0 END) AS \"Retried\", approx_percentile_cont(duration_seconds, 0.5) AS \"Latency\" FROM gh_webhook_delivery WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) GROUP BY 1, full_name, 4 ORDER BY 2 DESC, 3 DESC LIMIT 25",
               "refId": "A"
             }
           ],
@@ -8329,7 +8329,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT repo AS \"Repository\", ruleset AS \"Ruleset\", enforcement AS \"Enforcement\", target AS \"Target\", days_since_change AS \"Last changed\", url AS \"Link\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo, ruleset ORDER BY time DESC) AS rn FROM gh_ruleset WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE rn = 1 ORDER BY 1, 2",
+              "rawSql": "SELECT repo AS \"Repository\", ruleset AS \"Ruleset\", enforcement AS \"Enforcement\", target AS \"Target\", days_since_change AS \"Last changed\", url AS \"Link\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, ruleset ORDER BY time DESC) AS rn FROM gh_ruleset WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE rn = 1 ORDER BY 1, 2",
               "refId": "A"
             }
           ],
@@ -8411,7 +8411,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT repo AS \"Repository\", days_since_use AS \"Unused for\", key AS \"Key\", read_only AS \"Read only\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo, key ORDER BY time DESC) AS rn FROM gh_deploy_key WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE rn = 1 ORDER BY 2 DESC",
+              "rawSql": "SELECT repo AS \"Repository\", days_since_use AS \"Unused for\", key AS \"Key\", read_only AS \"Read only\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, key ORDER BY time DESC) AS rn FROM gh_deploy_key WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE rn = 1 ORDER BY 2 DESC",
               "refId": "A"
             }
           ],
@@ -8517,7 +8517,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT repo AS \"Repository\", host AS \"Host\", hook AS \"Hook\", active AS \"Active\", MAX(events) AS \"Events subscribed\" FROM (SELECT repo, host, hook, active, events, ROW_NUMBER() OVER (PARTITION BY repo, hook, host ORDER BY time DESC) AS rn FROM gh_webhook WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE rn = 1 GROUP BY 1, 2, 3, 4 ORDER BY 1, 2",
+              "rawSql": "SELECT repo AS \"Repository\", host AS \"Host\", hook AS \"Hook\", active AS \"Active\", MAX(events) AS \"Events subscribed\" FROM (SELECT full_name, repo, host, hook, active, events, ROW_NUMBER() OVER (PARTITION BY full_name, hook, host ORDER BY time DESC) AS rn FROM gh_webhook WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE rn = 1 GROUP BY full_name, 1, 2, 3, 4 ORDER BY 1, 2",
               "refId": "A"
             }
           ],
@@ -8735,7 +8735,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT b.branch AS \"Branch\", b.days_since_commit AS \"Idle\", b.repo AS \"Repository\", b.is_default AS \"Default\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo, branch ORDER BY time DESC) AS rn FROM gh_branch WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) b LEFT JOIN (SELECT repo, fork, archived FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo ORDER BY time DESC) AS rn FROM gh_repo WHERE time \u003e now() - INTERVAL '30 years' AND repo IN (${repo:singlequote})) x WHERE rn = 1) f ON f.repo = b.repo WHERE b.rn = 1 AND COALESCE(f.fork, 'false') \u003c\u003e 'true' AND COALESCE(f.archived, 'false') \u003c\u003e 'true' ORDER BY 2 DESC",
+              "rawSql": "SELECT b.branch AS \"Branch\", b.days_since_commit AS \"Idle\", b.repo AS \"Repository\", b.is_default AS \"Default\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, branch ORDER BY time DESC) AS rn FROM gh_branch WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) b LEFT JOIN (SELECT repo, full_name, fork, archived FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn FROM gh_repo WHERE time \u003e now() - INTERVAL '30 years' AND repo IN (${repo:singlequote})) x WHERE rn = 1) f ON f.full_name = b.full_name WHERE b.rn = 1 AND COALESCE(f.fork, 'false') \u003c\u003e 'true' AND COALESCE(f.archived, 'false') \u003c\u003e 'true' ORDER BY 2 DESC",
               "refId": "A"
             }
           ],
@@ -9032,7 +9032,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT repo AS \"Repository\", pattern AS \"Pattern\", required_reviews AS \"Reviews\", CAST(requires_commit_signatures AS INT) AS \"Signatures\", CAST(requires_linear_history AS INT) AS \"Linear\", CAST(allows_force_pushes AS INT) AS \"Force push\", CAST(requires_conversation_resolution AS INT) AS \"Threads\", required_checks AS \"Checks\", url AS \"Link\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo, pattern ORDER BY time DESC) AS rn FROM gh_branch_protection WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE rn = 1 ORDER BY 1, 2",
+              "rawSql": "SELECT repo AS \"Repository\", pattern AS \"Pattern\", required_reviews AS \"Reviews\", CAST(requires_commit_signatures AS INT) AS \"Signatures\", CAST(requires_linear_history AS INT) AS \"Linear\", CAST(allows_force_pushes AS INT) AS \"Force push\", CAST(requires_conversation_resolution AS INT) AS \"Threads\", required_checks AS \"Checks\", url AS \"Link\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, pattern ORDER BY time DESC) AS rn FROM gh_branch_protection WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE rn = 1 ORDER BY 1, 2",
               "refId": "A"
             }
           ],
@@ -9146,7 +9146,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT rule AS \"Rule\", bypass_always AS \"Always\", repo AS \"Repository\", ruleset AS \"Ruleset\", bypass_actors AS \"Bypass actors\", bypass_sampled AS \"Sampled\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo, ruleset, rule ORDER BY time DESC) AS rn FROM gh_ruleset_rule WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE rn = 1 ORDER BY 2 DESC, 3, 4, 1",
+              "rawSql": "SELECT rule AS \"Rule\", bypass_always AS \"Always\", repo AS \"Repository\", ruleset AS \"Ruleset\", bypass_actors AS \"Bypass actors\", bypass_sampled AS \"Sampled\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, ruleset, rule ORDER BY time DESC) AS rn FROM gh_ruleset_rule WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE rn = 1 ORDER BY 2 DESC, 3, 4, 1",
               "refId": "A"
             }
           ],
@@ -9557,7 +9557,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT environment AS \"Environment\", COUNT(*) AS \"Deployments\", repo AS \"Repository\", approx_percentile_cont(seconds_to_status, 0.5) AS \"To status\", approx_percentile_cont(seconds_live, 0.5) AS \"Live for\", SUM(CASE WHEN success THEN 1 ELSE 0 END) AS \"Successes\", SUM(CASE WHEN outcome = 'pending' THEN 1 ELSE 0 END) AS \"Pending\", MAX(url) AS \"Link\", MAX(environment_url) AS \"Live\" FROM gh_deployment WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) GROUP BY 1, 3 ORDER BY 2 DESC",
+              "rawSql": "SELECT environment AS \"Environment\", COUNT(*) AS \"Deployments\", repo AS \"Repository\", approx_percentile_cont(seconds_to_status, 0.5) AS \"To status\", approx_percentile_cont(seconds_live, 0.5) AS \"Live for\", SUM(CASE WHEN success THEN 1 ELSE 0 END) AS \"Successes\", SUM(CASE WHEN outcome = 'pending' THEN 1 ELSE 0 END) AS \"Pending\", MAX(url) AS \"Link\", MAX(environment_url) AS \"Live\" FROM gh_deployment WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) GROUP BY 1, full_name, 3 ORDER BY 2 DESC",
               "refId": "A"
             }
           ],
@@ -9723,7 +9723,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT repo || ' ' || tag AS \"Release\", downloads AS \"Downloads\", url AS \"Page\" FROM (SELECT repo, tag, downloads, url, ROW_NUMBER() OVER (PARTITION BY repo, tag ORDER BY time DESC) AS rn FROM gh_release WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE rn = 1 AND downloads \u003e 0 ORDER BY 2 DESC LIMIT 12",
+              "rawSql": "SELECT (CASE WHEN MIN(full_name) OVER (PARTITION BY repo) = MAX(full_name) OVER (PARTITION BY repo) THEN repo ELSE full_name END) || ' ' || tag AS \"Release\", downloads AS \"Downloads\", url AS \"Page\" FROM (SELECT repo, full_name, tag, downloads, url, ROW_NUMBER() OVER (PARTITION BY full_name, tag ORDER BY time DESC) AS rn FROM gh_release WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE rn = 1 AND downloads \u003e 0 ORDER BY 2 DESC LIMIT 12",
               "refId": "A"
             }
           ],
@@ -9915,7 +9915,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT a.asset AS \"Asset\", a.downloads AS \"Downloads\", a.tag AS \"Tag\", a.repo AS \"Repository\", a.size_bytes AS \"Size\", a.url AS \"Download\", r.url AS \"Link\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo, tag, asset ORDER BY time DESC) AS rn FROM gh_release_asset WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) a LEFT JOIN (SELECT repo, tag, url, ROW_NUMBER() OVER (PARTITION BY repo, tag ORDER BY time DESC) AS rn FROM gh_release WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) r ON r.repo = a.repo AND r.tag = a.tag AND r.rn = 1 WHERE a.rn = 1 ORDER BY a.downloads DESC LIMIT 40",
+              "rawSql": "SELECT a.asset AS \"Asset\", a.downloads AS \"Downloads\", a.tag AS \"Tag\", a.repo AS \"Repository\", a.size_bytes AS \"Size\", a.url AS \"Download\", r.url AS \"Link\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, tag, asset ORDER BY time DESC) AS rn FROM gh_release_asset WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) a LEFT JOIN (SELECT full_name, tag, url, ROW_NUMBER() OVER (PARTITION BY full_name, tag ORDER BY time DESC) AS rn FROM gh_release WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) r ON r.full_name = a.full_name AND r.tag = a.tag AND r.rn = 1 WHERE a.rn = 1 ORDER BY a.downloads DESC LIMIT 40",
               "refId": "A"
             }
           ],
@@ -10073,7 +10073,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT asset AS \"Asset\", MAX(downloads) - MIN(downloads) AS \"Gained\", MAX(downloads) AS \"Total\", tag AS \"Tag\", repo AS \"Repository\", MAX(url) AS \"Download\" FROM gh_release_asset WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) GROUP BY 1, 4, 5 HAVING MAX(downloads) \u003e MIN(downloads) ORDER BY 2 DESC LIMIT 25",
+              "rawSql": "SELECT asset AS \"Asset\", MAX(downloads) - MIN(downloads) AS \"Gained\", MAX(downloads) AS \"Total\", tag AS \"Tag\", repo AS \"Repository\", MAX(url) AS \"Download\" FROM gh_release_asset WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) GROUP BY 1, 4, full_name, 5 HAVING MAX(downloads) \u003e MIN(downloads) ORDER BY 2 DESC LIMIT 25",
               "refId": "A"
             }
           ],
@@ -11057,7 +11057,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT tool AS \"Tool\", SUM(results) AS \"Results\", repo AS \"Repository\", COUNT(*) AS \"Runs\", MAX(rules) AS \"Rules\" FROM gh_code_scanning_analysis WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) GROUP BY 1, 3 ORDER BY 2 DESC LIMIT 25",
+              "rawSql": "SELECT tool AS \"Tool\", SUM(results) AS \"Results\", repo AS \"Repository\", COUNT(*) AS \"Runs\", MAX(rules) AS \"Rules\" FROM gh_code_scanning_analysis WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) GROUP BY 1, full_name, 3 ORDER BY 2 DESC LIMIT 25",
               "refId": "A"
             }
           ],
@@ -11358,7 +11358,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT repo AS \"Repository\", setting AS \"Setting\", status AS \"Status\", CAST(enabled AS INT) AS \"Enabled\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo, setting ORDER BY time DESC) AS rn FROM gh_security_setting WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE rn = 1 ORDER BY 4, 1, 2",
+              "rawSql": "SELECT repo AS \"Repository\", setting AS \"Setting\", status AS \"Status\", CAST(enabled AS INT) AS \"Enabled\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, setting ORDER BY time DESC) AS rn FROM gh_security_setting WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE rn = 1 ORDER BY 4, 1, 2",
               "refId": "A"
             }
           ],
@@ -11471,7 +11471,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT repo AS \"Repository\", state AS \"State\", query_suite AS \"Query suite\", schedule AS \"Schedule\", languages AS \"Languages\", days_since_change AS \"Last changed\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo ORDER BY time DESC) AS rn FROM gh_code_scanning_setup WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE rn = 1 ORDER BY 1",
+              "rawSql": "SELECT repo AS \"Repository\", state AS \"State\", query_suite AS \"Query suite\", schedule AS \"Schedule\", languages AS \"Languages\", days_since_change AS \"Last changed\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn FROM gh_code_scanning_setup WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE rn = 1 ORDER BY 1",
               "refId": "A"
             }
           ],
@@ -11580,7 +11580,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT repo AS \"Repository\", permissions AS \"Permissions\", CAST(can_approve_pr AS INT) AS \"Can approve pull requests\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo ORDER BY time DESC) AS rn FROM gh_actions_policy WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE rn = 1 ORDER BY 1",
+              "rawSql": "SELECT repo AS \"Repository\", permissions AS \"Permissions\", CAST(can_approve_pr AS INT) AS \"Can approve pull requests\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn FROM gh_actions_policy WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE rn = 1 ORDER BY 1",
               "refId": "A"
             }
           ],
@@ -11690,7 +11690,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT secret AS \"Secret\", days_since_rotation AS \"Last rotated\", age_days AS \"Age\", repo AS \"Repository\", kind AS \"Kind\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo, kind, secret ORDER BY time DESC) AS rn FROM gh_secret WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE rn = 1 ORDER BY 2 DESC",
+              "rawSql": "SELECT secret AS \"Secret\", days_since_rotation AS \"Last rotated\", age_days AS \"Age\", repo AS \"Repository\", kind AS \"Kind\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, kind, secret ORDER BY time DESC) AS rn FROM gh_secret WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE rn = 1 ORDER BY 2 DESC",
               "refId": "A"
             }
           ],
@@ -12064,7 +12064,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT repo AS \"Repository\", SUM(gross) AS \"Gross\", sku AS \"SKU\", SUM(quantity) AS \"Quantity\", MAX(unit) AS \"Unit\", MAX(price_per_unit) AS \"Price\", SUM(net) AS \"Net\" FROM gh_billing_usage WHERE $__timeFilter(time) AND repo \u003c\u003e '(none)' GROUP BY 1, 3 ORDER BY 2 DESC LIMIT 40",
+              "rawSql": "SELECT repo AS \"Repository\", SUM(gross) AS \"Gross\", sku AS \"SKU\", SUM(quantity) AS \"Quantity\", MAX(unit) AS \"Unit\", MAX(price_per_unit) AS \"Price\", SUM(net) AS \"Net\" FROM gh_billing_usage WHERE $__timeFilter(time) AND repo \u003c\u003e '(none)' GROUP BY 1, full_name, 3 ORDER BY 2 DESC LIMIT 40",
               "refId": "A"
             }
           ],
@@ -12173,7 +12173,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT cache AS \"Cache\", SUM(size_bytes) AS \"Size\", repo AS \"Repository\", SUM(caches) AS \"Entries\", MIN(days_since_use) AS \"Days since use\" FROM (SELECT time, repo, cache, size_bytes, caches, days_since_use, MAX(time) OVER (PARTITION BY full_name) AS newest FROM gh_actions_cache_entry WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE time = newest GROUP BY 1, 3 ORDER BY 2 DESC LIMIT 25",
+              "rawSql": "SELECT cache AS \"Cache\", SUM(size_bytes) AS \"Size\", repo AS \"Repository\", SUM(caches) AS \"Entries\", MIN(days_since_use) AS \"Days since use\" FROM (SELECT time, full_name, repo, cache, size_bytes, caches, days_since_use, MAX(time) OVER (PARTITION BY full_name) AS newest FROM gh_actions_cache_entry WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE time = newest GROUP BY 1, full_name, 3 ORDER BY 2 DESC LIMIT 25",
               "refId": "A"
             }
           ],
@@ -13226,7 +13226,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT language AS \"Language\", SUM(bytes) AS \"Bytes\" FROM (SELECT repo, language, bytes, ROW_NUMBER() OVER (PARTITION BY repo, language ORDER BY time DESC) AS rn FROM gh_repo_language WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE rn = 1 GROUP BY 1 ORDER BY 2 DESC LIMIT 12",
+              "rawSql": "SELECT language AS \"Language\", SUM(bytes) AS \"Bytes\" FROM (SELECT language, bytes, ROW_NUMBER() OVER (PARTITION BY full_name, language ORDER BY time DESC) AS rn FROM gh_repo_language WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE rn = 1 GROUP BY 1 ORDER BY 2 DESC LIMIT 12",
               "refId": "A"
             }
           ],
@@ -13589,7 +13589,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT c.repo AS \"Repository\", c.health_percentage AS \"Community profile\", CAST(c.has_readme AS INT) AS \"Readme\", CAST(c.has_license AS INT) AS \"License\", CAST(c.has_contributing AS INT) AS \"Contributing\", CAST(c.has_code_of_conduct AS INT) AS \"Conduct\", p.issue_templates AS \"Issue templates\", CAST(c.has_pull_request_template AS INT) AS \"PR template\", c.url AS \"Link\" FROM (SELECT repo, health_percentage, url, has_readme, has_license, has_contributing, has_code_of_conduct, has_pull_request_template, ROW_NUMBER() OVER (PARTITION BY repo ORDER BY time DESC) AS rn FROM gh_repo_community WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) c LEFT JOIN (SELECT repo, issue_templates, ROW_NUMBER() OVER (PARTITION BY repo ORDER BY time DESC) AS rn FROM gh_repo_policy WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) p ON p.repo = c.repo AND p.rn = 1 WHERE c.rn = 1 ORDER BY 2 DESC",
+              "rawSql": "SELECT c.repo AS \"Repository\", c.health_percentage AS \"Community profile\", CAST(c.has_readme AS INT) AS \"Readme\", CAST(c.has_license AS INT) AS \"License\", CAST(c.has_contributing AS INT) AS \"Contributing\", CAST(c.has_code_of_conduct AS INT) AS \"Conduct\", p.issue_templates AS \"Issue templates\", CAST(c.has_pull_request_template AS INT) AS \"PR template\", c.url AS \"Link\" FROM (SELECT full_name, repo, health_percentage, url, has_readme, has_license, has_contributing, has_code_of_conduct, has_pull_request_template, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn FROM gh_repo_community WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) c LEFT JOIN (SELECT full_name, issue_templates, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn FROM gh_repo_policy WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) p ON p.full_name = c.full_name AND p.rn = 1 WHERE c.rn = 1 ORDER BY 2 DESC",
               "refId": "A"
             }
           ],
@@ -13829,7 +13829,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT repo AS \"Repository\", stars AS \"Stars\", language AS \"Language\", forks AS \"Forks\", network AS \"Network\", open_issues AS \"Open issues\", watchers AS \"Watchers\", size_kb AS \"Size\", age_days AS \"Age\", days_since_push AS \"Idle\", visibility AS \"Visibility\", license AS \"License\", url AS \"Link\" FROM (SELECT repo, language, stars, forks, network, open_issues, watchers, size_kb, age_days, days_since_push, visibility, license, url FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo ORDER BY time DESC) AS rn FROM gh_repo WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE rn = 1) ORDER BY stars DESC",
+              "rawSql": "SELECT repo AS \"Repository\", stars AS \"Stars\", language AS \"Language\", forks AS \"Forks\", network AS \"Network\", open_issues AS \"Open issues\", watchers AS \"Watchers\", size_kb AS \"Size\", age_days AS \"Age\", days_since_push AS \"Idle\", visibility AS \"Visibility\", license AS \"License\", url AS \"Link\" FROM (SELECT repo, full_name, language, stars, forks, network, open_issues, watchers, size_kb, age_days, days_since_push, visibility, license, url FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn FROM gh_repo WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE rn = 1) ORDER BY stars DESC",
               "refId": "A"
             }
           ],
@@ -13925,7 +13925,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT topic AS \"Topic\", COUNT(DISTINCT repo) AS \"Repositories\", url AS \"Link\" FROM gh_repo_topic WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) GROUP BY 1, 3 ORDER BY 2 DESC LIMIT 30",
+              "rawSql": "SELECT topic AS \"Topic\", COUNT(DISTINCT full_name) AS \"Repositories\", url AS \"Link\" FROM gh_repo_topic WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) GROUP BY 1, 3 ORDER BY 2 DESC LIMIT 30",
               "refId": "A"
             }
           ],
@@ -14653,7 +14653,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT \"License\", \"Packages\" FROM (SELECT CASE WHEN rn \u003c= 8 THEN \"License\" ELSE 'other' END AS \"License\", SUM(\"Packages\") AS \"Packages\", MIN(rn) AS o FROM (SELECT license AS \"License\", SUM(packages) AS \"Packages\", ROW_NUMBER() OVER (ORDER BY SUM(packages) DESC) AS rn FROM (SELECT license, packages, ROW_NUMBER() OVER (PARTITION BY repo, license ORDER BY time DESC) AS rn FROM gh_dependency_license WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE rn = 1 GROUP BY 1) z GROUP BY 1) w ORDER BY o",
+              "rawSql": "SELECT \"License\", \"Packages\" FROM (SELECT CASE WHEN rn \u003c= 8 THEN \"License\" ELSE 'other' END AS \"License\", SUM(\"Packages\") AS \"Packages\", MIN(rn) AS o FROM (SELECT license AS \"License\", SUM(packages) AS \"Packages\", ROW_NUMBER() OVER (ORDER BY SUM(packages) DESC) AS rn FROM (SELECT license, packages, ROW_NUMBER() OVER (PARTITION BY full_name, license ORDER BY time DESC) AS rn FROM gh_dependency_license WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE rn = 1 GROUP BY 1) z GROUP BY 1) w ORDER BY o",
               "refId": "A"
             }
           ],
@@ -14823,7 +14823,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT repo AS \"Repository\", COUNT(DISTINCT visibility) AS \"Visibility\", COUNT(DISTINCT archived) AS \"Archived\", COUNT(DISTINCT default_branch) AS \"Default branch\", COUNT(DISTINCT license) AS \"License\", COUNT(DISTINCT language) AS \"Language\", COUNT(DISTINCT repo_id) AS \"Identity\", MAX(url) AS \"Link\" FROM gh_repo WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) GROUP BY 1 HAVING COUNT(DISTINCT visibility) \u003e 1 OR COUNT(DISTINCT archived) \u003e 1 OR COUNT(DISTINCT default_branch) \u003e 1 OR COUNT(DISTINCT license) \u003e 1 OR COUNT(DISTINCT language) \u003e 1 ORDER BY 1",
+              "rawSql": "SELECT repo AS \"Repository\", COUNT(DISTINCT visibility) AS \"Visibility\", COUNT(DISTINCT archived) AS \"Archived\", COUNT(DISTINCT default_branch) AS \"Default branch\", COUNT(DISTINCT license) AS \"License\", COUNT(DISTINCT language) AS \"Language\", COUNT(DISTINCT repo_id) AS \"Identity\", MAX(url) AS \"Link\" FROM gh_repo WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) GROUP BY full_name, repo HAVING COUNT(DISTINCT visibility) \u003e 1 OR COUNT(DISTINCT archived) \u003e 1 OR COUNT(DISTINCT default_branch) \u003e 1 OR COUNT(DISTINCT license) \u003e 1 OR COUNT(DISTINCT language) \u003e 1 ORDER BY 1",
               "refId": "A"
             }
           ],
@@ -14988,7 +14988,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT repo AS \"Repository\", file AS \"File\", CAST(present AS INT) AS \"Present\", path AS \"Path\", changes AS \"Changes\", url AS \"Link\" FROM (SELECT repo, file, present, path, changes, url, ROW_NUMBER() OVER (PARTITION BY repo, file ORDER BY time DESC) AS rn FROM gh_policy_file WHERE time \u003e now() - INTERVAL '30 years' AND repo IN (${repo:singlequote})) x WHERE rn = 1 ORDER BY 3, 1, 2",
+              "rawSql": "SELECT repo AS \"Repository\", file AS \"File\", CAST(present AS INT) AS \"Present\", path AS \"Path\", changes AS \"Changes\", url AS \"Link\" FROM (SELECT repo, file, present, path, changes, url, ROW_NUMBER() OVER (PARTITION BY full_name, file ORDER BY time DESC) AS rn FROM gh_policy_file WHERE time \u003e now() - INTERVAL '30 years' AND repo IN (${repo:singlequote})) x WHERE rn = 1 ORDER BY 3, 1, 2",
               "refId": "A"
             }
           ],
@@ -15117,7 +15117,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT repo AS \"Repository\", blocks AS \"Blocks\", ecosystem AS \"Ecosystem\", \"interval\" AS \"Interval\" FROM (SELECT repo, ecosystem, \"interval\", blocks, time, MAX(time) OVER (PARTITION BY repo) AS newest FROM gh_dependabot_ecosystem WHERE time \u003e now() - INTERVAL '30 years' AND repo IN (${repo:singlequote})) x WHERE time = newest ORDER BY 1, 2",
+              "rawSql": "SELECT repo AS \"Repository\", blocks AS \"Blocks\", ecosystem AS \"Ecosystem\", \"interval\" AS \"Interval\" FROM (SELECT repo, ecosystem, \"interval\", blocks, time, MAX(time) OVER (PARTITION BY full_name) AS newest FROM gh_dependabot_ecosystem WHERE time \u003e now() - INTERVAL '30 years' AND repo IN (${repo:singlequote})) x WHERE time = newest ORDER BY 1, 2",
               "refId": "A"
             }
           ],
@@ -15171,7 +15171,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT ecosystem AS \"Ecosystem\", SUM(packages) AS \"Packages\" FROM (SELECT ecosystem, packages, ROW_NUMBER() OVER (PARTITION BY repo, ecosystem ORDER BY time DESC) AS rn FROM gh_dependency WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE rn = 1 GROUP BY 1 ORDER BY 2 DESC LIMIT 12",
+              "rawSql": "SELECT ecosystem AS \"Ecosystem\", SUM(packages) AS \"Packages\" FROM (SELECT ecosystem, packages, ROW_NUMBER() OVER (PARTITION BY full_name, ecosystem ORDER BY time DESC) AS rn FROM gh_dependency WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE rn = 1 GROUP BY 1 ORDER BY 2 DESC LIMIT 12",
               "refId": "A"
             }
           ],
@@ -15839,7 +15839,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT \"position\" AS \"Position\", repo AS \"Item\", kind AS \"Kind\", stars AS \"Stars\", days_since_push AS \"Idle\", url AS \"Link\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo ORDER BY time DESC) AS rn FROM gh_pinned_item WHERE $__timeFilter(time)) x WHERE rn = 1 ORDER BY 1",
+              "rawSql": "SELECT \"position\" AS \"Position\", repo AS \"Item\", kind AS \"Kind\", stars AS \"Stars\", days_since_push AS \"Idle\", url AS \"Link\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn FROM gh_pinned_item WHERE $__timeFilter(time)) x WHERE rn = 1 ORDER BY 1",
               "refId": "A"
             }
           ],

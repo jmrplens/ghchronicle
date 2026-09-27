@@ -77,9 +77,10 @@ var rangeExtremes = map[string]string{
 
 // sqlNewestPicks are the arguments of a MAX() or MIN() that read no value
 // over the range: a string that is one per row it is grouped on, the row
-// number a window gave the newest row, and the newest time of a partition.
+// number a window gave the newest row, the newest time of a partition, and
+// the full names repoNameSQL compares to tell whether two share a short name.
 var sqlNewestPicks = []string{
-	"url", "w.url", "title", "referrer_url", "environment_url", "unit", "rn", "time",
+	"url", "w.url", "title", "referrer_url", "environment_url", "unit", "rn", "time", "full_name",
 }
 
 var sqlExtreme = regexp.MustCompile(`\b(MAX|MIN)\(([^()]*(?:\([^()]*\))?[^()]*)\)`)
@@ -231,23 +232,23 @@ func TestTheSnapshotTablesReadTheirNewestDocumentInElasticsearch(t *testing.T) {
 	doc := mustBuild(t, "elasticsearch")
 	for title, identity := range map[string][]string{
 		"Account keys":                {"key.keyword", "kind.keyword"},
-		"Branch protection rules":     {"repo.keyword", "pattern.keyword"},
+		"Branch protection rules":     {"full_name.keyword", "repo.keyword", "pattern.keyword"},
 		"Commits by hour of day":      {"full_name.keyword"},
 		"Commits by weekday":          {"full_name.keyword"},
-		"Community profile":           {"repo.keyword"},
-		"Default code scanning setup": {"repo.keyword"},
-		"Dependabot ecosystems":       {"repo.keyword"},
-		"Deploy keys":                 {"repo.keyword", "key.keyword"},
-		"Pinned items":                {"repo.keyword"},
-		"Policy files":                {"repo.keyword", "file.keyword"},
+		"Community profile":           {"full_name.keyword", "repo.keyword"},
+		"Default code scanning setup": {"full_name.keyword", "repo.keyword"},
+		"Dependabot ecosystems":       {"full_name.keyword", "repo.keyword"},
+		"Deploy keys":                 {"full_name.keyword", "repo.keyword", "key.keyword"},
+		"Pinned items":                {"full_name.keyword", "repo.keyword"},
+		"Policy files":                {"full_name.keyword", "repo.keyword", "file.keyword"},
 		"Profile flags":               {"flag.keyword"},
-		"Repository settings":         {"repo.keyword"},
-		"Ruleset rules and bypasses":  {"repo.keyword", "ruleset.keyword", "rule.keyword"},
-		"Security settings":           {"repo.keyword", "setting.keyword"},
+		"Repository settings":         {"full_name.keyword", "repo.keyword"},
+		"Ruleset rules and bypasses":  {"full_name.keyword", "repo.keyword", "ruleset.keyword", "rule.keyword"},
+		"Security settings":           {"full_name.keyword", "repo.keyword", "setting.keyword"},
 		"Sponsorship tiers":           {"tier.keyword"},
-		"Stale branches":              {"repo.keyword", "branch.keyword"},
+		"Stale branches":              {"full_name.keyword", "repo.keyword", "branch.keyword"},
 		"Star lists":                  {"list.keyword"},
-		"Workflow token permissions":  {"repo.keyword"},
+		"Workflow token permissions":  {"full_name.keyword", "repo.keyword"},
 	} {
 		kind := "table"
 		if strings.HasPrefix(title, "Commits by") {
@@ -263,7 +264,7 @@ func TestTheSnapshotTablesReadTheirNewestDocumentInElasticsearch(t *testing.T) {
 				"document", title, fields, identity)
 		}
 		if kind == "table" && !strings.Contains(asJSON(t, p["transformations"]),
-			`"excludeByName":{"@timestamp":true}`) {
+			`"excludeByName":{"@timestamp":true`) {
 			t.Errorf("elasticsearch: %q shows the timestamp its newest document is found by",
 				title)
 		}

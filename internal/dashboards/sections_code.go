@@ -224,7 +224,7 @@ func commitsAndChurn(b *builder) []Panel {
 		}),
 		panel("table", codeForcePushes, box{W: 6, H: 8, X: 18, Y: 12}, []Target{sqlT(force)}, &P{
 			Prom: []Target{promTbl(fmt.Sprintf(
-				`sum by (repo) (increase(github_repo_activities_total{activity="force_push",%s}[$__range])) > 0`, PF,
+				`sum by (full_name, repo) (increase(github_repo_activities_total{activity="force_push",%s}[$__range])) > 0`, PF,
 			))},
 			PromTF: []any{organize(map[string]string{"repo": "Repository", "Value": codeForcePushes}, nil, nil)},
 			Desc:   "Each force push, newest first.",
@@ -255,7 +255,11 @@ func commitChecks(b *builder) []Panel {
 		" FROM gh_commit_check WHERE $__timeFilter(time) AND " + RF +
 		" GROUP BY 1, 3 ORDER BY 2 DESC LIMIT 20"
 
-	checksGR, checksGRtf := gTbl(rowsOf(countOf(rp(cc, "checks")), gn(cc, "app"), gn(cc, "check")),
+	// Each check run is a 1 added up per app and check. countOf added every
+	// run into one series first, and the table drew that as one row named
+	// after whichever came first.
+	checksGR, checksGRtf := gTbl(fmt.Sprintf(`groupByNodes(isNonNull(%s), "sum", %d, %d)`,
+		rp(cc, "checks"), gn(cc, "app"), gn(cc, "check")),
 		"App, check", []col{{"sum", "Runs"}})
 	checksES, checksEStf := esTbl(cc, []any{b.tm("app", 20), b.tm("check", 40)},
 		[]any{b.mCount(), b.mSum("failed")},
@@ -325,13 +329,16 @@ func commitChecks(b *builder) []Panel {
 				// number is the "#1483" a person names a run by.
 				` r.failures AS "Failed runs", r.run_number AS "Run number",` +
 				` c.url AS "Link", r.url AS "Run" FROM (` +
-				"SELECT repo, author, time, oid, headline, url FROM gh_commit" +
+				// Matched in the repository of the same full name: a fork and
+				// the repository it came from hold the same commits, and two
+				// owners' repositories of one name met on the short name.
+				"SELECT full_name, repo, author, time, oid, headline, url FROM gh_commit" +
 				codeInRange + RF + " AND gate = 'FAILURE') c" +
-				" JOIN (SELECT repo, head_sha, COUNT(*) AS failures, MAX(url) AS url," +
+				" JOIN (SELECT full_name, head_sha, COUNT(*) AS failures, MAX(url) AS url," +
 				" MAX(run_number) AS run_number FROM gh_workflow_run" +
 				codeInRange + RF + " AND conclusion <> 'success'" +
 				" GROUP BY 1, 2) r" +
-				" ON c.repo = r.repo AND c.oid = r.head_sha" +
+				" ON c.full_name = r.full_name AND c.oid = r.head_sha" +
 				// Newest first: the cap is 25 rows, and ordered by the first
 				// column it kept the alphabetically last repositories instead.
 				" ORDER BY 2 DESC LIMIT 25",

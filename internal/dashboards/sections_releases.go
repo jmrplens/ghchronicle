@@ -1,15 +1,20 @@
 package dashboards
 
-import "fmt"
+import (
+	"fmt"
+	"slices"
+)
 
 // ── Releases ────────────────────────────────────────────────────────────────
 
 func releases(b *builder) []Panel {
 	totalSQL := latestSumSQL("gh_release", "downloads", "tag")
 	// The release page rides beside the bars as a hidden column, which is
-	// what a click on a bar opens.
-	byTag := `SELECT repo || ' ' || tag AS "Release", downloads AS "Downloads", url AS "Page" FROM (` +
-		"SELECT repo, tag, downloads, url, ROW_NUMBER() OVER (PARTITION BY repo, tag" +
+	// what a click on a bar opens. A release is a tag of a repository by its
+	// full name, and its bar is named by repoNameSQL.
+	byTag := `SELECT (` + repoNameSQL + `) || ' ' || tag AS "Release", downloads AS "Downloads",` +
+		` url AS "Page" FROM (` +
+		"SELECT repo, full_name, tag, downloads, url, ROW_NUMBER() OVER (PARTITION BY full_name, tag" +
 		" ORDER BY time DESC) AS rn FROM gh_release WHERE $__timeFilter(time) AND " + RF +
 		") x WHERE rn = 1 AND downloads > 0 ORDER BY 2 DESC LIMIT 12"
 	// How many releases have been downloaded at all: the number beside the
@@ -22,20 +27,22 @@ func releases(b *builder) []Panel {
 	// An asset's url is the file itself, so the column says Download; the
 	// release page comes from gh_release, joined on the tag, and is the
 	// row's Link, so a reader can open the notes without fetching the binary.
-	release := "SELECT repo, tag, url, ROW_NUMBER() OVER (PARTITION BY repo, tag" +
+	// Joined in the repository of the same full name, since two owners'
+	// repositories of one name can both have a v1.0.0.
+	release := "SELECT full_name, tag, url, ROW_NUMBER() OVER (PARTITION BY full_name, tag" +
 		" ORDER BY time DESC) AS rn FROM gh_release WHERE $__timeFilter(time) AND " + RF
 	assets := `SELECT a.asset AS "Asset", a.downloads AS "Downloads", a.tag AS "Tag",` +
 		` a.repo AS "Repository", a.size_bytes AS "Size",` +
 		` a.url AS "Download", r.url AS "Link" FROM (` +
-		"SELECT *, ROW_NUMBER() OVER (PARTITION BY repo, tag, asset ORDER BY time DESC) AS rn" +
+		"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, tag, asset ORDER BY time DESC) AS rn" +
 		" FROM gh_release_asset WHERE $__timeFilter(time) AND " + RF + ") a" +
-		" LEFT JOIN (" + release + ") r ON r.repo = a.repo AND r.tag = a.tag AND r.rn = 1" +
+		" LEFT JOIN (" + release + ") r ON r.full_name = a.full_name AND r.tag = a.tag AND r.rn = 1" +
 		" WHERE a.rn = 1 ORDER BY a.downloads DESC LIMIT 40"
 	rl, ra := "gh_release", "gh_release_asset"
 
 	byTagGR, byTagGRtf := gTbl(topRows(rp(rl, "downloads"), 12, gn(rl, "repo"), gn(rl, "tag")),
 		"Release", []col{{"lastNotNull", "Downloads"}})
-	byTagES, byTagEStf := esTbl(rl, []any{b.tm("tag", 500), b.tm("repo", 50), b.tmURL()},
+	byTagES, byTagEStf := esTbl(rl, slices.Concat([]any{b.tm("tag", 500)}, b.tmRepo(50), []any{b.tmURL()}),
 		[]any{b.mNewest("downloads")},
 		[]named{
 			{"tag.keyword", "Release"},
@@ -43,7 +50,7 @@ func releases(b *builder) []Panel {
 			{"url.keyword", "Page"},
 			{"d", "Downloads"},
 		},
-		[]string{ESF})
+		[]string{ESF}, hideColumns(panelFullNameField))
 
 	assetsGR, assetsGRtf := gTbl(topRows(rp(ra, "downloads"), 40,
 		gn(ra, "repo"), gn(ra, "tag"), gn(ra, "asset")),
@@ -61,7 +68,7 @@ func releases(b *builder) []Panel {
 		rp(ra, "downloads"),
 	), gn(ra, "repo"), gn(ra, "tag"), gn(ra, "asset")),
 		"Asset", []col{{"sum", "Gained"}})
-	assetsES, assetsEStf := esTbl(ra, []any{b.tm("repo", 50), b.tm("tag", 500), b.tm("asset", 40), b.tmURL()},
+	assetsES, assetsEStf := esTbl(ra, append(b.tmRepo(50), b.tm("tag", 500), b.tm("asset", 40), b.tmURL()),
 		[]any{b.mNewest("downloads", "size_bytes")},
 		[]named{
 			{"repo.keyword", "Repository"},
@@ -70,7 +77,7 @@ func releases(b *builder) []Panel {
 			{"url.keyword", "Download"},
 			{"downloads", "Downloads"},
 			{"size_bytes", "Size"},
-		}, []string{ESF})
+		}, []string{ESF}, hideColumns(panelFullNameField))
 
 	return []Panel{
 		// One group in the column beside the chart, not two tiles with the
@@ -110,7 +117,7 @@ func releases(b *builder) []Panel {
 		}),
 		panel("barchart", "Downloads by release", box{W: 18, H: 8, X: 6, Y: 0}, []Target{sqlT(byTag)}, &P{
 			Prom: []Target{promTbl(fmt.Sprintf(
-				`label_join(topk(12, sum by (repo, tag) (github_release_downloads{%s}) > 0),`+
+				`label_join(topk(12, sum by (full_name, repo, tag) (github_release_downloads{%s}) > 0),`+
 					` "release", " ", "repo", "tag")`, PF,
 			))},
 			PromTF: []any{organize(map[string]string{"release": "Release", "Value": "Downloads"},
@@ -143,7 +150,7 @@ func releases(b *builder) []Panel {
 				` MAX(downloads) AS "Total", tag AS "Tag", repo AS "Repository",` +
 				` MAX(url) AS "Download"` +
 				" FROM gh_release_asset WHERE $__timeFilter(time) AND " + RF +
-				" GROUP BY 1, 4, 5 HAVING MAX(downloads) > MIN(downloads)" +
+				" GROUP BY 1, 4, full_name, 5 HAVING MAX(downloads) > MIN(downloads)" +
 				" ORDER BY 2 DESC LIMIT 25",
 		)}, &P{
 			PromNote: cannot("what each release asset gained across the range, as the "+

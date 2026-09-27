@@ -288,7 +288,7 @@ func pullsAndReviewers(b *builder) []Panel {
 		` approx_percentile_cont(seconds_to_merge, 0.5) AS "Time to merge",` +
 		` approx_percentile_cont(churn, 0.5) AS "Lines changed"` +
 		flowFromPulls + RF + " AND " + identified +
-		" AND state = 'MERGED' GROUP BY 1 ORDER BY 2 DESC"
+		" AND state = 'MERGED' GROUP BY full_name, repo ORDER BY 2 DESC"
 	// Who is a reviewer: a bot is named as one, and an author answering a
 	// review on their own pull request is not reviewing it, so those rows
 	// read "own" rather than the reviewer's login. Otherwise the busiest
@@ -330,17 +330,16 @@ func pullsAndReviewers(b *builder) []Panel {
 		[]named{{"author.keyword", "Author"}, {"n", "Pull requests"}},
 		[]string{ESF, esIdentified})
 
-	byRepoGR, byRepoGRtf := gTbl(fmt.Sprintf(`groupByNode(%s, %d, "avg")`,
-		mergedPath("seconds_to_merge"), gn(pr, "repo")), "Repository",
+	byRepoGR, byRepoGRtf := gTbl(grGroupBy(mergedPath("seconds_to_merge"), pr, "avg", "repo"), "Repository",
 		[]col{{"count", "Merged"}, {"median", flowMergeTime}})
-	byRepoES, byRepoEStf := esTbl(pr, []any{b.tm("repo", 50)},
+	byRepoES, byRepoEStf := esTbl(pr, b.tmRepo(50),
 		[]any{b.mCount(), b.mPct("seconds_to_merge", 50), b.mPct("churn", 50)},
 		[]named{
 			{inventoryRepoTerm, "Repository"},
 			{"n", "Merged"},
 			{"t", flowMergeTime},
 			{"c", flowChurn},
-		}, esMerged)
+		}, esMerged, hideColumns(panelFullNameField))
 
 	reviewersGR, reviewersGRtf := gTbl(fmt.Sprintf(
 		`limit(sortByTotal(groupByNode(%s, %d, "avg")), 20)`,
@@ -372,16 +371,16 @@ func pullsAndReviewers(b *builder) []Panel {
 		}),
 		panel("barchart", "Pull requests by author", box{W: 8, H: 9, X: 16, Y: 20}, []Target{sqlT(authors)}, &P{
 			PromNote: cannot("pull requests per author over the range.",
-				"The exporter keeps only `repo` and `state` on pull requests: "+
+				"The exporter keeps only the repository and `state` on pull requests: "+
 					"an author label would be a series per contributor per state."),
 			GR: authorsGR, GRTF: authorsGRtf,
 			ES: authorsES, ESTF: authorsEStf,
 		}),
 		panel("table", "Pull requests by repository", box{W: 12, H: 8, X: 0, Y: 29}, []Target{sqlT(byRepo)}, &P{
 			Prom: []Target{
-				promTbl(fmt.Sprintf("sum by (repo) (increase(github_pull_requests_total{%s}[$__range]))", promMerged), "A"),
-				promTbl(fmt.Sprintf("avg by (repo) (github_pull_requests_seconds_to_merge_mean{%s})", promMerged), "B"),
-				promTbl(fmt.Sprintf("avg by (repo) (github_pull_requests_churn_mean{%s})", promMerged), "C"),
+				promTbl(fmt.Sprintf("sum by (full_name, repo) (increase(github_pull_requests_total{%s}[$__range]))", promMerged), "A"),
+				promTbl(fmt.Sprintf("avg by (full_name, repo) (github_pull_requests_seconds_to_merge_mean{%s})", promMerged), "B"),
+				promTbl(fmt.Sprintf("avg by (full_name, repo) (github_pull_requests_churn_mean{%s})", promMerged), "C"),
 			},
 			PromTF: merged(map[string]string{
 				"repo": "Repository", inventoryValueCol + "A": "Merged",
@@ -477,7 +476,7 @@ func reviewDebt(b *builder) []Panel {
 		` SUM(outdated * (1 - resolved)) AS "Outdated",` +
 		` SUM(comments * (1 - resolved)) AS "Comments"` +
 		" FROM gh_review_thread WHERE $__timeFilter(time) AND " + RF +
-		" GROUP BY 1, 3 ORDER BY 2 DESC LIMIT 25"
+		" GROUP BY 1, full_name, 3 ORDER BY 2 DESC LIMIT 25"
 
 	// `comments` is on every thread, so counting the points of that leaf is
 	// one point per thread; `resolved` is the flag the debt is computed from.
@@ -498,11 +497,11 @@ func reviewDebt(b *builder) []Panel {
 	// Summarizing each thread over the whole range first leaves one point per
 	// series and nothing to average. It goes inside groupByNodes, not around
 	// it, because the node indices are read off the series name and the name
-	// groupByNodes writes is the clean `repo.number` the table shows.
-	debtGR, debtGRtf := gTbl(fmt.Sprintf(
-		`limit(sortByTotal(groupByNodes(%s, "sum", %d, %d)), 25)`,
-		total(fmt.Sprintf("offset(scale(%s,-1),1)", resolvedPath)),
-		gn(reviewThread, "repo"), gn(reviewThread, "number"),
+	// groupByNodes writes is the clean one grGroupBy then cuts to the
+	// `repo.number` the table shows.
+	debtGR, debtGRtf := gTbl(fmt.Sprintf(`limit(sortByTotal(%s), 25)`,
+		grGroupBy(total(fmt.Sprintf("offset(scale(%s,-1),1)", resolvedPath)),
+			reviewThread, "sum", "repo", "number"),
 	),
 		"Repository, pull request", []col{{"sum", "Unresolved"}})
 
@@ -513,7 +512,7 @@ func reviewDebt(b *builder) []Panel {
 	// multiplication to mean what the SQL ones mean. `path`, `subject_type`
 	// and `resolved_by` are string fields and stay out of it entirely: a
 	// top_metrics over a string panics the plugin.
-	debtES, debtEStf := esTbl(reviewThread, []any{b.tm("repo", 50), b.tm("number", 25)},
+	debtES, debtEStf := esTbl(reviewThread, append(b.tmRepo(50), b.tm("number", 25)),
 		[]any{b.mCount(), b.mSum("outdated"), b.mSum("comments")},
 		[]named{
 			{inventoryRepoTerm, "Repository"},
@@ -522,7 +521,7 @@ func reviewDebt(b *builder) []Panel {
 			{"o", "Outdated"},
 			{"c", "Comments"},
 		},
-		[]string{ESF, "resolved:0"})
+		[]string{ESF, "resolved:0"}, hideColumns(panelFullNameField))
 
 	return []Panel{
 		panel("timeseries", "Review threads over time", box{W: 12, H: 7, X: 0, Y: 53},
@@ -592,9 +591,9 @@ func stillOpen(b *builder) []Panel {
 		` x.title AS "Title", x.author AS "Author", x.label_names AS "Labels",` +
 		` x.comments AS "Comments", x.reviews AS "Reviews", f.fork AS "Fork",` +
 		` x.url AS "Link" FROM (` +
-		"SELECT *, ROW_NUMBER() OVER (PARTITION BY repo, number ORDER BY time DESC) AS rn" +
+		"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, number ORDER BY time DESC) AS rn" +
 		flowFromPulls + RF + " AND " + identified +
-		") x" + repoFlagsJoin("x.repo") +
+		") x" + repoFlagsJoin("x") +
 		" WHERE x.rn = 1 AND x.state = 'OPEN' AND " + notArchived +
 		fmt.Sprintf(" ORDER BY x.seconds_open DESC LIMIT %d", openLongest)
 	// The twin for issues, read the same way: until this table no issue was
@@ -604,15 +603,15 @@ func stillOpen(b *builder) []Panel {
 	openIssues := `SELECT x.number AS "Number", x.seconds_open AS "Open for", x.repo AS "Repository",` +
 		` x.author AS "Author", x.comments AS "Comments",` +
 		` x.label_names AS "Labels", f.fork AS "Fork", x.url AS "Link" FROM (` +
-		"SELECT *, ROW_NUMBER() OVER (PARTITION BY repo, number ORDER BY time DESC) AS rn" +
+		"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, number ORDER BY time DESC) AS rn" +
 		" FROM gh_issue WHERE $__timeFilter(time) AND " + RF + " AND " + identified +
-		") x" + repoFlagsJoin("x.repo") +
+		") x" + repoFlagsJoin("x") +
 		" WHERE x.rn = 1 AND x.state = 'OPEN' AND " + notArchived +
 		fmt.Sprintf(" ORDER BY x.seconds_open DESC LIMIT %d", openLongest)
 
-	openGR, openGRtf := gTbl(fmt.Sprintf(`limit(sortBy(groupByNodes(%s, "max", %d, %d), "max", true), %d)`,
-		rp("gh_pull_request", "seconds_open", "state", "OPEN"),
-		gn("gh_pull_request", "repo"), gn("gh_pull_request", "number"), openLongest),
+	openGR, openGRtf := gTbl(fmt.Sprintf(`limit(sortBy(%s, "max", true), %d)`,
+		grGroupBy(rp("gh_pull_request", "seconds_open", "state", "OPEN"), "gh_pull_request", "max", "repo", "number"),
+		openLongest),
 		"Repository, number", []col{{"max", flowOpenAge}})
 	// The url as a bucket, never as a metric: a top_metrics over a string
 	// panics the plugin, and a pull request has exactly one url. The
@@ -624,7 +623,7 @@ func stillOpen(b *builder) []Panel {
 	// the bucket kept showed whichever had the most rows in the range.
 	prAge := b.mMax("seconds_open")
 	openES, openEStf := esTbl("gh_pull_request",
-		[]any{b.tmBy("repo", 50, prAge), b.tmBy("number", openLongest, prAge), b.tm("url", 1)},
+		append(b.tmRepoBy(50, prAge), b.tmBy("number", openLongest, prAge), b.tm("url", 1)),
 		[]any{prAge, b.mMax("comments"), b.mMax("reviews")},
 		[]named{
 			{inventoryRepoTerm, "Repository"},
@@ -634,15 +633,16 @@ func stillOpen(b *builder) []Panel {
 			{"c", "Comments"},
 			{"r", "Reviews"},
 		},
-		[]string{ESF, "state:OPEN"}, keepLargest(flowOpenAge, openLongest)...)
+		[]string{ESF, "state:OPEN"}, append([]any{hideColumns(panelFullNameField)},
+			keepLargest(flowOpenAge, openLongest)...)...)
 
-	openIssuesGR, openIssuesGRtf := gTbl(fmt.Sprintf(`limit(sortBy(groupByNodes(%s, "max", %d, %d), "max", true), %d)`,
-		rp("gh_issue", "seconds_open", "state", "OPEN"),
-		gn("gh_issue", "repo"), gn("gh_issue", "number"), openLongest),
+	openIssuesGR, openIssuesGRtf := gTbl(fmt.Sprintf(`limit(sortBy(%s, "max", true), %d)`,
+		grGroupBy(rp("gh_issue", "seconds_open", "state", "OPEN"), "gh_issue", "max", "repo", "number"),
+		openLongest),
 		"Repository, number", []col{{"max", flowOpenAge}})
 	issueAge := b.mMax("seconds_open")
 	openIssuesES, openIssuesEStf := esTbl("gh_issue",
-		[]any{b.tmBy("repo", 50, issueAge), b.tmBy("number", openLongest, issueAge), b.tm("url", 1)},
+		append(b.tmRepoBy(50, issueAge), b.tmBy("number", openLongest, issueAge), b.tm("url", 1)),
 		[]any{issueAge, b.mMax("comments")},
 		[]named{
 			{inventoryRepoTerm, "Repository"},
@@ -651,7 +651,8 @@ func stillOpen(b *builder) []Panel {
 			{"s", flowOpenAge},
 			{"c", "Comments"},
 		},
-		[]string{ESF, "state:OPEN"}, keepLargest(flowOpenAge, openLongest)...)
+		[]string{ESF, "state:OPEN"}, append([]any{hideColumns(panelFullNameField)},
+			keepLargest(flowOpenAge, openLongest)...)...)
 	return []Panel{
 		panel("table", "Open the longest", box{W: 12, H: 8, X: 0, Y: 45}, []Target{sqlT(openest)}, &P{
 			// The comments are kept to the rows the open time ranks: capped
@@ -659,12 +660,12 @@ func stillOpen(b *builder) []Panel {
 			// request, and the merge showed each one past the twenty-fifth
 			// with an empty Open for.
 			Prom: func() []Target {
-				rank := fmt.Sprintf(`max by (repo, number, author) (github_pull_requests_seconds_open_mean{state="OPEN",%s})`, PF)
+				rank := fmt.Sprintf(`max by (full_name, repo, number, author) (github_pull_requests_seconds_open_mean{state="OPEN",%s})`, PF)
 				return []Target{
 					promTbl(promTop(openLongest, rank), "A"),
 					promTbl(promWithin(openLongest, fmt.Sprintf(
-						`max by (repo, number, author) (github_pull_requests_comments_mean{state="OPEN",%s})`, PF,
-					), rank, "repo", "number", "author"), "B"),
+						`max by (full_name, repo, number, author) (github_pull_requests_comments_mean{state="OPEN",%s})`, PF,
+					), rank, "full_name", "repo", "number", "author"), "B"),
 				}
 			}(),
 			PromTF: merged(map[string]string{

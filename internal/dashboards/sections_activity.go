@@ -276,9 +276,12 @@ func workElsewhere(b *builder) Panel {
 // starsGiven is the outbound direction of the section: what this account
 // starred in other people's repositories, by language and by repository.
 func starsGiven(b *builder) []Panel {
+	// A star is a 1 added up per language, and not countOf, which added
+	// every star into one series first: the grouping had one series to group
+	// and drew one bar.
 	langGR, langGRtf := gTbl(fmt.Sprintf(
-		`limit(sortByMaxima(groupByNode(%s, %d, "sum")), 12)`,
-		countOf(gp("gh_star_given", "stars")), gn("gh_star_given", "language"),
+		`limit(sortByMaxima(groupByNode(isNonNull(%s), %d, "sum")), 12)`,
+		gp("gh_star_given", "stars"), gn("gh_star_given", "language"),
 	),
 		"Language", []col{{"sum", overviewStarsGiven}})
 	langES, langEStf := esTbl("gh_star_given", []any{b.tm("language", 12)}, []any{b.mCount()},

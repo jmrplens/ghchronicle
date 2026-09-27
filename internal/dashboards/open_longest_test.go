@@ -46,8 +46,8 @@ func TestTheOpenLongestTablesKeepTheLongestOpenInEveryStore(t *testing.T) {
 			case "graphite":
 				expr, _ := targets[0].(map[string]any)["target"].(string)
 				longest := regexp.MustCompile(fmt.Sprintf(
-					`^(removeEmptySeries\()?limit\(sortBy\(groupByNodes\([^()]*\.seconds_open, "max", \d+, \d+\), `+
-						`"max", true\), %d\)\)?$`,
+					`^(removeEmptySeries\()?limit\(sortBy\(aliasByNode\(groupByNodes\([^()]*\.seconds_open, "max", `+
+						`\d+, \d+, \d+\), 1, 2\), "max", true\), %d\)\)?$`,
 					openLongest,
 				))
 				if !longest.MatchString(expr) {
@@ -88,7 +88,8 @@ func checkCappedOnTheOpenTime(t *testing.T, title string, targets []any) {
 
 // checkOpenLongestBuckets holds the Elasticsearch query of a table of what is
 // still open to keeping the repositories and, in each, the numbers of the
-// largest open time, which is the one metric of the query that reads it.
+// largest open time, which is the one metric of the query that reads it. A
+// repository is its full name, and its short name the one value inside it.
 func checkOpenLongestBuckets(t *testing.T, title string, target map[string]any) {
 	t.Helper()
 	age := ""
@@ -105,7 +106,7 @@ func checkOpenLongestBuckets(t *testing.T, title string, target map[string]any) 
 	for _, raw := range asList(target["bucketAggs"]) {
 		bucket := agg(raw)
 		field, _ := bucket["field"].(string)
-		if field != inventoryRepoTerm && field != flowNumberTerm {
+		if field != panelFullNameField && field != flowNumberTerm {
 			continue
 		}
 		kept[field] = true
@@ -115,7 +116,7 @@ func checkOpenLongestBuckets(t *testing.T, title string, target map[string]any) 
 				"time first, metric %s", title, field, settings["orderBy"], settings["order"], age)
 		}
 	}
-	if !kept[inventoryRepoTerm] || !kept[flowNumberTerm] {
+	if !kept[panelFullNameField] || !kept[flowNumberTerm] {
 		t.Errorf("elasticsearch: %s buckets by %v, want the repository and the number",
 			title, bucketFieldsOf(asList(target["bucketAggs"])))
 	}

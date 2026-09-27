@@ -1017,7 +1017,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "topk(10, max by (repo) (github_workflow_run_total_runs{repo=~\"$repo\"}))",
+              "expr": "topk(10, max by (full_name, repo) (github_workflow_run_total_runs{repo=~\"$repo\"}))",
               "format": "table",
               "instant": true,
               "range": false,
@@ -1115,7 +1115,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo) (github_traffic_count{kind=\"views\",repo=~\"$repo\"})",
+              "expr": "sum by (full_name, repo) (github_traffic_count{kind=\"views\",repo=~\"$repo\"})",
               "instant": false,
               "legendFormat": "{{repo}}",
               "range": true,
@@ -1179,7 +1179,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo) (github_traffic_uniques{kind=\"views\",repo=~\"$repo\"})",
+              "expr": "sum by (full_name, repo) (github_traffic_uniques{kind=\"views\",repo=~\"$repo\"})",
               "instant": false,
               "legendFormat": "{{repo}}",
               "range": true,
@@ -1243,7 +1243,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo) (github_traffic_count{kind=\"clones\",repo=~\"$repo\"})",
+              "expr": "sum by (full_name, repo) (github_traffic_count{kind=\"clones\",repo=~\"$repo\"})",
               "instant": false,
               "legendFormat": "{{repo}}",
               "range": true,
@@ -1536,7 +1536,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo) (github_traffic_count{kind=\"clones\",repo=~\"$repo\"})",
+              "expr": "sum by (full_name, repo) (github_traffic_count{kind=\"clones\",repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -1545,7 +1545,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo) (github_traffic_uniques{kind=\"clones\",repo=~\"$repo\"})",
+              "expr": "sum by (full_name, repo) (github_traffic_uniques{kind=\"clones\",repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -1554,7 +1554,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo) (github_traffic_count{kind=\"views\",repo=~\"$repo\"})",
+              "expr": "sum by (full_name, repo) (github_traffic_count{kind=\"views\",repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -1658,7 +1658,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo) (increase(github_stars_gained_total{repo=~\"$repo\"}[$__interval]))",
+              "expr": "sum by (full_name, repo) (increase(github_stars_gained_total{repo=~\"$repo\"}[$__interval]))",
               "instant": false,
               "interval": "1d",
               "legendFormat": "{{repo}}",
@@ -1779,7 +1779,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "topk(12, sum by (repo) (github_repo_stars{repo=~\"$repo\"}) \u003e 0)",
+              "expr": "topk(12, max by (full_name, repo) (github_repo_stars{repo=~\"$repo\"}) \u003e 0)",
               "format": "table",
               "instant": true,
               "range": false,
@@ -1905,7 +1905,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo) (increase(github_stars_gained_total{repo=~\"$repo\"}[$__range])) \u003e 0",
+              "expr": "sum by (full_name, repo) (increase(github_stars_gained_total{repo=~\"$repo\"}[$__range])) \u003e 0",
               "format": "table",
               "instant": true,
               "range": false,
@@ -2530,7 +2530,6 @@
                 "excludeByName": {
                   "Time": true,
                   "__name__": true,
-                  "full_name": true,
                   "instance": true,
                   "job": true,
                   "owner": true
@@ -3226,7 +3225,7 @@
           },
           "id": 44,
           "options": {
-            "content": "**Not available from Prometheus.** In the InfluxDB dashboard this panel shows pull requests per author over the range.\n\nThe exporter keeps only `repo` and `state` on pull requests: an author label would be a series per contributor per state.",
+            "content": "**Not available from Prometheus.** In the InfluxDB dashboard this panel shows pull requests per author over the range.\n\nThe exporter keeps only the repository and `state` on pull requests: an author label would be a series per contributor per state.",
             "mode": "markdown"
           },
           "targets": [],
@@ -3346,7 +3345,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo) (increase(github_pull_requests_total{state=\"MERGED\",repo=~\"$repo\"}[$__range]))",
+              "expr": "sum by (full_name, repo) (increase(github_pull_requests_total{state=\"MERGED\",repo=~\"$repo\"}[$__range]))",
               "format": "table",
               "instant": true,
               "range": false,
@@ -3355,7 +3354,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "avg by (repo) (github_pull_requests_seconds_to_merge_mean{state=\"MERGED\",repo=~\"$repo\"})",
+              "expr": "avg by (full_name, repo) (github_pull_requests_seconds_to_merge_mean{state=\"MERGED\",repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -3364,7 +3363,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "avg by (repo) (github_pull_requests_churn_mean{state=\"MERGED\",repo=~\"$repo\"})",
+              "expr": "avg by (full_name, repo) (github_pull_requests_churn_mean{state=\"MERGED\",repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -3744,7 +3743,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "topk(25, max by (repo, number, author) (github_pull_requests_seconds_open_mean{state=\"OPEN\",repo=~\"$repo\"}))",
+              "expr": "topk(25, max by (full_name, repo, number, author) (github_pull_requests_seconds_open_mean{state=\"OPEN\",repo=~\"$repo\"}))",
               "format": "table",
               "instant": true,
               "range": false,
@@ -3753,7 +3752,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo, number, author) (github_pull_requests_comments_mean{state=\"OPEN\",repo=~\"$repo\"}) and on (repo, number, author) topk(25, max by (repo, number, author) (github_pull_requests_seconds_open_mean{state=\"OPEN\",repo=~\"$repo\"}))",
+              "expr": "max by (full_name, repo, number, author) (github_pull_requests_comments_mean{state=\"OPEN\",repo=~\"$repo\"}) and on (full_name, repo, number, author) topk(25, max by (full_name, repo, number, author) (github_pull_requests_seconds_open_mean{state=\"OPEN\",repo=~\"$repo\"}))",
               "format": "table",
               "instant": true,
               "range": false,
@@ -4458,7 +4457,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo) (github_artifact_total_live_bytes{repo=~\"$repo\"}) \u003e 0",
+              "expr": "sum by (full_name, repo) (github_artifact_total_live_bytes{repo=~\"$repo\"}) \u003e 0",
               "instant": false,
               "legendFormat": "{{repo}}",
               "range": true,
@@ -4593,7 +4592,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "topk(30, sum by (repo, workflow) (increase(github_workflow_runs_total{repo=~\"$repo\"}[$__range])))",
+              "expr": "topk(30, sum by (full_name, repo, workflow) (increase(github_workflow_runs_total{repo=~\"$repo\"}[$__range])))",
               "format": "table",
               "instant": true,
               "range": false,
@@ -4602,7 +4601,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo, workflow) (increase(github_workflow_runs_total{conclusion!=\"success\",repo=~\"$repo\"}[$__range])) and on (repo, workflow) topk(30, sum by (repo, workflow) (increase(github_workflow_runs_total{repo=~\"$repo\"}[$__range])))",
+              "expr": "sum by (full_name, repo, workflow) (increase(github_workflow_runs_total{conclusion!=\"success\",repo=~\"$repo\"}[$__range])) and on (full_name, repo, workflow) topk(30, sum by (full_name, repo, workflow) (increase(github_workflow_runs_total{repo=~\"$repo\"}[$__range])))",
               "format": "table",
               "instant": true,
               "range": false,
@@ -4611,7 +4610,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "avg by (repo, workflow) (github_workflow_runs_duration_seconds_mean{repo=~\"$repo\"}) and on (repo, workflow) topk(30, sum by (repo, workflow) (increase(github_workflow_runs_total{repo=~\"$repo\"}[$__range])))",
+              "expr": "avg by (full_name, repo, workflow) (github_workflow_runs_duration_seconds_mean{repo=~\"$repo\"}) and on (full_name, repo, workflow) topk(30, sum by (full_name, repo, workflow) (increase(github_workflow_runs_total{repo=~\"$repo\"}[$__range])))",
               "format": "table",
               "instant": true,
               "range": false,
@@ -4753,7 +4752,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "topk(30, avg by (repo, job_name) (github_workflow_jobs_duration_seconds_mean{repo=~\"$repo\"}))",
+              "expr": "topk(30, avg by (full_name, repo, job_name) (github_workflow_jobs_duration_seconds_mean{repo=~\"$repo\"}))",
               "format": "table",
               "instant": true,
               "range": false,
@@ -4762,7 +4761,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo, job_name) (github_workflow_jobs_count{repo=~\"$repo\"}) and on (repo, job_name) topk(30, avg by (repo, job_name) (github_workflow_jobs_duration_seconds_mean{repo=~\"$repo\"}))",
+              "expr": "sum by (full_name, repo, job_name) (github_workflow_jobs_count{repo=~\"$repo\"}) and on (full_name, repo, job_name) topk(30, avg by (full_name, repo, job_name) (github_workflow_jobs_duration_seconds_mean{repo=~\"$repo\"}))",
               "format": "table",
               "instant": true,
               "range": false,
@@ -4916,7 +4915,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo) (increase(github_workflow_runs_total{conclusion!=\"success\",repo=~\"$repo\"}[$__range])) * on (repo) group_left avg by (repo) (github_workflow_runs_duration_seconds_mean{repo=~\"$repo\"})",
+              "expr": "sum by (full_name, repo) (increase(github_workflow_runs_total{conclusion!=\"success\",repo=~\"$repo\"}[$__range])) * on (full_name, repo) group_left avg by (full_name, repo) (github_workflow_runs_duration_seconds_mean{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -4925,7 +4924,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo) (increase(github_workflow_runs_total{repo=~\"$repo\"}[$__range])) * on (repo) group_left avg by (repo) (github_workflow_runs_duration_seconds_mean{repo=~\"$repo\"})",
+              "expr": "sum by (full_name, repo) (increase(github_workflow_runs_total{repo=~\"$repo\"}[$__range])) * on (full_name, repo) group_left avg by (full_name, repo) (github_workflow_runs_duration_seconds_mean{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -5061,7 +5060,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "topk(20, sum by (repo, workflow) (increase(github_workflow_runs_total{conclusion!=\"success\",repo=~\"$repo\"}[$__range])) \u003e 3)",
+              "expr": "topk(20, sum by (full_name, repo, workflow) (increase(github_workflow_runs_total{conclusion!=\"success\",repo=~\"$repo\"}[$__range])) \u003e 3)",
               "format": "table",
               "instant": true,
               "range": false,
@@ -5070,7 +5069,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo, workflow) (increase(github_workflow_runs_total{repo=~\"$repo\"}[$__range])) and on (repo, workflow) topk(20, sum by (repo, workflow) (increase(github_workflow_runs_total{conclusion!=\"success\",repo=~\"$repo\"}[$__range])) \u003e 3)",
+              "expr": "sum by (full_name, repo, workflow) (increase(github_workflow_runs_total{repo=~\"$repo\"}[$__range])) and on (full_name, repo, workflow) topk(20, sum by (full_name, repo, workflow) (increase(github_workflow_runs_total{conclusion!=\"success\",repo=~\"$repo\"}[$__range])) \u003e 3)",
               "format": "table",
               "instant": true,
               "range": false,
@@ -5144,7 +5143,7 @@
           },
           "id": 64,
           "options": {
-            "content": "**Not available from Prometheus.** In the InfluxDB dashboard this panel shows the workflows that are declared in a repository and did not run in the range, which is a join between two measurements.\n\nThe exporter keeps one series per label set and no way to subtract one set from another: `unless` compares label sets that would have to be identical. Both sides still carry a `workflow` label and it no longer holds the same string on each, the run's being the workflow file and the declaration's the human name, and the file path that would match is not exported at all: the declaration keeps `repo`, `workflow` and `state` and nothing else.\n\nEach row of it links to the item on GitHub.",
+            "content": "**Not available from Prometheus.** In the InfluxDB dashboard this panel shows the workflows that are declared in a repository and did not run in the range, which is a join between two measurements.\n\nThe exporter keeps one series per label set and no way to subtract one set from another: `unless` compares label sets that would have to be identical. Both sides still carry a `workflow` label and it no longer holds the same string on each, the run's being the workflow file and the declaration's the human name, and the file path that would match is not exported at all: the declaration keeps the repository, `workflow` and `state` and nothing else.\n\nEach row of it links to the item on GitHub.",
             "mode": "markdown"
           },
           "targets": [],
@@ -5270,7 +5269,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo) (github_artifact_total_count{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo) (github_artifact_total_count{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -5279,7 +5278,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo) (github_artifact_total_walked{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo) (github_artifact_total_walked{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -5288,7 +5287,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo) (github_artifact_total_live_bytes{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo) (github_artifact_total_live_bytes{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -5297,7 +5296,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo) (github_artifact_total_live_count{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo) (github_artifact_total_live_count{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -5981,7 +5980,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo) (increase(github_repo_activities_total{activity=\"force_push\",repo=~\"$repo\"}[$__range])) \u003e 0",
+              "expr": "sum by (full_name, repo) (increase(github_repo_activities_total{activity=\"force_push\",repo=~\"$repo\"}[$__range])) \u003e 0",
               "format": "table",
               "instant": true,
               "range": false,
@@ -6428,7 +6427,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "topk(25, max by (repo, label) (github_label_used{repo=~\"$repo\"}))",
+              "expr": "topk(25, max by (full_name, repo, label) (github_label_used{repo=~\"$repo\"}))",
               "format": "table",
               "instant": true,
               "range": false,
@@ -6437,7 +6436,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo, label) (github_label_issues{repo=~\"$repo\"}) and on (repo, label) topk(25, max by (repo, label) (github_label_used{repo=~\"$repo\"}))",
+              "expr": "max by (full_name, repo, label) (github_label_issues{repo=~\"$repo\"}) and on (full_name, repo, label) topk(25, max by (full_name, repo, label) (github_label_used{repo=~\"$repo\"}))",
               "format": "table",
               "instant": true,
               "range": false,
@@ -6446,7 +6445,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo, label) (github_label_pull_requests{repo=~\"$repo\"}) and on (repo, label) topk(25, max by (repo, label) (github_label_used{repo=~\"$repo\"}))",
+              "expr": "max by (full_name, repo, label) (github_label_pull_requests{repo=~\"$repo\"}) and on (full_name, repo, label) topk(25, max by (full_name, repo, label) (github_label_used{repo=~\"$repo\"}))",
               "format": "table",
               "instant": true,
               "range": false,
@@ -6607,7 +6606,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo, milestone, state) (github_milestone_progress{repo=~\"$repo\"})",
+              "expr": "sum by (full_name, repo, milestone, state) (github_milestone_progress{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -6616,7 +6615,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo, milestone, state) (github_milestone_issues{repo=~\"$repo\"})",
+              "expr": "sum by (full_name, repo, milestone, state) (github_milestone_issues{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -6625,7 +6624,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo, milestone, state) (github_milestone_pull_requests{repo=~\"$repo\"})",
+              "expr": "sum by (full_name, repo, milestone, state) (github_milestone_pull_requests{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -6721,7 +6720,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo) (increase(github_forks_seen_total{repo=~\"$repo\"}[$__interval]))",
+              "expr": "sum by (full_name, repo) (increase(github_forks_seen_total{repo=~\"$repo\"}[$__interval]))",
               "instant": false,
               "interval": "1d",
               "legendFormat": "{{repo}}",
@@ -6888,7 +6887,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo) (increase(github_forks_seen_total{repo=~\"$repo\"}[$__range]))",
+              "expr": "sum by (full_name, repo) (increase(github_forks_seen_total{repo=~\"$repo\"}[$__range]))",
               "format": "table",
               "instant": true,
               "range": false,
@@ -6897,7 +6896,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "avg by (repo) (github_forks_seen_advanced_mean{repo=~\"$repo\"})",
+              "expr": "avg by (full_name, repo) (github_forks_seen_advanced_mean{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -6906,7 +6905,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "avg by (repo) (github_forks_seen_seconds_to_push_mean{repo=~\"$repo\"})",
+              "expr": "avg by (full_name, repo) (github_forks_seen_seconds_to_push_mean{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -7280,7 +7279,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "topk(20, sum by (repo) (increase(github_issue_comments_total[$__range])))",
+              "expr": "topk(20, sum by (full_name) (increase(github_issue_comments_total[$__range])))",
               "format": "table",
               "instant": true,
               "range": false,
@@ -7295,7 +7294,6 @@
                 "excludeByName": {
                   "Time": true,
                   "__name__": true,
-                  "full_name": true,
                   "instance": true,
                   "job": true,
                   "owner": true
@@ -7303,7 +7301,7 @@
                 "indexByName": {},
                 "renameByName": {
                   "Value": "Comments",
-                  "repo": "Repository"
+                  "full_name": "Repository"
                 }
               }
             }
@@ -7395,7 +7393,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "topk(20, sum by (repo) (increase(github_discussion_comments_total[$__range])))",
+              "expr": "topk(20, sum by (full_name) (increase(github_discussion_comments_total[$__range])))",
               "format": "table",
               "instant": true,
               "range": false,
@@ -7410,7 +7408,6 @@
                 "excludeByName": {
                   "Time": true,
                   "__name__": true,
-                  "full_name": true,
                   "instance": true,
                   "job": true,
                   "owner": true
@@ -7418,7 +7415,7 @@
                 "indexByName": {},
                 "renameByName": {
                   "Value": "Comments",
-                  "repo": "Repository"
+                  "full_name": "Repository"
                 }
               }
             }
@@ -7724,7 +7721,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo, hook) (increase(github_webhook_deliveries_total{repo=~\"$repo\"}[$__range]))",
+              "expr": "sum by (full_name, repo, hook) (increase(github_webhook_deliveries_total{repo=~\"$repo\"}[$__range]))",
               "format": "table",
               "instant": true,
               "range": false,
@@ -7733,7 +7730,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo, hook) (increase(github_webhook_deliveries_total{ok=\"false\",repo=~\"$repo\"}[$__range]))",
+              "expr": "sum by (full_name, repo, hook) (increase(github_webhook_deliveries_total{ok=\"false\",repo=~\"$repo\"}[$__range]))",
               "format": "table",
               "instant": true,
               "range": false,
@@ -7742,7 +7739,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "avg by (repo, hook) (github_webhook_deliveries_redelivery_mean{repo=~\"$repo\"})",
+              "expr": "avg by (full_name, repo, hook) (github_webhook_deliveries_redelivery_mean{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -7751,7 +7748,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "avg by (repo, hook) (github_webhook_deliveries_duration_seconds_mean{repo=~\"$repo\"})",
+              "expr": "avg by (full_name, repo, hook) (github_webhook_deliveries_duration_seconds_mean{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -7885,7 +7882,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo, ruleset, enforcement) (github_ruleset_active{repo=~\"$repo\"})",
+              "expr": "sum by (full_name, repo, ruleset, enforcement) (github_ruleset_active{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -7894,7 +7891,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo, ruleset, enforcement) (github_ruleset_days_since_change{repo=~\"$repo\"})",
+              "expr": "sum by (full_name, repo, ruleset, enforcement) (github_ruleset_days_since_change{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -8009,7 +8006,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo, key, read_only) (github_deploy_key_days_since_use{repo=~\"$repo\"})",
+              "expr": "sum by (full_name, repo, key, read_only) (github_deploy_key_days_since_use{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -8143,7 +8140,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo, host, hook, active) (github_webhook_events{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo, host, hook, active) (github_webhook_events{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -8250,7 +8247,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "min by (repo, environment) (github_environment_days_since_change{repo=~\"$repo\"})",
+              "expr": "min by (full_name, repo, environment) (github_environment_days_since_change{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -8379,7 +8376,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "topk(50, max by (repo, branch, is_default) (github_branch_days_since_commit{repo=~\"$repo\"}))",
+              "expr": "topk(50, max by (full_name, repo, branch, is_default) (github_branch_days_since_commit{repo=~\"$repo\"}))",
               "format": "table",
               "instant": true,
               "range": false,
@@ -8674,7 +8671,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo, pattern) (github_branch_protection_required_reviews{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo, pattern) (github_branch_protection_required_reviews{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -8683,7 +8680,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo, pattern) (github_branch_protection_requires_commit_signatures{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo, pattern) (github_branch_protection_requires_commit_signatures{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -8692,7 +8689,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo, pattern) (github_branch_protection_requires_linear_history{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo, pattern) (github_branch_protection_requires_linear_history{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -8701,7 +8698,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo, pattern) (github_branch_protection_allows_force_pushes{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo, pattern) (github_branch_protection_allows_force_pushes{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -8710,7 +8707,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo, pattern) (github_branch_protection_requires_conversation_resolution{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo, pattern) (github_branch_protection_requires_conversation_resolution{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -8719,7 +8716,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo, pattern) (github_branch_protection_required_checks{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo, pattern) (github_branch_protection_required_checks{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -8868,7 +8865,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo, ruleset, rule) (github_ruleset_rule_bypass_actors{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo, ruleset, rule) (github_ruleset_rule_bypass_actors{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -8877,7 +8874,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo, ruleset, rule) (github_ruleset_rule_bypass_always{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo, ruleset, rule) (github_ruleset_rule_bypass_always{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -8886,7 +8883,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo, ruleset, rule) (github_ruleset_rule_bypass_sampled{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo, ruleset, rule) (github_ruleset_rule_bypass_sampled{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -9033,7 +9030,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo, ruleset, actor_type) (github_ruleset_versions_count{repo=~\"$repo\"})",
+              "expr": "sum by (full_name, repo, ruleset, actor_type) (github_ruleset_versions_count{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -9287,7 +9284,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo, environment) (increase(github_deployments_total{repo=~\"$repo\"}[$__range]))",
+              "expr": "sum by (full_name, repo, environment) (increase(github_deployments_total{repo=~\"$repo\"}[$__range]))",
               "format": "table",
               "instant": true,
               "range": false,
@@ -9296,7 +9293,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "avg by (repo, environment) (github_deployments_seconds_to_status_mean{repo=~\"$repo\"})",
+              "expr": "avg by (full_name, repo, environment) (github_deployments_seconds_to_status_mean{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -9305,7 +9302,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "avg by (repo, environment) (github_deployments_seconds_live_mean{repo=~\"$repo\"})",
+              "expr": "avg by (full_name, repo, environment) (github_deployments_seconds_live_mean{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -9314,7 +9311,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo, environment) (increase(github_deployments_total{outcome=\"success\",repo=~\"$repo\"}[$__range]))",
+              "expr": "sum by (full_name, repo, environment) (increase(github_deployments_total{outcome=\"success\",repo=~\"$repo\"}[$__range]))",
               "format": "table",
               "instant": true,
               "range": false,
@@ -9323,7 +9320,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo, environment) (increase(github_deployments_total{outcome=\"pending\",repo=~\"$repo\"}[$__range]))",
+              "expr": "sum by (full_name, repo, environment) (increase(github_deployments_total{outcome=\"pending\",repo=~\"$repo\"}[$__range]))",
               "format": "table",
               "instant": true,
               "range": false,
@@ -9509,7 +9506,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "label_join(topk(12, sum by (repo, tag) (github_release_downloads{repo=~\"$repo\"}) \u003e 0), \"release\", \" \", \"repo\", \"tag\")",
+              "expr": "label_join(topk(12, sum by (full_name, repo, tag) (github_release_downloads{repo=~\"$repo\"}) \u003e 0), \"release\", \" \", \"repo\", \"tag\")",
               "format": "table",
               "instant": true,
               "range": false,
@@ -10119,7 +10116,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo, feature) (github_security_feature_enabled{repo=~\"$repo\"})",
+              "expr": "sum by (full_name, repo, feature) (github_security_feature_enabled{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -10128,7 +10125,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo, feature) (github_security_feature_open_alerts{repo=~\"$repo\"})",
+              "expr": "sum by (full_name, repo, feature) (github_security_feature_open_alerts{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -10745,7 +10742,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (tool, repo) (increase(github_code_scanning_analyses_total{repo=~\"$repo\"}[$__range]))",
+              "expr": "sum by (tool, full_name, repo) (increase(github_code_scanning_analyses_total{repo=~\"$repo\"}[$__range]))",
               "format": "table",
               "instant": true,
               "range": false,
@@ -10754,7 +10751,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "avg by (tool, repo) (github_code_scanning_analyses_results_mean{repo=~\"$repo\"})",
+              "expr": "avg by (tool, full_name, repo) (github_code_scanning_analyses_results_mean{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -10948,7 +10945,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo, setting, status) (github_security_setting_enabled{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo, setting, status) (github_security_setting_enabled{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -11089,7 +11086,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo, state, query_suite, schedule) (github_code_scanning_setup_setups{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo, state, query_suite, schedule) (github_code_scanning_setup_setups{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -11098,7 +11095,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo, state, query_suite, schedule) (github_code_scanning_setup_languages{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo, state, query_suite, schedule) (github_code_scanning_setup_languages{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -11107,7 +11104,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo, state, query_suite, schedule) (github_code_scanning_setup_days_since_change{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo, state, query_suite, schedule) (github_code_scanning_setup_days_since_change{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -11252,7 +11249,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo, permissions) (github_actions_policy_can_approve_pr{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo, permissions) (github_actions_policy_can_approve_pr{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -11388,7 +11385,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo, kind, secret) (github_secret_age_days{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo, kind, secret) (github_secret_age_days{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -11397,7 +11394,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo, kind, secret) (github_secret_days_since_rotation{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo, kind, secret) (github_secret_days_since_rotation{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -11841,7 +11838,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo, sku, unit) (github_billing_usage_quantity{repo!=\"(none)\"})",
+              "expr": "sum by (full_name, repo, sku, unit) (github_billing_usage_quantity{repo!=\"(none)\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -11850,7 +11847,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo, sku, unit) (github_billing_usage_price_per_unit{repo!=\"(none)\"})",
+              "expr": "max by (full_name, repo, sku, unit) (github_billing_usage_price_per_unit{repo!=\"(none)\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -11859,7 +11856,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo, sku, unit) (github_billing_usage_gross{repo!=\"(none)\"})",
+              "expr": "sum by (full_name, repo, sku, unit) (github_billing_usage_gross{repo!=\"(none)\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -11868,7 +11865,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo, sku, unit) (github_billing_usage_net{repo!=\"(none)\"})",
+              "expr": "sum by (full_name, repo, sku, unit) (github_billing_usage_net{repo!=\"(none)\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -12008,7 +12005,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "topk(25, sum by (repo, cache) (github_actions_cache_entry_size_bytes{repo=~\"$repo\"}))",
+              "expr": "topk(25, sum by (full_name, repo, cache) (github_actions_cache_entry_size_bytes{repo=~\"$repo\"}))",
               "format": "table",
               "instant": true,
               "range": false,
@@ -12017,7 +12014,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "min by (repo, cache) (github_actions_cache_entry_days_since_use{repo=~\"$repo\"})",
+              "expr": "min by (full_name, repo, cache) (github_actions_cache_entry_days_since_use{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -12026,7 +12023,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo, cache) (github_actions_cache_entry_caches{repo=~\"$repo\"})",
+              "expr": "sum by (full_name, repo, cache) (github_actions_cache_entry_caches{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -12171,7 +12168,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo) (github_actions_cache_size_bytes{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo) (github_actions_cache_size_bytes{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -12180,7 +12177,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo) (github_actions_cache_count{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo) (github_actions_cache_count{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -12835,7 +12832,6 @@
                 "excludeByName": {
                   "Time": true,
                   "__name__": true,
-                  "full_name": true,
                   "instance": true,
                   "job": true,
                   "owner": true
@@ -13484,7 +13480,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo) (github_repo_community_health_percentage{repo=~\"$repo\"})",
+              "expr": "sum by (full_name, repo) (github_repo_community_health_percentage{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -13493,7 +13489,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo) (github_repo_community_has_readme{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo) (github_repo_community_has_readme{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -13502,7 +13498,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo) (github_repo_community_has_license{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo) (github_repo_community_has_license{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -13511,7 +13507,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo) (github_repo_community_has_contributing{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo) (github_repo_community_has_contributing{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -13520,7 +13516,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo) (github_repo_community_has_code_of_conduct{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo) (github_repo_community_has_code_of_conduct{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -13529,7 +13525,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo) (github_repo_policy_issue_templates{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo) (github_repo_policy_issue_templates{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -13538,7 +13534,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo) (github_repo_community_has_pull_request_template{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo) (github_repo_community_has_pull_request_template{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -13782,7 +13778,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo, language, visibility, license) (github_repo_stars{repo=~\"$repo\"})",
+              "expr": "sum by (full_name, repo, language, visibility, license) (github_repo_stars{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -13791,7 +13787,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo, language, visibility, license) (github_repo_forks{repo=~\"$repo\"})",
+              "expr": "sum by (full_name, repo, language, visibility, license) (github_repo_forks{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -13800,7 +13796,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo, language, visibility, license) (github_repo_network{repo=~\"$repo\"})",
+              "expr": "sum by (full_name, repo, language, visibility, license) (github_repo_network{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -13809,7 +13805,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo, language, visibility, license) (github_repo_open_issues{repo=~\"$repo\"})",
+              "expr": "sum by (full_name, repo, language, visibility, license) (github_repo_open_issues{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -13818,7 +13814,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo, language, visibility, license) (github_repo_watchers{repo=~\"$repo\"})",
+              "expr": "sum by (full_name, repo, language, visibility, license) (github_repo_watchers{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -13827,7 +13823,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo, language, visibility, license) (github_repo_size_kb{repo=~\"$repo\"})",
+              "expr": "sum by (full_name, repo, language, visibility, license) (github_repo_size_kb{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -13836,7 +13832,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo, language, visibility, license) (github_repo_age_days{repo=~\"$repo\"})",
+              "expr": "sum by (full_name, repo, language, visibility, license) (github_repo_age_days{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -13845,7 +13841,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo, language, visibility, license) (github_repo_days_since_push{repo=~\"$repo\"})",
+              "expr": "sum by (full_name, repo, language, visibility, license) (github_repo_days_since_push{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -14516,7 +14512,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo) (github_repo_policy_security_policy{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo) (github_repo_policy_security_policy{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -14525,7 +14521,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo) (github_repo_policy_delete_branch_on_merge{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo) (github_repo_policy_delete_branch_on_merge{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -14534,7 +14530,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo) (github_repo_policy_auto_merge{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo) (github_repo_policy_auto_merge{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -14543,7 +14539,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo) (github_repo_policy_branch_protection_rules{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo) (github_repo_policy_branch_protection_rules{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -14552,7 +14548,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo) (github_repo_policy_issue_templates{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo) (github_repo_policy_issue_templates{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -14561,7 +14557,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo) (github_repo_policy_codeowners_errors{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo) (github_repo_policy_codeowners_errors{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -15008,7 +15004,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo, file) (github_policy_file_present{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo, file) (github_policy_file_present{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -15017,7 +15013,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo, file) (github_policy_file_changes{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo, file) (github_policy_file_changes{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -15177,7 +15173,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo, ecosystem, interval) (github_dependabot_ecosystem_blocks{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo, ecosystem, interval) (github_dependabot_ecosystem_blocks{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -16067,7 +16063,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo) (github_pinned_item_position)",
+              "expr": "max by (full_name, repo) (github_pinned_item_position)",
               "format": "table",
               "instant": true,
               "range": false,
@@ -16076,7 +16072,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo) (github_pinned_item_stars)",
+              "expr": "max by (full_name, repo) (github_pinned_item_stars)",
               "format": "table",
               "instant": true,
               "range": false,
@@ -16085,7 +16081,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo) (github_pinned_item_days_since_push)",
+              "expr": "max by (full_name, repo) (github_pinned_item_days_since_push)",
               "format": "table",
               "instant": true,
               "range": false,

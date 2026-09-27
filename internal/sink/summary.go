@@ -81,8 +81,13 @@ type rule struct {
 // four of these reduce measurements that hold other people's repositories as
 // well as the account's own, and two owners can name a repository the same
 // thing, which by `repo` alone collapses into one series that is the sum of
-// two. They cost no extra series, since each of the three is decided by the
-// others, and they let a panel group by whichever one it means.
+// two, or for a snapshot the newer of the two readings. They cost no extra
+// series, since each of the three is decided by the others, and they let a
+// panel group by whichever one it means. Until 2.6.1 forty-six rules kept `repo`
+// alone, so alice/x and acme/x were one series before any query ran, and the
+// two comment counts kept no repository at all, which drew every repository
+// as one row in the tables that list them per repository.
+// TestEveryRuleThatNamesARepositoryNamesItInFull holds the rules to it.
 var promRules = map[string]rule{
 	// Account-wide snapshots.
 	"gh_account":             {mode: keepLast, keep: []string{"user"}},
@@ -121,55 +126,54 @@ var promRules = map[string]rule{
 		"owner", "repo", "full_name", "language", "visibility", "license",
 		"archived", "fork", "default_branch",
 	}},
-	"gh_repo_language":  {mode: keepLast, keep: []string{"repo", "language"}},
-	"gh_repo_topic":     {mode: keepLast, keep: []string{"repo", "topic"}},
-	"gh_repo_community": {mode: keepLast, keep: []string{"repo"}},
-	"gh_workflow":       {mode: keepLast, keep: []string{"repo", "workflow", "state"}},
+	"gh_repo_language":  {mode: keepLast, keep: []string{"owner", "repo", "full_name", "language"}},
+	"gh_repo_topic":     {mode: keepLast, keep: []string{"owner", "repo", "full_name", "topic"}},
+	"gh_repo_community": {mode: keepLast, keep: []string{"owner", "repo", "full_name"}},
+	"gh_workflow":       {mode: keepLast, keep: []string{"owner", "repo", "full_name", "workflow", "state"}},
 	// These two, gh_release and the two alert counts are what the dashboards
 	// add up across repositories, into the cache and artifact bytes, the
-	// downloads and the open alerts, so each keeps all three of a
-	// repository's tags: by `repo` alone two owners' repositories of one name
-	// were one series, the newer reading replaced the other's, and the sum
-	// lost it.
+	// downloads and the open alerts: by `repo` alone two owners' repositories
+	// of one name were one series, the newer reading replaced the other's,
+	// and the sum lost it.
 	"gh_actions_cache":  {mode: keepLast, keep: []string{"owner", "repo", "full_name"}},
 	"gh_artifact_total": {mode: keepLast, keep: []string{"owner", "repo", "full_name"}},
 	// How many runs a repository has ever had. The walk only ever sees the
 	// newest few hundred, so this is a current total in its own right, the
 	// twin of gh_artifact_total above it.
-	"gh_workflow_run_total": {mode: keepLast, keep: []string{"repo"}},
+	"gh_workflow_run_total": {mode: keepLast, keep: []string{"owner", "repo", "full_name"}},
 	"gh_release":            {mode: keepLast, keep: []string{"owner", "repo", "full_name", "tag", "draft", "prerelease"}},
 
 	// Security, which is a current state by definition.
 	"gh_dependabot_alert":    {mode: keepLast, keep: []string{"owner", "repo", "full_name", "severity", "ecosystem"}},
 	"gh_code_scanning_alert": {mode: keepLast, keep: []string{"owner", "repo", "full_name", "severity", "tool"}},
-	"gh_security_feature":    {mode: keepLast, keep: []string{"repo", "feature"}},
+	"gh_security_feature":    {mode: keepLast, keep: []string{"owner", "repo", "full_name", "feature"}},
 
 	// Windows that only mean anything added up.
-	"gh_traffic":          {mode: sum, keep: []string{"repo", "kind"}},
-	"gh_traffic_referrer": {mode: sum, keep: []string{"repo", "referrer"}},
+	"gh_traffic":          {mode: sum, keep: []string{"owner", "repo", "full_name", "kind"}},
+	"gh_traffic_referrer": {mode: sum, keep: []string{"owner", "repo", "full_name", "referrer"}},
 	"gh_billing_usage":    {mode: sum, keep: []string{"product", "sku", "unit", "owner", "repo", "full_name"}},
 
 	// Dated items, reduced to a count and the mean of their numbers.
-	"gh_pull_request": {mode: count, as: "gh_pull_requests", keep: []string{"repo", "state"}},
-	"gh_issue":        {mode: count, as: "gh_issues", keep: []string{"repo", "state"}, labels: []string{"resolution"}},
+	"gh_pull_request": {mode: count, as: "gh_pull_requests", keep: []string{"owner", "repo", "full_name", "state"}},
+	"gh_issue":        {mode: count, as: "gh_issues", keep: []string{"owner", "repo", "full_name", "state"}, labels: []string{"resolution"}},
 	// resolution is kept because closed says nothing about how: an issue
 	// finished and an issue abandoned are the same tag without it, and a
 	// mean time to close that mixes them answers a question nobody asked.
 	"gh_workflow_run": {
 		mode: count, as: "gh_workflow_runs",
-		keep: []string{"repo", "workflow", "conclusion"},
+		keep: []string{"owner", "repo", "full_name", "workflow", "conclusion"},
 		// A run lists the pull requests it ran for only when there are
 		// any, so a run without the field ran for none.
 		absentIsZero: []string{"pull_requests"},
 	},
 	"gh_workflow_job": {
 		mode: count, as: "gh_workflow_jobs",
-		keep: []string{"repo", "job_name", "conclusion"},
+		keep: []string{"owner", "repo", "full_name", "job_name", "conclusion"},
 	},
-	"gh_star":         {mode: count, as: "gh_stars_gained", keep: []string{"repo"}},
+	"gh_star":         {mode: count, as: "gh_stars_gained", keep: []string{"owner", "repo", "full_name"}},
 	"gh_event":        {mode: count, as: "gh_events", keep: []string{"type"}},
 	"gh_notification": {mode: count, as: "gh_notifications", keep: []string{"reason", "subject_type"}},
-	"gh_discussion":   {mode: count, as: "gh_discussions", keep: []string{"repo", "category"}, labels: []string{"has_answer"}},
+	"gh_discussion":   {mode: count, as: "gh_discussions", keep: []string{"owner", "repo", "full_name", "category"}, labels: []string{"has_answer"}},
 	// A sponsorship is a payment, dated when the money moved, and it is the
 	// only dated record of it: gh_account.sponsoring counts as of now and
 	// says neither when nor to whom. It reduces the way a star does, so
@@ -216,30 +220,30 @@ var promRules = map[string]rule{
 	// Text, not a number. It goes to a log store.
 	"gh_job_log": {mode: skip},
 
-	"gh_webhook":          {mode: keepLast, keep: []string{"repo", "hook", "host", "active"}},
-	"gh_webhook_delivery": {mode: count, as: "gh_webhook_deliveries", keep: []string{"repo", "hook", "ok", "code"}},
-	"gh_ruleset":          {mode: keepLast, keep: []string{"repo", "ruleset", "enforcement"}},
+	"gh_webhook":          {mode: keepLast, keep: []string{"owner", "repo", "full_name", "hook", "host", "active"}},
+	"gh_webhook_delivery": {mode: count, as: "gh_webhook_deliveries", keep: []string{"owner", "repo", "full_name", "hook", "ok", "code"}},
+	"gh_ruleset":          {mode: keepLast, keep: []string{"owner", "repo", "full_name", "ruleset", "enforcement"}},
 	// Every saved version of a ruleset, dated when it was saved. Counted,
 	// because the changelog is the history gh_ruleset.days_since_change only
 	// summarizes, and a series per version id would never move again.
-	"gh_ruleset_version": {mode: count, as: "gh_ruleset_versions", keep: []string{"repo", "ruleset", "actor_type"}},
-	"gh_environment":     {mode: keepLast, keep: []string{"repo", "environment"}},
-	"gh_deploy_key":      {mode: keepLast, keep: []string{"repo", "key", "read_only"}},
+	"gh_ruleset_version": {mode: count, as: "gh_ruleset_versions", keep: []string{"owner", "repo", "full_name", "ruleset", "actor_type"}},
+	"gh_environment":     {mode: keepLast, keep: []string{"owner", "repo", "full_name", "environment"}},
+	"gh_deploy_key":      {mode: keepLast, keep: []string{"owner", "repo", "full_name", "key", "read_only"}},
 
 	// Added with the coverage audit. The per-item ones become counts, the
 	// standing ones keep their newest value, and the pure history is skipped.
-	"gh_pull_request_review": {mode: count, as: "gh_reviews", keep: []string{"repo", "reviewer", "bot", "self"}, labels: []string{"review_state"}},
+	"gh_pull_request_review": {mode: count, as: "gh_reviews", keep: []string{"owner", "repo", "full_name", "reviewer", "bot", "self"}, labels: []string{"review_state"}},
 	// The gate's verdict is a field, since it lands after the commit's own
 	// date; the dashboard's "commits by gate state" reads it as a label.
-	"gh_commit":                 {mode: count, as: "gh_commits", keep: []string{"repo", "author", "signature"}, labels: []string{"gate"}},
-	"gh_repo_activity":          {mode: count, as: "gh_repo_activities", keep: []string{"repo", "activity"}},
-	"gh_code_scanning_analysis": {mode: count, as: "gh_code_scanning_analyses", keep: []string{"repo", "tool"}},
-	"gh_fork":                   {mode: count, as: "gh_forks_seen", keep: []string{"repo"}, absentIsZero: []string{"advanced"}},
+	"gh_commit":                 {mode: count, as: "gh_commits", keep: []string{"owner", "repo", "full_name", "author", "signature"}, labels: []string{"gate"}},
+	"gh_repo_activity":          {mode: count, as: "gh_repo_activities", keep: []string{"owner", "repo", "full_name", "activity"}},
+	"gh_code_scanning_analysis": {mode: count, as: "gh_code_scanning_analyses", keep: []string{"owner", "repo", "full_name", "tool"}},
+	"gh_fork":                   {mode: count, as: "gh_forks_seen", keep: []string{"owner", "repo", "full_name"}, absentIsZero: []string{"advanced"}},
 	"gh_star_given":             {mode: count, as: "gh_stars_given", keep: []string{"user"}},
 	"gh_external_contribution":  {mode: count, as: "gh_external_contributions", keep: []string{"user", "owner", "repo", "full_name"}, absentIsZero: []string{"merged"}},
-	"gh_dependabot_alert_item":  {mode: count, as: "gh_dependabot_alerts", keep: []string{"repo", "severity"}, labels: []string{"alert_state"}},
-	"gh_label":                  {mode: keepLast, keep: []string{"repo", "label"}},
-	"gh_milestone":              {mode: keepLast, keep: []string{"repo", "milestone", "state"}},
+	"gh_dependabot_alert_item":  {mode: count, as: "gh_dependabot_alerts", keep: []string{"owner", "repo", "full_name", "severity"}, labels: []string{"alert_state"}},
+	"gh_label":                  {mode: keepLast, keep: []string{"owner", "repo", "full_name", "label"}},
+	"gh_milestone":              {mode: keepLast, keep: []string{"owner", "repo", "full_name", "milestone", "state"}},
 	"gh_contribution_year":      {mode: keepLast, keep: []string{"user", "year"}},
 
 	// Lifetime counts, which are already one row each: the exporter serves
@@ -265,7 +269,7 @@ var promRules = map[string]rule{
 	"gh_repo_policy": {mode: keepLast, keep: []string{"owner", "repo", "full_name"}},
 
 	// Code scanning per item, the twin of the Dependabot rule above.
-	"gh_code_scanning_alert_item": {mode: count, as: "gh_code_scanning_alerts", keep: []string{"repo", "severity"}, labels: []string{"alert_state"}},
+	"gh_code_scanning_alert_item": {mode: count, as: "gh_code_scanning_alerts", keep: []string{"owner", "repo", "full_name", "severity"}, labels: []string{"alert_state"}},
 	// Repositories created, including the forks a sweep never discovers.
 	"gh_repo_created": {mode: count, as: "gh_repos_created", keep: []string{"user", "fork"}},
 
@@ -274,45 +278,44 @@ var promRules = map[string]rule{
 	// comment is the accepted answer is not a label: it was the tag is_answer
 	// until 2.6.1, and a comment accepted while the exporter ran was then an
 	// item of two series, counted in both. The `answers` field's mean is the
-	// share accepted.
-	"gh_discussion_comment": {mode: count, as: "gh_discussion_comments", keep: []string{"user", "own"}},
-	"gh_issue_comment":      {mode: count, as: "gh_issue_comments", keep: []string{"user", "own"}},
+	// share accepted. The repository is kept, since the tables that read these
+	// list the comments per repository, and without it every repository was
+	// one row: a series per repository commented in, which grows only as the
+	// account comments somewhere new.
+	"gh_discussion_comment": {mode: count, as: "gh_discussion_comments", keep: []string{"user", "own", "owner", "repo", "full_name"}},
+	"gh_issue_comment":      {mode: count, as: "gh_issue_comments", keep: []string{"user", "own", "owner", "repo", "full_name"}},
 	// Checks that are not Actions: the gate nothing else in here can see.
-	"gh_commit_check": {mode: count, as: "gh_commit_checks", keep: []string{"repo", "app", "conclusion"}},
+	"gh_commit_check": {mode: count, as: "gh_commit_checks", keep: []string{"owner", "repo", "full_name", "app", "conclusion"}},
 
 	// Transitions, which are events rather than state.
-	"gh_issue_event": {mode: count, as: "gh_issue_events", keep: []string{"repo", "event", "kind", "bot"}},
+	"gh_issue_event": {mode: count, as: "gh_issue_events", keep: []string{"owner", "repo", "full_name", "event", "kind", "bot"}},
 	// One row per cache on each ref, its entries already summed by the
 	// collector, so the newest per label set is the whole cache and not
 	// whichever of its entries came last.
-	"gh_actions_cache_entry": {mode: keepLast, keep: []string{"repo", "cache", "ref"}},
+	"gh_actions_cache_entry": {mode: keepLast, keep: []string{"owner", "repo", "full_name", "cache", "ref"}},
 	// The account's keys, which are a standing fact with an expiry date.
 	"gh_key": {mode: keepLast, keep: []string{"user", "kind", "key"}},
 
 	// The dependency graph: a photograph and a difference.
-	"gh_dependency":         {mode: keepLast, keep: []string{"repo", "ecosystem"}},
-	"gh_dependency_license": {mode: keepLast, keep: []string{"repo", "license"}},
-	"gh_dependency_change":  {mode: sum, keep: []string{"repo", "change", "ecosystem"}},
+	"gh_dependency":         {mode: keepLast, keep: []string{"owner", "repo", "full_name", "ecosystem"}},
+	"gh_dependency_license": {mode: keepLast, keep: []string{"owner", "repo", "full_name", "license"}},
+	"gh_dependency_change":  {mode: sum, keep: []string{"owner", "repo", "full_name", "change", "ecosystem"}},
 
 	// Added with the fourth metrics audit.
 	//
 	// The standing configuration of a repository, all of it stamped daily or
 	// now by its collector, so the newest reading is the only one that means
-	// anything. Each keeps the tags that carry the answer and drops `owner`
-	// and `full_name`, which is what the other per-repository snapshots above
-	// already do: `full_name` is `owner/repo` and repeats the label for
-	// nothing.
-	"gh_security_setting": {mode: keepLast, keep: []string{"repo", "setting", "status"}},
-	"gh_actions_policy":   {mode: keepLast, keep: []string{"repo", "permissions"}},
-	"gh_secret":           {mode: keepLast, keep: []string{"repo", "kind", "secret"}},
-	"gh_code_scanning_setup": {mode: keepLast, keep: []string{
-		"repo", "state", "query_suite", "schedule",
-	}},
-	"gh_policy_file":          {mode: keepLast, keep: []string{"repo", "file"}},
-	"gh_dependabot_ecosystem": {mode: keepLast, keep: []string{"repo", "ecosystem", "interval"}},
-	"gh_branch":               {mode: keepLast, keep: []string{"repo", "branch", "is_default"}},
-	"gh_branch_protection":    {mode: keepLast, keep: []string{"repo", "pattern"}},
-	"gh_ruleset_rule":         {mode: keepLast, keep: []string{"repo", "ruleset", "rule"}},
+	// anything. Each keeps the tags that carry the answer and the three that
+	// name the repository.
+	"gh_security_setting":     {mode: keepLast, keep: []string{"owner", "repo", "full_name", "setting", "status"}},
+	"gh_actions_policy":       {mode: keepLast, keep: []string{"owner", "repo", "full_name", "permissions"}},
+	"gh_secret":               {mode: keepLast, keep: []string{"owner", "repo", "full_name", "kind", "secret"}},
+	"gh_code_scanning_setup":  {mode: keepLast, keep: []string{"owner", "repo", "full_name", "state", "query_suite", "schedule"}},
+	"gh_policy_file":          {mode: keepLast, keep: []string{"owner", "repo", "full_name", "file"}},
+	"gh_dependabot_ecosystem": {mode: keepLast, keep: []string{"owner", "repo", "full_name", "ecosystem", "interval"}},
+	"gh_branch":               {mode: keepLast, keep: []string{"owner", "repo", "full_name", "branch", "is_default"}},
+	"gh_branch_protection":    {mode: keepLast, keep: []string{"owner", "repo", "full_name", "pattern"}},
+	"gh_ruleset_rule":         {mode: keepLast, keep: []string{"owner", "repo", "full_name", "ruleset", "rule"}},
 
 	// Dated items, the same reduction their siblings get.
 	//
@@ -321,13 +324,13 @@ var promRules = map[string]rule{
 	// takes, not what each individual deployment did. `state` is the stable
 	// outcome the collector derives, not the raw enum, which is a field
 	// precisely because it moves.
-	"gh_deployment": {mode: count, as: "gh_deployments", keep: []string{"repo", "environment"}, labels: []string{"outcome"}},
+	"gh_deployment": {mode: count, as: "gh_deployments", keep: []string{"owner", "repo", "full_name", "environment"}, labels: []string{"outcome"}},
 	// Review threads reduce to the size of the debt and to two shares: how
 	// much of it is resolved and how much no longer applies to the current
 	// code. Both are integer fields rather than tags, so the mean of each is
 	// exactly that share. `bot` stays because a backlog of bot objections
 	// reads differently from a backlog of human ones.
-	"gh_review_thread": {mode: count, as: "gh_review_threads", keep: []string{"repo", "bot"}},
+	"gh_review_thread": {mode: count, as: "gh_review_threads", keep: []string{"owner", "repo", "full_name", "bot"}},
 	// Repositories archived, the dated twin of gh_repo_created. Counted and
 	// not kept: every sweep re-emits the whole list, so the count is
 	// "repositories ever archived" and stays one gauge per owner, where

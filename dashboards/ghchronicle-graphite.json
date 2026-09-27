@@ -647,7 +647,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(aliasSub(consolidateBy(groupByNode(isNonNull(github.repo_created.*.*.*.*.*.created), 5, \"sum\"), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))",
+              "target": "removeEmptySeries(aliasSub(consolidateBy(aliasByNode(groupByNodes(isNonNull(github.repo_created.*.*.*.*.*.created), \"sum\", 3, 5), 1), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))",
               "textEditor": true
             }
           ],
@@ -924,7 +924,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "aliasSub(consolidateBy(groupByNode(summarize(github.traffic.*.views.*.$repo.count, \"1d\", \"sum\"), 5, \"sum\"), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\")",
+              "target": "aliasSub(consolidateBy(aliasByNode(groupByNodes(summarize(github.traffic.*.views.*.$repo.count, \"1d\", \"sum\"), \"sum\", 2, 5), 1), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\")",
               "textEditor": true
             }
           ],
@@ -985,7 +985,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "aliasSub(consolidateBy(groupByNode(summarize(github.traffic.*.views.*.$repo.uniques, \"1d\", \"sum\"), 5, \"sum\"), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\")",
+              "target": "aliasSub(consolidateBy(aliasByNode(groupByNodes(summarize(github.traffic.*.views.*.$repo.uniques, \"1d\", \"sum\"), \"sum\", 2, 5), 1), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\")",
               "textEditor": true
             }
           ],
@@ -1046,7 +1046,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "aliasSub(consolidateBy(groupByNode(summarize(github.traffic.*.clones.*.$repo.count, \"1d\", \"sum\"), 5, \"sum\"), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\")",
+              "target": "aliasSub(consolidateBy(aliasByNode(groupByNodes(summarize(github.traffic.*.clones.*.$repo.count, \"1d\", \"sum\"), \"sum\", 2, 5), 1), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\")",
               "textEditor": true
             }
           ],
@@ -1440,7 +1440,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(aliasSub(consolidateBy(aliasByNode(sumSeries(github.traffic.*.clones.*.$repo.count), 5), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))",
+              "target": "removeEmptySeries(aliasSub(consolidateBy(aliasByNode(github.traffic.*.clones.*.$repo.count, 5), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))",
               "textEditor": true
             }
           ],
@@ -1538,7 +1538,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "aliasSub(consolidateBy(groupByNode(summarize(github.star_day.*.*.$repo.stars, \"1d\", \"sum\"), 4, \"sum\"), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\")",
+              "target": "aliasSub(consolidateBy(aliasByNode(groupByNodes(summarize(github.star_day.*.*.$repo.stars, \"1d\", \"sum\"), \"sum\", 2, 4), 1), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\")",
               "textEditor": true
             }
           ],
@@ -1778,7 +1778,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(aliasSub(consolidateBy(groupByNode(github.star_day.*.*.$repo.stars, 4, \"sum\"), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))",
+              "target": "removeEmptySeries(aliasSub(consolidateBy(aliasByNode(groupByNodes(github.star_day.*.*.$repo.stars, \"sum\", 2, 4), 1), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))",
               "textEditor": true
             }
           ],
@@ -3503,7 +3503,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(groupByNode(github.pull_request.*.*.*.*.$repo.MERGED.seconds_to_merge, 6, \"avg\"))",
+              "target": "removeEmptySeries(aliasByNode(groupByNodes(github.pull_request.*.*.*.*.$repo.MERGED.seconds_to_merge, \"avg\", 3, 6), 1))",
               "textEditor": true
             }
           ],
@@ -3863,7 +3863,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(limit(sortBy(groupByNodes(github.pull_request.*.*.*.*.$repo.OPEN.seconds_open, \"max\", 6, 4), \"max\", true), 25))",
+              "target": "removeEmptySeries(limit(sortBy(aliasByNode(groupByNodes(github.pull_request.*.*.*.*.$repo.OPEN.seconds_open, \"max\", 3, 6, 4), 1, 2), \"max\", true), 25))",
               "textEditor": true
             }
           ],
@@ -4003,7 +4003,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(limit(sortBy(groupByNodes(github.issue.*.*.*.*.$repo.OPEN.seconds_open, \"max\", 6, 4), \"max\", true), 25))",
+              "target": "removeEmptySeries(limit(sortBy(aliasByNode(groupByNodes(github.issue.*.*.*.*.$repo.OPEN.seconds_open, \"max\", 3, 6, 4), 1, 2), \"max\", true), 25))",
               "textEditor": true
             }
           ],
@@ -4239,7 +4239,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(aliasSub(consolidateBy(limit(sortByTotal(groupByNodes(summarize(offset(scale(github.review_thread.*.*.*.*.*.$repo.*.resolved,-1),1), \"100y\", \"sum\", true), \"sum\", 7, 5)), 25), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))",
+              "target": "removeEmptySeries(aliasSub(consolidateBy(limit(sortByTotal(aliasByNode(groupByNodes(summarize(offset(scale(github.review_thread.*.*.*.*.*.$repo.*.resolved,-1),1), \"100y\", \"sum\", true), \"sum\", 4, 7, 5), 1, 2)), 25), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))",
               "textEditor": true
             }
           ],
@@ -4798,7 +4798,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(aliasSub(consolidateBy(groupByNode(summarize(removeBelowValue(github.artifact_total.*.*.$repo.live_bytes, 1), \"1h\", \"max\"), 4, \"max\"), \"max\"), \"^consolidateBy\\((.*),.max.\\)$\", \"\\1\"))",
+              "target": "removeEmptySeries(aliasSub(consolidateBy(aliasByNode(groupByNodes(summarize(removeBelowValue(github.artifact_total.*.*.$repo.live_bytes, 1), \"1h\", \"max\"), \"max\", 2, 4), 1), \"max\"), \"^consolidateBy\\((.*),.max.\\)$\", \"\\1\"))",
               "textEditor": true
             }
           ],
@@ -4930,7 +4930,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(limit(sortBy(groupByNodes(github.workflow_run.*.*.*.*.*.$repo.*.duration_seconds, \"avg\", 8, 7), \"count\", true), 30))",
+              "target": "removeEmptySeries(limit(sortBy(aliasByNode(groupByNodes(github.workflow_run.*.*.*.*.*.$repo.*.duration_seconds, \"avg\", 8, 5, 7), 0, 2), \"count\", true), 30))",
               "textEditor": true
             }
           ],
@@ -5064,7 +5064,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(limit(sortBy(groupByNodes(github.workflow_job.*.*.*.*.*.*.$repo.*.*.duration_seconds, \"avg\", 5, 8), \"median\", true), 30))",
+              "target": "removeEmptySeries(limit(sortBy(aliasByNode(groupByNodes(github.workflow_job.*.*.*.*.*.*.$repo.*.*.duration_seconds, \"avg\", 5, 4, 8), 0, 2), \"median\", true), 30))",
               "textEditor": true
             }
           ],
@@ -5212,7 +5212,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(limit(sortBy(groupByNodes(github.workflow_step.*.*.*.*.*.$repo.*.*.duration_seconds, \"avg\", 8, 5, 7), \"median\", true), 30))",
+              "target": "removeEmptySeries(limit(sortBy(aliasByNode(groupByNodes(github.workflow_step.*.*.*.*.*.$repo.*.*.duration_seconds, \"avg\", 8, 5, 4, 7), 0, 1, 3), \"median\", true), 30))",
               "textEditor": true
             }
           ],
@@ -5340,7 +5340,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(aliasSub(consolidateBy(groupByNode(github.workflow_run.*.*.*.*.*.$repo.*.duration_seconds, 7, \"sum\"), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))",
+              "target": "removeEmptySeries(aliasSub(consolidateBy(aliasByNode(groupByNodes(github.workflow_run.*.*.*.*.*.$repo.*.duration_seconds, \"sum\", 5, 7), 1), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))",
               "textEditor": true
             }
           ],
@@ -5471,7 +5471,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(aliasSub(consolidateBy(limit(sortBy(groupByNodes(sumSeries(isNonNull(github.workflow_run.*.failure.*.*.*.$repo.*.duration_seconds)), \"sum\", 7, 8), \"sum\", true), 20), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))",
+              "target": "removeEmptySeries(aliasSub(consolidateBy(limit(sortBy(aliasByNode(groupByNodes(isNonNull(github.workflow_run.*.failure.*.*.*.$repo.*.duration_seconds), \"sum\", 5, 7, 8), 1, 2), \"sum\", true), 20), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))",
               "textEditor": true
             }
           ],
@@ -5598,7 +5598,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(aliasSub(consolidateBy(limit(sortBy(groupByNodes(sumSeries(isNonNull(github.workflow_step.*.failure.*.*.*.$repo.*.*.duration_seconds)), \"sum\", 8, 7), \"sum\", true), 20), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))",
+              "target": "removeEmptySeries(aliasSub(consolidateBy(limit(sortBy(aliasByNode(groupByNodes(isNonNull(github.workflow_step.*.failure.*.*.*.$repo.*.*.duration_seconds), \"sum\", 8, 4, 7), 0, 2), \"sum\", true), 20), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))",
               "textEditor": true
             }
           ],
@@ -5702,7 +5702,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "aliasSub(consolidateBy(groupByNode(summarize(github.artifact.*.*.*.$repo.size_bytes, \"1d\", \"sum\"), 5, \"sum\"), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\")",
+              "target": "aliasSub(consolidateBy(aliasByNode(groupByNodes(summarize(github.artifact.*.*.*.$repo.size_bytes, \"1d\", \"sum\"), \"sum\", 3, 5), 1), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\")",
               "textEditor": true
             }
           ],
@@ -6724,7 +6724,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(aliasSub(consolidateBy(aliasByNode(sumSeries(isNonNull(github.commit_check.*.*.*.*.*.$repo.*.checks)), 2, 3), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))",
+              "target": "removeEmptySeries(aliasSub(consolidateBy(groupByNodes(isNonNull(github.commit_check.*.*.*.*.*.$repo.*.checks), \"sum\", 2, 3), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))",
               "textEditor": true
             }
           ],
@@ -7133,7 +7133,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "aliasSub(consolidateBy(groupByNode(summarize(isNonNull(github.fork.*.*.*.$repo.forks), \"1d\", \"sum\"), 5, \"sum\"), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\")",
+              "target": "aliasSub(consolidateBy(aliasByNode(groupByNodes(summarize(isNonNull(github.fork.*.*.*.$repo.forks), \"1d\", \"sum\"), \"sum\", 3, 5), 1), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\")",
               "textEditor": true
             }
           ],
@@ -7659,7 +7659,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "aliasSub(consolidateBy(groupByNode(summarize(sumSeries(isNonNull(github.issue_event.*.*.*.*.*.*.*.*.*.$repo.*.*.events)), \"1d\", \"sum\"), 4, \"sum\"), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\")",
+              "target": "aliasSub(consolidateBy(groupByNode(summarize(isNonNull(github.issue_event.*.*.*.*.*.*.*.*.*.$repo.*.*.events), \"1d\", \"sum\"), 4, \"sum\"), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\")",
               "textEditor": true
             }
           ],
@@ -7751,7 +7751,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(aliasSub(consolidateBy(aliasByNode(sumSeries(isNonNull(github.issue_comment.*.*.*.*.*.*.comments)), 2), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))",
+              "target": "removeEmptySeries(aliasSub(consolidateBy(groupByNode(isNonNull(github.issue_comment.*.*.*.*.*.*.comments), 2, \"sum\"), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))",
               "textEditor": true
             }
           ],
@@ -8310,7 +8310,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(limit(sortBy(groupByNodes(github.webhook_delivery.*.*.*.*.*.*.*.$repo.*.duration_seconds, \"avg\", 6, 9, 7), \"count\", true), 25))",
+              "target": "removeEmptySeries(limit(sortBy(aliasByNode(groupByNodes(github.webhook_delivery.*.*.*.*.*.*.*.$repo.*.duration_seconds, \"avg\", 6, 4, 9, 7), 0, 2, 3), \"count\", true), 25))",
               "textEditor": true
             }
           ],
@@ -9423,7 +9423,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(aliasSub(consolidateBy(sortBy(groupByNodes(isNonNull(github.ruleset_version.*.*.*.$repo.*.*.versions), \"sum\", 5, 6, 2), \"sum\", true), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))",
+              "target": "removeEmptySeries(aliasSub(consolidateBy(sortBy(aliasByNode(groupByNodes(isNonNull(github.ruleset_version.*.*.*.$repo.*.*.versions), \"sum\", 3, 5, 6, 2), 1, 2, 3), \"sum\", true), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))",
               "textEditor": true
             }
           ],
@@ -9667,7 +9667,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(aliasSub(consolidateBy(sortBy(groupByNodes(github.deployment.*.*.*.*.$repo.*.success, \"sum\", 6, 3), \"sum\", true), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))",
+              "target": "removeEmptySeries(aliasSub(consolidateBy(sortBy(aliasByNode(groupByNodes(github.deployment.*.*.*.*.$repo.*.success, \"sum\", 4, 6, 3), 1, 2), \"sum\", true), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))",
               "textEditor": true
             }
           ],
@@ -11038,7 +11038,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(groupByNodes(github.dependabot_alert_item.*.*.*.*.*.*.*.*.$repo.*.*.seconds_to_resolve, \"avg\", 10, 12, 8))",
+              "target": "removeEmptySeries(aliasByNode(groupByNodes(github.dependabot_alert_item.*.*.*.*.*.*.*.*.$repo.*.*.seconds_to_resolve, \"avg\", 3, 10, 12, 8), 1, 2, 3))",
               "textEditor": true
             }
           ],
@@ -11179,7 +11179,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(aliasSub(consolidateBy(limit(sortBy(groupByNodes(github.code_scanning_analysis.*.*.*.*.$repo.*.*.results, \"sum\", 7, 6), \"sum\", true), 25), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))",
+              "target": "removeEmptySeries(aliasSub(consolidateBy(limit(sortBy(aliasByNode(groupByNodes(github.code_scanning_analysis.*.*.*.*.$repo.*.*.results, \"sum\", 7, 3, 6), 0, 2), \"sum\", true), 25), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))",
               "textEditor": true
             }
           ],
@@ -12308,7 +12308,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(aliasByNode(consolidateBy(groupByNodes(removeBelowValue(filterSeries(transformNull(summarize(github.actions_cache_entry.*.*.*.*.$repo.size_bytes, \"1d\", \"last\"), -1), \"last\", \"\u003e=\", 0), 0), \"sum\", 6, 2), \"last\"), 0, 1))",
+              "target": "removeEmptySeries(aliasByNode(consolidateBy(groupByNodes(removeBelowValue(filterSeries(transformNull(summarize(github.actions_cache_entry.*.*.*.*.$repo.size_bytes, \"1d\", \"last\"), -1), \"last\", \"\u003e=\", 0), 0), \"sum\", 3, 6, 2), \"last\"), 1, 2))",
               "textEditor": true
             }
           ],
@@ -13117,7 +13117,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(aliasSub(consolidateBy(limit(sortByMaxima(groupByNode(sumSeries(isNonNull(github.star_given.*.*.*.*.*.stars)), 3, \"sum\")), 12), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))",
+              "target": "removeEmptySeries(aliasSub(consolidateBy(limit(sortByMaxima(groupByNode(isNonNull(github.star_given.*.*.*.*.*.stars), 3, \"sum\")), 12), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))",
               "textEditor": true
             }
           ],

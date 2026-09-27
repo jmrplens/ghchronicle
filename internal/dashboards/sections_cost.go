@@ -32,7 +32,7 @@ const (
 // empty, so the Copilot seat stayed in the table as a repository called (none)
 // here alone.
 func promByRepo(field, aggregation string) string {
-	return fmt.Sprintf("%s by (repo, sku, unit) (github_billing_usage_%s{repo!=%q})",
+	return fmt.Sprintf("%s by (full_name, repo, sku, unit) (github_billing_usage_%s{repo!=%q})",
 		aggregation, field, noneValue)
 }
 
@@ -51,7 +51,7 @@ func cost(b *builder) []Panel {
 		` SUM(quantity) AS "Quantity", MAX(unit) AS "Unit",` +
 		` MAX(price_per_unit) AS "Price", SUM(net) AS "Net"` +
 		" FROM gh_billing_usage WHERE $__timeFilter(time) AND repo <> " + noneSQL +
-		" GROUP BY 1, 3 ORDER BY 2 DESC LIMIT 40"
+		" GROUP BY 1, full_name, 3 ORDER BY 2 DESC LIMIT 40"
 	minutes := "SELECT " + timeBin + ", sku AS series," +
 		" SUM(quantity) AS quantity FROM gh_billing_usage" +
 		" WHERE $__timeFilter(time) AND unit = 'Minutes' GROUP BY 1, 2 ORDER BY 1"
@@ -66,7 +66,7 @@ func cost(b *builder) []Panel {
 		rowsOf(gp(bu, "gross"), gn(bu, "repo"), gn(bu, "sku")),
 	),
 		"Repository, SKU", []col{{"sum", "Gross"}})
-	byRepoES, byRepoEStf := esTbl(bu, []any{b.tm("repo", 40), b.tm("sku", 50), b.tm("unit", 5)},
+	byRepoES, byRepoEStf := esTbl(bu, append(b.tmRepo(40), b.tm("sku", 50), b.tm("unit", 5)),
 		[]any{b.mSum("quantity"), b.mMax("price_per_unit"), b.mSum("gross"), b.mSum("net")},
 		[]named{
 			{panelRepoField, "Repository"},
@@ -77,14 +77,14 @@ func cost(b *builder) []Panel {
 			{"g", "Gross"},
 			{"n", "Net"},
 		},
-		[]string{"NOT repo.keyword:" + noneElasticsearch})
+		[]string{"NOT repo.keyword:" + noneElasticsearch}, hideColumns(panelFullNameField))
 
 	cacheGR, cacheGRtf := gTbl(rowsOf("keepLastValue("+rp("gh_actions_cache", "size_bytes")+")",
 		gn("gh_actions_cache", "repo")), "Repository", []col{{"lastNotNull", "Cache"}})
-	cacheES, cacheEStf := esTbl("gh_actions_cache", []any{b.tm("repo", 500)},
+	cacheES, cacheEStf := esTbl("gh_actions_cache", b.tmRepo(500),
 		[]any{b.mNewest("size_bytes", "count")},
 		[]named{{panelRepoField, "Repository"}, {"size_bytes", "Cache"}, {"count", "Entries"}},
-		[]string{ESF})
+		[]string{ESF}, hideColumns(panelFullNameField))
 
 	return []Panel{
 		statGroup("Spend in range", box{W: 24, H: 4, X: 0, Y: 0}, []Target{sqlT(
@@ -190,8 +190,8 @@ func cost(b *builder) []Panel {
 				") x WHERE rn = 1 ORDER BY 2 DESC",
 		)}, &P{
 			Prom: []Target{
-				promTbl(fmt.Sprintf("max by (repo) (github_actions_cache_size_bytes{%s})", PF), "A"),
-				promTbl(fmt.Sprintf("max by (repo) (github_actions_cache_count{%s})", PF), "B"),
+				promTbl(fmt.Sprintf("max by (full_name, repo) (github_actions_cache_size_bytes{%s})", PF), "A"),
+				promTbl(fmt.Sprintf("max by (full_name, repo) (github_actions_cache_count{%s})", PF), "B"),
 			},
 			PromTF: merged(map[string]string{
 				"repo": "Repository", panelValueA: "Cache", panelValueB: "Entries",
@@ -250,15 +250,17 @@ func cacheEntries(b *builder) Panel {
 	// consolidateBy keeps a long range drawn on a narrow screen reading the
 	// last day rather than the mean of the last two, and it names the series
 	// after itself, so aliasByNode names each row by its repository and cache
-	// again, the two nodes groupByNodes left.
+	// again, the last two of the three nodes groupByNodes left: a repository
+	// is grouped by its full name, which two owners cannot share, and named
+	// by its short one.
 	ce := "gh_actions_cache_entry"
 	lastDay := fmt.Sprintf(`removeBelowValue(filterSeries(transformNull(summarize(%s, "1d", "last"), -1),`+
 		` "last", ">=", 0), 0)`, rp(ce, "size_bytes"))
-	entryGR, entryGRtf := gTbl(rowsOf(fmt.Sprintf(`consolidateBy(groupByNodes(%s, "sum", %d, %d), "last")`,
-		lastDay, gn(ce, "repo"), gn(ce, "cache")), 0, 1),
+	entryGR, entryGRtf := gTbl(rowsOf(fmt.Sprintf(`consolidateBy(groupByNodes(%s, "sum", %d, %d, %d), "last")`,
+		lastDay, gn(ce, "full_name"), gn(ce, "repo"), gn(ce, "cache")), 1, 2),
 		"Repository, cache", []col{{"lastNotNull", "Size"}})
 	entryES, entryEStf := esTbl(ce,
-		[]any{b.tm("repo", 500), b.terms("@timestamp", 1, "_key", "desc"), b.tm("cache", 50)},
+		append(b.tmRepo(500), b.terms("@timestamp", 1, "_key", "desc"), b.tm("cache", 50)),
 		[]any{b.mSum("size_bytes"), b.mSum("caches"), b.mMin("days_since_use")},
 		[]named{
 			{panelRepoField, "Repository"},
@@ -266,21 +268,21 @@ func cacheEntries(b *builder) Panel {
 			{"s", "Size"},
 			{"n", "Entries"},
 			{"d", costCacheIdle},
-		}, []string{ESF}, hideColumns("@timestamp"))
+		}, []string{ESF}, hideColumns(panelFullNameField, "@timestamp"))
 
 	return panel("table", "Cache entries by key", box{W: 24, H: 8, X: 0, Y: 21}, []Target{sqlT(
 		`SELECT cache AS "Cache", SUM(size_bytes) AS "Size", repo AS "Repository",` +
 			` SUM(caches) AS "Entries",` +
 			` MIN(days_since_use) AS "` + costCacheIdle + `" FROM (` +
-			"SELECT time, repo, cache, size_bytes, caches, days_since_use," +
+			"SELECT time, full_name, repo, cache, size_bytes, caches, days_since_use," +
 			" MAX(time) OVER (PARTITION BY full_name) AS newest" +
 			" FROM gh_actions_cache_entry WHERE $__timeFilter(time) AND " + RF +
-			") x WHERE time = newest GROUP BY 1, 3 ORDER BY 2 DESC LIMIT 25",
+			") x WHERE time = newest GROUP BY 1, full_name, 3 ORDER BY 2 DESC LIMIT 25",
 	)}, &P{
 		Prom: []Target{
-			promTbl(fmt.Sprintf("topk(25, sum by (repo, cache) (github_actions_cache_entry_size_bytes{%s}))", PF), "A"),
-			promTbl(fmt.Sprintf("min by (repo, cache) (github_actions_cache_entry_days_since_use{%s})", PF), "B"),
-			promTbl(fmt.Sprintf("sum by (repo, cache) (github_actions_cache_entry_caches{%s})", PF), "C"),
+			promTbl(fmt.Sprintf("topk(25, sum by (full_name, repo, cache) (github_actions_cache_entry_size_bytes{%s}))", PF), "A"),
+			promTbl(fmt.Sprintf("min by (full_name, repo, cache) (github_actions_cache_entry_days_since_use{%s})", PF), "B"),
+			promTbl(fmt.Sprintf("sum by (full_name, repo, cache) (github_actions_cache_entry_caches{%s})", PF), "C"),
 		},
 		PromTF: merged(map[string]string{
 			"repo": "Repository", "cache": "Cache", panelValueA: "Size",

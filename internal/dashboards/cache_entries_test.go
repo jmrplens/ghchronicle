@@ -70,13 +70,13 @@ func checkNewestTimestampBucket(t *testing.T, target map[string]any) {
 	t.Helper()
 	buckets, _ := target["bucketAggs"].([]any)
 	fields := bucketFieldsOf(buckets)
-	if len(buckets) != 3 || fields[0] != "repo.keyword" || fields[1] != "@timestamp" ||
-		fields[2] != "cache.keyword" {
-		t.Errorf("elasticsearch: Cache entries by key buckets by %v, want the repository, its "+
-			"newest timestamp and the cache", fields)
+	if len(buckets) != 4 || fields[0] != panelFullNameField || fields[1] != panelRepoField ||
+		fields[2] != "@timestamp" || fields[3] != "cache.keyword" {
+		t.Errorf("elasticsearch: Cache entries by key buckets by %v, want the repository by "+
+			"its full name, its newest timestamp and the cache", fields)
 		return
 	}
-	settings, _ := buckets[1].(map[string]any)["settings"].(map[string]any)
+	settings, _ := buckets[2].(map[string]any)["settings"].(map[string]any)
 	if settings["size"] != "1" || settings["orderBy"] != "_key" || settings["order"] != "desc" {
 		t.Errorf("elasticsearch: the timestamp bucket is %v, want the one newest", settings)
 	}

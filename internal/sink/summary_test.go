@@ -364,6 +364,68 @@ func TestTheSnapshotsTheDashboardsAddUpKeepTwoOwnersApart(t *testing.T) {
 	}
 }
 
+// TestEveryRuleThatNamesARepositoryNamesItInFull: a rule that keeps one of the
+// three tags that name a repository keeps all three, so that no reduction
+// makes two owners' repositories of one name one series. Forty-six rules
+// kept `repo` alone until 2.6.1, the #97 class the five above were the first
+// of: the traffic, the pull requests, the workflow runs and every
+// configuration table merged alice/x and acme/x before any query ran, and a
+// snapshot kept the newer reading of the two. The two comment counts kept no
+// repository at all, where the dashboards list them per repository, so they
+// are held to naming one.
+func TestEveryRuleThatNamesARepositoryNamesItInFull(t *testing.T) {
+	base := time.Date(2026, 9, 27, 10, 0, 0, 0, time.UTC)
+	listedPerRepository := []string{"gh_issue_comment", "gh_discussion_comment"}
+	checked := 0
+	for m, r := range promRules {
+		named := slices.Contains(listedPerRepository, m) || slices.ContainsFunc(r.keep, func(k string) bool {
+			return k == "owner" || k == "repo" || k == "full_name"
+		})
+		if !named || m == "gh_repo_archived" {
+			// gh_repo_archived keeps the owner and no repository on purpose: a
+			// count of the repositories ever archived, one gauge per owner.
+			continue
+		}
+		for _, k := range []string{"owner", "repo", "full_name"} {
+			if !slices.Contains(r.keep, k) {
+				t.Errorf("%s keeps %v, not %s: the three tags that name a repository travel together",
+					m, r.keep, k)
+			}
+		}
+		if names := twoOwnersReduced(m, r.keep, base); !names["alice/dotfiles"] || !names["acme/dotfiles"] {
+			t.Errorf("%s: the exporter holds %v for alice/dotfiles and acme/dotfiles, want the two apart", m, names)
+		}
+		checked++
+	}
+	if checked < 50 {
+		t.Errorf("checked %d rules that name a repository, fewer than the fifty there are", checked)
+	}
+}
+
+// twoOwnersReduced is the full names the reduction of measurement m keeps
+// over a point of alice/dotfiles and one of acme/dotfiles an hour later,
+// every other kept tag the same.
+func twoOwnersReduced(m string, keep []string, base time.Time) map[string]bool {
+	var points []Point
+	for i, owner := range []string{"alice", "acme"} {
+		tags := map[string]string{"owner": owner, "repo": "dotfiles", "full_name": owner + "/dotfiles"}
+		for _, k := range keep {
+			if tags[k] == "" {
+				tags[k] = "t"
+			}
+		}
+		points = append(points, Point{
+			Measurement: m, Tags: tags, Fields: map[string]any{"v": float64(i + 1)},
+			Time: base.Add(time.Duration(i) * time.Hour),
+		})
+	}
+	names := map[string]bool{}
+	for _, g := range Summarize(points) {
+		names[g.Tags["full_name"]] = true
+	}
+	return names
+}
+
 func TestSummarizeSumsAWindow(t *testing.T) {
 	base := time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC)
 	var pts []Point

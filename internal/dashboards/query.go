@@ -178,13 +178,19 @@ func hourly(e, leg string, ref ...string) Target {
 const binStep = "[$__interval]"
 
 // organize drops the columns Prometheus adds to every table frame and names
-// the rest.
+// the rest. The owner and the full name are dropped too, unless the panel
+// names one of them: a row per repository is kept apart by its full name and
+// shows the short one, and a table of other people's repositories shows the
+// full name. Grafana drops an excluded column before it renames any, so a
+// full name excluded and renamed at once was no column at all.
 func organize(rename map[string]string, exclude []string, order map[string]int) any {
 	excludeBy := map[string]any{}
 	for _, k := range append([]string{
 		"Time", "__name__", "job", "instance", "owner", "full_name",
 	}, exclude...) {
-		excludeBy[k] = true
+		if _, named := rename[k]; !named {
+			excludeBy[k] = true
+		}
 	}
 	if rename == nil {
 		rename = map[string]string{}
@@ -488,6 +494,40 @@ func perBucket(expr string, node int, spanHow ...string) string {
 		expr, span, how, node, how), how)
 }
 
+// perRepoBucket is perBucket with a series per repository of measurement m,
+// grouped by grGroupBy and so named by the short name.
+func perRepoBucket(expr, m string, spanHow ...string) string {
+	span, how := "1d", "sum"
+	if len(spanHow) > 0 {
+		span = spanHow[0]
+	}
+	if len(spanHow) > 1 {
+		how = spanHow[1]
+	}
+	return consolidated(grGroupBy(fmt.Sprintf(`summarize(%s, %q, %q)`, expr, span, how), m, how, "repo"), how)
+}
+
+// grGroupBy groups the series of measurement m by the tags named, in that
+// order, and names each group by them: groupByNodes, and aliasByNode over the
+// nodes the name keeps. A repository is grouped by its full name and named by
+// its short one, which is the only name its row or its series has in the
+// other stores. Grouped by the short name, two owners' repositories of one
+// name, alice/x and acme/x, were one series holding both. The name reads the
+// nodes of the group's own name, which groupByNodes joins with dots, and no
+// node holds a dot: the sink writes one as an underscore.
+func grGroupBy(expr, m, how string, by ...string) string {
+	var nodes, kept []string
+	for _, tag := range by {
+		if tag == "repo" {
+			nodes = append(nodes, strconv.Itoa(gn(m, "full_name")))
+		}
+		kept = append(kept, strconv.Itoa(len(nodes)))
+		nodes = append(nodes, strconv.Itoa(gn(m, tag)))
+	}
+	return fmt.Sprintf(`aliasByNode(groupByNodes(%s, %q, %s), %s)`,
+		expr, how, strings.Join(nodes, ", "), strings.Join(kept, ", "))
+}
+
 func medianBucket(path string, span ...string) string {
 	s := "1d"
 	if len(span) > 0 {
@@ -752,6 +792,17 @@ func (b *builder) terms(field string, size int, order ...string) any {
 // hideColumns(panelESTime) drops.
 func (b *builder) newestDoc() any { return b.terms(panelESTime, 1, "_key", "desc") }
 
+// tmRepo is a repository as buckets: one per full name, keeping `size` of
+// them, ordered as tm orders, and inside each its short name, which is one
+// value there and is what the row or the series is named by. Bucketed by the
+// short name alone, two owners' repositories of one name, alice/x and
+// acme/x, were one bucket: counts added together, and a newest reading that
+// stood for both. A table drops the full name's column with
+// hideColumns(panelFullNameField).
+func (b *builder) tmRepo(size int, order ...string) []any {
+	return []any{b.tm("full_name", size, order...), b.tm("repo", 1)}
+}
+
 // tmBy is a terms bucket on a tag that keeps the `size` values with the most
 // of `metric`, largest first. The metric has to be one of the same query's,
 // since the bucket names it by its id; renumberES carries that reference to
@@ -759,6 +810,13 @@ func (b *builder) newestDoc() any { return b.terms(panelESTime, 1, "_key", "desc
 func (b *builder) tmBy(tag string, size int, metric any) any {
 	id, _ := agg(metric)["id"].(string)
 	return b.tm(tag, size, id)
+}
+
+// tmRepoBy is tmRepo keeping the `size` repositories with the most of
+// `metric`, as tmBy keeps a tag's values.
+func (b *builder) tmRepoBy(size int, metric any) []any {
+	id, _ := agg(metric)["id"].(string)
+	return b.tmRepo(size, id)
 }
 
 // tmURL is the url of an item as a bucket, which is the one way a string
@@ -1034,8 +1092,10 @@ func hideColumns(names ...string) any {
 // count that only climbs it is the newest. Every repository is a bucket, not
 // the fifty of esDailyTerms: a repository left out is stars missing from the
 // total.
+//
+// A series per full name, named by the short one, as tmRepo explains.
 func (b *builder) esSnapshotStack(m, field string) Target {
-	return esq(m, []any{b.mMax(field)}, []any{b.tm("repo", 500), b.dh()}, "A",
+	return esq(m, []any{b.mMax(field)}, append(b.tmRepo(500), b.dh()), "A",
 		[]string{ESF}, "{{term repo.keyword}}")
 }
 
@@ -1067,7 +1127,11 @@ func (b *builder) esTotal(m string, met any, where ...string) []Target {
 
 func (b *builder) esDaily(m string, met any, by, span string, where []string, ref string) Target {
 	var buckets []any
-	if by != "" {
+	switch by {
+	case "":
+	case "repo":
+		buckets = b.tmRepo(esDailyTerms)
+	default:
 		buckets = append(buckets, b.tm(by, esDailyTerms))
 	}
 	if span == "" {

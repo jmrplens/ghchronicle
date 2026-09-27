@@ -37,6 +37,21 @@ paneles de Overview y no todos.
   la acompaña lo dice. Ninguna captura de esta página es de una cuenta real.
 </Aside>
 
+Un repositorio se distingue por su nombre completo en todos los paneles. Dos
+propietarios pueden dar el mismo nombre a un repositorio, como una cuenta y una
+organización a la que pertenece, que tienen cada una su `.github`, y una
+consulta que agrupaba, unía, contaba o tomaba la fila más reciente solo por el
+nombre corto convertía los dos en uno: "Open the longest" listaba `alice/x#5` y
+`acme/x#5` como una sola pull request, y cada gráfica por repositorio los
+dibujaba como una sola serie. Desde la 2.6.1 todos los almacenes identifican un
+repositorio por su nombre completo, y el exportador conserva el nombre completo
+en cada gauge que nombra uno. Una tabla sigue mostrando el nombre corto, así que
+los dos son dos filas con el mismo nombre, y el selector de repositorio sigue
+filtrando por él. Una gráfica en InfluxDB y PostgreSQL nombra una serie por su
+nombre corto salvo que dos repositorios del rango lo compartan, y entonces por
+sus nombres completos; los otros tres almacenes nombran ambas por el nombre
+corto.
+
 ## Overview
 
 Una cabecera y no un panel: la marca, grande y centrada, el nombre debajo, y
