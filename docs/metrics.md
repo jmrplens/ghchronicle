@@ -151,6 +151,15 @@ request in a stack is read through its own list because `added_to_stack` has
 no timeline type, and the one thing the list sees that this does not is a
 commit referencing an issue nobody has touched, three events in 2,217.
 
+The three of them ask only where something moved. One GraphQL query per
+twenty-five repositories first asks each when the head of its default branch
+was committed and when its newest issue and its newest pull request were
+updated, and a family asks nothing of a repository where nothing moved since
+its own window: on the account this was measured on, about half of the `issues`
+and `issueevents` queries and 96 per cent of the `commits` ones. The daily whole
+page of `issues` and a backfill are read everywhere.
+[Cost of a sweep](https://jmrp.io/docs/ghchronicle/api/cost/#asking-first-what-moved) has the count.
+
 **`deps`** collects the dependency graph, off by default. Two shapes of the
 same subject: the SBOM as a photograph, which is a licence histogram, and the
 difference between two commits, which says what entered and left and what

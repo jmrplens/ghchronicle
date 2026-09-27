@@ -183,6 +183,14 @@ type Runner struct {
 	// holding more forks than the hundred it reads, which the REST walk then
 	// takes as it did before the batch. Rebuilt by every forks batch.
 	forkOverflow map[string]bool
+
+	// moved is what this sweep's movement query said of each repository, and
+	// movedAsked whether it has been asked; unmoved counts, per family, the
+	// repositories this sweep left unread on its answer. All three are per
+	// sweep: see stayedPut.
+	moved      map[string]collect.Movement
+	movedAsked bool
+	unmoved    map[string]int
 }
 
 // walk is the pagination bound for the current sweep: the collector's own
@@ -256,6 +264,7 @@ func (r *Runner) Once(ctx context.Context) error {
 	}
 	r.openProgress(now)
 	r.beginHealth()
+	r.moved, r.movedAsked, r.unmoved = nil, false, nil
 	err := r.sweep(ctx, now)
 	// On the way out whatever happened, and not only when the sweep reached
 	// the end of it. The rule this measurement is read by is that a family
@@ -505,6 +514,11 @@ func (r *Runner) repoFamilies(ctx context.Context, now time.Time) error {
 		r.cacheDirty = true
 		if err != nil {
 			return err
+		}
+		// Said once per pass, since a skipped repository writes nothing and
+		// asks nothing, and the count is the only trace the query leaves.
+		if n := r.unmoved[family]; n > 0 {
+			r.Log.Info("nothing moved since the window, repositories left unread", "family", family, "repos", n)
 		}
 		delivered := r.emit(ctx, family, pass.points)
 		if family == "actions" {
@@ -857,8 +871,8 @@ func (r *Runner) repoFamily(ctx context.Context, family string, repo collect.Rep
 		// reads every repository's daily star history here, batched or not,
 		// because that is where the dated star counts come from.
 		return r.audienceWalk(ctx, family, repo, now)
-	case "issues":
-		return r.pulls(repo, now).Collect(ctx, r.API, repo, now)
+	case "issues", "issueevents", "commits":
+		return r.sinceWindow(ctx, family, repo, now)
 	case "actions":
 		return r.actions(now).Collect(ctx, r.API, repo, now)
 	case "artifacts":
@@ -869,16 +883,12 @@ func (r *Runner) repoFamily(ctx context.Context, family string, repo collect.Rep
 		return collect.RepoActivity{}.Collect(ctx, r.API, repo, now)
 	case "discussions":
 		return r.discussionPoints(ctx, repo, now)
-	case "commits":
-		return r.commits(now).Collect(ctx, r.API, repo, now)
 	case "activity":
 		return collect.RepoActivityLog{Walk: r.walk()}.Collect(ctx, r.API, repo, now)
 	case "analyses":
 		return collect.Analyses{Walk: r.walk(), Refusals: r.refusalsFor(family)}.Collect(ctx, r.API, repo, now)
 	case "planning":
 		return collect.Planning{}.Collect(ctx, r.API, repo, now)
-	case "issueevents":
-		return r.issueEvents(now).Collect(ctx, r.API, repo, now)
 	case "deps":
 		return r.dependencies(ctx, repo, now)
 	case "inventory":
@@ -897,6 +907,35 @@ func (r *Runner) repoFamily(ctx context.Context, family string, repo collect.Rep
 		return r.jobLogs(now).Collect(ctx, r.API, repo, now)
 	}
 	return nil, nil
+}
+
+// sinceWindow runs one of the three families that read only what moved
+// since a window of their own, and nothing for a repository the movement
+// query says has not moved since it: see stayedPut.
+func (r *Runner) sinceWindow(ctx context.Context, family string, repo collect.Repo, now time.Time) ([]sink.Point, error) {
+	var (
+		since time.Time
+		read  interface {
+			Collect(context.Context, *ghapi.Client, collect.Repo, time.Time) ([]sink.Point, error)
+		}
+	)
+	switch family {
+	case "issues":
+		// The daily whole page has no bound and is never skipped: it is the
+		// read for the items nobody touched.
+		pulls := r.pulls(repo, now)
+		since, read = pulls.Walk.Since, pulls
+	case "issueevents":
+		events := r.issueEvents(now)
+		since, read = events.From(now), events
+	default:
+		commits := r.commits(now)
+		since, read = commits.Since, commits
+	}
+	if r.stayedPut(ctx, family, repo, since) {
+		return nil, nil
+	}
+	return read.Collect(ctx, r.API, repo, now)
 }
 
 // pulls is the pull request collector for this run.
@@ -1119,6 +1158,71 @@ func (r *Runner) commits(now time.Time) collect.Commits {
 		since = now.AddDate(0, 0, -30)
 	}
 	return collect.Commits{Since: since}
+}
+
+// stayedPut reports whether a repository has nothing for this pass of family
+// to read since the start of its window, going by the movement query of this
+// sweep, so that the family leaves it unread.
+//
+// Three families ask: commits by when the default branch head was committed,
+// and issueevents and the incremental pass of issues by when an issue or a
+// pull request was last updated. Each of them was one GraphQL query per
+// repository on every pass whatever had moved, and most of those answers were
+// empty: see collect.Movements for the count. The skip is the same condition
+// that makes the read come back empty, not a guess at it, so what it gives up
+// is the charge and never a row, with one difference: the incremental issues
+// pass on a repository nothing moved in would have rewritten the newest page
+// of items nobody touched, which is the daily whole-page read's to do.
+//
+// The query is asked once per sweep, by the first of the three families to
+// reach a repository, rather than at the top of the sweep, because whether
+// any of them runs at all is decided by the loop that runs them. A family
+// later in the same sweep reads an answer a few minutes old, and that loses
+// nothing: whatever moves after it is inside the next pass's window, which
+// starts two cadences back.
+//
+// Nothing is skipped on an answer that is not there. A repository the query
+// did not answer for, a query that failed, and a window with no start, which
+// is the daily whole page, are all read as they were before it existed. Nor is
+// anything skipped in a backfill, which is asked for once to read everything,
+// and is the one run where a skip that turned out wrong would not be read
+// again by the next pass.
+func (r *Runner) stayedPut(ctx context.Context, family string, repo collect.Repo, since time.Time) bool {
+	if r.Backfill || since.IsZero() {
+		return false
+	}
+	m, answered := r.movements(ctx)[repo.FullName]
+	if !answered {
+		return false
+	}
+	moved := m.ItemsSince(since)
+	if family == "commits" {
+		moved = m.CommitsSince(since)
+	}
+	if moved {
+		return false
+	}
+	if r.unmoved == nil {
+		r.unmoved = map[string]int{}
+	}
+	r.unmoved[family]++
+	return true
+}
+
+// movements is this sweep's movement query, asked the first time it is
+// wanted.
+func (r *Runner) movements(ctx context.Context) map[string]collect.Movement {
+	if r.movedAsked {
+		return r.moved
+	}
+	r.movedAsked = true
+	moved, err := collect.Movements{Repos: r.repos}.Read(ctx, r.API)
+	if err != nil {
+		r.Log.Warn("which repositories moved could not be asked, reading those it did not answer for",
+			"answered", len(moved), "repos", len(r.repos), "err", err)
+	}
+	r.moved = moved
+	return moved
 }
 
 // dependencies diffs the dependency graph from where the last diff ended, so

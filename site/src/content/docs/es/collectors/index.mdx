@@ -155,6 +155,17 @@ lista porque `added_to_stack` no tiene tipo en la cronología, y lo único que l
 lista ve y esto no es un commit que referencia una issue que nadie ha tocado,
 tres eventos de 2.217.
 
+Las tres preguntan solo donde algo se movió. Una consulta GraphQL por cada
+veinticinco repositorios pregunta antes a cada uno cuándo se hizo el commit de
+la cabeza de su rama por defecto y cuándo se actualizaron su issue y su pull
+request más recientes, y una familia no pregunta nada a un repositorio donde
+nada se movió desde su propia ventana: en la cuenta donde se midió, cerca de la
+mitad de las consultas de `issues` y de `issueevents` y el 96 por ciento de las
+de `commits`. La página entera diaria de `issues` y un backfill se leen en todas
+partes.
+[Coste de una pasada](/ghchronicle/es/api/cost/#preguntar-primero-qué-se-movió)
+tiene la cuenta.
+
 **`deps`** recoge el grafo de dependencias, apagado por defecto. Dos formas del
 mismo asunto: el SBOM como fotografía, que es un histograma de licencias, y el
 diferencial entre dos commits, que dice qué entró y qué salió y con qué aviso de

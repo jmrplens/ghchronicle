@@ -1,0 +1,25 @@
+{
+  "data": {
+    "r0": {
+      "defaultBranchRef": {
+        "target": {
+          "committedDate": "@DAYS_AGO_4@T09:14:53Z"
+        }
+      },
+      "issues": {
+        "nodes": [
+          {
+            "updatedAt": "@DAYS_AGO_1@T09:00:00Z"
+          }
+        ]
+      },
+      "pullRequests": {
+        "nodes": [
+          {
+            "updatedAt": "@DAYS_AGO_1@T11:45:00Z"
+          }
+        ]
+      }
+    }
+  }
+}

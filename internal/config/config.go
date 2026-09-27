@@ -614,7 +614,7 @@ var defaultEvery = map[string]family{
 	},
 	"issues": {
 		every: 1 * time.Hour, group: "work",
-		why: "one GraphQL query per repository, one or two points for what moved in two cadences and up to about nine once a day for a whole page, so the hour is how soon a review or a merge is charted",
+		why: "one or two GraphQL points per repository whose issues or pull requests moved in two cadences, nothing for the rest, and up to about nine once a day for a whole page of every repository, so the hour is how soon a review or a merge is charted",
 	},
 	"events": {
 		every: 15 * time.Minute, group: "feeds",
@@ -650,7 +650,7 @@ var defaultEvery = map[string]family{
 	},
 	"commits": {
 		every: 1 * time.Hour, group: "work",
-		why: "one GraphQL point per repository for the last two cadences of the default branch, whatever was pushed, and 96 per cent of the answers measured held no commit, so the hour is how soon a push is charted",
+		why: "one GraphQL point per repository whose default branch has a commit from the last two cadences, which 38 of 999 answers measured had, and one per twenty-five repositories, shared with issues and issueevents, to ask which, so the hour is how soon a push is charted",
 	},
 	"activity": {
 		every: 15 * time.Minute, group: "feeds",
@@ -674,7 +674,7 @@ var defaultEvery = map[string]family{
 	},
 	"issueevents": {
 		every: 1 * time.Hour, group: "work",
-		why: "the timeline of what moved in two cadences, one GraphQL point a repository, so the hour is how soon a transition is worth seeing",
+		why: "the timeline of what moved in two cadences, one GraphQL point for each repository where an issue or a pull request moved and nothing for the rest, so the hour is how soon a transition is worth seeing",
 	},
 	"achievements": {
 		every: 24 * time.Hour, group: "account",
