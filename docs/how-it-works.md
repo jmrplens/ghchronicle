@@ -111,7 +111,7 @@ level=WARN msg="family failed everywhere, not marking it as run" family=security
 
 ### The state file
 
-`state_file` holds [seven things](https://jmrp.io/docs/ghchronicle/configuration/#state_file), and
+`state_file` holds [eight things](https://jmrp.io/docs/ghchronicle/configuration/#state_file), and
 the two a sweep is judged by are when each family last ran and when each
 repository was first seen.
 

@@ -415,10 +415,14 @@ func (r *Runner) accountFamilies(ctx context.Context, now time.Time) {
 	// with the tier the page shows, and both what the walk could not settle
 	// and a page that disagrees are said once per process: each stays true
 	// for as long as the count stays, and the row carries it every day.
+	//
+	// The co-authored count is added to from the state file rather than
+	// walked whole every day, and a backfill walks it whole: see
+	// collect.CoauthoredTally.
 	r.family(ctx, "achievements", now, func() ([]sink.Point, error) {
 		a := collect.Achievements{
 			Login: user, WebBase: collect.WebBaseFor(r.Cfg.GitHub.BaseURL, r.Cfg.GitHub.WebURL),
-			Warn: r.warnOnce,
+			Warn: r.warnOnce, Coauthored: &r.State.Coauthored, Whole: r.Backfill,
 		}
 		points, err := a.Collect(ctx, r.API, now)
 		if collect.IsMarkupError(err) {

@@ -1220,8 +1220,16 @@ once per process in the log, and it carries neither field, so no bar is drawn
 from a rule the page contradicts. Three of the counts are one GraphQL query;
 the fourth is a walk over the account's merged pull requests in public
 repositories with their commit messages, split by merge date where a range
-holds more than the thousand results a search will page, one point a page: a
-few dozen points and about a minute for the day over a whole account's life. A
+holds more than the thousand results a search will page, one point a page. Over
+a whole account's life that is a few dozen points and 24 MB (35 queries and
+94 seconds over 2,315 pull requests, measured on 2026-09-27), so it is done
+once and then kept: the state file holds the count with the last UTC day it
+covers, and each pass walks only the pull requests merged since, one page of
+0.3 to 0.6 MB a day on that account. The day a pass runs on is still being
+merged into, so its pull requests are in that day's row and walked again by the
+next pass. The whole history is walked again once a week, because the count can
+go down (a repository made private or deleted takes its pull requests out of
+`is:public`), and whenever the rule the count was kept by has changed. A
 count the API would not give is a day without progress rows, never a day
 without badges.
 

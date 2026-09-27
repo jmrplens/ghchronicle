@@ -94,7 +94,7 @@ La reserva se escala por cubo; ver [límites de la API](/ghchronicle/es/api/).
 state_file: /var/lib/ghchronicle/state.json
 ```
 
-Siete cosas, y borrar el fichero cuesta una distinta por cada una:
+Ocho cosas, y borrar el fichero cuesta una distinta por cada una:
 
 - `last_run`, cuándo corrió cada familia por última vez. Sin él todas las
   familias vencen a la vez, así que la pasada siguiente es completa, salvo que
@@ -119,14 +119,22 @@ Siete cosas, y borrar el fichero cuesta una distinta por cada una:
   el buzón entero.
 - `last_event`, el evento más reciente que tenía el feed. Sin él vacío lee el
   feed entero.
+- `coauthored`, el recuento de Pair Extraordinaire que la familia
+  `achievements` ha dado por cerrado, el último día UTC que cubre, la versión de
+  la regla con la que se contó y el día en que se recorrió entero el historial
+  por última vez. Cada pasada recorre solo las pull requests fusionadas desde
+  ese día, y el historial entero otra vez una vez por semana o cuando la regla
+  ha cambiado. Sin él la pasada siguiente recorre enteras las pull requests
+  fusionadas de la cuenta, que en una cuenta con 2.315 fueron 35 consultas y
+  24 MB, donde la pasada de un día es una consulta y de 0,3 a 0,6 MB.
 
-Seis de las siete cuestan solo cuota, porque lo que se vuelve a recoger se
+Siete de las ocho cuestan solo cuota, porque lo que se vuelve a recoger se
 indexa por medida, etiquetas y marca de tiempo y sobrescribe lo que ya está
 guardado. `last_head` es la que pierde algo: los cambios de dependencias entre
 la cabeza que tenía y la siguiente se leen de un rango que nadie puede nombrar
 una vez que la cabeza ha desaparecido.
 
-Una pasada con `-card-only` no escribe ninguna de las siete. Sus puntos llegan a
+Una pasada con `-card-only` no escribe ninguna de las ocho. Sus puntos llegan a
 [la tarjeta](/ghchronicle/es/card/) y a ningún almacén, así que una marca suya
 haría que la siguiente recogida se saltara una familia, o estrechara una
 lectura, cuyos datos fueron a parar a una imagen y a ningún otro sitio. El

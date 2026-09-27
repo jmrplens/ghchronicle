@@ -678,7 +678,7 @@ var defaultEvery = map[string]family{
 	},
 	"achievements": {
 		every: 24 * time.Hour, group: "account",
-		why: "the badges on the public profile page, read from the page itself because no API lists them, and the distance to each badge's next tier from the API beside; a badge is earned over weeks and the day costs one page and some thirty GraphQL points",
+		why: "the badges on the public profile page, which no API lists, and how far each tiered one is from its next tier; a badge is earned over weeks, and a day transfers the page, 36 KB, and 0.3 to 0.6 MB of pull requests merged since the day before for two GraphQL points, or the whole history once a week, 24 MB",
 	},
 	"keys": {
 		every: 24 * time.Hour, group: "account",

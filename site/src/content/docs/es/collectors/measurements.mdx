@@ -955,10 +955,19 @@ de los dos campos, así que no se dibuja ninguna barra a partir de una regla que
 la página contradice. Tres de los recuentos son una consulta GraphQL; el cuarto
 es un recorrido por las pull requests fusionadas de la cuenta en repositorios
 públicos con los mensajes de sus commits, partido por fecha de fusión donde un
-rango supera los mil resultados que una búsqueda pagina, un punto por página:
-unas pocas docenas de puntos y alrededor de un minuto al día sobre la vida
-entera de una cuenta. Un recuento que la API no dé es un día sin filas de
-progreso, nunca un día sin insignias.
+rango supera los mil resultados que una búsqueda pagina, un punto por página.
+Sobre la vida entera de una cuenta son unas pocas docenas de puntos y 24 MB (35
+consultas y 94 segundos sobre 2.315 pull requests, medido el 2026-09-27), así
+que se hace una vez y luego se guarda: el fichero de estado tiene el recuento
+con el último día UTC que cubre, y cada pasada recorre solo las pull requests
+fusionadas desde entonces, una página de 0,3 a 0,6 MB al día en esa cuenta. En
+el día en que corre una pasada todavía se fusiona, así que sus pull requests
+están en la fila de ese día y la pasada siguiente las vuelve a recorrer. El
+historial entero se vuelve a recorrer una vez por semana, porque el recuento
+puede bajar (un repositorio que pasa a privado o se borra saca sus pull requests
+de `is:public`), y siempre que haya cambiado la regla con la que se guardó el
+recuento. Un recuento que la API no dé es un día sin filas de progreso, nunca un
+día sin insignias.
 
 `gh_social_account` lleva una fila más que el listado de cuentas sociales: la
 página personal, bajo el proveedor `website`, del `blog` del perfil. El ORCID

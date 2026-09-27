@@ -8,6 +8,7 @@
       },
       "nodes": [
         {
+          "mergedAt": "@DAYS_AGO_1@T10:00:00Z",
           "mergeCommit": {
             "message": "Pair session 1 (#1)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
           },
@@ -23,6 +24,7 @@
           }
         },
         {
+          "mergedAt": "@DAYS_AGO_2@T10:00:00Z",
           "mergeCommit": {
             "message": "Pair session 2 (#2)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
           },
@@ -38,6 +40,7 @@
           }
         },
         {
+          "mergedAt": "@DAYS_AGO_3@T10:00:00Z",
           "mergeCommit": {
             "message": "Pair session 3 (#3)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
           },
@@ -53,6 +56,7 @@
           }
         },
         {
+          "mergedAt": "@DAYS_AGO_4@T10:00:00Z",
           "mergeCommit": {
             "message": "Pair session 4 (#4)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
           },
@@ -68,6 +72,7 @@
           }
         },
         {
+          "mergedAt": "@DAYS_AGO_5@T10:00:00Z",
           "mergeCommit": {
             "message": "Pair session 5 (#5)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
           },
@@ -83,6 +88,7 @@
           }
         },
         {
+          "mergedAt": "@DAYS_AGO_6@T10:00:00Z",
           "mergeCommit": {
             "message": "Pair session 6 (#6)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
           },
@@ -98,6 +104,7 @@
           }
         },
         {
+          "mergedAt": "@DAYS_AGO_7@T10:00:00Z",
           "mergeCommit": {
             "message": "Pair session 7 (#7)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
           },
@@ -113,6 +120,7 @@
           }
         },
         {
+          "mergedAt": "@DAYS_AGO_8@T10:00:00Z",
           "mergeCommit": {
             "message": "Pair session 8 (#8)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
           },
@@ -128,6 +136,7 @@
           }
         },
         {
+          "mergedAt": "@DAYS_AGO_9@T10:00:00Z",
           "mergeCommit": {
             "message": "Pair session 9 (#9)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
           },
@@ -143,6 +152,7 @@
           }
         },
         {
+          "mergedAt": "@DAYS_AGO_10@T10:00:00Z",
           "mergeCommit": {
             "message": "Pair session 10 (#10)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
           },
@@ -158,6 +168,7 @@
           }
         },
         {
+          "mergedAt": "@DAYS_AGO_11@T10:00:00Z",
           "mergeCommit": {
             "message": "Pair session 11 (#11)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
           },
@@ -173,6 +184,7 @@
           }
         },
         {
+          "mergedAt": "@DAYS_AGO_12@T10:00:00Z",
           "mergeCommit": {
             "message": "Pair session 12 (#12)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
           },
@@ -188,6 +200,7 @@
           }
         },
         {
+          "mergedAt": "@DAYS_AGO_13@T10:00:00Z",
           "mergeCommit": {
             "message": "Pair session 13 (#13)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
           },
@@ -203,6 +216,7 @@
           }
         },
         {
+          "mergedAt": "@DAYS_AGO_14@T10:00:00Z",
           "mergeCommit": {
             "message": "Pair session 14 (#14)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
           },
@@ -218,6 +232,7 @@
           }
         },
         {
+          "mergedAt": "@DAYS_AGO_15@T10:00:00Z",
           "mergeCommit": {
             "message": "Pair session 15 (#15)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
           },
@@ -233,6 +248,7 @@
           }
         },
         {
+          "mergedAt": "@DAYS_AGO_16@T10:00:00Z",
           "mergeCommit": {
             "message": "Pair session 16 (#16)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
           },
@@ -248,6 +264,7 @@
           }
         },
         {
+          "mergedAt": "@DAYS_AGO_17@T10:00:00Z",
           "mergeCommit": {
             "message": "Pair session 17 (#17)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
           },
@@ -263,6 +280,7 @@
           }
         },
         {
+          "mergedAt": "@DAYS_AGO_18@T10:00:00Z",
           "mergeCommit": {
             "message": "Pair session 18 (#18)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
           },
@@ -278,6 +296,7 @@
           }
         },
         {
+          "mergedAt": "@DAYS_AGO_19@T10:00:00Z",
           "mergeCommit": {
             "message": "Pair session 19 (#19)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
           },
@@ -293,6 +312,7 @@
           }
         },
         {
+          "mergedAt": "@DAYS_AGO_20@T10:00:00Z",
           "mergeCommit": {
             "message": "Pair session 20 (#20)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
           },
@@ -308,6 +328,7 @@
           }
         },
         {
+          "mergedAt": "@DAYS_AGO_21@T10:00:00Z",
           "mergeCommit": {
             "message": "Pair session 21 (#21)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
           },
@@ -323,6 +344,7 @@
           }
         },
         {
+          "mergedAt": "@DAYS_AGO_22@T10:00:00Z",
           "mergeCommit": {
             "message": "Pair session 22 (#22)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
           },
@@ -338,6 +360,7 @@
           }
         },
         {
+          "mergedAt": "@DAYS_AGO_23@T10:00:00Z",
           "mergeCommit": {
             "message": "Pair session 23 (#23)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
           },
@@ -353,6 +376,7 @@
           }
         },
         {
+          "mergedAt": "@DAYS_AGO_24@T10:00:00Z",
           "mergeCommit": {
             "message": "Pair session 24 (#24)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
           },
@@ -368,6 +392,7 @@
           }
         },
         {
+          "mergedAt": "@DAYS_AGO_25@T10:00:00Z",
           "mergeCommit": {
             "message": "Pair session 25 (#25)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
           },
@@ -383,6 +408,7 @@
           }
         },
         {
+          "mergedAt": "@DAYS_AGO_26@T10:00:00Z",
           "mergeCommit": {
             "message": "Pair session 26 (#26)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
           },
@@ -398,6 +424,7 @@
           }
         },
         {
+          "mergedAt": "@DAYS_AGO_27@T10:00:00Z",
           "mergeCommit": {
             "message": "Pair session 27 (#27)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
           },
@@ -413,6 +440,7 @@
           }
         },
         {
+          "mergedAt": "@DAYS_AGO_28@T10:00:00Z",
           "mergeCommit": {
             "message": "Pair session 28 (#28)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
           },
@@ -428,6 +456,7 @@
           }
         },
         {
+          "mergedAt": "@DAYS_AGO_29@T10:00:00Z",
           "mergeCommit": {
             "message": "Pair session 29 (#29)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
           },
@@ -443,6 +472,7 @@
           }
         },
         {
+          "mergedAt": "@DAYS_AGO_30@T10:00:00Z",
           "mergeCommit": {
             "message": "Pair session 30 (#30)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
           },
@@ -458,6 +488,7 @@
           }
         },
         {
+          "mergedAt": "@DAYS_AGO_31@T10:00:00Z",
           "mergeCommit": {
             "message": "Pair session 31 (#31)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
           },
@@ -473,6 +504,7 @@
           }
         },
         {
+          "mergedAt": "@DAYS_AGO_32@T10:00:00Z",
           "mergeCommit": {
             "message": "Pair session 32 (#32)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
           },
@@ -488,6 +520,7 @@
           }
         },
         {
+          "mergedAt": "@DAYS_AGO_33@T10:00:00Z",
           "mergeCommit": {
             "message": "Pair session 33 (#33)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
           },
@@ -503,6 +536,7 @@
           }
         },
         {
+          "mergedAt": "@DAYS_AGO_34@T10:00:00Z",
           "mergeCommit": {
             "message": "Pair session 34 (#34)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
           },
@@ -518,6 +552,7 @@
           }
         },
         {
+          "mergedAt": "@DAYS_AGO_35@T10:00:00Z",
           "mergeCommit": {
             "message": "Pair session 35 (#35)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
           },
@@ -533,6 +568,7 @@
           }
         },
         {
+          "mergedAt": "@DAYS_AGO_36@T10:00:00Z",
           "mergeCommit": {
             "message": "Pair session 36 (#36)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
           },
@@ -548,6 +584,7 @@
           }
         },
         {
+          "mergedAt": "@DAYS_AGO_37@T10:00:00Z",
           "mergeCommit": {
             "message": "Pair session 37 (#37)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
           },
@@ -563,6 +600,7 @@
           }
         },
         {
+          "mergedAt": "@DAYS_AGO_38@T10:00:00Z",
           "mergeCommit": {
             "message": "Pair session 38 (#38)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
           },
@@ -578,6 +616,7 @@
           }
         },
         {
+          "mergedAt": "@DAYS_AGO_39@T10:00:00Z",
           "mergeCommit": {
             "message": "Pair session 39 (#39)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
           },
@@ -593,6 +632,7 @@
           }
         },
         {
+          "mergedAt": "@DAYS_AGO_40@T10:00:00Z",
           "mergeCommit": {
             "message": "Pair session 40 (#40)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
           },
@@ -608,6 +648,7 @@
           }
         },
         {
+          "mergedAt": "@DAYS_AGO_41@T10:00:00Z",
           "mergeCommit": {
             "message": "Pair session 41 (#41)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
           },
@@ -623,6 +664,7 @@
           }
         },
         {
+          "mergedAt": "@DAYS_AGO_42@T10:00:00Z",
           "mergeCommit": {
             "message": "Pair session 42 (#42)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
           },
@@ -638,6 +680,7 @@
           }
         },
         {
+          "mergedAt": "@DAYS_AGO_43@T10:00:00Z",
           "mergeCommit": {
             "message": "Pair session 43 (#43)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
           },
@@ -653,6 +696,7 @@
           }
         },
         {
+          "mergedAt": "@DAYS_AGO_44@T10:00:00Z",
           "mergeCommit": {
             "message": "Pair session 44 (#44)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
           },
@@ -668,6 +712,7 @@
           }
         },
         {
+          "mergedAt": "@DAYS_AGO_45@T10:00:00Z",
           "mergeCommit": {
             "message": "Pair session 45 (#45)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
           },
@@ -683,6 +728,7 @@
           }
         },
         {
+          "mergedAt": "@DAYS_AGO_46@T10:00:00Z",
           "mergeCommit": {
             "message": "Pair session 46 (#46)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
           },
@@ -698,6 +744,7 @@
           }
         },
         {
+          "mergedAt": "@DAYS_AGO_47@T10:00:00Z",
           "mergeCommit": {
             "message": "Pair session 47 (#47)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
           },
@@ -713,6 +760,7 @@
           }
         },
         {
+          "mergedAt": "@DAYS_AGO_48@T10:00:00Z",
           "mergeCommit": {
             "message": "Pair session 48 (#48)\n\nCo-authored-by: Mona Lisa <mona@github.com>"
           },
@@ -728,6 +776,7 @@
           }
         },
         {
+          "mergedAt": "@DAYS_AGO_49@T10:00:00Z",
           "mergeCommit": {
             "message": "Solo change (#49)"
           },
@@ -743,6 +792,7 @@
           }
         },
         {
+          "mergedAt": "@DAYS_AGO_50@T10:00:00Z",
           "mergeCommit": {
             "message": "Solo change (#50)"
           },

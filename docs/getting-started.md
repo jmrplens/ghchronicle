@@ -228,9 +228,9 @@ it costs.
 > **Keep the state file**
 >
 > `state_file` is what remembers where each family got to, and
-> [seven things live in it](https://jmrp.io/docs/ghchronicle/configuration/#state_file). Delete it
+> [eight things live in it](https://jmrp.io/docs/ghchronicle/configuration/#state_file). Delete it
 > and the next sweep re-collects everything, which costs quota and nothing else
-> for six of the seven; the seventh is the commit each dependency diff starts
+> for seven of the eight; the eighth is the commit each dependency diff starts
 > from, and the changes in the gap are not collected again.
 
 ### Where to go next

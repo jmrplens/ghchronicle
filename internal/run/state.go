@@ -8,13 +8,15 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/jmrplens/ghchronicle/v2/internal/collect"
 )
 
 // State is what a sweep has to remember between runs.
 //
-// Seven things, and deleting the file costs a different thing for each of
-// them. Six of the seven cost only rate limit, because what is collected again
-// overwrites what is already stored. last_head is the one that loses
+// Eight things, and deleting the file costs a different thing for each of
+// them. Seven of the eight cost only rate limit, because what is collected
+// again overwrites what is already stored. last_head is the one that loses
 // something: the dependency changes between the head it held and the next one
 // are read from a range that nothing can name once the head is gone.
 //
@@ -35,6 +37,9 @@ import (
 //   - last_notified: where the inbox window was cut. Zero asks for the whole
 //     inbox.
 //   - last_event: the newest event the feed had. Empty reads the whole feed.
+//   - coauthored: the Pair Extraordinaire count and the last day it covers,
+//     so the achievements family walks the pull requests merged since instead
+//     of the account's whole history. Absent walks the whole history.
 type State struct {
 	path     string
 	LastRun  map[string]time.Time `json:"last_run"`
@@ -60,6 +65,11 @@ type State struct {
 	// LastEvent is the id of the newest event the feed had, which is the page
 	// the next sweep stops at. Empty reads the whole feed.
 	LastEvent string `json:"last_event,omitempty"`
+	// Coauthored is the co-authored pull request count as far as the
+	// achievements family has settled it. Zero, which is what an older state
+	// file reads as, is a count made by no rule, and the next pass walks the
+	// whole history for it.
+	Coauthored collect.CoauthoredTally `json:"coauthored,omitzero"`
 }
 
 func LoadState(path string) *State {

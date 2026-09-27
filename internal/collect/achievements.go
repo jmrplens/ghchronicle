@@ -37,8 +37,9 @@ import (
 //
 // Beside the badges the family writes gh_achievement_progress, how far the
 // account is from the next tier of each badge that has tiers; that half does
-// come from the API, one counts query and a walk over the co-authored pull
-// requests, and achievement_progress.go is where it lives.
+// come from the API, one counts query and a walk over the pull requests
+// merged since the last pass for the co-authored ones, and
+// achievement_progress.go is where it lives.
 //
 // The same page carries the profile's vcard, and the vcard lists one link the
 // API does not: the ORCID iD, which is connected in the profile settings and
@@ -60,6 +61,14 @@ type Achievements struct {
 	// and the progress rows absent for the day, and a walk whose count is
 	// a floor. Nil means silence.
 	Warn func(msg string, args ...any)
+	// Coauthored is where the Pair Extraordinaire count is kept between
+	// passes: read for the days a pass has left to walk, and written after a
+	// walk that came back. Nil walks the whole history every time and keeps
+	// nothing, which is what a caller without a state file gets.
+	Coauthored *CoauthoredTally
+	// Whole walks the whole history whatever Coauthored holds, which is what
+	// a backfill asks for.
+	Whole bool
 }
 
 // MarkupError says the achievements page no longer looks like the page this
@@ -138,15 +147,26 @@ func (a Achievements) Collect(ctx context.Context, c *ghapi.Client, now time.Tim
 		a.warn("achievement counts unavailable, no progress rows today", "err", err)
 		return points, nil
 	}
-	w := coauthoredWalk{login: a.Login}
-	if walkErr := w.walk(ctx, c, counts.CreatedAt.UTC().Truncate(oneDay), day); walkErr != nil {
+	base, from := a.coauthoredBase(counts.CreatedAt, day)
+	w := coauthoredWalk{login: a.Login, today: day}
+	if walkErr := w.walk(ctx, c, from, day); walkErr != nil {
+		// The tally is left as it was: a walk cut short added some of its
+		// days and not others, and the next pass asks for all of them.
 		a.warn("co-authored pull requests unavailable, no progress rows today", "err", walkErr, "queries", w.queries)
 		return points, nil
 	}
-	if w.capped || w.truncated > 0 {
-		a.warn("co-authored pull request count is a floor", "capped", w.capped, "truncated", w.truncated)
+	capped, truncated := base.Capped || w.capped, base.Truncated+w.truncated
+	if capped || truncated > 0 {
+		a.warn("co-authored pull request count is a floor", "capped", capped, "truncated", truncated)
 	}
-	counts.Coauthored = w.pulls
+	counts.Coauthored = base.Count + w.pulls
+	if a.Coauthored != nil {
+		*a.Coauthored = CoauthoredTally{
+			Count: base.Count + w.settled, Through: day.AddDate(0, 0, -1),
+			Truncated: base.Truncated + w.settledTruncated, Capped: capped,
+			Rule: coauthoredRule, WalkedWhole: base.WalkedWhole,
+		}
+	}
 	return append(points, a.progressPoints(earned, counts, day)...), nil
 }
 

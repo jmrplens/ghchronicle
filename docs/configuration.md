@@ -86,7 +86,7 @@ The reserve is scaled per bucket; see [rate limits](https://jmrp.io/docs/ghchron
 state_file: /var/lib/ghchronicle/state.json
 ```
 
-Seven things, and deleting the file costs a different one for each:
+Eight things, and deleting the file costs a different one for each:
 
 - `last_run`, when each family last ran. Without it every family is due at once,
   so the next sweep is a full one, except that the service starts the families
@@ -110,14 +110,21 @@ Seven things, and deleting the file costs a different one for each:
   whole inbox.
 - `last_event`, the newest event the feed had. Without it empty reads the whole
   feed.
+- `coauthored`, the Pair Extraordinaire count the `achievements` family has
+  settled, the last UTC day it covers, the version of the rule it was counted
+  by and the day the whole history was last walked. Each pass walks only the
+  pull requests merged since that day, and the whole history again once a week
+  or when the rule has changed. Without it the next pass walks the account's
+  merged pull requests whole, which on an account with 2,315 of them was 35
+  queries and 24 MB, where a day's pass is one query and 0.3 to 0.6 MB.
 
-Six of the seven cost only quota, because what is collected again is keyed by
+Seven of the eight cost only quota, because what is collected again is keyed by
 measurement, tags and timestamp and overwrites what is already stored.
 `last_head` is the one that loses something: the dependency changes between the
 head it held and the next one are read from a range that nothing can name once
 the head is gone.
 
-A run with `-card-only` writes none of the seven. Its points reach [the
+A run with `-card-only` writes none of the eight. Its points reach [the
 card](https://jmrp.io/docs/ghchronicle/card/) and no store, so a mark it left behind would make the
 next collection skip a family, or narrow a read, whose data went into a picture
 and nowhere else. It reads the file as any other run does.
@@ -685,7 +692,7 @@ the same membership.
 | Group       | Family         | Default | Why that value                                                                                                                                                                                                                                                                                                   |
 | ----------- | -------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `account`   | `account`      | `1h`    | the contribution calendar moves with every contribution and the profile's counts with every follow and star, and a pass is one GraphQL point and seven REST requests, of which only the profile is charged: GitHub never answered it with a 304, and the six package listings answer one until a package changes |
-| `account`   | `achievements` | `24h`   | the badges on the public profile page, read from the page itself because no API lists them, and the distance to each badge's next tier from the API beside; a badge is earned over weeks and the day costs one page and some thirty GraphQL points                                                               |
+| `account`   | `achievements` | `24h`   | the badges on the public profile page, which no API lists, and how far each tiered one is from its next tier; a badge is earned over weeks, and a day transfers the page, 36 KB, and 0.3 to 0.6 MB of pull requests merged since the day before for two GraphQL points, or the whole history once a week, 24 MB  |
 | `account`   | `billing`      | `1h`    | the month in progress moves while continuous integration runs: it had changed at every one of 46 six-hourly reads measured, and a pass is two requests, that month and the one before, of which only the first is charged                                                                                        |
 | `account`   | `history`      | `0`     | off until asked for by name: it walks every past year and the year so far, and the rows are idempotent                                                                                                                                                                                                           |
 | `account`   | `keys`         | `24h`   | an SSH or GPG key changes when somebody changes it, and what matters is its expiry date, not the hour it was noticed                                                                                                                                                                                             |
