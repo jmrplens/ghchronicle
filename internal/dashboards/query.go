@@ -989,7 +989,9 @@ func (b *builder) esSnapshotStack(m, field string) Target {
 var esStacked = Opts{"stack": true, "legend": "hidden"}
 
 // esLatestSum is the newest value per repository (and further tags), which the
-// stat sums across rows: the twin of latestSum in SQL.
+// stat sums across rows: the twin of latestSum in SQL, the repository filter
+// included. Without it every tile built on this read the whole store,
+// whatever the picker held.
 func (b *builder) esLatestSum(m, field string, by ...string) []Target {
 	// The metric before the buckets, because the ids are handed out in the
 	// order they are asked for and a panel's targets are compared as text.
@@ -998,7 +1000,7 @@ func (b *builder) esLatestSum(m, field string, by ...string) []Target {
 	for _, tag := range by {
 		buckets = append(buckets, b.tm(tag, 500))
 	}
-	return []Target{esq(m, metrics, buckets, "A", nil, "")}
+	return []Target{esq(m, metrics, buckets, "A", []string{ESF}, "")}
 }
 
 func (b *builder) esTotal(m string, met any, where ...string) []Target {

@@ -6740,7 +6740,7 @@
                   "type": "top_metrics"
                 }
               ],
-              "query": "_index:ghchronicle-gh_artifact_total",
+              "query": "_index:ghchronicle-gh_artifact_total AND repo.keyword:${repo:lucene}",
               "refId": "F",
               "timeField": "@timestamp"
             },
@@ -6772,7 +6772,7 @@
                   "type": "top_metrics"
                 }
               ],
-              "query": "_index:ghchronicle-gh_actions_cache",
+              "query": "_index:ghchronicle-gh_actions_cache AND repo.keyword:${repo:lucene}",
               "refId": "G",
               "timeField": "@timestamp"
             }
@@ -14217,7 +14217,7 @@
                   "type": "top_metrics"
                 }
               ],
-              "query": "_index:ghchronicle-gh_release",
+              "query": "_index:ghchronicle-gh_release AND repo.keyword:${repo:lucene}",
               "refId": "A",
               "timeField": "@timestamp"
             },
@@ -14873,7 +14873,7 @@
                   "type": "top_metrics"
                 }
               ],
-              "query": "_index:ghchronicle-gh_dependabot_alert",
+              "query": "_index:ghchronicle-gh_dependabot_alert AND repo.keyword:${repo:lucene}",
               "refId": "A",
               "timeField": "@timestamp"
             },
@@ -14927,7 +14927,7 @@
                   "type": "top_metrics"
                 }
               ],
-              "query": "_index:ghchronicle-gh_code_scanning_alert",
+              "query": "_index:ghchronicle-gh_code_scanning_alert AND repo.keyword:${repo:lucene}",
               "refId": "B",
               "timeField": "@timestamp"
             }
