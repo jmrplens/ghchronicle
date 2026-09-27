@@ -244,11 +244,12 @@ people's repositories, and those repositories themselves, how many stars each
 has and whether it is private. All of it is GraphQL, one point a page: the starred
 list, five issue searches, the two comment walks and the accepted answers the
 account wrote, which are read apart from the comments so that an answer
-accepted weeks after it was written is not missed. A sweep reads every page
-of the two searches for what is still open, and the other three, which are
-ordered by what moved last, back to a cadence before the sweep before: their
-first page, unless more than a hundred items moved in that time. A backfill
-reads those three to the end as well.
+accepted weeks after it was written is not missed. A sweep reads up to five
+pages of the starred list, every page of the two searches for what is still
+open, and the other three, which are ordered by what moved last, back to a
+cadence before the sweep before: their first page, unless more than a hundred
+items moved in that time. A backfill reads the starred list and those three to
+the end as well.
 
 **`totals`** asks GitHub for the numbers that are true since the beginning:
 pull requests merged ever, commits ever, issues opened ever, and the whole life
@@ -282,7 +283,7 @@ only needs to happen once.
 
 **`achievements`** collects the badges on the public profile page, and it is the
 one family that does not come from the API at all: GitHub lists achievements in
-neither REST nor GraphQL, so the page is read once a day as an anonymous
+neither REST nor GraphQL, so the page is read every hour as an anonymous
 visitor, without the token and charged to no budget. Beside each badge it
 writes how far the account is from that badge's next tier, which does come from
 the API. The parser is strict on purpose: when GitHub redesigns the page the
@@ -414,15 +415,22 @@ row has written fails at planning, so that one tells you. A filter such as
 `gh_event WHERE repo = 'owner/name'` keeps parsing and quietly returns nothing;
 it becomes `full_name = 'owner/name'`.
 
-Most measurements also carry a `url`
-field: the page on GitHub for the thing the row is about, so a dashboard row
-that names an item can also open it. A `url` is absolute or absent, since the
-dashboards link to the value itself, and every measurement that has one is
-linked by unit from at least one table, except the eight that only ever draw
-as a curve or a bar (`gh_pull_request_review`, `gh_workflow_job`, `gh_event`,
-`gh_issue_event`, `gh_artifact`, `gh_contribution_day`,
-`gh_contribution_day_repo` and `gh_commit_check`), where a per-item url has no
-row to sit on.
+Most measurements also carry a `url` field: the page on GitHub for the thing the
+row is about, so a dashboard row that names an item can also open it. A `url` is
+absolute or absent, since the dashboards link to the value itself. Every
+measurement that has one is linked item by item from at least one table, with
+two kinds of exception. The rows of some are only ever counted or added up, into
+a curve, a bar, a stat or a table line per repository, reviewer, job or check,
+where a per-item url has no row to sit on: `gh_pull_request_review`,
+`gh_workflow_job`, `gh_event`, `gh_issue_event`, `gh_artifact`,
+`gh_contribution_day`, `gh_contribution_day_repo`, `gh_commit_check`,
+`gh_issue_comment`, `gh_billing_usage`, `gh_dependabot_alert`,
+`gh_code_scanning_alert`, and the account-wide `gh_account`, `gh_account_total`,
+`gh_contributions_total` and `gh_sponsors_listing`. And two carry a url no table
+links: `gh_release_published`, which no panel reads, since the releases table
+links each release from `gh_release`, and `gh_upstream_repo`, which _Work
+elsewhere_ joins for its Stars while each of its rows links the item rather than
+the repository.
 
 A tag GitHub leaves empty is written as `(none)`, one spelling on every
 measurement, and the same `(none)` goes into a few string fields that say
@@ -693,9 +701,9 @@ stable release" from, the newest row with `prerelease` false. `gh_release`
 stays stamped at the sweep, because its downloads move, and its `age_days` is
 floored to whole days counted back from the sweep: the date it reconstructs is
 a day late for any release published later in the day than the sweep ran.
-`published` is 1 on every row, so counting releases is a sum. `prerelease` is a
-field here, where it is a tag on `gh_release`: a pre-release is promoted by
-unticking the box on the published release, and as a tag a promotion that
+`published` is the integer 1 on every row, so counting releases is a sum.
+`prerelease` is a boolean field here, where it is a tag on `gh_release`: a
+pre-release is promoted by unticking the box on the published release, and as a tag a promotion that
 keeps the publication's date would write a second row at the same instant,
 which the sum would count twice. A release taken back to a draft and published
 again writes a second row if GitHub gives it a new `published_at`, so the exact
@@ -842,16 +850,19 @@ return, and measured on 2026-09-26 the query costs one point a page with it as
 without it.
 
 `gh_upstream_repo` is the repository side of the same searches: one row per
-repository they reached in the pass, stamped at the sweep, with its `stars`,
-`forks`, primary `language` and `private`, and its page. The star count is not
-on `gh_external_contribution` because that row is dated when the item closed,
-and a count that moves nearly every day would rewrite a row of the past each
-time. The "Work elsewhere" table joins the newest of these rows inside the range
-onto each item as Stars. A repository gets a row whenever a search reads an
-item in it: each open state is read whole on every sweep, and each closed state
-from its most recent page, so a repository whose only items are closed and
-further back than that page keeps the row of the last sweep that read one of
-them, or of the last backfill.
+repository they reached in the pass, stamped at the sweep, with its `stars` and
+`forks` as integers, `private` as a boolean, its primary `language`, absent when
+GitHub detects none, and its page. The star count is not on
+`gh_external_contribution` because that row is dated when the item closed, and a
+count that moves nearly every day would rewrite a row of the past each time. In
+InfluxDB and PostgreSQL the "Work elsewhere" table joins the newest of these
+rows inside the range onto each item as Stars, and in Prometheus its Stars is
+the count the exporter holds; Graphite and Elasticsearch cannot join one
+measurement onto another, and their tables have no Stars column. A repository
+gets a row whenever a search reads an item in it: each open state is read whole
+on every sweep, and each closed state from its most recent page, so a repository
+whose only items are closed and further back than that page keeps the row of the
+last sweep that read one of them, or of the last backfill.
 
 ### Continuous integration
 
@@ -1005,9 +1016,12 @@ main of jmrplens/jmrplens, 57.9 MB between them, were stored as one of 3.8 MB.
 The listing is read a hundred entries a page, up to ten pages, where it used to
 stop at the first: on 2026-09-27 two repositories of the account held 118 and
 232 entries. It is read newest created first, an order a cache hit does not
-change, and a pass that reads fewer entries than the listing said it held,
-because one was deleted between two of its pages, writes no row: the day's next
-pass writes it.
+change. A pass that reads fewer entries than the listing said it held, because
+one was deleted between two of its pages, writes no `gh_actions_cache_entry`
+row, and nor does one whose later page failed: summed, a part of a cache would
+be written over the whole of it that the day's earlier passes stored, and the
+day's next pass writes the rows. The `gh_actions_cache` total, read before the
+listing, is written either way.
 
 ### Security
 
@@ -1186,8 +1200,8 @@ account query that was already being paid for: measured on 2026-09-11, eleven
 lists with their item counts added nothing to a cost of one.
 
 `gh_contribution_day` is the only place the green squares exist as data. With
-`every.history` set, it reaches back to the year the account was created, at
-one GraphQL point per year. Its `level` is the square's shade, GitHub's own
+`every.families.history` set, it reaches back to the year the account was
+created, at one GraphQL point per year. Its `level` is the square's shade, GitHub's own
 quartile of the year as the 0 to 4 the profile draws, which is not a function
 of the count: on one account 83 contributions on one day and 52 on another
 were both the second quartile. The quartile is of the window asked for, the
@@ -1258,14 +1272,31 @@ holds more than the thousand results a search will page, one point a page. Over
 a whole account's life that is a few dozen points and 24 MB (35 queries and
 94 seconds over 2,315 pull requests, measured on 2026-09-27), so it is done
 once and then kept: the state file holds the count with the last UTC day it
-covers, and each pass walks only the pull requests merged since, one page of
-0.3 to 0.6 MB a day on that account. The day a pass runs on is still being
+covers, and each pass walks only the pull requests merged since, one page a
+pass, 0.3 to 0.6 MB on that account. The day a pass runs on is still being
 merged into, so its pull requests are in that day's row and walked again by the
 next pass. The whole history is walked again once a week, because the count can
 go down (a repository made private or deleted takes its pull requests out of
-`is:public`), and whenever the rule the count was kept by has changed. A
-count the API would not give is a day without progress rows, never a day
-without badges.
+`is:public`), and whenever the rule the count was kept by has changed.
+
+A pass the API will not answer writes the badges and no progress rows, and says
+which read failed at warning, with the error: `achievement counts unavailable,
+no progress rows this pass` or `co-authored pull requests unavailable, no
+progress rows this pass`. It costs that pass and nothing more. The rows are the
+day's, so the pass an hour later writes them, and a walk cut short leaves the
+kept count as it was, for the next pass to walk its days again. A count the walk
+could not settle whole is written as a floor, and said once per process while
+its numbers stay the same:
+
+```text
+level=WARN msg="co-authored pull request count is a floor" capped=false truncated=3
+```
+
+`capped` is a day that alone held more than the thousand results a search
+pages, and `truncated` how many pull requests had more commits than a page of a
+hundred and no trailer in the ones read, which is the most the count can be
+short by. Both are kept in the state file with the count, so a pass that adds
+to a floor still says it is one.
 
 `gh_social_account` carries one more row than the social accounts listing:
 the homepage, under the provider `website`, from the `blog` of the profile.
@@ -1307,9 +1338,10 @@ containers. If a listing fails the GraphQL count stands.
 
 `gh_account_total` is the answer to "how many ever". Every other measurement
 here is a row per fact, which is the right shape for "how many in July" and the
-wrong one for a lifetime count. GitHub counts them itself, in one search request
-each, so the number is one row and is right on the first sweep of a fresh
-install.
+wrong one for a lifetime count. GitHub counts them itself: ten of them are one
+GraphQL query with a search alias for each, and `commits`, which GraphQL search
+cannot count, is a REST search of its own. So each number is one row and is
+right on the first sweep of a fresh install.
 
 The three fields that end in `_elsewhere` share one meaning of elsewhere: in a
 repository the account does not own, since the search qualifier `-user:LOGIN`
@@ -1459,7 +1491,10 @@ family with nothing to report.
 
 The second is what each sweep managed to do. One row per family it ran, always,
 with how many repositories it was asked about (`repos`), how many of them it
-could not collect (`failed`) and how many rows it produced (`points`); and one
+could not collect (`failed`) and how many rows it produced (`points`). For
+`commits`, `issueevents` and `issues`, `repos` also counts the repositories the
+[movement query](https://jmrp.io/docs/ghchronicle/api/cost/#asking-first-what-moved) found nothing
+new in, which the family left unread and wrote no row for. And one
 row more per repository it lost, naming that repository the way every other
 measurement names one and carrying `reason`, a bounded word for what stopped it
 (the HTTP status, `rate limited`, `query too large`, `canceled`), with the whole
@@ -1530,13 +1565,14 @@ a counter rather than a value.
 | ------------ | -------------------------------- | ----------------------------- | --------------------- |
 | `gh_job_log` | dated, when the line was printed | `workflow`, `job_name`, `run` | `line`, `head_branch` |
 
-Off by default: set `every.joblogs`. It is text rather than a measurement, so
-it is excluded from the InfluxDB sink by default and skipped by the Prometheus
-exporter; Loki is where it belongs. The exported dashboards carry a text
-panel, "Where failure output went", in the place the lines would take, since
-an importer may have no Loki; `cmd/publish_dashboard -loki <datasource-uid>`
-publishes the dashboard with the lines drawn from Loki in that panel's place
-(see [the dashboards](https://jmrp.io/docs/ghchronicle/dashboards/panels/#delivery-and-access)).
+Off by default: set `every.families.joblogs`. It is text rather than a
+measurement, so it is excluded from the InfluxDB sink by default and skipped by
+the Prometheus exporter; Loki is where it belongs. The exported dashboards carry
+a text panel, "Where failure output went", in the place the lines would take,
+since an importer may have no Loki; `cmd/publish_dashboard -loki
+<datasource-uid>` publishes the dashboard with the lines drawn from Loki in that
+panel's place (see [the
+dashboards](https://jmrp.io/docs/ghchronicle/dashboards/panels/#delivery-and-access)).
 
 Only failed jobs, and only the last forty lines of each. A successful job's
 output is thousands of lines nobody will read, each log costs a request, and
@@ -1613,9 +1649,13 @@ ones a fresh database is most likely to lack: `gh_discussion.state_reason`,
 that needs a closing, every `url` on an item GitHub sends no address for, the
 optional advisory fields on an alert, `checks_total` and `checks_failed` on a
 commit a gate ran on, `label_names` on an item with a label, `resolved_by` on
-a resolved thread, `queued_seconds` on a run's first attempt, and
+a resolved thread, `queued_seconds` on a run's first attempt,
 `pull_request`, `pull_requests`, `headline` and `head_repo` on a run GitHub
-linked, described or took from a fork. Two more are worth naming, because the
+linked, described or took from a fork, `merged` on work elsewhere that was
+merged and `additions`, `deletions` and `changed_files` on work elsewhere that
+is a pull request, which an account that has only opened issues in other
+people's repositories has never written, and `language` on an upstream
+repository GitHub detected one in. Two more are worth naming, because the
 tables above list them beside fields that are always there:
 `gh_dependabot_alert_item.dismissed_comment`, written only when whoever
 dismissed an alert typed a reason, and `gh_event.commits`, written only on a

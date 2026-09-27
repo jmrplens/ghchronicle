@@ -242,11 +242,12 @@ people's repositories, and those repositories themselves, how many stars each
 has and whether it is private. All of it is GraphQL, one point a page: the starred
 list, five issue searches, the two comment walks and the accepted answers the
 account wrote, which are read apart from the comments so that an answer
-accepted weeks after it was written is not missed. A sweep reads every page
-of the two searches for what is still open, and the other three, which are
-ordered by what moved last, back to a cadence before the sweep before: their
-first page, unless more than a hundred items moved in that time. A backfill
-reads those three to the end as well.
+accepted weeks after it was written is not missed. A sweep reads up to five
+pages of the starred list, every page of the two searches for what is still
+open, and the other three, which are ordered by what moved last, back to a
+cadence before the sweep before: their first page, unless more than a hundred
+items moved in that time. A backfill reads the starred list and those three to
+the end as well.
 
 **`totals`** asks GitHub for the numbers that are true since the beginning:
 pull requests merged ever, commits ever, issues opened ever, and the whole life
@@ -280,7 +281,7 @@ only needs to happen once.
 
 **`achievements`** collects the badges on the public profile page, and it is the
 one family that does not come from the API at all: GitHub lists achievements in
-neither REST nor GraphQL, so the page is read once a day as an anonymous
+neither REST nor GraphQL, so the page is read every hour as an anonymous
 visitor, without the token and charged to no budget. Beside each badge it
 writes how far the account is from that badge's next tier, which does come from
 the API. The parser is strict on purpose: when GitHub redesigns the page the
