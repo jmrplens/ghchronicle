@@ -1,12 +1,15 @@
 package collect
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/jmrplens/ghchronicle/v2/internal/ghapi"
 	"github.com/jmrplens/ghchronicle/v2/internal/sink"
 )
 
@@ -702,6 +705,106 @@ func TestArtifactsWalkedVersusCount(t *testing.T) {
 
 	if !total.Time.Equal(testNow) {
 		t.Errorf("the total is current state and must be stamped now, got %s", total.Time)
+	}
+}
+
+// flakyArtifacts serves three pages of a declared 250 artifacts, and answers
+// page `failing` with a 502 the first `times` times it is asked.
+func flakyArtifacts(t *testing.T, failing string, times int) *fixtureServer {
+	t.Helper()
+	f := newFixtureServer(t)
+	var mu sync.Mutex
+	failed := 0
+	f.handle("/repos/octocat/hello-world/actions/artifacts", func(w http.ResponseWriter, r *http.Request) {
+		page := r.URL.Query().Get("page")
+		mu.Lock()
+		fail := page == failing && failed < times
+		if fail {
+			failed++
+		}
+		mu.Unlock()
+		if fail {
+			w.WriteHeader(http.StatusBadGateway)
+			_, _ = w.Write([]byte(`{"message": "Server Error"}`))
+			return
+		}
+		switch page {
+		case "1":
+			_, _ = w.Write(artifactPage(t, 100, 250, 1000))
+		case "2":
+			_, _ = w.Write(artifactPage(t, 100, 250, 1100))
+		default:
+			_, _ = w.Write(artifactPage(t, 50, 250, 1200))
+		}
+	})
+	return f
+}
+
+// TestArtifactsGetPastAPageTheGatewayGaveUpOnOnce is issue #89 as the
+// collector sees it: the listing of jmrplens/jmrp.io answered page 2 with a
+// 502 on 8 of 27 passes, and each lost the pass its total. One 502 is now
+// asked again, and the walk ends as if it had never happened.
+func TestArtifactsGetPastAPageTheGatewayGaveUpOnOnce(t *testing.T) {
+	t.Parallel()
+	f := flakyArtifacts(t, "2", 1)
+	points, err := Artifacts{}.Collect(ctx(t), f.Client, testRepo, testNow)
+	if err != nil {
+		t.Fatalf("one 502 on page 2 failed the walk: %v", err)
+	}
+	checkPoints(t, points)
+	if n := len(only(t, points, "gh_artifact")); n != 250 {
+		t.Errorf("got %d artifact rows, want every page's 250", n)
+	}
+	total := only(t, points, "gh_artifact_total")[0]
+	if fieldInt(t, total, "count") != 250 || fieldInt(t, total, "walked") != 250 {
+		t.Errorf("total = %v, want count and walked 250", total.Fields)
+	}
+	if n := len(f.calls("/repos/octocat/hello-world/actions/artifacts")); n != 4 {
+		t.Errorf("made %d requests, want three pages and the one retry", n)
+	}
+}
+
+// TestArtifactsKeepATotalFromThePagesBeforeTheOneThatFailed: a page that
+// fails twice still fails the repository, and the pages before it still give
+// the pass its total, with `walked` short of `count` to say it is a floor.
+func TestArtifactsKeepATotalFromThePagesBeforeTheOneThatFailed(t *testing.T) {
+	t.Parallel()
+	f := flakyArtifacts(t, "2", 2)
+	points, err := Artifacts{}.Collect(ctx(t), f.Client, testRepo, testNow)
+	if se, ok := errors.AsType[*ghapi.StatusError](err); !ok || se.Code != http.StatusBadGateway {
+		t.Fatalf("err = %v, want the 502 of page 2", err)
+	}
+	checkPoints(t, points)
+	if n := len(only(t, points, "gh_artifact")); n != 100 {
+		t.Errorf("got %d artifact rows, want page 1's 100", n)
+	}
+	totals := only(t, points, "gh_artifact_total")
+	if len(totals) != 1 {
+		t.Fatalf("got %d totals, want one from the page that was read", len(totals))
+	}
+	total := totals[0]
+	if fieldInt(t, total, "count") != 250 || fieldInt(t, total, "walked") != 100 {
+		t.Errorf("total = %v, want the declared 250 and the 100 walked", total.Fields)
+	}
+	if fieldInt(t, total, "live_count") != 50 || fieldInt(t, total, "live_bytes") != 50*1000 {
+		t.Errorf("total = %v, want page 1's 50 live artifacts at 1000 bytes", total.Fields)
+	}
+	if !total.Time.Equal(testNow) {
+		t.Errorf("the total is stamped %s, want now", total.Time)
+	}
+}
+
+// TestArtifactsWriteNoTotalWhenPageOneFailed: nothing was read, so there is
+// no count to be a floor of, and zeros would read as every artifact gone.
+func TestArtifactsWriteNoTotalWhenPageOneFailed(t *testing.T) {
+	t.Parallel()
+	f := flakyArtifacts(t, "1", 2)
+	points, err := Artifacts{}.Collect(ctx(t), f.Client, testRepo, testNow)
+	if err == nil {
+		t.Fatal("page 1 answered 502 twice and the walk reported success")
+	}
+	if len(points) != 0 {
+		t.Errorf("wrote %d rows from a listing that answered nothing: %v", len(points), points)
 	}
 }
 

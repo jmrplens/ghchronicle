@@ -648,7 +648,10 @@ declared 29,405. `walked` is how far the five-page cap let the walk go.
 `live_bytes` is the size of the artifacts GitHub still holds among the ones
 walked, and `live_count` is how many those are, which is the count the size is
 over. When `walked` is below `count` the live figures are a floor rather than a
-total, which on that repository was short by a factor of fifty six.
+total, which on that repository was short by a factor of fifty six. A walk that
+a failed page cut short still writes the row, from the pages before it, and its
+`walked` stops short of `count` in the same way; only a first page that failed
+writes none, because then there is no count to be short of.
 
 `gh_actions_cache` says a repository holds twelve gigabytes;
 `gh_actions_cache_entry` says which key holds them and which has not been

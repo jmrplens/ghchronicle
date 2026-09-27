@@ -115,10 +115,11 @@ one that counts issues.
 
 **Artifact storage looks too small.** Compare `walked` against `count` in
 `gh_artifact_total`. When they disagree the live size is a floor: the repository
-has more artifacts than the page cap walked. It can also be smaller than
-expected for a second reason: `count` is GitHub's total and includes the
-artifacts it has already expired, while the size is over the live ones alone,
-which `live_count` counts.
+has more artifacts than the page cap walked, or a page of the listing failed on
+that sweep and the row was written from the pages before it. It can also be
+smaller than expected for a second reason: `count` is GitHub's total and
+includes the artifacts it has already expired, while the size is over the live
+ones alone, which `live_count` counts.
 
 **A panel answers with a schema error rather than No data.** InfluxDB 3 creates
 a column the first time a row carries it, so a query naming one that no row has

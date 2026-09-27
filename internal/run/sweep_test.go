@@ -82,6 +82,9 @@ func fakeRunner(t *testing.T, sinks ...sink.Sink) (r *Runner, fake *fakegh.Serve
 	fake = fakegh.New(t, "../../test/e2e/testdata")
 	api := ghapi.New("test-token", 10*time.Second)
 	api.SetBaseURL(fake.URL())
+	// fake.Fail breaks a path for good, so the client's one retry of a 502
+	// is asked at once rather than after its pause.
+	api.SetRetryPause(0)
 	cfg := &config.Config{
 		GitHub:       config.GitHub{Token: "test-token"},
 		Targets:      config.Targets{User: fakegh.Login},

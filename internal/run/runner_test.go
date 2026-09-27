@@ -63,6 +63,9 @@ func sweepRunner(t *testing.T, handler http.HandlerFunc) *Runner {
 	t.Cleanup(srv.Close)
 	api := ghapi.New("token", 5*time.Second)
 	api.SetBaseURL(srv.URL)
+	// The handlers here that answer 502 do it on purpose, so the client's
+	// one retry is asked at once rather than after its pause.
+	api.SetRetryPause(0)
 
 	cfg := &config.Config{
 		// BaseURL names the server too: the achievements family derives
@@ -158,6 +161,9 @@ func groupRunner(t *testing.T, groups []string, every config.Every, handler http
 	t.Cleanup(srv.Close)
 	api := ghapi.New("token", 5*time.Second)
 	api.SetBaseURL(srv.URL)
+	// The handlers here that answer 502 do it on purpose, so the client's
+	// one retry is asked at once rather than after its pause.
+	api.SetRetryPause(0)
 
 	cfg := &config.Config{
 		// BaseURL names the server too: the achievements family derives

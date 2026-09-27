@@ -119,10 +119,12 @@ que cuenta issues.
 
 **El almacenamiento de artefactos parece pequeño.** Compara `walked` con `count`
 en `gh_artifact_total`. Cuando no coinciden, el tamaño vivo es un suelo: el
-repositorio tiene más artefactos de los que recorrió el tope de páginas. También
-puede salir más pequeño de lo esperado por una segunda razón: `count` es el
-total de GitHub e incluye los artefactos que ya ha caducado, mientras que el
-tamaño es solo sobre los vivos, que son los que cuenta `live_count`.
+repositorio tiene más artefactos de los que recorrió el tope de páginas, o una
+página del listado falló en esa pasada y la fila se escribió con las páginas
+anteriores. También puede salir más pequeño de lo esperado por una segunda
+razón: `count` es el total de GitHub e incluye los artefactos que ya ha
+caducado, mientras que el tamaño es solo sobre los vivos, que son los que cuenta
+`live_count`.
 
 **Un panel responde con un error de esquema en vez de decir No data.** InfluxDB 3
 crea una columna la primera vez que una fila la trae, así que una consulta que

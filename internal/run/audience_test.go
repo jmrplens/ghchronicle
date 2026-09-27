@@ -708,8 +708,10 @@ func TestAStargazerWalkCutShortIsWalkedWholeAgain(t *testing.T) {
 	if err := r.repoFamilies(t.Context(), time.Now()); err != nil {
 		t.Fatal(err)
 	}
-	if _, lists := g.historyRequests(); lists != 2 {
-		t.Fatalf("the first sweep asked %d pages of the list, want page one and the page that failed", lists)
+	// The page that failed is asked twice: the client asks a 502 once more
+	// before handing it back.
+	if _, lists := g.historyRequests(); lists != 3 {
+		t.Fatalf("the first sweep asked %d pages of the list, want page one and the page that failed, twice", lists)
 	}
 	if !r.State.FirstSight("o/a") {
 		t.Error("a walk a 502 cut short recorded the repository as walked whole")

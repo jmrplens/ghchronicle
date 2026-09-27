@@ -604,10 +604,12 @@ func (r *Runner) collectFamily(ctx context.Context, family string, now time.Time
 		// gh_workflow_job held nothing at all for his five busiest
 		// repositories, each because one /repos/<repo>/actions/runs/<id>/jobs
 		// call had answered 502 once, and every run and job that repository's
-		// actions family had already collected was dropped with it. A retry
-		// would have helped that 502 and nothing else; keeping what was
-		// collected is right whatever failed, which is why it is this and not
-		// a retry. The repository is still counted as failed below: half a
+		// actions family had already collected was dropped with it. The
+		// client now asks a 502 or a 504 once more before handing it back,
+		// which is what gets past a gateway that gave up once; keeping what
+		// was collected is right whatever failed, a gateway that gave up
+		// twice included, which is why this is here as well as the retry.
+		// The repository is still counted as failed below: half a
 		// repository is not a repository that succeeded, and pass.failed is
 		// what decides whether the family is marked as run and what the
 		// collector's own rows report. It is also what keeps half a repository

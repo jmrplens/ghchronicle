@@ -128,6 +128,35 @@ A spent budget is a 403 as well and is never remembered as one: the client
 types it apart precisely so that a rate limit is not read as a feature that is
 off.
 
+### A gateway that gave up is asked once more
+
+A `502` or a `504` is the gateway in front of GitHub saying the answer did not
+come back in time, and it is intermittent. Measured on the author's own sweeps
+between 2026-09-11 and 2026-09-27, 36 of 397,455 REST requests answered one,
+25 of them after ten and a half seconds, and from 2026-09-25 most were the
+artifact listing of the two repositories with the longest artifact history. The
+size of the page is not the cause: asking for one artifact took as long as
+asking for a hundred.
+
+So a REST request that answers either is asked once more, two seconds later,
+before the collector hears about it. Three things hold for that second attempt:
+
+- **It is charged.** Every one of those 25 cost a request from `core`, even
+  when it was asked conditionally, where a `304` costs none. So the retry goes
+  through the brake like any other request, and a budget already at its reserve
+  is not spent on it.
+- **It is conditional.** It carries the same `If-None-Match` as the first
+  attempt, so a page that has not changed still comes back as a free `304`.
+- **It is the only one.** Each attempt can hold the family for ten seconds, and
+  a request that fails twice is logged and left to the next sweep as before.
+  What the collector read before it is kept either way.
+
+A `500` is not asked again: it is the application failing rather than the
+gateway giving up. GraphQL is not asked again here either, because its gateway
+error means a query too large to answer in ten seconds, which the same query
+would meet again; the collectors ask again on the same cursor with a smaller
+page instead.
+
 ### The budget in the log
 
 ```text

@@ -68,6 +68,10 @@ type Client struct {
 	// spend accumulates the cost GraphQL reports for each query, because no
 	// endpoint reports it: `GET /rate_limit` does not even see this budget.
 	spend GraphQLSpend
+
+	// retryPause is how long a REST GET waits before asking again after a
+	// gateway gave up on it; see send.
+	retryPause time.Duration
 }
 
 // RateState is the budget as GitHub last reported it.
@@ -109,12 +113,35 @@ func New(token string, timeout time.Duration) *Client {
 	// test server shutting down broke another test's request about one run in
 	// twenty.
 	return &Client{
-		http:  &http.Client{Timeout: timeout, Transport: httpx.OwnTransport()},
-		token: token,
-		base:  defaultBase,
-		cache: newCache(DefaultCacheBytes),
-		rates: map[string]RateState{},
+		http:       &http.Client{Timeout: timeout, Transport: httpx.OwnTransport()},
+		token:      token,
+		base:       defaultBase,
+		cache:      newCache(DefaultCacheBytes),
+		rates:      map[string]RateState{},
+		retryPause: DefaultRetryPause,
 	}
+}
+
+// DefaultRetryPause is how long a REST GET waits before its one retry after a
+// 502 or a 504; see send for why there is one.
+//
+// Short, because the attempt that failed has usually taken ten seconds
+// already. Not zero, because five of the 36 in send's measurement failed in
+// 113 to 811 ms, and without a pause the retry of one of those would reach
+// the gateway that had just failed within the same second. It is not tuned:
+// two seconds is the pause the retry was measured with by hand on
+// 2026-09-27, when page 3 of jmrplens/phonometry's artifact listing answered
+// 502 after 10.5 s and the same request two seconds later answered 200 in
+// 1.6 s.
+const DefaultRetryPause = 2 * time.Second
+
+// SetRetryPause changes how long a REST GET waits before asking again after a
+// 502 or a 504. Zero asks again at once, which is what a test against a fake
+// that fails on purpose wants; nothing in the binary changes it.
+func (c *Client) SetRetryPause(d time.Duration) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.retryPause = max(d, 0)
 }
 
 // SetBaseURL points the client at a different API root: a GitHub Enterprise
@@ -507,6 +534,9 @@ func (e *RateLimitedError) Error() string {
 // job history, and the only record of it was a line in the journal that read
 // like every other line. The message is what it always was, so anything that
 // reads the text, isPaginationLimit for one, reads the same text.
+//
+// A 502 or a 504 that arrives here from a REST GET is the second of two: send
+// has already asked once more.
 type StatusError struct {
 	// Path is the request, relative to the REST base.
 	Path string
@@ -576,12 +606,11 @@ func (c *Client) GetJSON(ctx context.Context, path string, out any, accept strin
 		req.Header.Set("If-None-Match", tag)
 	}
 
-	resp, err := c.http.Do(req)
+	resp, err := c.send(ctx, path, req, c.http.Do)
 	if err != nil {
 		return "", false, err
 	}
 	defer resp.Body.Close()
-	c.readRate(resp)
 
 	switch resp.StatusCode {
 	case http.StatusNotModified:
@@ -677,6 +706,69 @@ func replayable(raw []byte, out any) []byte {
 	return encoded
 }
 
+// send makes a REST GET, and makes it once more when the gateway in front of
+// GitHub gave up on it.
+//
+// A 502 or a 504 is the gateway reporting that the answer did not come back
+// in time, not the application refusing, and it is intermittent. Measured on
+// the production proxy's log from 2026-09-11 to 2026-09-27: 36 of 397,455
+// REST GETs answered one, 25 of them after 10.4 to 10.8 seconds, and 16 of
+// the 20 from 2026-09-25 on were the artifact listing of the two repositories
+// with the longest artifact history, each costing its pass the repository's
+// gh_artifact_total. The size of the page is not the cause: per_page=1 took
+// as long as per_page=100. A 500 is the application's own failure and is left
+// to the next sweep, which answered both of the two in that log.
+//
+// Once, because each attempt can hold the family for ten seconds, and a
+// request that fails twice is left to the next sweep as it was before. The
+// retry costs budget: every one of those 25 was charged a core request,
+// conditional or not (used moved by one each time, where a 304 moves it by
+// none), so it goes through the brake like any other request and a budget at
+// its reserve is not spent on it. It carries the If-None-Match of the first
+// attempt, because the pair the caller read is still the pair, and a 304 to
+// the retry is replayed from it.
+//
+// GraphQL does not come through here. Its gateway error is a query too large
+// for ten seconds (TooLargeError), which the same query asked again would
+// only time out on again, so the collectors ask again on the same cursor with
+// a smaller page instead. Both keep what the walk already read and ask again
+// from where it stopped; each asks the way its own failure can be fixed.
+func (c *Client) send(ctx context.Context, path string, req *http.Request, do func(*http.Request) (*http.Response, error)) (*http.Response, error) {
+	resp, err := do(req)
+	if err != nil {
+		return nil, err
+	}
+	c.readRate(resp)
+	if resp.StatusCode != http.StatusBadGateway && resp.StatusCode != http.StatusGatewayTimeout {
+		return resp, nil
+	}
+	first := &StatusError{Path: path, Code: resp.StatusCode, Status: resp.Status}
+	// Drained so the connection goes back to the pool for the retry rather
+	// than being torn down under it.
+	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 64<<10))
+	_ = resp.Body.Close()
+
+	c.mu.Lock()
+	pause := c.retryPause
+	c.mu.Unlock()
+	select {
+	case <-ctx.Done():
+		// Both, because each answers a different caller: the status is what
+		// GitHub said, and the cancellation is why nobody asked again.
+		return nil, fmt.Errorf("%w, and was not asked again: %w", first, ctx.Err())
+	case <-time.After(pause):
+	}
+	if stopped := c.brake(ctx, path); stopped != nil {
+		return nil, stopped
+	}
+	resp, err = do(req.Clone(ctx))
+	if err != nil {
+		return nil, err
+	}
+	c.readRate(resp)
+	return resp, nil
+}
+
 // GetText fetches a path that answers with plain text rather than JSON.
 //
 // Only the Actions job log does this, and it does it through a redirect to
@@ -752,12 +844,11 @@ func (c *Client) GetTextAs(ctx context.Context, path, accept string) (string, er
 			return nil
 		},
 	}
-	resp, err := client.Do(req)
+	resp, err := c.send(ctx, path, req, client.Do)
 	if err != nil {
 		return "", err
 	}
 	defer resp.Body.Close()
-	c.readRate(resp)
 
 	switch resp.StatusCode {
 	case http.StatusNotModified:

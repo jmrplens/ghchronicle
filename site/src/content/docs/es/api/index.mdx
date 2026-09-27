@@ -135,6 +135,36 @@ Una cuota agotada también es un 403 y nunca se recuerda como tal: el cliente lo
 tipa aparte precisamente para que un límite de peticiones no se lea como una
 función apagada.
 
+## Una pasarela que se rindió se pregunta una vez más
+
+Un `502` o un `504` es la pasarela que hay delante de GitHub diciendo que la
+respuesta no volvió a tiempo, y es intermitente. Medido en las pasadas de la
+propia cuenta del autor entre el 2026-09-11 y el 2026-09-27, 36 de 397.455
+peticiones REST respondieron uno, 25 de ellas tras diez segundos y medio, y
+desde el 2026-09-25 la mayoría fueron el listado de artefactos de los dos
+repositorios con la historia de artefactos más larga. El tamaño de la página no
+es la causa: pedir un artefacto tardó lo mismo que pedir cien.
+
+Así que una petición REST que responde cualquiera de los dos se pregunta una vez
+más, dos segundos después, antes de que el colector se entere. Esa segunda
+petición cumple tres cosas:
+
+- **Se cobra.** Cada una de esas 25 costó una petición de `core`, incluso
+  cuando se preguntó de forma condicional, donde un `304` no cuesta nada. Así
+  que el reintento pasa por el freno como cualquier otra petición, y un
+  presupuesto que ya está en su reserva no se gasta en él.
+- **Es condicional.** Lleva el mismo `If-None-Match` que la primera, así que una
+  página que no ha cambiado sigue volviendo como un `304` gratuito.
+- **Es la única.** Cada intento puede retener a la familia diez segundos, y una
+  petición que falla dos veces se registra y se deja para la pasada siguiente,
+  como antes. Lo que el colector leyó antes se conserva en cualquier caso.
+
+Un `500` no se vuelve a preguntar: es la aplicación la que falla, no la pasarela
+la que se rinde. GraphQL tampoco se vuelve a preguntar aquí, porque su error de
+pasarela significa una consulta demasiado grande para responderla en diez
+segundos, con la que la misma consulta volvería a toparse; los colectores
+vuelven a preguntar sobre el mismo cursor con una página más pequeña.
+
 ## El presupuesto en el log
 
 ```text

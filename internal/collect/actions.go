@@ -763,82 +763,6 @@ func (a Artifacts) Collect(ctx context.Context, c *ghapi.Client, repo Repo, now 
 	var live int64
 	var liveCount, walked, declared int
 
-	// Paginated. Summing only the first hundred artifacts published a live
-	// total of three megabytes next to a count of twenty-eight thousand, which
-	// is not a small error but a wrong answer.
-	for page := 1; page <= most; page++ {
-		var res struct {
-			TotalCount int           `json:"total_count"`
-			Artifacts  []artifactRow `json:"artifacts"`
-		}
-		path := fmt.Sprintf("/repos/%s/actions/artifacts?per_page=100&page=%d", repo.FullName, page)
-		if _, _, err := c.GetJSON(ctx, path, &res, ""); err != nil {
-			if isSkippable(err) || isPaginationLimit(err) {
-				break
-			}
-			return points, err
-		}
-		declared = res.TotalCount
-		if len(res.Artifacts) == 0 {
-			break
-		}
-		walked += len(res.Artifacts)
-		for i := range res.Artifacts {
-			art := &res.Artifacts[i]
-			if !art.Expired {
-				live += art.SizeBytes
-				liveCount++
-			}
-			fields := map[string]any{
-				"size_bytes": art.SizeBytes,
-				"run_id":     art.Workflow.ID,
-				"head_sha":   art.Workflow.HeadSHA,
-				// Whether GitHub still holds the file. A field and not a tag,
-				// because the row is dated when the artifact was created and
-				// expiry comes later: as the tag `expired` it opened a second
-				// series at the same instant the day the artifact expired,
-				// and the two rows were summed as two artifacts for ever.
-				// Measured on this account after eleven hours: 77 of 3,615
-				// artifacts doubled, and a day's storage read 18 per cent
-				// high. Under a new name so a database that already holds
-				// the tag column keeps accepting writes.
-				"live": !art.Expired,
-				// The same unbounded value as on the run: one branch per pull
-				// request, never reused. It was a tag and is now a field, and
-				// under the API's own name for the same reason as there: the
-				// old `branch` column of gh_artifact is a tag, and InfluxDB 3
-				// would reject a field that reused the name.
-				"head_branch": art.Workflow.HeadBranch,
-			}
-			// An artifact has no page on GitHub; the run that produced it
-			// does, and that is where a reader wants to land.
-			setNonEmpty(fields, "url", githubPage(repo.FullName, "actions", "runs",
-				strconv.FormatInt(art.Workflow.ID, 10)))
-			// The retention actually applied, which is the point of keeping
-			// the expiry at all: measured on this account, 88 of 100 artifacts
-			// live one day and 12 live seven, against a default setting of 90.
-			// Rounded because GitHub sets expires_at a few seconds short of a
-			// whole number of days.
-			if !art.ExpiresAt.IsZero() && !art.CreatedAt.IsZero() {
-				fields["retention_days"] = int(art.ExpiresAt.Sub(art.CreatedAt).Round(24*time.Hour) / (24 * time.Hour))
-			}
-			// Two builds of the same commit that produce the same digest is
-			// reproducibility measured rather than assumed.
-			if art.Digest != "" {
-				fields["digest"] = art.Digest
-			}
-			points = append(points, sink.Point{
-				Measurement: "gh_artifact",
-				Tags:        merge(base, map[string]string{"artifact": art.Name}),
-				Fields:      fields,
-				Time:        art.CreatedAt,
-			})
-		}
-		if len(res.Artifacts) < 100 || a.Walk.past(res.Artifacts[len(res.Artifacts)-1].CreatedAt) {
-			break
-		}
-	}
-
 	// One current total, so a dashboard can show storage without summing a
 	// window that would double-count artifacts still alive from earlier days.
 	//
@@ -853,18 +777,113 @@ func (a Artifacts) Collect(ctx context.Context, c *ghapi.Client, repo Repo, now 
 	// counting different things. `live_count` gives the bytes the count they
 	// are the size of, and `walked` against `count` says whether that is a
 	// total or a floor.
-	points = append(points, sink.Point{
-		Measurement: "gh_artifact_total",
-		Tags:        base,
-		Fields: map[string]any{
-			"live_bytes": live, "count": declared,
-			// How many of the declared total were actually walked.
-			"walked": walked,
-			// The artifacts behind live_bytes: the walked ones GitHub has
-			// not expired.
-			"live_count": liveCount,
-		},
-		Time: now,
-	})
-	return points, nil
+	total := func() sink.Point {
+		return sink.Point{
+			Measurement: "gh_artifact_total",
+			Tags:        base,
+			Fields: map[string]any{
+				"live_bytes": live, "count": declared,
+				// How many of the declared total were actually walked.
+				"walked": walked,
+				// The artifacts behind live_bytes: the walked ones GitHub
+				// has not expired.
+				"live_count": liveCount,
+			},
+			Time: now,
+		}
+	}
+
+	// Paginated. Summing only the first hundred artifacts published a live
+	// total of three megabytes next to a count of twenty-eight thousand, which
+	// is not a small error but a wrong answer.
+	for page := 1; page <= most; page++ {
+		var res struct {
+			TotalCount int           `json:"total_count"`
+			Artifacts  []artifactRow `json:"artifacts"`
+		}
+		path := fmt.Sprintf("/repos/%s/actions/artifacts?per_page=100&page=%d", repo.FullName, page)
+		if _, _, err := c.GetJSON(ctx, path, &res, ""); err != nil {
+			if isSkippable(err) || isPaginationLimit(err) {
+				break
+			}
+			if page > 1 {
+				// The pages before this one were read, so the declared count
+				// is known and `walked` stops short of it, which is already
+				// how the row says its live figures are a floor. Without it
+				// the pass had no total at all: measured from the production
+				// proxy's log between 2026-09-25 12:58Z and 2026-09-26
+				// 19:50Z, jmrplens/jmrp.io's listing answered page 2 with a
+				// 502 on 8 of its 27 passes, and each of those left the
+				// repository's storage an hour stale. A failed page 1 still
+				// writes nothing: then nothing is known, and a row of zeros
+				// would read as every artifact gone.
+				points = append(points, total())
+			}
+			return points, err
+		}
+		declared = res.TotalCount
+		if len(res.Artifacts) == 0 {
+			break
+		}
+		walked += len(res.Artifacts)
+		for i := range res.Artifacts {
+			art := &res.Artifacts[i]
+			if !art.Expired {
+				live += art.SizeBytes
+				liveCount++
+			}
+			points = append(points, artifactPoint(repo, base, art))
+		}
+		if len(res.Artifacts) < 100 || a.Walk.past(res.Artifacts[len(res.Artifacts)-1].CreatedAt) {
+			break
+		}
+	}
+
+	return append(points, total()), nil
+}
+
+// artifactPoint is one artifact, dated when it was created.
+func artifactPoint(repo Repo, base map[string]string, art *artifactRow) sink.Point {
+	fields := map[string]any{
+		"size_bytes": art.SizeBytes,
+		"run_id":     art.Workflow.ID,
+		"head_sha":   art.Workflow.HeadSHA,
+		// Whether GitHub still holds the file. A field and not a tag, because
+		// the row is dated when the artifact was created and expiry comes
+		// later: as the tag `expired` it opened a second series at the same
+		// instant the day the artifact expired, and the two rows were summed
+		// as two artifacts for ever. Measured on this account after eleven
+		// hours: 77 of 3,615 artifacts doubled, and a day's storage read 18
+		// per cent high. Under a new name so a database that already holds
+		// the tag column keeps accepting writes.
+		"live": !art.Expired,
+		// The same unbounded value as on the run: one branch per pull
+		// request, never reused. It was a tag and is now a field, and under
+		// the API's own name for the same reason as there: the old `branch`
+		// column of gh_artifact is a tag, and InfluxDB 3 would reject a field
+		// that reused the name.
+		"head_branch": art.Workflow.HeadBranch,
+	}
+	// An artifact has no page on GitHub; the run that produced it does, and
+	// that is where a reader wants to land.
+	setNonEmpty(fields, "url", githubPage(repo.FullName, "actions", "runs",
+		strconv.FormatInt(art.Workflow.ID, 10)))
+	// The retention actually applied, which is the point of keeping the
+	// expiry at all: measured on this account, 88 of 100 artifacts live one
+	// day and 12 live seven, against a default setting of 90. Rounded because
+	// GitHub sets expires_at a few seconds short of a whole number of days.
+	if !art.ExpiresAt.IsZero() && !art.CreatedAt.IsZero() {
+		fields["retention_days"] = int(art.ExpiresAt.Sub(art.CreatedAt).Round(24*time.Hour) / (24 * time.Hour))
+	}
+	// Two builds of the same commit that produce the same digest is
+	// reproducibility measured rather than assumed.
+	if art.Digest != "" {
+		fields["digest"] = art.Digest
+	}
+	return sink.Point{
+		Measurement: "gh_artifact",
+		Tags:        merge(base, map[string]string{"artifact": art.Name}),
+		Fields:      fields,
+		Time:        art.CreatedAt,
+	}
 }
