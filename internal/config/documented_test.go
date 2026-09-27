@@ -149,43 +149,20 @@ func checkCadences(t *testing.T, path string, documented map[string]string) {
 func exampleEvery(t *testing.T) map[string]string {
 	t.Helper()
 	out := map[string]string{}
-	inEvery, inFamilies, explained := false, false, false
-	for i, line := range readLines(t, exampleConfig) {
-		if line == "every:" {
-			inEvery = true
-			continue
-		}
-		if !inEvery {
-			continue
-		}
-		if line != "" && !strings.HasPrefix(line, " ") {
-			break // the next top-level key ends the block
-		}
-		indent, text, ok := uncomment(line)
-		if ok && indent == 2 {
-			inFamilies = text == "families:"
-			continue
-		}
-		if !inFamilies || !ok || indent != 4 {
-			continue
-		}
-		if strings.HasPrefix(text, "#") {
-			explained = true // a reason written above the line it is for
-			continue
-		}
+	for i, line := range familiesBlock(t) {
+		_, text, _ := uncomment(line)
 		name, value, found := strings.Cut(text, ": ")
-		if !found {
-			continue
+		if !found || strings.HasPrefix(text, "#") {
+			continue // a reason written above the line it is for
 		}
 		if !strings.HasPrefix(strings.TrimLeft(line, " "), "#") {
 			t.Errorf("%s:%d sets every.families.%s rather than showing it: a file copied from the example "+
-				"would keep that cadence after a release changed the built-in one", exampleConfig, i+1, name)
+				"would keep that cadence after a release changed the built-in one", exampleConfig, i, name)
 		}
 		value, why, _ := strings.Cut(value, "#")
-		if strings.TrimSpace(why) == "" && !explained {
-			t.Errorf("%s:%d shows every.families.%s with no reason for its value", exampleConfig, i+1, name)
+		if strings.TrimSpace(why) == "" && !reasonAbove(t, i) {
+			t.Errorf("%s:%d shows every.families.%s with no reason for its value", exampleConfig, i, name)
 		}
-		explained = false
 		if value = strings.TrimSpace(value); value != "" {
 			out[name] = value
 		}
@@ -196,6 +173,42 @@ func exampleEvery(t *testing.T) map[string]string {
 		t.Fatalf("%s: no every.families block found, so this test proves nothing", exampleConfig)
 	}
 	return out
+}
+
+// familiesBlock is the lines of every.families in config.example.yaml, keyed
+// by their line number, with the marker of the commented-out block still on
+// them: a family's own line at four spaces, and a prose line above one.
+func familiesBlock(t *testing.T) map[int]string {
+	t.Helper()
+	out := map[int]string{}
+	inEvery, inFamilies := false, false
+	for i, line := range readLines(t, exampleConfig) {
+		switch {
+		case line == "every:":
+			inEvery = true
+			continue
+		case !inEvery:
+			continue
+		case line != "" && !strings.HasPrefix(line, " "):
+			return out // the next top-level key ends the block
+		}
+		indent, text, ok := uncomment(line)
+		if ok && indent == 2 {
+			inFamilies = text == "families:"
+		} else if inFamilies && ok && indent == 4 {
+			out[i+1] = line
+		}
+	}
+	return out
+}
+
+// reasonAbove reports whether the line before a family's own is a comment of
+// the block's, which is where the reason of the three families that ship off
+// is written, since it runs to several lines.
+func reasonAbove(t *testing.T, line int) bool {
+	t.Helper()
+	_, text, _ := uncomment(familiesBlock(t)[line-1])
+	return strings.HasPrefix(text, "#")
 }
 
 // TestTheExampleConfigPinsNoCadence: a reader copies the example, and a
