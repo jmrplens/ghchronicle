@@ -10,6 +10,12 @@ import "fmt"
 // security section reads its own snapshots with the same tail.
 const deliveryNewestRow = ") x WHERE rn = 1"
 
+// deliveryIdlestFirst orders the three tables whose second column is how long
+// something has sat untouched, a deploy key unused, an environment unchanged
+// or a branch without a commit, with the longest first: that is the one a
+// reader removes or asks about.
+const deliveryIdlestFirst = " ORDER BY 2 DESC"
+
 // What the columns of this section are called wherever they are read. The same
 // name has to reach the panel from all five stores, since the overrides, the
 // units and the sorts below match a column by it; the security section names
@@ -169,7 +175,7 @@ func accessConfiguration(b *builder) []Panel {
 		` read_only AS "Read only" FROM (` +
 		"SELECT *, ROW_NUMBER() OVER (PARTITION BY repo, key ORDER BY time DESC) AS rn" +
 		" FROM gh_deploy_key WHERE $__timeFilter(time) AND " + RF + deliveryNewestRow +
-		" ORDER BY 2 DESC"
+		deliveryIdlestFirst
 	rs, dk := "gh_ruleset", "gh_deploy_key"
 
 	rulesGR, rulesGRtf := gTbl(rowsOf(rp(rs, "days_since_change"), gn(rs, "repo"),
@@ -315,7 +321,7 @@ func accessConfiguration(b *builder) []Panel {
 				` repo AS "Repository", url AS "Link" FROM (` +
 				"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, environment" +
 				" ORDER BY time DESC) AS rn FROM gh_environment" + ciInRange + RF +
-				deliveryNewestRow + " ORDER BY 2 DESC",
+				deliveryNewestRow + deliveryIdlestFirst,
 		)}, &P{
 			Prom: []Target{promTbl(fmt.Sprintf(
 				"min by (repo, environment) (github_environment_days_since_change{%s})", PF,
@@ -382,7 +388,7 @@ func branchesAndProtections(b *builder) []Panel {
 		" FROM gh_branch WHERE $__timeFilter(time) AND " + RF + ") b" +
 		repoFlagsJoin("b.repo") +
 		" WHERE b.rn = 1 AND " + notAFork + " AND " + notArchived +
-		" ORDER BY 2 DESC"
+		deliveryIdlestFirst
 	protections := `SELECT repo AS "Repository", pattern AS "Pattern",` +
 		` required_reviews AS "Reviews",` +
 		` CAST(requires_commit_signatures AS INT) AS "Signatures",` +
