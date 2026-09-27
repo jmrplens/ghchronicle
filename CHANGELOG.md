@@ -25,15 +25,15 @@ started from nothing. Beyond that, a path setting took `~` and `${VAR}` as the
 characters they are, whether a discussion comment is the accepted answer was
 part of its row's identity although a maintainer decides it days later, the
 repository list could outlive its hour by a tick, the example configuration
-pinned every cadence of its release for whoever copied it, the card counted
-two owners' repositories of one name as one, several dashboard tables read the
-largest value of the range where they meant the newest, or the other way
-round, or counted an item once per row a store held of it, or one cell of a
-grid where they meant them all, some Elasticsearch panels read every
-repository whatever the picker held, ranked by a measure they did not name or
-failed outright, the Graphite charts were labelled with the function that
-consolidated them, and every one-shot run reported at Info, as news, how it
-always runs.
+pinned every cadence of its release for whoever copied it, the card and the
+dashboards' sums of each repository's newest reading counted two owners'
+repositories of one name as one, several dashboard tables read the largest
+value of the range where they meant the newest, or the other way round, or
+counted an item once per row a store held of it, or one cell of a grid where
+they meant them all, some Elasticsearch panels read every repository whatever
+the picker held, ranked by a measure they did not name or failed outright, the
+Graphite charts were labelled with the function that consolidated them, and
+every one-shot run reported at Info, as news, how it always runs.
 
 - **A Docker state volume belongs to the collector.** Up to 2.6.0 neither
   image had `/var/lib/ghchronicle`, where the example configuration keeps the
@@ -253,6 +253,42 @@ always runs.
   before Elasticsearch 6.0, which Elasticsearch 9.5.3 answers with "Cannot
   find aggregation named [_term]"; they worked only because Grafana 13.2.1
   rewrites it, and they now say `_key`.
+- **The newest-reading sums keep two owners' repositories apart, and "Open the
+  longest" lists the longest open.** "Open alerts", the artifact and cache bytes
+  of "Runs in range" and "Downloads" add up each repository's newest reading,
+  and InfluxDB, PostgreSQL and Elasticsearch took that reading per short name,
+  so `alice/dotfiles` and `acme/dotfiles` were one series and whichever was read
+  later stood for both. The exporter kept the five measurements behind them by
+  `repo` alone, so Prometheus held one series for the two before any query ran;
+  Graphite keeps the full name in every path and never merged them. The queries
+  now take each series by `full_name`, still narrowed to the picked
+  repositories, and the exporter keeps `owner` and `full_name` beside `repo` on
+  `gh_dependabot_alert`, `gh_code_scanning_alert`, `gh_artifact_total`,
+  `gh_actions_cache` and `gh_release`. "Alerts by severity", "Alerts by
+  ecosystem", "Open alerts over time" and the count of releases beside the
+  downloads read the same series, so their bars still add up to the tile; in
+  Elasticsearch that count is still of distinct tags, as its description says.
+  Measured through Grafana 13.2.1 with `alice/dotfiles` at 2 open Dependabot
+  alerts and `acme/dotfiles`, read an hour later, at 5, the Dependabot count
+  read 5 before and 7 now in InfluxDB 3.11.2 and PostgreSQL 18.6, and
+  Elasticsearch 9.5.3 answered one row of 5 before and a row for each
+  repository, 5 and 2, now, which the tile adds up; the exporter's reducer and
+  the Prometheus tile, evaluated over the same two, read 5 and 7. "Open the
+  longest" and "Open issues the longest" kept, in Elasticsearch, the twenty-five
+  pull requests or issues of each repository with the most documents, for up to
+  fifty repositories, where the SQL stores and Graphite list the twenty-five
+  open longest, so a repository with more open items than that showed whichever
+  had the most rows in the range. The repository and number buckets now keep
+  their values by the largest open time, which puts the twenty-five open longest
+  among the rows, and the table sorts them by it and keeps twenty-five. Measured
+  the same way, with thirty pull requests in one repository open one to thirty
+  days and the younger ones written more often, the query answered the
+  twenty-five youngest before and the twenty-five oldest now. In Prometheus,
+  where a row of "Open the longest" is a repository and its description now says
+  so, the comments beside the open time were not capped, so the table listed
+  every repository with an open pull request, those past the twenty-fifth with
+  an empty Open for; they now keep to the rows the open time ranks. Both faults
+  were reported in [#97](https://github.com/jmrplens/ghchronicle/issues/97).
 - **Graphite tables that add their points up are consolidated by sum.** A
   table sends no `maxDataPoints`, so Grafana asks for the panel's width and
   graphite-web averages neighbouring points to fit it before the table adds
@@ -375,9 +411,11 @@ document; an extreme of the range read by any panel without a listed reason; a
 `top_metrics` over a field the collectors do not always write; the punch cards
 in every store; the five Elasticsearch figures without the picker their SQL
 twins name; an Elasticsearch ranking by an id its query lacks; a consolidated
-Graphite target under the name `consolidateBy` gives it; and the card's totals
-over two owners' repositories of one name. Where such a test calls something
-the old code lacks, it was run there with that call stubbed. The binary
+Graphite target under the name `consolidateBy` gives it; the card's totals,
+the newest-reading sums in every store and the exporter's five gauges over two
+owners' repositories of one name; and the two open-longest tables in every
+store. Where such a test calls something the old code lacks, it was run there
+with that call stubbed. The binary
 against the fake GitHub holds that a one-shot run says its refill at
 Debug and never at Info, and that no comment carries `is_answer`. The
 containerised suite holds the two newest-reading tables against InfluxDB 3, as
@@ -418,6 +456,14 @@ Not verified, and worth saying plainly:
   Dockerfile, not yet on a runner.
 - The card's count by full name is held by the accumulator's test. No account
   with two owners' repositories of one name was drawn.
+- The newest-reading sums by full name were measured on the Dependabot count, in
+  the three stores above; the other figures follow from the same two helpers and
+  the same exporter rule, and are held by a test of their queries, which
+  evaluates the Prometheus and Graphite ones over the two repositories as each
+  store holds them. The Elasticsearch open-longest order was measured on one
+  repository's pull requests. The cut to twenty-five across repositories, and
+  the sum of the Elasticsearch tile's rows, are Grafana transformations and
+  reductions, which run in the browser and which no measurement here reached.
 - The path expansion was run on Linux. The `${LOCALAPPDATA}` paths of the
   Windows page and the cache recipe of the Actions page follow from it and
   were not run on Windows or on a runner.
