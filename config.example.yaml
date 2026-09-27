@@ -1,7 +1,9 @@
 # ghchronicle configuration.
 #
-# Copy to config.yaml and edit. Every ${VAR} is read from the environment at
-# start-up, so this file can be committed while the secrets stay out of it.
+# Copy to config.yaml and edit. A ${VAR} in a credential, an address or a file
+# path is read from the environment at start-up, so this file can be committed
+# while the secrets stay out of it, and a file path may start with ~ for the
+# home directory.
 #
 # This file is the inventory: every setting there is, with a comment. The prose
 # that explains them is at https://jmrp.io/docs/ghchronicle/configuration/
@@ -253,53 +255,60 @@ every:
   #   feeds: 10m
 
   # One number for one family, which is the layer that can say anything the
-  # other two cannot. These are the built-in values, so the whole block below
-  # is a reference you can prune rather than a setting you have to keep.
-  families:
-    traffic: 6h       # GitHub's window is 14 days and is rewritten whole each time
-    repo: 1h          # stars, forks, languages, topics, releases
-    stars: 1h         # list walked whole once, then the newest hundred by GraphQL; history's newest page, usually a 304
-    issues: 1h        # pull requests, issues and reviews, per item
-    commits: 1h       # lines changed and signature state, per commit
-    actions: 15m      # the only family with a per-minute rhythm
-    artifacts: 1h
-    activity: 15m     # the repository log, where a force push is recorded
-    analyses: 1h      # code scanning runs, which GitHub prunes
-    security: 1h
-    forks: 12h        # the whole list fits in one page
-    planning: 6h      # labels and milestones
-    stats: 12h        # GitHub recomputes these slowly anyway
-    discussions: 1h
-    account: 1h       # profile, contribution calendar, contribution totals
-    events: 15m       # the feed keeps only the last 300 events, none older than 30 days
-    notifs: 15m       # GitHub keeps inbox notifications for three months unless they are saved
-    billing: 1h
-    profile: 12h      # packages, gists, social accounts
-    outbound: 1h      # stars given, work in other people's repositories, answers accepted there
-    settings: 6h      # webhooks and their deliveries, rulesets, environments, keys
-    branches: 24h     # one row per live branch, and how old its tip is
-    inventory: 24h    # workflow token policy, secret ages, code scanning setup
-    deployments: 30m  # deployments and their outcome, dated when they were created
-    policyfiles: 24h  # SECURITY.md, CODEOWNERS, dependabot.yml, FUNDING.yml
-    rulesets: 24h     # every saved version of every ruleset, dated when it was saved
-    issueevents: 1h   # labelled, closed, reopened: the transitions a state does not keep
-    totals: 1h        # the lifetime counts, asked of GitHub rather than added up here
-    keys: 24h         # the account's SSH and GPG keys, and when they expire
-    achievements: 1h  # the profile's badges, read off the public profile page (no API lists them), and how far each is from its next tier
-    ratelimit: 15m    # the collector's own budget, in all fifteen buckets; costs nothing
-    # The tail of every failed job's log. Off by default: it is text rather than
-    # a measurement, it costs a request per failure, and it only makes sense with
-    # a log store attached. The InfluxDB sink excludes it by default.
-    joblogs: 0
-    # Every past year's contribution calendar, one GraphQL point per year, back
-    # to the day the account was created, plus the year so far as a snapshot
-    # marked partial. Off by default; the past years never change and the rows
-    # are idempotent, and a daily cadence is what keeps this year's row current.
-    history: 0
-    # The dependency graph: the licence histogram, and what entered and left
-    # between two commits. Off by default because the SBOM is 1.8 MB per
-    # repository and has its own budget of a hundred a minute.
-    deps: 0
+  # other two cannot. The lines below are the built-in values, each with why
+  # it is that number, and they are commented out so that copying this file
+  # sets none of them: a family nobody names follows the built-in table,
+  # including when a later release changes it. Uncomment a line to change that
+  # family. A configuration copied from an example older than 2.6.1 sets every
+  # one of them, and so keeps the values of the release it was copied from;
+  # deleting those lines is what picks up the current ones.
+  # families:
+  #   traffic: 6h       # GitHub's window is 14 days, rewritten whole, so a missed sweep repairs itself
+  #   repo: 1h          # stars, forks, languages, topics, releases: slow to move, and mostly a free 304
+  #   stars: 1h         # a star lands at any hour; after the one full walk a pass is the newest hundred
+  #   issues: 1h        # pull requests, issues and reviews, read only where one moved in two cadences
+  #   commits: 1h       # lines changed and signature state, read only where a push landed in two cadences
+  #   actions: 15m      # a run is over in minutes, and its queue time is worth watching while it happens
+  #   artifacts: 1h     # they appear with the run that made them and expire on a scale of days
+  #   activity: 15m     # the repository log holds a hundred entries, a day on the busiest repository measured
+  #   analyses: 1h      # code scanning runs, which GitHub prunes and every scanned push adds to
+  #   security: 1h      # an open alert is something to act on today, and the list is short
+  #   forks: 12h        # the whole list fits in one page, and a fork is a rare event
+  #   planning: 6h      # labels and milestones, edited by hand a few times a week at most
+  #   stats: 12h        # GitHub recomputes these slowly, so asking more often returns the same numbers
+  #   discussions: 1h   # answered over hours or days, and nothing is asked of a repository without a forum
+  #   account: 1h       # the contribution calendar and the profile's counts move with every contribution
+  #   events: 15m       # one request a pass; the feed keeps the last 300 events, none older than 30 days
+  #   notifs: 15m       # one request a pass, and a thread shows only its latest move
+  #   billing: 1h       # the month in progress moves while continuous integration runs
+  #   profile: 12h      # packages, gists, social accounts, all of them edited by hand
+  #   outbound: 1h      # stars given, work in other people's repositories, answers accepted there
+  #   settings: 6h      # webhooks and their deliveries, rulesets, environments, keys: changed by hand
+  #   branches: 24h     # one row per live branch, and which are stale is a daily question
+  #   inventory: 24h    # workflow token policy, secret ages, code scanning setup: changed by hand
+  #   deployments: 30m  # deployments and their outcome, one GraphQL point per five repositories
+  #   policyfiles: 24h  # SECURITY.md, CODEOWNERS, dependabot.yml, FUNDING.yml move about once a quarter
+  #   rulesets: 24h     # every saved version of every ruleset, edited a few times a year
+  #   issueevents: 1h   # labelled, closed, reopened, read only where an issue or a pull request moved
+  #   totals: 1h        # the lifetime counts, asked of GitHub, which move with every star, merge and push
+  #   keys: 24h         # the account's SSH and GPG keys, where what matters is the expiry date
+  #   achievements: 1h  # the profile's badges, which no API lists, and how far each is from its next tier
+  #   ratelimit: 15m    # the collector's own budget, in all fifteen buckets; costs nothing
+  #   # The tail of every failed job's log. Off by default: it is text rather
+  #   # than a measurement, it costs a request per failure, and it only makes
+  #   # sense with a log store attached. The InfluxDB sink excludes it by
+  #   # default.
+  #   joblogs: 0
+  #   # Every past year's contribution calendar, one GraphQL point per year,
+  #   # back to the day the account was created, plus the year so far as a
+  #   # snapshot marked partial. Off by default; the past years never change
+  #   # and the rows are idempotent, and a daily cadence is what keeps this
+  #   # year's row current.
+  #   history: 0
+  #   # The dependency graph: the licence histogram, and what entered and left
+  #   # between two commits. Off by default because the SBOM is 1.8 MB per
+  #   # repository and has its own budget of a hundred a minute.
+  #   deps: 0
 
 # How often the sweep loop wakes to ask which families are due. This is the
 # loop's heartbeat and not a cadence: it gives no family an interval and is

@@ -140,13 +140,17 @@ func checkCadences(t *testing.T, path string, documented map[string]string) {
 // block a reader copies, comments and all, not a decoded value.
 //
 // Only families, because that is the layer that carries one row per family.
-// default and groups are shown commented out, and a reader who uncomments one
-// has not changed the reference this pins.
+// The block is commented out on purpose, like default and groups above it, so
+// each line is read with its comment marker taken off. A line left
+// uncommented fails here: it would set that family's cadence in every file
+// copied from the example, and keep setting it after a release changed the
+// built-in value, which is what the example did until 2.6.1. So does a line
+// with no reason beside it or above it.
 func exampleEvery(t *testing.T) map[string]string {
 	t.Helper()
 	out := map[string]string{}
-	inEvery, inFamilies := false, false
-	for _, line := range readLines(t, exampleConfig) {
+	inEvery, inFamilies, explained := false, false, false
+	for i, line := range readLines(t, exampleConfig) {
 		if line == "every:" {
 			inEvery = true
 			continue
@@ -157,19 +161,33 @@ func exampleEvery(t *testing.T) map[string]string {
 		if line != "" && !strings.HasPrefix(line, " ") {
 			break // the next top-level key ends the block
 		}
-		if line == "  families:" {
-			inFamilies = true
+		indent, text, ok := uncomment(line)
+		if ok && indent == 2 {
+			inFamilies = text == "families:"
 			continue
 		}
-		if !inFamilies || (line != "" && !strings.HasPrefix(line, "    ")) {
+		if !inFamilies || !ok || indent != 4 {
 			continue
 		}
-		name, value, ok := strings.Cut(strings.TrimSpace(line), ": ")
-		if !ok || strings.HasPrefix(name, "#") {
+		if strings.HasPrefix(text, "#") {
+			explained = true // a reason written above the line it is for
 			continue
 		}
-		if value, _, _ = strings.Cut(value, "#"); value != "" {
-			out[name] = strings.TrimSpace(value)
+		name, value, found := strings.Cut(text, ": ")
+		if !found {
+			continue
+		}
+		if !strings.HasPrefix(strings.TrimLeft(line, " "), "#") {
+			t.Errorf("%s:%d sets every.families.%s rather than showing it: a file copied from the example "+
+				"would keep that cadence after a release changed the built-in one", exampleConfig, i+1, name)
+		}
+		value, why, _ := strings.Cut(value, "#")
+		if strings.TrimSpace(why) == "" && !explained {
+			t.Errorf("%s:%d shows every.families.%s with no reason for its value", exampleConfig, i+1, name)
+		}
+		explained = false
+		if value = strings.TrimSpace(value); value != "" {
+			out[name] = value
 		}
 	}
 	if len(out) == 0 {
@@ -178,6 +196,23 @@ func exampleEvery(t *testing.T) map[string]string {
 		t.Fatalf("%s: no every.families block found, so this test proves nothing", exampleConfig)
 	}
 	return out
+}
+
+// TestTheExampleConfigPinsNoCadence: a reader copies the example, and a
+// family's cadence in that copy has to be whatever the binary running it
+// ships with. Until 2.6.1 the example set all thirty-four, so a configuration
+// copied from 2.5.x ran account at the twelve hours it had then and never
+// the hour 2.6.0 gave it.
+func TestTheExampleConfigPinsNoCadence(t *testing.T) {
+	t.Setenv("GITHUB_TOKEN", "x")
+	c, err := Load(exampleConfig)
+	if err != nil {
+		t.Fatalf("%s does not load: %v", exampleConfig, err)
+	}
+	if c.Every.Default != "" || len(c.Every.Groups) != 0 || len(c.Every.Families) != 0 {
+		t.Errorf("%s sets cadences (default %q, groups %v, families %v); a copy of it would keep them after a release changed the built-in ones",
+			exampleConfig, c.Every.Default, c.Every.Groups, c.Every.Families)
+	}
 }
 
 // TestTheExampleConfigLoads is the check no amount of table pinning gives: the
@@ -189,8 +224,8 @@ func TestTheExampleConfigLoads(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%s does not load: %v", exampleConfig, err)
 	}
-	// It documents the built-in values, so it must ask for nothing the audit
-	// did not already choose and must earn no warning at all.
+	// It shows the built-in values without setting them, so it must ask for
+	// nothing the audit did not already choose and must earn no warning.
 	if got := c.Warnings(); len(got) != 0 {
 		t.Errorf("%s starts with warnings, which the reference configuration should never do: %v", exampleConfig, got)
 	}
