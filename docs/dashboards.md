@@ -388,8 +388,10 @@ every hour, and an archived one's is its `gh_repo_total`. A repository the
 default filter sets aside for being archived gets no `gh_repo` row from a sweep,
 so the picker stops offering it once the last backfill is behind it, but people
 still star and fork it and every `totals` sweep reads its counts again. With
-All selected the sums include it, and a range shorter than the `totals`
-cadence, an hour by default, can leave its row out. An archived repository the
+All selected the sums include it. The four stores that sum over the dashboard
+range can leave its row out of a range shorter than the `totals` cadence, an
+hour by default; Prometheus takes no range here, each sum being an instant
+query over what the running collector pushed last. An archived repository the
 configuration no longer collects is left out, as the picker leaves out a live
 one: a row a backfill wrote under an earlier configuration stays in the store,
 and on the account this was checked against one such archived fork added 8
@@ -462,15 +464,26 @@ one out. With All selected it lists the archived repositories the default
 filter sets aside as well, with their current counts, whether or not the picker
 offers them: a sweep writes them no `gh_repo` row, which is what the picker
 lists, but the same row of each is read again on every `totals` sweep. One the
-configuration no longer collects is left out, as on the Overview. Each row is
-the repository's newest in the range, one per full name, and not the largest
-value each column reached in it: stars, branches, tags, releases and open
-issues go down, and a table of peaks gave a repository 4 stars from a
-backfill's row nine days old where GitHub and its newest row said 3. A
-repository archived inside the range has rows from before the archive and
-after it, and is still one row in every store, flagged archived.
+configuration no longer collects is left out, as on the Overview, and
+Elasticsearch and Graphite apply the Overview's seven-day rule here too: a range
+that ended more than a week ago leaves out the archived repositories the
+default filter sets aside. Each row is the repository's newest in the range,
+one per full name, and not the largest value each column reached in it: stars,
+branches, tags, releases and open issues go down, and a table of peaks gave a
+repository 4 stars from a backfill's row nine days old where GitHub and its
+newest row said 3. A repository archived inside the range has rows from before
+the archive and after it, and is still one row in every store. Four of them
+flag it archived; Graphite keeps the commits alone, with no fork or archived
+column. Elasticsearch keeps an archived row only from the last seven days, so a
+repository archived inside a range that ended more than a week ago is listed
+there from its rows before the archive, as not archived.
 
-Reads `gh_account_total` and `gh_repo_total`.
+Under the table, the repositories created and the repositories archived, each
+dated when it happened rather than when a sweep noticed it, and the workflow
+runs each repository has ever had, from the run listing's own total.
+
+Reads `gh_account_total`, `gh_repo_total`, `gh_repo_created`,
+`gh_repo_archived` and `gh_workflow_run_total`.
 
 ### Audience
 
@@ -523,9 +536,11 @@ count of every repository; in Graphite and Elasticsearch the curve is the
 repositories' star count as each sweep read it, and starts the day the collector
 did.
 
-Forks over time is a running count as well, from `gh_fork`, each fork dated when
-it was made, so it too reaches back past the day the collector started rather
-than beginning at the first snapshot. Both curves are drawn to both edges of the
+Forks over time is a running count as well in InfluxDB and PostgreSQL, from
+`gh_fork`, each fork dated when it was made, so it too reaches back past the day
+the collector started rather than beginning at the first snapshot. The other
+three draw the fork count each sweep read, from the day the collector or the
+exporter started. Both curves are drawn to both edges of the
 range: a running count over dated rows has a point only where a row is, so a
 fork curve over a quiet month was a line from the first fork to the last and
 blank on either side, which reads as collection having stopped. Each end carries
@@ -533,7 +548,7 @@ a bucket of zero, so the line holds its value to the end of the range.
 
 ![The Stars and forks section over a range from mid-June to mid-September: Stars gained over time as daily bars stacked by repository for cli, docs-site, edge-cache, parser and telemetry, the busiest days at four; Stars over time as one line climbing slowly to 350, its legend reading a mean of 309 and a max of 350; Stars by repository as horizontal bars, telemetry 148, cli 89, parser 62, edge-cache 37 and docs-site 14; Recent stars as a table of user, moment and repository, the newest given on 12 September; and Forks over time climbing slowly to 51, with a mean of 47](../site/src/assets/dashboards/stars-and-forks.png)
 
-Reads `gh_star_day`, `gh_star` and `gh_repo`.
+Reads `gh_star_day`, `gh_star`, `gh_fork` and `gh_repo`.
 
 ### Contributions
 
@@ -575,8 +590,9 @@ what the panels are read for is the shape.
 
 ![The Contributions section: contributions per day, the contribution calendar drawn as GitHub's own grid for the last year with its Mon, Wed and Fri labels, the contribution mix at 70.1 percent commits, commits per week with own commits overlaid, the totals table, the hour of day histogram peaking in the afternoon, the weekday bars, commits by repository, the five year table, commits per day by repository, and the bar chart splitting the commits the profile hides into yours and other people's, public and private](../site/src/assets/dashboards/contributions.png)
 
-Reads `gh_contribution_day`, `gh_commits_week`, `gh_contributions_total`,
-`gh_commit_punchcard`, `gh_contribution_repo` and `gh_contribution_year`.
+Reads `gh_contribution_day`, `gh_contribution_day_repo`, `gh_commits_week`,
+`gh_contributions_total`, `gh_commit_punchcard`, `gh_contribution_repo` and
+`gh_contribution_year`.
 
 ### Pull requests and issues
 
@@ -621,7 +637,8 @@ each item from its newest row.
 > pull request is still one that can be merged. Prometheus, Graphite and
 > Elasticsearch have no join, so there the rows stay and each panel says so.
 
-Reads `gh_pull_request`, `gh_pull_request_review` and `gh_issue`.
+Reads `gh_pull_request`, `gh_pull_request_review`, `gh_review_thread`,
+`gh_issue` and, for the archived and fork flags, `gh_repo`.
 
 ### Continuous integration
 
@@ -649,15 +666,20 @@ that only the two SQL stores can answer.
 
 "Artifact storage counted" exists because the total is a floor. GitHub reports how many artifacts a repository has, the collector
 records how many it actually walked, and when the second is smaller the live
-size is short: on one repository here, by a factor of fifty six. It carries a
-third count, the live artifacts among the ones walked, because GitHub's own
-total includes the ones it has already expired and the size does not. The tile
-at the top of the section is named for what it is over, and every panel that
-shows the size either shows those counts or says in its description that it is
-a floor.
+size is short: on one repository here, by a factor of fifty six. A sweep's walk
+stops at five pages, five hundred artifacts, and any walk stops sooner when a
+page of the listing fails, the pass keeping what it had read, so either can
+leave it short. It carries a third count, the live artifacts among the ones
+walked, because GitHub's own total includes the ones it has already expired and
+the size does not. The counts come from each repository's newest row, the one
+the tile reads, so a fuller walk earlier in the range cannot hide a short one. The
+tile at the top of the section is named for what it is over, and every panel
+that shows the size either shows those counts or says in its description that
+it is a floor.
 
 Reads `gh_workflow_run`, `gh_workflow_job`, `gh_workflow_step`, `gh_workflow`,
-`gh_artifact`, `gh_artifact_total` and `gh_actions_cache`.
+`gh_artifact`, `gh_artifact_total`, `gh_actions_cache` and, for the archived
+and fork flags, `gh_repo`.
 
 ### Code
 
@@ -730,6 +752,9 @@ Reads `gh_label`, `gh_milestone`, `gh_fork`, `gh_discussion`, `gh_issue_event`,
 
 The webhook failure rate, deliveries by status code, the endpoints ranked by
 failures, the rulesets and the deploy keys with how long each has gone unused.
+Under those, the configured webhooks, the environments, the stale branches, the
+branch protection rules, each ruleset's rules with who may bypass them, when
+each ruleset was changed, and the deployments over time and by environment.
 
 ![The Delivery and access section: a 20.1 percent webhook failure rate gauge, deliveries per hour by status code, the endpoint table showing legacy.example.net failing most of its deliveries, the rulesets table, the deploy keys table, the text panel about failed job output, the configured webhooks, the environments and stale branches tables, branch protection rules per repository, ruleset rules with their bypasses, ruleset changes, deployments per day by environment, and the deployments by environment table](../site/src/assets/dashboards/delivery-and-access.png)
 
@@ -756,8 +781,10 @@ exactly the interesting row. "Environments" asks the deploy key question about
 deployment targets: one environment here had not been touched in one thousand
 one hundred and seventy seven days.
 
-Reads `gh_webhook_delivery`, `gh_webhook`, `gh_ruleset`, `gh_deploy_key` and
-`gh_environment`.
+Reads `gh_webhook_delivery`, `gh_webhook`, `gh_ruleset`, `gh_ruleset_rule`,
+`gh_ruleset_version`, `gh_deploy_key`, `gh_environment`, `gh_branch`,
+`gh_branch_protection`, `gh_deployment` and, for the archived and fork flags
+of the stale branches, `gh_repo`.
 
 ### Releases
 
@@ -780,7 +807,9 @@ Reads `gh_release` and `gh_release_asset`.
 
 Open Dependabot and code scanning alerts, the breakdowns by severity and by
 ecosystem, open alerts over time, the feature table, and the time taken to
-resolve an alert by severity.
+resolve an alert by severity. Under those, the oldest open alerts, the security
+settings, the default code scanning setup, the workflow token permissions and
+the secrets with when each was last rotated.
 
 ![The Security section: the open alerts tile reading 25 from Dependabot and 29 from code scanning, alerts by severity and by ecosystem, open alerts per severity over time, the security feature table with on and off per repository, code scanning runs per day by tool, the time to resolve table with each advisory and its CVSS, the resolved scanning alerts, scan results by tool, the oldest open alerts, the security settings and default code scanning setup tables, workflow token permissions, and the secret rotation table](../site/src/assets/dashboards/security.png)
 
@@ -789,20 +818,38 @@ off". Without `gh_security_feature`, a repository with Dependabot disabled
 looks exactly like one with nothing to fix.
 
 The alert counts are current state, rewritten on every sweep, so every panel
-here takes the newest row of each series and adds those up rather than summing
-the range. Summing the range counts each alert once per sweep: before this was
-fixed the tile read 3.61 thousand where the account had a few dozen.
+that counts open alerts takes the newest row of each series and adds those up
+rather than summing the range. Summing the range counts each alert once per
+sweep: before this was fixed the tile read 3.61 thousand where the account had a
+few dozen. The feature table and the four tables at the foot of the section,
+the settings, the code scanning setup, the token permissions and the secrets,
+are current state too, and read each repository's newest row, so a feature
+switched off or an alert fixed inside the range reads as it stands and not as it
+was at its highest. Elasticsearch is the exception in four places,
+each saying so in its description: its curve of open alerts takes the largest
+series of each severity in a bucket rather than adding them, and its security
+settings, code scanning setup and token permissions take the largest reading of
+the range.
 
-The last two panels are new information rather than a different view. Time to
+Two panels are new information rather than a different view. Time to
 resolve a code scanning alert comes from dates that were being downloaded and
 thrown away, so until now only the open count existed; of thirty four alerts on
 one repository, thirty were fixed and three dismissed, and all thirty three
 were invisible. Scan results by tool says what a scan found rather than that it
 ran, which is what explains a jump in the alert count.
 
+"Oldest open alerts" lists the alert rows that say open, which are not always
+the rows those counts are made of. A sweep writes a row for each of the newest
+hundred alerts of a repository, and a repository with more has its counts taken
+from a read of the open ones alone. So an open alert behind a hundred newer
+ones, raised before the collector started, is counted and not listed, and an
+alert fixed while it sat behind the newest hundred stays listed as open, until a
+backfill reads the whole list.
+
 Reads `gh_dependabot_alert`, `gh_dependabot_alert_item`,
 `gh_code_scanning_alert`, `gh_code_scanning_alert_item`,
-`gh_code_scanning_analysis` and `gh_security_feature`.
+`gh_code_scanning_analysis`, `gh_security_feature`, `gh_security_setting`,
+`gh_code_scanning_setup`, `gh_actions_policy` and `gh_secret`.
 
 ### Cost
 
@@ -877,7 +924,18 @@ account contributed to: each one's star count at the newest sweep inside the
 range, from `gh_upstream_repo`, joined onto every item in the InfluxDB and
 PostgreSQL dashboards and beside every repository in the Prometheus one.
 Graphite and Elasticsearch cannot join two measurements in one panel and leave
-the column out, saying so.
+the column out, saying so. The `outbound` family writes that measurement since
+2.6.0, so a range with no row of it, which is every range before the upgrade,
+has an empty Stars column. Until the first `outbound` pass of 2.6.0 writes it,
+InfluxDB and PostgreSQL have no table to join and refuse the whole panel rather
+than leave the column empty, which
+[the troubleshooting page](https://jmrp.io/docs/ghchronicle/reference/troubleshooting/#the-data-looks-wrong)
+covers. InfluxDB, PostgreSQL and Elasticsearch list each item once, from its
+newest row in the range, and Elasticsearch has no Opened column, since that
+date is the row's own less how long the item was open, a subtraction a bucket
+cannot make. Prometheus has a row per repository, and Graphite one per item and
+state, since the state is part of the path: an item seen open and then closed
+inside the range is two rows there.
 
 Reads `gh_event`, `gh_notification`, `gh_external_contribution`,
 `gh_upstream_repo` and `gh_star_given`.
@@ -886,7 +944,10 @@ Reads `gh_event`, `gh_notification`, `gh_external_contribution`,
 
 Code by language, the community profile score per repository, the repository
 table, the topics, the packages, the gists, and the container tags with the
-moment each was published.
+moment each was published. Under those, the repository settings, the account
+keys, the social accounts, the configuration changes, the policy files, the
+Dependabot ecosystems, and the dependencies by licence, by ecosystem and as
+they changed.
 
 ![The Inventory section: code by language, the community profile table, the repository table with stars, forks, size, age and licence, the topics, packages and gists tables, the container tags published, the repository settings and account keys tables, dependencies by licence, the social accounts, configuration changes, policy files and Dependabot ecosystems tables, and dependencies by ecosystem and dependency changes](../site/src/assets/dashboards/inventory.png)
 
@@ -919,7 +980,8 @@ new repository, because GitHub publishes no rename history at all.
 
 Reads `gh_repo`, `gh_repo_language`, `gh_repo_community`, `gh_repo_topic`,
 `gh_repo_policy`, `gh_package`, `gh_package_version`, `gh_gist`, `gh_key`,
-`gh_social_account` and `gh_dependency_license`.
+`gh_social_account`, `gh_policy_file`, `gh_dependabot_ecosystem`,
+`gh_dependency`, `gh_dependency_license` and `gh_dependency_change`.
 
 ### Profile and sponsorship
 
@@ -955,7 +1017,13 @@ dashboard does not reach that panel: a pin can be a gist, which is named by its
 hash and is in no repository the filter knows.
 
 The achievements are read every hour from the public profile page, because no
-API lists them. Next tier at is the community-observed threshold
+API lists them. The count behind Pair Extraordinaire, merged pull requests in
+public repositories with a co-authored commit, is a tally the state file keeps:
+each hourly pass adds the pull requests merged since the last day it covers,
+and the whole history is walked again once a week, which is when a count that
+went down, a repository made private or deleted, comes down in the table.
+Without a state file every start walks it whole. Next tier at is the
+community-observed threshold
 (Schweinepriester/github-profile-achievements) rather than a number GitHub
 publishes, so the last column says whether the profile page agrees with the
 tier the count implies; a row that disagrees is a rule the page contradicts,
@@ -979,7 +1047,10 @@ The chart shows only the buckets with more than thirty requests in them,
 because search has thirty a minute and would flatten the axis. Reading all of
 this costs nothing: `GET /rate_limit` is the one endpoint GitHub does not
 charge for. Without it, a family skipped because a bucket was spent looks
-exactly like a family with nothing to report.
+exactly like a family with nothing to report. Most used and Lowest remaining
+in the table are the extremes of the range, the most any reading spent and the
+least any had left, so a bucket spent an hour ago still says so after it has
+refilled; Graphite keeps the lowest remaining alone.
 
 "Every family" and "What failed, and where" are the two panels below them, and
 the capture above predates both. The first lists every collector that ran in
@@ -1053,8 +1124,17 @@ pretend.
   fields of one row keeps the column it is sorted by and says which it dropped,
   and a boolean is not a metric there at all.
 - **Elasticsearch** keeps the dated documents, so a per-item table is the
-  newest documents themselves and everything else is a bucket aggregation, on
-  the `.keyword` sub-field of each tag.
+  newest documents themselves, or the newest document of each item where an
+  item has several, and everything else is a bucket aggregation, on the
+  `.keyword` sub-field of each tag.
+
+Graphite and Elasticsearch share two limits the SQL stores do not have. Neither
+can join two measurements in one panel, so Work elsewhere has no Stars column
+there and the community profile keeps the API's issue template flag rather
+than the count of templates. And neither can ask about one window while reading
+another, so the archived repositories the default filter sets aside count on
+the Overview and in Every repository, ever from their rows of the last seven
+days, and a range that ended more than a week ago leaves them out.
 
 Each panel whose twin in another store is richer says so in one sentence of its
 description.

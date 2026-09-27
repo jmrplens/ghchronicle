@@ -57,9 +57,11 @@ archivado es su `gh_repo_total`. Un repositorio que el filtro por omisión apart
 por estar archivado no recibe fila de `gh_repo` de ninguna pasada, así que el
 selector deja de ofrecerlo cuando el último relleno histórico queda atrás, pero
 la gente sigue dándole estrellas y haciéndole fork y cada pasada de `totals`
-vuelve a leer sus contadores. Con All seleccionado las sumas lo incluyen, y un
-rango más corto que la cadencia de `totals`, una hora por omisión, puede
-dejar fuera su fila. Un repositorio archivado que la configuración ya no recoge
+vuelve a leer sus contadores. Con All seleccionado las sumas lo incluyen. Los
+cuatro almacenes que suman sobre el rango del dashboard pueden dejar fuera su
+fila en un rango más corto que la cadencia de `totals`, una hora por omisión;
+Prometheus no toma rango aquí, porque cada suma es una consulta instantánea
+sobre lo último que empujó el recolector en marcha. Un repositorio archivado que la configuración ya no recoge
 se queda fuera, como el selector deja fuera a uno vivo: la fila que escribió un
 relleno histórico con una configuración anterior sigue en el almacén, y en la
 cuenta con la que se comprobó esto un fork archivado así sumaba 8 estrellas y 3
@@ -135,16 +137,29 @@ repositorios archivados que el filtro por omisión aparta, con sus contadores
 actuales, los ofrezca o no el selector: ninguna pasada les escribe fila de
 `gh_repo`, que es lo que lista el selector, pero la misma fila de cada uno se
 vuelve a leer en cada pasada de `totals`. Uno que la configuración ya no recoge
-se queda fuera, como en el Overview. Cada fila es la más reciente del
-repositorio dentro del rango, una por nombre completo, y no el valor más alto
-que alcanzó cada columna en él: estrellas, ramas, etiquetas, releases e issues
-abiertos bajan, y una tabla de máximos daba a un repositorio 4 estrellas por la
-fila de un relleno histórico de hacía nueve días donde GitHub y su fila más
-reciente decían 3. Un repositorio archivado dentro del
-rango tiene filas de antes del archivado y de después, y sigue siendo una fila
-en todos los almacenes, marcada como archivada.
+se queda fuera, como en el Overview, y Elasticsearch y Graphite aplican aquí
+también la regla de los siete días del Overview: un rango que terminó hace más
+de una semana deja fuera los repositorios archivados que el filtro por omisión
+aparta. Cada fila es la más reciente del repositorio dentro del rango, una por
+nombre completo, y no el valor más alto que alcanzó cada columna en él:
+estrellas, ramas, etiquetas, releases e issues abiertos bajan, y una tabla de
+máximos daba a un repositorio 4 estrellas por la fila de un relleno histórico
+de hacía nueve días donde GitHub y su fila más reciente decían 3. Un
+repositorio archivado dentro del rango tiene filas de antes del archivado y de
+después, y sigue siendo una fila en todos los almacenes. Cuatro de ellos lo
+marcan como archivado; Graphite guarda solo los commits, sin columna de fork
+ni de archivado. Elasticsearch solo toma una fila archivada si es de los
+últimos siete días, así que un repositorio archivado dentro de un rango que terminó
+hace más de una semana aparece allí por sus filas de antes del archivado, como
+no archivado.
 
-Lee `gh_account_total` y `gh_repo_total`.
+Debajo de la tabla, los repositorios creados y los archivados, cada uno con la
+fecha en que ocurrió y no la de la pasada que lo vio, y las ejecuciones de
+workflow que ha tenido cada repositorio, del total del propio listado de
+ejecuciones.
+
+Lee `gh_account_total`, `gh_repo_total`, `gh_repo_created`,
+`gh_repo_archived` y `gh_workflow_run_total`.
 
 ## Audience
 
@@ -199,9 +214,11 @@ time es el número actual de cada repositorio; en Graphite y Elasticsearch la
 curva es el número de estrellas de los repositorios tal como lo leyó cada
 pasada, y empieza el día en que arrancó el colector.
 
-Los forks en el tiempo son también un recuento acumulado, desde `gh_fork`, cada
-fork con la fecha en que se hizo, así que también se remontan más allá del día
-en que arrancó el colector en vez de empezar en la primera instantánea. Las dos
+Los forks en el tiempo son también un recuento acumulado en InfluxDB y
+PostgreSQL, desde `gh_fork`, cada fork con la fecha en que se hizo, así que
+también se remontan más allá del día en que arrancó el colector en vez de
+empezar en la primera instantánea. Los otros tres dibujan el número de forks
+que leyó cada pasada, desde el día en que arrancó el colector o el exportador. Las dos
 curvas se dibujan hasta los dos bordes del rango: un recuento acumulado sobre
 filas fechadas solo tiene punto donde hay fila, así que una curva de forks sobre
 un mes tranquilo era una línea del primer fork al último y nada a los lados, lo
@@ -210,7 +227,7 @@ así que la línea mantiene su valor hasta el final del rango.
 
 ![La sección Stars and forks en un rango de mediados de junio a mediados de septiembre: Stars gained over time como barras diarias apiladas por repositorio para cli, docs-site, edge-cache, parser y telemetry, con los días de más estrellas en cuatro; Stars over time como una sola línea que sube despacio hasta 350, con una leyenda que marca una media de 309 y un máximo de 350; Stars by repository como barras horizontales, telemetry 148, cli 89, parser 62, edge-cache 37 y docs-site 14; Recent stars como una tabla de usuario, momento y repositorio, la más reciente dada el 12 de septiembre; y Forks over time subiendo despacio hasta 51, con una media de 47](../../../../assets/dashboards/stars-and-forks.png)
 
-Lee `gh_star_day`, `gh_star` y `gh_repo`.
+Lee `gh_star_day`, `gh_star`, `gh_fork` y `gh_repo`.
 
 ## Contributions
 
@@ -257,8 +274,9 @@ que se lee en esos paneles es la forma.
 
 ![La sección Contributions: contribuciones por día, el calendario de contribuciones dibujado como la propia rejilla de GitHub para el último año con sus etiquetas Mon, Wed y Fri, la mezcla de contribuciones con un 70,1 por ciento de commits, commits por semana con los propios superpuestos, la tabla de totales, el histograma por hora con el pico en la tarde, las barras por día de la semana, commits por repositorio, la tabla de cinco años, commits por día y repositorio, y el gráfico que separa los commits que el perfil esconde en propios y ajenos, públicos y privados](../../../../assets/dashboards/contributions.png)
 
-Lee `gh_contribution_day`, `gh_commits_week`, `gh_contributions_total`,
-`gh_commit_punchcard`, `gh_contribution_repo` y `gh_contribution_year`.
+Lee `gh_contribution_day`, `gh_contribution_day_repo`, `gh_commits_week`,
+`gh_contributions_total`, `gh_commit_punchcard`, `gh_contribution_repo` y
+`gh_contribution_year`.
 
 ## Pull requests and issues
 
@@ -306,7 +324,8 @@ de su fila más reciente.
   lo dice.
 </Aside>
 
-Lee `gh_pull_request`, `gh_pull_request_review` y `gh_issue`.
+Lee `gh_pull_request`, `gh_pull_request_review`, `gh_review_thread`,
+`gh_issue` y, para las marcas de archivado y de fork, `gh_repo`.
 
 ## Continuous integration
 
@@ -335,14 +354,21 @@ aquí que solo pueden responder los dos almacenes SQL.
 
 "Artifact storage counted" existe porque el total es un suelo. GitHub dice cuántos artefactos tiene un repositorio, el colector anota
 cuántos recorrió de verdad, y cuando el segundo es menor el tamaño vivo se queda
-corto: en un repositorio de aquí, por un factor de cincuenta y seis. Lleva una
-tercera cuenta, los artefactos vivos entre los recorridos, porque el total del
-propio GitHub incluye los que ya ha caducado y el tamaño no. La tarjeta del
-principio de la sección se llama por aquello sobre lo que está, y todo panel que
-enseña el tamaño enseña esas cuentas o dice en su descripción que es un suelo.
+corto: en un repositorio de aquí, por un factor de cincuenta y seis. El
+recorrido de una pasada se para en cinco páginas, quinientos artefactos, y
+cualquier recorrido se para antes cuando falla una página del listado y la
+pasada se queda con lo que había leído, así que cualquiera de las dos cosas
+puede dejarlo corto. Lleva una tercera cuenta, los artefactos vivos entre los
+recorridos, porque el total del propio GitHub incluye los que ya ha caducado y
+el tamaño no. Las cuentas salen de la fila más reciente de cada repositorio, la
+misma que lee la tarjeta, así que un recorrido más completo antes dentro del
+rango no puede tapar uno corto. La tarjeta del principio de la sección se llama
+por aquello sobre lo que está, y todo panel que enseña el tamaño enseña esas
+cuentas o dice en su descripción que es un suelo.
 
 Lee `gh_workflow_run`, `gh_workflow_job`, `gh_workflow_step`, `gh_workflow`,
-`gh_artifact`, `gh_artifact_total` y `gh_actions_cache`.
+`gh_artifact`, `gh_artifact_total`, `gh_actions_cache` y, para las marcas de
+archivado y de fork, `gh_repo`.
 
 ## Code
 
@@ -415,7 +441,10 @@ Lee `gh_label`, `gh_milestone`, `gh_fork`, `gh_discussion`, `gh_issue_event`,
 
 La tasa de fallo de los webhooks, las entregas por código de estado, los
 endpoints ordenados por fallos, los rulesets y las claves de despliegue con
-cuánto tiempo llevan sin usarse.
+cuánto tiempo llevan sin usarse. Debajo, los webhooks configurados, los
+entornos, las ramas estancadas, las reglas de protección de rama, las reglas de
+cada ruleset con quién puede saltárselas, cuándo cambió cada ruleset, y los
+despliegues en el tiempo y por entorno.
 
 ![La sección Delivery and access: un medidor con 20,1 por ciento de fallo de webhooks, entregas por hora según el código de estado, la tabla de endpoints con legacy.example.net fallando la mayoría de sus entregas, la tabla de rulesets, la de claves de despliegue, el panel de texto sobre la salida de los jobs fallidos, los webhooks configurados, las tablas de entornos y de ramas estancadas, las reglas de protección de rama por repositorio, las reglas de ruleset con sus excepciones, los cambios de ruleset, los despliegues por día y entorno, y la tabla de despliegues por entorno](../../../../assets/dashboards/delivery-and-access.png)
 
@@ -444,8 +473,10 @@ fila interesante. "Environments" le hace la pregunta de las claves de despliegue
 a los destinos de despliegue: un entorno de aquí llevaba mil ciento setenta y
 siete días sin tocarse.
 
-Lee `gh_webhook_delivery`, `gh_webhook`, `gh_ruleset`, `gh_deploy_key` y
-`gh_environment`.
+Lee `gh_webhook_delivery`, `gh_webhook`, `gh_ruleset`, `gh_ruleset_rule`,
+`gh_ruleset_version`, `gh_deploy_key`, `gh_environment`, `gh_branch`,
+`gh_branch_protection`, `gh_deployment` y, para las marcas de archivado y de
+fork de las ramas estancadas, `gh_repo`.
 
 ## Releases
 
@@ -468,7 +499,10 @@ Lee `gh_release` y `gh_release_asset`.
 
 Alertas abiertas de Dependabot y de code scanning, los desgloses por severidad y
 por ecosistema, las alertas abiertas en el tiempo, la tabla de funciones y el
-tiempo que se tarda en resolver una alerta según su severidad.
+tiempo que se tarda en resolver una alerta según su severidad. Debajo, las
+alertas abiertas más antiguas, los ajustes de seguridad, la configuración por
+defecto de code scanning, los permisos del token de los workflows y los
+secretos con cuándo se rotó cada uno por última vez.
 
 ![La sección Security: la tarjeta de alertas abiertas con 25 de Dependabot y 29 de code scanning, alertas por severidad y por ecosistema, alertas abiertas por severidad en el tiempo, la tabla de funciones de seguridad con on y off por repositorio, ejecuciones de code scanning por día y herramienta, la tabla de tiempo hasta resolver con cada aviso y su CVSS, las alertas de escaneo resueltas, los resultados por herramienta, las alertas abiertas más antiguas, las tablas de ajustes de seguridad y de configuración por defecto de code scanning, los permisos del token de los workflows y la tabla de rotación de secretos](../../../../assets/dashboards/security.png)
 
@@ -477,11 +511,20 @@ apagada". Sin `gh_security_feature`, un repositorio con Dependabot desactivado
 es indistinguible de uno que no tiene nada que arreglar.
 
 Los recuentos de alertas son estado actual, reescritos en cada pasada, así que
-todos los paneles de aquí toman la fila más reciente de cada serie y suman esas,
-no el rango. Sumar el rango cuenta cada alerta una vez por pasada: antes de
-arreglarlo la tarjeta marcaba 3,61 mil donde la cuenta tiene unas pocas decenas.
+todos los paneles que cuentan alertas abiertas toman la fila más reciente de
+cada serie y suman esas, no el rango. Sumar el rango cuenta cada alerta una vez
+por pasada: antes de arreglarlo la tarjeta marcaba 3,61 mil donde la cuenta
+tiene unas pocas decenas. La tabla de funciones y las cuatro tablas del final
+de la sección, los ajustes, la configuración de code scanning, los permisos del
+token y los secretos, también son estado actual, y leen la fila más reciente de
+cada repositorio, así que una función apagada o una alerta arreglada dentro del
+rango se leen como están y no como estaban en su punto más alto. Elasticsearch
+es la excepción en cuatro sitios, y cada uno lo dice en su descripción: su
+curva de alertas abiertas toma la serie más grande de cada severidad en un
+bucket en vez de sumarlas, y sus ajustes de seguridad, su configuración de code
+scanning y sus permisos del token toman la lectura más alta del rango.
 
-Los dos últimos paneles son información nueva, no otra vista. El tiempo hasta
+Dos paneles son información nueva, no otra vista. El tiempo hasta
 resolver una alerta de code scanning sale de unas fechas que se descargaban y se
 tiraban, así que hasta ahora solo existía el recuento de abiertas; de treinta y
 cuatro alertas de un repositorio, treinta estaban arregladas y tres descartadas,
@@ -489,9 +532,19 @@ y las treinta y tres eran invisibles. "Scan results by tool" dice qué encontró
 análisis en vez de que se ejecutó, que es lo que explica un salto en el número de
 alertas.
 
+"Oldest open alerts" lista las filas de alerta que dicen abierta, que no siempre
+son las filas de las que salen esos recuentos. Una pasada escribe una fila por
+cada una de las cien alertas más recientes de un repositorio, y uno con más
+toma sus recuentos de una lectura solo de las abiertas. Así que una alerta
+abierta detrás de cien más nuevas, levantada antes de que arrancara el
+colector, se cuenta y no se lista, y una alerta arreglada mientras estaba
+detrás de las cien más recientes sigue listada como abierta, hasta que un
+relleno histórico lee la lista entera.
+
 Lee `gh_dependabot_alert`, `gh_dependabot_alert_item`,
 `gh_code_scanning_alert`, `gh_code_scanning_alert_item`,
-`gh_code_scanning_analysis` y `gh_security_feature`.
+`gh_code_scanning_analysis`, `gh_security_feature`, `gh_security_setting`,
+`gh_code_scanning_setup`, `gh_actions_policy` y `gh_secret`.
 
 ## Cost
 
@@ -568,7 +621,18 @@ repositorios a los que contribuyó la cuenta: las estrellas de cada uno en la
 pasada más reciente dentro del rango, de `gh_upstream_repo`, unidas a cada
 elemento en los dashboards de InfluxDB y PostgreSQL y junto a cada repositorio
 en el de Prometheus. Graphite y Elasticsearch no pueden unir dos medidas en un
-panel y dejan la columna fuera, diciéndolo.
+panel y dejan la columna fuera, diciéndolo. La familia `outbound` escribe esa
+medida desde 2.6.0, así que un rango sin ninguna fila suya, que es todo rango
+anterior a la actualización, tiene vacía la columna Stars. Hasta que la primera
+pasada de `outbound` de 2.6.0 la escribe, InfluxDB y PostgreSQL no tienen tabla
+que unir y rechazan el panel entero en vez de dejar la columna vacía, lo que
+cubre [la página de problemas](/ghchronicle/es/reference/troubleshooting/#los-datos-parecen-mal).
+InfluxDB, PostgreSQL y Elasticsearch listan cada elemento una vez, por su fila
+más reciente dentro del rango, y Elasticsearch no tiene columna Opened, porque
+esa fecha es la de la fila menos el tiempo que el elemento estuvo abierto, una
+resta que un bucket no puede hacer. Prometheus tiene una fila por repositorio,
+y Graphite una por elemento y estado, porque el estado forma parte de la ruta:
+un elemento visto abierto y luego cerrado dentro del rango son dos filas allí.
 
 Lee `gh_event`, `gh_notification`, `gh_external_contribution`,
 `gh_upstream_repo` y `gh_star_given`.
@@ -577,7 +641,10 @@ Lee `gh_event`, `gh_notification`, `gh_external_contribution`,
 
 Código por lenguaje, la puntuación del perfil de comunidad de cada repositorio,
 la tabla de repositorios, los temas, los paquetes, los gists y las etiquetas de
-contenedor con el momento en que se publicó cada una.
+contenedor con el momento en que se publicó cada una. Debajo, los ajustes del
+repositorio, las claves de la cuenta, las cuentas sociales, los cambios de
+configuración, los ficheros de política, los ecosistemas de Dependabot, y las
+dependencias por licencia, por ecosistema y según cambiaron.
 
 ![La sección Inventory: código por lenguaje, la tabla de perfil de comunidad, la tabla de repositorios con estrellas, forks, tamaño, edad y licencia, las tablas de temas, paquetes y gists, las etiquetas de contenedor publicadas, las tablas de ajustes del repositorio y de claves de la cuenta, dependencias por licencia, las tablas de cuentas sociales, cambios de configuración, ficheros de política y ecosistemas de Dependabot, y dependencias por ecosistema y cambios de dependencias](../../../../assets/dashboards/inventory.png)
 
@@ -612,7 +679,8 @@ publica ningún historial de renombrados.
 
 Lee `gh_repo`, `gh_repo_language`, `gh_repo_community`, `gh_repo_topic`,
 `gh_repo_policy`, `gh_package`, `gh_package_version`, `gh_gist`, `gh_key`,
-`gh_social_account` y `gh_dependency_license`.
+`gh_social_account`, `gh_policy_file`, `gh_dependabot_ecosystem`,
+`gh_dependency`, `gh_dependency_license` y `gh_dependency_change`.
 
 ## Profile and sponsorship
 
@@ -650,7 +718,13 @@ del dashboard no llega a ese panel: un fijado puede ser un gist, que se nombra
 por su hash y no está en ningún repositorio que el filtro conozca.
 
 Los logros se leen cada hora de la página pública del perfil, porque
-ninguna API los lista. "Next tier at" es el umbral observado por la comunidad
+ninguna API los lista. El recuento de Pair Extraordinaire, pull requests
+fusionadas en repositorios públicos con un commit en coautoría, es un total que
+guarda el fichero de estado: cada pasada horaria suma las pull requests
+fusionadas desde el último día que cubre, y la historia entera se vuelve a
+recorrer una vez por semana, que es cuando un recuento que bajó, por un
+repositorio hecho privado o borrado, baja en la tabla. Sin fichero de estado
+cada arranque la recorre entera. "Next tier at" es el umbral observado por la comunidad
 (Schweinepriester/github-profile-achievements) y no un número que GitHub
 publique, así que la última columna dice si la página del perfil coincide con
 el escalón que implica el recuento; una fila que no coincide es una regla que
@@ -674,7 +748,10 @@ El gráfico muestra solo los cubos con más de treinta peticiones, porque el de
 búsqueda tiene treinta por minuto y aplastaría el eje. Leer todo esto no cuesta
 nada: `GET /rate_limit` es el único endpoint que GitHub no cobra. Sin él, una
 familia saltada por falta de presupuesto es indistinguible de una que no tenía
-nada que contar.
+nada que contar. Most used y Lowest remaining son en la tabla los extremos del
+rango, lo más que gastó cualquier lectura y lo menos que le quedaba a
+cualquiera, así que un cubo agotado hace una hora lo sigue diciendo después de
+recargarse; Graphite guarda solo el mínimo restante.
 
 "Every family" y "What failed, and where" son los dos paneles de debajo, y la
 captura de arriba es anterior a ambos. El primero lista todos los colectores
@@ -754,8 +831,18 @@ en vez de fingir.
   varios campos de una fila se queda con la columna por la que ordena y dice
   cuál ha soltado, y un booleano allí ni siquiera es una métrica.
 - **Elasticsearch** conserva los documentos fechados, así que una tabla por
-  elemento son los documentos más recientes y todo lo demás es una agregación
-  por buckets, sobre el subcampo `.keyword` de cada etiqueta.
+  elemento son los documentos más recientes, o el más reciente de cada elemento
+  cuando un elemento tiene varios, y todo lo demás es una agregación por
+  buckets, sobre el subcampo `.keyword` de cada etiqueta.
+
+Graphite y Elasticsearch comparten dos límites que los almacenes SQL no tienen.
+Ninguno puede unir dos medidas en un panel, así que allí Work elsewhere no
+tiene columna Stars y el perfil de comunidad conserva la bandera de plantilla
+de issue de la API en vez del número de plantillas. Y ninguno puede preguntar
+por una ventana mientras lee otra, así que los repositorios archivados que el
+filtro por omisión aparta cuentan en el Overview y en Every repository, ever
+por sus filas de los últimos siete días, y un rango que terminó hace más de una
+semana los deja fuera.
 
 Cada panel cuyo gemelo en otro almacén es más rico lo dice en una frase de su
 descripción.
