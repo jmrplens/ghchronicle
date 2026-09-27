@@ -387,6 +387,11 @@ export default defineConfig({
 							translations: { es: "GitHub Actions" },
 							slug: "install/actions",
 						},
+						{
+							label: "Upgrading",
+							translations: { es: "Actualizar" },
+							slug: "install/upgrading",
+						},
 					],
 				},
 				{

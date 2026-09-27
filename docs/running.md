@@ -126,6 +126,12 @@ Plus two that write nothing: `-list` prints the repositories in scope, and
 > its cadence says, and walks the stargazer list, the whole star history and
 > the co-authored pull requests again.
 
+### Upgrading
+
+A new release goes over the old one the way the old one was installed, and
+the configuration and the state carry over. What the first hours after it look
+like, from 2.5.x to 2.6.x and to 2.6.1, is on [upgrading](https://jmrp.io/docs/ghchronicle/install/upgrading/).
+
 ## Linux
 
 The whole path on Linux: the right archive, the signature, the PATH, a service, and building it yourself.
@@ -2305,3 +2311,147 @@ The same thing by hand, if you would rather not depend on it:
   env:
     GITHUB_TOKEN: ${{ secrets.GHCHRONICLE_TOKEN }}
 ```
+
+## Upgrading
+
+What the first hours after an upgrade from 2.5.x to 2.6.x look like, each of them once and on purpose, and what 2.6.1 changes in a store written before it.
+
+Source: <https://jmrp.io/docs/ghchronicle/install/upgrading/>
+
+Install the new release the way the old one was installed, over it, and start
+the collector again. The configuration, the state file and the write ledger
+carry over as they are, and nothing has to be migrated by hand. What follows is
+what the first hours after the upgrade look like, so that none of it reads as a
+fault, and the few things worth doing about them.
+
+The dashboards are generated from the binary, so publish them again after an
+upgrade, with `-publish-dashboard` or `grafana.publish_on_start`: see [letting
+the binary do it](https://jmrp.io/docs/ghchronicle/dashboards/#letting-the-binary-do-it).
+
+### From 2.5.x to 2.6.x
+
+#### The first start pays in full, once
+
+2.6.0 keeps what a sweep learned about GitHub in [a cache file beside the state
+file](https://jmrp.io/docs/ghchronicle/configuration/#the-cache-beside-it), and 2.5.x wrote none. So
+the first start finds nothing to read, says so at `debug` as `no cache file
+yet, the first pass of each family pays in full`, and asks everything once
+without an ETag. That is the price every 2.5.x restart paid: measured on the
+author's service on 2026-09-26, the first 38 minutes after a restart spent
+1,092 charged `core` requests on passes that cost about 66 with the cache warm.
+From the second start on the file is there, and the log says `cache file read`.
+
+#### `achievements` walks the whole merged history, once
+
+The co-authored pull request count behind Pair Extraordinaire is kept in the
+state file from 2.6.0 on, and a 2.5.x state file holds none. The first
+`achievements` pass therefore walks every pull request the account has merged:
+35 queries and 23.7 MB over 2,315 of them, measured on 2026-09-27. After that a
+pass walks the days since the count it keeps, and the whole history again once
+a week.
+
+#### `totals` runs first
+
+The pull request query is sized per repository from the counts `totals` reads,
+and 2.6.0 keeps those sizes in the cache file. The first sweep has none, so it
+runs `totals` before the pull requests whatever its cadence says, and says so:
+
+```text
+level=INFO msg="no page sizes remembered, running totals before the pull requests it sizes"
+```
+
+#### The slow families spread out
+
+A 2.5.x state file has the account's daily families marked at one instant and
+its twelve-hour ones at another, because that is when they ran, together. 2.6.0
+starts at most one family of six hours or more a sweep, so the first day after
+the upgrade brings them in one a tick: over up to two and a half hours at the
+built-in cadences, and longer with `deps`, `history` or `joblogs` switched on.
+The log names who starts and who waits, under `slow families due together take
+turns`, and from then on each keeps its own time. See [the slow families take
+turns](https://jmrp.io/docs/ghchronicle/configuration/cadences/#the-slow-families-take-turns).
+
+#### `commented_elsewhere` drops
+
+The search behind `gh_account_total.commented_elsewhere` used to count the
+threads the account commented on in its own repositories too. From 2.5.2, whose
+changes shipped in 2.6.0, it leaves them out, as its two siblings already did,
+and the field keeps its name. So every store's series drops by the difference
+on the first `totals` sweep after the upgrade, from 125 to 55 on the account it
+was measured on. It is a correction, not a loss.
+
+#### PostgreSQL tables gain columns
+
+2.6.0 adds fields to measurements whose tables an earlier release made, and a
+table an earlier release made has no column for them. The PostgreSQL sink that
+connects reads each table's columns the first time its process meets it and
+adds the missing ones with `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`. The SQL
+file sink cannot ask, so its file carries that statement for every field, and
+replaying it into a database an earlier release filled makes psql print a
+notice for every table and every column that is already there. They are
+expected:
+
+```text
+NOTICE:  relation "gh_repo" already exists, skipping
+NOTICE:  column "stars" of relation "gh_repo" already exists, skipping
+```
+
+See [how the declarations arrive](https://jmrp.io/docs/ghchronicle/sinks/postgres/#how-the-declarations-arrive).
+
+#### The Stars column of Work elsewhere waits for `outbound`
+
+The "Work elsewhere" table joins `gh_upstream_repo`, a measurement 2.6.0 adds,
+for the stars of each repository. Until the first `outbound` pass of the new
+version writes it, which is within the hour, InfluxDB and PostgreSQL refuse the
+whole table rather than leave the column empty, and a range that ends before the
+upgrade has no stars to show in any store. Wait for that pass, or publish the
+dashboards after it; see [the data looks
+wrong](https://jmrp.io/docs/ghchronicle/reference/troubleshooting/#the-data-looks-wrong).
+
+#### A configuration copied from an older example keeps the old cadences
+
+Up to 2.6.0 the example configuration set every family under `every.families`
+to the built-in value of its release, so a `config.yaml` copied from it sets
+them all. One copied from 2.5.x keeps twelve of them slower than 2.6.0 runs
+them: `account`, `outbound` and `totals` at `12h`, `achievements` at `24h`,
+`stars`, `billing` and `analyses` at `6h`, `discussions` at `2h`, `deployments`
+at `1h`, and `activity`, `events` and `notifs` at `30m`. Nothing warns, since
+the warning is for a cadence four times faster than the built-in one. Deleting
+those lines is what picks up the current values; from 2.6.1 the example shows
+them commented out, so a copy of it sets none. See [every family, its group and
+its built-in
+cadence](https://jmrp.io/docs/ghchronicle/configuration/cadences/#every-family-its-group-and-its-built-in-cadence).
+
+### To 2.6.1
+
+#### Whether a comment is the accepted answer is a field
+
+`gh_discussion_comment` carried `is_answer` as a tag, and a maintainer accepts
+an answer days after the comment was written, so one comment read before and
+after that was two rows at the same instant. 2.6.1 writes no `is_answer` at
+all: the `answers` field every row already carried, 1 for the accepted answer
+and 0 for any other comment, says the same thing. A store written before 2.6.1
+and since holds the measurement in two shapes until the measurement is dropped
+and filled again with a [backfill](https://jmrp.io/docs/ghchronicle/how/backfill/). The dashboards
+read both shapes, one row per comment, and [the measurements
+page](https://jmrp.io/docs/ghchronicle/collectors/measurements/#how-to-read-the-tables) says what
+each store keeps and how to drop it. A tool that makes the change for you is
+planned for a later release, in
+[issue #96](https://github.com/jmrplens/ghchronicle/issues/96).
+
+#### A path setting is expanded
+
+`state_file`, `sinks.dedupe_file`, `log.file`, `sinks.file.path` and
+`sinks.sql.path` take a leading `~` as the home directory and a `${VAR}` from
+the environment, as credentials and addresses always did. A configuration that
+wrote either one used to get a directory named with those characters, under
+the working directory, and now gets the path it meant. Where that was the
+state file, the state the old release kept is in the directory with the odd
+name, and the new one starts without it: move the files across before the
+first start if the walks it saves are worth keeping. See [`${VAR}`
+expansion](https://jmrp.io/docs/ghchronicle/configuration/#var-expansion).
+
+> **What else changed**
+>
+> Every release's own notes, with what was measured and what was not, are in
+> [the changelog](https://jmrp.io/docs/ghchronicle/reference/changelog/).
