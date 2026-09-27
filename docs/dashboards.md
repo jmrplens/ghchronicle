@@ -918,7 +918,7 @@ rearrangement would fork the series. The repository filter at the top of the
 dashboard does not reach that panel: a pin can be a gist, which is named by its
 hash and is in no repository the filter knows.
 
-The achievements are read once a day from the public profile page, because no
+The achievements are read every hour from the public profile page, because no
 API lists them. Next tier at is the community-observed threshold
 (Schweinepriester/github-profile-achievements) rather than a number GitHub
 publishes, so the last column says whether the profile page agrees with the

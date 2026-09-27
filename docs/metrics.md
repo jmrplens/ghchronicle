@@ -1181,7 +1181,7 @@ of those days.
 
 `gh_achievement` is the one measurement that does not come from the API.
 GitHub lists achievements nowhere in REST or GraphQL, so the family reads the
-public profile page, `https://github.com/<login>?tab=achievements`, once a day
+public profile page, `https://github.com/<login>?tab=achievements`, every hour
 as an anonymous visitor: no token travels to it and it is charged to no
 budget. One row per badge, stamped at the start of the UTC day: `name` is the
 badge, `tier_number` is the number on its label (1 with no label, 2 to 4 for
@@ -1250,7 +1250,7 @@ without badges.
 `gh_social_account` carries one more row than the social accounts listing:
 the homepage, under the provider `website`, from the `blog` of the profile.
 The ORCID iD the profile page shows is in no endpoint, so the `achievements`
-family, which already reads that page once a day, writes it from the page's
+family, which already reads that page every hour, writes it from the page's
 vcard under the provider `orcid`, stamped at the start of the UTC day like
 the badges. The links the API does list (Mastodon, LinkedIn, Bluesky) are
 written by the `profile` family from the API and skipped on the page, so no

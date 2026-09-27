@@ -217,10 +217,10 @@ func startsOf(sweeps []sweep, family string) []time.Time {
 
 // TestAWeekOfTicksSpreadsTheSlowFamiliesOnceAndForAll is the simulation #87
 // asks for, on the production account's schedule: the built-in cadences with
-// deps and history named at a day, fourteen families of six hours or more, all
+// deps and history named at a day, thirteen families of six hours or more, all
 // of them due in the same sweep. No sweep starts more than one, so every
 // last_run is its own from the sweep the last of them starts in; that last one
-// waits thirteen quarter hour ticks, 3h15m, the worst wait this schedule has;
+// waits twelve quarter hour ticks, 3h, the worst wait this schedule has;
 // and from then on every family starts exactly a cadence after it last did,
 // because once apart they stay apart. The families at every tick run at every
 // tick throughout.
@@ -231,8 +231,8 @@ func TestAWeekOfTicksSpreadsTheSlowFamiliesOnceAndForAll(t *testing.T) {
 		t.Fatalf("tick = %s, want the quarter hour the built-in cadences give", tick)
 	}
 	slow := slowFamilies(r)
-	if len(slow) != 14 {
-		t.Fatalf("%d slow families, want the fourteen of the production schedule: %v", len(slow), slow)
+	if len(slow) != 13 {
+		t.Fatalf("%d slow families, want the thirteen of the production schedule: %v", len(slow), slow)
 	}
 	sweeps := schedule(r, tick, 7)
 	for _, s := range sweeps {
@@ -326,10 +326,10 @@ func TestASweepStartsMoreWhenOneCannotKeepTheCadences(t *testing.T) {
 		shortest, tik time.Duration
 		want          int
 	}{
-		{"the built-in table", 12, 6 * time.Hour, 15 * time.Minute, 1},
-		{"the production schedule", 14, 6 * time.Hour, 15 * time.Minute, 1},
+		{"the built-in table", 11, 6 * time.Hour, 15 * time.Minute, 1},
+		{"the production schedule", 13, 6 * time.Hour, 15 * time.Minute, 1},
 		{"every.default: 6h", 31, 6 * time.Hour, time.Hour, 6},
-		{"nothing faster than the hour", 12, 6 * time.Hour, time.Hour, 2},
+		{"nothing faster than the hour", 11, 6 * time.Hour, time.Hour, 2},
 		{"a heartbeat longer than the cadence", 5, 6 * time.Hour, 12 * time.Hour, 5},
 	} {
 		if got := turnsPerSweep(tc.slow, tc.shortest, tc.tik); got != tc.want {

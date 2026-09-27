@@ -55,6 +55,7 @@ family carries its own.
 | `ratelimit`    | 15m     | What the collector has left to spend, in each budget                                     |
 | `deployments`  | 30m     | Deployments and their environments, batched over every repository                        |
 | `account`      | 1h      | Profile, contribution calendar, contribution totals                                      |
+| `achievements` | 1h      | The profile badges, and the distance to each next tier                                   |
 | `analyses`     | 1h      | Code scanning analyses, which GitHub prunes                                              |
 | `artifacts`    | 1h      | Artifacts and their expiry                                                               |
 | `billing`      | 1h      | Usage per day, product, SKU and repository                                               |
@@ -73,7 +74,6 @@ family carries its own.
 | `forks`        | 12h     | Who forked, and when                                                                     |
 | `profile`      | 12h     | Packages, gists, social accounts                                                         |
 | `stats`        | 12h     | Commits per week, the punch card, the workflow definitions                               |
-| `achievements` | 24h     | The profile badges, and the distance to each next tier                                   |
 | `branches`     | 24h     | Which branches are live and how stale each tip is                                        |
 | `inventory`    | 24h     | What a workflow's own token may do, both secret stores, default code scanning            |
 | `keys`         | 24h     | The account's SSH and GPG keys, and when each expires                                    |

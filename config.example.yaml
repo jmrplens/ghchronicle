@@ -285,7 +285,7 @@ every:
     issueevents: 1h   # labelled, closed, reopened: the transitions a state does not keep
     totals: 1h        # the lifetime counts, asked of GitHub rather than added up here
     keys: 24h         # the account's SSH and GPG keys, and when they expire
-    achievements: 24h # the profile's badges, read off the public profile page (no API lists them), and how far each is from its next tier
+    achievements: 1h  # the profile's badges, read off the public profile page (no API lists them), and how far each is from its next tier
     ratelimit: 15m    # the collector's own budget, in all fifteen buckets; costs nothing
     # The tail of every failed job's log. Off by default: it is text rather than
     # a measurement, it costs a request per failure, and it only makes sense with

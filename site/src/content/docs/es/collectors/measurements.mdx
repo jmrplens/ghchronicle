@@ -905,7 +905,7 @@ la página en 33 de esos días.
 
 `gh_achievement` es la única medida que no sale de la API. GitHub no lista los
 logros en REST ni en GraphQL, así que la familia lee la página pública del
-perfil, `https://github.com/<login>?tab=achievements`, una vez al día como
+perfil, `https://github.com/<login>?tab=achievements`, cada hora como
 visitante anónimo: ningún token viaja a ella y no se carga a ningún
 presupuesto. Una fila por insignia, fechada al inicio del día UTC: `name` es
 la insignia, `tier_number` el número de su etiqueta (1 sin etiqueta, 2 a 4
@@ -978,7 +978,7 @@ día sin insignias.
 `gh_social_account` lleva una fila más que el listado de cuentas sociales: la
 página personal, bajo el proveedor `website`, del `blog` del perfil. El ORCID
 iD que muestra la página del perfil no está en ningún endpoint, así que la
-familia `achievements`, que ya lee esa página una vez al día, lo escribe desde
+familia `achievements`, que ya lee esa página cada hora, lo escribe desde
 la vcard de la página bajo el proveedor `orcid`, sellado al comienzo del día
 UTC como las insignias. Los enlaces que la API sí lista (Mastodon, LinkedIn,
 Bluesky) los escribe la familia `profile` desde la API y en la página se
