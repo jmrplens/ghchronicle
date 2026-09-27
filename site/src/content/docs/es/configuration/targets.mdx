@@ -60,6 +60,12 @@ targets:
 `exclude` acepta globs de shell, así que `someone/experiment-*` descarta un
 prefijo entero en una línea.
 
+Nombrar uno de los repositorios de la propia cuenta, un fork tuyo por ejemplo,
+no cuesta ninguna petición para descubrirlo: el listado ya lo devolvió, con las
+cuatro cosas que el descubrimiento quiere saber de él. Solo un nombre que ningún
+listado devuelve, el repositorio de otra persona o uno de una organización que
+no está en `orgs`, se lee aparte cada vez que se reconstruye la lista.
+
 ## Por qué forks y archivados están apagados por omisión
 
 Ambos valores por defecto existen por la misma razón, que es el límite de

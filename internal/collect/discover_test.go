@@ -158,7 +158,6 @@ func TestDiscoverSetsTheArchivedAside(t *testing.T) {
 	// totals row puts the archive on record.
 	f := newFixtureServer(t)
 	f.file("/user/repos", "user_repos.json")
-	f.file("/repos/octocat/old-thing", "repo_archived_fork.json")
 	found, err := Discover(ctx(t), f.Client, &Filter{User: "octocat", Repos: []string{"octocat/old-thing"}})
 	if err != nil {
 		t.Fatal(err)
@@ -175,21 +174,23 @@ func TestDiscoverNamedRepositoryOverridesEveryFilter(t *testing.T) {
 	t.Parallel()
 	f := newFixtureServer(t)
 	f.file("/user/repos", "user_repos.json")
-	// An archived fork, excluded twice over by the defaults and once more
-	// by the glob. Naming it wins.
-	f.file("/repos/octocat/linguist", "repo_archived_fork.json")
+	f.file("/repos/someone/a-fork-i-maintain", "repo_named_elsewhere.json")
+	// Two archived forks, excluded twice over by the defaults and once more
+	// by a glob each, one the listing returned and one it did not. Naming
+	// them wins.
 	found, err := Discover(ctx(t), f.Client, &Filter{
-		User: "octocat", Repos: []string{"octocat/linguist", "octocat/hello-world"},
-		Exclude: []string{"octocat/*"},
+		User:    "octocat",
+		Repos:   []string{"octocat/old-fork", "octocat/hello-world", "someone/a-fork-i-maintain"},
+		Exclude: []string{"octocat/*", "someone/*"},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := names(found.Repos); !equalNames(got, []string{"octocat/hello-world", "octocat/linguist"}) {
+	if got := names(found.Repos); !equalNames(got, []string{"octocat/hello-world", "octocat/old-fork", "someone/a-fork-i-maintain"}) {
 		t.Errorf("got %v", got)
 	}
 	for _, r := range found.Repos {
-		if r.FullName == "octocat/linguist" && (!r.Fork || !r.Archived) {
+		if r.FullName != "octocat/hello-world" && (!r.Fork || !r.Archived) {
 			t.Errorf("named repository lost its flags: %+v", r)
 		}
 	}
@@ -198,6 +199,55 @@ func TestDiscoverNamedRepositoryOverridesEveryFilter(t *testing.T) {
 	found, err = Discover(ctx(t), f.Client, &Filter{Repos: []string{"nobody/nothing"}})
 	if repos := found.Repos; err != nil || len(repos) != 1 || repos[0].Owner != "nobody" || repos[0].Name != "nothing" {
 		t.Errorf("repos=%v err=%v", repos, err)
+	}
+}
+
+// TestDiscoverTakesANamedRepositoryFromTheListing is the discovery half of
+// issue #86. The listing already carries the four flags discovery wants, and
+// on the account it was measured on every named repository was a fork the
+// listing had returned and the filter had dropped, each read again every hour
+// to learn those same four flags. A name the listing returned is taken from
+// it, whatever case it is spelt in, and keeps the spelling it was given; a
+// name it did not return is still read.
+func TestDiscoverTakesANamedRepositoryFromTheListing(t *testing.T) {
+	t.Parallel()
+	f := newFixtureServer(t)
+	f.file("/user/repos", "user_repos.json")
+	f.file("/repos/someone/a-fork-i-maintain", "repo_named_elsewhere.json")
+	found, err := Discover(ctx(t), f.Client, &Filter{
+		User:  "octocat",
+		Repos: []string{"octocat/old-fork", "OctoCat/Linguist", "someone/a-fork-i-maintain"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{"/repos/octocat/old-fork", "/repos/OctoCat/Linguist", "/repos/octocat/linguist"} {
+		if n := len(f.calls(path)); n != 0 {
+			t.Errorf("%s was read %d times, and the listing had already said what it is", path, n)
+		}
+	}
+	if n := len(f.calls("/repos/someone/a-fork-i-maintain")); n != 1 {
+		t.Errorf("a name the listing did not return was read %d times, want once", n)
+	}
+
+	want := map[string]Repo{
+		"octocat/old-fork": {Owner: "octocat", Name: "old-fork", FullName: "octocat/old-fork", Fork: true, Archived: true},
+		"OctoCat/Linguist": {Owner: "OctoCat", Name: "Linguist", FullName: "OctoCat/Linguist", Fork: true},
+		"someone/a-fork-i-maintain": {
+			Owner: "someone", Name: "a-fork-i-maintain", FullName: "someone/a-fork-i-maintain",
+			Fork: true, Archived: true, HasDiscussions: true,
+		},
+	}
+	for _, r := range found.Repos {
+		if w, named := want[r.FullName]; named {
+			if r != w {
+				t.Errorf("%s discovered as %+v, want %+v", r.FullName, r, w)
+			}
+			delete(want, r.FullName)
+		}
+	}
+	for name := range want {
+		t.Errorf("%s was named and not discovered: %v", name, names(found.Repos))
 	}
 }
 
@@ -239,15 +289,15 @@ func TestDiscoverReadsWhetherDiscussionsAreOn(t *testing.T) {
 	t.Parallel()
 	f := newFixtureServer(t)
 	f.file("/user/repos", "user_repos.json")
-	f.file("/repos/octocat/linguist", "repo_archived_fork.json")
-	found, err := Discover(ctx(t), f.Client, &Filter{User: "octocat", Repos: []string{"octocat/linguist"}})
+	f.file("/repos/someone/a-fork-i-maintain", "repo_named_elsewhere.json")
+	found, err := Discover(ctx(t), f.Client, &Filter{User: "octocat", Repos: []string{"someone/a-fork-i-maintain"}})
 	if err != nil {
 		t.Fatal(err)
 	}
 	want := map[string]bool{
-		"octocat/hello-world":  true,
-		"octocat/experiment-1": false,
-		"octocat/linguist":     true,
+		"octocat/hello-world":       true,
+		"octocat/experiment-1":      false,
+		"someone/a-fork-i-maintain": true,
 	}
 	for _, r := range found.Repos {
 		if on, known := want[r.FullName]; known && r.HasDiscussions != on {

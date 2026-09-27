@@ -25,6 +25,10 @@ import (
 type RepoCore struct {
 	// Walk bounds the release list. Default one page; a backfill walks all.
 	Walk Walk
+	// Refusals remembers the community profiles GitHub refused, which is
+	// every fork's, so the 404 is paid once a day rather than on every pass.
+	// Nil asks every time.
+	Refusals *Refusals
 }
 
 type releaseRow struct {
@@ -178,11 +182,20 @@ func (rc RepoCore) Collect(ctx context.Context, c *ghapi.Client, repo Repo, now 
 	}
 
 	// Community health: the percentage plus which files exist.
+	//
+	// GitHub serves no community profile for a fork. Measured on 2026-09-27
+	// over the 67 repositories of this account, all 28 forks answered 404
+	// and all 39 others 200, and a 404 carries no ETag: the fifteen forks the
+	// production configuration names cost 404 charged requests in 30.9
+	// hours, 9 per cent of the core requests that process was charged, to be
+	// told the same thing on every pass. The refusal is remembered rather
+	// than the fork flag read, so any repository GitHub refuses is asked
+	// once a day, and a fork it starts answering for is noticed within it.
 	var community struct {
 		Health int            `json:"health_percentage"`
 		Files  map[string]any `json:"files"`
 	}
-	if _, _, err := c.GetJSON(ctx, "/repos/"+repo.FullName+"/community/profile", &community, ""); err == nil {
+	if _, _, err := rc.Refusals.GetJSON(ctx, c, "/repos/"+repo.FullName+"/community/profile", &community, ""); err == nil {
 		f := map[string]any{"health_percentage": community.Health}
 		setNonEmpty(f, "url", pageURL(r.HTMLURL, "community"))
 		for _, key := range []string{"code_of_conduct", "contributing", "license", "readme", "issue_template", "pull_request_template"} {

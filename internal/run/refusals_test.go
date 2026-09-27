@@ -67,3 +67,47 @@ func TestARefusalIsPaidOncePerDayPerFamily(t *testing.T) {
 		t.Errorf("a backfill must ask again, /dependabot/alerts asked %d times in total", n)
 	}
 }
+
+// TestAForkIsAskedForItsCommunityProfileOncePerDay is issue #86 at the sweep.
+// GitHub serves no community profile for a fork, and every pass of the repo
+// family paid a 404 for it: 404 of them in 30.9 hours for the fifteen forks
+// the production configuration names. The family keeps its memory like
+// security does, while the repository itself, which every row comes from, is
+// still read on every pass.
+func TestAForkIsAskedForItsCommunityProfileOncePerDay(t *testing.T) {
+	t.Parallel()
+	var mu sync.Mutex
+	asked := map[string]int{}
+	r := sweepRunner(t, func(w http.ResponseWriter, req *http.Request) {
+		mu.Lock()
+		asked[req.URL.Path]++
+		mu.Unlock()
+		switch req.URL.Path {
+		case "/repos/o/n":
+			_, _ = w.Write([]byte(`{"full_name":"o/n","html_url":"https://github.com/o/n","fork":true}`))
+		case "/repos/o/n/releases":
+			_, _ = w.Write([]byte(`[]`))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+			_, _ = w.Write([]byte(`{"message":"Not Found"}`))
+		}
+	})
+	r.Cfg.Every = everyOnly("repo")
+	if err := r.Cfg.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	start := time.Date(2026, 9, 25, 13, 0, 0, 0, time.UTC)
+	for _, now := range []time.Time{start, start.Add(time.Minute), start.Add(2 * time.Minute)} {
+		if err := r.repoFamilies(context.Background(), now); err != nil {
+			t.Fatal(err)
+		}
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if n := asked["/repos/o/n/community/profile"]; n != 1 {
+		t.Errorf("the community profile was asked %d times over three sweeps, want once", n)
+	}
+	if n := asked["/repos/o/n"]; n != 3 {
+		t.Errorf("the repository was read %d times over three sweeps, want every sweep", n)
+	}
+}

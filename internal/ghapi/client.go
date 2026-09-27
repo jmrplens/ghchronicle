@@ -217,12 +217,12 @@ const cacheEntryOverhead = 256
 //
 // The type is part of the key because the body is that type's encoding of
 // the answer and nothing else (see replayable). One URL is decoded into two
-// types when a repository is named in targets.repos: discovery reads four
-// flags out of GET /repos/{owner}/{repo} and the repo family reads forty
-// fields out of the same URL. Keyed by URL alone, the entry discovery wrote
-// would answer the repo family's 304 with nothing but those four flags, and
-// a repository with hundreds of stars would be recorded with none. Keyed by
-// both, each caller has an entry of its own, each repeat is still
+// types when targets.repos names a repository no listing returned: discovery
+// reads four flags out of GET /repos/{owner}/{repo} and the repo family reads
+// forty fields out of the same URL. Keyed by URL alone, the entry discovery
+// wrote would answer the repo family's 304 with nothing but those four flags,
+// and a repository with hundreds of stars would be recorded with none. Keyed
+// by both, each caller has an entry of its own, each repeat is still
 // conditional, and the only cost is the second entry's bytes.
 //
 // A call that decodes nothing keys on the nil type, which is the wire body's

@@ -768,7 +768,7 @@ func (r *Runner) repoFamily(ctx context.Context, family string, repo collect.Rep
 	case "traffic":
 		return collect.Traffic{}.Collect(ctx, r.API, repo, now)
 	case "repo":
-		return collect.RepoCore{Walk: r.walk()}.Collect(ctx, r.API, repo, now)
+		return collect.RepoCore{Walk: r.walk(), Refusals: r.refusalsFor(family)}.Collect(ctx, r.API, repo, now)
 	case "stars", "forks":
 		// The REST walks: a repository's whole stargazer list the first time
 		// it is seen, the forks of a fresh install, and every backfill. The

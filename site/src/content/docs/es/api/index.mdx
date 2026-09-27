@@ -91,8 +91,8 @@ repetición como la misma respuesta que la original. Cada entrada se indexa por
 la URL y por el tipo que la decodificó, así que la única URL que dos
 colectores leen de forma distinta, `GET /repos/{owner}/{repo}` (cuatro
 indicadores para el descubrimiento de un repositorio nombrado en
-`targets.repos`, cuarenta campos para la familia repo), tiene una entrada por
-lector y ninguno recibe la del otro.
+`targets.repos` que ningún listado devolvió, cuarenta campos para la familia
+repo), tiene una entrada por lector y ninguno recibe la del otro.
 
 La caché está acotada, y la cota son 256 MB. Es un LRU, y a cada entrada se le
 cobran los bytes que guarda más doscientos por la casilla del mapa, el elemento
@@ -114,8 +114,10 @@ decodificados además de su propia huella.
 
 Un 403 o un 404 es como GitHub dice que una función está apagada: Dependabot en
 un repositorio que no lo usa, code scanning donde nunca se activó, un foro en un
-repositorio con las discusiones apagadas. Eso no es un error, y el colector lo
-convierte en "aquí no hay nada".
+repositorio con las discusiones apagadas, el perfil de comunidad de un fork, que
+GitHub no sirve en absoluto (los 28 forks de la cuenta en la que se midió
+respondieron 404, y los otros 39 repositorios 200). Eso no es un error, y el
+colector lo convierte en "aquí no hay nada".
 
 Lo que no es, es gratis. Un rechazo no lleva ETag, así que donde una página que
 no ha cambiado no cuesta nada, una función apagada se cobra entera en cada

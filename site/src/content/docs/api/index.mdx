@@ -83,8 +83,9 @@ GitHub that answers the repeat 304 and fails on the first point that differs,
 which is what keeps the replay the same answer as the original. An entry is
 keyed by the URL and the type that decoded it, so the one URL two collectors
 read differently, `GET /repos/{owner}/{repo}` (four flags for discovery of a
-repository named in `targets.repos`, forty fields for the repo family), has an
-entry per reader and neither is answered from the other's.
+repository named in `targets.repos` that no listing returned, forty fields for
+the repo family), has an entry per reader and neither is answered from the
+other's.
 
 The cache is bounded, and the bound is 256 MB. It is an LRU, and an entry is
 charged the bytes it holds plus two hundred for the map slot, the list element
@@ -104,8 +105,10 @@ much of decoded bodies on top of its own footprint.
 
 A 403 or a 404 is how GitHub says a feature is switched off: Dependabot on a
 repository that does not use it, code scanning where it was never enabled, a
-forum on a repository with discussions off. That is not an error, and the
-collector turns it into "there is nothing here".
+forum on a repository with discussions off, the community profile of a fork,
+which GitHub does not serve at all (all 28 forks of the account it was measured
+on answered 404, and all 39 other repositories 200). That is not an error, and
+the collector turns it into "there is nothing here".
 
 What it is not is free. A refusal carries no ETag, so where a page that did not
 change costs nothing, a feature that is off is charged in full on every sweep,

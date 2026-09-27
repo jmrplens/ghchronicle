@@ -443,3 +443,58 @@ func TestRepoCoreSurvivesOptionalSurfacesBeingOff(t *testing.T) {
 		}
 	}
 }
+
+// TestRepoCoreAsksAForkForItsCommunityProfileOnceADay is issue #86. GitHub
+// serves no community profile for a fork, and the 404 carries no ETag, so
+// every pass paid in full to be told so again. Remembered, it is asked once a
+// day, and nothing the family writes changes: the repository and its releases
+// are still read on every pass, since they are what the rows come from.
+func TestRepoCoreAsksAForkForItsCommunityProfileOnceADay(t *testing.T) {
+	t.Parallel()
+	const profile = "/repos/octocat/linguist/community/profile"
+	fork := Repo{Owner: "octocat", Name: "linguist", FullName: "octocat/linguist", Fork: true}
+	f := newFixtureServer(t)
+	f.file("/repos/octocat/linguist", "repo_fork.json")
+	f.status(profile, http.StatusNotFound, "Not Found")
+	f.file("/repos/octocat/linguist/releases", "releases.json")
+
+	clock := testNow
+	rc := RepoCore{Refusals: &Refusals{For: 24 * time.Hour, now: func() time.Time { return clock }}}
+	first, err := rc.Collect(ctx(t), f.Client, fork, testNow)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := rc.Collect(ctx(t), f.Client, fork, testNow)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := len(f.calls(profile)); n != 1 {
+		t.Errorf("the community profile was asked %d times in two passes, want once: the refusal is remembered", n)
+	}
+	for _, path := range []string{"/repos/octocat/linguist", "/repos/octocat/linguist/releases"} {
+		if n := len(f.calls(path)); n != 2 {
+			t.Errorf("%s was asked %d times in two passes, want every pass", path, n)
+		}
+	}
+	checkPoints(t, second)
+	if !samePoints(first, second) {
+		t.Errorf("a remembered refusal changed the points:\n%v\n%v", first, second)
+	}
+	wantMeasurements(t, second, "gh_repo", "gh_security_setting", "gh_release", "gh_release_asset", "gh_release_published")
+	if got := byMeasurement(second)["gh_repo_community"]; len(got) != 0 {
+		t.Errorf("a fork GitHub refused the profile of has a community row: %v", got)
+	}
+	if repo := only(t, second, "gh_repo")[0]; repo.Tags["fork"] != "true" {
+		t.Errorf("gh_repo tagged %v, want the fork said", repo.Tags)
+	}
+
+	// A day later it is asked again, which is how a fork GitHub starts
+	// answering for is noticed.
+	clock = clock.Add(24 * time.Hour)
+	if _, err = rc.Collect(ctx(t), f.Client, fork, testNow); err != nil {
+		t.Fatal(err)
+	}
+	if n := len(f.calls(profile)); n != 2 {
+		t.Errorf("after a day the community profile was asked %d times in total, want 2", n)
+	}
+}
