@@ -26,8 +26,8 @@ characters they are, whether a discussion comment is the accepted answer was
 part of its row's identity although a maintainer decides it days later, the
 repository list could outlive its hour by a tick, the example configuration
 pinned every cadence of its release for whoever copied it, the card and the
-dashboards' sums of each repository's newest reading counted two owners'
-repositories of one name as one, several dashboard tables read the largest
+dashboards, in their sums and in every table and chart per repository, counted
+two owners' repositories of one name as one, several dashboard tables read the largest
 value of the range where they meant the newest, or the other way round, or
 counted an item once per row a store held of it, or one cell of a grid where
 they meant them all, some Elasticsearch panels read every repository whatever
@@ -98,9 +98,10 @@ every one-shot run reported at Info, as news, how it always runs.
   field every row already carried, 1 for the accepted answer and 0 for any
   other comment, says the same thing, so no store needs a column, and InfluxDB
   3, which fixed `is_answer` as a tag column, has nothing to refuse. The
-  exporter keeps `user` and `own` as labels. A store written before 2.6.1 and
-  after it holds the measurement in two shapes: a comment an earlier release
-  read gains one more row, without the tag, when a 2.6.1 sweep reads it again.
+  exporter keeps `user`, `own` and the repository as labels, and not the
+  answer. A store written before 2.6.1 and after it holds the measurement in
+  two shapes: a comment an earlier release read gains one more row, without
+  the tag, when a 2.6.1 sweep reads it again.
   The dashboards read both shapes, one row per comment in every store, accepted
   when any of its rows says so, so an answer accepted before the upgrade and
   taken back since still reads accepted. What makes it one shape again is
@@ -289,6 +290,39 @@ every one-shot run reported at Info, as news, how it always runs.
   every repository with an open pull request, those past the twenty-fifth with
   an empty Open for; they now keep to the rows the open time ranks. Both faults
   were reported in [#97](https://github.com/jmrplens/ghchronicle/issues/97).
+- **Every panel keeps two owners' repositories of one name apart.** The sums
+  above were the first of a class: about fifty panels in each store still
+  partitioned, grouped, joined, deduplicated, ranked or bucketed by the short
+  `repo` alone. "Open the longest" read `alice/x#5` and `acme/x#5` as one pull
+  request, the configuration tables kept the newer reading of the two, "Commits
+  behind a red branch", "Release assets" and the workflow tables joined one
+  repository's rows to the other's, and every chart and bar per repository drew
+  the two as one. InfluxDB and PostgreSQL now key 55 panels by `full_name`,
+  Elasticsearch buckets 57 by it with the short name inside, Graphite groups 30
+  by the full name's node and names the row by the short one, and Prometheus
+  lists `full_name` in every `by` and `on` of 51. A table still shows the short
+  name and the picker still filters by it; a chart in the two SQL stores names
+  a series in full only when two in the range share its short name, as the
+  [panels page](https://jmrp.io/docs/ghchronicle/dashboards/panels/) says. The
+  exporter kept 46 measurements by `repo` alone, so Prometheus had merged the
+  two before any query ran: every rule that keeps `repo` now keeps `owner` and
+  `full_name` beside it, and the issue and discussion comment counts, which
+  kept no repository and drew all of them as one row in "Comments left" and
+  "Discussion answers", keep all three. Seven Graphite panels named their rows
+  after a `sumSeries` that had already added every series into one, which
+  graphite-web answers with one row named after the first series: measured
+  against `graphiteapp/graphite-statsd:1.1.10-5`, three series grouped that way
+  came back as one row holding 3. "Workflows that keep failing", "Steps that
+  fail", "Comments left", "Clone amplification", "Checks that are not
+  Actions", "Languages starred" and "Transitions over time" now group the
+  series themselves. Four Prometheus tables that show the full name, "Comments
+  left", "Discussion answers", "Commits by repository" and "Work elsewhere",
+  dropped that column before renaming it and now show it. Measured through the
+  containerised stack with `alice/twin#5` open ten days and `acme/twin#5` three,
+  "Open the longest" answered one row before and two now in InfluxDB 3.11.2,
+  PostgreSQL 18.6, Graphite and, through Grafana 13.2.1, Elasticsearch 9.5.3;
+  "Views over time" in InfluxDB drew one series, `twin`, of 24 views before and
+  `acme/twin` at 15 and `alice/twin` at 9 now.
 - **Graphite tables that add their points up are consolidated by sum.** A
   table sends no `maxDataPoints`, so Grafana asks for the panel's width and
   graphite-web averages neighbouring points to fit it before the table adds
@@ -413,8 +447,9 @@ in every store; the five Elasticsearch figures without the picker their SQL
 twins name; an Elasticsearch ranking by an id its query lacks; a consolidated
 Graphite target under the name `consolidateBy` gives it; the card's totals,
 the newest-reading sums in every store and the exporter's five gauges over two
-owners' repositories of one name; and the two open-longest tables in every
-store. Where such a test calls something the old code lacks, it was run there
+owners' repositories of one name; the two open-longest tables in every store;
+and every query of every store, and every exporter rule that names a
+repository, over two owners' repositories of one name. Where such a test calls something the old code lacks, it was run there
 with that call stubbed. The binary
 against the fake GitHub holds that a one-shot run says its refill at
 Debug and never at Info, and that no comment carries `is_answer`. The
@@ -456,6 +491,12 @@ Not verified, and worth saying plainly:
   Dockerfile, not yet on a runner.
 - The card's count by full name is held by the accumulator's test. No account
   with two owners' repositories of one name was drawn.
+- The keying by full name of the other panels was measured on "Open the
+  longest" in four stores and "Views over time" in InfluxDB. The rest follow
+  from the same helpers and are held by a test that reads every query of every
+  store and the exporter's rules; the containerised suite sends every panel
+  through Grafana and holds that it is accepted and answers. No Prometheus was
+  read with two owners' repositories of one name.
 - The newest-reading sums by full name were measured on the Dependabot count, in
   the three stores above; the other figures follow from the same two helpers and
   the same exporter rule, and are held by a test of their queries, which
