@@ -46,42 +46,42 @@ list of forks changes a few times a year. One interval for all of them would
 either waste the rate limit on the slow ones or lose the fast ones, so each
 family carries its own.
 
-| Family          | Default | Collects                                                       |
-| --------------- | ------- | -------------------------------------------------------------- |
-| `actions`       | 15m     | Workflow runs, jobs, steps, the Actions cache                  |
-| `ratelimit`     | 15m     | What the collector has left to spend, in each budget            |
-| `activity`      | 30m     | The repository activity log, where a force push is recorded    |
-| `events`        | 30m     | The account event feed, which keeps only the last 300          |
-| `notifs`        | 30m     | The notification inbox                                          |
-| `artifacts`     | 1h      | Artifacts and their expiry                                      |
-| `commits`       | 1h      | Lines changed and signature state, per commit                  |
-| `deployments`   | 1h      | Deployments and their environments, batched over every repository |
-| `issueevents`   | 1h      | The timeline of what moved: labels, assignments, transitions   |
-| `issues`        | 1h      | Pull requests, issues and reviews, per item                    |
-| `repo`          | 1h      | Stars, forks, languages, topics, releases, rulesets            |
-| `security`      | 1h      | Dependabot and code scanning alerts                            |
-| `discussions`   | 2h      | The forum half of a repository                                 |
-| `analyses`      | 6h      | Code scanning analyses, which GitHub prunes                    |
-| `billing`       | 6h      | Usage per day, product, SKU and repository                     |
-| `planning`      | 6h      | Labels and milestones                                          |
-| `settings`      | 6h      | Webhooks and their deliveries, environments, deploy keys       |
-| `stars`         | 6h      | Stars per day for every repository, and the stargazer walk once, then the newest hundred |
-| `traffic`       | 6h      | The whole 14-day window, rewritten                             |
-| `account`       | 12h     | Profile, contribution calendar, contribution totals            |
-| `forks`         | 12h     | Who forked, and when                                            |
-| `outbound`      | 12h     | Stars given, and work in other people's repositories           |
-| `profile`       | 12h     | Packages, gists, social accounts                               |
-| `stats`         | 12h     | Commits per week, the punch card, the workflow definitions     |
-| `totals`        | 12h     | The lifetime numbers, asked of GitHub rather than added up here |
-| `achievements`  | 24h     | The profile badges, and the distance to each next tier         |
-| `branches`      | 24h     | Which branches are live and how stale each tip is              |
-| `inventory`     | 24h     | What a workflow's own token may do, both secret stores, default code scanning |
-| `keys`          | 24h     | The account's SSH and GPG keys, and when each expires          |
-| `policyfiles`   | 24h     | SECURITY.md, CODEOWNERS, dependabot.yml and FUNDING.yml        |
-| `rulesets`      | 24h     | Every version of every ruleset's changelog                     |
-| `deps`          | off     | The dependency SBOM of each repository, and what changed       |
-| `history`       | off     | Each year's contribution calendar, the current one included    |
-| `joblogs`       | off     | The tail of every failed job's log                             |
+| Family         | Default | Collects                                                                                 |
+| -------------- | ------- | ---------------------------------------------------------------------------------------- |
+| `actions`      | 15m     | Workflow runs, jobs, steps, the Actions cache                                            |
+| `ratelimit`    | 15m     | What the collector has left to spend, in each budget                                     |
+| `activity`     | 30m     | The repository activity log, where a force push is recorded                              |
+| `events`       | 30m     | The account event feed, which keeps only the last 300                                    |
+| `notifs`       | 30m     | The notification inbox                                                                   |
+| `artifacts`    | 1h      | Artifacts and their expiry                                                               |
+| `commits`      | 1h      | Lines changed and signature state, per commit                                            |
+| `deployments`  | 1h      | Deployments and their environments, batched over every repository                        |
+| `issueevents`  | 1h      | The timeline of what moved: labels, assignments, transitions                             |
+| `issues`       | 1h      | Pull requests, issues and reviews, per item                                              |
+| `repo`         | 1h      | Stars, forks, languages, topics, releases, rulesets                                      |
+| `security`     | 1h      | Dependabot and code scanning alerts                                                      |
+| `discussions`  | 2h      | The forum half of a repository                                                           |
+| `analyses`     | 6h      | Code scanning analyses, which GitHub prunes                                              |
+| `billing`      | 6h      | Usage per day, product, SKU and repository                                               |
+| `planning`     | 6h      | Labels and milestones                                                                    |
+| `settings`     | 6h      | Webhooks and their deliveries, environments, deploy keys                                 |
+| `stars`        | 6h      | Stars per day for every repository, and the stargazer walk once, then the newest hundred |
+| `traffic`      | 6h      | The whole 14-day window, rewritten                                                       |
+| `account`      | 12h     | Profile, contribution calendar, contribution totals                                      |
+| `forks`        | 12h     | Who forked, and when                                                                     |
+| `outbound`     | 1h      | Stars given, and work in other people's repositories                                     |
+| `profile`      | 12h     | Packages, gists, social accounts                                                         |
+| `stats`        | 12h     | Commits per week, the punch card, the workflow definitions                               |
+| `totals`       | 12h     | The lifetime numbers, asked of GitHub rather than added up here                          |
+| `achievements` | 24h     | The profile badges, and the distance to each next tier                                   |
+| `branches`     | 24h     | Which branches are live and how stale each tip is                                        |
+| `inventory`    | 24h     | What a workflow's own token may do, both secret stores, default code scanning            |
+| `keys`         | 24h     | The account's SSH and GPG keys, and when each expires                                    |
+| `policyfiles`  | 24h     | SECURITY.md, CODEOWNERS, dependabot.yml and FUNDING.yml                                  |
+| `rulesets`     | 24h     | Every version of every ruleset's changelog                                               |
+| `deps`         | off     | The dependency SBOM of each repository, and what changed                                 |
+| `history`      | off     | Each year's contribution calendar, the current one included                              |
+| `joblogs`      | off     | The tail of every failed job's log                                                       |
 
 Setting any of them to `0` switches it off entirely. See
 [cadences](https://jmrp.io/docs/ghchronicle/configuration/cadences/).
@@ -551,11 +551,37 @@ that a sweep reads.
 - The archived repositories, in full, whatever `include_archived` says. Their
   history is the account's history and it never moves again, which is exactly
   why a sweep leaves them out and why one walk of them is enough. Forks stay
-  as configured. A sweep still writes the one row each archived repository
-  has, the date it was archived: the listing it already pays for says which,
-  and one query per `totals` sweep says when.
+  as configured. What does still move on an archived repository, its stars,
+  forks and watchers, a sweep reads without a backfill: the listing it already
+  pays for says which repositories are archived, and every `totals` sweep asks
+  about all of them, one query per twenty five, for two rows each. One is
+  `gh_repo_archived`, dated when the repository was archived. The other is its
+  `gh_repo_total`, stamped at the sweep like a collected repository's, and
+  that is the row the account's star and fork totals are read from.
 - Every pull request and issue, in pages of fifty, where a sweep reads what
   changed since the sweep before and one whole page a day.
+- Every pull request and issue the account opened in other people's
+  repositories that has since been merged or closed, in pages of a hundred
+  ordered by when each one last moved, where a sweep reads each of the three
+  closed states back to a cadence before the sweep before. That is enough for
+  a sweep because a merge or a close moves the item to the top, however long
+  ago it was opened, and it is one page unless more than a hundred items
+  moved in that time; a sweep that read one page and no more lost the item
+  that a hundred later updates, a bot locking old threads or a relabel, had
+  pushed onto the second. The ones still open are bounded by neither a page nor a date:
+  every sweep reads them all, since each one gets a row for every day it stays
+  open. In 2.5.1 and earlier each of the five searches read its newest
+  hundred and stopped, on a sweep and on a backfill alike.
+
+  GitHub serves a thousand results of any search and no more, so an account
+  past a thousand in one of those states keeps the thousand that moved most
+  recently. That is said in the log, once per count, rather than left to show
+  as two panels that disagree:
+
+  ```text
+  level=WARN msg="outbound search read fewer items than it counts, GitHub serves a thousand at most" kind=pull_request state=merged count=2860 read=1000
+  ```
+
 - Every page of artifacts, of repository activity and of code scanning
   analyses, where a sweep reads five, two and one.
 - Every release, deployment and discussion, and every Dependabot and code

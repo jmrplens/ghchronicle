@@ -134,11 +134,22 @@ func TestRepoFormatsMatchGrafanas(t *testing.T) {
 		{"$repo", one, "", "o/it's"},
 		{"$repo", two, "*", "*"},
 		{"${repo:lucene}", two, "*", "*"},
+		// The text of All is its name, with an allValue or without one: the
+		// SQL dashboards let the archived repositories the picker does not
+		// list into gh_repo_total by it.
+		{"${repo:text}", two, "", "All"},
+		{"${repo:text}", two, "*", "All"},
 	} {
 		got := Vars{Repos: tc.repos, AllValue: tc.all}.Apply(map[string]any{"q": "[" + tc.token + "]"})
 		if got["q"] != "["+tc.want+"]" {
 			t.Errorf("%s over %v (allValue %q) = %v, want [%s]", tc.token, tc.repos, tc.all, got["q"], tc.want)
 		}
+	}
+	// Repositories picked are named by their own text, which is what keeps
+	// the archived ones out of a panel the reader narrowed.
+	picked := Vars{Repos: two, Text: "o/a + o/it's"}.Apply(map[string]any{"q": "[${repo:text}]"})
+	if picked["q"] != "[o/a + o/it's]" {
+		t.Errorf("${repo:text} of a pick = %v, want the names picked", picked["q"])
 	}
 }
 

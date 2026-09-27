@@ -229,8 +229,12 @@ account while REST lists them.
 **`outbound`** is the other half of everything else here. Every other family
 measures what the account owns; this measures what it reads and what it
 contributes to: the stars it gave, and the pull requests it opened in other
-people's repositories. All of it is GraphQL, one point a query: the starred
-list, five issue searches and the two comment walks.
+people's repositories. All of it is GraphQL, one point a page: the starred
+list, five issue searches and the two comment walks. A sweep reads every page
+of the two searches for what is still open, and the other three, which are
+ordered by what moved last, back to a cadence before the sweep before: their
+first page, unless more than a hundred items moved in that time. A backfill
+reads those three to the end as well.
 
 **`totals`** asks GitHub for the numbers that are true since the beginning:
 pull requests merged ever, commits ever, issues opened ever, and the whole life
@@ -243,7 +247,9 @@ file limit, forty thousand where this was measured. Search reports a total for
 any query and GraphQL reports one for any connection, so one query of ten
 aliased searches, one REST search for
 the commit count and one batched query give a number that is one row and is
-right on the first sweep of a fresh install.
+right on the first sweep of a fresh install. The archived repositories the
+default filter sets aside are in it too, from the query that dates their
+archive, so their stars and forks stay in the account's totals.
 
 **`ratelimit`** is the only measurement the collector takes of itself: what is
 left in each of GitHub's fifteen independent budgets and when each resets.

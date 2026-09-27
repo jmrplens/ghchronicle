@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -18,13 +19,19 @@ import (
 
 // archivedGitHub is a GitHub whose listing holds one live repository, one
 // archived and one archived fork, and whose GraphQL answers the three
-// queries the totals family sends. archivedQueries counts the one this test
-// is about: the query for the archive dates of the repositories set aside.
+// queries the totals family sends. dates counts the one this test is about:
+// the query for the repositories set aside, which is where their archive
+// dates and their star counts come from.
 type archivedGitHub struct {
 	mu       sync.Mutex
 	archived bool // whether o/old is still archived, which a test flips
+	stars    int  // what o/old's stargazerCount answers, which a test moves
 	dates    atomic.Int32
 }
+
+// aliasRepo reads one alias of a batched query: its name and the repository
+// it asks about.
+var aliasRepo = regexp.MustCompile(`(r\d+): repository\(owner: "o", name: "(\w+)"\)`)
 
 func (g *archivedGitHub) handler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
@@ -53,16 +60,22 @@ func (g *archivedGitHub) handler(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case strings.Contains(env.Query, "fragment archived on Repository"):
 			g.dates.Add(1)
+			g.mu.Lock()
+			stars := g.stars
+			g.mu.Unlock()
 			for i := 0; strings.Contains(env.Query, fmt.Sprintf("r%d:", i)); i++ {
 				data[fmt.Sprintf("r%d", i)] = map[string]any{
 					"nameWithOwner": "o/old", "url": "https://github.com/o/old",
 					"createdAt": "2020-05-14T00:00:00Z", "archivedAt": "2026-08-29T15:22:31Z",
+					"isArchived": true, "stargazerCount": stars,
 				}
 			}
 		case strings.Contains(env.Query, "fragment totals on Repository"):
-			data["r0"] = map[string]any{
-				"nameWithOwner": "o/n", "url": "https://github.com/o/n",
-				"createdAt": "2020-01-01T00:00:00Z", "pushedAt": "2026-09-01T00:00:00Z",
+			for _, m := range aliasRepo.FindAllStringSubmatch(env.Query, -1) {
+				data[m[1]] = map[string]any{
+					"nameWithOwner": "o/" + m[2], "url": "https://github.com/o/" + m[2],
+					"createdAt": "2020-01-01T00:00:00Z", "pushedAt": "2026-09-01T00:00:00Z",
+				}
 			}
 		}
 		if err := json.NewEncoder(w).Encode(map[string]any{"data": data}); err != nil {
@@ -149,8 +162,13 @@ func names(repos []collect.Repo) string {
 // hold: the Prometheus one drops a series not rewritten within a day, and
 // the OTLP state keeps the newest batch per series. Unarchived, the
 // repository is collected again and leaves the set.
+//
+// The same query carries the repository's lifetime row, issue #78: an
+// archived repository is still starred and unstarred, and its gh_repo_total
+// follows GitHub's count from one sweep to the next, stamped at each, where
+// up to 2.5.1 only a backfill wrote it, once.
 func TestASweepDatesTheArchiveFromTheListing(t *testing.T) {
-	gh := &archivedGitHub{archived: true}
+	gh := &archivedGitHub{archived: true, stars: 4}
 	got := &kept{}
 	r := sweepRunner(t, gh.handler)
 	r.Sinks = []sink.Sink{got}
@@ -168,13 +186,18 @@ func TestASweepDatesTheArchiveFromTheListing(t *testing.T) {
 		t.Fatalf("first sweep: %d archive rows from %d queries, want one of each",
 			got.measured("gh_repo_archived"), gh.dates.Load())
 	}
-	if got.measured("gh_repo_total") != 1 {
-		t.Errorf("the lifetime batch wrote %d rows, want the collected repository alone", got.measured("gh_repo_total"))
+	if got.measured("gh_repo_total") != 2 {
+		t.Errorf("the first sweep wrote %d lifetime rows, want the collected repository's and o/old's", got.measured("gh_repo_total"))
 	}
+	checkArchivedStars(t, got, 4)
 	first := got.rows("gh_repo_archived")[0]
 
-	// Due again: asked again, and the row is the same row, dated at the
-	// archive and not at the sweep, so every store converges on it.
+	// Due again, and somebody unstarred it: asked again, the archive row is
+	// the same row, dated at the archive and not at the sweep, so every store
+	// converges on it, and the lifetime row says what GitHub says now.
+	gh.mu.Lock()
+	gh.stars = 3
+	gh.mu.Unlock()
 	r.State.LastRun["totals"] = time.Now().Add(-time.Hour)
 	if err := r.Once(t.Context()); err != nil {
 		t.Fatal(err)
@@ -189,8 +212,10 @@ func TestASweepDatesTheArchiveFromTheListing(t *testing.T) {
 	if !first.Time.Equal(time.Date(2026, 8, 29, 15, 22, 31, 0, time.UTC)) {
 		t.Errorf("the row is dated %s, want the archivedAt GitHub answered", first.Time)
 	}
+	checkArchivedStars(t, got, 3)
 
-	// Unarchived: the repository is collected again and nothing is asked.
+	// Unarchived: the repository is collected again, in the lifetime batch
+	// of the collected ones, and the archive query is not asked.
 	gh.mu.Lock()
 	gh.archived = false
 	gh.mu.Unlock()
@@ -202,8 +227,32 @@ func TestASweepDatesTheArchiveFromTheListing(t *testing.T) {
 	if gh.dates.Load() != 2 || names(r.archived) != "" {
 		t.Errorf("unarchived, o/old is still set aside (%q) or asked about (%d queries)", names(r.archived), gh.dates.Load())
 	}
-	if got.measured("gh_repo_total") != 3 {
-		t.Errorf("unarchived, o/old is not in the lifetime batch: %d gh_repo_total rows in all, want 3", got.measured("gh_repo_total"))
+	rows := got.rows("gh_repo_total")
+	if len(rows) != 6 || rows[5].Tags["full_name"] != "o/old" || rows[5].Tags["archived"] != "false" {
+		t.Errorf("unarchived, o/old is not in the lifetime batch of the collected repositories: %v", rows)
+	}
+}
+
+// checkArchivedStars: the newest lifetime row of o/old is tagged archived,
+// carries the stars GitHub answered, and is stamped at the sweep that asked,
+// which was a moment ago, not at the archive or at an earlier sweep.
+func checkArchivedStars(t *testing.T, got *kept, want int) {
+	t.Helper()
+	var newest *sink.Point
+	for _, p := range got.rows("gh_repo_total") {
+		if p.Tags["full_name"] == "o/old" {
+			newest = &p
+		}
+	}
+	switch {
+	case newest == nil:
+		t.Fatal("o/old was set aside and got no lifetime row")
+	case newest.Tags["archived"] != "true":
+		t.Errorf("o/old's lifetime row is tagged archived=%q", newest.Tags["archived"])
+	case newest.Fields["stars"] != want:
+		t.Errorf("o/old's lifetime row counts %v stars, want the %d GitHub answers now", newest.Fields["stars"], want)
+	case time.Since(newest.Time) > time.Minute:
+		t.Errorf("o/old's lifetime row is stamped %s, want the sweep that asked", newest.Time)
 	}
 }
 

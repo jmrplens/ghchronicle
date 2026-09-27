@@ -24,6 +24,24 @@ const (
 	ESF = "repo.keyword:${repo:lucene}"
 )
 
+// RFA is RF for gh_repo_total, the one measurement a sweep writes for a
+// repository set aside for being archived. The picker of the SQL stores lists
+// the repositories with a gh_repo row in the last seven days, and no sweep
+// writes one for a repository set aside: only a backfill does, so a week after
+// the last one RF would leave every one of them out of the account's totals.
+// Under All an archived row passes as well; with repositories picked, only
+// those do, as everywhere else.
+//
+// "All" is the variable's text rather than its value, because the SQL
+// variables have no allValue and All expands to the list itself: the text
+// formatter answers "All" whenever All is selected (MultiValueVariable's
+// getValueText in @grafana/scenes, and templateSrv before it), and a list of
+// names joined by " + " otherwise. A GitHub repository name cannot hold a
+// quote, so the text cannot break out of the literal. The other three stores
+// need nothing of the kind: their All is a wildcard, and a wildcard matches
+// the archived repositories already.
+const RFA = "(" + RF + " OR (archived = 'true' AND '${repo:text}' = 'All'))"
+
 // Stores names each store as the prose refers to it.
 var Stores = map[string]string{
 	"influxdb":      "InfluxDB",
@@ -488,6 +506,14 @@ func idx(m string) string { return "ghchronicle-" + m }
 // one datasource over ghchronicle-* serves every panel, then the filters.
 func lq(m string, clauses ...string) string {
 	return strings.Join(append([]string{"_index:" + idx(m)}, clauses...), " AND ")
+}
+
+// liveOrArchivedES is liveOrArchived's documents: a live repository's out of
+// gh_repo and an archived one's out of gh_repo_total, in one query so that a
+// terms bucket per full_name takes the newest of either.
+func liveOrArchivedES() string {
+	return fmt.Sprintf("((_index:%s AND archived.keyword:false) OR (_index:%s AND archived.keyword:true)) AND %s",
+		idx("gh_repo"), idx("gh_repo_total"), ESF)
 }
 
 func esq(m string, metrics, buckets []any, ref string, where []string, alias string) Target {

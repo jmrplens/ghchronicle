@@ -64,7 +64,7 @@
     },
     {
       "datasource": "${DS_GRAPHITE}",
-      "description": "Public repositories of the account, and the current stars and forks of the selected ones, summed over the newest row of each repository rather than over every row in the range.",
+      "description": "Public repositories of the account, and the current stars and forks of the selected ones, summed over the newest row of each repository rather than over every row in the range. With All selected that includes the archived repositories the default filter sets aside, which the picker stops listing once the last backfill is behind it: people still star and fork them, and each totals sweep reads their counts again, twelve hours apart by default, so a range shorter than that can leave them out. Each repository counts once, by its full name. The repository count is GitHub's own count of the account's public repositories and not the set the sums are taken over: those are the repositories the sweeps collect and the archived ones above, private ones included, and forks left out unless `include_forks` is on.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -116,13 +116,13 @@
         {
           "datasource": "${DS_GRAPHITE}",
           "refId": "B",
-          "target": "alias(sumSeries(keepLastValue(github.repo.*.*.*.*.*.*.*.$repo.*.stars)), \"Stars\")",
+          "target": "alias(sumSeries(groupByNode(group(aliasByNode(keepLastValue(github.repo.false.*.*.*.*.*.*.$repo.*.stars), 5), aliasByNode(keepLastValue(github.repo_total.true.*.*.*.$repo.*.stars), 4)), 0, \"max\")), \"Stars\")",
           "textEditor": true
         },
         {
           "datasource": "${DS_GRAPHITE}",
           "refId": "C",
-          "target": "alias(sumSeries(keepLastValue(github.repo.*.*.*.*.*.*.*.$repo.*.forks)), \"Forks\")",
+          "target": "alias(sumSeries(groupByNode(group(aliasByNode(keepLastValue(github.repo.false.*.*.*.*.*.*.$repo.*.forks), 5), aliasByNode(keepLastValue(github.repo_total.true.*.*.*.$repo.*.forks), 4)), 0, \"max\")), \"Forks\")",
           "textEditor": true
         }
       ],
@@ -379,7 +379,7 @@
       "panels": [
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Every pull request this account has had merged, anywhere, and every one it has reviewed, including in repositories it does not own; the public commits attributed to it, from the commit search index; the issues it opened; and the two numbers a sweep over one's own repositories cannot see at all, pull requests merged and comments left in other people's repositories. All counted by GitHub's own search rather than by adding up rows.",
+          "description": "Every pull request this account has had merged, anywhere, and every one it has reviewed, including in repositories it does not own; the public commits attributed to it, from the commit search index; the issues it opened; and the two numbers a sweep over one's own repositories cannot see at all, both about repositories the account does not own: its pull requests merged there, and the issues and pull requests it commented on there, each counted once however many comments it left. All counted by GitHub's own search rather than by adding up rows.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -455,7 +455,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "F",
-              "target": "alias(keepLastValue(github.account_total.*.commented_elsewhere), \"Comments elsewhere\")",
+              "target": "alias(keepLastValue(github.account_total.*.commented_elsewhere), \"Threads commented elsewhere\")",
               "textEditor": true
             }
           ],
@@ -464,7 +464,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "The whole life of each repository in one row: not what happened in the dashboard range, but everything there has ever been. The repository picker holds every repository the account can see, its forks and its archived ones alongside its own, so a count here is over all of them until the picker is narrowed. Sorted by commits, a fork of a busy project outranks anything the account wrote, 370,296 commits against 3,385 on the account this was measured on, so the table opens with the account's own repositories first and the forks under them, both ranked by commits. The fork and archived flags are columns here rather than a filter, the title being what it is, and a click on either sorts by it. In Graphite two facts landing in the same storage slot of one series are reduced to one point, so the medians are over what the storage kept. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "The whole life of each repository in one row: not what happened in the dashboard range, but everything there has ever been. The repository picker holds the repositories the sweeps collect: forks too when `include_forks` is on, and archived ones when `include_archived` is on and for a while after a backfill, which collects them either way. A count here is over every repository the picker holds until it is narrowed. Sorted by commits, a fork of a busy project outranks anything the account wrote, 370,296 commits against 3,385 on the account this was measured on, so the table opens with the account's own repositories first and the forks under them, both ranked by commits. The fork and archived flags are columns here rather than a filter, the title being what it is, and a click on either sorts by it. With All selected the archived repositories the picker does not list are here too, with their current counts: the default filter walks none of their history, but every totals sweep reads this row of each of them again. In Graphite two facts landing in the same storage slot of one series are reduced to one point, so the medians are over what the storage kept. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -536,7 +536,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(aliasByNode(keepLastValue(github.repo_total.*.*.*.*.$repo.*.commits), 6))",
+              "target": "removeEmptySeries(aliasByNode(groupByNodes(aliasByNode(keepLastValue(github.repo_total.*.*.*.*.$repo.*.commits), 4, 6), \"max\", 0, 1), 1))",
               "textEditor": true
             }
           ],
@@ -5853,7 +5853,7 @@
       "panels": [
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "How many commits landed in the window, how many lines each way, and what share carried a signature GitHub could verify. A commit with no signature at all is a different fact from one whose signature failed to verify, and both are counted separately in the chart below. The repository picker holds every repository the account can see, its forks and its archived ones alongside its own, so a count here is over all of them until the picker is narrowed. This panel keeps its own range of ninety days whatever the page is set to. Every commit is a row of its own in the store, and at about ten months of them the query is refused for opening too many files, which the reader would see as an empty panel rather than as an error.",
+          "description": "How many commits landed in the window, how many lines each way, and what share carried a signature GitHub could verify. A commit with no signature at all is a different fact from one whose signature failed to verify, and both are counted separately in the chart below. The repository picker holds the repositories the sweeps collect: forks too when `include_forks` is on, and archived ones when `include_archived` is on and for a while after a backfill, which collects them either way. A count here is over every repository the picker holds until it is narrowed. This panel keeps its own range of ninety days whatever the page is set to. Every commit is a row of its own in the store, and at about ten months of them the query is refused for opening too many files, which the reader would see as an empty panel rather than as an error.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -6125,7 +6125,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "The twenty authors with the most commits in the window. The repository picker holds every repository the account can see, its forks and its archived ones alongside its own, so a count here is over all of them until the picker is narrowed. On an account with forks of busy projects the upstream authors are the top of this table, which is the honest answer to the question as asked: narrow the picker to read it as the account's own work. This panel keeps its own range of ninety days whatever the page is set to. Every commit is a row of its own in the store, and at about ten months of them the query is refused for opening too many files, which the reader would see as an empty panel rather than as an error. Graphite reduces the churn of each author: how many commits, and the median. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others.",
+          "description": "The twenty authors with the most commits in the window. The repository picker holds the repositories the sweeps collect: forks too when `include_forks` is on, and archived ones when `include_archived` is on and for a while after a backfill, which collects them either way. A count here is over every repository the picker holds until it is narrowed. On an account with forks of busy projects the upstream authors are the top of this table, which is the honest answer to the question as asked: narrow the picker to read it as the account's own work. This panel keeps its own range of ninety days whatever the page is set to. Every commit is a row of its own in the store, and at about ten months of them the query is refused for opening too many files, which the reader would see as an empty panel rather than as an error. Graphite reduces the churn of each author: how many commits, and the median. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others.",
           "fieldConfig": {
             "defaults": {
               "custom": {

@@ -94,6 +94,10 @@ var macros = [][2]string{
 	{"$__timeGroupAlias(time, 1h)", `floor(extract(epoch FROM time) / 3600) * 3600 AS "time"`},
 	{"$__timeGroupAlias(time, 5m)", `floor(extract(epoch FROM time) / 300) * 300 AS "time"`},
 	{"${repo:sqlstring}", "'a','b'"},
+	// What the variable's text is when All is selected, which the two
+	// lifetime panels compare against to let the archived repositories the
+	// picker does not list into gh_repo_total. The list above is All too.
+	{"${repo:text}", "All"},
 }
 
 const usage = `usage: check_postgres [--dump <influxdb-datasource-uid>] <schema.json>`

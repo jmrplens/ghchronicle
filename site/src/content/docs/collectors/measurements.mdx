@@ -365,10 +365,11 @@ than a state: dated at `archivedAt`, a clear-out is visible as the batch it
 was, and a live repository produces no row at all, so counting the rows is
 counting the archive. It does not need `include_archived`. The listing a sweep
 already pays for says which repositories are archived, and the `totals` family
-asks the date of all of them in one GraphQL query of four scalars per
-repository, on every `totals` sweep: one point at that cadence, and the rows
-it rewrites are the same rows, which is what an exporter that keeps only what
-is rewritten needs; the listing cannot supply the date itself, since REST
+asks the date of all of them, beside their lifetime row, in one GraphQL query
+per twenty five repositories, on every `totals` sweep: a point per twenty five
+at that cadence, and the rows it rewrites are the same rows, which is what an
+exporter that keeps only what is rewritten needs; the listing cannot supply the
+date itself, since REST
 carries no `archived_at` and its `updated_at` was measured two seconds to
 eight minutes after the archive. An archived fork under the default fork rule
 is the one kind with no row.
@@ -459,6 +460,23 @@ spells it, with the `[bot]` suffix, on every measurement.
 `gh_discussion` counts comments and replies apart: comments answer the
 discussion, replies answer those, and GitHub's own number on the page is the
 two added together.
+
+`gh_external_contribution` is the work the account did in repositories it does
+not own, from five searches, one per `kind` and `state`: pull requests
+`merged`, `open` and `closed` unmerged, and issues `open` and `closed`. An item
+still open is rewritten at the start of every day it stays open, so a sweep
+reads both open states whole. A closed item is written once, stamped when it
+closed, so the three closed states are read by when each item last moved: a
+sweep reads each back to a cadence before the sweep before, which holds
+whatever merged or closed since then however long ago it was opened and however
+many other items moved in between, and is one page of a hundred unless more
+than a hundred did. A backfill reads on until the pages run out or reach
+`backfill.since`. GitHub serves a thousand
+results of any search and no more, so an account past a thousand in one state
+has the thousand that moved most recently, and the log says so at warning.
+`gh_account_total.pulls_merged_elsewhere` and `issues_elsewhere` are GitHub's
+own counts and are right whatever the cap. An item that was open and later
+closed keeps its `open` rows beside the closed one, since `state` is a tag.
 
 ## Continuous integration
 
@@ -867,6 +885,22 @@ wrong one for a lifetime count. GitHub counts them itself, in one search request
 each, so the number is one row and is right on the first sweep of a fresh
 install.
 
+The three fields that end in `_elsewhere` share one meaning of elsewhere: in a
+repository the account does not own, since the search qualifier `-user:LOGIN`
+leaves out the ones it does, so an organisation's repositories count as
+elsewhere even when the account belongs to it. `pulls_merged_elsewhere` is its pull
+requests merged there and `issues_elsewhere` the issues it opened there.
+`commented_elsewhere` is the issues and pull requests there that carry at least
+one comment of its own (`commenter:LOGIN -user:LOGIN`): threads, not comments,
+each counted once however many it left. One it opened counts only if it also
+commented, since the opening post is not a comment: measured on 2026-09-26, 33
+of the 102 threads the account had opened elsewhere. In 2.5.1 and earlier it
+was `commenter:LOGIN -author:LOGIN`, which left out the threads the account
+opened and kept every one in its own repositories: 125 where the definition
+above gives 55 on the account this was read against, 103 of them at home and 54
+of those Dependabot pull requests. A store holding rows from before the upgrade
+sees the series drop by that difference on the first sweep after it.
+
 `gh_dependency_change` writes a row on every sweep of the `deps` family, not
 only when a dependency moved: a range with no change, a head that did not move
 and the first sweep, which has no base yet, each write one row with `change`
@@ -961,6 +995,22 @@ same query at no extra cost and is a second, independent reading of the switch
 `gh_security_feature{feature="dependabot"}.enabled` reports: one is the
 repository's own setting, the other is whether the listing actually answered.
 Two sources that disagree is the case worth seeing.
+
+`gh_repo_total` is where an archived repository's stars and forks are read
+from, on the Overview and in _Every repository, ever_, and `gh_repo` is not.
+One the default filter sets aside for being archived gets no `gh_repo` row from
+a sweep, since no family walks it, and has only the one a backfill wrote, but
+it is still starred, unstarred and forked, so the `totals` family writes its
+`gh_repo_total` on every sweep from the query that dates its archive: the same
+tags and fields a collected repository's row has, `archived` true, stamped at
+the sweep. Up to 2.5.1 only a backfill wrote it, once, and on 2026-09-26 one
+such row said 4 stars where GitHub said 3. A live repository's stars and forks
+on the Overview still come from `gh_repo`, which a sweep writes every hour
+where `totals` writes every twelve. It gets no `gh_repo_policy`. That
+query asks about twenty five repositories at a time: measured the same day,
+the gateway answered the lifetime row of fifty archived repositories once in
+9.2 seconds and refused it twice after about eleven, and answered twenty five
+in under seven.
 
 The three dependency measurements are off by default. The SBOM is one call and
 a megabyte or two per repository, and only the aggregate is kept: a single

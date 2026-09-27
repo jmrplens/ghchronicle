@@ -146,10 +146,13 @@ const jobLogPath = repoPath + "/actions/jobs/2000000011/logs"
 // probe is a subset of the account query, and the totals fragment mentions
 // pullRequests( as well.
 //
-// The three fragment names below are matched first because a fragment name
-// cannot appear in any other query, so they can neither be shadowed nor shadow
-// anything.
+// The fragment names below are matched first because a fragment name cannot
+// appear in any other query, so they can neither be shadowed nor shadow
+// anything. The archived fragment has to be: it carries the lifetime counts,
+// pullRequests( among them, and would otherwise be answered with pull
+// requests.
 var graphQL = []struct{ marker, fixture string }{
+	{"fragment archived on Repository", "graphql_repo_archived.json"},
 	{"fragment branchInventory on Repository", "graphql_branches.json"},
 	{"fragment deploypage on DeploymentConnection", "graphql_deployments.json"},
 	{"fragment policyfiles on Repository", "graphql_policy_files.json"},

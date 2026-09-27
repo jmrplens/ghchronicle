@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/jmrplens/ghchronicle/v2/internal/config"
 )
 
 // TestTheStateCommentAccountsForEveryFieldItKeeps reads this package's own
@@ -233,5 +235,46 @@ func TestAStateFromBeforeTheStarHistoryReadsEveryHistoryOnce(t *testing.T) {
 	}
 	if !saved.HistoryDue("o/b") {
 		t.Error("a repository never read reads as read")
+	}
+}
+
+// TestAFamilyRunsOnEveryTickItsCadenceReaches sweeps the way the loop does:
+// a ticker at the shortest cadence, and the sweep's clock read after the tick
+// arrives, a little late by an amount that varies from tick to tick. A family
+// asked for its interval to the millisecond waited a second tick whenever
+// that lateness shrank: in production on 2026-09-26 the quarter-hour
+// families ran every 24 minutes on average and the hourly ones every 69.
+func TestAFamilyRunsOnEveryTickItsCadenceReaches(t *testing.T) {
+	t.Parallel()
+	cfg := &config.Config{GitHub: config.GitHub{Token: "t"}, Targets: config.Targets{User: "u"}, AllowNoSinks: true}
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("Validate: %v", err)
+	}
+	r := &Runner{Cfg: cfg, State: LoadState(filepath.Join(t.TempDir(), "state.json"))}
+	tick, _ := r.tick()
+	if tick != 15*time.Minute {
+		t.Fatalf("tick = %s, want the quarter hour the built-in cadences give", tick)
+	}
+	start := time.Date(2026, 9, 26, 0, 0, 0, 0, time.UTC)
+	runs := map[string]int{}
+	const ticks = 96 // a day
+	for i := range ticks {
+		// Late by 3 ms on even ticks and 1 ms on odd ones, so every other
+		// gap between two sweeps is 2 ms short of a tick.
+		late := time.Millisecond * time.Duration(1+2*((i+1)%2))
+		now := start.Add(time.Duration(i)*tick + late)
+		for _, family := range []string{"actions", "events", "repo", "traffic"} {
+			every, _ := r.Cfg.Interval(family)
+			if r.due(family, every, now) {
+				runs[family]++
+				r.State.Mark(family, now)
+			}
+		}
+	}
+	for _, family := range []string{"actions", "events", "repo", "traffic"} {
+		every, _ := r.Cfg.Interval(family)
+		if want := int(ticks * tick / every); runs[family] != want {
+			t.Errorf("%s, every %s, ran %d times in a day of %s ticks, want %d", family, every, runs[family], tick, want)
+		}
 	}
 }

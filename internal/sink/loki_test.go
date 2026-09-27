@@ -537,6 +537,57 @@ func TestLokiReadsTheDemotedStatesFromFields(t *testing.T) {
 	}
 }
 
+// TestLokiSaysWhatHappenedToAnExternalContribution walks every kind, state and
+// merged flag an outbound item can carry. Every line used to read "USER
+// merged REPO#N", open issues included, when who merged a pull request in
+// someone else's repository is not in the row and is seldom its author. The
+// five combinations the searches produce each get their own sentence, and the
+// seven that contradict themselves, an issue merged or a pull request whose
+// state and merged flag disagree, get the neutral one along with a kind or
+// state nobody wrote.
+func TestLokiSaysWhatHappenedToAnExternalContribution(t *testing.T) {
+	const neutral = "octocat's contribution o/r#7"
+	for _, c := range []struct {
+		kind, state string
+		merged      any
+		want        string
+	}{
+		{"pull_request", "open", nil, "octocat's pull request o/r#7 is open"},
+		{"pull_request", "merged", 1, "octocat's pull request o/r#7 was merged"},
+		{"pull_request", "closed", nil, "octocat's pull request o/r#7 was closed without merging"},
+		{"issue", "open", nil, "octocat's issue o/r#7 is open"},
+		{"issue", "closed", nil, "octocat's issue o/r#7 was closed"},
+
+		{"pull_request", "open", 1, neutral},
+		{"pull_request", "merged", nil, neutral},
+		{"pull_request", "closed", 1, neutral},
+		{"issue", "open", 1, neutral},
+		{"issue", "closed", 1, neutral},
+		{"issue", "merged", nil, neutral},
+		{"issue", "merged", 1, neutral},
+
+		{"discussion", "open", nil, neutral},
+		{"pull_request", "draft", nil, neutral},
+		{"", "", nil, neutral},
+	} {
+		fields := map[string]any{"contributions": 1}
+		if c.merged != nil {
+			fields["merged"] = c.merged
+		}
+		p := Point{
+			Measurement: "gh_external_contribution",
+			Tags: map[string]string{
+				"user": "octocat", "full_name": "o/r", "owner": "o", "repo": "r",
+				"number": "7", "kind": c.kind, "state": c.state,
+			},
+			Fields: fields,
+		}
+		if got := lokiEvents["gh_external_contribution"].message(p); got != c.want {
+			t.Errorf("kind %q, state %q, merged %v: message = %q, want %q", c.kind, c.state, c.merged, got, c.want)
+		}
+	}
+}
+
 // lokiRecorder is a push endpoint that keeps every push and answers each with
 // status, or 204 when status is zero.
 type lokiRecorder struct {

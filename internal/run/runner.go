@@ -133,11 +133,11 @@ type Runner struct {
 	// per sweep for as long as the parser lags.
 	markupWarned bool
 
-	// achievementsSaid is every warning the achievements family has already
-	// given, by its text: a count that is a floor and a tier the page
-	// disagrees with are true for weeks, and one line each is what the log
-	// needs to say so.
-	achievementsSaid map[string]bool
+	// said is every warning a family has already given through warnOnce, by
+	// its text: a count that is a floor, a tier the page disagrees with and a
+	// search past GitHub's cap are true for weeks, and one line each is what
+	// the log needs to say so.
+	said map[string]bool
 
 	// forkOverflow is every repository the forks batch of this sweep found
 	// holding more forks than the hundred it reads, which the REST walk then
@@ -297,12 +297,14 @@ func (r *Runner) accountFamilies(ctx context.Context, now time.Time) {
 	})
 	// The lifetime numbers, asked of GitHub rather than added up here, so a
 	// tile that wants "ever" reads one row instead of scanning a table.
-	// The archived repositories set aside ride along here, for the one row
-	// each has, the date it was archived, and every totals sweep asks it
-	// again: one GraphQL query for all of them, at this family's cadence,
-	// and the rows it rewrites are the same rows, so every store converges
-	// on them the way it does on a collected archived repository's. Asking
-	// once and remembering it was tried, and it is what the exporters cannot
+	// The archived repositories set aside ride along here, for the two rows
+	// each has: the date it was archived, and its lifetime row with the
+	// stars and forks it still gains and loses. Every totals sweep asks for
+	// both again, one GraphQL query per twenty five of them at this family's
+	// cadence: the archive row is the same row each time, so every store
+	// converges on it, and the lifetime row is stamped at the sweep like a
+	// collected repository's, so the account's totals count it. Asking once
+	// and remembering it was tried, and it is what the exporters cannot
 	// hold: the Prometheus exporter drops a series not rewritten within a
 	// day, and the OTLP state keeps the newest batch per series, so the count
 	// of archived repositories would have expired, or become the one newly
@@ -337,8 +339,14 @@ func (r *Runner) accountFamilies(ctx context.Context, now time.Time) {
 	r.family(ctx, "profile", now, func() ([]sink.Point, error) {
 		return collect.Profile{Login: user, Walk: r.walk()}.Collect(ctx, r.API, now)
 	})
+	// A search whose pages run out before its count does has met GitHub's
+	// cap of a thousand results, and the rows past it are missing with nothing
+	// failing. Said once per count: the open states are read whole on every
+	// sweep, and an account past the cap stays past it.
 	r.family(ctx, "outbound", now, func() ([]sink.Point, error) {
-		return collect.Outbound{Login: user, Walk: r.walk()}.Collect(ctx, r.API, now)
+		return collect.Outbound{
+			Login: user, Walk: r.walk(), Moved: r.outboundMoved(now), Warn: r.warnOnce,
+		}.Collect(ctx, r.API, now)
 	})
 	// The whole green-squares history of every past year, for one point of
 	// GraphQL each, and the year so far as a daily snapshot. Disabled by
@@ -361,7 +369,7 @@ func (r *Runner) accountFamilies(ctx context.Context, now time.Time) {
 	r.family(ctx, "achievements", now, func() ([]sink.Point, error) {
 		a := collect.Achievements{
 			Login: user, WebBase: collect.WebBaseFor(r.Cfg.GitHub.BaseURL, r.Cfg.GitHub.WebURL),
-			Warn: r.achievementsWarn,
+			Warn: r.warnOnce,
 		}
 		points, err := a.Collect(ctx, r.API, now)
 		if collect.IsMarkupError(err) {
@@ -372,7 +380,7 @@ func (r *Runner) accountFamilies(ctx context.Context, now time.Time) {
 			return nil, nil
 		}
 		for _, d := range collect.Disagreements(points) {
-			r.achievementsWarn("achievement tier disagrees with the profile page, its rule may have changed", "badge", d)
+			r.warnOnce("achievement tier disagrees with the profile page, its rule may have changed", "badge", d)
 		}
 		return points, err
 	})
@@ -412,7 +420,7 @@ var batchOnlyFamilies = map[string]bool{
 func (r *Runner) repoFamilies(ctx context.Context, now time.Time) error {
 	for _, family := range perRepoFamilies {
 		every, enabled := r.Cfg.Interval(family)
-		if !enabled || (!r.prime && !r.State.Due(family, every, now)) {
+		if !enabled || (!r.prime && !r.due(family, every, now)) {
 			continue
 		}
 		// A family the interrupted walk finished is not run again. Its rows
@@ -866,6 +874,26 @@ func (r *Runner) pulls(repo collect.Repo, now time.Time) collect.Pulls {
 	return collect.Pulls{First: min(first, 10), Walk: collect.Walk{Pages: -1, Since: since}}
 }
 
+// outboundMoved is how far back a sweep's closed outbound searches read: a
+// cadence before the outbound sweep before this one, the margin the pull
+// request walk above keeps too, and two cadences when there is no record of
+// one. A closed item moves to the top of its search when it closes, so reading
+// back to there catches every item closed since, however long the collector
+// was down and however many other items moved in between; a page count alone
+// lost the one that a hundred later updates pushed onto the second page. A
+// backfill's Walk carries its own bound, so it gets none.
+func (r *Runner) outboundMoved(now time.Time) time.Time {
+	if r.Backfill {
+		return time.Time{}
+	}
+	every, _ := r.Cfg.Interval("outbound")
+	since := now.Add(-2 * every)
+	if last, ran := r.State.LastRun["outbound"]; ran && last.Before(since) {
+		since = last.Add(-every)
+	}
+	return since
+}
+
 // discussionPoints collects the discussions of a repository whose forum is
 // on, and nothing from one whose forum is off. The query costs the same
 // whether or not there is a forum to page, and the listing already said there
@@ -1036,19 +1064,19 @@ func (r *Runner) jobLogs(now time.Time) collect.JobLogs {
 }
 
 // family runs one account-wide collector if it is due and within budget.
-// achievementsWarn logs one line per distinct warning of the achievements
-// family. The key is the message and its arguments rendered as text, so the
+// warnOnce logs one line per distinct warning a collector hands back through
+// its Warn. The key is the message and its arguments rendered as text, so the
 // same floor or the same disagreement is one line however many days it holds,
 // and a new count or a new badge is a new line.
-func (r *Runner) achievementsWarn(msg string, args ...any) {
+func (r *Runner) warnOnce(msg string, args ...any) {
 	key := fmt.Sprint(append([]any{msg}, args...)...)
-	if r.achievementsSaid[key] {
+	if r.said[key] {
 		return
 	}
-	if r.achievementsSaid == nil {
-		r.achievementsSaid = map[string]bool{}
+	if r.said == nil {
+		r.said = map[string]bool{}
 	}
-	r.achievementsSaid[key] = true
+	r.said[key] = true
 	r.Log.Warn(msg, args...)
 }
 
@@ -1057,7 +1085,7 @@ func (r *Runner) family(ctx context.Context, name string, now time.Time, run fun
 		return
 	}
 	every, enabled := r.Cfg.Interval(name)
-	if !enabled || (!r.prime && !r.State.Due(name, every, now)) {
+	if !enabled || (!r.prime && !r.due(name, every, now)) {
 		return
 	}
 	// Already written by the walk this run resumes. An account family is its
@@ -1327,6 +1355,26 @@ func (r *Runner) Serve(ctx context.Context) error {
 			}
 		}
 	}
+}
+
+// due reports whether a family's interval has elapsed, to within half a tick.
+//
+// The loop wakes on a ticker and reads the sweep's clock after it wakes, a
+// little late by an amount that changes from tick to tick, so two sweeps a
+// tick apart can be a few milliseconds less than a tick apart. Asked to the
+// millisecond, a family whose cadence is a whole number of ticks then waited
+// one tick more about half the time: in production on 2026-09-26 the quarter
+// hour families ran every 24 minutes on average, the half hour ones every 39
+// and the hourly ones every 69. Half a tick absorbs any such lateness and
+// still cannot let a family run a tick before its interval.
+func (r *Runner) due(family string, every time.Duration, now time.Time) bool {
+	return r.State.Due(family, every-r.slack(), now)
+}
+
+// slack is half a tick: how early a sweep may find an interval elapsed.
+func (r *Runner) slack() time.Duration {
+	tick, _ := r.tick()
+	return tick / 2
 }
 
 // tick is how often the loop wakes to ask which families are due, and where

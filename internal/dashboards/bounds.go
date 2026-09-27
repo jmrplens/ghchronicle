@@ -88,9 +88,17 @@ func bounded() Opts { return Opts{"time_from": commitWindow} }
 // unactionable rows out instead: see repoFlagsJoin. This sentence stays on the
 // panels that count, where leaving rows out would be answering a different
 // question from the one the title asks.
-const forksIncluded = "The repository picker holds every repository the account can see, " +
-	"its forks and its archived ones alongside its own, so a count here is over all of " +
-	"them until the picker is narrowed."
+//
+// What the picker holds is what the sweeps collect, so the sentence names the
+// settings and not a number: with include_forks and include_archived off, the
+// default, it lists neither kind, and it lists the archived ones for a while
+// after a backfill, which walks them whatever the setting says. How long
+// depends on the store: seven days of gh_repo in the SQL stores, the range in
+// Elasticsearch and Prometheus, and as long as the path exists in Graphite.
+const forksIncluded = "The repository picker holds the repositories the sweeps collect: " +
+	"forks too when `include_forks` is on, and archived ones when `include_archived` is on " +
+	"and for a while after a backfill, which collects them either way. A count here is " +
+	"over every repository the picker holds until it is narrowed."
 
 // archivedLeftOut is what a list of what to do next says where it leaves the
 // archived repositories out. A pull request in one cannot be merged, an issue

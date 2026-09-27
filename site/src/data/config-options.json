@@ -983,7 +983,7 @@
     {
       "name": "outbound",
       "group": "account",
-      "every": "12h"
+      "every": "1h"
     },
     {
       "name": "planning",

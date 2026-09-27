@@ -64,7 +64,7 @@
     },
     {
       "datasource": "${DS_INFLUXDB}",
-      "description": "Public repositories of the account, and the current stars and forks of the selected ones, summed over the newest row of each repository rather than over every row in the range.",
+      "description": "Public repositories of the account, and the current stars and forks of the selected ones, summed over the newest row of each repository rather than over every row in the range. With All selected that includes the archived repositories the default filter sets aside, which the picker stops listing once the last backfill is behind it: people still star and fork them, and each totals sweep reads their counts again, twelve hours apart by default, so a range shorter than that can leave them out. Each repository counts once, by its full name. The repository count is GitHub's own count of the account's public repositories and not the set the sums are taken over: those are the repositories the sweeps collect and the archived ones above, private ones included, and forks left out unless `include_forks` is on.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -118,7 +118,7 @@
           "datasource": "${DS_INFLUXDB}",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT SUM(stars) AS \"Stars\", SUM(forks) AS \"Forks\" FROM (SELECT repo, stars, forks FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo ORDER BY time DESC) AS rn FROM gh_repo WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE rn = 1)",
+          "rawSql": "SELECT SUM(stars) AS \"Stars\", SUM(forks) AS \"Forks\" FROM (SELECT full_name, stars, forks FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn FROM (SELECT time, full_name, stars, forks FROM gh_repo WHERE $__timeFilter(time) AND archived = 'false' AND repo IN (${repo:singlequote}) UNION ALL SELECT time, full_name, stars, forks FROM gh_repo_total WHERE $__timeFilter(time) AND archived = 'true' AND (repo IN (${repo:singlequote}) OR (archived = 'true' AND '${repo:text}' = 'All'))) u) x WHERE rn = 1)",
           "refId": "B"
         }
       ],
@@ -325,7 +325,7 @@
       "panels": [
         {
           "datasource": "${DS_INFLUXDB}",
-          "description": "Every pull request this account has had merged, anywhere, and every one it has reviewed, including in repositories it does not own; the public commits attributed to it, from the commit search index; the issues it opened; and the two numbers a sweep over one's own repositories cannot see at all, pull requests merged and comments left in other people's repositories. All counted by GitHub's own search rather than by adding up rows.",
+          "description": "Every pull request this account has had merged, anywhere, and every one it has reviewed, including in repositories it does not own; the public commits attributed to it, from the commit search index; the issues it opened; and the two numbers a sweep over one's own repositories cannot see at all, both about repositories the account does not own: its pull requests merged there, and the issues and pull requests it commented on there, each counted once however many comments it left. All counted by GitHub's own search rather than by adding up rows.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -372,7 +372,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT pulls_merged AS \"Pull requests merged\", pulls_reviewed AS \"Pull requests reviewed\", commits AS \"Commits\", issues_opened AS \"Issues opened\", pulls_merged_elsewhere AS \"Merged elsewhere\", commented_elsewhere AS \"Comments elsewhere\" FROM gh_account_total WHERE $__timeFilter(time) ORDER BY time DESC LIMIT 1",
+              "rawSql": "SELECT pulls_merged AS \"Pull requests merged\", pulls_reviewed AS \"Pull requests reviewed\", commits AS \"Commits\", issues_opened AS \"Issues opened\", pulls_merged_elsewhere AS \"Merged elsewhere\", commented_elsewhere AS \"Threads commented elsewhere\" FROM gh_account_total WHERE $__timeFilter(time) ORDER BY time DESC LIMIT 1",
               "refId": "A"
             }
           ],
@@ -381,7 +381,7 @@
         },
         {
           "datasource": "${DS_INFLUXDB}",
-          "description": "The whole life of each repository in one row: not what happened in the dashboard range, but everything there has ever been. The repository picker holds every repository the account can see, its forks and its archived ones alongside its own, so a count here is over all of them until the picker is narrowed. Sorted by commits, a fork of a busy project outranks anything the account wrote, 370,296 commits against 3,385 on the account this was measured on, so the table opens with the account's own repositories first and the forks under them, both ranked by commits. The fork and archived flags are columns here rather than a filter, the title being what it is, and a click on either sorts by it.",
+          "description": "The whole life of each repository in one row: not what happened in the dashboard range, but everything there has ever been. The repository picker holds the repositories the sweeps collect: forks too when `include_forks` is on, and archived ones when `include_archived` is on and for a while after a backfill, which collects them either way. A count here is over every repository the picker holds until it is narrowed. Sorted by commits, a fork of a busy project outranks anything the account wrote, 370,296 commits against 3,385 on the account this was measured on, so the table opens with the account's own repositories first and the forks under them, both ranked by commits. The fork and archived flags are columns here rather than a filter, the title being what it is, and a click on either sorts by it. With All selected the archived repositories the picker does not list are here too, with their current counts: the default filter walks none of their history, but every totals sweep reads this row of each of them again.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -484,7 +484,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT repo AS \"Repository\", MAX(commits) AS \"Commits\", MAX(fork) AS \"Fork\", MAX(archived) AS \"Archived\", MAX(pulls_merged) AS \"Merged\", MAX(issues) AS \"Issues\", MAX(releases) AS \"Releases\", MAX(stars) AS \"Stars\", MAX(branches) AS \"Branches\", MAX(tags) AS \"Tags\", MAX(url) AS \"Link\" FROM gh_repo_total WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) GROUP BY 1 ORDER BY 2 DESC",
+              "rawSql": "SELECT repo AS \"Repository\", MAX(commits) AS \"Commits\", MAX(fork) AS \"Fork\", MAX(archived) AS \"Archived\", MAX(pulls_merged) AS \"Merged\", MAX(issues) AS \"Issues\", MAX(releases) AS \"Releases\", MAX(stars) AS \"Stars\", MAX(branches) AS \"Branches\", MAX(tags) AS \"Tags\", MAX(url) AS \"Link\" FROM gh_repo_total WHERE $__timeFilter(time) AND (repo IN (${repo:singlequote}) OR (archived = 'true' AND '${repo:text}' = 'All')) GROUP BY 1 ORDER BY 2 DESC",
               "refId": "A"
             }
           ],
@@ -5773,7 +5773,7 @@
       "panels": [
         {
           "datasource": "${DS_INFLUXDB}",
-          "description": "How many commits landed in the window, how many lines each way, and what share carried a signature GitHub could verify. A commit with no signature at all is a different fact from one whose signature failed to verify, and both are counted separately in the chart below. The repository picker holds every repository the account can see, its forks and its archived ones alongside its own, so a count here is over all of them until the picker is narrowed. This panel keeps its own range of ninety days whatever the page is set to. Every commit is a row of its own in the store, and at about ten months of them the query is refused for opening too many files, which the reader would see as an empty panel rather than as an error.",
+          "description": "How many commits landed in the window, how many lines each way, and what share carried a signature GitHub could verify. A commit with no signature at all is a different fact from one whose signature failed to verify, and both are counted separately in the chart below. The repository picker holds the repositories the sweeps collect: forks too when `include_forks` is on, and archived ones when `include_archived` is on and for a while after a backfill, which collects them either way. A count here is over every repository the picker holds until it is narrowed. This panel keeps its own range of ninety days whatever the page is set to. Every commit is a row of its own in the store, and at about ten months of them the query is refused for opening too many files, which the reader would see as an empty panel rather than as an error.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -6020,7 +6020,7 @@
         },
         {
           "datasource": "${DS_INFLUXDB}",
-          "description": "The twenty authors with the most commits in the window. The repository picker holds every repository the account can see, its forks and its archived ones alongside its own, so a count here is over all of them until the picker is narrowed. On an account with forks of busy projects the upstream authors are the top of this table, which is the honest answer to the question as asked: narrow the picker to read it as the account's own work. This panel keeps its own range of ninety days whatever the page is set to. Every commit is a row of its own in the store, and at about ten months of them the query is refused for opening too many files, which the reader would see as an empty panel rather than as an error.",
+          "description": "The twenty authors with the most commits in the window. The repository picker holds the repositories the sweeps collect: forks too when `include_forks` is on, and archived ones when `include_archived` is on and for a while after a backfill, which collects them either way. A count here is over every repository the picker holds until it is narrowed. On an account with forks of busy projects the upstream authors are the top of this table, which is the honest answer to the question as asked: narrow the picker to read it as the account's own work. This panel keeps its own range of ninety days whatever the page is set to. Every commit is a row of its own in the store, and at about ten months of them the query is refused for opening too many files, which the reader would see as an empty panel rather than as an error.",
           "fieldConfig": {
             "defaults": {
               "custom": {

@@ -374,9 +374,10 @@ vez de un estado: fechada en `archivedAt`, una limpieza se ve como la tanda que
 fue, y un repositorio vivo no produce fila alguna, así que contar las filas es
 contar el archivo. No necesita `include_archived`. El listado que una pasada ya
 paga dice qué repositorios están archivados, y la familia `totals` pregunta la
-fecha de todos ellos en una consulta GraphQL de cuatro escalares por
-repositorio, en cada pasada de `totals`: un punto a esa cadencia, y las filas
-que reescribe son las mismas filas, que es lo que necesita un exportador que
+fecha de todos ellos, junto a su fila de toda la vida, en una consulta GraphQL
+por cada veinticinco repositorios, en cada pasada de `totals`: un punto por
+cada veinticinco a esa cadencia, y las filas que reescribe son las mismas
+filas, que es lo que necesita un exportador que
 solo guarda lo que se reescribe; el listado no puede dar la fecha por sí
 mismo, porque REST no lleva `archived_at` y su `updated_at` se midió entre dos
 segundos y ocho minutos después del archivado. Un fork archivado bajo la regla
@@ -472,6 +473,26 @@ sufijo `[bot]`, en todas las medidas.
 `gh_discussion` cuenta aparte comentarios y respuestas: los comentarios
 responden a la discusión, las respuestas responden a esos, y el número que
 GitHub enseña en la página es la suma de los dos.
+
+`gh_external_contribution` es el trabajo que la cuenta hizo en repositorios que
+no son suyos, sacado de cinco búsquedas, una por `kind` y `state`: pull
+requests `merged`, `open` y `closed` sin fusionar, e issues `open` y `closed`.
+Un elemento que sigue abierto se reescribe al principio de cada día que sigue
+abierto, así que una pasada lee enteros los dos estados abiertos. Un elemento
+cerrado se escribe una vez, fechado cuando se cerró, así que los tres estados
+cerrados se leen por cuándo se movió cada elemento por última vez: una pasada
+lee cada uno hasta una cadencia antes de la pasada anterior, lo que contiene lo
+que se fusionó o se cerró desde entonces por mucho tiempo que haga que se abrió
+y por muchos otros elementos que se movieran entre medias, y es una página de
+cien salvo que se movieran más de cien. Un relleno sigue leyendo hasta que se
+acaban las páginas o llegan a `backfill.since`.
+GitHub sirve mil resultados de cualquier búsqueda y ni uno más, así que una
+cuenta que pase de mil en un estado tiene los mil que se movieron más
+recientemente, y el log lo dice como aviso.
+`gh_account_total.pulls_merged_elsewhere` e `issues_elsewhere` son los
+recuentos del propio GitHub y aciertan pase lo que pase con ese tope. Un
+elemento que estuvo abierto y luego se cerró conserva sus filas `open` junto a
+la cerrada, porque `state` es una etiqueta.
 
 ## Integración continua
 
@@ -898,6 +919,23 @@ en julio" y la equivocada para un total de por vida. GitHub los cuenta él mismo
 con una petición de búsqueda cada uno, así que el número es una fila y es
 correcto en la primera pasada de una instalación recién hecha.
 
+Los tres campos que acaban en `_elsewhere` comparten un mismo sentido de fuera:
+en un repositorio que no es de la cuenta, porque el calificador de búsqueda
+`-user:LOGIN` deja fuera los que sí lo son, así que los repositorios de una
+organización cuentan como fuera aunque la cuenta pertenezca a ella.
+`pulls_merged_elsewhere` son sus pull requests fusionadas allí e
+`issues_elsewhere` las issues que abrió allí. `commented_elsewhere` son las
+issues y pull requests de allí que llevan al menos un comentario suyo
+(`commenter:LOGIN -user:LOGIN`): hilos, no comentarios, cada uno contado una
+vez por muchos que dejara. Uno que abrió solo cuenta si además comentó, porque
+el mensaje inicial no es un comentario: medido el 2026-09-26, 33 de los 102
+hilos que la cuenta había abierto fuera. En la 2.5.1 y anteriores era
+`commenter:LOGIN -author:LOGIN`, que dejaba fuera los hilos que abrió la cuenta
+y contaba todos los de sus propios repositorios: 125 donde la definición de
+arriba da 55 en la cuenta con la que se leyó esto, 103 de ellos en casa y 54 de
+esos pull requests de Dependabot. Un almacén con filas de antes de actualizar
+ve la serie bajar esa diferencia en la primera pasada después.
+
 `gh_dependency_change` escribe una fila en cada pasada de la familia `deps`, no
 solo cuando una dependencia se movió: un rango sin cambios, una cabeza que no
 se movió y la primera pasada, que aún no tiene base, escriben cada uno una fila
@@ -994,6 +1032,24 @@ misma consulta sin coste añadido y es una segunda lectura, independiente, del
 mismo interruptor que informa `gh_security_feature{feature="dependabot"}.enabled`:
 uno es el ajuste del propio repositorio, el otro es si el listado respondió de
 verdad. Que las dos fuentes discrepen es el caso que merece verse.
+
+`gh_repo_total` es de donde se leen las estrellas y los forks de un
+repositorio archivado, en el Overview y en _Every repository, ever_, y
+`gh_repo` no lo es. El que el filtro por omisión aparta por estar archivado no
+recibe fila de `gh_repo` de ninguna pasada, porque ninguna familia lo recorre,
+y solo tiene la que escribió un relleno histórico, pero sigue recibiendo y
+perdiendo estrellas y forks, así que la familia `totals` escribe su
+`gh_repo_total` en cada pasada desde la consulta que fecha su archivado: las
+mismas etiquetas y campos que la fila de un repositorio recogido, `archived` a
+true, sellada en la pasada. Hasta la 2.5.1 solo un relleno histórico la
+escribía, una vez, y el 2026-09-26 una de esas filas decía 4 estrellas donde
+GitHub decía 3. Las estrellas y los forks de un repositorio vivo en el Overview
+siguen saliendo de `gh_repo`, que una pasada escribe cada hora donde `totals`
+escribe cada doce. No recibe `gh_repo_policy`. Esa consulta
+pregunta por veinticinco repositorios cada vez: medido ese mismo día, la
+pasarela respondió a la fila de toda la vida de cincuenta repositorios
+archivados una vez en 9,2 segundos y la rechazó dos veces pasados unos once, y
+respondió a veinticinco en menos de siete.
 
 Las tres medidas de dependencias están apagadas por omisión. El SBOM es una
 llamada y un mega o dos por repositorio, y solo se guarda el agregado: una sola

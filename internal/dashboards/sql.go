@@ -85,10 +85,35 @@ func latestPerRepo(fields []string) string {
 // latestPerRepoWithin is the same with the window named, for the one caller
 // that must not take the page's: see repoFlagsJoin.
 func latestPerRepoWithin(fields []string, window string) string {
+	return latestRowOf("gh_repo", fields, window, RF)
+}
+
+// latestRowOf is the most recent row of each repository in a snapshot table,
+// for a table other than gh_repo or a filter other than RF. Partitioned by
+// the repository alone, so a repository whose tags changed, archived or made
+// public, is still one row: the newest.
+func latestRowOf(table string, fields []string, window, filter string) string {
 	return fmt.Sprintf("SELECT repo, %s FROM ("+
 		"SELECT *, ROW_NUMBER() OVER (PARTITION BY repo ORDER BY time DESC) AS rn"+
-		" FROM gh_repo WHERE %s AND %s) x WHERE rn = 1",
-		strings.Join(fields, ", "), window, RF)
+		" FROM %s WHERE %s AND %s) x WHERE rn = 1",
+		strings.Join(fields, ", "), table, window, filter)
+}
+
+// liveOrArchived is the newest row of each repository, a live one's out of
+// gh_repo and an archived one's out of gh_repo_total, for the Overview's stars
+// and forks: see there for why the two tables and why full_name. A repository
+// in both, one archived inside the range, is still one row, whichever of the
+// two is newer.
+func liveOrArchived(fields []string) string {
+	cols := strings.Join(fields, ", ")
+	from := func(table, archived, filter string) string {
+		return fmt.Sprintf("SELECT time, full_name, %s FROM %s"+
+			" WHERE $__timeFilter(time) AND archived = '%s' AND %s", cols, table, archived, filter)
+	}
+	return fmt.Sprintf("SELECT full_name, %s FROM ("+
+		"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn"+
+		" FROM (%s UNION ALL %s) u) x WHERE rn = 1",
+		cols, from("gh_repo", "false", RF), from("gh_repo_total", "true", RFA))
 }
 
 // latestSumSQL is the sum of a snapshot field, one row per partition, newest
