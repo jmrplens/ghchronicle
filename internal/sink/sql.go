@@ -16,9 +16,10 @@ import (
 // standard output, so a user pipes them into psql.
 //
 // This is the sink for the Grafana user who self-hosts PostgreSQL or
-// TimescaleDB and runs no InfluxDB. The tool cannot speak the PostgreSQL wire
-// protocol without a driver, and a driver is a dependency this repository
-// does not take, so it emits the SQL and leaves the connection to psql. The
+// TimescaleDB and runs no InfluxDB, when the load is meant to happen
+// somewhere this process cannot reach, later, under review, or into another
+// SQL engine. A database this process can reach is Postgres's, the other half,
+// which connects through a driver and writes the same statements itself. The
 // text is the contract: a table per measurement, a TEXT column per tag, a
 // typed column per field, and a primary key on the time plus the tag columns.
 // That key is what makes a rewrite of the traffic window converge instead of
