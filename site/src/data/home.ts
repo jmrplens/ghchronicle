@@ -117,7 +117,7 @@ export const en: HomeContent = {
 		install,
 		configTitle: "Configure",
 		configNote:
-			"The smallest configuration that does something. Every ${VAR} is read from the environment, so this file holds no secrets.",
+			"The smallest configuration that does something. A ${VAR} in a credential, an address or a path is read from the environment, so this file holds no secrets.",
 		config,
 		outputTitle: "Collect",
 		outputNote:
@@ -224,7 +224,7 @@ export const es: HomeContent = {
 		install,
 		configTitle: "Configurar",
 		configNote:
-			"La configuración mínima que hace algo. Cada ${VAR} se lee del entorno, así que este fichero no guarda secretos.",
+			"La configuración mínima que hace algo. Un ${VAR} en una credencial, una dirección o una ruta se lee del entorno, así que este fichero no guarda secretos.",
 		config,
 		outputTitle: "Recoger",
 		outputNote:

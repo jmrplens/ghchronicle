@@ -8528,7 +8528,7 @@
           },
           "id": 94,
           "options": {
-            "content": "### Failed job output\n\nThe last lines of every job that failed are collected too, but they are text\nrather than measurements, so they go to a log store rather than here. With the\nLoki sink enabled, this is the query:\n\n```\n{job=\"ghchronicle\", kind=\"job_log\"} |= \"error\"\n```\n\nSet `every.joblogs` to switch the collection on. GitHub deletes job logs after\nthe repository's retention period, ninety days by default, and answers 410\nafterwards, so an older log cannot be backfilled: what exists is what was\ncaptured while it was there.\n\nPublished to a Grafana that has a Loki datasource, with\n`cmd/publish_dashboard -loki \u003cdatasource-uid\u003e`, this panel shows those lines\ninstead of this note.\n",
+            "content": "### Failed job output\n\nThe last lines of every job that failed are collected too, but they are text\nrather than measurements, so they go to a log store rather than here. With the\nLoki sink enabled, this is the query:\n\n```\n{job=\"ghchronicle\", kind=\"job_log\"} |= \"error\"\n```\n\nSet `every.families.joblogs` to switch the collection on. GitHub deletes job\nlogs after the repository's retention period, ninety days by default, and\nanswers 410 afterwards, so an older log cannot be backfilled: what exists is\nwhat was captured while it was there.\n\nPublished to a Grafana that has a Loki datasource, with\n`cmd/publish_dashboard -loki \u003cdatasource-uid\u003e`, this panel shows those lines\ninstead of this note.\n",
             "mode": "markdown"
           },
           "targets": [],

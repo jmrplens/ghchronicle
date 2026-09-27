@@ -225,7 +225,10 @@ const coauthoredWholeEvery = 7
 // number, and growing with each pull request merged. Run live on 2026-09-27
 // over the last one, two and four days, a pass was the counts query and one
 // page of the walk, 54 KB, 333 KB and 874 KB in two to three seconds, where
-// the whole walk was 35 queries, 23.7 MB and 94 seconds.
+// the whole walk was 35 queries, 23.7 MB and 94 seconds. The one-day figure
+// is from before 09:05 UTC: the hourly passes the production proxy logged
+// later the same day, from 12:44 to 18:43 UTC, walked 468 to 513 KB each,
+// since a pass walks the day in progress and the day had merged more.
 type CoauthoredTally struct {
 	// Count is the co-authored pull requests merged on or before Through.
 	Count int `json:"count"`

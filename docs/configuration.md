@@ -41,7 +41,7 @@ has a default.
 
 A credential, an address or a file path is expanded from the environment at
 start-up. `${GITHUB_TOKEN}` becomes the value of that variable, or an empty
-string if it is not set.
+string if it is not set, except in a file path, below.
 
 ```yaml
 github:
@@ -69,8 +69,12 @@ reaches:
   directory, so `state_file: ~/.ghchronicle/state.json` is a file under it.
   Only `~` on its own or before a separator is read that way, `~name` is left
   as written, and a `~` where the process has no home directory is refused at
-  start-up naming the key. Before 2.6.1 no path was expanded, and that
-  `state_file` was a directory called `~` under the working directory.
+  start-up naming the key. So is a `${VAR}` in a path that is unset or empty,
+  since the path left without it is not the one written:
+  `state_file: ${STATE_DIRECTORY}/state.json` would be `/state.json`, with the
+  ledger and the cache file beside it at the root of the filesystem. Before
+  2.6.1 no path was expanded, and that `~` in a `state_file` was a directory
+  called `~` under the working directory.
 
 Every other value is read as written, so a `${VAR}` in `sinks.loki.tenant_id`,
 `sinks.influxdb.bucket`, `sinks.prometheus.listen`, a label, a prefix or a
@@ -142,9 +146,10 @@ Eight things, and deleting the file costs a different one for each:
   pull requests merged since that day, and the whole history again once a week
   or when the rule has changed. Without it the next pass walks the account's
   merged pull requests whole, which on an account with 2,315 of them was 35
-  queries and 23.7 MB, where a pass over the last day is the counts query and
-  one page of the walk, two points and 54 KB, and one over the last four days
-  874 KB, run live against the same account on 2026-09-27.
+  queries and 23.7 MB, where a pass that has it walks only the day in progress:
+  the counts query and one page of the walk, two points, and 468 to 513 KB for
+  each hourly pass the production proxy logged against the same account on
+  2026-09-27, a size that grows through the day with what is merged.
 
 Seven of the eight cost only quota, because what is collected again is keyed by
 measurement, tags and timestamp and overwrites what is already stored.
@@ -263,7 +268,8 @@ paid before it existed, and loses nothing. Every answer is asked for again,
 every refused feature is asked about again, which is also how to have a feature
 switched on today noticed before its day is out, the jobs of the newest runs are
 listed once more, and the first sweep runs `totals` before the pull requests,
-whatever its cadence says, so their pages are sized again, and says so:
+whatever its cadence says, so their pages are sized again. When `totals` was
+not due anyway, it says so:
 
 ```text
 level=INFO msg="no page sizes remembered, running totals before the pull requests it sizes"
@@ -298,6 +304,7 @@ the key and what it needs.
 | Message                                                               | Means                                                                 |
 | --------------------------------------------------------------------- | --------------------------------------------------------------------- |
 | `github.token is empty and GITHUB_TOKEN is unset`                     | Exactly what it says                                                  |
+| `state_file: "${X}/state.json" names ${X}, which is unset, ...`       | A path names a variable with no value: set it, or write the path out  |
 | `targets: set at least one of user, orgs or repos`                    | Nothing to collect                                                    |
 | `sinks: enable at least one of ...`                                   | A run that collects and discards is almost never what anyone meant    |
 | `every.families.<name>: unknown collector`                            | The name is not a family. The message lists the ones that exist       |
@@ -770,7 +777,7 @@ the same membership.
 
 | Group       | Family         | Default | Why that value                                                                                                                                                                                                                                                                                                                                             |
 | ----------- | -------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `account`   | `account`      | `1h`    | the contribution calendar moves with every contribution and the profile's counts with every follow and star, and a pass is one GraphQL point and seven REST requests, of which only the profile is charged: GitHub never answered it with a 304, and the six package listings answer one until a package changes                                           |
+| `account`   | `account`      | `1h`    | the contribution calendar moves with every contribution and the profile's counts with every follow and star, and a pass is one GraphQL point and seven REST requests, of which only the profile is charged: GitHub all but never answered it with a 304, once in 48 conditional reads, and the six package listings answer one until a package changes                                           |
 | `account`   | `achievements` | `1h`    | the badges on the public profile page, which no API lists, and how far each tiered one is from its next tier; a pass transfers the page, 36 KB and off the budget, and the pull requests merged since the day before for two GraphQL points, so a tier reached in the afternoon shows in the afternoon, and the whole history is walked once a week, 24 MB |
 | `account`   | `billing`      | `1h`    | the month in progress moves while continuous integration runs: it had changed at every one of 46 six-hourly reads measured, and a pass is two requests, that month and the one before, of which only the first is charged                                                                                                                                  |
 | `account`   | `history`      | `0`     | off until asked for by name: it walks every past year and the year so far, and the rows are idempotent                                                                                                                                                                                                                                                     |
@@ -994,8 +1001,9 @@ level=WARN msg="heartbeat is 1h and the shortest cadence is 15m (actions), so
 
 ### The slow families take turns
 
-The running service starts at most one family whose cadence is six hours or
-more in each sweep, and leaves any other that is due for the next tick.
+The running service starts one family whose cadence is six hours or more in
+each sweep, or the fewest that still keep every cadence when one cannot
+(below), and leaves any other that is due for the next tick.
 
 Families that run in the same sweep are marked with the same instant in the
 state file, so they come due together again at every cadence, for ever. A group

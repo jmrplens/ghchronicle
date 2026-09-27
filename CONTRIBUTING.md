@@ -46,8 +46,10 @@ make golangci-lint         # the config check, the formatter's diff, then the li
 The targets name the packages rather than `./...`, which on a machine with the
 git-ignored `plan/` directory would take in a Go package of its own; and
 `make golangci-lint` is what CI runs, formatter included, where a plain
-`golangci-lint run` skips the formatting gate. `make analyze` runs every static
-check CI runs and reports each failure at once.
+`golangci-lint run` skips the formatting gate. `make analyze` runs CI's Go,
+Markdown, shell and generated-artifact checks and reports each failure at once;
+actionlint, hadolint, the site's lint below and `go vet` for the other
+platforms CI type-checks run only in CI.
 
 For a change under `site/`:
 

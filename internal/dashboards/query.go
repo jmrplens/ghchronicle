@@ -29,13 +29,14 @@ const (
 // `repo` family writes every hour for each repository the sweeps collect.
 const pickerWindow = "time > now() - INTERVAL '7 days'"
 
-// RFA is RF for gh_repo_total, the one measurement a sweep writes for a
-// repository set aside for being archived. The picker of the SQL stores lists
-// the repositories with a gh_repo row inside pickerWindow, and no sweep
-// writes one for a repository set aside: only a backfill does, so a week after
-// the last one RF would leave every one of them out of the account's totals.
-// Under All an archived row passes as well; with repositories picked, only
-// those do, as everywhere else.
+// RFA is RF for gh_repo_total, the row a sweep writes dated now for a
+// repository set aside for being archived; its other row, gh_repo_archived, is
+// dated at the archive and read with no repository filter. The picker of the
+// SQL stores lists the repositories with a gh_repo row inside pickerWindow,
+// and no sweep writes one for a repository set aside: only a backfill does,
+// so a week after the last one RF would leave every one of them out of the
+// account's totals. Under All an archived row passes as well; with
+// repositories picked, only those do, as everywhere else.
 //
 // Not every archived row, though: only one of a repository the collector
 // still writes, which is setAsideCollected. The row of an archived repository
@@ -549,12 +550,39 @@ func removeEmptySeries(expr string) string {
 	return "removeEmptySeries(" + expr + ")"
 }
 
+// sumConsolidated is the series of a table that adds its points up,
+// consolidated by sum, which is perBucket's reason in a table.
+//
+// A table panel sends no maxDataPoints of its own, so Grafana sends the
+// panel's width in pixels, and graphite-web fits a series with more points
+// than that by averaging neighbors, its default. Averaged, a count halves:
+// against graphiteapp/graphite-statsd:1.1.10-5 with this repository's storage
+// schema, three discussion comments 5, 12 and 20 days back read 3 over
+// now-30d with no maxDataPoints and 1.5 with 500 or 600, the width of a
+// third of the page, because the 720 hourly slots became 360 and each
+// comment's 1 was averaged with the 0 isNonNull had put beside it. Summed,
+// they read 3 at 500. The consolidation belongs on the outermost series:
+// graphite-web gives every series a function makes the default again, and
+// the ones that only rename, sort, pick or drop series keep theirs.
+//
+// consolidateBy also renames each series to consolidateBy(name,"sum"), which
+// in a table is the text of the row's first column, so aliasSub gives the
+// name back.
+func sumConsolidated(expr string) string {
+	return `aliasSub(consolidateBy(` + expr + `, "sum"), "^consolidateBy\((.*),.sum.\)$", "\1")`
+}
+
 func gTbl(expr, name string, cols []col) (targets []Target, tf []any) {
 	names := map[string]any{"Field": name}
 	list := make([]any, len(cols))
+	adds := false
 	for i, c := range cols {
 		list[i] = c.Reducer
 		names[reducers[c.Reducer]] = c.Name
+		adds = adds || c.Reducer == "sum"
+	}
+	if adds {
+		expr = sumConsolidated(expr)
 	}
 	return []Target{grq(removeEmptySeries(expr))}, []any{
 		map[string]any{"id": "reduce", "options": map[string]any{

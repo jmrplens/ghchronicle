@@ -103,8 +103,11 @@ tag. A tag moved to a field takes a new name or an existing field that says
 the same, because a store that holds the tag column refuses a field of that
 name. And an existing measurement gains fields, not tags: a tag changes every
 row's identity, and PostgreSQL keys each table on the tags it was created
-with, so a tag added later is a plain column outside the key and a tag
-dropped stays in it, holding ''. Dropping `is_answer` left the stores with
+with. A tag a later release adds to a table an earlier release made gets no
+column from either PostgreSQL sink, so every insert of that measurement is
+refused until the table is dropped or altered by hand; only a tag first seen
+within one process or one file becomes a plain column outside the key. A tag
+dropped stays in the key, holding ''. Dropping `is_answer` left the stores with
 `gh_discussion_comment` in two shapes until it is dropped and backfilled;
 the planning panels read one row per comment across both, and a migration
 tool is issue #96.
@@ -162,10 +165,12 @@ window or filter and change the gate with it. Never gated: a backfill, the
 daily whole page of `issues`, and a repository the query did not answer for.
 
 **The slow families take turns, in the loop only.** The running service starts
-at most one family of six hours or more a sweep (`takeTurns`), because families
-marked in one sweep come due together for ever. `-once` runs every family
-that is due, and a primed sweep, a card and a backfill run every family, none
-of them in turns. The worst-wait table on the cadences page (eleven slow families at the built-in
+one family of six hours or more a sweep at the built-in cadences (`takeTurns`),
+because families marked in one sweep come due together for ever;
+`turnsPerSweep` starts more when one a sweep could not keep every cadence, as
+under `every.default: 6h`. `-once` runs every family that is due, and a primed
+sweep, a card and a backfill run every family, none of them in turns. The
+worst-wait table on the cadences page (eleven slow families at the built-in
 cadences, 2h30m) is prose that no test pins: a cadence that crosses six hours
 changes it.
 
@@ -237,11 +242,13 @@ returns plus the day's index, never to the clock.
 a feature is on, stars: each series' newest row inside the range, never
 `MAX()` over the range, which counts a fixed alert at its peak and a feature
 switched off as on. Archived repositories are the other trap. One set aside by
-the filter gets only `gh_repo_total` from a sweep, so the SQL stores let it
-through with `RFA`, under All and only when it has a row inside the picker's
-seven days (`setAsideCollected`), and Elasticsearch and Graphite hold the same
-seven days (`esCollectedWindow`, `grCollected`), so a store's leftovers from a
-repository nobody collects any more count nowhere.
+the filter gets two rows from a sweep and no `gh_repo`: `gh_repo_total` dated
+now and `gh_repo_archived` dated at its archive, read with no repository
+filter. The SQL stores let the first through with `RFA`, under All and only
+when it has a row inside the picker's seven days (`setAsideCollected`), and
+Elasticsearch and Graphite hold the same seven days (`esCollectedWindow`,
+`grCollected`), so a store's leftovers from a repository nobody collects any
+more count nowhere.
 
 **A PostgreSQL table is declared in two steps.** `CREATE TABLE IF NOT EXISTS`
 declares `time` and the tags, which are the primary key and the one thing a
@@ -352,7 +359,7 @@ Verified, so nobody spends an afternoon on it again:
 ```sh
 make build vet test-race     # the race suite includes test/e2e; 42 s on the maintainer's machine
 make golangci-lint           # config verify, fmt --diff, then run: CI's lint job
-make analyze                 # every static check CI runs, each failure reported at once
+make analyze                 # CI's Go, Markdown, shell and generated-artifact checks, each failure reported at once
 go run ./cmd/probe owner/name          # try collectors against one repository
 GHC_DUMP=<family> go run ./cmd/probe   # print that family's line protocol
 go run ./cmd/ghchronicle -config config.yaml -list

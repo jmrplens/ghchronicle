@@ -572,6 +572,12 @@ func scanningAndResolution(b *builder) []Panel {
 // rather than zero, so three of these panels take the largest reading inside
 // the range instead and say so in their own descriptions. The fourth reads a
 // number that can go down, so it takes the newest.
+//
+// Graphite reads the newest point of each series too, but a series there is
+// the whole path, and the status, the state, suite and schedule, and the
+// permissions are tags: a change inside the range leaves the old row beside
+// the new one. Grouping those nodes away would keep one row and lose the words
+// the row exists to show, so the three panels say it instead.
 func posture(b *builder) []Panel {
 	ss, csu := "gh_security_setting", "gh_code_scanning_setup"
 	ap, sc := "gh_actions_policy", "gh_secret"
@@ -693,8 +699,10 @@ func posture(b *builder) []Panel {
 				"the two disagree is the row worth reading.",
 			Overrides: append([]any{width("Setting", 200)}, threeStates()...),
 			GR:        setGR, GRTF: setGRtf,
-			GRDesc: "Graphite names each row repository, setting and status from the path.",
-			ES:     setES, ESTF: setEStf, ESDesc: esMaxNote,
+			GRDesc: "Graphite names each row repository, setting and status from the path, so a " +
+				"setting whose status changed inside the range is two rows, the old status and " +
+				"the new, each with its last reading.",
+			ES: setES, ESTF: setEStf, ESDesc: esMaxNote,
 		}),
 		panel("table", "Default code scanning setup", box{W: 12, H: 12, X: 12, Y: 41}, []Target{sqlT(setup)}, &P{
 			Prom: []Target{
@@ -727,7 +735,9 @@ func posture(b *builder) []Panel {
 			GRDesc: grRows + " The number it keeps is `days_since_change`, which GitHub " +
 				"gives only for a setup it has actually changed, so a repository that answers " +
 				"not-configured or unavailable has no series here and no row at all: the other " +
-				"four dashboards list it with the cell empty.",
+				"four dashboards list it with the cell empty. The state, the query suite and " +
+				"the schedule are part of the path, so a setup that changed one of them inside " +
+				"the range is two rows, the old and the new.",
 			ES: csuES, ESTF: csuEStf,
 			ESDesc: "In Elasticsearch both numbers are the largest reading inside the range " +
 				"rather than the newest. A setup with no change date has no reading at all, " +
@@ -749,8 +759,9 @@ func posture(b *builder) []Panel {
 				width("Permissions", 130), onOff(securityCanApprovePR, 220),
 			},
 			GR: apGR, GRTF: apGRtf,
-			GRDesc: "Graphite names each row repository and permissions from the path.",
-			ES:     apES, ESTF: apEStf, ESDesc: esMaxNote,
+			GRDesc: "Graphite names each row repository and permissions from the path, so " +
+				"permissions changed inside the range are two rows, the old and the new.",
+			ES: apES, ESTF: apEStf, ESDesc: esMaxNote,
 		}),
 		panel("table", "Secret rotation", box{W: 12, H: 7, X: 12, Y: 53},
 			[]Target{sqlT(secrets)}, &P{

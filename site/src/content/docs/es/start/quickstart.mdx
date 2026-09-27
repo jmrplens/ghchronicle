@@ -92,8 +92,9 @@ mano o quiera saber a qué acaba de decir que sí.
       stdout: true # cámbialo por influxdb cuando tengas dónde guardarlo
     ```
 
-    Cada `${VAR}` se lee del entorno al arrancar, así que el fichero no contiene
-    secretos y se puede versionar. Todo lo demás tiene un valor por omisión.
+    Un `${VAR}` en una credencial, una dirección o una ruta de fichero se lee
+    del entorno al arrancar, así que el fichero no contiene secretos y se puede
+    versionar. Todo lo demás tiene un valor por omisión.
 
     La versión documentada, la que comenta todas las opciones que hay, vive en
     el repositorio y no en la instalación, así que cógela de ahí cuando quieras

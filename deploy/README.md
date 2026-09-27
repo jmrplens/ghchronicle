@@ -17,9 +17,11 @@ docker compose -f compose.influxdb-grafana.yaml up -d
 | `compose.postgres-grafana.yaml` | those two and Grafana, dashboard already in it |
 
 Each one carries its own configuration inline, so there is no second file to
-write, and each is brought up against the real images before a release. With
-Grafana, the collector publishes the dashboard when it starts and points it at
-the store beside it: nothing to import, no datasource to fill in.
+write. With Grafana, the collector publishes the dashboard when it starts and
+points it at the store beside it: nothing to import, no datasource to fill in.
+Every combination was brought up against the real images when these files were
+added, for 2.4.0; nothing brings them up since, and what holds them now is the
+check below.
 
 The [Docker page](https://jmrp.io/docs/ghchronicle/install/docker/) shows the
 same files with a picker, which is the easier way in if you are reading the

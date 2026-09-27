@@ -9,8 +9,9 @@ What one ghchronicle sweep over the GitHub API does, in what order, and why each
 Source: <https://jmrp.io/docs/ghchronicle/how/>
 
 A sweep is one pass over every family whose interval has elapsed, except that
-the running service starts at most one family of six hours or more in each
-sweep and leaves the others that are due for the next ticks: the [slow families
+the running service starts one family of six hours or more in each sweep, more
+only where one could not keep every cadence, and leaves the others that are due
+for the next ticks: the [slow families
 take turns](https://jmrp.io/docs/ghchronicle/configuration/cadences/#the-slow-families-take-turns).
 It is an increment, not a rebuild: it asks for the little that can have changed
 since last time, writes what it got to every configured store, and records when

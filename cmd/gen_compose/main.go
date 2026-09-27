@@ -4,8 +4,10 @@
 // They are generated rather than written by hand for the reason every other
 // generated thing here is: a compose file in a page is a promise that it
 // works, and one that is typed twice is one that is wrong once. These are
-// written once, shown by the page, and brought up by the end-to-end suite, so
-// what a reader copies is what was tested.
+// written once and shown by the page, so what a reader copies is what the
+// generator writes, and `make check-compose` fails when the two differ. No
+// suite brings them up: every combination was brought up against the real
+// images once, when they were added for 2.4.0.
 package main
 
 import (

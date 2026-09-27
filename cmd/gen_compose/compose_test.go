@@ -9,11 +9,11 @@ import (
 
 // What every compose file has to be true of, whichever combination it is.
 //
-// Bringing them up is the end-to-end suite's job and needs Docker. These are
-// the claims the page makes about them, which can be read without one: that a
-// reader needs nothing but a token, that no credential is written into the
-// file the container gets, and that the collector waits for what the stack
-// brought up rather than racing it.
+// Nothing here brings them up, which needs Docker, and no suite does. These
+// are the claims the page makes about them, which can be read without one:
+// that a reader needs nothing but a token, that no credential is written into
+// the file the container gets, and that the collector waits for what the
+// stack brought up rather than racing it.
 
 // TestEveryCombinationNeedsNothingButATokenAndAName. The two variables the
 // header tells a reader to put in .env are the two the file refuses to start

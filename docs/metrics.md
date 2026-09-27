@@ -474,20 +474,21 @@ which keeps no strings, cannot group by them and its panels say so.
 
 **A store written before 2.6.1 and since holds `gh_discussion_comment` in two
 shapes.** A comment an earlier release read before it was accepted and again
-after is two rows at one instant, one per value of `is_answer`, and every
-comment a 2.6.1 sweep reads again gains a third row without the tag. The two dashboard tables over
-the measurement read one row per comment in every store, accepted when any of
-its rows says so, so an answer accepted before 2.6.1 and taken back since
-still reads accepted. Dropping the measurement and running a `-backfill` leaves
-one row per comment: the table in InfluxDB 3 and in PostgreSQL, the
-`github.discussion_comment` paths in Graphite, the
-`ghchronicle-gh_discussion_comment` index in Elasticsearch. The PostgreSQL
-sink that connects keeps writing into a table an earlier release made,
-conflicting on that table's own key, and its new rows hold the empty string
-for `is_answer`. The SQL file cannot know that key, so replayed into such a
-table its `gh_discussion_comment` statements are refused while the rest of
-the file loads, until the table is dropped. The Prometheus exporter keeps
-nothing across a restart and counts each comment once.
+after is two rows at one instant, one per value of `is_answer`. A comment an
+earlier release read gains one more row without the tag when a 2.6.1 sweep reads
+it again: a second for most, a third for one already held twice. The two
+dashboard tables over the measurement read one row per comment in every store,
+accepted when any of its rows says so, so an answer accepted before 2.6.1 and
+taken back since still reads accepted. Dropping the measurement and running a
+`-backfill` leaves one row per comment: the table in InfluxDB 3 and in
+PostgreSQL, the `github.discussion_comment` paths in Graphite, the
+`ghchronicle-gh_discussion_comment` index in Elasticsearch. The PostgreSQL sink
+that connects keeps writing into a table an earlier release made, conflicting on
+that table's own key, and its new rows hold the empty string for `is_answer`.
+The SQL file cannot know that key, so replayed into such a table its
+`gh_discussion_comment` statements are refused while the rest of the file loads,
+until the table is dropped. The Prometheus exporter keeps nothing across a
+restart and counts each comment once.
 
 #### From a row to a query
 
@@ -1273,9 +1274,11 @@ a whole account's life that is a few dozen points and 24 MB (35 queries and
 94 seconds over 2,315 pull requests, measured on 2026-09-27), so it is done
 once and then kept: the state file holds the count with the last UTC day it
 covers, and each pass walks only the pull requests merged since, one page a
-pass, 0.3 to 0.6 MB on that account. The day a pass runs on is still being
-merged into, so its pull requests are in that day's row and walked again by the
-next pass. The whole history is walked again once a week, because the count can
+pass: 468 to 513 KB on that account for each hourly pass the production proxy
+logged on 2026-09-27, a size that grows through the day with what is merged.
+The day a pass runs on is still being merged into, so its pull requests are in
+that day's row and walked again by the next pass. The whole history is walked
+again once a week, because the count can
 go down (a repository made private or deleted takes its pull requests out of
 `is:public`), and whenever the rule the count was kept by has changed.
 

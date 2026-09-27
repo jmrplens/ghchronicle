@@ -14,7 +14,7 @@ cuál acaba de cargar en la cabecera `x-ratelimit-resource`.
 | Cubo      | Límite               | Lo gasta                                                         |
 | --------- | -------------------- | ---------------------------------------------------------------- |
 | `core`    | 5000 por hora        | Toda llamada REST                                                |
-| `graphql` | 5000 puntos por hora | Toda consulta GraphQL: las pull requests e issues, la cuenta, los commits, las discusiones, los despliegues y el resto, que la [tabla de coste](/ghchronicle/es/api/cost/) pone precio familia a familia, y la consulta que pregunta qué repositorios se movieron |
+| `graphql` | 5000 puntos por hora | Toda consulta GraphQL: las pull requests e issues, la cuenta, los commits, las discusiones, los despliegues y el resto, a los que la [tabla de coste](/ghchronicle/es/api/cost/) pone precio familia a familia, y la consulta que pregunta qué repositorios se movieron |
 | `search`  | 30 por minuto        | El contador de commits de `totals`, y nada más: la búsqueda GraphQL no tiene tipo COMMIT |
 
 Dos más los carga una familia cada uno: `webhook_deliveries` (500 por minuto)

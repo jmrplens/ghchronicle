@@ -462,6 +462,9 @@ check-docs: ## Fail if docs/ no longer matches the pages it is generated from
 # committed that the source no longer produces. Each is also a step of CI, all
 # but check-docs in its Generated artifacts job, and a check missing here is one
 # a local run passes and CI then fails, which check-compose was until 2.6.1.
+# shellcheck is here for the same reason. What CI runs that this does not:
+# actionlint and hadolint, which have no target here, the site's own lint,
+# which needs its build first, and go vet under the other GOOS and GOARCH.
 analyze: ## Run the whole static-analysis suite and report every failure at once
 	@analysis_status=0; \
 	run_check() { \
@@ -486,19 +489,20 @@ analyze: ## Run the whole static-analysis suite and report every failure at once
 	echo "Go analysis packages: $(PKGS)"; \
 	echo "Go analysis build tags: $(E2E_DOCKER_TAG)"; \
 	echo ""; \
-	run_check "[1/13] golangci-lint config verify" golangci-lint config verify; \
-	run_check "[2/13] golangci-lint fmt" golangci-lint fmt --diff $(FMT_PATHS); \
-	run_check "[3/13] golangci-lint run" golangci-lint run $(PKGS); \
-	run_check "[4/13] govulncheck" $(MAKE) --no-print-directory govulncheck; \
-	run_check "[5/13] markdownlint" $(MAKE) --no-print-directory mdlint; \
-	run_check "[6/13] documentation local links" $(MAKE) --no-print-directory check-doc-links; \
-	run_check "[7/13] dashboards up to date" $(MAKE) --no-print-directory check-dashboards; \
-	run_check "[8/13] card gallery up to date" $(MAKE) --no-print-directory check-gallery; \
-	run_check "[9/13] layout facts up to date" $(MAKE) --no-print-directory check-layouts; \
-	run_check "[10/13] configuration surface up to date" $(MAKE) --no-print-directory check-config-options; \
-	run_check "[11/13] compose files up to date" $(MAKE) --no-print-directory check-compose; \
-	run_check "[12/13] builder cases up to date" $(MAKE) --no-print-directory check-config-cases; \
-	run_check "[13/13] docs/ up to date" $(MAKE) --no-print-directory check-docs; \
+	run_check "[1/14] golangci-lint config verify" golangci-lint config verify; \
+	run_check "[2/14] golangci-lint fmt" golangci-lint fmt --diff $(FMT_PATHS); \
+	run_check "[3/14] golangci-lint run" golangci-lint run $(PKGS); \
+	run_check "[4/14] govulncheck" $(MAKE) --no-print-directory govulncheck; \
+	run_check "[5/14] markdownlint" $(MAKE) --no-print-directory mdlint; \
+	run_check "[6/14] documentation local links" $(MAKE) --no-print-directory check-doc-links; \
+	run_check "[7/14] dashboards up to date" $(MAKE) --no-print-directory check-dashboards; \
+	run_check "[8/14] card gallery up to date" $(MAKE) --no-print-directory check-gallery; \
+	run_check "[9/14] layout facts up to date" $(MAKE) --no-print-directory check-layouts; \
+	run_check "[10/14] configuration surface up to date" $(MAKE) --no-print-directory check-config-options; \
+	run_check "[11/14] compose files up to date" $(MAKE) --no-print-directory check-compose; \
+	run_check "[12/14] builder cases up to date" $(MAKE) --no-print-directory check-config-cases; \
+	run_check "[13/14] docs/ up to date" $(MAKE) --no-print-directory check-docs; \
+	run_check "[14/14] shellcheck" $(MAKE) --no-print-directory shellcheck; \
 	echo "============================================================"; \
 	if [ "$$analysis_status" -ne 0 ]; then \
 		echo "Analysis failed. Review the findings above."; \

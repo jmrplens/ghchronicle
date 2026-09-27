@@ -256,8 +256,9 @@ ghchronicle __VERSION__ (commit <commit>, built <date>)
 
 ## The token, and the rest of the environment
 
-Every `${VAR}` in the configuration file is read from the environment when the
-process starts, so the token never has to be in the file.
+A `${VAR}` in a credential, an address or a file path of the configuration
+file is read from the environment when the process starts, so the token never
+has to be in the file.
 
 <Tabs syncKey="windows-shell">
   <TabItem label="PowerShell">

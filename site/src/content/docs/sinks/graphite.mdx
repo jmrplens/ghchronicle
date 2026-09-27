@@ -69,8 +69,9 @@ number, so:
 - A table that needs several fields of one row cannot be built. The shipped
   dashboard keeps the column it is sorted by and says in the panel description
   which columns it dropped.
-- A boolean is not a metric there at all, and neither is a title or any other
-  string. Those panels say so.
+- A title or any other string is not a metric there at all, and the sink
+  drops it; the panels that would show one say so. A boolean is kept as 1 or 0
+  like any number.
 - A panel cannot join two measurements, since each lives under its own path.
   Work elsewhere has no Stars column, and the community profile keeps the API's
   issue template flag rather than the count of templates, which lives under

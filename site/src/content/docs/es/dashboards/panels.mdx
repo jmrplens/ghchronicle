@@ -522,7 +522,12 @@ rango se leen como están y no como estaban en su punto más alto. Elasticsearch
 es la excepción en cuatro sitios, y cada uno lo dice en su descripción: su
 curva de alertas abiertas toma la serie más grande de cada severidad en un
 bucket en vez de sumarlas, y sus ajustes de seguridad, su configuración de code
-scanning y sus permisos del token toman la lectura más alta del rango.
+scanning y sus permisos del token toman la lectura más alta del rango. Graphite
+es la excepción en tres, y lo dice en cada una: sus ajustes, su configuración
+de code scanning y sus permisos del token nombran cada fila a partir de la
+ruta, de la que forman parte el `status` de un ajuste, el `state`, la
+`query_suite` y el `schedule` de la configuración, y los `permissions`, así que
+un cambio dentro del rango son dos filas, la vieja y la nueva.
 
 Dos paneles son información nueva, no otra vista. El tiempo hasta
 resolver una alerta de code scanning sale de unas fechas que se descargaban y se
@@ -829,7 +834,8 @@ en vez de fingir.
 - **Graphite** conserva los puntos fechados pero no tiene filas: una tabla ahí
   es un número por serie reducido sobre el rango, así que una tabla que necesita
   varios campos de una fila se queda con la columna por la que ordena y dice
-  cuál ha soltado, y un booleano allí ni siquiera es una métrica.
+  cuál ha soltado, una cadena allí ni siquiera es una métrica, y un booleano se
+  guarda como 1 o 0, igual que cualquier número.
 - **Elasticsearch** conserva los documentos fechados, así que una tabla por
   elemento son los documentos más recientes, o el más reciente de cada elemento
   cuando un elemento tiene varios, y todo lo demás es una agregación por

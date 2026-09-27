@@ -92,8 +92,9 @@ themselves or wants to know what they just agreed to.
       stdout: true # swap for influxdb once you have somewhere to put it
     ```
 
-    Every `${VAR}` is read from the environment at start-up, so the file itself
-    holds no secrets and can be committed. Everything else has a default.
+    A `${VAR}` in a credential, an address or a file path is read from the
+    environment at start-up, so the file itself holds no secrets and can be
+    committed. Everything else has a default.
 
     The documented version, which comments every option there is, lives in the
     repository rather than in the install, so take it from there when you want

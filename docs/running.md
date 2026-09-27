@@ -976,8 +976,9 @@ ghchronicle 2.6.0 (commit <commit>, built <date>)
 
 ### The token, and the rest of the environment
 
-Every `${VAR}` in the configuration file is read from the environment when the
-process starts, so the token never has to be in the file.
+A `${VAR}` in a credential, an address or a file path of the configuration
+file is read from the environment when the process starts, so the token never
+has to be in the file.
 
 - **PowerShell**
 
@@ -2354,7 +2355,10 @@ a week.
 
 The pull request query is sized per repository from the counts `totals` reads,
 and 2.6.0 keeps those sizes in the cache file. The first sweep has none, so it
-runs `totals` before the pull requests whatever its cadence says, and says so:
+runs `totals` before the pull requests whatever its cadence says. At its hourly
+cadence `totals` is usually due anyway after an upgrade, and then it simply
+runs first; only when it is not due, and the sweep is not a primed one, which
+runs every family, does the log say why it runs:
 
 ```text
 level=INFO msg="no page sizes remembered, running totals before the pull requests it sizes"
@@ -2448,7 +2452,9 @@ wrote either one used to get a directory named with those characters, under
 the working directory, and now gets the path it meant. Where that was the
 state file, the state the old release kept is in the directory with the odd
 name, and the new one starts without it: move the files across before the
-first start if the walks it saves are worth keeping. See [`${VAR}`
+first start if the walks it saves are worth keeping. A `${VAR}` in a path that
+is unset or empty stops the start and names the key, rather than leaving the
+path without that part. See [`${VAR}`
 expansion](https://jmrp.io/docs/ghchronicle/configuration/#var-expansion).
 
 > **What else changed**

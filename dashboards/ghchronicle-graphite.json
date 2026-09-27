@@ -647,7 +647,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(groupByNode(isNonNull(github.repo_created.*.*.*.*.*.created), 5, \"sum\"))",
+              "target": "removeEmptySeries(aliasSub(consolidateBy(groupByNode(isNonNull(github.repo_created.*.*.*.*.*.created), 5, \"sum\"), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))",
               "textEditor": true
             }
           ],
@@ -1440,7 +1440,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(aliasByNode(sumSeries(github.traffic.*.clones.*.$repo.count), 5))",
+              "target": "removeEmptySeries(aliasSub(consolidateBy(aliasByNode(sumSeries(github.traffic.*.clones.*.$repo.count), 5), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))",
               "textEditor": true
             }
           ],
@@ -1778,7 +1778,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(groupByNode(github.star_day.*.*.$repo.stars, 4, \"sum\"))",
+              "target": "removeEmptySeries(aliasSub(consolidateBy(groupByNode(github.star_day.*.*.$repo.stars, 4, \"sum\"), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))",
               "textEditor": true
             }
           ],
@@ -2668,7 +2668,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(groupByNodes(github.contribution_day_repo.*.*.*.*.*.*.commits, \"sum\", 3, 5))",
+              "target": "removeEmptySeries(aliasSub(consolidateBy(groupByNodes(github.contribution_day_repo.*.*.*.*.*.*.commits, \"sum\", 3, 5), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))",
               "textEditor": true
             }
           ],
@@ -3360,7 +3360,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(limit(sortByTotal(groupByNode(isNonNull(github.pull_request.*.*.*.*.$repo.*.churn), 2, \"sum\")), 15))",
+              "target": "removeEmptySeries(aliasSub(consolidateBy(limit(sortByTotal(groupByNode(isNonNull(github.pull_request.*.*.*.*.$repo.*.churn), 2, \"sum\")), 15), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))",
               "textEditor": true
             }
           ],
@@ -4239,7 +4239,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(limit(sortByTotal(groupByNodes(summarize(offset(scale(github.review_thread.*.*.*.*.*.$repo.*.resolved,-1),1), \"100y\", \"sum\", true), \"sum\", 7, 5)), 25))",
+              "target": "removeEmptySeries(aliasSub(consolidateBy(limit(sortByTotal(groupByNodes(summarize(offset(scale(github.review_thread.*.*.*.*.*.$repo.*.resolved,-1),1), \"100y\", \"sum\", true), \"sum\", 7, 5)), 25), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))",
               "textEditor": true
             }
           ],
@@ -5340,7 +5340,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(groupByNode(github.workflow_run.*.*.*.*.*.$repo.*.duration_seconds, 7, \"sum\"))",
+              "target": "removeEmptySeries(aliasSub(consolidateBy(groupByNode(github.workflow_run.*.*.*.*.*.$repo.*.duration_seconds, 7, \"sum\"), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))",
               "textEditor": true
             }
           ],
@@ -5471,7 +5471,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(limit(sortBy(groupByNodes(sumSeries(isNonNull(github.workflow_run.*.failure.*.*.*.$repo.*.duration_seconds)), \"sum\", 7, 8), \"sum\", true), 20))",
+              "target": "removeEmptySeries(aliasSub(consolidateBy(limit(sortBy(groupByNodes(sumSeries(isNonNull(github.workflow_run.*.failure.*.*.*.$repo.*.duration_seconds)), \"sum\", 7, 8), \"sum\", true), 20), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))",
               "textEditor": true
             }
           ],
@@ -5598,7 +5598,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(limit(sortBy(groupByNodes(sumSeries(isNonNull(github.workflow_step.*.failure.*.*.*.$repo.*.*.duration_seconds)), \"sum\", 8, 7), \"sum\", true), 20))",
+              "target": "removeEmptySeries(aliasSub(consolidateBy(limit(sortBy(groupByNodes(sumSeries(isNonNull(github.workflow_step.*.failure.*.*.*.$repo.*.*.duration_seconds)), \"sum\", 8, 7), \"sum\", true), 20), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))",
               "textEditor": true
             }
           ],
@@ -6323,7 +6323,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(sortByTotal(groupByNode(isNonNull(github.commit.*.*.*.*.$repo.*.*.churn), 8, \"sum\")))",
+              "target": "removeEmptySeries(aliasSub(consolidateBy(sortByTotal(groupByNode(isNonNull(github.commit.*.*.*.*.$repo.*.*.churn), 8, \"sum\")), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))",
               "textEditor": true
             }
           ],
@@ -6450,7 +6450,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(aliasByNode(github.repo_activity.force_push.*.*.*.$repo.events, 6, 3))",
+              "target": "removeEmptySeries(aliasSub(consolidateBy(aliasByNode(github.repo_activity.force_push.*.*.*.$repo.events, 6, 3), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))",
               "textEditor": true
             }
           ],
@@ -6724,7 +6724,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(aliasByNode(sumSeries(isNonNull(github.commit_check.*.*.*.*.*.$repo.*.checks)), 2, 3))",
+              "target": "removeEmptySeries(aliasSub(consolidateBy(aliasByNode(sumSeries(isNonNull(github.commit_check.*.*.*.*.*.$repo.*.checks)), 2, 3), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))",
               "textEditor": true
             }
           ],
@@ -7751,7 +7751,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(aliasByNode(sumSeries(isNonNull(github.issue_comment.*.*.*.*.*.*.comments)), 2))",
+              "target": "removeEmptySeries(aliasSub(consolidateBy(aliasByNode(sumSeries(isNonNull(github.issue_comment.*.*.*.*.*.*.comments)), 2), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))",
               "textEditor": true
             }
           ],
@@ -7866,7 +7866,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(groupByNode(isNonNull(groupByNodes(group(aliasByNode(github.discussion_comment.*.*.*.*.*.*.*.*.*.comments, 4, 3), aliasByNode(github.discussion_comment.*.*.*.*.*.*.*.*.*.*.comments, 4, 3)), \"max\", 0, 1)), 0, \"sum\"))",
+              "target": "removeEmptySeries(aliasSub(consolidateBy(groupByNode(isNonNull(groupByNodes(group(aliasByNode(github.discussion_comment.*.*.*.*.*.*.*.*.*.comments, 4, 3), aliasByNode(github.discussion_comment.*.*.*.*.*.*.*.*.*.*.comments, 4, 3)), \"max\", 0, 1)), 0, \"sum\"), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))",
               "textEditor": true
             }
           ],
@@ -8571,7 +8571,7 @@
           },
           "id": 94,
           "options": {
-            "content": "### Failed job output\n\nThe last lines of every job that failed are collected too, but they are text\nrather than measurements, so they go to a log store rather than here. With the\nLoki sink enabled, this is the query:\n\n```\n{job=\"ghchronicle\", kind=\"job_log\"} |= \"error\"\n```\n\nSet `every.joblogs` to switch the collection on. GitHub deletes job logs after\nthe repository's retention period, ninety days by default, and answers 410\nafterwards, so an older log cannot be backfilled: what exists is what was\ncaptured while it was there.\n\nPublished to a Grafana that has a Loki datasource, with\n`cmd/publish_dashboard -loki \u003cdatasource-uid\u003e`, this panel shows those lines\ninstead of this note.\n",
+            "content": "### Failed job output\n\nThe last lines of every job that failed are collected too, but they are text\nrather than measurements, so they go to a log store rather than here. With the\nLoki sink enabled, this is the query:\n\n```\n{job=\"ghchronicle\", kind=\"job_log\"} |= \"error\"\n```\n\nSet `every.families.joblogs` to switch the collection on. GitHub deletes job\nlogs after the repository's retention period, ninety days by default, and\nanswers 410 afterwards, so an older log cannot be backfilled: what exists is\nwhat was captured while it was there.\n\nPublished to a Grafana that has a Loki datasource, with\n`cmd/publish_dashboard -loki \u003cdatasource-uid\u003e`, this panel shows those lines\ninstead of this note.\n",
             "mode": "markdown"
           },
           "targets": [],
@@ -9423,7 +9423,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(sortBy(groupByNodes(isNonNull(github.ruleset_version.*.*.*.$repo.*.*.versions), \"sum\", 5, 6, 2), \"sum\", true))",
+              "target": "removeEmptySeries(aliasSub(consolidateBy(sortBy(groupByNodes(isNonNull(github.ruleset_version.*.*.*.$repo.*.*.versions), \"sum\", 5, 6, 2), \"sum\", true), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))",
               "textEditor": true
             }
           ],
@@ -9667,7 +9667,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(sortBy(groupByNodes(github.deployment.*.*.*.*.$repo.*.success, \"sum\", 6, 3), \"sum\", true))",
+              "target": "removeEmptySeries(aliasSub(consolidateBy(sortBy(groupByNodes(github.deployment.*.*.*.*.$repo.*.success, \"sum\", 6, 3), \"sum\", true), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))",
               "textEditor": true
             }
           ],
@@ -10119,7 +10119,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(aliasByNode(limit(sortBy(nonNegativeDerivative(github.release_asset.*.*.*.$repo.*.downloads), \"sum\", true), 25), 5, 6, 2))",
+              "target": "removeEmptySeries(aliasSub(consolidateBy(aliasByNode(limit(sortBy(nonNegativeDerivative(github.release_asset.*.*.*.$repo.*.downloads), \"sum\", true), 25), 5, 6, 2), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))",
               "textEditor": true
             }
           ],
@@ -11179,7 +11179,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(limit(sortBy(groupByNodes(github.code_scanning_analysis.*.*.*.*.$repo.*.*.results, \"sum\", 7, 6), \"sum\", true), 25))",
+              "target": "removeEmptySeries(aliasSub(consolidateBy(limit(sortBy(groupByNodes(github.code_scanning_analysis.*.*.*.*.$repo.*.*.results, \"sum\", 7, 6), \"sum\", true), 25), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))",
               "textEditor": true
             }
           ],
@@ -11232,7 +11232,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "What the repository itself says about the five security_and_analysis keys, which have three states and not two: `unavailable` is GitHub omitting the whole block on a private repository, and that is not `disabled`. Read it against the Security features panel above, where one is the repository's own setting and the other is whether the listing answered at all: a row where the two disagree is the row worth reading. Graphite names each row repository, setting and status from the path.",
+          "description": "What the repository itself says about the five security_and_analysis keys, which have three states and not two: `unavailable` is GitHub omitting the whole block on a private repository, and that is not `disabled`. Read it against the Security features panel above, where one is the repository's own setting and the other is whether the listing answered at all: a row where the two disagree is the row worth reading. Graphite names each row repository, setting and status from the path, so a setting whose status changed inside the range is two rows, the old status and the new, each with its last reading.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -11396,7 +11396,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "GitHub's own default setup, and nothing else. A repository can answer not-configured here and still run CodeQL from a workflow it wrote itself, which the Code scanning runs panel above sees and this one does not. In not-configured, `languages` is what GitHub detected in the repository, not what anything analyzed. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others. The number it keeps is `days_since_change`, which GitHub gives only for a setup it has actually changed, so a repository that answers not-configured or unavailable has no series here and no row at all: the other four dashboards list it with the cell empty.",
+          "description": "GitHub's own default setup, and nothing else. A repository can answer not-configured here and still run CodeQL from a workflow it wrote itself, which the Code scanning runs panel above sees and this one does not. In not-configured, `languages` is what GitHub detected in the repository, not what anything analyzed. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others. The number it keeps is `days_since_change`, which GitHub gives only for a setup it has actually changed, so a repository that answers not-configured or unavailable has no series here and no row at all: the other four dashboards list it with the cell empty. The state, the query suite and the schedule are part of the path, so a setup that changed one of them inside the range is two rows, the old and the new.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -11531,7 +11531,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "The default permissions of GITHUB_TOKEN, which is what a compromised action inherits. `write` beside can-approve-pull-requests on is the supply-chain row: that workflow can push a change and approve it. `read` means a workflow cannot push at all. Graphite names each row repository and permissions from the path.",
+          "description": "The default permissions of GITHUB_TOKEN, which is what a compromised action inherits. `write` beside can-approve-pull-requests on is the supply-chain row: that workflow can push a change and approve it. `read` means a workflow cannot push at all. Graphite names each row repository and permissions from the path, so permissions changed inside the range are two rows, the old and the new.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -12177,7 +12177,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(limit(sortByTotal(exclude(aliasByNode(github.billing_usage.*.*.*.*.*.*.*.gross, 5, 6), \"^_none_\\.\")), 40))",
+              "target": "removeEmptySeries(aliasSub(consolidateBy(limit(sortByTotal(exclude(aliasByNode(github.billing_usage.*.*.*.*.*.*.*.gross, 5, 6), \"^_none_\\.\")), 40), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))",
               "textEditor": true
             }
           ],
@@ -12601,7 +12601,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(groupByNode(github.event.*.*.*.*.*.*.events, -2, \"sum\"))",
+              "target": "removeEmptySeries(aliasSub(consolidateBy(groupByNode(github.event.*.*.*.*.*.*.events, -2, \"sum\"), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))",
               "textEditor": true
             }
           ],
@@ -12677,7 +12677,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(limit(sortByTotal(groupByNode(github.event.*.*.*.*.*.*.events, 3, \"sum\")), 20))",
+              "target": "removeEmptySeries(aliasSub(consolidateBy(limit(sortByTotal(groupByNode(github.event.*.*.*.*.*.*.events, 3, \"sum\")), 20), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))",
               "textEditor": true
             }
           ],
@@ -12792,7 +12792,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(limit(sortByTotal(groupByNodes(github.notification.*.*.*.*.*.*.notifications, \"sum\", 5, 7)), 25))",
+              "target": "removeEmptySeries(aliasSub(consolidateBy(limit(sortByTotal(groupByNodes(github.notification.*.*.*.*.*.*.notifications, \"sum\", 5, 7)), 25), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))",
               "textEditor": true
             }
           ],
@@ -13117,7 +13117,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(limit(sortByMaxima(groupByNode(sumSeries(isNonNull(github.star_given.*.*.*.*.*.stars)), 3, \"sum\")), 12))",
+              "target": "removeEmptySeries(aliasSub(consolidateBy(limit(sortByMaxima(groupByNode(sumSeries(isNonNull(github.star_given.*.*.*.*.*.stars)), 3, \"sum\")), 12), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))",
               "textEditor": true
             }
           ],
@@ -14449,7 +14449,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(groupByNode(isNonNull(github.package_version.*.*.*.*.*.*.*.*.published), 4, \"sum\"))",
+              "target": "removeEmptySeries(aliasSub(consolidateBy(groupByNode(isNonNull(github.package_version.*.*.*.*.*.*.*.*.published), 4, \"sum\"), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))",
               "textEditor": true
             }
           ],
@@ -16923,7 +16923,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(aliasByNode(github.collector_family.*.*.*.*.*.family.failed, 2, 5))",
+              "target": "removeEmptySeries(aliasSub(consolidateBy(aliasByNode(github.collector_family.*.*.*.*.*.family.failed, 2, 5), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))",
               "textEditor": true
             }
           ],
@@ -17034,7 +17034,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(aliasByNode(github.collector_family.*.*.*.*.*.repo.failed, 2, 6, 5))",
+              "target": "removeEmptySeries(aliasSub(consolidateBy(aliasByNode(github.collector_family.*.*.*.*.*.repo.failed, 2, 6, 5), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))",
               "textEditor": true
             }
           ],

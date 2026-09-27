@@ -101,8 +101,9 @@ func (h host) statePath(userConfigDir string) string {
 func setupConfig(a setupAnswers, now time.Time) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "# Written by `ghchronicle -setup` on %s.\n", now.Format("2006-01-02"))
-	b.WriteString("# Every ${VAR} is read from the environment at start-up, so this file\n")
-	b.WriteString("# carries no credential and can be copied and kept anywhere.\n\n")
+	b.WriteString("# A ${VAR} in a credential, an address or a file path is read from the\n")
+	b.WriteString("# environment at start-up, so this file carries no credential and can be\n")
+	b.WriteString("# copied and kept anywhere. Any other value is read as written.\n\n")
 	b.WriteString("github:\n  token: ${GITHUB_TOKEN}\n\n")
 	fmt.Fprintf(&b, "targets:\n  user: %s\n\n", a.User)
 	b.WriteString("sinks:\n")

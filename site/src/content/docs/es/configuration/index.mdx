@@ -44,7 +44,8 @@ valor por defecto.
 
 Una credencial, una dirección o una ruta de fichero se expande desde el
 entorno al arrancar. `${GITHUB_TOKEN}` se convierte en el valor de esa
-variable, o en una cadena vacía si no está definida.
+variable, o en una cadena vacía si no está definida, salvo en una ruta de
+fichero, más abajo.
 
 ```yaml
 github:
@@ -72,9 +73,13 @@ a las que llega:
   directorio personal, así que `state_file: ~/.ghchronicle/state.json` es un
   fichero dentro de él. Solo se lee así una `~` sola o seguida de un
   separador, `~nombre` se deja como está escrito, y una `~` cuando el proceso
-  no tiene directorio personal se rechaza al arrancar nombrando la clave. Antes
-  de 2.6.1 no se expandía ninguna ruta, y ese `state_file` era un directorio
-  llamado `~` dentro del directorio de trabajo.
+  no tiene directorio personal se rechaza al arrancar nombrando la clave.
+  También un `${VAR}` en una ruta que no está definido o está vacío, porque la
+  ruta que queda sin él no es la escrita:
+  `state_file: ${STATE_DIRECTORY}/state.json` sería `/state.json`, con el
+  registro de escrituras y el fichero de caché a su lado en la raíz del sistema
+  de ficheros. Antes de 2.6.1 no se expandía ninguna ruta, y esa `~` en un
+  `state_file` era un directorio llamado `~` dentro del directorio de trabajo.
 
 Cualquier otro valor se lee tal como está escrito, así que un `${VAR}` en
 `sinks.loki.tenant_id`, `sinks.influxdb.bucket`, `sinks.prometheus.listen`,
@@ -153,9 +158,11 @@ Ocho cosas, y borrar el fichero cuesta una distinta por cada una:
   ese día, y el historial entero otra vez una vez por semana o cuando la regla
   ha cambiado. Sin él la pasada siguiente recorre enteras las pull requests
   fusionadas de la cuenta, que en una cuenta con 2.315 fueron 35 consultas y
-  23,7 MB, donde una pasada sobre el último día es la consulta de recuentos y
-  una página del recorrido, dos puntos y 54 KB, y una sobre los cuatro últimos
-  días 874 KB, ejecutadas en vivo contra la misma cuenta el 2026-09-27.
+  23,7 MB, donde una pasada que lo tiene recorre solo el día en curso: la
+  consulta de recuentos y una página del recorrido, dos puntos, y de 468 a
+  513 KB en cada pasada horaria que registró el proxy de producción contra la
+  misma cuenta el 2026-09-27, un tamaño que crece a lo largo del día con lo que
+  se fusiona.
 
 Siete de las ocho cuestan solo cuota, porque lo que se vuelve a recoger se
 indexa por medida, etiquetas y marca de tiempo y sobrescribe lo que ya está
@@ -280,7 +287,8 @@ vuelve a pedir, cada función rechazada se vuelve a preguntar, que es también l
 manera de que una función activada hoy se note antes de que acabe su día, los
 jobs de las ejecuciones más recientes se vuelven a listar una vez, y la primera
 pasada corre `totals` antes de las pull requests, diga lo que diga su cadencia,
-así que sus páginas se vuelven a dimensionar, y lo dice:
+así que sus páginas se vuelven a dimensionar. Cuando `totals` no tocaba de
+todos modos, lo dice:
 
 ```text
 level=INFO msg="no page sizes remembered, running totals before the pull requests it sizes"
@@ -315,6 +323,7 @@ nombran la clave y lo que necesita.
 | Mensaje                                                               | Significa                                                          |
 | --------------------------------------------------------------------- | ------------------------------------------------------------------ |
 | `github.token is empty and GITHUB_TOKEN is unset`                     | Exactamente lo que dice                                            |
+| `state_file: "${X}/state.json" names ${X}, which is unset, ...`       | Una ruta nombra una variable sin valor: defínela, o escribe la ruta entera |
 | `targets: set at least one of user, orgs or repos`                    | No hay nada que recoger                                            |
 | `sinks: enable at least one of ...`                                   | Una ejecución que recoge y tira casi nunca es lo que alguien quiso |
 | `every.families.<name>: unknown collector`                            | El nombre no es una familia. El mensaje lista las que existen      |

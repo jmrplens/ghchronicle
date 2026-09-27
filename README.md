@@ -60,7 +60,7 @@ Grafana is on `http://localhost:3000` with the dashboard already in it: the
 collector publishes it on start and points it at the store beside it, so there
 is nothing to import and no datasource to fill in. The
 [Docker page](https://jmrp.io/docs/ghchronicle/install/docker/) has one compose
-file per store, each brought up against the real images before a release.
+file per store, written by one generator that CI holds them to.
 
 ```sh
 ghchronicle -config config.yaml    # what the service ends up running
@@ -202,10 +202,12 @@ docker run -v $PWD/config.yaml:/config.yaml:ro -v ghchronicle-state:/var/lib/ghc
 ```
 
 with `state_file: /var/lib/ghchronicle/state.json` in the configuration. The
-image runs as uid 65532 and has nowhere of its own to write, so the volume,
-handed to that uid once, is what keeps the state and the cache from one
-container to the next; without it every sweep warns `state not saved` and
-`cache file not saved`.
+image has no `/var/lib/ghchronicle`, its uid 65532 cannot create one, and a new
+named volume belongs to root, hence the one `chown`; mounted there, the volume
+keeps the state and the cache from one container to the next, and without it
+every sweep warns `state not saved` and `cache file not saved`. A
+configuration that names no `state_file` writes to the container's working
+directory instead, which is writable and goes with the container.
 
 For the whole path on one system rather than these few lines:
 [Linux](https://jmrp.io/docs/ghchronicle/install/linux/),
@@ -232,8 +234,9 @@ sinks:
   stdout: true
 ```
 
-Every `${VAR}` is read from the environment, so the file can be committed while
-the secrets stay out of it. `config.example.yaml` in this repository is the
+A `${VAR}` in a credential, an address or a file path is read from the
+environment, so the file can be committed while the secrets stay out of it;
+any other value is read as written. `config.example.yaml` in this repository is the
 documented version, with a comment on every option there is. It collects every
 family it knows except three that ship switched off, `deps`, `history` and
 `joblogs`, each turned on by giving it a cadence under `every.families`; and

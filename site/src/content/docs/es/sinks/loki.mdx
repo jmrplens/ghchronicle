@@ -65,10 +65,12 @@ Dos frases cambiaron en 2.6.0, y una línea que ya está en Loki conserva el tex
 con el que se envió:
 
 - Una contribución externa dice qué le pasó al elemento y no quién lo hizo,
-  porque la fila no dice quién lo fusionó o lo cerró:
-  `USER's pull request OWNER/REPO#N` is open, was merged o was closed without
-  merging, y `USER's issue OWNER/REPO#N` is open o was closed. Una fila cuyo
-  estado y cuya marca de fusión no coinciden dice
+  porque la fila no dice quién lo fusionó o lo cerró: una pull request dice
+  `USER's pull request OWNER/REPO#N is open`,
+  `USER's pull request OWNER/REPO#N was merged` o
+  `USER's pull request OWNER/REPO#N was closed without merging`, y una issue
+  `USER's issue OWNER/REPO#N is open` o `USER's issue OWNER/REPO#N was closed`.
+  Una fila cuyo estado y cuya marca de fusión no coinciden dice
   `USER's contribution OWNER/REPO#N`. Antes todas las líneas decían
   `USER merged OWNER/REPO#N`, issues abiertas incluidas.
 - Una release dice `published release TAG of OWNER/REPO`, o

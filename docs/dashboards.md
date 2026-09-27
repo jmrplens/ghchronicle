@@ -829,7 +829,11 @@ was at its highest. Elasticsearch is the exception in four places,
 each saying so in its description: its curve of open alerts takes the largest
 series of each severity in a bucket rather than adding them, and its security
 settings, code scanning setup and token permissions take the largest reading of
-the range.
+the range. Graphite is the exception in three, and says so in each: its
+settings, code scanning setup and token permissions name each row from the
+path, of which a setting's `status`, the setup's `state`, `query_suite` and
+`schedule`, and the `permissions` are part, so a change inside the range is two
+rows, the old one and the new.
 
 Two panels are new information rather than a different view. Time to
 resolve a code scanning alert comes from dates that were being downloaded and
@@ -1122,7 +1126,8 @@ pretend.
 - **Graphite** keeps the dated points but has no rows: a table there is one
   number per series reduced over the range, so a table that needs several
   fields of one row keeps the column it is sorted by and says which it dropped,
-  and a boolean is not a metric there at all.
+  a string is not a metric there at all, and a boolean is kept as 1 or 0 like
+  any number.
 - **Elasticsearch** keeps the dated documents, so a per-item table is the
   newest documents themselves, or the newest document of each item where an
   item has several, and everything else is a bucket aggregation, on the

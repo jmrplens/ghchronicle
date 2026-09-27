@@ -75,8 +75,9 @@ un número, así que:
 - No se puede construir una tabla que necesite varios campos de una misma fila.
   El dashboard incluido conserva la columna por la que ordena y dice en la
   descripción qué columnas descartó.
-- Un booleano no es una métrica allí en absoluto, ni tampoco un título ni
-  ninguna otra cadena. Esos paneles lo dicen.
+- Un título o cualquier otra cadena no es una métrica allí en absoluto, y el
+  destino la descarta; los paneles que mostrarían una lo dicen. Un booleano se
+  guarda como 1 o 0, igual que cualquier número.
 - Un panel no puede unir dos medidas, porque cada una vive bajo su propia
   ruta. Work elsewhere no tiene columna Stars, y el perfil de comunidad
   conserva la bandera de plantilla de issue de la API en vez del número de

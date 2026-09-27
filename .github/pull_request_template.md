@@ -13,7 +13,9 @@ fails before it and passes after it: name the test.
 - [ ] `make golangci-lint` (the formatter's diff as well as the linters)
 - [ ] `make check-dashboards check-gallery check-layouts check-config-options check-compose check-config-cases`
       (for a Go change; regenerate with the same targets without `check-`,
-      `make config-options` before `make config-cases`)
+      the dashboards with `go run ./cmd/gen_dashboards` or
+      `make gen-dashboards`, and `make config-options` before
+      `make config-cases`)
 - [ ] `cd site && pnpm run build && pnpm run lint` (for a change under `site/`)
 
 ## What it owes

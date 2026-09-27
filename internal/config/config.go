@@ -631,7 +631,7 @@ var defaultEvery = map[string]family{
 	},
 	"account": {
 		every: 1 * time.Hour, group: "account",
-		why: "the contribution calendar moves with every contribution and the profile's counts with every follow and star, and a pass is one GraphQL point and seven REST requests, of which only the profile is charged: GitHub never answered it with a 304, and the six package listings answer one until a package changes",
+		why: "the contribution calendar moves with every contribution and the profile's counts with every follow and star, and a pass is one GraphQL point and seven REST requests, of which only the profile is charged: GitHub all but never answered it with a 304, once in 48 conditional reads, and the six package listings answer one until a package changes",
 	},
 	"billing": {
 		every: 1 * time.Hour, group: "account",
@@ -774,6 +774,13 @@ func expandEnv(s string) string {
 // written rather than guessed at. A ~ with no home to put in its place is
 // refused, because the alternative is a directory called ~ that the next
 // reader of the configuration will not think to look for.
+//
+// A ${VAR} that is unset or empty is refused for the same reason. Expanded
+// to nothing, `state_file: ${STATE_DIRECTORY}/state.json` is /state.json:
+// run as root the state, the ledger and the cache file land at the root of
+// the filesystem without a word, and run as anyone else every sweep warns
+// that none of them was saved. A credential or an address that expands to
+// nothing is caught by the check that needs it; nothing checks a path.
 func expandPath(key, s string) (string, error) {
 	if rest, tilde := strings.CutPrefix(s, "~"); tilde &&
 		(rest == "" || rest[0] == '/' || rest[0] == filepath.Separator) {
@@ -782,6 +789,17 @@ func expandPath(key, s string) (string, error) {
 			return "", fmt.Errorf("%s: %q starts with ~ and there is no home directory to put in its place: %w", key, s, err)
 		}
 		s = home + rest
+	}
+	for _, ref := range envRef.FindAllStringSubmatch(s, -1) {
+		value, set := os.LookupEnv(ref[1])
+		if value != "" {
+			continue
+		}
+		state := "empty"
+		if !set {
+			state = "unset"
+		}
+		return "", fmt.Errorf("%s: %q names ${%s}, which is %s, and the path left without it is not the one written: set it, or write the path out", key, s, ref[1], state)
 	}
 	return expandEnv(s), nil
 }

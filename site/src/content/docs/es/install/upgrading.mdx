@@ -44,7 +44,10 @@ el recuento que guarda, y el historial entero otra vez una vez por semana.
 La consulta de pull requests se dimensiona por repositorio a partir de los
 recuentos que lee `totals`, y la 2.6.0 guarda esos tamaños en el fichero de
 caché. La primera pasada no tiene ninguno, así que corre `totals` antes que las
-pull requests diga lo que diga su cadencia, y lo dice:
+pull requests diga lo que diga su cadencia. Con su cadencia de una hora,
+`totals` suele tocar de todos modos después de actualizar, y entonces
+simplemente corre primero; solo cuando no toca, y la pasada no es la de
+cebado, que corre todas las familias, el log dice por qué corre:
 
 ```text
 level=INFO msg="no page sizes remembered, running totals before the pull requests it sizes"
@@ -137,12 +140,14 @@ ti está prevista para una versión posterior, en
 `state_file`, `sinks.dedupe_file`, `log.file`, `sinks.file.path` y
 `sinks.sql.path` toman una `~` inicial como el directorio personal y un
 `${VAR}` del entorno, como siempre hicieron las credenciales y las direcciones.
-Una configuración que escribía cualquiera de las dos obtenía un directorio
+Una configuración que escribía cualquiera de los dos obtenía un directorio
 llamado con esos caracteres, dentro del directorio de trabajo, y ahora obtiene
 la ruta que quería decir. Donde eso era el fichero de estado, el estado que
 guardaba la versión anterior está en el directorio del nombre raro, y la nueva
 arranca sin él: mueve los ficheros antes del primer arranque si los recorridos
-que ahorra merecen conservarse. Ver [expansión de
+que ahorra merecen conservarse. Un `${VAR}` en una ruta que no está definido
+o está vacío detiene el arranque y nombra la clave, en vez de dejar la ruta sin
+esa parte. Ver [expansión de
 `${VAR}`](/ghchronicle/es/configuration/#expansión-de-var).
 
 <Aside type="note" title="Qué más cambió">

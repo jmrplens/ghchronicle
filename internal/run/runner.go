@@ -427,9 +427,9 @@ func (r *Runner) accountFamilies(ctx context.Context, now time.Time) {
 	})
 	// The whole green-squares history of every past year, for one point of
 	// GraphQL each, and the year so far as a daily snapshot. Disabled by
-	// default; setting `every.history` to any duration runs it, the past
-	// years are there after the first sweep, and a daily cadence is what keeps
-	// this year's row current.
+	// default; setting `every.families.history` to any duration runs it, the
+	// past years are there after the first sweep, and a daily cadence is what
+	// keeps this year's row current.
 	r.family(ctx, "history", now, func() ([]sink.Point, error) {
 		return collect.History{Login: user}.Collect(ctx, r.API, now)
 	})

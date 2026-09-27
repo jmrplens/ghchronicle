@@ -173,8 +173,8 @@ jobs:
         run: make check-config-options
 
       # deploy/*.yaml is what the Docker page offers a reader to copy, so a
-      # compose that no longer matches the generator is a page promising a
-      # stack nobody brought up.
+      # compose that no longer matches the generator is a page offering a
+      # stack the generator no longer writes.
       - name: The compose files match the generator
         run: make check-compose
 

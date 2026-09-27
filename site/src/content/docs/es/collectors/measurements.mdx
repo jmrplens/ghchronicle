@@ -170,11 +170,12 @@ no guarda texto, no puede agrupar por ellos y sus paneles lo dicen.
 **Un almacén escrito antes de 2.6.1 y después guarda `gh_discussion_comment`
 con dos formas.** Un comentario que una versión anterior leyó antes de que lo
 aceptaran y otra vez después son dos filas en el mismo instante, una por cada
-valor de `is_answer`, y cada comentario que una pasada de 2.6.1 vuelve a leer
-gana una tercera fila sin esa etiqueta. Las dos tablas del dashboard sobre esta medida leen una fila por
-comentario en todos los almacenes, aceptado si cualquiera de sus filas lo dice,
-así que una respuesta aceptada antes de 2.6.1 y retirada después sigue
-apareciendo como aceptada. Borrar la medida y lanzar un `-backfill` deja una fila
+valor de `is_answer`. Un comentario que leyó una versión anterior gana una
+fila más sin esa etiqueta cuando una pasada de 2.6.1 lo vuelve a leer: la
+segunda para la mayoría, la tercera para uno que ya tenía dos. Las dos tablas
+del dashboard sobre esta medida leen una fila por comentario en todos los
+almacenes, aceptado si cualquiera de sus filas lo dice, así que una respuesta
+aceptada antes de 2.6.1 y retirada después sigue apareciendo como aceptada. Borrar la medida y lanzar un `-backfill` deja una fila
 por comentario: la tabla en InfluxDB 3 y en PostgreSQL, las rutas
 `github.discussion_comment` en Graphite, el índice
 `ghchronicle-gh_discussion_comment` en Elasticsearch. El destino PostgreSQL
@@ -1003,10 +1004,11 @@ Sobre la vida entera de una cuenta son unas pocas docenas de puntos y 24 MB (35
 consultas y 94 segundos sobre 2.315 pull requests, medido el 2026-09-27), así
 que se hace una vez y luego se guarda: el fichero de estado tiene el recuento
 con el último día UTC que cubre, y cada pasada recorre solo las pull requests
-fusionadas desde entonces, una página por pasada, de 0,3 a 0,6 MB en esa
-cuenta. En el día en que corre una pasada todavía se fusiona, así que sus pull
-requests están en la fila de ese día y la pasada siguiente las vuelve a
-recorrer. El historial entero se vuelve a recorrer una vez por semana, porque
+fusionadas desde entonces, una página por pasada: de 468 a 513 KB en esa
+cuenta en cada pasada horaria que registró el proxy de producción el
+2026-09-27, un tamaño que crece a lo largo del día con lo que se fusiona. En el
+día en que corre una pasada todavía se fusiona, así que sus pull requests están
+en la fila de ese día y la pasada siguiente las vuelve a recorrer. El historial entero se vuelve a recorrer una vez por semana, porque
 el recuento puede bajar (un repositorio que pasa a privado o se borra saca sus
 pull requests de `is:public`), y siempre que haya cambiado la regla con la que
 se guardó el recuento.

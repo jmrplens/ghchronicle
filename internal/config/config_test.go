@@ -415,6 +415,35 @@ sinks:
 	}
 }
 
+// TestAnUnsetVariableInAPathIsRefusedNamingTheKey: expanded to nothing,
+// `state_file: ${GHC_REVIEW_UNSET_DIR}/state.json` was /state.json, and the
+// ledger and the cache file went beside it: run as root, written at the root
+// of the filesystem without a word, and `-backfill-status` looked for
+// /state-progress.json. The ~ is refused for that reason already, and a
+// variable that is set but empty leaves the same path.
+func TestAnUnsetVariableInAPathIsRefusedNamingTheKey(t *testing.T) {
+	t.Setenv("GITHUB_TOKEN", "x")
+	t.Setenv("GHC_TEST_EMPTY_DIR", "")
+	// Registered with t.Setenv so it is put back, then unset for the test.
+	t.Setenv("GHC_TEST_UNSET_DIR", "")
+	if err := os.Unsetenv("GHC_TEST_UNSET_DIR"); err != nil {
+		t.Fatal(err)
+	}
+	for key, body := range map[string]string{
+		"state_file":        "state_file: ${GHC_TEST_UNSET_DIR}/state.json\nsinks: {stdout: true}\n",
+		"sinks.dedupe_file": "sinks: {stdout: true, dedupe_file: \"${GHC_TEST_UNSET_DIR}/w.bin\"}\n",
+		"log.file":          "log: {file: \"${GHC_TEST_EMPTY_DIR}/g.log\"}\nsinks: {stdout: true}\n",
+		"sinks.file.path":   "sinks: {file: {path: \"${GHC_TEST_UNSET_DIR}/p.lp\"}}\n",
+		"sinks.sql.path":    "sinks: {sql: {path: \"${GHC_TEST_EMPTY_DIR}/p.sql\"}}\n",
+	} {
+		_, err := Load(write(t, "targets: {user: jmrplens}\n"+body))
+		if err == nil || !strings.Contains(err.Error(), key+": ") ||
+			!strings.Contains(err.Error(), "is unset") && !strings.Contains(err.Error(), "is empty") {
+			t.Errorf("%s naming a variable with no value: err = %v, want it refused naming the key", key, err)
+		}
+	}
+}
+
 // TestATildeWithNoHomeIsRefusedNamingTheKey: a service account with no home
 // directory would otherwise get a directory called ~ wherever it started,
 // which is the last place anybody reading the configuration would look.
