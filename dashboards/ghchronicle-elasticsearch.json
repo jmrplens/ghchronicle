@@ -3351,7 +3351,7 @@
                   "settings": {
                     "min_doc_count": "1",
                     "order": "asc",
-                    "orderBy": "_term",
+                    "orderBy": "_key",
                     "size": "24"
                   },
                   "type": "terms"
@@ -3477,7 +3477,7 @@
                   "settings": {
                     "min_doc_count": "1",
                     "order": "asc",
-                    "orderBy": "_term",
+                    "orderBy": "_key",
                     "size": "24"
                   },
                   "type": "terms"
@@ -3828,7 +3828,7 @@
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
-                    "orderBy": "_term",
+                    "orderBy": "_key",
                     "size": "50"
                   },
                   "type": "terms"
@@ -18366,11 +18366,11 @@
               "bucketAggs": [
                 {
                   "field": "type.keyword",
-                  "id": "426",
+                  "id": "427",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
-                    "orderBy": "1",
+                    "orderBy": "426",
                     "size": "30"
                   },
                   "type": "terms"
@@ -18380,7 +18380,7 @@
               "metrics": [
                 {
                   "field": "events",
-                  "id": "427",
+                  "id": "426",
                   "type": "sum"
                 }
               ],
@@ -18452,11 +18452,11 @@
               "bucketAggs": [
                 {
                   "field": "full_name.keyword",
-                  "id": "428",
+                  "id": "429",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
-                    "orderBy": "1",
+                    "orderBy": "428",
                     "size": "20"
                   },
                   "type": "terms"
@@ -18466,7 +18466,7 @@
               "metrics": [
                 {
                   "field": "events",
-                  "id": "429",
+                  "id": "428",
                   "type": "sum"
                 }
               ],
@@ -18577,18 +18577,18 @@
               "bucketAggs": [
                 {
                   "field": "reason.keyword",
-                  "id": "430",
+                  "id": "431",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
-                    "orderBy": "1",
+                    "orderBy": "430",
                     "size": "25"
                   },
                   "type": "terms"
                 },
                 {
                   "field": "subject_type.keyword",
-                  "id": "431",
+                  "id": "432",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -18602,7 +18602,7 @@
               "metrics": [
                 {
                   "field": "notifications",
-                  "id": "432",
+                  "id": "430",
                   "type": "sum"
                 }
               ],
@@ -20513,18 +20513,18 @@
               "bucketAggs": [
                 {
                   "field": "topic.keyword",
-                  "id": "467",
+                  "id": "468",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
-                    "orderBy": "1",
+                    "orderBy": "467",
                     "size": "30"
                   },
                   "type": "terms"
                 },
                 {
                   "field": "url.keyword",
-                  "id": "468",
+                  "id": "469",
                   "settings": {
                     "min_doc_count": "1",
                     "missing": "",
@@ -20539,7 +20539,7 @@
               "metrics": [
                 {
                   "field": "repo.keyword",
-                  "id": "469",
+                  "id": "467",
                   "type": "cardinality"
                 }
               ],

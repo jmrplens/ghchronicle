@@ -730,6 +730,15 @@ func (b *builder) terms(field string, size int, order ...string) any {
 	}
 }
 
+// tmBy is a terms bucket on a tag that keeps the `size` values with the most
+// of `metric`, largest first. The metric has to be one of the same query's,
+// since the bucket names it by its id; renumberES carries that reference to
+// the id the metric ends up with.
+func (b *builder) tmBy(tag string, size int, metric any) any {
+	id, _ := agg(metric)["id"].(string)
+	return b.tm(tag, size, id)
+}
+
 // tmURL is the url of an item as a bucket, which is the one way a string
 // reaches an Elasticsearch table: a top_metrics over a string panics the
 // plugin (see the note on Social accounts). One value per parent bucket,

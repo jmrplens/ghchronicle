@@ -52,14 +52,16 @@ func activity(b *builder) []Panel {
 
 	typeGR, typeGRtf := gTbl(fmt.Sprintf(`groupByNode(%s, -2, "sum")`, events("events")),
 		"Type", []col{{"sum", "Events"}})
-	typeES, typeEStf := esTbl(ev, []any{b.tm("type", 30, "1")}, []any{b.mSum("events")},
+	typeEvents := b.mSum("events")
+	typeES, typeEStf := esTbl(ev, []any{b.tmBy("type", 30, typeEvents)}, []any{typeEvents},
 		[]named{{"type.keyword", "Type"}, {"e", "Events"}}, nil)
 
 	repoGR, repoGRtf := gTbl(fmt.Sprintf(
 		`limit(sortByTotal(groupByNode(%s, %d, "sum")), 20)`, events("events"), gn(ev, "full_name"),
 	),
 		"Repository", []col{{"sum", "Events"}})
-	repoES, repoEStf := esTbl(ev, []any{b.tm("full_name", 20, "1")}, []any{b.mSum("events")},
+	repoEvents := b.mSum("events")
+	repoES, repoEStf := esTbl(ev, []any{b.tmBy("full_name", 20, repoEvents)}, []any{repoEvents},
 		[]named{{"full_name.keyword", "Repository"}, {"e", "Events"}}, nil)
 
 	notifGR, notifGRtf := gTbl(fmt.Sprintf(
@@ -67,8 +69,9 @@ func activity(b *builder) []Panel {
 		notes, gn(nt, "reason"), gn(nt, "subject_type"),
 	),
 		"Reason, kind", []col{{"sum", "Notifications"}})
-	notifES, notifEStf := esTbl(nt, []any{b.tm("reason", 25, "1"), b.tm("subject_type", 10)},
-		[]any{b.mSum("notifications")},
+	notified := b.mSum("notifications")
+	notifES, notifEStf := esTbl(nt, []any{b.tmBy("reason", 25, notified), b.tm("subject_type", 10)},
+		[]any{notified},
 		[]named{
 			{"reason.keyword", "Reason"},
 			{"subject_type.keyword", "Kind"},

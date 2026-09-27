@@ -300,7 +300,8 @@ func whatTheyPublish(b *builder) []Panel {
 		`limit(sortByMaxima(groupByNode(keepLastValue(%s), %d, "sum")), 30)`,
 		rp(rt, "present"), gn(rt, "topic"),
 	), "Topic", []col{{"lastNotNull", "Repositories"}})
-	topicsES, topicsEStf := esTbl(rt, []any{b.tm("topic", 30, "1"), b.tmURL()}, []any{b.mUniq("repo")},
+	topicRepos := b.mUniq("repo")
+	topicsES, topicsEStf := esTbl(rt, []any{b.tmBy("topic", 30, topicRepos), b.tmURL()}, []any{topicRepos},
 		[]named{{"topic.keyword", "Topic"}, {inventoryURLTerm, "Link"}, {"r", "Repositories"}}, []string{ESF})
 
 	pkgGR, pkgGRtf := gTbl(rowsOf(gp(pk, "versions"), gn(pk, "package"), gn(pk, "type")),

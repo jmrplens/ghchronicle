@@ -120,7 +120,7 @@ func contributionTotals(b *builder) []Panel {
 			rp("gh_commit_punchcard", "commits"), gn("gh_commit_punchcard", node)),
 			name, []col{{"lastNotNull", "Commits"}})
 		es, estf = esTbl("gh_commit_punchcard",
-			[]any{b.tm(node, 24, "_term", "asc"), b.tm("repo", 500)}, []any{b.mMax("commits")},
+			[]any{b.tm(node, 24, "_key", "asc"), b.tm("repo", 500)}, []any{b.mMax("commits")},
 			[]named{
 				{node + ".keyword", name},
 				{"repo.keyword", "Repository"},
@@ -159,7 +159,7 @@ func contributionTotals(b *builder) []Panel {
 	yearRename["year"] = "Year"
 	yearGR, yearGRtf := gTbl(rowsOf(gp("gh_contribution_year", "contributions"),
 		gn("gh_contribution_year", "year")), "Year", []col{{"lastNotNull", "Contributions"}})
-	yearES, yearEStf := esTbl("gh_contribution_year", []any{b.tm("year", 50, "_term")},
+	yearES, yearEStf := esTbl("gh_contribution_year", []any{b.tm("year", 50, "_key")},
 		[]any{b.mNewest(yearFields...)},
 		append([]named{{"year.keyword", "Year"}}, yearCols...), nil)
 

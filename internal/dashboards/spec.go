@@ -706,12 +706,33 @@ func Render(storeName string, ds, logs any) []map[string]any {
 // builds a panel's helpers before its neighbors would otherwise hand out the
 // numbers in a different order every time the file is reshuffled; this keeps
 // the exported JSON stable against that.
+//
+// A terms bucket that keeps its top values by a metric names that metric's
+// id, so the reference is renumbered with it. Grafana orders by a metric id
+// only when a metric of the query carries it, and otherwise leaves the bucket
+// in Elasticsearch's order by document count without a word: four tables kept
+// the values with the most documents that way, ordered by an id no metric had.
 func renumberES(panels []map[string]any) {
 	n := 0
 	for _, t := range targetsOf(panels) {
+		metrics := map[string]map[string]any{}
+		for _, e := range asList(t["metrics"]) {
+			m, _ := e.(map[string]any)
+			if id, ok := m["id"].(string); ok {
+				metrics[id] = m
+			}
+		}
 		for _, e := range numbered(t) {
 			n++
 			e["id"] = strconv.Itoa(n)
+		}
+		for _, e := range asList(t["bucketAggs"]) {
+			bucket, _ := e.(map[string]any)
+			settings, _ := bucket["settings"].(map[string]any)
+			by, _ := settings["orderBy"].(string)
+			if m, ok := metrics[by]; ok {
+				settings["orderBy"] = m["id"]
+			}
 		}
 	}
 }
