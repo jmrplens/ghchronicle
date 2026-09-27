@@ -173,7 +173,14 @@ were being read for.
 **A tag is a series, a field is a value.** Anything unbounded goes in a field.
 The Actions runner name looks like a good tag until you notice a hosted runner
 is named uniquely per run (`GitHub Actions 1000163135`), which would create a
-series for every job ever executed. It is a field.
+series for every job ever executed. It is a field. So is any value that moves
+after the row's own date: a tag is part of the row's identity, so a tag that
+changed would open a second row at the same instant and leave the stale one
+beside it for ever. A comment is accepted as the answer days after it was
+written, so since 2.6.1 that is the `answers` field of `gh_discussion_comment`
+rather than an `is_answer` tag. [The measurements
+page](/ghchronicle/collectors/measurements/#how-to-read-the-tables) lists the
+others, and what a store written before 2.6.1 holds.
 
 **Weekly rows are anchored to the week, not to today.** `gh_commits_week` is
 stamped at the Sunday that starts each week. A sweep on Tuesday and one on

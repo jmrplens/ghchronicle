@@ -8,10 +8,13 @@ What one ghchronicle sweep over the GitHub API does, in what order, and why each
 
 Source: <https://jmrp.io/docs/ghchronicle/how/>
 
-A sweep is one pass over every family whose interval has elapsed. It is an
-increment, not a rebuild: it asks for the little that can have changed since
-last time, writes what it got to every configured store, and records when each
-family ran.
+A sweep is one pass over every family whose interval has elapsed, except that
+the running service starts at most one family of six hours or more in each
+sweep and leaves the others that are due for the next ticks: the [slow families
+take turns](https://jmrp.io/docs/ghchronicle/configuration/cadences/#the-slow-families-take-turns).
+It is an increment, not a rebuild: it asks for the little that can have changed
+since last time, writes what it got to every configured store, and records when
+each family ran.
 
 ### The shape of one pass
 
@@ -88,9 +91,12 @@ Setting any of them to `0` switches it off entirely. See
 
 ### Discovery
 
-The repository list is rebuilt at most once an hour. Repositories are created
-rarely and listing them costs a page per hundred, so anything shorter spends
-quota to learn nothing. Forks and archived repositories are excluded by
+The repository list is rebuilt once an hour, by the first sweep that finds it
+an hour old, give or take half a tick: a sweep reads its clock a few
+milliseconds either side of the hour, and without that margin a repository
+created in between waited a tick more. Repositories are created rarely and
+listing them costs a page per hundred, so anything shorter spends quota to
+learn nothing. Forks and archived repositories are excluded by
 default, for the reason set out in [targets](https://jmrp.io/docs/ghchronicle/configuration/targets/).
 
 ### Failure is per repository, not per sweep
@@ -133,12 +139,16 @@ deleting it costs one full-price pass of each family and loses nothing.
 > An exporter holds its samples in memory, so a restart empties it and it stays
 > empty until each family's cadence comes round, which for the twelve-hour ones
 > is half a day of a dashboard reading zero. Paying for one full sweep is the
-> cheaper mistake, so the first sweep after start-up runs every enabled family
-> whatever the state file says. A [backfill](https://jmrp.io/docs/ghchronicle/how/backfill/) does
-> the same, because reaching as far back as GitHub allows is the whole point of
-> asking for one, and so does a run drawing [a card](https://jmrp.io/docs/ghchronicle/card/),
-> because every number on the card comes from that one sweep and a family
-> skipped as not due would be a zero on the picture.
+> cheaper mistake, so when the service feeds the [Prometheus
+> exporter](https://jmrp.io/docs/ghchronicle/sinks/prometheus/#scraping-it) its first sweep after
+> start-up runs every enabled family whatever the state file says, unless
+> `no_prime` is set. It records as run only the families that were due, so the
+> others keep the turn they had. `-once` starts no exporter and does not prime.
+> A [backfill](https://jmrp.io/docs/ghchronicle/how/backfill/) runs every family too, because
+> reaching as far back as GitHub allows is the whole point of asking for one,
+> and so does a run drawing [a card](https://jmrp.io/docs/ghchronicle/card/), because every number
+> on the card comes from that one sweep and a family skipped as not due would
+> be a zero on the picture.
 
 ### The brake
 
@@ -326,7 +336,14 @@ were being read for.
 **A tag is a series, a field is a value.** Anything unbounded goes in a field.
 The Actions runner name looks like a good tag until you notice a hosted runner
 is named uniquely per run (`GitHub Actions 1000163135`), which would create a
-series for every job ever executed. It is a field.
+series for every job ever executed. It is a field. So is any value that moves
+after the row's own date: a tag is part of the row's identity, so a tag that
+changed would open a second row at the same instant and leave the stale one
+beside it for ever. A comment is accepted as the answer days after it was
+written, so since 2.6.1 that is the `answers` field of `gh_discussion_comment`
+rather than an `is_answer` tag. [The measurements
+page](https://jmrp.io/docs/ghchronicle/collectors/measurements/#how-to-read-the-tables) lists the
+others, and what a store written before 2.6.1 holds.
 
 **Weekly rows are anchored to the week, not to today.** `gh_commits_week` is
 stamped at the Sunday that starts each week. A sweep on Tuesday and one on
@@ -362,7 +379,7 @@ the tool treats them as such.
 | --------------------------- | --------------------------------- | -------------------------------------------------- |
 | Pages per collector         | the collector's own small default | until the API runs out, or the bound is reached    |
 | When the reserve is reached | skip the family and warn          | wait for the window to reset, then carry on        |
-| Which families run          | those whose interval has elapsed  | every enabled family, whatever the state file says |
+| Which families run          | those whose interval has elapsed, the slow ones [taking turns](https://jmrp.io/docs/ghchronicle/configuration/cadences/#the-slow-families-take-turns) in the service | every enabled family, whatever the state file says |
 | When it is stopped          | nothing to keep; the next tick sweeps | a checkpoint keeps its place, and the same command carries on |
 | How often                   | on a schedule, forever            | deliberately, usually once                         |
 
@@ -594,6 +611,13 @@ that a sweep reads.
   analyses, where a sweep reads five, two and one.
 - Every release, deployment and discussion, and every Dependabot and code
   scanning alert, where a sweep reads the newest page of each list.
+- Every issue and discussion comment the account left anywhere, and every
+  answer of its own that was accepted, where a sweep reads the newest hundred
+  comments of each kind and the newest five hundred accepted answers.
+- Every star the account gave, where a sweep reads the newest five hundred.
+- The co-authored pull requests behind Pair Extraordinaire's progress, walked
+  over the account's whole life, where a pass adds the days since the last one
+  and walks the whole history once a week.
 - Every page of every stargazer list, where a sweep reads the newest hundred
   stars of a repository whose list it has walked whole once. Up to 2.5.0 a
   first walk that failed was recorded as done, and a backfill read a recorded
@@ -606,6 +630,14 @@ that a sweep reads.
 - The newest hundred webhook deliveries per hook, where a sweep reads thirty.
 - At most 500 failed job logs per repository, none older than ninety days,
   once `joblogs` has a cadence; a sweep reads at most ten.
+
+Two things a sweep remembers, a backfill leaves alone. A 403 or 404 that a
+sweep [remembers for a day](https://jmrp.io/docs/ghchronicle/api/#a-refusal-is-remembered-too) is
+asked again, since a backfill consults no such memory. And it reads the [cache
+file](https://jmrp.io/docs/ghchronicle/configuration/#the-cache-beside-it) beside the state file
+but writes nothing to it: the pages it walks are ones no sweep asks for, and
+kept there they would push out the sweeps' own, so a service started after it
+would start colder than it stopped.
 
 ### What it does not switch on
 
@@ -637,8 +669,9 @@ and pages by cursor instead, so the alert walk is written against cursors.
 **The GraphQL gateway gives up on a hundred pull requests.** Asking for a
 hundred pull requests with their reviews in one query answers an **HTML 502**
 after about ten seconds. The pull request walk halves its page size and retries
-on the same cursor, silently: the collectors carry no logger, so a backfill of a
-busy repository shows this only as a slower family, never as a line.
+on the same cursor, silently: the pull request collector carries no logger, so
+a backfill of a busy repository shows this only as a slower family, never as a
+line.
 
 > **Three things cannot be backfilled at any price**
 >

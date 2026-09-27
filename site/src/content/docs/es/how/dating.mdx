@@ -180,7 +180,14 @@ leían los ficheros.
 campo. El nombre del runner de Actions parece una buena etiqueta hasta que uno
 se fija en que un runner alojado se nombra de forma única en cada ejecución
 (`GitHub Actions 1000163135`), lo que crearía una serie por cada job ejecutado
-alguna vez. Es un campo.
+alguna vez. Es un campo. También lo es todo valor que se mueve después de la
+fecha de su fila: una etiqueta es parte de la identidad de la fila, así que una
+etiqueta que cambiara abriría una segunda fila en el mismo instante y dejaría
+la vieja al lado para siempre. Un comentario se acepta como respuesta días
+después de escribirse, así que desde la 2.6.1 eso es el campo `answers` de
+`gh_discussion_comment` y no una etiqueta `is_answer`. [La página de
+medidas](/ghchronicle/es/collectors/measurements/#cómo-leer-las-tablas) lista
+las demás, y qué guarda un almacén escrito antes de la 2.6.1.
 
 **Las filas semanales se anclan a la semana, no a hoy.** `gh_commits_week` se
 sella en el domingo con el que empieza cada semana. Una pasada del martes y otra

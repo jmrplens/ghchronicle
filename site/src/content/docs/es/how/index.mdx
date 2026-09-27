@@ -8,10 +8,13 @@ compactTables:
 
 import { Aside } from "@astrojs/starlight/components";
 
-Una pasada es un recorrido por cada familia cuyo intervalo ya ha vencido. Es un
-incremento, no una reconstrucción: pide lo poco que puede haber cambiado desde
-la vez anterior, escribe lo obtenido en todos los almacenes configurados y
-anota cuándo corrió cada familia.
+Una pasada es un recorrido por cada familia cuyo intervalo ya ha vencido, salvo
+que el servicio en marcha arranca como mucho una familia de seis horas o más en
+cada pasada y deja las demás que tocan para los tics siguientes: [las familias
+lentas se turnan](/ghchronicle/es/configuration/cadences/#las-familias-lentas-se-turnan).
+Es un incremento, no una reconstrucción: pide lo poco que puede haber cambiado
+desde la vez anterior, escribe lo obtenido en todos los almacenes configurados
+y anota cuándo corrió cada familia.
 
 ## La forma de una pasada
 
@@ -89,9 +92,12 @@ Poner cualquiera a `0` la apaga por completo. Ver
 
 ## El descubrimiento
 
-La lista de repositorios se rehace como mucho una vez por hora. Los
-repositorios se crean pocas veces y listarlos cuesta una página por cada cien,
-así que cualquier cosa más corta gasta cuota para no aprender nada. Los forks y
+La lista de repositorios se rehace una vez por hora, en la primera pasada que
+la encuentra con una hora de antigüedad, con medio tic de margen: una pasada
+lee su reloj unos milisegundos antes o después de la hora, y sin ese margen un
+repositorio creado entre medias esperaba un tic más. Los repositorios se crean
+pocas veces y listarlos cuesta una página por cada cien, así que cualquier cosa
+más corta gasta cuota para no aprender nada. Los forks y
 los archivados quedan fuera por omisión, por la razón que se expone en
 [objetivos](/ghchronicle/es/configuration/targets/).
 
@@ -138,13 +144,17 @@ nada.
   Un exportador guarda sus muestras en memoria, así que un reinicio lo vacía y
   sigue vacío hasta que llega la cadencia de cada familia, lo que para las de
   doce horas es medio día de dashboard a cero. Pagar una pasada completa es el
-  error más barato, así que la primera pasada tras el arranque corre todas las
-  familias activas diga lo que diga el fichero de estado. Un
-  [relleno](/ghchronicle/es/how/backfill/) hace lo mismo, porque llegar tan
-  atrás como permita GitHub es justo lo que se le pide, y también una pasada que
-  dibuja [una tarjeta](/ghchronicle/es/card/), porque cada número de la tarjeta
-  sale de esa única pasada y una familia saltada por no tocarle sería un cero en
-  la imagen.
+  error más barato, así que cuando el servicio alimenta el [exportador de
+  Prometheus](/ghchronicle/es/sinks/prometheus/#cómo-consultarlo) su primera
+  pasada tras el arranque corre todas las familias activas diga lo que diga el
+  fichero de estado, salvo que `no_prime` esté puesto. Solo anota como hechas
+  las familias a las que les tocaba, así que las demás conservan el turno que
+  tenían. `-once` no arranca exportador y no hace esa pasada completa. Un
+  [relleno histórico](/ghchronicle/es/how/backfill/) también corre todas las
+  familias, porque llegar tan atrás como permita GitHub es justo lo que se le
+  pide, y también una pasada que dibuja [una tarjeta](/ghchronicle/es/card/),
+  porque cada número de la tarjeta sale de esa única pasada y una familia
+  saltada por no tocarle sería un cero en la imagen.
 </Aside>
 
 ## El freno

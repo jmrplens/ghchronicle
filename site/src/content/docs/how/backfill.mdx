@@ -23,7 +23,7 @@ the tool treats them as such.
 | --------------------------- | --------------------------------- | -------------------------------------------------- |
 | Pages per collector         | the collector's own small default | until the API runs out, or the bound is reached    |
 | When the reserve is reached | skip the family and warn          | wait for the window to reset, then carry on        |
-| Which families run          | those whose interval has elapsed  | every enabled family, whatever the state file says |
+| Which families run          | those whose interval has elapsed, the slow ones [taking turns](/ghchronicle/configuration/cadences/#the-slow-families-take-turns) in the service | every enabled family, whatever the state file says |
 | When it is stopped          | nothing to keep; the next tick sweeps | a checkpoint keeps its place, and the same command carries on |
 | How often                   | on a schedule, forever            | deliberately, usually once                         |
 
@@ -255,6 +255,13 @@ that a sweep reads.
   analyses, where a sweep reads five, two and one.
 - Every release, deployment and discussion, and every Dependabot and code
   scanning alert, where a sweep reads the newest page of each list.
+- Every issue and discussion comment the account left anywhere, and every
+  answer of its own that was accepted, where a sweep reads the newest hundred
+  comments of each kind and the newest five hundred accepted answers.
+- Every star the account gave, where a sweep reads the newest five hundred.
+- The co-authored pull requests behind Pair Extraordinaire's progress, walked
+  over the account's whole life, where a pass adds the days since the last one
+  and walks the whole history once a week.
 - Every page of every stargazer list, where a sweep reads the newest hundred
   stars of a repository whose list it has walked whole once. Up to 2.5.0 a
   first walk that failed was recorded as done, and a backfill read a recorded
@@ -267,6 +274,14 @@ that a sweep reads.
 - The newest hundred webhook deliveries per hook, where a sweep reads thirty.
 - At most 500 failed job logs per repository, none older than ninety days,
   once `joblogs` has a cadence; a sweep reads at most ten.
+
+Two things a sweep remembers, a backfill leaves alone. A 403 or 404 that a
+sweep [remembers for a day](/ghchronicle/api/#a-refusal-is-remembered-too) is
+asked again, since a backfill consults no such memory. And it reads the [cache
+file](/ghchronicle/configuration/#the-cache-beside-it) beside the state file
+but writes nothing to it: the pages it walks are ones no sweep asks for, and
+kept there they would push out the sweeps' own, so a service started after it
+would start colder than it stopped.
 
 ## What it does not switch on
 
@@ -298,8 +313,9 @@ and pages by cursor instead, so the alert walk is written against cursors.
 **The GraphQL gateway gives up on a hundred pull requests.** Asking for a
 hundred pull requests with their reviews in one query answers an **HTML 502**
 after about ten seconds. The pull request walk halves its page size and retries
-on the same cursor, silently: the collectors carry no logger, so a backfill of a
-busy repository shows this only as a slower family, never as a line.
+on the same cursor, silently: the pull request collector carries no logger, so
+a backfill of a busy repository shows this only as a slower family, never as a
+line.
 
 <Aside type="caution" title="Three things cannot be backfilled at any price">
 No amount of waiting changes these, and they are the reason the project exists
