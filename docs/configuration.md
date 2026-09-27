@@ -89,7 +89,9 @@ state_file: /var/lib/ghchronicle/state.json
 Seven things, and deleting the file costs a different one for each:
 
 - `last_run`, when each family last ran. Without it every family is due at once,
-  so the next sweep is a full one.
+  so the next sweep is a full one, except that the service starts the families
+  of six hours or more
+  [one a sweep](https://jmrp.io/docs/ghchronicle/configuration/cadences/#the-slow-families-take-turns).
 - `first_saw`, when each repository's stargazer list was first walked whole.
   It is written only after a walk that came back without an error. Without it
   the one-off full walk of the stargazer list is done again.
@@ -903,6 +905,67 @@ start-up says so:
 level=WARN msg="heartbeat is 1h and the shortest cadence is 15m (actions), so
   no family can run more often than every 1h"
 ```
+
+### The slow families take turns
+
+The running service starts at most one family whose cadence is six hours or
+more in each sweep, and leaves any other that is due for the next tick.
+
+Families that run in the same sweep are marked with the same instant in the
+state file, so they come due together again at every cadence, for ever. A group
+like that forms whenever many families are marked at once: a fresh install, a
+`-once` or a backfill run before the service, a family switched on. Until 2.6.0
+the production account's eight daily families ran in the first sweep of the UTC
+day, every day, and its five twelve-hour ones together in one sweep of their
+own. On 2026-09-26 the daily sweep took 294 billable `core` requests and 24.3 MB
+against 17.5 requests for the median sweep, and with the twelve-hour sweep 45
+minutes after it, its hour was eight times the median hour in `core` requests.
+The calendar put them there, not the work.
+
+The family that starts is the one that has been due the longest, counted from
+the later of its last run and the last time the process let it start. The
+second half matters for a family whose every pass fails: a failed pass is not
+marked as run, so by its last run alone it would be the most overdue family on
+every sweep and would take every turn. Counted this way it goes behind the
+others.
+
+A family waits for each of the others at most once, so the worst wait is one
+tick for each other slow family, and only the last of a group that formed waits
+that long. At the quarter-hour tick the built-in cadences give:
+
+| Schedule                                      | Families of 6h or more | Longest wait      |
+| --------------------------------------------- | ---------------------- | ----------------- |
+| the built-in cadences                         | 12                     | 11 ticks, `2h45m` |
+| with `deps` and `history` at `24h`            | 14                     | 13 ticks, `3h15m` |
+| with `deps`, `history` and `joblogs` at a day | 15                     | 14 ticks, `3h30m` |
+
+That wait is paid once. Once two families have run in different sweeps they
+come due in different sweeps, and nothing moves them again: a simulated week of
+the fourteen, all due in one sweep at the start, had every family start exactly
+a cadence after its previous start from the first day on.
+
+The log says which family started and which are waiting, so a slow family
+missing from a sweep it was due in is accounted for:
+
+```text
+level=INFO msg="slow families due together take turns" starting=planning
+  waiting=settings,traffic,forks,profile,stats,achievements,branches,inventory,keys,policyfiles,rulesets
+```
+
+One a sweep holds while it can keep every cadence, and a configuration with a
+longer tick can have more slow families than that. `every.default: 6h` ticks
+hourly, because nothing in it runs more often, with thirty-one families at six
+hours, and one a sweep would start each of them every thirty-one hours. A sweep
+there starts the fewest that fit, six, and no family waits as long as its
+cadence.
+
+Only the service takes turns. `-once` runs every family that is due, because it
+has no next tick to leave one for: run once a day by a scheduler, it would leave
+it for a day. A backfill, a card and the first sweep of a service that primes
+the [Prometheus exporter](https://jmrp.io/docs/ghchronicle/sinks/prometheus/#scraping-it) run
+every family whatever the state file says. The primed sweep then records only
+the families that were due, so a restart does not put the others back on one
+instant, and each keeps the turn it had.
 
 ### Making them slower
 

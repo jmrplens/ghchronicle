@@ -97,7 +97,9 @@ state_file: /var/lib/ghchronicle/state.json
 Siete cosas, y borrar el fichero cuesta una distinta por cada una:
 
 - `last_run`, cuándo corrió cada familia por última vez. Sin él todas las
-  familias vencen a la vez, así que la pasada siguiente es completa.
+  familias vencen a la vez, así que la pasada siguiente es completa, salvo que
+  el servicio arranca las familias de seis horas o más
+  [una por pasada](/ghchronicle/es/configuration/cadences/#las-familias-lentas-se-turnan).
 - `first_saw`, cuándo se recorrió entera por primera vez la lista de
   stargazers de cada repositorio. Solo se escribe tras un recorrido que volvió
   sin error. Sin él el recorrido completo de la lista de stargazers se vuelve a

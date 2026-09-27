@@ -434,6 +434,13 @@ comes round, the panels that read it have nothing, and for a twelve-hour family
 that is half a day of zeros. The stores are unaffected either way, since they
 keep what was collected before the restart.
 
+The priming sweep records as run only the families that were due, and the
+others run again when they would have without the restart. Recorded all at
+once, the families of six hours or more would be due together a day later and
+[take turns](https://jmrp.io/docs/ghchronicle/configuration/cadences/#the-slow-families-take-turns),
+and the last of them would pass the day after which the exporter drops a
+series.
+
 A series that has not been rewritten for **24 hours** is dropped, so a
 repository that leaves the sweep stops being reported as if it were still there.
 The horizon is not configurable.

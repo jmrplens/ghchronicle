@@ -300,6 +300,71 @@ level=WARN msg="heartbeat is 1h and the shortest cadence is 15m (actions), so
   no family can run more often than every 1h"
 ```
 
+## Las familias lentas se turnan
+
+El servicio en marcha arranca como mucho una familia de cadencia de seis horas o
+más en cada pasada, y deja cualquier otra que toque para el tic siguiente.
+
+Las familias que corren en la misma pasada quedan marcadas con el mismo instante
+en el fichero de estado, así que vuelven a tocar juntas en cada cadencia, para
+siempre. Un grupo así se forma siempre que se marcan muchas familias a la vez:
+una instalación nueva, un `-once` o un backfill antes del servicio, una familia
+que se enciende. Hasta la 2.6.0 las ocho familias diarias de la cuenta de
+producción corrían en la primera pasada del día UTC, todos los días, y sus cinco
+familias de doce horas juntas en una pasada propia. El 2026-09-26 la pasada
+diaria gastó 294 peticiones `core` facturables y 24,3 MB frente a 17,5
+peticiones de la pasada mediana, y con la de doce horas 45 minutos después, su
+hora fue ocho veces la hora mediana en peticiones `core`. Las puso ahí el
+calendario, no el trabajo.
+
+La familia que arranca es la que lleva más tiempo tocando, contado desde lo más
+reciente entre su última pasada y la última vez que el proceso la dejó arrancar.
+La segunda mitad importa para una familia cuyas pasadas fallan todas: una pasada
+fallida no se marca como hecha, así que por su última pasada sola sería la
+familia más atrasada en cada pasada y se quedaría con todos los turnos. Contada
+así, se pone detrás de las demás.
+
+Una familia espera a cada una de las otras como mucho una vez, así que la peor
+espera es un tic por cada otra familia lenta, y solo la última de un grupo recién
+formado espera tanto. Con el tic de cuarto de hora que dan las cadencias internas:
+
+| Calendario                                 | Familias de 6h o más | Espera más larga |
+| ------------------------------------------ | -------------------- | ---------------- |
+| las cadencias internas                     | 12                   | 11 tics, `2h45m` |
+| con `deps` e `history` a `24h`             | 14                   | 13 tics, `3h15m` |
+| con `deps`, `history` y `joblogs` a un día | 15                   | 14 tics, `3h30m` |
+
+Esa espera se paga una vez. En cuanto dos familias han corrido en pasadas
+distintas, tocan en pasadas distintas y nada vuelve a juntarlas: una semana
+simulada de las catorce, todas pendientes en una misma pasada al principio, tuvo
+cada familia arrancando exactamente una cadencia después de su arranque anterior
+desde el primer día.
+
+El log dice qué familia arrancó y cuáles esperan, así que una familia lenta que
+falta en una pasada en la que tocaba queda explicada:
+
+```text
+level=INFO msg="slow families due together take turns" starting=planning
+  waiting=settings,traffic,forks,profile,stats,achievements,branches,inventory,keys,policyfiles,rulesets
+```
+
+Una por pasada vale mientras puede cumplir todas las cadencias, y una
+configuración con un tic más largo puede tener más familias lentas que eso.
+`every.default: 6h` late cada hora, porque nada en ella corre más a menudo, con
+treinta y una familias a seis horas, y una por pasada arrancaría cada una cada
+treinta y una horas. Ahí una pasada arranca las menos que caben, seis, y ninguna
+familia espera tanto como su cadencia.
+
+Solo el servicio se turna. `-once` corre todas las familias que tocan, porque no
+tiene un tic siguiente al que dejar ninguna: lanzado una vez al día por un
+planificador, la dejaría para el día siguiente. Un backfill, una tarjeta y la
+primera pasada de un servicio que ceba el
+[exportador de Prometheus](/ghchronicle/es/sinks/prometheus/#cómo-consultarlo)
+corren todas las familias diga lo que diga el fichero de estado. La pasada
+cebada anota después solo las familias a las que les tocaba, así que un
+reinicio no vuelve a poner las demás en un mismo instante, y cada una conserva
+el turno que tenía.
+
 ## Hacerlas más lentas
 
 Si el presupuesto aprieta, alarga `artifacts` y después `actions`. Son las dos

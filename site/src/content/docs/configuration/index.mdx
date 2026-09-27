@@ -96,7 +96,9 @@ state_file: /var/lib/ghchronicle/state.json
 Seven things, and deleting the file costs a different one for each:
 
 - `last_run`, when each family last ran. Without it every family is due at once,
-  so the next sweep is a full one.
+  so the next sweep is a full one, except that the service starts the families
+  of six hours or more
+  [one a sweep](/ghchronicle/configuration/cadences/#the-slow-families-take-turns).
 - `first_saw`, when each repository's stargazer list was first walked whole.
   It is written only after a walk that came back without an error. Without it
   the one-off full walk of the stargazer list is done again.

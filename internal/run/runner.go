@@ -51,7 +51,8 @@ type Runner struct {
 	// An exporter holds its samples in memory, so a restart empties it and it
 	// stays empty until each family's cadence comes round, which for the
 	// twelve hour ones is half a day of a dashboard reading zero. Paying for
-	// one full sweep is the cheaper mistake.
+	// one full sweep is the cheaper mistake. In the loop, what it runs early
+	// it does not record as run: see markRun.
 	Prime bool
 
 	// Card says this sweep draws a card, which runs every enabled family the
@@ -103,6 +104,15 @@ type Runner struct {
 	reposAt time.Time
 	primed  bool
 	prime   bool
+
+	// serving is whether these sweeps are the loop's, which has a next tick
+	// to leave a family for; held is the slow families this sweep leaves for
+	// it, and started when this process last let each slow family start. See
+	// takeTurns.
+	serving bool
+	held    map[string]bool
+	started map[string]time.Time
+
 	// archived is the archived repositories the filter set aside, from the
 	// same listing as repos. A sweep's totals family dates each one's archive
 	// and asks nothing else about it; a backfill has none, because it
@@ -271,6 +281,9 @@ func (r *Runner) sweep(ctx context.Context, now time.Time) error {
 	if err := r.discoverRepos(ctx, now); err != nil {
 		return err
 	}
+	// After the listing, so a sweep that cannot list the repositories runs
+	// nothing and spends nobody's turn.
+	r.takeTurns(now)
 	r.accountFamilies(ctx, now)
 	return r.repoFamilies(ctx, now)
 }
@@ -456,7 +469,8 @@ var batchOnlyFamilies = map[string]bool{
 func (r *Runner) repoFamilies(ctx context.Context, now time.Time) error {
 	for _, family := range perRepoFamilies {
 		every, enabled := r.Cfg.Interval(family)
-		if !enabled || (!r.prime && !r.due(family, every, now)) {
+		due := enabled && r.due(family, every, now)
+		if !enabled || (!r.prime && !due) || r.held[family] {
 			continue
 		}
 		// A family the interrupted walk finished is not run again. Its rows
@@ -531,9 +545,29 @@ func (r *Runner) repoFamilies(ctx context.Context, now time.Time) error {
 		if pass.failed == 0 && r.fullPassDue(family, now) {
 			r.State.MarkFull(family, now)
 		}
-		r.State.Mark(family, now)
+		r.markRun(family, due, now)
 	}
 	return nil
+}
+
+// markRun records that a family ran, except in the primed first sweep of the
+// loop for a family that was not due.
+//
+// That sweep runs every family to fill the exporter, and marking the ones it
+// ran early would put all of them on one last_run: every restart would form
+// again the group takeTurns exists to break up, and the next day would have
+// its families take turns again. Taking turns is what makes the exporter lose
+// a series, because it drops one not rewritten within a day. Simulated over
+// the built-in cadences, marking them left five daily families up to 1h30m
+// past a day without a write after each restart, and fifteen hours at
+// every.default: 24h. Left where they were, the families keep the turns they
+// had, and each is written again at its own time, within its cadence of the
+// primed write.
+func (r *Runner) markRun(family string, due bool, now time.Time) {
+	if r.serving && r.prime && !due {
+		return
+	}
+	r.State.Mark(family, now)
 }
 
 // reposToCover is how many repositories a family's pass is about to ask, which
@@ -976,6 +1010,22 @@ func (r *Runner) discussions() collect.Discussions {
 // hourly family slips a tick now and then and the pass drifts later with it,
 // and the day it drifted across midnight would hold no row at all for any
 // untouched open pull request.
+//
+// The first sweep of the day, and not a later one per repository. Spreading
+// the read over the day, each repository at the first sweep after hour
+// hash(full_name) mod 24, would take its points out of the first hour, and it
+// keeps a day the service starts after a repository's hour, whose first sweep
+// is already past it. It does not keep a day the family stops running before
+// that hour. As it is, any sweep of the day reads the page, the first and, if
+// that one failed, each one after it; spread, only the sweeps after the hour
+// could. Such a day loses the row of every untouched open pull request of each
+// repository whose hour had not come, and nothing can write it later, because
+// a read stamps the day it happens on. The production service was stopped
+// from 14:11Z on 2026-09-17 to 22:46Z, and had it come back after midnight,
+// every repository whose hour fell in that gap would have no row for the day;
+// and every.groups.work: 6h has no issues sweep after its last of the day, at
+// the same hour every day, so a repository whose hour fell after it would
+// never be read whole.
 func (r *Runner) fullPassDue(family string, now time.Time) bool {
 	if family != "issues" {
 		return false
@@ -1137,11 +1187,18 @@ func (r *Runner) family(ctx context.Context, name string, now time.Time, run fun
 		return
 	}
 	sizing := name == "totals" && r.sizeFirst
-	if due := r.due(name, every, now); !due && !r.prime {
+	due := r.due(name, every, now)
+	if !due && !r.prime {
 		if !sizing {
 			return
 		}
 		r.Log.Info("no page sizes remembered, running totals before the pull requests it sizes")
+	}
+	// Due, and waiting behind another slow family: see takeTurns. Unless it
+	// is the totals that size the pull request page, which this sweep needs
+	// whatever its cadence.
+	if r.held[name] && !sizing {
+		return
 	}
 	// Already written by the walk this run resumes. An account family is its
 	// own unit: it asks about no repository, so there is nothing smaller of it
@@ -1189,7 +1246,7 @@ func (r *Runner) family(ctx context.Context, name string, now time.Time, run fun
 	// a whole family's pass on every sweep until it comes back. The failure
 	// is not lost by being marked; it is in the log and in the collector's own
 	// rows, which is where it was missing.
-	r.State.Mark(name, now)
+	r.markRun(name, due || sizing, now)
 	// The checkpoint is stricter than the mark above, and on purpose. A mark
 	// costs a family one pass of its own cadence; a checkpoint is a family a
 	// resume never opens again, so a family that lost a batch, or whose rows
@@ -1396,6 +1453,8 @@ func nonNegative(n int) uint64 {
 // every quarter of an hour is not delayed by one that runs every twelve hours,
 // unless the config forces one: see tick.
 func (r *Runner) Serve(ctx context.Context) error {
+	// The one kind of run with a next tick to leave a slow family for.
+	r.serving = true
 	tick, from := r.tick()
 	r.Log.Info("ghchronicle running", "tick", tick.String(), "tick_from", from)
 	if err := r.Once(ctx); err != nil {
