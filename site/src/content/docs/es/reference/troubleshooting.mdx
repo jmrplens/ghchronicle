@@ -127,15 +127,18 @@ consulta demasiado grande para sus diez segundos, y ahí los colectores vuelven
 a preguntar con una página más pequeña.
 
 **`state not saved` o `cache file not saved`.** El usuario con el que corre el
-colector no puede escribir en el directorio que nombra el fichero de estado, o
-el directorio no existe y no se puede crear. Nada de lo que aprende una pasada
-sobrevive entonces a un reinicio: el siguiente arranque recoge todas las
-familias y vuelve a recorrer la lista de estrellas, el historial entero de
-estrellas y las pull requests en coautoría. En un contenedor es un directorio
-del anfitrión montado sin entregárselo al uid 65532, un volumen nuevo montado
-en otro sitio que no sea `/var/lib/ghchronicle`, o cualquier volumen nuevo con
-una imagen anterior a la 2.6.1, ninguno de ellos de ese uid, o un fichero de
-estado montado solo, sobre el que no se puede renombrar; ver [qué tiene que ser
+colector no pudo poner el fichero en su sitio. Cada uno de los dos se escribe
+con un nombre temporal en el directorio que nombra el fichero de estado y
+después se renombra a su sitio, así que o no se puede escribir en ese
+directorio, o no existe y no se puede crear, o el propio fichero no se puede
+sustituir con un renombrado. Nada de lo que aprende una pasada sobrevive
+entonces a un reinicio: el siguiente arranque recoge todas las familias y vuelve
+a recorrer la lista de estrellas, el historial entero de estrellas y las pull
+requests en coautoría. En un contenedor es un directorio del anfitrión montado
+sin entregárselo al uid 65532, un volumen nuevo montado en otro sitio que no sea
+`/var/lib/ghchronicle`, o cualquier volumen nuevo con una imagen anterior a la
+2.6.1, ninguno de ellos de ese uid, o un fichero de estado montado solo, sobre
+el que no se puede renombrar; ver [qué tiene que ser
 escribible](/ghchronicle/es/install/docker/#qué-tiene-que-ser-escribible).
 
 **`rate limit reserve reached, family skipped`.** Una vez está bien. En cada

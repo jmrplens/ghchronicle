@@ -46,18 +46,6 @@ func contributionTotals(b *builder) []Panel {
 		` SUM(owner_commits) AS "Own commits" FROM gh_commits_week` +
 		" WHERE $__timeFilter(time) AND " + RF + " GROUP BY 1 ORDER BY 1"
 
-	// The punch card is a whole-life snapshot per repository, rewritten every
-	// sweep, so summing the range counted every commit once per sweep. One row
-	// per repository and bucket, newest first, and then the sum.
-	punchSQL := func(node, name, order string) string {
-		return fmt.Sprintf(`SELECT %s AS "%s", SUM(commits) AS "Commits" FROM (`+
-			"SELECT %s, commits, ROW_NUMBER() OVER (PARTITION BY repo, %s"+
-			" ORDER BY time DESC) AS rn FROM gh_commit_punchcard"+
-			" WHERE $__timeFilter(time) AND %s) x WHERE rn = 1 GROUP BY 1 ORDER BY %s",
-			node, name, node, node, RF, order)
-	}
-	byHour := punchSQL("hour", "Hour", "1")
-	byDay := punchSQL("weekday", "Weekday", "2 DESC")
 	// The short name is what this column shows, deliberately: it is the one
 	// table that lists third-party repositories beside your own, and on a
 	// phone an `owner/` prefix was all that fit. It used to strip the owner
@@ -96,9 +84,6 @@ func contributionTotals(b *builder) []Panel {
 		{"issues", "Issues"},
 		{"repositories", "New repos"},
 	}
-	punchcardWhy := "The exporter skips `gh_commit_punchcard`: on an account with eighteen " +
-		"repositories it is 1,217 series, four fifths of the whole exporter, for " +
-		"a distribution GitHub serves as one snapshot."
 	// Named, or the transposed table's header reads "Field" and "1". The
 	// first field of the frame is a number, so Grafana labels the one value
 	// column with its row index and displays it "Last year 1"; the organize
@@ -111,27 +96,6 @@ func contributionTotals(b *builder) []Panel {
 		organize(map[string]string{"Last year 1": "Last year"}, nil, nil),
 	}
 	weekPath := func(field string) string { return rp("gh_commits_week", field) }
-
-	// The punch card is a snapshot per repository, rewritten on every read:
-	// each repository's newest reading of each hour, as the SQL twin's newest
-	// row per repository and hour, and then the repositories added together.
-	// The largest reading of the range stood here before, which is the newest
-	// only for as long as a count never falls, and a rewritten history is one
-	// way for it to fall.
-	punch := func(node, name string) (gr []Target, grtf []any, es []Target, estf []any) {
-		gr, grtf = gTbl(fmt.Sprintf(`sortByName(groupByNode(keepLastValue(%s), %d, "sum"))`,
-			rp("gh_commit_punchcard", "commits"), gn("gh_commit_punchcard", node)),
-			name, []col{{"lastNotNull", "Commits"}})
-		es, estf = esTbl("gh_commit_punchcard",
-			[]any{b.tm(node, 24, "_key", "asc"), b.tm("repo", 500), b.newestDoc()}, []any{b.mMax("commits")},
-			[]named{
-				{node + ".keyword", name},
-				{"repo.keyword", "Repository"},
-				{"commits", "Commits"},
-			}, []string{ESF},
-			groupSum(name, "Commits", name, "Commits")...)
-		return gr, grtf, es, estf
-	}
 
 	promTotals, totalRename, totalFields := perFieldRow("github_contributions_total_", "user", totalCols)
 	totalsGR, totalsGRtf := gTbl(rowsOf(gp("gh_contributions_total",
@@ -155,8 +119,7 @@ func contributionTotals(b *builder) []Panel {
 		[]named{{panelFullNameField, "Repository"}, {"url.keyword", "Link"}, {"commits", "Commits"}},
 		[]string{"kind:commits"})
 
-	hourGR, hourGRtf, hourES, hourEStf := punch("hour", "Hour")
-	dayGR, dayGRtf, dayES, dayEStf := punch("weekday", "Weekday")
+	hourCard, dayCard := punchCards(b)
 
 	promYears, yearRename, yearFields := perFieldRow("github_contribution_year_", "year", yearCols)
 	yearRename["year"] = "Year"
@@ -214,23 +177,8 @@ func contributionTotals(b *builder) []Panel {
 			GR: totalsGR, GRTF: totalsGRtf,
 			ES: totalsES, ESTF: append(totalsEStf, transpose...),
 		}),
-		panel("barchart", "Commits by hour of day", box{W: 12, H: 7, X: 0, Y: 19}, []Target{sqlT(byHour)}, &P{
-			PromNote: cannot("commits by hour of the day, over the whole life of each "+
-				"repository.", punchcardWhy),
-			// Every other hour labeled: twenty four labels at phone width ran
-			// together as one string of digits.
-			Opts: Opts{"horizontal": false, "tick_spacing": 100},
-			Desc: "The whole life of each repository, not the selected range: GitHub serves " +
-				"this distribution as a single snapshot.",
-			GR: hourGR, GRTF: hourGRtf,
-			ES: hourES, ESTF: hourEStf,
-		}),
-		panel("barchart", "Commits by weekday", box{W: 6, H: 7, X: 12, Y: 19}, []Target{sqlT(byDay)}, &P{
-			PromNote: cannot("commits by weekday, over the whole life of each repository.",
-				punchcardWhy),
-			GR: dayGR, GRTF: dayGRtf,
-			ES: dayES, ESTF: dayEStf,
-		}),
+		hourCard,
+		dayCard,
 		panel("table", "Commits by repository", box{W: 6, H: 7, X: 18, Y: 19}, []Target{sqlT(byRepo)}, &P{
 			Prom:      []Target{promTbl(`topk(25, sum by (full_name) (github_contribution_repo_commits{kind="commits"}))`)},
 			PromTF:    []any{organize(map[string]string{"full_name": "Repository", "Value": "Commits"}, nil, nil)},
@@ -267,6 +215,87 @@ func contributionTotals(b *builder) []Panel {
 			ES: yearES, ESTF: yearEStf, ESDesc: esRange,
 		}),
 	}
+}
+
+// punchCards is the two charts of the punch card: commits by hour of day and
+// by weekday, over the whole life of each repository.
+func punchCards(b *builder) (hour, day Panel) {
+	// The punch card is a whole-life snapshot per repository, rewritten every
+	// sweep, so summing the range counted every commit once per sweep. It is
+	// also a grid, a row per weekday and hour, and one read stamps every cell
+	// of it with the same instant. So the snapshot is every row at the
+	// repository's newest time, and the panel adds all of them up by hour or
+	// by weekday. The newest row per repository and hour kept one of the
+	// weekdays that tie on that time, and per repository and weekday one of
+	// the hours: through Grafana on the end-to-end fixture, Monday read 3 in
+	// both SQL stores where its two cells held 3 and 5. The newest row per
+	// cell would add the cells up, but would keep a cell that the newest grid
+	// no longer has, which a rewritten history can empty.
+	punchSQL := func(node, name, order string) string {
+		return fmt.Sprintf(`SELECT %s AS "%s", SUM(commits) AS "Commits" FROM (`+
+			"SELECT time, %s, commits, MAX(time) OVER (PARTITION BY full_name) AS newest"+
+			" FROM gh_commit_punchcard WHERE $__timeFilter(time) AND %s) x"+
+			" WHERE time = newest GROUP BY 1 ORDER BY %s",
+			node, name, node, RF, order)
+	}
+	byHour := punchSQL("hour", "Hour", "1")
+	byDay := punchSQL("weekday", "Weekday", "2 DESC")
+
+	punchcardWhy := "The exporter skips `gh_commit_punchcard`: on an account with eighteen " +
+		"repositories it is 1,217 series, four fifths of the whole exporter, for " +
+		"a distribution GitHub serves as one snapshot."
+
+	// The Elasticsearch twin of punchSQL: each repository's newest grid, its
+	// cells summed per hour or weekday inside that one timestamp, and then
+	// the repositories added together. A max stood inside the timestamp
+	// before, which read the largest cell where the panel wants all of them:
+	// Monday read 5 on the same fixture. The bucket per repository comes
+	// first because the newest grid is a repository's, so the rows arrive in
+	// repository order and are sorted by the hour or the weekday after they
+	// are added up, as the bucket per hour first used to order them.
+	//
+	// Graphite cannot find a repository's newest grid: each cell is a series
+	// of its own, and keepLastValue carries a cell to the end of the range
+	// after the newest grid has dropped it, which GRDesc below says.
+	punch := func(node, name string) (gr []Target, grtf []any, es []Target, estf []any) {
+		gr, grtf = gTbl(fmt.Sprintf(`sortByName(groupByNode(keepLastValue(%s), %d, "sum"))`,
+			rp("gh_commit_punchcard", "commits"), gn("gh_commit_punchcard", node)),
+			name, []col{{"lastNotNull", "Commits"}})
+		es, estf = esTbl("gh_commit_punchcard",
+			[]any{b.tm("full_name", 500), b.newestDoc(), b.tm(node, 24, "_key", "asc")},
+			[]any{b.mSum("commits")},
+			[]named{
+				{node + ".keyword", name},
+				{"commits", "Commits"},
+			}, []string{ESF},
+			append(groupSum(name, "Commits", name, "Commits"), sortAsc(name))...)
+		return gr, grtf, es, estf
+	}
+	punchGRDesc := "Graphite keeps each cell of the grid as a series of its own, so a cell " +
+		"a rewritten history emptied keeps its last count here, where the SQL and " +
+		"Elasticsearch twins read only each repository's newest grid."
+
+	hourGR, hourGRtf, hourES, hourEStf := punch("hour", "Hour")
+	dayGR, dayGRtf, dayES, dayEStf := punch("weekday", "Weekday")
+
+	hour = panel("barchart", "Commits by hour of day", box{W: 12, H: 7, X: 0, Y: 19}, []Target{sqlT(byHour)}, &P{
+		PromNote: cannot("commits by hour of the day, over the whole life of each "+
+			"repository.", punchcardWhy),
+		// Every other hour labeled: twenty four labels at phone width ran
+		// together as one string of digits.
+		Opts: Opts{"horizontal": false, "tick_spacing": 100},
+		Desc: "The whole life of each repository, not the selected range: GitHub serves " +
+			"this distribution as a single snapshot.",
+		GR: hourGR, GRTF: hourGRtf, GRDesc: punchGRDesc,
+		ES: hourES, ESTF: hourEStf,
+	})
+	day = panel("barchart", "Commits by weekday", box{W: 6, H: 7, X: 12, Y: 19}, []Target{sqlT(byDay)}, &P{
+		PromNote: cannot("commits by weekday, over the whole life of each repository.",
+			punchcardWhy),
+		GR: dayGR, GRTF: dayGRtf, GRDesc: punchGRDesc,
+		ES: dayES, ESTF: dayEStf,
+	})
+	return hour, day
 }
 
 // yearsDesc is the Contributions by year panel's own prose, kept out of the

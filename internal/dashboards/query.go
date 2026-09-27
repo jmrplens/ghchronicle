@@ -983,6 +983,17 @@ func groupSum(by, value, nameBy, nameValue string) []any {
 	}
 }
 
+// sortAsc orders a frame's rows by one column, ascending. A table's own
+// `sort` option is descending only, and some panels read in an order of their
+// own: a pin by its slot, a flag by its name, and a punch card by its hour,
+// whose rows a groupBy hands on in the order it first met each value.
+func sortAsc(field string) any {
+	return map[string]any{"id": "sortBy", "options": map[string]any{
+		"fields": map[string]any{},
+		"sort":   []any{map[string]any{"field": field, "desc": false}},
+	}}
+}
+
 // hideColumns drops columns a table's query returns only to be grouped by: the
 // full name an Elasticsearch table buckets on so that two owners' repositories
 // of one name are two rows, while the row is named by the short name the other

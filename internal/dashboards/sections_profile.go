@@ -298,16 +298,6 @@ func profileBool(name string, w int) any {
 	})
 }
 
-// profileSortAsc orders a table's rows by one column, ascending. A table's own
-// `sort` option is descending only, and these two panels read in the order the
-// account arranged them: a pin by its slot, a flag by its name.
-func profileSortAsc(field string) any {
-	return map[string]any{"id": "sortBy", "options": map[string]any{
-		"fields": map[string]any{},
-		"sort":   []any{map[string]any{"field": field, "desc": false}},
-	}}
-}
-
 // sponsorship is the money: what the sponsors listing holds right now, every
 // sponsorship that was ever made in either direction, and the tiers on offer.
 func sponsorship(b *builder) []Panel {
@@ -548,7 +538,7 @@ func profileStanding(b *builder) []Panel {
 	// sort by hand, on the one store of the five where the rows arrive by name.
 	pinGR, pinGRtf := gTbl(rowsOf(profileKeepLast+gp(pi, "position")+")", gn(pi, "repo")),
 		"Item", []col{{"lastNotNull", "Position"}})
-	pinGRtf = append(pinGRtf, profileSortAsc("Position"))
+	pinGRtf = append(pinGRtf, sortAsc("Position"))
 	// The kind and the link as buckets and never as metrics: they are strings,
 	// and a top_metrics over one panics Grafana's Elasticsearch plugin. A pin
 	// has exactly one of each, so bucketing by them costs no rows. `position`
@@ -573,11 +563,11 @@ func profileStanding(b *builder) []Panel {
 			{"position", "Position"},
 			{"stars", "Stars"},
 			{"days_since_push", "Idle"},
-		}, nil, hideColumns(panelESTime), profileSortAsc("Position"))
+		}, nil, hideColumns(panelESTime), sortAsc("Position"))
 
 	flagGR, flagGRtf := gTbl(rowsOf(profileKeepLast+gp(pf, "enabled")+")", gn(pf, "flag")),
 		"Flag", []col{{"lastNotNull", "Enabled"}})
-	flagGRtf = append(flagGRtf, profileSortAsc("Flag"))
+	flagGRtf = append(flagGRtf, sortAsc("Flag"))
 	// A max inside each flag's newest document: `enabled` is a boolean, which a
 	// top_metrics hands back as text. See newestDoc.
 	flagES, flagEStf := esTbl(pf, []any{b.tm("flag", 10, "_key", "asc"), b.newestDoc(), b.tmURL()},
@@ -610,7 +600,7 @@ func profileStanding(b *builder) []Panel {
 			PromTF: append(merged(map[string]string{
 				"repo": "Item", panelValueA: "Position", panelValueB: "Stars",
 				panelValueC: "Idle",
-			}, []string{"user"}, map[string]int{"repo": 0}), profileSortAsc("Position")),
+			}, []string{"user"}, map[string]int{"repo": 0}), sortAsc("Position")),
 			Desc: "What the profile shows first, in the order it shows it. The row worth seeing " +
 				"is a pinned repository nobody has pushed to in two years. Position is a field " +
 				"and not a tag on purpose: a repository that moves from slot two to slot three " +
@@ -632,7 +622,7 @@ func profileStanding(b *builder) []Panel {
 			Prom: []Target{promTbl("max by (flag) (github_profile_flag_enabled)")},
 			PromTF: []any{organize(map[string]string{
 				"flag": "Flag", "Value": "Enabled",
-			}, []string{"user"}, map[string]int{"flag": 0}), profileSortAsc("Flag")},
+			}, []string{"user"}, map[string]int{"flag": 0}), sortAsc("Flag")},
 			Desc: "A closed list of eight flags the profile advertises, as they read at the " +
 				"last sweep. Seven are booleans that change once in years, and the day one " +
 				"does is the day worth being able to point at: hireable, developer program, " +

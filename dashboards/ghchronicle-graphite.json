@@ -2169,7 +2169,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "The whole life of each repository, not the selected range: GitHub serves this distribution as a single snapshot.",
+          "description": "The whole life of each repository, not the selected range: GitHub serves this distribution as a single snapshot. Graphite keeps each cell of the grid as a series of its own, so a cell a rewritten history emptied keeps its last count here, where the SQL and Elasticsearch twins read only each repository's newest grid.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -2245,7 +2245,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "",
+          "description": "Graphite keeps each cell of the grid as a series of its own, so a cell a rewritten history emptied keeps its last count here, where the SQL and Elasticsearch twins read only each repository's newest grid.",
           "fieldConfig": {
             "defaults": {
               "color": {

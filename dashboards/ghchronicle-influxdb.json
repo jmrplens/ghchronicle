@@ -2179,7 +2179,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT hour AS \"Hour\", SUM(commits) AS \"Commits\" FROM (SELECT hour, commits, ROW_NUMBER() OVER (PARTITION BY repo, hour ORDER BY time DESC) AS rn FROM gh_commit_punchcard WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE rn = 1 GROUP BY 1 ORDER BY 1",
+              "rawSql": "SELECT hour AS \"Hour\", SUM(commits) AS \"Commits\" FROM (SELECT time, hour, commits, MAX(time) OVER (PARTITION BY full_name) AS newest FROM gh_commit_punchcard WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE time = newest GROUP BY 1 ORDER BY 1",
               "refId": "A"
             }
           ],
@@ -2233,7 +2233,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT weekday AS \"Weekday\", SUM(commits) AS \"Commits\" FROM (SELECT weekday, commits, ROW_NUMBER() OVER (PARTITION BY repo, weekday ORDER BY time DESC) AS rn FROM gh_commit_punchcard WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE rn = 1 GROUP BY 1 ORDER BY 2 DESC",
+              "rawSql": "SELECT weekday AS \"Weekday\", SUM(commits) AS \"Commits\" FROM (SELECT time, weekday, commits, MAX(time) OVER (PARTITION BY full_name) AS newest FROM gh_commit_punchcard WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE time = newest GROUP BY 1 ORDER BY 2 DESC",
               "refId": "A"
             }
           ],

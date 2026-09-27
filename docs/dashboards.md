@@ -585,8 +585,12 @@ and where the panel sits on the dashboard it stretches into a tall bar when
 maximized, 27 by 67 pixels in a 1920 by 900 window and 27 by 84 in a taller one.
 And a tooltip naming the day and the count, since the cell is colored by the
 value it carries, so that value has to be the shade and a column is a week. The two punch cards are current state rather than history: every
-sweep writes the whole grid again, so a sum over a range counts every sweep and
-what the panels are read for is the shape.
+sweep writes the whole grid again, a point per weekday and hour, so a sum over a
+range would count every sweep. Each panel adds up every cell of each
+repository's newest grid in the range, by hour or by weekday, and what the
+panels are read for is the shape. Graphite keeps each cell as a series of its
+own, so a cell a rewritten history emptied keeps its last count there, where
+the SQL stores and Elasticsearch read only the newest grid.
 
 ![The Contributions section: contributions per day, the contribution calendar drawn as GitHub's own grid for the last year with its Mon, Wed and Fri labels, the contribution mix at 70.1 percent commits, commits per week with own commits overlaid, the totals table, the hour of day histogram peaking in the afternoon, the weekday bars, commits by repository, the five year table, commits per day by repository, and the bar chart splitting the commits the profile hides into yours and other people's, public and private](../site/src/assets/dashboards/contributions.png)
 

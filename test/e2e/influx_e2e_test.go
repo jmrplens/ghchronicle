@@ -183,10 +183,10 @@ func TestInfluxBisectsAroundAnUnparseableLine(t *testing.T) {
 	if !strings.Contains(out, "influxdb rejected a line as unparseable") {
 		t.Errorf("the rejected lines were not reported by content:\n%s", out)
 	}
-	// Five punch card points in the fixture, and every one of them is isolated
+	// Six punch card points in the fixture, and every one of them is isolated
 	// rather than the whole stats batch being lost.
-	if !strings.Contains(out, "sink rejected some lines") || !strings.Contains(out, "rejected=5") {
-		t.Errorf("the sweep did not report five rejected lines:\n%s", out)
+	if !strings.Contains(out, "sink rejected some lines") || !strings.Contains(out, "rejected=6") {
+		t.Errorf("the sweep did not report six rejected lines:\n%s", out)
 	}
 
 	accepted := parseLineProtocol(t, rec.Body())

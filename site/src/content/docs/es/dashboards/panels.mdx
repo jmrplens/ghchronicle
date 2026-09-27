@@ -269,8 +269,13 @@ por 67 píxeles en una ventana de 1920 por 900 y 27 por 84 en una más alta. Y u
 tooltip que diga el día y el recuento, porque la celda se colorea por el valor
 que lleva, así que ese valor tiene que ser el tono y una columna es una semana.
 Los dos punch cards son estado actual y no historia: cada pasada reescribe la
-rejilla entera, así que una suma sobre un rango cuenta todas las pasadas y lo
-que se lee en esos paneles es la forma.
+rejilla entera, un punto por día de la semana y hora, así que una suma sobre un
+rango contaría todas las pasadas. Cada panel suma todas las celdas de la
+rejilla más reciente de cada repositorio en el rango, por hora o por día de la
+semana, y lo que se lee en esos paneles es la forma. Graphite guarda cada celda
+como una serie propia, así que una celda que un historial reescrito dejó vacía
+mantiene allí su última cuenta, donde los almacenes SQL y Elasticsearch leen
+solo la rejilla más reciente.
 
 ![La sección Contributions: contribuciones por día, el calendario de contribuciones dibujado como la propia rejilla de GitHub para el último año con sus etiquetas Mon, Wed y Fri, la mezcla de contribuciones con un 70,1 por ciento de commits, commits por semana con los propios superpuestos, la tabla de totales, el histograma por hora con el pico en la tarde, las barras por día de la semana, commits por repositorio, la tabla de cinco años, commits por día y repositorio, y el gráfico que separa los commits que el perfil esconde en propios y ajenos, públicos y privados](../../../../assets/dashboards/contributions.png)
 

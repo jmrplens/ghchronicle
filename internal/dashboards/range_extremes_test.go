@@ -232,8 +232,8 @@ func TestTheSnapshotTablesReadTheirNewestDocumentInElasticsearch(t *testing.T) {
 	for title, identity := range map[string][]string{
 		"Account keys":                {"key.keyword", "kind.keyword"},
 		"Branch protection rules":     {"repo.keyword", "pattern.keyword"},
-		"Commits by hour of day":      {"hour.keyword", "repo.keyword"},
-		"Commits by weekday":          {"weekday.keyword", "repo.keyword"},
+		"Commits by hour of day":      {"full_name.keyword"},
+		"Commits by weekday":          {"full_name.keyword"},
 		"Community profile":           {"repo.keyword"},
 		"Default code scanning setup": {"repo.keyword"},
 		"Dependabot ecosystems":       {"repo.keyword"},

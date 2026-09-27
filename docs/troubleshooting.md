@@ -121,15 +121,17 @@ failed twice, and the next sweep asks again. GitHub's GraphQL gateway gives up
 the same way on a query too large for its ten seconds, and there the collectors
 ask again with a smaller page instead.
 
-**`state not saved` or `cache file not saved`.** The directory the state file
-names cannot be written by the user the collector runs as, or does not exist
-and cannot be created. Nothing a sweep learns then survives a restart: the
-next start collects every family and walks the stargazer list, the whole star
-history and the co-authored pull requests again. In a container this is a
-host directory mounted without handing it to uid 65532, a new volume mounted
-anywhere but `/var/lib/ghchronicle`, or any new volume under an image before
-2.6.1, none of which that uid owns, or a state file mounted on its own, which
-cannot be renamed over; see [what has to be
+**`state not saved` or `cache file not saved`.** The user the collector runs as
+could not put the file in place. Each of the two is written under a temporary
+name in the directory the state file names and then renamed into place, so
+either that directory cannot be written, or it does not exist and cannot be
+created, or the file itself cannot be renamed over. Nothing a sweep learns then
+survives a restart: the next start collects every family and walks the
+stargazer list, the whole star history and the co-authored pull requests again.
+In a container this is a host directory mounted without handing it to uid
+65532, a new volume mounted anywhere but `/var/lib/ghchronicle`, or any new
+volume under an image before 2.6.1, none of which that uid owns, or a state
+file mounted on its own, which cannot be renamed over; see [what has to be
 writable](https://jmrp.io/docs/ghchronicle/install/docker/#what-has-to-be-writable).
 
 **`rate limit reserve reached, family skipped`.** Once is fine. Every sweep

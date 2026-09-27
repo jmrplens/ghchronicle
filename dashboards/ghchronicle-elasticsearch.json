@@ -3346,19 +3346,8 @@
             {
               "bucketAggs": [
                 {
-                  "field": "hour.keyword",
+                  "field": "full_name.keyword",
                   "id": "72",
-                  "settings": {
-                    "min_doc_count": "1",
-                    "order": "asc",
-                    "orderBy": "_key",
-                    "size": "24"
-                  },
-                  "type": "terms"
-                },
-                {
-                  "field": "repo.keyword",
-                  "id": "73",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -3369,12 +3358,23 @@
                 },
                 {
                   "field": "@timestamp",
-                  "id": "74",
+                  "id": "73",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
                     "orderBy": "_key",
                     "size": "1"
+                  },
+                  "type": "terms"
+                },
+                {
+                  "field": "hour.keyword",
+                  "id": "74",
+                  "settings": {
+                    "min_doc_count": "1",
+                    "order": "asc",
+                    "orderBy": "_key",
+                    "size": "24"
                   },
                   "type": "terms"
                 }
@@ -3384,7 +3384,7 @@
                 {
                   "field": "commits",
                   "id": "75",
-                  "type": "max"
+                  "type": "sum"
                 }
               ],
               "query": "_index:ghchronicle-gh_commit_punchcard AND repo.keyword:${repo:lucene}",
@@ -3400,9 +3400,8 @@
                 "excludeByName": {},
                 "indexByName": {},
                 "renameByName": {
-                  "Max": "Commits",
-                  "hour.keyword": "Hour",
-                  "repo.keyword": "Repository"
+                  "Sum": "Commits",
+                  "hour.keyword": "Hour"
                 }
               }
             },
@@ -3432,6 +3431,18 @@
                   "Commits (sum)": "Commits",
                   "Hour": "Hour"
                 }
+              }
+            },
+            {
+              "id": "sortBy",
+              "options": {
+                "fields": {},
+                "sort": [
+                  {
+                    "desc": false,
+                    "field": "Hour"
+                  }
+                ]
               }
             }
           ],
@@ -3483,19 +3494,8 @@
             {
               "bucketAggs": [
                 {
-                  "field": "weekday.keyword",
+                  "field": "full_name.keyword",
                   "id": "76",
-                  "settings": {
-                    "min_doc_count": "1",
-                    "order": "asc",
-                    "orderBy": "_key",
-                    "size": "24"
-                  },
-                  "type": "terms"
-                },
-                {
-                  "field": "repo.keyword",
-                  "id": "77",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -3506,12 +3506,23 @@
                 },
                 {
                   "field": "@timestamp",
-                  "id": "78",
+                  "id": "77",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
                     "orderBy": "_key",
                     "size": "1"
+                  },
+                  "type": "terms"
+                },
+                {
+                  "field": "weekday.keyword",
+                  "id": "78",
+                  "settings": {
+                    "min_doc_count": "1",
+                    "order": "asc",
+                    "orderBy": "_key",
+                    "size": "24"
                   },
                   "type": "terms"
                 }
@@ -3521,7 +3532,7 @@
                 {
                   "field": "commits",
                   "id": "79",
-                  "type": "max"
+                  "type": "sum"
                 }
               ],
               "query": "_index:ghchronicle-gh_commit_punchcard AND repo.keyword:${repo:lucene}",
@@ -3537,8 +3548,7 @@
                 "excludeByName": {},
                 "indexByName": {},
                 "renameByName": {
-                  "Max": "Commits",
-                  "repo.keyword": "Repository",
+                  "Sum": "Commits",
                   "weekday.keyword": "Weekday"
                 }
               }
@@ -3569,6 +3579,18 @@
                   "Commits (sum)": "Commits",
                   "Weekday": "Weekday"
                 }
+              }
+            },
+            {
+              "id": "sortBy",
+              "options": {
+                "fields": {},
+                "sort": [
+                  {
+                    "desc": false,
+                    "field": "Weekday"
+                  }
+                ]
               }
             }
           ],
