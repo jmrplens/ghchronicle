@@ -456,7 +456,11 @@ one out. With All selected it lists the archived repositories the default
 filter sets aside as well, with their current counts, whether or not the picker
 offers them: a sweep writes them no `gh_repo` row, which is what the picker
 lists, but the same row of each is read again on every `totals` sweep. One the
-configuration no longer collects is left out, as on the Overview. A
+configuration no longer collects is left out, as on the Overview. Each row is
+the repository's newest in the range, one per full name, and not the largest
+value each column reached in it: stars, branches, tags, releases and open
+issues go down, and a table of peaks gave a repository 4 stars from a
+backfill's row nine days old where GitHub and its newest row said 3. A
 repository archived inside the range has rows from before the archive and
 after it, and is still one row in every store, flagged archived.
 

@@ -63,6 +63,12 @@ const RFA = "(" + RF + " OR (archived = 'true' AND '${repo:text}' = 'All' AND " 
 // margin and not a cadence. It asks for the repository and not for the row,
 // the way the picker does, so a range that ended a month ago still counts a
 // repository set aside that the collector reads today.
+//
+// A statement that numbers its rows with a window has to take this filter in
+// a subquery of its own: InfluxDB 3.11.5 refused the window and the IN in
+// one SELECT over gh_repo_total ("Window schema has wrong number of fields.
+// Expected 31 got 30", measured on 2026-09-27), and answered with the filter
+// one level down.
 const setAsideCollected = "full_name IN (SELECT full_name FROM gh_repo_total WHERE " +
 	pickerWindow + " AND archived = 'true')"
 
@@ -876,6 +882,22 @@ func groupSum(by, value, nameBy, nameValue string) []any {
 			"renameByName": map[string]any{by: nameBy, value + " (sum)": nameValue},
 		}},
 	}
+}
+
+// hideColumns drops columns a table's query returns only to be grouped by: the
+// full name an Elasticsearch table buckets on so that two owners' repositories
+// of one name are two rows, while the row is named by the short name the other
+// stores show. It runs after esTbl's own organize, which leaves a column it
+// was not asked to rename under the name the response parser gave it.
+func hideColumns(names ...string) any {
+	exclude := map[string]any{}
+	for _, name := range names {
+		exclude[name] = true
+	}
+	return map[string]any{"id": "organize", "options": map[string]any{
+		"excludeByName": exclude, "indexByName": map[string]any{},
+		"renameByName": map[string]any{},
+	}}
 }
 
 // groupRows is groupSum for more than one column to group by and more than a

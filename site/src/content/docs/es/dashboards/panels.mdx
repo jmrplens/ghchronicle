@@ -130,7 +130,12 @@ repositorios archivados que el filtro por omisión aparta, con sus contadores
 actuales, los ofrezca o no el selector: ninguna pasada les escribe fila de
 `gh_repo`, que es lo que lista el selector, pero la misma fila de cada uno se
 vuelve a leer en cada pasada de `totals`. Uno que la configuración ya no recoge
-se queda fuera, como en el Overview. Un repositorio archivado dentro del
+se queda fuera, como en el Overview. Cada fila es la más reciente del
+repositorio dentro del rango, una por nombre completo, y no el valor más alto
+que alcanzó cada columna en él: estrellas, ramas, etiquetas, releases e issues
+abiertos bajan, y una tabla de máximos daba a un repositorio 4 estrellas por la
+fila de un relleno histórico de hacía nueve días donde GitHub y su fila más
+reciente decían 3. Un repositorio archivado dentro del
 rango tiene filas de antes del archivado y de después, y sigue siendo una fila
 en todos los almacenes, marcada como archivada.
 

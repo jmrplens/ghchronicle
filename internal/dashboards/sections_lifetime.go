@@ -38,7 +38,9 @@ const everyRepositoryDesc = "The whole life of each repository in one row: not w
 	"370,296 commits against 3,385 on the account this was measured on, so the table " +
 	"opens with the account's own repositories first and the forks under them, both " +
 	"ranked by commits. The fork and archived flags are columns here rather than a " +
-	"filter, the title being what it is, and a click on either sorts by it. With All " +
+	"filter, the title being what it is, and a click on either sorts by it. Each row is " +
+	"the repository's newest reading in the range, so a count that went down, a star " +
+	"taken back or a branch deleted, reads as it stands and not as its highest. With All " +
 	"selected the archived repositories the picker does not list are here too, with " +
 	"their current counts, as long as the collector still reads them: the default " +
 	"filter walks none of their history, but every totals sweep reads this row of each " +
@@ -52,9 +54,9 @@ const everyRepositoryDesc = "The whole life of each repository in one row: not w
 // live ones until the archive and the archived ones after it, and since a
 // sweep began writing the archived ones for a repository the filter sets
 // aside that is every archive under the default filter, not only under
-// include_archived. The SQL stores group by the name and take MAX(archived),
-// which is true for such a repository, and the other three do the same in
-// their own terms: the archived row where a repository has one. Graphite
+// include_archived. The SQL stores take each repository's newest row, which
+// is the archived one for such a repository, and the other three do the same
+// in their own terms: the archived row where a repository has one. Graphite
 // groups by full_name and then names the row by the short name the other
 // stores show, naming the series by those two nodes before it groups them so
 // that the grouping reads a name of two nodes and not the path inside
@@ -62,7 +64,10 @@ const everyRepositoryDesc = "The whole life of each repository in one row: not w
 // true; Prometheus takes the archived series, and a live one only for a
 // repository that has no archived one.
 //
-// An archived repository the collector no longer writes is left out where the
+// One row per full_name in each, since alice/.github and acme/.github are two
+// repositories: Elasticsearch buckets by it and hides the column, Graphite
+// groups by it, and Prometheus keeps it as a label its merge joins on. An
+// archived repository the collector no longer writes is left out where the
 // store can say so: Graphite and Elasticsearch keep the archived rows of the
 // last seven days, which esCollectedWindow explains, and Prometheus holds
 // only what the running collector pushes.
@@ -76,7 +81,8 @@ func everyRepositoryTwins(b *builder) *P {
 		byName(grCollected(rp(rt, "commits", "archived", "true")))), 1),
 		"Repository", []col{{"lastNotNull", "Commits"}})
 	es, estf := esTbl(rt, []any{
-		b.tm("repo", 500), b.tmURL(), b.tm("fork", 2), b.tm("archived", 1, "_key", "desc"),
+		b.tm("full_name", 500), b.tm("repo", 1), b.tmURL(), b.tm("fork", 2),
+		b.tm("archived", 1, "_key", "desc"),
 	},
 		[]any{b.mNewest("commits", "pulls_merged", "issues", "releases", "stars", "branches", "tags")},
 		[]named{
@@ -92,7 +98,8 @@ func everyRepositoryTwins(b *builder) *P {
 			{"branches", "Branches"},
 			{"tags", "Tags"},
 		},
-		[]string{ESF, "(archived.keyword:false OR " + esCollectedWindow + ")"})
+		[]string{ESF, "(archived.keyword:false OR " + esCollectedWindow + ")"},
+		hideColumns("full_name.keyword"))
 	var prom []Target
 	for i, field := range []string{
 		"commits", "pulls_merged", "issues", "releases", "stars", "branches", "tags",
@@ -130,16 +137,27 @@ func lifetime(b *builder) []Panel {
 	// first for the phone, so Commits keeps second place and the two flags
 	// take the next two. At 430 pixels that is Repository, Commits and Fork
 	// inside the 380 the table has.
-	repos := `SELECT repo AS "Repository", MAX(commits) AS "Commits",` +
-		` MAX(fork) AS "Fork", MAX(archived) AS "Archived",` +
-		` MAX(pulls_merged) AS "Merged", MAX(issues) AS "Issues",` +
-		` MAX(releases) AS "Releases", MAX(stars) AS "Stars",` +
-		` MAX(branches) AS "Branches", MAX(tags) AS "Tags",` +
-		// MAX(url) rather than grouping by it: a repository renamed inside
-		// the range has two urls and is still one row.
-		` MAX(url) AS "Link"` +
+	// The newest row of each repository in the range, not the largest value
+	// of each column: stars, branches, tags, releases and open issues all go
+	// down, and MAX() read the range's peak as the count. Measured on
+	// 2026-09-27 against the production store over thirty days:
+	// jmrplens/FFT2octave read 4 stars, from a backfill on 2026-09-18, where
+	// GitHub and its newest row said 3. Commits and merges only grow, so the
+	// newest row is also their largest. One row per full_name, as the
+	// Overview counts them, so two owners' repositories of one name are two
+	// rows, and the url is the newest row's rather than a column the rows
+	// are split on. The filter sits a level below the window, which
+	// setAsideCollected says why.
+	repos := `SELECT repo AS "Repository", commits AS "Commits",` +
+		` fork AS "Fork", archived AS "Archived",` +
+		` pulls_merged AS "Merged", issues AS "Issues",` +
+		` releases AS "Releases", stars AS "Stars",` +
+		` branches AS "Branches", tags AS "Tags", url AS "Link" FROM (` +
+		"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn FROM (" +
+		"SELECT time, full_name, repo, commits, fork, archived, pulls_merged, issues," +
+		" releases, stars, branches, tags, url" +
 		" FROM gh_repo_total WHERE $__timeFilter(time) AND " + RFA +
-		" GROUP BY 1 ORDER BY 2 DESC"
+		") f) x WHERE rn = 1 ORDER BY 2 DESC"
 	twins := everyRepositoryTwins(b)
 
 	// The two dated measurements on the row below sit years outside any range a

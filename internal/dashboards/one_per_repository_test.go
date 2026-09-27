@@ -668,9 +668,9 @@ func globbed(pattern string, series []grSeries) []grSeries {
 // archived one inside the range. Since a sweep writes the archived row of a
 // repository the default filter sets aside, that is every archive, and a
 // table that listed a row per tag set showed it twice, once as live with the
-// counts it had before. The SQL stores take MAX(archived), true for it; the
-// others are held to the same answer here: one row for it, archived, with
-// the newer counts.
+// counts it had before. The SQL stores take its newest row, which is the
+// archived one; the others are held to the same answer here: one row for it,
+// archived, with the newer counts.
 func TestEveryRepositoryEverListsARepositoryArchivedInsideTheRangeOnce(t *testing.T) {
 	t.Parallel()
 	for _, store := range AllStores() {
@@ -713,11 +713,86 @@ func checkEveryRepositoryTarget(t *testing.T, store string, target map[string]an
 			}
 		}
 	default:
-		if sql := target["rawSql"].(string); !strings.Contains(sql, `MAX(archived) AS "Archived"`) {
-			t.Errorf("%s: Every repository, ever does not take MAX(archived):\n%s", store, sql)
+		if sql := target["rawSql"].(string); !newestRowEach.MatchString(sql) {
+			t.Errorf("%s: Every repository, ever does not read the newest row of each "+
+				"repository, so one archived inside the range is not one row flagged "+
+				"archived:\n%s", store, sql)
 		}
 	}
 }
+
+// TestEveryRepositoryEverReadsEachRepositorysNewestRow is what checking 2.6.0
+// against GitHub panel by panel found in the Lifetime table: it took MAX() of
+// every column over the range, and stars, branches, tags, releases and open
+// issues go down, so it drew the range's peak as the count. Measured on
+// 2026-09-27 over thirty days, jmrplens/FFT2octave read 4 stars, from a
+// backfill's row of 2026-09-18, where GitHub and its newest row said 3. Each
+// store is held to the newest row of each repository, one per full name, in
+// its own terms: the SQL stores number the rows of each full name newest first,
+// keep the first and take no column's MAX(); Elasticsearch buckets by the full
+// name and reads the newest document of each; Prometheus asks instant queries,
+// which answer each series' current value. Graphite draws commits alone, which
+// only grow, as each series' last value, and groups by the full name, which
+// the test above evaluates.
+func TestEveryRepositoryEverReadsEachRepositorysNewestRow(t *testing.T) {
+	t.Parallel()
+	peak := regexp.MustCompile(`\bMAX\((commits|pulls_merged|issues|releases|stars|branches|tags)\)`)
+	for _, store := range AllStores() {
+		p := panelOf(t, store.Build(nil), "Every repository, ever", "table")
+		for _, raw := range p["targets"].([]any) {
+			target := raw.(map[string]any)
+			switch store.Name {
+			case "influxdb", "postgres":
+				sql, _ := target["rawSql"].(string)
+				if m := peak.FindString(sql); m != "" || !newestRowEach.MatchString(sql) {
+					t.Errorf("%s: Every repository, ever does not read each repository's newest "+
+						"row (takes %q):\n%s", store.Name, m, sql)
+				}
+			case "elasticsearch":
+				checkNewestPerFullName(t, target)
+			case "prometheus":
+				if target["instant"] != true {
+					t.Errorf("prometheus: %v is not an instant query, so it is not the current value", target["expr"])
+				}
+			}
+		}
+	}
+}
+
+// checkNewestPerFullName holds the Elasticsearch target of Every repository,
+// ever to a bucket per full name, so that alice/.github and acme/.github are
+// two rows, and to the newest document of each.
+func checkNewestPerFullName(t *testing.T, target map[string]any) {
+	t.Helper()
+	buckets, _ := target["bucketAggs"].([]any)
+	if len(buckets) == 0 || buckets[0].(map[string]any)["field"] != "full_name.keyword" {
+		t.Errorf("elasticsearch: Every repository, ever buckets first by %v, want one row per "+
+			"full name", bucketFieldsOf(buckets))
+	}
+	metrics, _ := target["metrics"].([]any)
+	for _, raw := range metrics {
+		m := raw.(map[string]any)
+		settings, _ := m["settings"].(map[string]any)
+		if m["type"] != "top_metrics" || settings["order"] != "desc" || settings["orderBy"] != "@timestamp" {
+			t.Errorf("elasticsearch: Every repository, ever reads %v, want the newest document", m)
+		}
+	}
+}
+
+// bucketFieldsOf names the fields of a list of bucket aggregations, for a message.
+func bucketFieldsOf(buckets []any) []any {
+	out := make([]any, len(buckets))
+	for i, raw := range buckets {
+		b, _ := raw.(map[string]any)
+		out[i] = b["field"]
+	}
+	return out
+}
+
+// newestRowEach is a statement that keeps the newest row of each repository,
+// by its full name, and draws the Archived column from that row.
+var newestRowEach = regexp.MustCompile(`(?s)^SELECT .*\barchived AS "Archived".*` +
+	`ROW_NUMBER\(\) OVER \(PARTITION BY full_name ORDER BY time DESC\) AS rn.*\) x WHERE rn = 1\b`)
 
 // overviewRow is one row of a table as the checks below read it: the
 // repository it names, whether it says archived where the store can say, and
