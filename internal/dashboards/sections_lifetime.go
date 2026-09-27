@@ -521,8 +521,11 @@ func collectorSection(b *builder) []Panel {
 				width("Why", 110), width("Sweeps", 80), width("Repositories", 100),
 			},
 			Desc: "Every collector that ran in the range, with what stopped it where " +
-				"something did, how many sweeps it ran in, and how many repositories it " +
-				"was asked about. A family with no row here did not run at all, which is " +
+				"something did, how many sweeps it ran in, and the most repositories one " +
+				"of those sweeps asked it about. For commits, issueevents and issues that " +
+				"count includes the repositories the movement query found nothing new in, " +
+				"which the family left unread and wrote no row for. A family with no row " +
+				"here did not run at all, which is " +
 				"the one thing an empty panel could never say: not due, switched off, or " +
 				"skipped because a rate budget was spent. Why is what separates the two " +
 				"kinds of failure that would otherwise read alike: a spent search budget " +

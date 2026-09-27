@@ -250,3 +250,26 @@ func TestNoDescriptionSaysGraphiteDropsABoolean(t *testing.T) {
 		}
 	}
 }
+
+// TestEveryFamilySaysWhomItsRepositoriesCount: the table said Repositories was
+// how many repositories a family was asked about, and for commits, issueevents
+// and issues it also counts the ones the movement query left unread, which
+// wrote nothing, so a family of three repositories read could stand at thirty.
+// The column is also the most of any sweep in the range, where it read as if
+// the family had been asked once.
+func TestEveryFamilySaysWhomItsRepositoriesCount(t *testing.T) {
+	t.Parallel()
+	for _, store := range AllStores() {
+		p := panelOf(t, store.Build(nil), "Every family", "table")
+		desc := descriptionOf(p)
+		for _, want := range []string{
+			"the most repositories one of those sweeps asked it about",
+			"For commits, issueevents and issues",
+			"the movement query found nothing new in",
+		} {
+			if !strings.Contains(desc, want) {
+				t.Errorf("%s: Every family does not say %q: %q", store.Name, want, desc)
+			}
+		}
+	}
+}

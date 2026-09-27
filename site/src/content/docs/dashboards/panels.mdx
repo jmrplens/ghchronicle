@@ -720,8 +720,11 @@ refilled; Graphite keeps the lowest remaining alone.
 "Every family" and "What failed, and where" are the two panels below them, and
 the capture above predates both. The first lists every collector that ran in
 the range, what stopped it where something did, how many sweeps it ran in and
-how many repositories it was asked about; a family with no row there did not run
-at all. The reason is a column of its own so that the two kinds of failure sort
+the most repositories one of those sweeps asked it about, which for `commits`,
+`issueevents` and `issues` includes the repositories the
+[movement query](/ghchronicle/api/cost/#asking-first-what-moved) found nothing
+new in and the family left unread; a family with no row there did not run at
+all. The reason is a column of its own so that the two kinds of failure sort
 apart: a spent search budget is not the 502 that cost a repository
 its history, and a family that met both has a row for each. The second is one
 row per repository one collector could not collect, newest first, with what
