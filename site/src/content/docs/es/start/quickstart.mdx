@@ -137,8 +137,8 @@ mano o quiera saber a qué acaba de decir que sí.
 
 ## Qué hace la primera pasada que las siguientes no hacen
 
-Tres cosas ocurren una sola vez, y son la razón de que la primera pasada sea la
-cara.
+Cuatro cosas ocurren una sola vez, y son la razón de que la primera pasada sea
+la cara.
 
 - Se lee el historial diario de estrellas de cada repositorio, vea lo que vea
   el token, hasta la primera semana del repositorio, y se recorre entera,
@@ -153,9 +153,20 @@ cara.
 - Un mes de ejecuciones de workflows, para que una instalación nueva no dibuje
   una historia de CI que empieza hace quince minutos. Después, el doble de la
   cadencia, y nunca menos de dos horas.
-- El calendario de contribuciones de cada año, si `every.history` está puesto,
-  hasta el día en que se creó la cuenta. Después, solo el año en curso,
-  reescrito a su cadencia.
+- Las pull requests en coautoría de toda la vida de la cuenta, que
+  `achievements` recorre para el recuento de Pair Extraordinaire: 35 consultas
+  y 23,7 MB sobre 2.315 pull requests fusionadas, medido el 2026-09-27.
+  Después, una pasada recorre los días desde entonces, una página, y el
+  historial entero otra vez una vez por semana.
+- El calendario de contribuciones de cada año, si `every.families.history`
+  está puesto, hasta el día en que se creó la cuenta. Después, solo el año en
+  curso, reescrito a su cadencia.
+
+Tampoco hay nada en caché todavía, así que cada respuesta de la primera pasada
+se paga entera, donde una posterior pregunta con el ETag con que llegó la
+última respuesta y casi siempre recibe un 304 gratis; ver [la caché que hay
+junto al fichero de
+estado](/ghchronicle/es/configuration/#la-caché-que-hay-a-su-lado).
 
 Espera unos pocos miles de puntos de una primera pasada sobre veinte
 repositorios, y unos pocos cientos de cada una de las siguientes.

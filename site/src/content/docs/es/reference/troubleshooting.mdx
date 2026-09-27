@@ -45,6 +45,33 @@ la cuarta.
 GitHub sigue devolviendo los últimos catorce días que _tuvieron_ datos, no los
 últimos catorce días. El colector anota lo que le dicen.
 
+**`cache file not read, the first pass of each family pays in full`.** El
+fichero de caché que hay junto al fichero de estado quedó cortado, dañado o
+escrito en otro formato, así que no se lee en absoluto, y el siguiente guardado
+lo sobrescribe. Cuesta una pasada de cada familia a precio completo y no pierde
+nada; ver [la caché que hay a su
+lado](/ghchronicle/es/configuration/#la-caché-que-hay-a-su-lado).
+
+**`which repositories moved could not be asked, reading those it did not answer
+for`.** La consulta que dice a `commits`, `issues` e `issueevents` qué
+repositorios leer falló, o respondió por algunos de ellos. Cada repositorio del
+que no dijo nada se lee como si no se hubiera preguntado, así que no se pierde
+nada y la pasada cuesta lo que costaba antes de que existiera la consulta; ver
+[preguntar primero qué se movió](/ghchronicle/es/api/cost/#preguntar-primero-qué-se-movió).
+
+**`outbound search read fewer items than it counts, GitHub serves a thousand at
+most`.** GitHub sirve mil resultados de una búsqueda y ni uno más, y la cuenta
+tiene más que eso en uno de los estados que busca `outbound`, las pull requests
+fusionadas por ejemplo. Se quedan los mil que se movieron más recientemente, y
+la línea se dice una vez por recuento; ver [qué alcanza que una pasada
+no](/ghchronicle/es/how/backfill/#qué-alcanza-que-una-pasada-no).
+
+**`NOTICE: column ... already exists, skipping` de psql.** Reproducir el fichero
+del destino SQL en una base de datos que ya tiene sus tablas. El fichero
+declara cada tabla y cada columna de campo que escribe, porque no puede
+preguntar cuáles existen, y PostgreSQL lo dice por cada una que ya está, con un
+`relation ... already exists` para la tabla. No ha fallado nada.
+
 **Una familia que no aparece nunca en el log.** Aún no le toca. Con una cadencia
 de doce horas, medio día de logs puede legítimamente no mencionar nunca
 `stats`. Una familia de seis horas o más también puede tocarle y estar esperando
@@ -91,10 +118,29 @@ repositorios en una familia, así que se reintentará en vez de darse por hecha.
 Que falle un repositorio es normal; que fallen todos es el token, la red o una
 caída.
 
+**`collector failed` que nombra un `502 Bad Gateway` o un `504 Gateway
+Timeout`.** La pasarela de GitHub se rindió con una petición REST. El cliente
+pregunta una vez más dos segundos después y no dice nada de ello, así que una
+línea como esta es una petición que falló dos veces, y la siguiente pasada
+vuelve a preguntar. La pasarela GraphQL de GitHub se rinde igual con una
+consulta demasiado grande para sus diez segundos, y ahí los colectores vuelven
+a preguntar con una página más pequeña.
+
+**`state not saved` o `cache file not saved`.** El usuario con el que corre el
+colector no puede escribir en el directorio que nombra el fichero de estado, o
+el directorio no existe y no se puede crear. Nada de lo que aprende una pasada
+sobrevive entonces a un reinicio: el siguiente arranque recoge todas las
+familias y vuelve a recorrer la lista de estrellas, el historial entero de
+estrellas y las pull requests en coautoría. En un contenedor es el volumen del
+estado, que Docker crea como propiedad de root; ver [qué tiene que ser
+escribible](/ghchronicle/es/install/docker/#qué-tiene-que-ser-escribible).
+
 **`rate limit reserve reached, family skipped`.** Una vez está bien. En cada
 pasada significa que las cadencias son demasiado rápidas para el número de
-repositorios. Alarga `artifacts` y después `actions`; ver
-[coste de una pasada](/ghchronicle/es/api/cost/).
+repositorios. Si el cubo que se queda corto es `core`, alarga `artifacts` y
+después `actions`; si es `graphql`, `issues`, `issueevents` y `commits`. Ver
+[qué crece con la actividad, no con el
+tamaño](/ghchronicle/es/api/cost/#qué-crece-con-la-actividad-no-con-el-tamaño).
 
 ## Los datos parecen mal
 
@@ -143,8 +189,10 @@ al panel entero, también en PostgreSQL, donde lo que falta es la tabla y no la
 columna: la tabla "Work elsewhere" hace un join con `gh_upstream_repo` para las
 estrellas de cada repositorio, y hasta que la primera pasada de `outbound` de la
 versión nueva la escribe, que es dentro de una hora, los dos almacenes rechazan
-la tabla en vez de dejar vacía su columna Stars. Espera esa pasada, fuerza una
-con `-once`, o publica los dashboards después. Las demás columnas que pueden
+la tabla en vez de dejar vacía su columna Stars. Espera esa pasada o publica
+los dashboards después. Un `-once` no la adelanta: corre solo las familias a
+las que les toca, y a `outbound` no le toca hasta una hora después de su última
+pasada. Las demás columnas que pueden
 faltar están en
 [Columnas que solo existen una vez escritas](/ghchronicle/es/collectors/measurements/#columnas-que-solo-existen-una-vez-escritas).
 
@@ -185,10 +233,13 @@ ghchronicle -config config.yaml -once        # una pasada en primer plano, y sal
 journalctl -u ghchronicle -f                 # bajo systemd
 ```
 
-`debug` añade tres líneas a eso y nada más: el tamaño del libro de escrituras
-al arrancar, las familias de cuenta saltadas por falta de `targets.user` y las
-entradas que un destino dejó fuera por viejas. No hay registro por petición en
-ningún nivel. Ver [registro](/ghchronicle/es/configuration/logging/).
+`debug` añade siete líneas a eso y nada más: el tamaño del libro de escrituras
+al arrancar, un primer arranque sin fichero de caché, un arranque que vuelve a
+listar jobs porque un almacén no lleva registro, las familias de cuenta
+saltadas por falta de `targets.user`, las entradas que un destino dejó fuera
+por viejas, una pasada solo de tarjeta que deja en paz el fichero de estado, y
+cada guardado del fichero de caché. No hay registro por petición en ningún
+nivel. Ver [depuración](/ghchronicle/es/configuration/logging/#depuración).
 
 ```yaml
 log:
@@ -357,9 +408,22 @@ La columna aparece la primera vez que un punto lleva algo para ella.
 **Un campo cambió de tipo y el insert falla.** Una columna se crea con el tipo
 del primer valor visto y no se altera después, así que un campo que era un
 número y ahora es una cadena no tiene dónde ir. Renombra el campo, o tira la
-tabla y deja que la siguiente pasada la declare otra vez.
+tabla y reinicia el colector, cuya siguiente pasada la declara otra vez. El
+reinicio no es opcional: el destino declara una tabla una vez por proceso, así
+que mientras corre sigue escribiendo en la tabla que declaró, y cada insert
+falla hasta que vuelve a arrancar.
 
-**El sink de fichero y este no coinciden.** No pueden: los dos renderizan el
-mismo esquema desde el mismo código, y `cmd/check_postgres` planifica contra él
+**Se rechazan las sentencias de `gh_discussion_comment` del fichero SQL.** Con
+`there is no unique or exclusion constraint matching the ON CONFLICT
+specification`, reproducido en una tabla que creó una versión anterior a la
+2.6.1. Esa tabla conserva `is_answer` en su clave, que la 2.6.1 ya no escribe,
+y el fichero no puede leer la clave de una tabla como hace el destino que
+conecta, así que sus upserts nombran una clave que la tabla no tiene. El resto
+del fichero se carga. Tira la tabla, como describe [la página de
+medidas](/ghchronicle/es/collectors/measurements/#cómo-leer-las-tablas), y
+vuelve a llenarla con un relleno histórico.
+
+**El sink de fichero y este no coinciden.** Salvo por la clave de arriba, no
+pueden: los dos renderizan el mismo esquema desde el mismo código, y `cmd/check_postgres` planifica contra él
 cada consulta de panel. Si las tablas difieren, una se cargó desde una versión
 anterior.

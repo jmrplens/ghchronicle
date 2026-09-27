@@ -195,8 +195,10 @@ that program: keep it, and read it.
 
 - **-list**
 
-  Prints the repositories in scope, one full name per line, and costs the
-  discovery calls and nothing else.
+  Prints the repositories in scope, one full name per line, then the
+  archived ones the filter sets aside, each followed by `(archived: its
+  archive date and lifetime totals; a backfill collects the rest)`, and
+  costs the discovery calls and nothing else.
 
   ```sh
   ghchronicle -config adhoc.yaml -list
@@ -227,8 +229,12 @@ fails is logged and the sweep continues, because a repository with a feature
 switched off must not stop the sweep for the other forty.
 
 ```text
-level=ERROR msg="collector failed" family=issueevents repo=acme/parser err="/repos/acme/parser/issues/events?per_page=100&page=1: 504 Gateway Timeout"
+level=ERROR msg="collector failed" family=artifacts repo=acme/parser err="/repos/acme/parser/actions/artifacts?per_page=100&page=2: 502 Bad Gateway: {\n  \"message\": \"Server Error\"\n}"
 ```
+
+A 502 or a 504 in such a line has already failed twice: the client asks once
+more, two seconds later, before it gives up on a REST request, and logs
+neither attempt.
 
 A caller that needs to know about that has to read standard error. There is no
 exit code for it, deliberately: on a large account some family fails somewhere
@@ -269,14 +275,18 @@ code 0 both times, which reads like a bug and is the brake working. At `info`
 the log says so by omission:
 
 ```text
-level=INFO msg="repositories discovered" count=1
+level=INFO msg="cache file read" file=/tmp/ghchronicle-adhoc-cache.bin ...
+level=INFO msg="repositories discovered" count=1 archived_aside=0
 level=INFO msg="rate budget" bucket=core remaining=3949 limit=5000
 level=INFO msg="sweep finished"
 ```
 
 No `written` line, because nothing was due. Deleting the state file collects
-everything again at full price, including the one-off walk of every star, so
-point `state_file` somewhere the application controls and leave it there.
+everything again, including the one-off walk of every star, so point
+`state_file` somewhere the application controls and leave it there. The cache
+file beside it, `/tmp/ghchronicle-adhoc-cache.bin` here, keeps the ETags, so
+what has not changed since is answered a free 304; deleting that as well is
+what costs the full price.
 
 > **When it is not ad hoc**
 >

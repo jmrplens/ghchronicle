@@ -93,7 +93,10 @@ repositorio y pasado por la entrada `token`. Ver
 
 ## Funcionar sin token
 
-Es posible, y conviene ser honesto sobre lo que cuesta. Una tarjeta de números
-públicos se puede dibujar con llamadas sin autenticar, pero los paneles de
-tráfico y de alertas quedarán vacíos y el log dirá `not available (403)` en
-cada uno. Eso es el colector informando de un permiso, no de un fallo.
+Solo para las tres órdenes que no preguntan nada a GitHub: `-backfill-status`,
+`-publish-dashboard` y `-uninstall`. Todo lo que recoge, una tarjeta de números
+públicos incluida, necesita uno, y sin él se para al arrancar con
+`github.token is empty and GITHUB_TOKEN is unset`. Lo que cuesta un token al
+que le falta un permiso es la tabla de arriba: la parte que no puede ver queda
+vacía, y el log dice `not available (403)` para cada una, que es el colector
+informando de un permiso, no de un fallo.

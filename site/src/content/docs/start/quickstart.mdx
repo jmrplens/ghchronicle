@@ -137,7 +137,7 @@ themselves or wants to know what they just agreed to.
 
 ## What the first sweep does that later ones do not
 
-Three things happen once, and they are why the first run is the expensive one.
+Four things happen once, and they are why the first run is the expensive one.
 
 - The daily star history of every repository, whatever the token may see, is
   read back to the repository's first week, and the whole stargazer list of
@@ -151,9 +151,19 @@ Three things happen once, and they are why the first run is the expensive one.
 - A month of workflow runs, so a fresh install does not chart a CI history that
   begins fifteen minutes ago. After that, twice the cadence, and never less
   than two hours.
-- Every year's contribution calendar, if `every.history` is set, back to the
-  day the account was created. After that, only the year in progress, rewritten
-  at its cadence.
+- The co-authored pull requests of the account's whole life, which
+  `achievements` walks for the Pair Extraordinaire count: 35 queries and
+  23.7 MB over 2,315 merged pull requests, measured on 2026-09-27. After that a
+  pass walks the days since, one page, and the whole history again once a
+  week.
+- Every year's contribution calendar, if `every.families.history` is set, back
+  to the day the account was created. After that, only the year in progress,
+  rewritten at its cadence.
+
+Nothing is cached yet either, so every answer of the first sweep is paid in
+full, where a later one asks with the ETag the last answer came with and is
+mostly answered a free 304; see [the cache beside the state
+file](/ghchronicle/configuration/#the-cache-beside-it).
 
 Expect a few thousand points from a first sweep of twenty repositories, and a
 few hundred from each one after.

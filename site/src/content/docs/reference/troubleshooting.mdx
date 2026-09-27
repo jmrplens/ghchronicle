@@ -44,6 +44,32 @@ the fourth.
 keeps returning the last fourteen days that _had_ data, not the last fourteen
 days. The collector records what it is told.
 
+**`cache file not read, the first pass of each family pays in full`.** The
+cache file beside the state file was cut short, damaged or written in another
+format, so it is not read at all, and the next save writes over it. It costs
+one pass of each family at full price and loses nothing; see [the cache beside
+it](/ghchronicle/configuration/#the-cache-beside-it).
+
+**`which repositories moved could not be asked, reading those it did not answer
+for`.** The query that tells `commits`, `issues` and `issueevents` which
+repositories to read failed, or answered for some of them. Every repository it
+said nothing about is read as if it had not been asked, so nothing is missed
+and the pass costs what it did before the query existed; see [asking first
+what moved](/ghchronicle/api/cost/#asking-first-what-moved).
+
+**`outbound search read fewer items than it counts, GitHub serves a thousand at
+most`.** GitHub serves a thousand results of a search and no more, and the
+account has more than that in one of the states `outbound` searches, merged
+pull requests for instance. The thousand that moved most recently are kept,
+and the line is said once per count; see [what a backfill reaches that a sweep
+does not](/ghchronicle/how/backfill/#what-it-reaches-that-a-sweep-does-not).
+
+**`NOTICE: column ... already exists, skipping` from psql.** Replaying the SQL
+file sink's file into a database that already has its tables. The file declares
+every table and every field column it writes, since it cannot ask which exist,
+and PostgreSQL says so for each one that does, with a `relation ... already
+exists` for the table. Nothing failed.
+
 **A family that never appears in the log.** It is not due yet. With a
 twelve-hour cadence, half a day of logs can legitimately never mention
 `stats`. A family of six hours or more can also be due and waiting its turn
@@ -88,10 +114,27 @@ for one family, so it will be retried rather than treated as done. One
 repository failing is normal; all of them is the token, the network or an
 outage.
 
+**`collector failed` naming a `502 Bad Gateway` or a `504 Gateway Timeout`.**
+GitHub's gateway gave up on a REST request. The client asks once more two
+seconds later and says nothing about it, so a line like this is a request that
+failed twice, and the next sweep asks again. GitHub's GraphQL gateway gives up
+the same way on a query too large for its ten seconds, and there the collectors
+ask again with a smaller page instead.
+
+**`state not saved` or `cache file not saved`.** The directory the state file
+names cannot be written by the user the collector runs as, or does not exist
+and cannot be created. Nothing a sweep learns then survives a restart: the
+next start collects every family and walks the stargazer list, the whole star
+history and the co-authored pull requests again. In a container this is the
+state volume, which Docker creates owned by root; see [what has to be
+writable](/ghchronicle/install/docker/#what-has-to-be-writable).
+
 **`rate limit reserve reached, family skipped`.** Once is fine. Every sweep
-means the cadences are too fast for the number of repositories. Lengthen
-`artifacts` and then `actions`; see
-[cost of a sweep](/ghchronicle/api/cost/).
+means the cadences are too fast for the number of repositories. If the bucket
+that runs short is `core`, lengthen `artifacts` and then `actions`; if it is
+`graphql`, `issues`, `issueevents` and `commits`. See [what scales with
+activity, not with
+size](/ghchronicle/api/cost/#what-scales-with-activity-not-with-size).
 
 ## The data looks wrong
 
@@ -136,8 +179,9 @@ in PostgreSQL as well, where the table rather than the column is missing: the
 "Work elsewhere" table joins `gh_upstream_repo` for each repository's stars, and
 until the first `outbound` pass of the new version writes it, which is within an
 hour, both stores refuse the table rather than leave its Stars column empty.
-Either wait for that sweep, force one with `-once`, or publish the dashboards
-after it. The other columns a database can lack are listed under
+Either wait for that pass or publish the dashboards after it. A `-once` does
+not hurry it: it runs only the families that are due, and `outbound` is not
+until an hour after its last pass. The other columns a database can lack are listed under
 [Columns that exist only once written](/ghchronicle/collectors/measurements/#columns-that-exist-only-once-written).
 
 **The traffic chart only goes back fourteen days.** That is a first sweep. The
@@ -175,11 +219,13 @@ ghchronicle -config config.yaml -once        # one sweep in the foreground, then
 journalctl -u ghchronicle -f                 # under systemd
 ```
 
-`debug` adds three lines to that and nothing else: the size of the
-written-points ledger at start-up, the account-wide families skipped for want
-of a `targets.user`, and the entries a sink left out for being too old. There
-is no per-request log at any level. See
-[logging](/ghchronicle/configuration/logging/).
+`debug` adds seven lines to that and nothing else: the size of the
+written-points ledger at start-up, a first start with no cache file, a start
+listing jobs again because a store keeps no ledger, the account-wide families
+skipped for want of a `targets.user`, the entries a sink left out for being too
+old, a card-only sweep leaving the state file alone, and each save of the cache
+file. There is no per-request log at any level. See
+[debugging](/ghchronicle/configuration/logging/#debugging).
 
 ```yaml
 log:
@@ -343,8 +389,20 @@ as NULL. The column appears the first time a point carries something for it.
 **A field changed type and the insert fails.** A column is created with the
 type of the first value seen and is never altered afterwards, so a field that
 was a number and is now a string has nowhere to go. Rename the field, or drop
-the table and let the next sweep declare it again.
+the table and restart the collector, whose next sweep declares it again. The
+restart is not optional: the sink declares a table once per process, so while
+it runs it goes on writing into the table it declared, and every insert fails
+until it starts again.
 
-**The file sink and this one disagree.** They cannot: both render the same
-schema from the same code, and `cmd/check_postgres` plans every panel query
+**The SQL file's `gh_discussion_comment` statements are refused.** With `there
+is no unique or exclusion constraint matching the ON CONFLICT specification`,
+replayed into a table a release before 2.6.1 made. That table keeps
+`is_answer` in its key, which 2.6.1 no longer writes, and the file cannot read
+a table's key the way the connecting sink does, so its upserts name a key the
+table does not have. The rest of the file loads. Drop the table, as [the
+measurements page](/ghchronicle/collectors/measurements/#how-to-read-the-tables)
+describes, and fill it again with a backfill.
+
+**The file sink and this one disagree.** Apart from the key above, they cannot:
+both render the same schema from the same code, and `cmd/check_postgres` plans every panel query
 against it. If the tables differ, one of them was loaded from an older version.

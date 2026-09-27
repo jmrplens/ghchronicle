@@ -174,8 +174,11 @@ porque el `GITHUB_TOKEN` automático no tiene acceso de push a otros
 repositorios, [no puede leer el tráfico ni siquiera del
 suyo](https://docs.github.com/es/rest/metrics/traffic#get-repository-clones--fine-grained-access-tokens)
 y no es un usuario. Un runner alojado no conserva el fichero de estado entre
-ejecuciones, así que cada una vuelve a recorrer los stargazers y el historial
-de estrellas entero salvo que el estado se guarde en caché.
+ejecuciones, así que salvo que el estado se guarde en caché, lo que necesita un
+fichero de configuración, cada ejecución es una primera ejecución: recoge todas
+las familias diga lo que diga su cadencia, vuelve a recorrer los stargazers, el
+historial de estrellas entero y las pull requests en coautoría de la cuenta, y
+paga cada respuesta entera, sin ETag con el que recibir un 304 gratis.
 
 Los modos, las entradas y el paso de caché están en [GitHub
 Actions](/ghchronicle/es/install/actions/).
