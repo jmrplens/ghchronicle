@@ -21,7 +21,17 @@ each release was published, an answer accepted after its comment left the
 newest hundred, and an open security alert however old it is. A release now
 reaches Loki once, at its publication, where every release was sent again
 every hour, and a PostgreSQL database an earlier release made takes the new
-fields, which it would have refused.
+fields, which it would have refused. And it stops paying for what an audit of
+the production service's request log, 30.9 hours of 2.5.1, found bought
+nothing: a fork's community profile and a second read of each named fork, 14
+per cent of the charged `core` requests; a query for every repository where
+nothing had moved, 43 per cent of the GraphQL points; the whole merged pull
+request history read every day for one count, 31 per cent of the bytes; every
+ETag the process held, forgotten at each restart; and the daily families run
+in one sweep for ever, which made the first hour of each UTC day eight times
+the median. The same audit found two things the store said wrong, fixed here
+too: the entries of one Actions cache on one ref overwrote each other, and a
+502 from a slow listing cost a repository its artifact storage row.
 
 - **Outbound rows say how large the change was and whether the repository
   is private.** `gh_external_contribution` said where a contribution went and
@@ -165,6 +175,85 @@ fields, which it would have refused.
   `alerts` stays the rows read, and the measurements page now says that 100
   on a sweep means a hundred or more; a backfill that walks the whole list
   writes the total.
+- **PostgreSQL takes a field an earlier release never wrote.** The SQL file
+  sink and the PostgreSQL sink declared a table the first time a process, or a
+  rotated file, met its measurement, as a `CREATE TABLE IF NOT EXISTS` with
+  every column of that batch, and that statement does nothing at all to a
+  table an earlier release made. A field the earlier release did not write
+  reached the `INSERT` with no column, and PostgreSQL refused the statement
+  and the batch around it, on every write after it, since the sink took the
+  table as declared. This release adds fields to three measurements that have
+  tables already. The `CREATE TABLE` now declares the time and the tags, which
+  are the key, and each field follows as
+  `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`, which means the same thing to a
+  new table and to one any earlier release made. The PostgreSQL sink reads
+  the catalog the first time its process meets a table and adds only the
+  columns it lacks, because PostgreSQL takes an `ALTER TABLE`'s exclusive
+  lock before it checks `IF NOT EXISTS`, so one per field on every restart
+  would wait behind each Grafana query reading the table and hold up every
+  query after it. A statement the server refuses is sent again on the next
+  write rather than taken as done. The file says every field, since a
+  replayed file cannot ask, and psql prints a notice for each column a table
+  already has.
+- **The entries of one Actions cache on one ref are one row, and it holds
+  them all.** `gh_actions_cache_entry` is stamped at the start of the UTC day
+  and tagged with the repository, the ref and `cache`, the key cut before its
+  content hash, and every CodeQL overlay cache on a branch cuts to the same
+  tag, as several other caches do. The entries of one cache on one ref were so
+  many writes of one row, and the store kept whichever came last: on
+  2026-09-26 the fifteen CodeQL caches on main of jmrplens/jmrplens, 57.9 MB
+  between them, were stored as one of 3.8 MB, and on 2026-09-27 the account's
+  737 entries came to 380 rows. The write ledger holds one value a row, so it
+  sent the rest of each group again on every pass: an `actions` pass with
+  nothing new wrote 345 rows, about 270 of them these. The collector now sums
+  them into the row: `caches` is how many entries there are, `size_bytes`
+  their total, `days_since_use` and `key` those of the most recently used, and
+  `age_days` that of the oldest. The fields are the ones the measurement had,
+  so no store needs a column, and the rows of the days before the upgrade keep
+  the one entry the store kept. "Cache entries by key" reads the sums in all
+  five stores: the SQL stores add up `caches` where they counted rows,
+  Prometheus gains an Entries column, Graphite adds each ref's last value, and
+  Elasticsearch takes each ref's newest document where it summed every
+  document in the range.
+  ([#91](https://github.com/jmrplens/ghchronicle/issues/91))
+- **The cache listing is read past its first hundred, in an order a cache hit
+  does not change.** It stopped at the hundred entries used most recently, and
+  on 2026-09-27 jmrplens/ghchronicle listed 118 and jmrplens/mikroscope 232.
+  It is now read a hundred a page, up to ten pages, newest created first.
+  GitHub's default order is by last use, which every cache hit changes: an
+  entry restored between two pages moved to the front, the one that ended a
+  page was read twice and one further down never was. By creation a hit moves
+  nothing, and a new entry lands on a page already read. A deletion between
+  two pages still loses one, so a walk is taken as whole only when it read as
+  many distinct entries as the first page's `total_count` said; otherwise the
+  pass writes the totals and no entry row, reports no failure, and the day's
+  next pass writes them. A page past the first that fails leaves the rows out
+  rather than write part of a cache over the whole of it. The extra pages are
+  conditional, and the account's listings answered 304 to 3,059 of 3,256
+  requests from 2026-09-25 12:58Z to 2026-09-27 01:39Z.
+- **A REST request the gateway gives up on is asked once more.** GitHub's
+  artifact listing turned slow on the two repositories of the account with
+  the longest artifact history, and a request past the gateway's ten seconds
+  comes back 502: in the audit's 27 `artifacts` passes, jmrplens/jmrp.io's
+  walk ended in one 12 times and jmrplens/phonometry's 3. Over the whole log,
+  2026-09-11 to 2026-09-27, 36 of 397,455 REST GETs answered 502 or 504, 25
+  of them after 10.4 to 10.8 seconds, and a page of one took as long as a
+  page of a hundred. The client now asks a 502 or a 504 once more, two
+  seconds later, before any collector sees it, so every REST family has it.
+  The retry is charged like the request it repeats, so it passes the brake
+  again; it carries the validator the first attempt carried; and a
+  cancellation during the pause sends nothing more. A 500 and a 503 are not
+  asked again, and neither is GraphQL, whose gateway error means a query too
+  large, which the collectors already ask again with a smaller page.
+  ([#89](https://github.com/jmrplens/ghchronicle/issues/89))
+- **An artifact walk cut short still writes the repository's total.**
+  `gh_artifact_total` was appended after the walk, so a failed page cost the
+  repository its storage row for the pass, as it did jmrplens/jmrp.io in 12
+  passes of 27. It is now written from the pages walked when a later one
+  fails, with `walked` below `count` marking the live figures as a floor, as
+  it already did for a walk the five-page cap stopped. A failed first page
+  still writes nothing, because a row of zeros would read as every artifact
+  gone.
 - **Ten families run more often.** `events`, `notifs` and `activity` every
   quarter of an hour instead of every half, `deployments` every half hour
   instead of every hour, `stars`, `billing` and `analyses` every hour instead
@@ -193,37 +282,146 @@ fields, which it would have refused.
   family's `why`, which the warning about a cadence set far shorter than the
   built-in one quotes, now says what a pass costs and how fast the data moves.
   Five were not so, and are corrected whether or not their cadence changed:
-  `commits` is one GraphQL point per repository whatever was pushed, and 961 of
-  999 answers held no commit, where it said a request per commit; `issues` is
-  one query per repository at one or two points, up to about nine once a day
-  for a whole page, where it said a request per item; `repo` is three REST
-  requests per repository and two points per ten, where it said one request;
-  `rulesets` answers 304 only with a warm cache, since the ETag cache lives in
-  memory and none of the 43 requests after a restart was conditional; and
-  `billing` had changed at every read, where it said a few times a day at
-  most. No family ships at two hours any more, and that rung stays on the
+  `commits` said a request per commit, where it is a GraphQL point per
+  repository, and since the change below only per repository whose default
+  branch moved, 38 of 999 answers measured, with one more per twenty-five
+  repositories to ask which; `issues` said a request per item, where it is one
+  or two points per repository whose items moved, and up to about nine once a
+  day for a whole page; `repo` said one request, where it is three REST
+  requests per repository and two points per ten; `rulesets` said its
+  requests answer 304 until somebody edits one, which held only in a process
+  that lived a day, none of the 43 after a restart being conditional, and now
+  holds across a restart, since the ETag cache is kept beside the state file;
+  and `billing` said a few times a day at most, where it had changed at every
+  read. `issueevents` and `achievements` say what they cost after the changes
+  below. No family ships at two hours any more, and that rung stays on the
   ladder the warning's factor of four is worked out from, since it is where
   one step down from six hours lands.
-- **PostgreSQL takes a field an earlier release never wrote.** The SQL file
-  sink and the PostgreSQL sink declared a table the first time a process, or a
-  rotated file, met its measurement, as a `CREATE TABLE IF NOT EXISTS` with
-  every column of that batch, and that statement does nothing at all to a
-  table an earlier release made. A field the earlier release did not write
-  reached the `INSERT` with no column, and PostgreSQL refused the statement
-  and the batch around it, on every write after it, since the sink took the
-  table as declared. This release adds fields to three measurements that have
-  tables already. The `CREATE TABLE` now declares the time and the tags, which
-  are the key, and each field follows as
-  `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`, which means the same thing to a
-  new table and to one any earlier release made. The PostgreSQL sink reads
-  the catalog the first time its process meets a table and adds only the
-  columns it lacks, because PostgreSQL takes an `ALTER TABLE`'s exclusive
-  lock before it checks `IF NOT EXISTS`, so one per field on every restart
-  would wait behind each Grafana query reading the table and hold up every
-  query after it. A statement the server refuses is sent again on the next
-  write rather than taken as done. The file says every field, since a
-  replayed file cannot ask, and psql prints a notice for each column a table
-  already has.
+- **The families of six hours or more take turns.** A family that runs is
+  marked with its sweep's instant, so families that once ran in one sweep came
+  due together at every cadence for ever, and the state file carried them
+  across restarts. In production the eight daily families ran in the first
+  sweep of each UTC day and the twelve-hour ones together 45 minutes later: on
+  2026-09-26 that first sweep took 294 charged `core` requests and 24.3 MB,
+  where the median sweep took 17.5 requests, and its hour was eight times the
+  median hour in `core` requests. The service now starts at most one family
+  of six hours or more in a sweep and leaves the others due for the next
+  tick, the one overdue longest first, counted from the later of its last run
+  and the last time it was let start, so a family whose every pass fails does
+  not take every turn. Once two have run in different sweeps they stay apart,
+  so the wait is paid once, and at worst it is a tick for each other slow
+  family: 2h45m for the last of the twelve at the built-in cadences, 3h15m
+  with `deps` and `history` on at a day. A configuration with more slow
+  families than one a tick can start within their cadences starts the fewest
+  that fit. `-once` still runs every family that is due, having no next tick
+  to leave one for, and a backfill, a card and the sweep that primes the
+  Prometheus exporter run every family; the primed sweep now marks as run
+  only those that were due, where marking them all put the group back
+  together at every restart. The log names who starts and who waits, under
+  `slow families due together take turns`. Every family keeps its cadence and
+  its cost; only the sweep it lands in moves.
+  ([#87](https://github.com/jmrplens/ghchronicle/issues/87))
+- **Commits, issues and issue events ask first what moved.** The three read
+  only what moved since a window of their own, one GraphQL query per
+  repository on every pass, and GitHub charges a query for the page it asks
+  for, not for what comes back. In the audit's 30.9 hours, 961 of the 999
+  `commits` answers held no commit, and 468 of the 968 incremental `issues`
+  answers and 486 of the 1,005 `issueevents` answers held no item: 2,077
+  points for nothing, 43 per cent of the process's GraphQL spend. A sweep that
+  runs any of the three now first asks every repository, twenty-five to an
+  aliased query at a point each, when the head of its default branch was
+  committed and when its newest issue and pull request were updated, and each
+  family leaves unread a repository where nothing moved since the start of
+  its own window. For `commits` that is exactly when the read comes back
+  empty, since `history(since:)` filters on the committed date. The query is
+  asked once a sweep, by the first of the three to reach a repository. A
+  repository it did not answer for, a failed query, the daily whole page of
+  `issues` and every backfill are read as before, and the log says how many
+  repositories each family left unread. On this account it costs two points
+  a sweep and would have saved 2,023 points in those hours, about 66 an hour,
+  and more than that, since a repository whose items all predate the window
+  answered a page anyway and is skipped too. Twenty-five is the batch because
+  fifty took up to 7.8 of the gateway's ten seconds on busy repositories.
+  ([#92](https://github.com/jmrplens/ghchronicle/issues/92))
+- **The co-authored pull request count is kept, and each day adds to it.**
+  `achievements` counted Pair Extraordinaire by walking every public merged
+  pull request of the account, with the message of every commit in it, on
+  every daily pass, though a merged pull request never changes: 34 or 35
+  queries and 18 to 24 MB a day for one number, on an account with 2,315 such
+  pull requests, and 22.0 of the 70.9 MB the service transferred in the
+  audit's 30.9 hours. The state file now keeps the count, the last UTC day it
+  covers, the version of the rule it was counted by and the day the whole
+  history was last walked, and each pass walks only the days since and adds
+  what it finds. Today is counted but not settled, since pull requests are
+  still being merged into it, and the next pass walks it again; a `merged:`
+  range is of UTC days, which is what lets a pass settle a day by the clock.
+  The whole history is walked again once a week, when the rule changes, on a
+  backfill and when the tally is missing or dated today or later, because the
+  count can go down: a repository made private or deleted takes its pull
+  requests out of `is:public`. A walk that fails leaves the tally as it was.
+  Run live, a pass over the last one to four days read 54 KB to 874 KB in two
+  to three seconds, where the whole walk is 35 queries, 23.7 MB and 94
+  seconds. The first pass after the upgrade finds no tally and walks the whole
+  history once.
+  ([#90](https://github.com/jmrplens/ghchronicle/issues/90))
+- **A fork's community profile is asked once a day, and a named repository is
+  not read twice.** GitHub serves no community profile for a fork, and its 404
+  carries no ETag, so it was charged in full on every `repo` pass: 404 of them
+  in the audit's 30.9 hours for the fifteen forks the account names in
+  `targets.repos`. Discovery also read each named repository again for the
+  four flags the owned listing had just returned, and a fork's body embeds
+  its parent's counters, which move, so 212 of those 405 reads were charged.
+  Together that was 616 of the 4,426 charged `core` requests, 14 per cent.
+  The community profile now goes through the refusals the runner remembers
+  for the `repo` family, as security, analyses, inventory and deps already
+  do, so a repository GitHub refuses it for, fork or not, is asked once a
+  day, 15 a day here where the hourly cadence made it 360, and one it starts
+  answering for is noticed within the day; a backfill still asks. Discovery
+  takes a named repository from the listing that returned it, matched without
+  regard to case and keeping the configuration's spelling, and reads only a
+  name no listing returned, such as another owner's repository.
+  ([#86](https://github.com/jmrplens/ghchronicle/issues/86))
+- **A restart keeps what the process learned about GitHub.** The ETag cache,
+  the workflow runs whose jobs were written, the refusals remembered for a
+  day and the page sizes `totals` sets for the pull request query lived in
+  the process, so every restart paid for all of them again, and a daily
+  family in a process that did not live a day never got a 304: the first 38
+  minutes after the restart of 2026-09-26 spent 1,092 charged `core` requests
+  on passes that cost about 66 warm. The runner now keeps all four in a file
+  beside the state file, `<name>-cache.bin`, read at the first sweep, written
+  at most every five minutes and once more on the way out, with mode 600 like
+  the state file, since it holds what GitHub answered about private
+  repositories too. It has no setting and follows the state file, so the
+  Docker volume, the systemd `ReadWritePaths` or the Action's cached
+  directory that holds the state file holds it as well; the
+  [configuration page](https://jmrp.io/docs/ghchronicle/configuration/#the-cache-beside-it)
+  says what is in it. An answer is kept under its URL and a digest of what
+  its collector decodes, so an upgrade that adds a field to one asks those
+  URLs again rather than answer a 304 with a body stored without it. The file
+  keeps what was asked for within twice the longest cadence, never less than
+  a day, leaves out any answer over a megabyte and stops at 64 MB, least
+  recently asked for first. A file cut short, damaged or of another format is
+  set aside with a warning, which costs what deleting it costs: one pass of
+  each family at a cold cache's price, and nothing else. A card-only run and
+  a backfill read it and do not write it, the backfill because its deep pages
+  would crowd the sweeps' answers out.
+  ([#88](https://github.com/jmrplens/ghchronicle/issues/88))
+- **A remembered run is recalled only where every store holds its jobs.** A
+  run in the cache file is a claim that its jobs were written, so a start
+  recalls none where nothing says what the stores hold: with no write ledger,
+  as when the ledger is deleted to fill a wiped store again, with
+  `dedupe_file: off` or a store's own `dedupe: false`, or in a run that ends
+  with its sweep; and where a destination was added since the file was
+  written. A pass a store refused forgets its runs as well. Their jobs are
+  then listed and offered again with every other point.
+- **A first sweep with no page sizes runs `totals` first.** The pull request
+  query is sized per repository from the counts `totals` reads, and a restart
+  was meant to run `totals` first; only the sweep that primes the Prometheus
+  exporter did. On 2026-09-26 the daily whole page of `issues` cost 328 points
+  where it had cost 139 on each day before, a page of fifty for 37 of its 38
+  requests. A first sweep that finds no page sizes, in the process or in the
+  cache file, now runs `totals` before the pull requests, whatever its
+  cadence says.
 
 Measured on 2026-09-26 against the live API with this account's token: the
 five outbound searches cost a point a page with every new field and without
@@ -257,21 +455,79 @@ while an `ADD COLUMN IF NOT EXISTS` for a column already there waited until a
 one second `lock_timeout` refused it and a `SELECT` behind it waited 3
 seconds; a restarted sink with a `lock_timeout` of 500 ms wrote in 32 ms.
 
+The audit counted the log of the proxy in front of the production service,
+one line per GitHub request with its status, rate headers, GraphQL cost and
+size, over one process of 2.5.1 from 2026-09-25 12:58Z to 2026-09-26 19:50Z:
+25,857 requests, 4,426 of the 21,828 `core` ones charged, 4,786 GraphQL
+points and 70.9 MB on the wire; the rows written are the journal's. Measured
+live on 2026-09-27: all 28 of the account's forks answered their community
+profile 404 and its 39 other repositories 200, and the owned listing and a
+read of each repository agreed on the four flags for all 67; page 3 of
+jmrplens/phonometry's artifact listing answered 502 after 10.5 seconds and
+the same request two seconds later 200 in 1.6; jmrplens/mikroscope's cache
+listing honoured `sort=created_at` and its direction, over 240 entries with
+distinct creation times, and after the change jmrplens/jmrplens wrote two
+cache rows, the CodeQL one with `caches` 15 and 57,894,432 bytes, and
+mikroscope 116 over 232 entries with no identity shared. Against golang/go,
+whose head was committed at 22:27:19Z and authored three days before,
+`history(since:)` held the head from that second and nothing from the next.
+The movement query took 5.2 to 7.8 seconds for fifty of the hundred most
+recently updated repositories with more than twenty thousand stars and 2.9
+to 4.8 for twenty-five, and a hundred cost 2 points and came back with
+`RESOURCE_LIMITS_EXCEEDED` past the sixty-fifth alias. A `merged:` range held
+a pull request merged at 00:05Z and one at 23:18Z each in its own date only.
+One sweep of every family kept 1,065 answers in the cache file, 10.3 MB of
+bodies and 1.6 MB of file, none over 404 KB, and the process before the
+audited one, which lived five and a half days, held 6,695 URLs, about 99 MB,
+of which the 2,517 asked for in its last 48 hours come to about 31 MB.
+
 Each change in behaviour carries a test shown to fail against the code before
 it: the draft's age, the promoted release, the Loki line and its lookback, the
 answer past the newest hundred, the column an earlier process never wrote, the
 exporter's reading of an upstream repository, the open alert behind a hundred
-fixed ones, and a day of ticks at the built-in cadences, which fails on all
-ten against the old table. The new fields are held by the outbound golden
-file, and the release lookback by a test of the binary against the fake
-GitHub as well as the sink's own.
+fixed ones, a day of ticks at the built-in cadences, which fails on all ten
+against the old table, the entries of one cache on one ref and a listing that
+changes while it is read, a 502 answered on its second asking and the
+artifact total kept past one that is not, a fork asked for its community
+profile once a day, six slow families due in one sweep, which the old loop
+started together, the co-authored count added to across a restart, and a
+repository nothing moved in, which the old runner asked all three families
+about. Where such a test's file calls something the old code lacks, it was
+run there with that call stubbed, or with the tests that need it set aside.
+The binary against the fake GitHub holds the rest: a second process asks
+with the validators the first one stored and is answered 304, a named fork
+is asked nothing the listing answered, a second sweep leaves unread what did
+not move, and the cache rows add up to the totals the fake declares with no
+identity shared, each of which fails against the code before it. The
+containerised suite now runs "Cache entries by key" against every store with
+rows in it, InfluxDB and PostgreSQL no longer excused. The new fields are
+held by the outbound golden file, and the release lookback by a test of the
+binary against the fake GitHub as well as the sink's own.
 
 Not verified, and worth saying plainly:
 
 - None of it has run in production. The cost of the new cadences is projected
-  from 2.5.1's request log, not read from 2.6.0 running them, and the first
-  day after the upgrade is the first reading of it. The same is true of the
-  release lines in Loki, the accepted answers and `gh_upstream_repo`.
+  from 2.5.1's request log, not read from 2.6.0 running them, and so is what
+  the audit's fixes save: every saving above is that log with the waste
+  counted out, and the first day after the upgrade is the first reading of
+  both. The same is true of the release lines in Loki, the accepted answers
+  and `gh_upstream_repo`.
+- The upgrade is the one start with no cache file, so it pays for the first
+  pass of each family in full once, and the first restart after it is the
+  first reading of the file in production. Its bounds were measured on this
+  account's 37 repositories; an account with more or larger answers was not
+  tried, and one past 64 MB keeps the answers asked for most recently.
+- One retry was seen to turn a 502 into a 200 once, by hand. How many of the
+  gateway errors production meets a second asking two seconds later clears
+  is for 2.6.0's own request log to say.
+- The turns were seen in the loop's tests and in a simulated week, not in
+  production, where the first day after the upgrade spreads the daily
+  families over up to 3h15m. Whether they stay apart after that is read from
+  the state file of the days that follow.
+- A co-authored count that goes down, because a repository was made private
+  or deleted, and a cache listing that loses an entry while it is read have
+  been held to fixtures only; neither was seen live, and the weekly walk that
+  notices the first has not run against GitHub.
 - The release lookback was measured against Loki 3.7.7 with its default
   limits. A Loki with another `max_chunk_age`, or a
   `reject_old_samples_max_age` shorter than a week, was not tried, and the
@@ -294,7 +550,15 @@ Not verified, and worth saying plainly:
 - Left out rather than unproven: Dependabot's `alerts` stays what a sweep
   read, since a total would take a walk of the whole list, and no panel reads
   `gh_release_published` yet, because a releases-per-month panel renumbers
-  every later panel the containerised suite names by position.
+  every later panel the containerised suite names by position. An `actions`
+  pass with nothing new still writes the two rows per repository stamped at
+  the sweep, 74 on this account, because keying a current state in the write
+  ledger without its timestamp trades against panels whose range is shorter
+  than the interval it would then be sent again at. And the daily whole page
+  of `issues` stays on the first sweep of the UTC day rather than spread over
+  the day by repository, as the audit offered: a day the family stopped
+  before a repository's hour would lose rows of that day no later read can
+  write, since a read stamps the day it happens on.
 
 ## 2.5.2 - 2026-09-26
 
