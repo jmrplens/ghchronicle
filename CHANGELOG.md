@@ -244,8 +244,8 @@ Not verified, and worth saying plainly:
   each store is sent, read offline. No suite writes a row of the old shape
   into a real store, so the Graphite join across the two depths of path and
   the Elasticsearch fold per comment have not read a store holding both. The
-  PostgreSQL conflict on the old key was measured by hand, once, and is held
-  by a test with the catalog stubbed.
+  PostgreSQL conflict on the old key was measured by hand against PostgreSQL
+  18.6, and is held by a test with the catalog stubbed.
 - The newest-reading tables were checked for their values against InfluxDB 3
   alone. In the other four stores the containerised suite sends every panel
   through Grafana and holds that it is accepted and answers, not what it
@@ -259,8 +259,8 @@ Not verified, and worth saying plainly:
 - Left out rather than unproven: a tool that drops and fills
   `gh_discussion_comment` again, which is
   [#96](https://github.com/jmrplens/ghchronicle/issues/96), and a warning for
-  a cadence slower than the built-in one, since a slower cadence is as often
-  chosen as copied.
+  a cadence slower than the built-in one: a slower cadence is a configuration's
+  to choose, and the example no longer chooses one for whoever copies it.
 
 ## 2.6.0 - 2026-09-27
 
