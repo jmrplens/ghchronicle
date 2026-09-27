@@ -705,8 +705,11 @@ func shownPath(path string) string {
 	return path
 }
 
-// sweep still writes the one row each has, the date it was archived, and a
-// backfill collects them in full.
+// listRepositories prints what a sweep collects, one repository a line, and
+// then the archived repositories the filter sets aside. A sweep still writes
+// two rows for each of those, the date it was archived and its lifetime
+// totals, which is where the account's stars and forks count it, and a
+// backfill collects the rest of it.
 func listRepositories(ctx context.Context, api *ghapi.Client, cfg *config.Config, stdout io.Writer) error {
 	found, err := collect.Discover(ctx, api, &collect.Filter{
 		User: cfg.Targets.User, Orgs: cfg.Targets.Orgs, Repos: cfg.Targets.Repos,
@@ -720,7 +723,7 @@ func listRepositories(ctx context.Context, api *ghapi.Client, cfg *config.Config
 		fmt.Fprintln(stdout, r.FullName)
 	}
 	for _, r := range found.Archived {
-		fmt.Fprintln(stdout, r.FullName, "(archived: the archive date only; a backfill collects it)")
+		fmt.Fprintln(stdout, r.FullName, "(archived: its archive date and lifetime totals; a backfill collects the rest)")
 	}
 	return nil
 }
