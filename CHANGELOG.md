@@ -9,16 +9,18 @@ so every link in one is absolute; the release page adds the pull and
 verification commands and a link to the commits.
 
 Versions follow [semantic versioning](https://semver.org/). The dates are the
-day the tag was pushed.
+day the tag was pushed, with one exception: 2.5.2 has a section and no tag. It
+was never released on its own, and its changes shipped in 2.6.0.
 
 ## 2.6.0 - 2026-09-27
 
 Built on 2.5.2, which made every family run at the cadence it states, this
-release runs ten of them at the cadences their measured cost allows and adds
-what a reader of the store asked for and could not get: how large a
-contribution elsewhere was and whether its repository is private, the moment
-each release was published, an answer accepted after its comment left the
-newest hundred, and an open security alert however old it is. A release now
+release runs eleven of them at the cadences their measured cost allows and
+adds what a reader of the store asked for and could not get: how large a
+contribution elsewhere was, whether its repository is private and how many
+stars that repository has, the moment each release was published, an answer
+accepted after its comment left the newest hundred, and an open security
+alert however old it is. A release now
 reaches Loki once, at its publication, where every release was sent again
 every hour, and a PostgreSQL database an earlier release made takes the new
 fields, which it would have refused. And it stops paying for what an audit of
@@ -34,9 +36,9 @@ too: the entries of one Actions cache on one ref overwrote each other, and a
 502 from a slow listing cost a repository its artifact storage row.
 
 2.5.2 was never released on its own. Its changes, the Loki sentences, the
-outbound searches past a hundred, the archived repositories in the totals, the
-threads commented elsewhere and a scheduler that ran families a tick late,
-ship in this release: they are in the
+outbound searches past a hundred and the family run every hour, the archived
+repositories in the totals, the threads commented elsewhere and a scheduler
+that ran families a tick late, ship in this release: they are in the
 [2.5.2 section of the changelog](https://github.com/jmrplens/ghchronicle/blob/v2.6.0/CHANGELOG.md#252---2026-09-26).
 
 - **Outbound rows say how large the change was and whether the repository
