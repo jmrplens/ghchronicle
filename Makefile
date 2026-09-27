@@ -1,6 +1,6 @@
 # Makefile for ghchronicle. Running `make` with no arguments lists the targets.
 #
-# The project is one binary plus seven development utilities under cmd/, and the
+# The project is one binary plus ten development utilities under cmd/, and the
 # utilities are most of the reason this file exists: each wants a different
 # combination of positional arguments, a live Grafana, a token or a local
 # PostgreSQL, and reading that back out of the source every time is work nobody
@@ -451,14 +451,17 @@ check-docs: ## Fail if docs/ no longer matches the pages it is generated from
 # gofmt with more rules, and golangci-lint's govet runs every analyzer go vet
 # runs and more, so both would repeat a question the linter already answered.
 # check-dashboards, check-gallery, check-layouts, check-config-options,
-# check-config-cases and check-docs are in the list because a dashboard that no
-# longer matches its specification, a card picture that no longer matches the
-# renderer, a layout fact the site states that the registry no longer holds, a
-# configuration setting the builder offers that the binary no longer has, a
-# configuration the builder writes that the round-trip test no longer loads, or
-# a file under docs/ that no longer matches the page it is generated from, is
-# the same kind of defect as a lint finding: something committed that the
-# source no longer produces.
+# check-compose, check-config-cases and check-docs are in the list because a
+# dashboard that no longer matches its specification, a card picture that no
+# longer matches the renderer, a layout fact the site states that the registry
+# no longer holds, a configuration setting the builder offers that the binary
+# no longer has, a compose file the Docker page offers that the generator no
+# longer writes, a configuration the builder writes that the round-trip test no
+# longer loads, or a file under docs/ that no longer matches the page it is
+# generated from, is the same kind of defect as a lint finding: something
+# committed that the source no longer produces. Each is also a step of CI, all
+# but check-docs in its Generated artifacts job, and a check missing here is one
+# a local run passes and CI then fails, which check-compose was until 2.6.1.
 analyze: ## Run the whole static-analysis suite and report every failure at once
 	@analysis_status=0; \
 	run_check() { \
@@ -483,18 +486,19 @@ analyze: ## Run the whole static-analysis suite and report every failure at once
 	echo "Go analysis packages: $(PKGS)"; \
 	echo "Go analysis build tags: $(E2E_DOCKER_TAG)"; \
 	echo ""; \
-	run_check "[1/12] golangci-lint config verify" golangci-lint config verify; \
-	run_check "[2/12] golangci-lint fmt" golangci-lint fmt --diff $(FMT_PATHS); \
-	run_check "[3/12] golangci-lint run" golangci-lint run $(PKGS); \
-	run_check "[4/12] govulncheck" $(MAKE) --no-print-directory govulncheck; \
-	run_check "[5/12] markdownlint" $(MAKE) --no-print-directory mdlint; \
-	run_check "[6/12] documentation local links" $(MAKE) --no-print-directory check-doc-links; \
-	run_check "[7/12] dashboards up to date" $(MAKE) --no-print-directory check-dashboards; \
-	run_check "[8/12] card gallery up to date" $(MAKE) --no-print-directory check-gallery; \
-	run_check "[9/12] layout facts up to date" $(MAKE) --no-print-directory check-layouts; \
-	run_check "[10/12] configuration surface up to date" $(MAKE) --no-print-directory check-config-options; \
-	run_check "[11/12] builder cases up to date" $(MAKE) --no-print-directory check-config-cases; \
-	run_check "[12/12] docs/ up to date" $(MAKE) --no-print-directory check-docs; \
+	run_check "[1/13] golangci-lint config verify" golangci-lint config verify; \
+	run_check "[2/13] golangci-lint fmt" golangci-lint fmt --diff $(FMT_PATHS); \
+	run_check "[3/13] golangci-lint run" golangci-lint run $(PKGS); \
+	run_check "[4/13] govulncheck" $(MAKE) --no-print-directory govulncheck; \
+	run_check "[5/13] markdownlint" $(MAKE) --no-print-directory mdlint; \
+	run_check "[6/13] documentation local links" $(MAKE) --no-print-directory check-doc-links; \
+	run_check "[7/13] dashboards up to date" $(MAKE) --no-print-directory check-dashboards; \
+	run_check "[8/13] card gallery up to date" $(MAKE) --no-print-directory check-gallery; \
+	run_check "[9/13] layout facts up to date" $(MAKE) --no-print-directory check-layouts; \
+	run_check "[10/13] configuration surface up to date" $(MAKE) --no-print-directory check-config-options; \
+	run_check "[11/13] compose files up to date" $(MAKE) --no-print-directory check-compose; \
+	run_check "[12/13] builder cases up to date" $(MAKE) --no-print-directory check-config-cases; \
+	run_check "[13/13] docs/ up to date" $(MAKE) --no-print-directory check-docs; \
 	echo "============================================================"; \
 	if [ "$$analysis_status" -ne 0 ]; then \
 		echo "Analysis failed. Review the findings above."; \
