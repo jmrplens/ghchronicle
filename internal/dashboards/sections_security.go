@@ -44,17 +44,22 @@ const (
 )
 
 // onOff renders a genuinely two-state boolean column as a word rather than as
-// 1 and 0. Two panels of this section carry one, and every store hands the
-// value over as a number: SQL casts it, Prometheus and Graphite hold a boolean
-// as 1 or 0, and the Elasticsearch panels take a max for the reason posture()
-// gives. A boolean that is false for two different reasons is threeStates().
+// 1 and 0. SQL casts the flag, Prometheus and Graphite hold a boolean as 1 or
+// 0, and an Elasticsearch metric over one reads 1 or 0 too. An Elasticsearch
+// bucket on one does not: Grafana names a bucket that has another below it by
+// the key's text, `true` or `false` (measured against Grafana 13.2.1 in the
+// containerised suite), which is how Security features reads its flag there,
+// and with the two numbers alone mapped the word was drawn bare. A boolean
+// that is false for two different reasons is threeStates().
 func onOff(name string, w int) any {
 	return override(name, []any{
 		map[string]any{"id": securityCellOptions, "value": map[string]any{"type": securityColoredText}},
 		map[string]any{"id": "mappings", "value": []any{map[string]any{
 			"type": "value", "options": map[string]any{
-				"0": map[string]any{"text": "off", "color": "text", "index": 1},
-				"1": map[string]any{"text": "on", "color": "green", "index": 0},
+				"0":     map[string]any{"text": "off", "color": "text", "index": 1},
+				"1":     map[string]any{"text": "on", "color": "green", "index": 0},
+				"false": map[string]any{"text": "off", "color": "text", "index": 3},
+				"true":  map[string]any{"text": "on", "color": "green", "index": 2},
 			},
 		}}},
 		map[string]any{"id": securityCellWidth, "value": w},
@@ -117,11 +122,17 @@ func openAlerts(b *builder) []Panel {
 		"SELECT ecosystem, open, ROW_NUMBER() OVER (PARTITION BY repo, severity, ecosystem" +
 		" ORDER BY time DESC) AS rn FROM gh_dependabot_alert WHERE $__timeFilter(time) AND " + RF +
 		") x WHERE rn = 1 GROUP BY 1 ORDER BY 2 DESC"
+	// The newest reading of each repository's feature, not the largest of the
+	// range: MAX(enabled) read a feature switched off inside the range as on,
+	// and MAX(open_alerts) an alert fixed inside it as still open, which is
+	// the difference this table is here to show. By full name, since two
+	// owners' repositories of one name are two rows with two answers.
 	feats := `SELECT repo AS "Repository", feature AS "Feature",` +
-		` MAX(CAST(enabled AS INT)) AS "Enabled", MAX(open_alerts) AS "Open alerts",` +
-		` url AS "Link"` +
-		" FROM gh_security_feature WHERE $__timeFilter(time) AND " + RF +
-		" GROUP BY 1, 2, 5 ORDER BY 1, 2"
+		` CAST(enabled AS INT) AS "Enabled", open_alerts AS "Open alerts",` +
+		` url AS "Link" FROM (` +
+		"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, feature ORDER BY time DESC) AS rn" +
+		securityFrom + "gh_security_feature" + ciInRange + RF + deliveryNewestRow +
+		" ORDER BY 1, 2"
 	// A snapshot per repository, severity and ecosystem: the value of a
 	// bucket is the newest row of each series inside it, and the severity's
 	// line is those added up. A MAX per severity took the largest series
@@ -154,10 +165,20 @@ func openAlerts(b *builder) []Panel {
 	sevGR, sevGRtf, sevES, sevEStf := byTag("severity", "Severity")
 	ecoGR, ecoGRtf, ecoES, ecoEStf := byTag("ecosystem", "Ecosystem")
 
-	featGR, featGRtf := gTbl(rowsOf(rp(sf, "open_alerts"), gn(sf, "repo"), gn(sf, "feature")),
-		"Repository, feature", []col{{"max", securityOpenAlerts}})
+	// The last value of each series, and consolidated by the last value too:
+	// a narrow panel asks for fewer points than the range holds, and the
+	// average Graphite consolidates by otherwise drew the mean of an alert's
+	// last two readings.
+	featGR, featGRtf := gTbl(rowsOf(fmt.Sprintf(`consolidateBy(%s, "last")`, rp(sf, "open_alerts")),
+		gn(sf, "repo"), gn(sf, "feature")),
+		"Repository, feature", []col{{"lastNotNull", securityOpenAlerts}})
+	// Each full name and feature, then its newest timestamp, which holds the
+	// one document of the newest sweep: the flag and the count are read from
+	// that, as the cache table reads its newest day. The flag stays a bucket,
+	// since a top_metrics over a boolean hands the plugin a string.
 	featES, featEStf := esTbl(sf, []any{
-		b.tm("repo", 500), b.tm("feature", 5),
+		b.tm("full_name", 500), b.tm("repo", 1), b.tm("feature", 5),
+		b.terms(panelESTime, 1, "_key", "desc"),
 		// A boolean is mapped as itself, with no keyword sub-field to ask for.
 		b.terms("enabled", 2), b.tmURL(),
 	}, []any{b.mMax("open_alerts")},
@@ -167,7 +188,7 @@ func openAlerts(b *builder) []Panel {
 			{"feature.keyword", "Feature"},
 			{"enabled", "Enabled"},
 			{"o", securityOpenAlerts},
-		}, []string{ESF})
+		}, []string{ESF}, hideColumns(panelFullNameField, panelESTime))
 
 	return []Panel{
 		statGroup(securityOpenAlerts, box{W: 12, H: 4, X: 0, Y: 0}, []Target{
@@ -250,11 +271,14 @@ func openAlerts(b *builder) []Panel {
 				inventoryValueCol + "B": securityOpenAlerts,
 			}, nil, map[string]int{"repo": 0, "feature": 1}),
 			Desc: "Recorded explicitly, so a repository with the feature switched off is " +
-				"distinguishable from one with no alerts.",
+				"distinguishable from one with no alerts. Each row is the newest reading of " +
+				"the repository's feature, so a feature switched off or an alert fixed inside " +
+				"the range reads as it stands and not as it was at its highest.",
 			Overrides: []any{enabled, width(securityOpenAlerts, 120), ownerLinkOn("Feature", "the security overview")},
 			GR:        featGR, GRTF: featGRtf,
-			GRDesc: "Graphite names each row repository and feature from the path. " + grRows,
-			ES:     featES, ESTF: featEStf,
+			GRDesc: "Graphite names each row repository and feature from the path and keeps one " +
+				"number per row, the open alerts, so whether the feature is on is not shown here.",
+			ES: featES, ESTF: featEStf,
 		}),
 	}
 }

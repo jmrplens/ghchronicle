@@ -4285,7 +4285,7 @@
       "panels": [
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "How many runs the range holds and how they ended. The success rate is the runs that succeeded as a share of the runs that succeeded or failed: a run canceled by a newer push under a concurrency group, or skipped by its own condition, decided nothing and is counted beside it as undecided rather than as a failure. The run duration is the median over the range and the queue wait is the time a job spent waiting for a runner, which only exists at job level, the run-level number folding the wait into the duration. Over the runs whose jobs were expanded, which is the newest runs of each sweep and, after a backfill, every run GitHub still holds, which from 1 October 2026 means the repository's retention period, ninety days by default; not every run the run count includes. Last come the bytes the runs left behind, which are the artifacts the walk reached: GitHub lists thousands of them per repository and the walk stops at five hundred, so this is a floor wherever it did. \"Artifact storage counted\" below puts the two counts beside it. In Graphite two facts landing in the same storage slot of one series are reduced to one point, so the medians are over what the storage kept.",
+          "description": "How many runs the range holds and how they ended. The success rate is the runs that succeeded as a share of the runs that succeeded or failed: a run canceled by a newer push under a concurrency group, or skipped by its own condition, decided nothing and is counted beside it as undecided rather than as a failure. The run duration is the median over the range and the queue wait is the time a job spent waiting for a runner, which only exists at job level, the run-level number folding the wait into the duration. Over the runs whose jobs were expanded, which is the newest runs of each sweep and, after a backfill, every run GitHub still holds, which from 1 October 2026 means the repository's retention period, ninety days by default; not every run the run count includes. Last come the bytes the runs left behind, which are the artifacts the walk reached: GitHub lists thousands of them per repository and the walk stops at five hundred, or sooner when a page of the listing fails and the pass keeps what it had read, so this is a floor wherever it stopped short. \"Artifact storage counted\" below puts the two counts beside it. In Graphite two facts landing in the same storage slot of one series are reduced to one point, so the medians are over what the storage kept.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -4747,7 +4747,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Artifacts that have not expired, over the ones the walk reached, which is a floor on any repository with more than five hundred: \"Artifact storage counted\" further down has the counts that say which those are. GitHub deletes artifacts on their own schedule, which is why this falls without anyone doing anything. A reading taken at each sweep, so the curve starts the day the collector did: there is no history of it to rebuild. The eight repositories holding the most are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "Artifacts that have not expired, over the ones the walk reached, which is a floor on any repository with more than five hundred, and on one whose walk a failed page of the listing cut short: \"Artifact storage counted\" further down has the counts that say which those are. GitHub deletes artifacts on their own schedule, which is why this falls without anyone doing anything. A reading taken at each sweep, so the curve starts the day the collector did: there is no history of it to rebuild. The eight repositories holding the most are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -5711,7 +5711,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Artifact storage, and how much of it was counted. Three counts, because the live size is on neither of the other two: Declared is GitHub's own total and counts the artifacts it has already expired, Walked is how far the page cap let the walk go, and Live is the artifacts still held among those, which is what the live size is the size of. When Walked is lower than Declared the live size is a floor rather than a total: here it is short by a factor of fifty six, and without these columns the tile above would say so nowhere. In Graphite two facts landing in the same storage slot of one series are reduced to one point, so the medians are over what the storage kept.",
+          "description": "Artifact storage, and how much of it was counted. Three counts, because the live size is on neither of the other two: Declared is GitHub's own total and counts the artifacts it has already expired, Walked is how far the walk went, and Live is the artifacts still held among those, which is what the live size is the size of. A sweep's walk stops at five pages, five hundred artifacts, and any walk stops sooner when a page of the listing fails, the pass writing what it had read: either way Walked is lower than Declared and the live size is a floor rather than a total. Here it is short by a factor of fifty six, and without these columns the tile above would say so nowhere. All four are the newest row of each repository, which is the one the tile reads. Graphite has no rows: each series is one number, so this table keeps the live size, the newest of each repository, and drops the three counts, which leaves it unable to say whether that size is a floor.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -8983,6 +8983,16 @@
                             "color": "green",
                             "index": 0,
                             "text": "on"
+                          },
+                          "false": {
+                            "color": "text",
+                            "index": 3,
+                            "text": "off"
+                          },
+                          "true": {
+                            "color": "green",
+                            "index": 2,
+                            "text": "on"
                           }
                         },
                         "type": "value"
@@ -9020,6 +9030,16 @@
                           "1": {
                             "color": "green",
                             "index": 0,
+                            "text": "on"
+                          },
+                          "false": {
+                            "color": "text",
+                            "index": 3,
+                            "text": "off"
+                          },
+                          "true": {
+                            "color": "green",
+                            "index": 2,
                             "text": "on"
                           }
                         },
@@ -9096,6 +9116,16 @@
                           "1": {
                             "color": "green",
                             "index": 0,
+                            "text": "on"
+                          },
+                          "false": {
+                            "color": "text",
+                            "index": 3,
+                            "text": "off"
+                          },
+                          "true": {
+                            "color": "green",
+                            "index": 2,
                             "text": "on"
                           }
                         },
@@ -10547,7 +10577,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Recorded explicitly, so a repository with the feature switched off is distinguishable from one with no alerts. Graphite names each row repository and feature from the path. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "Recorded explicitly, so a repository with the feature switched off is distinguishable from one with no alerts. Each row is the newest reading of the repository's feature, so a feature switched off or an alert fixed inside the range reads as it stands and not as it was at its highest. Graphite names each row repository and feature from the path and keeps one number per row, the open alerts, so whether the feature is on is not shown here. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -10586,6 +10616,16 @@
                           "1": {
                             "color": "green",
                             "index": 0,
+                            "text": "on"
+                          },
+                          "false": {
+                            "color": "text",
+                            "index": 3,
+                            "text": "off"
+                          },
+                          "true": {
+                            "color": "green",
+                            "index": 2,
                             "text": "on"
                           }
                         },
@@ -10636,7 +10676,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(aliasByNode(github.security_feature.*.*.*.$repo.open_alerts, 5, 2))",
+              "target": "removeEmptySeries(aliasByNode(consolidateBy(github.security_feature.*.*.*.$repo.open_alerts, \"last\"), 5, 2))",
               "textEditor": true
             }
           ],
@@ -10648,7 +10688,7 @@
                 "includeTimeField": false,
                 "mode": "seriesToRows",
                 "reducers": [
-                  "max"
+                  "lastNotNull"
                 ]
               }
             },
@@ -10659,7 +10699,7 @@
                 "indexByName": {},
                 "renameByName": {
                   "Field": "Repository, feature",
-                  "Max": "Open alerts"
+                  "Last *": "Open alerts"
                 }
               }
             }
@@ -11542,6 +11582,16 @@
                           "1": {
                             "color": "green",
                             "index": 0,
+                            "text": "on"
+                          },
+                          "false": {
+                            "color": "text",
+                            "index": 3,
+                            "text": "off"
+                          },
+                          "true": {
+                            "color": "green",
+                            "index": 2,
                             "text": "on"
                           }
                         },

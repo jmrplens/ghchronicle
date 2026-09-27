@@ -193,8 +193,10 @@ func runOutcomes(b *builder) []Panel {
 				"only exists at job level, the run-level number folding the wait into the " +
 				"duration. " + expanded + " Last come the bytes the runs left behind, which " +
 				"are the artifacts the walk reached: GitHub lists thousands of them per " +
-				"repository and the walk stops at five hundred, so this is a floor wherever " +
-				"it did. \"Artifact storage counted\" below puts the two counts beside it.",
+				"repository and the walk stops at five hundred, or sooner when a page of the " +
+				"listing fails and the pass keeps what it had read, so this is a floor " +
+				"wherever it stopped short. \"Artifact storage counted\" below puts the two " +
+				"counts beside it.",
 			PromDesc: sinceStart + " " + lastSweep,
 			GR: []Target{
 				grNamed("A", ciRunCount, total(countOf(runSeconds))),
@@ -295,7 +297,8 @@ func runOutcomes(b *builder) []Panel {
 			Opts:    mergeOpts(Opts{"unit": "bytes"}, hourBins),
 			SQLOpts: seriesOpts,
 			Desc: "Artifacts that have not expired, over the ones the walk reached, which " +
-				"is a floor on any repository with more than five hundred: " +
+				"is a floor on any repository with more than five hundred, and on one whose " +
+				"walk a failed page of the listing cut short: " +
 				"\"Artifact storage counted\" further down has the counts that say which " +
 				"those are. GitHub deletes artifacts on their own " +
 				"schedule, which is why this falls without anyone doing anything. A " +
@@ -667,12 +670,18 @@ func artifactStorage(b *builder) []Panel {
 			GR: []Target{grq(perBucket(rp("gh_artifact", "size_bytes"), gn("gh_artifact", "repo")))},
 			ES: []Target{b.esDaily("gh_artifact", b.mSum("size_bytes"), "repo", "", []string{ESF}, "")},
 		}),
+		// The four counts of one row, each repository's newest. A MAX() of each
+		// over the range put the largest live size the range had held beside a
+		// Walked from whichever sweep read furthest, so a walk cut short, whose
+		// row says so by a Walked short of Declared, was hidden by any fuller
+		// one before it, and the live size stood above the tile's.
 		panel("table", "Artifact storage counted", box{W: 12, H: 8, X: 12, Y: 54},
-			[]Target{sqlT(`SELECT repo AS "Repository", MAX(count) AS "Declared",` +
-				` MAX(walked) AS "Walked", MAX(live_count) AS "` + ciLiveCount + `",` +
-				` MAX(live_bytes) AS "Live size"` +
-				" FROM gh_artifact_total WHERE $__timeFilter(time) AND " + RF +
-				" GROUP BY 1 ORDER BY 2 DESC")}, &P{
+			[]Target{sqlT(`SELECT repo AS "Repository", count AS "Declared",` +
+				` walked AS "Walked", live_count AS "` + ciLiveCount + `",` +
+				` live_bytes AS "Live size" FROM (` +
+				"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn" +
+				" FROM gh_artifact_total" + ciInRange + RF + deliveryNewestRow +
+				" ORDER BY 2 DESC")}, &P{
 				Prom: []Target{
 					promTbl(fmt.Sprintf("max by (repo) (github_artifact_total_count{%s})", PF), "A"),
 					promTbl(fmt.Sprintf("max by (repo) (github_artifact_total_walked{%s})", PF), "B"),
@@ -687,16 +696,23 @@ func artifactStorage(b *builder) []Panel {
 				Desc: "Artifact storage, and how much of it was counted. Three counts, because " +
 					"the live size is on neither of the other two: Declared is GitHub's own " +
 					"total and counts the artifacts it has already expired, Walked is how far " +
-					"the page cap let the walk go, and Live is the artifacts still held among " +
-					"those, which is what the live size is the size of. When Walked is lower " +
-					"than Declared the live size is a floor rather than a total: here it is " +
+					"the walk went, and Live is the artifacts still held among " +
+					"those, which is what the live size is the size of. A sweep's walk stops at " +
+					"five pages, five hundred artifacts, and any walk stops sooner when a page " +
+					"of the listing fails, the pass writing what it had read: either way Walked " +
+					"is lower than " +
+					"Declared and the live size is a floor rather than a total. Here it is " +
 					"short by a factor of fifty six, and without these columns the tile above " +
-					"would say so nowhere.",
+					"would say so nowhere. All four are the newest row of each repository, " +
+					"which is the one the tile reads.",
 				Overrides: []any{
 					unitOf(ciLiveSize, "bytes", 120), width("Declared", 110),
 					width("Walked", 100), width(ciLiveCount, 90),
 				},
-				GR: walkedGR, GRTF: walkedGRtf, GRDesc: grSlot,
+				GR: walkedGR, GRTF: walkedGRtf,
+				GRDesc: "Graphite has no rows: each series is one number, so this table keeps " +
+					"the live size, the newest of each repository, and drops the three counts, " +
+					"which leaves it unable to say whether that size is a floor.",
 				ES: walkedES, ESTF: walkedEStf,
 			}),
 	}
