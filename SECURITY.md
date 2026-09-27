@@ -36,8 +36,16 @@ Concretely, and in rough order of interest:
   an error message, in a point, in the card, or in a request to any host other
   than the configured API.
 - A collector or a sink reaching a host the configuration did not name.
-- A path written outside `state_file`, `sinks.dedupe_file`, `sinks.file.path`
-  and `log.file`.
+- A path written outside the ones the configuration and the flags name:
+  `state_file` and the files derived beside it, `<name>-cache.bin`, a
+  backfill's `<name>-progress.json` and `<name>-written.bin` unless
+  `sinks.dedupe_file` names another; `sinks.file.path`, `sinks.sql.path` and
+  `log.file`; the card at `-card`, and its `_dark` twin with
+  `-card-theme both`; and what `-setup` writes: the configuration, at
+  `-config` or the system's default path, and when a service is asked for,
+  its unit, plist or task file and `ghchronicle.env` beside the
+  configuration. The state, the cache, the checkpoint, the ledger and the
+  card are each written to a `.tmp` beside them first and renamed into place.
 - Anything in a GitHub response that changes what the process executes, opens
   or writes, rather than only what it records.
 - A dependency advisory that this project's use actually reaches.
@@ -50,7 +58,9 @@ Concretely, and in rough order of interest:
   what the process can do with it.
 - Collected data being readable by whoever can read the store or the file sink.
   The file sink is written `0600` inside a `0750` directory for that reason,
-  and widening it is the operator's decision.
+  and widening it is the operator's decision. The cache file beside the state
+  file holds GitHub's answers as the token received them, private
+  repositories included, and is written `0600` too.
 - The Prometheus exporter serving the numbers it exists to serve. Bind it to
   loopback if they are not for everyone.
 - A rate limit, a 403 or a 404. Those are recorded and skipped by design.
