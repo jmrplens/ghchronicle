@@ -33,6 +33,12 @@ the median. The same audit found two things the store said wrong, fixed here
 too: the entries of one Actions cache on one ref overwrote each other, and a
 502 from a slow listing cost a repository its artifact storage row.
 
+2.5.2 was never released on its own. Its changes, the Loki sentences, the
+outbound searches past a hundred, the archived repositories in the totals, the
+threads commented elsewhere and a scheduler that ran families a tick late,
+ship in this release: they are in the
+[2.5.2 section of the changelog](https://github.com/jmrplens/ghchronicle/blob/v2.6.0/CHANGELOG.md#252---2026-09-26).
+
 - **Outbound rows say how large the change was and whether the repository
   is private.** `gh_external_contribution` said where a contribution went and
   what became of it, and nothing about the change or the repository, although
