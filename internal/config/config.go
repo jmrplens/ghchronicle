@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"maps"
 	"os"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strconv"
@@ -759,6 +760,32 @@ func expandEnv(s string) string {
 	})
 }
 
+// expandPath is expandEnv for a setting that names a file, where a leading ~
+// is also the home directory. Without it `state_file: ~/.ghchronicle/state.json`
+// was a directory called ~ under wherever the process started, which on a
+// runner is a checkout nothing caches, and the documented cache recipe and
+// the Windows paths under ${LOCALAPPDATA} both depended on a file path
+// meaning what a shell would make of it.
+//
+// The ~ is read as the file writes it, before the environment is: a
+// variable's value is used as it stands, which is also what a shell does
+// with one. Only ~ on its own or followed by a separator is the home
+// directory; ~name is somebody else's in a shell, and is left as it is
+// written rather than guessed at. A ~ with no home to put in its place is
+// refused, because the alternative is a directory called ~ that the next
+// reader of the configuration will not think to look for.
+func expandPath(key, s string) (string, error) {
+	if rest, tilde := strings.CutPrefix(s, "~"); tilde &&
+		(rest == "" || rest[0] == '/' || rest[0] == filepath.Separator) {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", fmt.Errorf("%s: %q starts with ~ and there is no home directory to put in its place: %w", key, s, err)
+		}
+		s = home + rest
+	}
+	return expandEnv(s), nil
+}
+
 // Validate fills defaults and reports what is unusable.
 func (c *Config) Validate() error {
 	if err := c.resolveGitHub(); err != nil {
@@ -767,7 +794,9 @@ func (c *Config) Validate() error {
 	if err := c.resolveTargets(); err != nil {
 		return err
 	}
-	c.resolveFilePaths()
+	if err := c.resolveFilePaths(); err != nil {
+		return err
+	}
 	if err := c.resolveSinks(); err != nil {
 		return err
 	}
@@ -838,16 +867,31 @@ func (c *Config) resolveTargets() error {
 	return nil
 }
 
-// resolveFilePaths names the two files a sweep remembers itself in.
-func (c *Config) resolveFilePaths() {
+// resolveFilePaths names the two files a sweep remembers itself in, and
+// expands the run's own log file with them. The paths of the file and SQL
+// sinks are expanded where those sinks resolve.
+//
+// The state file is expanded before anything is derived from it, so the
+// ledger, the checkpoint and the cache file land beside the file the state
+// really goes to rather than beside its unexpanded spelling.
+func (c *Config) resolveFilePaths() error {
+	var err error
+	if c.StateFile, err = expandPath("state_file", c.StateFile); err != nil {
+		return err
+	}
 	if c.StateFile == "" {
 		c.StateFile = "ghchronicle-state.json"
+	}
+	if c.Sinks.DedupeFile, err = expandPath("sinks.dedupe_file", c.Sinks.DedupeFile); err != nil {
+		return err
 	}
 	if c.Sinks.DedupeFile == "" {
 		// Beside the state file, since it is the same kind of thing: what a
 		// sweep has to remember so the next one does less.
 		c.Sinks.DedupeFile = strings.TrimSuffix(c.StateFile, ".json") + "-written.bin"
 	}
+	c.Log.File, err = expandPath("log.file", c.Log.File)
+	return err
 }
 
 // BackfillProgressFile is where a backfill keeps its checkpoint: beside the
@@ -988,6 +1032,10 @@ func (f *FileSink) resolve() error {
 	if f == nil {
 		return nil
 	}
+	var err error
+	if f.Path, err = expandPath("sinks.file.path", f.Path); err != nil {
+		return err
+	}
 	if f.Path == "" {
 		return errors.New("sinks.file: path is required")
 	}
@@ -1049,6 +1097,10 @@ func (s *PostgresSink) resolve() error {
 func (s *SQLSink) resolve() error {
 	if s == nil {
 		return nil
+	}
+	var err error
+	if s.Path, err = expandPath("sinks.sql.path", s.Path); err != nil {
+		return err
 	}
 	if s.Path == "" {
 		return errors.New("sinks.sql: path is required, a file or - for standard output")

@@ -331,3 +331,107 @@ sinks: {stdout: true}
 		t.Errorf("grafana = %+v, want nothing at all", c.Grafana)
 	}
 }
+
+// TestEveryPathSettingExpandsTheHomeAndTheEnvironment: a path setting means
+// what a shell would make of it. Until 2.6.1 only credentials and addresses
+// were expanded, so `state_file: ~/.ghchronicle/state.json` was a directory
+// called ~ under the working directory, the cache recipe the Actions page gave
+// cached nothing, and the Windows page's ${LOCALAPPDATA} paths were folders
+// named after the reference. The files derived from the state file follow it,
+// and the two sentinels, "off" and "-", are left alone.
+func TestEveryPathSettingExpandsTheHomeAndTheEnvironment(t *testing.T) {
+	t.Setenv("GITHUB_TOKEN", "x")
+	home := t.TempDir()
+	// Both, so the test means the same on Windows, where the home directory
+	// is USERPROFILE and HOME is nobody's.
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("TEST_GHC_DIR", "/srv/ghc")
+
+	c, err := Load(write(t, `
+targets: {user: jmrplens}
+state_file: ~/.ghchronicle/state.json
+log: {file: "${TEST_GHC_DIR}/ghchronicle.log"}
+sinks:
+  file: {path: ~/points.lp}
+  sql: {path: "${TEST_GHC_DIR}/points.sql"}
+`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for key, pair := range map[string][2]string{
+		"state_file":              {c.StateFile, home + "/.ghchronicle/state.json"},
+		"the derived dedupe_file": {c.Sinks.DedupeFile, home + "/.ghchronicle/state-written.bin"},
+		"the derived cache file":  {c.CacheFile(), home + "/.ghchronicle/state-cache.bin"},
+		"the derived checkpoint":  {c.BackfillProgressFile(), home + "/.ghchronicle/state-progress.json"},
+		"log.file":                {c.Log.File, "/srv/ghc/ghchronicle.log"},
+		"sinks.file.path":         {c.Sinks.File.Path, home + "/points.lp"},
+		"sinks.sql.path":          {c.Sinks.SQL.Path, "/srv/ghc/points.sql"},
+	} {
+		if pair[0] != pair[1] {
+			t.Errorf("%s = %q, want %q", key, pair[0], pair[1])
+		}
+	}
+
+	c, err = Load(write(t, `
+targets: {user: jmrplens}
+state_file: "${TEST_GHC_DIR}/state.json"
+log: {file: ~/ghchronicle.log}
+sinks:
+  dedupe_file: ~/written.bin
+  file: {path: "${TEST_GHC_DIR}/points.lp"}
+  sql: {path: ~/points.sql}
+`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for key, pair := range map[string][2]string{
+		"state_file":        {c.StateFile, "/srv/ghc/state.json"},
+		"sinks.dedupe_file": {c.Sinks.DedupeFile, home + "/written.bin"},
+		"log.file":          {c.Log.File, home + "/ghchronicle.log"},
+		"sinks.file.path":   {c.Sinks.File.Path, "/srv/ghc/points.lp"},
+		"sinks.sql.path":    {c.Sinks.SQL.Path, home + "/points.sql"},
+	} {
+		if pair[0] != pair[1] {
+			t.Errorf("%s = %q, want %q", key, pair[0], pair[1])
+		}
+	}
+
+	// ~name is another account's home in a shell, which this does not guess
+	// at, and the sentinels are words rather than paths.
+	c, err = Load(write(t, `
+targets: {user: jmrplens}
+state_file: ~other/state.json
+sinks:
+  dedupe_file: "off"
+  sql: {path: "-"}
+`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.StateFile != "~other/state.json" || c.Sinks.DedupeFile != "off" || c.Sinks.SQL.Path != "-" {
+		t.Errorf("state_file = %q, dedupe_file = %q, sql.path = %q, want each as written",
+			c.StateFile, c.Sinks.DedupeFile, c.Sinks.SQL.Path)
+	}
+}
+
+// TestATildeWithNoHomeIsRefusedNamingTheKey: a service account with no home
+// directory would otherwise get a directory called ~ wherever it started,
+// which is the last place anybody reading the configuration would look.
+func TestATildeWithNoHomeIsRefusedNamingTheKey(t *testing.T) {
+	t.Setenv("GITHUB_TOKEN", "x")
+	t.Setenv("HOME", "")
+	t.Setenv("USERPROFILE", "")
+	for key, body := range map[string]string{
+		"state_file":        "state_file: ~/state.json\nsinks: {stdout: true}\n",
+		"sinks.dedupe_file": "sinks: {stdout: true, dedupe_file: ~/w.bin}\n",
+		"log.file":          "log: {file: ~/g.log}\nsinks: {stdout: true}\n",
+		"sinks.file.path":   "sinks: {file: {path: ~/p.lp}}\n",
+		"sinks.sql.path":    "sinks: {sql: {path: ~/p.sql}}\n",
+	} {
+		_, err := Load(write(t, "targets: {user: jmrplens}\n"+body))
+		if err == nil || !strings.Contains(err.Error(), key+": ") || !strings.Contains(err.Error(), "home directory") {
+			t.Errorf("%s with no home: err = %v, want it refused naming the key", key, err)
+		}
+	}
+}
