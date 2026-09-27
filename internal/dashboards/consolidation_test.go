@@ -143,12 +143,12 @@ func consolidateCalls(t *testing.T, expr string) []consolidateCall {
 	for i := 0; i < len(expr); i++ {
 		c := expr[i]
 		switch {
+		case quote != 0 && c == '\\':
+			i++
+		case quote != 0 && c == quote:
+			quote = 0
 		case quote != 0:
-			if c == '\\' {
-				i++
-			} else if c == quote {
-				quote = 0
-			}
+			// A parenthesis inside a quoted argument opens and closes nothing.
 		case c == '"' || c == '\'':
 			quote = c
 		case c == '(':
@@ -171,8 +171,8 @@ func consolidateCalls(t *testing.T, expr string) []consolidateCall {
 				t.Fatalf("a consolidateBy with no function to consolidate by in %s", expr)
 			}
 			var enclosing []string
-			for j := len(stack) - 1; j >= 0; j-- {
-				enclosing = append(enclosing, stack[j].name)
+			for _, around := range slices.Backward(stack) {
+				enclosing = append(enclosing, around.name)
 			}
 			out = append(out, consolidateCall{how[1], enclosing, expr[i+1:]})
 		}
