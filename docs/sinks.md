@@ -846,6 +846,15 @@ number, so:
   which columns it dropped.
 - A boolean is not a metric there at all, and neither is a title or any other
   string. Those panels say so.
+- A panel cannot join two measurements, since each lives under its own path.
+  Work elsewhere has no Stars column, and the community profile keeps the API's
+  issue template flag rather than the count of templates, which lives under
+  another measurement.
+- A target cannot ask about one window while it reads another. The Overview
+  and Every repository, ever count an archived repository the default filter
+  sets aside from its points of the last seven days, where the SQL stores ask
+  whether the collector still writes it, so a range that ended more than a week
+  ago leaves those repositories out.
 
 Everything time-shaped works normally, which is most of the dashboard.
 
@@ -962,8 +971,18 @@ InfluxDB one, as Lucene filters and aggregations over **one** datasource
 pointing at `<prefix>-*`, because each target names its own index in its query.
 
 Set the datasource's time field to `@timestamp`. A per-item table there is the
-newest documents themselves; everything else is a bucket aggregation.
-OpenSearch works through the same plugin.
+newest documents themselves, or the newest document of each item where an item
+has several; everything else is a bucket aggregation. OpenSearch works through
+the same plugin.
+
+Two things a query cannot do there, and the panels that need them say so. It
+cannot join two indices, so Work elsewhere has no Stars column and the
+community profile keeps the API's issue template flag rather than the count of
+templates. And it cannot ask about one window while it reads another: the
+Overview and Every repository, ever count an archived repository the default
+filter sets aside from its documents of the last seven days, where the SQL
+stores ask whether the collector still writes it, so a range that ended more
+than a week ago leaves those repositories out.
 
 ### Where to go next
 

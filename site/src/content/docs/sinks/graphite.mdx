@@ -71,6 +71,15 @@ number, so:
   which columns it dropped.
 - A boolean is not a metric there at all, and neither is a title or any other
   string. Those panels say so.
+- A panel cannot join two measurements, since each lives under its own path.
+  Work elsewhere has no Stars column, and the community profile keeps the API's
+  issue template flag rather than the count of templates, which lives under
+  another measurement.
+- A target cannot ask about one window while it reads another. The Overview
+  and Every repository, ever count an archived repository the default filter
+  sets aside from its points of the last seven days, where the SQL stores ask
+  whether the collector still writes it, so a range that ended more than a week
+  ago leaves those repositories out.
 
 Everything time-shaped works normally, which is most of the dashboard.
 
