@@ -174,14 +174,15 @@ run reported at Info, as news, how it always runs.
   file remembers again" was printed at every `-once` run after the first,
   which is every cron job, every Action run and every Docker one-shot, and at
   every start of a service whose sinks keep no ledger (Loki, OTLP, the
-  exporter, stdout, the file). It is now said at Debug, as `not every store
-  keeps a write ledger, ...`, and at Info only when a ledger the configuration
-  keeps reads empty, which is what deleting it to fill a wiped store looks
-  like, as `the write ledger remembers nothing, ...`. The runs are recalled
-  exactly as before. The two `achievements` warnings that said "no progress
-  rows today" say "no progress rows this pass", since the family runs every
-  hour and the next pass writes the day's rows. A filter on the old texts
-  stops matching.
+  exporter, stdout, the file). It is now said at Debug, as
+  `not every store keeps a write ledger, ...`, and at Info only when a ledger
+  the configuration keeps reads empty, which is what deleting it to fill a
+  wiped store looks like, as `the write ledger remembers nothing, ...`. What
+  the runner does is unchanged: in none of these cases does it recall the runs
+  the cache file remembers. The two `achievements` warnings that said "no
+  progress rows today" say "no progress rows this pass", since the family runs
+  every hour and the next pass writes the day's rows. A filter on the old
+  texts stops matching.
 - **The documentation says what 2.6.0 does, in both languages.** The collector
   and measurement pages: `achievements` hourly, the two measurements whose url
   no table links, `gh_account_total` as one GraphQL query and one search, a
