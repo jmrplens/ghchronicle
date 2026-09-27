@@ -361,6 +361,19 @@ func TestARestartKeepsWhatTheCacheLearned(t *testing.T) {
 	if !bytes.Contains(out, []byte("cache file read")) {
 		t.Errorf("the second process did not say it read the cache file:\n%s", out)
 	}
+	// A one-shot run opens no write ledger, so it lists the jobs of the runs
+	// the cache file remembers at every run. That is how it always runs, not
+	// news: it is said at Debug, and never at Info, where it used to be the
+	// one line a cron job, the Action and a Docker one-shot all printed about
+	// a ledger they had never been meant to keep.
+	if !bytes.Contains(out, []byte("not every store keeps a write ledger")) {
+		t.Errorf("the second process did not say at Debug why it lists the remembered runs' jobs again:\n%s", out)
+	}
+	for line := range strings.SplitSeq(string(out), "\n") {
+		if strings.Contains(line, "listing the jobs of the runs the cache file remembers again") && strings.Contains(line, "level=INFO") {
+			t.Errorf("a one-shot run reported its refill at Info: %s", line)
+		}
+	}
 	all := gh.Requests()
 	assertRepeatsWereRevalidated(t, all[:afterFirst], all[afterFirst:])
 }

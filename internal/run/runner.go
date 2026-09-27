@@ -101,6 +101,11 @@ type Runner struct {
 	// every run of the window without its jobs. The command sets it: see its
 	// ledgerForgot.
 	Refill bool
+	// RefillEveryStart says Refill is how this configuration always starts,
+	// a run that opens no ledger or stores that keep none, so the refill is
+	// said at Debug; otherwise a ledger that is kept read empty, and that is
+	// worth an Info line.
+	RefillEveryStart bool
 	// cacheLoaded is whether CacheFile has been read, which happens once, at
 	// the first sweep. cacheSaved is when it was last written, and
 	// cacheDirty whether a family has run since.

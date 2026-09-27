@@ -674,3 +674,46 @@ func TestAStoreFilledAgainIsOfferedTheJobsOfTheRunsRemembered(t *testing.T) {
 		})
 	}
 }
+
+// TestARefillIsReportedAtInfoOnlyWhenAKeptLedgerReadEmpty: the runs a cache
+// file remembers are listed again whenever no ledger says what the stores
+// hold, and that is news only when the configuration keeps a ledger and it
+// read empty, which is what deleting it to fill a wiped store looks like. A
+// run that opens none, or stores that keep none, do the same at every start,
+// and saying so at Info put the line in every cron job's and every Action
+// run's log.
+func TestARefillIsReportedAtInfoOnlyWhenAKeptLedgerReadEmpty(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name       string
+		everyStart bool
+		level      string
+	}{
+		{name: "a kept ledger read empty", level: "level=INFO"},
+		{name: "no ledger kept", everyStart: true, level: "level=DEBUG"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			var listed atomic.Int32
+			cacheFile := filepath.Join(t.TempDir(), "state-cache.bin")
+			first := actionsProcess(t, oneRunServer(&listed), cacheFile, false, &captured{name: "influxdb"})
+			if err := first.SaveCache(); err != nil {
+				t.Fatal(err)
+			}
+			r := sweepRunner(t, oneRunServer(&listed))
+			log, buf := debugLog()
+			r.Log, r.Sinks, r.CacheFile = log, []sink.Sink{&captured{name: "influxdb"}}, cacheFile
+			r.Refill, r.RefillEveryStart = true, tc.everyStart
+			r.loadCache(time.Now())
+			var said []string
+			for line := range strings.SplitSeq(buf.String(), "\n") {
+				if strings.Contains(line, "listing the jobs of the runs the cache file remembers again") {
+					said = append(said, line)
+				}
+			}
+			if len(said) != 1 || !strings.Contains(said[0], tc.level) || !strings.Contains(said[0], "runs=1") {
+				t.Errorf("the refill was said as %q, want once at %s with the one run", said, tc.level)
+			}
+		})
+	}
+}

@@ -315,7 +315,7 @@ func execute(args []string, stdout, stderr io.Writer) {
 	publishOnStart(ctx, cfg, o, logger)
 
 	runner := newRunner(cfg, api, sinks, logger, &o)
-	runner.Refill = ledgerForgot(cfg, ledger)
+	runner.Refill, runner.RefillEveryStart = ledgerForgot(cfg, ledger)
 	switch {
 	case o.backfill:
 		err = runBackfill(ctx, runner, cfg, accumulator, &o, logger)
@@ -913,10 +913,15 @@ func cardOptions(o *options, theme string) *render.Options {
 // false` keep none for it, and a ledger file that was deleted, which is how a
 // wiped store is filled again, reads empty. See run.Runner's Refill for what
 // the runner does with it.
-func ledgerForgot(cfg *config.Config, ledger *sink.Ledger) bool {
-	if ledger == nil || ledger.Len() == 0 {
-		return true
-	}
+//
+// everyStart says the answer is the configuration's and not this start's: a
+// run that opens no ledger, a store that keeps none, and sinks none of which
+// can keep one (Loki, OTLP, the exporter, stdout, the file) forget at every
+// start alike. Only a ledger this configuration keeps that reads empty is
+// news, the deleted file above among it, and the runner says so at Info for
+// that one alone: said at every start, it was the one line a cron job, the
+// Action and a Docker one-shot printed about a ledger they never keep.
+func ledgerForgot(cfg *config.Config, ledger *sink.Ledger) (forgot, everyStart bool) {
 	s := cfg.Sinks
 	var own []*bool
 	if s.Influx != nil {
@@ -939,10 +944,19 @@ func ledgerForgot(cfg *config.Config, ledger *sink.Ledger) bool {
 	}
 	for _, on := range own {
 		if !config.Enabled(on) {
-			return true
+			return true, true
 		}
 	}
-	return false
+	switch {
+	case ledger == nil:
+		return true, true
+	case ledger.Len() > 0:
+		return false, false
+	case len(own) == 0:
+		return true, true
+	default:
+		return true, false
+	}
 }
 
 // buildSinks builds the configured sinks, and hands back the write ledger they
