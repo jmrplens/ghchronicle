@@ -179,10 +179,15 @@ func cost(b *builder) []Panel {
 		}),
 		cacheEntries(b),
 		panel("table", "Cache against the ceiling", box{W: 24, H: 8, X: 0, Y: 29}, []Target{sqlT(
-			`SELECT repo AS "Repository", MAX(size_bytes) AS "Cache",` +
-				` MAX(count) AS "Entries"` +
+			// Each repository's newest row. A cache is what GitHub holds now,
+			// and the largest of the range kept a repository at a size its
+			// evictions had since brought down, beside a tile and a table
+			// above that read the newest.
+			`SELECT repo AS "Repository", size_bytes AS "Cache",` +
+				` count AS "Entries" FROM (` +
+				"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn" +
 				" FROM gh_actions_cache WHERE $__timeFilter(time) AND " + RF +
-				" GROUP BY 1 ORDER BY 2 DESC",
+				") x WHERE rn = 1 ORDER BY 2 DESC",
 		)}, &P{
 			Prom: []Target{
 				promTbl(fmt.Sprintf("max by (repo) (github_actions_cache_size_bytes{%s})", PF), "A"),

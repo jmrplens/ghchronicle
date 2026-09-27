@@ -736,6 +736,22 @@ func (b *builder) terms(field string, size int, order ...string) any {
 	}
 }
 
+// newestDoc is the bucket that keeps, of the documents the buckets above it
+// hold, only those of the newest timestamp: a snapshot's newest reading, which
+// the metrics below it then read as it stands. Buckets above it say whose
+// reading it is and buckets below it are what that reading says, so a tag that
+// can change, a status or a url, goes below and takes the newest value too.
+//
+// A max over every document of the range read the largest the range had held
+// instead: a protection switched off, a key used again or a count that fell
+// inside the range read as it had been. top_metrics would read the newest
+// document too, but it hands a boolean back as the text "true", which the
+// plugin panics on, and appends nothing for a field the document lacks, which
+// fails the frame; a max inside this bucket answers 1 or 0 for the first and
+// null for the second. The key reaches the table as a column, which
+// hideColumns(panelESTime) drops.
+func (b *builder) newestDoc() any { return b.terms(panelESTime, 1, "_key", "desc") }
+
 // tmBy is a terms bucket on a tag that keeps the `size` values with the most
 // of `metric`, largest first. The metric has to be one of the same query's,
 // since the bucket names it by its id; renumberES carries that reference to

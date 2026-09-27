@@ -190,22 +190,23 @@ func accessConfiguration(b *builder) []Panel {
 
 	keysGR, keysGRtf := gTbl(rowsOf(rp(dk, "days_since_use"), gn(dk, "repo"),
 		gn(dk, "key"), gn(dk, "read_only")), "Key", []col{{"lastNotNull", deliveryKeyUnused}})
-	// A `max` rather than the newest reading, because `days_since_use` is
-	// written only for a key GitHub has seen used and a top_metrics has no
-	// value to hand back for the others. Grafana's Elasticsearch plugin
-	// appends nothing at all in that case, so the metric column came back one
-	// row shorter than the three bucket columns and the whole panel failed
-	// with `frame has different field lengths, field 0 is len 2 but field 3 is
-	// len 1`. Every other aggregation appends a null instead and the row keeps
-	// its shape, which is what an unused key should look like: an empty cell.
-	keysES, keysEStf := esTbl(dk, []any{b.tm("repo", 50), b.tm("key", 50), b.tm("read_only", 2)},
+	// A `max` inside each key's newest document rather than a top_metrics,
+	// because `days_since_use` is written only for a key GitHub has seen used
+	// and a top_metrics has no value to hand back for the others. Grafana's
+	// Elasticsearch plugin appends nothing at all in that case, so the metric
+	// column came back one row shorter than the three bucket columns and the
+	// whole panel failed with `frame has different field lengths, field 0 is
+	// len 2 but field 3 is len 1`. Every other aggregation appends a null
+	// instead and the row keeps its shape, which is what an unused key should
+	// look like: an empty cell. See newestDoc.
+	keysES, keysEStf := esTbl(dk, []any{b.tm("repo", 50), b.tm("key", 50), b.newestDoc(), b.tm("read_only", 2)},
 		[]any{b.mMax("days_since_use")},
 		[]named{
 			{inventoryRepoTerm, "Repository"},
 			{"key.keyword", "Key"},
 			{"read_only.keyword", deliveryKeyReadOnly},
 			{"d", deliveryKeyUnused},
-		}, []string{ESF})
+		}, []string{ESF}, hideColumns(panelESTime))
 
 	whGR, whGRtf := gTbl(rowsOf("keepLastValue("+rp("gh_webhook", "events")+")",
 		gn("gh_webhook", "repo"), gn("gh_webhook", "host")),
@@ -265,10 +266,8 @@ func accessConfiguration(b *builder) []Panel {
 			GR:        keysGR, GRTF: keysGRtf,
 			GRDesc: "Graphite names each row repository, key and whether it is read-only from the path.",
 			ES:     keysES, ESTF: keysEStf,
-			ESDesc: "Elasticsearch answers with the largest number of days inside the range " +
-				"rather than with the newest reading. A key GitHub has never seen used has " +
-				"no reading at all, in this dashboard or any of the others, and its cell " +
-				"is empty.",
+			ESDesc: "A key GitHub has never seen used has no reading at all, in this " +
+				"dashboard or any of the others, and its cell is empty.",
 		}),
 		panel("text", "Where failure output went", box{W: 16, H: 8, X: 8, Y: 16}, nil, &P{
 			Opts: Opts{"content": logNote},
@@ -308,10 +307,15 @@ func accessConfiguration(b *builder) []Panel {
 			ES: whES, ESTF: whEStf,
 		}),
 		panel("table", "Environments", box{W: 12, H: 8, X: 12, Y: 24}, []Target{sqlT(
-			`SELECT environment AS "Environment", MIN(days_since_change) AS "Idle",` +
-				` repo AS "Repository", MAX(url) AS "Link" FROM gh_environment` +
-				" WHERE $__timeFilter(time) AND " + RF +
-				" GROUP BY 1, 3 ORDER BY 2 DESC",
+			// Each environment's newest row. The row is a daily snapshot and its
+			// days since change climb by one a day, so the least of the range
+			// was the reading of the range's first day, a month short on an
+			// environment nobody touches.
+			`SELECT environment AS "Environment", days_since_change AS "Idle",` +
+				` repo AS "Repository", url AS "Link" FROM (` +
+				"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, environment" +
+				" ORDER BY time DESC) AS rn FROM gh_environment" + ciInRange + RF +
+				deliveryNewestRow + " ORDER BY 2 DESC",
 		)}, &P{
 			Prom: []Target{promTbl(fmt.Sprintf(
 				"min by (repo, environment) (github_environment_days_since_change{%s})", PF,
@@ -398,36 +402,34 @@ func branchesAndProtections(b *builder) []Panel {
 	branchGR, branchGRtf := gTbl(rowsOf(rp(gb, "days_since_commit"),
 		gn(gb, "repo"), gn(gb, "branch"), gn(gb, "is_default")),
 		"Repository, branch, default", []col{{"lastNotNull", "Idle"}})
-	// A `max` rather than the newest reading, for the reason the deploy keys
-	// table above carries one. `days_since_commit` is written only for a ref
-	// whose target is a commit, and a ref that points at anything else is
-	// stored with no age at all, which the collector has a test for. A
-	// top_metrics hands back nothing for a bucket where the field never
-	// appears, leaving the metric column shorter than the three bucket columns
-	// and killing the whole panel with `frame has different field lengths`.
-	// `max` appends a null instead and the row keeps its shape.
+	// A `max` inside each branch's newest document rather than a top_metrics,
+	// for the reason the deploy keys table above carries one.
+	// `days_since_commit` is written only for a ref whose target is a commit,
+	// and a ref that points at anything else is stored with no age at all,
+	// which the collector has a test for. A top_metrics hands back nothing for
+	// a bucket where the field never appears, leaving the metric column
+	// shorter than the three bucket columns and killing the whole panel with
+	// `frame has different field lengths`. `max` appends a null instead and
+	// the row keeps its shape.
 	branchES, branchEStf := esTbl(gb,
-		[]any{b.tm("repo", 500), b.tm("branch", 500), b.tm("is_default", 2)},
+		[]any{b.tm("repo", 500), b.tm("branch", 500), b.newestDoc(), b.tm("is_default", 2)},
 		[]any{b.mMax("days_since_commit")},
 		[]named{
 			{inventoryRepoTerm, "Repository"},
 			{"branch.keyword", "Branch"},
 			{"is_default.keyword", "Default"},
 			{"days_since_commit", "Idle"},
-		}, []string{ESF})
+		}, []string{ESF}, hideColumns(panelESTime))
 
 	// Graphite holds the four switches as 1 and 0 like any number, but a table
 	// there carries one number per row, and the one a reader would sort this
 	// by is the number of status checks.
 	protGR, protGRtf := gTbl(rowsOf(rp(bp, "required_checks"), gn(bp, "repo"), gn(bp, "pattern")),
 		"Repository, pattern", []col{{"lastNotNull", "Checks"}})
-	// A `max` per column rather than the newest reading, for the reason the
-	// repository settings table carries one: four of these six are booleans,
-	// and Elasticsearch hands a boolean out of a top_metrics as the string
-	// "true", which panics Grafana's plugin and takes the whole panel with it.
-	// `max` is answered as a number over a boolean, and appends a null rather
-	// than nothing where `required_reviews` was never written.
-	protES, protEStf := esTbl(bp, []any{b.tm("repo", 500), b.tm("pattern", 100), b.tmURL()},
+	// Each pattern's newest document, then a max of each column inside it:
+	// four of these six are booleans, which a top_metrics would hand back as
+	// text, and `required_reviews` is not always written. See newestDoc.
+	protES, protEStf := esTbl(bp, []any{b.tm("repo", 500), b.tm("pattern", 100), b.newestDoc(), b.tmURL()},
 		[]any{
 			b.mMax("required_reviews"), b.mMax("requires_commit_signatures"),
 			b.mMax("requires_linear_history"), b.mMax("allows_force_pushes"),
@@ -443,7 +445,7 @@ func branchesAndProtections(b *builder) []Panel {
 			{"allows_force_pushes", deliveryForcePush},
 			{"requires_conversation_resolution", "Threads"},
 			{"required_checks", "Checks"},
-		}, []string{ESF})
+		}, []string{ESF}, hideColumns(panelESTime))
 
 	// Graphite keeps one column of the three, so it keeps `bypass_actors`: the
 	// exact total, which means the same thing standing alone as it does beside
@@ -451,8 +453,10 @@ func branchesAndProtections(b *builder) []Panel {
 	ruleGR, ruleGRtf := gTbl(rowsOf(rp(rr, "bypass_actors"),
 		gn(rr, "repo"), gn(rr, "ruleset"), gn(rr, "rule")),
 		"Repository, ruleset, rule", []col{{"lastNotNull", deliveryBypassActors}})
+	// All three from each rule's newest document, so they come from one
+	// reading and agree with each other the way the SQL twin's newest row does.
 	ruleES, ruleEStf := esTbl(rr,
-		[]any{b.tm("repo", 500), b.tm("ruleset", 100), b.tm("rule", 100)},
+		[]any{b.tm("repo", 500), b.tm("ruleset", 100), b.tm("rule", 100), b.newestDoc()},
 		[]any{b.mMax("bypass_actors"), b.mMax("bypass_always"), b.mMax("bypass_sampled")},
 		[]named{
 			{inventoryRepoTerm, "Repository"},
@@ -461,7 +465,7 @@ func branchesAndProtections(b *builder) []Panel {
 			{"bypass_actors", deliveryBypassActors},
 			{"bypass_always", "Always"},
 			{"bypass_sampled", "Sampled"},
-		}, []string{ESF})
+		}, []string{ESF}, hideColumns(panelESTime))
 
 	return []Panel{
 		panel("table", "Stale branches", box{W: 12, H: 8, X: 0, Y: 32}, []Target{sqlT(branches)}, &P{
@@ -491,10 +495,9 @@ func branchesAndProtections(b *builder) []Panel {
 			GRDesc: "Graphite names each row repository, branch and whether it is the default " +
 				"from the path. " + noRepoFlagsHere,
 			ES: branchES, ESTF: branchEStf,
-			ESDesc: "Elasticsearch answers with the largest number of days inside the range " +
-				"rather than with the newest reading. A branch whose ref points at something " +
-				"that is not a commit has no age at all, in this dashboard or any of the " +
-				"others, and its cell is empty. " + noRepoFlagsHere,
+			ESDesc: "A branch whose ref points at something that is not a commit has no age " +
+				"at all, in this dashboard or any of the others, and its cell is empty. " +
+				noRepoFlagsHere,
 		}),
 		panel("table", "Branch protection rules", box{W: 12, H: 8, X: 12, Y: 32},
 			[]Target{sqlT(protections)}, &P{
@@ -535,10 +538,6 @@ func branchesAndProtections(b *builder) []Panel {
 					"one number per row, the status checks, so what else the protection requires " +
 					"is missing. " + grRows,
 				ES: protES, ESTF: protEStf,
-				ESDesc: "In Elasticsearch all six columns are the largest value inside the range " +
-					"rather than the newest reading, because a top_metrics over a boolean panics " +
-					"the plugin: a protection switched off inside the range still reads as on " +
-					"until the range has moved past the day it was on.",
 			}),
 		panel("table", "Ruleset rules and bypasses", box{W: 24, H: 8, X: 0, Y: 40},
 			[]Target{sqlT(ruleRows)}, &P{
@@ -571,8 +570,6 @@ func branchesAndProtections(b *builder) []Panel {
 					"read alone, against a total this table cannot show beside it, is exactly " +
 					"the misreading the panel exists to prevent.",
 				ES: ruleES, ESTF: ruleEStf,
-				ESDesc: "In Elasticsearch the three bypass numbers are the largest inside the range " +
-					"rather than the newest reading, so they still agree with each other.",
 			}),
 		rulesetChanges(b),
 	}

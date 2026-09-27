@@ -3366,13 +3366,24 @@
                     "size": "500"
                   },
                   "type": "terms"
+                },
+                {
+                  "field": "@timestamp",
+                  "id": "74",
+                  "settings": {
+                    "min_doc_count": "1",
+                    "order": "desc",
+                    "orderBy": "_key",
+                    "size": "1"
+                  },
+                  "type": "terms"
                 }
               ],
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
                   "field": "commits",
-                  "id": "74",
+                  "id": "75",
                   "type": "max"
                 }
               ],
@@ -3473,7 +3484,7 @@
               "bucketAggs": [
                 {
                   "field": "weekday.keyword",
-                  "id": "75",
+                  "id": "76",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "asc",
@@ -3484,12 +3495,23 @@
                 },
                 {
                   "field": "repo.keyword",
-                  "id": "76",
+                  "id": "77",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
                     "orderBy": "_count",
                     "size": "500"
+                  },
+                  "type": "terms"
+                },
+                {
+                  "field": "@timestamp",
+                  "id": "78",
+                  "settings": {
+                    "min_doc_count": "1",
+                    "order": "desc",
+                    "orderBy": "_key",
+                    "size": "1"
                   },
                   "type": "terms"
                 }
@@ -3498,7 +3520,7 @@
               "metrics": [
                 {
                   "field": "commits",
-                  "id": "77",
+                  "id": "79",
                   "type": "max"
                 }
               ],
@@ -3668,7 +3690,7 @@
               "bucketAggs": [
                 {
                   "field": "full_name.keyword",
-                  "id": "78",
+                  "id": "80",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -3679,7 +3701,7 @@
                 },
                 {
                   "field": "url.keyword",
-                  "id": "79",
+                  "id": "81",
                   "settings": {
                     "min_doc_count": "1",
                     "missing": "",
@@ -3693,7 +3715,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "80",
+                  "id": "82",
                   "settings": {
                     "metrics": [
                       "commits"
@@ -3824,7 +3846,7 @@
               "bucketAggs": [
                 {
                   "field": "year.keyword",
-                  "id": "81",
+                  "id": "83",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -3837,7 +3859,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "82",
+                  "id": "84",
                   "settings": {
                     "metrics": [
                       "contributions",
@@ -3935,7 +3957,7 @@
               "bucketAggs": [
                 {
                   "field": "full_name.keyword",
-                  "id": "84",
+                  "id": "86",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -3946,7 +3968,7 @@
                 },
                 {
                   "field": "@timestamp",
-                  "id": "85",
+                  "id": "87",
                   "settings": {
                     "interval": "1d",
                     "min_doc_count": "0",
@@ -3959,7 +3981,7 @@
               "metrics": [
                 {
                   "field": "commits",
-                  "id": "83",
+                  "id": "85",
                   "type": "sum"
                 }
               ],
@@ -4018,7 +4040,7 @@
               "bucketAggs": [
                 {
                   "field": "private.keyword",
-                  "id": "86",
+                  "id": "88",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -4032,7 +4054,7 @@
               "metrics": [
                 {
                   "field": "commits",
-                  "id": "87",
+                  "id": "89",
                   "type": "sum"
                 }
               ],
@@ -4241,31 +4263,6 @@
               "bucketAggs": [
                 {
                   "field": "measurement.keyword",
-                  "id": "89",
-                  "settings": {
-                    "min_doc_count": "1",
-                    "order": "desc",
-                    "orderBy": "_count",
-                    "size": "1"
-                  },
-                  "type": "terms"
-                }
-              ],
-              "datasource": "${DS_ELASTICSEARCH}",
-              "metrics": [
-                {
-                  "id": "88",
-                  "type": "count"
-                }
-              ],
-              "query": "_index:ghchronicle-gh_pull_request AND state:MERGED AND repo.keyword:${repo:lucene} AND _exists_:number",
-              "refId": "A",
-              "timeField": "@timestamp"
-            },
-            {
-              "bucketAggs": [
-                {
-                  "field": "measurement.keyword",
                   "id": "91",
                   "settings": {
                     "min_doc_count": "1",
@@ -4279,18 +4276,12 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "field": "seconds_to_merge",
                   "id": "90",
-                  "settings": {
-                    "percents": [
-                      "50"
-                    ]
-                  },
-                  "type": "percentiles"
+                  "type": "count"
                 }
               ],
-              "query": "_index:ghchronicle-gh_pull_request AND repo.keyword:${repo:lucene} AND state:MERGED",
-              "refId": "B",
+              "query": "_index:ghchronicle-gh_pull_request AND state:MERGED AND repo.keyword:${repo:lucene} AND _exists_:number",
+              "refId": "A",
               "timeField": "@timestamp"
             },
             {
@@ -4310,7 +4301,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "field": "seconds_to_first_human_review",
+                  "field": "seconds_to_merge",
                   "id": "92",
                   "settings": {
                     "percents": [
@@ -4320,8 +4311,8 @@
                   "type": "percentiles"
                 }
               ],
-              "query": "_index:ghchronicle-gh_pull_request AND repo.keyword:${repo:lucene} AND _exists_:seconds_to_first_human_review",
-              "refId": "C",
+              "query": "_index:ghchronicle-gh_pull_request AND repo.keyword:${repo:lucene} AND state:MERGED",
+              "refId": "B",
               "timeField": "@timestamp"
             },
             {
@@ -4341,12 +4332,18 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
+                  "field": "seconds_to_first_human_review",
                   "id": "94",
-                  "type": "count"
+                  "settings": {
+                    "percents": [
+                      "50"
+                    ]
+                  },
+                  "type": "percentiles"
                 }
               ],
-              "query": "_index:ghchronicle-gh_issue AND state:CLOSED AND repo.keyword:${repo:lucene} AND _exists_:number",
-              "refId": "D",
+              "query": "_index:ghchronicle-gh_pull_request AND repo.keyword:${repo:lucene} AND _exists_:seconds_to_first_human_review",
+              "refId": "C",
               "timeField": "@timestamp"
             },
             {
@@ -4366,18 +4363,12 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "field": "seconds_to_close",
                   "id": "96",
-                  "settings": {
-                    "percents": [
-                      "50"
-                    ]
-                  },
-                  "type": "percentiles"
+                  "type": "count"
                 }
               ],
-              "query": "_index:ghchronicle-gh_issue AND state:CLOSED AND repo.keyword:${repo:lucene}",
-              "refId": "E",
+              "query": "_index:ghchronicle-gh_issue AND state:CLOSED AND repo.keyword:${repo:lucene} AND _exists_:number",
+              "refId": "D",
               "timeField": "@timestamp"
             },
             {
@@ -4397,8 +4388,39 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "field": "churn",
+                  "field": "seconds_to_close",
                   "id": "98",
+                  "settings": {
+                    "percents": [
+                      "50"
+                    ]
+                  },
+                  "type": "percentiles"
+                }
+              ],
+              "query": "_index:ghchronicle-gh_issue AND state:CLOSED AND repo.keyword:${repo:lucene}",
+              "refId": "E",
+              "timeField": "@timestamp"
+            },
+            {
+              "bucketAggs": [
+                {
+                  "field": "measurement.keyword",
+                  "id": "101",
+                  "settings": {
+                    "min_doc_count": "1",
+                    "order": "desc",
+                    "orderBy": "_count",
+                    "size": "1"
+                  },
+                  "type": "terms"
+                }
+              ],
+              "datasource": "${DS_ELASTICSEARCH}",
+              "metrics": [
+                {
+                  "field": "churn",
+                  "id": "100",
                   "settings": {
                     "percents": [
                       "50"
@@ -4471,7 +4493,7 @@
               "bucketAggs": [
                 {
                   "field": "state.keyword",
-                  "id": "101",
+                  "id": "103",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -4482,7 +4504,7 @@
                 },
                 {
                   "field": "@timestamp",
-                  "id": "102",
+                  "id": "104",
                   "settings": {
                     "interval": "1d",
                     "min_doc_count": "0",
@@ -4494,7 +4516,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "100",
+                  "id": "102",
                   "type": "count"
                 }
               ],
@@ -4560,7 +4582,7 @@
               "bucketAggs": [
                 {
                   "field": "@timestamp",
-                  "id": "104",
+                  "id": "106",
                   "settings": {
                     "interval": "1d",
                     "min_doc_count": "0",
@@ -4573,7 +4595,7 @@
               "metrics": [
                 {
                   "field": "seconds_to_merge",
-                  "id": "103",
+                  "id": "105",
                   "settings": {
                     "percents": [
                       "50",
@@ -4647,7 +4669,7 @@
               "bucketAggs": [
                 {
                   "field": "state.keyword",
-                  "id": "106",
+                  "id": "108",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -4658,7 +4680,7 @@
                 },
                 {
                   "field": "@timestamp",
-                  "id": "107",
+                  "id": "109",
                   "settings": {
                     "interval": "1d",
                     "min_doc_count": "0",
@@ -4670,7 +4692,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "105",
+                  "id": "107",
                   "type": "count"
                 }
               ],
@@ -4738,7 +4760,7 @@
               "bucketAggs": [
                 {
                   "field": "@timestamp",
-                  "id": "109",
+                  "id": "111",
                   "settings": {
                     "interval": "1d",
                     "min_doc_count": "0",
@@ -4751,7 +4773,7 @@
               "metrics": [
                 {
                   "field": "churn",
-                  "id": "108",
+                  "id": "110",
                   "settings": {
                     "percents": [
                       "50"
@@ -4989,7 +5011,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "110",
+                  "id": "112",
                   "settings": {
                     "order": "desc",
                     "size": "500",
@@ -5103,7 +5125,7 @@
               "bucketAggs": [
                 {
                   "field": "author.keyword",
-                  "id": "111",
+                  "id": "113",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -5116,7 +5138,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "112",
+                  "id": "114",
                   "type": "count"
                 }
               ],
@@ -5255,7 +5277,7 @@
               "bucketAggs": [
                 {
                   "field": "repo.keyword",
-                  "id": "113",
+                  "id": "115",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -5268,12 +5290,12 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "114",
+                  "id": "116",
                   "type": "count"
                 },
                 {
                   "field": "seconds_to_merge",
-                  "id": "115",
+                  "id": "117",
                   "settings": {
                     "percents": [
                       "50"
@@ -5283,7 +5305,7 @@
                 },
                 {
                   "field": "churn",
-                  "id": "116",
+                  "id": "118",
                   "settings": {
                     "percents": [
                       "50"
@@ -5417,7 +5439,7 @@
               "bucketAggs": [
                 {
                   "field": "reviewer.keyword",
-                  "id": "117",
+                  "id": "119",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -5430,12 +5452,12 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "118",
+                  "id": "120",
                   "type": "count"
                 },
                 {
                   "field": "seconds_to_review",
-                  "id": "119",
+                  "id": "121",
                   "settings": {
                     "percents": [
                       "50"
@@ -5522,7 +5544,7 @@
               "bucketAggs": [
                 {
                   "field": "reviewer.keyword",
-                  "id": "121",
+                  "id": "123",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -5533,7 +5555,7 @@
                 },
                 {
                   "field": "@timestamp",
-                  "id": "122",
+                  "id": "124",
                   "settings": {
                     "interval": "1d",
                     "min_doc_count": "0",
@@ -5545,7 +5567,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "120",
+                  "id": "122",
                   "type": "count"
                 }
               ],
@@ -5722,7 +5744,7 @@
               "bucketAggs": [
                 {
                   "field": "repo.keyword",
-                  "id": "123",
+                  "id": "125",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -5733,7 +5755,7 @@
                 },
                 {
                   "field": "number.keyword",
-                  "id": "124",
+                  "id": "126",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -5744,7 +5766,7 @@
                 },
                 {
                   "field": "url.keyword",
-                  "id": "125",
+                  "id": "127",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -5758,17 +5780,17 @@
               "metrics": [
                 {
                   "field": "seconds_open",
-                  "id": "126",
+                  "id": "128",
                   "type": "max"
                 },
                 {
                   "field": "comments",
-                  "id": "127",
+                  "id": "129",
                   "type": "max"
                 },
                 {
                   "field": "reviews",
-                  "id": "128",
+                  "id": "130",
                   "type": "max"
                 }
               ],
@@ -5938,7 +5960,7 @@
               "bucketAggs": [
                 {
                   "field": "repo.keyword",
-                  "id": "129",
+                  "id": "131",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -5949,7 +5971,7 @@
                 },
                 {
                   "field": "number.keyword",
-                  "id": "130",
+                  "id": "132",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -5960,7 +5982,7 @@
                 },
                 {
                   "field": "url.keyword",
-                  "id": "131",
+                  "id": "133",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -5974,12 +5996,12 @@
               "metrics": [
                 {
                   "field": "seconds_open",
-                  "id": "132",
+                  "id": "134",
                   "type": "max"
                 },
                 {
                   "field": "comments",
-                  "id": "133",
+                  "id": "135",
                   "type": "max"
                 }
               ],
@@ -6063,7 +6085,7 @@
               "bucketAggs": [
                 {
                   "field": "bot.keyword",
-                  "id": "135",
+                  "id": "137",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -6074,7 +6096,7 @@
                 },
                 {
                   "field": "@timestamp",
-                  "id": "136",
+                  "id": "138",
                   "settings": {
                     "interval": "1d",
                     "min_doc_count": "0",
@@ -6086,7 +6108,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "134",
+                  "id": "136",
                   "type": "count"
                 }
               ],
@@ -6244,7 +6266,7 @@
               "bucketAggs": [
                 {
                   "field": "repo.keyword",
-                  "id": "137",
+                  "id": "139",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -6255,7 +6277,7 @@
                 },
                 {
                   "field": "number.keyword",
-                  "id": "138",
+                  "id": "140",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -6268,17 +6290,17 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "139",
+                  "id": "141",
                   "type": "count"
                 },
                 {
                   "field": "outdated",
-                  "id": "140",
+                  "id": "142",
                   "type": "sum"
                 },
                 {
                   "field": "comments",
-                  "id": "141",
+                  "id": "143",
                   "type": "sum"
                 }
               ],
@@ -6578,31 +6600,6 @@
               "bucketAggs": [
                 {
                   "field": "measurement.keyword",
-                  "id": "143",
-                  "settings": {
-                    "min_doc_count": "1",
-                    "order": "desc",
-                    "orderBy": "_count",
-                    "size": "1"
-                  },
-                  "type": "terms"
-                }
-              ],
-              "datasource": "${DS_ELASTICSEARCH}",
-              "metrics": [
-                {
-                  "id": "142",
-                  "type": "count"
-                }
-              ],
-              "query": "_index:ghchronicle-gh_workflow_run AND repo.keyword:${repo:lucene}",
-              "refId": "A",
-              "timeField": "@timestamp"
-            },
-            {
-              "bucketAggs": [
-                {
-                  "field": "measurement.keyword",
                   "id": "145",
                   "settings": {
                     "min_doc_count": "1",
@@ -6616,13 +6613,12 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "field": "success",
                   "id": "144",
-                  "type": "avg"
+                  "type": "count"
                 }
               ],
-              "query": "_index:ghchronicle-gh_workflow_run AND repo.keyword:${repo:lucene} AND conclusion:(success OR failure)",
-              "refId": "B",
+              "query": "_index:ghchronicle-gh_workflow_run AND repo.keyword:${repo:lucene}",
+              "refId": "A",
               "timeField": "@timestamp"
             },
             {
@@ -6642,12 +6638,13 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
+                  "field": "success",
                   "id": "146",
-                  "type": "count"
+                  "type": "avg"
                 }
               ],
-              "query": "_index:ghchronicle-gh_workflow_run AND repo.keyword:${repo:lucene} AND conclusion:(cancelled OR skipped)",
-              "refId": "C",
+              "query": "_index:ghchronicle-gh_workflow_run AND repo.keyword:${repo:lucene} AND conclusion:(success OR failure)",
+              "refId": "B",
               "timeField": "@timestamp"
             },
             {
@@ -6667,18 +6664,12 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "field": "duration_seconds",
                   "id": "148",
-                  "settings": {
-                    "percents": [
-                      "50"
-                    ]
-                  },
-                  "type": "percentiles"
+                  "type": "count"
                 }
               ],
-              "query": "_index:ghchronicle-gh_workflow_run AND repo.keyword:${repo:lucene}",
-              "refId": "D",
+              "query": "_index:ghchronicle-gh_workflow_run AND repo.keyword:${repo:lucene} AND conclusion:(cancelled OR skipped)",
+              "refId": "C",
               "timeField": "@timestamp"
             },
             {
@@ -6698,8 +6689,39 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "field": "queued_seconds",
+                  "field": "duration_seconds",
                   "id": "150",
+                  "settings": {
+                    "percents": [
+                      "50"
+                    ]
+                  },
+                  "type": "percentiles"
+                }
+              ],
+              "query": "_index:ghchronicle-gh_workflow_run AND repo.keyword:${repo:lucene}",
+              "refId": "D",
+              "timeField": "@timestamp"
+            },
+            {
+              "bucketAggs": [
+                {
+                  "field": "measurement.keyword",
+                  "id": "153",
+                  "settings": {
+                    "min_doc_count": "1",
+                    "order": "desc",
+                    "orderBy": "_count",
+                    "size": "1"
+                  },
+                  "type": "terms"
+                }
+              ],
+              "datasource": "${DS_ELASTICSEARCH}",
+              "metrics": [
+                {
+                  "field": "queued_seconds",
+                  "id": "152",
                   "settings": {
                     "percents": [
                       "50"
@@ -6710,38 +6732,6 @@
               ],
               "query": "_index:ghchronicle-gh_workflow_job AND repo.keyword:${repo:lucene}",
               "refId": "E",
-              "timeField": "@timestamp"
-            },
-            {
-              "bucketAggs": [
-                {
-                  "field": "repo.keyword",
-                  "id": "153",
-                  "settings": {
-                    "min_doc_count": "1",
-                    "order": "desc",
-                    "orderBy": "_count",
-                    "size": "500"
-                  },
-                  "type": "terms"
-                }
-              ],
-              "datasource": "${DS_ELASTICSEARCH}",
-              "metrics": [
-                {
-                  "id": "152",
-                  "settings": {
-                    "metrics": [
-                      "live_bytes"
-                    ],
-                    "order": "desc",
-                    "orderBy": "@timestamp"
-                  },
-                  "type": "top_metrics"
-                }
-              ],
-              "query": "_index:ghchronicle-gh_artifact_total AND repo.keyword:${repo:lucene}",
-              "refId": "F",
               "timeField": "@timestamp"
             },
             {
@@ -6762,6 +6752,38 @@
               "metrics": [
                 {
                   "id": "154",
+                  "settings": {
+                    "metrics": [
+                      "live_bytes"
+                    ],
+                    "order": "desc",
+                    "orderBy": "@timestamp"
+                  },
+                  "type": "top_metrics"
+                }
+              ],
+              "query": "_index:ghchronicle-gh_artifact_total AND repo.keyword:${repo:lucene}",
+              "refId": "F",
+              "timeField": "@timestamp"
+            },
+            {
+              "bucketAggs": [
+                {
+                  "field": "repo.keyword",
+                  "id": "157",
+                  "settings": {
+                    "min_doc_count": "1",
+                    "order": "desc",
+                    "orderBy": "_count",
+                    "size": "500"
+                  },
+                  "type": "terms"
+                }
+              ],
+              "datasource": "${DS_ELASTICSEARCH}",
+              "metrics": [
+                {
+                  "id": "156",
                   "settings": {
                     "metrics": [
                       "size_bytes"
@@ -6927,7 +6949,7 @@
               "bucketAggs": [
                 {
                   "field": "conclusion.keyword",
-                  "id": "157",
+                  "id": "159",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -6938,7 +6960,7 @@
                 },
                 {
                   "field": "@timestamp",
-                  "id": "158",
+                  "id": "160",
                   "settings": {
                     "interval": "1d",
                     "min_doc_count": "0",
@@ -6950,7 +6972,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "156",
+                  "id": "158",
                   "type": "count"
                 }
               ],
@@ -7016,7 +7038,7 @@
               "bucketAggs": [
                 {
                   "field": "@timestamp",
-                  "id": "160",
+                  "id": "162",
                   "settings": {
                     "interval": "1d",
                     "min_doc_count": "0",
@@ -7029,7 +7051,7 @@
               "metrics": [
                 {
                   "field": "duration_seconds",
-                  "id": "159",
+                  "id": "161",
                   "settings": {
                     "percents": [
                       "50",
@@ -7102,7 +7124,7 @@
               "bucketAggs": [
                 {
                   "field": "@timestamp",
-                  "id": "162",
+                  "id": "164",
                   "settings": {
                     "interval": "1h",
                     "min_doc_count": "0",
@@ -7115,7 +7137,7 @@
               "metrics": [
                 {
                   "field": "queued_seconds",
-                  "id": "161",
+                  "id": "163",
                   "settings": {
                     "percents": [
                       "50"
@@ -7133,7 +7155,7 @@
               "bucketAggs": [
                 {
                   "field": "@timestamp",
-                  "id": "164",
+                  "id": "166",
                   "settings": {
                     "interval": "1h",
                     "min_doc_count": "0",
@@ -7146,7 +7168,7 @@
               "metrics": [
                 {
                   "field": "queued_seconds",
-                  "id": "163",
+                  "id": "165",
                   "type": "max"
                 }
               ],
@@ -7213,7 +7235,7 @@
               "bucketAggs": [
                 {
                   "field": "repo.keyword",
-                  "id": "166",
+                  "id": "168",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -7224,7 +7246,7 @@
                 },
                 {
                   "field": "@timestamp",
-                  "id": "167",
+                  "id": "169",
                   "settings": {
                     "interval": "1h",
                     "min_doc_count": "0",
@@ -7237,7 +7259,7 @@
               "metrics": [
                 {
                   "field": "live_bytes",
-                  "id": "165",
+                  "id": "167",
                   "type": "max"
                 }
               ],
@@ -7391,7 +7413,7 @@
               "bucketAggs": [
                 {
                   "field": "workflow.keyword",
-                  "id": "168",
+                  "id": "170",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -7402,7 +7424,7 @@
                 },
                 {
                   "field": "repo.keyword",
-                  "id": "169",
+                  "id": "171",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -7415,17 +7437,17 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "170",
+                  "id": "172",
                   "type": "count"
                 },
                 {
                   "field": "success",
-                  "id": "171",
+                  "id": "173",
                   "type": "avg"
                 },
                 {
                   "field": "duration_seconds",
-                  "id": "172",
+                  "id": "174",
                   "settings": {
                     "percents": [
                       "50"
@@ -7561,7 +7583,7 @@
               "bucketAggs": [
                 {
                   "field": "job_name.keyword",
-                  "id": "173",
+                  "id": "175",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -7572,7 +7594,7 @@
                 },
                 {
                   "field": "repo.keyword",
-                  "id": "174",
+                  "id": "176",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -7585,12 +7607,12 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "175",
+                  "id": "177",
                   "type": "count"
                 },
                 {
                   "field": "duration_seconds",
-                  "id": "176",
+                  "id": "178",
                   "settings": {
                     "percents": [
                       "50"
@@ -7600,7 +7622,7 @@
                 },
                 {
                   "field": "duration_seconds",
-                  "id": "177",
+                  "id": "179",
                   "type": "max"
                 }
               ],
@@ -7743,7 +7765,7 @@
               "bucketAggs": [
                 {
                   "field": "step.keyword",
-                  "id": "178",
+                  "id": "180",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -7754,7 +7776,7 @@
                 },
                 {
                   "field": "job_name.keyword",
-                  "id": "179",
+                  "id": "181",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -7765,7 +7787,7 @@
                 },
                 {
                   "field": "repo.keyword",
-                  "id": "180",
+                  "id": "182",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -7778,12 +7800,12 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "181",
+                  "id": "183",
                   "type": "count"
                 },
                 {
                   "field": "duration_seconds",
-                  "id": "182",
+                  "id": "184",
                   "settings": {
                     "percents": [
                       "50"
@@ -7793,7 +7815,7 @@
                 },
                 {
                   "field": "duration_seconds",
-                  "id": "183",
+                  "id": "185",
                   "type": "max"
                 }
               ],
@@ -7933,7 +7955,7 @@
               "bucketAggs": [
                 {
                   "field": "repo.keyword",
-                  "id": "184",
+                  "id": "186",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -7947,12 +7969,12 @@
               "metrics": [
                 {
                   "field": "duration_seconds",
-                  "id": "185",
+                  "id": "187",
                   "type": "sum"
                 },
                 {
                   "field": "success",
-                  "id": "186",
+                  "id": "188",
                   "type": "avg"
                 }
               ],
@@ -8096,7 +8118,7 @@
               "bucketAggs": [
                 {
                   "field": "repo.keyword",
-                  "id": "187",
+                  "id": "189",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -8107,7 +8129,7 @@
                 },
                 {
                   "field": "workflow.keyword",
-                  "id": "188",
+                  "id": "190",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -8120,12 +8142,12 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "189",
+                  "id": "191",
                   "type": "count"
                 },
                 {
                   "field": "success",
-                  "id": "190",
+                  "id": "192",
                   "type": "avg"
                 }
               ],
@@ -8250,7 +8272,7 @@
               "bucketAggs": [
                 {
                   "field": "step.keyword",
-                  "id": "191",
+                  "id": "193",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -8261,7 +8283,7 @@
                 },
                 {
                   "field": "repo.keyword",
-                  "id": "192",
+                  "id": "194",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -8274,7 +8296,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "193",
+                  "id": "195",
                   "type": "count"
                 }
               ],
@@ -8376,7 +8398,7 @@
               "bucketAggs": [
                 {
                   "field": "repo.keyword",
-                  "id": "195",
+                  "id": "197",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -8387,7 +8409,7 @@
                 },
                 {
                   "field": "@timestamp",
-                  "id": "196",
+                  "id": "198",
                   "settings": {
                     "interval": "1d",
                     "min_doc_count": "0",
@@ -8400,7 +8422,7 @@
               "metrics": [
                 {
                   "field": "size_bytes",
-                  "id": "194",
+                  "id": "196",
                   "type": "sum"
                 }
               ],
@@ -8511,7 +8533,7 @@
               "bucketAggs": [
                 {
                   "field": "repo.keyword",
-                  "id": "197",
+                  "id": "199",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -8524,7 +8546,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "198",
+                  "id": "200",
                   "settings": {
                     "metrics": [
                       "count",
@@ -8750,31 +8772,6 @@
               "bucketAggs": [
                 {
                   "field": "measurement.keyword",
-                  "id": "200",
-                  "settings": {
-                    "min_doc_count": "1",
-                    "order": "desc",
-                    "orderBy": "_count",
-                    "size": "1"
-                  },
-                  "type": "terms"
-                }
-              ],
-              "datasource": "${DS_ELASTICSEARCH}",
-              "metrics": [
-                {
-                  "id": "199",
-                  "type": "count"
-                }
-              ],
-              "query": "_index:ghchronicle-gh_commit AND repo.keyword:${repo:lucene}",
-              "refId": "A",
-              "timeField": "@timestamp"
-            },
-            {
-              "bucketAggs": [
-                {
-                  "field": "measurement.keyword",
                   "id": "202",
                   "settings": {
                     "min_doc_count": "1",
@@ -8788,13 +8785,12 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "field": "additions",
                   "id": "201",
-                  "type": "sum"
+                  "type": "count"
                 }
               ],
               "query": "_index:ghchronicle-gh_commit AND repo.keyword:${repo:lucene}",
-              "refId": "B",
+              "refId": "A",
               "timeField": "@timestamp"
             },
             {
@@ -8814,13 +8810,13 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "field": "deletions",
+                  "field": "additions",
                   "id": "203",
                   "type": "sum"
                 }
               ],
               "query": "_index:ghchronicle-gh_commit AND repo.keyword:${repo:lucene}",
-              "refId": "C",
+              "refId": "B",
               "timeField": "@timestamp"
             },
             {
@@ -8840,8 +8836,34 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "field": "signed",
+                  "field": "deletions",
                   "id": "205",
+                  "type": "sum"
+                }
+              ],
+              "query": "_index:ghchronicle-gh_commit AND repo.keyword:${repo:lucene}",
+              "refId": "C",
+              "timeField": "@timestamp"
+            },
+            {
+              "bucketAggs": [
+                {
+                  "field": "measurement.keyword",
+                  "id": "208",
+                  "settings": {
+                    "min_doc_count": "1",
+                    "order": "desc",
+                    "orderBy": "_count",
+                    "size": "1"
+                  },
+                  "type": "terms"
+                }
+              ],
+              "datasource": "${DS_ELASTICSEARCH}",
+              "metrics": [
+                {
+                  "field": "signed",
+                  "id": "207",
                   "type": "avg"
                 }
               ],
@@ -8952,32 +8974,6 @@
               "bucketAggs": [
                 {
                   "field": "@timestamp",
-                  "id": "208",
-                  "settings": {
-                    "interval": "1d",
-                    "min_doc_count": "0",
-                    "trimEdges": "0"
-                  },
-                  "type": "date_histogram"
-                }
-              ],
-              "datasource": "${DS_ELASTICSEARCH}",
-              "metrics": [
-                {
-                  "field": "additions",
-                  "id": "207",
-                  "type": "sum"
-                }
-              ],
-              "query": "_index:ghchronicle-gh_commit AND repo.keyword:${repo:lucene}",
-              "refId": "A",
-              "timeField": "@timestamp"
-            },
-            {
-              "alias": "removed",
-              "bucketAggs": [
-                {
-                  "field": "@timestamp",
                   "id": "210",
                   "settings": {
                     "interval": "1d",
@@ -8990,8 +8986,34 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "field": "deletions",
+                  "field": "additions",
                   "id": "209",
+                  "type": "sum"
+                }
+              ],
+              "query": "_index:ghchronicle-gh_commit AND repo.keyword:${repo:lucene}",
+              "refId": "A",
+              "timeField": "@timestamp"
+            },
+            {
+              "alias": "removed",
+              "bucketAggs": [
+                {
+                  "field": "@timestamp",
+                  "id": "212",
+                  "settings": {
+                    "interval": "1d",
+                    "min_doc_count": "0",
+                    "trimEdges": "0"
+                  },
+                  "type": "date_histogram"
+                }
+              ],
+              "datasource": "${DS_ELASTICSEARCH}",
+              "metrics": [
+                {
+                  "field": "deletions",
+                  "id": "211",
                   "type": "sum"
                 }
               ],
@@ -9060,7 +9082,7 @@
               "bucketAggs": [
                 {
                   "field": "activity.keyword",
-                  "id": "212",
+                  "id": "214",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -9071,7 +9093,7 @@
                 },
                 {
                   "field": "@timestamp",
-                  "id": "213",
+                  "id": "215",
                   "settings": {
                     "interval": "1h",
                     "min_doc_count": "0",
@@ -9084,7 +9106,7 @@
               "metrics": [
                 {
                   "field": "events",
-                  "id": "211",
+                  "id": "213",
                   "type": "sum"
                 }
               ],
@@ -9218,7 +9240,7 @@
               "bucketAggs": [
                 {
                   "field": "author.keyword",
-                  "id": "214",
+                  "id": "216",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -9231,22 +9253,22 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "215",
+                  "id": "217",
                   "type": "count"
                 },
                 {
                   "field": "additions",
-                  "id": "216",
+                  "id": "218",
                   "type": "sum"
                 },
                 {
                   "field": "deletions",
-                  "id": "217",
+                  "id": "219",
                   "type": "sum"
                 },
                 {
                   "field": "churn",
-                  "id": "218",
+                  "id": "220",
                   "settings": {
                     "percents": [
                       "50"
@@ -9327,7 +9349,7 @@
               "bucketAggs": [
                 {
                   "field": "signature.keyword",
-                  "id": "219",
+                  "id": "221",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -9340,7 +9362,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "220",
+                  "id": "222",
                   "type": "count"
                 }
               ],
@@ -9425,7 +9447,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "221",
+                  "id": "223",
                   "settings": {
                     "order": "desc",
                     "size": "25",
@@ -9615,7 +9637,7 @@
               "bucketAggs": [
                 {
                   "field": "gate.keyword",
-                  "id": "223",
+                  "id": "225",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -9626,7 +9648,7 @@
                 },
                 {
                   "field": "@timestamp",
-                  "id": "224",
+                  "id": "226",
                   "settings": {
                     "interval": "1d",
                     "min_doc_count": "0",
@@ -9638,7 +9660,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "222",
+                  "id": "224",
                   "type": "count"
                 }
               ],
@@ -9737,7 +9759,7 @@
               "bucketAggs": [
                 {
                   "field": "app.keyword",
-                  "id": "225",
+                  "id": "227",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -9748,7 +9770,7 @@
                 },
                 {
                   "field": "check.keyword",
-                  "id": "226",
+                  "id": "228",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -9761,12 +9783,12 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "227",
+                  "id": "229",
                   "type": "count"
                 },
                 {
                   "field": "failed",
-                  "id": "228",
+                  "id": "230",
                   "type": "sum"
                 }
               ],
@@ -9968,7 +9990,7 @@
               "bucketAggs": [
                 {
                   "field": "repo.keyword",
-                  "id": "229",
+                  "id": "231",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -9979,7 +10001,7 @@
                 },
                 {
                   "field": "label.keyword",
-                  "id": "230",
+                  "id": "232",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -9990,7 +10012,7 @@
                 },
                 {
                   "field": "url.keyword",
-                  "id": "231",
+                  "id": "233",
                   "settings": {
                     "min_doc_count": "1",
                     "missing": "",
@@ -10004,7 +10026,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "232",
+                  "id": "234",
                   "settings": {
                     "metrics": [
                       "used",
@@ -10194,7 +10216,7 @@
               "bucketAggs": [
                 {
                   "field": "repo.keyword",
-                  "id": "233",
+                  "id": "235",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -10205,7 +10227,7 @@
                 },
                 {
                   "field": "milestone.keyword",
-                  "id": "234",
+                  "id": "236",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -10216,7 +10238,7 @@
                 },
                 {
                   "field": "state.keyword",
-                  "id": "235",
+                  "id": "237",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -10227,7 +10249,7 @@
                 },
                 {
                   "field": "url.keyword",
-                  "id": "236",
+                  "id": "238",
                   "settings": {
                     "min_doc_count": "1",
                     "missing": "",
@@ -10241,7 +10263,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "237",
+                  "id": "239",
                   "settings": {
                     "metrics": [
                       "progress",
@@ -10336,7 +10358,7 @@
               "bucketAggs": [
                 {
                   "field": "repo.keyword",
-                  "id": "239",
+                  "id": "241",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -10347,7 +10369,7 @@
                 },
                 {
                   "field": "@timestamp",
-                  "id": "240",
+                  "id": "242",
                   "settings": {
                     "interval": "1d",
                     "min_doc_count": "0",
@@ -10359,7 +10381,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "238",
+                  "id": "240",
                   "type": "count"
                 }
               ],
@@ -10504,7 +10526,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "241",
+                  "id": "243",
                   "settings": {
                     "order": "desc",
                     "size": "25",
@@ -10663,7 +10685,7 @@
               "bucketAggs": [
                 {
                   "field": "category.keyword",
-                  "id": "242",
+                  "id": "244",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -10674,7 +10696,7 @@
                 },
                 {
                   "field": "has_answer",
-                  "id": "243",
+                  "id": "245",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -10687,17 +10709,17 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "244",
+                  "id": "246",
                   "type": "count"
                 },
                 {
                   "field": "comments",
-                  "id": "245",
+                  "id": "247",
                   "type": "avg"
                 },
                 {
                   "field": "upvotes",
-                  "id": "246",
+                  "id": "248",
                   "type": "avg"
                 }
               ],
@@ -10916,7 +10938,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "247",
+                  "id": "249",
                   "settings": {
                     "order": "desc",
                     "size": "50",
@@ -11024,7 +11046,7 @@
               "bucketAggs": [
                 {
                   "field": "event.keyword",
-                  "id": "249",
+                  "id": "251",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -11035,7 +11057,7 @@
                 },
                 {
                   "field": "@timestamp",
-                  "id": "250",
+                  "id": "252",
                   "settings": {
                     "interval": "1d",
                     "min_doc_count": "0",
@@ -11047,7 +11069,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "248",
+                  "id": "250",
                   "type": "count"
                 }
               ],
@@ -11145,7 +11167,7 @@
               "bucketAggs": [
                 {
                   "field": "full_name.keyword",
-                  "id": "251",
+                  "id": "253",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -11158,7 +11180,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "252",
+                  "id": "254",
                   "type": "count"
                 }
               ],
@@ -11269,7 +11291,7 @@
               "bucketAggs": [
                 {
                   "field": "full_name.keyword",
-                  "id": "253",
+                  "id": "255",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -11280,7 +11302,7 @@
                 },
                 {
                   "field": "comment.keyword",
-                  "id": "254",
+                  "id": "256",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -11294,12 +11316,12 @@
               "metrics": [
                 {
                   "field": "answers",
-                  "id": "255",
+                  "id": "257",
                   "type": "max"
                 },
                 {
                   "field": "upvotes",
-                  "id": "256",
+                  "id": "258",
                   "type": "max"
                 }
               ],
@@ -11516,7 +11538,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "257",
+                  "id": "259",
                   "settings": {
                     "order": "desc",
                     "size": "100",
@@ -11702,31 +11724,6 @@
               "bucketAggs": [
                 {
                   "field": "@timestamp",
-                  "id": "259",
-                  "settings": {
-                    "interval": "1d",
-                    "min_doc_count": "0",
-                    "trimEdges": "0"
-                  },
-                  "type": "date_histogram"
-                }
-              ],
-              "datasource": "${DS_ELASTICSEARCH}",
-              "hide": true,
-              "metrics": [
-                {
-                  "id": "258",
-                  "type": "count"
-                }
-              ],
-              "query": "_index:ghchronicle-gh_webhook_delivery AND ok:false AND repo.keyword:${repo:lucene}",
-              "refId": "A",
-              "timeField": "@timestamp"
-            },
-            {
-              "bucketAggs": [
-                {
-                  "field": "@timestamp",
                   "id": "261",
                   "settings": {
                     "interval": "1d",
@@ -11741,6 +11738,31 @@
               "metrics": [
                 {
                   "id": "260",
+                  "type": "count"
+                }
+              ],
+              "query": "_index:ghchronicle-gh_webhook_delivery AND ok:false AND repo.keyword:${repo:lucene}",
+              "refId": "A",
+              "timeField": "@timestamp"
+            },
+            {
+              "bucketAggs": [
+                {
+                  "field": "@timestamp",
+                  "id": "263",
+                  "settings": {
+                    "interval": "1d",
+                    "min_doc_count": "0",
+                    "trimEdges": "0"
+                  },
+                  "type": "date_histogram"
+                }
+              ],
+              "datasource": "${DS_ELASTICSEARCH}",
+              "hide": true,
+              "metrics": [
+                {
+                  "id": "262",
                   "type": "count"
                 }
               ],
@@ -11845,7 +11867,7 @@
               "bucketAggs": [
                 {
                   "field": "code.keyword",
-                  "id": "263",
+                  "id": "265",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -11856,7 +11878,7 @@
                 },
                 {
                   "field": "@timestamp",
-                  "id": "264",
+                  "id": "266",
                   "settings": {
                     "interval": "1h",
                     "min_doc_count": "0",
@@ -11868,7 +11890,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "262",
+                  "id": "264",
                   "type": "count"
                 }
               ],
@@ -12018,7 +12040,7 @@
               "bucketAggs": [
                 {
                   "field": "host.keyword",
-                  "id": "265",
+                  "id": "267",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -12029,7 +12051,7 @@
                 },
                 {
                   "field": "repo.keyword",
-                  "id": "266",
+                  "id": "268",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -12040,7 +12062,7 @@
                 },
                 {
                   "field": "ok.keyword",
-                  "id": "267",
+                  "id": "269",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -12053,12 +12075,12 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "268",
+                  "id": "270",
                   "type": "count"
                 },
                 {
                   "field": "duration_seconds",
-                  "id": "269",
+                  "id": "271",
                   "settings": {
                     "percents": [
                       "50"
@@ -12203,7 +12225,7 @@
               "bucketAggs": [
                 {
                   "field": "repo.keyword",
-                  "id": "270",
+                  "id": "272",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -12214,7 +12236,7 @@
                 },
                 {
                   "field": "ruleset.keyword",
-                  "id": "271",
+                  "id": "273",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -12225,7 +12247,7 @@
                 },
                 {
                   "field": "enforcement.keyword",
-                  "id": "272",
+                  "id": "274",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -12236,7 +12258,7 @@
                 },
                 {
                   "field": "target.keyword",
-                  "id": "273",
+                  "id": "275",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -12247,7 +12269,7 @@
                 },
                 {
                   "field": "url.keyword",
-                  "id": "274",
+                  "id": "276",
                   "settings": {
                     "min_doc_count": "1",
                     "missing": "",
@@ -12261,7 +12283,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "275",
+                  "id": "277",
                   "settings": {
                     "metrics": [
                       "days_since_change"
@@ -12299,7 +12321,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "A write key nobody has used in a year is a credential to remove. Elasticsearch answers with the largest number of days inside the range rather than with the newest reading. A key GitHub has never seen used has no reading at all, in this dashboard or any of the others, and its cell is empty.",
+          "description": "A write key nobody has used in a year is a credential to remove. A key GitHub has never seen used has no reading at all, in this dashboard or any of the others, and its cell is empty.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -12372,7 +12394,7 @@
               "bucketAggs": [
                 {
                   "field": "repo.keyword",
-                  "id": "276",
+                  "id": "278",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -12383,7 +12405,7 @@
                 },
                 {
                   "field": "key.keyword",
-                  "id": "277",
+                  "id": "279",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -12393,8 +12415,19 @@
                   "type": "terms"
                 },
                 {
+                  "field": "@timestamp",
+                  "id": "280",
+                  "settings": {
+                    "min_doc_count": "1",
+                    "order": "desc",
+                    "orderBy": "_key",
+                    "size": "1"
+                  },
+                  "type": "terms"
+                },
+                {
                   "field": "read_only.keyword",
-                  "id": "278",
+                  "id": "281",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -12408,7 +12441,7 @@
               "metrics": [
                 {
                   "field": "days_since_use",
-                  "id": "279",
+                  "id": "282",
                   "type": "max"
                 }
               ],
@@ -12430,6 +12463,16 @@
                   "read_only.keyword": "Read only",
                   "repo.keyword": "Repository"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "@timestamp": true
+                },
+                "indexByName": {},
+                "renameByName": {}
               }
             }
           ],
@@ -12534,7 +12577,7 @@
               "bucketAggs": [
                 {
                   "field": "repo.keyword",
-                  "id": "280",
+                  "id": "283",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -12545,7 +12588,7 @@
                 },
                 {
                   "field": "host.keyword",
-                  "id": "281",
+                  "id": "284",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -12556,7 +12599,7 @@
                 },
                 {
                   "field": "active.keyword",
-                  "id": "282",
+                  "id": "285",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -12569,7 +12612,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "283",
+                  "id": "286",
                   "settings": {
                     "metrics": [
                       "events"
@@ -12708,7 +12751,7 @@
               "bucketAggs": [
                 {
                   "field": "repo.keyword",
-                  "id": "284",
+                  "id": "287",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -12719,7 +12762,7 @@
                 },
                 {
                   "field": "environment.keyword",
-                  "id": "285",
+                  "id": "288",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -12730,7 +12773,7 @@
                 },
                 {
                   "field": "url.keyword",
-                  "id": "286",
+                  "id": "289",
                   "settings": {
                     "min_doc_count": "1",
                     "missing": "",
@@ -12744,7 +12787,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "287",
+                  "id": "290",
                   "settings": {
                     "metrics": [
                       "days_since_change"
@@ -12780,7 +12823,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "Nothing else answers which branches were abandoned: GitHub's own branch list is ordered by name and keeps no history. The refs come back unordered and capped at a hundred per repository, so `gh_repo_total.branches` is the true count and is what makes the truncation visible. The account's own live repositories only: a branch of a fork is the upstream project's history and not the account's, and a branch of an archived repository can be neither pushed to nor deleted. Of the 1,208 branches in the picker when this was measured, 1,083 were a fork's and those are the rows this leaves out. Elasticsearch answers with the largest number of days inside the range rather than with the newest reading. A branch whose ref points at something that is not a commit has no age at all, in this dashboard or any of the others, and its cell is empty. Only gh_repo carries the fork and archived flags and this store cannot join one measurement to another, so the rows the SQL dashboards leave out are listed here.",
+          "description": "Nothing else answers which branches were abandoned: GitHub's own branch list is ordered by name and keeps no history. The refs come back unordered and capped at a hundred per repository, so `gh_repo_total.branches` is the true count and is what makes the truncation visible. The account's own live repositories only: a branch of a fork is the upstream project's history and not the account's, and a branch of an archived repository can be neither pushed to nor deleted. Of the 1,208 branches in the picker when this was measured, 1,083 were a fork's and those are the rows this leaves out. A branch whose ref points at something that is not a commit has no age at all, in this dashboard or any of the others, and its cell is empty. Only gh_repo carries the fork and archived flags and this store cannot join one measurement to another, so the rows the SQL dashboards leave out are listed here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -12877,7 +12920,7 @@
               "bucketAggs": [
                 {
                   "field": "repo.keyword",
-                  "id": "288",
+                  "id": "291",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -12888,7 +12931,7 @@
                 },
                 {
                   "field": "branch.keyword",
-                  "id": "289",
+                  "id": "292",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -12898,8 +12941,19 @@
                   "type": "terms"
                 },
                 {
+                  "field": "@timestamp",
+                  "id": "293",
+                  "settings": {
+                    "min_doc_count": "1",
+                    "order": "desc",
+                    "orderBy": "_key",
+                    "size": "1"
+                  },
+                  "type": "terms"
+                },
+                {
                   "field": "is_default.keyword",
-                  "id": "290",
+                  "id": "294",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -12913,7 +12967,7 @@
               "metrics": [
                 {
                   "field": "days_since_commit",
-                  "id": "291",
+                  "id": "295",
                   "type": "max"
                 }
               ],
@@ -12936,13 +12990,23 @@
                   "repo.keyword": "Repository"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "@timestamp": true
+                },
+                "indexByName": {},
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "What each branch protection enforces. `gh_repo_policy.branch_protection_rules` counts these and stops there, so a protection that is switched on and asks for nothing looks the same as one that blocks force pushes and demands three checks. Reviews is the number of required approvals, Threads whether every conversation must be resolved, and Checks how many status checks are required. Reviews is left empty rather than filled with a zero where GitHub reports no count at all, which is a different state from asking for none. In Elasticsearch all six columns are the largest value inside the range rather than the newest reading, because a top_metrics over a boolean panics the plugin: a protection switched off inside the range still reads as on until the range has moved past the day it was on.",
+          "description": "What each branch protection enforces. `gh_repo_policy.branch_protection_rules` counts these and stops there, so a protection that is switched on and asks for nothing looks the same as one that blocks force pushes and demands three checks. Reviews is the number of required approvals, Threads whether every conversation must be resolved, and Checks how many status checks are required. Reviews is left empty rather than filled with a zero where GitHub reports no count at all, which is a different state from asking for none.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -13230,7 +13294,7 @@
               "bucketAggs": [
                 {
                   "field": "repo.keyword",
-                  "id": "292",
+                  "id": "296",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -13241,7 +13305,7 @@
                 },
                 {
                   "field": "pattern.keyword",
-                  "id": "293",
+                  "id": "297",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -13251,8 +13315,19 @@
                   "type": "terms"
                 },
                 {
+                  "field": "@timestamp",
+                  "id": "298",
+                  "settings": {
+                    "min_doc_count": "1",
+                    "order": "desc",
+                    "orderBy": "_key",
+                    "size": "1"
+                  },
+                  "type": "terms"
+                },
+                {
                   "field": "url.keyword",
-                  "id": "294",
+                  "id": "299",
                   "settings": {
                     "min_doc_count": "1",
                     "missing": "",
@@ -13267,32 +13342,32 @@
               "metrics": [
                 {
                   "field": "required_reviews",
-                  "id": "295",
+                  "id": "300",
                   "type": "max"
                 },
                 {
                   "field": "requires_commit_signatures",
-                  "id": "296",
+                  "id": "301",
                   "type": "max"
                 },
                 {
                   "field": "requires_linear_history",
-                  "id": "297",
+                  "id": "302",
                   "type": "max"
                 },
                 {
                   "field": "allows_force_pushes",
-                  "id": "298",
+                  "id": "303",
                   "type": "max"
                 },
                 {
                   "field": "requires_conversation_resolution",
-                  "id": "299",
+                  "id": "304",
                   "type": "max"
                 },
                 {
                   "field": "required_checks",
-                  "id": "300",
+                  "id": "305",
                   "type": "max"
                 }
               ],
@@ -13320,13 +13395,23 @@
                   "url.keyword": "Link"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "@timestamp": true
+                },
+                "indexByName": {},
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "Ruleset rules, and who may walk past them. The Rulesets panel above says a ruleset exists and is enforced. This says what it does and who it does not apply to: a ruleset reported ACTIVE with every actor on ALWAYS protects nobody, and neither that panel nor branch protection would ever say so. Always is counted over a page of five while Bypass actors is the exact total, so Sampled says how many were really read, and the comparison is sound only while the three agree. In Elasticsearch the three bypass numbers are the largest inside the range rather than the newest reading, so they still agree with each other.",
+          "description": "Ruleset rules, and who may walk past them. The Rulesets panel above says a ruleset exists and is enforced. This says what it does and who it does not apply to: a ruleset reported ACTIVE with every actor on ALWAYS protects nobody, and neither that panel nor branch protection would ever say so. Always is counted over a page of five while Bypass actors is the exact total, so Sampled says how many were really read, and the comparison is sound only while the three agree.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -13431,7 +13516,7 @@
               "bucketAggs": [
                 {
                   "field": "repo.keyword",
-                  "id": "301",
+                  "id": "306",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -13442,7 +13527,7 @@
                 },
                 {
                   "field": "ruleset.keyword",
-                  "id": "302",
+                  "id": "307",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -13453,12 +13538,23 @@
                 },
                 {
                   "field": "rule.keyword",
-                  "id": "303",
+                  "id": "308",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
                     "orderBy": "_count",
                     "size": "100"
+                  },
+                  "type": "terms"
+                },
+                {
+                  "field": "@timestamp",
+                  "id": "309",
+                  "settings": {
+                    "min_doc_count": "1",
+                    "order": "desc",
+                    "orderBy": "_key",
+                    "size": "1"
                   },
                   "type": "terms"
                 }
@@ -13467,17 +13563,17 @@
               "metrics": [
                 {
                   "field": "bypass_actors",
-                  "id": "304",
+                  "id": "310",
                   "type": "max"
                 },
                 {
                   "field": "bypass_always",
-                  "id": "305",
+                  "id": "311",
                   "type": "max"
                 },
                 {
                   "field": "bypass_sampled",
-                  "id": "306",
+                  "id": "312",
                   "type": "max"
                 }
               ],
@@ -13501,6 +13597,16 @@
                   "rule.keyword": "Rule",
                   "ruleset.keyword": "Ruleset"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "@timestamp": true
+                },
+                "indexByName": {},
+                "renameByName": {}
               }
             }
           ],
@@ -13619,7 +13725,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "307",
+                  "id": "313",
                   "settings": {
                     "order": "desc",
                     "size": "200",
@@ -13724,7 +13830,7 @@
               "bucketAggs": [
                 {
                   "field": "environment.keyword",
-                  "id": "309",
+                  "id": "315",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -13735,7 +13841,7 @@
                 },
                 {
                   "field": "@timestamp",
-                  "id": "310",
+                  "id": "316",
                   "settings": {
                     "interval": "1d",
                     "min_doc_count": "0",
@@ -13747,7 +13853,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "308",
+                  "id": "314",
                   "type": "count"
                 }
               ],
@@ -13984,7 +14090,7 @@
               "bucketAggs": [
                 {
                   "field": "repo.keyword",
-                  "id": "311",
+                  "id": "317",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -13995,7 +14101,7 @@
                 },
                 {
                   "field": "environment.keyword",
-                  "id": "312",
+                  "id": "318",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -14006,7 +14112,7 @@
                 },
                 {
                   "field": "outcome.keyword",
-                  "id": "313",
+                  "id": "319",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -14017,7 +14123,7 @@
                 },
                 {
                   "field": "url.keyword",
-                  "id": "314",
+                  "id": "320",
                   "settings": {
                     "min_doc_count": "1",
                     "missing": "",
@@ -14029,7 +14135,7 @@
                 },
                 {
                   "field": "environment_url.keyword",
-                  "id": "315",
+                  "id": "321",
                   "settings": {
                     "min_doc_count": "1",
                     "missing": "",
@@ -14043,12 +14149,12 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "316",
+                  "id": "322",
                   "type": "count"
                 },
                 {
                   "field": "seconds_to_status",
-                  "id": "317",
+                  "id": "323",
                   "settings": {
                     "percents": [
                       "50"
@@ -14058,7 +14164,7 @@
                 },
                 {
                   "field": "seconds_live",
-                  "id": "318",
+                  "id": "324",
                   "settings": {
                     "percents": [
                       "50"
@@ -14182,7 +14288,7 @@
               "bucketAggs": [
                 {
                   "field": "repo.keyword",
-                  "id": "320",
+                  "id": "326",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -14193,7 +14299,7 @@
                 },
                 {
                   "field": "tag.keyword",
-                  "id": "321",
+                  "id": "327",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -14206,7 +14312,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "319",
+                  "id": "325",
                   "settings": {
                     "metrics": [
                       "downloads"
@@ -14225,7 +14331,7 @@
               "bucketAggs": [
                 {
                   "field": "measurement.keyword",
-                  "id": "323",
+                  "id": "329",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -14239,7 +14345,7 @@
               "metrics": [
                 {
                   "field": "tag.keyword",
-                  "id": "322",
+                  "id": "328",
                   "type": "cardinality"
                 }
               ],
@@ -14333,7 +14439,7 @@
               "bucketAggs": [
                 {
                   "field": "tag.keyword",
-                  "id": "324",
+                  "id": "330",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -14344,7 +14450,7 @@
                 },
                 {
                   "field": "repo.keyword",
-                  "id": "325",
+                  "id": "331",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -14355,7 +14461,7 @@
                 },
                 {
                   "field": "url.keyword",
-                  "id": "326",
+                  "id": "332",
                   "settings": {
                     "min_doc_count": "1",
                     "missing": "",
@@ -14369,7 +14475,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "327",
+                  "id": "333",
                   "settings": {
                     "metrics": [
                       "downloads"
@@ -14558,7 +14664,7 @@
               "bucketAggs": [
                 {
                   "field": "repo.keyword",
-                  "id": "328",
+                  "id": "334",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -14569,7 +14675,7 @@
                 },
                 {
                   "field": "tag.keyword",
-                  "id": "329",
+                  "id": "335",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -14580,7 +14686,7 @@
                 },
                 {
                   "field": "asset.keyword",
-                  "id": "330",
+                  "id": "336",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -14591,7 +14697,7 @@
                 },
                 {
                   "field": "url.keyword",
-                  "id": "331",
+                  "id": "337",
                   "settings": {
                     "min_doc_count": "1",
                     "missing": "",
@@ -14605,7 +14711,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "332",
+                  "id": "338",
                   "settings": {
                     "metrics": [
                       "downloads",
@@ -14827,7 +14933,7 @@
               "bucketAggs": [
                 {
                   "field": "repo.keyword",
-                  "id": "334",
+                  "id": "340",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -14838,7 +14944,7 @@
                 },
                 {
                   "field": "severity.keyword",
-                  "id": "335",
+                  "id": "341",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -14849,7 +14955,7 @@
                 },
                 {
                   "field": "ecosystem.keyword",
-                  "id": "336",
+                  "id": "342",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -14862,7 +14968,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "333",
+                  "id": "339",
                   "settings": {
                     "metrics": [
                       "open"
@@ -14881,7 +14987,7 @@
               "bucketAggs": [
                 {
                   "field": "repo.keyword",
-                  "id": "338",
+                  "id": "344",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -14892,7 +14998,7 @@
                 },
                 {
                   "field": "severity.keyword",
-                  "id": "339",
+                  "id": "345",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -14903,7 +15009,7 @@
                 },
                 {
                   "field": "tool.keyword",
-                  "id": "340",
+                  "id": "346",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -14916,7 +15022,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "337",
+                  "id": "343",
                   "settings": {
                     "metrics": [
                       "open"
@@ -14982,7 +15088,7 @@
               "bucketAggs": [
                 {
                   "field": "severity.keyword",
-                  "id": "341",
+                  "id": "347",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -14993,7 +15099,7 @@
                 },
                 {
                   "field": "repo.keyword",
-                  "id": "342",
+                  "id": "348",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -15004,7 +15110,7 @@
                 },
                 {
                   "field": "ecosystem.keyword",
-                  "id": "343",
+                  "id": "349",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -15017,7 +15123,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "344",
+                  "id": "350",
                   "settings": {
                     "metrics": [
                       "open"
@@ -15124,7 +15230,7 @@
               "bucketAggs": [
                 {
                   "field": "ecosystem.keyword",
-                  "id": "345",
+                  "id": "351",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -15135,7 +15241,7 @@
                 },
                 {
                   "field": "repo.keyword",
-                  "id": "346",
+                  "id": "352",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -15146,7 +15252,7 @@
                 },
                 {
                   "field": "severity.keyword",
-                  "id": "347",
+                  "id": "353",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -15159,7 +15265,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "348",
+                  "id": "354",
                   "settings": {
                     "metrics": [
                       "open"
@@ -15336,7 +15442,7 @@
               "bucketAggs": [
                 {
                   "field": "severity.keyword",
-                  "id": "350",
+                  "id": "356",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -15347,7 +15453,7 @@
                 },
                 {
                   "field": "@timestamp",
-                  "id": "351",
+                  "id": "357",
                   "settings": {
                     "interval": "1d",
                     "min_doc_count": "0",
@@ -15360,7 +15466,7 @@
               "metrics": [
                 {
                   "field": "open",
-                  "id": "349",
+                  "id": "355",
                   "type": "max"
                 }
               ],
@@ -15504,7 +15610,7 @@
               "bucketAggs": [
                 {
                   "field": "full_name.keyword",
-                  "id": "352",
+                  "id": "358",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -15515,7 +15621,7 @@
                 },
                 {
                   "field": "repo.keyword",
-                  "id": "353",
+                  "id": "359",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -15526,7 +15632,7 @@
                 },
                 {
                   "field": "feature.keyword",
-                  "id": "354",
+                  "id": "360",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -15537,7 +15643,7 @@
                 },
                 {
                   "field": "@timestamp",
-                  "id": "355",
+                  "id": "361",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -15548,7 +15654,7 @@
                 },
                 {
                   "field": "enabled",
-                  "id": "356",
+                  "id": "362",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -15559,7 +15665,7 @@
                 },
                 {
                   "field": "url.keyword",
-                  "id": "357",
+                  "id": "363",
                   "settings": {
                     "min_doc_count": "1",
                     "missing": "",
@@ -15574,7 +15680,7 @@
               "metrics": [
                 {
                   "field": "open_alerts",
-                  "id": "358",
+                  "id": "364",
                   "type": "max"
                 }
               ],
@@ -15669,7 +15775,7 @@
               "bucketAggs": [
                 {
                   "field": "tool.keyword",
-                  "id": "360",
+                  "id": "366",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -15680,7 +15786,7 @@
                 },
                 {
                   "field": "@timestamp",
-                  "id": "361",
+                  "id": "367",
                   "settings": {
                     "interval": "1d",
                     "min_doc_count": "0",
@@ -15692,7 +15798,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "359",
+                  "id": "365",
                   "type": "count"
                 }
               ],
@@ -15806,7 +15912,7 @@
               "bucketAggs": [
                 {
                   "field": "severity.keyword",
-                  "id": "362",
+                  "id": "368",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -15819,12 +15925,12 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "363",
+                  "id": "369",
                   "type": "count"
                 },
                 {
                   "field": "seconds_to_resolve",
-                  "id": "364",
+                  "id": "370",
                   "settings": {
                     "percents": [
                       "50"
@@ -16025,7 +16131,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "365",
+                  "id": "371",
                   "settings": {
                     "order": "desc",
                     "size": "25",
@@ -16196,7 +16302,7 @@
               "bucketAggs": [
                 {
                   "field": "tool.keyword",
-                  "id": "366",
+                  "id": "372",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -16207,7 +16313,7 @@
                 },
                 {
                   "field": "repo.keyword",
-                  "id": "367",
+                  "id": "373",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -16220,17 +16326,17 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "368",
+                  "id": "374",
                   "type": "count"
                 },
                 {
                   "field": "results",
-                  "id": "369",
+                  "id": "375",
                   "type": "sum"
                 },
                 {
                   "field": "rules",
-                  "id": "370",
+                  "id": "376",
                   "type": "max"
                 }
               ],
@@ -16410,7 +16516,7 @@
               "bucketAggs": [
                 {
                   "field": "repo.keyword",
-                  "id": "371",
+                  "id": "377",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -16421,7 +16527,7 @@
                 },
                 {
                   "field": "number.keyword",
-                  "id": "372",
+                  "id": "378",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -16432,7 +16538,7 @@
                 },
                 {
                   "field": "severity.keyword",
-                  "id": "373",
+                  "id": "379",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -16443,7 +16549,7 @@
                 },
                 {
                   "field": "package.keyword",
-                  "id": "374",
+                  "id": "380",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -16454,7 +16560,7 @@
                 },
                 {
                   "field": "url.keyword",
-                  "id": "375",
+                  "id": "381",
                   "settings": {
                     "min_doc_count": "1",
                     "missing": "",
@@ -16469,7 +16575,7 @@
               "metrics": [
                 {
                   "field": "@timestamp",
-                  "id": "376",
+                  "id": "382",
                   "type": "min"
                 }
               ],
@@ -16500,7 +16606,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "What the repository itself says about the five security_and_analysis keys, which have three states and not two: `unavailable` is GitHub omitting the whole block on a private repository, and that is not `disabled`. Read it against the Security features panel above, where one is the repository's own setting and the other is whether the listing answered at all: a row where the two disagree is the row worth reading. In Elasticsearch this is the largest reading inside the range rather than the newest, because reading a boolean as the newest document's own value hands the panel back the string `true` and the plugin fails on it.",
+          "description": "What the repository itself says about the five security_and_analysis keys, which have three states and not two: `unavailable` is GitHub omitting the whole block on a private repository, and that is not `disabled`. Read it against the Security features panel above, where one is the repository's own setting and the other is whether the listing answered at all: a row where the two disagree is the row worth reading.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -16633,7 +16739,7 @@
               "bucketAggs": [
                 {
                   "field": "repo.keyword",
-                  "id": "377",
+                  "id": "383",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -16644,7 +16750,7 @@
                 },
                 {
                   "field": "setting.keyword",
-                  "id": "378",
+                  "id": "384",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -16654,8 +16760,19 @@
                   "type": "terms"
                 },
                 {
+                  "field": "@timestamp",
+                  "id": "385",
+                  "settings": {
+                    "min_doc_count": "1",
+                    "order": "desc",
+                    "orderBy": "_key",
+                    "size": "1"
+                  },
+                  "type": "terms"
+                },
+                {
                   "field": "status.keyword",
-                  "id": "379",
+                  "id": "386",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -16669,7 +16786,7 @@
               "metrics": [
                 {
                   "field": "enabled",
-                  "id": "380",
+                  "id": "387",
                   "type": "max"
                 }
               ],
@@ -16692,13 +16809,23 @@
                   "status.keyword": "Status"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "@timestamp": true
+                },
+                "indexByName": {},
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "GitHub's own default setup, and nothing else. A repository can answer not-configured here and still run CodeQL from a workflow it wrote itself, which the Code scanning runs panel above sees and this one does not. In not-configured, `languages` is what GitHub detected in the repository, not what anything analyzed. In Elasticsearch both numbers are the largest reading inside the range rather than the newest. A setup with no change date has no reading at all, and its cell is empty.",
+          "description": "GitHub's own default setup, and nothing else. A repository can answer not-configured here and still run CodeQL from a workflow it wrote itself, which the Code scanning runs panel above sees and this one does not. In not-configured, `languages` is what GitHub detected in the repository, not what anything analyzed.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -16802,7 +16929,7 @@
               "bucketAggs": [
                 {
                   "field": "repo.keyword",
-                  "id": "381",
+                  "id": "388",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -16812,8 +16939,19 @@
                   "type": "terms"
                 },
                 {
+                  "field": "@timestamp",
+                  "id": "389",
+                  "settings": {
+                    "min_doc_count": "1",
+                    "order": "desc",
+                    "orderBy": "_key",
+                    "size": "1"
+                  },
+                  "type": "terms"
+                },
+                {
                   "field": "state.keyword",
-                  "id": "382",
+                  "id": "390",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -16824,7 +16962,7 @@
                 },
                 {
                   "field": "query_suite.keyword",
-                  "id": "383",
+                  "id": "391",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -16835,7 +16973,7 @@
                 },
                 {
                   "field": "schedule.keyword",
-                  "id": "384",
+                  "id": "392",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -16849,12 +16987,12 @@
               "metrics": [
                 {
                   "field": "languages",
-                  "id": "385",
+                  "id": "393",
                   "type": "max"
                 },
                 {
                   "field": "days_since_change",
-                  "id": "386",
+                  "id": "394",
                   "type": "max"
                 }
               ],
@@ -16879,13 +17017,23 @@
                   "state.keyword": "State"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "@timestamp": true
+                },
+                "indexByName": {},
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "The default permissions of GITHUB_TOKEN, which is what a compromised action inherits. `write` beside can-approve-pull-requests on is the supply-chain row: that workflow can push a change and approve it. `read` means a workflow cannot push at all. In Elasticsearch this is the largest reading inside the range rather than the newest, because reading a boolean as the newest document's own value hands the panel back the string `true` and the plugin fails on it.",
+          "description": "The default permissions of GITHUB_TOKEN, which is what a compromised action inherits. `write` beside can-approve-pull-requests on is the supply-chain row: that workflow can push a change and approve it. `read` means a workflow cannot push at all.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -16985,7 +17133,7 @@
               "bucketAggs": [
                 {
                   "field": "repo.keyword",
-                  "id": "387",
+                  "id": "395",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -16995,8 +17143,19 @@
                   "type": "terms"
                 },
                 {
+                  "field": "@timestamp",
+                  "id": "396",
+                  "settings": {
+                    "min_doc_count": "1",
+                    "order": "desc",
+                    "orderBy": "_key",
+                    "size": "1"
+                  },
+                  "type": "terms"
+                },
+                {
                   "field": "permissions.keyword",
-                  "id": "388",
+                  "id": "397",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -17010,7 +17169,7 @@
               "metrics": [
                 {
                   "field": "can_approve_pr",
-                  "id": "389",
+                  "id": "398",
                   "type": "max"
                 }
               ],
@@ -17031,6 +17190,16 @@
                   "permissions.keyword": "Permissions",
                   "repo.keyword": "Repository"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "@timestamp": true
+                },
+                "indexByName": {},
+                "renameByName": {}
               }
             }
           ],
@@ -17139,7 +17308,7 @@
               "bucketAggs": [
                 {
                   "field": "repo.keyword",
-                  "id": "390",
+                  "id": "399",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -17150,7 +17319,7 @@
                 },
                 {
                   "field": "kind.keyword",
-                  "id": "391",
+                  "id": "400",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -17161,7 +17330,7 @@
                 },
                 {
                   "field": "secret.keyword",
-                  "id": "392",
+                  "id": "401",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -17174,7 +17343,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "393",
+                  "id": "402",
                   "settings": {
                     "metrics": [
                       "age_days",
@@ -17334,7 +17503,7 @@
               "bucketAggs": [
                 {
                   "field": "measurement.keyword",
-                  "id": "395",
+                  "id": "404",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -17348,7 +17517,7 @@
               "metrics": [
                 {
                   "field": "gross",
-                  "id": "394",
+                  "id": "403",
                   "type": "sum"
                 }
               ],
@@ -17360,7 +17529,7 @@
               "bucketAggs": [
                 {
                   "field": "measurement.keyword",
-                  "id": "397",
+                  "id": "406",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -17374,7 +17543,7 @@
               "metrics": [
                 {
                   "field": "discount",
-                  "id": "396",
+                  "id": "405",
                   "type": "sum"
                 }
               ],
@@ -17386,7 +17555,7 @@
               "bucketAggs": [
                 {
                   "field": "measurement.keyword",
-                  "id": "399",
+                  "id": "408",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -17400,7 +17569,7 @@
               "metrics": [
                 {
                   "field": "net",
-                  "id": "398",
+                  "id": "407",
                   "type": "sum"
                 }
               ],
@@ -17412,7 +17581,7 @@
               "bucketAggs": [
                 {
                   "field": "measurement.keyword",
-                  "id": "401",
+                  "id": "410",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -17426,7 +17595,7 @@
               "metrics": [
                 {
                   "field": "quantity",
-                  "id": "400",
+                  "id": "409",
                   "type": "sum"
                 }
               ],
@@ -17493,7 +17662,7 @@
               "bucketAggs": [
                 {
                   "field": "product.keyword",
-                  "id": "403",
+                  "id": "412",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -17504,7 +17673,7 @@
                 },
                 {
                   "field": "@timestamp",
-                  "id": "404",
+                  "id": "413",
                   "settings": {
                     "interval": "1d",
                     "min_doc_count": "0",
@@ -17517,7 +17686,7 @@
               "metrics": [
                 {
                   "field": "gross",
-                  "id": "402",
+                  "id": "411",
                   "type": "sum"
                 }
               ],
@@ -17585,7 +17754,7 @@
               "bucketAggs": [
                 {
                   "field": "sku.keyword",
-                  "id": "406",
+                  "id": "415",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -17596,7 +17765,7 @@
                 },
                 {
                   "field": "@timestamp",
-                  "id": "407",
+                  "id": "416",
                   "settings": {
                     "interval": "1d",
                     "min_doc_count": "0",
@@ -17609,7 +17778,7 @@
               "metrics": [
                 {
                   "field": "quantity",
-                  "id": "405",
+                  "id": "414",
                   "type": "sum"
                 }
               ],
@@ -17786,7 +17955,7 @@
               "bucketAggs": [
                 {
                   "field": "repo.keyword",
-                  "id": "408",
+                  "id": "417",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -17797,7 +17966,7 @@
                 },
                 {
                   "field": "sku.keyword",
-                  "id": "409",
+                  "id": "418",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -17808,7 +17977,7 @@
                 },
                 {
                   "field": "unit.keyword",
-                  "id": "410",
+                  "id": "419",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -17822,22 +17991,22 @@
               "metrics": [
                 {
                   "field": "quantity",
-                  "id": "411",
+                  "id": "420",
                   "type": "sum"
                 },
                 {
                   "field": "price_per_unit",
-                  "id": "412",
+                  "id": "421",
                   "type": "max"
                 },
                 {
                   "field": "gross",
-                  "id": "413",
+                  "id": "422",
                   "type": "sum"
                 },
                 {
                   "field": "net",
-                  "id": "414",
+                  "id": "423",
                   "type": "sum"
                 }
               ],
@@ -17969,7 +18138,7 @@
               "bucketAggs": [
                 {
                   "field": "repo.keyword",
-                  "id": "415",
+                  "id": "424",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -17980,7 +18149,7 @@
                 },
                 {
                   "field": "@timestamp",
-                  "id": "416",
+                  "id": "425",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -17991,7 +18160,7 @@
                 },
                 {
                   "field": "cache.keyword",
-                  "id": "417",
+                  "id": "426",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -18005,17 +18174,17 @@
               "metrics": [
                 {
                   "field": "size_bytes",
-                  "id": "418",
+                  "id": "427",
                   "type": "sum"
                 },
                 {
                   "field": "caches",
-                  "id": "419",
+                  "id": "428",
                   "type": "sum"
                 },
                 {
                   "field": "days_since_use",
-                  "id": "420",
+                  "id": "429",
                   "type": "min"
                 }
               ],
@@ -18159,7 +18328,7 @@
               "bucketAggs": [
                 {
                   "field": "repo.keyword",
-                  "id": "421",
+                  "id": "430",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -18172,7 +18341,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "422",
+                  "id": "431",
                   "settings": {
                     "metrics": [
                       "size_bytes",
@@ -18276,7 +18445,7 @@
               "bucketAggs": [
                 {
                   "field": "type.keyword",
-                  "id": "424",
+                  "id": "433",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -18287,7 +18456,7 @@
                 },
                 {
                   "field": "@timestamp",
-                  "id": "425",
+                  "id": "434",
                   "settings": {
                     "interval": "1h",
                     "min_doc_count": "0",
@@ -18300,7 +18469,7 @@
               "metrics": [
                 {
                   "field": "events",
-                  "id": "423",
+                  "id": "432",
                   "type": "sum"
                 }
               ],
@@ -18366,11 +18535,11 @@
               "bucketAggs": [
                 {
                   "field": "type.keyword",
-                  "id": "427",
+                  "id": "436",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
-                    "orderBy": "426",
+                    "orderBy": "435",
                     "size": "30"
                   },
                   "type": "terms"
@@ -18380,7 +18549,7 @@
               "metrics": [
                 {
                   "field": "events",
-                  "id": "426",
+                  "id": "435",
                   "type": "sum"
                 }
               ],
@@ -18452,11 +18621,11 @@
               "bucketAggs": [
                 {
                   "field": "full_name.keyword",
-                  "id": "429",
+                  "id": "438",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
-                    "orderBy": "428",
+                    "orderBy": "437",
                     "size": "20"
                   },
                   "type": "terms"
@@ -18466,7 +18635,7 @@
               "metrics": [
                 {
                   "field": "events",
-                  "id": "428",
+                  "id": "437",
                   "type": "sum"
                 }
               ],
@@ -18577,18 +18746,18 @@
               "bucketAggs": [
                 {
                   "field": "reason.keyword",
-                  "id": "431",
+                  "id": "440",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
-                    "orderBy": "430",
+                    "orderBy": "439",
                     "size": "25"
                   },
                   "type": "terms"
                 },
                 {
                   "field": "subject_type.keyword",
-                  "id": "432",
+                  "id": "441",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -18602,7 +18771,7 @@
               "metrics": [
                 {
                   "field": "notifications",
-                  "id": "430",
+                  "id": "439",
                   "type": "sum"
                 }
               ],
@@ -18684,7 +18853,7 @@
               "bucketAggs": [
                 {
                   "field": "reason.keyword",
-                  "id": "434",
+                  "id": "443",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -18695,7 +18864,7 @@
                 },
                 {
                   "field": "@timestamp",
-                  "id": "435",
+                  "id": "444",
                   "settings": {
                     "interval": "1d",
                     "min_doc_count": "0",
@@ -18708,7 +18877,7 @@
               "metrics": [
                 {
                   "field": "notifications",
-                  "id": "433",
+                  "id": "442",
                   "type": "sum"
                 }
               ],
@@ -18869,7 +19038,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "436",
+                  "id": "445",
                   "settings": {
                     "order": "desc",
                     "size": "25",
@@ -19094,7 +19263,7 @@
               "bucketAggs": [
                 {
                   "field": "full_name.keyword",
-                  "id": "437",
+                  "id": "446",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -19105,7 +19274,7 @@
                 },
                 {
                   "field": "kind.keyword",
-                  "id": "438",
+                  "id": "447",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -19116,7 +19285,7 @@
                 },
                 {
                   "field": "number.keyword",
-                  "id": "439",
+                  "id": "448",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -19127,7 +19296,7 @@
                 },
                 {
                   "field": "@timestamp",
-                  "id": "440",
+                  "id": "449",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -19138,7 +19307,7 @@
                 },
                 {
                   "field": "state.keyword",
-                  "id": "441",
+                  "id": "450",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -19149,7 +19318,7 @@
                 },
                 {
                   "field": "title.keyword",
-                  "id": "442",
+                  "id": "451",
                   "settings": {
                     "min_doc_count": "1",
                     "missing": "",
@@ -19161,7 +19330,7 @@
                 },
                 {
                   "field": "url.keyword",
-                  "id": "443",
+                  "id": "452",
                   "settings": {
                     "min_doc_count": "1",
                     "missing": "",
@@ -19176,12 +19345,12 @@
               "metrics": [
                 {
                   "field": "@timestamp",
-                  "id": "444",
+                  "id": "453",
                   "type": "max"
                 },
                 {
                   "field": "comments",
-                  "id": "445",
+                  "id": "454",
                   "type": "max"
                 }
               ],
@@ -19269,7 +19438,7 @@
               "bucketAggs": [
                 {
                   "field": "language.keyword",
-                  "id": "446",
+                  "id": "455",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -19282,7 +19451,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "447",
+                  "id": "456",
                   "type": "count"
                 }
               ],
@@ -19447,7 +19616,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "448",
+                  "id": "457",
                   "settings": {
                     "order": "desc",
                     "size": "25",
@@ -19554,7 +19723,7 @@
               "bucketAggs": [
                 {
                   "field": "language.keyword",
-                  "id": "449",
+                  "id": "458",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -19565,7 +19734,7 @@
                 },
                 {
                   "field": "repo.keyword",
-                  "id": "450",
+                  "id": "459",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -19578,7 +19747,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "451",
+                  "id": "460",
                   "settings": {
                     "metrics": [
                       "bytes"
@@ -19641,7 +19810,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "GitHub's own score, and the boxes it is made of. The score alone hides which one is missing: here eight of thirty-five repositories have no license. GitHub's page and score do count a templates directory, but the API's issue_template flag reports only the legacy single file, so it reads false on a repository that scores 100 with four issue forms: on this account seven repositories carry templates and the flag is false on all of them (community/community#207706). In the InfluxDB, PostgreSQL and Prometheus dashboards, which can join two measurements, Issue templates is how many the repository actually has, forms and Markdown, from gh_repo_policy. Elasticsearch answers every column with the largest reading inside the range rather than with the newest one: it keeps the six boxes as booleans, and the aggregation that would take the newest reading returns a boolean as text, which the datasource cannot render. Issue template here is the API's own flag, which reports only the legacy single file and not a templates directory the page and the score count: one panel cannot join the count in gh_repo_policy to this row.",
+          "description": "GitHub's own score, and the boxes it is made of. The score alone hides which one is missing: here eight of thirty-five repositories have no license. GitHub's page and score do count a templates directory, but the API's issue_template flag reports only the legacy single file, so it reads false on a repository that scores 100 with four issue forms: on this account seven repositories carry templates and the flag is false on all of them (community/community#207706). In the InfluxDB, PostgreSQL and Prometheus dashboards, which can join two measurements, Issue templates is how many the repository actually has, forms and Markdown, from gh_repo_policy. Issue template here is the API's own flag, which reports only the legacy single file and not a templates directory the page and the score count: one panel cannot join the count in gh_repo_policy to this row.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -19995,7 +20164,7 @@
               "bucketAggs": [
                 {
                   "field": "repo.keyword",
-                  "id": "459",
+                  "id": "468",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -20005,8 +20174,19 @@
                   "type": "terms"
                 },
                 {
+                  "field": "@timestamp",
+                  "id": "469",
+                  "settings": {
+                    "min_doc_count": "1",
+                    "order": "desc",
+                    "orderBy": "_key",
+                    "size": "1"
+                  },
+                  "type": "terms"
+                },
+                {
                   "field": "url.keyword",
-                  "id": "460",
+                  "id": "470",
                   "settings": {
                     "min_doc_count": "1",
                     "missing": "",
@@ -20021,37 +20201,37 @@
               "metrics": [
                 {
                   "field": "health_percentage",
-                  "id": "452",
+                  "id": "461",
                   "type": "max"
                 },
                 {
                   "field": "has_readme",
-                  "id": "453",
+                  "id": "462",
                   "type": "max"
                 },
                 {
                   "field": "has_license",
-                  "id": "454",
+                  "id": "463",
                   "type": "max"
                 },
                 {
                   "field": "has_contributing",
-                  "id": "455",
+                  "id": "464",
                   "type": "max"
                 },
                 {
                   "field": "has_code_of_conduct",
-                  "id": "456",
+                  "id": "465",
                   "type": "max"
                 },
                 {
                   "field": "has_issue_template",
-                  "id": "457",
+                  "id": "466",
                   "type": "max"
                 },
                 {
                   "field": "has_pull_request_template",
-                  "id": "458",
+                  "id": "467",
                   "type": "max"
                 }
               ],
@@ -20078,6 +20258,16 @@
                   "repo.keyword": "Repository",
                   "url.keyword": "Link"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "@timestamp": true
+                },
+                "indexByName": {},
+                "renameByName": {}
               }
             }
           ],
@@ -20316,7 +20506,7 @@
               "bucketAggs": [
                 {
                   "field": "repo.keyword",
-                  "id": "461",
+                  "id": "471",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -20327,7 +20517,7 @@
                 },
                 {
                   "field": "language.keyword",
-                  "id": "462",
+                  "id": "472",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -20338,7 +20528,7 @@
                 },
                 {
                   "field": "visibility.keyword",
-                  "id": "463",
+                  "id": "473",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -20349,7 +20539,7 @@
                 },
                 {
                   "field": "license.keyword",
-                  "id": "464",
+                  "id": "474",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -20360,7 +20550,7 @@
                 },
                 {
                   "field": "url.keyword",
-                  "id": "465",
+                  "id": "475",
                   "settings": {
                     "min_doc_count": "1",
                     "missing": "",
@@ -20374,7 +20564,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "466",
+                  "id": "476",
                   "settings": {
                     "metrics": [
                       "stars",
@@ -20513,18 +20703,18 @@
               "bucketAggs": [
                 {
                   "field": "topic.keyword",
-                  "id": "468",
+                  "id": "478",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
-                    "orderBy": "467",
+                    "orderBy": "477",
                     "size": "30"
                   },
                   "type": "terms"
                 },
                 {
                   "field": "url.keyword",
-                  "id": "469",
+                  "id": "479",
                   "settings": {
                     "min_doc_count": "1",
                     "missing": "",
@@ -20539,7 +20729,7 @@
               "metrics": [
                 {
                   "field": "repo.keyword",
-                  "id": "467",
+                  "id": "477",
                   "type": "cardinality"
                 }
               ],
@@ -20694,7 +20884,7 @@
               "bucketAggs": [
                 {
                   "field": "package.keyword",
-                  "id": "470",
+                  "id": "480",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -20705,7 +20895,7 @@
                 },
                 {
                   "field": "type.keyword",
-                  "id": "471",
+                  "id": "481",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -20716,7 +20906,7 @@
                 },
                 {
                   "field": "url.keyword",
-                  "id": "472",
+                  "id": "482",
                   "settings": {
                     "min_doc_count": "1",
                     "missing": "",
@@ -20730,7 +20920,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "473",
+                  "id": "483",
                   "settings": {
                     "metrics": [
                       "versions",
@@ -20932,7 +21122,7 @@
               "bucketAggs": [
                 {
                   "field": "gist.keyword",
-                  "id": "474",
+                  "id": "484",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -20943,7 +21133,7 @@
                 },
                 {
                   "field": "url.keyword",
-                  "id": "475",
+                  "id": "485",
                   "settings": {
                     "min_doc_count": "1",
                     "missing": "",
@@ -20957,7 +21147,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "476",
+                  "id": "486",
                   "settings": {
                     "metrics": [
                       "files",
@@ -21097,7 +21287,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "477",
+                  "id": "487",
                   "settings": {
                     "order": "desc",
                     "size": "30",
@@ -21326,7 +21516,7 @@
               "bucketAggs": [
                 {
                   "field": "repo.keyword",
-                  "id": "478",
+                  "id": "488",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -21336,8 +21526,19 @@
                   "type": "terms"
                 },
                 {
+                  "field": "@timestamp",
+                  "id": "489",
+                  "settings": {
+                    "min_doc_count": "1",
+                    "order": "desc",
+                    "orderBy": "_key",
+                    "size": "1"
+                  },
+                  "type": "terms"
+                },
+                {
                   "field": "url.keyword",
-                  "id": "479",
+                  "id": "490",
                   "settings": {
                     "min_doc_count": "1",
                     "missing": "",
@@ -21352,32 +21553,32 @@
               "metrics": [
                 {
                   "field": "security_policy",
-                  "id": "480",
+                  "id": "491",
                   "type": "max"
                 },
                 {
                   "field": "delete_branch_on_merge",
-                  "id": "481",
+                  "id": "492",
                   "type": "max"
                 },
                 {
                   "field": "auto_merge",
-                  "id": "482",
+                  "id": "493",
                   "type": "max"
                 },
                 {
                   "field": "branch_protection_rules",
-                  "id": "483",
+                  "id": "494",
                   "type": "max"
                 },
                 {
                   "field": "issue_templates",
-                  "id": "484",
+                  "id": "495",
                   "type": "max"
                 },
                 {
                   "field": "codeowners_errors",
-                  "id": "485",
+                  "id": "496",
                   "type": "max"
                 }
               ],
@@ -21403,6 +21604,16 @@
                   "repo.keyword": "Repository",
                   "url.keyword": "Link"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "@timestamp": true
+                },
+                "indexByName": {},
+                "renameByName": {}
               }
             }
           ],
@@ -21480,7 +21691,7 @@
               "bucketAggs": [
                 {
                   "field": "key.keyword",
-                  "id": "486",
+                  "id": "497",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -21491,7 +21702,7 @@
                 },
                 {
                   "field": "kind.keyword",
-                  "id": "487",
+                  "id": "498",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -21501,8 +21712,19 @@
                   "type": "terms"
                 },
                 {
+                  "field": "@timestamp",
+                  "id": "499",
+                  "settings": {
+                    "min_doc_count": "1",
+                    "order": "desc",
+                    "orderBy": "_key",
+                    "size": "1"
+                  },
+                  "type": "terms"
+                },
+                {
                   "field": "url.keyword",
-                  "id": "488",
+                  "id": "500",
                   "settings": {
                     "min_doc_count": "1",
                     "missing": "",
@@ -21516,17 +21738,19 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "489",
-                  "settings": {
-                    "metrics": [
-                      "days_since_use",
-                      "never_used",
-                      "days_to_expiry"
-                    ],
-                    "order": "desc",
-                    "orderBy": "@timestamp"
-                  },
-                  "type": "top_metrics"
+                  "field": "days_since_use",
+                  "id": "501",
+                  "type": "max"
+                },
+                {
+                  "field": "never_used",
+                  "id": "502",
+                  "type": "max"
+                },
+                {
+                  "field": "days_to_expiry",
+                  "id": "503",
+                  "type": "max"
                 }
               ],
               "query": "_index:ghchronicle-gh_key",
@@ -21542,13 +21766,23 @@
                 "excludeByName": {},
                 "indexByName": {},
                 "renameByName": {
-                  "Top Metrics days_since_use": "Days since use",
-                  "Top Metrics days_to_expiry": "Days to expiry",
-                  "Top Metrics never_used": "Never used",
+                  "Max days_since_use": "Days since use",
+                  "Max days_to_expiry": "Days to expiry",
+                  "Max never_used": "Never used",
                   "key.keyword": "Key",
                   "kind.keyword": "Kind",
                   "url.keyword": "Link"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "@timestamp": true
+                },
+                "indexByName": {},
+                "renameByName": {}
               }
             }
           ],
@@ -21601,7 +21835,7 @@
               "bucketAggs": [
                 {
                   "field": "license.keyword",
-                  "id": "490",
+                  "id": "504",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -21612,7 +21846,7 @@
                 },
                 {
                   "field": "repo.keyword",
-                  "id": "491",
+                  "id": "505",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -21625,7 +21859,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "492",
+                  "id": "506",
                   "settings": {
                     "metrics": [
                       "packages"
@@ -21757,7 +21991,7 @@
               "bucketAggs": [
                 {
                   "field": "provider.keyword",
-                  "id": "493",
+                  "id": "507",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -21768,7 +22002,7 @@
                 },
                 {
                   "field": "url.keyword",
-                  "id": "494",
+                  "id": "508",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -21782,7 +22016,7 @@
               "metrics": [
                 {
                   "field": "present",
-                  "id": "495",
+                  "id": "509",
                   "type": "max"
                 }
               ],
@@ -21831,7 +22065,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "Four rows per repository: dependabot, codeowners, security and funding. Path is the one in force, or where the file would go if it existed, because a file at the wrong path is a file that does nothing and gh_repo_policy does not carry it. Changes counts every commit against that path over the whole life of the repository, so a file that is gone but has a history was deleted and this row is dated at the deletion. The crossing worth reading: a dependabot row with no blocks, which is a repository absent from the table beside this one, next to vulnerability alerts off in gh_repo_policy, is a repository that receives no dependency updates by either route. Each row is dated at the last commit that touched the path, so this reads the whole history rather than the dashboard range: a file nobody has touched in a year would otherwise vanish as you narrow the range. Elasticsearch answers Present and Changes with the largest reading inside the range rather than with the newest row, because the aggregation that takes the newest one returns a boolean as text, which the datasource cannot render. A url is written only for a file that is there, so the absent rows are kept by bucketing them under an empty one. Elasticsearch answers only inside the dashboard range, so years outside it are missing.",
+          "description": "Four rows per repository: dependabot, codeowners, security and funding. Path is the one in force, or where the file would go if it existed, because a file at the wrong path is a file that does nothing and gh_repo_policy does not carry it. Changes counts every commit against that path over the whole life of the repository, so a file that is gone but has a history was deleted and this row is dated at the deletion. The crossing worth reading: a dependabot row with no blocks, which is a repository absent from the table beside this one, next to vulnerability alerts off in gh_repo_policy, is a repository that receives no dependency updates by either route. Each row is dated at the last commit that touched the path, so this reads the whole history rather than the dashboard range: a file nobody has touched in a year would otherwise vanish as you narrow the range. A url is written only for a file that is there, so the absent rows are kept by bucketing them under an empty one. Elasticsearch answers only inside the dashboard range, so years outside it are missing.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -21987,7 +22221,7 @@
               "bucketAggs": [
                 {
                   "field": "repo.keyword",
-                  "id": "496",
+                  "id": "510",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -21998,7 +22232,7 @@
                 },
                 {
                   "field": "file.keyword",
-                  "id": "497",
+                  "id": "511",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -22008,8 +22242,19 @@
                   "type": "terms"
                 },
                 {
+                  "field": "@timestamp",
+                  "id": "512",
+                  "settings": {
+                    "min_doc_count": "1",
+                    "order": "desc",
+                    "orderBy": "_key",
+                    "size": "1"
+                  },
+                  "type": "terms"
+                },
+                {
                   "field": "path.keyword",
-                  "id": "498",
+                  "id": "513",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -22020,7 +22265,7 @@
                 },
                 {
                   "field": "url.keyword",
-                  "id": "499",
+                  "id": "514",
                   "settings": {
                     "min_doc_count": "1",
                     "missing": "",
@@ -22035,12 +22280,12 @@
               "metrics": [
                 {
                   "field": "present",
-                  "id": "500",
+                  "id": "515",
                   "type": "max"
                 },
                 {
                   "field": "changes",
-                  "id": "501",
+                  "id": "516",
                   "type": "max"
                 }
               ],
@@ -22065,13 +22310,23 @@
                   "url.keyword": "Link"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "@timestamp": true
+                },
+                "indexByName": {},
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "What each dependabot.yml actually updates, and how often. One ecosystem appears more than once when it is configured per directory, which is exactly what blocks counts: five ecosystems across seven blocks is one repository here. Dated from dependabot.yml itself, at the last commit that touched it, so this reads the whole history rather than the dashboard range, and only the newest version of each file: an ecosystem dropped from it, or a schedule moved from daily to weekly, leaves no second row behind. A repository that deleted the file altogether writes no block at all and so keeps its last ones here; the dependabot row beside it in Policy files, with Present at zero, is what says so. Elasticsearch answers only inside the dashboard range, so years outside it are missing. A block removed from a dependabot.yml inside the range still has a document in it, where the SQL twin reads only the newest version of the file and drops it.",
+          "description": "What each dependabot.yml actually updates, and how often. One ecosystem appears more than once when it is configured per directory, which is exactly what blocks counts: five ecosystems across seven blocks is one repository here. Dated from dependabot.yml itself, at the last commit that touched it, so this reads the whole history rather than the dashboard range, and only the newest version of each file: an ecosystem dropped from it, or a schedule moved from daily to weekly, leaves no second row behind. A repository that deleted the file altogether writes no block at all and so keeps its last ones here; the dependabot row beside it in Policy files, with Present at zero, is what says so. Elasticsearch answers only inside the dashboard range, so years outside it are missing.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -22191,7 +22446,7 @@
               "bucketAggs": [
                 {
                   "field": "repo.keyword",
-                  "id": "502",
+                  "id": "517",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -22201,8 +22456,19 @@
                   "type": "terms"
                 },
                 {
+                  "field": "@timestamp",
+                  "id": "518",
+                  "settings": {
+                    "min_doc_count": "1",
+                    "order": "desc",
+                    "orderBy": "_key",
+                    "size": "1"
+                  },
+                  "type": "terms"
+                },
+                {
                   "field": "ecosystem.keyword",
-                  "id": "503",
+                  "id": "519",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -22213,7 +22479,7 @@
                 },
                 {
                   "field": "interval.keyword",
-                  "id": "504",
+                  "id": "520",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -22227,7 +22493,7 @@
               "metrics": [
                 {
                   "field": "blocks",
-                  "id": "505",
+                  "id": "521",
                   "type": "max"
                 }
               ],
@@ -22249,6 +22515,16 @@
                   "interval.keyword": "Interval",
                   "repo.keyword": "Repository"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "@timestamp": true
+                },
+                "indexByName": {},
+                "renameByName": {}
               }
             }
           ],
@@ -22301,7 +22577,7 @@
               "bucketAggs": [
                 {
                   "field": "ecosystem.keyword",
-                  "id": "506",
+                  "id": "522",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -22312,7 +22588,7 @@
                 },
                 {
                   "field": "repo.keyword",
-                  "id": "507",
+                  "id": "523",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -22325,7 +22601,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "508",
+                  "id": "524",
                   "settings": {
                     "metrics": [
                       "packages"
@@ -22469,7 +22745,7 @@
               "bucketAggs": [
                 {
                   "field": "change.keyword",
-                  "id": "510",
+                  "id": "526",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -22480,7 +22756,7 @@
                 },
                 {
                   "field": "@timestamp",
-                  "id": "511",
+                  "id": "527",
                   "settings": {
                     "interval": "1d",
                     "min_doc_count": "0",
@@ -22493,7 +22769,7 @@
               "metrics": [
                 {
                   "field": "packages",
-                  "id": "509",
+                  "id": "525",
                   "type": "sum"
                 }
               ],
@@ -22506,7 +22782,7 @@
               "bucketAggs": [
                 {
                   "field": "@timestamp",
-                  "id": "513",
+                  "id": "529",
                   "settings": {
                     "interval": "1d",
                     "min_doc_count": "0",
@@ -22519,7 +22795,7 @@
               "metrics": [
                 {
                   "field": "vulnerable",
-                  "id": "512",
+                  "id": "528",
                   "type": "sum"
                 }
               ],
@@ -22643,7 +22919,7 @@
               "bucketAggs": [
                 {
                   "field": "@timestamp",
-                  "id": "515",
+                  "id": "531",
                   "settings": {
                     "interval": "1d",
                     "min_doc_count": "0",
@@ -22657,7 +22933,7 @@
               "metrics": [
                 {
                   "field": "lifetime_received_cents",
-                  "id": "514",
+                  "id": "530",
                   "type": "max"
                 }
               ],
@@ -22692,7 +22968,7 @@
               "bucketAggs": [
                 {
                   "field": "@timestamp",
-                  "id": "517",
+                  "id": "533",
                   "settings": {
                     "interval": "1d",
                     "min_doc_count": "0",
@@ -22706,7 +22982,7 @@
               "metrics": [
                 {
                   "field": "monthly_income_cents",
-                  "id": "516",
+                  "id": "532",
                   "type": "max"
                 }
               ],
@@ -22741,7 +23017,7 @@
               "bucketAggs": [
                 {
                   "field": "@timestamp",
-                  "id": "519",
+                  "id": "535",
                   "settings": {
                     "interval": "1d",
                     "min_doc_count": "0",
@@ -22755,7 +23031,7 @@
               "metrics": [
                 {
                   "field": "next_payout_cents",
-                  "id": "518",
+                  "id": "534",
                   "type": "max"
                 }
               ],
@@ -22790,7 +23066,7 @@
               "bucketAggs": [
                 {
                   "field": "@timestamp",
-                  "id": "521",
+                  "id": "537",
                   "settings": {
                     "interval": "1d",
                     "min_doc_count": "0",
@@ -22804,7 +23080,7 @@
               "metrics": [
                 {
                   "field": "sponsor_spend_cents",
-                  "id": "520",
+                  "id": "536",
                   "type": "max"
                 }
               ],
@@ -23020,7 +23296,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "522",
+                  "id": "538",
                   "settings": {
                     "order": "desc",
                     "size": "200",
@@ -23077,7 +23353,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "Standing inventory, the way an SSH key is. The listing says how many tiers there are; this says which and at what price. Dating a tier at its creation would put all of them outside every dashboard range, where they would read as no tiers at all, so they are anchored to the start of the UTC day and the creation date survives as an age. Elasticsearch takes the newest price of each tier and the largest reading of the rest inside the range: an age only grows and a retirement only happens once, so the two agree, and a max over a boolean is the one form the datasource can render. Elasticsearch hands the stored field back as it is. The arithmetic in the stats above is a server-side expression, and those reduce a series to one number, which is not a shape a table of rows has: so the money column here keeps cents and its heading says so rather than reading as a hundredfold overcharge.",
+          "description": "Standing inventory, the way an SSH key is. The listing says how many tiers there are; this says which and at what price. Dating a tier at its creation would put all of them outside every dashboard range, where they would read as no tiers at all, so they are anchored to the start of the UTC day and the creation date survives as an age. Elasticsearch hands the stored field back as it is. The arithmetic in the stats above is a server-side expression, and those reduce a series to one number, which is not a shape a table of rows has: so the money column here keeps cents and its heading says so rather than reading as a hundredfold overcharge.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -23260,7 +23536,7 @@
               "bucketAggs": [
                 {
                   "field": "tier.keyword",
-                  "id": "523",
+                  "id": "539",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -23270,8 +23546,19 @@
                   "type": "terms"
                 },
                 {
+                  "field": "@timestamp",
+                  "id": "540",
+                  "settings": {
+                    "min_doc_count": "1",
+                    "order": "desc",
+                    "orderBy": "_key",
+                    "size": "1"
+                  },
+                  "type": "terms"
+                },
+                {
                   "field": "url.keyword",
-                  "id": "524",
+                  "id": "541",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -23284,7 +23571,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "525",
+                  "id": "542",
                   "settings": {
                     "metrics": [
                       "price_cents"
@@ -23296,17 +23583,17 @@
                 },
                 {
                   "field": "one_time",
-                  "id": "526",
+                  "id": "543",
                   "type": "max"
                 },
                 {
                   "field": "retired",
-                  "id": "527",
+                  "id": "544",
                   "type": "max"
                 },
                 {
                   "field": "age_days",
-                  "id": "528",
+                  "id": "545",
                   "type": "max"
                 }
               ],
@@ -23331,13 +23618,23 @@
                   "url.keyword": "Link"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "@timestamp": true
+                },
+                "indexByName": {},
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "What the profile shows first, in the order it shows it. The row worth seeing is a pinned repository nobody has pushed to in two years. Position is a field and not a tag on purpose: a repository that moves from slot two to slot three is the same pin, and as a tag every rearrangement would fork the series. The repository filter at the top of the dashboard does not reach this panel, because a pin can be a gist, which is named by its hash and is in no repository the filter knows. Elasticsearch takes the newest position of each pin, and the largest stars and idle days inside the range rather than the newest ones, because a gist carries neither field and only an aggregation that can answer null keeps its row. Stars only grow, so the largest is the current count. Idle days reset to 0 on a push, so a pin that was pushed to inside the range still reads as idle here until the range has rolled past the push.",
+          "description": "What the profile shows first, in the order it shows it. The row worth seeing is a pinned repository nobody has pushed to in two years. Position is a field and not a tag on purpose: a repository that moves from slot two to slot three is the same pin, and as a tag every rearrangement would fork the series. The repository filter at the top of the dashboard does not reach this panel, because a pin can be a gist, which is named by its hash and is in no repository the filter knows.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -23459,7 +23756,7 @@
               "bucketAggs": [
                 {
                   "field": "repo.keyword",
-                  "id": "529",
+                  "id": "546",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -23469,8 +23766,19 @@
                   "type": "terms"
                 },
                 {
+                  "field": "@timestamp",
+                  "id": "547",
+                  "settings": {
+                    "min_doc_count": "1",
+                    "order": "desc",
+                    "orderBy": "_key",
+                    "size": "1"
+                  },
+                  "type": "terms"
+                },
+                {
                   "field": "kind.keyword",
-                  "id": "530",
+                  "id": "548",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -23481,7 +23789,7 @@
                 },
                 {
                   "field": "url.keyword",
-                  "id": "531",
+                  "id": "549",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -23494,7 +23802,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "532",
+                  "id": "550",
                   "settings": {
                     "metrics": [
                       "position"
@@ -23506,12 +23814,12 @@
                 },
                 {
                   "field": "stars",
-                  "id": "533",
+                  "id": "551",
                   "type": "max"
                 },
                 {
                   "field": "days_since_push",
-                  "id": "534",
+                  "id": "552",
                   "type": "max"
                 }
               ],
@@ -23538,6 +23846,16 @@
               }
             },
             {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "@timestamp": true
+                },
+                "indexByName": {},
+                "renameByName": {}
+              }
+            },
+            {
               "id": "sortBy",
               "options": {
                 "fields": {},
@@ -23554,7 +23872,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "A closed list of eight flags the profile advertises, as they read at the last sweep. Seven are booleans that change once in years, and the day one does is the day worth being able to point at: hireable, developer program, campus expert, GitHub star, bounty hunter, employee and whether the account has a Sponsors listing. The eighth is the availability status, carried as a flag rather than as a measurement of its own. Its message and how long ago it was set are collected on that row and shown nowhere here: the message is text, and the age belongs to the status message rather than to the flag, on one row of eight, so it was a column with seven empty cells and one that read the age of a message beside a flag that was off. GitHub says when none of the badges was granted, so there is no date for the others to fill. Elasticsearch answers Enabled with the largest reading inside the range rather than the newest one: it keeps enabled as a boolean, and the aggregation that would take the newest reading returns a boolean as text, which the datasource cannot render.",
+          "description": "A closed list of eight flags the profile advertises, as they read at the last sweep. Seven are booleans that change once in years, and the day one does is the day worth being able to point at: hireable, developer program, campus expert, GitHub star, bounty hunter, employee and whether the account has a Sponsors listing. The eighth is the availability status, carried as a flag rather than as a measurement of its own. Its message and how long ago it was set are collected on that row and shown nowhere here: the message is text, and the age belongs to the status message rather than to the flag, on one row of eight, so it was a column with seven empty cells and one that read the age of a message beside a flag that was off. GitHub says when none of the badges was granted, so there is no date for the others to fill.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -23674,7 +23992,7 @@
               "bucketAggs": [
                 {
                   "field": "flag.keyword",
-                  "id": "535",
+                  "id": "553",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "asc",
@@ -23684,8 +24002,19 @@
                   "type": "terms"
                 },
                 {
+                  "field": "@timestamp",
+                  "id": "554",
+                  "settings": {
+                    "min_doc_count": "1",
+                    "order": "desc",
+                    "orderBy": "_key",
+                    "size": "1"
+                  },
+                  "type": "terms"
+                },
+                {
                   "field": "url.keyword",
-                  "id": "536",
+                  "id": "555",
                   "settings": {
                     "min_doc_count": "1",
                     "missing": "",
@@ -23700,7 +24029,7 @@
               "metrics": [
                 {
                   "field": "enabled",
-                  "id": "537",
+                  "id": "556",
                   "type": "max"
                 }
               ],
@@ -23722,13 +24051,23 @@
                   "url.keyword": "Link"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "@timestamp": true
+                },
+                "indexByName": {},
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "The lists the account files its stars into, and how many each holds. gh_star_given records every star the account gave and the Overview counts them; this is how they are organized, which exists nowhere else. It rides in the account query that was already being paid for, at no extra cost. The row is a daily snapshot: Age is how long ago the list was made and Last added how long ago a star last went into it, both as days so the row can sit inside any dashboard range. Elasticsearch takes the newest item count of each list and the largest reading of the two ages inside the range: an age only grows, and a list nobody has added to has no Last added at all and keeps its row with an empty cell. Last added resets on an addition, so a list added to inside the range still reads as idle here until the range has rolled past it. Private is not a column here: the datasource aggregates over every index at once, and the same name is a text tag on notifications and daily contributions, whose shards refuse a max over it.",
+          "description": "The lists the account files its stars into, and how many each holds. gh_star_given records every star the account gave and the Overview counts them; this is how they are organized, which exists nowhere else. It rides in the account query that was already being paid for, at no extra cost. The row is a daily snapshot: Age is how long ago the list was made and Last added how long ago a star last went into it, both as days so the row can sit inside any dashboard range. A list nobody has added to has no Last added at all, in this dashboard or any of the others, and its cell is empty. Private is not a column here: the datasource aggregates over every index at once, and the same name is a text tag on notifications and daily contributions, whose shards refuse a max over it.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -23885,7 +24224,7 @@
               "bucketAggs": [
                 {
                   "field": "list.keyword",
-                  "id": "538",
+                  "id": "557",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -23895,8 +24234,19 @@
                   "type": "terms"
                 },
                 {
+                  "field": "@timestamp",
+                  "id": "558",
+                  "settings": {
+                    "min_doc_count": "1",
+                    "order": "desc",
+                    "orderBy": "_key",
+                    "size": "1"
+                  },
+                  "type": "terms"
+                },
+                {
                   "field": "url.keyword",
-                  "id": "539",
+                  "id": "559",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -23909,7 +24259,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "540",
+                  "id": "560",
                   "settings": {
                     "metrics": [
                       "items"
@@ -23921,12 +24271,12 @@
                 },
                 {
                   "field": "age_days",
-                  "id": "541",
+                  "id": "561",
                   "type": "max"
                 },
                 {
                   "field": "days_since_add",
-                  "id": "542",
+                  "id": "562",
                   "type": "max"
                 }
               ],
@@ -23949,6 +24299,16 @@
                   "list.keyword": "List",
                   "url.keyword": "Link"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "@timestamp": true
+                },
+                "indexByName": {},
+                "renameByName": {}
               }
             }
           ],
@@ -24055,7 +24415,7 @@
               "bucketAggs": [
                 {
                   "field": "achievement.keyword",
-                  "id": "543",
+                  "id": "563",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "asc",
@@ -24066,7 +24426,7 @@
                 },
                 {
                   "field": "url.keyword",
-                  "id": "544",
+                  "id": "564",
                   "settings": {
                     "min_doc_count": "1",
                     "missing": "",
@@ -24080,7 +24440,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "545",
+                  "id": "565",
                   "settings": {
                     "metrics": [
                       "tier_number"
@@ -24398,7 +24758,7 @@
               "bucketAggs": [
                 {
                   "field": "achievement.keyword",
-                  "id": "546",
+                  "id": "566",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "asc",
@@ -24409,7 +24769,7 @@
                 },
                 {
                   "field": "image.keyword",
-                  "id": "547",
+                  "id": "567",
                   "settings": {
                     "min_doc_count": "1",
                     "missing": "",
@@ -24421,7 +24781,7 @@
                 },
                 {
                   "field": "url.keyword",
-                  "id": "548",
+                  "id": "568",
                   "settings": {
                     "min_doc_count": "1",
                     "missing": "",
@@ -24435,7 +24795,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "549",
+                  "id": "569",
                   "settings": {
                     "metrics": [
                       "percent",
@@ -24546,7 +24906,7 @@
               "bucketAggs": [
                 {
                   "field": "resource.keyword",
-                  "id": "551",
+                  "id": "571",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -24557,7 +24917,7 @@
                 },
                 {
                   "field": "@timestamp",
-                  "id": "552",
+                  "id": "572",
                   "settings": {
                     "interval": "5m",
                     "min_doc_count": "0",
@@ -24570,7 +24930,7 @@
               "metrics": [
                 {
                   "field": "used_ratio",
-                  "id": "550",
+                  "id": "570",
                   "type": "max"
                 }
               ],
@@ -24628,7 +24988,7 @@
               "bucketAggs": [
                 {
                   "field": "resource.keyword",
-                  "id": "553",
+                  "id": "573",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -24642,17 +25002,17 @@
               "metrics": [
                 {
                   "field": "limit",
-                  "id": "554",
+                  "id": "574",
                   "type": "max"
                 },
                 {
                   "field": "remaining",
-                  "id": "555",
+                  "id": "575",
                   "type": "min"
                 },
                 {
                   "field": "used",
-                  "id": "556",
+                  "id": "576",
                   "type": "max"
                 }
               ],
@@ -24801,7 +25161,7 @@
               "bucketAggs": [
                 {
                   "field": "family.keyword",
-                  "id": "557",
+                  "id": "577",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -24812,7 +25172,7 @@
                 },
                 {
                   "field": "reason.keyword",
-                  "id": "558",
+                  "id": "578",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -24826,16 +25186,16 @@
               "metrics": [
                 {
                   "field": "failed",
-                  "id": "559",
+                  "id": "579",
                   "type": "sum"
                 },
                 {
-                  "id": "560",
+                  "id": "580",
                   "type": "count"
                 },
                 {
                   "field": "repos",
-                  "id": "561",
+                  "id": "581",
                   "type": "max"
                 }
               ],
@@ -24946,7 +25306,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "562",
+                  "id": "582",
                   "settings": {
                     "order": "desc",
                     "size": "100",

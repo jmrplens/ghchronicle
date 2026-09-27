@@ -832,13 +832,14 @@ var dashboardMissing = map[string]map[int]string{
 //     lengths, field 0 is len 2 but field 3 is len 1`.
 //
 // All three now take their reading with a `max`, which is answered as a number
-// over a boolean and appends a null for a missing value. Community profile and
-// Deploy keys say in their own descriptions that Elasticsearch reads the
-// largest value inside the range where the other dashboards read the newest
-// one; Repository settings says nothing because there is nothing to say, its
-// SQL twin being a MAX() over the same range. Panel 155, "Social accounts",
-// was the same family, `url` as a top_metrics, and was moved to a terms bucket
-// earlier.
+// over a boolean and appends a null for a missing value, and take it inside
+// each series' newest document, so it is the newest reading, as the other
+// dashboards read each series' newest row. For a while it was the largest
+// value inside the range instead, which each description had to admit; since
+// 2.6.1 a terms bucket on the timestamp, one key, newest first, narrows each
+// series to that document before the max reads it. Panel 155, "Social
+// accounts", was the same family, `url` as a top_metrics, and was moved to a
+// terms bucket earlier.
 var dashboardPluginBugs = map[string]map[int]string{}
 
 // TestDashboardPanelsAreAcceptedByTheirStore is the first question and the one

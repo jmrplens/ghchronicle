@@ -156,10 +156,9 @@ func repositoryList(b *builder) []Panel {
 	// `interface {} is string, not float64` from the plugin. A `max` over the
 	// same field is answered as a number, 1 or 0, which is the value the SQL
 	// panel casts to and the value the exporter publishes, so the columns
-	// carry the same two numbers everywhere. What it costs here is the reading
-	// itself, and this panel is the one place where that is a real difference:
-	// the SQL twin takes the newest row per repository and `max` takes the
-	// largest value inside the range, so the description says so.
+	// carry the same two numbers everywhere. Taken inside each repository's
+	// newest document, it is the newest reading, as the SQL twin's newest row
+	// per repository is: see newestDoc.
 	healthESMetrics := []any{b.mMax("health_percentage")}
 	healthESNames := []named{
 		{inventoryRepoTerm, "Repository"},
@@ -172,8 +171,8 @@ func repositoryList(b *builder) []Panel {
 	healthESMetrics = append(healthESMetrics, b.mMax("has_issue_template"), b.mMax("has_pull_request_template"))
 	healthESNames = append(healthESNames, named{"has_issue_template", "Issue template"},
 		named{"has_pull_request_template", inventoryPRTemplate}, named{inventoryURLTerm, "Link"})
-	healthES, healthEStf := esTbl(rc, []any{b.tm("repo", 500), b.tmURL()}, healthESMetrics,
-		healthESNames, []string{ESF})
+	healthES, healthEStf := esTbl(rc, []any{b.tm("repo", 500), b.newestDoc(), b.tmURL()}, healthESMetrics,
+		healthESNames, []string{ESF}, hideColumns(panelESTime))
 
 	var reposProm []Target
 	reposRename := map[string]string{
@@ -243,10 +242,7 @@ func repositoryList(b *builder) []Panel {
 			GR: healthGR, GRTF: healthGRtf,
 			GRDesc: "Graphite has the percentage; the boxes are not metrics there.",
 			ES:     healthES, ESTF: healthEStf,
-			ESDesc: "Elasticsearch answers every column with the largest reading inside the " +
-				"range rather than with the newest one: it keeps the six boxes as booleans, " +
-				"and the aggregation that would take the newest reading returns a boolean " +
-				"as text, which the datasource cannot render. Issue template here is " +
+			ESDesc: "Issue template here is " +
 				"the API's own flag, which reports only the legacy single file and not a " +
 				"templates directory the page and the score count: " +
 				"one panel cannot join the count in gh_repo_policy to this row.",
@@ -426,15 +422,12 @@ func whatTheyPublish(b *builder) []Panel {
 func settingsAndKeys(b *builder) []Panel {
 	polGR, polGRtf := gTbl(rowsOf(inventoryKeepLast+rp("gh_repo_policy", "branch_protection_rules")+")",
 		gn("gh_repo_policy", "repo")), "Repository", []col{{"lastNotNull", inventoryProtectionRules}})
-	// A `max` per column for the same reason the community profile above has
-	// one: the first three of these are booleans, and a top_metrics reads a
-	// boolean back as the string "true", which panics Grafana's Elasticsearch
-	// plugin and takes the whole panel with it. Here `max` costs nothing at
-	// all, which is why this panel carries no note about Elasticsearch: the
-	// SQL twin below reduces the same range with MAX() and Prometheus asks
-	// `max by (repo)`, so every dashboard that carries these six columns
-	// answers them with the same numbers.
-	polES, polEStf := esTbl("gh_repo_policy", []any{b.tm("repo", 500), b.tmURL()},
+	// A `max` per column inside each repository's newest document, for the
+	// reason the community profile above has one: the first three of these
+	// are booleans, and a top_metrics reads a boolean back as the string
+	// "true", which panics Grafana's Elasticsearch plugin and takes the whole
+	// panel with it.
+	polES, polEStf := esTbl("gh_repo_policy", []any{b.tm("repo", 500), b.newestDoc(), b.tmURL()},
 		[]any{
 			b.mMax("security_policy"), b.mMax("delete_branch_on_merge"), b.mMax("auto_merge"),
 			b.mMax("branch_protection_rules"), b.mMax("issue_templates"),
@@ -449,13 +442,20 @@ func settingsAndKeys(b *builder) []Panel {
 			{"branch_protection_rules", inventoryProtectionRules},
 			{"issue_templates", inventoryIssueTemplates},
 			{"codeowners_errors", "CODEOWNERS errors"},
-		}, []string{ESF})
+		}, []string{ESF}, hideColumns(panelESTime))
 
 	keysGR, keysGRtf := gTbl(rowsOf(inventoryKeepLast+gp("gh_key", "days_since_use")+")",
 		gn("gh_key", "key"), gn("gh_key", "kind")), "Key, kind",
 		[]col{{"lastNotNull", inventoryKeyIdle}})
-	keysES, keysEStf := esTbl("gh_key", []any{b.tm("key", 50), b.tm("kind", 5), b.tmURL()},
-		[]any{b.mNewest("days_since_use", "never_used", "days_to_expiry")},
+	// Each key's newest document, then a max of each field inside it, and not
+	// a top_metrics: no key carries all three fields, an SSH key has either
+	// days_since_use or never_used and a GPG key neither, and a top_metrics
+	// appends nothing for a field its document lacks. Measured against Grafana
+	// 13.2.1 and Elasticsearch 9.5.3 with one key of each kind, the whole
+	// panel failed with "frame has different field lengths, field 0 is len 2
+	// but field 3 is len 1"; a max answers null there. See newestDoc.
+	keysES, keysEStf := esTbl("gh_key", []any{b.tm("key", 50), b.tm("kind", 5), b.newestDoc(), b.tmURL()},
+		[]any{b.mMax("days_since_use"), b.mMax("never_used"), b.mMax("days_to_expiry")},
 		[]named{
 			{"key.keyword", "Key"},
 			{"kind.keyword", "Kind"},
@@ -463,7 +463,7 @@ func settingsAndKeys(b *builder) []Panel {
 			{"days_since_use", inventoryKeyIdle},
 			{"never_used", "Never used"},
 			{"days_to_expiry", "Days to expiry"},
-		}, nil)
+		}, nil, hideColumns(panelESTime))
 
 	licGR, licGRtf := gTbl(fmt.Sprintf(
 		`sortByMaxima(groupByNode(keepLastValue(%s), %d, "sum"))`,
@@ -498,16 +498,20 @@ func settingsAndKeys(b *builder) []Panel {
 
 	return []Panel{
 		panel("table", "Repository settings", box{W: 24, H: 8, X: 0, Y: 35}, []Target{sqlT(
+			// Each repository's newest row, not the largest of each column over
+			// the range: a setting switched off or a CODEOWNERS file mended
+			// inside the range read as it had been.
 			`SELECT repo AS "Repository",` +
-				` MAX(CAST(security_policy AS INT)) AS "Security policy",` +
-				` MAX(CAST(delete_branch_on_merge AS INT)) AS "Delete on merge",` +
-				` MAX(CAST(auto_merge AS INT)) AS "Auto merge",` +
-				` MAX(branch_protection_rules) AS "Protection rules",` +
-				` MAX(issue_templates) AS "Issue templates",` +
-				` MAX(codeowners_errors) AS "CODEOWNERS errors",` +
-				` url AS "Link"` +
-				" FROM gh_repo_policy WHERE $__timeFilter(time) AND " + RF +
-				" GROUP BY 1, 8 ORDER BY 1",
+				` CAST(security_policy AS INT) AS "Security policy",` +
+				` CAST(delete_branch_on_merge AS INT) AS "Delete on merge",` +
+				` CAST(auto_merge AS INT) AS "Auto merge",` +
+				` branch_protection_rules AS "Protection rules",` +
+				` issue_templates AS "Issue templates",` +
+				` codeowners_errors AS "CODEOWNERS errors",` +
+				` url AS "Link" FROM (` +
+				"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn" +
+				" FROM gh_repo_policy" + ciInRange + RF + deliveryNewestRow +
+				" ORDER BY 1",
 		)}, &P{
 			Prom: []Target{
 				promTbl(fmt.Sprintf("max by (repo) (github_repo_policy_security_policy{%s})", PF), "A"),
@@ -537,11 +541,17 @@ func settingsAndKeys(b *builder) []Panel {
 			ES: polES, ESTF: polEStf,
 		}),
 		panel("table", "Account keys", box{W: 12, H: 7, X: 0, Y: 43}, []Target{sqlT(
+			// Each key's newest row. The row is a daily snapshot, so the least
+			// days since use over the range was the reading of the range's
+			// first day, a month short on a key nobody uses, and the most
+			// never_used kept saying never used after a key's first use.
 			`SELECT key AS "Key", kind AS "Kind",` +
-				` MIN(days_since_use) AS "Days since use",` +
-				` MAX(never_used) AS "Never used",` +
-				` MIN(days_to_expiry) AS "Days to expiry", MAX(url) AS "Link"` +
-				" FROM gh_key WHERE $__timeFilter(time) GROUP BY 1, 2 ORDER BY 2, 1",
+				` days_since_use AS "Days since use",` +
+				` never_used AS "Never used",` +
+				` days_to_expiry AS "Days to expiry", url AS "Link" FROM (` +
+				"SELECT *, ROW_NUMBER() OVER (PARTITION BY key, kind ORDER BY time DESC) AS rn" +
+				" FROM gh_key WHERE $__timeFilter(time)" + deliveryNewestRow +
+				" ORDER BY 2, 1",
 		)}, &P{
 			Prom: []Target{
 				promTbl("min by (key, kind) (github_key_days_since_use)", "A"),
@@ -723,11 +733,13 @@ func policyAndDependencies(b *builder) []Panel {
 	// `present` is a boolean, so max and never top_metrics: the sink writes a
 	// Go bool as a JSON boolean, Elasticsearch hands it back out of a
 	// top_metrics as the string "true", and the plugin panics converting that
-	// to a float. `path` is a string and cannot be a metric at all, so it is a
-	// terms bucket, which costs no rows here because one file in force has one
-	// path.
+	// to a float. The max is taken inside each file's newest document, which
+	// for a file deleted inside the range is the row dated at the deletion.
+	// `path` is a string and cannot be a metric at all, so it is a terms
+	// bucket below that document, which costs no rows because one document
+	// has one path.
 	policyES, policyEStf := esTbl(pf,
-		[]any{b.tm("repo", 500), b.tm("file", 10), b.tm("path", 50), b.tmURL()},
+		[]any{b.tm("repo", 500), b.tm("file", 10), b.newestDoc(), b.tm("path", 50), b.tmURL()},
 		[]any{b.mMax("present"), b.mMax("changes")},
 		[]named{
 			{inventoryRepoTerm, "Repository"},
@@ -736,20 +748,22 @@ func policyAndDependencies(b *builder) []Panel {
 			{inventoryURLTerm, "Link"},
 			{"present", "Present"},
 			{"changes", "Changes"},
-		}, []string{ESF})
+		}, []string{ESF}, hideColumns(panelESTime))
 
 	ecoGR, ecoGRtf := gTbl(rowsOf(inventoryKeepLast+rp(de, "blocks")+")",
 		gn(de, "repo"), gn(de, "ecosystem"), gn(de, "interval")),
 		"Repository, ecosystem, interval", []col{{"lastNotNull", "Blocks"}})
+	// The newest version of each file, as the SQL twin reads it: each
+	// repository's newest timestamp, then the blocks stamped at it.
 	ecoES, ecoEStf := esTbl(de,
-		[]any{b.tm("repo", 500), b.tm("ecosystem", 20), b.tm("interval", 10)},
+		[]any{b.tm("repo", 500), b.newestDoc(), b.tm("ecosystem", 20), b.tm("interval", 10)},
 		[]any{b.mMax("blocks")},
 		[]named{
 			{inventoryRepoTerm, "Repository"},
 			{"ecosystem.keyword", "Ecosystem"},
 			{"interval.keyword", "Interval"},
 			{"blocks", "Blocks"},
-		}, []string{ESF})
+		}, []string{ESF}, hideColumns(panelESTime))
 
 	packGR, packGRtf := gTbl(fmt.Sprintf(
 		`sortByMaxima(groupByNode(keepLastValue(%s), %d, "sum"))`,
@@ -812,10 +826,7 @@ func policyAndDependencies(b *builder) []Panel {
 			GR: policyGR, GRTF: policyGRtf,
 			GRDesc: "Graphite has no path either: it is a string. " + grRows + " " + grRange,
 			ES:     policyES, ESTF: policyEStf,
-			ESDesc: "Elasticsearch answers Present and Changes with the largest reading inside " +
-				"the range rather than with the newest row, because the aggregation that takes " +
-				"the newest one returns a boolean as text, which the datasource cannot render. " +
-				"A url is written only for a file that is there, so the absent rows are " +
+			ESDesc: "A url is written only for a file that is there, so the absent rows are " +
 				"kept by bucketing them under an empty one. " + esRange,
 		}),
 		panel("table", "Dependabot ecosystems", box{W: 12, H: 12, X: 12, Y: 57}, []Target{sqlT(ecosystems)}, &P{
@@ -846,9 +857,7 @@ func policyAndDependencies(b *builder) []Panel {
 				"block removed inside the range keeps its last value here, where the SQL " +
 				"twin drops it.",
 			ES: ecoES, ESTF: ecoEStf,
-			ESDesc: esRange + " A block removed from a dependabot.yml inside the range still " +
-				"has a document in it, where the SQL twin reads only the newest version of " +
-				"the file and drops it.",
+			ESDesc: esRange,
 		}),
 		panel("barchart", "Dependencies by ecosystem", box{W: 12, H: 7, X: 0, Y: 69},
 			[]Target{sqlT(packages)}, &P{

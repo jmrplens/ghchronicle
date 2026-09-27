@@ -112,15 +112,18 @@ func contributionTotals(b *builder) []Panel {
 	}
 	weekPath := func(field string) string { return rp("gh_commits_week", field) }
 
-	// The punch card is a whole-life snapshot per repository that only grows,
-	// so the newest value is the largest and a max over the range reads it;
-	// the repositories are then added together.
+	// The punch card is a snapshot per repository, rewritten on every read:
+	// each repository's newest reading of each hour, as the SQL twin's newest
+	// row per repository and hour, and then the repositories added together.
+	// The largest reading of the range stood here before, which is the newest
+	// only for as long as a count never falls, and a rewritten history is one
+	// way for it to fall.
 	punch := func(node, name string) (gr []Target, grtf []any, es []Target, estf []any) {
 		gr, grtf = gTbl(fmt.Sprintf(`sortByName(groupByNode(keepLastValue(%s), %d, "sum"))`,
 			rp("gh_commit_punchcard", "commits"), gn("gh_commit_punchcard", node)),
 			name, []col{{"lastNotNull", "Commits"}})
 		es, estf = esTbl("gh_commit_punchcard",
-			[]any{b.tm(node, 24, "_key", "asc"), b.tm("repo", 500)}, []any{b.mMax("commits")},
+			[]any{b.tm(node, 24, "_key", "asc"), b.tm("repo", 500), b.newestDoc()}, []any{b.mMax("commits")},
 			[]named{
 				{node + ".keyword", name},
 				{"repo.keyword", "Repository"},

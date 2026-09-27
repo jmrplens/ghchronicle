@@ -514,20 +514,19 @@ Los recuentos de alertas son estado actual, reescritos en cada pasada, así que
 todos los paneles que cuentan alertas abiertas toman la fila más reciente de
 cada serie y suman esas, no el rango. Sumar el rango cuenta cada alerta una vez
 por pasada: antes de arreglarlo la tarjeta marcaba 3,61 mil donde la cuenta
-tiene unas pocas decenas. La tabla de funciones y las cuatro tablas del final
-de la sección, los ajustes, la configuración de code scanning, los permisos del
+tiene unas pocas decenas. La tabla de funciones y las cuatro tablas del final de
+la sección, los ajustes, la configuración de code scanning, los permisos del
 token y los secretos, también son estado actual, y leen la fila más reciente de
 cada repositorio, así que una función apagada o una alerta arreglada dentro del
 rango se leen como están y no como estaban en su punto más alto. Elasticsearch
-es la excepción en cuatro sitios, y cada uno lo dice en su descripción: su
-curva de alertas abiertas toma la serie más grande de cada severidad en un
-bucket en vez de sumarlas, y sus ajustes de seguridad, su configuración de code
-scanning y sus permisos del token toman la lectura más alta del rango. Graphite
-es la excepción en tres, y lo dice en cada una: sus ajustes, su configuración
-de code scanning y sus permisos del token nombran cada fila a partir de la
-ruta, de la que forman parte el `status` de un ajuste, el `state`, la
-`query_suite` y el `schedule` de la configuración, y los `permissions`, así que
-un cambio dentro del rango son dos filas, la vieja y la nueva.
+hace lo mismo reduciendo cada serie a su documento más reciente y leyendo ese, y
+es la excepción en un sitio, que lo dice en su descripción: su curva de alertas
+abiertas toma la serie más grande de cada severidad en un bucket en vez de
+sumarlas. Graphite es la excepción en tres, y lo dice en cada una: sus ajustes,
+su configuración de code scanning y sus permisos del token nombran cada fila a
+partir de la ruta, de la que forman parte el `status` de un ajuste, el `state`,
+la `query_suite` y el `schedule` de la configuración, y los `permissions`, así
+que un cambio dentro del rango son dos filas, la vieja y la nueva.
 
 Dos paneles son información nueva, no otra vista. El tiempo hasta
 resolver una alerta de code scanning sale de unas fechas que se descargaban y se

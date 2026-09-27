@@ -8727,7 +8727,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT environment AS \"Environment\", MIN(days_since_change) AS \"Idle\", repo AS \"Repository\", MAX(url) AS \"Link\" FROM gh_environment WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring}) GROUP BY 1, 3 ORDER BY 2 DESC",
+              "rawSql": "SELECT environment AS \"Environment\", days_since_change AS \"Idle\", repo AS \"Repository\", url AS \"Link\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, environment ORDER BY time DESC) AS rn FROM gh_environment WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1 ORDER BY 2 DESC",
               "refId": "A"
             }
           ],
@@ -12416,7 +12416,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT repo AS \"Repository\", MAX(size_bytes) AS \"Cache\", MAX(count) AS \"Entries\" FROM gh_actions_cache WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring}) GROUP BY 1 ORDER BY 2 DESC",
+              "rawSql": "SELECT repo AS \"Repository\", size_bytes AS \"Cache\", count AS \"Entries\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn FROM gh_actions_cache WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1 ORDER BY 2 DESC",
               "refId": "A"
             }
           ],
@@ -14667,7 +14667,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT repo AS \"Repository\", MAX(CAST(security_policy AS INT)) AS \"Security policy\", MAX(CAST(delete_branch_on_merge AS INT)) AS \"Delete on merge\", MAX(CAST(auto_merge AS INT)) AS \"Auto merge\", MAX(branch_protection_rules) AS \"Protection rules\", MAX(issue_templates) AS \"Issue templates\", MAX(codeowners_errors) AS \"CODEOWNERS errors\", url AS \"Link\" FROM gh_repo_policy WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring}) GROUP BY 1, 8 ORDER BY 1",
+              "rawSql": "SELECT repo AS \"Repository\", CAST(security_policy AS INT) AS \"Security policy\", CAST(delete_branch_on_merge AS INT) AS \"Delete on merge\", CAST(auto_merge AS INT) AS \"Auto merge\", branch_protection_rules AS \"Protection rules\", issue_templates AS \"Issue templates\", codeowners_errors AS \"CODEOWNERS errors\", url AS \"Link\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn FROM gh_repo_policy WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1 ORDER BY 1",
               "refId": "A"
             }
           ],
@@ -14747,7 +14747,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT \"key\" AS \"Key\", kind AS \"Kind\", MIN(days_since_use) AS \"Days since use\", MAX(never_used) AS \"Never used\", MIN(days_to_expiry) AS \"Days to expiry\", MAX(url) AS \"Link\" FROM gh_key WHERE $__timeFilter(time) GROUP BY 1, 2 ORDER BY 2, 1",
+              "rawSql": "SELECT \"key\" AS \"Key\", kind AS \"Kind\", days_since_use AS \"Days since use\", never_used AS \"Never used\", days_to_expiry AS \"Days to expiry\", url AS \"Link\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY \"key\", kind ORDER BY time DESC) AS rn FROM gh_key WHERE $__timeFilter(time)) x WHERE rn = 1 ORDER BY 2, 1",
               "refId": "A"
             }
           ],

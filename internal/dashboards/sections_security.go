@@ -567,11 +567,11 @@ func scanningAndResolution(b *builder) []Panel {
 // adds anything over the range. Thirty days of a daily snapshot is thirty
 // identical rows, which is how the open-alert tile above once read 3.61K.
 //
-// Elasticsearch is the exception, and only where a top_metrics cannot be used:
-// it panics on a boolean and shortens the frame on a number that is absent
-// rather than zero, so three of these panels take the largest reading inside
-// the range instead and say so in their own descriptions. The fourth reads a
-// number that can go down, so it takes the newest.
+// Elasticsearch cannot use a top_metrics for three of them: it panics on a
+// boolean and shortens the frame on a number that is absent rather than zero.
+// Those three take a max inside each series' newest document instead, which
+// is the newest reading all the same (see newestDoc), and the fourth, whose
+// numbers are always written, takes the newest with a top_metrics.
 //
 // Graphite reads the newest point of each series too, but a series there is
 // the whole path, and the status, the state, suite and schedule, and the
@@ -627,23 +627,28 @@ func posture(b *builder) []Panel {
 	// read them: top_metrics hands a boolean back as the string "true", and the
 	// Elasticsearch plugin panics on it with `interface {} is string, not
 	// float64`, which is the bug gh_repo_community's has_* columns already met.
-	// A max of a boolean is 1 or 0, which the word mapping reads.
-	setES, setEStf := esTbl(ss, []any{b.tm("repo", 500), b.tm("setting", 10), b.tm("status", 5)},
+	// A max of a boolean is 1 or 0, which the word mapping reads, and taken
+	// inside the newest document it is the newest reading. The status is below
+	// that document, so a setting whose status changed inside the range is one
+	// row, as it is in the SQL twin.
+	setES, setEStf := esTbl(ss, []any{b.tm("repo", 500), b.tm("setting", 10), b.newestDoc(), b.tm("status", 5)},
 		[]any{b.mMax("enabled")},
 		[]named{
 			{inventoryRepoTerm, "Repository"},
 			{"setting.keyword", "Setting"},
 			{"status.keyword", "Status"},
 			{"e", "Enabled"},
-		}, []string{ESF})
+		}, []string{ESF}, hideColumns(panelESTime))
 	// Both numbers are deliberately absent on some rows: GitHub sends no
 	// change date for a setup it has never changed, and a repository that
 	// answers 403 has neither that nor a language count. So they are asked for
-	// with a max as the deploy keys panel is: an aggregation appends a null
-	// there and the row keeps its shape, where a top_metrics appends nothing at
-	// all and the panel dies with `frame has different field lengths`.
+	// with a max inside the newest document, as the deploy keys panel does: an
+	// aggregation appends a null there and the row keeps its shape, where a
+	// top_metrics appends nothing at all and the panel dies with `frame has
+	// different field lengths`. The SQL twin reads one row per repository, so
+	// the state, suite and schedule are of that document too.
 	csuES, csuEStf := esTbl(csu, []any{
-		b.tm("repo", 500), b.tm("state", 5), b.tm("query_suite", 10), b.tm("schedule", 10),
+		b.tm("repo", 500), b.newestDoc(), b.tm("state", 5), b.tm("query_suite", 10), b.tm("schedule", 10),
 	}, []any{b.mMax("languages"), b.mMax("days_since_change")},
 		[]named{
 			{inventoryRepoTerm, "Repository"},
@@ -652,22 +657,20 @@ func posture(b *builder) []Panel {
 			{"schedule.keyword", "Schedule"},
 			{"l", "Languages"},
 			{"d", deliveryLastChanged},
-		}, []string{ESF})
-	apES, apEStf := esTbl(ap, []any{b.tm("repo", 500), b.tm("permissions", 5)},
+		}, []string{ESF}, hideColumns(panelESTime))
+	apES, apEStf := esTbl(ap, []any{b.tm("repo", 500), b.newestDoc(), b.tm("permissions", 5)},
 		[]any{b.mMax("can_approve_pr")},
 		[]named{
 			{inventoryRepoTerm, "Repository"},
 			{"permissions.keyword", "Permissions"},
 			{"c", securityCanApprovePR},
-		}, []string{ESF})
-	// The newest reading rather than the largest, which is what the other three
-	// panels here settle for and what this one must not. `days_since_rotation`
-	// is the one number in this section that goes down: it climbs with the
-	// secret's age until somebody rotates the credential and then restarts at
-	// zero. A max over the range would hand back the value from the day before
-	// the rotation, closing the gap between the two columns and hiding the only
-	// rotation the panel exists to show. Both fields are written on every point,
-	// so there is no absent value to shorten the frame here.
+		}, []string{ESF}, hideColumns(panelESTime))
+	// The newest reading, and here with a top_metrics: `days_since_rotation`
+	// climbs with the secret's age until somebody rotates the credential and
+	// then restarts at zero, so a max over the range would hand back the value
+	// from the day before the rotation, closing the gap between the two columns
+	// and hiding the only rotation the panel exists to show. Both fields are
+	// written on every point, so there is no absent value to shorten the frame.
 	scES, scEStf := esTbl(sc, []any{b.tm("repo", 500), b.tm("kind", 5), b.tm("secret", 500)},
 		[]any{b.mNewest("age_days", "days_since_rotation")},
 		[]named{
@@ -677,10 +680,6 @@ func posture(b *builder) []Panel {
 			{"a", "Age"},
 			{"r", securityLastRotated},
 		}, []string{ESF})
-
-	esMaxNote := "In Elasticsearch this is the largest reading inside the range rather than " +
-		"the newest, because reading a boolean as the newest document's own value hands " +
-		"the panel back the string `true` and the plugin fails on it."
 
 	return []Panel{
 		panel("table", "Security settings", box{W: 12, H: 12, X: 0, Y: 41}, []Target{sqlT(settings)}, &P{
@@ -702,7 +701,7 @@ func posture(b *builder) []Panel {
 			GRDesc: "Graphite names each row repository, setting and status from the path, so a " +
 				"setting whose status changed inside the range is two rows, the old status and " +
 				"the new, each with its last reading.",
-			ES: setES, ESTF: setEStf, ESDesc: esMaxNote,
+			ES: setES, ESTF: setEStf,
 		}),
 		panel("table", "Default code scanning setup", box{W: 12, H: 12, X: 12, Y: 41}, []Target{sqlT(setup)}, &P{
 			Prom: []Target{
@@ -739,9 +738,6 @@ func posture(b *builder) []Panel {
 				"the schedule are part of the path, so a setup that changed one of them inside " +
 				"the range is two rows, the old and the new.",
 			ES: csuES, ESTF: csuEStf,
-			ESDesc: "In Elasticsearch both numbers are the largest reading inside the range " +
-				"rather than the newest. A setup with no change date has no reading at all, " +
-				"and its cell is empty.",
 		}),
 		panel("table", "Workflow token permissions", box{W: 12, H: 7, X: 0, Y: 53}, []Target{sqlT(policy)}, &P{
 			Prom: []Target{promTbl(fmt.Sprintf(
@@ -761,7 +757,7 @@ func posture(b *builder) []Panel {
 			GR: apGR, GRTF: apGRtf,
 			GRDesc: "Graphite names each row repository and permissions from the path, so " +
 				"permissions changed inside the range are two rows, the old and the new.",
-			ES: apES, ESTF: apEStf, ESDesc: esMaxNote,
+			ES: apES, ESTF: apEStf,
 		}),
 		panel("table", "Secret rotation", box{W: 12, H: 7, X: 12, Y: 53},
 			[]Target{sqlT(secrets)}, &P{

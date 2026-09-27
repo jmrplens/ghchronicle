@@ -482,19 +482,18 @@ The alert counts are current state, rewritten on every sweep, so every panel
 that counts open alerts takes the newest row of each series and adds those up
 rather than summing the range. Summing the range counts each alert once per
 sweep: before this was fixed the tile read 3.61 thousand where the account had a
-few dozen. The feature table and the four tables at the foot of the section,
-the settings, the code scanning setup, the token permissions and the secrets,
-are current state too, and read each repository's newest row, so a feature
-switched off or an alert fixed inside the range reads as it stands and not as it
-was at its highest. Elasticsearch is the exception in four places,
-each saying so in its description: its curve of open alerts takes the largest
-series of each severity in a bucket rather than adding them, and its security
-settings, code scanning setup and token permissions take the largest reading of
-the range. Graphite is the exception in three, and says so in each: its
-settings, code scanning setup and token permissions name each row from the
-path, of which a setting's `status`, the setup's `state`, `query_suite` and
-`schedule`, and the `permissions` are part, so a change inside the range is two
-rows, the old one and the new.
+few dozen. The feature table and the four tables at the foot of the section, the
+settings, the code scanning setup, the token permissions and the secrets, are
+current state too, and read each repository's newest row, so a feature switched
+off or an alert fixed inside the range reads as it stands and not as it was at
+its highest. Elasticsearch does the same by narrowing each series to its newest
+document and reading that, and is the exception in one place, which says so in
+its description: its curve of open alerts takes the largest series of each
+severity in a bucket rather than adding them. Graphite is the exception in
+three, and says so in each: its settings, code scanning setup and token
+permissions name each row from the path, of which a setting's `status`, the
+setup's `state`, `query_suite` and `schedule`, and the `permissions` are part,
+so a change inside the range is two rows, the old one and the new.
 
 Two panels are new information rather than a different view. Time to
 resolve a code scanning alert comes from dates that were being downloaded and
