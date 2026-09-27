@@ -318,8 +318,14 @@ func (r *Runner) clock() time.Time {
 
 // discoverRepos rebuilds the repository list when it has gone stale, and
 // leaves the previous one in place otherwise.
+//
+// Stale to within half a tick, for the reason due gives: the sweep an hour
+// after the one that listed the repositories reads its clock a few
+// milliseconds either side of the hour, and asked to the millisecond the
+// list outlived it about half the time, so a repository created in between
+// waited a tick more, an hour and a quarter at the quarter hour tick.
 func (r *Runner) discoverRepos(ctx context.Context, now time.Time) error {
-	if r.repos != nil && now.Sub(r.reposAt) <= discoverInterval {
+	if r.repos != nil && now.Sub(r.reposAt) < discoverInterval-r.slack() {
 		return nil
 	}
 	found, err := collect.Discover(ctx, r.API, &collect.Filter{

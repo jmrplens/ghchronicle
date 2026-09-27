@@ -579,29 +579,47 @@ func TestARepositoryThatRunsOutOfBudgetLeavesTheFamilyUnmarked(t *testing.T) {
 	}
 }
 
-// TestTheRepositoryListIsReusedForExactlyTheDiscoveryInterval: a list an
-// hour old is still the list, and one a moment older is rebuilt.
-func TestTheRepositoryListIsReusedForExactlyTheDiscoveryInterval(t *testing.T) {
+// TestTheRepositoryListIsRebuiltHalfATickBeforeTheHour: the list is reused
+// until the discovery interval less half a tick, and rebuilt from then on,
+// which is the margin due gives a family. Without it the sweep an hour after
+// the listing, reading its clock a millisecond early, reused the list for a
+// tick more, and at the quarter hour tick a repository created in between
+// waited an hour and a quarter for its first sweep.
+func TestTheRepositoryListIsRebuiltHalfATickBeforeTheHour(t *testing.T) {
 	t.Parallel()
 	var asked atomic.Int32
 	r := sweepRunner(t, func(w http.ResponseWriter, _ *http.Request) {
 		asked.Add(1)
 		_, _ = w.Write([]byte(`[]`))
 	})
+	r.Cfg.Heartbeat = "15m"
+	if err := r.Cfg.Validate(); err != nil {
+		t.Fatal(err)
+	}
 	now := time.Now()
-	r.reposAt = now.Add(-discoverInterval)
+	// Three ticks on: the list is still the list.
+	r.reposAt = now.Add(-45 * time.Minute)
 	if err := r.discoverRepos(t.Context(), now); err != nil {
 		t.Fatal(err)
 	}
 	if n := asked.Load(); n != 0 || names(r.repos) != "o/n" {
-		t.Errorf("a list exactly an hour old was rebuilt: %d requests, repos %q", n, names(r.repos))
+		t.Errorf("a list three ticks old was rebuilt: %d requests, repos %q", n, names(r.repos))
 	}
-	later := now.Add(time.Nanosecond)
-	if err := r.discoverRepos(t.Context(), later); err != nil {
+	// Just inside the margin: still the list.
+	r.reposAt = now.Add(-(discoverInterval - 7*time.Minute - 31*time.Second))
+	if err := r.discoverRepos(t.Context(), now); err != nil {
 		t.Fatal(err)
 	}
-	if asked.Load() == 0 || !r.reposAt.Equal(later) {
-		t.Errorf("a list past the hour was not rebuilt: %d requests, rebuilt at %s", asked.Load(), r.reposAt)
+	if n := asked.Load(); n != 0 {
+		t.Errorf("a list more than half a tick short of the hour was rebuilt: %d requests", n)
+	}
+	// The fourth tick, a millisecond short of the hour: rebuilt.
+	r.reposAt = now.Add(-(discoverInterval - time.Millisecond))
+	if err := r.discoverRepos(t.Context(), now); err != nil {
+		t.Fatal(err)
+	}
+	if asked.Load() == 0 || !r.reposAt.Equal(now) {
+		t.Errorf("the sweep a millisecond short of the hour kept the list: %d requests, rebuilt at %s", asked.Load(), r.reposAt)
 	}
 }
 
@@ -765,7 +783,7 @@ func TestEverySweepOnATickIsJudgedByItsOwnAnswer(t *testing.T) {
 	}{
 		{name: "every tick succeeds", finished: 3},
 		{
-			name: "every tick fails", discoveredAgo: discoverInterval - 30*time.Second,
+			name: "every tick fails", discoveredAgo: discoverInterval - 45*time.Second,
 			named: []string{"not-a-full-name"}, finished: 1, failed: 2,
 		},
 	} {
