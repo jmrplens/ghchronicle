@@ -12,6 +12,255 @@ Versions follow [semantic versioning](https://semver.org/). The dates are the
 day the tag was pushed, with one exception: 2.5.2 has a section and no tag. It
 was never released on its own, and its changes shipped in 2.6.0.
 
+## 2.6.1 - 2026-09-28
+
+An audit of the documentation against the code of 2.6.0, every page in both
+languages read beside what it describes. Most of what it found was prose the
+release had left behind, and the pages now say what the code does. Some of it
+was the code: a path setting took `~` and `${VAR}` as the characters they are,
+whether a discussion comment is the accepted answer was part of its row's
+identity although a maintainer decides it days later, the repository list
+could outlive its hour by a tick, the example configuration pinned every
+cadence of its release for whoever copied it, several dashboard tables read
+the largest value of the range where they meant the newest, or the other way
+round, or counted an item once per row a store held of it, and every one-shot
+run reported at Info, as news, how it always runs.
+
+- **A path setting means the path it spells.** `state_file`,
+  `sinks.dedupe_file`, `log.file`, `sinks.file.path` and `sinks.sql.path` were
+  taken as written, where credentials and addresses were expanded, so
+  `state_file: ~/.ghchronicle/state.json` was a directory called `~` under
+  wherever the process started: `-backfill-status` printed the checkpoint as
+  `~/.ghchronicle/state-progress.json`, the cache recipe on the Actions page
+  cached nothing, and the Windows page's `${LOCALAPPDATA}` paths were folders
+  named after the reference. The five now take a leading `~` as the home
+  directory and `${VAR}` from the environment, and the state file is expanded
+  before the ledger, the checkpoint and the cache file are derived from it, so
+  they land beside it. `~name` is left as written. Two spellings that would
+  put files where nobody looks stop the start, naming the key: a `~` with no
+  home directory, and a `${VAR}` that is unset or empty, which expanded to
+  nothing made `state_file: ${STATE_DIRECTORY}/state.json` the root's
+  `/state.json`. The configuration file's own path is a command-line argument
+  and is not expanded, and the header `-setup` writes now says which values
+  are. A configuration that used either spelling kept its state in the oddly
+  named directory, where 2.6.1 does not look: move the files across before the
+  first start if the walks they save are worth keeping, as the
+  [upgrade page](https://jmrp.io/docs/ghchronicle/install/upgrading/#a-path-setting-is-expanded)
+  says.
+- **Whether a comment is the accepted answer is a field.**
+  `gh_discussion_comment` carried `is_answer` as a tag, and a maintainer
+  accepts an answer days after the comment was written, or takes it back, so
+  the value moved after the row's own date, which is what the measurements page
+  says makes a field. As a tag, a comment read before it was accepted and again
+  after was two rows at the same instant for ever, and in the exporter an item
+  of two series, counted in both. 2.6.1 writes no `is_answer`: the `answers`
+  field every row already carried, 1 for the accepted answer and 0 for any
+  other comment, says the same thing, so no store needs a column, and InfluxDB
+  3, which fixed `is_answer` as a tag column, has nothing to refuse. The
+  exporter keeps `user` and `own` as labels. A store written before 2.6.1 and
+  after it holds the measurement in two shapes: a comment an earlier release
+  read gains one more row, without the tag, when a 2.6.1 sweep reads it again.
+  The dashboards read both shapes, one row per comment in every store, accepted
+  when any of its rows says so, so an answer accepted before the upgrade and
+  taken back since still reads accepted. What makes it one shape again is
+  dropping the measurement and running a `-backfill`: the table in InfluxDB 3
+  and in PostgreSQL, the `github.discussion_comment` paths in Graphite, the
+  `ghchronicle-gh_discussion_comment` index in Elasticsearch, as the
+  [measurements page](https://jmrp.io/docs/ghchronicle/collectors/measurements/#how-to-read-the-tables)
+  says; Prometheus holds nothing across a restart and needs nothing. A tool
+  that makes the change is planned for a later release, in
+  [#96](https://github.com/jmrplens/ghchronicle/issues/96).
+- **The PostgreSQL sink conflicts on the key its table has.** The connecting
+  sink built its `ON CONFLICT` from the tags of the points in hand, the key
+  this release would declare, and a table an earlier release made keeps the
+  key it was made with. Once `is_answer` stopped being written the two
+  differed: measured against PostgreSQL 18.6, with a `gh_discussion_comment`
+  table made with `is_answer` in its key, a point without the tag was refused
+  with "there is no unique or exclusion constraint matching the ON CONFLICT
+  specification", and the `gh_discussion` row of the same batch was rolled
+  back with it. The sink now reads a table's primary key from the catalog when
+  it reads its columns, once per table per process, and conflicts on that; a
+  key column the point no longer carries takes the empty string every tag
+  column defaults to, so the new rows sit beside the old ones until the table
+  is dropped. Measured the same way, both rows were written, and the batch's
+  other row with them. The SQL file sink cannot read a catalog: replayed into
+  such a table, its `gh_discussion_comment` statements are refused one by one
+  and the rest of the file loads.
+- **The repository list is rebuilt half a tick before its hour.** Discovery
+  kept the list while it was an hour old or less, to the millisecond, and the
+  sweep an hour after the listing reads its clock a few milliseconds either
+  side of the hour. When it read a hair short, the list outlived that sweep
+  and a repository created in between waited a tick more: an hour and a
+  quarter at the quarter-hour tick. It is the lateness 2.5.2 took out of when
+  a family is due, and discovery takes the same half-tick margin.
+- **The example configuration shows the cadences without setting them.**
+  `config.example.yaml` set all thirty-four families under `every.families`,
+  each to its release's built-in value, so a configuration copied from it
+  pinned every cadence of that release. One copied from 2.5.1, compared line by
+  line against the tagged example, keeps twelve families slower than 2.6.0
+  runs them: `account`, `outbound` and `totals` at `12h`, `achievements` at
+  `24h`, `stars`, `billing` and `analyses` at `6h`, `discussions` at `2h`,
+  `deployments` at `1h`, and `activity`, `events` and `notifs` at `30m`. Nothing
+  warns, since the warning at start-up is for a cadence four times shorter than
+  the built-in one. The block is now commented out, every line with its
+  built-in value and the reason for it, and a test fails when the example sets
+  any cadence. Deleting those lines from a copied configuration is what picks
+  up the current cadences; a line kept is a cadence chosen. The reason given
+  for `actions`, "the only family with a per-minute rhythm", was wrong beside
+  `events`, `notifs`, `activity` and `ratelimit`, which run at the same quarter
+  hour, and it now says what the cadence is for.
+- **"Security features" and "Artifact storage counted" read the newest row.**
+  "Security features" took `MAX()` of `enabled` and `open_alerts` over the
+  range, so a feature switched off inside the range read as on and an alert
+  fixed inside it still counted at its peak. Every store now reads the newest
+  reading of each repository's feature: InfluxDB and PostgreSQL number each
+  full name and feature's rows newest first and keep the first, Elasticsearch
+  buckets them by their newest timestamp, Graphite reads the last value of each
+  series, consolidated by the last value, and Prometheus asked an instant query
+  already. "Artifact storage counted" put `MAX()` of each of its four counts
+  side by side, so the live size was the largest the range had held and
+  Walked came from whichever sweep read furthest, which hid the short Walked a
+  walk cut short by a failed page writes on purpose; the SQL stores now take
+  all four from each repository's newest row. In the containerised suite,
+  against InfluxDB 3 with a newer reading that finds a feature switched off
+  and an older artifact total that walked further written beside a sweep, the
+  two tables as they were read Enabled 1, Open alerts 1, Walked 9 and a live
+  size of 205,800 bytes, where the newest rows say 0, 0, 2 and 204,800; they now
+  read the newest rows.
+- **"Every bucket" gives the extremes of the range in every store.** The SQL
+  stores put the most any reading in the range had used and the least any had
+  left under Most used and Lowest remaining. Graphite and Elasticsearch put
+  the newest reading under those names, and Prometheus the value as it stands,
+  so a bucket spent to its last request an hour ago read as untouched in three
+  of the five dashboards once it had refilled. Graphite now keeps the lowest
+  remaining, consolidated by the minimum, Elasticsearch takes the largest
+  limit and used and the smallest remaining, and Prometheus asks
+  `max_over_time` and `min_over_time` over the range.
+- **"Work elsewhere" lists each item once in Elasticsearch.** It listed the
+  newest forty documents of `gh_external_contribution`, and an open item is a
+  document for every day it is seen open, so one pull request filled a row a
+  day and pushed older items off the table. Each item is now a bucket holding
+  its newest document.
+- **"Discussion answers" counts each comment once.** It counted rows in
+  InfluxDB and PostgreSQL and documents in Elasticsearch, so a comment read
+  before and after it was accepted was two comments and two accepted answers,
+  and in Graphite it was one row for the whole account under a Repository
+  column. It now reads one row per comment in every store, as "Answers
+  elsewhere" does, and Graphite gives a row per repository.
+- **Graphite tables that add their points up are consolidated by sum.** A
+  table sends no `maxDataPoints`, so Grafana asks for the panel's width and
+  graphite-web averages neighbouring points to fit it before the table adds
+  them up: measured against `graphiteapp/graphite-statsd:1.1.10-5` with the
+  repository's storage schema, three discussion comments over the last thirty
+  days read 1.5 at 500 points and 3 with none. The twenty tables that add
+  their points up now ask for the sum.
+- **Panel descriptions say what the panels read.** "Oldest open alerts" called
+  itself the rows the two counts are made of, where since 2.6.0 the counts
+  come from a read of the open alerts alone and the rows from the newest
+  hundred in every state. The Overview's archived repositories hung on a range
+  Prometheus does not take. "Achievement progress" had Pair Extraordinaire
+  walked every hour, where the state file keeps a tally the hourly pass adds
+  to and the whole history is walked once a week. "Work elsewhere" said the
+  event feed forgets an item in three days, where it keeps its last three
+  hundred events of thirty. The artifact tables blamed the five-page cap alone
+  for a live size that is a floor, and a failed page does it too. Seventeen
+  Graphite tables that take no median said the medians were over what the
+  storage kept, two said a boolean is not a metric in Graphite, which keeps it
+  as 1 or 0, and the note on failed job output told readers to set
+  `every.joblogs`, which the loader refuses, where the key is
+  `every.families.joblogs`.
+- **A one-shot run no longer reports at Info how it always runs.** "no write
+  ledger remembers what the stores hold, listing the jobs of the runs the cache
+  file remembers again" was printed at every `-once` run after the first,
+  which is every cron job, every Action run and every Docker one-shot, and at
+  every start of a service whose sinks keep no ledger (Loki, OTLP, the
+  exporter, stdout, the file). It is now said at Debug, as `not every store
+  keeps a write ledger, ...`, and at Info only when a ledger the configuration
+  keeps reads empty, which is what deleting it to fill a wiped store looks
+  like, as `the write ledger remembers nothing, ...`. The runs are recalled
+  exactly as before. The two `achievements` warnings that said "no progress
+  rows today" say "no progress rows this pass", since the family runs every
+  hour and the next pass writes the day's rows. A filter on the old texts
+  stops matching.
+- **The documentation says what 2.6.0 does, in both languages.** The collector
+  and measurement pages: `achievements` hourly, the two measurements whose url
+  no table links, `gh_account_total` as one GraphQL query and one search, a
+  cache walk that loses an entry still writing the total, what
+  `gh_collector_family.repos` counts for the three families that ask first
+  what moved, and the types of the fields 2.6.0 added. The cost pages: those
+  three families and the movement query at a point per twenty-five
+  repositories, the half hour `notifs` asks for, the starred list `outbound`
+  reads, what makes a card pay cold, the co-authored walk of a first sweep,
+  and a backfill that resumes where it stopped. How a sweep and a backfill
+  run: one slow family a sweep, when a primed sweep runs every family, and
+  what a backfill reaches that a sweep does not. Configuration: which keys are
+  expanded and which are not, when the cache file is saved, the seven Debug
+  lines, the lines a 2.6 sweep prints routinely, and the families whose cost
+  follows activity. Installation: a Docker state directory the image's uid
+  65532 can write, an Actions cache recipe that caches, the slow families
+  arriving over two and a half hours after a service's first start, the five
+  quarter-hour families an hourly schedule slows, and a new
+  [upgrade page](https://jmrp.io/docs/ghchronicle/install/upgrading/) for
+  2.5.x to 2.6.x and for 2.6.1. The start and reference pages: the log lines
+  2.6 added, a 502 or 504 in `collector failed` that has already been asked
+  twice, a dropped PostgreSQL table declared again only after a restart, and
+  the flat cadence keys the parser refuses. The sink pages: what both
+  PostgreSQL sinks do to a table an earlier release made, Loki's one measured
+  figure for the old release lines, its line formats and its lookback, and the
+  joins and second windows Graphite and Elasticsearch cannot ask for. The
+  dashboard and card pages: every panel paragraph against the generated files,
+  the measurements each section reads derived from them, and the archived
+  repositories the Overview counts and the card does not. The landing page's
+  calendar runs every hour. README, CLAUDE.md, CONTRIBUTING, SECURITY,
+  RELEASING, the Action's notes, which promised a card without a token, and
+  the pull request and bug report templates say what the code and CI do.
+  `make analyze` runs `check-compose` as CI does, and the site's stats check
+  every row of the dashboards README's panel counts, four of which said 152
+  where all five files hold 154.
+
+Each change in behaviour carries a test shown to fail against the code before
+it, run there again for these notes: the five path settings with `~` and with
+`${VAR}`, a `~` with no home and an unset variable, each refused; the list
+rebuilt a millisecond short of the hour; the refill said at Debug where no
+ledger is kept; the example setting any cadence; a comment accepted between
+two reads, in both walks that write it; the upsert on a table made with
+`is_answer` in its key; the two comment tables read per comment in every
+store; the newest reading of "Security features" and "Artifact storage
+counted"; the extremes of "Every bucket"; "Work elsewhere" in Elasticsearch;
+the twenty Graphite tables that add their points up; every description
+above; and the two `achievements` warnings. Where such a test calls something
+the old code lacks, it was run there with that call stubbed. The binary
+against the fake GitHub holds that a one-shot run says its refill at Debug and
+never at Info, and that no comment carries `is_answer`; the containerised
+suite holds the two newest-reading tables against InfluxDB 3, as above.
+
+Not verified, and worth saying plainly:
+
+- None of it has run in production, which runs 2.6.0. The upgrade that puts
+  the second shape of `gh_discussion_comment` beside the first is the first
+  reading of it in a store.
+- The dashboards over two shapes were checked on the statements and queries
+  each store is sent, read offline. No suite writes a row of the old shape
+  into a real store, so the Graphite join across the two depths of path and
+  the Elasticsearch fold per comment have not read a store holding both. The
+  PostgreSQL conflict on the old key was measured by hand, once, and is held
+  by a test with the catalog stubbed.
+- The newest-reading tables were checked for their values against InfluxDB 3
+  alone. In the other four stores the containerised suite sends every panel
+  through Grafana and holds that it is accepted and answers, not what it
+  answers.
+- The Graphite sum was measured on one table, the discussion comments, and
+  the other nineteen follow from the same wrapper.
+- The path expansion was run on Linux. The `${LOCALAPPDATA}` paths of the
+  Windows page and the cache recipe of the Actions page follow from it and
+  were not run on Windows or on a runner.
+- The discovery margin is held by the loop's tests, not seen in production.
+- Left out rather than unproven: a tool that drops and fills
+  `gh_discussion_comment` again, which is
+  [#96](https://github.com/jmrplens/ghchronicle/issues/96), and a warning for
+  a cadence slower than the built-in one, since a slower cadence is as often
+  chosen as copied.
+
 ## 2.6.0 - 2026-09-27
 
 Built on 2.5.2, which made every family run at the cadence it states, this
