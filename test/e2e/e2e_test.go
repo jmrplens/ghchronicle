@@ -238,6 +238,7 @@ func TestOnceAgainstFakeGitHub(t *testing.T) {
 	assertDatingRulesSurvived(t, points)
 	assertStarDaysWereWritten(t, points, time.Now())
 	assertAcceptedAnswersWereRead(t, points)
+	assertCacheRowsAddUpToTheTotals(t, points)
 	assertOutboundSaysWhereTheWorkWent(t, points)
 	assertAchievementProgressAgreesWithThePage(t, points, out)
 	assertStateRecordsTheSweep(t, readState(t, filepath.Join(dir, "state.json")))
@@ -561,6 +562,48 @@ func assertStarDaysWereWritten(t *testing.T, points []point, sweptBy time.Time) 
 	}
 	if total != historyStars {
 		t.Errorf("the star days add up to %v, want the fixture's %d", total, historyStars)
+	}
+}
+
+// assertCacheRowsAddUpToTheTotals: the cache listing reached the sink as one
+// row per cache on each ref, and those rows are the whole listing. The fixture
+// holds three CodeQL caches on main whose keys cut to one tag, which a row per
+// entry wrote three times over one row; its entries add up to the count and
+// the bytes the usage call declares, so a row lost or counted twice shows as
+// a total that no longer matches.
+func assertCacheRowsAddUpToTheTotals(t *testing.T, points []point) {
+	t.Helper()
+	var declared point
+	rows := map[string]point{}
+	var entries, size float64
+	for _, p := range points {
+		switch p.Measurement {
+		case "gh_actions_cache":
+			declared = p
+		case "gh_actions_cache_entry":
+			id := p.Tags["cache"] + " " + p.Tags["ref"] + " " + p.Time
+			if _, twice := rows[id]; twice {
+				t.Errorf("two cache rows share %s", id)
+			}
+			rows[id] = p
+			n, _ := p.Fields["caches"].(float64)
+			b, _ := p.Fields["size_bytes"].(float64)
+			entries += n
+			size += b
+		}
+	}
+	if len(rows) != 3 {
+		t.Errorf("wrote %d cache rows, want one per cache and ref: 3", len(rows))
+	}
+	if entries != declared.Fields["count"] || size != declared.Fields["size_bytes"] {
+		t.Errorf("the cache rows hold %v entries of %v bytes, want the %v of %v the usage declares",
+			entries, size, declared.Fields["count"], declared.Fields["size_bytes"])
+	}
+	for _, p := range rows {
+		if p.Tags["cache"] == "codeql-overlay-base-database-1" && p.Tags["ref"] == "refs/heads/main" &&
+			(p.Fields["caches"] != float64(3) || p.Fields["size_bytes"] != float64(3871480+3801875+3835985)) {
+			t.Errorf("the CodeQL caches on main = %v, want the three entries summed", p.Fields)
+		}
 	}
 }
 

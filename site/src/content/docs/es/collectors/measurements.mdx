@@ -681,8 +681,19 @@ repositorio se quedaba corto por un factor de cincuenta y seis.
 `gh_actions_cache` dice que un repositorio ocupa doce gigabytes;
 `gh_actions_cache_entry` dice qué clave los ocupa y cuál lleva una semana sin
 tocarse, que es lo que decide qué desaloja GitHub al llegar al techo de diez
-gigabytes. La etiqueta es la clave sin su hash de contenido, porque la clave
-entera es una serie por build.
+gigabytes. La etiqueta `cache` es la clave sin su hash de contenido, porque la
+clave entera es una serie por build.
+
+Una fila de `gh_actions_cache_entry` es una caché en una ref para el día, con
+sus entradas sumadas en ella: `caches` es cuántas hay, `size_bytes` su total,
+`days_since_use` y `key` los de la usada más recientemente, y `age_days` el de
+la más antigua. Hasta la 2.5.2 era una fila por entrada, y todas las entradas
+de una caché en una ref tenían las mismas etiquetas y el mismo día, así que el
+almacén se quedaba con la última que se escribía: el 2026-09-26 las quince
+cachés de CodeQL en main de jmrplens/jmrplens, 57,9 MB entre todas, quedaron
+guardadas como una de 3,8 MB. El listado se lee en páginas de cien entradas,
+hasta diez, donde antes se paraba en la primera: el 2026-09-27 dos
+repositorios de la cuenta tenían 118 y 232 entradas.
 
 ## Seguridad
 

@@ -461,7 +461,10 @@ The two cache panels are about the ceiling. GitHub caps a repository at ten
 gigabytes and evicts the least recently used entry past it, so the bar is each
 repository against that cap and the panel is read for the distance left; the
 entry table says which key is being thrown away and which has not been touched
-for a week.
+for a week. Each row of that table is one cache of one repository: its newest
+snapshot on every ref in the range, added up, so Entries counts the entries
+GitHub holds and not the rows the table read. It is the same sum in the five
+stores; Graphite shows the size alone, since a Graphite table keeps one column.
 
 Reads `gh_billing_usage`, `gh_actions_cache` and `gh_actions_cache_entry`.
 

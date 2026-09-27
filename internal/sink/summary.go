@@ -272,7 +272,9 @@ var promRules = map[string]rule{
 
 	// Transitions, which are events rather than state.
 	"gh_issue_event": {mode: count, as: "gh_issue_events", keep: []string{"repo", "event", "kind", "bot"}},
-	// One row per cache entry, and per key rather than per build.
+	// One row per cache on each ref, its entries already summed by the
+	// collector, so the newest per label set is the whole cache and not
+	// whichever of its entries came last.
 	"gh_actions_cache_entry": {mode: keepLast, keep: []string{"repo", "cache", "ref"}},
 	// The account's keys, which are a standing fact with an expiry date.
 	"gh_key": {mode: keepLast, keep: []string{"user", "kind", "key"}},

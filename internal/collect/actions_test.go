@@ -815,7 +815,7 @@ func TestActionsCacheEntriesNameWhatHoldsTheSpace(t *testing.T) {
 
 	entries := only(t, points, "gh_actions_cache_entry")
 	if len(entries) != 2 {
-		t.Fatalf("got %d cache entries, want one per key", len(entries))
+		t.Fatalf("got %d cache rows, want one per cache and ref", len(entries))
 	}
 	// The total says a repository holds twelve gigabytes. Only this says which
 	// key holds them, which is what decides what gets evicted.

@@ -140,7 +140,7 @@ func TestCachePointsWriteTheTotalAndAgeEveryEntry(t *testing.T) {
 	f := newFixtureServer(t)
 	f.file("/repos/octocat/hello-world/actions/cache/usage", "actions_cache.json")
 	f.file("/repos/octocat/hello-world/actions/caches", "actions_caches.json")
-	points, err := cachePoints(ctx(t), f.Client, testRepo, activityBase, testNow)
+	points, err := cachePoints(ctx(t), f.Client, testRepo, activityBase, testNow, Walk{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -167,7 +167,7 @@ func TestCachePointsSkipAMissingListingButReportABrokenOne(t *testing.T) {
 		t.Parallel()
 		f := newFixtureServer(t)
 		f.status("/repos/octocat/hello-world/actions/caches", http.StatusInternalServerError, "boom")
-		points, err := cachePoints(ctx(t), f.Client, testRepo, activityBase, testNow)
+		points, err := cachePoints(ctx(t), f.Client, testRepo, activityBase, testNow, Walk{})
 		if err == nil {
 			t.Fatalf("a broken cache listing was not reported, got %d points", len(points))
 		}
@@ -177,14 +177,14 @@ func TestCachePointsSkipAMissingListingButReportABrokenOne(t *testing.T) {
 		f := newFixtureServer(t)
 		f.status("/repos/octocat/hello-world/actions/cache/usage", http.StatusInternalServerError, "boom")
 		f.file("/repos/octocat/hello-world/actions/caches", "actions_caches.json")
-		if _, err := cachePoints(ctx(t), f.Client, testRepo, activityBase, testNow); err == nil {
+		if _, err := cachePoints(ctx(t), f.Client, testRepo, activityBase, testNow, Walk{}); err == nil {
 			t.Fatal("a broken cache usage was not reported")
 		}
 	})
 	t.Run("both missing", func(t *testing.T) {
 		t.Parallel()
 		f := newFixtureServer(t)
-		points, err := cachePoints(ctx(t), f.Client, testRepo, activityBase, testNow)
+		points, err := cachePoints(ctx(t), f.Client, testRepo, activityBase, testNow, Walk{})
 		if err != nil || len(points) != 0 {
 			t.Fatalf("a repository without caches gave %d points and %v", len(points), err)
 		}

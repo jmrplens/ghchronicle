@@ -54,6 +54,12 @@ type Actions struct {
 	// Walk bounds the run list. Its default is two pages; a backfill asks for
 	// everything and bounds itself by date instead.
 	Walk Walk
+	// CacheWalk bounds the cache listing. Its default is ten pages, a
+	// thousand entries, which is four times the most any repository of the
+	// account this was measured on held (232, on 2026-09-27). Only its pages
+	// are read: the listing is what is stored now, not a history, so there
+	// is no date to stop at and a backfill has no more of it to read.
+	CacheWalk Walk
 }
 
 // RunKey is the identity of one attempt of a workflow run. The attempt is
@@ -185,7 +191,7 @@ func (a Actions) Collect(ctx context.Context, c *ghapi.Client, repo Repo, now ti
 	// The cache totals are the last call of the family and the least of it:
 	// a repository's whole run and job history is already in points, so a
 	// failure here goes back with them rather than instead of them.
-	cache, err := cachePoints(ctx, c, repo, base, now)
+	cache, err := cachePoints(ctx, c, repo, base, now, a.CacheWalk)
 	return append(points, cache...), err
 }
 
@@ -364,13 +370,14 @@ func headline(message string) string {
 	return strings.TrimSpace(line)
 }
 
-// cachePoints is what Actions has stored: the total, and a row per entry.
+// cachePoints is what Actions has stored: the total, and a row per cache on
+// each ref.
 //
-// The total says a repository holds twelve gigabytes; only the per-entry rows
-// say which key holds them and which key has not been touched for a week,
-// which is what decides what GitHub evicts when a repository crosses its ten
+// The total says a repository holds twelve gigabytes; only the rows under it
+// say which cache holds them and which has not been touched for a week, which
+// is what decides what GitHub evicts when a repository crosses its ten
 // gigabyte ceiling. Both are current state, so both are stamped now.
-func cachePoints(ctx context.Context, c *ghapi.Client, repo Repo, base map[string]string, now time.Time) ([]sink.Point, error) {
+func cachePoints(ctx context.Context, c *ghapi.Client, repo Repo, base map[string]string, now time.Time, w Walk) ([]sink.Point, error) {
 	var points []sink.Point
 	var usage struct {
 		Size  int64 `json:"active_caches_size_in_bytes"`
@@ -388,45 +395,132 @@ func cachePoints(ctx context.Context, c *ghapi.Client, repo Repo, base map[strin
 		return points, err
 	}
 
-	var caches struct {
-		TotalCount int `json:"total_count"`
-		Caches     []struct {
-			Ref            string    `json:"ref"`
-			Key            string    `json:"key"`
-			SizeInBytes    int64     `json:"size_in_bytes"`
-			CreatedAt      time.Time `json:"created_at"`
-			LastAccessedAt time.Time `json:"last_accessed_at"`
-		} `json:"actions_caches"`
-	}
-	switch _, _, err := c.GetJSON(ctx, "/repos/"+repo.FullName+"/actions/caches?per_page=100", &caches, ""); {
-	case err == nil:
-		for _, e := range caches.Caches {
-			points = append(points, sink.Point{
-				Measurement: "gh_actions_cache_entry",
-				Tags: merge(base, map[string]string{
-					// The key carries a content hash, so it is a series per
-					// build and cannot be a tag. The prefix before the hash is
-					// the thing a reader means by "the pnpm cache".
-					"cache": cachePrefix(e.Key),
-					"ref":   e.Ref,
-				}),
-				Fields: map[string]any{
-					"size_bytes": e.SizeInBytes, "caches": 1, "key": e.Key,
-					"days_since_use": int(now.Sub(e.LastAccessedAt).Hours() / 24),
-					"age_days":       int(now.Sub(e.CreatedAt).Hours() / 24),
-				},
-				// Stamped at the start of the day rather than at creation: it
-				// is a snapshot of what is stored now, and a day's sweeps
-				// should rewrite one row rather than add one an hour.
-				Time: now.UTC().Truncate(24 * time.Hour),
-			})
-		}
-	case !isSkippable(err):
-		// The totals row above is already in hand, and the per-entry listing
-		// failing does not make it less true.
+	entries, err := cacheEntries(ctx, c, repo, w)
+	if err != nil {
+		// The totals row above is already in hand, and the listing failing
+		// does not make it less true. What the listing gave before it failed
+		// is not written: summed, it would be a part of each cache, written
+		// over the whole of it that the day's earlier passes stored.
 		return points, err
 	}
-	return points, nil
+	return append(points, cacheRows(entries, base, now)...), nil
+}
+
+// cacheEntry is one entry of the cache listing.
+type cacheEntry struct {
+	ID             int64     `json:"id"`
+	Ref            string    `json:"ref"`
+	Key            string    `json:"key"`
+	SizeInBytes    int64     `json:"size_in_bytes"`
+	CreatedAt      time.Time `json:"created_at"`
+	LastAccessedAt time.Time `json:"last_accessed_at"`
+}
+
+// cacheEntries walks the cache listing, a hundred entries a page.
+//
+// Past the first page because one page is the most recently used hundred,
+// not the cache: measured on 2026-09-27, jmrplens/ghchronicle listed 118
+// entries and jmrplens/mikroscope 232. The listing is ordered by last use, so
+// an entry used between two requests moves to the front and pushes the one
+// that ended a page onto the next, where it is read again; the id is what
+// keeps it from being counted twice. A page costs nothing while the listing
+// has not changed, and it seldom has: from 2026-09-25 12:58Z to 2026-09-27
+// 01:39Z the account's listings answered 304 to 3,059 of 3,256 requests.
+func cacheEntries(ctx context.Context, c *ghapi.Client, repo Repo, w Walk) ([]cacheEntry, error) {
+	var entries []cacheEntry
+	seen := map[int64]bool{}
+	most := w.limit(10)
+	for page := 1; page <= most; page++ {
+		var res struct {
+			Caches []cacheEntry `json:"actions_caches"`
+		}
+		path := fmt.Sprintf("/repos/%s/actions/caches?per_page=100&page=%d", repo.FullName, page)
+		if _, _, err := c.GetJSON(ctx, path, &res, ""); err != nil {
+			if isSkippable(err) || isPaginationLimit(err) {
+				break
+			}
+			return nil, err
+		}
+		for _, e := range res.Caches {
+			if !seen[e.ID] {
+				seen[e.ID] = true
+				entries = append(entries, e)
+			}
+		}
+		if len(res.Caches) < 100 {
+			break
+		}
+	}
+	return entries, nil
+}
+
+// cacheRows is one row per cache on each ref, its entries summed into it.
+//
+// A row per entry is what this used to write, under the same tags and the
+// same day for every entry of one cache on one ref, which a store keys as one
+// row: it kept whichever entry was written last. Measured on
+// jmrplens/jmrplens on 2026-09-26, fifteen CodeQL caches on main, 57.9 MB
+// between them, were stored as one of 3.8 MB, and on 2026-09-27 the 737
+// entries of the whole account came to 380 rows. The write ledger keys
+// a point the same way and remembers one value per key, so it sent those
+// entries again on every pass that had nothing new. Summed here, the identity
+// is unique by construction: `caches` counts the entries, `size_bytes` is
+// their total, `days_since_use` and `key` are the most recently used entry's,
+// the one GitHub will evict last, and `age_days` is the oldest entry's.
+//
+// Stamped at the start of the day rather than at creation: it is a snapshot
+// of what is stored now, and a day's sweeps should rewrite one row rather than
+// add one an hour.
+func cacheRows(entries []cacheEntry, base map[string]string, now time.Time) []sink.Point {
+	type cacheRef struct{ cache, ref string }
+	type sum struct {
+		size    int64
+		n       int
+		newest  cacheEntry
+		created time.Time
+	}
+	sums := map[cacheRef]*sum{}
+	var order []cacheRef
+	for _, e := range entries {
+		// The key carries a content hash, so it is a series per build and
+		// cannot be a tag. The prefix before the hash is the thing a reader
+		// means by "the pnpm cache".
+		k := cacheRef{cachePrefix(e.Key), e.Ref}
+		s := sums[k]
+		if s == nil {
+			s = &sum{newest: e, created: e.CreatedAt}
+			sums[k] = s
+			order = append(order, k)
+		}
+		s.size += e.SizeInBytes
+		s.n++
+		// The id breaks a tie, so the row does not depend on which page an
+		// entry arrived on: a key that changed with the order would be a
+		// new value to write on a pass that saw nothing new.
+		if e.LastAccessedAt.After(s.newest.LastAccessedAt) ||
+			e.LastAccessedAt.Equal(s.newest.LastAccessedAt) && e.ID > s.newest.ID {
+			s.newest = e
+		}
+		if e.CreatedAt.Before(s.created) {
+			s.created = e.CreatedAt
+		}
+	}
+	day := now.UTC().Truncate(24 * time.Hour)
+	points := make([]sink.Point, 0, len(order))
+	for _, k := range order {
+		s := sums[k]
+		points = append(points, sink.Point{
+			Measurement: "gh_actions_cache_entry",
+			Tags:        merge(base, map[string]string{"cache": k.cache, "ref": k.ref}),
+			Fields: map[string]any{
+				"size_bytes": s.size, "caches": s.n, "key": s.newest.Key,
+				"days_since_use": int(now.Sub(s.newest.LastAccessedAt).Hours() / 24),
+				"age_days":       int(now.Sub(s.created).Hours() / 24),
+			},
+			Time: day,
+		})
+	}
+	return points
 }
 
 // cachePrefix is the part of a cache key before its content hash.

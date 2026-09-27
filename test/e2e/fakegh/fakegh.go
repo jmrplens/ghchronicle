@@ -97,6 +97,7 @@ var rest = map[string]string{
 	repoPath + "/actions/runs/1000163135/jobs":      "actions_jobs.json",
 	repoPath + "/actions/runs/1000163134/jobs":      "actions_jobs_failed.json",
 	repoPath + "/actions/cache/usage":               "actions_cache.json",
+	repoPath + "/actions/caches":                    "actions_caches.json",
 	repoPath + "/actions/artifacts":                 "artifacts.json",
 	repoPath + "/actions/workflows":                 "workflows.json",
 	repoPath + "/dependabot/alerts":                 "dependabot_alerts.json",

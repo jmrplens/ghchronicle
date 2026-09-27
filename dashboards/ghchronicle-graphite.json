@@ -12159,7 +12159,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "The total says a repository holds twelve gigabytes. This says which key holds them and which has not been touched for a week, which is what decides what GitHub evicts at the ten gigabyte ceiling. In Graphite two facts landing in the same storage slot of one series are reduced to one point, so the medians are over what the storage kept.",
+          "description": "The total says a repository holds twelve gigabytes. This says which key holds them and which has not been touched for a week, which is what decides what GitHub evicts at the ten gigabyte ceiling. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -12258,7 +12258,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(aliasByNode(keepLastValue(github.actions_cache_entry.*.*.*.*.$repo.size_bytes), 6, 2))",
+              "target": "removeEmptySeries(groupByNodes(keepLastValue(github.actions_cache_entry.*.*.*.*.$repo.size_bytes), \"sum\", 6, 2))",
               "textEditor": true
             }
           ],

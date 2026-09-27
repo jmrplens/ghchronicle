@@ -955,8 +955,19 @@ total, which on that repository was short by a factor of fifty six.
 `gh_actions_cache` says a repository holds twelve gigabytes;
 `gh_actions_cache_entry` says which key holds them and which has not been
 touched for a week, which is what decides what GitHub evicts at the ten
-gigabyte ceiling. The tag is the key without its content hash, because the
-whole key is a series per build.
+gigabyte ceiling. The `cache` tag is the key without its content hash, because
+the whole key is a series per build.
+
+A row of `gh_actions_cache_entry` is one cache on one ref for the day, with
+its entries summed into it: `caches` is how many there are, `size_bytes` their
+total, `days_since_use` and `key` those of the one used most recently, and
+`age_days` that of the oldest. Up to 2.5.2 it was a row per entry, and every
+entry of one cache on one ref had the same tags and the same day, so the store
+kept whichever was written last: on 2026-09-26 the fifteen CodeQL caches on
+main of jmrplens/jmrplens, 57.9 MB between them, were stored as one of 3.8 MB.
+The listing is read a hundred entries a page, up to ten pages, where it used to
+stop at the first: on 2026-09-27 two repositories of the account held 118 and
+232 entries.
 
 ### Security
 

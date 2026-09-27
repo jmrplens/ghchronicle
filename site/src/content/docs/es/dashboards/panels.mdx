@@ -488,7 +488,11 @@ Los dos paneles de caché van del techo. GitHub limita cada repositorio a diez
 gigabytes y expulsa la entrada menos usada al pasarlo, así que la barra es cada
 repositorio contra ese tope y el panel se lee por lo que queda de margen; la
 tabla de entradas dice qué clave se está tirando y cuál lleva una semana sin
-tocarse.
+tocarse. Cada fila de esa tabla es una caché de un repositorio: su instantánea
+más reciente en cada ref del rango, sumadas, así que Entries cuenta las
+entradas que guarda GitHub y no las filas que leyó la tabla. Es la misma suma
+en los cinco almacenes; Graphite muestra solo el tamaño, porque una tabla de
+Graphite se queda con una columna.
 
 Lee `gh_billing_usage`, `gh_actions_cache` y `gh_actions_cache_entry`.
 

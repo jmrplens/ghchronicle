@@ -729,10 +729,12 @@ func dashboardFrameAnswer(frame map[string]any) (values int, numbers []float64, 
 //   - seconds_to_resolve exists only on a resolved alert, and every code
 //     scanning alert here is open, so any account whose alerts are all open
 //     gets the broken panel;
-//   - the four missing tables (issue events, cache entries, account keys,
-//     dependency licenses) are families this account has nothing in, which is
-//     the ordinary case for most accounts;
-//   - gh_contribution_day_repo is the fifth missing table and the one case
+//   - the three missing tables (issue events, account keys, dependency
+//     licenses) are families this account has nothing in, which is the
+//     ordinary case for most accounts. Cache entries were a fourth until the
+//     fake answered the cache listing, with three CodeQL caches on one ref
+//     that the collector sums into one row;
+//   - gh_contribution_day_repo is the fourth missing table and the one case
 //     where the fixture rather than the account is thin. graphql_account.json
 //     carries commitContributionsByRepository with a totalCount per repository
 //     and no `contributions.nodes`, so the collector has no day to date a row
@@ -740,20 +742,20 @@ func dashboardFrameAnswer(frame map[string]any) (values int, numbers []float64, 
 //     gh_contribution_repo and answer the panels above. Nothing but the two
 //     panels here reads the daily split, so a real account has both and this
 //     sweep has neither.
-//   - gh_repo_created is the sixth, and the fixture is thin in the same way:
+//   - gh_repo_created is the fifth, and the fixture is thin in the same way:
 //     graphql_account.json carries totalRepositoryContributions as a number
 //     and no `repositoryContributions.nodes`, so the collector has neither a
 //     repository to name nor a date to stamp it at, and writes no row at all.
 //     Any account that created a repository inside GitHub's trailing year has
 //     them.
-//   - gh_repo_archived is the seventh and is not the fixture at all. The
+//   - gh_repo_archived is the sixth and is not the fixture at all. The
 //     measurement is written from the repository list the sweep discovers, so
 //     it needs `targets.include_archived`, and this sweep's config leaves it
 //     off. The fixture does hold an archived repository, octocat/linguist,
 //     archived a fortnight back, and with that setting off it is never asked
 //     about. An account running the default filter is in exactly the same
 //     position, which is why the panel's own description names the setting.
-//   - gh_dependency and gh_dependency_change are the eighth and ninth, beside
+//   - gh_dependency and gh_dependency_change are the seventh and eighth, beside
 //     gh_dependency_license above and for one reason shared by all three:
 //     `deps` is the one family fakegh.NotCollected leaves out, because there is
 //     no SBOM or dependency-diff fixture to switch it on for, so no sweep here
@@ -785,7 +787,6 @@ var dashboardMissing = map[string]map[int]string{
 		95:  "gh_release_asset.url",
 		96:  "gh_release_asset.url",
 		103: "gh_code_scanning_alert_item.seconds_to_resolve",
-		115: "gh_actions_cache_entry",
 		130: "gh_package.url",
 		131: "gh_gist.url",
 		134: "gh_key",
@@ -800,7 +801,6 @@ var dashboardMissing = map[string]map[int]string{
 		31:  "gh_contribution_day_repo",
 		75:  "gh_issue_event",
 		103: "gh_code_scanning_alert_item.seconds_to_resolve",
-		115: "gh_actions_cache_entry",
 		134: "gh_key",
 		135: "gh_dependency_license",
 		140: "gh_dependency",

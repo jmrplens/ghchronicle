@@ -11972,6 +11972,15 @@
               "instant": true,
               "range": false,
               "refId": "B"
+            },
+            {
+              "datasource": "${DS_PROMETHEUS}",
+              "editorMode": "code",
+              "expr": "sum by (repo, cache) (github_actions_cache_entry_caches{repo=~\"$repo\"})",
+              "format": "table",
+              "instant": true,
+              "range": false,
+              "refId": "C"
             }
           ],
           "title": "Cache entries by key",
@@ -11998,6 +12007,7 @@
                 "renameByName": {
                   "Value #A": "Size",
                   "Value #B": "Days since use",
+                  "Value #C": "Entries",
                   "cache": "Cache",
                   "repo": "Repository"
                 }
