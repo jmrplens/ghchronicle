@@ -16780,7 +16780,7 @@
         },
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "Every budget GitHub reports, and the one that runs out first decides what a sweep can collect. Reading them costs nothing: GET /rate_limit is free.",
+          "description": "Every budget GitHub reports, and the one that runs out first decides what a sweep can collect. Reading them costs nothing: GET /rate_limit is free. Most used is the most any reading in the range had spent, and Lowest remaining the least any had left, so a bucket spent an hour ago still says so after it has refilled.",
           "fieldConfig": {
             "defaults": {
               "custom": {

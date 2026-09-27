@@ -16976,7 +16976,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "Every budget GitHub reports, and the one that runs out first decides what a sweep can collect. Reading them costs nothing: GET /rate_limit is free.",
+          "description": "Every budget GitHub reports, and the one that runs out first decides what a sweep can collect. Reading them costs nothing: GET /rate_limit is free. Most used is the most any reading in the range had spent, and Lowest remaining the least any had left, so a bucket spent an hour ago still says so after it has refilled.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -17019,7 +17019,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (resource) (github_rate_limit_limit)",
+              "expr": "max by (resource) (max_over_time(github_rate_limit_limit[$__range]))",
               "format": "table",
               "instant": true,
               "range": false,
@@ -17028,7 +17028,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "min by (resource) (github_rate_limit_remaining)",
+              "expr": "min by (resource) (min_over_time(github_rate_limit_remaining[$__range]))",
               "format": "table",
               "instant": true,
               "range": false,
@@ -17037,7 +17037,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (resource) (github_rate_limit_used)",
+              "expr": "max by (resource) (max_over_time(github_rate_limit_used[$__range]))",
               "format": "table",
               "instant": true,
               "range": false,

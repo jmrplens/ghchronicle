@@ -24504,7 +24504,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "Every budget GitHub reports, and the one that runs out first decides what a sweep can collect. Reading them costs nothing: GET /rate_limit is free.",
+          "description": "Every budget GitHub reports, and the one that runs out first decides what a sweep can collect. Reading them costs nothing: GET /rate_limit is free. Most used is the most any reading in the range had spent, and Lowest remaining the least any had left, so a bucket spent an hour ago still says so after it has refilled.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -24561,17 +24561,19 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
+                  "field": "limit",
                   "id": "546",
-                  "settings": {
-                    "metrics": [
-                      "limit",
-                      "remaining",
-                      "used"
-                    ],
-                    "order": "desc",
-                    "orderBy": "@timestamp"
-                  },
-                  "type": "top_metrics"
+                  "type": "max"
+                },
+                {
+                  "field": "remaining",
+                  "id": "547",
+                  "type": "min"
+                },
+                {
+                  "field": "used",
+                  "id": "548",
+                  "type": "max"
                 }
               ],
               "query": "_index:ghchronicle-gh_rate_limit",
@@ -24587,9 +24589,9 @@
                 "excludeByName": {},
                 "indexByName": {},
                 "renameByName": {
-                  "Top Metrics limit": "Limit",
-                  "Top Metrics remaining": "Lowest remaining",
-                  "Top Metrics used": "Most used",
+                  "Max limit": "Limit",
+                  "Max used": "Most used",
+                  "Min": "Lowest remaining",
                   "resource.keyword": "Bucket"
                 }
               }
@@ -24719,7 +24721,7 @@
               "bucketAggs": [
                 {
                   "field": "family.keyword",
-                  "id": "547",
+                  "id": "549",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -24730,7 +24732,7 @@
                 },
                 {
                   "field": "reason.keyword",
-                  "id": "548",
+                  "id": "550",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -24744,16 +24746,16 @@
               "metrics": [
                 {
                   "field": "failed",
-                  "id": "549",
+                  "id": "551",
                   "type": "sum"
                 },
                 {
-                  "id": "550",
+                  "id": "552",
                   "type": "count"
                 },
                 {
                   "field": "repos",
-                  "id": "551",
+                  "id": "553",
                   "type": "max"
                 }
               ],
@@ -24864,7 +24866,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "552",
+                  "id": "554",
                   "settings": {
                     "order": "desc",
                     "size": "100",

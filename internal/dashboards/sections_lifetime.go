@@ -395,10 +395,15 @@ func collectorSection(b *builder) []Panel {
 		" FROM gh_rate_limit WHERE $__timeFilter(time) GROUP BY 1 ORDER BY 2 DESC"
 	rl := "gh_rate_limit"
 
-	bucketsGR, bucketsGRtf := gTbl(rowsOf(fmt.Sprintf("keepLastValue(%s)", gp(rl, "remaining")),
-		gn(rl, "resource")), "Bucket", []col{{"lastNotNull", lifetimeLowestRemaining}})
+	// The extremes of the range in every store, as the SQL takes them. The
+	// newest reading stood under these names in Graphite and Elasticsearch,
+	// so a bucket spent to its last request an hour ago read as untouched
+	// there once it had refilled. Consolidated by the least too, since the
+	// average of a narrow panel's points would lift the lowest.
+	bucketsGR, bucketsGRtf := gTbl(rowsOf(fmt.Sprintf(`consolidateBy(%s, "min")`, gp(rl, "remaining")),
+		gn(rl, "resource")), "Bucket", []col{{"min", lifetimeLowestRemaining}})
 	bucketsES, bucketsEStf := esTbl(rl, []any{b.tm("resource", 20)},
-		[]any{b.mNewest("limit", "remaining", "used")},
+		[]any{b.mMax("limit"), b.mMin("remaining"), b.mMax("used")},
 		[]named{
 			{"resource.keyword", "Bucket"},
 			{"limit", "Limit"},
@@ -478,9 +483,9 @@ func collectorSection(b *builder) []Panel {
 			}),
 		panel("table", "Every bucket", box{W: 12, H: 11, X: 12, Y: 0}, []Target{sqlT(tableQ)}, &P{
 			Prom: []Target{
-				promTbl("max by (resource) (github_rate_limit_limit)", "A"),
-				promTbl("min by (resource) (github_rate_limit_remaining)", "B"),
-				promTbl("max by (resource) (github_rate_limit_used)", "C"),
+				promTbl("max by (resource) (max_over_time(github_rate_limit_limit[$__range]))", "A"),
+				promTbl("min by (resource) (min_over_time(github_rate_limit_remaining[$__range]))", "B"),
+				promTbl("max by (resource) (max_over_time(github_rate_limit_used[$__range]))", "C"),
 			},
 			PromTF: merged(map[string]string{
 				"resource": "Bucket", panelValueA: "Limit",
@@ -488,8 +493,13 @@ func collectorSection(b *builder) []Panel {
 			}, nil, nil),
 			Opts: Opts{"sort": lifetimeMostUsed},
 			Desc: "Every budget GitHub reports, and the one that runs out first decides what " +
-				"a sweep can collect. Reading them costs nothing: GET /rate_limit is free.",
-			GR: bucketsGR, GRTF: bucketsGRtf, GRDesc: grSlot,
+				"a sweep can collect. Reading them costs nothing: GET /rate_limit is free. " +
+				"Most used is the most any reading in the range had spent, and Lowest " +
+				"remaining the least any had left, so a bucket spent an hour ago still says " +
+				"so after it has refilled.",
+			GR: bucketsGR, GRTF: bucketsGRtf,
+			GRDesc: "Graphite has no rows: each series is one number, so this table keeps the " +
+				"lowest remaining of each bucket and drops the limit and the most used.",
 			ES: bucketsES, ESTF: bucketsEStf,
 		}),
 		panel("table", "Every family", box{W: 12, H: 9, X: 0, Y: 11}, []Target{sqlT(ranQ)}, &P{

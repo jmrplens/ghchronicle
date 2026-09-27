@@ -522,7 +522,7 @@ func topRowsBy(path string, n int, by string, nodes ...int) string {
 
 var reducers = map[string]string{
 	"lastNotNull": "Last *", "sum": "Total", "mean": "Mean", "median": "Median",
-	"max": "Max", "count": "Count",
+	"max": "Max", "min": "Min", "count": "Count",
 }
 
 // gTbl renders a Graphite series list as a table: one row per series, one

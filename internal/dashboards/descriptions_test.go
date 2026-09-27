@@ -1,6 +1,7 @@
 package dashboards
 
 import (
+	"slices"
 	"strings"
 	"testing"
 )
@@ -41,6 +42,56 @@ func TestEveryArtifactFloorNamesBothCauses(t *testing.T) {
 		}
 		if named == 0 {
 			t.Errorf("%s: no panel calls the artifact size a floor, so this checks nothing", store)
+		}
+	}
+}
+
+// TestEveryBucketReadsTheExtremesOfTheRange: the SQL stores put the most any
+// reading in the range had used and the least any had left under Most used
+// and Lowest remaining, while Graphite and Elasticsearch put the newest
+// reading there and Prometheus the value as it stands, so a bucket spent to
+// its last request read as untouched in three stores once it had refilled.
+func TestEveryBucketReadsTheExtremesOfTheRange(t *testing.T) {
+	t.Parallel()
+	for _, store := range AllStores() {
+		p := panelOf(t, store.Build(nil), "Every bucket", "table")
+		targets := targetList(p)
+		switch store.Name {
+		case "influxdb", "postgres":
+			sql := allSQL(p)
+			if !strings.Contains(sql, `MAX(used) AS "Most used"`) ||
+				!strings.Contains(sql, `MIN(remaining) AS "Lowest remaining"`) {
+				t.Errorf("%s: Every bucket does not take the extremes of the range: %s", store.Name, sql)
+			}
+		case "graphite":
+			expr, _ := targets[0].(map[string]any)["target"].(string)
+			if got := graphiteReducers(p); !slices.Equal(got, []any{"min"}) ||
+				!strings.Contains(expr, `consolidateBy(`+gp("gh_rate_limit", "remaining")+`, "min")`) {
+				t.Errorf("graphite: Every bucket reduces the remaining count by %v over %s, want "+
+					"the least of the range", got, expr)
+			}
+		case "elasticsearch":
+			metrics, _ := targets[0].(map[string]any)["metrics"].([]any)
+			var got []string
+			for _, raw := range metrics {
+				m, _ := raw.(map[string]any)
+				field, _ := m["field"].(string)
+				kind, _ := m["type"].(string)
+				got = append(got, kind+" "+field)
+			}
+			if want := []string{"max limit", "min remaining", "max used"}; !slices.Equal(got, want) {
+				t.Errorf("elasticsearch: Every bucket reads %v, want %v", got, want)
+			}
+		case "prometheus":
+			exprs := asJSON(t, targets)
+			for _, want := range []string{
+				"min_over_time(github_rate_limit_remaining[$__range])",
+				"max_over_time(github_rate_limit_used[$__range])",
+			} {
+				if !strings.Contains(exprs, want) {
+					t.Errorf("prometheus: Every bucket does not ask %s: %s", want, exprs)
+				}
+			}
 		}
 	}
 }

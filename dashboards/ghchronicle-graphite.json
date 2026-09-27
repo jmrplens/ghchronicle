@@ -16729,7 +16729,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Every budget GitHub reports, and the one that runs out first decides what a sweep can collect. Reading them costs nothing: GET /rate_limit is free. In Graphite two facts landing in the same storage slot of one series are reduced to one point, so the medians are over what the storage kept.",
+          "description": "Every budget GitHub reports, and the one that runs out first decides what a sweep can collect. Reading them costs nothing: GET /rate_limit is free. Most used is the most any reading in the range had spent, and Lowest remaining the least any had left, so a bucket spent an hour ago still says so after it has refilled. Graphite has no rows: each series is one number, so this table keeps the lowest remaining of each bucket and drops the limit and the most used.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -16772,7 +16772,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(aliasByNode(keepLastValue(github.rate_limit.*.remaining), 2))",
+              "target": "removeEmptySeries(aliasByNode(consolidateBy(github.rate_limit.*.remaining, \"min\"), 2))",
               "textEditor": true
             }
           ],
@@ -16784,7 +16784,7 @@
                 "includeTimeField": false,
                 "mode": "seriesToRows",
                 "reducers": [
-                  "lastNotNull"
+                  "min"
                 ]
               }
             },
@@ -16795,7 +16795,7 @@
                 "indexByName": {},
                 "renameByName": {
                   "Field": "Bucket",
-                  "Last *": "Lowest remaining"
+                  "Min": "Lowest remaining"
                 }
               }
             }
