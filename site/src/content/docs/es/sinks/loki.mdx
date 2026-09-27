@@ -61,6 +61,21 @@ consultable en Grafana sin mantener dos copias de los datos.
 someone starred acme/telemetry full_name="acme/telemetry" user="someone" starred=1
 ```
 
+Dos frases cambiaron en 2.6.0, y una línea que ya está en Loki conserva el texto
+con el que se envió:
+
+- Una contribución externa dice qué le pasó al elemento y no quién lo hizo,
+  porque la fila no dice quién lo fusionó o lo cerró:
+  `USER's pull request OWNER/REPO#N` is open, was merged o was closed without
+  merging, y `USER's issue OWNER/REPO#N` is open o was closed. Una fila cuyo
+  estado y cuya marca de fusión no coinciden dice
+  `USER's contribution OWNER/REPO#N`. Antes todas las líneas decían
+  `USER merged OWNER/REPO#N`, issues abiertas incluidas.
+- Una release dice `published release TAG of OWNER/REPO`, o
+  `published prerelease TAG of OWNER/REPO`, en el momento en que se publicó.
+  Antes decía `release TAG of OWNER/REPO, N downloads`, así que una consulta
+  que filtre por `downloads` solo encuentra las líneas antiguas.
+
 `batch` es cuántas entradas van en un envío, 1000 salvo que se baje.
 
 La etiqueta de stream es `kind`, que es por lo que se filtra primero.
@@ -114,9 +129,10 @@ Una release es el evento que muestra lo que cuesta el horizonte, y el único
 stream que mira más atrás. Su línea se genera a partir de
 `gh_release_published`, en el momento en que se publicó la release. Antes salía
 de `gh_release`, que se sella en la pasada porque sus descargas se mueven, así
-que cada pasada de repositorios volvía a enviar todas las releases: 3.360 líneas
-en un día en la cuenta en la que se midió, un tercio de todo lo que envió el
-destino. Fechada en la publicación, una release la ve primero la pasada de
+que cada pasada de repositorios volvía a enviar todas las releases. Medido con
+2.5.1 en producción, durante 30,9 horas y 27 pasadas de `repo`, fueron 4.313 de
+las 10.467 líneas que envió el destino, un 41 por ciento, para las 2 releases
+publicadas en esas horas. Fechada en la publicación, una release la ve primero la pasada de
 `repo` siguiente, así que una publicada justo después de que una pasada leyera
 su repositorio tiene una cadencia entera cuando escribe la siguiente pasada, más
 lo que esa pasada se retrase: un tick que perdió, las familias más lentas que
@@ -125,8 +141,10 @@ corrieron antes, un reinicio. Con `repo` y `max_age` en su hora por omisión,
 veía más vieja.
 
 Así que el stream de releases mira atrás la cadencia de `repo` más `max_age`:
-dos horas por omisión, siete con `repo: 6h`, y nunca más de seis días, un día
-menos que la semana que permite `reject_old_samples_max_age`. Loki solo rechaza
+dos horas por omisión, siete con `repo: 6h`. Esa mirada atrás tiene un tope de
+seis días, un día menos que la semana que permite `reject_old_samples_max_age`,
+y nunca acorta `max_age`: uno fijado por encima de seis días es el horizonte de
+este stream igual que el de cualquier otro. Loki solo rechaza
 una línea vieja por ir atrasada respecto a una más nueva de su stream, que es lo
 que la segunda comprobación de arriba sigue haciendo. Una release publicada en
 la hora anterior a una pasada la envía esa pasada y otra vez la siguiente, la
@@ -143,7 +161,8 @@ recientemente, en orden"; una serie temporal responde "cuánto, en qué periodo"
 
 ## Los logs de jobs pertenecen aquí
 
-`every.joblogs` recoge las últimas cuarenta líneas de cada job fallido de GitHub
+La familia `joblogs`, apagada hasta que `every.families.joblogs` le da una
+cadencia, recoge las últimas cuarenta líneas de cada job fallido de GitHub
 Actions. Es texto y no una medida, así que el destino de InfluxDB lo excluye por
 omisión y el exportador de Prometheus lo salta. Loki es donde le corresponde, y
 la consulta es:
