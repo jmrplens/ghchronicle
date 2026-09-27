@@ -313,7 +313,7 @@ func commitChecks(b *builder) []Panel {
 				"bot, the commit statuses an older integration still writes.",
 			PromDesc:  sinceStart,
 			Overrides: []any{barCell("Runs", "short", 120)},
-			GR:        checksGR, GRTF: checksGRtf, GRDesc: grSlot,
+			GR:        checksGR, GRTF: checksGRtf, GRDesc: grRows + " " + grSlotCounts,
 			ES: checksES, ESTF: checksEStf,
 		}),
 		panel("table", "Commits behind a red branch", box{W: 24, H: 8, X: 0, Y: 27}, []Target{sqlT(

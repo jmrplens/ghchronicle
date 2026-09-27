@@ -135,6 +135,38 @@ func TestEveryArtifactFloorNamesBothCauses(t *testing.T) {
 	}
 }
 
+// TestGraphiteNamesTheStorageSlotOnlyForWhatItReduces: the sentence about two
+// facts sharing a storage slot, and the medians being over what the storage
+// kept, was appended to twenty eight Graphite panels, and seventeen of them
+// took no median: "Every repository, ever" keeps one column of commits, and
+// the cache and the keys tables read the last value, which is the one point
+// the slot keeps. The sentence names what the panel reduces, and a panel
+// that reads the last value does not carry it.
+func TestGraphiteNamesTheStorageSlotOnlyForWhatItReduces(t *testing.T) {
+	t.Parallel()
+	for title, p := range rendered(t, "graphite") {
+		desc := descriptionOf(p)
+		targets := asJSON(t, targetList(p))
+		reducers := graphiteReducers(p)
+		if strings.Contains(desc, "the medians are over what the storage kept") &&
+			!strings.Contains(targets, "percentileOfSeries") && !slices.Contains(reducers, "median") {
+			t.Errorf("graphite: %q speaks of medians and takes none: %s", title, targets)
+		}
+		if strings.Contains(desc, "the counts are over what the storage kept") &&
+			!strings.Contains(targets, "isNonNull") && !slices.Contains(reducers, "count") {
+			t.Errorf("graphite: %q speaks of counts and counts nothing: %s", title, targets)
+		}
+		if strings.Contains(desc, "the totals are over what the storage kept") && !slices.Contains(reducers, "sum") {
+			t.Errorf("graphite: %q speaks of totals and adds nothing up: %v", title, reducers)
+		}
+	}
+	desc := descriptionOf(mustPanel(t, rendered(t, "graphite"), "Every repository, ever"))
+	if !strings.Contains(desc, "keeps the commits it is ranked by and drops the other columns") {
+		t.Errorf("graphite: Every repository, ever does not say it keeps one column of the "+
+			"many its shared description names: %q", desc)
+	}
+}
+
 // TestAchievementProgressSaysHowPairExtraordinaireIsCounted: the description
 // said the co-authored count was walked every hour. Since 2.6.0 it is a tally
 // the state file keeps, added to by each hourly pass and walked whole once a
@@ -196,6 +228,24 @@ func TestEveryBucketReadsTheExtremesOfTheRange(t *testing.T) {
 				if !strings.Contains(exprs, want) {
 					t.Errorf("prometheus: Every bucket does not ask %s: %s", want, exprs)
 				}
+			}
+		}
+	}
+}
+
+// TestNoDescriptionSaysGraphiteDropsABoolean: two Graphite descriptions, a
+// code comment and the dashboards README said a boolean is not a metric in
+// Graphite, and so explained a missing column by something that is not so. The sink writes every
+// boolean field as 1 or 0 like any number (sink.numeric), and the
+// containerised Graphite holds gh_fork's `advanced` and gh_branch_protection's
+// switches as series of their own; what drops those columns is a table having
+// one number per row.
+func TestNoDescriptionSaysGraphiteDropsABoolean(t *testing.T) {
+	t.Parallel()
+	for _, store := range AllStores() {
+		for title, p := range rendered(t, store.Name) {
+			if desc := descriptionOf(p); strings.Contains(desc, "boolean is not a metric") {
+				t.Errorf("%s: %q says a boolean is not a Graphite metric: %q", store.Name, title, desc)
 			}
 		}
 	}

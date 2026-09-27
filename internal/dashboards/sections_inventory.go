@@ -530,7 +530,9 @@ func settingsAndKeys(b *builder) []Panel {
 				profileBool(inventorySecurityPolicy, 120), profileBool(inventoryDeleteOnMerge, 120),
 				profileBool(inventoryAutoMerge, 100), ownerLinkOn("Repository", "the repository settings"),
 			},
-			GR: polGR, GRTF: polGRtf, GRDesc: grSlot,
+			GR: polGR, GRTF: polGRtf,
+			GRDesc: "Graphite has no rows: each series is one number, so this table keeps the " +
+				"protection rules of each repository and drops the other settings.",
 			ES: polES, ESTF: polEStf,
 		}),
 		panel("table", "Account keys", box{W: 12, H: 7, X: 0, Y: 43}, []Target{sqlT(
@@ -554,7 +556,9 @@ func settingsAndKeys(b *builder) []Panel {
 				"remembers until the signatures stop verifying. All of them are managed in " +
 				"one place, the keys settings, which is where every row links.",
 			Overrides: []any{ownerLinkOn("Key", "the keys settings")},
-			GR:        keysGR, GRTF: keysGRtf, GRDesc: grSlot,
+			GR:        keysGR, GRTF: keysGRtf,
+			GRDesc: "Graphite has no rows: each series is one number, so this table keeps the " +
+				"days since each key was last used and drops whether it was ever used and when it expires.",
 			ES: keysES, ESTF: keysEStf,
 		}),
 		// Eight bars and the rest folded: a license name can be a whole SPDX

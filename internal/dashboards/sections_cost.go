@@ -211,7 +211,7 @@ func cost(b *builder) []Panel {
 				}},
 				map[string]any{"id": "custom.width", "value": 180},
 			}), width("Entries", 110)},
-			GR: cacheGR, GRTF: cacheGRtf, GRDesc: grSlot,
+			GR: cacheGR, GRTF: cacheGRtf, GRDesc: grRows,
 			ES: cacheES, ESTF: cacheEStf,
 		}),
 	}

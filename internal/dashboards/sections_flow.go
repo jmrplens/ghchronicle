@@ -662,7 +662,7 @@ func stillOpen(b *builder) []Panel {
 				width("Comments", 100), width("Reviews", 90), width("Fork", 70),
 				linkOn("Number"),
 			},
-			GR: openGR, GRTF: openGRtf, GRDesc: grSlot + " " + stillOpenNote + " " + noRepoFlagsHere,
+			GR: openGR, GRTF: openGRtf, GRDesc: grRows + " " + stillOpenNote + " " + noRepoFlagsHere,
 			ES: openES, ESTF: openEStf, ESDesc: stillOpenNote + " " + noRepoFlagsHere,
 		}),
 		panel("table", "Open issues the longest", box{W: 12, H: 8, X: 12, Y: 45}, []Target{sqlT(openIssues)}, &P{
@@ -682,7 +682,7 @@ func stillOpen(b *builder) []Panel {
 				linkOn("Number"),
 			},
 			GR: openIssuesGR, GRTF: openIssuesGRtf,
-			GRDesc: grSlot + " " + stillOpenNote + " " + noRepoFlagsHere,
+			GRDesc: grRows + " " + stillOpenNote + " " + noRepoFlagsHere,
 			ES:     openIssuesES, ESTF: openIssuesEStf,
 			ESDesc: stillOpenNote + " " + noRepoFlagsHere,
 		}),

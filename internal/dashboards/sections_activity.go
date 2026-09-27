@@ -326,7 +326,10 @@ func starsGiven(b *builder) []Panel {
 				when("When"), width("Language", 120),
 				barCell(activityItsStars, "short", 120), linkOn("Repository"),
 			},
-			GR: starGR, GRTF: starGRtf, GRDesc: grSlot,
+			GR: starGR, GRTF: starGRtf,
+			GRDesc: "Graphite has no rows: each series is one number, so this table keeps the " +
+				"star count of each repository starred in the range and drops when it was " +
+				"starred and its language.",
 			ES: starES, ESTF: starEStf,
 		}),
 	}

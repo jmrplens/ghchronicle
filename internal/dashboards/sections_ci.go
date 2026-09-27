@@ -567,7 +567,7 @@ func whatKeepsFailing(b *builder) []Panel {
 				unitOf("Failure rate", "percent", 120), barCell("Failures", "short", 110),
 				linkOn("Repository"),
 			},
-			GR: failingGR, GRTF: failingGRtf, GRDesc: grSlot,
+			GR: failingGR, GRTF: failingGRtf, GRDesc: grRows + " " + grSlotCounts,
 			ES: failingES, ESTF: failingEStf,
 			ESOver: []any{unitOf(ciSuccessRate, "percentunit", 120)},
 		}),
@@ -585,7 +585,7 @@ func whatKeepsFailing(b *builder) []Panel {
 				"by reading job logs, and it comes from a table already collected. " + expandedSteps,
 			PromDesc:  sinceStart,
 			Overrides: []any{width("Step", 200), barCell("Failures", "short", 120)},
-			GR:        failStepsGR, GRTF: failStepsGRtf, GRDesc: grSlot,
+			GR:        failStepsGR, GRTF: failStepsGRtf, GRDesc: grRows + " " + grSlotCounts,
 			ES: failStepsES, ESTF: failStepsEStf,
 		}),
 		// Joined on the file path, not on the name. gh_workflow tags both: its

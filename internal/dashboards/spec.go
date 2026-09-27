@@ -73,8 +73,15 @@ const (
 	// The same for Graphite and Elasticsearch.
 	grRows = "Graphite has no rows: each series is one number reduced over the range, so " +
 		"this table keeps the column it is sorted by and drops the others."
-	grSlot = "In Graphite two facts landing in the same storage slot of one series are " +
-		"reduced to one point, so the medians are over what the storage kept."
+	grSlot = grSlotLead + "the medians are over what the storage kept."
+	// grSlotCounts and grSlotTotals are grSlot for a table that counts or adds
+	// up the points of a series and takes no median: a table that reads the
+	// last value of each series loses nothing to the slot, since the point the
+	// storage keeps is the newest, and says nothing about it.
+	grSlotCounts = grSlotLead + "the counts are over what the storage kept."
+	grSlotTotals = grSlotLead + "the totals are over what the storage kept."
+	grSlotLead   = "In Graphite two facts landing in the same storage slot of one series are " +
+		"reduced to one point, so "
 	grRange    = "Graphite answers only inside the dashboard range, so years outside it are missing."
 	grSnapshot = "In Graphite the curve is the repositories' star count as each sweep read it, " +
 		"so it starts the day the collector did and sits at GitHub's count."

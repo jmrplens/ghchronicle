@@ -464,7 +464,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "The whole life of each repository in one row: not what happened in the dashboard range, but everything there has ever been. The repository picker holds the repositories the sweeps collect: forks too when `include_forks` is on, and archived ones when `include_archived` is on and for a while after a backfill, which collects them either way. A count here is over every repository the picker holds until it is narrowed. Sorted by commits, a fork of a busy project outranks anything the account wrote, 370,296 commits against 3,385 on the account this was measured on, so the table opens with the account's own repositories first and the forks under them, both ranked by commits. The fork and archived flags are columns here rather than a filter, the title being what it is, and a click on either sorts by it. Each row is the repository's newest reading in the range, so a count that went down, a star taken back or a branch deleted, reads as it stands and not as its highest. With All selected the archived repositories the picker does not list are here too, with their current counts, as long as the collector still reads them: the default filter walks none of their history, but every totals sweep reads this row of each of them again, and one the configuration no longer collects is left out. In Graphite two facts landing in the same storage slot of one series are reduced to one point, so the medians are over what the storage kept. In Graphite an archived repository counts from its points of the last seven days, since a target here cannot ask whether the collector still writes a repository while it reads the range, so a range that ended more than a week ago leaves the archived ones out. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "The whole life of each repository in one row: not what happened in the dashboard range, but everything there has ever been. The repository picker holds the repositories the sweeps collect: forks too when `include_forks` is on, and archived ones when `include_archived` is on and for a while after a backfill, which collects them either way. A count here is over every repository the picker holds until it is narrowed. Sorted by commits, a fork of a busy project outranks anything the account wrote, 370,296 commits against 3,385 on the account this was measured on, so the table opens with the account's own repositories first and the forks under them, both ranked by commits. The fork and archived flags are columns here rather than a filter, the title being what it is, and a click on either sorts by it. Each row is the repository's newest reading in the range, so a count that went down, a star taken back or a branch deleted, reads as it stands and not as its highest. With All selected the archived repositories the picker does not list are here too, with their current counts, as long as the collector still reads them: the default filter walks none of their history, but every totals sweep reads this row of each of them again, and one the configuration no longer collects is left out. Graphite has no rows: each series is one number, so this table keeps the commits it is ranked by and drops the other columns, the fork and archived flags among them. In Graphite an archived repository counts from its points of the last seven days, since a target here cannot ask whether the collector still writes a repository while it reads the range, so a range that ended more than a week ago leaves the archived ones out. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -3731,7 +3731,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Time to merge only counts what merged. This is the other half: what is still open and how long it has been, which is the number that decides what to do next rather than describing what already happened. Each pull request is read from its newest row, so one that merged inside the range is not here any more. Archived repositories are left out, since nothing in one can be merged, closed or run until it is unarchived; narrowing the picker to one shows an empty table here rather than rows nobody can act on. A fork's pull request is still one that can be merged, so those stay and Fork says which they are. In Graphite two facts landing in the same storage slot of one series are reduced to one point, so the medians are over what the storage kept. This store cannot read each item from its newest row, so one that closed inside the range stays listed as open, at the reading of its last open day, until the range moves past that day. Only gh_repo carries the fork and archived flags and this store cannot join one measurement to another, so the rows the SQL dashboards leave out are listed here. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "Time to merge only counts what merged. This is the other half: what is still open and how long it has been, which is the number that decides what to do next rather than describing what already happened. Each pull request is read from its newest row, so one that merged inside the range is not here any more. Archived repositories are left out, since nothing in one can be merged, closed or run until it is unarchived; narrowing the picker to one shows an empty table here rather than rows nobody can act on. A fork's pull request is still one that can be merged, so those stay and Fork says which they are. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others. This store cannot read each item from its newest row, so one that closed inside the range stays listed as open, at the reading of its last open day, until the range moves past that day. Only gh_repo carries the fork and archived flags and this store cannot join one measurement to another, so the rows the SQL dashboards leave out are listed here. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -3895,7 +3895,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "The same question for issues: what is still open and for how long. Labels is what the issue was filed as, so an old one reads as a bug nobody fixed or a wish nobody granted. Each issue is read from its newest row, so one closed inside the range is not here any more. Archived repositories are left out, since nothing in one can be merged, closed or run until it is unarchived; narrowing the picker to one shows an empty table here rather than rows nobody can act on. A fork's issues stay, and Fork says which they are. In Graphite two facts landing in the same storage slot of one series are reduced to one point, so the medians are over what the storage kept. This store cannot read each item from its newest row, so one that closed inside the range stays listed as open, at the reading of its last open day, until the range moves past that day. Only gh_repo carries the fork and archived flags and this store cannot join one measurement to another, so the rows the SQL dashboards leave out are listed here. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "The same question for issues: what is still open and for how long. Labels is what the issue was filed as, so an old one reads as a bug nobody fixed or a wish nobody granted. Each issue is read from its newest row, so one closed inside the range is not here any more. Archived repositories are left out, since nothing in one can be merged, closed or run until it is unarchived; narrowing the picker to one shows an empty table here rather than rows nobody can act on. A fork's issues stay, and Fork says which they are. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others. This store cannot read each item from its newest row, so one that closed inside the range stays listed as open, at the reading of its last open day, until the range moves past that day. Only gh_repo carries the fork and archived flags and this store cannot join one measurement to another, so the rows the SQL dashboards leave out are listed here. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -5372,7 +5372,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Not the ones that fail sometimes: the ones nobody has switched off. Two workflows here fail on every single run, 108 of 108 and 86 of 86. In Graphite two facts landing in the same storage slot of one series are reduced to one point, so the medians are over what the storage kept. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "Not the ones that fail sometimes: the ones nobody has switched off. Two workflows here fail on every single run, 108 of 108 and 86 of 86. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others. In Graphite two facts landing in the same storage slot of one series are reduced to one point, so the counts are over what the storage kept. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -5503,7 +5503,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Which step, not which job. This is the question that otherwise gets answered by reading job logs, and it comes from a table already collected. Over the runs whose jobs were expanded, which is the newest runs of each sweep and, after a backfill, every run GitHub still holds, which from 1 October 2026 means the repository's retention period, ninety days by default; not every run the run count includes. Steps reach less far back than jobs: GitHub stops serving a job's steps before the job itself, and measured in September 2026 it served none for runs older than about five and a half months. In Graphite two facts landing in the same storage slot of one series are reduced to one point, so the medians are over what the storage kept.",
+          "description": "Which step, not which job. This is the question that otherwise gets answered by reading job logs, and it comes from a table already collected. Over the runs whose jobs were expanded, which is the newest runs of each sweep and, after a backfill, every run GitHub still holds, which from 1 October 2026 means the repository's retention period, ninety days by default; not every run the run count includes. Steps reach less far back than jobs: GitHub stops serving a job's steps before the job itself, and measured in September 2026 it served none for runs older than about five and a half months. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others. In Graphite two facts landing in the same storage slot of one series are reduced to one point, so the counts are over what the storage kept.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -6641,7 +6641,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Everything Actions runs is already in the two sections above, in far more detail. These are the other gates: the code quality service, the dependency bot, the commit statuses an older integration still writes. In Graphite two facts landing in the same storage slot of one series are reduced to one point, so the medians are over what the storage kept.",
+          "description": "Everything Actions runs is already in the two sections above, in far more detail. These are the other gates: the code quality service, the dependency bot, the commit statuses an older integration still writes. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others. In Graphite two facts landing in the same storage slot of one series are reduced to one point, so the counts are over what the storage kept.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -7142,7 +7142,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Whether a fork was ever pushed to separates a derivative from a bookmark, which most forks are. Idle is the time since that push, counted from the row's own date, so it is right when the panel is drawn rather than when the last sweep ran. Graphite names each row forker and repository from the path, and a boolean is not a metric there, so whether it was pushed to is missing. It cannot subtract the row's own date from now either, so the column is how long after the fork its last push came, which is negative for a fork nobody has pushed to: those inherit the parent's last push. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "Whether a fork was ever pushed to separates a derivative from a bookmark, which most forks are. Idle is the time since that push, counted from the row's own date, so it is right when the panel is drawn rather than when the last sweep ran. Graphite names each row forker and repository from the path and keeps one number per row, so whether it was pushed to is missing. It cannot subtract the row's own date from now either, so the column is how long after the fork its last push came, which is negative for a fork nobody has pushed to: those inherit the parent's last push. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -7668,7 +7668,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Comments on issues and pull requests, in any repository. The ones outside this account are the half a sweep over one's own repositories cannot see. In Graphite two facts landing in the same storage slot of one series are reduced to one point, so the medians are over what the storage kept.",
+          "description": "Comments on issues and pull requests, in any repository. The ones outside this account are the half a sweep over one's own repositories cannot see. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others. In Graphite two facts landing in the same storage slot of one series are reduced to one point, so the counts are over what the storage kept.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -7783,7 +7783,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Discussions are the one surface where the work is almost entirely in other people's repositories: gh_discussion sees three rows inside this account, and this sees sixty six across twenty six repositories. Each comment counts once, however many rows a store holds of it, which Answers elsewhere explains. In Graphite two facts landing in the same storage slot of one series are reduced to one point, so the medians are over what the storage kept.",
+          "description": "Discussions are the one surface where the work is almost entirely in other people's repositories: gh_discussion sees three rows inside this account, and this sees sixty six across twenty six repositories. Each comment counts once, however many rows a store holds of it, which Answers elsewhere explains. Graphite has no rows: each series is one number, so this table keeps the comments of each repository and drops the accepted answers and the upvotes.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -8580,7 +8580,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "The panel beside this one is built from deliveries, so a hook that has never delivered anything appears in it nowhere. This is the inventory: an active hook with no traffic is the interesting row. Hook is GitHub's id for it, the number in its settings page: GitHub names every webhook \"web\", so the name told nothing apart. In Graphite two facts landing in the same storage slot of one series are reduced to one point, so the medians are over what the storage kept.",
+          "description": "The panel beside this one is built from deliveries, so a hook that has never delivered anything appears in it nowhere. This is the inventory: an active hook with no traffic is the interesting row. Hook is GitHub's id for it, the number in its settings page: GitHub names every webhook \"web\", so the name told nothing apart. Graphite has no rows: each series is one number, so this table keeps the events each hook subscribes to and drops its id and whether it is active.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -8687,7 +8687,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "The same question the deploy keys table asks, about deployment targets: one environment here has not been touched in one thousand one hundred and seventy seven days. In Graphite two facts landing in the same storage slot of one series are reduced to one point, so the medians are over what the storage kept. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "The same question the deploy keys table asks, about deployment targets: one environment here has not been touched in one thousand one hundred and seventy seven days. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -8919,7 +8919,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "What each branch protection enforces. `gh_repo_policy.branch_protection_rules` counts these and stops there, so a protection that is switched on and asks for nothing looks the same as one that blocks force pushes and demands three checks. Reviews is the number of required approvals, Threads whether every conversation must be resolved, and Checks how many status checks are required. Reviews is left empty rather than filled with a zero where GitHub reports no count at all, which is a different state from asking for none. Graphite names each row repository and pattern from the path, and a boolean is not a metric there at all, so what the protection requires beyond the number of status checks is missing. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "What each branch protection enforces. `gh_repo_policy.branch_protection_rules` counts these and stops there, so a protection that is switched on and asks for nothing looks the same as one that blocks force pushes and demands three checks. Reviews is the number of required approvals, Threads whether every conversation must be resolved, and Checks how many status checks are required. Reviews is left empty rather than filled with a zero where GitHub reports no count at all, which is a different state from asking for none. Graphite names each row repository and pattern from the path and keeps one number per row, the status checks, so what else the protection requires is missing. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -11072,7 +11072,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "The panel beside this one says the scan ran. This says what it found, which is what explains a jump in the alert count: one tool here returns sixty three results in three runs and another fifty two in nine hundred and fifty three. In Graphite two facts landing in the same storage slot of one series are reduced to one point, so the medians are over what the storage kept.",
+          "description": "The panel beside this one says the scan ran. This says what it found, which is what explains a jump in the alert count: one tool here returns sixty three results in three runs and another fifty two in nine hundred and fifty three. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others. In Graphite two facts landing in the same storage slot of one series are reduced to one point, so the totals are over what the storage kept.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -12340,7 +12340,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "GitHub caps a repository at ten gigabytes and evicts the least recently used entry past it. The bar is each repository's cache against that cap, so one that has reached the red end is throwing caches away on every run and the panel above says which key goes. In Graphite two facts landing in the same storage slot of one series are reduced to one point, so the medians are over what the storage kept.",
+          "description": "GitHub caps a repository at ten gigabytes and evicts the least recently used entry past it. The bar is each repository's cache against that cap, so one that has reached the red end is throwing caches away on every run and the panel above says which key goes. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -13149,7 +13149,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Whether the account stars small projects or famous ones, which the language breakdown cannot say. In Graphite two facts landing in the same storage slot of one series are reduced to one point, so the medians are over what the storage kept. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "Whether the account stars small projects or famous ones, which the language breakdown cannot say. Graphite has no rows: each series is one number, so this table keeps the star count of each repository starred in the range and drops when it was starred and its language. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -14481,7 +14481,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "What each repository allows, in the batch that already costs one point of GraphQL. CODEOWNERS errors is the one that fails silently: a broken file stops requesting reviews and says nothing. In Graphite two facts landing in the same storage slot of one series are reduced to one point, so the medians are over what the storage kept. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "What each repository allows, in the batch that already costs one point of GraphQL. CODEOWNERS errors is the one that fails silently: a broken file stops requesting reviews and says nothing. Graphite has no rows: each series is one number, so this table keeps the protection rules of each repository and drops the other settings. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -14666,7 +14666,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "The keys that sign and open everything. Two of the SSH keys here have never been used at all, and the expiry of the GPG key is the kind of date nobody remembers until the signatures stop verifying. All of them are managed in one place, the keys settings, which is where every row links. In Graphite two facts landing in the same storage slot of one series are reduced to one point, so the medians are over what the storage kept. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "The keys that sign and open everything. Two of the SSH keys here have never been used at all, and the expiry of the GPG key is the kind of date nobody remembers until the signatures stop verifying. All of them are managed in one place, the keys settings, which is where every row links. Graphite has no rows: each series is one number, so this table keeps the days since each key was last used and drops whether it was ever used and when it expires. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {

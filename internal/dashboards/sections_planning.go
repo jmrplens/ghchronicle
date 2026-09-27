@@ -195,8 +195,8 @@ func labelsMilestonesAndForks(b *builder) []Panel {
 			GROver: []any{unitOf(planningPushedAfter, "s", 110)},
 			ESOver: []any{unitOf(planningPushedAfter, "s", 110)},
 			GR:     forkGR, GRTF: forkGRtf,
-			GRDesc: "Graphite names each row forker and repository from the path, and a boolean " +
-				"is not a metric there, so whether it was pushed to is missing. It cannot " +
+			GRDesc: "Graphite names each row forker and repository from the path and keeps one " +
+				"number per row, so whether it was pushed to is missing. It cannot " +
 				"subtract the row's own date from now either, so the column is how long " +
 				"after the fork its last push came, which is negative for a fork nobody has " +
 				"pushed to: those inherit the parent's last push. " + grRows,
@@ -354,7 +354,7 @@ func discussionAndComments(b *builder) []Panel {
 				"this account are the half a sweep over one's own repositories cannot see.",
 			PromDesc:  sinceStart,
 			Overrides: []any{barCell("Comments", "short", 120)},
-			GR:        commentsGR, GRTF: commentsGRtf, GRDesc: grSlot,
+			GR:        commentsGR, GRTF: commentsGRtf, GRDesc: grRows + " " + grSlotCounts,
 			ES: commentsES, ESTF: commentsEStf,
 		}),
 	}, answersGiven(b, perItem, grPerItem)...)
@@ -446,7 +446,9 @@ func answersGiven(b *builder, perItem, grPerItem string) []Panel {
 				"once, however many rows a store holds of it, which Answers elsewhere explains.",
 			PromDesc:  sinceStart,
 			Overrides: []any{barCell("Comments", "short", 120)},
-			GR:        answersGR, GRTF: answersGRtf, GRDesc: grSlot,
+			GR:        answersGR, GRTF: answersGRtf,
+			GRDesc: "Graphite has no rows: each series is one number, so this table keeps the " +
+				"comments of each repository and drops the accepted answers and the upvotes.",
 			ES: answersES, ESTF: answersEStf,
 			ESDesc: "In Elasticsearch each comment is a bucket inside its repository's, " +
 				"a thousand at most per repository, and the table adds the buckets up.",

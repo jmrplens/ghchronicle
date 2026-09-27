@@ -302,7 +302,9 @@ func accessConfiguration(b *builder) []Panel {
 				"number in its settings page: GitHub names every webhook \"web\", so the name " +
 				"told nothing apart.",
 			Overrides: []any{width("Host", 200), width("Active", 90), width(deliveryHookEvents, 150)},
-			GR:        whGR, GRTF: whGRtf, GRDesc: grSlot,
+			GR:        whGR, GRTF: whGRtf,
+			GRDesc: "Graphite has no rows: each series is one number, so this table keeps the " +
+				"events each hook subscribes to and drops its id and whether it is active.",
 			ES: whES, ESTF: whEStf,
 		}),
 		panel("table", "Environments", box{W: 12, H: 8, X: 12, Y: 24}, []Target{sqlT(
@@ -325,7 +327,7 @@ func accessConfiguration(b *builder) []Panel {
 				unitOf("Idle", "d", 100), width("Environment", 150),
 				ownerLinkOn("Environment", "the deployment log"),
 			},
-			GR: envGR, GRTF: envGRtf, GRDesc: grSlot,
+			GR: envGR, GRTF: envGRtf, GRDesc: grRows,
 			ES: envES, ESTF: envEStf,
 		}),
 	}
@@ -414,9 +416,9 @@ func branchesAndProtections(b *builder) []Panel {
 			{"days_since_commit", "Idle"},
 		}, []string{ESF})
 
-	// A boolean is not a metric in Graphite, so the four switches have no series
-	// there to read at all, and a table there carries one column: the number of
-	// status checks, which is the column a reader would sort this by.
+	// Graphite holds the four switches as 1 and 0 like any number, but a table
+	// there carries one number per row, and the one a reader would sort this
+	// by is the number of status checks.
 	protGR, protGRtf := gTbl(rowsOf(rp(bp, "required_checks"), gn(bp, "repo"), gn(bp, "pattern")),
 		"Repository, pattern", []col{{"lastNotNull", "Checks"}})
 	// A `max` per column rather than the newest reading, for the reason the
@@ -529,9 +531,9 @@ func branchesAndProtections(b *builder) []Panel {
 					width("Checks", 80), ownerLinkOn("Pattern", "the branch settings"),
 				},
 				GR: protGR, GRTF: protGRtf,
-				GRDesc: "Graphite names each row repository and pattern from the path, and a boolean " +
-					"is not a metric there at all, so what the protection requires beyond the " +
-					"number of status checks is missing. " + grRows,
+				GRDesc: "Graphite names each row repository and pattern from the path and keeps " +
+					"one number per row, the status checks, so what else the protection requires " +
+					"is missing. " + grRows,
 				ES: protES, ESTF: protEStf,
 				ESDesc: "In Elasticsearch all six columns are the largest value inside the range " +
 					"rather than the newest reading, because a top_metrics over a boolean panics " +

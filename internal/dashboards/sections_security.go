@@ -528,7 +528,7 @@ func scanningAndResolution(b *builder) []Panel {
 				barCell("Results", "short", 120), width("Runs", 100),
 				width("Rules", 100),
 			},
-			GR: toolGR, GRTF: toolGRtf, GRDesc: grSlot,
+			GR: toolGR, GRTF: toolGRtf, GRDesc: grRows + " " + grSlotTotals,
 			ES: toolES, ESTF: toolEStf,
 		}),
 		panel("table", "Oldest open alerts", box{W: 24, H: 7, X: 0, Y: 34}, []Target{sqlT(oldest)}, &P{

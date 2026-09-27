@@ -263,7 +263,9 @@ func lifetime(b *builder) []Panel {
 				Overrides: []any{
 					linkOn("Repository"), width("Fork", 70), width("Archived", 90),
 				},
-				GR: twins.GR, GRTF: twins.GRTF, GRDesc: grSlot + " " + grArchivedWindow,
+				GR: twins.GR, GRTF: twins.GRTF, GRDesc: "Graphite has no rows: each series is one number, so this table keeps the " +
+					"commits it is ranked by and drops the other columns, the fork and archived " +
+					"flags among them. " + grArchivedWindow,
 				ES: twins.ES, ESTF: twins.ESTF, ESDesc: esArchivedWindow,
 			}),
 		// The description leads with the window rather than explaining it in
