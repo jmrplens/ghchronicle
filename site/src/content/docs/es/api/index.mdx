@@ -14,7 +14,7 @@ cuál acaba de cargar en la cabecera `x-ratelimit-resource`.
 | Cubo      | Límite               | Lo gasta                                                         |
 | --------- | -------------------- | ---------------------------------------------------------------- |
 | `core`    | 5000 por hora        | Toda llamada REST                                                |
-| `graphql` | 5000 puntos por hora | Las consultas de cuenta, commits, discusiones, etiquetas e hitos, y desde el 2026-09-11 las estrellas y forks más nuevos, la lista de estrellas dadas, las búsquedas de outbound y diez de los once contadores de totals |
+| `graphql` | 5000 puntos por hora | Toda consulta GraphQL: las pull requests e issues, la cuenta, los commits, las discusiones, los despliegues y el resto, que la [tabla de coste](/ghchronicle/es/api/cost/) pone precio familia a familia, y la consulta que pregunta qué repositorios se movieron |
 | `search`  | 30 por minuto        | El contador de commits de `totals`, y nada más: la búsqueda GraphQL no tiene tipo COMMIT |
 
 Dos más los carga una familia cada uno: `webhook_deliveries` (500 por minuto)
@@ -193,6 +193,8 @@ normal; una familia saltada en cada pasada es un problema de configuración.
 
 Un [relleno histórico](/ghchronicle/es/how/backfill/) es la intención contraria
 y lo dice. Cuando un cubo se agota espera a que la ventana se reinicie en vez de
-rendirse, porque un relleno que se detiene a medias ha gastado la parte cara del
-presupuesto y conserva solo las familias que terminó: cada una se escribe y se
-marca en cuanto acaba, y el resto hay que volver a lanzarlo.
+rendirse, porque lo que se le pidió es el recorrido entero, y una familia
+saltada por falta de presupuesto sería una familia que hay que volver a
+recorrer. Parado a medias, pierde poco: un punto de control junto al fichero de
+estado guarda su sitio, repositorio a repositorio, y [el mismo comando sigue
+desde ahí](/ghchronicle/es/how/backfill/#pararlo-y-retomarlo).
