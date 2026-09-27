@@ -3,15 +3,20 @@ package run
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/jmrplens/ghchronicle/v2/internal/sink"
 )
 
 // TestAChangedAchievementsPageIsSaidOnce pins what the family promises when
@@ -123,5 +128,191 @@ func TestAnAchievementDisagreementIsSaidOnce(t *testing.T) {
 	}
 	if strings.Contains(log.String(), "collector failed") {
 		t.Errorf("a disagreement is a warning, not a failed collector:\n%s", log.String())
+	}
+}
+
+// coauthoredGitHub answers the achievements family for an account created on
+// 2026-09-01: the recorded e2e page, the counts, and the walk from a table of
+// merged: ranges, each answered with its pull requests and when they merged.
+// It records the ranges the walk asked for, in order.
+type coauthoredGitHub struct {
+	t      *testing.T
+	page   []byte
+	ranges map[string][]coauthoredPull
+	mu     sync.Mutex
+	asked  []string
+}
+
+// coauthoredPull is one merged pull request of the fake: when, and whether a
+// commit of it carries the trailer.
+type coauthoredPull struct {
+	merged     string
+	coauthored bool
+}
+
+var mergedRange = regexp.MustCompile(`merged:(\S+)`)
+
+func (g *coauthoredGitHub) handler(w http.ResponseWriter, req *http.Request) {
+	switch req.URL.Path {
+	case "/octocat":
+		w.Header().Set("Content-Type", "text/html")
+		_, _ = w.Write(g.page)
+	case "/graphql":
+		body, _ := io.ReadAll(req.Body)
+		w.Header().Set("Content-Type", "application/json")
+		if bytes.Contains(body, []byte("query achievementCounts(")) {
+			_, _ = w.Write([]byte(`{"data":{"pulls":{"issueCount":1},"answers":{"discussionCount":0},"user":{"createdAt":"2026-09-01T08:00:00Z","repositories":{"nodes":[{"stargazerCount":4321}]}}}}`))
+			return
+		}
+		var sent struct {
+			Variables struct {
+				Query string `json:"query"`
+			} `json:"variables"`
+		}
+		_ = json.Unmarshal(body, &sent)
+		m := mergedRange.FindStringSubmatch(sent.Variables.Query)
+		if m == nil {
+			g.t.Errorf("a walk query with no merged: range: %s", body)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		key := m[1]
+		g.mu.Lock()
+		g.asked = append(g.asked, key)
+		g.mu.Unlock()
+		pulls, known := g.ranges[key]
+		if !known {
+			g.t.Errorf("the walk asked for merged:%s, which this history does not expect", key)
+		}
+		nodes := make([]string, 0, len(pulls))
+		for _, p := range pulls {
+			message := "Solo (#1)"
+			if p.coauthored {
+				message = "Pair (#2)\n\nCo-authored-by: Mona <mona@example.com>"
+			}
+			nodes = append(nodes, fmt.Sprintf(`{"mergedAt":%q,"mergeCommit":{"message":%q},"commits":{"totalCount":1,"nodes":[{"commit":{"message":"work"}}]}}`,
+				p.merged, message))
+		}
+		fmt.Fprintf(w, `{"data":{"search":{"issueCount":%d,"pageInfo":{"hasNextPage":false,"endCursor":""},"nodes":[%s]}}}`,
+			len(pulls), strings.Join(nodes, ","))
+	default:
+		w.WriteHeader(http.StatusNotFound)
+	}
+}
+
+// walked is every merged: range asked so far.
+func (g *coauthoredGitHub) walked() []string {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	return append([]string(nil), g.asked...)
+}
+
+// coauthoredCount is the count on the Pair Extraordinaire row a sink got.
+func coauthoredCount(t *testing.T, got *kept) any {
+	t.Helper()
+	for _, p := range got.rows("gh_achievement_progress") {
+		if p.Tags["achievement"] == "pair-extraordinaire" {
+			return p.Fields["count"]
+		}
+	}
+	t.Fatal("no Pair Extraordinaire row")
+	return nil
+}
+
+// TestTheCoauthoredCountIsAddedToAcrossARestart pins what issue #90 asked
+// for: the co-authored count is kept in the state file with the last day it
+// covers, and the next day's pass, in a process started from that file, asks
+// only for the pull requests merged since, and adds them. The day a pass is
+// made on is walked again by the next one, since pull requests are still
+// merged into it after the pass: the pull request merged on the 12th is in
+// both walks and counted once. A backfill walks the whole history again
+// instead and starts the count over from it, which is how a count that fell,
+// a pull request whose repository went private, is set right.
+func TestTheCoauthoredCountIsAddedToAcrossARestart(t *testing.T) {
+	t.Parallel()
+	page, err := os.ReadFile(filepath.Join("..", "..", "test", "e2e", "testdata", "achievements_page.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	gh := &coauthoredGitHub{t: t, page: page, ranges: map[string][]coauthoredPull{
+		"2026-09-01..2026-09-12": {
+			{"2026-09-03T10:00:00Z", true},
+			{"2026-09-04T11:00:00Z", false},
+			{"2026-09-11T23:59:00Z", true},
+			{"2026-09-12T08:00:00Z", true},
+		},
+		"2026-09-12..2026-09-13": {
+			{"2026-09-12T08:00:00Z", true},
+			{"2026-09-12T20:00:00Z", true},
+			{"2026-09-13T09:00:00Z", false},
+			{"2026-09-13T10:00:00Z", true},
+		},
+		// The whole history as a backfill on the 14th finds it: the pull
+		// request of the 3rd is gone.
+		"2026-09-01..2026-09-14": {
+			{"2026-09-11T23:59:00Z", true},
+			{"2026-09-12T08:00:00Z", true},
+			{"2026-09-12T20:00:00Z", true},
+			{"2026-09-13T10:00:00Z", true},
+			{"2026-09-14T09:00:00Z", true},
+		},
+	}}
+	path := filepath.Join(t.TempDir(), "state.json")
+	pass := func(at time.Time, backfill ...bool) *kept {
+		t.Helper()
+		got := &kept{}
+		r := sweepRunner(t, gh.handler)
+		r.Backfill = len(backfill) > 0 && backfill[0]
+		r.Sinks = []sink.Sink{got}
+		r.Cfg.Targets.User = "octocat"
+		r.Cfg.Every = everyOnly("achievements")
+		if cfgErr := r.Cfg.Validate(); cfgErr != nil {
+			t.Fatal(cfgErr)
+		}
+		r.State = LoadState(path)
+		r.accountFamilies(context.Background(), at)
+		if saveErr := r.State.Save(); saveErr != nil {
+			t.Fatal(saveErr)
+		}
+		return got
+	}
+
+	first := pass(time.Date(2026, 9, 12, 12, 0, 0, 0, time.UTC))
+	if got := coauthoredCount(t, first); got != 3 {
+		t.Errorf("the first pass counted %v, want the 3 co-authored pull requests of the whole history", got)
+	}
+	second := pass(time.Date(2026, 9, 13, 12, 0, 0, 0, time.UTC))
+	if got := coauthoredCount(t, second); got != 5 {
+		t.Errorf("the second pass counted %v, want the 2 settled on the 11th and before, plus the 2 of the 12th and the 1 of the 13th", got)
+	}
+	want := []string{"2026-09-01..2026-09-12", "2026-09-12..2026-09-13"}
+	if got := gh.walked(); strings.Join(got, " ") != strings.Join(want, " ") {
+		t.Errorf("the walks asked for %q, want the whole history and then the days since the one the count covers, %q", got, want)
+	}
+	saved, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var state struct {
+		Coauthored struct {
+			Count   int       `json:"count"`
+			Through time.Time `json:"through"`
+		} `json:"coauthored"`
+	}
+	if err = json.Unmarshal(saved, &state); err != nil {
+		t.Fatal(err)
+	}
+	if state.Coauthored.Count != 4 || !state.Coauthored.Through.Equal(time.Date(2026, 9, 12, 0, 0, 0, 0, time.UTC)) {
+		t.Errorf("the state file keeps %+v, want 4 through the 12th: the 13th is still being merged into", state.Coauthored)
+	}
+
+	// Added to, the 14th would be the 4 kept and the 2 of the 13th and the
+	// 14th, 6; walked whole, it is the 5 the history now holds.
+	walk := pass(time.Date(2026, 9, 14, 12, 0, 0, 0, time.UTC), true)
+	if got := gh.walked(); got[len(got)-1] != "2026-09-01..2026-09-14" {
+		t.Errorf("the backfill asked for %q, want the whole history, merged:2026-09-01..2026-09-14", got[len(got)-1])
+	}
+	if got := coauthoredCount(t, walk); got != 5 {
+		t.Errorf("the backfill counted %v, want the 5 the whole history holds now", got)
 	}
 }

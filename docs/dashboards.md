@@ -218,12 +218,12 @@ ghchronicle -config config.yaml -uninstall all          # says what would go
 ghchronicle -config config.yaml -uninstall all -yes     # and then goes
 ```
 
-| Target      | What goes                                                            |
-| ----------- | -------------------------------------------------------------------- |
-| `dashboard` | The dashboards it published, and the datasources it created           |
-| `data`      | Every table in the store whose name starts with `gh_`                 |
-| `state`     | The state file, the dedupe ledger and the backfill checkpoint         |
-| `all`       | The three above                                                       |
+| Target      | What goes                                                                |
+| ----------- | ------------------------------------------------------------------------ |
+| `dashboard` | The dashboards it published, and the datasources it created              |
+| `data`      | Every table in the store whose name starts with `gh_`                    |
+| `state`     | The state file, the dedupe ledger, the cache and the backfill checkpoint |
+| `all`       | The three above                                                          |
 
 A datasource named in `grafana.datasource.uid` or `grafana.datasource.loki_uid`
 is never removed, and neither is a Loki datasource it adopted: each was
@@ -388,7 +388,7 @@ default filter sets aside for being archived gets no `gh_repo` row from a sweep,
 so the picker stops offering it once the last backfill is behind it, but people
 still star and fork it and every `totals` sweep reads its counts again. With
 All selected the sums include it, and a range shorter than the `totals`
-cadence, twelve hours by default, can leave its row out. Picking repositories
+cadence, an hour by default, can leave its row out. Picking repositories
 counts those alone. Each repository counts once, by its full name: two owners'
 repositories of the same name are two, and one archived while the collector
 runs is not counted under both its live row and its archived one. The
@@ -799,7 +799,10 @@ The two cache panels are about the ceiling. GitHub caps a repository at ten
 gigabytes and evicts the least recently used entry past it, so the bar is each
 repository against that cap and the panel is read for the distance left; the
 entry table says which key is being thrown away and which has not been touched
-for a week.
+for a week. Each row of that table is one cache of one repository: its newest
+snapshot on every ref in the range, added up, so Entries counts the entries
+GitHub holds and not the rows the table read. It is the same sum in the five
+stores; Graphite shows the size alone, since a Graphite table keeps one column.
 
 Reads `gh_billing_usage`, `gh_actions_cache` and `gh_actions_cache_entry`.
 
@@ -833,8 +836,15 @@ each star was given. Whether the projects are small or famous is a different
 question from how many there are, so the second table carries their own star
 counts.
 
-Reads `gh_event`, `gh_notification`, `gh_external_contribution` and
-`gh_star_given`.
+The table of work elsewhere carries the same number for the repositories the
+account contributed to: each one's star count at the newest sweep inside the
+range, from `gh_upstream_repo`, joined onto every item in the InfluxDB and
+PostgreSQL dashboards and beside every repository in the Prometheus one.
+Graphite and Elasticsearch cannot join two measurements in one panel and leave
+the column out, saying so.
+
+Reads `gh_event`, `gh_notification`, `gh_external_contribution`,
+`gh_upstream_repo` and `gh_star_given`.
 
 ### Inventory
 
@@ -940,7 +950,7 @@ the capture above predates both. The first lists every collector that ran in
 the range, what stopped it where something did, how many sweeps it ran in and
 how many repositories it was asked about; a family with no row there did not run
 at all. The reason is a column of its own so that the two kinds of failure sort
-apart: a search budget spent twice a day is not the 502 that cost a repository
+apart: a spent search budget is not the 502 that cost a repository
 its history, and a family that met both has a row for each. The second is one
 row per repository one collector could not collect, newest first, with what
 GitHub answered. An empty second table is the

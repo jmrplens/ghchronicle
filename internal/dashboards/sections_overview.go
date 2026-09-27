@@ -132,12 +132,13 @@ func overview(b *builder) []Panel {
 	// totals sweep, and people still star and fork it. Measured on 2026-09-26
 	// against the account of issue #78: the seventeen archived repositories
 	// its filter sets aside held 80 stars and 24 forks that the tile left out.
-	// Not gh_repo_total for every repository, though: that family runs every
-	// twelve hours and gh_repo every hour, so the live stars would lag the
-	// Inventory table and the card by up to half a day and a range of six
-	// hours would hold none of them. Under All every store lets the archived
-	// rows through, the SQL ones by RFA and the rest by a wildcard; with
-	// repositories picked, only those count.
+	// Not gh_repo_total for every repository, though: the Inventory table and
+	// the card read gh_repo, and the two families run at their own moments,
+	// on cadences a configuration can set apart, so the live stars would
+	// disagree with both by whatever lies between the two sweeps: half a day,
+	// when totals still ran every twelve hours. Under All every store lets the
+	// archived rows through, the SQL ones by RFA and the rest by a wildcard;
+	// with repositories picked, only those count.
 	//
 	// One row per full_name and not per repo, which is a name two owners can
 	// both use: alice/.github and acme/.github are two repositories with stars
@@ -203,7 +204,7 @@ func overview(b *builder) []Panel {
 				"than over every row in the range. With All selected that includes the " +
 				"archived repositories the default filter sets aside, which the picker " +
 				"stops listing once the last backfill is behind it: people still star and " +
-				"fork them, and each totals sweep reads their counts again, twelve hours " +
+				"fork them, and each totals sweep reads their counts again, an hour " +
 				"apart by default, so a range shorter than that can leave them out. Each " +
 				"repository counts once, by its full name. The repository count is GitHub's " +
 				"own count of the account's public repositories and not the set the sums " +

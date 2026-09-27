@@ -60,6 +60,12 @@ targets:
 `exclude` takes shell globs, so `someone/experiment-*` drops a whole prefix in
 one line.
 
+Naming one of the account's own repositories, a fork of yours for instance,
+costs no request to discover it: the listing already returned it, with the
+four things discovery wants to know about it. Only a name no listing returns,
+someone else's repository or one of an organisation not in `orgs`, is read on
+its own each time the list is rebuilt.
+
 ## Why forks and archived are off by default
 
 Both defaults exist for the same reason, which is the rate limit.

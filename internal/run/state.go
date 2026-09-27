@@ -2,17 +2,21 @@
 package run
 
 import (
+	"bufio"
 	"encoding/json"
+	"io"
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/jmrplens/ghchronicle/v2/internal/collect"
 )
 
 // State is what a sweep has to remember between runs.
 //
-// Seven things, and deleting the file costs a different thing for each of
-// them. Six of the seven cost only rate limit, because what is collected again
-// overwrites what is already stored. last_head is the one that loses
+// Eight things, and deleting the file costs a different thing for each of
+// them. Seven of the eight cost only rate limit, because what is collected
+// again overwrites what is already stored. last_head is the one that loses
 // something: the dependency changes between the head it held and the next one
 // are read from a range that nothing can name once the head is gone.
 //
@@ -33,6 +37,9 @@ import (
 //   - last_notified: where the inbox window was cut. Zero asks for the whole
 //     inbox.
 //   - last_event: the newest event the feed had. Empty reads the whole feed.
+//   - coauthored: the Pair Extraordinaire count and the last day it covers,
+//     so the achievements family walks the pull requests merged since instead
+//     of the account's whole history. Absent walks the whole history.
 type State struct {
 	path     string
 	LastRun  map[string]time.Time `json:"last_run"`
@@ -58,6 +65,11 @@ type State struct {
 	// LastEvent is the id of the newest event the feed had, which is the page
 	// the next sweep stops at. Empty reads the whole feed.
 	LastEvent string `json:"last_event,omitempty"`
+	// Coauthored is the co-authored pull request count as far as the
+	// achievements family has settled it. Zero, which is what an older state
+	// file reads as, is a count made by no rule, and the next pass walks the
+	// whole history for it.
+	Coauthored collect.CoauthoredTally `json:"coauthored,omitzero"`
 }
 
 func LoadState(path string) *State {
@@ -123,8 +135,18 @@ func (s *State) Save() error {
 // zero length file there is not a cosmetic problem; the sweep's state pays one
 // flush a sweep for the same guarantee.
 func replaceFile(path string, b []byte) error {
+	return replaceFileWith(path, func(w io.Writer) error {
+		_, err := w.Write(b)
+		return err
+	})
+}
+
+// replaceFileWith is replaceFile for contents written as they are produced
+// rather than held whole first, which the cache file is: tens of megabytes
+// that would otherwise be in memory twice for the length of every save.
+func replaceFileWith(path string, write func(io.Writer) error) error {
 	tmp := path + ".tmp"
-	if err := writeWhole(tmp, b); err != nil {
+	if err := writeWhole(tmp, write); err != nil {
 		return err
 	}
 	if err := os.Rename(tmp, path); err != nil {
@@ -134,14 +156,18 @@ func replaceFile(path string, b []byte) error {
 	return nil
 }
 
-// writeWhole writes b to path and flushes it, so what the rename above puts in
-// place is the contents and not just the name of them.
-func writeWhole(path string, b []byte) error {
+// writeWhole writes path through write and flushes it, so what the rename
+// above puts in place is the contents and not just the name of them.
+func writeWhole(path string, write func(io.Writer) error) error {
 	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
 		return err
 	}
-	if _, err = f.Write(b); err != nil {
+	buffered := bufio.NewWriterSize(f, 1<<16)
+	if err = write(buffered); err == nil {
+		err = buffered.Flush()
+	}
+	if err != nil {
 		_ = f.Close()
 		return err
 	}

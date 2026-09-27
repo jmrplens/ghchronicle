@@ -837,6 +837,28 @@ func groupSum(by, value, nameBy, nameValue string) []any {
 	}
 }
 
+// groupRows is groupSum for more than one column to group by and more than a
+// sum: the rows that share every column in `by` become one, and each column in
+// `reduce` is reduced by the calculation it names and keeps its own name.
+func groupRows(by []string, reduce map[string]string) []any {
+	fields := map[string]any{}
+	rename := map[string]any{}
+	for _, name := range by {
+		fields[name] = map[string]any{"operation": "groupby", "aggregations": []any{}}
+	}
+	for name, how := range reduce {
+		fields[name] = map[string]any{"operation": "aggregate", "aggregations": []any{how}}
+		rename[name+" ("+how+")"] = name
+	}
+	return []any{
+		map[string]any{"id": "groupBy", "options": map[string]any{"fields": fields}},
+		map[string]any{"id": "organize", "options": map[string]any{
+			"excludeByName": map[string]any{}, "indexByName": map[string]any{},
+			"renameByName": rename,
+		}},
+	}
+}
+
 // esSnapshotStack is a per-repository snapshot drawn as history: the largest
 // reading of each repository in each day, one series per repository, for a
 // panel that stacks them (esStacked) so the top of the stack is the account's

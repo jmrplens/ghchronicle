@@ -89,8 +89,11 @@ El registro guarda dos hashes de 64 bits y un día por punto, así que una cuent
 grande cuesta unos pocos megabytes. Va indexado por destino, así que un almacén
 que estuvo inalcanzable recibe todo en su siguiente escritura. Perderlo, o
 poner `dedupe_file: off`, cuesta una pasada de reescritura y nada más, que es
-justo lo que quiere un almacén que se ha vaciado y hay que volver a llenar. Es
-el segundo fichero que conviene poner en una ruta persistente, junto al
+justo lo que quiere un almacén que se ha vaciado y hay que volver a llenar. Los
+jobs de las ejecuciones de workflow que recuerda
+[la caché](/ghchronicle/es/configuration/#la-caché-que-hay-a-su-lado) vienen
+con él: un arranque que no encuentra el registro los vuelve a listar. Es el
+segundo fichero que conviene poner en una ruta persistente, junto al
 [fichero de estado](/ghchronicle/es/configuration/).
 
 Una ejecución que termina cuando termina su pasada no abre el registro. `-once`,

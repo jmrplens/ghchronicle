@@ -3,9 +3,14 @@ package e2e
 import (
 	"encoding/json"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/jmrplens/ghchronicle/v2/test/e2e/fakegh"
 )
 
 type lokiStream struct {
@@ -81,10 +86,48 @@ func TestLokiSinkPushesEventsAsLogLines(t *testing.T) {
 		}
 	}
 
-	for _, want := range []string{"workflow_run", "star", "commit", "event"} {
+	for _, want := range []string{"workflow_run", "star", "commit", "event", "release"} {
 		if kinds[want] == 0 {
 			t.Errorf("no %s entries were pushed; kinds seen: %v", want, sortedNames(kinds))
 		}
+	}
+	assertReleasesAtPublication(t, reqs)
+}
+
+// assertReleasesAtPublication holds the release stream to the moments the
+// fixtures' releases were published, and to nothing else. The line used to
+// come from gh_release, stamped at the sweep, so each repository pass pushed
+// every release again at the moment of that pass, and the stream read in
+// order said a release had happened every hour.
+func assertReleasesAtPublication(t *testing.T, reqs []capturedRequest) {
+	t.Helper()
+	published := map[int64]string{
+		fakegh.DaysAgo(32).Add(9*time.Hour + 30*time.Minute).UnixNano(): "published release v1.2.0 of ",
+		fakegh.DaysAgo(10).Add(9*time.Hour + 5*time.Minute).UnixNano():  "published prerelease v1.3.0-rc1 of ",
+	}
+	seen := map[int64]bool{}
+	for _, r := range reqs {
+		for _, s := range decodeLoki(t, r.Body).Streams {
+			if s.Stream["kind"] != "release" {
+				continue
+			}
+			for _, v := range s.Values {
+				at, _ := strconv.ParseInt(v[0], 10, 64)
+				sentence, ok := published[at]
+				if !ok {
+					t.Errorf("a release line is stamped %s, which is no publication in the fixtures: %s",
+						time.Unix(0, at).UTC().Format(time.RFC3339Nano), v[1])
+					continue
+				}
+				if !strings.HasPrefix(v[1], sentence) {
+					t.Errorf("the line at %s reads %q, want %q", time.Unix(0, at).UTC().Format(time.RFC3339), v[1], sentence)
+				}
+				seen[at] = true
+			}
+		}
+	}
+	if len(seen) != len(published) {
+		t.Errorf("the release stream holds %d of the fixtures' %d publications", len(seen), len(published))
 	}
 }
 
@@ -160,7 +203,7 @@ func assertLokiEntry(t *testing.T, kind, entry string) {
 // failure.
 func TestLokiDropsWhatItWouldBeRefusedFor(t *testing.T) {
 	t.Parallel()
-	gh := newFakeGitHub(t)
+	gh := fakegh.New(t, "testdata", releasedJustNowOverlay(t))
 	rec := newCapture(t, nil)
 	dir := t.TempDir()
 	cfg := writeSinkConfig(t, dir, gh.URL(), `  loki:
@@ -175,9 +218,114 @@ func TestLokiDropsWhatItWouldBeRefusedFor(t *testing.T) {
 	if strings.Contains(out, "sink write failed") {
 		t.Errorf("a drop was reported as a failure:\n%s", out)
 	}
-	// What is inside the horizon still goes: the fixtures date one workflow
-	// run at the moment of the run.
+	// What is inside the horizon still goes, and the overlay's release is the
+	// entry inside it. The base fixtures have none: what went here before was
+	// gh_release, stamped at the sweep and so inside any horizon, which is the
+	// line a release stopped being rendered as.
 	if lokiEntryCount(t, rec) == 0 {
 		t.Errorf("the horizon dropped everything, including the entries inside it")
+	}
+	sent := false
+	for _, r := range rec.Accepted() {
+		for _, s := range decodeLoki(t, r.Body).Streams {
+			for _, v := range s.Values {
+				sent = sent || strings.HasPrefix(v[1], "published release v1.4.0 of octocat/hello-world ")
+			}
+		}
+	}
+	if !sent {
+		t.Errorf("the release published a moment ago is not among the entries sent")
+	}
+}
+
+// releasedJustNowOverlay is the base release list with one more release,
+// published at the fake's own present.
+func releasedJustNowOverlay(t *testing.T) string {
+	t.Helper()
+	return releasesOverlay(t, map[string]any{
+		"id": 3, "tag_name": "v1.4.0", "name": "v1.4.0", "draft": false, "prerelease": false,
+		"html_url":   "https://github.com/octocat/hello-world/releases/tag/v1.4.0",
+		"created_at": "@NOW@", "published_at": "@NOW@", "assets": []any{},
+	})
+}
+
+// releasesOverlay is the base release list with the given releases added, in
+// a directory of its own for fakegh to serve over the base fixtures.
+func releasesOverlay(t *testing.T, extra ...map[string]any) string {
+	t.Helper()
+	raw, err := os.ReadFile(filepath.Join("testdata", "releases.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var releases []map[string]any
+	if err = json.Unmarshal(raw, &releases); err != nil {
+		t.Fatalf("releases.json: %v", err)
+	}
+	body, err := json.Marshal(append(releases, extra...))
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	if err = os.WriteFile(filepath.Join(dir, "releases.json"), body, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return dir
+}
+
+// TestLokiSendsAReleaseTheLastPassCouldNotHaveSeen is the test issue #80 asked
+// for, through the binary and the configuration it reads. The release line is
+// dated at the publication, and the first repo pass to see a release is the
+// one after it, so at the default hour of both repo and max_age a release
+// published just after a pass read its repository was more than an hour old
+// when the next pass wrote, and the sink's wall clock left it out for good.
+// The release stream looks back a repo cadence plus max_age instead: one
+// published a cadence minus a minute before the pass arrives, one published
+// just after the previous pass read the repository of a pass that runs a
+// quarter of an hour late arrives too, and one past the lookback, which an
+// earlier pass would have sent, does not.
+//
+// The dates are the real clock rather than the fake's, because the horizon is
+// the sink's own wall clock and not the sweep's.
+func TestLokiSendsAReleaseTheLastPassCouldNotHaveSeen(t *testing.T) {
+	t.Parallel()
+	now := time.Now().UTC()
+	published := func(id int, tag string, ago time.Duration) map[string]any {
+		at := now.Add(-ago).Format(time.RFC3339)
+		return map[string]any{
+			"id": id, "tag_name": tag, "name": tag, "draft": false, "prerelease": false,
+			"html_url":   "https://github.com/octocat/hello-world/releases/tag/" + tag,
+			"created_at": at, "published_at": at, "assets": []any{},
+		}
+	}
+	gh := fakegh.New(t, "testdata", releasesOverlay(t,
+		published(3, "v1.4.0", 59*time.Minute),
+		published(4, "v1.4.1", 75*time.Minute),
+		published(5, "v1.3.9", 2*time.Hour+10*time.Minute),
+	))
+	rec := newCapture(t, nil)
+	dir := t.TempDir()
+	// Every family runs at a minute here; repo goes back to its own hour, and
+	// max_age is left to its default, which is the configuration that lost
+	// these lines.
+	sweepOnce(t, writeSinkConfigAt(t, dir, gh.URL(), `  loki:
+    url: `+rec.URL()+`/loki/api/v1/push`, map[string]string{"repo": "1h"}))
+
+	sent := map[string]bool{}
+	for _, r := range rec.Accepted() {
+		for _, s := range decodeLoki(t, r.Body).Streams {
+			if s.Stream["kind"] != "release" {
+				continue
+			}
+			for _, v := range s.Values {
+				if f := strings.Fields(v[1]); len(f) > 2 {
+					sent[f[2]] = true
+				}
+			}
+		}
+	}
+	for tag, want := range map[string]bool{"v1.4.0": true, "v1.4.1": true, "v1.3.9": false} {
+		if sent[tag] != want {
+			t.Errorf("release %s sent = %v, want %v; the release stream carried %v", tag, sent[tag], want, sent)
+		}
 	}
 }

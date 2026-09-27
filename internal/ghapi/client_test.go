@@ -24,6 +24,10 @@ func newTestClient(t *testing.T, h http.HandlerFunc) (*Client, *httptest.Server)
 	t.Cleanup(srv.Close)
 	c := New("test-token", 5*time.Second)
 	c.SetBaseURL(srv.URL)
+	// A server here that answers 502 does so on purpose and for good, so
+	// the retry that follows is asked at once; retry_test.go is where the
+	// pause itself is tested.
+	c.SetRetryPause(0)
 	return c, srv
 }
 

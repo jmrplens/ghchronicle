@@ -45,7 +45,7 @@ container, a scheduled workflow.
 | --------------- | ------------------------------------------------------------------------------------------------------ |
 | **family**      | One collector, named in the configuration: `actions`, `stars`, `issues`. There are 34                |
 | **group**       | A named set of families, for switching a whole area on or off: `ci`, `security`, `audience`. There are 8 |
-| **measurement** | One kind of row in the store, named `gh_*`: `gh_star`, `gh_workflow_run`. There are 93               |
+| **measurement** | One kind of row in the store, named `gh_*`: `gh_star`, `gh_workflow_run`. There are 95               |
 | **point**       | One row: a measurement, its tags, its fields and the date the thing happened                         |
 | **sweep**       | One pass over the families that are due, which is what the process does on a loop                    |
 | **backfill**    | A run with `-backfill`, which walks the history instead of the increment                             |
@@ -190,7 +190,8 @@ themselves or wants to know what they just agreed to.
     ```
 
     Each family then runs on its own cadence: workflow runs every fifteen
-    minutes, the contribution calendar every twelve hours.
+    minutes, the contribution calendar every hour, the account's SSH and GPG
+    keys once a day.
 
 ### What the first sweep does that later ones do not
 
@@ -227,9 +228,9 @@ it costs.
 > **Keep the state file**
 >
 > `state_file` is what remembers where each family got to, and
-> [seven things live in it](https://jmrp.io/docs/ghchronicle/configuration/#state_file). Delete it
+> [eight things live in it](https://jmrp.io/docs/ghchronicle/configuration/#state_file). Delete it
 > and the next sweep re-collects everything, which costs quota and nothing else
-> for six of the seven; the seventh is the commit each dependency diff starts
+> for seven of the eight; the eighth is the commit each dependency diff starts
 > from, and the changes in the gap are not collected again.
 
 ### Where to go next
@@ -567,7 +568,7 @@ Yes, as long as the collector runs while they are still there. The `events`
 family keeps the account's activity feed, which GitHub serves up to three
 hundred events and none older than thirty days, and `notifs` keeps the inbox,
 which GitHub says holds notifications for three months unless they are saved.
-Both run every thirty minutes by default, each item a point dated when it
+Both run every fifteen minutes by default, each item a point dated when it
 happened, and a Loki sink turns them into log lines.
 
 GitHub states both windows in its documentation on [the event

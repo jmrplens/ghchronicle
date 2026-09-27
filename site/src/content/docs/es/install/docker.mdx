@@ -94,20 +94,23 @@ verdadera.
 
 ## Qué tiene que ser escribible
 
-El fichero de configuración se monta de solo lectura. Cuatro cosas no:
+El fichero de configuración se monta de solo lectura. Cinco cosas no:
 
-| Ruta                | Necesaria para                                                                              |
-| ------------------- | --------------------------------------------------------------------------------------------- |
-| `state_file`        | Siempre. Sin una ruta persistente el recorrido de estrellas se repite en cada reinicio      |
-| `sinks.dedupe_file` | Siempre. El registro de escrituras, que por omisión vive junto al fichero de estado         |
-| `sinks.file.path`   | Solo con el destino de fichero                                                              |
-| `log.file`          | Solo con un fichero de log configurado                                                      |
+| Ruta                 | Necesaria para                                                                         |
+| -------------------- | -------------------------------------------------------------------------------------- |
+| `state_file`         | Siempre. Sin una ruta persistente el recorrido de estrellas se repite en cada reinicio |
+| `<nombre>-cache.bin` | Siempre. La caché, que vive junto al fichero de estado y no tiene ajuste propio        |
+| `sinks.dedupe_file`  | Siempre. El registro de escrituras, que por omisión vive junto al fichero de estado    |
+| `sinks.file.path`    | Solo con el destino de fichero                                                         |
+| `log.file`           | Solo con un fichero de log configurado                                                 |
 
-Los dos primeros viven por omisión en el mismo directorio, así que un solo
-volumen montado cubre ambos. Montar solo el fichero de estado pierde el registro
-en cada reinicio, y entonces cada reinicio cuesta una pasada entera de
+Los tres primeros viven por omisión en el mismo directorio, así que un solo
+volumen montado los cubre. Montar solo el fichero de estado pierde el registro y
+la caché en cada reinicio, y entonces cada reinicio cuesta una pasada entera de
 reescritura, que es justo lo que el registro existe para evitar:
-[solo se escribe lo que ha cambiado](/ghchronicle/es/sinks/#solo-se-escribe-lo-que-ha-cambiado).
+[solo se escribe lo que ha cambiado](/ghchronicle/es/sinks/#solo-se-escribe-lo-que-ha-cambiado),
+y una pasada entera volviendo a preguntar a GitHub lo que la caché ya sabía:
+[la caché que hay a su lado](/ghchronicle/es/configuration/#la-caché-que-hay-a-su-lado).
 
 ```sh
 docker volume create ghchronicle-state

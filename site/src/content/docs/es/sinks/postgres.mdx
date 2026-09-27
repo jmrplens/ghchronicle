@@ -72,7 +72,10 @@ es lo que hace que una reescritura de la ventana de tráfico de catorce días
 converja en vez de acumular.
 
 ```sql
-CREATE TABLE IF NOT EXISTS "gh_traffic" ("time" TIMESTAMPTZ NOT NULL, "full_name" TEXT NOT NULL DEFAULT '', "kind" TEXT NOT NULL DEFAULT '', "owner" TEXT NOT NULL DEFAULT '', "repo" TEXT NOT NULL DEFAULT '', "count" BIGINT, "uniques" BIGINT, "url" TEXT, PRIMARY KEY ("time", "full_name", "kind", "owner", "repo"));
+CREATE TABLE IF NOT EXISTS "gh_traffic" ("time" TIMESTAMPTZ NOT NULL, "full_name" TEXT NOT NULL DEFAULT '', "kind" TEXT NOT NULL DEFAULT '', "owner" TEXT NOT NULL DEFAULT '', "repo" TEXT NOT NULL DEFAULT '', PRIMARY KEY ("time", "full_name", "kind", "owner", "repo"));
+ALTER TABLE "gh_traffic" ADD COLUMN IF NOT EXISTS "count" BIGINT;
+ALTER TABLE "gh_traffic" ADD COLUMN IF NOT EXISTS "uniques" BIGINT;
+ALTER TABLE "gh_traffic" ADD COLUMN IF NOT EXISTS "url" TEXT;
 INSERT INTO "gh_traffic" ("time", "full_name", "kind", "owner", "repo", "count", "uniques", "url") VALUES ('2026-09-07T00:00:00Z'::timestamptz, 'acme/telemetry', 'views', 'acme', 'telemetry', 41, 12, 'https://github.com/acme/telemetry/graphs/traffic') ON CONFLICT ("time", "full_name", "kind", "owner", "repo") DO UPDATE SET "count" = EXCLUDED."count", "uniques" = EXCLUDED."uniques", "url" = EXCLUDED."url";
 ```
 
@@ -85,10 +88,28 @@ INSERT INTO "gh_traffic" ("time", "full_name", "kind", "owner", "repo", "count",
 ## Cómo llegan las declaraciones
 
 El `CREATE TABLE IF NOT EXISTS` se emite la primera vez que se ve una medida en
-un fichero, con la unión de las columnas que lleva ese lote. Una columna que
-aparece en un lote posterior llega como
-`ALTER TABLE ... ADD COLUMN IF NOT EXISTS`. Un fichero rotado empieza otra vez
-sus declaraciones, así que cualquier fichero se puede reproducir por su cuenta.
+un fichero, o en el proceso de un sink que conecta, con el tiempo y las
+etiquetas de las que está hecha la clave. Cada campo de la unión que lleva ese
+lote lo sigue como `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`, y lo mismo un
+campo que aparece en un lote posterior. Los campos nunca van en el
+`CREATE TABLE`, porque esa sentencia no le hace nada a una tabla que creó una
+versión anterior: un campo que esa versión no escribía llegaría al `INSERT`
+sin columna, y PostgreSQL rechaza la sentencia y el lote que la rodea. Añadir
+cada columna si falta significa lo mismo para una tabla nueva y para una
+antigua. Un fichero rotado empieza otra vez sus declaraciones, así que
+cualquier fichero se puede reproducir por su cuenta.
+
+El sink que conecta no envía todos esos `ALTER TABLE`. Pregunta al catálogo qué
+columnas tiene ya una tabla la primera vez que su proceso se encuentra con ella,
+y añade solo las que le faltan. PostgreSQL toma el bloqueo exclusivo de un
+`ALTER TABLE` antes de comprobar `IF NOT EXISTS`, así que uno por campo en cada
+arranque esperaba a cada consulta de Grafana que leía la tabla y retenía todas
+las que llegaban detrás. **Medido contra PostgreSQL 18.6** con un lector que
+mantenía una tabla abierta: `CREATE TABLE IF NOT EXISTS` respondió en menos de
+un milisegundo, mientras que un `ADD COLUMN IF NOT EXISTS` de una columna que ya
+existía esperó hasta que un `lock_timeout` de un segundo lo rechazó, y un
+`SELECT` detrás de él esperó tres segundos. Una sentencia que el servidor
+rechaza se envía otra vez en la escritura siguiente en vez de darse por hecha.
 
 Una etiqueta vista por primera vez después de declarar la tabla no puede
 unirse a la clave primaria sin reescribirla, así que se convierte en una columna

@@ -389,8 +389,8 @@ func collectorSection(b *builder) []Panel {
 	cf := "gh_collector_family"
 	// Grouped by the reason as well as by the family, because the two kinds of
 	// failure a reader has to tell apart land in the same column otherwise: a
-	// search budget spent twice a day is not the 502 that cost a repository
-	// its whole history, and sorted by the same number they read the same.
+	// spent search budget is not the 502 that cost a repository its whole
+	// history, and sorted by the same number they read the same.
 	// Sweeps is the denominator that makes Failures a proportion rather than a
 	// number that grows with the range: a family that fails on every sweep
 	// reads 2880 of 2880 over thirty days, not 2880 out of a repository count
@@ -485,8 +485,8 @@ func collectorSection(b *builder) []Panel {
 				"was asked about. A family with no row here did not run at all, which is " +
 				"the one thing an empty panel could never say: not due, switched off, or " +
 				"skipped because a rate budget was spent. Why is what separates the two " +
-				"kinds of failure that would otherwise read alike: a search budget spent " +
-				"twice a day sorts apart from the 502 that cost a repository its history, " +
+				"kinds of failure that would otherwise read alike: a spent search budget " +
+				"sorts apart from the 502 that cost a repository its history, " +
 				"and a family that had both has a row for each. Failures is the sweep's " +
 				"own count, so a family that failed on some of its repositories and was " +
 				"still marked as having run says so here; a batched query that failed " +

@@ -85,8 +85,11 @@ The ledger stores two 64 bit hashes and a day per point, so a large account
 costs a few megabytes. It is keyed by sink, so a store that was unreachable
 still receives everything on its next write. Losing it, or setting
 `dedupe_file: off`, costs one sweep of rewriting and nothing else, which is
-exactly what a store that has been wiped and needs filling again wants. It is
-the second file worth putting on a persistent path, next to the
+exactly what a store that has been wiped and needs filling again wants. The
+jobs of the workflow runs the
+[cache file](https://jmrp.io/docs/ghchronicle/configuration/#the-cache-beside-it) remembers come
+with it: a start that finds no ledger lists them again. It is the second file
+worth putting on a persistent path, next to the
 [state file](https://jmrp.io/docs/ghchronicle/configuration/).
 
 A run that ends when its sweep does never opens the ledger at all. `-once`,
@@ -380,10 +383,10 @@ release assets one per file ever published. Measured, together they were **four
 fifths of the exporter's entire output**. Both are drawn properly by the
 InfluxDB dashboard.
 
-Nine more are skipped for a reason other than size, eight of them as history
-and one as text, so eleven measurements in all never reach the exporter. The
+Ten more are skipped for a reason other than size, nine of them as history
+and one as text, so twelve measurements in all never reach the exporter. The
 list, with the reason for each, is on
-[dating a point](https://jmrp.io/docs/ghchronicle/how/dating/#the-eleven-that-are-never-served).
+[dating a point](https://jmrp.io/docs/ghchronicle/how/dating/#the-twelve-that-are-never-served).
 
 The exporter holds only what the last sweep collected, and for workflow runs
 that is the newest thirty per repository between builds: an ordinary sweep
@@ -433,6 +436,13 @@ exactly the behaviour the priming exists to avoid: until each family's cadence
 comes round, the panels that read it have nothing, and for a twelve-hour family
 that is half a day of zeros. The stores are unaffected either way, since they
 keep what was collected before the restart.
+
+The priming sweep records as run only the families that were due, and the
+others run again when they would have without the restart. Recorded all at
+once, the families of six hours or more would be due together a day later and
+[take turns](https://jmrp.io/docs/ghchronicle/configuration/cadences/#the-slow-families-take-turns),
+and the last of them would pass the day after which the exporter drops a
+series.
 
 A series that has not been rewritten for **24 hours** is dropped, so a
 repository that leaves the sweep stops being reported as if it were still there.
@@ -642,7 +652,10 @@ what makes a rewrite of the fourteen-day traffic window converge instead of
 accumulate.
 
 ```sql
-CREATE TABLE IF NOT EXISTS "gh_traffic" ("time" TIMESTAMPTZ NOT NULL, "full_name" TEXT NOT NULL DEFAULT '', "kind" TEXT NOT NULL DEFAULT '', "owner" TEXT NOT NULL DEFAULT '', "repo" TEXT NOT NULL DEFAULT '', "count" BIGINT, "uniques" BIGINT, "url" TEXT, PRIMARY KEY ("time", "full_name", "kind", "owner", "repo"));
+CREATE TABLE IF NOT EXISTS "gh_traffic" ("time" TIMESTAMPTZ NOT NULL, "full_name" TEXT NOT NULL DEFAULT '', "kind" TEXT NOT NULL DEFAULT '', "owner" TEXT NOT NULL DEFAULT '', "repo" TEXT NOT NULL DEFAULT '', PRIMARY KEY ("time", "full_name", "kind", "owner", "repo"));
+ALTER TABLE "gh_traffic" ADD COLUMN IF NOT EXISTS "count" BIGINT;
+ALTER TABLE "gh_traffic" ADD COLUMN IF NOT EXISTS "uniques" BIGINT;
+ALTER TABLE "gh_traffic" ADD COLUMN IF NOT EXISTS "url" TEXT;
 INSERT INTO "gh_traffic" ("time", "full_name", "kind", "owner", "repo", "count", "uniques", "url") VALUES ('2026-09-07T00:00:00Z'::timestamptz, 'acme/telemetry', 'views', 'acme', 'telemetry', 41, 12, 'https://github.com/acme/telemetry/graphs/traffic') ON CONFLICT ("time", "full_name", "kind", "owner", "repo") DO UPDATE SET "count" = EXCLUDED."count", "uniques" = EXCLUDED."uniques", "url" = EXCLUDED."url";
 ```
 
@@ -655,10 +668,27 @@ INSERT INTO "gh_traffic" ("time", "full_name", "kind", "owner", "repo", "count",
 ### How the declarations arrive
 
 The `CREATE TABLE IF NOT EXISTS` is emitted the first time a measurement is
-seen in a file, with the union of the columns that batch carries. A column that
-turns up in a later batch arrives as `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`.
-A rotated file starts its declarations again, so any one file can be replayed
-on its own.
+seen in a file, or by a connecting sink's process, with the time and the tags
+the key is made of. Each field of the union that batch carries follows it as
+`ALTER TABLE ... ADD COLUMN IF NOT EXISTS`, and so does a field that turns up
+in a later batch. The fields are never in the `CREATE TABLE`, because that
+statement does nothing to a table an earlier release made: a field the release
+did not write would reach the `INSERT` with no column, and PostgreSQL refuses
+the statement and the batch around it. Adding each column if it is missing
+means the same thing to a new table and an old one. A rotated file starts its
+declarations again, so any one file can be replayed on its own.
+
+The connecting sink does not send every one of those `ALTER TABLE`s. It asks
+the catalog which columns a table already has the first time its process meets
+the table, and adds only the ones it lacks. PostgreSQL takes an `ALTER TABLE`'s
+exclusive lock before it checks `IF NOT EXISTS`, so one per field on every
+restart waited for each Grafana query reading the table and held up every
+query after it. **Measured against PostgreSQL 18.6** with a reader holding a
+table open: `CREATE TABLE IF NOT EXISTS` returned in under a millisecond, while
+an `ADD COLUMN IF NOT EXISTS` for a column already there waited until a one
+second `lock_timeout` refused it, and a `SELECT` behind it waited three seconds.
+A statement the server refuses is sent again on the next write rather than
+taken as done.
 
 A tag first seen after the table was declared cannot join the primary key
 without rewriting it, so it becomes a plain column. That only happens when a
@@ -985,22 +1015,52 @@ request from 2024.
 
 But the limit that actually bites is the other one. Loki also refuses an entry
 more than its out-of-order window behind the newest entry already in that
-stream, about two hours by default.
+stream, which is half of the ingester's `max_chunk_age`, one hour by default.
 
 **Measured against a real Loki 3**: once the stream held an entry from 19:14,
-one from 00:35 the same day came back as "entry too far behind".
+one from 00:35 the same day came back as "entry too far behind". Against Loki
+3.7.7 with its default limits, a stream holding an entry five minutes old took
+one 55 minutes old and refused one 75 minutes old.
 
-So the horizon is applied three ways:
+So the horizon is applied two ways:
 
 1. against the wall clock,
-2. against the newest entry of each stream inside the batch,
-3. against the newest entry that stream has been sent before.
+2. against the newest entry that stream has been sent before.
+
+Inside one push nothing is behind, because the sink sends each stream oldest
+first and Loki judges each entry against the newest one before it: one push of
+entries from 23 hours, 12 hours and a minute ago into an empty stream was taken
+whole.
 
 What falls outside is left out and counted, at debug level, rather than costing
 the whole push.
 
-`max_age` defaults to one hour, which is inside Loki's default window. Raise it
-only if you have raised `out_of_order_time_window` to match.
+`max_age` defaults to one hour, which is Loki's default window. Raise it only if
+you have raised Loki's `max_chunk_age` to match, since the window is half of
+it.
+
+A release is the event that shows what the horizon costs, and the one stream
+that looks further back. Its line is rendered from `gh_release_published`, at
+the moment the release was published. It used to come from `gh_release`, which
+is stamped at the sweep because its downloads move, so every repository pass
+pushed every release again: 3,360 lines in a day on the account this was
+measured on, a third of everything the sink sent. Dated at the publication, a
+release is first seen by the `repo` pass after it, so one published just after
+a pass read its repository is a whole cadence old when the next pass writes,
+plus however late that pass runs: a tick it lost, the slower families that ran
+before it, a restart. With `repo` and `max_age` both at their default hour,
+`max_age` alone left such a release out, and every later pass only saw it
+older.
+
+So the release stream looks back the `repo` cadence plus `max_age`: two hours
+at the defaults, seven with `repo: 6h`, and never more than six days, a day
+short of the week `reject_old_samples_max_age` allows. Loki refuses an old line
+only for being behind a newer one in its stream, which the second check above
+still makes. A release published in the hour before a pass is sent by that pass
+and again by the next, the same line at the same instant, which Loki keeps
+once. Under `-once` the cadence that matters is the schedule that runs the
+binary, so set `every.families.repo` to it. The release is in the metrics store
+either way.
 
 ### What Loki is not for
 

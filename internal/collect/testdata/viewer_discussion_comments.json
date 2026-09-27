@@ -13,6 +13,8 @@
             "createdAt": "2024-04-02T01:00:00Z",
             "isAnswer": false,
             "upvoteCount": 1,
+            "url": "https://github.com/ThrowTheSwitch/Ceedling/discussions/867#discussioncomment-9876543",
+            "databaseId": 9876543,
             "discussion": {
               "number": 867,
               "title": "Cannot find the generated mocks",
@@ -35,7 +37,8 @@
                 "isAnswerable": true
               },
               "repository": {
-                "nameWithOwner": "ThrowTheSwitch/Ceedling"
+                "nameWithOwner": "ThrowTheSwitch/Ceedling",
+                "isPrivate": false
               }
             }
           },
@@ -43,6 +46,8 @@
             "createdAt": "2026-08-19T09:00:00Z",
             "isAnswer": false,
             "upvoteCount": 0,
+            "url": "https://github.com/octocat/hello-world/discussions/4#discussioncomment-18200001",
+            "databaseId": 18200001,
             "discussion": {
               "number": 4,
               "title": "Roadmap",
@@ -59,7 +64,8 @@
                 "isAnswerable": false
               },
               "repository": {
-                "nameWithOwner": "octocat/hello-world"
+                "nameWithOwner": "octocat/hello-world",
+                "isPrivate": true
               }
             }
           },
@@ -67,6 +73,8 @@
             "createdAt": "2026-09-05T10:00:00Z",
             "isAnswer": true,
             "upvoteCount": 3,
+            "url": "https://github.com/fosrl/pangolin/discussions/118#discussioncomment-18283966",
+            "databaseId": 18283966,
             "discussion": {
               "number": 118,
               "title": "How do I bind a second port",
@@ -89,7 +97,8 @@
                 "isAnswerable": true
               },
               "repository": {
-                "nameWithOwner": "fosrl/pangolin"
+                "nameWithOwner": "fosrl/pangolin",
+                "isPrivate": false
               }
             }
           }

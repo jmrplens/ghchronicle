@@ -172,7 +172,7 @@ function readSinks() {
 		.filter((entry) => !settings.has(entry.key));
 	const build = blockAfter(
 		read("cmd/ghchronicle/main.go"),
-		"func buildSinks(cfg *config.Config, log *slog.Logger, oneShot bool) ([]sink.Sink, error) {",
+		"func buildSinks(cfg *config.Config, log *slog.Logger, oneShot bool) ([]sink.Sink, *sink.Ledger, error) {",
 	);
 	const sinkDir = path.join(repo, "internal/sink");
 	const sources = fs

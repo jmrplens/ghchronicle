@@ -90,20 +90,23 @@ signature at all, so for them that answer is the true one.
 
 ## What has to be writable
 
-The config file is mounted read-only. Four things are not:
+The config file is mounted read-only. Five things are not:
 
-| Path                | Needed for                                                                                 |
-| ------------------- | ------------------------------------------------------------------------------------------- |
-| `state_file`        | Always. Without a persistent path the stargazer walk repeats on every restart              |
-| `sinks.dedupe_file` | Always. The write ledger, which defaults to sitting beside the state file                  |
-| `sinks.file.path`   | Only with the file sink                                                                    |
-| `log.file`          | Only with a log file configured                                                            |
+| Path                | Needed for                                                                        |
+| ------------------- | --------------------------------------------------------------------------------- |
+| `state_file`        | Always. Without a persistent path the stargazer walk repeats on every restart     |
+| `<name>-cache.bin`  | Always. The cache, which sits beside the state file and has no setting of its own |
+| `sinks.dedupe_file` | Always. The write ledger, which defaults to sitting beside the state file         |
+| `sinks.file.path`   | Only with the file sink                                                           |
+| `log.file`          | Only with a log file configured                                                   |
 
-Both of the first two live in the same directory by default, so one mounted
-volume covers them. Mounting only the state file loses the ledger on every
-restart, and every restart then costs a whole sweep of rewriting, which is the
-one thing the ledger exists to prevent:
-[only what changed is written](/ghchronicle/sinks/#only-what-changed-is-written).
+The first three live in the same directory by default, so one mounted volume
+covers them. Mounting only the state file loses the ledger and the cache on
+every restart, and every restart then costs a whole sweep of rewriting, which is
+the one thing the ledger exists to prevent:
+[only what changed is written](/ghchronicle/sinks/#only-what-changed-is-written),
+and a whole sweep of asking GitHub again what the cache already knew:
+[the cache beside it](/ghchronicle/configuration/#the-cache-beside-it).
 
 ```sh
 docker volume create ghchronicle-state

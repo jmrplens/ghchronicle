@@ -83,22 +83,52 @@ request from 2024.
 
 But the limit that actually bites is the other one. Loki also refuses an entry
 more than its out-of-order window behind the newest entry already in that
-stream, about two hours by default.
+stream, which is half of the ingester's `max_chunk_age`, one hour by default.
 
 **Measured against a real Loki 3**: once the stream held an entry from 19:14,
-one from 00:35 the same day came back as "entry too far behind".
+one from 00:35 the same day came back as "entry too far behind". Against Loki
+3.7.7 with its default limits, a stream holding an entry five minutes old took
+one 55 minutes old and refused one 75 minutes old.
 
-So the horizon is applied three ways:
+So the horizon is applied two ways:
 
 1. against the wall clock,
-2. against the newest entry of each stream inside the batch,
-3. against the newest entry that stream has been sent before.
+2. against the newest entry that stream has been sent before.
+
+Inside one push nothing is behind, because the sink sends each stream oldest
+first and Loki judges each entry against the newest one before it: one push of
+entries from 23 hours, 12 hours and a minute ago into an empty stream was taken
+whole.
 
 What falls outside is left out and counted, at debug level, rather than costing
 the whole push.
 
-`max_age` defaults to one hour, which is inside Loki's default window. Raise it
-only if you have raised `out_of_order_time_window` to match.
+`max_age` defaults to one hour, which is Loki's default window. Raise it only if
+you have raised Loki's `max_chunk_age` to match, since the window is half of
+it.
+
+A release is the event that shows what the horizon costs, and the one stream
+that looks further back. Its line is rendered from `gh_release_published`, at
+the moment the release was published. It used to come from `gh_release`, which
+is stamped at the sweep because its downloads move, so every repository pass
+pushed every release again: 3,360 lines in a day on the account this was
+measured on, a third of everything the sink sent. Dated at the publication, a
+release is first seen by the `repo` pass after it, so one published just after
+a pass read its repository is a whole cadence old when the next pass writes,
+plus however late that pass runs: a tick it lost, the slower families that ran
+before it, a restart. With `repo` and `max_age` both at their default hour,
+`max_age` alone left such a release out, and every later pass only saw it
+older.
+
+So the release stream looks back the `repo` cadence plus `max_age`: two hours
+at the defaults, seven with `repo: 6h`, and never more than six days, a day
+short of the week `reject_old_samples_max_age` allows. Loki refuses an old line
+only for being behind a newer one in its stream, which the second check above
+still makes. A release published in the hour before a pass is sent by that pass
+and again by the next, the same line at the same instant, which Loki keeps
+once. Under `-once` the cadence that matters is the schedule that runs the
+binary, so set `every.families.repo` to it. The release is in the metrics store
+either way.
 
 ## What Loki is not for
 

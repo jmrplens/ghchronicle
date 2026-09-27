@@ -270,9 +270,10 @@ type LokiSink struct {
 	// MaxAge drops entries older than this. Loki refuses a whole push when one
 	// entry predates its reject_old_samples_max_age, a week by default, and
 	// much of what this collects is older than that on purpose. The tighter
-	// limit is the out-of-order window, about two hours, which is why the
-	// sink settles on an hour rather than a day. Match it to your Loki.
-	// Empty means the sink's own default, one hour.
+	// limit is the out-of-order window, half the ingester's max_chunk_age and
+	// so an hour by default, which is why the sink settles on an hour rather
+	// than a day. Match it to your Loki. Empty means the sink's own default,
+	// one hour.
 	MaxAge string `yaml:"max_age" ghc:"example=1h"`
 }
 
@@ -597,11 +598,11 @@ var defaultEvery = map[string]family{
 	},
 	"repo": {
 		every: 1 * time.Hour, group: "repos",
-		why: "stars, forks, languages and topics move slowly, and this is one request per repository",
+		why: "stars, forks, languages and topics move slowly, and a pass is three REST requests per repository, most of them a free 304, and two GraphQL points per ten repositories",
 	},
 	"stars": {
-		every: 6 * time.Hour, group: "audience",
-		why: "the full stargazer walk happens once; after that the newest hundred ride in one GraphQL query per ten repositories, and the daily star history is one request per repository, usually a free 304",
+		every: 1 * time.Hour, group: "audience",
+		why: "a star can land at any hour, and after the one full stargazer walk a pass is one GraphQL point per ten repositories for the newest hundred and one conditional request per repository for the daily history, which answered a free 304 to 184 of 185 measured",
 	},
 	"actions": {
 		every: 15 * time.Minute, group: "ci",
@@ -613,27 +614,27 @@ var defaultEvery = map[string]family{
 	},
 	"issues": {
 		every: 1 * time.Hour, group: "work",
-		why: "one request per item, so the cost follows how much is open rather than how often this asks",
+		why: "one or two GraphQL points per repository whose issues or pull requests moved in two cadences, nothing for the rest, and up to about nine once a day for a whole page of every repository, so the hour is how soon a review or a merge is charted",
 	},
 	"events": {
-		every: 30 * time.Minute, group: "feeds",
-		why: "the feed keeps the last three hundred events of the past thirty days, so this is the size of a window, not a speed",
+		every: 15 * time.Minute, group: "feeds",
+		why: "one core request a pass, and the feed had moved in 43 of 46 half hours measured, so the quarter hour is how soon an event reaches the dashboard; the window, the last three hundred events of the past thirty days, is far wider than that",
 	},
 	"notifs": {
-		every: 30 * time.Minute, group: "feeds",
-		why: "GitHub keeps inbox notifications for three months unless they are saved, but each thread shows only its latest move, so this is the size of a window, not a speed",
+		every: 15 * time.Minute, group: "feeds",
+		why: "one core request a pass and twenty once a day for the whole inbox, and a thread shows only its latest move, so a move overtaken before the next read is never seen; half the passes measured brought a new row",
 	},
 	"stats": {
 		every: 12 * time.Hour, group: "work",
 		why: "GitHub recomputes these slowly anyway, so asking more often returns the same numbers",
 	},
 	"account": {
-		every: 12 * time.Hour, group: "account",
-		why: "the contribution calendar changes once a day, and the whole family costs one GraphQL point",
+		every: 1 * time.Hour, group: "account",
+		why: "the contribution calendar moves with every contribution and the profile's counts with every follow and star, and a pass is one GraphQL point and seven REST requests, of which only the profile is charged: GitHub never answered it with a 304, and the six package listings answer one until a package changes",
 	},
 	"billing": {
-		every: 6 * time.Hour, group: "account",
-		why: "GitHub updates the usage report a few times a day at most",
+		every: 1 * time.Hour, group: "account",
+		why: "the month in progress moves while continuous integration runs: it had changed at every one of 46 six-hourly reads measured, and a pass is two requests, that month and the one before, of which only the first is charged",
 	},
 	"profile": {
 		every: 12 * time.Hour, group: "account",
@@ -644,20 +645,20 @@ var defaultEvery = map[string]family{
 		why: "artifacts appear with the run that made them and expire on a scale of days",
 	},
 	"discussions": {
-		every: 2 * time.Hour, group: "work",
-		why: "a discussion is answered over hours or days, and few repositories have any",
+		every: 1 * time.Hour, group: "work",
+		why: "a discussion is answered over hours or days and few repositories have a forum, and a pass is two GraphQL points for each that does and nothing for the rest",
 	},
 	"commits": {
 		every: 1 * time.Hour, group: "work",
-		why: "one request per commit, so the cost follows how much was pushed rather than how often this asks",
+		why: "one GraphQL point per repository whose default branch has a commit from the last two cadences, which 38 of 999 answers measured had, and one per twenty-five repositories, shared with issues and issueevents, to ask which, so the hour is how soon a push is charted",
 	},
 	"activity": {
-		every: 30 * time.Minute, group: "feeds",
-		why: "the repository log holds a hundred entries, which covered twenty-six hours on the busiest repository measured",
+		every: 15 * time.Minute, group: "feeds",
+		why: "the repository log holds a hundred entries, which covered twenty-six hours on the busiest repository measured, and a pass is one or two conditional requests per repository, which answered a free 304 to 2,320 of 2,356 measured",
 	},
 	"analyses": {
-		every: 6 * time.Hour, group: "security",
-		why: "GitHub prunes code scanning analyses, and a repository produces a handful a day",
+		every: 1 * time.Hour, group: "security",
+		why: "GitHub prunes code scanning analyses and every scanned push adds some, and a pass is one conditional request per repository with code scanning, three of them charged in the median pass measured, the refusals of the rest remembered for a day",
 	},
 	"forks": {
 		every: 12 * time.Hour, group: "audience",
@@ -673,11 +674,11 @@ var defaultEvery = map[string]family{
 	},
 	"issueevents": {
 		every: 1 * time.Hour, group: "work",
-		why: "the timeline of what moved in two cadences, one GraphQL point a repository, so the hour is how soon a transition is worth seeing",
+		why: "the timeline of what moved in two cadences, one GraphQL point for each repository where an issue or a pull request moved and nothing for the rest, so the hour is how soon a transition is worth seeing",
 	},
 	"achievements": {
 		every: 24 * time.Hour, group: "account",
-		why: "the badges on the public profile page, read from the page itself because no API lists them, and the distance to each badge's next tier from the API beside; a badge is earned over weeks and the day costs one page and some thirty GraphQL points",
+		why: "the badges on the public profile page, which no API lists, and how far each tiered one is from its next tier; a badge is earned over weeks, and a day transfers the page, 36 KB, and 0.3 to 0.6 MB of pull requests merged since the day before for two GraphQL points, or the whole history once a week, 24 MB",
 	},
 	"keys": {
 		every: 24 * time.Hour, group: "account",
@@ -688,8 +689,8 @@ var defaultEvery = map[string]family{
 		why: "off until asked for by name: the SBOM is 1.8 MB per repository and has its own budget of a hundred a minute",
 	},
 	"totals": {
-		every: 12 * time.Hour, group: "account",
-		why: "twice a day is plenty for a number that only grows",
+		every: 1 * time.Hour, group: "account",
+		why: "the lifetime numbers move with every star, fork, merge and push, and a pass is one GraphQL point for the account, one per ten repositories and one per twenty-five archived ones set aside, and one request of the search budget",
 	},
 	"ratelimit": {
 		every: 15 * time.Minute, group: "collector",
@@ -716,8 +717,8 @@ var defaultEvery = map[string]family{
 		why: "four core requests per repository, for settings that change only when somebody changes them",
 	},
 	"deployments": {
-		every: 1 * time.Hour, group: "ci",
-		why: "the surface a delivery dashboard reads, and the newest page is cheap: one GraphQL point per five repositories",
+		every: 30 * time.Minute, group: "ci",
+		why: "the surface a delivery dashboard reads, and the newest page is one GraphQL point per five repositories, which brought up to four new rows a pass measured, so the half hour costs little",
 	},
 	"policyfiles": {
 		every: 24 * time.Hour, group: "repos",
@@ -725,7 +726,7 @@ var defaultEvery = map[string]family{
 	},
 	"rulesets": {
 		every: 24 * time.Hour, group: "repos",
-		why: "a ruleset is edited a few times a year, every version keeps its own date, and both requests answer 304 until somebody edits one",
+		why: "a ruleset is edited a few times a year and every version keeps its own date; both requests answer a free 304 until somebody edits one, the first pass after a restart included, since the ETag cache is kept beside the state file",
 	},
 }
 
@@ -867,6 +868,26 @@ func (c *Config) BackfillProgressFile() string {
 		return ""
 	}
 	return strings.TrimSuffix(c.StateFile, ".json") + "-progress.json"
+}
+
+// CacheFile is where a run keeps what it learned about GitHub for the run
+// after it: the conditional cache, the workflow runs whose jobs were
+// written, the refusals and the pull request page sizes. Beside the state
+// file, the way the backfill checkpoint is.
+//
+// Derived and not a setting of its own, for the checkpoint's reason and one
+// more: the file only ever makes a pass cheaper, so there is nothing to
+// choose about it but where it lives, and where the state file lives is
+// already that choice. Deleting it costs one pass of each family at a cold
+// cache's price and loses nothing.
+//
+// Empty when there is no state file, and such a run keeps no cache file
+// either.
+func (c *Config) CacheFile() string {
+	if c.StateFile == "" {
+		return ""
+	}
+	return strings.TrimSuffix(c.StateFile, ".json") + "-cache.bin"
 }
 
 // resolveSinks expands the environment in every configured sink, fills its
@@ -1128,12 +1149,15 @@ func (c *Config) HeartbeatEvery() (time.Duration, bool) { return c.heartbeat, c.
 // tooFastFactor is where "substantially shorter than the built-in cadence"
 // starts: at least four times more often.
 //
-// The built-in values are a ladder, 15m 30m 1h 2h 6h 12h 24h, and the widest
-// gap between two neighboring rungs is three (2h to 6h). Four is therefore
-// the smallest factor no single step down the ladder can reach, which is the
-// number that separates a deliberate one-rung adjustment, made by somebody
-// looking at that family, from the thing this warning exists for: a default or
-// a group value landing on a family it was never chosen for. The owner's own
+// The built-in values stand on a ladder, 15m 30m 1h 2h 6h 12h 24h, and the
+// widest gap between two neighboring rungs is three (2h to 6h). No family has
+// shipped at 2h since discussions moved to the hour, and the rung stays: it is
+// where one step down from 6h lands, so the ladder is the values a cadence is
+// tuned between and not only the ones in use. Four is therefore the smallest
+// factor no single step down the ladder can reach, which is the number that
+// separates a deliberate one-rung adjustment, made by somebody looking at
+// that family, from the thing this warning exists for: a default or a group
+// value landing on a family it was never chosen for. The owner's own
 // example is far past it, a 15m default against 24h for keys being ninety-six
 // times more often, and the group work at one number flattens 1h and 12h,
 // which is twelve.

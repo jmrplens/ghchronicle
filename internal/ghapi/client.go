@@ -68,6 +68,10 @@ type Client struct {
 	// spend accumulates the cost GraphQL reports for each query, because no
 	// endpoint reports it: `GET /rate_limit` does not even see this budget.
 	spend GraphQLSpend
+
+	// retryPause is how long a REST GET waits before asking again after a
+	// gateway gave up on it; see send.
+	retryPause time.Duration
 }
 
 // RateState is the budget as GitHub last reported it.
@@ -109,12 +113,35 @@ func New(token string, timeout time.Duration) *Client {
 	// test server shutting down broke another test's request about one run in
 	// twenty.
 	return &Client{
-		http:  &http.Client{Timeout: timeout, Transport: httpx.OwnTransport()},
-		token: token,
-		base:  defaultBase,
-		cache: newCache(DefaultCacheBytes),
-		rates: map[string]RateState{},
+		http:       &http.Client{Timeout: timeout, Transport: httpx.OwnTransport()},
+		token:      token,
+		base:       defaultBase,
+		cache:      newCache(DefaultCacheBytes),
+		rates:      map[string]RateState{},
+		retryPause: DefaultRetryPause,
 	}
+}
+
+// DefaultRetryPause is how long a REST GET waits before its one retry after a
+// 502 or a 504; see send for why there is one.
+//
+// Short, because the attempt that failed has usually taken ten seconds
+// already. Not zero, because five of the 36 in send's measurement failed in
+// 113 to 811 ms, and without a pause the retry of one of those would reach
+// the gateway that had just failed within the same second. It is not tuned:
+// two seconds is the pause the retry was measured with by hand on
+// 2026-09-27, when page 3 of jmrplens/phonometry's artifact listing answered
+// 502 after 10.5 s and the same request two seconds later answered 200 in
+// 1.6 s.
+const DefaultRetryPause = 2 * time.Second
+
+// SetRetryPause changes how long a REST GET waits before asking again after a
+// 502 or a 504. Zero asks again at once, which is what a test against a fake
+// that fails on purpose wants; nothing in the binary changes it.
+func (c *Client) SetRetryPause(d time.Duration) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.retryPause = max(d, 0)
 }
 
 // SetBaseURL points the client at a different API root: a GitHub Enterprise
@@ -200,36 +227,47 @@ const DefaultCacheBytes = 256 << 20
 // cost between 198 and 253 bytes each in HeapAlloc across forty-one sizes
 // from 100 to 235,000 entries, and 251 at the 922 one sweep holds, the spread
 // being where the map's capacity happens to land. That is the map slot, whose
-// key is a string and a reflect.Type, the container/list element, and the
-// conditional struct, whose 88 bytes are allocated one at a time and so round
-// up to a 96 byte size class. The URL, the ETag, the body and the Link are
-// counted separately below. Two hundred and fifty-six rounds the measured
-// range up, so the accounting errs towards charging more than the entry costs
-// and never less.
+// key was a string and a reflect.Type, the container/list element, and the
+// conditional struct, whose 88 bytes were allocated one at a time and so
+// rounded up to a 96 byte size class. The URL, the ETag, the body and the
+// Link are counted separately below. Two hundred and fifty-six rounds the
+// measured range up, so the accounting errs towards charging more than the
+// entry costs and never less.
 //
 // It was two hundred, measured when the key was the URL alone and the struct
 // held no Link. The type in the key had already taken the real cost past it
 // at most sizes, to between 182 and 237 at the same forty-one, and the Link's
 // string header is the other sixteen bytes.
+//
+// Measured again on 2026-09-27, same Go, once the type in the key became its
+// name and the struct gained the Unix second of its last use: between 179 and
+// 245 bytes at forty-one sizes spaced evenly on a log scale from 100 to
+// 235,000 entries, and 249 at 922, each the lowest of five runs, because a
+// collection landing in the middle of one size throws that one reading off.
+// The key is two strings now, the same sixteen bytes a reflect.Type took, and
+// the eight of the stamp fill the struct's 96 byte size class rather than
+// spilling out of it, so the constant still covers the range.
 const cacheEntryOverhead = 256
 
 // cacheKey names an entry: the URL, and the type its body was decoded into.
 //
 // The type is part of the key because the body is that type's encoding of
 // the answer and nothing else (see replayable). One URL is decoded into two
-// types when a repository is named in targets.repos: discovery reads four
-// flags out of GET /repos/{owner}/{repo} and the repo family reads forty
-// fields out of the same URL. Keyed by URL alone, the entry discovery wrote
-// would answer the repo family's 304 with nothing but those four flags, and
-// a repository with hundreds of stars would be recorded with none. Keyed by
-// both, each caller has an entry of its own, each repeat is still
+// types when targets.repos names a repository no listing returned: discovery
+// reads four flags out of GET /repos/{owner}/{repo} and the repo family reads
+// forty fields out of the same URL. Keyed by URL alone, the entry discovery
+// wrote would answer the repo family's 304 with nothing but those four flags,
+// and a repository with hundreds of stars would be recorded with none. Keyed
+// by both, each caller has an entry of its own, each repeat is still
 // conditional, and the only cost is the second entry's bytes.
 //
-// A call that decodes nothing keys on the nil type, which is the wire body's
-// own entry.
+// The type is held by its decodingName rather than as a reflect.Type, because
+// the cache outlives the process (see Answers) and a reflect.Type does not.
+// A call that decodes nothing keys on the empty name, which is the wire
+// body's own entry.
 type cacheKey struct {
 	url string
-	typ reflect.Type
+	typ string
 }
 
 // conditional is the ETag and the body of one URL, for one decoding type. The
@@ -257,6 +295,11 @@ type conditional struct {
 	etag string
 	body []byte
 	link string
+	// used is when a request last asked for this entry, in Unix seconds. The
+	// order of the list already says which entry is older; this says by how
+	// much, which is what a file kept across a restart needs to leave out an
+	// entry nothing has asked for in days (see Answers).
+	used int64
 }
 
 func (e *conditional) size() int {
@@ -294,6 +337,9 @@ type cache struct {
 	// order is most recently used at the front, so the victim is the back.
 	order   *list.List
 	entries map[cacheKey]*list.Element
+	// clock stamps an entry's use. Nil is the wall clock, which is what
+	// everything but a test of the stamp reads.
+	clock func() time.Time
 }
 
 // CacheStats is what the conditional-request cache currently holds.
@@ -345,7 +391,16 @@ func (k *cache) get(key cacheKey) (etag string, body []byte, link string) {
 		return "", nil, ""
 	}
 	k.order.MoveToFront(el)
+	e.used = k.now()
 	return e.etag, e.body, e.link
+}
+
+// now is the instant an entry is stamped with, in the unit the entry keeps.
+func (k *cache) now() int64 {
+	if k.clock != nil {
+		return k.clock().Unix()
+	}
+	return time.Now().Unix()
 }
 
 // put stores the pair for key, with the Link header the body came with, and
@@ -362,7 +417,7 @@ func (k *cache) put(key cacheKey, etag string, body []byte, link string) {
 		k.drop(key)
 		return
 	}
-	e := &conditional{key: key, etag: etag, body: body, link: link}
+	e := &conditional{key: key, etag: etag, body: body, link: link, used: k.now()}
 	if e.size() > k.limit {
 		// Nothing else would fit beside it, so keeping it would mean emptying
 		// the cache for one page. Paying for that page again is the cheaper
@@ -507,6 +562,9 @@ func (e *RateLimitedError) Error() string {
 // job history, and the only record of it was a line in the journal that read
 // like every other line. The message is what it always was, so anything that
 // reads the text, isPaginationLimit for one, reads the same text.
+//
+// A 502 or a 504 that arrives here from a REST GET is the second of two: send
+// has already asked once more.
 type StatusError struct {
 	// Path is the request, relative to the REST base.
 	Path string
@@ -568,7 +626,7 @@ func (c *Client) GetJSON(ctx context.Context, path string, out any, accept strin
 	//
 	// The entry is the one this caller's type wrote: a body stored by another
 	// type decoding the same URL holds only what that type kept.
-	key := cacheKey{url: url, typ: reflect.TypeOf(out)}
+	key := cacheKey{url: url, typ: decodingName(reflect.TypeOf(out))}
 	c.mu.Lock()
 	tag, saved, savedLink := c.cache.get(key)
 	c.mu.Unlock()
@@ -576,12 +634,11 @@ func (c *Client) GetJSON(ctx context.Context, path string, out any, accept strin
 		req.Header.Set("If-None-Match", tag)
 	}
 
-	resp, err := c.http.Do(req)
+	resp, err := c.send(ctx, path, req, c.http.Do)
 	if err != nil {
 		return "", false, err
 	}
 	defer resp.Body.Close()
-	c.readRate(resp)
 
 	switch resp.StatusCode {
 	case http.StatusNotModified:
@@ -661,7 +718,9 @@ func (c *Client) GetJSON(ctx context.Context, path string, out any, accept strin
 // did. Nothing in this repository decodes into such a type, and the collect
 // package's conditional parity test is what keeps that true: it collects
 // every REST family twice against a fake that answers the repeat 304 and
-// fails on the first point that differs.
+// fails on the first point that differs. A body an earlier process stored
+// keeps the promise too, because it is only ever answered to a type that
+// decodes exactly as the one that stored it (see decodingName).
 //
 // A value that cannot be encoded, or a call that decoded nothing, keeps the
 // raw body: the cache is then no worse than it was, and only that answer
@@ -675,6 +734,69 @@ func replayable(raw []byte, out any) []byte {
 		return raw
 	}
 	return encoded
+}
+
+// send makes a REST GET, and makes it once more when the gateway in front of
+// GitHub gave up on it.
+//
+// A 502 or a 504 is the gateway reporting that the answer did not come back
+// in time, not the application refusing, and it is intermittent. Measured on
+// the production proxy's log from 2026-09-11 to 2026-09-27: 36 of 397,455
+// REST GETs answered one, 25 of them after 10.4 to 10.8 seconds, and 16 of
+// the 20 from 2026-09-25 on were the artifact listing of the two repositories
+// with the longest artifact history, each costing its pass the repository's
+// gh_artifact_total. The size of the page is not the cause: per_page=1 took
+// as long as per_page=100. A 500 is the application's own failure and is left
+// to the next sweep, which answered both of the two in that log.
+//
+// Once, because each attempt can hold the family for ten seconds, and a
+// request that fails twice is left to the next sweep as it was before. The
+// retry costs budget: every one of those 25 was charged a core request,
+// conditional or not (used moved by one each time, where a 304 moves it by
+// none), so it goes through the brake like any other request and a budget at
+// its reserve is not spent on it. It carries the If-None-Match of the first
+// attempt, because the pair the caller read is still the pair, and a 304 to
+// the retry is replayed from it.
+//
+// GraphQL does not come through here. Its gateway error is a query too large
+// for ten seconds (TooLargeError), which the same query asked again would
+// only time out on again, so the collectors ask again on the same cursor with
+// a smaller page instead. Both keep what the walk already read and ask again
+// from where it stopped; each asks the way its own failure can be fixed.
+func (c *Client) send(ctx context.Context, path string, req *http.Request, do func(*http.Request) (*http.Response, error)) (*http.Response, error) {
+	resp, err := do(req)
+	if err != nil {
+		return nil, err
+	}
+	c.readRate(resp)
+	if resp.StatusCode != http.StatusBadGateway && resp.StatusCode != http.StatusGatewayTimeout {
+		return resp, nil
+	}
+	first := &StatusError{Path: path, Code: resp.StatusCode, Status: resp.Status}
+	// Drained so the connection goes back to the pool for the retry rather
+	// than being torn down under it.
+	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 64<<10))
+	_ = resp.Body.Close()
+
+	c.mu.Lock()
+	pause := c.retryPause
+	c.mu.Unlock()
+	select {
+	case <-ctx.Done():
+		// Both, because each answers a different caller: the status is what
+		// GitHub said, and the cancellation is why nobody asked again.
+		return nil, fmt.Errorf("%w, and was not asked again: %w", first, ctx.Err())
+	case <-time.After(pause):
+	}
+	if stopped := c.brake(ctx, path); stopped != nil {
+		return nil, stopped
+	}
+	resp, err = do(req.Clone(ctx))
+	if err != nil {
+		return nil, err
+	}
+	c.readRate(resp)
+	return resp, nil
 }
 
 // GetText fetches a path that answers with plain text rather than JSON.
@@ -718,9 +840,9 @@ func (c *Client) GetTextAs(ctx context.Context, path, accept string) (string, er
 	}
 	req.Header.Set("Accept", accept)
 
-	// The text has no decoding type, and the nil type is a key no GetJSON
-	// caller writes under: GetJSON stores a nil out's body under the type of
-	// nil too, but nothing asks the same URL both ways.
+	// The text has no decoding type, and the empty name is a key no GetJSON
+	// caller writes under: GetJSON stores a nil out's body under the empty
+	// name too, but nothing asks the same URL both ways.
 	key := cacheKey{url: url}
 	c.mu.Lock()
 	tag, saved, _ := c.cache.get(key)
@@ -752,12 +874,11 @@ func (c *Client) GetTextAs(ctx context.Context, path, accept string) (string, er
 			return nil
 		},
 	}
-	resp, err := client.Do(req)
+	resp, err := c.send(ctx, path, req, client.Do)
 	if err != nil {
 		return "", err
 	}
 	defer resp.Body.Close()
-	c.readRate(resp)
 
 	switch resp.StatusCode {
 	case http.StatusNotModified:

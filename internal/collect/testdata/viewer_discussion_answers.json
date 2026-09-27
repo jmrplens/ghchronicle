@@ -1,0 +1,82 @@
+{
+  "data": {
+    "viewer": {
+      "login": "octocat",
+      "repositoryDiscussionComments": {
+        "totalCount": 2,
+        "pageInfo": {
+          "hasPreviousPage": false,
+          "startCursor": "Y3Vyc29yOnYyOpHOAHTMsQ=="
+        },
+        "nodes": [
+          {
+            "createdAt": "2023-11-20T16:30:00Z",
+            "isAnswer": true,
+            "upvoteCount": 2,
+            "url": "https://github.com/someone/else/discussions/57#discussioncomment-7654321",
+            "databaseId": 7654321,
+            "discussion": {
+              "number": 57,
+              "title": "Build fails on arm64",
+              "createdAt": "2023-11-19T09:00:00Z",
+              "isAnswered": true,
+              "answerChosenAt": "2026-09-22T09:19:47Z",
+              "answerChosenBy": {
+                "login": "someone"
+              },
+              "answer": {
+                "author": {
+                  "login": "octocat"
+                }
+              },
+              "closed": false,
+              "closedAt": null,
+              "stateReason": null,
+              "category": {
+                "name": "Q&A",
+                "isAnswerable": true
+              },
+              "repository": {
+                "nameWithOwner": "someone/else",
+                "isPrivate": false
+              }
+            }
+          },
+          {
+            "createdAt": "2026-09-05T10:00:00Z",
+            "isAnswer": true,
+            "upvoteCount": 3,
+            "url": "https://github.com/fosrl/pangolin/discussions/118#discussioncomment-18283966",
+            "databaseId": 18283966,
+            "discussion": {
+              "number": 118,
+              "title": "How do I bind a second port",
+              "createdAt": "2026-09-05T08:00:00Z",
+              "isAnswered": true,
+              "answerChosenAt": "2026-09-05T12:00:00Z",
+              "answerChosenBy": {
+                "login": "nozamdavid"
+              },
+              "answer": {
+                "author": {
+                  "login": "octocat"
+                }
+              },
+              "closed": false,
+              "closedAt": null,
+              "stateReason": null,
+              "category": {
+                "name": "Q&A",
+                "isAnswerable": true
+              },
+              "repository": {
+                "nameWithOwner": "fosrl/pangolin",
+                "isPrivate": false
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

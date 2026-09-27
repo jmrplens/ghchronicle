@@ -1,0 +1,29 @@
+{
+  "data": {
+    "viewer": {
+      "login": "octocat",
+      "repositoryDiscussionComments": {
+        "totalCount": 2,
+        "pageInfo": {"hasPreviousPage": false, "startCursor": "Y3Vyc29yOnYyOpHOAHTMsQ=="},
+        "nodes": [
+          {
+            "createdAt": "@DAYS_AGO_75@T16:30:00Z",
+            "url": "https://github.com/someone/else/discussions/57#discussioncomment-7654321",
+            "databaseId": 7654321,
+            "isAnswer": true,
+            "upvoteCount": 2,
+            "discussion": {"number": 57, "title": "Build fails on arm64", "repository": {"nameWithOwner": "someone/else", "isPrivate": false}}
+          },
+          {
+            "createdAt": "@DAYS_AGO_6@T10:00:00Z",
+            "url": "https://github.com/fosrl/pangolin/discussions/118#discussioncomment-18283966",
+            "databaseId": 18283966,
+            "isAnswer": true,
+            "upvoteCount": 3,
+            "discussion": {"number": 118, "title": "How do I bind a second port", "repository": {"nameWithOwner": "fosrl/pangolin", "isPrivate": false}}
+          }
+        ]
+      }
+    }
+  }
+}

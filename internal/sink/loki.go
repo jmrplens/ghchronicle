@@ -47,14 +47,30 @@ type Loki struct {
 	// a week, and half of what this collects is older than that by design: a
 	// star from 2020, a pull request from 2024. But Loki also refuses an entry
 	// more than its out-of-order window behind the newest entry already in
-	// that stream, which defaults to about two hours. Measured against a real
-	// Loki 3: once a stream held an entry from 19:14, one from 00:35 the same
-	// day came back as "entry too far behind".
+	// that stream, which is half the ingester's max_chunk_age, one hour by
+	// default. Measured against a real Loki 3: once a stream held an entry
+	// from 19:14, one from 00:35 the same day came back as "entry too far
+	// behind", and against Loki 3.7.7 with its default limits, a stream
+	// holding an entry five minutes old took one 55 minutes old and refused
+	// one 75 minutes old.
 	//
 	// So the horizon is applied twice: against the wall clock, and against the
-	// newest entry in each stream, both within this batch and across pushes.
-	// Zero means one hour, which is inside the default window.
+	// newest entry each stream has already been sent. Zero means one hour,
+	// which is the default window.
 	MaxAge time.Duration
+
+	// Lookback reaches the wall-clock horizon of one stream further back
+	// than MaxAge, keyed by kind. An entry dated when the thing happened is
+	// first seen by the pass after it, and a stream whose family runs about
+	// as often as MaxAge loses whatever happened just after one pass read it
+	// by the time the next pass writes. Loki does not refuse such an entry
+	// for its age, only for being behind a newer one in the same stream,
+	// which the check against what was sent still makes. An entry inside the
+	// lookback is sent again by the next pass, the same line at the same
+	// instant, and Loki keeps it once: measured against Loki 3.7.7, a line
+	// sent again after another line, and again after its chunk was flushed,
+	// came back once from a query.
+	Lookback map[string]time.Duration
 
 	// watermarks remembers the newest entry sent per stream, so the second
 	// push is judged by the same rule Loki will judge it by.
@@ -69,10 +85,11 @@ func NewLoki(url, tenant string, labels map[string]string, batch int, maxAge, ti
 		batch = 1000
 	}
 	// An hour rather than a day: the binding limit is the out-of-order window,
-	// about two hours, not reject_old_samples_max_age. A day would let a push
-	// carry an entry Loki refuses, and Loki refuses the whole push, so the
-	// cost of guessing high is every entry in the batch and not just the old
-	// one. Zero is the config layer saying nothing, which lands here.
+	// an hour by default, not reject_old_samples_max_age. A day would let a
+	// push carry an entry Loki refuses, and Loki answers the push with a 400,
+	// so the cost of guessing high is the whole write reported as failed and
+	// not just the old entry. Zero is the config layer saying nothing, which
+	// lands here.
 	if maxAge <= 0 {
 		maxAge = time.Hour
 	}
@@ -90,6 +107,20 @@ func NewLoki(url, tenant string, labels map[string]string, batch int, maxAge, ti
 		watermarks: map[string]time.Time{},
 		client:     &http.Client{Timeout: timeout, Transport: httpx.OwnTransport()},
 	}
+}
+
+// lokiOldest is as far back as a lookback may reach. Loki answers a push with
+// a 400, which fails the whole write here, when an entry is older than
+// reject_old_samples_max_age, a week by default: measured against Loki 3.7.7,
+// an entry eight days old was refused with "timestamp too old" and one six
+// days old taken. A day inside the week leaves room for a pass that runs late.
+const lokiOldest = 6 * 24 * time.Hour
+
+// horizon is how old an entry of this kind may be against the wall clock.
+// MaxAge is never shortened, so a max_age set past the cap is still the
+// operator's call.
+func (l *Loki) horizon(kind string) time.Duration {
+	return max(l.MaxAge, min(l.Lookback[kind], lokiOldest))
 }
 
 func (l *Loki) Name() string { return "loki" }
@@ -131,9 +162,19 @@ var lokiEvents = map[string]lokiEvent{
 	"gh_fork": {kind: "fork", message: func(p Point) string {
 		return fmt.Sprintf("%s forked %s", tagOf(p, "by"), tagOf(p, "full_name"))
 	}},
-	"gh_release": {kind: "release", message: func(p Point) string {
-		return fmt.Sprintf("release %s of %s, %s downloads",
-			tagOf(p, "tag"), tagOf(p, "full_name"), fieldOf(p, "downloads"))
+	// The publication, not gh_release. That row is stamped at the sweep
+	// because its download count moves, so rendered it pushed every release
+	// again on every repository pass: 3,360 lines in a day on the account
+	// this was measured on, a third of everything the sink sent, each one
+	// saying a release had happened at the hour of a pass. The download count
+	// is a gauge, and the stream keeps its name so a query written against it
+	// still reads it.
+	"gh_release_published": {kind: "release", message: func(p Point) string {
+		what := "release"
+		if fieldOf(p, "prerelease") == "true" {
+			what = "prerelease"
+		}
+		return fmt.Sprintf("published %s %s of %s", what, tagOf(p, "tag"), tagOf(p, "full_name"))
 	}},
 	"gh_package_version": {kind: "package", message: func(p Point) string {
 		return fmt.Sprintf("published %s:%s", tagOf(p, "package"), tagOf(p, "tag"))
@@ -335,8 +376,8 @@ type lokiEntry struct {
 // it handed over would credit Loki with storing every point of every family,
 // which is what the runner used to do.
 func (l *Loki) Write(ctx context.Context, points []Point) (int, error) {
-	grouped, newest, old := l.eventsByStream(points)
-	values, behind := l.admit(grouped, newest)
+	grouped, old := l.eventsByStream(points)
+	values, behind := l.admit(grouped)
 	dropped := old + behind
 
 	written := 0
@@ -355,54 +396,50 @@ func (l *Loki) Write(ctx context.Context, points []Point) (int, error) {
 }
 
 // eventsByStream turns the points that have an event rule into log lines,
-// keyed by the stream they belong to, and reports the newest entry each stream
-// carries in this batch.
+// keyed by the stream they belong to.
 //
 // Grouping is not an optimization: a Loki stream is defined by its label set,
 // and pushing one stream per line would be pathological. Anything already past
 // the wall-clock horizon is counted and left out, because the dated history
 // belongs in the metrics store and what a log answers is "what happened
 // recently, in order".
-func (l *Loki) eventsByStream(points []Point) (grouped map[string][]lokiEntry, newest map[string]time.Time, dropped int) {
+func (l *Loki) eventsByStream(points []Point) (grouped map[string][]lokiEntry, dropped int) {
 	grouped = map[string][]lokiEntry{}
-	newest = map[string]time.Time{}
-	wall := time.Now().Add(-l.MaxAge)
+	now := time.Now()
 	for _, p := range points {
 		ev, ok := lokiEvents[p.Measurement]
 		if !ok {
 			continue
 		}
 		stamp := stampOf(p)
-		if stamp.Before(wall) {
+		if stamp.Before(now.Add(-l.horizon(ev.kind))) {
 			dropped++
 			continue
 		}
 		grouped[ev.kind] = append(grouped[ev.kind], lokiEntry{stamp, logLine(ev.message(p), p)})
-		if stamp.After(newest[ev.kind]) {
-			newest[ev.kind] = stamp
-		}
 	}
-	return grouped, newest, dropped
+	return grouped, dropped
 }
 
 // admit drops what Loki would refuse for being too far behind the newest entry
-// in its own stream, and renders the survivors as the timestamp and line pairs
-// the push API takes.
+// already in its own stream, and renders the survivors as the timestamp and
+// line pairs the push API takes.
 //
-// The high-water mark is the newest of this batch and everything already sent,
-// so the rule is applied within a push as well as across pushes: Loki judges
-// the rest of a push against its own newest entry, and a batch spanning a day
-// fails on its very first push otherwise.
-func (l *Loki) admit(grouped map[string][]lokiEntry, newest map[string]time.Time) (values map[string][][2]string, dropped int) {
+// The mark is what earlier pushes sent, and not the newest entry of this one.
+// push sends each stream oldest first and Loki judges each entry against the
+// newest before it, so nothing inside one push is behind: measured against
+// Loki 3.7.7 with its default limits, one push of a stream's entries from 23
+// hours, 12 hours and a minute ago was taken whole, while entries from a
+// minute and 23 hours ago sent newest first lost the older one. Judging a
+// batch by its own newest entry
+// cost nothing while no horizon was longer than MaxAge, and a lookback is: it
+// would leave out the older of two releases one slow pass carries.
+func (l *Loki) admit(grouped map[string][]lokiEntry) (values map[string][][2]string, dropped int) {
 	values = map[string][][2]string{}
 	l.wmMu.Lock()
 	defer l.wmMu.Unlock()
 	for kind, entries := range grouped {
-		high := newest[kind]
-		if wm := l.watermarks[kind]; wm.After(high) {
-			high = wm
-		}
-		floor := high.Add(-l.MaxAge)
+		floor := l.watermarks[kind].Add(-l.MaxAge)
 		for _, e := range entries {
 			if e.at.Before(floor) {
 				dropped++

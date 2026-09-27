@@ -56,6 +56,9 @@ func newFixtureServer(t *testing.T) *fixtureServer {
 	t.Cleanup(f.srv.Close)
 	f.Client = ghapi.New("test-token", 0)
 	f.Client.SetBaseURL(f.srv.URL)
+	// A route that answers 502 here does it on purpose, every time, so the
+	// client's one retry of it is asked at once rather than after a pause.
+	f.Client.SetRetryPause(0)
 	return f
 }
 

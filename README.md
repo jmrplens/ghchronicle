@@ -108,7 +108,7 @@ each one draws and how to put one in a profile README.
 The full documentation is at
 **<https://jmrp.io/docs/ghchronicle/>**, in English and Spanish:
 [quickstart](https://jmrp.io/docs/ghchronicle/start/quickstart/),
-[the 93 measurements](https://jmrp.io/docs/ghchronicle/collectors/measurements/),
+[the 95 measurements](https://jmrp.io/docs/ghchronicle/collectors/measurements/),
 [choosing a store](https://jmrp.io/docs/ghchronicle/sinks/),
 [the cost of a sweep](https://jmrp.io/docs/ghchronicle/api/cost/) and
 [troubleshooting](https://jmrp.io/docs/ghchronicle/reference/troubleshooting/).
@@ -121,7 +121,7 @@ left unproven; the notes on each tag say what landed.
 
 ## What it collects
 
-Ninety-three measurements across thirty-four families, covering every surface
+Ninety-five measurements across thirty-four families, covering every surface
 a personal or organisation account exposes.
 
 | Area          | What is kept                                                                                                                                                                                                                           |
@@ -262,14 +262,16 @@ whatever else uses the same token keeps working. GitHub runs fifteen
 independent budgets and names the one it charged in a header; the reserve is
 tracked per bucket and scaled to each, because search allows thirty requests a
 minute against core's five thousand. Responses are cached by ETag, and a 304
-costs no quota at all, which is what makes short cadences affordable.
+costs no quota at all, which is what makes short cadences affordable. The cache
+is kept in a file beside the state file, so a restart asks with the validators
+the process before it stored instead of paying for every answer again.
 
 Each family has its own cadence because they move at very different speeds:
-workflow runs every fifteen minutes, the contribution calendar every twelve
-hours. The cheapest thing here by far is GraphQL: one query returns the full
-366-day contribution calendar, every contribution total, the per-repository
-commit breakdown and the social counts, for one point of a five thousand point
-budget.
+workflow runs every fifteen minutes, the contribution calendar every hour, the
+account's SSH and GPG keys once a day. The cheapest thing here by far is
+GraphQL: one query returns the full 366-day contribution calendar, every
+contribution total, the per-repository commit breakdown and the social counts,
+for one point of a five thousand point budget.
 
 A backfill is the opposite intention and says so: `-backfill` walks every
 surface to the end, bounded by a date you choose or by nothing at all, and when

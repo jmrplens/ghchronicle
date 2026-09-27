@@ -257,8 +257,10 @@ vez de leer el código de salida para saberlo.
 
 Una pasada cuesta llamadas a la API: cuatro por repositorio para el tráfico,
 tres por repositorio más dos puntos de GraphQL por cada diez repositorios para
-la familia del repositorio, un punto de GraphQL por repositorio para commits y
-uno o dos para issues.
+la familia del repositorio, un punto de GraphQL por repositorio con un commit
+nuevo para commits y uno o dos por repositorio con una issue o una pull request
+que se movió para issues, tras un punto por cada veinticinco repositorios que
+pregunta cuáles.
 [Coste de una pasada](/ghchronicle/es/api/cost/) tiene la tabla medida. El
 presupuesto son 5000 llamadas REST por hora para todo el token, compartidas con
 lo demás que lo use, y el colector frena antes de gastar las últimas

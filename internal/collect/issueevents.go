@@ -434,11 +434,17 @@ func (ie IssueEvents) Collect(ctx context.Context, c *ghapi.Client, repo Repo, n
 	if ie.Walk.Pages != 0 {
 		return ie.history(ctx, c, repo, base)
 	}
-	since := ie.Since
-	if since.IsZero() {
-		since = now.AddDate(0, 0, -30)
+	return ie.recent(ctx, c, repo, base, ie.From(now))
+}
+
+// From is where an ordinary sweep's window starts: Since, or thirty days back
+// when it is zero. A method rather than a line of Collect because the runner
+// asks it too, to know whether a repository has moved since.
+func (ie IssueEvents) From(now time.Time) time.Time {
+	if ie.Since.IsZero() {
+		return now.AddDate(0, 0, -30)
 	}
-	return ie.recent(ctx, c, repo, base, since)
+	return ie.Since
 }
 
 // recent is the ordinary sweep: the timeline of every item updated in the

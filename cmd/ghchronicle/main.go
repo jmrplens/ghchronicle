@@ -299,7 +299,7 @@ func execute(args []string, stdout, stderr io.Writer) {
 	// serve nobody, and starting one collides with the port a long-running
 	// instance already holds. The push sinks all still run.
 	oneShot := o.once || o.backfill || o.card != ""
-	sinks, err := buildSinks(cfg, logger, oneShot)
+	sinks, ledger, err := buildSinks(cfg, logger, oneShot)
 	if err != nil {
 		fatal(stderr, err)
 		return
@@ -315,6 +315,7 @@ func execute(args []string, stdout, stderr io.Writer) {
 	publishOnStart(ctx, cfg, o, logger)
 
 	runner := newRunner(cfg, api, sinks, logger, &o)
+	runner.Refill = ledgerForgot(cfg, ledger)
 	switch {
 	case o.backfill:
 		err = runBackfill(ctx, runner, cfg, accumulator, &o, logger)
@@ -326,6 +327,12 @@ func execute(args []string, stdout, stderr io.Writer) {
 		if err = runner.Serve(ctx); err != nil && ctx.Err() != nil {
 			err = nil
 		}
+	}
+	// Before the error is looked at, because a sweep that failed or was
+	// stopped still learned what it asked, and the next start pays for
+	// whatever is not written here.
+	if saveErr := runner.SaveCache(); saveErr != nil {
+		logger.Warn("cache file not saved", "file", cfg.CacheFile(), "err", saveErr)
 	}
 	if err != nil {
 		fatal(stderr, err)
@@ -357,6 +364,9 @@ func newRunner(cfg *config.Config, api *ghapi.Client, sinks []sink.Sink,
 	return &run.Runner{
 		Cfg: cfg, API: api, Sinks: sinks,
 		State: run.LoadState(cfg.StateFile), Log: logger,
+		// Every kind of run reads it, and every kind but a card-only one and
+		// a backfill writes it back: see run.Runner's CacheFile.
+		CacheFile: cfg.CacheFile(),
 		// Only the in-memory exporter needs it, and only when it will serve:
 		// a push sink has already delivered what it collected, and -once
 		// starts no exporter to fill. What -once does not do is collect every
@@ -894,7 +904,47 @@ func cardOptions(o *options, theme string) *render.Options {
 	}
 }
 
-func buildSinks(cfg *config.Config, log *slog.Logger, oneShot bool) ([]sink.Sink, error) {
+// ledgerForgot reports whether no write ledger remembers what the stores hold
+// at this start, so that every point is offered to them again: a run that ends
+// with its sweep opens none, `dedupe_file: off` and a store's own `dedupe:
+// false` keep none for it, and a ledger file that was deleted, which is how a
+// wiped store is filled again, reads empty. See run.Runner's Refill for what
+// the runner does with it.
+func ledgerForgot(cfg *config.Config, ledger *sink.Ledger) bool {
+	if ledger == nil || ledger.Len() == 0 {
+		return true
+	}
+	s := cfg.Sinks
+	var own []*bool
+	if s.Influx != nil {
+		own = append(own, s.Influx.Dedupe)
+	}
+	if s.Telegraf != nil {
+		own = append(own, s.Telegraf.Dedupe)
+	}
+	if s.Graphite != nil {
+		own = append(own, s.Graphite.Dedupe)
+	}
+	if s.SQL != nil {
+		own = append(own, s.SQL.Dedupe)
+	}
+	if s.Postgres != nil {
+		own = append(own, s.Postgres.Dedupe)
+	}
+	if s.Elasticsearch != nil {
+		own = append(own, s.Elasticsearch.Dedupe)
+	}
+	for _, on := range own {
+		if !config.Enabled(on) {
+			return true
+		}
+	}
+	return false
+}
+
+// buildSinks builds the configured sinks, and hands back the write ledger they
+// share, nil when this run opens none.
+func buildSinks(cfg *config.Config, log *slog.Logger, oneShot bool) ([]sink.Sink, *sink.Ledger, error) {
 	var out []sink.Sink
 
 	// One ledger, shared by the stores that keep history. It answers per sink,
@@ -933,7 +983,17 @@ func buildSinks(cfg *config.Config, log *slog.Logger, oneShot bool) ([]sink.Sink
 		out = append(out, otlp)
 	}
 	if l := cfg.Sinks.Loki; l != nil {
-		out = append(out, sink.NewLoki(l.URL, l.TenantID, l.Labels, l.Batch, l.Age(), cfg.GitHub.HTTPTimeout()))
+		loki := sink.NewLoki(l.URL, l.TenantID, l.Labels, l.Batch, l.Age(), cfg.GitHub.HTTPTimeout())
+		// A release is dated at its publication and first seen by the repo
+		// pass after it, so one published just after a pass read its
+		// repository is a cadence old when the next pass writes, plus however
+		// late that pass runs. With both at the hour, max_age alone left it
+		// out, and every later pass only saw it older. The cadence plus
+		// max_age lets a pass be as late as the sink lets any entry be.
+		if every, ok := cfg.Interval("repo"); ok {
+			loki.Lookback = map[string]time.Duration{"release": every + loki.MaxAge}
+		}
+		out = append(out, loki)
 	}
 	if f := cfg.Sinks.File; f != nil {
 		out = append(out, sink.NewFile(f.Path, f.Format, f.MaxBytes, f.Keep))
@@ -943,7 +1003,7 @@ func buildSinks(cfg *config.Config, log *slog.Logger, oneShot bool) ([]sink.Sink
 		// Started here rather than lazily, so a port already in use is an
 		// error at start-up instead of a silently missing exporter.
 		if err := exporter.Start(); err != nil {
-			return nil, fmt.Errorf("prometheus exporter: %w", err)
+			return nil, nil, fmt.Errorf("prometheus exporter: %w", err)
 		}
 		out = append(out, exporter)
 	}
@@ -979,7 +1039,7 @@ func buildSinks(cfg *config.Config, log *slog.Logger, oneShot bool) ([]sink.Sink
 			out = append(out, sink.NewStdout())
 		}
 	}
-	return out, nil
+	return out, ledger, nil
 }
 
 // writeCard renders the SVG through a temporary file, so a reader watching the

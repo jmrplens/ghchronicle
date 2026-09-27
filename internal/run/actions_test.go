@@ -105,7 +105,7 @@ func TestTheFirstSweepRemembersEveryRepositorysRuns(t *testing.T) {
 		t.Errorf("the first sweep asks for %d pages of %d, want 10 of 100", first.Walk.Pages, first.PerPage)
 	}
 	seen := collect.RunKey{ID: 1, Attempt: 1}
-	first.Expanded[seen] = struct{}{}
+	first.Expanded[seen] = now
 	second := r.actions(now)
 	if _, ok := second.Expanded[seen]; !ok {
 		t.Error("the second repository of the first sweep forgot what the first one expanded")

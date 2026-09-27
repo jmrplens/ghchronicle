@@ -275,9 +275,9 @@ func TestRateLimitRefusesToStampAClosedWindowWithNow(t *testing.T) {
 	t.Parallel()
 	f := newFixtureServer(t)
 	rateLimitEndpoint(f)
-	// This family runs every fifteen minutes and the batched queries every
-	// twelve hours, so the reading left behind can belong to a window that
-	// closed hours ago. Publishing it stamped `now` would date a measurement
+	// This family runs every fifteen minutes and the slowest GraphQL families
+	// once or twice a day, so the reading left behind can belong to a window
+	// that closed hours ago. Publishing it stamped `now` would date a measurement
 	// at a moment it was never taken at.
 	budgetThenBroken(f, 900, testNow.Add(-11*time.Hour))
 

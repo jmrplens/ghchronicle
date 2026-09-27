@@ -237,6 +237,9 @@ func TestOnceAgainstFakeGitHub(t *testing.T) {
 	assertTheForkWasFiltered(t, points)
 	assertDatingRulesSurvived(t, points)
 	assertStarDaysWereWritten(t, points, time.Now())
+	assertAcceptedAnswersWereRead(t, points)
+	assertCacheRowsAddUpToTheTotals(t, points)
+	assertOutboundSaysWhereTheWorkWent(t, points)
 	assertAchievementProgressAgreesWithThePage(t, points, out)
 	assertStateRecordsTheSweep(t, readState(t, filepath.Join(dir, "state.json")))
 
@@ -268,8 +271,9 @@ func TestTheSecondSweepIsPricedByTheCache(t *testing.T) {
 	gh := newFakeGitHub(t)
 	dir := t.TempDir()
 	// Cadences shorter than the tick, so every tick is a sweep with every
-	// family due, in the one process whose cache the first sweep filled:
-	// -once twice would be two processes and two empty caches.
+	// family due, in the one process whose cache the first sweep filled. Two
+	// -once runs would price the cache file as well, which is
+	// TestARestartKeepsWhatTheCacheLearned's to do.
 	cfg := writeConfigWithCadence(t, dir, gh.URL(), "e2e-token", login, "1s", "heartbeat: 2s\n")
 
 	p := serveInBackground(t, cfg)
@@ -295,6 +299,7 @@ func TestTheSecondSweepIsPricedByTheCache(t *testing.T) {
 		t.Fatalf("the second sweep asked the fake nothing; the first asked %d", len(first))
 	}
 	assertRepeatsWereRevalidated(t, first, second)
+	assertNothingMovedWasLeftUnread(t, second, p.Output())
 	core1, gql1 := sweepCost(first)
 	core2, gql2 := sweepCost(second)
 	t.Logf("first sweep: %d core, %d graphql; second sweep: %d core, %d graphql", core1, gql1, core2, gql2)
@@ -302,6 +307,62 @@ func TestTheSecondSweepIsPricedByTheCache(t *testing.T) {
 		t.Errorf("the second sweep charged %d core requests against the first sweep's %d: fewer than half of the first sweep's URLs came back 304", core2, core1)
 	}
 	assertOwnSpendWasPriced(t, readPoints(t, filepath.Join(dir, "points.jsonl")))
+}
+
+// assertNothingMovedWasLeftUnread holds a sweep after the first to the
+// movement query: the fake's one repository was last pushed to four days ago
+// and its items touched a day ago, both before a window of two one second
+// cadences, so the sweep asks once what moved, reads no commit history, and
+// says in the log what it left unread.
+func assertNothingMovedWasLeftUnread(t *testing.T, sweep []fakegh.Request, output string) {
+	t.Helper()
+	moved, history := 0, 0
+	for _, req := range sweep {
+		switch {
+		case strings.Contains(req.GraphQL, "fragment moved on Repository"):
+			moved++
+		case strings.Contains(req.GraphQL, "history("):
+			history++
+		}
+	}
+	if moved != 1 || history != 0 {
+		t.Errorf("the second sweep sent %d movement queries and %d commit history queries, want the one and none", moved, history)
+	}
+	if !strings.Contains(output, "repositories left unread") {
+		t.Errorf("the second sweep did not say what it left unread:\n%s", output)
+	}
+}
+
+// TestARestartKeepsWhatTheCacheLearned is the same price across a restart:
+// -once, then -once again as a new process with the same state file. The
+// first process leaves its cache beside the state file, so the second asks
+// every URL the first was answered 200 for with the validator the first
+// stored, and is answered 304. Before the file existed, a restart of the
+// production service answered 130 requests of its first sweep and not one of
+// them 304.
+func TestARestartKeepsWhatTheCacheLearned(t *testing.T) {
+	t.Parallel()
+	gh := newFakeGitHub(t)
+	dir := t.TempDir()
+	// Cadences under the loop's half tick of slack, so the second process
+	// finds every family due again.
+	cfg := writeConfigWithCadence(t, dir, gh.URL(), "e2e-token", login, "1s", "")
+	if out, err := run(t, 2*time.Minute, "-config", cfg, "-once"); err != nil {
+		t.Fatalf("the first -once failed: %v\n%s", err, out)
+	}
+	afterFirst := len(gh.Requests())
+	if _, err := os.Stat(filepath.Join(dir, "state-cache.bin")); err != nil {
+		t.Fatalf("the first process left no cache file beside its state file: %v", err)
+	}
+	out, err := run(t, 2*time.Minute, "-config", cfg, "-once")
+	if err != nil {
+		t.Fatalf("the second -once failed: %v\n%s", err, out)
+	}
+	if !bytes.Contains(out, []byte("cache file read")) {
+		t.Errorf("the second process did not say it read the cache file:\n%s", out)
+	}
+	all := gh.Requests()
+	assertRepeatsWereRevalidated(t, all[:afterFirst], all[afterFirst:])
 }
 
 // assertRepeatsWereRevalidated: every GET the first sweep was answered 200
@@ -562,6 +623,112 @@ func assertStarDaysWereWritten(t *testing.T, points []point, sweptBy time.Time) 
 	}
 }
 
+// assertCacheRowsAddUpToTheTotals: the cache listing reached the sink as one
+// row per cache on each ref, and those rows are the whole listing. The fixture
+// holds three CodeQL caches on main whose keys cut to one tag, which a row per
+// entry wrote three times over one row; its entries add up to the count and
+// the bytes the usage call declares, so a row lost or counted twice shows as
+// a total that no longer matches.
+func assertCacheRowsAddUpToTheTotals(t *testing.T, points []point) {
+	t.Helper()
+	var declared point
+	rows := map[string]point{}
+	var entries, size float64
+	for _, p := range points {
+		switch p.Measurement {
+		case "gh_actions_cache":
+			declared = p
+		case "gh_actions_cache_entry":
+			id := p.Tags["cache"] + " " + p.Tags["ref"] + " " + p.Time
+			if _, twice := rows[id]; twice {
+				t.Errorf("two cache rows share %s", id)
+			}
+			rows[id] = p
+			n, _ := p.Fields["caches"].(float64)
+			b, _ := p.Fields["size_bytes"].(float64)
+			entries += n
+			size += b
+		}
+	}
+	if len(rows) != 3 {
+		t.Errorf("wrote %d cache rows, want one per cache and ref: 3", len(rows))
+	}
+	if entries != declared.Fields["count"] || size != declared.Fields["size_bytes"] {
+		t.Errorf("the cache rows hold %v entries of %v bytes, want the %v of %v the usage declares",
+			entries, size, declared.Fields["count"], declared.Fields["size_bytes"])
+	}
+	for _, p := range rows {
+		if p.Tags["cache"] == "codeql-overlay-base-database-1" && p.Tags["ref"] == "refs/heads/main" &&
+			(p.Fields["caches"] != float64(3) || p.Fields["size_bytes"] != float64(3871480+3801875+3835985)) {
+			t.Errorf("the CodeQL caches on main = %v, want the three entries summed", p.Fields)
+		}
+	}
+}
+
+// assertAcceptedAnswersWereRead: the accepted answers are a walk of their own
+// beside the newest page of discussion comments. The fake's answers hold one
+// comment older than that page, which reaches the sink only through them,
+// and one the page holds too, which reaches it once.
+func assertAcceptedAnswersWereRead(t *testing.T, points []point) {
+	t.Helper()
+	written := map[string]int{}
+	for _, p := range points {
+		if p.Measurement != "gh_discussion_comment" {
+			continue
+		}
+		written[p.Tags["comment"]]++
+		if p.Tags["comment"] == "7654321" && (p.Tags["is_answer"] != "true" || p.Fields["answers"] != float64(1)) {
+			t.Errorf("the answer older than the newest page was written as %v %v", p.Tags, p.Fields)
+		}
+	}
+	if written["7654321"] != 1 || written["18283966"] != 1 {
+		t.Errorf("discussion comments written %v, want the older answer and the one both walks see once each", written)
+	}
+}
+
+// assertOutboundSaysWhereTheWorkWent: every outbound row says whether its
+// repository is private, a pull request says how large it was, and each
+// repository the searches reached has one row of its own, stamped at the
+// sweep, with the star count that would move a closed contribution's row of
+// the past if it were written there.
+func assertOutboundSaysWhereTheWorkWent(t *testing.T, points []point) {
+	t.Helper()
+	upstream := map[string]point{}
+	for _, p := range points {
+		switch p.Measurement {
+		case "gh_upstream_repo":
+			if _, twice := upstream[p.Tags["full_name"]]; twice {
+				t.Errorf("%s has two gh_upstream_repo rows in one sweep", p.Tags["full_name"])
+			}
+			upstream[p.Tags["full_name"]] = p
+		case "gh_external_contribution", "gh_issue_comment", "gh_discussion_comment":
+			if _, ok := p.Fields["private"].(bool); !ok {
+				t.Errorf("%s in %s carries no private: %v", p.Measurement, p.Tags["full_name"], p.Fields)
+			}
+			// The fake answers every search with the same page, so the pull
+			// request is found by its number rather than by its state.
+			if p.Measurement == "gh_external_contribution" && p.Tags["number"] == "118" &&
+				(p.Fields["additions"] != float64(167) || p.Fields["changed_files"] != float64(6)) {
+				t.Errorf("the pull request carries no size: %v", p.Fields)
+			}
+			if _, stars := p.Fields["stars"]; stars {
+				t.Errorf("%s carries the repository's stars on a dated row: %v", p.Measurement, p.Fields)
+			}
+		}
+	}
+	if len(upstream) != 2 {
+		t.Fatalf("gh_upstream_repo rows for %v, want someone/else and another/project", sortedNames(upstream))
+	}
+	goRepo := upstream["someone/else"]
+	if goRepo.Fields["stars"] != float64(5152) || goRepo.Fields["private"] != false ||
+		goRepo.Fields["url"] != "https://github.com/someone/else" {
+		t.Errorf("someone/else = %v", goRepo.Fields)
+	}
+	if at, err := time.Parse(time.RFC3339Nano, goRepo.Time); err != nil || time.Since(at) > time.Hour {
+		t.Errorf("gh_upstream_repo stamped %s, want the sweep", goRepo.Time)
+	}
+}
+
 // noRepository is collect.noneTag as it reaches a sink: what all three tags
 // carry on a row that is about no repository at all.
 const noRepository = "(none)"
@@ -649,7 +816,7 @@ func assertOneShapeNamesEveryRepository(t *testing.T, points []point) {
 	// naming none of them for a year with nothing failing.
 	for _, m := range []string{
 		"gh_repo", "gh_event", "gh_notification", "gh_star_given",
-		"gh_external_contribution", "gh_issue_comment", "gh_discussion_comment",
+		"gh_external_contribution", "gh_upstream_repo", "gh_issue_comment", "gh_discussion_comment",
 		"gh_package", "gh_pinned_item", "gh_contribution_repo", "gh_billing_usage",
 	} {
 		switch {

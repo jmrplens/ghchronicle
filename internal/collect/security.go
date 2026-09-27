@@ -51,6 +51,8 @@ import (
 type Security struct {
 	// Walk bounds the alert lists. Default one page each; a backfill walks
 	// them all, which is what makes time-to-resolve computable on old alerts.
+	// It bounds the rows and not the open counts: a walk that stops short of
+	// the end has those read from the open alerts alone (see openAlerts).
 	Walk Walk
 	// Refusals remembers the repositories where a list is switched off, so
 	// the 403 is paid once a day rather than once an hour. Nil asks every time.
@@ -201,29 +203,78 @@ func alertCWEs(ids []string) string {
 
 func (sc Security) Collect(ctx context.Context, c *ghapi.Client, repo Repo, now time.Time) ([]sink.Point, error) {
 	base := repoTags(repo.Owner, repo.Name)
-	var points []sink.Point
+	points, err := sc.dependabot(ctx, c, repo, base, now)
+	if err != nil {
+		return points, err
+	}
+	scanning, err := sc.codeScanning(ctx, c, repo, base, now)
+	// Dependabot answered and code scanning did not: the rows above are as
+	// true as they were, so they travel with the error rather than being
+	// thrown away with it.
+	return append(points, scanning...), err
+}
 
-	dependabot, dependabotOn, err := sc.dependabotAlerts(ctx, c, repo)
+// dependabot renders the Dependabot alert list: a row per alert the walk
+// read, the open counts, and the feature.
+//
+// The rows are every state, not only the open ones: an alert that was fixed is
+// the only evidence of how long it took, and asking for state=open alone threw
+// that away. `alerts` is the rows read and nothing more, so on a sweep of a
+// repository past a hundred alerts it reads 100, meaning a hundred or more.
+// The list pages by cursor and declares no last page, so unlike code scanning
+// there is no one request that says its length, and the whole walk to recount
+// alerts fixed years ago is what a backfill is for.
+func (sc Security) dependabot(ctx context.Context, c *ghapi.Client, repo Repo,
+	base map[string]string, now time.Time,
+) ([]sink.Point, error) {
+	path := fmt.Sprintf("/repos/%s/dependabot/alerts?per_page=100", repo.FullName)
+	rows, enabled, more, err := dependabotPages(ctx, c, sc.Refusals, sc.Walk, path)
 	if err != nil {
 		return nil, err
 	}
-	alerts, open := dependabotPoints(dependabot, base, repo, now)
-	points = append(points, alerts...)
-	points = append(points, securityFeaturePoint(base, "dependabot",
-		githubPage(repo.FullName, "security"), dependabotOn, open, len(dependabot), now))
-
-	scanning, scanningOn, err := sc.codeScanningAlerts(ctx, c, repo)
+	points := dependabotItems(rows, base)
+	open, err := openAlerts(ctx, c, path, rows, more, dependabotPages)
 	if err != nil {
-		// Dependabot answered and code scanning did not: the rows above are
-		// as true as they were, so they travel with the error rather than
-		// being thrown away with it.
+		// The rows are as true as they were; it is the count that could not
+		// be completed, and a count from the page would be the one this read
+		// exists to correct.
 		return points, err
 	}
-	alerts, open = codeScanningPoints(scanning, base, repo, now)
-	points = append(points, alerts...)
-	points = append(points, securityFeaturePoint(base, "code_scanning",
-		githubPage(repo.FullName, "security", "code-scanning"), scanningOn, open, len(scanning), now))
-	return points, nil
+	counts, n := dependabotCounts(open, base, repo, now)
+	points = append(points, counts...)
+	return append(points, securityFeaturePoint(base, "dependabot",
+		githubPage(repo.FullName, "security"), enabled, n, len(rows), now)), nil
+}
+
+// codeScanning renders the code scanning alert list: a row per alert the walk
+// read, the open counts, and the feature with the list's own total.
+//
+// Every state, for the same reason as Dependabot. `state=all` is not a valid
+// value here (it answers 400), so the parameter is left off, which is the
+// endpoint's own way of saying all of them.
+func (sc Security) codeScanning(ctx context.Context, c *ghapi.Client, repo Repo,
+	base map[string]string, now time.Time,
+) ([]sink.Point, error) {
+	path := fmt.Sprintf("/repos/%s/code-scanning/alerts?per_page=100", repo.FullName)
+	rows, enabled, more, err := codeScanningPages(ctx, c, sc.Refusals, sc.Walk, path)
+	if err != nil {
+		return nil, err
+	}
+	points := codeScanningItems(rows, base)
+	open, err := openAlerts(ctx, c, path, rows, more, codeScanningPages)
+	if err != nil {
+		return points, err
+	}
+	total := len(rows)
+	if more {
+		if total, err = codeScanningTotal(ctx, c, repo, total); err != nil {
+			return points, err
+		}
+	}
+	counts, n := codeScanningCounts(open, base, repo, now)
+	points = append(points, counts...)
+	return append(points, securityFeaturePoint(base, "code_scanning",
+		githubPage(repo.FullName, "security", "code-scanning"), enabled, n, total, now)), nil
 }
 
 // securityFeaturePoint records whether the repository hands this kind of alert
@@ -244,89 +295,144 @@ func securityFeaturePoint(base map[string]string, feature, url string,
 	}
 }
 
-// dependabotAlerts walks the Dependabot alert list, and says whether the
-// repository will hand it over at all.
+// alertPages walks one alert list from path, newest first. answered is
+// whether the repository hands the list over at all, and more whether the
+// walk stopped with alerts still behind it.
+type alertPages[T any] func(ctx context.Context, c *ghapi.Client, memory *Refusals, w Walk, path string) (rows []T, answered, more bool, err error)
+
+// openAlerts is the list the open counts are taken from.
 //
-// Every state, not only the open ones: an alert that was fixed is the only
-// evidence of how long it took, and asking for state=open threw that away.
-// Dependabot's list refuses `page=` outright ("Pagination using the page
-// parameter is not supported") and pages by cursor through the Link header,
-// unlike every other alert endpoint.
-func (sc Security) dependabotAlerts(ctx context.Context, c *ghapi.Client, repo Repo) (rows []dependabotRow, enabled bool, err error) {
+// When the walk read the whole list that is the rows it read. When it stopped
+// with more behind it, which is every sweep of a repository past a hundred
+// alerts, those rows are the newest hundred in every state, and an alert still
+// open but older than them, a long-standing one behind a busy history of fixed
+// ones, was simply not counted. So the list is read again with state=open,
+// walked to its end: it is short where it matters, usually empty (measured on
+// 2026-09-26, the two lists of this account past a hundred alerts answer an
+// empty page), and asked conditionally like every other page, so a list that
+// did not change is a free 304.
+//
+// The request goes past the refusal memory on purpose. The unfiltered list has
+// just answered, so the feature is on, and a refusal here is about this walk,
+// not the repository: it neither turns the feature off nor is remembered for a
+// day. The counts fall back to the rows read, which is what they were before.
+// A refusal deeper in the open walk keeps the pages it read, which are the
+// newest open alerts and so already hold every open one of those rows.
+func openAlerts[T any](ctx context.Context, c *ghapi.Client, path string, read []T, more bool, walk alertPages[T]) ([]T, error) {
+	if !more {
+		return read, nil
+	}
+	open, answered, _, err := walk(ctx, c, nil, Unbounded, path+"&state=open")
+	if err != nil || !answered {
+		return read, err
+	}
+	return open, nil
+}
+
+// codeScanningTotal is how many alerts the code scanning list holds, for a
+// walk that stopped before its end; read is what it read, and stands when the
+// list will not say.
+//
+// The list pages by number, so a page of one alert declares the total as its
+// last page. Measured on 2026-09-26 on jmrplens/Cloudflare-DNS-Updater:
+// per_page=1 answers page=1393 under rel="last", the 1,393 distinct alerts a
+// backfill read, where a sweep had been writing 100. GitHub's 304 carries no
+// Link at all, and the client replays the one its 200 came with, so a total
+// that did not move is read for nothing.
+func codeScanningTotal(ctx context.Context, c *ghapi.Client, repo Repo, read int) (int, error) {
+	var one []scanRow
+	link, _, err := c.GetJSON(ctx, fmt.Sprintf("/repos/%s/code-scanning/alerts?per_page=1", repo.FullName), &one, "")
+	if err != nil {
+		if isSkippable(err) {
+			// Past the refusal memory for the reason openAlerts gives.
+			return read, nil
+		}
+		return read, err
+	}
+	if m := lastPageRe.FindStringSubmatch(link); m != nil {
+		if n, convErr := strconv.Atoi(m[1]); convErr == nil {
+			return n, nil
+		}
+	}
+	return read, nil
+}
+
+// dependabotPages walks a Dependabot alert list.
+//
+// The list refuses `page=` outright ("Pagination using the page parameter is
+// not supported") and pages by cursor through the Link header, unlike every
+// other alert endpoint, so it ends where the cursor does.
+func dependabotPages(ctx context.Context, c *ghapi.Client, memory *Refusals, w Walk, path string) (rows []dependabotRow, answered, more bool, err error) {
 	after := ""
-	most := sc.Walk.limit(1)
+	most := w.limit(1)
 	for page := 1; page <= most; page++ {
-		path := fmt.Sprintf("/repos/%s/dependabot/alerts?per_page=100", repo.FullName)
+		next := path
 		if after != "" {
-			path += "&after=" + after
+			next += "&after=" + after
 		}
 		var batch []dependabotRow
-		link, _, e := sc.Refusals.GetJSON(ctx, c, path, &batch, "")
+		link, _, e := memory.GetJSON(ctx, c, next, &batch, "")
 		if e != nil {
 			if isSkippable(e) {
 				// Only the first page can mean "the feature is off". A refusal
 				// deeper in the walk is about the walk, not the repository,
 				// and the pages already read stay.
-				return rows, page > 1, nil
+				return rows, page > 1, page > 1, nil
 			}
 			if isPaginationLimit(e) {
-				break
+				return rows, true, false, nil
 			}
-			return nil, false, e
+			return nil, false, false, e
 		}
 		rows = append(rows, batch...)
 		after = afterCursor(link)
-		if after == "" || len(batch) < 100 || sc.Walk.past(batch[len(batch)-1].CreatedAt) {
+		if after == "" || len(batch) < 100 {
+			return rows, true, false, nil
+		}
+		if w.past(batch[len(batch)-1].CreatedAt) {
 			break
 		}
 	}
-	return rows, true, nil
+	return rows, true, true, nil
 }
 
-// codeScanningAlerts walks the code scanning alert list, and says whether the
-// repository will hand it over at all.
+// codeScanningPages walks a code scanning alert list.
 //
-// Every state, for the same reason as Dependabot: an alert that was fixed is
-// the only evidence of how long it took. `state=all` is not a valid value here
-// (it answers 400), so the parameter is left off, which is the endpoint's own
-// way of saying all of them. The walk is written out rather than handed to
-// pages() because pages() folds a switched-off feature into an empty result,
-// and that is exactly the distinction wanted here.
-func (sc Security) codeScanningAlerts(ctx context.Context, c *ghapi.Client, repo Repo) (rows []scanRow, enabled bool, err error) {
-	most := sc.Walk.limit(1)
+// It is written out rather than handed to pages() because pages() folds a
+// switched-off feature into an empty result, and that is exactly the
+// distinction wanted here.
+func codeScanningPages(ctx context.Context, c *ghapi.Client, memory *Refusals, w Walk, path string) (rows []scanRow, answered, more bool, err error) {
+	most := w.limit(1)
 	for page := 1; page <= most; page++ {
 		var batch []scanRow
-		path := fmt.Sprintf("/repos/%s/code-scanning/alerts?per_page=100&page=%d", repo.FullName, page)
-		if _, _, e := sc.Refusals.GetJSON(ctx, c, path, &batch, ""); e != nil {
+		if _, _, e := memory.GetJSON(ctx, c, fmt.Sprintf("%s&page=%d", path, page), &batch, ""); e != nil {
 			if isSkippable(e) {
-				return rows, page > 1, nil
+				return rows, page > 1, page > 1, nil
 			}
 			if isPaginationLimit(e) {
-				break
+				return rows, true, false, nil
 			}
-			return nil, false, e
+			return nil, false, false, e
 		}
 		rows = append(rows, batch...)
+		if len(batch) < 100 {
+			return rows, true, false, nil
+		}
 		// The list is newest first, so a backfill bounded by date stops here
 		// the way the Dependabot walk does, rather than paying for every page
 		// back to the first scan and discarding what lies past the bound.
-		if len(batch) < 100 || sc.Walk.past(batch[len(batch)-1].CreatedAt) {
+		if w.past(batch[len(batch)-1].CreatedAt) {
 			break
 		}
 	}
-	return rows, true, nil
+	return rows, true, true, nil
 }
 
-// dependabotPoints renders one point per alert plus the open counts, and
-// returns how many are open.
-func dependabotPoints(rows []dependabotRow, base map[string]string, repo Repo, now time.Time) (points []sink.Point, open int) {
-	counts := map[[2]string]int{}
+// dependabotItems renders one point per alert, in whatever state.
+func dependabotItems(rows []dependabotRow, base map[string]string) []sink.Point {
+	points := make([]sink.Point, 0, len(rows))
 	for i := range rows {
 		a := &rows[i]
-		if a.State == "open" {
-			counts[[2]string{a.SecurityAdvisory.Severity, a.Dependency.Package.Ecosystem}]++
-			open++
-		}
 		fields := dependabotAlertFields(a)
 		// The state is a field and not a tag: the row is dated when the
 		// alert was raised and the state moves later, so as a tag an alert
@@ -353,6 +459,21 @@ func dependabotPoints(rows []dependabotRow, base map[string]string, repo Repo, n
 			Fields: fields,
 			Time:   a.CreatedAt,
 		})
+	}
+	return points
+}
+
+// dependabotCounts renders the open alerts by severity and ecosystem, and
+// returns how many are open. rows is either list openAlerts hands over, and
+// only the open ones count in both.
+func dependabotCounts(rows []dependabotRow, base map[string]string, repo Repo, now time.Time) (points []sink.Point, open int) {
+	counts := map[[2]string]int{}
+	for i := range rows {
+		a := &rows[i]
+		if a.State == "open" {
+			counts[[2]string{a.SecurityAdvisory.Severity, a.Dependency.Package.Ecosystem}]++
+			open++
+		}
 	}
 	for k, n := range counts {
 		points = append(points, sink.Point{
@@ -435,26 +556,30 @@ func dependabotAlertFields(a *dependabotRow) map[string]any {
 	return f
 }
 
-// codeScanningPoints renders one point per alert plus the open counts, and
-// returns how many are open.
-func codeScanningPoints(rows []scanRow, base map[string]string, repo Repo, now time.Time) (points []sink.Point, open int) {
-	counts := map[[2]string]int{}
+// codeScanningItems renders one point per alert, in whatever state.
+func codeScanningItems(rows []scanRow, base map[string]string) []sink.Point {
+	points := make([]sink.Point, 0, len(rows))
 	for i := range rows {
 		a := &rows[i]
-		sev := a.Rule.SecuritySeverity
-		if sev == "" {
-			sev = a.Rule.Severity
-		}
-		if a.State == "open" {
-			counts[[2]string{sev, a.Tool.Name}]++
-			open++
-		}
 		points = append(points, sink.Point{
 			Measurement: "gh_code_scanning_alert_item",
-			Tags:        scanAlertTags(a, base, sev),
+			Tags:        scanAlertTags(a, base, scanSeverity(a)),
 			Fields:      scanAlertFields(a),
 			Time:        a.CreatedAt,
 		})
+	}
+	return points
+}
+
+// codeScanningCounts renders the open alerts by severity and tool, and
+// returns how many are open, from either list openAlerts hands over.
+func codeScanningCounts(rows []scanRow, base map[string]string, repo Repo, now time.Time) (points []sink.Point, open int) {
+	counts := map[[2]string]int{}
+	for i := range rows {
+		if a := &rows[i]; a.State == "open" {
+			counts[[2]string{scanSeverity(a), a.Tool.Name}]++
+			open++
+		}
 	}
 	for k, n := range counts {
 		points = append(points, sink.Point{
@@ -466,6 +591,16 @@ func codeScanningPoints(rows []scanRow, base map[string]string, repo Repo, now t
 		})
 	}
 	return points, open
+}
+
+// scanSeverity is what an alert is grouped by, in its row and in the open
+// counts alike, so an alert is never one severity in one and another in the
+// other: the security severity, or the rule's own when there is none.
+func scanSeverity(a *scanRow) string {
+	if a.Rule.SecuritySeverity != "" {
+		return a.Rule.SecuritySeverity
+	}
+	return a.Rule.Severity
 }
 
 // scanAlertTags names one alert and says where it is. The state and the

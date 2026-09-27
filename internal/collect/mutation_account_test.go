@@ -1224,13 +1224,19 @@ func TestDiscussionContextWithoutAnAnswerAuthorOrACreationDate(t *testing.T) {
 
 // accountBackwardServer answers one of the two viewer comment connections
 // with one comment a page, saying there is an older page until the fifth
-// query, and records the variables of each.
+// query, and records the variables of each. The accepted answers, which the
+// discussion walk reads after its own pages and which have tests of their
+// own, are an empty list here, so what is recorded is that walk alone.
 func accountBackwardServer(t *testing.T, connection, node string, emptyPage bool) (*fixtureServer, func() []map[string]any) {
 	t.Helper()
 	f := newFixtureServer(t)
 	var mu sync.Mutex
 	var asked []map[string]any
-	f.graphQL(func(w http.ResponseWriter, _ *http.Request, _ string, vars map[string]any) {
+	f.graphQL(func(w http.ResponseWriter, _ *http.Request, query string, vars map[string]any) {
+		if strings.Contains(query, "onlyAnswers: true") {
+			fmt.Fprintf(w, `{"data":{"viewer":{%q:{"totalCount":0,"pageInfo":{"hasPreviousPage":false,"startCursor":null},"nodes":[]}}}}`, connection)
+			return
+		}
 		mu.Lock()
 		asked = append(asked, vars)
 		n := len(asked)

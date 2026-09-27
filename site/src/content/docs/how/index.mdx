@@ -41,38 +41,38 @@ is the subject of [dating a point](/ghchronicle/how/dating/).
 ## Why families and not one interval
 
 The surfaces move at wildly different speeds. Workflow runs finish every few
-minutes on a busy account. The contribution calendar changes once a day. The
-list of forks changes a few times a year. One interval for all of them would
+minutes on a busy account. Labels and milestones are edited a few times a week.
+The list of forks changes a few times a year. One interval for all of them would
 either waste the rate limit on the slow ones or lose the fast ones, so each
 family carries its own.
 
 | Family         | Default | Collects                                                                                 |
 | -------------- | ------- | ---------------------------------------------------------------------------------------- |
 | `actions`      | 15m     | Workflow runs, jobs, steps, the Actions cache                                            |
+| `activity`     | 15m     | The repository activity log, where a force push is recorded                              |
+| `events`       | 15m     | The account event feed, which keeps only the last 300                                    |
+| `notifs`       | 15m     | The notification inbox                                                                   |
 | `ratelimit`    | 15m     | What the collector has left to spend, in each budget                                     |
-| `activity`     | 30m     | The repository activity log, where a force push is recorded                              |
-| `events`       | 30m     | The account event feed, which keeps only the last 300                                    |
-| `notifs`       | 30m     | The notification inbox                                                                   |
+| `deployments`  | 30m     | Deployments and their environments, batched over every repository                        |
+| `account`      | 1h      | Profile, contribution calendar, contribution totals                                      |
+| `analyses`     | 1h      | Code scanning analyses, which GitHub prunes                                              |
 | `artifacts`    | 1h      | Artifacts and their expiry                                                               |
+| `billing`      | 1h      | Usage per day, product, SKU and repository                                               |
 | `commits`      | 1h      | Lines changed and signature state, per commit                                            |
-| `deployments`  | 1h      | Deployments and their environments, batched over every repository                        |
+| `discussions`  | 1h      | The forum half of a repository                                                           |
 | `issueevents`  | 1h      | The timeline of what moved: labels, assignments, transitions                             |
 | `issues`       | 1h      | Pull requests, issues and reviews, per item                                              |
+| `outbound`     | 1h      | Stars given, and work in other people's repositories                                     |
 | `repo`         | 1h      | Stars, forks, languages, topics, releases, rulesets                                      |
 | `security`     | 1h      | Dependabot and code scanning alerts                                                      |
-| `discussions`  | 2h      | The forum half of a repository                                                           |
-| `analyses`     | 6h      | Code scanning analyses, which GitHub prunes                                              |
-| `billing`      | 6h      | Usage per day, product, SKU and repository                                               |
+| `stars`        | 1h      | Stars per day for every repository, and the stargazer walk once, then the newest hundred |
+| `totals`       | 1h      | The lifetime numbers, asked of GitHub rather than added up here                          |
 | `planning`     | 6h      | Labels and milestones                                                                    |
 | `settings`     | 6h      | Webhooks and their deliveries, environments, deploy keys                                 |
-| `stars`        | 6h      | Stars per day for every repository, and the stargazer walk once, then the newest hundred |
 | `traffic`      | 6h      | The whole 14-day window, rewritten                                                       |
-| `account`      | 12h     | Profile, contribution calendar, contribution totals                                      |
 | `forks`        | 12h     | Who forked, and when                                                                     |
-| `outbound`     | 1h      | Stars given, and work in other people's repositories                                     |
 | `profile`      | 12h     | Packages, gists, social accounts                                                         |
 | `stats`        | 12h     | Commits per week, the punch card, the workflow definitions                               |
-| `totals`       | 12h     | The lifetime numbers, asked of GitHub rather than added up here                          |
 | `achievements` | 24h     | The profile badges, and the distance to each next tier                                   |
 | `branches`     | 24h     | Which branches are live and how stale each tip is                                        |
 | `inventory`    | 24h     | What a workflow's own token may do, both secret stores, default code scanning            |
@@ -111,7 +111,7 @@ level=WARN msg="family failed everywhere, not marking it as run" family=security
 
 ## The state file
 
-`state_file` holds [seven things](/ghchronicle/configuration/#state_file), and
+`state_file` holds [eight things](/ghchronicle/configuration/#state_file), and
 the two a sweep is judged by are when each family last ran and when each
 repository was first seen.
 
@@ -120,6 +120,13 @@ once instead of on every sweep, as `history_read` does for the daily star
 history. It is written through a temporary file and renamed,
 so a crash mid-write cannot leave a truncated state that would trigger a full
 re-collection.
+
+Beside it the collector keeps what makes a sweep cheap rather than what makes it
+complete: the ETag cache, the workflow runs whose jobs were written, the
+refusals and the pull request page sizes, in
+[`<name>-cache.bin`](/ghchronicle/configuration/#the-cache-beside-it). A restart
+reads it back and starts where the last process stopped, not from nothing, and
+deleting it costs one full-price pass of each family and loses nothing.
 
 <Aside
   type="note"

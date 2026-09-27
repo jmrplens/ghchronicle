@@ -170,12 +170,19 @@ func (a Achievements) counts(ctx context.Context, c *ghapi.Client) (achievementC
 // coauthoredPullsQuery is one page of the merged pull requests of the
 // account in public repositories, with every commit message the badge could
 // be reading: the commits of the pull request and the merge commit, which
-// is where a squash merge keeps the trailers of the commits it folded.
+// is where a squash merge keeps the trailers of the commits it folded, and
+// when it merged, which is what tells the days a pass settles from the one
+// still being merged into.
 //
 // Measured on 2026-09-12 against the live API: a page of a hundred with
 // their first hundred commits each costs one point, the same as a page of
 // fifty, because the gateway prices a search by its own page and not by the
-// commit connections under it.
+// commit connections under it. The messages are most of the bytes, and the
+// other way to see a co-author costs more where it matters: asking each
+// commit for the count of its authors, which lists co-authors, answered the
+// same page of a hundred in 27 KB where the messages took 968 KB, and cost
+// 102 points where they cost one (measured on 2026-09-27). Nor does asking
+// for gzip help: the same answer came back uncompressed.
 const coauthoredPullsQuery = `
 query coauthoredPulls($query: String!, $first: Int!, $after: String) {
   search(type: ISSUE, query: $query, first: $first, after: $after) {
@@ -183,12 +190,75 @@ query coauthoredPulls($query: String!, $first: Int!, $after: String) {
     pageInfo { hasNextPage endCursor }
     nodes {
       ... on PullRequest {
+        mergedAt
         mergeCommit { message }
         commits(first: 100) { totalCount nodes { commit { message } } }
       }
     }
   }
 }`
+
+// coauthoredRule is the version of the rule the Pair Extraordinaire count is
+// made by: which pull requests the walk asks for and what in them it reads
+// as a co-author. A tally kept under another version counted something else,
+// and adding this rule's days to it would mix the two, so it is walked again
+// whole. Raise it with any change to the search, the trailer or the commits
+// read.
+const coauthoredRule = 1
+
+// coauthoredWholeEvery is how many days a tally is added to before the whole
+// history is walked again. Adding only ever raises the count, and it can go
+// down: a repository made private or deleted takes its pull requests out of
+// is:public, and only a walk over the whole range sees them gone. A week is
+// how long a count that fell is shown too high, against a whole walk that
+// transfers what about seventy daily passes that add do (measured below).
+const coauthoredWholeEvery = 7
+
+// CoauthoredTally is the Pair Extraordinaire count as far as it is settled,
+// kept in the state file so that the next pass walks the pull requests merged
+// since instead of the account's whole history.
+//
+// The whole history, walked every day, was 34 or 35 queries and 18 to 24 MB
+// on each daily pass from 2026-09-20 to 2026-09-27, measured on the production
+// proxy's log for an account with 2,315 public merged pull requests: 127 of
+// the 410 MB the service transferred from the 20th to the 26th, to count one
+// number, and growing with each pull request merged. Run live on 2026-09-27
+// over the last one, two and four days, a pass was the counts query and one
+// page of the walk, 54 KB, 333 KB and 874 KB in two to three seconds, where
+// the whole walk was 35 queries, 23.7 MB and 94 seconds.
+type CoauthoredTally struct {
+	// Count is the co-authored pull requests merged on or before Through.
+	Count int `json:"count"`
+	// Through is the last UTC day Count covers: the day before the pass that
+	// settled it. The day a pass is made on is still being merged into, so
+	// its pull requests are in that day's row and not here, and the next
+	// pass walks the day again.
+	Through time.Time `json:"through"`
+	// Truncated and Capped are what of Count is a floor, as coauthoredWalk
+	// says it, kept so a pass that adds to a floor still says it is one.
+	Truncated int  `json:"truncated,omitempty"`
+	Capped    bool `json:"capped,omitempty"`
+	// Rule is the coauthoredRule Count was made by.
+	Rule int `json:"rule"`
+	// WalkedWhole is the UTC day the whole history was last walked.
+	WalkedWhole time.Time `json:"walked_whole"`
+}
+
+// coauthoredBase is where a pass starts from: the tally an earlier pass left
+// and the day after the last it covers, or nothing and the account's first
+// day when the whole history is due.
+func (a Achievements) coauthoredBase(created, day time.Time) (base CoauthoredTally, from time.Time) {
+	if a.Coauthored != nil && !a.Whole {
+		t := *a.Coauthored
+		// A Through on or after today is a clock that went back; the tally
+		// cannot say which of its days are still to come.
+		if t.Rule == coauthoredRule && !t.Through.IsZero() && t.Through.Before(day) &&
+			day.Before(t.WalkedWhole.AddDate(0, 0, coauthoredWholeEvery)) {
+			return t, t.Through.AddDate(0, 0, 1)
+		}
+	}
+	return CoauthoredTally{Rule: coauthoredRule, WalkedWhole: day}, created.UTC().Truncate(oneDay)
+}
 
 // coauthoredBy is the trailer GitHub reads a co-author from, at the start of
 // a line of the commit message, in any case.
@@ -205,16 +275,25 @@ const searchCap = 1000
 // carry the trailer.
 //
 // Search stops at a thousand results, so the walk is over ranges of merge
-// dates: the whole life of the account first, and a range that holds more
-// than a thousand is split in two by date and each half asked again. Each
-// page and each split costs one point; measured on 2026-09-12 over the
-// 1,767 public merged pull requests of an account created in 2017, the
-// walk was 31 queries in 68 seconds, 32 points for the day with the counts
-// query beside it.
+// dates: the range asked first, and a range that holds more than a thousand
+// is split in two by date and each half asked again. Each page and each split
+// costs one point; measured on 2026-09-12 over the 1,767 public merged pull
+// requests of an account created in 2017, the whole life of the account was
+// 31 queries in 68 seconds, 32 points for the day with the counts query
+// beside it. A merged: range is of UTC days, which is what lets a pass
+// settle a day by the clock: measured on 2026-09-27 over the pull requests
+// merged from the 24th to the 26th, one merged at 00:05Z is in its own date
+// and not in the day before, and one merged at 23:18Z in its own and not in
+// the day after, which leaves no time zone standing but UTC's.
 type coauthoredWalk struct {
 	login string
-	// pulls is the count so far, and queries what the walk has cost.
-	pulls, queries int
+	// today is the start of the UTC day the pass is made on. What merged
+	// before it is settled, and what merged on it is counted for today's row
+	// and walked again by the next pass.
+	today time.Time
+	// pulls is the count so far, settled the part of it merged before today,
+	// and queries what the walk has cost.
+	pulls, settled, queries int
 	// capped is set when one day alone held more than a thousand merged
 	// pull requests, which no range can split further: the count is then a
 	// floor.
@@ -222,8 +301,9 @@ type coauthoredWalk struct {
 	// truncated is how many pull requests had more commits than one page
 	// carries and no trailer in the ones read, nor in their merge commit: a
 	// trailer past the hundredth commit is not seen, and the count is a
-	// floor by that many at most.
-	truncated int
+	// floor by that many at most. settledTruncated is the part of it merged
+	// before today.
+	truncated, settledTruncated int
 }
 
 // oneDay is the granularity of a merged: range.
@@ -235,6 +315,7 @@ type coauthoredPage struct {
 		IssueCount int      `json:"issueCount"`
 		PageInfo   pageInfo `json:"pageInfo"`
 		Nodes      []struct {
+			MergedAt    time.Time `json:"mergedAt"`
 			MergeCommit *struct {
 				Message string `json:"message"`
 			} `json:"mergeCommit"`
@@ -316,11 +397,18 @@ func (w *coauthoredWalk) count(res *coauthoredPage) {
 			}
 			found = coauthoredBy.MatchString(n.Commits.Nodes[j].Commit.Message)
 		}
+		settled := n.MergedAt.Before(w.today)
 		switch {
 		case found:
 			w.pulls++
+			if settled {
+				w.settled++
+			}
 		case n.Commits.TotalCount > len(n.Commits.Nodes):
 			w.truncated++
+			if settled {
+				w.settledTruncated++
+			}
 		}
 	}
 }

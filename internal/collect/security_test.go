@@ -433,13 +433,14 @@ func TestSecurityCodeScanningStopsAtTheBackfillBound(t *testing.T) {
 	f.status("/repos/octocat/hello-world/dependabot/alerts", 403, "Dependabot alerts are disabled for this repository.")
 	// Every page is full and the last alert of each is older than the one
 	// before, so only the bound can end the walk.
-	f.handle("/repos/octocat/hello-world/code-scanning/alerts", func(w http.ResponseWriter, r *http.Request) {
+	const path = "/repos/octocat/hello-world/code-scanning/alerts"
+	f.handle(path, listOnly(func(w http.ResponseWriter, r *http.Request) {
 		page, _ := strconv.Atoi(r.URL.Query().Get("page"))
 		_, _ = w.Write(repeat(t, "code_scanning_alerts.json", "", 100, func(i int, row map[string]any) {
 			row["number"] = 10000 - 100*page - i
 			row["created_at"] = testNow.AddDate(0, 0, -page*30-i).Format(time.RFC3339)
 		}))
-	})
+	}))
 
 	points, err := Security{Walk: Walk{Pages: -1, Since: testNow.AddDate(0, 0, -45)}}.Collect(ctx(t), f.Client, testRepo, testNow)
 	if err != nil {
@@ -448,11 +449,17 @@ func TestSecurityCodeScanningStopsAtTheBackfillBound(t *testing.T) {
 	checkPoints(t, points)
 	// Page one runs from 30 to 129 days back and its last alert is past the
 	// bound, so page two is never asked for.
-	if n := len(f.calls("/repos/octocat/hello-world/code-scanning/alerts")); n != 1 {
+	if n := len(listCalls(f, path)); n != 1 {
 		t.Errorf("made %d code scanning calls during a backfill bounded at 45 days, want 1", n)
 	}
 	if n := len(only(t, points, "gh_code_scanning_alert_item")); n != 100 {
 		t.Errorf("got %d alert items, want the whole page that was read", n)
+	}
+	// The bound leaves alerts behind it as a sweep's single page does, and
+	// an open one among them is still open, so the counts are read from the
+	// open alerts here too.
+	if n := len(openCalls(f, path)); n != 1 {
+		t.Errorf("asked for the open alerts %d times, want once", n)
 	}
 }
 
@@ -536,6 +543,421 @@ func TestSecurityRefusalAfterTheFirstPageKeepsWhatWasRead(t *testing.T) {
 	dep := find(t, points, "gh_security_feature", map[string]string{"feature": "dependabot"})
 	if dep.Fields["enabled"] != true || fieldInt(t, dep, "alerts") != 100 {
 		t.Errorf("dependabot feature = %v, want enabled with the 100 rows page one gave", dep.Fields)
+	}
+	// A walk a refusal cut short has alerts behind it, as much as one the
+	// page limit stopped, so the open counts still come from the open walk
+	// and not from the rows read.
+	for _, path := range []string{dependabotPath, scanningPath} {
+		if len(openCalls(f, path)) == 0 {
+			t.Errorf("%s: a walk refused past its first page read no open alerts", path)
+		}
+	}
+}
+
+// The two alert lists, by the paths the fixture server routes on.
+const (
+	dependabotPath = "/repos/octocat/hello-world/dependabot/alerts"
+	scanningPath   = "/repos/octocat/hello-world/code-scanning/alerts"
+)
+
+// listCalls is the requests for a list itself, every state and a hundred to
+// a page, leaving out the open alerts and the one-alert page that a walk
+// stopping short of the end asks for after it.
+func listCalls(f *fixtureServer, path string) []request {
+	var out []request
+	for _, r := range f.calls(path) {
+		if _, filtered := r.Query["state"]; !filtered && r.Query["per_page"] == "100" {
+			out = append(out, r)
+		}
+	}
+	return out
+}
+
+// openCalls is the requests for the open alerts of a list.
+func openCalls(f *fixtureServer, path string) []request {
+	var out []request
+	for _, r := range f.calls(path) {
+		if r.Query["state"] == "open" {
+			out = append(out, r)
+		}
+	}
+	return out
+}
+
+// listOnly serves a list with serve and answers its open alerts and its
+// one-alert page with an empty list. It is for a test about the walk of the
+// list itself, whose handler serves full pages to any query and would serve
+// the open walk, which goes on to the end, full pages for ever.
+func listOnly(serve http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if q := r.URL.Query(); q.Get("state") == "open" || q.Get("per_page") == "1" {
+			_, _ = w.Write([]byte("[]"))
+			return
+		}
+		serve(w, r)
+	}
+}
+
+// validated answers a request that presents the validator with a 304 and no
+// body and no Link, as GitHub does, and every other with serve and the
+// validator beside it.
+func validated(serve http.HandlerFunc) http.HandlerFunc {
+	const etag = `"alerts-v1"`
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("If-None-Match") == etag {
+			w.WriteHeader(http.StatusNotModified)
+			return
+		}
+		w.Header().Set("ETag", etag)
+		serve(w, r)
+	}
+}
+
+// alertsPastAHundred serves a repository past a hundred alerts on both lists,
+// whose newest hundred are all fixed and whose one open alert is a year older
+// than any of them: the long-standing open alert behind a busy history of
+// fixed ones, which a count taken from the newest page reads as none. The
+// code scanning list declares 1,393 alerts, the total measured on
+// jmrplens/Cloudflare-DNS-Updater, in the shape GitHub's Link header has.
+func alertsPastAHundred(t *testing.T, f *fixtureServer) {
+	t.Helper()
+	fixed := func(i int, row map[string]any) {
+		created := testNow.Add(-time.Duration(i+1) * time.Hour)
+		row["number"] = 1000 - i
+		row["state"] = "fixed"
+		row["created_at"] = created.Format(time.RFC3339)
+		row["fixed_at"] = created.Add(time.Hour).Format(time.RFC3339)
+	}
+	// The first row of each fixture is an open alert: high, go, on
+	// golang.org/x/net for Dependabot; high, CodeQL for code scanning.
+	stillOpen := func(_ int, row map[string]any) {
+		row["number"] = 7
+		row["created_at"] = testNow.AddDate(-1, 0, 0).Format(time.RFC3339)
+	}
+	f.handle(dependabotPath, validated(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("state") == "open" {
+			_, _ = w.Write(repeat(t, "dependabot_alerts.json", "", 1, stillOpen))
+			return
+		}
+		w.Header().Set("Link", `<https://api.github.com/repositories/1/dependabot/alerts?per_page=100&after=cursor-2>; rel="next"`)
+		_, _ = w.Write(repeat(t, "dependabot_alerts.json", "", 100, fixed))
+	}))
+	f.handle(scanningPath, validated(func(w http.ResponseWriter, r *http.Request) {
+		switch q := r.URL.Query(); {
+		case q.Get("state") == "open":
+			_, _ = w.Write(repeat(t, "code_scanning_alerts.json", "", 1, stillOpen))
+		case q.Get("per_page") == "1":
+			w.Header().Set("Link", `<https://api.github.com/repositories/1/code-scanning/alerts?per_page=1&page=2>; rel="next", `+
+				`<https://api.github.com/repositories/1/code-scanning/alerts?per_page=1&page=1393>; rel="last"`)
+			_, _ = w.Write(repeat(t, "code_scanning_alerts.json", "", 1, fixed))
+		default:
+			_, _ = w.Write(repeat(t, "code_scanning_alerts.json", "", 100, fixed))
+		}
+	}))
+}
+
+// TestSecurityAnOpenAlertPastTheNewestHundredIsCounted is the open count that
+// could not see past a hundred. A sweep reads the newest page of each list,
+// and the counts were taken from it, so an alert still open behind a hundred
+// newer ones was not counted: "no open alerts" said on the strength of a
+// number that depends on how many alerts a repository has ever had. The
+// shipped Security panels read open_alerts in all five stores.
+//
+// When the page comes back full and the walk stops there, the counts come
+// from the open alerts alone, and the code scanning total from the last page
+// of a one-alert page. Dependabot's total stays the rows read: it pages by
+// cursor and has no last page to read one from.
+func TestSecurityAnOpenAlertPastTheNewestHundredIsCounted(t *testing.T) {
+	t.Parallel()
+	f := newFixtureServer(t)
+	alertsPastAHundred(t, f)
+
+	points, err := Security{}.Collect(ctx(t), f.Client, testRepo, testNow)
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkPoints(t, points)
+	checkTheOldOpenAlertIsCounted(t, points)
+
+	// The list once, as before, then its open alerts a hundred to a page,
+	// and for code scanning the one-alert page its total is read off.
+	for _, path := range []string{dependabotPath, scanningPath} {
+		if n := len(listCalls(f, path)); n != 1 {
+			t.Errorf("%s: the list was asked %d times on a sweep, want its one page", path, n)
+		}
+		open := openCalls(f, path)
+		if len(open) != 1 || open[0].Query["per_page"] != "100" {
+			t.Errorf("%s: open alerts asked as %v, want one full page", path, open)
+		}
+	}
+	var totals int
+	for _, r := range f.calls(scanningPath) {
+		if r.Query["per_page"] == "1" {
+			totals++
+		}
+	}
+	if totals != 1 {
+		t.Errorf("the code scanning total was asked %d times, want once", totals)
+	}
+
+	// The next sweep asks every one of them conditionally, like every other
+	// page, and the 304s give the same rows. The total is the case that
+	// matters: a 304 carries no Link, so it is read off the one the client
+	// kept from the 200.
+	asked := map[string]int{dependabotPath: len(f.calls(dependabotPath)), scanningPath: len(f.calls(scanningPath))}
+	again, err := Security{}.Collect(ctx(t), f.Client, testRepo, testNow)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for path, first := range asked {
+		second := f.calls(path)[first:]
+		if len(second) != first {
+			t.Errorf("%s: the second sweep made %d requests, the first %d", path, len(second), first)
+		}
+		for _, r := range second {
+			if r.Header.Get("If-None-Match") == "" {
+				t.Errorf("%s?%v was asked again without the validator", path, r.Query)
+			}
+		}
+	}
+	if !samePoints(points, again) {
+		t.Errorf("the sweep answered from 304s wrote different points:\n%v\n%v", points, again)
+	}
+}
+
+// checkTheOldOpenAlertIsCounted reads what a sweep of alertsPastAHundred
+// writes: the year-old open alert in both counts of both lists, and nothing
+// else changed by it.
+func checkTheOldOpenAlertIsCounted(t *testing.T, points []sink.Point) {
+	t.Helper()
+	dep := find(t, points, "gh_security_feature", map[string]string{"feature": "dependabot"})
+	if dep.Fields["enabled"] != true || fieldInt(t, dep, "open_alerts") != 1 || fieldInt(t, dep, "alerts") != 100 {
+		t.Errorf("dependabot feature = %v, want the one open alert, and 100 alerts meaning a hundred or more", dep.Fields)
+	}
+	if g := byMeasurement(points)["gh_dependabot_alert"]; len(g) != 1 ||
+		g[0].Tags["severity"] != "high" || g[0].Tags["ecosystem"] != "go" || fieldInt(t, g[0], "open") != 1 {
+		t.Errorf("dependabot open counts = %v, want the one high go alert", g)
+	}
+	cs := find(t, points, "gh_security_feature", map[string]string{"feature": "code_scanning"})
+	if cs.Fields["enabled"] != true || fieldInt(t, cs, "open_alerts") != 1 || fieldInt(t, cs, "alerts") != 1393 {
+		t.Errorf("code scanning feature = %v, want the one open alert of 1393", cs.Fields)
+	}
+	if g := byMeasurement(points)["gh_code_scanning_alert"]; len(g) != 1 ||
+		g[0].Tags["severity"] != "high" || g[0].Tags["tool"] != "CodeQL" || fieldInt(t, g[0], "open") != 1 {
+		t.Errorf("code scanning open counts = %v, want the one high CodeQL alert", g)
+	}
+	checkTheOpenAlertsFeedOnlyTheCounts(t, points)
+}
+
+// checkTheOpenAlertsFeedOnlyTheCounts: the rows stay the page the sweep read,
+// each dated when it was raised, and the old alert's row is a backfill's to
+// write, as every row past the page is. The counts are current state.
+func checkTheOpenAlertsFeedOnlyTheCounts(t *testing.T, points []sink.Point) {
+	t.Helper()
+	for _, m := range []string{"gh_dependabot_alert_item", "gh_code_scanning_alert_item"} {
+		items := only(t, points, m)
+		if len(items) != 100 {
+			t.Errorf("%s: %d rows, want the 100 of the page read", m, len(items))
+		}
+		for _, p := range items {
+			if p.Tags["number"] == "7" {
+				t.Errorf("%s: the open alert past the page was written as a row: %v", m, p.Fields)
+			}
+		}
+	}
+	for _, m := range []string{"gh_dependabot_alert", "gh_code_scanning_alert", "gh_security_feature"} {
+		for _, p := range byMeasurement(points)[m] {
+			if !p.Time.Equal(testNow) {
+				t.Errorf("%s stamped %s: a count is current state, stamped at the sweep", m, p.Time)
+			}
+		}
+	}
+}
+
+// alertsWithOpenPages serves both lists past a hundred alerts, their newest
+// hundred all fixed, and their open alerts over two pages: a full hundred and
+// then tail more, or a refusal of the second page when tail is zero. Each
+// list pages its own way, Dependabot by cursor and code scanning by number,
+// so each has its own copy of the walk to hold.
+func alertsWithOpenPages(t *testing.T, f *fixtureServer, tail int) {
+	t.Helper()
+	fixed := func(i int, row map[string]any) {
+		row["number"] = 1000 - i
+		row["state"] = "fixed"
+		row["created_at"] = testNow.Add(-time.Duration(i+1) * time.Hour).Format(time.RFC3339)
+	}
+	// The first row of each fixture is open; these are older than every
+	// fixed one, and each is its own alert.
+	open := func(from int) func(int, map[string]any) {
+		return func(i int, row map[string]any) {
+			row["number"] = from - i
+			row["created_at"] = testNow.AddDate(-1, 0, -from+i).Format(time.RFC3339)
+		}
+	}
+	second := func(w http.ResponseWriter, name string) {
+		if tail == 0 {
+			w.WriteHeader(http.StatusForbidden)
+			_, _ = w.Write([]byte(`{"message":"Resource not accessible by integration"}`))
+			return
+		}
+		_, _ = w.Write(repeat(t, name, "", tail, open(400)))
+	}
+	f.handle(dependabotPath, func(w http.ResponseWriter, r *http.Request) {
+		switch q := r.URL.Query(); {
+		case q.Get("state") != "open":
+			w.Header().Set("Link", `<https://api.github.com/repositories/1/dependabot/alerts?per_page=100&after=cursor-2>; rel="next"`)
+			_, _ = w.Write(repeat(t, "dependabot_alerts.json", "", 100, fixed))
+		case q.Get("after") == "":
+			w.Header().Set("Link", `<https://api.github.com/repositories/1/dependabot/alerts?per_page=100&state=open&after=open-2>; rel="next"`)
+			_, _ = w.Write(repeat(t, "dependabot_alerts.json", "", 100, open(600)))
+		default:
+			second(w, "dependabot_alerts.json")
+		}
+	})
+	f.handle(scanningPath, func(w http.ResponseWriter, r *http.Request) {
+		switch q := r.URL.Query(); {
+		case q.Get("per_page") == "1":
+			w.Header().Set("Link", `<https://api.github.com/repositories/1/code-scanning/alerts?per_page=1&page=1393>; rel="last"`)
+			_, _ = w.Write(repeat(t, "code_scanning_alerts.json", "", 1, fixed))
+		case q.Get("state") != "open":
+			_, _ = w.Write(repeat(t, "code_scanning_alerts.json", "", 100, fixed))
+		case q.Get("page") == "1":
+			_, _ = w.Write(repeat(t, "code_scanning_alerts.json", "", 100, open(600)))
+		default:
+			second(w, "code_scanning_alerts.json")
+		}
+	})
+}
+
+// TestSecurityTheOpenAlertsAreReadToTheirEnd is what makes open_alerts
+// complete: the open alerts are walked until GitHub runs out of them, not for
+// the one page a sweep reads of the list. A repository with more than a
+// hundred open alerts behind a hundred fixed ones would otherwise read a
+// hundred again, the number #82 exists to stop anyone stating.
+func TestSecurityTheOpenAlertsAreReadToTheirEnd(t *testing.T) {
+	t.Parallel()
+	f := newFixtureServer(t)
+	alertsWithOpenPages(t, f, 3)
+
+	points, err := Security{}.Collect(ctx(t), f.Client, testRepo, testNow)
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkPoints(t, points)
+	for _, feature := range []string{"dependabot", "code_scanning"} {
+		p := find(t, points, "gh_security_feature", map[string]string{"feature": feature})
+		if fieldInt(t, p, "open_alerts") != 103 {
+			t.Errorf("%s open_alerts = %v, want the 103 of both open pages", feature, p.Fields["open_alerts"])
+		}
+	}
+	for _, m := range []string{"gh_dependabot_alert", "gh_code_scanning_alert"} {
+		if g := byMeasurement(points)[m]; len(g) != 1 || fieldInt(t, g[0], "open") != 103 {
+			t.Errorf("%s = %v, want the 103 open alerts in their one group", m, g)
+		}
+	}
+	for _, path := range []string{dependabotPath, scanningPath} {
+		if n := len(openCalls(f, path)); n != 2 {
+			t.Errorf("%s: open alerts asked %d times, want both of their pages", path, n)
+		}
+	}
+}
+
+// TestSecurityARefusalDeeperInTheOpenWalkKeepsItsFirstPage. The open walk
+// refused on its second page has still read the newest hundred open alerts,
+// which is every open one of the rows the list gave and a hundred more
+// besides, so the counts come from that page. Falling back to the rows read,
+// as a refusal of its first page does, would count the fixed hundred and say
+// none are open.
+func TestSecurityARefusalDeeperInTheOpenWalkKeepsItsFirstPage(t *testing.T) {
+	t.Parallel()
+	f := newFixtureServer(t)
+	alertsWithOpenPages(t, f, 0)
+
+	points, err := Security{}.Collect(ctx(t), f.Client, testRepo, testNow)
+	if err != nil {
+		t.Fatalf("a refusal deeper in the open walk failed the collector: %v", err)
+	}
+	for _, feature := range []string{"dependabot", "code_scanning"} {
+		p := find(t, points, "gh_security_feature", map[string]string{"feature": feature})
+		if p.Fields["enabled"] != true || fieldInt(t, p, "open_alerts") != 100 {
+			t.Errorf("%s = %v, want enabled with the 100 open alerts of the open walk's first page", feature, p.Fields)
+		}
+	}
+}
+
+// TestSecurityBelowAHundredAlertsAsksNothingMore holds the cost of the open
+// counts to the repositories that need them. A list shorter than a page is
+// all of the list: its open alerts and its total are already in it, so a
+// repository below a hundred alerts pays one request a list, as before.
+// Measured on 2026-09-26, that is every repository of this account but two.
+func TestSecurityBelowAHundredAlertsAsksNothingMore(t *testing.T) {
+	t.Parallel()
+	f := newFixtureServer(t)
+	f.file(dependabotPath, "dependabot_alerts.json")
+	f.file(scanningPath, "code_scanning_alerts.json")
+
+	points, err := Security{}.Collect(ctx(t), f.Client, testRepo, testNow)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{dependabotPath, scanningPath} {
+		if calls := f.calls(path); len(calls) != 1 || len(listCalls(f, path)) != 1 {
+			t.Errorf("%s was asked %d times, want only the list's one page", path, len(calls))
+		}
+	}
+	for feature, open := range map[string]int64{"dependabot": 1, "code_scanning": 2} {
+		p := find(t, points, "gh_security_feature", map[string]string{"feature": feature})
+		if fieldInt(t, p, "open_alerts") != open || fieldInt(t, p, "alerts") != 4 {
+			t.Errorf("%s = %v, want %d open of 4", feature, p.Fields, open)
+		}
+	}
+}
+
+// TestSecurityARefusalOfTheOpenAlertsIsAboutTheWalk: the list has just
+// answered 200, so the feature is on, and a refusal of its open alerts or of
+// its one-alert page says nothing about the repository. Neither turns the
+// feature off, neither is remembered for a day the way a refused list is,
+// and the counts and the total fall back to what the page gave, which is
+// what they were before the open alerts were read at all.
+func TestSecurityARefusalOfTheOpenAlertsIsAboutTheWalk(t *testing.T) {
+	t.Parallel()
+	f := newFixtureServer(t)
+	full := func(name, link string) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			if q := r.URL.Query(); q.Get("state") == "open" || q.Get("per_page") == "1" {
+				w.WriteHeader(http.StatusNotFound)
+				_, _ = w.Write([]byte(`{"message":"Not Found"}`))
+				return
+			}
+			if link != "" {
+				w.Header().Set("Link", link)
+			}
+			// The fixtures' first row is open, so the page holds a hundred
+			// open alerts and that is the count to fall back to.
+			_, _ = w.Write(repeat(t, name, "", 100, func(i int, row map[string]any) { row["number"] = 1000 + i }))
+		}
+	}
+	f.handle(dependabotPath, full("dependabot_alerts.json",
+		`<https://api.github.com/repositories/1/dependabot/alerts?per_page=100&after=cursor-2>; rel="next"`))
+	f.handle(scanningPath, full("code_scanning_alerts.json", ""))
+
+	sc := Security{Refusals: &Refusals{}}
+	for sweep := 1; sweep <= 2; sweep++ {
+		points, err := sc.Collect(ctx(t), f.Client, testRepo, testNow)
+		if err != nil {
+			t.Fatalf("sweep %d: a refused open walk failed the collector: %v", sweep, err)
+		}
+		for _, feature := range []string{"dependabot", "code_scanning"} {
+			p := find(t, points, "gh_security_feature", map[string]string{"feature": feature})
+			if p.Fields["enabled"] != true || fieldInt(t, p, "open_alerts") != 100 || fieldInt(t, p, "alerts") != 100 {
+				t.Errorf("sweep %d: %s = %v, want enabled with the page's 100 open of 100", sweep, feature, p.Fields)
+			}
+		}
+	}
+	for _, path := range []string{dependabotPath, scanningPath} {
+		if n := len(openCalls(f, path)); n != 2 {
+			t.Errorf("%s: open alerts asked %d times in two sweeps, want each sweep to ask again", path, n)
+		}
 	}
 }
 

@@ -85,8 +85,11 @@ The ledger stores two 64 bit hashes and a day per point, so a large account
 costs a few megabytes. It is keyed by sink, so a store that was unreachable
 still receives everything on its next write. Losing it, or setting
 `dedupe_file: off`, costs one sweep of rewriting and nothing else, which is
-exactly what a store that has been wiped and needs filling again wants. It is
-the second file worth putting on a persistent path, next to the
+exactly what a store that has been wiped and needs filling again wants. The
+jobs of the workflow runs the
+[cache file](/ghchronicle/configuration/#the-cache-beside-it) remembers come
+with it: a start that finds no ledger lists them again. It is the second file
+worth putting on a persistent path, next to the
 [state file](/ghchronicle/configuration/).
 
 A run that ends when its sweep does never opens the ledger at all. `-once`,

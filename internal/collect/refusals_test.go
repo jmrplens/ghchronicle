@@ -1,10 +1,12 @@
 package collect
 
 import (
+	"errors"
 	"net/http"
 	"testing"
 	"time"
 
+	"github.com/jmrplens/ghchronicle/v2/internal/ghapi"
 	"github.com/jmrplens/ghchronicle/v2/internal/sink"
 )
 
@@ -105,4 +107,54 @@ func samePoints(a, b []sink.Point) bool {
 		}
 	}
 	return true
+}
+
+// TestARecalledRefusalStandsUntilItsOwnDayEnds is the memory crossing a
+// restart: what one process was refused, handed to the next, answers without
+// a request until the instant the first process's day ends and not a moment
+// longer, and says the same thing the 403 said. A window that closed while
+// nothing was running is not recalled at all.
+func TestARecalledRefusalStandsUntilItsOwnDayEnds(t *testing.T) {
+	t.Parallel()
+	f := newFixtureServer(t)
+	const path = "/repos/octocat/hello-world/dependabot/alerts"
+	f.status(path, http.StatusForbidden, "Dependabot alerts are disabled for this repository.")
+
+	clock := testNow
+	before := &Refusals{For: 24 * time.Hour, now: func() time.Time { return clock }}
+	if _, _, err := before.GetJSON(ctx(t), f.Client, path, nil, ""); err == nil {
+		t.Fatal("the 403 was not an error")
+	}
+	kept := before.Standing()
+	if len(kept) != 1 || kept[0].Path != path || kept[0].Status != http.StatusForbidden ||
+		!kept[0].Until.Equal(testNow.Add(24*time.Hour)) {
+		t.Fatalf("Standing = %+v, want the one 403 until a day after it was heard", kept)
+	}
+
+	// The next process starts three hours later.
+	clock = testNow.Add(3 * time.Hour)
+	after := &Refusals{For: 24 * time.Hour, now: func() time.Time { return clock }}
+	after.Recall(kept)
+	_, _, err := after.GetJSON(ctx(t), f.Client, path, nil, "")
+	unavailable, ok := errors.AsType[*ghapi.UnavailableError](err)
+	if !ok || unavailable.Status != http.StatusForbidden || unavailable.Reason != kept[0].Reason {
+		t.Errorf("the recalled refusal answered %v, want the 403 it was", err)
+	}
+	if n := len(f.calls(path)); n != 1 {
+		t.Errorf("asked %d times across the two processes, want once", n)
+	}
+
+	clock = testNow.Add(24 * time.Hour)
+	if _, _, err = after.GetJSON(ctx(t), f.Client, path, nil, ""); err == nil {
+		t.Fatal("the 403 was not an error")
+	}
+	if n := len(f.calls(path)); n != 2 {
+		t.Errorf("asked %d times by the end of the first day, want the question asked again", n)
+	}
+
+	late := &Refusals{For: 24 * time.Hour, now: func() time.Time { return testNow.Add(25 * time.Hour) }}
+	late.Recall(kept)
+	if standing := late.Standing(); len(standing) != 0 {
+		t.Errorf("a window that closed before the process started was recalled: %+v", standing)
+	}
 }

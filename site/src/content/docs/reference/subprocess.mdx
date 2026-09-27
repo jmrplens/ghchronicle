@@ -253,7 +253,9 @@ exit code for it.
 
 A sweep costs API calls: four per repository for traffic, three per repository
 plus two GraphQL points per ten repositories for the repository family, one
-GraphQL point per repository for commits and one to two for issues. [Cost of a sweep](/ghchronicle/api/cost/) has the measured
+GraphQL point per repository with a new commit for commits and one to two per
+repository with an issue or a pull request that moved for issues, after one
+point per twenty-five repositories that asks which. [Cost of a sweep](/ghchronicle/api/cost/) has the measured
 table. The budget is 5000 REST calls an hour for the whole token, shared with
 everything else that uses it, and the collector brakes before spending the last
 `reserve_rate` of them: it stops a family rather than crossing that line, and

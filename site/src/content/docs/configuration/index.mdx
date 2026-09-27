@@ -93,10 +93,12 @@ The reserve is scaled per bucket; see [rate limits](/ghchronicle/api/).
 state_file: /var/lib/ghchronicle/state.json
 ```
 
-Seven things, and deleting the file costs a different one for each:
+Eight things, and deleting the file costs a different one for each:
 
 - `last_run`, when each family last ran. Without it every family is due at once,
-  so the next sweep is a full one.
+  so the next sweep is a full one, except that the service starts the families
+  of six hours or more
+  [one a sweep](/ghchronicle/configuration/cadences/#the-slow-families-take-turns).
 - `first_saw`, when each repository's stargazer list was first walked whole.
   It is written only after a walk that came back without an error. Without it
   the one-off full walk of the stargazer list is done again.
@@ -115,14 +117,21 @@ Seven things, and deleting the file costs a different one for each:
   whole inbox.
 - `last_event`, the newest event the feed had. Without it empty reads the whole
   feed.
+- `coauthored`, the Pair Extraordinaire count the `achievements` family has
+  settled, the last UTC day it covers, the version of the rule it was counted
+  by and the day the whole history was last walked. Each pass walks only the
+  pull requests merged since that day, and the whole history again once a week
+  or when the rule has changed. Without it the next pass walks the account's
+  merged pull requests whole, which on an account with 2,315 of them was 35
+  queries and 24 MB, where a day's pass is one query and 0.3 to 0.6 MB.
 
-Six of the seven cost only quota, because what is collected again is keyed by
+Seven of the eight cost only quota, because what is collected again is keyed by
 measurement, tags and timestamp and overwrites what is already stored.
 `last_head` is the one that loses something: the dependency changes between the
 head it held and the next one are read from a range that nothing can name once
 the head is gone.
 
-A run with `-card-only` writes none of the seven. Its points reach [the
+A run with `-card-only` writes none of the eight. Its points reach [the
 card](/ghchronicle/card/) and no store, so a mark it left behind would make the
 next collection skip a family, or narrow a read, whose data went into a picture
 and nowhere else. It reads the file as any other run does.
@@ -145,6 +154,69 @@ store that has been wiped and needs filling again wants. Both files want a
 persistent path:
 [only what changed is written](/ghchronicle/sinks/#only-what-changed-is-written).
 
+### The cache beside it
+
+```text
+/var/lib/ghchronicle/state-cache.bin
+```
+
+Beside `state_file`, as `<name>-cache.bin`, is what a sweep learned about GitHub
+that makes the next one cheap. There is nothing to configure: its place is the
+state file's. It holds four things:
+
+- the [conditional cache](/ghchronicle/api/#etags-and-why-a-304-is-free): every
+  answer asked for within twice the longest cadence the configuration runs, and
+  never less than a day, 48 hours at the default cadences, with the ETag it came
+  with, so a restart asks with `If-None-Match` and is answered a free 304;
+- the workflow runs whose jobs were written, so a restart does not list them
+  again;
+- the [refusals](/ghchronicle/api/#a-refusal-is-remembered-too), each until the
+  end of its own day;
+- the page sizes the `totals` family gave the pull request query.
+
+All four used to live in the process, and every restart paid for them again.
+Measured on the author's service on 2026-09-26, the first 38 minutes after a
+restart spent 1,092 charged core requests on passes that cost about 66 with the
+cache warm.
+
+The runs are a claim that every store holds their jobs, so a start does not
+recall them where that is not known: where no write ledger remembers what the
+stores hold, which is the case once the ledger is deleted to fill a wiped store
+again, with `dedupe_file: off` or a store's own `dedupe: false`, and in a run
+that ends with its sweep; and where a destination has been added since the file
+was written. Their jobs are then listed and offered again with every other
+point.
+
+It is written at most every five minutes while the collector runs, and once more
+when it stops, however it stops. A run with `-card-only` reads it and does not
+write it, for the reason it leaves the state file alone. A `-backfill` reads it
+and does not write it either: the pages it walks are pages no sweep asks for,
+and kept they would crowd the sweeps' own answers out of the file. An upgrade
+keeps it: an answer is kept under the shape of what its collector reads, so the
+only answers asked for again in full are those of a collector that now reads
+something else.
+
+It is bounded. An answer larger than a megabyte is left out, and so is whatever
+comes past 64 MB, the least recently asked for first. Measured against the
+author's account of 37 repositories, one sweep of every family keeps 1,065
+answers, 10.3 MB of them and 1.6 MB of file, none of them larger than 404 KB.
+Over days the cache in memory grows by the answers whose query carries a moving
+window: the author's service held 6,695 after five and a half days, about 99 MB,
+and the 2,517 of them asked for in the last 48 hours, which are what the file
+keeps, come to about 31 MB. It holds what GitHub answered about private
+repositories as well as public ones, and is written with mode 600, as the state
+file is.
+
+Deleting it costs one pass of each family at full price, the price every restart
+paid before it existed, and loses nothing. Every answer is asked for again,
+every refused feature is asked about again, which is also how to have a feature
+switched on today noticed before its day is out, the jobs of the newest runs are
+listed once more, and the first sweep runs `totals` before the pull requests,
+whatever its cadence says, so their pages are sized again. A file that does not
+load in full, cut short, damaged or written in another format, is set aside
+with a warning and costs the same. It wants the same persistent path as the
+other two.
+
 ## `backfill`
 
 ```yaml
@@ -155,7 +227,7 @@ backfill:
 Only applies to a run started with `-backfill`, and is overridden by
 `-backfill-since`. See [backfill](/ghchronicle/how/backfill/).
 
-A backfill keeps a third file beside `state_file`, `<name>-progress.json`,
+A backfill keeps one more file beside `state_file`, `<name>-progress.json`,
 which is where it records what it has already written so a stop costs one
 repository rather than the walk. There is nothing to configure: it appears when
 a backfill starts, it is removed when the walk reaches the end, and a sweep

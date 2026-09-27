@@ -97,6 +97,7 @@ var rest = map[string]string{
 	repoPath + "/actions/runs/1000163135/jobs":      "actions_jobs.json",
 	repoPath + "/actions/runs/1000163134/jobs":      "actions_jobs_failed.json",
 	repoPath + "/actions/cache/usage":               "actions_cache.json",
+	repoPath + "/actions/caches":                    "actions_caches.json",
 	repoPath + "/actions/artifacts":                 "artifacts.json",
 	repoPath + "/actions/workflows":                 "workflows.json",
 	repoPath + "/dependabot/alerts":                 "dependabot_alerts.json",
@@ -157,6 +158,16 @@ var graphQL = []struct{ marker, fixture string }{
 	{"fragment deploypage on DeploymentConnection", "graphql_deployments.json"},
 	{"fragment policyfiles on Repository", "graphql_policy_files.json"},
 	{"fragment audience on Repository", "graphql_audience.json"},
+	// The movement query asks each repository for its newest pull request,
+	// so it spells the pull request query's marker too. It answers with the
+	// newest dates the fixtures behind the three families it stands in for
+	// carry: the head of graphql_commits_page1.json, the issue opened a day
+	// ago, and the review comment left on the open pull request later that
+	// morning.
+	{"fragment moved on Repository", "graphql_moved.json"},
+	// The accepted answers are the comments connection filtered, so the
+	// filter is the marker, and it has to come before the connection's.
+	{"onlyAnswers: true", "graphql_discussion_answers.json"},
 	{"repositoryDiscussionComments", "graphql_discussion_comments.json"},
 	// The two queries of the achievements family are named, so the name is
 	// the marker: the counts also search ISSUE and the walk also pages a

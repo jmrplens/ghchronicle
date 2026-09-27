@@ -17,6 +17,7 @@ const (
 	costBilled         = "Actually billed"
 	costActionsMinutes = "Actions minutes"
 	costSumSeries      = "sumSeries("
+	costCacheIdle      = "Days since use"
 )
 
 // promByRepo is one column of the cost table in Prometheus: a billing field
@@ -78,19 +79,30 @@ func cost(b *builder) []Panel {
 		},
 		[]string{"NOT repo.keyword:" + noneElasticsearch})
 
-	entryGR, entryGRtf := gTbl(rowsOf("keepLastValue("+rp("gh_actions_cache_entry", "size_bytes")+")",
-		gn("gh_actions_cache_entry", "repo"), gn("gh_actions_cache_entry", "cache")),
+	// A row of gh_actions_cache_entry is one cache on one ref, a daily
+	// snapshot with its entries already summed into it, so every store reads
+	// each ref's newest row in the range and adds those up per cache, which
+	// is what the SQL does with ROW_NUMBER. Graphite carries each ref's last
+	// value to the end of the range before adding. Elasticsearch cannot take
+	// the newest of a bucket and sum it in one aggregation, so it takes the
+	// newest document of each ref and the panel adds them: a sum over the
+	// documents would add one snapshot for every day in the range.
+	ce := "gh_actions_cache_entry"
+	entryGR, entryGRtf := gTbl(fmt.Sprintf(`groupByNodes(keepLastValue(%s), "sum", %d, %d)`,
+		rp(ce, "size_bytes"), gn(ce, "repo"), gn(ce, "cache")),
 		"Repository, cache", []col{{"lastNotNull", "Size"}})
-	entryES, entryEStf := esTbl("gh_actions_cache_entry",
-		[]any{b.tm("repo", 500), b.tm("cache", 50)},
-		[]any{b.mSum("size_bytes"), b.mCount(), b.mMax("days_since_use")},
+	entryES, entryEStf := esTbl(ce,
+		[]any{b.tm("repo", 500), b.tm("cache", 50), b.tm("ref", 500)},
+		[]any{b.mNewest("size_bytes", "caches", "days_since_use")},
 		[]named{
 			{panelRepoField, "Repository"},
 			{"cache.keyword", "Cache"},
+			{"ref.keyword", "Ref"},
 			{"s", "Size"},
 			{"n", "Entries"},
-			{"d", "Days since use"},
-		}, []string{ESF})
+			{"d", costCacheIdle},
+		}, []string{ESF}, groupRows([]string{"Repository", "Cache"},
+			map[string]string{"Size": "sum", "Entries": "sum", costCacheIdle: "min"})...)
 
 	cacheGR, cacheGRtf := gTbl(rowsOf("keepLastValue("+rp("gh_actions_cache", "size_bytes")+")",
 		gn("gh_actions_cache", "repo")), "Repository", []col{{"lastNotNull", "Cache"}})
@@ -192,9 +204,9 @@ func cost(b *builder) []Panel {
 		}),
 		panel("table", "Cache entries by key", box{W: 24, H: 8, X: 0, Y: 21}, []Target{sqlT(
 			`SELECT cache AS "Cache", SUM(size_bytes) AS "Size", repo AS "Repository",` +
-				` COUNT(*) AS "Entries",` +
-				` MIN(days_since_use) AS "Days since use" FROM (` +
-				"SELECT repo, cache, ref, size_bytes, days_since_use," +
+				` SUM(caches) AS "Entries",` +
+				` MIN(days_since_use) AS "` + costCacheIdle + `" FROM (` +
+				"SELECT repo, cache, ref, size_bytes, caches, days_since_use," +
 				" ROW_NUMBER() OVER (PARTITION BY repo, cache, ref ORDER BY time DESC) AS rn" +
 				" FROM gh_actions_cache_entry WHERE $__timeFilter(time) AND " + RF +
 				") x WHERE rn = 1 GROUP BY 1, 3 ORDER BY 2 DESC LIMIT 25",
@@ -202,17 +214,18 @@ func cost(b *builder) []Panel {
 			Prom: []Target{
 				promTbl(fmt.Sprintf("topk(25, sum by (repo, cache) (github_actions_cache_entry_size_bytes{%s}))", PF), "A"),
 				promTbl(fmt.Sprintf("min by (repo, cache) (github_actions_cache_entry_days_since_use{%s})", PF), "B"),
+				promTbl(fmt.Sprintf("sum by (repo, cache) (github_actions_cache_entry_caches{%s})", PF), "C"),
 			},
 			PromTF: merged(map[string]string{
 				"repo": "Repository", "cache": "Cache", panelValueA: "Size",
-				panelValueB: "Days since use",
+				panelValueB: costCacheIdle, panelValueC: "Entries",
 			}, nil, map[string]int{"repo": 0, "cache": 1}),
 			Opts: Opts{"sort": "Size"},
 			Desc: "The total says a repository holds twelve gigabytes. This says which key " +
 				"holds them and which has not been touched for a week, which is what decides " +
 				"what GitHub evicts at the ten gigabyte ceiling.",
 			Overrides: []any{unitOf("Size", "bytes", 120), barCell("Entries", "short", 100)},
-			GR:        entryGR, GRTF: entryGRtf, GRDesc: grSlot,
+			GR:        entryGR, GRTF: entryGRtf, GRDesc: grRows,
 			ES: entryES, ESTF: entryEStf,
 		}),
 		panel("table", "Cache against the ceiling", box{W: 24, H: 8, X: 0, Y: 29}, []Target{sqlT(

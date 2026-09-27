@@ -25,6 +25,10 @@ import (
 type RepoCore struct {
 	// Walk bounds the release list. Default one page; a backfill walks all.
 	Walk Walk
+	// Refusals remembers the community profiles GitHub refused, which is
+	// every fork's, so the 404 is paid once a day rather than on every pass.
+	// Nil asks every time.
+	Refusals *Refusals
 }
 
 type releaseRow struct {
@@ -178,11 +182,20 @@ func (rc RepoCore) Collect(ctx context.Context, c *ghapi.Client, repo Repo, now 
 	}
 
 	// Community health: the percentage plus which files exist.
+	//
+	// GitHub serves no community profile for a fork. Measured on 2026-09-27
+	// over the 67 repositories of this account, all 28 forks answered 404
+	// and all 39 others 200, and a 404 carries no ETag: the fifteen forks the
+	// production configuration names cost 404 charged requests in 30.9
+	// hours, 9 per cent of the core requests that process was charged, to be
+	// told the same thing on every pass. The refusal is remembered rather
+	// than the fork flag read, so any repository GitHub refuses is asked
+	// once a day, and a fork it starts answering for is noticed within it.
 	var community struct {
 		Health int            `json:"health_percentage"`
 		Files  map[string]any `json:"files"`
 	}
-	if _, _, err := c.GetJSON(ctx, "/repos/"+repo.FullName+"/community/profile", &community, ""); err == nil {
+	if _, _, err := rc.Refusals.GetJSON(ctx, c, "/repos/"+repo.FullName+"/community/profile", &community, ""); err == nil {
 		f := map[string]any{"health_percentage": community.Health}
 		setNonEmpty(f, "url", pageURL(r.HTMLURL, "community"))
 		for _, key := range []string{"code_of_conduct", "contributing", "license", "readme", "issue_template", "pull_request_template"} {
@@ -225,8 +238,9 @@ func releasePoints(ctx context.Context, c *ghapi.Client, repo Repo, base map[str
 	// after eleven hours. One row per asset per day still answers "downloads
 	// per day", by the difference between two days, and the newest row is
 	// still the value. The release itself stays stamped at the sweep: it is
-	// one row per release, and the Loki line it renders as is the one dated
-	// event a sweep is sure to produce.
+	// one row per release, and its download count moves, so dated at the
+	// publication it would rewrite that old partition on every sweep. The
+	// publication is the row that carries the date.
 	day := now.UTC().Truncate(24 * time.Hour)
 	var points []sink.Point
 	for _, rel := range releases {
@@ -251,17 +265,47 @@ func releasePoints(ctx context.Context, c *ghapi.Client, repo Repo, base map[str
 				Time: day,
 			})
 		}
+		fields := map[string]any{"downloads": total, "assets": len(rel.Assets)}
+		// A draft comes with published_at null, and an age measured from Go's
+		// zero time saturates: every draft row held 106751 days, beside a real
+		// maximum of 271 on the account it was measured on, and skewed anything
+		// that averaged the field without filtering drafts out first.
+		published := !rel.Draft && !rel.PublishedAt.IsZero()
+		if published {
+			fields["age_days"] = int(now.Sub(rel.PublishedAt).Hours() / 24)
+		}
 		points = append(points, sink.Point{
 			Measurement: "gh_release",
 			Tags: merge(base, map[string]string{
 				"tag": rel.TagName, "prerelease": boolTag(rel.Prerelease), "draft": boolTag(rel.Draft),
 			}),
-			Fields: map[string]any{
-				"downloads": total, "assets": len(rel.Assets),
-				"age_days": int(now.Sub(rel.PublishedAt).Hours() / 24),
-				"url":      rel.HTMLURL,
-			},
-			Time: now,
+			Fields: withURL(fields, rel.HTMLURL),
+			Time:   now,
+		})
+		if !published {
+			continue
+		}
+		// The publication, dated when it happened, which the floored age
+		// cannot give back: counted from the sweep, a release published later
+		// in the day than the sweep ran lands a day late. It is what a
+		// calendar of releases groups by, and what Loki renders, once, where
+		// gh_release pushed every release again on every pass. A draft has
+		// not been published and writes nothing, so no `draft` tag either:
+		// it would hold one value on every row.
+		//
+		// `prerelease` is a field, not the tag it is on gh_release. The box
+		// can be unticked on a release already published, which is how a
+		// pre-release is promoted, and as a tag a promotion that keeps the
+		// publication's date would be a second row at the same instant for
+		// ever, counted twice by every count of releases. gh_release can
+		// keep the tag because its date moves with every sweep.
+		points = append(points, sink.Point{
+			Measurement: "gh_release_published",
+			Tags:        merge(base, map[string]string{"tag": rel.TagName}),
+			Fields: withURL(map[string]any{
+				"published": 1, "prerelease": rel.Prerelease,
+			}, rel.HTMLURL),
+			Time: rel.PublishedAt,
 		})
 	}
 	return points, nil

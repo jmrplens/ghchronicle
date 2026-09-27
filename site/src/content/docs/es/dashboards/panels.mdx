@@ -58,7 +58,7 @@ por estar archivado no recibe fila de `gh_repo` de ninguna pasada, así que el
 selector deja de ofrecerlo cuando el último relleno histórico queda atrás, pero
 la gente sigue dándole estrellas y haciéndole fork y cada pasada de `totals`
 vuelve a leer sus contadores. Con All seleccionado las sumas lo incluyen, y un
-rango más corto que la cadencia de `totals`, doce horas por omisión, puede
+rango más corto que la cadencia de `totals`, una hora por omisión, puede
 dejar fuera su fila. Elegir repositorios cuenta solo esos. Cada repositorio
 cuenta una vez, por su nombre completo: dos repositorios del mismo nombre de
 dos dueños son dos, y uno archivado mientras el recolector funciona no se
@@ -488,7 +488,11 @@ Los dos paneles de caché van del techo. GitHub limita cada repositorio a diez
 gigabytes y expulsa la entrada menos usada al pasarlo, así que la barra es cada
 repositorio contra ese tope y el panel se lee por lo que queda de margen; la
 tabla de entradas dice qué clave se está tirando y cuál lleva una semana sin
-tocarse.
+tocarse. Cada fila de esa tabla es una caché de un repositorio: su instantánea
+más reciente en cada ref del rango, sumadas, así que Entries cuenta las
+entradas que guarda GitHub y no las filas que leyó la tabla. Es la misma suma
+en los cinco almacenes; Graphite muestra solo el tamaño, porque una tabla de
+Graphite se queda con una columna.
 
 Lee `gh_billing_usage`, `gh_actions_cache` y `gh_actions_cache_entry`.
 
@@ -522,8 +526,15 @@ que dio esta cuenta, no las que recibió, por lenguaje y por proyecto, fechadas
 cuando dio cada una. Si los proyectos son pequeños o famosos es otra pregunta
 distinta de cuántos son, así que la segunda tabla lleva sus propias estrellas.
 
-Lee `gh_event`, `gh_notification`, `gh_external_contribution` y
-`gh_star_given`.
+La tabla del trabajo en otros repositorios lleva ese mismo número para los
+repositorios a los que contribuyó la cuenta: las estrellas de cada uno en la
+pasada más reciente dentro del rango, de `gh_upstream_repo`, unidas a cada
+elemento en los dashboards de InfluxDB y PostgreSQL y junto a cada repositorio
+en el de Prometheus. Graphite y Elasticsearch no pueden unir dos medidas en un
+panel y dejan la columna fuera, diciéndolo.
+
+Lee `gh_event`, `gh_notification`, `gh_external_contribution`,
+`gh_upstream_repo` y `gh_star_given`.
 
 ## Inventory
 
@@ -633,8 +644,8 @@ captura de arriba es anterior a ambos. El primero lista todos los colectores
 que corrieron en el rango, qué los detuvo cuando algo lo hizo, en cuántos
 barridos corrieron y cuántos repositorios se les preguntaron; una familia sin
 fila ahí no corrió en absoluto. El motivo es columna aparte para que los dos
-tipos de fallo se ordenen por separado: un presupuesto de búsqueda agotado dos
-veces al día no es el 502 que le costó a un repositorio su historia, y una
+tipos de fallo se ordenen por separado: un presupuesto de búsqueda agotado
+no es el 502 que le costó a un repositorio su historia, y una
 familia que tuvo ambos tiene una fila de cada. El segundo es una fila por cada
 repositorio que un colector no pudo recoger, el más reciente primero, con lo
 que respondió GitHub.

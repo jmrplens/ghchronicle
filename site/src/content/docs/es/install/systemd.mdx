@@ -82,13 +82,17 @@ casi nada: un socket TCP saliente y un directorio escribible.
 dueño correcto al arrancar, así que el fichero de estado tiene dónde vivir sin
 un `mkdir` manual y un `chown` que alguien olvidará tras una reinstalación.
 
-Ahí viven dos ficheros, no uno. Junto a `state.json` la pasada guarda su
+Ahí viven tres ficheros, no uno. Junto a `state.json` la pasada guarda su
 registro de escrituras, `state-written.bin` por omisión, que es lo que evita
-volver a escribir un punto que no ha cambiado; `ReadWritePaths` cubre el
-directorio, así que los dos están ya permitidos. Si pones alguno en otro sitio,
-esa ruta hay que añadirla aquí, y perder el registro cuesta una pasada de
-reescritura:
-[solo se escribe lo que ha cambiado](/ghchronicle/es/sinks/#solo-se-escribe-lo-que-ha-cambiado).
+volver a escribir un punto que no ha cambiado, y su caché, `state-cache.bin`,
+que es lo que permite a un reinicio preguntar a GitHub solo por lo que cambió;
+`ReadWritePaths` cubre el directorio, así que los tres están ya permitidos. Si
+pones el fichero de estado o el registro en otro sitio, esa ruta hay que
+añadirla aquí, y la caché sigue al fichero de estado vaya donde vaya. Perder el
+registro cuesta una pasada de reescritura:
+[solo se escribe lo que ha cambiado](/ghchronicle/es/sinks/#solo-se-escribe-lo-que-ha-cambiado);
+perder la caché, una pasada a precio completo:
+[la caché que hay a su lado](/ghchronicle/es/configuration/#la-caché-que-hay-a-su-lado).
 
 ## Instalarla
 
@@ -111,6 +115,7 @@ reescritura:
     - /var/lib/ghchronicle/
       - state.json lo crea el servicio
       - state-written.bin el registro de escrituras, al lado
+      - state-cache.bin la caché, también al lado
 
     </FileTree>
 

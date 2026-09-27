@@ -49,7 +49,7 @@ keep it running once you are done watching it.
   ship as `tar.gz` (`zip` on Windows).
 
   ```sh
-  tar -xzf ghchronicle_2.5.2_linux_amd64.tar.gz
+  tar -xzf ghchronicle_2.6.0_linux_amd64.tar.gz
   sudo install -m 755 ghchronicle /usr/local/bin/
   ```
 
@@ -153,7 +153,7 @@ the version you see is the file it just wrote, and it says so when another
 Pin a version, or choose where it goes:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.sh | VERSION=2.5.2 BIN_DIR=~/bin bash
+curl -fsSL https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.sh | VERSION=2.6.0 BIN_DIR=~/bin bash
 ```
 
 > **Reading it first is the whole point of a short script**
@@ -178,7 +178,7 @@ Release archives are named
 | `aarch64`          | `linux_arm64`       |
 
 ```sh
-VERSION=2.5.2
+VERSION=2.6.0
 arch=$(uname -m); case "$arch" in x86_64) arch=amd64 ;; aarch64) arch=arm64 ;; esac
 base=https://github.com/jmrplens/ghchronicle/releases/download/v$VERSION
 curl -fsSLO "$base/ghchronicle_${VERSION}_linux_${arch}.tar.gz"
@@ -216,7 +216,7 @@ the file, then verify the archive against the file.
     ```
 
     ```text
-    ghchronicle_2.5.2_linux_amd64.tar.gz: OK
+    ghchronicle_2.6.0_linux_amd64.tar.gz: OK
     ```
 
 3. Check the checksum file itself, if you have
@@ -286,7 +286,7 @@ meant to.
 the build date of that release.
 
 ```text
-ghchronicle 2.5.2 (commit <commit>, built <date>)
+ghchronicle 2.6.0 (commit <commit>, built <date>)
 ```
 
 ### Run it once
@@ -333,7 +333,7 @@ find.
   the go command fetched and the Go release that compiled it:
 
   ```text
-  ghchronicle 2.5.2 (module v2.5.2, built with <go version>)
+  ghchronicle 2.6.0 (module v2.6.0, built with <go version>)
   ```
 
   The first version comes from the `VERSION` file the module embeds.
@@ -366,9 +366,9 @@ on every invocation. What the rest of this documentation assumes:
 
 `state_file` has a default of its own, `ghchronicle-state.json` in the working
 directory, with the write ledger beside it as
-`ghchronicle-state-written.bin`. That default is fine for a first run in a
-directory you made, and wrong for a service, whose working directory is not
-something to rely on. Set it.
+`ghchronicle-state-written.bin` and the cache as `ghchronicle-state-cache.bin`.
+That default is fine for a first run in a directory you made, and wrong for a
+service, whose working directory is not something to rely on. Set it.
 
 ## macOS
 
@@ -404,7 +404,7 @@ the version you see is the file it just wrote, and it says so when another
 Pin a version, or choose where it goes:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.sh | VERSION=2.5.2 BIN_DIR=~/bin bash
+curl -fsSL https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.sh | VERSION=2.6.0 BIN_DIR=~/bin bash
 ```
 
 > **Reading it first is the whole point of a short script**
@@ -429,7 +429,7 @@ architecture.
 | `x86_64`           | Intel              | `darwin_amd64`      |
 
 ```sh
-VERSION=2.5.2
+VERSION=2.6.0
 arch=$(uname -m); case "$arch" in x86_64) arch=amd64 ;; esac
 base=https://github.com/jmrplens/ghchronicle/releases/download/v$VERSION
 curl -fsSLO "$base/ghchronicle_${VERSION}_darwin_${arch}.tar.gz"
@@ -467,7 +467,7 @@ signature over that file.
     ```
 
     ```text
-    ghchronicle_2.5.2_darwin_arm64.tar.gz: OK
+    ghchronicle_2.6.0_darwin_arm64.tar.gz: OK
     ```
 
 3. Check the checksum file itself, if you have
@@ -679,7 +679,7 @@ so the Xcode command line tools are not needed for it.
   module version the go command fetched and the Go release that compiled it:
 
   ```text
-  ghchronicle 2.5.2 (module v2.5.2, built with <go version>)
+  ghchronicle 2.6.0 (module v2.6.0, built with <go version>)
   ```
 
 - **make**
@@ -708,8 +708,9 @@ the conventional places rather than ones the tool knows:
 | Log              | `~/Library/Logs/ghchronicle.log`                    | `/usr/local/var/log/`            |
 
 `state_file` has a default of its own, `ghchronicle-state.json` in the working
-directory, with the write ledger beside it as `ghchronicle-state-written.bin`.
-A launchd job's working directory is not something to rely on. Set it.
+directory, with the write ledger beside it as `ghchronicle-state-written.bin`
+and the cache as `ghchronicle-state-cache.bin`. A launchd job's working
+directory is not something to rely on. Set it.
 
 ## Windows
 
@@ -753,7 +754,7 @@ takes parameters, which needs the slightly longer form because `iex` has
 nowhere to put them:
 
 ```powershell
-& ([scriptblock]::Create((irm https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.ps1))) -Version 2.5.2 -BinDir C:\tools -NoPathUpdate
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.ps1))) -Version 2.6.0 -BinDir C:\tools -NoPathUpdate
 ```
 
 > **Reading it first is the whole point of a short script**
@@ -815,7 +816,7 @@ rather than the shell:
 ```
 
 ```powershell
-$version = "2.5.2"
+$version = "2.6.0"
 $arch = if ($env:PROCESSOR_ARCHITECTURE -eq "ARM64") { "arm64" } else { "amd64" }
 $base = "https://github.com/jmrplens/ghchronicle/releases/download/v$version"
 $zip = "ghchronicle_${version}_windows_${arch}.zip"
@@ -938,7 +939,7 @@ It answers with one line: the release number, then the commit and the build
 date of that release.
 
 ```text
-ghchronicle 2.5.2 (commit <commit>, built <date>)
+ghchronicle 2.6.0 (commit <commit>, built <date>)
 ```
 
 > **If Windows warns about the file**
@@ -1135,7 +1136,7 @@ means no MSVC, no MinGW and no Windows SDK.
   compiled it:
 
   ```text
-  ghchronicle 2.5.2 (module v2.5.2, built with <go version>)
+  ghchronicle 2.6.0 (module v2.6.0, built with <go version>)
   ```
 
 - **From a checkout**
@@ -1258,12 +1259,16 @@ almost nothing: an outbound TCP socket and one writable directory.
 the right ownership on start, so the state file has somewhere to live without a
 manual `mkdir` and a `chown` that someone will forget after a reinstall.
 
-Two files live there, not one. Beside `state.json` the sweep keeps its write
+Three files live there, not one. Beside `state.json` the sweep keeps its write
 ledger, `state-written.bin` by default, which is what stops an unchanged point
-being written again; `ReadWritePaths` covers the directory, so both are already
-allowed. Put either somewhere else and that path needs adding here, and losing
-the ledger costs one sweep of rewriting:
-[only what changed is written](https://jmrp.io/docs/ghchronicle/sinks/#only-what-changed-is-written).
+being written again, and its cache, `state-cache.bin`, which is what lets a
+restart ask GitHub only for what changed; `ReadWritePaths` covers the
+directory, so all three are already allowed. Put the state file or the ledger
+somewhere else and that path needs adding here, and the cache follows the state
+file wherever it goes. Losing the ledger costs one sweep of rewriting:
+[only what changed is written](https://jmrp.io/docs/ghchronicle/sinks/#only-what-changed-is-written);
+losing the cache, one sweep at full price:
+[the cache beside it](https://jmrp.io/docs/ghchronicle/configuration/#the-cache-beside-it).
 
 ### Installing it
 
@@ -1282,6 +1287,7 @@ the ledger costs one sweep of rewriting:
     - /var/lib/ghchronicle/
       - state.json created by the service
       - state-written.bin the write ledger, beside it
+      - state-cache.bin the cache, beside it too
 
 3. Write the environment file, and nothing else in it.
 
@@ -1790,11 +1796,11 @@ tag, recorded in a public transparency log. With
 cosign verify \
   --certificate-identity-regexp 'https://github.com/jmrplens/ghchronicle/.github/workflows/release.yml@refs/tags/.*' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-  ghcr.io/jmrplens/ghchronicle:v2.5.2 > /dev/null
+  ghcr.io/jmrplens/ghchronicle:v2.6.0 > /dev/null
 ```
 
 ```text
-Verification for ghcr.io/jmrplens/ghchronicle:v2.5.2 --
+Verification for ghcr.io/jmrplens/ghchronicle:v2.6.0 --
 The following checks were performed on each of these signatures:
   - The cosign claims were validated
   - Existence of the claims in the transparency log was verified offline
@@ -1818,20 +1824,23 @@ signature at all, so for them that answer is the true one.
 
 ### What has to be writable
 
-The config file is mounted read-only. Four things are not:
+The config file is mounted read-only. Five things are not:
 
-| Path                | Needed for                                                                                 |
-| ------------------- | ------------------------------------------------------------------------------------------- |
-| `state_file`        | Always. Without a persistent path the stargazer walk repeats on every restart              |
-| `sinks.dedupe_file` | Always. The write ledger, which defaults to sitting beside the state file                  |
-| `sinks.file.path`   | Only with the file sink                                                                    |
-| `log.file`          | Only with a log file configured                                                            |
+| Path                | Needed for                                                                        |
+| ------------------- | --------------------------------------------------------------------------------- |
+| `state_file`        | Always. Without a persistent path the stargazer walk repeats on every restart     |
+| `<name>-cache.bin`  | Always. The cache, which sits beside the state file and has no setting of its own |
+| `sinks.dedupe_file` | Always. The write ledger, which defaults to sitting beside the state file         |
+| `sinks.file.path`   | Only with the file sink                                                           |
+| `log.file`          | Only with a log file configured                                                   |
 
-Both of the first two live in the same directory by default, so one mounted
-volume covers them. Mounting only the state file loses the ledger on every
-restart, and every restart then costs a whole sweep of rewriting, which is the
-one thing the ledger exists to prevent:
-[only what changed is written](https://jmrp.io/docs/ghchronicle/sinks/#only-what-changed-is-written).
+The first three live in the same directory by default, so one mounted volume
+covers them. Mounting only the state file loses the ledger and the cache on
+every restart, and every restart then costs a whole sweep of rewriting, which is
+the one thing the ledger exists to prevent:
+[only what changed is written](https://jmrp.io/docs/ghchronicle/sinks/#only-what-changed-is-written),
+and a whole sweep of asking GitHub again what the cache already knew:
+[the cache beside it](https://jmrp.io/docs/ghchronicle/configuration/#the-cache-beside-it).
 
 ```sh
 docker volume create ghchronicle-state
@@ -1956,7 +1965,7 @@ it downloads a release binary and calls it.
 | `card-width`      | `""`                 | Card width in pixels. Empty draws the layout at its own width; each one draws between two ends of its own, stated in its [section](https://jmrp.io/docs/ghchronicle/card/layouts/). Only `activity-heatmap` spends the room on data, a whole year of the calendar at its far end |
 | `card-speed`      | `""`                 | How fast an animated layout plays, as a decimal from 0 to 1. Empty means 0.5, the pace every card has always been drawn at; below it the card is slower, above it faster, and every animated layout scales together. 0 is the slowest animation and not a still card, `card-motion: off` is |
 | `include-private` | `false`              | `true` counts private repositories when no config file is given. See the warning below |
-| `version`         | `latest`             | The release to install: `latest` for the newest, or a release with or without its `v`, so `2.5.2` and `v2.5.2` are the same one. The major tag `v2` is what `uses:` takes, not a release, and is refused |
+| `version`         | `latest`             | The release to install: `latest` for the newest, or a release with or without its `v`, so `2.6.0` and `v2.6.0` are the same one. The major tag `v2` is what `uses:` takes, not a release, and is refused |
 
 ### The three modes
 
@@ -2169,11 +2178,17 @@ handful of calls; on an account with many stars or old repositories, cache it:
     restore-keys: ghchronicle-state-
 ```
 
-and point `state_file` at `~/.ghchronicle/state.json` in the config. A `card`
-mode run reads a restored state file, which is what lets it skip both walks, and
-never writes one back: it delivers its points to the card and to no store, so
-nothing it learned may tell the next collection that a family is already done.
-What fills the cache is a `once` or `backfill` step.
+and point `state_file` at `~/.ghchronicle/state.json` in the config. The
+directory holds [the cache beside the state
+file](https://jmrp.io/docs/ghchronicle/configuration/#the-cache-beside-it) as well, which a `once`
+step writes and a `backfill` step only reads, so a run restored from it also
+asks GitHub with the validators the last one stored, and pays only for what
+changed. A `card` mode run reads a restored state file, which
+is what lets it skip both walks, and never writes one back, nor the cache file
+beside it: it delivers its points to the card and to no store, so nothing it
+learned may tell the next collection that a family is already done. What fills
+the `actions/cache` entry is a `once` step, with both files, or a `backfill`
+step, with the state file alone.
 
 ### Without the Action
 

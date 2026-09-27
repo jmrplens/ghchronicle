@@ -41,7 +41,7 @@ var lokiKinds = map[string]string{
 	"gh_star":                   "star",
 	"gh_star_given":             "star_given",
 	"gh_fork":                   "fork",
-	"gh_release":                "release",
+	"gh_release_published":      "release",
 	"gh_package_version":        "package",
 	"gh_pull_request":           "pull_request",
 	"gh_pull_request_review":    "review",
@@ -108,7 +108,10 @@ func TestLokiKeepsTheNanosecondTheEventHappened(t *testing.T) {
 	// `make e2e-docker-up` and a second `go test` produce. A dated stream must
 	// hold nothing at all from the moment this sweep began.
 	t.Run("nothing dated was restamped with the sweep's clock", func(t *testing.T) {
-		for _, kind := range []string{"star", "workflow_run", "traffic"} {
+		// release joined these when its line moved from gh_release, stamped at
+		// the sweep, to the publication: before that, this is exactly what
+		// its stream held.
+		for _, kind := range []string{"star", "workflow_run", "traffic", "release"} {
 			reads, err := lokiRange(ctx, s, kind, sweep.Started, time.Now().UTC().Add(time.Minute))
 			if err != nil {
 				t.Fatalf("%s: %v", kind, err)

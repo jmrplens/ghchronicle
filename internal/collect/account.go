@@ -523,8 +523,8 @@ func (a Account) followingCount(ctx context.Context, c *ghapi.Client, u *account
 // profile family lists them, because GraphQL's User.packages does not see the
 // container registry: measured on this account, the connection answers 0
 // while REST lists four containers, and the 0 was published as
-// gh_account.packages beside four gh_package rows. Six requests twice a day,
-// and GitHub answers an unchanged list with a free 304.
+// gh_account.packages beside four gh_package rows. Six requests an hour, and
+// GitHub answers an unchanged list with a free 304.
 //
 // A failure keeps GraphQL's count, for the reason followingCount gives: the
 // calendar is already in hand and a flaky listing must not cost the sweep

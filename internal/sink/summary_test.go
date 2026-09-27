@@ -301,6 +301,32 @@ func TestSummarizeKeepsTheNewestSnapshot(t *testing.T) {
 	}
 }
 
+// TestAnUpstreamRepositoryIsItsNewestReading: the repositories the account
+// contributed to are read on every outbound sweep, and the exporter serves
+// each one's newest star count, visibility and forks, one series per
+// repository whatever the number of sweeps that saw it.
+func TestAnUpstreamRepositoryIsItsNewestReading(t *testing.T) {
+	base := time.Date(2026, 9, 26, 10, 0, 0, 0, time.UTC)
+	goSDK := map[string]string{"full_name": "modelcontextprotocol/go-sdk", "owner": "modelcontextprotocol", "repo": "go-sdk"}
+	beszel := map[string]string{"full_name": "henrygd/beszel", "owner": "henrygd", "repo": "beszel"}
+	out := Summarize([]Point{
+		{Measurement: "gh_upstream_repo", Tags: goSDK, Fields: map[string]any{"stars": 5152, "private": false, "language": "Go"}, Time: base},
+		{Measurement: "gh_upstream_repo", Tags: goSDK, Fields: map[string]any{"stars": 5153, "private": false, "language": "Go"}, Time: base.Add(time.Hour)},
+		{Measurement: "gh_upstream_repo", Tags: beszel, Fields: map[string]any{"stars": 25771, "forks": 1047, "private": false}, Time: base},
+	})
+	if len(out) != 2 {
+		t.Fatalf("got %d series, want one per repository: %+v", len(out), out)
+	}
+	for _, g := range out {
+		if g.Measurement != "gh_upstream_repo" || len(g.Tags) != 3 {
+			t.Errorf("gauge = %s %v, want gh_upstream_repo by the repository's three tags", g.Measurement, g.Tags)
+		}
+		if g.Tags["repo"] == "go-sdk" && g.Fields["stars"] != 5153 {
+			t.Errorf("go-sdk stars = %v, want the newest reading, 5153", g.Fields["stars"])
+		}
+	}
+}
+
 func TestSummarizeSumsAWindow(t *testing.T) {
 	base := time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC)
 	var pts []Point

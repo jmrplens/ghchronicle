@@ -94,10 +94,12 @@ La reserva se escala por cubo; ver [límites de la API](/ghchronicle/es/api/).
 state_file: /var/lib/ghchronicle/state.json
 ```
 
-Siete cosas, y borrar el fichero cuesta una distinta por cada una:
+Ocho cosas, y borrar el fichero cuesta una distinta por cada una:
 
 - `last_run`, cuándo corrió cada familia por última vez. Sin él todas las
-  familias vencen a la vez, así que la pasada siguiente es completa.
+  familias vencen a la vez, así que la pasada siguiente es completa, salvo que
+  el servicio arranca las familias de seis horas o más
+  [una por pasada](/ghchronicle/es/configuration/cadences/#las-familias-lentas-se-turnan).
 - `first_saw`, cuándo se recorrió entera por primera vez la lista de
   stargazers de cada repositorio. Solo se escribe tras un recorrido que volvió
   sin error. Sin él el recorrido completo de la lista de stargazers se vuelve a
@@ -117,14 +119,22 @@ Siete cosas, y borrar el fichero cuesta una distinta por cada una:
   el buzón entero.
 - `last_event`, el evento más reciente que tenía el feed. Sin él vacío lee el
   feed entero.
+- `coauthored`, el recuento de Pair Extraordinaire que la familia
+  `achievements` ha dado por cerrado, el último día UTC que cubre, la versión de
+  la regla con la que se contó y el día en que se recorrió entero el historial
+  por última vez. Cada pasada recorre solo las pull requests fusionadas desde
+  ese día, y el historial entero otra vez una vez por semana o cuando la regla
+  ha cambiado. Sin él la pasada siguiente recorre enteras las pull requests
+  fusionadas de la cuenta, que en una cuenta con 2.315 fueron 35 consultas y
+  24 MB, donde la pasada de un día es una consulta y de 0,3 a 0,6 MB.
 
-Seis de las siete cuestan solo cuota, porque lo que se vuelve a recoger se
+Siete de las ocho cuestan solo cuota, porque lo que se vuelve a recoger se
 indexa por medida, etiquetas y marca de tiempo y sobrescribe lo que ya está
 guardado. `last_head` es la que pierde algo: los cambios de dependencias entre
 la cabeza que tenía y la siguiente se leen de un rango que nadie puede nombrar
 una vez que la cabeza ha desaparecido.
 
-Una pasada con `-card-only` no escribe ninguna de las siete. Sus puntos llegan a
+Una pasada con `-card-only` no escribe ninguna de las ocho. Sus puntos llegan a
 [la tarjeta](/ghchronicle/es/card/) y a ningún almacén, así que una marca suya
 haría que la siguiente recogida se saltara una familia, o estrechara una
 lectura, cuyos datos fueron a parar a una imagen y a ningún otro sitio. El
@@ -148,6 +158,71 @@ un almacén que se ha vaciado y hay que volver a llenar. Los dos ficheros quiere
 una ruta persistente:
 [solo se escribe lo que ha cambiado](/ghchronicle/es/sinks/#solo-se-escribe-lo-que-ha-cambiado).
 
+### La caché que hay a su lado
+
+```text
+/var/lib/ghchronicle/state-cache.bin
+```
+
+Junto a `state_file`, como `<nombre>-cache.bin`, está lo que una pasada aprendió
+de GitHub y que abarata la siguiente. No hay nada que configurar: su sitio es el
+del fichero de estado. Guarda cuatro cosas:
+
+- la [caché condicional](/ghchronicle/es/api/#los-etags-y-por-qué-un-304-es-gratis):
+  cada respuesta pedida dentro del doble de la cadencia más larga que corre la
+  configuración, y nunca menos de un día, 48 horas con las cadencias por
+  omisión, con el ETag con que llegó, así que un reinicio pregunta con
+  `If-None-Match` y recibe un 304 gratis;
+- las ejecuciones de workflow cuyos jobs ya se escribieron, para que un
+  reinicio no los vuelva a listar;
+- los [rechazos](/ghchronicle/es/api/#un-rechazo-también-se-recuerda), cada uno
+  hasta el final de su propio día;
+- los tamaños de página que la familia `totals` dio a la consulta de pull
+  requests.
+
+Las cuatro vivían antes en el proceso, y cada reinicio las volvía a pagar.
+Medido en el servicio del autor el 2026-09-26, los primeros 38 minutos tras un
+reinicio gastaron 1.092 peticiones core cobradas en pasadas que costaban unas 66
+con la caché caliente.
+
+Las ejecuciones son la afirmación de que cada almacén tiene sus jobs, así que un
+arranque no las recupera donde eso no se sabe: donde ningún registro de
+escrituras recuerda lo que tienen los almacenes, que es lo que pasa al borrar el
+registro para volver a llenar un almacén vaciado, con `dedupe_file: off` o con
+el `dedupe: false` de un almacén, y en una ejecución que termina con su pasada;
+y donde se ha añadido un destino desde que se escribió el fichero. Sus jobs se
+vuelven a listar entonces y se ofrecen otra vez con todos los demás puntos.
+
+Se escribe como mucho cada cinco minutos mientras el recolector corre, y una vez
+más cuando se para, se pare como se pare. Una pasada con `-card-only` lo lee y
+no lo escribe, por la misma razón por la que deja en paz el fichero de estado.
+Un `-backfill` lo lee y tampoco lo escribe: las páginas que recorre son páginas
+que ninguna pasada pide, y guardadas desplazarían del fichero las respuestas de
+las propias pasadas. Una actualización lo conserva: una respuesta se guarda bajo
+la forma de lo que lee su recolector, así que las únicas respuestas que se
+vuelven a pedir enteras son las de un recolector que ahora lee otra cosa.
+
+Está acotado. Una respuesta de más de un megabyte se queda fuera, y también lo
+que pase de 64 MB, empezando por lo que menos recientemente se pidió. Medido
+contra la cuenta del autor, de 37 repositorios, una pasada de todas las familias
+guarda 1.065 respuestas, 10,3 MB de ellas y 1,6 MB de fichero, ninguna de más de
+404 KB. Con los días la caché en memoria crece con las respuestas cuya consulta
+lleva una ventana móvil: el servicio del autor tenía 6.695 tras cinco días y
+medio, unos 99 MB, y las 2.517 de ellas pedidas en las últimas 48 horas, que son
+las que guarda el fichero, suman unos 31 MB. Contiene lo que GitHub respondió
+sobre repositorios privados además de públicos, y se escribe con modo 600, como
+el fichero de estado.
+
+Borrarlo cuesta una pasada de cada familia a precio completo, el precio que
+pagaba cada reinicio antes de que existiera, y no pierde nada. Cada respuesta se
+vuelve a pedir, cada función rechazada se vuelve a preguntar, que es también la
+manera de que una función activada hoy se note antes de que acabe su día, los
+jobs de las ejecuciones más recientes se vuelven a listar una vez, y la primera
+pasada corre `totals` antes de las pull requests, diga lo que diga su cadencia,
+así que sus páginas se vuelven a dimensionar. Un fichero que no se carga entero,
+cortado, dañado o escrito en otro formato, se aparta con un aviso y cuesta lo
+mismo. Quiere la misma ruta persistente que los otros dos.
+
 ## `backfill`
 
 ```yaml
@@ -158,7 +233,7 @@ backfill:
 Solo se aplica a una ejecución lanzada con `-backfill`, y `-backfill-since` lo
 sobrescribe. Ver [relleno histórico](/ghchronicle/es/how/backfill/).
 
-Un relleno lleva un tercer fichero junto a `state_file`,
+Un relleno lleva un fichero más junto a `state_file`,
 `<nombre>-progress.json`, donde anota lo que ya ha escrito para que una parada
 cueste un repositorio y no el recorrido entero. No hay nada que configurar:
 aparece cuando arranca un relleno, se borra cuando el recorrido llega al final,

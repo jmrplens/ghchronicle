@@ -261,7 +261,7 @@ func TestTheDailyPullsPassIsNotOnRecordWhenARepositoryFailed(t *testing.T) {
 }
 
 // TestTheDailyPullsPassOutgrowsAStaleTotal is the guard on the sizing. The
-// totals family runs twice a day, so a repository that crossed a page size
+// totals family runs every hour, so a repository that crossed a page size
 // since it last ran holds more than the page asked for; a page that came
 // back full with more behind it is that case, and the daily pass reads one
 // page more rather than trust the count. Fifty is where the sizing stops and

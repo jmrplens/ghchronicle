@@ -113,11 +113,12 @@ func fromHeaders(c *ghapi.Client, resource string, endpointUsed int, now time.Ti
 //
 // The fallback is only taken while that answer still describes the window the
 // point is being stamped in. This family runs every fifteen minutes and the
-// batched queries every twelve hours, so the last reading left behind can be
-// half a day old, and a spent budget from a window that closed long ago
-// stamped `now` is a reading of a moment it was never taken at. The window is
-// an hour, so what survives this test is at worst an hour of under-counting
-// inside the window it belongs to.
+// slowest GraphQL families, forks and the daily ones, once or twice a day, so
+// where a configuration leaves GraphQL to them the last reading left behind
+// can be most of a day old, and a spent budget from a window that closed long
+// ago stamped `now` is a reading of a moment it was never taken at. The
+// window is an hour, so what survives this test is at worst an hour of
+// under-counting inside the window it belongs to.
 func graphqlPoint(ctx context.Context, c *ghapi.Client, now time.Time) (sink.Point, bool) {
 	rate, err := c.GraphQLRate(ctx)
 	if err != nil {

@@ -73,42 +73,42 @@ con el código en ambos sentidos, así que una familia que se añada, se mueva o
 cambie de coste sin que esta tabla la siga rompe la compilación.
 `ghchronicle -groups` imprime esa misma pertenencia.
 
-| Grupo       | Familia        | Por omisión | Motivo                                                                                                                                                                                                                                                                              |
-| ----------- | -------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `account`   | `account`      | `12h`       | el calendario de contribuciones cambia una vez al día, y la familia entera cuesta un punto de GraphQL                                                                                                                                                                               |
-| `account`   | `achievements` | `24h`       | las insignias de la página pública del perfil, leídas de la propia página porque ninguna API las lista, y al lado la distancia de cada insignia a su siguiente nivel, sacada de la API; una insignia se gana en semanas y el día cuesta una página y unos treinta puntos de GraphQL |
-| `account`   | `billing`      | `6h`        | GitHub actualiza el informe de uso unas pocas veces al día como mucho                                                                                                                                                                                                               |
-| `account`   | `history`      | `0`         | apagada hasta que se la nombre: recorre cada año pasado y lo que va de este, y las filas son idempotentes                                                                                                                                                                           |
-| `account`   | `keys`         | `24h`       | una clave SSH o GPG cambia cuando alguien la cambia, y lo que importa es su fecha de caducidad, no la hora en que se vio                                                                                                                                                            |
-| `account`   | `outbound`     | `1h`        | las estrellas dadas, el trabajo en repositorios ajenos y las respuestas aceptadas allí, por unos nueve puntos de GraphQL por pasada, así que la hora no cuesta nada que se note y una respuesta aceptada esta tarde está en el panel esta tarde                                     |
-| `account`   | `profile`      | `12h`       | paquetes, gists y cuentas sociales, todo ello editado a mano                                                                                                                                                                                                                        |
-| `account`   | `totals`       | `12h`       | dos veces al día sobra para un número que solo crece                                                                                                                                                                                                                                |
-| `audience`  | `forks`        | `12h`       | la lista entera cabe en una página, y un fork es un suceso raro                                                                                                                                                                                                                     |
-| `audience`  | `stars`        | `6h`        | el recorrido completo ocurre una vez; después las cien estrellas más nuevas viajan en una consulta GraphQL por cada diez repositorios, y el historial diario de estrellas es una petición por repositorio, casi siempre un 304 gratis                                               |
-| `audience`  | `traffic`      | `6h`        | la ventana de catorce días se reescribe entera cada vez, así que una pasada perdida se repara en la siguiente                                                                                                                                                                       |
-| `ci`        | `actions`      | `15m`       | una ejecución de workflow termina en minutos, y su tiempo en cola solo merece verse mientras ocurre                                                                                                                                                                                 |
-| `ci`        | `artifacts`    | `1h`        | los artefactos aparecen con la ejecución que los hizo y caducan en escala de días                                                                                                                                                                                                   |
-| `ci`        | `deployments`  | `1h`        | es la superficie que lee un dashboard de entrega, y la página más nueva es barata: un punto de GraphQL por cada cinco repositorios                                                                                                                                                  |
-| `ci`        | `joblogs`      | `0`         | apagada hasta que se la nombre: es texto y no una medida, cuesta una petición por fallo, y solo tiene sentido con un almacén de logs conectado                                                                                                                                      |
-| `collector` | `ratelimit`    | `15m`       | es gratis, y merece la pena tenerla a la resolución de la familia más rápida                                                                                                                                                                                                        |
-| `feeds`     | `activity`     | `30m`       | el log del repositorio guarda cien entradas, que cubrieron veintiséis horas en el repositorio más activo medido                                                                                                                                                                     |
-| `feeds`     | `events`       | `30m`       | el feed guarda los últimos trescientos eventos de los últimos treinta días, así que esto es el tamaño de una ventana, no una velocidad                                                                                                                                              |
-| `feeds`     | `notifs`       | `30m`       | GitHub conserva las notificaciones de la bandeja tres meses salvo las guardadas, pero cada hilo muestra solo su último movimiento, así que esto es el tamaño de una ventana, no una velocidad                                                                                       |
-| `repos`     | `branches`     | `24h`       | las ramas se crean y se borran todo el día, pero lo que responde la fila es cuáles están rancias ahora mismo, que es una pregunta diaria                                                                                                                                            |
-| `repos`     | `deps`         | `0`         | apagada hasta que se la nombre: el SBOM son 1,8 MB por repositorio y tiene su propio presupuesto de cien por minuto                                                                                                                                                                 |
-| `repos`     | `inventory`    | `24h`       | cuatro peticiones core por repositorio, para ajustes que cambian solo cuando alguien los cambia                                                                                                                                                                                     |
-| `repos`     | `policyfiles`  | `24h`       | SECURITY.md, CODEOWNERS, dependabot.yml y FUNDING.yml se mueven una vez por trimestre                                                                                                                                                                                               |
-| `repos`     | `repo`         | `1h`        | estrellas, forks, lenguajes y temas se mueven despacio, y esto es una petición por repositorio                                                                                                                                                                                      |
-| `repos`     | `rulesets`     | `24h`       | un ruleset se edita unas pocas veces al año, cada versión conserva su propia fecha, y las dos peticiones responden 304 hasta que alguien edita uno                                                                                                                                  |
-| `repos`     | `settings`     | `6h`        | webhooks, rulesets, entornos y claves de despliegue cambian solo cuando alguien los cambia                                                                                                                                                                                          |
-| `security`  | `analyses`     | `6h`        | GitHub poda los análisis de code scanning, y un repositorio produce un puñado al día                                                                                                                                                                                                |
-| `security`  | `security`     | `1h`        | una alerta es algo sobre lo que actuar hoy, y la lista de abiertas es corta                                                                                                                                                                                                         |
-| `work`      | `commits`      | `1h`        | una petición por commit, así que el coste sigue a cuánto se ha subido y no a cada cuánto se pregunta                                                                                                                                                                                |
-| `work`      | `discussions`  | `2h`        | una discusión se responde en horas o días, y pocos repositorios tienen alguna                                                                                                                                                                                                       |
-| `work`      | `issueevents`  | `1h`        | la cronología de lo que se movió en dos cadencias, un punto GraphQL por repositorio, así que la hora es lo pronto que merece verse una transición                                                                                                                                   |
-| `work`      | `issues`       | `1h`        | una petición por elemento, así que el coste sigue a cuánto hay abierto y no a cada cuánto se pregunta                                                                                                                                                                               |
-| `work`      | `planning`     | `6h`        | etiquetas e hitos se editan a mano, unas pocas veces por semana como mucho                                                                                                                                                                                                          |
-| `work`      | `stats`        | `12h`       | GitHub las recalcula despacio de todas formas, así que preguntar más a menudo devuelve los mismos números                                                                                                                                                                           |
+| Grupo       | Familia        | Por omisión | Motivo                                                                                                                                                                                                                                                                                                                                               |
+| ----------- | -------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `account`   | `account`      | `1h`        | el calendario de contribuciones se mueve con cada contribución y los contadores del perfil con cada seguimiento y cada estrella, y una pasada es un punto de GraphQL y siete peticiones REST, de las que solo se cobra la del perfil: GitHub nunca la respondió con un 304, y los seis listados de paquetes lo responden hasta que cambia un paquete |
+| `account`   | `achievements` | `24h`       | las insignias de la página pública del perfil, que ninguna API lista, y lo que le falta a cada una con niveles para el siguiente; una insignia se gana en semanas, y un día transfiere la página, 36 KB, y de 0,3 a 0,6 MB de pull requests fusionadas desde el día anterior por dos puntos de GraphQL, o el historial entero cada semana, 24 MB     |
+| `account`   | `billing`      | `1h`        | el mes en curso se mueve mientras corre la integración continua: había cambiado en cada una de las 46 lecturas cada seis horas medidas, y una pasada son dos peticiones, ese mes y el anterior, de las que solo se cobra la primera                                                                                                                  |
+| `account`   | `history`      | `0`         | apagada hasta que se la nombre: recorre cada año pasado y lo que va de este, y las filas son idempotentes                                                                                                                                                                                                                                            |
+| `account`   | `keys`         | `24h`       | una clave SSH o GPG cambia cuando alguien la cambia, y lo que importa es su fecha de caducidad, no la hora en que se vio                                                                                                                                                                                                                             |
+| `account`   | `outbound`     | `1h`        | las estrellas dadas, el trabajo en repositorios ajenos y las respuestas aceptadas allí, por unos nueve puntos de GraphQL por pasada, así que la hora no cuesta nada que se note y una respuesta aceptada esta tarde está en el panel esta tarde                                                                                                      |
+| `account`   | `profile`      | `12h`       | paquetes, gists y cuentas sociales, todo ello editado a mano                                                                                                                                                                                                                                                                                         |
+| `account`   | `totals`       | `1h`        | los números de toda la vida se mueven con cada estrella, fork, fusión y push, y una pasada es un punto de GraphQL por la cuenta, uno por cada diez repositorios y uno por cada veinticinco archivados que se dejan fuera, y una petición del presupuesto de búsqueda                                                                                 |
+| `audience`  | `forks`        | `12h`       | la lista entera cabe en una página, y un fork es un suceso raro                                                                                                                                                                                                                                                                                      |
+| `audience`  | `stars`        | `1h`        | una estrella puede llegar a cualquier hora, y tras el único recorrido completo de la lista una pasada es un punto de GraphQL por cada diez repositorios para las cien más nuevas y una petición condicional por repositorio para el historial diario, que respondió un 304 gratis a 184 de las 185 medidas                                           |
+| `audience`  | `traffic`      | `6h`        | la ventana de catorce días se reescribe entera cada vez, así que una pasada perdida se repara en la siguiente                                                                                                                                                                                                                                        |
+| `ci`        | `actions`      | `15m`       | una ejecución de workflow termina en minutos, y su tiempo en cola solo merece verse mientras ocurre                                                                                                                                                                                                                                                  |
+| `ci`        | `artifacts`    | `1h`        | los artefactos aparecen con la ejecución que los hizo y caducan en escala de días                                                                                                                                                                                                                                                                    |
+| `ci`        | `deployments`  | `30m`       | es la superficie que lee un dashboard de entrega, y la página más nueva es un punto de GraphQL por cada cinco repositorios, que trajo hasta cuatro filas nuevas por pasada medida, así que la media hora cuesta poco                                                                                                                                 |
+| `ci`        | `joblogs`      | `0`         | apagada hasta que se la nombre: es texto y no una medida, cuesta una petición por fallo, y solo tiene sentido con un almacén de logs conectado                                                                                                                                                                                                       |
+| `collector` | `ratelimit`    | `15m`       | es gratis, y merece la pena tenerla a la resolución de la familia más rápida                                                                                                                                                                                                                                                                         |
+| `feeds`     | `activity`     | `15m`       | el log del repositorio guarda cien entradas, que cubrieron veintiséis horas en el repositorio más activo medido, y una pasada son una o dos peticiones condicionales por repositorio, que respondieron un 304 gratis a 2.320 de las 2.356 medidas                                                                                                    |
+| `feeds`     | `events`       | `15m`       | una petición core por pasada, y el feed se había movido en 43 de las 46 medias horas medidas, así que el cuarto de hora es lo pronto que un evento llega al panel; la ventana, los últimos trescientos eventos de los últimos treinta días, es mucho más ancha que eso                                                                               |
+| `feeds`     | `notifs`       | `15m`       | una petición core por pasada y veinte una vez al día por la bandeja entera, y un hilo muestra solo su último movimiento, así que un movimiento que otro adelanta antes de la siguiente lectura no se ve nunca; la mitad de las pasadas medidas trajo una fila nueva                                                                                  |
+| `repos`     | `branches`     | `24h`       | las ramas se crean y se borran todo el día, pero lo que responde la fila es cuáles están rancias ahora mismo, que es una pregunta diaria                                                                                                                                                                                                             |
+| `repos`     | `deps`         | `0`         | apagada hasta que se la nombre: el SBOM son 1,8 MB por repositorio y tiene su propio presupuesto de cien por minuto                                                                                                                                                                                                                                  |
+| `repos`     | `inventory`    | `24h`       | cuatro peticiones core por repositorio, para ajustes que cambian solo cuando alguien los cambia                                                                                                                                                                                                                                                      |
+| `repos`     | `policyfiles`  | `24h`       | SECURITY.md, CODEOWNERS, dependabot.yml y FUNDING.yml se mueven una vez por trimestre                                                                                                                                                                                                                                                                |
+| `repos`     | `repo`         | `1h`        | estrellas, forks, lenguajes y temas se mueven despacio, y una pasada son tres peticiones REST por repositorio, casi todas un 304 gratis, y dos puntos de GraphQL por cada diez repositorios                                                                                                                                                          |
+| `repos`     | `rulesets`     | `24h`       | un ruleset se edita unas pocas veces al año y cada versión conserva su propia fecha; las dos peticiones responden un 304 gratis hasta que alguien edita uno, también en la primera pasada tras un reinicio, porque la caché de ETag se guarda junto al fichero de estado                                                                             |
+| `repos`     | `settings`     | `6h`        | webhooks, rulesets, entornos y claves de despliegue cambian solo cuando alguien los cambia                                                                                                                                                                                                                                                           |
+| `security`  | `analyses`     | `1h`        | GitHub poda los análisis de code scanning y cada push analizado añade alguno, y una pasada es una petición condicional por repositorio con code scanning, tres de ellas cobradas en la pasada mediana medida, con las negativas del resto recordadas un día                                                                                          |
+| `security`  | `security`     | `1h`        | una alerta es algo sobre lo que actuar hoy, y la lista de abiertas es corta                                                                                                                                                                                                                                                                          |
+| `work`      | `commits`      | `1h`        | un punto de GraphQL por cada repositorio cuya rama por defecto tiene un commit de las dos últimas cadencias, que tenían 38 de 999 respuestas medidas, y uno por cada veinticinco repositorios, compartido con issues e issueevents, para preguntar cuáles, así que la hora es lo pronto que se ve en el panel un push                                |
+| `work`      | `discussions`  | `1h`        | una discusión se responde en horas o días y pocos repositorios tienen foro, y una pasada son dos puntos de GraphQL por cada uno que lo tiene y nada por el resto                                                                                                                                                                                     |
+| `work`      | `issueevents`  | `1h`        | la cronología de lo que se movió en dos cadencias, un punto GraphQL por cada repositorio donde se movió una issue o una pull request y nada por los demás, así que la hora es lo pronto que merece verse una transición                                                                                                                              |
+| `work`      | `issues`       | `1h`        | uno o dos puntos GraphQL por cada repositorio cuyas issues o pull requests se movieron en dos cadencias, nada por los demás, y hasta unos nueve una vez al día por una página entera de cada repositorio, así que la hora es lo pronto que se ve en el panel una revisión o una fusión                                                               |
+| `work`      | `planning`     | `6h`        | etiquetas e hitos se editan a mano, unas pocas veces por semana como mucho                                                                                                                                                                                                                                                                           |
+| `work`      | `stats`        | `12h`       | GitHub las recalcula despacio de todas formas, así que preguntar más a menudo devuelve los mismos números                                                                                                                                                                                                                                            |
 
 ## El aviso cuando una cadencia va más rápido de lo que el valor merece
 
@@ -137,12 +137,14 @@ línea que dijese "el grupo `work` va demasiado rápido" no nombraría nada sobr
 lo que actuar: el motivo de que una cadencia sea la que es pertenece a la
 familia, así que el aviso también.
 
-Cuatro es el umbral porque los valores internos son una escalera, `15m` `30m`
-`1h` `2h` `6h` `12h` `24h`, y el mayor salto entre dos peldaños vecinos es de
-tres, de `2h` a `6h`. Cuatro es por tanto el menor factor que ningún peldaño
-suelto alcanza. Bajar un peldaño es un ajuste deliberado de quien está mirando
-esa familia y se queda callado; cuatro o más solo puede ser una capa amplia
-cayendo donde nunca se la eligió, o un número escrito sin leer esta tabla.
+Cuatro es el umbral porque los valores internos están sobre una escalera, `15m`
+`30m` `1h` `2h` `6h` `12h` `24h`, y el mayor salto entre dos peldaños vecinos es
+de tres, de `2h` a `6h`. Ninguna familia viene a `2h` desde que `discussions`
+pasó a la hora, pero el peldaño sigue siendo donde cae un paso abajo desde `6h`.
+Cuatro es por tanto el menor factor que ningún peldaño suelto alcanza. Bajar un
+peldaño es un ajuste deliberado de quien está mirando esa familia y se queda
+callado; cuatro o más solo puede ser una capa amplia cayendo donde nunca se la
+eligió, o un número escrito sin leer esta tabla.
 
 Nada avisa por ir más despacio. Esto va de desperdicio, no de gusto.
 
@@ -298,6 +300,71 @@ level=WARN msg="heartbeat is 1h and the shortest cadence is 15m (actions), so
   no family can run more often than every 1h"
 ```
 
+## Las familias lentas se turnan
+
+El servicio en marcha arranca como mucho una familia de cadencia de seis horas o
+más en cada pasada, y deja cualquier otra que toque para el tic siguiente.
+
+Las familias que corren en la misma pasada quedan marcadas con el mismo instante
+en el fichero de estado, así que vuelven a tocar juntas en cada cadencia, para
+siempre. Un grupo así se forma siempre que se marcan muchas familias a la vez:
+una instalación nueva, un `-once` o un backfill antes del servicio, una familia
+que se enciende. Hasta la 2.6.0 las ocho familias diarias de la cuenta de
+producción corrían en la primera pasada del día UTC, todos los días, y sus cinco
+familias de doce horas juntas en una pasada propia. El 2026-09-26 la pasada
+diaria gastó 294 peticiones `core` facturables y 24,3 MB frente a 17,5
+peticiones de la pasada mediana, y con la de doce horas 45 minutos después, su
+hora fue ocho veces la hora mediana en peticiones `core`. Las puso ahí el
+calendario, no el trabajo.
+
+La familia que arranca es la que lleva más tiempo tocando, contado desde lo más
+reciente entre su última pasada y la última vez que el proceso la dejó arrancar.
+La segunda mitad importa para una familia cuyas pasadas fallan todas: una pasada
+fallida no se marca como hecha, así que por su última pasada sola sería la
+familia más atrasada en cada pasada y se quedaría con todos los turnos. Contada
+así, se pone detrás de las demás.
+
+Una familia espera a cada una de las otras como mucho una vez, así que la peor
+espera es un tic por cada otra familia lenta, y solo la última de un grupo recién
+formado espera tanto. Con el tic de cuarto de hora que dan las cadencias internas:
+
+| Calendario                                 | Familias de 6h o más | Espera más larga |
+| ------------------------------------------ | -------------------- | ---------------- |
+| las cadencias internas                     | 12                   | 11 tics, `2h45m` |
+| con `deps` e `history` a `24h`             | 14                   | 13 tics, `3h15m` |
+| con `deps`, `history` y `joblogs` a un día | 15                   | 14 tics, `3h30m` |
+
+Esa espera se paga una vez. En cuanto dos familias han corrido en pasadas
+distintas, tocan en pasadas distintas y nada vuelve a juntarlas: una semana
+simulada de las catorce, todas pendientes en una misma pasada al principio, tuvo
+cada familia arrancando exactamente una cadencia después de su arranque anterior
+desde el primer día.
+
+El log dice qué familia arrancó y cuáles esperan, así que una familia lenta que
+falta en una pasada en la que tocaba queda explicada:
+
+```text
+level=INFO msg="slow families due together take turns" starting=planning
+  waiting=settings,traffic,forks,profile,stats,achievements,branches,inventory,keys,policyfiles,rulesets
+```
+
+Una por pasada vale mientras puede cumplir todas las cadencias, y una
+configuración con un tic más largo puede tener más familias lentas que eso.
+`every.default: 6h` late cada hora, porque nada en ella corre más a menudo, con
+treinta y una familias a seis horas, y una por pasada arrancaría cada una cada
+treinta y una horas. Ahí una pasada arranca las menos que caben, seis, y ninguna
+familia espera tanto como su cadencia.
+
+Solo el servicio se turna. `-once` corre todas las familias que tocan, porque no
+tiene un tic siguiente al que dejar ninguna: lanzado una vez al día por un
+planificador, la dejaría para el día siguiente. Un backfill, una tarjeta y la
+primera pasada de un servicio que ceba el
+[exportador de Prometheus](/ghchronicle/es/sinks/prometheus/#cómo-consultarlo)
+corren todas las familias diga lo que diga el fichero de estado. La pasada
+cebada anota después solo las familias a las que les tocaba, así que un
+reinicio no vuelve a poner las demás en un mismo instante, y cada una conserva
+el turno que tenía.
+
 ## Hacerlas más lentas
 
 Si el presupuesto aprieta, alarga `artifacts` y después `actions`. Son las dos
@@ -316,5 +383,6 @@ Alargar una cadencia no hace más gruesa la historia, porque los puntos se fecha
 por la cosa que ocurrió y no por la pasada. Recoger las ejecuciones de workflows
 cada hora en vez de cada quince minutos sigue registrando cada ejecución en el
 segundo en que terminó. Lo que arriesga una cadencia larga es perder una ventana
-entera: `events`, `notifs` y `activity` son ventanas y no velocidades, como dice
-la tabla de arriba, y ninguna más lo es.
+entera: `events` lee los últimos trescientos eventos, `notifs` solo el último
+movimiento de cada hilo y `activity` las últimas cien entradas del log de cada
+repositorio, así que lo que salga de una de ellas entre dos pasadas se pierde.

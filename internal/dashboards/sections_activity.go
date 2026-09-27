@@ -51,13 +51,22 @@ func activity(b *builder) []Panel {
 	// row's time is when it was seen and not when it was opened; the day it
 	// was opened is the row's time minus how long it has been open, and the
 	// newest row of each item is the one listed.
-	external := `SELECT full_name AS "Repository", ` + agoSQL("time", "seconds_open") + ` AS "Opened",` +
-		` time AS "Seen", kind AS "Kind",` +
-		` state AS "State", title AS "Title", comments AS "Comments",` +
-		` url AS "Link" FROM (` +
+	//
+	// The repository's stars are not on the item's row, which is dated when
+	// the item closed: they are gh_upstream_repo's, stamped at each sweep,
+	// and the newest of those inside the range is joined on. Inside the
+	// range and not the whole history, because that measurement is a row
+	// per repository per sweep, and because a range in the past then shows
+	// the count as it stood then.
+	external := `SELECT x.full_name AS "Repository", ` + agoSQL("x.time", "x.seconds_open") + ` AS "Opened",` +
+		` x.time AS "Seen", x.kind AS "Kind",` +
+		` x.state AS "State", x.title AS "Title", u.stars AS "Stars", x.comments AS "Comments",` +
+		` x.url AS "Link" FROM (` +
 		"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, kind, number ORDER BY time DESC) AS rn" +
-		" FROM gh_external_contribution WHERE $__timeFilter(time)) x WHERE rn = 1" +
-		" ORDER BY time DESC LIMIT 40"
+		" FROM gh_external_contribution WHERE $__timeFilter(time)) x" +
+		" LEFT JOIN (SELECT full_name, stars, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn" +
+		" FROM gh_upstream_repo WHERE $__timeFilter(time)) u ON u.full_name = x.full_name AND u.rn = 1" +
+		" WHERE x.rn = 1 ORDER BY x.time DESC LIMIT 40"
 	ev, nt, ec := "gh_event", "gh_notification", "gh_external_contribution"
 	notes := gp(nt, "notifications")
 
@@ -194,30 +203,37 @@ func activity(b *builder) []Panel {
 					promTbl("sum by (full_name) (increase(github_external_contributions_total[$__range]))", "A"),
 					promTbl("avg by (full_name) (github_external_contributions_merged_mean)", "B"),
 					promTbl("avg by (full_name) (github_external_contributions_comments_mean)", "C"),
+					promTbl("max by (full_name) (github_upstream_repo_stars)", "D"),
 				},
 				PromTF: merged(map[string]string{
 					"full_name": "Repository", panelValueA: "Contributions", panelValueB: "Merged",
-					panelValueC: "Comments",
+					panelValueC: "Comments", panelValueD: "Stars",
 				}, nil, nil),
 				Desc: "Pull requests and issues opened in repositories this account does not own, " +
 					"with the state each ended in. Nothing else sees them: they are not in these " +
 					"repositories and the event feed forgets them in three days. Seen is the " +
 					"row's own date, which for an open item is the day it was last seen open; " +
-					"Opened is when it was opened.",
+					"Opened is when it was opened. Stars is the repository's own count at the " +
+					"last sweep inside the range.",
 				PromDesc: "Prometheus keeps the repository only, so this is contributions per " +
-					"repository over the range, the share merged and the mean comments. " +
-					sinceStart,
+					"repository over the range, the share merged and the mean comments, beside " +
+					"the stars at the last sweep. " + sinceStart,
 				Overrides: []any{
 					when("Opened"), when("Seen"), repoColumn(),
-					width("Kind", 110), width("State", 90), width("Comments", 100), linkOn("Repository"),
+					width("Kind", 110), width("State", 90), width("Comments", 100),
+					unitOf("Stars", "short", 90), linkOn("Repository"),
 				},
 				PromOver: []any{
 					barCell("Contributions", "short", 160),
 					unitOf("Merged", "percentunit", 100),
 				},
 				GR: extGR, GRTF: extGRtf,
-				GRDesc: "Graphite names each row from the path and keeps no text, so the title is missing. " + grRows,
-				ES:     extES, ESTF: extEStf,
+				GRDesc: "Graphite names each row from the path and keeps no text, so the title is missing, " +
+					"and it cannot join the repository's stars, which sit under another measurement's " +
+					"path, onto an item's row. " + grRows,
+				ES: extES, ESTF: extEStf,
+				ESDesc: "Elasticsearch lists the contributions' own documents and cannot join the " +
+					"repository's stars, which are documents of another index, onto them.",
 			}),
 	}, starsGiven(b)...)
 }

@@ -138,6 +138,10 @@ func outboundFixture(t *testing.T, searches *[]string, starred *[]map[string]any
 				q, _ := vars["query"].(string)
 				*searches = append(*searches, q)
 			}
+			// The fixture answers every field whether or not it was asked
+			// for, so what the query selects is checked here or nowhere.
+			wantSelected(t, query, "additions", "deletions", "changedFiles",
+				"stargazerCount", "forkCount", "isPrivate", "url primaryLanguage { name }")
 			f.write(w, "graphql_search_issues.json")
 		case strings.Contains(query, "repositoryDiscussionComments"):
 			// gh_discussion_comment is written by two collectors from two
@@ -145,19 +149,31 @@ func outboundFixture(t *testing.T, searches *[]string, starred *[]map[string]any
 			// repoactivity_test: a selection added to one and not the other
 			// gives the measurement two shapes, and half its rows would
 			// answer "was this thread ever answered" with a zero value.
-			for _, field := range []string{
-				"answerChosenBy", "answer {", "closed", "stateReason", "isAnswerable",
-			} {
-				if !strings.Contains(query, field) {
-					t.Errorf("query does not ask for %s:\n%s", field, query)
-				}
+			// isPrivate is the exception: the other one has it from the
+			// listing that found the repository, and asks for nothing.
+			wantSelected(t, query, "answerChosenBy", "answer {", "closed", "stateReason",
+				"isAnswerable", "repository { nameWithOwner isPrivate }")
+			if strings.Contains(query, "onlyAnswers: true") {
+				f.write(w, "viewer_discussion_answers.json")
+				return
 			}
 			f.write(w, "viewer_discussion_comments.json")
 		default:
+			wantSelected(t, query, "repository { nameWithOwner isPrivate }")
 			f.write(w, "viewer_issue_comments.json")
 		}
 	})
 	return f
+}
+
+// wantSelected fails for every selection the query does not make.
+func wantSelected(t *testing.T, query string, selections ...string) {
+	t.Helper()
+	for _, sel := range selections {
+		if !strings.Contains(query, sel) {
+			t.Errorf("query does not ask for %s:\n%s", sel, query)
+		}
+	}
 }
 
 func TestOutbound(t *testing.T) {
@@ -172,14 +188,16 @@ func TestOutbound(t *testing.T) {
 	}
 	checkPoints(t, points)
 	wantMeasurements(t, points, "gh_star_given", "gh_external_contribution",
-		"gh_discussion_comment", "gh_issue_comment")
+		"gh_upstream_repo", "gh_discussion_comment", "gh_issue_comment")
 
 	checkOutboundComments(t, points)
 	checkStarsGiven(t, points, starred)
 	checkSearchesAreScoped(t, searches)
 	checkExternalContributions(t, points)
+	checkUpstreamRepositories(t, points)
 	// The rows are the ones the REST paths wrote for the same three stars and
-	// two items, recorded before the move to GraphQL.
+	// two items, recorded before the move to GraphQL, with the size and the
+	// visibility the REST search never read added to the contributions.
 	checkGolden(t, "outbound", points, "gh_star_given", "gh_external_contribution")
 }
 
@@ -204,6 +222,28 @@ func checkOutboundComments(t *testing.T, points []sink.Point) {
 	comment := find(t, points, "gh_issue_comment", map[string]string{"full_name": "torvalds/linux"})
 	if comment.Tags["own"] != "false" || comment.Tags["number"] != "42" {
 		t.Errorf("issue comment = %v", comment.Tags)
+	}
+	checkCommentsSayWhetherPrivate(t, points)
+}
+
+// checkCommentsSayWhetherPrivate reads the repository's visibility off every
+// comment row. `own` does not answer it: the account's own repositories are
+// private and public alike, and an organisation's private repository is not
+// the account's own at all.
+func checkCommentsSayWhetherPrivate(t *testing.T, points []sink.Point) {
+	t.Helper()
+	for _, m := range []string{"gh_issue_comment", "gh_discussion_comment"} {
+		for _, p := range only(t, points, m) {
+			want := p.Tags["full_name"] == "octocat/hello-world"
+			if got, ok := p.Fields["private"].(bool); !ok || got != want {
+				t.Errorf("%s in %s: private = %v, want %v", m, p.Tags["full_name"], p.Fields["private"], want)
+			}
+		}
+	}
+	// The accepted answer only the second walk reads carries it as well.
+	late := find(t, points, "gh_discussion_comment", map[string]string{"comment": "7654321"})
+	if late.Fields["private"] != false {
+		t.Errorf("an answer from the answers walk = %v", late.Fields)
 	}
 }
 
@@ -368,6 +408,105 @@ func checkExternalContributions(t *testing.T, points []sink.Point) {
 	if hasField(open, "merged") {
 		t.Error("an issue is never merged")
 	}
+	checkContributionSizeAndVisibility(t, merged, open)
+}
+
+// checkContributionSizeAndVisibility reads the two facts about an item that do
+// not move once it is closed: how large the change was, and whether the
+// repository it went to is private, which is what lets a consumer leave
+// private work out of anything it shows to others.
+func checkContributionSizeAndVisibility(t *testing.T, merged, open sink.Point) {
+	t.Helper()
+	if fieldInt(t, merged, "additions") != 167 || fieldInt(t, merged, "deletions") != 12 ||
+		fieldInt(t, merged, "changed_files") != 6 {
+		t.Errorf("a pull request carries its size: %v", merged.Fields)
+	}
+	if merged.Fields["private"] != false || open.Fields["private"] != true {
+		t.Errorf("private = %v and %v, want false on someone/else and true on another/project",
+			merged.Fields["private"], open.Fields["private"])
+	}
+	for _, name := range []string{"additions", "deletions", "changed_files"} {
+		if hasField(open, name) {
+			t.Errorf("an issue has no diff, and carries %s: %v", name, open.Fields)
+		}
+	}
+	// The star count moves every day, and this row is dated when the item
+	// closed: on it, every move would rewrite a partition of the past.
+	for _, p := range []sink.Point{merged, open} {
+		for _, name := range []string{"stars", "repo_stars", "forks", "language"} {
+			if hasField(p, name) {
+				t.Errorf("gh_external_contribution carries %s, a current state of the repository: %v", name, p.Fields)
+			}
+		}
+	}
+}
+
+// checkUpstreamRepositories reads the repositories the searches reached, one
+// row each however many items and searches named it, stamped at the sweep
+// because every number on it is the repository as it stands now.
+func checkUpstreamRepositories(t *testing.T, points []sink.Point) {
+	t.Helper()
+	upstream := only(t, points, "gh_upstream_repo")
+	if len(upstream) != 2 {
+		t.Fatalf("got %d upstream repositories from 10 items in 5 searches, want the 2 distinct ones", len(upstream))
+	}
+	for _, p := range upstream {
+		if !p.Time.Equal(testNow) {
+			t.Errorf("%s stamped %s, want the sweep %s", p.Tags["full_name"], p.Time, testNow)
+		}
+		if len(p.Tags) != 3 {
+			t.Errorf("%s tags = %v, want the repository's three and nothing else", p.Tags["full_name"], p.Tags)
+		}
+	}
+	upstreamGo := find(t, points, "gh_upstream_repo", map[string]string{
+		"full_name": "someone/else", "owner": "someone", "repo": "else",
+	})
+	if fieldInt(t, upstreamGo, "stars") != 5152 || fieldInt(t, upstreamGo, "forks") != 555 ||
+		upstreamGo.Fields["private"] != false || upstreamGo.Fields["language"] != "Go" ||
+		upstreamGo.Fields["url"] != "https://github.com/someone/else" {
+		t.Errorf("someone/else = %v", upstreamGo.Fields)
+	}
+	// GitHub answers primaryLanguage null for a repository it detects no
+	// language in, and a field says nothing rather than an empty string.
+	private := find(t, points, "gh_upstream_repo", map[string]string{"full_name": "another/project"})
+	if private.Fields["private"] != true || fieldInt(t, private, "stars") != 21 || hasField(private, "language") {
+		t.Errorf("another/project = %v", private.Fields)
+	}
+}
+
+// A search that fails after others answered still leaves the repositories
+// those reached: their contributions are handed up with the error, and the
+// row that says what each of those repositories is goes with them.
+func TestOutboundKeepsTheUpstreamRepositoriesOfAFailedSweep(t *testing.T) {
+	t.Parallel()
+	searched := 0
+	f := newFixtureServer(t)
+	f.graphQL(func(w http.ResponseWriter, _ *http.Request, query string, _ map[string]any) {
+		switch {
+		case strings.Contains(query, "starredRepositories(first:"):
+			f.write(w, "graphql_starred.json")
+		case strings.Contains(query, "search(type: ISSUE"):
+			searched++
+			if searched > 1 {
+				_, _ = w.Write([]byte(accountInternalError))
+				return
+			}
+			f.write(w, "graphql_search_issues.json")
+		default:
+			t.Errorf("the comments were read after a search failed: %s", query)
+		}
+	})
+	points, err := Outbound{Login: "octocat"}.Collect(ctx(t), f.Client, testNow)
+	if err == nil {
+		t.Fatal("a failed search was not reported")
+	}
+	if got := len(only(t, points, "gh_external_contribution")); got != 2 {
+		t.Errorf("got %d contributions, want the first search's 2", got)
+	}
+	upstream := only(t, points, "gh_upstream_repo")
+	if len(upstream) != 2 {
+		t.Errorf("got %d upstream repositories, want the 2 the first search reached", len(upstream))
+	}
 }
 
 func TestOutboundSearchForbiddenIsSkipped(t *testing.T) {
@@ -487,9 +626,11 @@ func TestOutboundStarredStopsAtTheBackfillBound(t *testing.T) {
 // page from the front never sees a comment left this morning. The sweep asks
 // for the last hundred; a backfill walks back with before from the page's
 // startCursor, and stops once the oldest comment of a page is past Since.
+// The accepted answers are the same connection filtered, and are read from
+// the same end.
 func TestOutboundCommentsAreReadFromTheNewestEnd(t *testing.T) {
 	t.Parallel()
-	var discussion, issue []map[string]any
+	var discussion, issue, answers []map[string]any
 	f := newFixtureServer(t)
 	f.graphQL(func(w http.ResponseWriter, _ *http.Request, query string, vars map[string]any) {
 		switch {
@@ -497,6 +638,9 @@ func TestOutboundCommentsAreReadFromTheNewestEnd(t *testing.T) {
 			f.write(w, "graphql_starred.json")
 		case strings.Contains(query, "search(type: ISSUE"):
 			f.write(w, "graphql_search_issues.json")
+		case strings.Contains(query, "onlyAnswers: true"):
+			answers = append(answers, vars)
+			f.write(w, "viewer_discussion_answers.json")
 		case strings.Contains(query, "repositoryDiscussionComments"):
 			discussion = append(discussion, vars)
 			if vars["before"] == nil {
@@ -516,7 +660,7 @@ func TestOutboundCommentsAreReadFromTheNewestEnd(t *testing.T) {
 	if _, err := (Outbound{Login: "octocat"}).Collect(ctx(t), f.Client, testNow); err != nil {
 		t.Fatal(err)
 	}
-	for name, seen := range map[string][]map[string]any{"discussion": discussion, "issue": issue} {
+	for name, seen := range map[string][]map[string]any{"discussion": discussion, "issue": issue, "answer": answers} {
 		if len(seen) != 1 || seen[0]["last"] != float64(100) || seen[0]["first"] != nil || seen[0]["before"] != nil {
 			t.Errorf("a sweep's %s comments query = %v, want last: 100 and no cursor", name, seen)
 		}
@@ -538,6 +682,141 @@ func TestOutboundCommentsAreReadFromTheNewestEnd(t *testing.T) {
 	}
 	if len(discussion) != 1 {
 		t.Errorf("a backfill since September asked %d discussion pages, want to stop at the page whose oldest comment is 2024", len(discussion))
+	}
+}
+
+// answersFixture serves the newest page of comments as one with older pages
+// behind it, which a sweep does not read, and the accepted answers through
+// answer, recording the text of both queries.
+func answersFixture(t *testing.T, answer func(w http.ResponseWriter, vars map[string]any)) (f *fixtureServer, newest, answers *string) {
+	t.Helper()
+	newest, answers = new(string), new(string)
+	f = newFixtureServer(t)
+	f.graphQL(func(w http.ResponseWriter, _ *http.Request, query string, vars map[string]any) {
+		switch {
+		case strings.Contains(query, "starredRepositories(first:"):
+			f.write(w, "graphql_starred.json")
+		case strings.Contains(query, "search(type: ISSUE"):
+			f.write(w, "graphql_search_issues.json")
+		case strings.Contains(query, "onlyAnswers: true"):
+			*answers = query
+			answer(w, vars)
+		case strings.Contains(query, "repositoryDiscussionComments"):
+			*newest = query
+			b := strings.Replace(string(fixture(t, "viewer_discussion_comments.json")), `"hasPreviousPage": false`, `"hasPreviousPage": true`, 1)
+			_, _ = w.Write([]byte(b))
+		default:
+			f.write(w, "viewer_issue_comments.json")
+		}
+	})
+	return f, newest, answers
+}
+
+// The newest hundred is a window measured in comments, and an answer can be
+// accepted after its comment has left it: measured on 2026-09-26, one was
+// accepted fourteen days after it was written, and the account's newest
+// hundred of 108 comments no longer held one of its 15 accepted answers. A
+// sweep reads the accepted answers on their own, so an answer older than the
+// newest page is written with is_answer=true, dated when it was written like
+// every other comment; and one both walks see is written once, since a
+// second copy in the same batch would be counted twice by the exporter and
+// averaged twice into its upvotes.
+func TestAnAnswerAcceptedPastTheNewestHundredIsRead(t *testing.T) {
+	t.Parallel()
+	f, newest, answers := answersFixture(t, func(w http.ResponseWriter, _ map[string]any) {
+		_, _ = w.Write(fixture(t, "viewer_discussion_answers.json"))
+	})
+	points, err := Outbound{Login: "octocat"}.Collect(ctx(t), f.Client, testNow)
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkPoints(t, points)
+
+	late := find(t, points, "gh_discussion_comment", map[string]string{"comment": "7654321"})
+	if late.Tags["is_answer"] != "true" || late.Tags["own"] != "false" || late.Tags["full_name"] != "someone/else" ||
+		late.Tags["number"] != "57" || fieldInt(t, late, "answers") != 1 {
+		t.Errorf("the answer accepted past the newest hundred = %v %v", late.Tags, late.Fields)
+	}
+	if want := time.Date(2023, 11, 20, 16, 30, 0, 0, time.UTC); !late.Time.Equal(want) {
+		t.Errorf("stamped %s, want when the comment was written, %s", late.Time, want)
+	}
+	if late.Fields["url"] != "https://github.com/someone/else/discussions/57#discussioncomment-7654321" ||
+		late.Fields["answered_by"] != "octocat" || late.Fields["discussion_answered"] != true {
+		t.Errorf("the thread's context did not come with it: %v", late.Fields)
+	}
+
+	comments := only(t, points, "gh_discussion_comment")
+	both := 0
+	for _, p := range comments {
+		if p.Tags["comment"] == "18283966" {
+			both++
+		}
+	}
+	if both != 1 || len(comments) != 4 {
+		t.Errorf("the answer both walks see was written %d times among %d comments, want once among 4", both, len(comments))
+	}
+
+	// One selection for both, which is what makes the answer both walks see
+	// the same row: a field one of them forgot would be a zero on half of it.
+	_, newestNodes, _ := strings.Cut(*newest, "pageInfo")
+	_, answerNodes, _ := strings.Cut(*answers, "pageInfo")
+	if newestNodes == "" || newestNodes != answerNodes {
+		t.Errorf("the two walks ask for different comments:\n%s\n%s", *newest, *answers)
+	}
+}
+
+// The accepted answers are read back from the newest, to the end or to five
+// pages on a sweep, and a backfill's date bound does not stop them: a sweep
+// reads its pages whatever their dates, and a backfill reads no less.
+func TestTheAcceptedAnswersAreReadPastTheirFirstPage(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name  string
+		walk  Walk
+		more  func(before any) bool
+		pages int
+	}{
+		{"a sweep, to the end", Walk{}, func(before any) bool { return before == nil }, 2},
+		{"a backfill since last week, to the end", Walk{Pages: -1, Since: testNow.AddDate(0, 0, -7)}, func(before any) bool { return before == nil }, 2},
+		{"a sweep, to its bound", Walk{}, func(any) bool { return true }, 5},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			var asked []map[string]any
+			f, _, _ := answersFixture(t, func(w http.ResponseWriter, vars map[string]any) {
+				asked = append(asked, vars)
+				b := string(fixture(t, "viewer_discussion_answers.json"))
+				if tc.more(vars["before"]) {
+					b = strings.Replace(b, `"hasPreviousPage": false`, `"hasPreviousPage": true`, 1)
+				}
+				_, _ = w.Write([]byte(b))
+			})
+			if _, err := (Outbound{Login: "octocat", Walk: tc.walk}).Collect(ctx(t), f.Client, testNow); err != nil {
+				t.Fatal(err)
+			}
+			if len(asked) != tc.pages {
+				t.Fatalf("asked %d pages of accepted answers, want %d", len(asked), tc.pages)
+			}
+			if asked[0]["last"] != float64(100) || asked[0]["before"] != nil || asked[1]["before"] != "Y3Vyc29yOnYyOpHOAHTMsQ==" {
+				t.Errorf("answer queries = %v, want the newest hundred and then back from its startCursor", asked)
+			}
+		})
+	}
+}
+
+// A walk of the accepted answers that fails is the family's failure, and the
+// newest hundred read before it are still rows the store does not have.
+func TestAFailedAnswerWalkKeepsTheNewestComments(t *testing.T) {
+	t.Parallel()
+	f, _, _ := answersFixture(t, func(w http.ResponseWriter, _ map[string]any) {
+		_, _ = w.Write([]byte(accountInternalError))
+	})
+	points, err := Outbound{Login: "octocat"}.Collect(ctx(t), f.Client, testNow)
+	if err == nil || !strings.Contains(err.Error(), "INTERNAL") {
+		t.Fatalf("err = %v, want the failed answer walk reported", err)
+	}
+	if got := len(byMeasurement(points)["gh_discussion_comment"]); got != 3 {
+		t.Errorf("kept %d comments of the newest page, want its 3", got)
 	}
 }
 

@@ -277,7 +277,11 @@ func TestDiscussionsCommentsCarryTheSameContextAsTheAccountWalk(t *testing.T) {
 		}
 		f.write(w, "graphql_discussions_answered.json")
 	})
-	points, err := Discussions{Login: "octocat"}.Collect(ctx(t), f.Client, testRepo, testNow)
+	// Private, so the visibility the account walk reads off each comment's
+	// repository is seen coming from the listing that found this one.
+	private := testRepo
+	private.Private = true
+	points, err := Discussions{Login: "octocat"}.Collect(ctx(t), f.Client, private, testNow)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -288,6 +292,11 @@ func TestDiscussionsCommentsCarryTheSameContextAsTheAccountWalk(t *testing.T) {
 		t.Fatalf("got %d comments, want two comments and one reply", len(comments))
 	}
 	checkEveryCommentCarriesTheThread(t, comments)
+	for _, c := range comments {
+		if c.Fields["private"] != true {
+			t.Errorf("comment %s in a private repository: private = %v", c.Tags["comment"], c.Fields["private"])
+		}
+	}
 	// The account's own comment lost the thread: it is not the answer, and
 	// only discussion_answered tells that apart from nobody answering.
 	mine := find(t, points, "gh_discussion_comment", map[string]string{"comment": "9724102"})

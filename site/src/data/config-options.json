@@ -878,7 +878,7 @@
     {
       "name": "account",
       "group": "account",
-      "every": "12h"
+      "every": "1h"
     },
     {
       "name": "achievements",
@@ -893,12 +893,12 @@
     {
       "name": "activity",
       "group": "feeds",
-      "every": "30m"
+      "every": "15m"
     },
     {
       "name": "analyses",
       "group": "security",
-      "every": "6h"
+      "every": "1h"
     },
     {
       "name": "artifacts",
@@ -908,7 +908,7 @@
     {
       "name": "billing",
       "group": "account",
-      "every": "6h"
+      "every": "1h"
     },
     {
       "name": "branches",
@@ -923,7 +923,7 @@
     {
       "name": "deployments",
       "group": "ci",
-      "every": "1h"
+      "every": "30m"
     },
     {
       "name": "deps",
@@ -933,12 +933,12 @@
     {
       "name": "discussions",
       "group": "work",
-      "every": "2h"
+      "every": "1h"
     },
     {
       "name": "events",
       "group": "feeds",
-      "every": "30m"
+      "every": "15m"
     },
     {
       "name": "forks",
@@ -978,7 +978,7 @@
     {
       "name": "notifs",
       "group": "feeds",
-      "every": "30m"
+      "every": "15m"
     },
     {
       "name": "outbound",
@@ -1028,7 +1028,7 @@
     {
       "name": "stars",
       "group": "audience",
-      "every": "6h"
+      "every": "1h"
     },
     {
       "name": "stats",
@@ -1038,7 +1038,7 @@
     {
       "name": "totals",
       "group": "account",
-      "every": "12h"
+      "every": "1h"
     },
     {
       "name": "traffic",

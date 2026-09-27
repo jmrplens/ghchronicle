@@ -78,8 +78,8 @@ var overviewWant = map[string]float64{"Stars": 2 + 10 + 6 + 4, "Forks": 1 + 3 + 
 // that key a series by its tags, so each of the repositories above is several
 // series there and the query is what makes it one. The account has 22 stars.
 // Summed as they come its gh_repo_total series hold 26; one series per full
-// name of that table alone is 21, a star behind gh_repo, which a sweep writes
-// every hour where totals writes every twelve; one per short name, as the
+// name of that table alone is 21, a star behind gh_repo, which the repo
+// family writes at a moment of its own; one per short name, as the
 // Graphite query did before the review of #78, makes the two .github
 // repositories one and is 20; gh_repo alone, as 2.5.1 read it, is 24.
 //

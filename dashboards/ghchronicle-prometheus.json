@@ -64,7 +64,7 @@
     },
     {
       "datasource": "${DS_PROMETHEUS}",
-      "description": "Public repositories of the account, and the current stars and forks of the selected ones, summed over the newest row of each repository rather than over every row in the range. With All selected that includes the archived repositories the default filter sets aside, which the picker stops listing once the last backfill is behind it: people still star and fork them, and each totals sweep reads their counts again, twelve hours apart by default, so a range shorter than that can leave them out. Each repository counts once, by its full name. The repository count is GitHub's own count of the account's public repositories and not the set the sums are taken over: those are the repositories the sweeps collect and the archived ones above, private ones included, and forks left out unless `include_forks` is on.",
+      "description": "Public repositories of the account, and the current stars and forks of the selected ones, summed over the newest row of each repository rather than over every row in the range. With All selected that includes the archived repositories the default filter sets aside, which the picker stops listing once the last backfill is behind it: people still star and fork them, and each totals sweep reads their counts again, an hour apart by default, so a range shorter than that can leave them out. Each repository counts once, by its full name. The repository count is GitHub's own count of the account's public repositories and not the set the sums are taken over: those are the repositories the sweeps collect and the archived ones above, private ones included, and forks left out unless `include_forks` is on.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -11972,6 +11972,15 @@
               "instant": true,
               "range": false,
               "refId": "B"
+            },
+            {
+              "datasource": "${DS_PROMETHEUS}",
+              "editorMode": "code",
+              "expr": "sum by (repo, cache) (github_actions_cache_entry_caches{repo=~\"$repo\"})",
+              "format": "table",
+              "instant": true,
+              "range": false,
+              "refId": "C"
             }
           ],
           "title": "Cache entries by key",
@@ -11998,6 +12007,7 @@
                 "renameByName": {
                   "Value #A": "Size",
                   "Value #B": "Days since use",
+                  "Value #C": "Entries",
                   "cache": "Cache",
                   "repo": "Repository"
                 }
@@ -12539,7 +12549,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "Pull requests and issues opened in repositories this account does not own, with the state each ended in. Nothing else sees them: they are not in these repositories and the event feed forgets them in three days. Seen is the row's own date, which for an open item is the day it was last seen open; Opened is when it was opened. Prometheus keeps the repository only, so this is contributions per repository over the range, the share merged and the mean comments. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date. The Prometheus exporter carries no url, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "Pull requests and issues opened in repositories this account does not own, with the state each ended in. Nothing else sees them: they are not in these repositories and the event feed forgets them in three days. Seen is the row's own date, which for an open item is the day it was last seen open; Opened is when it was opened. Stars is the repository's own count at the last sweep inside the range. Prometheus keeps the repository only, so this is contributions per repository over the range, the share merged and the mean comments, beside the stars at the last sweep. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date. The Prometheus exporter carries no url, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -12630,6 +12640,22 @@
                   {
                     "id": "custom.width",
                     "value": 100
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Stars"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "short"
+                  },
+                  {
+                    "id": "custom.width",
+                    "value": 90
                   }
                 ]
               },
@@ -12736,6 +12762,15 @@
               "instant": true,
               "range": false,
               "refId": "C"
+            },
+            {
+              "datasource": "${DS_PROMETHEUS}",
+              "editorMode": "code",
+              "expr": "max by (full_name) (github_upstream_repo_stars)",
+              "format": "table",
+              "instant": true,
+              "range": false,
+              "refId": "D"
             }
           ],
           "title": "Work elsewhere",
@@ -12760,6 +12795,7 @@
                   "Value #A": "Contributions",
                   "Value #B": "Merged",
                   "Value #C": "Comments",
+                  "Value #D": "Stars",
                   "full_name": "Repository"
                 }
               }
@@ -16989,7 +17025,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "Every collector that ran in the range, with what stopped it where something did, how many sweeps it ran in, and how many repositories it was asked about. A family with no row here did not run at all, which is the one thing an empty panel could never say: not due, switched off, or skipped because a rate budget was spent. Why is what separates the two kinds of failure that would otherwise read alike: a search budget spent twice a day sorts apart from the 502 that cost a repository its history, and a family that had both has a row for each. Failures is the sweep's own count, so a family that failed on some of its repositories and was still marked as having run says so here; a batched query that failed names no repository and counts as one. One row here is not a family: `discover` is the repository listing, which every family depends on, and it appears only when it failed, because a listing that worked is stated by every other row of the same sweep. No repository filter: these rows belong to the collector rather than to a repository. In Prometheus this counts the collector's last sweep, not the dashboard range. There is no Sweeps column here for the same reason: the exporter holds one sweep, so the count would be one on every row.",
+          "description": "Every collector that ran in the range, with what stopped it where something did, how many sweeps it ran in, and how many repositories it was asked about. A family with no row here did not run at all, which is the one thing an empty panel could never say: not due, switched off, or skipped because a rate budget was spent. Why is what separates the two kinds of failure that would otherwise read alike: a spent search budget sorts apart from the 502 that cost a repository its history, and a family that had both has a row for each. Failures is the sweep's own count, so a family that failed on some of its repositories and was still marked as having run says so here; a batched query that failed names no repository and counts as one. One row here is not a family: `discover` is the repository listing, which every family depends on, and it appears only when it failed, because a listing that worked is stated by every other row of the same sweep. No repository filter: these rows belong to the collector rather than to a repository. In Prometheus this counts the collector's last sweep, not the dashboard range. There is no Sweeps column here for the same reason: the exporter holds one sweep, so the count would be one on every row.",
           "fieldConfig": {
             "defaults": {
               "custom": {

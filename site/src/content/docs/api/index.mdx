@@ -83,8 +83,9 @@ GitHub that answers the repeat 304 and fails on the first point that differs,
 which is what keeps the replay the same answer as the original. An entry is
 keyed by the URL and the type that decoded it, so the one URL two collectors
 read differently, `GET /repos/{owner}/{repo}` (four flags for discovery of a
-repository named in `targets.repos`, forty fields for the repo family), has an
-entry per reader and neither is answered from the other's.
+repository named in `targets.repos` that no listing returned, forty fields for
+the repo family), has an entry per reader and neither is answered from the
+other's.
 
 The cache is bounded, and the bound is 256 MB. It is an LRU, and an entry is
 charged the bytes it holds plus two hundred for the map slot, the list element
@@ -100,12 +101,25 @@ And the bound is resident memory once the cache is full, which is the number to
 know before giving the process a container with a memory limit: it can hold that
 much of decoded bodies on top of its own footprint.
 
+The cache outlives the process. What was asked for within twice the longest
+cadence is kept in [a file beside the state
+file](/ghchronicle/configuration/#the-cache-beside-it), written at most every
+five minutes while the collector runs and once more when it stops, and a restart
+reads it back, so its first sweep asks with the validators the last one stored.
+Before that file, the first sweep after a restart of the author's service made
+130 requests and not one of them was answered 304. An entry is kept under a
+digest of everything its type decodes rather than under the type's name, so an
+upgrade that changes what a collector reads asks that collector's URLs again in
+full instead of answering them with a body stored without the new field.
+
 ## A refusal is remembered too
 
 A 403 or a 404 is how GitHub says a feature is switched off: Dependabot on a
 repository that does not use it, code scanning where it was never enabled, a
-forum on a repository with discussions off. That is not an error, and the
-collector turns it into "there is nothing here".
+forum on a repository with discussions off, the community profile of a fork,
+which GitHub does not serve at all (all 28 forks of the account it was measured
+on answered 404, and all 39 other repositories 200). That is not an error, and
+the collector turns it into "there is nothing here".
 
 What it is not is free. A refusal carries no ETag, so where a page that did not
 change costs nothing, a feature that is off is charged in full on every sweep,
@@ -116,12 +130,43 @@ Two consequences worth knowing:
 
 - Switch a feature on and it is noticed a day later at the latest, not on the
   next sweep.
-- Restarting the process asks again straight away. The memory lives in the
-  process, like the ETag cache, not in the state file.
+- Restarting the process does not ask again. The refusals are kept with the
+  ETag cache in [the file beside the state
+  file](/ghchronicle/configuration/#the-cache-beside-it), each until the end of
+  its own day, and deleting that file is how to ask again straight away.
 
 A spent budget is a 403 as well and is never remembered as one: the client
 types it apart precisely so that a rate limit is not read as a feature that is
 off.
+
+## A gateway that gave up is asked once more
+
+A `502` or a `504` is the gateway in front of GitHub saying the answer did not
+come back in time, and it is intermittent. Measured on the author's own sweeps
+between 2026-09-11 and 2026-09-27, 36 of 397,455 REST requests answered one,
+25 of them after ten and a half seconds, and from 2026-09-25 most were the
+artifact listing of the two repositories with the longest artifact history. The
+size of the page is not the cause: asking for one artifact took as long as
+asking for a hundred.
+
+So a REST request that answers either is asked once more, two seconds later,
+before the collector hears about it. Three things hold for that second attempt:
+
+- **It is charged.** Every one of those 25 cost a request from `core`, even
+  when it was asked conditionally, where a `304` costs none. So the retry goes
+  through the brake like any other request, and a budget already at its reserve
+  is not spent on it.
+- **It is conditional.** It carries the same `If-None-Match` as the first
+  attempt, so a page that has not changed still comes back as a free `304`.
+- **It is the only one.** Each attempt can hold the family for ten seconds, and
+  a request that fails twice is logged and left to the next sweep as before.
+  What the collector read before it is kept either way.
+
+A `500` is not asked again: it is the application failing rather than the
+gateway giving up. GraphQL is not asked again here either, because its gateway
+error means a query too large to answer in ten seconds, which the same query
+would meet again; the collectors ask again on the same cursor with a smaller
+page instead.
 
 ## The budget in the log
 

@@ -112,8 +112,8 @@ func TestACollidingNameIsUnambiguousInEachLayer(t *testing.T) {
 		t.Errorf("every.families.security = %v, want 4h", got)
 	}
 	// analyses is the other member of group security and must be untouched.
-	if got := mustInterval(t, byFamily, "analyses"); got != 6*time.Hour {
-		t.Errorf("every.families.security moved analyses to %v, want its built-in 6h", got)
+	if got := mustInterval(t, byFamily, "analyses"); got != time.Hour {
+		t.Errorf("every.families.security moved analyses to %v, want its built-in 1h", got)
 	}
 	byGroup := loadEvery(t, "every: {groups: {security: 4h}}\n")
 	for _, name := range []string{"security", "analyses"} {
@@ -176,13 +176,13 @@ func TestASubstantiallyFasterCadenceWarns(t *testing.T) {
 	}
 	// Every slow family, not just the first one found: the reason is per
 	// family, so the warning has to be too.
-	for _, name := range []string{"traffic", "billing", "stats", "branches", "policyfiles"} {
+	for _, name := range []string{"traffic", "profile", "stats", "branches", "policyfiles"} {
 		if !slices.ContainsFunc(c.Warnings(), func(w string) bool { return strings.Contains(w, "sets "+name+" to ") }) {
 			t.Errorf("no warning names %s, whose built-in %v is far past a 15m default", name, defaultEvery[name].every)
 		}
 	}
 	// And nothing at or near its built-in value is mentioned.
-	for _, name := range []string{"actions", "ratelimit", "events", "notifs", "activity"} {
+	for _, name := range []string{"actions", "ratelimit", "events", "notifs", "activity", "deployments"} {
 		if slices.ContainsFunc(c.Warnings(), func(w string) bool { return strings.Contains(w, "sets "+name+" to ") }) {
 			t.Errorf("%s runs at or near its built-in cadence and must not warn", name)
 		}
@@ -193,7 +193,7 @@ func TestASubstantiallyFasterCadenceWarns(t *testing.T) {
 // useless, because the reason lives on the family.
 func TestAGroupCadenceWarnsPerFamilyAndNeverPerGroup(t *testing.T) {
 	// Group work holds families measured at 1h and at 12h, so one number for
-	// the group flattens six different values.
+	// the group flattens the values of six families.
 	c := loadEvery(t, "every: {groups: {work: 1h}}\n")
 	var named []string
 	for _, w := range c.Warnings() {
@@ -206,8 +206,8 @@ func TestAGroupCadenceWarnsPerFamilyAndNeverPerGroup(t *testing.T) {
 			t.Errorf("warning %q does not point at the key that set the cadence", w)
 		}
 	}
-	// planning is 6h and stats is 12h against the group's 1h. issues and
-	// commits are 1h already and discussions is 2h, so all three stay out.
+	// planning is 6h and stats is 12h against the group's 1h. issues,
+	// commits and discussions are 1h already, so all three stay out.
 	slices.Sort(named)
 	if want := []string{"planning", "stats"}; !slices.Equal(named, want) {
 		t.Errorf("warned about %v, want %v", named, want)

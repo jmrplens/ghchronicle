@@ -13,7 +13,8 @@
             "issue": {
               "number": 7,
               "repository": {
-                "nameWithOwner": "octocat/hello-world"
+                "nameWithOwner": "octocat/hello-world",
+                "isPrivate": true
               }
             }
           },
@@ -22,7 +23,8 @@
             "issue": {
               "number": 42,
               "repository": {
-                "nameWithOwner": "torvalds/linux"
+                "nameWithOwner": "torvalds/linux",
+                "isPrivate": false
               }
             }
           }

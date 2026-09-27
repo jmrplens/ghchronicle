@@ -110,6 +110,11 @@ var promRules = map[string]rule{
 	// The lists the stars given are filed into: a daily snapshot anchored
 	// like the tiers, so the newest reading per list is the whole answer.
 	"gh_star_list": {mode: keepLast, keep: []string{"user", "list"}},
+	// The repositories the outbound contributions went to, stamped at the
+	// sweep, so the newest reading is the whole answer, the way
+	// gh_pinned_item's is: a series per repository the account has worked
+	// in, which grows only as the account reaches a new one.
+	"gh_upstream_repo": {mode: keepLast, keep: []string{"owner", "repo", "full_name"}},
 
 	// Repository snapshots.
 	"gh_repo": {mode: keepLast, keep: []string{
@@ -197,6 +202,10 @@ var promRules = map[string]rule{
 	// The publication date of every container tag is history; the count of
 	// them is already a field on gh_package.
 	"gh_package_version": {mode: skip},
+	// So is the publication date of every release, and gh_release already
+	// serves a series per release, so how many there are is a count of
+	// those.
+	"gh_release_published": {mode: skip},
 
 	// Text, not a number. It goes to a log store.
 	"gh_job_log": {mode: skip},
@@ -263,7 +272,9 @@ var promRules = map[string]rule{
 
 	// Transitions, which are events rather than state.
 	"gh_issue_event": {mode: count, as: "gh_issue_events", keep: []string{"repo", "event", "kind", "bot"}},
-	// One row per cache entry, and per key rather than per build.
+	// One row per cache on each ref, its entries already summed by the
+	// collector, so the newest per label set is the whole cache and not
+	// whichever of its entries came last.
 	"gh_actions_cache_entry": {mode: keepLast, keep: []string{"repo", "cache", "ref"}},
 	// The account's keys, which are a standing fact with an expiry date.
 	"gh_key": {mode: keepLast, keep: []string{"user", "kind", "key"}},

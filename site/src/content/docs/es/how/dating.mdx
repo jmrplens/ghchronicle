@@ -136,10 +136,10 @@ distintos vistos por serie. Eso es lo que permite que un dashboard de
 Prometheus responda "por día", mediante `increase()` sobre un contador
 monótono, ya que no tiene filas que contar.
 
-### Las once que no se sirven nunca
+### Las doce que no se sirven nunca
 
-Once de las medidas llevan `skip`, así que un exportador de Prometheus y un
-backend OTLP con `raw: false` no las ven nunca. Ocho son historia, dos son
+Doce de las medidas llevan `skip`, así que un exportador de Prometheus y un
+backend OTLP con `raw: false` no las ven nunca. Nueve son historia, dos son
 tamaño y una es texto:
 
 | Medida                     | Por qué                                                                                        |
@@ -152,6 +152,7 @@ tamaño y una es texto:
 | `gh_job_log`               | Texto, no un número. Su sitio es un almacén de logs                                            |
 | `gh_package_version`       | Historia. La fecha de publicación de cada tag; su recuento ya es un campo de `gh_package`        |
 | `gh_release_asset`         | Tamaño. Una serie por cada fichero publicado alguna vez                                        |
+| `gh_release_published`     | Historia. La fecha de publicación de cada release; `gh_release` ya es una serie por release     |
 | `gh_star_day`              | Historia. Estrellas por día, corregidas hacia atrás cuando se quita una estrella dada en las últimas treinta semanas; el recuento es `gh_repo.stars` |
 | `gh_traffic_path`          | Historia. Las rutas por día                                                                    |
 | `gh_workflow_step`         | Historia. Los tiempos por paso                                                                 |

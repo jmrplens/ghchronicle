@@ -1,8 +1,10 @@
 package collect
 
 import (
+	"fmt"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/jmrplens/ghchronicle/v2/internal/sink"
 )
@@ -23,7 +25,8 @@ func TestRepoCoreSnapshot(t *testing.T) {
 	checkPoints(t, points)
 	// Languages, topics and rulesets are RepoDetail's now, in one batched
 	// GraphQL query rather than a REST call each.
-	wantMeasurements(t, points, "gh_repo", "gh_repo_community", "gh_release", "gh_release_asset", "gh_security_setting")
+	wantMeasurements(t, points, "gh_repo", "gh_repo_community", "gh_release", "gh_release_asset",
+		"gh_release_published", "gh_security_setting")
 
 	checkRepoRow(t, points)
 	checkSecuritySettings(t, points)
@@ -45,6 +48,7 @@ func TestRepoCoreSnapshot(t *testing.T) {
 
 	checkReleaseDownloads(t, points)
 	checkReleaseAssetProvenance(t, points)
+	checkReleasePublications(t, points)
 }
 
 // checkRepoRow reads the repository snapshot: its tags, its counts, and its
@@ -118,6 +122,133 @@ func checkReleaseDownloads(t *testing.T, points []sink.Point) {
 	rc := find(t, points, "gh_release", map[string]string{"tag": "v1.3.0-rc1"})
 	if rc.Tags["prerelease"] != "true" || fieldInt(t, rc, "assets") != 0 {
 		t.Errorf("prerelease = %v %v", rc.Tags, rc.Fields)
+	}
+}
+
+// checkReleasePublications reads the row each publication writes, dated at
+// published_at to the second, which is what gh_release's floored age_days
+// cannot give back: counted back from the sweep, v1.2.0 lands on the 10th
+// only because the sweep here runs later in the day than it was published.
+func checkReleasePublications(t *testing.T, points []sink.Point) {
+	t.Helper()
+	if got := len(only(t, points, "gh_release_published")); got != 2 {
+		t.Fatalf("got %d publications, want one for each of the two releases that are not drafts", got)
+	}
+	for _, want := range []struct {
+		tag        string
+		prerelease bool
+		at         time.Time
+	}{
+		{"v1.2.0", false, time.Date(2026, 8, 10, 9, 30, 0, 0, time.UTC)},
+		{"v1.3.0-rc1", true, time.Date(2026, 9, 1, 9, 5, 0, 0, time.UTC)},
+	} {
+		p := find(t, points, "gh_release_published", map[string]string{"tag": want.tag})
+		if !p.Time.Equal(want.at) {
+			t.Errorf("%s stamped %s, want its publication %s", want.tag, p.Time, want.at)
+		}
+		if p.Tags["full_name"] != "octocat/hello-world" {
+			t.Errorf("%s tags = %v", want.tag, p.Tags)
+		}
+		if p.Fields["prerelease"] != want.prerelease {
+			t.Errorf("%s prerelease = %v, want the field %v", want.tag, p.Fields["prerelease"], want.prerelease)
+		}
+		// Every row here is a release that is not a draft, so the tag would
+		// hold the same value on all of them and only deepen the path.
+		if draft, ok := p.Tags["draft"]; ok {
+			t.Errorf("%s carries draft=%q, a tag with one possible value", want.tag, draft)
+		}
+		if fieldInt(t, p, "published") != 1 {
+			t.Errorf("%s published = %v, want 1 so that counting rows is a sum", want.tag, p.Fields["published"])
+		}
+		if url := "https://github.com/octocat/hello-world/releases/tag/" + want.tag; p.Fields["url"] != url {
+			t.Errorf("%s url = %v, want %s", want.tag, p.Fields["url"], url)
+		}
+	}
+}
+
+// TestAPromotedReleaseIsStillOneRow unticks the pre-release box on a release
+// already published, which is how a pre-release is promoted: the publication
+// keeps its date and only the flag moves. Every store keys a row by
+// measurement, tags and time, so with the flag as a tag the promotion wrote a
+// second row beside the first at the same instant, and counting publications
+// counted the release twice. As a field the second sweep rewrites the row it
+// wrote the first time.
+func TestAPromotedReleaseIsStillOneRow(t *testing.T) {
+	t.Parallel()
+	identity := func(prerelease bool) string {
+		f := newFixtureServer(t)
+		f.file("/repos/octocat/hello-world", "repo.json")
+		f.handle("/repos/octocat/hello-world/releases", func(w http.ResponseWriter, _ *http.Request) {
+			_, _ = w.Write(repeat(t, "releases.json", "", 1, func(_ int, row map[string]any) {
+				row["prerelease"] = prerelease
+			}))
+		})
+		points, err := RepoCore{}.Collect(ctx(t), f.Client, testRepo, testNow)
+		if err != nil {
+			t.Fatal(err)
+		}
+		p := find(t, points, "gh_release_published", map[string]string{"tag": "v1.2.0"})
+		if p.Fields["prerelease"] != prerelease {
+			t.Errorf("prerelease = %v, want %v", p.Fields["prerelease"], prerelease)
+		}
+		return fmt.Sprintf("%s %v %s", p.Measurement, p.Tags, p.Time)
+	}
+	if before, after := identity(true), identity(false); before != after {
+		t.Errorf("promoting the release moved its row:\n before %s\n after  %s", before, after)
+	}
+}
+
+// TestADraftReleaseHasNoPublicationAndNoAge is the draft GitHub sends with
+// published_at null. Measured from Go's zero time its age saturated, and every
+// draft row held age_days = 106751 beside a real maximum of 271 on the account
+// it was measured on. It is still a release on gh_release, tagged as a draft,
+// and nothing about it is dated or aged.
+func TestADraftReleaseHasNoPublicationAndNoAge(t *testing.T) {
+	t.Parallel()
+	f := newFixtureServer(t)
+	f.file("/repos/octocat/hello-world", "repo.json")
+	f.file("/repos/octocat/hello-world/releases", "releases.json")
+	points, err := RepoCore{}.Collect(ctx(t), f.Client, testRepo, testNow)
+	if err != nil {
+		t.Fatal(err)
+	}
+	draft := find(t, points, "gh_release", map[string]string{"tag": "v1.4.0"})
+	if draft.Tags["draft"] != "true" || !draft.Time.Equal(testNow) {
+		t.Errorf("draft = %v at %s, want the draft tag at the sweep", draft.Tags, draft.Time)
+	}
+	if age, ok := draft.Fields["age_days"]; ok {
+		t.Errorf("the draft carries age_days = %v, and it has not been published", age)
+	}
+	for _, p := range byMeasurement(points)["gh_release_published"] {
+		if p.Tags["tag"] == "v1.4.0" {
+			t.Errorf("the draft wrote a publication dated %s", p.Time)
+		}
+	}
+}
+
+// TestAReleaseWithoutAPageWritesNoURL holds both release rows to the rule
+// every url here obeys, absolute or absent. GitHub always sends html_url; a
+// body without it wrote url="" on gh_release, which a table's Link column
+// would have hung on the release and sent nowhere.
+func TestAReleaseWithoutAPageWritesNoURL(t *testing.T) {
+	t.Parallel()
+	f := newFixtureServer(t)
+	f.file("/repos/octocat/hello-world", "repo.json")
+	f.handle("/repos/octocat/hello-world/releases", func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write(repeat(t, "releases.json", "", 1, func(_ int, row map[string]any) {
+			delete(row, "html_url")
+		}))
+	})
+	points, err := RepoCore{}.Collect(ctx(t), f.Client, testRepo, testNow)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, m := range []string{"gh_release", "gh_release_published"} {
+		for _, p := range only(t, points, m) {
+			if url, ok := p.Fields["url"]; ok {
+				t.Errorf("%s %s carries url %q with no page to point at", m, p.Tags["tag"], url)
+			}
+		}
 	}
 }
 
@@ -310,5 +441,60 @@ func TestRepoCoreSurvivesOptionalSurfacesBeingOff(t *testing.T) {
 		if m != "gh_repo" && m != "gh_security_setting" {
 			t.Errorf("got %s, want only the two that come from the repository body", m)
 		}
+	}
+}
+
+// TestRepoCoreAsksAForkForItsCommunityProfileOnceADay is issue #86. GitHub
+// serves no community profile for a fork, and the 404 carries no ETag, so
+// every pass paid in full to be told so again. Remembered, it is asked once a
+// day, and nothing the family writes changes: the repository and its releases
+// are still read on every pass, since they are what the rows come from.
+func TestRepoCoreAsksAForkForItsCommunityProfileOnceADay(t *testing.T) {
+	t.Parallel()
+	const profile = "/repos/octocat/linguist/community/profile"
+	fork := Repo{Owner: "octocat", Name: "linguist", FullName: "octocat/linguist", Fork: true}
+	f := newFixtureServer(t)
+	f.file("/repos/octocat/linguist", "repo_fork.json")
+	f.status(profile, http.StatusNotFound, "Not Found")
+	f.file("/repos/octocat/linguist/releases", "releases.json")
+
+	clock := testNow
+	rc := RepoCore{Refusals: &Refusals{For: 24 * time.Hour, now: func() time.Time { return clock }}}
+	first, err := rc.Collect(ctx(t), f.Client, fork, testNow)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := rc.Collect(ctx(t), f.Client, fork, testNow)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := len(f.calls(profile)); n != 1 {
+		t.Errorf("the community profile was asked %d times in two passes, want once: the refusal is remembered", n)
+	}
+	for _, path := range []string{"/repos/octocat/linguist", "/repos/octocat/linguist/releases"} {
+		if n := len(f.calls(path)); n != 2 {
+			t.Errorf("%s was asked %d times in two passes, want every pass", path, n)
+		}
+	}
+	checkPoints(t, second)
+	if !samePoints(first, second) {
+		t.Errorf("a remembered refusal changed the points:\n%v\n%v", first, second)
+	}
+	wantMeasurements(t, second, "gh_repo", "gh_security_setting", "gh_release", "gh_release_asset", "gh_release_published")
+	if got := byMeasurement(second)["gh_repo_community"]; len(got) != 0 {
+		t.Errorf("a fork GitHub refused the profile of has a community row: %v", got)
+	}
+	if repo := only(t, second, "gh_repo")[0]; repo.Tags["fork"] != "true" {
+		t.Errorf("gh_repo tagged %v, want the fork said", repo.Tags)
+	}
+
+	// A day later it is asked again, which is how a fork GitHub starts
+	// answering for is noticed.
+	clock = clock.Add(24 * time.Hour)
+	if _, err = rc.Collect(ctx(t), f.Client, fork, testNow); err != nil {
+		t.Fatal(err)
+	}
+	if n := len(f.calls(profile)); n != 2 {
+		t.Errorf("after a day the community profile was asked %d times in total, want 2", n)
 	}
 }

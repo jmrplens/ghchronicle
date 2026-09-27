@@ -75,7 +75,7 @@ func Discover(ctx context.Context, c *ghapi.Client, f *Filter) (Discovery, error
 
 	// Explicitly named repositories are collected whatever the filters say:
 	// naming one is the clearest possible statement of intent.
-	named, err := namedRepos(ctx, c, f.Repos)
+	named, err := namedRepos(ctx, c, f.Repos, owned)
 	for _, r := range named {
 		keep(r, false)
 	}
@@ -172,15 +172,39 @@ func (f *Filter) ownedRepos(ctx context.Context, c *ghapi.Client) ([]Repo, error
 
 // namedRepos reads the repositories the configuration named one by one.
 //
+// A name the listings already returned is taken from them instead. A listing
+// entry carries the four flags wanted here, and they are the same answer:
+// compared on 2026-09-27 over the 67 repositories of this account, the
+// listing and GET /repos/{owner}/{repo} agreed on all four for every one.
+// Read again, each named fork cost a request an hour, and more often than not
+// a charged one, because a fork's body embeds its parent's counters, which
+// move: 212 of the 405 reads of the fifteen forks the production
+// configuration names came back 200 in 30.9 hours. What is left to read is a
+// name no listing returned, another owner's repository or one of an
+// organization not listed.
+//
+// The match ignores case, as GitHub does when it serves a name, and the
+// repository keeps the spelling the configuration gave it, which is the one
+// every tag has always carried.
+//
 // A repository the token cannot see still counts as named: it is listed with
 // what little is known about it rather than dropped, because the name in the
 // configuration is the statement of intent.
-func namedRepos(ctx context.Context, c *ghapi.Client, names []string) ([]Repo, error) {
+func namedRepos(ctx context.Context, c *ghapi.Client, names []string, listed []Repo) ([]Repo, error) {
+	known := make(map[string]Repo, len(listed))
+	for _, r := range listed {
+		known[strings.ToLower(r.FullName)] = r
+	}
 	var out []Repo
 	for _, full := range names {
 		owner, name, ok := strings.Cut(full, "/")
 		if !ok {
 			return out, fmt.Errorf("targets.repos: %q is not owner/name", full)
+		}
+		if r, found := known[strings.ToLower(full)]; found {
+			r.Owner, r.Name, r.FullName = owner, name, full
+			out = append(out, r)
+			continue
 		}
 		var r struct {
 			Private        bool `json:"private"`

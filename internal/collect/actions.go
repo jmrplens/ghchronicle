@@ -40,7 +40,14 @@ type Actions struct {
 	// job listings a sweep, two hundred and eighty six of them 304, and a
 	// hundred and thirty seven seconds of waiting for them, ninety six times
 	// a day. Nil keeps no memory, which is what a backfill wants.
-	Expanded map[RunKey]struct{}
+	//
+	// Each run carries the instant of the last sweep that listed it, whether
+	// its jobs were written then or before. That is what lets the runner keep
+	// the set across a restart without keeping it for ever: a run the listing
+	// has not returned for a while has left the newest page for good, the
+	// listing being newest first, and the file beside the state keeps only
+	// the ones it returned lately. A re-run is a new attempt, so a new key.
+	Expanded map[RunKey]time.Time
 	// PerPage is how many runs a page of the listing holds. Zero means a
 	// hundred, the most GitHub serves and what a first sweep and a backfill
 	// ask for. A sweep every quarter of an hour asks for thirty: the page is
@@ -54,6 +61,12 @@ type Actions struct {
 	// Walk bounds the run list. Its default is two pages; a backfill asks for
 	// everything and bounds itself by date instead.
 	Walk Walk
+	// CacheWalk bounds the cache listing. Its default is ten pages, a
+	// thousand entries, which is four times the most any repository of the
+	// account this was measured on held (232, on 2026-09-27). Only its pages
+	// are read: the listing is what is stored now, not a history, so there
+	// is no date to stop at and a backfill has no more of it to read.
+	CacheWalk Walk
 }
 
 // RunKey is the identity of one attempt of a workflow run. The attempt is
@@ -163,7 +176,14 @@ func (a Actions) Collect(ctx context.Context, c *ghapi.Client, repo Repo, now ti
 	// threw a failed collector's points away.
 	if a.Expanded != nil {
 		for _, key := range expanded {
-			a.Expanded[key] = struct{}{}
+			a.Expanded[key] = now
+		}
+		// Seen again, so still on the newest page: see Expanded.
+		for i := range runs {
+			key := RunKey{ID: runs[i].ID, Attempt: runs[i].RunAttempt}
+			if _, written := a.Expanded[key]; written {
+				a.Expanded[key] = now
+			}
 		}
 	}
 	if err != nil {
@@ -185,7 +205,7 @@ func (a Actions) Collect(ctx context.Context, c *ghapi.Client, repo Repo, now ti
 	// The cache totals are the last call of the family and the least of it:
 	// a repository's whole run and job history is already in points, so a
 	// failure here goes back with them rather than instead of them.
-	cache, err := cachePoints(ctx, c, repo, base, now)
+	cache, err := cachePoints(ctx, c, repo, base, now, a.CacheWalk)
 	return append(points, cache...), err
 }
 
@@ -364,13 +384,14 @@ func headline(message string) string {
 	return strings.TrimSpace(line)
 }
 
-// cachePoints is what Actions has stored: the total, and a row per entry.
+// cachePoints is what Actions has stored: the total, and a row per cache on
+// each ref.
 //
-// The total says a repository holds twelve gigabytes; only the per-entry rows
-// say which key holds them and which key has not been touched for a week,
-// which is what decides what GitHub evicts when a repository crosses its ten
+// The total says a repository holds twelve gigabytes; only the rows under it
+// say which cache holds them and which has not been touched for a week, which
+// is what decides what GitHub evicts when a repository crosses its ten
 // gigabyte ceiling. Both are current state, so both are stamped now.
-func cachePoints(ctx context.Context, c *ghapi.Client, repo Repo, base map[string]string, now time.Time) ([]sink.Point, error) {
+func cachePoints(ctx context.Context, c *ghapi.Client, repo Repo, base map[string]string, now time.Time, w Walk) ([]sink.Point, error) {
 	var points []sink.Point
 	var usage struct {
 		Size  int64 `json:"active_caches_size_in_bytes"`
@@ -388,45 +409,156 @@ func cachePoints(ctx context.Context, c *ghapi.Client, repo Repo, base map[strin
 		return points, err
 	}
 
-	var caches struct {
-		TotalCount int `json:"total_count"`
-		Caches     []struct {
-			Ref            string    `json:"ref"`
-			Key            string    `json:"key"`
-			SizeInBytes    int64     `json:"size_in_bytes"`
-			CreatedAt      time.Time `json:"created_at"`
-			LastAccessedAt time.Time `json:"last_accessed_at"`
-		} `json:"actions_caches"`
-	}
-	switch _, _, err := c.GetJSON(ctx, "/repos/"+repo.FullName+"/actions/caches?per_page=100", &caches, ""); {
-	case err == nil:
-		for _, e := range caches.Caches {
-			points = append(points, sink.Point{
-				Measurement: "gh_actions_cache_entry",
-				Tags: merge(base, map[string]string{
-					// The key carries a content hash, so it is a series per
-					// build and cannot be a tag. The prefix before the hash is
-					// the thing a reader means by "the pnpm cache".
-					"cache": cachePrefix(e.Key),
-					"ref":   e.Ref,
-				}),
-				Fields: map[string]any{
-					"size_bytes": e.SizeInBytes, "caches": 1, "key": e.Key,
-					"days_since_use": int(now.Sub(e.LastAccessedAt).Hours() / 24),
-					"age_days":       int(now.Sub(e.CreatedAt).Hours() / 24),
-				},
-				// Stamped at the start of the day rather than at creation: it
-				// is a snapshot of what is stored now, and a day's sweeps
-				// should rewrite one row rather than add one an hour.
-				Time: now.UTC().Truncate(24 * time.Hour),
-			})
-		}
-	case !isSkippable(err):
-		// The totals row above is already in hand, and the per-entry listing
-		// failing does not make it less true.
+	entries, whole, err := cacheEntries(ctx, c, repo, w)
+	if err != nil {
+		// The totals row above is already in hand, and the listing failing
+		// does not make it less true. What the listing gave before it failed
+		// is not written: summed, it would be a part of each cache, written
+		// over the whole of it that the day's earlier passes stored.
 		return points, err
 	}
-	return points, nil
+	if !whole {
+		// The listing changed under the walk, so a row could be a part of
+		// its cache, as it would after a failure. It is not one, and the
+		// day's next pass writes the rows.
+		return points, nil
+	}
+	return append(points, cacheRows(entries, base, now)...), nil
+}
+
+// cacheEntry is one entry of the cache listing.
+type cacheEntry struct {
+	ID             int64     `json:"id"`
+	Ref            string    `json:"ref"`
+	Key            string    `json:"key"`
+	SizeInBytes    int64     `json:"size_in_bytes"`
+	CreatedAt      time.Time `json:"created_at"`
+	LastAccessedAt time.Time `json:"last_accessed_at"`
+}
+
+// cacheEntries walks the cache listing, a hundred entries a page, newest
+// created first, and says whether what it read is the listing whole.
+//
+// Past the first page because one page is a hundred entries, not the cache:
+// measured on 2026-09-27, jmrplens/ghchronicle listed 118 entries and
+// jmrplens/mikroscope 232. A page costs nothing while the listing has not
+// changed, and it seldom has: from 2026-09-25 12:58Z to 2026-09-27 01:39Z the
+// account's listings answered 304 to 3,059 of 3,256 requests.
+//
+// The pages are numbered, so an entry that changes place between two
+// requests moves every entry behind it one place along, and at the next page
+// one of them is read twice or not at all. GitHub's own order is by last use,
+// which every cache hit changes: an entry restored between two requests went
+// to the front, and an entry of the pages still to read was never read. Newest
+// created first, a hit moves nothing. A new entry goes to the front, onto a
+// page already read, and pushes the entry that ended it onto the next one
+// again, where the id keeps it from being counted twice. A deletion pulls
+// the entries behind it up, and one of them is never read. So the walk is
+// whole when it read, once each, as many entries as the first page said the
+// listing held, and what it read is then the listing as that request found
+// it. A walk that stops at its cap or on a refusal is taken as it is, as the
+// other walks take theirs.
+func cacheEntries(ctx context.Context, c *ghapi.Client, repo Repo, w Walk) ([]cacheEntry, bool, error) {
+	var entries []cacheEntry
+	seen := map[int64]bool{}
+	most := w.limit(10)
+	listed, ended := 0, false
+	for page := 1; page <= most; page++ {
+		var res struct {
+			Total  int          `json:"total_count"`
+			Caches []cacheEntry `json:"actions_caches"`
+		}
+		path := fmt.Sprintf("/repos/%s/actions/caches?per_page=100&page=%d&sort=created_at&direction=desc", repo.FullName, page)
+		if _, _, err := c.GetJSON(ctx, path, &res, ""); err != nil {
+			if isSkippable(err) || isPaginationLimit(err) {
+				break
+			}
+			return nil, false, err
+		}
+		if page == 1 {
+			listed = res.Total
+		}
+		for _, e := range res.Caches {
+			if !seen[e.ID] {
+				seen[e.ID] = true
+				entries = append(entries, e)
+			}
+		}
+		if len(res.Caches) < 100 {
+			ended = true
+			break
+		}
+	}
+	return entries, !ended || len(entries) == listed, nil
+}
+
+// cacheRows is one row per cache on each ref, its entries summed into it.
+//
+// A row per entry is what this used to write, under the same tags and the
+// same day for every entry of one cache on one ref, which a store keys as one
+// row: it kept whichever entry was written last. Measured on
+// jmrplens/jmrplens on 2026-09-26, fifteen CodeQL caches on main, 57.9 MB
+// between them, were stored as one of 3.8 MB, and on 2026-09-27 the 737
+// entries of the whole account came to 380 rows. The write ledger keys
+// a point the same way and remembers one value per key, so it sent those
+// entries again on every pass that had nothing new. Summed here, the identity
+// is unique by construction: `caches` counts the entries, `size_bytes` is
+// their total, `days_since_use` and `key` are the most recently used entry's,
+// the one GitHub will evict last, and `age_days` is the oldest entry's.
+//
+// Stamped at the start of the day rather than at creation: it is a snapshot
+// of what is stored now, and a day's sweeps should rewrite one row rather than
+// add one an hour.
+func cacheRows(entries []cacheEntry, base map[string]string, now time.Time) []sink.Point {
+	type cacheRef struct{ cache, ref string }
+	type sum struct {
+		size    int64
+		n       int
+		newest  cacheEntry
+		created time.Time
+	}
+	sums := map[cacheRef]*sum{}
+	var order []cacheRef
+	for _, e := range entries {
+		// The key carries a content hash, so it is a series per build and
+		// cannot be a tag. The prefix before the hash is the thing a reader
+		// means by "the pnpm cache".
+		k := cacheRef{cachePrefix(e.Key), e.Ref}
+		s := sums[k]
+		if s == nil {
+			s = &sum{newest: e, created: e.CreatedAt}
+			sums[k] = s
+			order = append(order, k)
+		}
+		s.size += e.SizeInBytes
+		s.n++
+		// The id breaks a tie, so the row does not depend on which page an
+		// entry arrived on: a key that changed with the order would be a
+		// new value to write on a pass that saw nothing new.
+		if e.LastAccessedAt.After(s.newest.LastAccessedAt) ||
+			e.LastAccessedAt.Equal(s.newest.LastAccessedAt) && e.ID > s.newest.ID {
+			s.newest = e
+		}
+		if e.CreatedAt.Before(s.created) {
+			s.created = e.CreatedAt
+		}
+	}
+	day := now.UTC().Truncate(24 * time.Hour)
+	points := make([]sink.Point, 0, len(order))
+	for _, k := range order {
+		s := sums[k]
+		points = append(points, sink.Point{
+			Measurement: "gh_actions_cache_entry",
+			Tags:        merge(base, map[string]string{"cache": k.cache, "ref": k.ref}),
+			Fields: map[string]any{
+				"size_bytes": s.size, "caches": s.n, "key": s.newest.Key,
+				"days_since_use": int(now.Sub(s.newest.LastAccessedAt).Hours() / 24),
+				"age_days":       int(now.Sub(s.created).Hours() / 24),
+			},
+			Time: day,
+		})
+	}
+	return points
 }
 
 // cachePrefix is the part of a cache key before its content hash.
@@ -669,82 +801,6 @@ func (a Artifacts) Collect(ctx context.Context, c *ghapi.Client, repo Repo, now 
 	var live int64
 	var liveCount, walked, declared int
 
-	// Paginated. Summing only the first hundred artifacts published a live
-	// total of three megabytes next to a count of twenty-eight thousand, which
-	// is not a small error but a wrong answer.
-	for page := 1; page <= most; page++ {
-		var res struct {
-			TotalCount int           `json:"total_count"`
-			Artifacts  []artifactRow `json:"artifacts"`
-		}
-		path := fmt.Sprintf("/repos/%s/actions/artifacts?per_page=100&page=%d", repo.FullName, page)
-		if _, _, err := c.GetJSON(ctx, path, &res, ""); err != nil {
-			if isSkippable(err) || isPaginationLimit(err) {
-				break
-			}
-			return points, err
-		}
-		declared = res.TotalCount
-		if len(res.Artifacts) == 0 {
-			break
-		}
-		walked += len(res.Artifacts)
-		for i := range res.Artifacts {
-			art := &res.Artifacts[i]
-			if !art.Expired {
-				live += art.SizeBytes
-				liveCount++
-			}
-			fields := map[string]any{
-				"size_bytes": art.SizeBytes,
-				"run_id":     art.Workflow.ID,
-				"head_sha":   art.Workflow.HeadSHA,
-				// Whether GitHub still holds the file. A field and not a tag,
-				// because the row is dated when the artifact was created and
-				// expiry comes later: as the tag `expired` it opened a second
-				// series at the same instant the day the artifact expired,
-				// and the two rows were summed as two artifacts for ever.
-				// Measured on this account after eleven hours: 77 of 3,615
-				// artifacts doubled, and a day's storage read 18 per cent
-				// high. Under a new name so a database that already holds
-				// the tag column keeps accepting writes.
-				"live": !art.Expired,
-				// The same unbounded value as on the run: one branch per pull
-				// request, never reused. It was a tag and is now a field, and
-				// under the API's own name for the same reason as there: the
-				// old `branch` column of gh_artifact is a tag, and InfluxDB 3
-				// would reject a field that reused the name.
-				"head_branch": art.Workflow.HeadBranch,
-			}
-			// An artifact has no page on GitHub; the run that produced it
-			// does, and that is where a reader wants to land.
-			setNonEmpty(fields, "url", githubPage(repo.FullName, "actions", "runs",
-				strconv.FormatInt(art.Workflow.ID, 10)))
-			// The retention actually applied, which is the point of keeping
-			// the expiry at all: measured on this account, 88 of 100 artifacts
-			// live one day and 12 live seven, against a default setting of 90.
-			// Rounded because GitHub sets expires_at a few seconds short of a
-			// whole number of days.
-			if !art.ExpiresAt.IsZero() && !art.CreatedAt.IsZero() {
-				fields["retention_days"] = int(art.ExpiresAt.Sub(art.CreatedAt).Round(24*time.Hour) / (24 * time.Hour))
-			}
-			// Two builds of the same commit that produce the same digest is
-			// reproducibility measured rather than assumed.
-			if art.Digest != "" {
-				fields["digest"] = art.Digest
-			}
-			points = append(points, sink.Point{
-				Measurement: "gh_artifact",
-				Tags:        merge(base, map[string]string{"artifact": art.Name}),
-				Fields:      fields,
-				Time:        art.CreatedAt,
-			})
-		}
-		if len(res.Artifacts) < 100 || a.Walk.past(res.Artifacts[len(res.Artifacts)-1].CreatedAt) {
-			break
-		}
-	}
-
 	// One current total, so a dashboard can show storage without summing a
 	// window that would double-count artifacts still alive from earlier days.
 	//
@@ -759,18 +815,113 @@ func (a Artifacts) Collect(ctx context.Context, c *ghapi.Client, repo Repo, now 
 	// counting different things. `live_count` gives the bytes the count they
 	// are the size of, and `walked` against `count` says whether that is a
 	// total or a floor.
-	points = append(points, sink.Point{
-		Measurement: "gh_artifact_total",
-		Tags:        base,
-		Fields: map[string]any{
-			"live_bytes": live, "count": declared,
-			// How many of the declared total were actually walked.
-			"walked": walked,
-			// The artifacts behind live_bytes: the walked ones GitHub has
-			// not expired.
-			"live_count": liveCount,
-		},
-		Time: now,
-	})
-	return points, nil
+	total := func() sink.Point {
+		return sink.Point{
+			Measurement: "gh_artifact_total",
+			Tags:        base,
+			Fields: map[string]any{
+				"live_bytes": live, "count": declared,
+				// How many of the declared total were actually walked.
+				"walked": walked,
+				// The artifacts behind live_bytes: the walked ones GitHub
+				// has not expired.
+				"live_count": liveCount,
+			},
+			Time: now,
+		}
+	}
+
+	// Paginated. Summing only the first hundred artifacts published a live
+	// total of three megabytes next to a count of twenty-eight thousand, which
+	// is not a small error but a wrong answer.
+	for page := 1; page <= most; page++ {
+		var res struct {
+			TotalCount int           `json:"total_count"`
+			Artifacts  []artifactRow `json:"artifacts"`
+		}
+		path := fmt.Sprintf("/repos/%s/actions/artifacts?per_page=100&page=%d", repo.FullName, page)
+		if _, _, err := c.GetJSON(ctx, path, &res, ""); err != nil {
+			if isSkippable(err) || isPaginationLimit(err) {
+				break
+			}
+			if page > 1 {
+				// The pages before this one were read, so the declared count
+				// is known and `walked` stops short of it, which is already
+				// how the row says its live figures are a floor. Without it
+				// the pass had no total at all: measured from the production
+				// proxy's log between 2026-09-25 12:58Z and 2026-09-26
+				// 19:50Z, jmrplens/jmrp.io's listing answered page 2 with a
+				// 502 on 8 of its 27 passes, and each of those left the
+				// repository's storage an hour stale. A failed page 1 still
+				// writes nothing: then nothing is known, and a row of zeros
+				// would read as every artifact gone.
+				points = append(points, total())
+			}
+			return points, err
+		}
+		declared = res.TotalCount
+		if len(res.Artifacts) == 0 {
+			break
+		}
+		walked += len(res.Artifacts)
+		for i := range res.Artifacts {
+			art := &res.Artifacts[i]
+			if !art.Expired {
+				live += art.SizeBytes
+				liveCount++
+			}
+			points = append(points, artifactPoint(repo, base, art))
+		}
+		if len(res.Artifacts) < 100 || a.Walk.past(res.Artifacts[len(res.Artifacts)-1].CreatedAt) {
+			break
+		}
+	}
+
+	return append(points, total()), nil
+}
+
+// artifactPoint is one artifact, dated when it was created.
+func artifactPoint(repo Repo, base map[string]string, art *artifactRow) sink.Point {
+	fields := map[string]any{
+		"size_bytes": art.SizeBytes,
+		"run_id":     art.Workflow.ID,
+		"head_sha":   art.Workflow.HeadSHA,
+		// Whether GitHub still holds the file. A field and not a tag, because
+		// the row is dated when the artifact was created and expiry comes
+		// later: as the tag `expired` it opened a second series at the same
+		// instant the day the artifact expired, and the two rows were summed
+		// as two artifacts for ever. Measured on this account after eleven
+		// hours: 77 of 3,615 artifacts doubled, and a day's storage read 18
+		// per cent high. Under a new name so a database that already holds
+		// the tag column keeps accepting writes.
+		"live": !art.Expired,
+		// The same unbounded value as on the run: one branch per pull
+		// request, never reused. It was a tag and is now a field, and under
+		// the API's own name for the same reason as there: the old `branch`
+		// column of gh_artifact is a tag, and InfluxDB 3 would reject a field
+		// that reused the name.
+		"head_branch": art.Workflow.HeadBranch,
+	}
+	// An artifact has no page on GitHub; the run that produced it does, and
+	// that is where a reader wants to land.
+	setNonEmpty(fields, "url", githubPage(repo.FullName, "actions", "runs",
+		strconv.FormatInt(art.Workflow.ID, 10)))
+	// The retention actually applied, which is the point of keeping the
+	// expiry at all: measured on this account, 88 of 100 artifacts live one
+	// day and 12 live seven, against a default setting of 90. Rounded because
+	// GitHub sets expires_at a few seconds short of a whole number of days.
+	if !art.ExpiresAt.IsZero() && !art.CreatedAt.IsZero() {
+		fields["retention_days"] = int(art.ExpiresAt.Sub(art.CreatedAt).Round(24*time.Hour) / (24 * time.Hour))
+	}
+	// Two builds of the same commit that produce the same digest is
+	// reproducibility measured rather than assumed.
+	if art.Digest != "" {
+		fields["digest"] = art.Digest
+	}
+	return sink.Point{
+		Measurement: "gh_artifact",
+		Tags:        merge(base, map[string]string{"artifact": art.Name}),
+		Fields:      fields,
+		Time:        art.CreatedAt,
+	}
 }

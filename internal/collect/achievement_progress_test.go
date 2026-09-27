@@ -467,3 +467,150 @@ func TestAchievementProgressForABadgeNotOnThePage(t *testing.T) {
 		t.Errorf("a badge off the page has its name from the table and no image: %v", p.Fields)
 	}
 }
+
+// tallyServer serves the recorded page, the counts of an account created on
+// 2026-09-01 and every query of the walk as the one page given, and records
+// the merged: range of each walk query.
+func tallyServer(t *testing.T, walk string) (*fixtureServer, func() []string) {
+	t.Helper()
+	f := newFixtureServer(t)
+	achievementsPage(f, "jmrplens", func() string { return recordedAchievements(t) })
+	var mu sync.Mutex
+	var asked []string
+	f.graphQL(func(w http.ResponseWriter, _ *http.Request, query string, vars map[string]any) {
+		if strings.Contains(query, "query achievementCounts(") {
+			_, _ = w.Write([]byte(`{"data":{"pulls":{"issueCount":1847},"answers":{"discussionCount":6},"user":{"createdAt":"2026-09-01T09:00:00Z","repositories":{"nodes":[{"stargazerCount":113}]}}}}`))
+			return
+		}
+		q, _ := vars["query"].(string)
+		mu.Lock()
+		asked = append(asked, mergedRange.FindStringSubmatch(q)[1])
+		mu.Unlock()
+		_, _ = w.Write([]byte(walk))
+	})
+	return f, func() []string {
+		mu.Lock()
+		defer mu.Unlock()
+		return append([]string(nil), asked...)
+	}
+}
+
+// tallyWalk is the page tallyServer answers the walk with: on the day before
+// testNow, one co-authored pull request and one without; on testNow's own
+// day, one more co-authored, which the day's row counts and the tally leaves
+// to the next pass.
+const tallyWalk = `{"data":{"search":{"issueCount":3,"pageInfo":{"hasNextPage":false,"endCursor":""},"nodes":[` +
+	`{"mergedAt":"2026-09-07T12:00:00Z","mergeCommit":{"message":"Pair\n\nCo-authored-by: A <a@example.com>"},"commits":{"totalCount":1,"nodes":[{"commit":{"message":"work"}}]}},` +
+	`{"mergedAt":"2026-09-07T13:00:00Z","mergeCommit":{"message":"Solo"},"commits":{"totalCount":1,"nodes":[{"commit":{"message":"work"}}]}},` +
+	`{"mergedAt":"2026-09-08T09:00:00Z","mergeCommit":{"message":"Pair\n\nCo-authored-by: B <b@example.com>"},"commits":{"totalCount":1,"nodes":[{"commit":{"message":"work"}}]}}` +
+	`]}}}`
+
+// TestCoauthoredCountIsAddedToOrWalkedWhole pins when a pass adds the days
+// since the tally to it and when it walks the whole history instead: a
+// tally made by this rule, dated before today and walked whole less than a
+// week ago is added to; no tally, one of another rule, one whose whole walk
+// is a week old, one dated today or later and a backfill are walked whole,
+// and the count starts again from what that walk finds, since the whole walk
+// exists to let a count go down.
+func TestCoauthoredCountIsAddedToOrWalkedWhole(t *testing.T) {
+	t.Parallel()
+	d := func(day int) time.Time { return time.Date(2026, 9, day, 0, 0, 0, 0, time.UTC) }
+	kept := CoauthoredTally{Count: 10, Through: d(6), Rule: coauthoredRule, WalkedWhole: d(3)}
+	with := func(change func(*CoauthoredTally)) CoauthoredTally {
+		c := kept
+		change(&c)
+		return c
+	}
+	// The walk finds two co-authored pull requests, one of them on today.
+	wholeWalk := CoauthoredTally{Count: 1, Through: d(7), Rule: coauthoredRule, WalkedWhole: d(8)}
+	for name, tc := range map[string]struct {
+		tally     CoauthoredTally
+		backfill  bool
+		asked     string
+		row       int64
+		leftAfter CoauthoredTally
+	}{
+		"no tally":           {CoauthoredTally{}, false, "2026-09-01..2026-09-08", 2, wholeWalk},
+		"a tally to add to":  {kept, false, "2026-09-07..2026-09-08", 12, CoauthoredTally{Count: 11, Through: d(7), Rule: coauthoredRule, WalkedWhole: d(3)}},
+		"six days on":        {with(func(c *CoauthoredTally) { c.WalkedWhole = d(2) }), false, "2026-09-07..2026-09-08", 12, CoauthoredTally{Count: 11, Through: d(7), Rule: coauthoredRule, WalkedWhole: d(2)}},
+		"a week on":          {with(func(c *CoauthoredTally) { c.WalkedWhole = d(1) }), false, "2026-09-01..2026-09-08", 2, wholeWalk},
+		"another rule":       {with(func(c *CoauthoredTally) { c.Rule = coauthoredRule + 1 }), false, "2026-09-01..2026-09-08", 2, wholeWalk},
+		"a tally from today": {with(func(c *CoauthoredTally) { c.Through = d(8) }), false, "2026-09-01..2026-09-08", 2, wholeWalk},
+		"a backfill":         {kept, true, "2026-09-01..2026-09-08", 2, wholeWalk},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			f, asked := tallyServer(t, tallyWalk)
+			tally := tc.tally
+			a := Achievements{Login: "jmrplens", WebBase: f.srv.URL, Coauthored: &tally, Whole: tc.backfill}
+			points, err := a.Collect(ctx(t), f.Client, testNow)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := asked(); len(got) != 1 || got[0] != tc.asked {
+				t.Errorf("walked %q, want %s", got, tc.asked)
+			}
+			p := find(t, points, "gh_achievement_progress", map[string]string{"achievement": "pair-extraordinaire"})
+			if got := fieldInt(t, p, "count"); got != tc.row {
+				t.Errorf("the row counts %d, want %d", got, tc.row)
+			}
+			if tally != tc.leftAfter {
+				t.Errorf("the tally left is %+v, want %+v", tally, tc.leftAfter)
+			}
+		})
+	}
+}
+
+// A walk that fails leaves the tally as it was: some of its days may have
+// been counted and others not, and the next pass asks for all of them.
+func TestCoauthoredTallyOutlivesAFailedWalk(t *testing.T) {
+	t.Parallel()
+	f, _ := tallyServer(t, `{"errors":[{"type":"RATE_LIMITED","message":"API rate limit exceeded"}]}`)
+	before := CoauthoredTally{Count: 10, Through: time.Date(2026, 9, 6, 0, 0, 0, 0, time.UTC), Rule: coauthoredRule, WalkedWhole: time.Date(2026, 9, 3, 0, 0, 0, 0, time.UTC)}
+	tally := before
+	points, err := Achievements{Login: "jmrplens", WebBase: f.srv.URL, Coauthored: &tally}.Collect(ctx(t), f.Client, testNow)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := len(byMeasurement(points)["gh_achievement_progress"]); n != 0 {
+		t.Errorf("%d progress rows from a walk that failed", n)
+	}
+	if tally != before {
+		t.Errorf("the tally became %+v, want it untouched", tally)
+	}
+}
+
+// A floor the tally carries is still a floor after a pass that found nothing
+// truncated, and one found before today is added to it; one found today is
+// said and left to the next pass, which walks that day again.
+func TestCoauthoredTallyKeepsItsFloor(t *testing.T) {
+	t.Parallel()
+	big := func(merged string) string {
+		return `{"mergedAt":"` + merged + `","mergeCommit":{"message":"Big"},"commits":{"totalCount":140,"nodes":[{"commit":{"message":"work"}}]}}`
+	}
+	for name, tc := range map[string]struct {
+		walk      string
+		truncated int
+	}{
+		"nothing truncated since": {tallyWalk, 1},
+		"one truncated yesterday": {`{"data":{"search":{"issueCount":1,"pageInfo":{"hasNextPage":false,"endCursor":""},"nodes":[` + big("2026-09-07T12:00:00Z") + `]}}}`, 2},
+		"one truncated today":     {`{"data":{"search":{"issueCount":1,"pageInfo":{"hasNextPage":false,"endCursor":""},"nodes":[` + big("2026-09-08T12:00:00Z") + `]}}}`, 1},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			f, _ := tallyServer(t, tc.walk)
+			tally := CoauthoredTally{Count: 10, Through: time.Date(2026, 9, 6, 0, 0, 0, 0, time.UTC), Truncated: 1, Rule: coauthoredRule, WalkedWhole: time.Date(2026, 9, 3, 0, 0, 0, 0, time.UTC)}
+			var warned []string
+			a := Achievements{Login: "jmrplens", WebBase: f.srv.URL, Coauthored: &tally, Warn: func(msg string, _ ...any) { warned = append(warned, msg) }}
+			if _, err := a.Collect(ctx(t), f.Client, testNow); err != nil {
+				t.Fatal(err)
+			}
+			if len(warned) != 1 || warned[0] != "co-authored pull request count is a floor" {
+				t.Errorf("warned %q, want the floor said", warned)
+			}
+			if tally.Truncated != tc.truncated {
+				t.Errorf("the tally keeps %d truncated, want %d", tally.Truncated, tc.truncated)
+			}
+		})
+	}
+}
