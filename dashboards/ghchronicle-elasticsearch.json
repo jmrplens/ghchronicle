@@ -24768,8 +24768,19 @@
                   "type": "terms"
                 },
                 {
-                  "field": "image.keyword",
+                  "field": "@timestamp",
                   "id": "567",
+                  "settings": {
+                    "min_doc_count": "1",
+                    "order": "desc",
+                    "orderBy": "_key",
+                    "size": "1"
+                  },
+                  "type": "terms"
+                },
+                {
+                  "field": "image.keyword",
+                  "id": "568",
                   "settings": {
                     "min_doc_count": "1",
                     "missing": "",
@@ -24781,7 +24792,7 @@
                 },
                 {
                   "field": "url.keyword",
-                  "id": "568",
+                  "id": "569",
                   "settings": {
                     "min_doc_count": "1",
                     "missing": "",
@@ -24795,19 +24806,29 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "569",
-                  "settings": {
-                    "metrics": [
-                      "percent",
-                      "count",
-                      "next_threshold",
-                      "tier_number",
-                      "agrees"
-                    ],
-                    "order": "desc",
-                    "orderBy": "@timestamp"
-                  },
-                  "type": "top_metrics"
+                  "field": "percent",
+                  "id": "570",
+                  "type": "max"
+                },
+                {
+                  "field": "count",
+                  "id": "571",
+                  "type": "max"
+                },
+                {
+                  "field": "next_threshold",
+                  "id": "572",
+                  "type": "max"
+                },
+                {
+                  "field": "tier_number",
+                  "id": "573",
+                  "type": "max"
+                },
+                {
+                  "field": "agrees",
+                  "id": "574",
+                  "type": "max"
                 }
               ],
               "query": "_index:ghchronicle-gh_achievement_progress",
@@ -24823,15 +24844,25 @@
                 "excludeByName": {},
                 "indexByName": {},
                 "renameByName": {
-                  "Top Metrics agrees": "Page agrees",
-                  "Top Metrics count": "Count",
-                  "Top Metrics next_threshold": "Next tier at",
-                  "Top Metrics percent": "Progress",
-                  "Top Metrics tier_number": "Tier",
+                  "Max agrees": "Page agrees",
+                  "Max count": "Count",
+                  "Max next_threshold": "Next tier at",
+                  "Max percent": "Progress",
+                  "Max tier_number": "Tier",
                   "achievement.keyword": "Achievement",
                   "image.keyword": "Badge",
                   "url.keyword": "Link"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "@timestamp": true
+                },
+                "indexByName": {},
+                "renameByName": {}
               }
             }
           ],
@@ -24906,7 +24937,7 @@
               "bucketAggs": [
                 {
                   "field": "resource.keyword",
-                  "id": "571",
+                  "id": "576",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -24917,7 +24948,7 @@
                 },
                 {
                   "field": "@timestamp",
-                  "id": "572",
+                  "id": "577",
                   "settings": {
                     "interval": "5m",
                     "min_doc_count": "0",
@@ -24930,7 +24961,7 @@
               "metrics": [
                 {
                   "field": "used_ratio",
-                  "id": "570",
+                  "id": "575",
                   "type": "max"
                 }
               ],
@@ -24988,7 +25019,7 @@
               "bucketAggs": [
                 {
                   "field": "resource.keyword",
-                  "id": "573",
+                  "id": "578",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -25002,17 +25033,17 @@
               "metrics": [
                 {
                   "field": "limit",
-                  "id": "574",
+                  "id": "579",
                   "type": "max"
                 },
                 {
                   "field": "remaining",
-                  "id": "575",
+                  "id": "580",
                   "type": "min"
                 },
                 {
                   "field": "used",
-                  "id": "576",
+                  "id": "581",
                   "type": "max"
                 }
               ],
@@ -25161,7 +25192,7 @@
               "bucketAggs": [
                 {
                   "field": "family.keyword",
-                  "id": "577",
+                  "id": "582",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -25172,7 +25203,7 @@
                 },
                 {
                   "field": "reason.keyword",
-                  "id": "578",
+                  "id": "583",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -25186,16 +25217,16 @@
               "metrics": [
                 {
                   "field": "failed",
-                  "id": "579",
+                  "id": "584",
                   "type": "sum"
                 },
                 {
-                  "id": "580",
+                  "id": "585",
                   "type": "count"
                 },
                 {
                   "field": "repos",
-                  "id": "581",
+                  "id": "586",
                   "type": "max"
                 }
               ],
@@ -25306,7 +25337,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "582",
+                  "id": "587",
                   "settings": {
                     "order": "desc",
                     "size": "100",

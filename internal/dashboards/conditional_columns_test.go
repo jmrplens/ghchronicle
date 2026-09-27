@@ -488,3 +488,69 @@ func directChildren(n ast.Node) []ast.Node {
 	})
 	return out
 }
+
+// TestNoTopMetricsReadsAFieldSomeDocumentsLack is the same class in
+// Elasticsearch, where it does not refuse the query but fails the frame. A
+// top_metrics appends nothing for a field the document it picks lacks, so the
+// metric column comes back shorter than the bucket columns and Grafana fails
+// the whole panel with "frame has different field lengths". Measured against
+// Grafana 13.2.1 and Elasticsearch 9.5.3: "Account keys" asked a top_metrics
+// for three fields no key carries all of, and "Achievement progress" for a
+// percent and a next threshold a badge whose page disagrees does not carry,
+// and both failed with one key or badge of each kind. A max inside each
+// series' newest document answers null there instead: see newestDoc.
+//
+// Every field a collector writes under a condition is checked, not only the
+// ones an SQL panel names, since the list above is kept to those.
+func TestNoTopMetricsReadsAFieldSomeDocumentsLack(t *testing.T) {
+	t.Parallel()
+	conditional := map[[2]string]string{}
+	for c := range conditionalWrites(t) {
+		conditional[[2]string{c.column, c.measurement}] = c.writtenIn
+	}
+	// A query that keeps only the documents that carry the field.
+	carried := map[[2]string]string{
+		{"commits", "gh_contribution_repo"}: "kind:commits",
+	}
+	for _, p := range renderedPanels(t, "elasticsearch") {
+		for _, raw := range targetList(p) {
+			target, _ := raw.(map[string]any)
+			query, _ := target["query"].(string)
+			for _, key := range topMetricsFields(target) {
+				file, lacking := conditional[key]
+				if !lacking {
+					continue
+				}
+				if filter := carried[key]; filter != "" && strings.Contains(query, filter) {
+					continue
+				}
+				t.Errorf("elasticsearch: %q reads %s of %s with a top_metrics, and "+
+					"internal/collect/%s writes it only under a condition, so a row whose "+
+					"newest document lacks it fails the whole panel: take a max inside a "+
+					"newestDoc bucket instead", p["title"], key[0], key[1], file)
+			}
+		}
+	}
+}
+
+var esIndexOf = regexp.MustCompile(`_index:ghchronicle-(gh_[a-z0-9_]+)`)
+
+// topMetricsFields is every field a target's top_metrics read, each with the
+// measurement its index holds.
+func topMetricsFields(target map[string]any) [][2]string {
+	query, _ := target["query"].(string)
+	m := esIndexOf.FindStringSubmatch(query)
+	if m == nil {
+		return nil
+	}
+	var out [][2]string
+	for _, metric := range asList(target["metrics"]) {
+		if agg(metric)["type"] != "top_metrics" {
+			continue
+		}
+		for _, field := range settingStrings(agg(metric), "metrics") {
+			out = append(out, [2]string{field, m[1]})
+		}
+	}
+	return out
+}

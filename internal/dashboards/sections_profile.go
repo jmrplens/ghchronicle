@@ -115,9 +115,18 @@ func achievementProgress(b *builder) Panel {
 	// The badge image and the url reach the table as buckets of one value
 	// each, the way the url does everywhere: a top metric over a string
 	// panics the plugin. The badge is named by its slug, as on the shelf,
-	// and the numbers are the newest document's own.
-	es, estf := esTbl(ap, []any{b.tm("achievement", 50, "_key", "asc"), b.tmURL("image"), b.tmURL()},
-		[]any{b.mNewest("percent", "count", "next_threshold", "tier_number", "agrees")},
+	// and the numbers are the newest document's own, each a max inside it
+	// rather than a top_metrics: a badge whose page disagrees with its count
+	// carries no percent and no next threshold, and a top_metrics appends
+	// nothing for them. Measured against Grafana 13.2.1 and Elasticsearch
+	// 9.5.3 with one badge of each kind, the whole panel failed with "frame
+	// has different field lengths"; a max answers null. See newestDoc.
+	es, estf := esTbl(ap, []any{
+		b.tm("achievement", 50, "_key", "asc"), b.newestDoc(), b.tmURL("image"), b.tmURL(),
+	}, []any{
+		b.mMax("percent"), b.mMax("count"), b.mMax("next_threshold"),
+		b.mMax("tier_number"), b.mMax("agrees"),
+	},
 		[]named{
 			{"achievement.keyword", "Achievement"},
 			{"image.keyword", "Badge"},
@@ -127,7 +136,7 @@ func achievementProgress(b *builder) Panel {
 			{"next_threshold", profileNextTier},
 			{"tier_number", "Tier"},
 			{"agrees", profilePageAgrees},
-		}, nil)
+		}, nil, hideColumns(panelESTime))
 	var prom []Target
 	for i, field := range []string{"percent", "count", "next_threshold", "tier_number", "agrees"} {
 		prom = append(prom, promTbl(fmt.Sprintf("max by (achievement) (github_achievement_progress_%s)", field), string(rune('A'+i))))
