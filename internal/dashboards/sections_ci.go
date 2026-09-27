@@ -305,8 +305,12 @@ func runOutcomes(b *builder) []Panel {
 				"reading taken at each sweep, so the curve starts the day the collector " +
 				"did: there is no history of it to rebuild. The eight repositories holding " +
 				"the most are named; the rest are `other`. " + bucketFollowsRange,
-			GR: []Target{grq(fmt.Sprintf("removeEmptySeries(removeBelowValue(%s, 1))",
-				perBucket(artifactBytes, gn("gh_artifact_total", "repo"), "1h", "max")))},
+			// Below one byte is dropped before the series are grouped rather
+			// than after: removeBelowValue renames what it is applied to, and
+			// outside perBucket it named every curve over the name perBucket
+			// had just given back.
+			GR: []Target{grq(removeEmptySeries(perBucket("removeBelowValue("+artifactBytes+", 1)",
+				gn("gh_artifact_total", "repo"), "1h", "max")))},
 			ES: []Target{b.esDaily("gh_artifact_total", b.mMax("live_bytes"), "repo", "1h", []string{ESF}, "")},
 		}),
 	}

@@ -474,7 +474,8 @@ func medianTotal(path string) string {
 }
 
 // perBucket is one series per value of a tag node, one point per bucket.
-// Counts are consolidated by sum so a long range does not average them away.
+// Counts are consolidated by sum so a long range does not average them away,
+// under the tag's value as the series name, which is the legend entry.
 func perBucket(expr string, node int, spanHow ...string) string {
 	span, how := "1d", "sum"
 	if len(spanHow) > 0 {
@@ -483,8 +484,8 @@ func perBucket(expr string, node int, spanHow ...string) string {
 	if len(spanHow) > 1 {
 		how = spanHow[1]
 	}
-	return fmt.Sprintf(`consolidateBy(groupByNode(summarize(%s, %q, %q), %d, %q), %q)`,
-		expr, span, how, node, how, how)
+	return consolidated(fmt.Sprintf(`groupByNode(summarize(%s, %q, %q), %d, %q)`,
+		expr, span, how, node, how), how)
 }
 
 func medianBucket(path string, span ...string) string {
@@ -564,12 +565,17 @@ func removeEmptySeries(expr string) string {
 // they read 3 at 500. The consolidation belongs on the outermost series:
 // graphite-web gives every series a function makes the default again, and
 // the ones that only rename, sort, pick or drop series keep theirs.
-//
-// consolidateBy also renames each series to consolidateBy(name,"sum"), which
-// in a table is the text of the row's first column, so aliasSub gives the
-// name back.
-func sumConsolidated(expr string) string {
-	return `aliasSub(consolidateBy(` + expr + `, "sum"), "^consolidateBy\((.*),.sum.\)$", "\1")`
+func sumConsolidated(expr string) string { return consolidated(expr, "sum") }
+
+// consolidated is a series list consolidated by `how` under the names it came
+// with. consolidateBy also renames each series, to consolidateBy(name,"how"),
+// and Grafana draws that name as it is: in a table it is the text of the
+// row's first column, and in a chart the legend entry, which read
+// consolidateBy(r1,"sum") against graphiteapp/graphite-statsd:1.1.10-5 and
+// Grafana 13.2.1. aliasSub gives the name back, and leaves the consolidation
+// in place, since it renames the series rather than making new ones.
+func consolidated(expr, how string) string {
+	return `aliasSub(consolidateBy(` + expr + `, "` + how + `"), "^consolidateBy\((.*),.` + how + `.\)$", "\1")`
 }
 
 func gTbl(expr, name string, cols []col) (targets []Target, tf []any) {
