@@ -364,8 +364,10 @@ func TestCoauthoredWalkReportsATruncatedPullRequest(t *testing.T) {
 }
 
 // TestAchievementsWriteTheBadgesWhenTheCountsFail pins what a refused count
-// costs: the progress rows of the day, said through Warn, and never the
-// badges the page already gave.
+// costs: the progress rows of this pass, said through Warn, and never the
+// badges the page already gave. The warning names the pass and not the day:
+// the family runs every hour, so the day's rows are whatever an earlier pass
+// wrote and the next pass writes them again.
 func TestAchievementsWriteTheBadgesWhenTheCountsFail(t *testing.T) {
 	t.Parallel()
 	for name, answer := range map[string]http.HandlerFunc{
@@ -390,13 +392,13 @@ func TestAchievementsWriteTheBadgesWhenTheCountsFail(t *testing.T) {
 			if got := byMeasurement(points); len(got["gh_achievement"]) != 8 || len(got["gh_achievement_progress"]) != 0 {
 				t.Errorf("got %d badges and %d progress rows, want 8 and none", len(got["gh_achievement"]), len(got["gh_achievement_progress"]))
 			}
-			if len(warned) != 1 || !strings.Contains(warned[0], "no progress rows today") {
-				t.Errorf("warned %q, want the missing rows said once", warned)
+			if len(warned) != 1 || !strings.Contains(warned[0], "no progress rows this pass") {
+				t.Errorf("warned %q, want the missing rows of this pass said once", warned)
 			}
 		})
 	}
 
-	// And a walk that fails after the counts came back is the same day
+	// And a walk that fails after the counts came back is the same pass
 	// without progress rows.
 	t.Run("the walk refused", func(t *testing.T) {
 		t.Parallel()
@@ -418,8 +420,8 @@ func TestAchievementsWriteTheBadgesWhenTheCountsFail(t *testing.T) {
 		if got := byMeasurement(points); len(got["gh_achievement"]) != 8 || len(got["gh_achievement_progress"]) != 0 {
 			t.Errorf("got %d badges and %d progress rows, want 8 and none", len(got["gh_achievement"]), len(got["gh_achievement_progress"]))
 		}
-		if len(warned) != 1 || !strings.Contains(warned[0], "co-authored pull requests unavailable") {
-			t.Errorf("warned %q", warned)
+		if len(warned) != 1 || warned[0] != "co-authored pull requests unavailable, no progress rows this pass" {
+			t.Errorf("warned %q, want the missing rows of this pass said once", warned)
 		}
 	})
 }

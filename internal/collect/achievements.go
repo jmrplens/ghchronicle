@@ -33,7 +33,9 @@ import (
 // dashboard, and a page GitHub redesigned would produce nothing but wrong
 // numbers, so the parser refuses rather than guesses.
 //
-// One request a day is the intended cadence: a badge is earned over weeks.
+// The page is read on every pass, hourly at the built-in cadence, so that a
+// tier reached in the afternoon shows in the afternoon; the read is charged
+// to no budget.
 //
 // Beside the badges the family writes gh_achievement_progress, how far the
 // account is from the next tier of each badge that has tiers; that half does
@@ -58,8 +60,8 @@ type Achievements struct {
 	HTTP *http.Client
 	// Warn is where the progress half reports what did not stop the
 	// family: the counts it could not read, which leave the badges written
-	// and the progress rows absent for the day, and a walk whose count is
-	// a floor. Nil means silence.
+	// and no progress rows from this pass, and a walk whose count is a
+	// floor. Nil means silence.
 	Warn func(msg string, args ...any)
 	// Coauthored is where the Pair Extraordinaire count is kept between
 	// passes: read for the days a pass has left to walk, and written after a
@@ -140,11 +142,13 @@ func (a Achievements) Collect(ctx context.Context, c *ghapi.Client, now time.Tim
 		})
 	}
 	// The progress rows ride beside the badges. A count the API would not
-	// give is a day without progress rows, not a day without badges: the
-	// page was read and what it says is written whatever the API did.
+	// give is a pass without progress rows, not one without badges: the
+	// page was read and what it says is written whatever the API did. The
+	// rows are the day's, so the next pass, an hour later at the built-in
+	// cadence, writes them.
 	counts, err := a.counts(ctx, c)
 	if err != nil {
-		a.warn("achievement counts unavailable, no progress rows today", "err", err)
+		a.warn("achievement counts unavailable, no progress rows this pass", "err", err)
 		return points, nil
 	}
 	base, from := a.coauthoredBase(counts.CreatedAt, day)
@@ -152,7 +156,7 @@ func (a Achievements) Collect(ctx context.Context, c *ghapi.Client, now time.Tim
 	if walkErr := w.walk(ctx, c, from, day); walkErr != nil {
 		// The tally is left as it was: a walk cut short added some of its
 		// days and not others, and the next pass asks for all of them.
-		a.warn("co-authored pull requests unavailable, no progress rows today", "err", walkErr, "queries", w.queries)
+		a.warn("co-authored pull requests unavailable, no progress rows this pass", "err", walkErr, "queries", w.queries)
 		return points, nil
 	}
 	capped, truncated := base.Capped || w.capped, base.Truncated+w.truncated
