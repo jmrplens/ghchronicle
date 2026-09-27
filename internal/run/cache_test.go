@@ -661,10 +661,10 @@ func TestAStoreFilledAgainIsOfferedTheJobsOfTheRunsRemembered(t *testing.T) {
 				sinks = append(sinks, store)
 			}
 			process(tc.refill, sinks...)
-			if got := listed.Load() == 2; got != tc.jobs {
+			if (listed.Load() == 2) != tc.jobs {
 				t.Errorf("the second process listed the jobs %d times in all, want them listed again %v", listed.Load(), tc.jobs)
 			}
-			if got := store.measured("gh_workflow_job") == 1; got != tc.jobs {
+			if (store.measured("gh_workflow_job") == 1) != tc.jobs {
 				t.Errorf("the store the second process wrote to got %d jobs, want the run's job %v",
 					store.measured("gh_workflow_job"), tc.jobs)
 			}

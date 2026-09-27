@@ -17,6 +17,7 @@ const (
 	costBilled         = "Actually billed"
 	costActionsMinutes = "Actions minutes"
 	costSumSeries      = "sumSeries("
+	costCacheIdle      = "Days since use"
 )
 
 // promByRepo is one column of the cost table in Prometheus: a billing field
@@ -99,9 +100,9 @@ func cost(b *builder) []Panel {
 			{"ref.keyword", "Ref"},
 			{"s", "Size"},
 			{"n", "Entries"},
-			{"d", "Days since use"},
+			{"d", costCacheIdle},
 		}, []string{ESF}, groupRows([]string{"Repository", "Cache"},
-			map[string]string{"Size": "sum", "Entries": "sum", "Days since use": "min"})...)
+			map[string]string{"Size": "sum", "Entries": "sum", costCacheIdle: "min"})...)
 
 	cacheGR, cacheGRtf := gTbl(rowsOf("keepLastValue("+rp("gh_actions_cache", "size_bytes")+")",
 		gn("gh_actions_cache", "repo")), "Repository", []col{{"lastNotNull", "Cache"}})
@@ -204,7 +205,7 @@ func cost(b *builder) []Panel {
 		panel("table", "Cache entries by key", box{W: 24, H: 8, X: 0, Y: 21}, []Target{sqlT(
 			`SELECT cache AS "Cache", SUM(size_bytes) AS "Size", repo AS "Repository",` +
 				` SUM(caches) AS "Entries",` +
-				` MIN(days_since_use) AS "Days since use" FROM (` +
+				` MIN(days_since_use) AS "` + costCacheIdle + `" FROM (` +
 				"SELECT repo, cache, ref, size_bytes, caches, days_since_use," +
 				" ROW_NUMBER() OVER (PARTITION BY repo, cache, ref ORDER BY time DESC) AS rn" +
 				" FROM gh_actions_cache_entry WHERE $__timeFilter(time) AND " + RF +
@@ -217,7 +218,7 @@ func cost(b *builder) []Panel {
 			},
 			PromTF: merged(map[string]string{
 				"repo": "Repository", "cache": "Cache", panelValueA: "Size",
-				panelValueB: "Days since use", panelValueC: "Entries",
+				panelValueB: costCacheIdle, panelValueC: "Entries",
 			}, nil, map[string]int{"repo": 0, "cache": 1}),
 			Opts: Opts{"sort": "Size"},
 			Desc: "The total says a repository holds twelve gigabytes. This says which key " +

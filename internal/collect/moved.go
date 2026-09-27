@@ -94,13 +94,17 @@ func (m Movement) ItemsSince(since time.Time) bool { return !m.Items.Before(sinc
 
 // movedNode is one repository's answer.
 type movedNode struct {
-	DefaultBranchRef *struct {
-		Target struct {
-			CommittedDate time.Time `json:"committedDate"`
-		} `json:"target"`
-	} `json:"defaultBranchRef"`
-	Issues       newestUpdate `json:"issues"`
-	PullRequests newestUpdate `json:"pullRequests"`
+	DefaultBranchRef *branchHead  `json:"defaultBranchRef"`
+	Issues           newestUpdate `json:"issues"`
+	PullRequests     newestUpdate `json:"pullRequests"`
+}
+
+// branchHead is the default branch's head commit. The ref is null on a
+// repository with no commits, which is why movedNode holds it by pointer.
+type branchHead struct {
+	Target struct {
+		CommittedDate time.Time `json:"committedDate"`
+	} `json:"target"`
 }
 
 // newestUpdate is a connection of one node, the most recently updated.
