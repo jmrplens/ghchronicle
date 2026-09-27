@@ -22,8 +22,10 @@ Administration (lectura); las alertas necesitan `security_events`. Ver
 **Una función encendida y nada recogido de ella.** Code scanning activado esta
 mañana, Dependabot encendido, un foro abierto: el colector preguntó antes de que
 lo hicieras, le dijeron que no, y recuerda ese rechazo un día en vez de pagarlo
-en cada pasada. Se nota como muy tarde al día siguiente, y reiniciar el proceso
-vuelve a preguntar en el acto. Ver
+en cada pasada. Se nota como muy tarde al día siguiente, también tras un
+reinicio; borrar [el fichero de caché junto al fichero de
+estado](/ghchronicle/es/configuration/#la-caché-que-hay-a-su-lado) vuelve a
+preguntar en el acto. Ver
 [un rechazo también se recuerda](/ghchronicle/es/api/#un-rechazo-también-se-recuerda).
 
 **`still being computed by GitHub (202)`.** GitHub calcula los endpoints
@@ -198,7 +200,9 @@ Una familia a la que aún no le toca sencillamente no aparece.
   sobrescribe. La séptima, `last_head`, es el commit desde el que arrancaba cada
   diff de dependencias, y sin ella la pasada siguiente tiene la fotografía y no
   el diff. Ver
-  [el fichero de estado](/ghchronicle/es/configuration/#state_file).
+  [el fichero de estado](/ghchronicle/es/configuration/#state_file). El fichero
+  de caché que hay a su lado cuesta cuota y nada más: ver [la caché que hay a su
+  lado](/ghchronicle/es/configuration/#la-caché-que-hay-a-su-lado).
 </Aside>
 
 ## ¿Por qué Loki descarta entradas?

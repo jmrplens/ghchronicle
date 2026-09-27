@@ -103,6 +103,17 @@ And the bound is resident memory once the cache is full, which is the number to
 know before giving the process a container with a memory limit: it can hold that
 much of decoded bodies on top of its own footprint.
 
+The cache outlives the process. What was asked for within twice the longest
+cadence is kept in [a file beside the state
+file](https://jmrp.io/docs/ghchronicle/configuration/#the-cache-beside-it), written at most every
+five minutes while the collector runs and once more when it stops, and a restart
+reads it back, so its first sweep asks with the validators the last one stored.
+Before that file, the first sweep after a restart of the author's service made
+130 requests and not one of them was answered 304. An entry is kept under a
+digest of everything its type decodes rather than under the type's name, so an
+upgrade that changes what a collector reads asks that collector's URLs again in
+full instead of answering them with a body stored without the new field.
+
 ### A refusal is remembered too
 
 A 403 or a 404 is how GitHub says a feature is switched off: Dependabot on a
@@ -121,8 +132,10 @@ Two consequences worth knowing:
 
 - Switch a feature on and it is noticed a day later at the latest, not on the
   next sweep.
-- Restarting the process asks again straight away. The memory lives in the
-  process, like the ETag cache, not in the state file.
+- Restarting the process does not ask again. The refusals are kept with the
+  ETag cache in [the file beside the state
+  file](https://jmrp.io/docs/ghchronicle/configuration/#the-cache-beside-it), each until the end of
+  its own day, and deleting that file is how to ask again straight away.
 
 A spent budget is a 403 as well and is never remembered as one: the client
 types it apart precisely so that a rate limit is not read as a feature that is
@@ -183,12 +196,15 @@ Source: <https://jmrp.io/docs/ghchronicle/api/cost/>
 Measured on 2026-09-11 with the real binary against the live API, every family
 switched on and every request logged with the `x-ratelimit-resource` and
 `x-ratelimit-used` headers of its own response. **Cold** is the first sweep of
-a fresh install or of a restarted service: an empty ETag cache, a month of
-workflow runs. **Steady** is the third sweep of the same process a few minutes
-later, when about four fifths of its requests were answered 304 and cost
-nothing; the second sweep is the one that pays the fill-in the actions row
-describes. A 304 is free, and it is only ever available to REST: GraphQL
-carries no ETag, so its column is the same in both sweeps.
+a fresh install: an empty ETag cache, a month of workflow runs. A restarted
+service no longer starts there: it reads its cache back from [the file beside
+the state file](https://jmrp.io/docs/ghchronicle/configuration/#the-cache-beside-it), and only one
+that has lost that file pays the empty cache again. **Steady** is the third
+sweep of the same process a few minutes later, when about four fifths of its
+requests were answered 304 and cost nothing; the second sweep is the one that
+pays the fill-in the actions row describes. A 304 is free, and it is only ever
+available to REST: GraphQL carries no ETag, so its column is the same in both
+sweeps.
 
 The figures are per repository where the family asks per repository, and per
 sweep where it asks about the account. `core` is the REST bucket, `pt` a

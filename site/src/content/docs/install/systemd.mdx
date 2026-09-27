@@ -81,12 +81,16 @@ almost nothing: an outbound TCP socket and one writable directory.
 the right ownership on start, so the state file has somewhere to live without a
 manual `mkdir` and a `chown` that someone will forget after a reinstall.
 
-Two files live there, not one. Beside `state.json` the sweep keeps its write
+Three files live there, not one. Beside `state.json` the sweep keeps its write
 ledger, `state-written.bin` by default, which is what stops an unchanged point
-being written again; `ReadWritePaths` covers the directory, so both are already
-allowed. Put either somewhere else and that path needs adding here, and losing
-the ledger costs one sweep of rewriting:
-[only what changed is written](/ghchronicle/sinks/#only-what-changed-is-written).
+being written again, and its cache, `state-cache.bin`, which is what lets a
+restart ask GitHub only for what changed; `ReadWritePaths` covers the
+directory, so all three are already allowed. Put the state file or the ledger
+somewhere else and that path needs adding here, and the cache follows the state
+file wherever it goes. Losing the ledger costs one sweep of rewriting:
+[only what changed is written](/ghchronicle/sinks/#only-what-changed-is-written);
+losing the cache, one sweep at full price:
+[the cache beside it](/ghchronicle/configuration/#the-cache-beside-it).
 
 ## Installing it
 
@@ -109,6 +113,7 @@ the ledger costs one sweep of rewriting:
     - /var/lib/ghchronicle/
       - state.json created by the service
       - state-written.bin the write ledger, beside it
+      - state-cache.bin the cache, beside it too
 
     </FileTree>
 

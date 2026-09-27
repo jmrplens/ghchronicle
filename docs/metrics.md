@@ -900,13 +900,16 @@ The jobs of a run are listed once. The jobs of a completed attempt never
 change, and listing them again every sweep was a request per run in the window,
 nearly all of them 304s that cost no quota but a third of a second of waiting
 each, ninety six times a day. The collector remembers each attempt whose jobs
-it wrote, in memory like the ETag cache, so after a restart the first sweep
-lists the newest twenty per repository once and then asks only for new runs and
-new attempts; a backfill lists every run regardless. A re-run keeps the run's
-id and is a new attempt, so it is listed again. The cap of twenty bounds what a
-sweep pays, not which runs get jobs: a window with more runs than that fills in
-twenty a sweep. A run is remembered only once the sweep that listed it
-succeeded, because the runner keeps nothing of a collector that failed partway.
+it wrote, and keeps that memory with the ETag cache in [the file beside the
+state file](https://jmrp.io/docs/ghchronicle/configuration/#the-cache-beside-it), so a restart asks
+only for new runs and new attempts, as the sweep before it would have; a
+backfill lists every run regardless. A re-run keeps the run's id and is a new
+attempt, so it is listed again. The cap of twenty bounds what a sweep pays, not
+which runs get jobs: a window with more runs than that fills in twenty a sweep.
+A run is remembered only once every store has taken the pass that listed its
+jobs: a pass a store refused forgets its runs, and the next one lists and
+writes them again. The file keeps a run while the listing keeps returning it,
+and forgets it on the same horizon as an answer nobody asks for any more.
 
 A run's jobs outlive their steps. Measured on 24 September 2026, GitHub listed
 every job of a run 278 days old, with its times and its runner, and gave every

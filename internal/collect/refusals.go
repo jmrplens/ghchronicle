@@ -3,6 +3,8 @@ package collect
 import (
 	"context"
 	"errors"
+	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -20,11 +22,13 @@ import (
 // bucket, which is 589 core points a day, a fifth of the daily spend, for
 // answers the collectors already turn into "nothing here".
 //
-// The memory lives in the process, like the ETag cache, not in the state
-// file: a restart asks once more, and the day is the ceiling on how late a
-// feature the author switches on is noticed. The runner keeps one per family,
-// so what is remembered is keyed by family, repository and endpoint, the
-// last two being what the path names.
+// The runner keeps one per family, so what is remembered is keyed by family,
+// repository and endpoint, the last two being what the path names, and it
+// keeps them across a restart in the cache file beside the state file, each
+// with the instant its window closes (see Standing). The day is the ceiling
+// on how late a feature the author switches on is noticed, whether or not
+// the process restarted inside it; deleting that file is how to ask again
+// sooner.
 type Refusals struct {
 	// For is how long a refusal is remembered. Zero means a day.
 	For time.Duration
@@ -101,4 +105,62 @@ func (m *Refusals) clock() time.Time {
 		return m.now()
 	}
 	return time.Now()
+}
+
+// Refused is one remembered refusal in the form a file keeps it: the path
+// that was refused, what it answered, and until when that answer stands.
+type Refused struct {
+	Path   string
+	Status int
+	Reason string
+	Until  time.Time
+}
+
+// Standing lists the refusals whose window is still open, sorted by path so
+// that two saves of the same memory write the same bytes. A nil *Refusals
+// has none.
+func (m *Refusals) Standing() []Refused {
+	if m == nil {
+		return nil
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	now := m.clock()
+	out := make([]Refused, 0, len(m.until))
+	for path, r := range m.until {
+		if !now.Before(r.until) {
+			continue
+		}
+		out = append(out, Refused{Path: path, Status: r.err.Status, Reason: r.err.Reason, Until: r.until})
+	}
+	slices.SortFunc(out, func(a, b Refused) int { return strings.Compare(a.Path, b.Path) })
+	return out
+}
+
+// Recall takes back refusals an earlier process remembered. A window that
+// has closed since is dropped rather than recalled, and a refusal already
+// remembered here is left as it is: it was heard more recently than anything
+// a file can say about the same path.
+func (m *Refusals) Recall(refused []Refused) {
+	if m == nil {
+		return
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	now := m.clock()
+	for _, r := range refused {
+		if !now.Before(r.Until) {
+			continue
+		}
+		if _, held := m.until[r.Path]; held {
+			continue
+		}
+		if m.until == nil {
+			m.until = map[string]refusal{}
+		}
+		m.until[r.Path] = refusal{
+			until: r.Until,
+			err:   &ghapi.UnavailableError{Path: r.Path, Status: r.Status, Reason: r.Reason},
+		}
+	}
 }

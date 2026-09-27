@@ -622,15 +622,19 @@ Los jobs de una ejecución se listan una vez. Los jobs de un intento terminado
 no cambian nunca, y volver a listarlos en cada pasada era una petición por
 ejecución en la ventana, casi todas 304 que no cuestan cuota pero sí un tercio
 de segundo de espera cada una, noventa y seis veces al día. El colector
-recuerda cada intento cuyos jobs escribió, en memoria como la caché de ETag,
-así que tras un reinicio la primera pasada lista las veinte más nuevas de cada
-repositorio una vez y después solo pregunta por ejecuciones e intentos nuevos;
-un backfill las lista todas igualmente. Una reejecución conserva el id de la
-ejecución y es un intento nuevo, así que se lista otra vez. El tope de veinte
-acota lo que paga una pasada, no qué ejecuciones reciben jobs: una ventana con
-más ejecuciones que eso se completa a veinte por pasada. Una ejecución se
-recuerda solo cuando la pasada que la listó ha terminado bien, porque el
-runner no conserva nada de un colector que falló a medias.
+recuerda cada intento cuyos jobs escribió, y guarda esa memoria con la caché de
+ETag en [el fichero junto al fichero de
+estado](/ghchronicle/es/configuration/#la-caché-que-hay-a-su-lado), así que un
+reinicio solo pregunta por ejecuciones e intentos nuevos, como habría hecho la
+pasada anterior; un backfill las lista todas igualmente. Una reejecución
+conserva el id de la ejecución y es un intento nuevo, así que se lista otra
+vez. El tope de veinte acota lo que paga una pasada, no qué ejecuciones reciben
+jobs: una ventana con más ejecuciones que eso se completa a veinte por pasada.
+Una ejecución queda recordada solo cuando todos los almacenes aceptaron la
+pasada que listó sus jobs: una pasada que un almacén rechazó olvida sus
+ejecuciones, y la siguiente las vuelve a listar y a escribir. El fichero guarda
+una ejecución mientras el listado la siga devolviendo, y la olvida con el mismo
+horizonte que una respuesta que ya nadie pide.
 
 Los jobs de una ejecución duran más que sus pasos. Medido el 24 de septiembre de
 2026, GitHub listaba todos los jobs de una ejecución de hace 278 días, con sus

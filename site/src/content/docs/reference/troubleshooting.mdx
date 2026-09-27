@@ -22,9 +22,10 @@ Administration (read); alerts need `security_events`. See
 **A feature switched on, and nothing collected from it.** Code scanning enabled
 this morning, Dependabot turned on, a forum opened: the collector asked before
 you did it, was refused, and remembers the refusal for a day rather than paying
-for it on every sweep. It is noticed a day later at the latest, and restarting
-the process asks again straight away. See
-[a refusal is remembered too](/ghchronicle/api/#a-refusal-is-remembered-too).
+for it on every sweep. It is noticed a day later at the latest, a restart
+included; deleting [the cache file beside the state
+file](/ghchronicle/configuration/#the-cache-beside-it) asks again straight away.
+See [a refusal is remembered too](/ghchronicle/api/#a-refusal-is-remembered-too).
 
 **`still being computed by GitHub (202)`.** GitHub computes the `stats/*`
 endpoints asynchronously and answers 202 with an empty body while it works. The
@@ -189,7 +190,9 @@ A family that is not due yet simply does not appear.
   is collected again is keyed by measurement, tags and timestamp and overwrites.
   The seventh, `last_head`, is the commit each dependency diff started from, and
   without it the next sweep has the photograph and no diff. See
-  [the state file](/ghchronicle/configuration/#state_file).
+  [the state file](/ghchronicle/configuration/#state_file). The cache file
+  beside it costs quota and nothing more: see [the cache beside
+  it](/ghchronicle/configuration/#the-cache-beside-it).
 </Aside>
 
 ## Why does Loki drop entries?

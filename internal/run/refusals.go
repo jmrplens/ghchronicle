@@ -13,9 +13,10 @@ import (
 // on every sweep: measured on 2026-09-11, 589 core points a day across the
 // security, analyses, inventory and deps families, a fifth of the daily
 // spend. A day is the window because the author knows when he switches
-// Dependabot or code scanning on for a repository, and a restart empties the
-// memory anyway. A backfill is run deliberately and asks everything, so it
-// does not consult it.
+// Dependabot or code scanning on for a repository, and a restart no longer
+// cuts it short: the cache file keeps each refusal with the instant its day
+// ends, and deleting that file is how to ask sooner. A backfill is run
+// deliberately and asks everything, so it does not consult it.
 func (r *Runner) refusalsFor(family string) *collect.Refusals {
 	if r.Backfill {
 		return nil

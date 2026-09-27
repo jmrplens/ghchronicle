@@ -307,6 +307,38 @@ func TestTheSecondSweepIsPricedByTheCache(t *testing.T) {
 	assertOwnSpendWasPriced(t, readPoints(t, filepath.Join(dir, "points.jsonl")))
 }
 
+// TestARestartKeepsWhatTheCacheLearned is the same price across a restart:
+// -once, then -once again as a new process with the same state file. The
+// first process leaves its cache beside the state file, so the second asks
+// every URL the first was answered 200 for with the validator the first
+// stored, and is answered 304. Before the file existed, a restart of the
+// production service answered 130 requests of its first sweep and not one of
+// them 304.
+func TestARestartKeepsWhatTheCacheLearned(t *testing.T) {
+	t.Parallel()
+	gh := newFakeGitHub(t)
+	dir := t.TempDir()
+	// Cadences under the loop's half tick of slack, so the second process
+	// finds every family due again.
+	cfg := writeConfigWithCadence(t, dir, gh.URL(), "e2e-token", login, "1s", "")
+	if out, err := run(t, 2*time.Minute, "-config", cfg, "-once"); err != nil {
+		t.Fatalf("the first -once failed: %v\n%s", err, out)
+	}
+	afterFirst := len(gh.Requests())
+	if _, err := os.Stat(filepath.Join(dir, "state-cache.bin")); err != nil {
+		t.Fatalf("the first process left no cache file beside its state file: %v", err)
+	}
+	out, err := run(t, 2*time.Minute, "-config", cfg, "-once")
+	if err != nil {
+		t.Fatalf("the second -once failed: %v\n%s", err, out)
+	}
+	if !bytes.Contains(out, []byte("cache file read")) {
+		t.Errorf("the second process did not say it read the cache file:\n%s", out)
+	}
+	all := gh.Requests()
+	assertRepeatsWereRevalidated(t, all[:afterFirst], all[afterFirst:])
+}
+
 // assertRepeatsWereRevalidated: every GET the first sweep was answered 200
 // for came back 304 when the second sweep asked again, and some did. A 404
 // carries no validator, so a feature this account has switched off is

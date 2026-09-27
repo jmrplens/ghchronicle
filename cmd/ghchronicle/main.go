@@ -327,6 +327,12 @@ func execute(args []string, stdout, stderr io.Writer) {
 			err = nil
 		}
 	}
+	// Before the error is looked at, because a sweep that failed or was
+	// stopped still learned what it asked, and the next start pays for
+	// whatever is not written here.
+	if saveErr := runner.SaveCache(); saveErr != nil {
+		logger.Warn("cache file not saved", "file", cfg.CacheFile(), "err", saveErr)
+	}
 	if err != nil {
 		fatal(stderr, err)
 	}
@@ -357,6 +363,9 @@ func newRunner(cfg *config.Config, api *ghapi.Client, sinks []sink.Sink,
 	return &run.Runner{
 		Cfg: cfg, API: api, Sinks: sinks,
 		State: run.LoadState(cfg.StateFile), Log: logger,
+		// Every kind of run reads it, and every kind but a card-only one and
+		// a backfill writes it back: see run.Runner's CacheFile.
+		CacheFile: cfg.CacheFile(),
 		// Only the in-memory exporter needs it, and only when it will serve:
 		// a push sink has already delivered what it collected, and -once
 		// starts no exporter to fill. What -once does not do is collect every

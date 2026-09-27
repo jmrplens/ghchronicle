@@ -121,6 +121,13 @@ history. It is written through a temporary file and renamed,
 so a crash mid-write cannot leave a truncated state that would trigger a full
 re-collection.
 
+Beside it the collector keeps what makes a sweep cheap rather than what makes it
+complete: the ETag cache, the workflow runs whose jobs were written, the
+refusals and the pull request page sizes, in
+[`<name>-cache.bin`](/ghchronicle/configuration/#the-cache-beside-it). A restart
+reads it back and starts where the last process stopped, not from nothing, and
+deleting it costs one full-price pass of each family and loses nothing.
+
 <Aside
   type="note"
   title="Three runs collect every family whatever the state says"

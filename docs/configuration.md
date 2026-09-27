@@ -138,6 +138,61 @@ store that has been wiped and needs filling again wants. Both files want a
 persistent path:
 [only what changed is written](https://jmrp.io/docs/ghchronicle/sinks/#only-what-changed-is-written).
 
+#### The cache beside it
+
+```text
+/var/lib/ghchronicle/state-cache.bin
+```
+
+Beside `state_file`, as `<name>-cache.bin`, is what a sweep learned about GitHub
+that makes the next one cheap. There is nothing to configure: its place is the
+state file's. It holds four things:
+
+- the [conditional cache](https://jmrp.io/docs/ghchronicle/api/#etags-and-why-a-304-is-free): every
+  answer asked for within twice the longest cadence the configuration runs, and
+  never less than a day, 48 hours at the default cadences, with the ETag it came
+  with, so a restart asks with `If-None-Match` and is answered a free 304;
+- the workflow runs whose jobs were written, so a restart does not list them
+  again;
+- the [refusals](https://jmrp.io/docs/ghchronicle/api/#a-refusal-is-remembered-too), each until the
+  end of its own day;
+- the page sizes the `totals` family gave the pull request query.
+
+All four used to live in the process, and every restart paid for them again.
+Measured on the author's service on 2026-09-26, the first 38 minutes after a
+restart spent 1,092 charged core requests on passes that cost about 66 with the
+cache warm.
+
+It is written at most every five minutes while the collector runs, and once more
+when it stops, however it stops. A run with `-card-only` reads it and does not
+write it, for the reason it leaves the state file alone. A `-backfill` reads it
+and does not write it either: the pages it walks are pages no sweep asks for,
+and kept they would crowd the sweeps' own answers out of the file. An upgrade
+keeps it: an answer is kept under the shape of what its collector reads, so the
+only answers asked for again in full are those of a collector that now reads
+something else.
+
+It is bounded. An answer larger than a megabyte is left out, and so is whatever
+comes past 64 MB, the least recently asked for first. Measured against the
+author's account of 37 repositories, one sweep of every family keeps 1,065
+answers, 10.3 MB of them and 1.6 MB of file, none of them larger than 404 KB.
+Over days the cache in memory grows by the answers whose query carries a moving
+window: the author's service held 6,695 after five and a half days, about 99 MB,
+and the 2,517 of them asked for in the last 48 hours, which are what the file
+keeps, come to about 31 MB. It holds what GitHub answered about private
+repositories as well as public ones, and is written with mode 600, as the state
+file is.
+
+Deleting it costs one pass of each family at full price, the price every restart
+paid before it existed, and loses nothing. Every answer is asked for again,
+every refused feature is asked about again, which is also how to have a feature
+switched on today noticed before its day is out, the jobs of the newest runs are
+listed once more, and the first sweep runs `totals` before the pull requests,
+whatever its cadence says, so their pages are sized again. A file that does not
+load in full, cut short, damaged or written in another format, is set aside
+with a warning and costs the same. It wants the same persistent path as the
+other two.
+
 ### `backfill`
 
 ```yaml
@@ -148,7 +203,7 @@ backfill:
 Only applies to a run started with `-backfill`, and is overridden by
 `-backfill-since`. See [backfill](https://jmrp.io/docs/ghchronicle/how/backfill/).
 
-A backfill keeps a third file beside `state_file`, `<name>-progress.json`,
+A backfill keeps one more file beside `state_file`, `<name>-progress.json`,
 which is where it records what it has already written so a stop costs one
 repository rather than the walk. There is nothing to configure: it appears when
 a backfill starts, it is removed when the walk reaches the end, and a sweep
@@ -651,7 +706,7 @@ the same membership.
 | `repos`     | `inventory`    | `24h`   | four core requests per repository, for settings that change only when somebody changes them                                                                                                                                                                                                                      |
 | `repos`     | `policyfiles`  | `24h`   | SECURITY.md, CODEOWNERS, dependabot.yml and FUNDING.yml move about once a quarter                                                                                                                                                                                                                                |
 | `repos`     | `repo`         | `1h`    | stars, forks, languages and topics move slowly, and a pass is three REST requests per repository, most of them a free 304, and two GraphQL points per ten repositories                                                                                                                                           |
-| `repos`     | `rulesets`     | `24h`   | a ruleset is edited a few times a year and every version keeps its own date; both requests answer a free 304 until somebody edits one, except on the first pass after a restart, since the ETag cache lives in memory                                                                                            |
+| `repos`     | `rulesets`     | `24h`   | a ruleset is edited a few times a year and every version keeps its own date; both requests answer a free 304 until somebody edits one, the first pass after a restart included, since the ETag cache is kept beside the state file                                                                               |
 | `repos`     | `settings`     | `6h`    | webhooks, rulesets, environments and deploy keys change only when somebody changes them                                                                                                                                                                                                                          |
 | `security`  | `analyses`     | `1h`    | GitHub prunes code scanning analyses and every scanned push adds some, and a pass is one conditional request per repository with code scanning, three of them charged in the median pass measured, the refusals of the rest remembered for a day                                                                 |
 | `security`  | `security`     | `1h`    | an alert is something to act on today, and the list of open ones is short                                                                                                                                                                                                                                        |

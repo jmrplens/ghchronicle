@@ -40,7 +40,14 @@ type Actions struct {
 	// job listings a sweep, two hundred and eighty six of them 304, and a
 	// hundred and thirty seven seconds of waiting for them, ninety six times
 	// a day. Nil keeps no memory, which is what a backfill wants.
-	Expanded map[RunKey]struct{}
+	//
+	// Each run carries the instant of the last sweep that listed it, whether
+	// its jobs were written then or before. That is what lets the runner keep
+	// the set across a restart without keeping it for ever: a run the listing
+	// has not returned for a while has left the newest page for good, the
+	// listing being newest first, and the file beside the state keeps only
+	// the ones it returned lately. A re-run is a new attempt, so a new key.
+	Expanded map[RunKey]time.Time
 	// PerPage is how many runs a page of the listing holds. Zero means a
 	// hundred, the most GitHub serves and what a first sweep and a backfill
 	// ask for. A sweep every quarter of an hour asks for thirty: the page is
@@ -169,7 +176,14 @@ func (a Actions) Collect(ctx context.Context, c *ghapi.Client, repo Repo, now ti
 	// threw a failed collector's points away.
 	if a.Expanded != nil {
 		for _, key := range expanded {
-			a.Expanded[key] = struct{}{}
+			a.Expanded[key] = now
+		}
+		// Seen again, so still on the newest page: see Expanded.
+		for i := range runs {
+			key := RunKey{ID: runs[i].ID, Attempt: runs[i].RunAttempt}
+			if _, written := a.Expanded[key]; written {
+				a.Expanded[key] = now
+			}
 		}
 	}
 	if err != nil {

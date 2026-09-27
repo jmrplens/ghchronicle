@@ -11,13 +11,16 @@ import SpecSheet from "../../../../components/SpecSheet.astro";
 Medido el 2026-09-11 con el binario real contra la API viva, con todas las
 familias encendidas y cada petición registrada con las cabeceras
 `x-ratelimit-resource` y `x-ratelimit-used` de su propia respuesta. **Frío** es
-la primera pasada de una instalación nueva o de un servicio reiniciado: caché de
-ETag vacía, un mes de ejecuciones de workflows. **Estable** es la tercera pasada
-del mismo proceso unos minutos después, cuando cuatro quintas partes de sus
-peticiones se respondieron con 304 y no costaron nada; la segunda pasada es la
-que paga el relleno que describe la fila de actions. Un 304 es gratis, y solo
-existe para REST: GraphQL no lleva ETag, así que su columna es la misma en las
-dos pasadas.
+la primera pasada de una instalación nueva: caché de ETag vacía, un mes de
+ejecuciones de workflows. Un servicio reiniciado ya no empieza ahí: vuelve a
+leer su caché del [fichero junto al fichero de
+estado](/ghchronicle/es/configuration/#la-caché-que-hay-a-su-lado), y solo uno
+que haya perdido ese fichero vuelve a pagar la caché vacía. **Estable** es la
+tercera pasada del mismo proceso unos minutos después, cuando cuatro quintas
+partes de sus peticiones se respondieron con 304 y no costaron nada; la segunda
+pasada es la que paga el relleno que describe la fila de actions. Un 304 es
+gratis, y solo existe para REST: GraphQL no lleva ETag, así que su columna es la
+misma en las dos pasadas.
 
 Las cifras son por repositorio donde la familia pregunta por repositorio, y por
 pasada donde pregunta por la cuenta. `core` es el cubo de REST, `pt` un punto

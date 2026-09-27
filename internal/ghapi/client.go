@@ -227,17 +227,26 @@ const DefaultCacheBytes = 256 << 20
 // cost between 198 and 253 bytes each in HeapAlloc across forty-one sizes
 // from 100 to 235,000 entries, and 251 at the 922 one sweep holds, the spread
 // being where the map's capacity happens to land. That is the map slot, whose
-// key is a string and a reflect.Type, the container/list element, and the
-// conditional struct, whose 88 bytes are allocated one at a time and so round
-// up to a 96 byte size class. The URL, the ETag, the body and the Link are
-// counted separately below. Two hundred and fifty-six rounds the measured
-// range up, so the accounting errs towards charging more than the entry costs
-// and never less.
+// key was a string and a reflect.Type, the container/list element, and the
+// conditional struct, whose 88 bytes were allocated one at a time and so
+// rounded up to a 96 byte size class. The URL, the ETag, the body and the
+// Link are counted separately below. Two hundred and fifty-six rounds the
+// measured range up, so the accounting errs towards charging more than the
+// entry costs and never less.
 //
 // It was two hundred, measured when the key was the URL alone and the struct
 // held no Link. The type in the key had already taken the real cost past it
 // at most sizes, to between 182 and 237 at the same forty-one, and the Link's
 // string header is the other sixteen bytes.
+//
+// Measured again on 2026-09-27, same Go, once the type in the key became its
+// name and the struct gained the Unix second of its last use: between 179 and
+// 245 bytes at forty-one sizes spaced evenly on a log scale from 100 to
+// 235,000 entries, and 249 at 922, each the lowest of five runs, because a
+// collection landing in the middle of one size throws that one reading off.
+// The key is two strings now, the same sixteen bytes a reflect.Type took, and
+// the eight of the stamp fill the struct's 96 byte size class rather than
+// spilling out of it, so the constant still covers the range.
 const cacheEntryOverhead = 256
 
 // cacheKey names an entry: the URL, and the type its body was decoded into.
@@ -252,11 +261,13 @@ const cacheEntryOverhead = 256
 // by both, each caller has an entry of its own, each repeat is still
 // conditional, and the only cost is the second entry's bytes.
 //
-// A call that decodes nothing keys on the nil type, which is the wire body's
-// own entry.
+// The type is held by its decodingName rather than as a reflect.Type, because
+// the cache outlives the process (see Answers) and a reflect.Type does not.
+// A call that decodes nothing keys on the empty name, which is the wire
+// body's own entry.
 type cacheKey struct {
 	url string
-	typ reflect.Type
+	typ string
 }
 
 // conditional is the ETag and the body of one URL, for one decoding type. The
@@ -284,6 +295,11 @@ type conditional struct {
 	etag string
 	body []byte
 	link string
+	// used is when a request last asked for this entry, in Unix seconds. The
+	// order of the list already says which entry is older; this says by how
+	// much, which is what a file kept across a restart needs to leave out an
+	// entry nothing has asked for in days (see Answers).
+	used int64
 }
 
 func (e *conditional) size() int {
@@ -321,6 +337,9 @@ type cache struct {
 	// order is most recently used at the front, so the victim is the back.
 	order   *list.List
 	entries map[cacheKey]*list.Element
+	// clock stamps an entry's use. Nil is the wall clock, which is what
+	// everything but a test of the stamp reads.
+	clock func() time.Time
 }
 
 // CacheStats is what the conditional-request cache currently holds.
@@ -372,7 +391,16 @@ func (k *cache) get(key cacheKey) (etag string, body []byte, link string) {
 		return "", nil, ""
 	}
 	k.order.MoveToFront(el)
+	e.used = k.now()
 	return e.etag, e.body, e.link
+}
+
+// now is the instant an entry is stamped with, in the unit the entry keeps.
+func (k *cache) now() int64 {
+	if k.clock != nil {
+		return k.clock().Unix()
+	}
+	return time.Now().Unix()
 }
 
 // put stores the pair for key, with the Link header the body came with, and
@@ -389,7 +417,7 @@ func (k *cache) put(key cacheKey, etag string, body []byte, link string) {
 		k.drop(key)
 		return
 	}
-	e := &conditional{key: key, etag: etag, body: body, link: link}
+	e := &conditional{key: key, etag: etag, body: body, link: link, used: k.now()}
 	if e.size() > k.limit {
 		// Nothing else would fit beside it, so keeping it would mean emptying
 		// the cache for one page. Paying for that page again is the cheaper
@@ -598,7 +626,7 @@ func (c *Client) GetJSON(ctx context.Context, path string, out any, accept strin
 	//
 	// The entry is the one this caller's type wrote: a body stored by another
 	// type decoding the same URL holds only what that type kept.
-	key := cacheKey{url: url, typ: reflect.TypeOf(out)}
+	key := cacheKey{url: url, typ: decodingName(reflect.TypeOf(out))}
 	c.mu.Lock()
 	tag, saved, savedLink := c.cache.get(key)
 	c.mu.Unlock()
@@ -690,7 +718,9 @@ func (c *Client) GetJSON(ctx context.Context, path string, out any, accept strin
 // did. Nothing in this repository decodes into such a type, and the collect
 // package's conditional parity test is what keeps that true: it collects
 // every REST family twice against a fake that answers the repeat 304 and
-// fails on the first point that differs.
+// fails on the first point that differs. A body an earlier process stored
+// keeps the promise too, because it is only ever answered to a type that
+// decodes exactly as the one that stored it (see decodingName).
 //
 // A value that cannot be encoded, or a call that decoded nothing, keeps the
 // raw body: the cache is then no worse than it was, and only that answer
@@ -810,9 +840,9 @@ func (c *Client) GetTextAs(ctx context.Context, path, accept string) (string, er
 	}
 	req.Header.Set("Accept", accept)
 
-	// The text has no decoding type, and the nil type is a key no GetJSON
-	// caller writes under: GetJSON stores a nil out's body under the type of
-	// nil too, but nothing asks the same URL both ways.
+	// The text has no decoding type, and the empty name is a key no GetJSON
+	// caller writes under: GetJSON stores a nil out's body under the empty
+	// name too, but nothing asks the same URL both ways.
 	key := cacheKey{url: url}
 	c.mu.Lock()
 	tag, saved, _ := c.cache.get(key)

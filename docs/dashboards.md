@@ -218,12 +218,12 @@ ghchronicle -config config.yaml -uninstall all          # says what would go
 ghchronicle -config config.yaml -uninstall all -yes     # and then goes
 ```
 
-| Target      | What goes                                                            |
-| ----------- | -------------------------------------------------------------------- |
-| `dashboard` | The dashboards it published, and the datasources it created           |
-| `data`      | Every table in the store whose name starts with `gh_`                 |
-| `state`     | The state file, the dedupe ledger and the backfill checkpoint         |
-| `all`       | The three above                                                       |
+| Target      | What goes                                                                |
+| ----------- | ------------------------------------------------------------------------ |
+| `dashboard` | The dashboards it published, and the datasources it created              |
+| `data`      | Every table in the store whose name starts with `gh_`                    |
+| `state`     | The state file, the dedupe ledger, the cache and the backfill checkpoint |
+| `all`       | The three above                                                          |
 
 A datasource named in `grafana.datasource.uid` or `grafana.datasource.loki_uid`
 is never removed, and neither is a Loki datasource it adopted: each was

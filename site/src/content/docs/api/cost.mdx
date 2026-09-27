@@ -11,12 +11,15 @@ import SpecSheet from "../../../components/SpecSheet.astro";
 Measured on 2026-09-11 with the real binary against the live API, every family
 switched on and every request logged with the `x-ratelimit-resource` and
 `x-ratelimit-used` headers of its own response. **Cold** is the first sweep of
-a fresh install or of a restarted service: an empty ETag cache, a month of
-workflow runs. **Steady** is the third sweep of the same process a few minutes
-later, when about four fifths of its requests were answered 304 and cost
-nothing; the second sweep is the one that pays the fill-in the actions row
-describes. A 304 is free, and it is only ever available to REST: GraphQL
-carries no ETag, so its column is the same in both sweeps.
+a fresh install: an empty ETag cache, a month of workflow runs. A restarted
+service no longer starts there: it reads its cache back from [the file beside
+the state file](/ghchronicle/configuration/#the-cache-beside-it), and only one
+that has lost that file pays the empty cache again. **Steady** is the third
+sweep of the same process a few minutes later, when about four fifths of its
+requests were answered 304 and cost nothing; the second sweep is the one that
+pays the fill-in the actions row describes. A 304 is free, and it is only ever
+available to REST: GraphQL carries no ETag, so its column is the same in both
+sweeps.
 
 The figures are per repository where the family asks per repository, and per
 sweep where it asks about the account. `core` is the REST bucket, `pt` a

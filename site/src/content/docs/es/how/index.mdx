@@ -123,6 +123,14 @@ diario de estrellas. Se escribe a través de un fichero temporal
 y se renombra, así que una caída a mitad de escritura no puede dejar un estado
 truncado que provocaría una recolección completa.
 
+Junto a él el recolector guarda lo que hace barata una pasada y no lo que la
+hace completa: la caché de ETags, las ejecuciones de workflow cuyos jobs ya se
+escribieron, los rechazos y los tamaños de página de las pull requests, en
+[`<nombre>-cache.bin`](/ghchronicle/es/configuration/#la-caché-que-hay-a-su-lado).
+Un reinicio lo vuelve a leer y empieza donde se paró el proceso anterior, no de
+cero, y borrarlo cuesta una pasada a precio completo de cada familia y no pierde
+nada.
+
 <Aside
   type="note"
   title="Tres pasadas recogen todas las familias diga lo que diga el estado"

@@ -328,6 +328,12 @@ every:
 # the beginning and pay for it; everything re-collected overwrites what is
 # already stored, except the dependency changes since the head it held, which
 # are read from a range nothing can name once the head is gone.
+#
+# Beside it, as state-cache.bin here, the collector keeps what makes a restart
+# cheap rather than complete: the ETag cache, the workflow runs whose jobs were
+# written, the refusals and the pull request page sizes. It has no setting of
+# its own and follows the state file; deleting it costs one pass of each family
+# at a cold cache's price and loses nothing.
 state_file: /var/lib/ghchronicle/state.json
 
 log:

@@ -86,6 +86,19 @@ type Runner struct {
 	// sweep cheaper, never less complete.
 	CardOnly bool
 
+	// CacheFile is where what this process learned about GitHub is kept for
+	// the next one: the conditional cache, the runs whose jobs were written,
+	// the refusals and the page sizes. Empty keeps all four in memory, which
+	// is what a runner nobody gave a file gets. Every run reads it, and every
+	// run but a card-only one and a backfill writes it: see saveCache.
+	CacheFile string
+	// cacheLoaded is whether CacheFile has been read, which happens once, at
+	// the first sweep. cacheSaved is when it was last written, and
+	// cacheDirty whether a family has run since.
+	cacheLoaded bool
+	cacheSaved  time.Time
+	cacheDirty  bool
+
 	repos   []collect.Repo
 	reposAt time.Time
 	primed  bool
@@ -97,19 +110,36 @@ type Runner struct {
 	archived []collect.Repo
 
 	// counts is what the totals family last said each repository holds, and
-	// is what sizes the pull request page. Memory only: a restart runs totals
-	// on its first sweep, before any per-repository family.
+	// is what sizes the pull request page. Kept in CacheFile, so a restart
+	// sizes the page from the totals of the process before it; a first sweep
+	// that has none runs totals before any per-repository family, whatever
+	// its cadence says (see sizeFirst).
 	counts map[string]collect.ItemCounts
+	// countsAsked is whether the first sweep of this process has settled
+	// sizeFirst, and sizeFirst whether that sweep runs totals because there
+	// were no counts to size the page from.
+	//
+	// Only the first, because a totals pass that answers with no counts, on
+	// an account with nothing in it, would otherwise be forced on every
+	// sweep. What the counts save is the page of fifty they replace: on
+	// 2026-09-26 the daily whole-page read cost 328 points against the 139 of
+	// each of the five days before it, the process having started eleven
+	// hours before the read with no counts, and totals not being due until
+	// forty-five minutes after it.
+	countsAsked bool
+	sizeFirst   bool
 
-	// expanded is every workflow run attempt whose jobs a sweep of this
-	// process already wrote, so the next sweep does not list them again.
-	// Memory only, like the ETag cache: after a restart the first sweep
-	// lists the jobs of the newest runs once and then stops asking.
-	expanded map[collect.RunKey]struct{}
+	// expanded is every workflow run attempt whose jobs a sweep already
+	// wrote, and when a sweep last listed it, so the next sweep does not
+	// list its jobs again. expandedKept is the same as of the end of the last
+	// actions pass whose rows every sink took, and is the one kept in
+	// CacheFile: see settleExpanded.
+	expanded     map[collect.RunKey]time.Time
+	expandedKept map[collect.RunKey]time.Time
 
 	// refusals is, per family, the endpoints that answered 403 or 404 and
-	// when to ask them again. Memory only, for the same reason as the two
-	// above: see refusalsFor.
+	// when to ask them again, kept in CacheFile with that instant: see
+	// refusalsFor.
 	refusals map[string]*collect.Refusals
 
 	// health is what this sweep has learned about its own collectors, which
@@ -200,8 +230,10 @@ func (r *Runner) PrimeAgain() { r.primed = false }
 // marking anything as run.
 func (r *Runner) Once(ctx context.Context) error {
 	now := r.clock()
+	r.loadCache(now)
 	r.prime = (r.Prime || r.Card) && !r.primed
 	r.primed = true
+	r.sizeFirst = r.pageSizesUnknown()
 	if r.prime {
 		why := "first sweep after start-up, running every family to fill the exporter"
 		switch {
@@ -277,6 +309,7 @@ func (r *Runner) discoverRepos(ctx context.Context, now time.Time) error {
 		return err
 	}
 	r.repos, r.archived, r.reposAt = found.Repos, found.Archived, now
+	r.cacheDirty = true
 	r.Log.Info("repositories discovered", "count", len(r.repos), "archived_aside", len(r.archived))
 	return nil
 }
@@ -309,6 +342,9 @@ func (r *Runner) accountFamilies(ctx context.Context, now time.Time) {
 	// day, and the OTLP state keeps the newest batch per series, so the count
 	// of archived repositories would have expired, or become the one newly
 	// archived, until the next restart.
+	//
+	// It is also what sizes the pull request page, so a first sweep with no
+	// counts to size it from runs it whether or not it is due: see sizeFirst.
 	r.family(ctx, "totals", now, func() ([]sink.Point, error) {
 		totals := collect.Totals{Login: user, Repos: r.repos, Archived: r.archived}
 		points, err := totals.Collect(ctx, r.API, now)
@@ -448,11 +484,16 @@ func (r *Runner) repoFamilies(ctx context.Context, now time.Time) error {
 		// family of thirty-five repositories covered the two that were left.
 		written := len(r.repos) - r.reposToCover(family)
 		pass, err := r.collectFamily(ctx, family, now)
+		r.cacheDirty = true
 		if err != nil {
 			return err
 		}
-		r.emit(ctx, family, pass.points)
+		delivered := r.emit(ctx, family, pass.points)
+		if family == "actions" {
+			r.settleExpanded(delivered)
+		}
 		r.noteFamily(family, pass.covered+written, pass.failed, pass.written)
+		r.saveCacheSoon()
 		// A family where every repository failed has not run. Marking it would
 		// hide the outage until its next cadence, which for the slow families
 		// is half a day.
@@ -978,9 +1019,10 @@ func (r *Runner) noteCounts(points []sink.Point) {
 // A backfill lists the jobs of every run, whatever this process remembers;
 // a sweep skips the runs whose jobs this process already wrote, which after
 // the first sweep is nearly all of them. The memory starts empty with the
-// process and is never reset: the first sweep runs this once per repository
-// before the family is marked, and a reset here would keep only the last
-// repository's runs.
+// process, or with what CacheFile kept of the process before it, and is
+// never reset: the first sweep runs this once per repository before the
+// family is marked, and a reset here would keep only the last repository's
+// runs.
 func (r *Runner) actions(now time.Time) collect.Actions {
 	if r.Backfill {
 		// Every run's jobs, however many requests that is. A backfill
@@ -998,7 +1040,7 @@ func (r *Runner) actions(now time.Time) collect.Actions {
 		since, pages, perPage = now.AddDate(0, 0, -30), 10, 100
 	}
 	if r.expanded == nil {
-		r.expanded = map[collect.RunKey]struct{}{}
+		r.expanded = map[collect.RunKey]time.Time{}
 	}
 	return collect.Actions{
 		Since: since, Jobs: true, MaxJobRuns: 20, Expanded: r.expanded,
@@ -1066,7 +1108,6 @@ func (r *Runner) jobLogs(now time.Time) collect.JobLogs {
 	return collect.JobLogs{Since: since, MaxJobs: 500, Walk: collect.Walk{Pages: -1, Since: since}}
 }
 
-// family runs one account-wide collector if it is due and within budget.
 // warnOnce logs one line per distinct warning a collector hands back through
 // its Warn. The key is the message and its arguments rendered as text, so the
 // same floor or the same disagreement is one line however many days it holds,
@@ -1083,13 +1124,24 @@ func (r *Runner) warnOnce(msg string, args ...any) {
 	r.Log.Warn(msg, args...)
 }
 
+// family runs one account-wide collector if it is due and within budget, or
+// if this sweep runs it whether or not it is due: a primed one runs every
+// family, and one that has nothing to size the pull request page with runs
+// totals.
 func (r *Runner) family(ctx context.Context, name string, now time.Time, run func() ([]sink.Point, error)) {
 	if r.Cfg.Targets.User == "" {
 		return
 	}
 	every, enabled := r.Cfg.Interval(name)
-	if !enabled || (!r.prime && !r.due(name, every, now)) {
+	if !enabled {
 		return
+	}
+	sizing := name == "totals" && r.sizeFirst
+	if due := r.due(name, every, now); !due && !r.prime {
+		if !sizing {
+			return
+		}
+		r.Log.Info("no page sizes remembered, running totals before the pull requests it sizes")
 	}
 	// Already written by the walk this run resumes. An account family is its
 	// own unit: it asks about no repository, so there is nothing smaller of it
@@ -1108,6 +1160,7 @@ func (r *Runner) family(ctx context.Context, name string, now time.Time, run fun
 		return
 	}
 	points, err := run()
+	r.cacheDirty = true
 	if err != nil {
 		r.Log.Error("collector failed", "family", name, "err", err)
 	}
@@ -1123,6 +1176,7 @@ func (r *Runner) family(ctx context.Context, name string, now time.Time, run fun
 		r.noteFamilyFailure(name, err)
 	}
 	r.noteFamily(name, 0, failed, len(points))
+	r.saveCacheSoon()
 	if err != nil && len(points) == 0 {
 		// Nothing at all came back, so the family has not run. Marking it
 		// would hide the outage until its next cadence, which for the twelve
@@ -1242,10 +1296,11 @@ func (r *Runner) reserveFor(rate ghapi.RateState) int {
 // emit sends one family's points, or one repository's of them, and reports
 // whether every sink took them.
 //
-// The answer is what the backfill checkpoint is written on: a record there is
-// a claim that a store already holds those rows, and a sink that failed is the
-// one case where that claim would be false. Nothing else reads it, because
-// nothing else may skip work on the strength of it.
+// The answer is what the backfill checkpoint is written on, and what the
+// memory of the workflow runs whose jobs were written is settled on (see
+// settleExpanded): each is a claim that a store already holds those rows, and
+// a sink that failed is the one case where that claim would be false. Nothing
+// else reads it, because nothing else may skip work on the strength of it.
 //
 // attrs are added to each line this writes. A walk that keeps a checkpoint
 // sends a repository at a time, and without the repository's name the journal

@@ -726,7 +726,7 @@ var defaultEvery = map[string]family{
 	},
 	"rulesets": {
 		every: 24 * time.Hour, group: "repos",
-		why: "a ruleset is edited a few times a year and every version keeps its own date; both requests answer a free 304 until somebody edits one, except on the first pass after a restart, since the ETag cache lives in memory",
+		why: "a ruleset is edited a few times a year and every version keeps its own date; both requests answer a free 304 until somebody edits one, the first pass after a restart included, since the ETag cache is kept beside the state file",
 	},
 }
 
@@ -868,6 +868,26 @@ func (c *Config) BackfillProgressFile() string {
 		return ""
 	}
 	return strings.TrimSuffix(c.StateFile, ".json") + "-progress.json"
+}
+
+// CacheFile is where a run keeps what it learned about GitHub for the run
+// after it: the conditional cache, the workflow runs whose jobs were
+// written, the refusals and the pull request page sizes. Beside the state
+// file, the way the backfill checkpoint is.
+//
+// Derived and not a setting of its own, for the checkpoint's reason and one
+// more: the file only ever makes a pass cheaper, so there is nothing to
+// choose about it but where it lives, and where the state file lives is
+// already that choice. Deleting it costs one pass of each family at a cold
+// cache's price and loses nothing.
+//
+// Empty when there is no state file, and such a run keeps no cache file
+// either.
+func (c *Config) CacheFile() string {
+	if c.StateFile == "" {
+		return ""
+	}
+	return strings.TrimSuffix(c.StateFile, ".json") + "-cache.bin"
 }
 
 // resolveSinks expands the environment in every configured sink, fills its

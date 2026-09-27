@@ -359,5 +359,6 @@ the conventional places rather than ones the tool knows:
 | Log              | `~/Library/Logs/ghchronicle.log`                    | `/usr/local/var/log/`            |
 
 `state_file` has a default of its own, `ghchronicle-state.json` in the working
-directory, with the write ledger beside it as `ghchronicle-state-written.bin`.
-A launchd job's working directory is not something to rely on. Set it.
+directory, with the write ledger beside it as `ghchronicle-state-written.bin`
+and the cache as `ghchronicle-state-cache.bin`. A launchd job's working
+directory is not something to rely on. Set it.

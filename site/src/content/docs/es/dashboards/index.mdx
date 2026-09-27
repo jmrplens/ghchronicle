@@ -193,12 +193,12 @@ ghchronicle -config config.yaml -uninstall all          # dice qué se iría
 ghchronicle -config config.yaml -uninstall all -yes     # y entonces se va
 ```
 
-| Objetivo    | Qué se va                                                              |
-| ----------- | ---------------------------------------------------------------------- |
-| `dashboard` | Los dashboards que publicó, y los datasources que haya creado él        |
-| `data`      | Toda tabla del almacén cuyo nombre empiece por `gh_`                    |
-| `state`     | El fichero de estado, el libro de deduplicación y el punto de control   |
-| `all`       | Los tres de arriba                                                      |
+| Objetivo    | Qué se va                                                                       |
+| ----------- | ------------------------------------------------------------------------------- |
+| `dashboard` | Los dashboards que publicó, y los datasources que haya creado él                |
+| `data`      | Toda tabla del almacén cuyo nombre empiece por `gh_`                            |
+| `state`     | El fichero de estado, el libro de deduplicación, la caché y el punto de control |
+| `all`       | Los tres de arriba                                                              |
 
 Un datasource nombrado en `grafana.datasource.uid` o en
 `grafana.datasource.loki_uid` no se quita nunca, ni tampoco un datasource de

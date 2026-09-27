@@ -110,6 +110,18 @@ caché se llena, que es el número que hay que saber antes de meter el proceso e
 un contenedor con límite de memoria: puede retener esa cantidad de cuerpos
 decodificados además de su propia huella.
 
+La caché sobrevive al proceso. Lo que se pidió dentro del doble de la cadencia
+más larga se guarda en [un fichero junto al fichero de
+estado](/ghchronicle/es/configuration/#la-caché-que-hay-a-su-lado), escrito como
+mucho cada cinco minutos mientras el recolector corre y una vez más cuando se
+para, y un reinicio lo vuelve a leer, así que su primera pasada pregunta con los
+validadores que guardó la anterior. Antes de ese fichero, la primera pasada tras
+un reinicio del servicio del autor hizo 130 peticiones y ninguna recibió un 304.
+Cada entrada se guarda bajo un resumen de todo lo que decodifica su tipo y no
+bajo el nombre del tipo, así que una actualización que cambia lo que lee un
+colector vuelve a pedir enteras las URL de ese colector en lugar de responderlas
+con un cuerpo guardado sin el campo nuevo.
+
 ## Un rechazo también se recuerda
 
 Un 403 o un 404 es como GitHub dice que una función está apagada: Dependabot en
@@ -128,8 +140,11 @@ Dos consecuencias que conviene saber:
 
 - Enciende una función y se nota como muy tarde al día siguiente, no en la
   pasada siguiente.
-- Reiniciar el proceso vuelve a preguntar en el acto. La memoria vive en el
-  proceso, como la caché de ETags, no en el fichero de estado.
+- Reiniciar el proceso no vuelve a preguntar. Los rechazos se guardan con la
+  caché de ETags en [el fichero junto al fichero de
+  estado](/ghchronicle/es/configuration/#la-caché-que-hay-a-su-lado), cada uno
+  hasta el final de su propio día, y borrar ese fichero es la manera de volver a
+  preguntar en el acto.
 
 Una cuota agotada también es un 403 y nunca se recuerda como tal: el cliente lo
 tipa aparte precisamente para que un límite de peticiones no se lea como una

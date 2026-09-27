@@ -253,11 +253,16 @@ handful of calls; on an account with many stars or old repositories, cache it:
     restore-keys: ghchronicle-state-
 ```
 
-and point `state_file` at `~/.ghchronicle/state.json` in the config. A `card`
-mode run reads a restored state file, which is what lets it skip both walks, and
-never writes one back: it delivers its points to the card and to no store, so
-nothing it learned may tell the next collection that a family is already done.
-What fills the cache is a `once` or `backfill` step.
+and point `state_file` at `~/.ghchronicle/state.json` in the config. The
+directory holds [the cache beside the state
+file](/ghchronicle/configuration/#the-cache-beside-it) as well, which a `once`
+step writes and a `backfill` step only reads, so a run restored from it also
+asks GitHub with the validators the last one stored, and pays only for what
+changed. A `card` mode run reads a restored state file, which
+is what lets it skip both walks, and never writes one back, nor the cache file
+beside it: it delivers its points to the card and to no store, so nothing it
+learned may tell the next collection that a family is already done. What fills
+the cache is a `once` or `backfill` step.
 
 ## Without the Action
 

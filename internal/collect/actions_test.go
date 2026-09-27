@@ -140,7 +140,7 @@ func TestActionsDoesNotListTheJobsOfARunAlreadyWritten(t *testing.T) {
 		}
 		return n
 	}
-	expanded := map[RunKey]struct{}{}
+	expanded := map[RunKey]time.Time{}
 	sweep := Actions{Jobs: true, Expanded: expanded, Walk: Walk{Pages: 1}}
 
 	points, err := sweep.Collect(ctx(t), f.Client, testRepo, testNow)
@@ -187,6 +187,41 @@ func TestActionsDoesNotListTheJobsOfARunAlreadyWritten(t *testing.T) {
 	}
 }
 
+// TestAListedRunIsStampedWithTheSweepThatListedIt: the memory of expanded
+// runs outlives the process now, and what keeps it from growing for ever is
+// the stamp each run carries of the last sweep that listed it. A run the
+// listing still returns is stamped again whether or not its jobs were listed
+// this time; one it no longer returns keeps the stamp it had, which is what
+// ages it out of the file beside the state.
+func TestAListedRunIsStampedWithTheSweepThatListedIt(t *testing.T) {
+	t.Parallel()
+	f := newFixtureServer(t)
+	f.file("/repos/octocat/hello-world/actions/runs", "actions_runs.json")
+	for _, id := range []string{"1000163135", "1000163134", "1000163132"} {
+		f.file("/repos/octocat/hello-world/actions/runs/"+id+"/jobs", "actions_jobs.json")
+	}
+	earlier := testNow.Add(-6 * time.Hour)
+	written := RunKey{ID: 1000163135, Attempt: 1}
+	gone := RunKey{ID: 1, Attempt: 1}
+	expanded := map[RunKey]time.Time{written: earlier, gone: earlier}
+	sweep := Actions{Jobs: true, Expanded: expanded, Walk: Walk{Pages: 1}}
+	if _, err := sweep.Collect(ctx(t), f.Client, testRepo, testNow); err != nil {
+		t.Fatal(err)
+	}
+	if n := len(f.calls("/repos/octocat/hello-world/actions/runs/1000163135/jobs")); n != 0 {
+		t.Errorf("the run already written had its jobs listed %d times", n)
+	}
+	if got := expanded[written]; !got.Equal(testNow) {
+		t.Errorf("the run listed again is stamped %s, want this sweep's %s", got, testNow)
+	}
+	if got := expanded[RunKey{ID: 1000163134, Attempt: 2}]; !got.Equal(testNow) {
+		t.Errorf("the run expanded now is stamped %s, want this sweep's %s", got, testNow)
+	}
+	if got := expanded[gone]; !got.Equal(earlier) {
+		t.Errorf("a run the listing did not return is stamped %s, want the %s it had", got, earlier)
+	}
+}
+
 // TestASweepThatFailedKeepsTheJobsItHadAlreadyCollected is the collector's
 // half of the defect a real store showed: one 502 on one run's job listing
 // used to cost a repository every run and job the family had already
@@ -200,7 +235,7 @@ func TestASweepThatFailedKeepsTheJobsItHadAlreadyCollected(t *testing.T) {
 	f.file("/repos/octocat/hello-world/actions/runs/1000163135/jobs", "actions_jobs.json")
 	f.status("/repos/octocat/hello-world/actions/runs/1000163134/jobs", http.StatusBadGateway, "boom")
 	f.file("/repos/octocat/hello-world/actions/runs/1000163132/jobs", "actions_jobs.json")
-	expanded := map[RunKey]struct{}{}
+	expanded := map[RunKey]time.Time{}
 	sweep := Actions{Jobs: true, Expanded: expanded, Walk: Walk{Pages: 1}}
 
 	points, err := sweep.Collect(ctx(t), f.Client, testRepo, testNow)
@@ -249,7 +284,7 @@ func TestActionsSkippedRunsDoNotCountAgainstTheCap(t *testing.T) {
 	f.file("/repos/octocat/hello-world/actions/runs/1000163135/jobs", "actions_jobs.json")
 	f.file("/repos/octocat/hello-world/actions/runs/1000163134/jobs", "actions_jobs.json")
 	f.file("/repos/octocat/hello-world/actions/runs/1000163132/jobs", "actions_jobs.json")
-	sweep := Actions{Jobs: true, MaxJobRuns: 1, Expanded: map[RunKey]struct{}{}, Walk: Walk{Pages: 1}}
+	sweep := Actions{Jobs: true, MaxJobRuns: 1, Expanded: map[RunKey]time.Time{}, Walk: Walk{Pages: 1}}
 	for _, want := range []string{"1000163135", "1000163134", "1000163132"} {
 		if _, err := sweep.Collect(ctx(t), f.Client, testRepo, testNow); err != nil {
 			t.Fatal(err)

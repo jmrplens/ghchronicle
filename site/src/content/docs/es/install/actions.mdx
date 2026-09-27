@@ -258,12 +258,17 @@ muchas estrellas o con repositorios antiguos, guárdalo en caché:
     restore-keys: ghchronicle-state-
 ```
 
-y apunta `state_file` a `~/.ghchronicle/state.json` en la configuración. Una
-pasada en modo `card` lee el estado restaurado, que es lo que le permite
-saltarse los dos recorridos, y nunca lo vuelve a escribir: entrega sus puntos a la
-tarjeta y a ningún almacén, así que nada de lo que aprendió puede decirle a la
-siguiente recogida que una familia ya está hecha. Quien llena la caché es un
-paso `once` o `backfill`.
+y apunta `state_file` a `~/.ghchronicle/state.json` en la configuración. El
+directorio guarda también [la caché junto al fichero de
+estado](/ghchronicle/es/configuration/#la-caché-que-hay-a-su-lado), que un paso
+`once` escribe y un paso `backfill` solo lee, así que una ejecución restaurada
+de él pregunta además a GitHub con los validadores que guardó la anterior, y
+solo paga lo que cambió. Una pasada en modo `card` lee el
+estado restaurado, que es lo que le permite saltarse los dos recorridos, y nunca
+lo vuelve a escribir, ni tampoco el fichero de caché que hay a su lado: entrega
+sus puntos a la tarjeta y a ningún almacén, así que nada de lo que aprendió
+puede decirle a la siguiente recogida que una familia ya está hecha. Quien llena
+la caché es un paso `once` o `backfill`.
 
 ## Sin la Action
 

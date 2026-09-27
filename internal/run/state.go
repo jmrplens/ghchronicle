@@ -2,7 +2,9 @@
 package run
 
 import (
+	"bufio"
 	"encoding/json"
+	"io"
 	"os"
 	"path/filepath"
 	"time"
@@ -123,8 +125,18 @@ func (s *State) Save() error {
 // zero length file there is not a cosmetic problem; the sweep's state pays one
 // flush a sweep for the same guarantee.
 func replaceFile(path string, b []byte) error {
+	return replaceFileWith(path, func(w io.Writer) error {
+		_, err := w.Write(b)
+		return err
+	})
+}
+
+// replaceFileWith is replaceFile for contents written as they are produced
+// rather than held whole first, which the cache file is: tens of megabytes
+// that would otherwise be in memory twice for the length of every save.
+func replaceFileWith(path string, write func(io.Writer) error) error {
 	tmp := path + ".tmp"
-	if err := writeWhole(tmp, b); err != nil {
+	if err := writeWhole(tmp, write); err != nil {
 		return err
 	}
 	if err := os.Rename(tmp, path); err != nil {
@@ -134,14 +146,18 @@ func replaceFile(path string, b []byte) error {
 	return nil
 }
 
-// writeWhole writes b to path and flushes it, so what the rename above puts in
-// place is the contents and not just the name of them.
-func writeWhole(path string, b []byte) error {
+// writeWhole writes path through write and flushes it, so what the rename
+// above puts in place is the contents and not just the name of them.
+func writeWhole(path string, write func(io.Writer) error) error {
 	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
 		return err
 	}
-	if _, err = f.Write(b); err != nil {
+	buffered := bufio.NewWriterSize(f, 1<<16)
+	if err = write(buffered); err == nil {
+		err = buffered.Flush()
+	}
+	if err != nil {
 		_ = f.Close()
 		return err
 	}
