@@ -103,8 +103,9 @@ sinks:
     listen: 127.0.0.1:9605
     path: /metrics
     # The first sweep after start-up runs every family, because the exporter
-    # keeps its samples in memory and a restart empties it. Set this to keep
-    # that first sweep on the normal schedule instead, at the cost of a
+    # keeps its samples in memory and a restart empties it; it marks as run
+    # only the families that were due, so the others keep their turn. Set this
+    # to keep that first sweep on the normal schedule instead, at the cost of a
     # dashboard reading zero until each cadence comes round.
     # no_prime: false
 

@@ -19,7 +19,10 @@ inputs:
       Dependabot alerts need the security_events scope.
     required: true
   config:
-    description: Path to a ghchronicle configuration file. Omit to run with defaults built from `user`.
+    description: >
+      Path to a ghchronicle configuration file. Omit to run with defaults built from `user`, whose
+      state lives in a new temporary directory each run; keeping the state between runs with
+      actions/cache needs a configuration file whose state_file the cache step can name.
     required: false
     default: ""
   user:
