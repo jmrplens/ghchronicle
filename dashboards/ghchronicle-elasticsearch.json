@@ -17673,7 +17673,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "The total says a repository holds twelve gigabytes. This says which key holds them and which has not been touched for a week, which is what decides what GitHub evicts at the ten gigabyte ceiling.",
+          "description": "The total says a repository holds twelve gigabytes. This says which key holds them and which has not been touched for a week, which is what decides what GitHub evicts at the ten gigabyte ceiling. It is what each repository holds now: the entries of its newest snapshot in the range, the last day the collector read its caches, and none of the refs GitHub has evicted since an earlier one.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -17783,8 +17783,19 @@
                   "type": "terms"
                 },
                 {
-                  "field": "cache.keyword",
+                  "field": "@timestamp",
                   "id": "414",
+                  "settings": {
+                    "min_doc_count": "1",
+                    "order": "desc",
+                    "orderBy": "_key",
+                    "size": "1"
+                  },
+                  "type": "terms"
+                },
+                {
+                  "field": "cache.keyword",
+                  "id": "415",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -17792,33 +17803,24 @@
                     "size": "50"
                   },
                   "type": "terms"
-                },
-                {
-                  "field": "ref.keyword",
-                  "id": "415",
-                  "settings": {
-                    "min_doc_count": "1",
-                    "order": "desc",
-                    "orderBy": "_count",
-                    "size": "500"
-                  },
-                  "type": "terms"
                 }
               ],
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
+                  "field": "size_bytes",
                   "id": "416",
-                  "settings": {
-                    "metrics": [
-                      "size_bytes",
-                      "caches",
-                      "days_since_use"
-                    ],
-                    "order": "desc",
-                    "orderBy": "@timestamp"
-                  },
-                  "type": "top_metrics"
+                  "type": "sum"
+                },
+                {
+                  "field": "caches",
+                  "id": "417",
+                  "type": "sum"
+                },
+                {
+                  "field": "days_since_use",
+                  "id": "418",
+                  "type": "min"
                 }
               ],
               "query": "_index:ghchronicle-gh_actions_cache_entry AND repo.keyword:${repo:lucene}",
@@ -17834,58 +17836,22 @@
                 "excludeByName": {},
                 "indexByName": {},
                 "renameByName": {
-                  "Top Metrics caches": "Entries",
-                  "Top Metrics days_since_use": "Days since use",
-                  "Top Metrics size_bytes": "Size",
+                  "Min": "Days since use",
+                  "Sum caches": "Entries",
+                  "Sum size_bytes": "Size",
                   "cache.keyword": "Cache",
-                  "ref.keyword": "Ref",
                   "repo.keyword": "Repository"
-                }
-              }
-            },
-            {
-              "id": "groupBy",
-              "options": {
-                "fields": {
-                  "Cache": {
-                    "aggregations": [],
-                    "operation": "groupby"
-                  },
-                  "Days since use": {
-                    "aggregations": [
-                      "min"
-                    ],
-                    "operation": "aggregate"
-                  },
-                  "Entries": {
-                    "aggregations": [
-                      "sum"
-                    ],
-                    "operation": "aggregate"
-                  },
-                  "Repository": {
-                    "aggregations": [],
-                    "operation": "groupby"
-                  },
-                  "Size": {
-                    "aggregations": [
-                      "sum"
-                    ],
-                    "operation": "aggregate"
-                  }
                 }
               }
             },
             {
               "id": "organize",
               "options": {
-                "excludeByName": {},
+                "excludeByName": {
+                  "@timestamp": true
+                },
                 "indexByName": {},
-                "renameByName": {
-                  "Days since use (min)": "Days since use",
-                  "Entries (sum)": "Entries",
-                  "Size (sum)": "Size"
-                }
+                "renameByName": {}
               }
             }
           ],
@@ -17997,7 +17963,7 @@
               "bucketAggs": [
                 {
                   "field": "repo.keyword",
-                  "id": "417",
+                  "id": "419",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -18010,7 +17976,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "418",
+                  "id": "420",
                   "settings": {
                     "metrics": [
                       "size_bytes",
@@ -18114,7 +18080,7 @@
               "bucketAggs": [
                 {
                   "field": "type.keyword",
-                  "id": "420",
+                  "id": "422",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -18125,7 +18091,7 @@
                 },
                 {
                   "field": "@timestamp",
-                  "id": "421",
+                  "id": "423",
                   "settings": {
                     "interval": "1h",
                     "min_doc_count": "0",
@@ -18138,7 +18104,7 @@
               "metrics": [
                 {
                   "field": "events",
-                  "id": "419",
+                  "id": "421",
                   "type": "sum"
                 }
               ],
@@ -18204,7 +18170,7 @@
               "bucketAggs": [
                 {
                   "field": "type.keyword",
-                  "id": "422",
+                  "id": "424",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -18218,7 +18184,7 @@
               "metrics": [
                 {
                   "field": "events",
-                  "id": "423",
+                  "id": "425",
                   "type": "sum"
                 }
               ],
@@ -18290,7 +18256,7 @@
               "bucketAggs": [
                 {
                   "field": "full_name.keyword",
-                  "id": "424",
+                  "id": "426",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -18304,7 +18270,7 @@
               "metrics": [
                 {
                   "field": "events",
-                  "id": "425",
+                  "id": "427",
                   "type": "sum"
                 }
               ],
@@ -18415,7 +18381,7 @@
               "bucketAggs": [
                 {
                   "field": "reason.keyword",
-                  "id": "426",
+                  "id": "428",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -18426,7 +18392,7 @@
                 },
                 {
                   "field": "subject_type.keyword",
-                  "id": "427",
+                  "id": "429",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -18440,7 +18406,7 @@
               "metrics": [
                 {
                   "field": "notifications",
-                  "id": "428",
+                  "id": "430",
                   "type": "sum"
                 }
               ],
@@ -18522,7 +18488,7 @@
               "bucketAggs": [
                 {
                   "field": "reason.keyword",
-                  "id": "430",
+                  "id": "432",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -18533,7 +18499,7 @@
                 },
                 {
                   "field": "@timestamp",
-                  "id": "431",
+                  "id": "433",
                   "settings": {
                     "interval": "1d",
                     "min_doc_count": "0",
@@ -18546,7 +18512,7 @@
               "metrics": [
                 {
                   "field": "notifications",
-                  "id": "429",
+                  "id": "431",
                   "type": "sum"
                 }
               ],
@@ -18707,7 +18673,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "432",
+                  "id": "434",
                   "settings": {
                     "order": "desc",
                     "size": "25",
@@ -18928,7 +18894,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "433",
+                  "id": "435",
                   "settings": {
                     "order": "desc",
                     "size": "40",
@@ -19027,7 +18993,7 @@
               "bucketAggs": [
                 {
                   "field": "language.keyword",
-                  "id": "434",
+                  "id": "436",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -19040,7 +19006,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "435",
+                  "id": "437",
                   "type": "count"
                 }
               ],
@@ -19205,7 +19171,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "436",
+                  "id": "438",
                   "settings": {
                     "order": "desc",
                     "size": "25",
@@ -19312,7 +19278,7 @@
               "bucketAggs": [
                 {
                   "field": "language.keyword",
-                  "id": "437",
+                  "id": "439",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -19323,7 +19289,7 @@
                 },
                 {
                   "field": "repo.keyword",
-                  "id": "438",
+                  "id": "440",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -19336,7 +19302,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "439",
+                  "id": "441",
                   "settings": {
                     "metrics": [
                       "bytes"
@@ -19753,7 +19719,7 @@
               "bucketAggs": [
                 {
                   "field": "repo.keyword",
-                  "id": "447",
+                  "id": "449",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -19764,7 +19730,7 @@
                 },
                 {
                   "field": "url.keyword",
-                  "id": "448",
+                  "id": "450",
                   "settings": {
                     "min_doc_count": "1",
                     "missing": "",
@@ -19779,37 +19745,37 @@
               "metrics": [
                 {
                   "field": "health_percentage",
-                  "id": "440",
-                  "type": "max"
-                },
-                {
-                  "field": "has_readme",
-                  "id": "441",
-                  "type": "max"
-                },
-                {
-                  "field": "has_license",
                   "id": "442",
                   "type": "max"
                 },
                 {
-                  "field": "has_contributing",
+                  "field": "has_readme",
                   "id": "443",
                   "type": "max"
                 },
                 {
-                  "field": "has_code_of_conduct",
+                  "field": "has_license",
                   "id": "444",
                   "type": "max"
                 },
                 {
-                  "field": "has_issue_template",
+                  "field": "has_contributing",
                   "id": "445",
                   "type": "max"
                 },
                 {
-                  "field": "has_pull_request_template",
+                  "field": "has_code_of_conduct",
                   "id": "446",
+                  "type": "max"
+                },
+                {
+                  "field": "has_issue_template",
+                  "id": "447",
+                  "type": "max"
+                },
+                {
+                  "field": "has_pull_request_template",
+                  "id": "448",
                   "type": "max"
                 }
               ],
@@ -20074,7 +20040,7 @@
               "bucketAggs": [
                 {
                   "field": "repo.keyword",
-                  "id": "449",
+                  "id": "451",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -20085,28 +20051,6 @@
                 },
                 {
                   "field": "language.keyword",
-                  "id": "450",
-                  "settings": {
-                    "min_doc_count": "1",
-                    "order": "desc",
-                    "orderBy": "_count",
-                    "size": "1"
-                  },
-                  "type": "terms"
-                },
-                {
-                  "field": "visibility.keyword",
-                  "id": "451",
-                  "settings": {
-                    "min_doc_count": "1",
-                    "order": "desc",
-                    "orderBy": "_count",
-                    "size": "1"
-                  },
-                  "type": "terms"
-                },
-                {
-                  "field": "license.keyword",
                   "id": "452",
                   "settings": {
                     "min_doc_count": "1",
@@ -20117,8 +20061,30 @@
                   "type": "terms"
                 },
                 {
-                  "field": "url.keyword",
+                  "field": "visibility.keyword",
                   "id": "453",
+                  "settings": {
+                    "min_doc_count": "1",
+                    "order": "desc",
+                    "orderBy": "_count",
+                    "size": "1"
+                  },
+                  "type": "terms"
+                },
+                {
+                  "field": "license.keyword",
+                  "id": "454",
+                  "settings": {
+                    "min_doc_count": "1",
+                    "order": "desc",
+                    "orderBy": "_count",
+                    "size": "1"
+                  },
+                  "type": "terms"
+                },
+                {
+                  "field": "url.keyword",
+                  "id": "455",
                   "settings": {
                     "min_doc_count": "1",
                     "missing": "",
@@ -20132,7 +20098,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "454",
+                  "id": "456",
                   "settings": {
                     "metrics": [
                       "stars",
@@ -20271,7 +20237,7 @@
               "bucketAggs": [
                 {
                   "field": "topic.keyword",
-                  "id": "455",
+                  "id": "457",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -20282,7 +20248,7 @@
                 },
                 {
                   "field": "url.keyword",
-                  "id": "456",
+                  "id": "458",
                   "settings": {
                     "min_doc_count": "1",
                     "missing": "",
@@ -20297,7 +20263,7 @@
               "metrics": [
                 {
                   "field": "repo.keyword",
-                  "id": "457",
+                  "id": "459",
                   "type": "cardinality"
                 }
               ],
@@ -20452,7 +20418,7 @@
               "bucketAggs": [
                 {
                   "field": "package.keyword",
-                  "id": "458",
+                  "id": "460",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -20463,7 +20429,7 @@
                 },
                 {
                   "field": "type.keyword",
-                  "id": "459",
+                  "id": "461",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -20474,7 +20440,7 @@
                 },
                 {
                   "field": "url.keyword",
-                  "id": "460",
+                  "id": "462",
                   "settings": {
                     "min_doc_count": "1",
                     "missing": "",
@@ -20488,7 +20454,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "461",
+                  "id": "463",
                   "settings": {
                     "metrics": [
                       "versions",
@@ -20690,7 +20656,7 @@
               "bucketAggs": [
                 {
                   "field": "gist.keyword",
-                  "id": "462",
+                  "id": "464",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -20701,7 +20667,7 @@
                 },
                 {
                   "field": "url.keyword",
-                  "id": "463",
+                  "id": "465",
                   "settings": {
                     "min_doc_count": "1",
                     "missing": "",
@@ -20715,7 +20681,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "464",
+                  "id": "466",
                   "settings": {
                     "metrics": [
                       "files",
@@ -20855,7 +20821,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "465",
+                  "id": "467",
                   "settings": {
                     "order": "desc",
                     "size": "30",
@@ -21084,7 +21050,7 @@
               "bucketAggs": [
                 {
                   "field": "repo.keyword",
-                  "id": "466",
+                  "id": "468",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -21095,7 +21061,7 @@
                 },
                 {
                   "field": "url.keyword",
-                  "id": "467",
+                  "id": "469",
                   "settings": {
                     "min_doc_count": "1",
                     "missing": "",
@@ -21110,32 +21076,32 @@
               "metrics": [
                 {
                   "field": "security_policy",
-                  "id": "468",
-                  "type": "max"
-                },
-                {
-                  "field": "delete_branch_on_merge",
-                  "id": "469",
-                  "type": "max"
-                },
-                {
-                  "field": "auto_merge",
                   "id": "470",
                   "type": "max"
                 },
                 {
-                  "field": "branch_protection_rules",
+                  "field": "delete_branch_on_merge",
                   "id": "471",
                   "type": "max"
                 },
                 {
-                  "field": "issue_templates",
+                  "field": "auto_merge",
                   "id": "472",
                   "type": "max"
                 },
                 {
-                  "field": "codeowners_errors",
+                  "field": "branch_protection_rules",
                   "id": "473",
+                  "type": "max"
+                },
+                {
+                  "field": "issue_templates",
+                  "id": "474",
+                  "type": "max"
+                },
+                {
+                  "field": "codeowners_errors",
+                  "id": "475",
                   "type": "max"
                 }
               ],
@@ -21238,7 +21204,7 @@
               "bucketAggs": [
                 {
                   "field": "key.keyword",
-                  "id": "474",
+                  "id": "476",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -21249,7 +21215,7 @@
                 },
                 {
                   "field": "kind.keyword",
-                  "id": "475",
+                  "id": "477",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -21260,7 +21226,7 @@
                 },
                 {
                   "field": "url.keyword",
-                  "id": "476",
+                  "id": "478",
                   "settings": {
                     "min_doc_count": "1",
                     "missing": "",
@@ -21274,7 +21240,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "477",
+                  "id": "479",
                   "settings": {
                     "metrics": [
                       "days_since_use",
@@ -21359,7 +21325,7 @@
               "bucketAggs": [
                 {
                   "field": "license.keyword",
-                  "id": "478",
+                  "id": "480",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -21370,7 +21336,7 @@
                 },
                 {
                   "field": "repo.keyword",
-                  "id": "479",
+                  "id": "481",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -21383,7 +21349,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "480",
+                  "id": "482",
                   "settings": {
                     "metrics": [
                       "packages"
@@ -21515,7 +21481,7 @@
               "bucketAggs": [
                 {
                   "field": "provider.keyword",
-                  "id": "481",
+                  "id": "483",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -21526,7 +21492,7 @@
                 },
                 {
                   "field": "url.keyword",
-                  "id": "482",
+                  "id": "484",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -21540,7 +21506,7 @@
               "metrics": [
                 {
                   "field": "present",
-                  "id": "483",
+                  "id": "485",
                   "type": "max"
                 }
               ],
@@ -21745,7 +21711,7 @@
               "bucketAggs": [
                 {
                   "field": "repo.keyword",
-                  "id": "484",
+                  "id": "486",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -21756,7 +21722,7 @@
                 },
                 {
                   "field": "file.keyword",
-                  "id": "485",
+                  "id": "487",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -21767,7 +21733,7 @@
                 },
                 {
                   "field": "path.keyword",
-                  "id": "486",
+                  "id": "488",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -21778,7 +21744,7 @@
                 },
                 {
                   "field": "url.keyword",
-                  "id": "487",
+                  "id": "489",
                   "settings": {
                     "min_doc_count": "1",
                     "missing": "",
@@ -21793,12 +21759,12 @@
               "metrics": [
                 {
                   "field": "present",
-                  "id": "488",
+                  "id": "490",
                   "type": "max"
                 },
                 {
                   "field": "changes",
-                  "id": "489",
+                  "id": "491",
                   "type": "max"
                 }
               ],
@@ -21949,7 +21915,7 @@
               "bucketAggs": [
                 {
                   "field": "repo.keyword",
-                  "id": "490",
+                  "id": "492",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -21960,7 +21926,7 @@
                 },
                 {
                   "field": "ecosystem.keyword",
-                  "id": "491",
+                  "id": "493",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -21971,7 +21937,7 @@
                 },
                 {
                   "field": "interval.keyword",
-                  "id": "492",
+                  "id": "494",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -21985,7 +21951,7 @@
               "metrics": [
                 {
                   "field": "blocks",
-                  "id": "493",
+                  "id": "495",
                   "type": "max"
                 }
               ],
@@ -22059,7 +22025,7 @@
               "bucketAggs": [
                 {
                   "field": "ecosystem.keyword",
-                  "id": "494",
+                  "id": "496",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -22070,7 +22036,7 @@
                 },
                 {
                   "field": "repo.keyword",
-                  "id": "495",
+                  "id": "497",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -22083,7 +22049,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "496",
+                  "id": "498",
                   "settings": {
                     "metrics": [
                       "packages"
@@ -22227,7 +22193,7 @@
               "bucketAggs": [
                 {
                   "field": "change.keyword",
-                  "id": "498",
+                  "id": "500",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -22236,32 +22202,6 @@
                   },
                   "type": "terms"
                 },
-                {
-                  "field": "@timestamp",
-                  "id": "499",
-                  "settings": {
-                    "interval": "1d",
-                    "min_doc_count": "0",
-                    "trimEdges": "0"
-                  },
-                  "type": "date_histogram"
-                }
-              ],
-              "datasource": "${DS_ELASTICSEARCH}",
-              "metrics": [
-                {
-                  "field": "packages",
-                  "id": "497",
-                  "type": "sum"
-                }
-              ],
-              "query": "_index:ghchronicle-gh_dependency_change AND repo.keyword:${repo:lucene} AND NOT change.keyword:\"(none)\"",
-              "refId": "A",
-              "timeField": "@timestamp"
-            },
-            {
-              "alias": "vulnerable",
-              "bucketAggs": [
                 {
                   "field": "@timestamp",
                   "id": "501",
@@ -22276,8 +22216,34 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
+                  "field": "packages",
+                  "id": "499",
+                  "type": "sum"
+                }
+              ],
+              "query": "_index:ghchronicle-gh_dependency_change AND repo.keyword:${repo:lucene} AND NOT change.keyword:\"(none)\"",
+              "refId": "A",
+              "timeField": "@timestamp"
+            },
+            {
+              "alias": "vulnerable",
+              "bucketAggs": [
+                {
+                  "field": "@timestamp",
+                  "id": "503",
+                  "settings": {
+                    "interval": "1d",
+                    "min_doc_count": "0",
+                    "trimEdges": "0"
+                  },
+                  "type": "date_histogram"
+                }
+              ],
+              "datasource": "${DS_ELASTICSEARCH}",
+              "metrics": [
+                {
                   "field": "vulnerable",
-                  "id": "500",
+                  "id": "502",
                   "type": "sum"
                 }
               ],
@@ -22401,7 +22367,7 @@
               "bucketAggs": [
                 {
                   "field": "@timestamp",
-                  "id": "503",
+                  "id": "505",
                   "settings": {
                     "interval": "1d",
                     "min_doc_count": "0",
@@ -22415,7 +22381,7 @@
               "metrics": [
                 {
                   "field": "lifetime_received_cents",
-                  "id": "502",
+                  "id": "504",
                   "type": "max"
                 }
               ],
@@ -22450,7 +22416,7 @@
               "bucketAggs": [
                 {
                   "field": "@timestamp",
-                  "id": "505",
+                  "id": "507",
                   "settings": {
                     "interval": "1d",
                     "min_doc_count": "0",
@@ -22464,7 +22430,7 @@
               "metrics": [
                 {
                   "field": "monthly_income_cents",
-                  "id": "504",
+                  "id": "506",
                   "type": "max"
                 }
               ],
@@ -22499,7 +22465,7 @@
               "bucketAggs": [
                 {
                   "field": "@timestamp",
-                  "id": "507",
+                  "id": "509",
                   "settings": {
                     "interval": "1d",
                     "min_doc_count": "0",
@@ -22513,7 +22479,7 @@
               "metrics": [
                 {
                   "field": "next_payout_cents",
-                  "id": "506",
+                  "id": "508",
                   "type": "max"
                 }
               ],
@@ -22548,7 +22514,7 @@
               "bucketAggs": [
                 {
                   "field": "@timestamp",
-                  "id": "509",
+                  "id": "511",
                   "settings": {
                     "interval": "1d",
                     "min_doc_count": "0",
@@ -22562,7 +22528,7 @@
               "metrics": [
                 {
                   "field": "sponsor_spend_cents",
-                  "id": "508",
+                  "id": "510",
                   "type": "max"
                 }
               ],
@@ -22778,7 +22744,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "510",
+                  "id": "512",
                   "settings": {
                     "order": "desc",
                     "size": "200",
@@ -23018,7 +22984,7 @@
               "bucketAggs": [
                 {
                   "field": "tier.keyword",
-                  "id": "511",
+                  "id": "513",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -23029,7 +22995,7 @@
                 },
                 {
                   "field": "url.keyword",
-                  "id": "512",
+                  "id": "514",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -23042,7 +23008,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "513",
+                  "id": "515",
                   "settings": {
                     "metrics": [
                       "price_cents"
@@ -23054,17 +23020,17 @@
                 },
                 {
                   "field": "one_time",
-                  "id": "514",
+                  "id": "516",
                   "type": "max"
                 },
                 {
                   "field": "retired",
-                  "id": "515",
+                  "id": "517",
                   "type": "max"
                 },
                 {
                   "field": "age_days",
-                  "id": "516",
+                  "id": "518",
                   "type": "max"
                 }
               ],
@@ -23217,7 +23183,7 @@
               "bucketAggs": [
                 {
                   "field": "repo.keyword",
-                  "id": "517",
+                  "id": "519",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -23228,7 +23194,7 @@
                 },
                 {
                   "field": "kind.keyword",
-                  "id": "518",
+                  "id": "520",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -23239,7 +23205,7 @@
                 },
                 {
                   "field": "url.keyword",
-                  "id": "519",
+                  "id": "521",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -23252,7 +23218,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "520",
+                  "id": "522",
                   "settings": {
                     "metrics": [
                       "position"
@@ -23264,12 +23230,12 @@
                 },
                 {
                   "field": "stars",
-                  "id": "521",
+                  "id": "523",
                   "type": "max"
                 },
                 {
                   "field": "days_since_push",
-                  "id": "522",
+                  "id": "524",
                   "type": "max"
                 }
               ],
@@ -23432,7 +23398,7 @@
               "bucketAggs": [
                 {
                   "field": "flag.keyword",
-                  "id": "523",
+                  "id": "525",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "asc",
@@ -23443,7 +23409,7 @@
                 },
                 {
                   "field": "url.keyword",
-                  "id": "524",
+                  "id": "526",
                   "settings": {
                     "min_doc_count": "1",
                     "missing": "",
@@ -23458,7 +23424,7 @@
               "metrics": [
                 {
                   "field": "enabled",
-                  "id": "525",
+                  "id": "527",
                   "type": "max"
                 }
               ],
@@ -23643,7 +23609,7 @@
               "bucketAggs": [
                 {
                   "field": "list.keyword",
-                  "id": "526",
+                  "id": "528",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -23654,7 +23620,7 @@
                 },
                 {
                   "field": "url.keyword",
-                  "id": "527",
+                  "id": "529",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -23667,7 +23633,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "528",
+                  "id": "530",
                   "settings": {
                     "metrics": [
                       "items"
@@ -23679,12 +23645,12 @@
                 },
                 {
                   "field": "age_days",
-                  "id": "529",
+                  "id": "531",
                   "type": "max"
                 },
                 {
                   "field": "days_since_add",
-                  "id": "530",
+                  "id": "532",
                   "type": "max"
                 }
               ],
@@ -23813,7 +23779,7 @@
               "bucketAggs": [
                 {
                   "field": "achievement.keyword",
-                  "id": "531",
+                  "id": "533",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "asc",
@@ -23824,7 +23790,7 @@
                 },
                 {
                   "field": "url.keyword",
-                  "id": "532",
+                  "id": "534",
                   "settings": {
                     "min_doc_count": "1",
                     "missing": "",
@@ -23838,7 +23804,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "533",
+                  "id": "535",
                   "settings": {
                     "metrics": [
                       "tier_number"
@@ -24156,7 +24122,7 @@
               "bucketAggs": [
                 {
                   "field": "achievement.keyword",
-                  "id": "534",
+                  "id": "536",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "asc",
@@ -24167,7 +24133,7 @@
                 },
                 {
                   "field": "image.keyword",
-                  "id": "535",
+                  "id": "537",
                   "settings": {
                     "min_doc_count": "1",
                     "missing": "",
@@ -24179,7 +24145,7 @@
                 },
                 {
                   "field": "url.keyword",
-                  "id": "536",
+                  "id": "538",
                   "settings": {
                     "min_doc_count": "1",
                     "missing": "",
@@ -24193,7 +24159,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "537",
+                  "id": "539",
                   "settings": {
                     "metrics": [
                       "percent",
@@ -24304,7 +24270,7 @@
               "bucketAggs": [
                 {
                   "field": "resource.keyword",
-                  "id": "539",
+                  "id": "541",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -24315,7 +24281,7 @@
                 },
                 {
                   "field": "@timestamp",
-                  "id": "540",
+                  "id": "542",
                   "settings": {
                     "interval": "5m",
                     "min_doc_count": "0",
@@ -24328,7 +24294,7 @@
               "metrics": [
                 {
                   "field": "used_ratio",
-                  "id": "538",
+                  "id": "540",
                   "type": "max"
                 }
               ],
@@ -24386,7 +24352,7 @@
               "bucketAggs": [
                 {
                   "field": "resource.keyword",
-                  "id": "541",
+                  "id": "543",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -24399,7 +24365,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "542",
+                  "id": "544",
                   "settings": {
                     "metrics": [
                       "limit",
@@ -24557,7 +24523,7 @@
               "bucketAggs": [
                 {
                   "field": "family.keyword",
-                  "id": "543",
+                  "id": "545",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -24568,7 +24534,7 @@
                 },
                 {
                   "field": "reason.keyword",
-                  "id": "544",
+                  "id": "546",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -24582,16 +24548,16 @@
               "metrics": [
                 {
                   "field": "failed",
-                  "id": "545",
+                  "id": "547",
                   "type": "sum"
                 },
                 {
-                  "id": "546",
+                  "id": "548",
                   "type": "count"
                 },
                 {
                   "field": "repos",
-                  "id": "547",
+                  "id": "549",
                   "type": "max"
                 }
               ],
@@ -24702,7 +24668,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "548",
+                  "id": "550",
                   "settings": {
                     "order": "desc",
                     "size": "100",

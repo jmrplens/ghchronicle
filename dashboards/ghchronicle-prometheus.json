@@ -11859,7 +11859,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "The total says a repository holds twelve gigabytes. This says which key holds them and which has not been touched for a week, which is what decides what GitHub evicts at the ten gigabyte ceiling.",
+          "description": "The total says a repository holds twelve gigabytes. This says which key holds them and which has not been touched for a week, which is what decides what GitHub evicts at the ten gigabyte ceiling. It is what each repository holds now: the entries of its newest snapshot in the range, the last day the collector read its caches, and none of the refs GitHub has evicted since an earlier one. In Prometheus each ref is the value last pushed for it, and a ref GitHub evicted is never pushed again: the exporter drops it a day after the last sweep that listed it, and the OTLP sink sends it again until the process restarts, so until then it still counts here.",
           "fieldConfig": {
             "defaults": {
               "custom": {

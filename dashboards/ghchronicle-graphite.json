@@ -12159,7 +12159,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "The total says a repository holds twelve gigabytes. This says which key holds them and which has not been touched for a week, which is what decides what GitHub evicts at the ten gigabyte ceiling. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others.",
+          "description": "The total says a repository holds twelve gigabytes. This says which key holds them and which has not been touched for a week, which is what decides what GitHub evicts at the ten gigabyte ceiling. It is what each repository holds now: the entries of its newest snapshot in the range, the last day the collector read its caches, and none of the refs GitHub has evicted since an earlier one. Graphite cannot find each repository's newest day, so it reads the last UTC day of the range: from midnight UTC until the day's first pass of the `actions` family, within a quarter of an hour at the default cadence, the table is empty, and a repository that pass could not read is missing from it. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -12258,7 +12258,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(groupByNodes(keepLastValue(github.actions_cache_entry.*.*.*.*.$repo.size_bytes), \"sum\", 6, 2))",
+              "target": "removeEmptySeries(aliasByNode(consolidateBy(groupByNodes(removeBelowValue(filterSeries(transformNull(summarize(github.actions_cache_entry.*.*.*.*.$repo.size_bytes, \"1d\", \"last\"), -1), \"last\", \"\u003e=\", 0), 0), \"sum\", 6, 2), \"last\"), 0, 1))",
               "textEditor": true
             }
           ],

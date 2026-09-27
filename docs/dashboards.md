@@ -815,10 +815,20 @@ The two cache panels are about the ceiling. GitHub caps a repository at ten
 gigabytes and evicts the least recently used entry past it, so the bar is each
 repository against that cap and the panel is read for the distance left; the
 entry table says which key is being thrown away and which has not been touched
-for a week. Each row of that table is one cache of one repository: its newest
-snapshot on every ref in the range, added up, so Entries counts the entries
-GitHub holds and not the rows the table read. It is the same sum in the five
-stores; Graphite shows the size alone, since a Graphite table keeps one column.
+for a week. Each row of that table is one cache of one repository as it stands:
+the rows of the last day in the range the collector read that repository's
+caches, one per ref, added up, so Entries counts the entries GitHub holds and
+not the rows the table read. A ref GitHub evicted keeps its last row in the
+store, and adding each ref's newest row in the range counted it: on the
+account this was checked against, one cache read 128 entries and 9.46 GiB over
+108 refs where the newest day, and GitHub, held 44 and 3.08 GiB over 24.
+InfluxDB, PostgreSQL and Elasticsearch read each repository's newest day.
+Graphite cannot find it, so it reads the last UTC day of the range: its table
+is empty from midnight UTC until the day's first `actions` pass, and it shows
+the size alone, since a Graphite table keeps one column. Prometheus holds the
+value last pushed for each ref, so an evicted ref still counts there until the
+exporter drops it a day later, or, pushed over OTLP, until the process
+restarts.
 
 Reads `gh_billing_usage`, `gh_actions_cache` and `gh_actions_cache_entry`.
 
