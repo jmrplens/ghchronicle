@@ -59,7 +59,19 @@ selector deja de ofrecerlo cuando el último relleno histórico queda atrás, pe
 la gente sigue dándole estrellas y haciéndole fork y cada pasada de `totals`
 vuelve a leer sus contadores. Con All seleccionado las sumas lo incluyen, y un
 rango más corto que la cadencia de `totals`, una hora por omisión, puede
-dejar fuera su fila. Elegir repositorios cuenta solo esos. Cada repositorio
+dejar fuera su fila. Un repositorio archivado que la configuración ya no recoge
+se queda fuera, como el selector deja fuera a uno vivo: la fila que escribió un
+relleno histórico con una configuración anterior sigue en el almacén, y en la
+cuenta con la que se comprobó esto un fork archivado así sumaba 8 estrellas y 3
+forks, 393 y 106 donde GitHub daba 385 y 103 para lo que recogen las pasadas.
+Los dashboards SQL cuentan una fila archivada solo de un repositorio con una
+fila de `gh_repo_total` en los últimos siete días, la ventana del propio
+selector. Elasticsearch y Graphite no pueden preguntar eso de una ventana
+mientras leen otra, así que cuentan un repositorio archivado por sus filas de
+los últimos siete días, y un rango que terminó hace más de una semana deja
+fuera los archivados en esos dos. Prometheus solo guarda lo que empuja el
+recolector en marcha, así que no tiene esa fila que dejar fuera. Elegir
+repositorios cuenta solo esos. Cada repositorio
 cuenta una vez, por su nombre completo: dos repositorios del mismo nombre de
 dos dueños son dos, y uno archivado mientras el recolector funciona no se
 cuenta a la vez por su fila viva y por la archivada. El recuento de
@@ -117,7 +129,8 @@ forks debajo sin dejar ninguno fuera. Con All seleccionado lista también los
 repositorios archivados que el filtro por omisión aparta, con sus contadores
 actuales, los ofrezca o no el selector: ninguna pasada les escribe fila de
 `gh_repo`, que es lo que lista el selector, pero la misma fila de cada uno se
-vuelve a leer en cada pasada de `totals`. Un repositorio archivado dentro del
+vuelve a leer en cada pasada de `totals`. Uno que la configuración ya no recoge
+se queda fuera, como en el Overview. Un repositorio archivado dentro del
 rango tiene filas de antes del archivado y de después, y sigue siendo una fila
 en todos los almacenes, marcada como archivada.
 

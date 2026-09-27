@@ -64,7 +64,7 @@
     },
     {
       "datasource": "${DS_GRAPHITE}",
-      "description": "Public repositories of the account, and the current stars and forks of the selected ones, summed over the newest row of each repository rather than over every row in the range. With All selected that includes the archived repositories the default filter sets aside, which the picker stops listing once the last backfill is behind it: people still star and fork them, and each totals sweep reads their counts again, an hour apart by default, so a range shorter than that can leave them out. Each repository counts once, by its full name. The repository count is GitHub's own count of the account's public repositories and not the set the sums are taken over: those are the repositories the sweeps collect and the archived ones above, private ones included, and forks left out unless `include_forks` is on.",
+      "description": "Public repositories of the account, and the current stars and forks of the selected ones, summed over the newest row of each repository rather than over every row in the range. With All selected that includes the archived repositories the default filter sets aside, which the picker stops listing once the last backfill is behind it: people still star and fork them, and each totals sweep reads their counts again, an hour apart by default, so a range shorter than that can leave them out. An archived repository the configuration no longer collects is left out, as the picker leaves out a live one: a row written under an earlier configuration stays in the store, but nothing reads that repository's counts any more. Each repository counts once, by its full name. The repository count is GitHub's own count of the account's public repositories and not the set the sums are taken over: those are the repositories the sweeps collect and the archived ones above, private ones included, and forks left out unless `include_forks` is on. In Graphite an archived repository counts from its points of the last seven days, since a target here cannot ask whether the collector still writes a repository while it reads the range, so a range that ended more than a week ago leaves the archived ones out.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -116,13 +116,13 @@
         {
           "datasource": "${DS_GRAPHITE}",
           "refId": "B",
-          "target": "alias(sumSeries(groupByNode(group(aliasByNode(keepLastValue(github.repo.false.*.*.*.*.*.*.$repo.*.stars), 5), aliasByNode(keepLastValue(github.repo_total.true.*.*.*.$repo.*.stars), 4)), 0, \"max\")), \"Stars\")",
+          "target": "alias(sumSeries(groupByNode(group(aliasByNode(keepLastValue(github.repo.false.*.*.*.*.*.*.$repo.*.stars), 5), aliasByNode(keepLastValue(timeSlice(github.repo_total.true.*.*.*.$repo.*.stars, \"-7d\")), 4)), 0, \"max\")), \"Stars\")",
           "textEditor": true
         },
         {
           "datasource": "${DS_GRAPHITE}",
           "refId": "C",
-          "target": "alias(sumSeries(groupByNode(group(aliasByNode(keepLastValue(github.repo.false.*.*.*.*.*.*.$repo.*.forks), 5), aliasByNode(keepLastValue(github.repo_total.true.*.*.*.$repo.*.forks), 4)), 0, \"max\")), \"Forks\")",
+          "target": "alias(sumSeries(groupByNode(group(aliasByNode(keepLastValue(github.repo.false.*.*.*.*.*.*.$repo.*.forks), 5), aliasByNode(keepLastValue(timeSlice(github.repo_total.true.*.*.*.$repo.*.forks, \"-7d\")), 4)), 0, \"max\")), \"Forks\")",
           "textEditor": true
         }
       ],
@@ -464,7 +464,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "The whole life of each repository in one row: not what happened in the dashboard range, but everything there has ever been. The repository picker holds the repositories the sweeps collect: forks too when `include_forks` is on, and archived ones when `include_archived` is on and for a while after a backfill, which collects them either way. A count here is over every repository the picker holds until it is narrowed. Sorted by commits, a fork of a busy project outranks anything the account wrote, 370,296 commits against 3,385 on the account this was measured on, so the table opens with the account's own repositories first and the forks under them, both ranked by commits. The fork and archived flags are columns here rather than a filter, the title being what it is, and a click on either sorts by it. With All selected the archived repositories the picker does not list are here too, with their current counts: the default filter walks none of their history, but every totals sweep reads this row of each of them again. In Graphite two facts landing in the same storage slot of one series are reduced to one point, so the medians are over what the storage kept. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "The whole life of each repository in one row: not what happened in the dashboard range, but everything there has ever been. The repository picker holds the repositories the sweeps collect: forks too when `include_forks` is on, and archived ones when `include_archived` is on and for a while after a backfill, which collects them either way. A count here is over every repository the picker holds until it is narrowed. Sorted by commits, a fork of a busy project outranks anything the account wrote, 370,296 commits against 3,385 on the account this was measured on, so the table opens with the account's own repositories first and the forks under them, both ranked by commits. The fork and archived flags are columns here rather than a filter, the title being what it is, and a click on either sorts by it. With All selected the archived repositories the picker does not list are here too, with their current counts, as long as the collector still reads them: the default filter walks none of their history, but every totals sweep reads this row of each of them again, and one the configuration no longer collects is left out. In Graphite two facts landing in the same storage slot of one series are reduced to one point, so the medians are over what the storage kept. In Graphite an archived repository counts from its points of the last seven days, since a target here cannot ask whether the collector still writes a repository while it reads the range, so a range that ended more than a week ago leaves the archived ones out. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -536,7 +536,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(aliasByNode(groupByNodes(aliasByNode(keepLastValue(github.repo_total.*.*.*.*.$repo.*.commits), 4, 6), \"max\", 0, 1), 1))",
+              "target": "removeEmptySeries(aliasByNode(groupByNodes(group(aliasByNode(keepLastValue(github.repo_total.false.*.*.*.$repo.*.commits), 4, 6), aliasByNode(keepLastValue(timeSlice(github.repo_total.true.*.*.*.$repo.*.commits, \"-7d\")), 4, 6)), \"max\", 0, 1), 1))",
               "textEditor": true
             }
           ],

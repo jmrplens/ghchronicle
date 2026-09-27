@@ -52,7 +52,18 @@ default filter sets aside for being archived gets no `gh_repo` row from a sweep,
 so the picker stops offering it once the last backfill is behind it, but people
 still star and fork it and every `totals` sweep reads its counts again. With
 All selected the sums include it, and a range shorter than the `totals`
-cadence, an hour by default, can leave its row out. Picking repositories
+cadence, an hour by default, can leave its row out. An archived repository the
+configuration no longer collects is left out, as the picker leaves out a live
+one: a row a backfill wrote under an earlier configuration stays in the store,
+and on the account this was checked against one such archived fork added 8
+stars and 3 forks, 393 and 106 where GitHub gave 385 and 103 for what the
+sweeps collect. The SQL dashboards count an archived row only for a repository
+with a `gh_repo_total` row in the last seven days, the picker's own window.
+Elasticsearch and Graphite cannot ask that of one window while reading
+another, so they count an archived repository from its rows of the last seven
+days, and a range that ended more than a week ago leaves the archived ones out
+there. Prometheus holds only what the running collector pushes, so it has no
+such row to leave out. Picking repositories
 counts those alone. Each repository counts once, by its full name: two owners'
 repositories of the same name are two, and one archived while the collector
 runs is not counted under both its live row and its archived one. The
@@ -108,7 +119,8 @@ own repositories on the first screen and the forks under them without leaving
 one out. With All selected it lists the archived repositories the default
 filter sets aside as well, with their current counts, whether or not the picker
 offers them: a sweep writes them no `gh_repo` row, which is what the picker
-lists, but the same row of each is read again on every `totals` sweep. A
+lists, but the same row of each is read again on every `totals` sweep. One the
+configuration no longer collects is left out, as on the Overview. A
 repository archived inside the range has rows from before the archive and
 after it, and is still one row in every store, flagged archived.
 

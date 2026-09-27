@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/jmrplens/ghchronicle/v2/internal/grafana"
 )
@@ -23,6 +24,9 @@ type overviewRepo struct {
 	live, stale *[2]float64
 	// totals are its gh_repo_total series, by the archived tag they carry.
 	totals map[string][2]float64
+	// age is how long before the end of the range its series were last
+	// written: zero for a repository the collector reads every sweep.
+	age time.Duration
 }
 
 // overviewAccount is an account with everything the sums have to get right at
@@ -169,10 +173,25 @@ func overviewPromSeries() []promSample {
 	return out
 }
 
+// overviewGone is an archived repository the collector no longer writes: an
+// archived fork that a backfill under an earlier configuration read nine days
+// before the end of the range, as one read jmrplens/portainer-mcp-enhanced on
+// 2026-09-18, and that nothing has read since. Its one row is still in the
+// store, and it is not the account's.
+var overviewGone = overviewRepo{
+	owner: "bob", name: "gone", totals: map[string][2]float64{"true": {8, 3}},
+	age: 9 * 24 * time.Hour,
+}
+
 // overviewGraphiteSeries is overviewAccount as the Graphite sink writes it:
 // one path per series, a node per tag in the order tags.go gives, each value
 // made a node the way the sink makes it.
 func overviewGraphiteSeries() []grSeries {
+	return graphiteSeriesOf(overviewAccount)
+}
+
+// graphiteSeriesOf is overviewGraphiteSeries for any list of repositories.
+func graphiteSeriesOf(repos []overviewRepo) []grSeries {
 	node := regexp.MustCompile(`[^A-Za-z0-9_:-]`)
 	var out []grSeries
 	add := func(m string, r overviewRepo, archived string, v [2]float64) {
@@ -186,10 +205,13 @@ func overviewGraphiteSeries() []grSeries {
 			parts = append(parts, node.ReplaceAllString(values[tag], "_"))
 		}
 		for i, field := range overviewFields {
-			out = append(out, grSeries{strings.Join(append(slices.Clone(parts), field), "."), overviewValue(field, v, i)})
+			out = append(out, grSeries{
+				name:  strings.Join(append(slices.Clone(parts), field), "."),
+				value: overviewValue(field, v, i), age: r.age,
+			})
 		}
 	}
-	for _, r := range overviewAccount {
+	for _, r := range repos {
 		if r.live != nil {
 			add("gh_repo", r, "false", *r.live)
 		}
@@ -476,10 +498,13 @@ func aggregate(how string, by []string, in []promSample) []promSample {
 // ── A Graphite evaluator for the functions these panels use ──────────────────
 
 // grSeries is one Graphite series reduced to the value keepLastValue leaves at
-// the end of the range, which is the value a stat of it draws.
+// the end of the range, which is the value a stat of it draws, and how long
+// before the end of the range that value was written, which is what timeSlice
+// reads.
 type grSeries struct {
 	name  string
 	value float64
+	age   time.Duration
 }
 
 // evalGraphite evaluates a target made of paths and the functions the two
@@ -520,6 +545,8 @@ func (p *exprParser) graphite(series []grSeries) []grSeries {
 	switch word {
 	case "keepLastValue", "group", "removeEmptySeries":
 		return in
+	case "timeSlice":
+		return p.sliced(in, args)
 	case "alias":
 		out := slices.Clone(in)
 		for i := range out {
@@ -543,31 +570,73 @@ func (p *exprParser) graphite(series []grSeries) []grSeries {
 		for _, s := range in {
 			total += s.value
 		}
-		return []grSeries{{"sumSeries", total}}
-	case "groupByNode", "groupByNodes":
-		// groupByNode(series, node, how) and groupByNodes(series, how, node...).
-		how, nodes := args[len(args)-1], args[:len(args)-1]
-		if word == "groupByNodes" {
-			how, nodes = args[0], args[1:]
-		}
-		samples := make([]promSample, len(in))
-		for i, s := range in {
-			parts := strings.Split(s.name, ".")
-			var key []string
-			for _, a := range nodes {
-				n, _ := strconv.Atoi(a)
-				key = append(key, parts[n])
-			}
-			samples[i] = promSample{map[string]string{"key": strings.Join(key, ".")}, s.value}
-		}
-		var out []grSeries
-		for _, g := range aggregate(how, []string{"key"}, samples) {
-			out = append(out, grSeries{g.labels["key"], g.value})
-		}
-		return out
+		return []grSeries{{name: "sumSeries", value: total, age: newestOf(in)}}
+	case "groupByNode":
+		// groupByNode(series, node, how).
+		return grouped(in, args[len(args)-1], args[:len(args)-1])
+	case "groupByNodes":
+		// groupByNodes(series, how, node...).
+		return grouped(in, args[0], args[1:])
 	}
 	p.t.Fatalf("%s: no evaluator for %s()", p.s, word)
 	return nil
+}
+
+// sliced is timeSlice(series, "-Nd"), which nulls every point before N days
+// ago, so a series last written before then has nothing left to carry.
+func (p *exprParser) sliced(in []grSeries, args []string) []grSeries {
+	p.t.Helper()
+	if len(args) != 1 {
+		p.t.Fatalf("%s: timeSlice(%v) is not a start N days back", p.s, args)
+	}
+	days, err := strconv.Atoi(strings.TrimSuffix(strings.TrimPrefix(args[0], "-"), "d"))
+	if err != nil {
+		p.t.Fatalf("%s: timeSlice(%v) is not a start N days back", p.s, args)
+	}
+	var kept []grSeries
+	for _, s := range in {
+		if s.age <= time.Duration(days)*24*time.Hour {
+			kept = append(kept, s)
+		}
+	}
+	return kept
+}
+
+// grouped is groupByNode and groupByNodes: the series that share the nodes
+// named become one, reduced by how, and named by those nodes.
+func grouped(in []grSeries, how string, nodes []string) []grSeries {
+	samples := make([]promSample, len(in))
+	members := map[string][]grSeries{}
+	for i, s := range in {
+		parts := strings.Split(s.name, ".")
+		var key []string
+		for _, a := range nodes {
+			n, _ := strconv.Atoi(a)
+			key = append(key, parts[n])
+		}
+		joined := strings.Join(key, ".")
+		samples[i] = promSample{map[string]string{"key": joined}, s.value}
+		members[joined] = append(members[joined], s)
+	}
+	var out []grSeries
+	for _, g := range aggregate(how, []string{"key"}, samples) {
+		key := g.labels["key"]
+		out = append(out, grSeries{name: key, value: g.value, age: newestOf(members[key])})
+	}
+	return out
+}
+
+// newestOf is when the newest of several series was last written, which is
+// when a series made of them was.
+func newestOf(in []grSeries) time.Duration {
+	if len(in) == 0 {
+		return 0
+	}
+	newest := in[0].age
+	for _, s := range in[1:] {
+		newest = min(newest, s.age)
+	}
+	return newest
 }
 
 // globbed is every series a path matches, node by node.

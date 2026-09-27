@@ -40,8 +40,9 @@ const everyRepositoryDesc = "The whole life of each repository in one row: not w
 	"ranked by commits. The fork and archived flags are columns here rather than a " +
 	"filter, the title being what it is, and a click on either sorts by it. With All " +
 	"selected the archived repositories the picker does not list are here too, with " +
-	"their current counts: the default filter walks none of their history, but every " +
-	"totals sweep reads this row of each of them again."
+	"their current counts, as long as the collector still reads them: the default " +
+	"filter walks none of their history, but every totals sweep reads this row of each " +
+	"of them again, and one the configuration no longer collects is left out."
 
 // everyRepositoryTwins is what "Every repository, ever" asks the three stores
 // that do not speak SQL, out here for the reason everyRepositoryDesc is.
@@ -60,10 +61,19 @@ const everyRepositoryDesc = "The whole life of each repository in one row: not w
 // keepLastValue; Elasticsearch keeps the one archived bucket that sorts last,
 // true; Prometheus takes the archived series, and a live one only for a
 // repository that has no archived one.
+//
+// An archived repository the collector no longer writes is left out where the
+// store can say so: Graphite and Elasticsearch keep the archived rows of the
+// last seven days, which esCollectedWindow explains, and Prometheus holds
+// only what the running collector pushes.
 func everyRepositoryTwins(b *builder) *P {
 	rt := "gh_repo_total"
-	gr, grtf := gTbl(rowsOf(fmt.Sprintf(`groupByNodes(%s, "max", 0, 1)`,
-		rowsOf(fmt.Sprintf("keepLastValue(%s)", rp(rt, "commits")), gn(rt, "full_name"), gn(rt, "repo"))), 1),
+	byName := func(path string) string {
+		return rowsOf(fmt.Sprintf("keepLastValue(%s)", path), gn(rt, "full_name"), gn(rt, "repo"))
+	}
+	gr, grtf := gTbl(rowsOf(fmt.Sprintf(`groupByNodes(group(%s, %s), "max", 0, 1)`,
+		byName(rp(rt, "commits", "archived", "false")),
+		byName(grCollected(rp(rt, "commits", "archived", "true")))), 1),
 		"Repository", []col{{"lastNotNull", "Commits"}})
 	es, estf := esTbl(rt, []any{
 		b.tm("repo", 500), b.tmURL(), b.tm("fork", 2), b.tm("archived", 1, "_key", "desc"),
@@ -82,7 +92,7 @@ func everyRepositoryTwins(b *builder) *P {
 			{"branches", "Branches"},
 			{"tags", "Tags"},
 		},
-		[]string{ESF})
+		[]string{ESF, "(archived.keyword:false OR " + esCollectedWindow + ")"})
 	var prom []Target
 	for i, field := range []string{
 		"commits", "pulls_merged", "issues", "releases", "stars", "branches", "tags",
@@ -235,8 +245,8 @@ func lifetime(b *builder) []Panel {
 				Overrides: []any{
 					linkOn("Repository"), width("Fork", 70), width("Archived", 90),
 				},
-				GR: twins.GR, GRTF: twins.GRTF, GRDesc: grSlot,
-				ES: twins.ES, ESTF: twins.ESTF,
+				GR: twins.GR, GRTF: twins.GRTF, GRDesc: grSlot + " " + grArchivedWindow,
+				ES: twins.ES, ESTF: twins.ESTF, ESDesc: esArchivedWindow,
 			}),
 		// The description leads with the window rather than explaining it in
 		// the middle. The row above this says Lifetime and the panel beside it
