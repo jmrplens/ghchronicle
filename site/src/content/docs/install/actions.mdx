@@ -25,7 +25,7 @@ it downloads a release binary and calls it.
 | Input             | Default              | What it does                                                                                                      |
 | ----------------- | -------------------- | ----------------------------------------------------------------------------------------------------------------- |
 | `token`           | required             | A personal access token. The automatic `GITHUB_TOKEN` is not enough                                               |
-| `config`          | `""`                 | Path to a configuration file. Omit to run with defaults built from `user`                                         |
+| `config`          | `""`                 | Path to a configuration file. Omit to run with defaults built from `user`, whose state lasts one run and cannot be cached |
 | `user`            | the repository owner | The account to collect when no config file is given                                                               |
 | `mode`            | `once`               | `once`, `backfill` or `card`                                                                                      |
 | `backfill-since`  | `""`                 | Bound for `backfill`: a date, `90d`, `2y` or a Go duration. Empty means no bound                                  |
@@ -240,30 +240,50 @@ in the `<picture>` are relative to the README, so a `docs/README.md` points at
   account-wide works with it. See [the token](/ghchronicle/start/token/).
 </Aside>
 
-**The state file does not survive between runs.** Each run therefore does the
-full stargazer walk again, and reads every repository's daily star history
-whole, a page per thirty weeks of its life. On a small account that is a
-handful of calls; on an account with many stars or old repositories, cache it:
+**The state file does not survive between runs.** Without it every run is a
+first run. Every family runs, whatever its cadence says, because nothing
+remembers when it last did. The full stargazer walk is done again, and every
+repository's daily star history is read whole, a page per thirty weeks of its
+life. `achievements` walks the account's merged pull requests whole for its
+co-authored count, which was 35 queries and 23.7 MB on an account with 2,315
+of them. And with no [cache file](/ghchronicle/configuration/#the-cache-beside-it)
+beside the state, nothing is asked with an ETag, so no answer is a free 304. On
+a small account that is a handful of calls; on an account with many stars, old
+repositories or a long history, cache it.
+
+Caching needs a `config:` file. Without one the Action writes a configuration
+of its own and puts the state in a new temporary directory under `RUNNER_TEMP`
+on every run, which no cache step can name. With one, point `state_file` at the
+home directory:
 
 ```yaml
-- uses: actions/cache@v4
+state_file: ~/.ghchronicle/state.json
+```
+
+and restore and save that directory with a step before the ghchronicle one:
+
+```yaml
+- uses: actions/cache@v6
   with:
     path: ~/.ghchronicle
     key: ghchronicle-state-${{ github.run_id }}
     restore-keys: ghchronicle-state-
 ```
 
-and point `state_file` at `~/.ghchronicle/state.json` in the config. The
-directory holds [the cache beside the state
-file](/ghchronicle/configuration/#the-cache-beside-it) as well, which a `once`
-step writes and a `backfill` step only reads, so a run restored from it also
-asks GitHub with the validators the last one stored, and pays only for what
-changed. A `card` mode run reads a restored state file, which
+A `~` in `state_file` is the home directory from 2.6.1 on. An older release
+reads it as written, a directory called `~` in the checkout that the cache step
+never sees, so with a `version` older than 2.6.1 write the path out:
+`/home/runner/.ghchronicle/state.json` on a GitHub-hosted Ubuntu runner.
+
+The directory then holds the cache file as well, which a `once` step writes and
+a `backfill` step only reads, so a run restored from it also asks GitHub with
+the validators the last one stored, and pays only for what changed. A `card` mode run reads a restored state file, which
 is what lets it skip both walks, and never writes one back, nor the cache file
 beside it: it delivers its points to the card and to no store, so nothing it
 learned may tell the next collection that a family is already done. What fills
 the `actions/cache` entry is a `once` step, with both files, or a `backfill`
-step, with the state file alone.
+step, with the state file alone. No step keeps a write ledger there: a run that
+ends with its sweep opens none.
 
 ## Without the Action
 

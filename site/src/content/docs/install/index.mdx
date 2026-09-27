@@ -84,11 +84,15 @@ keep it running once you are done watching it.
   </TabItem>
   <TabItem label="Container">
     ```sh
-    docker run -v $PWD/config.yaml:/config.yaml:ro -e GITHUB_TOKEN \
+    docker run -v $PWD/config.yaml:/config.yaml:ro \
+      -v ghchronicle-state:/var/lib/ghchronicle -e GITHUB_TOKEN \
       ghcr.io/jmrplens/ghchronicle -config /config.yaml
     ```
 
-    Distroless, static, and running as uid 65532.
+    Distroless, static, and running as uid 65532. With `state_file` under
+    `/var/lib/ghchronicle` the volume keeps the state, once it is handed to
+    that user: [what has to be
+    writable](/ghchronicle/install/docker/#what-has-to-be-writable).
 
   </TabItem>
   <TabItem label="Action">
@@ -110,8 +114,8 @@ keep it running once you are done watching it.
 
 The collector pushes to every store it supports, so it does not need to be
 reachable from anywhere. It needs to reach GitHub and to reach its databases.
-That is the only constraint, and it is what makes all five of these viable.
-Four of the five want a host you own: systemd, Docker and cron. GitHub Actions
+That is the only constraint, and it is what makes all four of these viable.
+Three of the four want a host you own: systemd, Docker and cron. GitHub Actions
 is the one that does not. The system pages above are where the scheduler lives,
 one per system: systemd or cron on Linux, launchd on macOS, a scheduled task on
 Windows.
@@ -151,7 +155,9 @@ Plus two that write nothing: `-list` prints the repositories in scope, and
 `-card ... -card-only` renders the SVG without touching a database.
 
 <Aside type="note" title="The state file is the one thing that must persist">
-  Whichever way it runs, keep `state_file` on a path that survives a restart. It
-  is what stops the full stargazer walk and the year-by-year contribution
-  backfill happening again on every run.
+  Whichever way it runs, keep `state_file` on a path that survives a restart,
+  in a directory the collector can write, since the cache file and the write
+  ledger live beside it. Without it every run collects every family whatever
+  its cadence says, and walks the stargazer list, the whole star history and
+  the co-authored pull requests again.
 </Aside>

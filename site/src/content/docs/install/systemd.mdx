@@ -140,6 +140,13 @@ losing the cache, one sweep at full price:
     sudo systemctl status ghchronicle
     ```
 
+    The first sweep runs every family, since none has run yet, except that
+    the service starts at most one family of six hours or more a sweep:
+    `traffic`, `stats`, `forks` and the rest of the eleven reach the store
+    over the first two and a half hours, and only this once. See [the slow
+    families take
+    turns](/ghchronicle/configuration/cadences/#the-slow-families-take-turns).
+
 </Steps>
 
 ## What to watch
@@ -147,9 +154,13 @@ losing the cache, one sweep at full price:
 The log says what was written and where.
 
 ```text
-level=INFO msg=written sink=influxdb family=traffic points=629
-level=INFO msg="rate budget" bucket=core remaining=4354 limit=5000
+level=INFO msg=written sink=influxdb family=repo points=934 unchanged=1955
+level=INFO msg="rate budget" bucket=core remaining=4477 limit=5000
 ```
+
+[What the log says on a good
+day](/ghchronicle/configuration/logging/#what-the-log-says-on-a-good-day) has
+every routine line.
 
 Two warnings are worth an alert:
 
@@ -178,7 +189,12 @@ journalctl -u ghchronicle -p warning --since today
 0 * * * * /usr/local/bin/ghchronicle -config /etc/ghchronicle/config.yaml -once
 ```
 
-Keep the state file on a persistent path even in this mode. It is what stops
-the stargazer walk and the year-by-year contribution backfill happening again
-on every run. Note that an hourly cron gives every family an hourly cadence at
-best, so the fifteen-minute rhythm of `actions` is lost.
+Keep the state file on a persistent path even in this mode. Without it every
+run collects every family, whatever its cadence, and walks the stargazer list,
+the whole star history and the co-authored pull requests again; the cache file
+beside it is what lets a run ask GitHub only for what changed. Note that an
+hourly cron gives every family an hourly cadence at best, so the five that run
+every fifteen minutes, `actions`, `events`, `notifs`, `activity` and
+`ratelimit`, run four times less often: a workflow run's queue time is read
+after it is over, and a notification thread moved twice inside the hour shows
+only its second move.

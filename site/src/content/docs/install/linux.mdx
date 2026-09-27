@@ -197,7 +197,10 @@ ghchronicle -config config.yaml -once   # one sweep, then exit
 [systemd](/ghchronicle/install/systemd/) is the arrangement this documentation
 treats as the default on Linux, and the unit there is hardened rather than
 minimal, because this is very likely the only process on the host holding a
-GitHub token with read access to every repository of an account.
+GitHub token with read access to every repository of an account. A service
+started on a state file nothing has written yet brings its eleven families of
+six hours or more into the store over its first two and a half hours, one a
+sweep, and only that once; the systemd page says why.
 
 A scheduler works too:
 [cron with `-once`](/ghchronicle/install/systemd/#cron-instead-of-a-service) is
@@ -257,7 +260,7 @@ on every invocation. What the rest of this documentation assumes:
 | ------------------ | ---------------------------------- | --------------------------- |
 | Configuration      | `/etc/ghchronicle/config.yaml`     | world readable, no secrets  |
 | Tokens             | `/etc/ghchronicle/ghchronicle.env` | `600`                       |
-| State and ledger   | `/var/lib/ghchronicle/`            | written by the service user |
+| State, ledger, cache | `/var/lib/ghchronicle/`          | written by the service user |
 
 `state_file` has a default of its own, `ghchronicle-state.json` in the working
 directory, with the write ledger beside it as

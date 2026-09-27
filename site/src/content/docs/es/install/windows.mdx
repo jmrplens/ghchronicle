@@ -378,8 +378,9 @@ programada, y tiene dos formas.
     registrada sin ninguna duración.
 
     Esta forma trae dos condiciones, y ninguna es la de cron. Una tarea horaria
-    da a todas las familias una cadencia horaria como mucho, así que el ritmo
-    de quince minutos de `actions` se pierde, que es el mismo cambio que
+    da a todas las familias una cadencia horaria como mucho, así que las cinco
+    que corren cada quince minutos, `actions`, `events`, `notifs`, `activity`
+    y `ratelimit`, corren cuatro veces menos, que es el mismo cambio que
     [hace cron en Linux](/ghchronicle/es/install/systemd/#cron-en-vez-de-un-servicio).
     Y aquí `Register-ScheduledTask` no nombra ni `-User` ni `-Principal`, así
     que la tarea queda registrada con la cuenta que la crea y con el tipo de
@@ -478,22 +479,32 @@ fichero en absoluto.
 | Fichero           | Para una tarea de máquina     | Para una cuenta                |
 | ----------------- | ----------------------------- | ------------------------------ |
 | Configuración     | `C:/ProgramData/ghchronicle/` | `${LOCALAPPDATA}/ghchronicle/` |
-| Estado y registro | `C:/ProgramData/ghchronicle/` | `${LOCALAPPDATA}/ghchronicle/` |
+| Estado, registro, caché | `C:/ProgramData/ghchronicle/` | `${LOCALAPPDATA}/ghchronicle/` |
 | Log               | `C:/ProgramData/ghchronicle/` | `${LOCALAPPDATA}/ghchronicle/` |
 
 `${LOCALAPPDATA}` se escribe así porque `${VAR}` es la única forma que el
-colector expande, desde el entorno, al arrancar el proceso. `%VAR%` es una
-notación del intérprete y para el fichero no significa nada: un
-`%LOCALAPPDATA%` copiado dentro del YAML te da un directorio llamado
-literalmente `%LOCALAPPDATA%`, al lado de donde la tarea estuviera trabajando.
-Son `%LOCALAPPDATA%` en `cmd` y `$env:LOCALAPPDATA` en PowerShell los que crean
-el directorio en primer lugar.
+colector expande, desde el entorno, al arrancar el proceso, y lo hace en
+`state_file`, `sinks.dedupe_file` y `log.file` desde la 2.6.1. Una versión
+anterior no expande ninguna ruta, y lee `${LOCALAPPDATA}/ghchronicle/state.json`
+como un directorio llamado literalmente `${LOCALAPPDATA}`; con una de esas,
+escribe la ruta entera. `%VAR%` es una notación del intérprete y para el
+fichero no significa nada: un `%LOCALAPPDATA%` copiado dentro del YAML te da un
+directorio llamado literalmente `%LOCALAPPDATA%`, al lado de donde la tarea
+estuviera trabajando. Son `%LOCALAPPDATA%` en `cmd` y `$env:LOCALAPPDATA` en
+PowerShell los que crean el directorio en primer lugar.
+
+La ruta de la propia configuración es la excepción de la tabla: se da en la
+línea de órdenes, donde el colector no expande nada, así que el `-config` de
+una tarea programada la nombra entera,
+`C:\Users\tu\AppData\Local\ghchronicle\config.yaml`.
 
 Un directorio bajo `C:\ProgramData` lo puede escribir quien lo creó y lo puede
 leer todo el mundo, así que créalo elevado y luego concede escritura a la
-cuenta con la que corre la tarea. El fichero de estado y su registro de
-escrituras son los dos que el colector reescribe en cada pasada; si uno de
-ellos está marcado como de solo lectura el colector quita ese atributo él
-mismo, porque NTFS se niega a reemplazar un fichero de solo lectura incluso
-cuando se le pide reemplazarlo, y una pasada no debería fallar por una
-propiedad de fichero.
+cuenta con la que corre la tarea. Deja escribibles el fichero de estado y el
+fichero de caché que hay a su lado. El colector reemplaza los dos escribiendo
+un fichero nuevo y renombrándolo sobre el viejo, y NTFS se niega a reemplazar
+un fichero de solo lectura incluso cuando se le pide reemplazarlo, así que un
+fichero de estado de solo lectura deja de guardarse y cada pasada avisa
+`state not saved`. El registro de escrituras y los ficheros rotados del
+destino de fichero son los dos a los que quita ese atributo él mismo, y una
+pasada no falla por ellos.
