@@ -20,7 +20,8 @@ ghchronicle -config config.yaml -card card.svg -card-only
 <Aside type="note" title="Esto es una función secundaria">
   El objetivo del proyecto es la ingesta. La tarjeta existe porque los números
   ya estaban ahí, y se dibuja exactamente con los mismos puntos que reciben las
-  bases de datos, así que la tarjeta y el dashboard no pueden contradecirse.
+  bases de datos, así que la tarjeta y el dashboard leen los mismos números,
+  con la única excepción que nombra [Qué dibuja](#qué-dibuja).
 </Aside>
 
 ## Las opciones
@@ -69,6 +70,15 @@ Las estrellas y los forks se **suman de los repositorios que recogió la pasada*
 porque el endpoint de cuenta de GitHub no informa de ninguno de los dos totales.
 Eso significa que excluir forks o archivados en `targets` se nota también en la
 tarjeta, que es la lectura honesta y no una discrepancia oculta.
+
+Esa suma es el único punto en el que la tarjeta y el
+[Overview](/ghchronicle/es/dashboards/panels/#overview) del dashboard se
+separan. La tarjeta suma `gh_repo`, la fila que una pasada escribe por cada
+repositorio que recoge. El Overview suma además los repositorios archivados que
+el filtro por omisión aparta, cuyos contadores lee cada pasada de `totals` en
+`gh_repo_total`, porque la gente les sigue dando estrellas y haciéndoles fork.
+En la cuenta en la que se midió, el 2026-09-27, el filtro por omisión apartaba
+diecisiete, con 80 estrellas y 24 forks que el Overview cuenta y la tarjeta no.
 
 ## Los campos
 

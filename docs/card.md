@@ -18,7 +18,8 @@ ghchronicle -config config.yaml -card card.svg -card-only
 >
 > The point of the project is the ingestion. The card exists because the numbers
 > were already there, and it is drawn from exactly the same points the databases
-> receive, so the card and the dashboard cannot disagree.
+> receive, so the card and the dashboard read the same numbers, with the one
+> exception [What it draws](https://jmrp.io/docs/ghchronicle/card/#what-it-draws) names.
 
 ### The flags
 
@@ -66,6 +67,15 @@ Stars and forks are **summed from the repositories the sweep collected**,
 because GitHub's account endpoint reports neither total. That means excluding
 forks or archived repositories in `targets` is visible on the card too, which
 is the honest reading rather than a hidden discrepancy.
+
+That sum is the one place the card and the dashboard's
+[Overview](https://jmrp.io/docs/ghchronicle/dashboards/panels/#overview) part. The card adds up
+`gh_repo`, the row a sweep writes for each repository it collects. The Overview
+adds the archived repositories the default filter sets aside as well, whose
+counts every `totals` sweep reads into `gh_repo_total`, since people go on
+starring and forking them. On the account this was measured on, on 2026-09-27,
+the default filter set aside seventeen, holding 80 stars and 24 forks that the
+Overview counts and the card does not.
 
 ### The fields
 
