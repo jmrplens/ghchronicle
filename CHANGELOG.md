@@ -15,17 +15,58 @@ was never released on its own, and its changes shipped in 2.6.0.
 ## 2.6.1 - 2026-09-28
 
 An audit of the documentation against the code of 2.6.0, every page in both
-languages read beside what it describes. Most of what it found was prose the
-release had left behind, and the pages now say what the code does. Some of it
-was the code: a path setting took `~` and `${VAR}` as the characters they are,
-whether a discussion comment is the accepted answer was part of its row's
-identity although a maintainer decides it days later, the repository list
-could outlive its hour by a tick, the example configuration pinned every
-cadence of its release for whoever copied it, several dashboard tables read
-the largest value of the range where they meant the newest, or the other way
-round, or counted an item once per row a store held of it, and every one-shot
-run reported at Info, as news, how it always runs.
+languages read beside what it describes, and a second pass that followed each
+fault it found in a dashboard to every panel of its kind. Most of what it found
+was prose the release had left behind, and the pages now say what the code
+does. Some of it was the code, and the image most of all: a Docker volume
+mounted where the example configuration keeps the state belonged to root, so
+the collector saved neither its state nor its cache in it and every restart
+started from nothing. Beyond that, a path setting took `~` and `${VAR}` as the
+characters they are, whether a discussion comment is the accepted answer was
+part of its row's identity although a maintainer decides it days later, the
+repository list could outlive its hour by a tick, the example configuration
+pinned every cadence of its release for whoever copied it, the card counted
+two owners' repositories of one name as one, several dashboard tables read the
+largest value of the range where they meant the newest, or the other way
+round, or counted an item once per row a store held of it, or one cell of a
+grid where they meant them all, some Elasticsearch panels read every
+repository whatever the picker held, ranked by a measure they did not name or
+failed outright, the Graphite charts were labelled with the function that
+consolidated them, and every one-shot run reported at Info, as news, how it
+always runs.
 
+- **A Docker state volume belongs to the collector.** Up to 2.6.0 neither
+  image had `/var/lib/ghchronicle`, where the example configuration keeps the
+  state and every compose stack in `deploy/` mounts its `state` volume.
+  Docker fills a new named volume
+  from the directory it is mounted over, owner included, so with no directory
+  there the volume was created owned by root and the collector, which runs as
+  uid 65532, could not write to it; with nothing mounted there, it could not
+  make the directory. Whoever ran either image that way without handing the
+  volume to uid 65532 themselves kept nothing a sweep learns: every sweep
+  warned `state not saved`, and from 2.6.0 `cache file not saved` too, and
+  every restart, or every run of a Docker one-shot, which is a new container
+  each time, started from nothing. It collected every family whatever its
+  cadence, walked the stargazer list, the whole star history and the
+  co-authored pull requests again, and had no ETag to be answered 304 with.
+  Both images now carry the directory, owned by uid 65532, made in an empty
+  stage since distroless has no shell to make it with. Measured with images
+  built here from both Dockerfiles, each run once with `-once` against the
+  fake GitHub: before, a new named volume stayed `0:0` and both warnings came
+  back; after, it was `65532:65532` and held `state.json` and
+  `state-cache.bin` with no warning. The collector-only stack, brought up with
+  compose and restarted, read its cache back. An empty volume a 2.6.0
+  container left to root is handed over the first time a container of 2.6.1 is
+  created on it, which `docker compose pull` followed by `docker compose up -d`
+  does, as the
+  [upgrade page](https://jmrp.io/docs/ghchronicle/install/upgrading/#a-docker-state-volume-needs-no-chown)
+  says. A host directory mounted there is left as it is and still needs its
+  `chown`, and a named volume mounted anywhere else is still root's, as
+  [what has to be writable](https://jmrp.io/docs/ghchronicle/install/docker/#what-has-to-be-writable)
+  says. CI's image job and the release workflow now create a new volume on
+  every image they build and read its owner from the host, so an image that
+  lost the directory fails CI, and a release whose image lost it is published
+  without becoming `latest`.
 - **A path setting means the path it spells.** `state_file`,
   `sinks.dedupe_file`, `log.file`, `sinks.file.path` and `sinks.sql.path` were
   taken as written, where credentials and addresses were expanded, so
@@ -127,6 +168,50 @@ run reported at Info, as news, how it always runs.
   two tables as they were read Enabled 1, Open alerts 1, Walked 9 and a live
   size of 205,800 bytes, where the newest rows say 0, 0, 2 and 204,800; they now
   read the newest rows.
+- **Every other table of current state reads its newest reading.** The same
+  fault was looked for in every panel of every store. In InfluxDB and
+  PostgreSQL, "Account keys" took the least `days_since_use` of the range and
+  "Environments" the least `days_since_change`, each of which climbs by one a
+  day, so both read the range's first day, a month short over thirty days;
+  "Account keys" also took the most `never_used`, which kept a key reading
+  never used after its first use; "Repository settings" took each column's
+  largest, so a setting switched off or a CODEOWNERS file mended inside the
+  range read as it had been; and "Cache against the ceiling" kept a repository
+  at a size its evictions had brought down, beside a tile and a table that
+  read the newest. Each now keeps its series' newest row.
+  Elasticsearch took the largest reading of the range, and said so, in
+  seventeen tables where a `top_metrics` could not be used, since it hands a
+  boolean back as text and appends nothing for an absent field: the security
+  settings, code scanning setup, token permissions, branch protection, ruleset
+  bypasses, deploy keys, stale branches, community profile, repository
+  settings, policy files, sponsorship tiers, pinned items, profile flags, star
+  lists, Dependabot ecosystems and both punch cards. Each series is now
+  narrowed to its newest document before it is read, and a tag that can
+  change, a status or a path, is one row as in SQL. Measured through Grafana
+  13.2.1 and Elasticsearch 9.5.3, a branch protection whose second reading
+  switched signatures off and dropped its review count read signatures 1 and
+  reviews 2 before, and 0 and empty now. Two Elasticsearch tables failed
+  outright there, "frame has different field lengths": "Account keys", whose
+  `top_metrics` asked for three fields no key carries all of, and "Achievement
+  progress" whenever a badge's page disagrees with its count, since such a
+  badge carries no `percent` and no `next_threshold`. Both read the newest
+  document the same way now, and the disagreeing badge is a row with empty
+  progress. What still takes an extreme of the range does so because the
+  extreme is what the panel means: a peak, an event rather than a reading, or
+  a value that cannot fall.
+- **The punch cards add up every cell of each repository's grid.** A punch
+  card is a grid, a point per weekday and hour, and one read stamps every cell
+  with the same instant. InfluxDB and PostgreSQL kept the newest row per
+  repository and hour, or per repository and weekday, which is one arbitrary
+  cell of those tied on that instant, and Elasticsearch the largest cell of
+  each repository's hour or weekday. Through Grafana 13.2.1 in the
+  containerised suite, with a cell added so that an hour holds two weekdays,
+  Monday (3 at 09:00 and 5 at 10:00) read 3 in InfluxDB and PostgreSQL and 5
+  in Elasticsearch, and 09:00 (3 on Monday and 6 on Tuesday) read 3 and 6;
+  only Graphite, which sums every cell, read 8 and 9. The three now add up
+  every cell of each repository's newest grid in the range. Graphite keeps
+  each cell as a series of its own, so a cell a rewritten history emptied
+  keeps its last count there, as both panels now say.
 - **"Every bucket" gives the extremes of the range in every store.** The SQL
   stores put the most any reading in the range had used and the least any had
   left under Most used and Lowest remaining. Graphite and Elasticsearch put
@@ -147,6 +232,27 @@ run reported at Info, as news, how it always runs.
   and in Graphite it was one row for the whole account under a Repository
   column. It now reads one row per comment in every store, as "Answers
   elsewhere" does, and Graphite gives a row per repository.
+- **Five Elasticsearch figures follow the repository picker.** The "Open
+  alerts" tile of the Security row, in both its Dependabot and its code
+  scanning count, the artifact and cache bytes of "Runs in range" and the
+  total of "Downloads" read the newest value of every repository in the store,
+  whatever the picker held, where their SQL twins and every other
+  Elasticsearch panel of their rows read the picked repositories. The query
+  the five share now names the picked repositories, as its SQL twin always
+  has.
+- **Four Elasticsearch panels rank by the measure they name.** "Events by
+  type", "Events by repository", "Notifications" and "Topics" keep their top
+  values by a metric, and named it by an id no metric of their query carried.
+  Grafana then leaves the buckets in Elasticsearch's own order, by document
+  count, so each kept the values with the most documents rather than the
+  largest sum or the most repositories, and said nothing. Measured through
+  Grafana 13.2.1 and Elasticsearch 9.5.3, with one event type of three
+  one-event documents and another of one ten-event document, "Events by type"
+  cut to one value kept the three events before and keeps the ten now. The
+  punch cards and "Contributions by year" ordered by `_term`, the name from
+  before Elasticsearch 6.0, which Elasticsearch 9.5.3 answers with "Cannot
+  find aggregation named [_term]"; they worked only because Grafana 13.2.1
+  rewrites it, and they now say `_key`.
 - **Graphite tables that add their points up are consolidated by sum.** A
   table sends no `maxDataPoints`, so Grafana asks for the panel's width and
   graphite-web averages neighbouring points to fit it before the table adds
@@ -154,6 +260,16 @@ run reported at Info, as news, how it always runs.
   repository's storage schema, three discussion comments over the last thirty
   days read 1.5 at 500 points and 3 with none. The twenty tables that add
   their points up now ask for the sum.
+- **The Graphite charts name their series again.** graphite-web renames every
+  series it consolidates, as `consolidateBy(name,"sum")`, and Grafana draws
+  that name as it is. Measured against the same image and Grafana 13.2.1,
+  "Views over time" drew its two repositories as `consolidateBy(r1,"sum")` and
+  `consolidateBy(r2,"sum")`, "Open alerts over time" its severity as
+  `consolidateBy(high,"max")`, which its colours by severity then did not
+  match, and "Artifact storage over time" its repository wrapped in two
+  functions. Every consolidated chart, twenty-four targets, now gives its
+  series back the names they came with and keeps the consolidation: the three
+  read `r1` and `r2`, `high`, and `r1`.
 - **Panel descriptions say what the panels read.** "Oldest open alerts" called
   itself the rows the two counts are made of, where since 2.6.0 the counts
   come from a read of the open alerts alone and the rows from the newest
@@ -163,12 +279,29 @@ run reported at Info, as news, how it always runs.
   to and the whole history is walked once a week. "Work elsewhere" said the
   event feed forgets an item in three days, where it keeps its last three
   hundred events of thirty. The artifact tables blamed the five-page cap alone
-  for a live size that is a floor, and a failed page does it too. Seventeen
-  Graphite tables that take no median said the medians were over what the
-  storage kept, two said a boolean is not a metric in Graphite, which keeps it
-  as 1 or 0, and the note on failed job output told readers to set
-  `every.joblogs`, which the loader refuses, where the key is
-  `every.families.joblogs`.
+  for a live size that is a floor, and a failed page does it too. "Every
+  family" said its Repositories column was how many repositories a family was
+  asked about, where it is the most one sweep of the range asked it about, and
+  for `commits`, `issueevents` and `issues` it counts the repositories the
+  movement query found nothing new in and the family left unread, so a family
+  that read three can stand at thirty. Seventeen Graphite tables that take no
+  median said the medians were over what the storage kept, two said a boolean
+  is not a metric in Graphite, which keeps it as 1 or 0, and the note on
+  failed job output told readers to set `every.joblogs`, which the loader
+  refuses, where the key is `every.families.joblogs`.
+- **The card counts two owners' repositories of one name as two.** The
+  accumulator behind the SVG card keyed `gh_repo` and `gh_repo_language` by the
+  short `repo` tag, so a user's `.github` and an organisation's, in a sweep
+  that targets both, were one repository: the later reading replaced the
+  other's stars, forks and language bytes, and the card's totals lost them,
+  where the Overview, which keys by full name, counted both. The card now keys
+  both measurements by `full_name`, and by the short name where a point
+  carries none. The top repositories still show the short name, so they can
+  show one twice, and a tie between two such rows is broken by the full name
+  rather than by the order of a map. Fed two owners' `dotfiles`, a later
+  reading of one of them, their languages and a repository with no full name,
+  the card read 9 stars, 1 fork and 41 bytes of Shell before, and 16, 3 and
+  141 after.
 - **A one-shot run no longer reports at Info how it always runs.** "no write
   ledger remembers what the stores hold, listing the jobs of the runs the cache
   file remembers again" was printed at every `-once` run after the first,
@@ -197,24 +330,30 @@ run reported at Info, as news, how it always runs.
   what a backfill reaches that a sweep does not. Configuration: which keys are
   expanded and which are not, when the cache file is saved, the seven Debug
   lines, the lines a 2.6 sweep prints routinely, and the families whose cost
-  follows activity. Installation: a Docker state directory the image's uid
-  65532 can write, an Actions cache recipe that caches, the slow families
-  arriving over two and a half hours after a service's first start, the five
-  quarter-hour families an hourly schedule slows, and a new
+  follows activity. Installation: the Docker state directories that still need
+  a `chown`, a state file mounted on its own, which is never saved, an Actions
+  cache recipe that caches, the slow families arriving over two and a half
+  hours after a service's first start, the five quarter-hour families an
+  hourly schedule slows, and a new
   [upgrade page](https://jmrp.io/docs/ghchronicle/install/upgrading/) for
   2.5.x to 2.6.x and for 2.6.1. The start and reference pages: the log lines
   2.6 added, a 502 or 504 in `collector failed` that has already been asked
-  twice, a dropped PostgreSQL table declared again only after a restart, and
-  the flat cadence keys the parser refuses. The sink pages: what both
-  PostgreSQL sinks do to a table an earlier release made, Loki's one measured
+  twice, a dropped PostgreSQL table declared again only after a restart, the
+  flat cadence keys the parser refuses, and a `state not saved` that names
+  each way the rename into place fails. The sink pages: what both PostgreSQL
+  sinks do to a table an earlier release made, Loki's one measured
   figure for the old release lines, its line formats and its lookback, and the
   joins and second windows Graphite and Elasticsearch cannot ask for. The
   dashboard and card pages: every panel paragraph against the generated files,
-  the measurements each section reads derived from them, and the archived
-  repositories the Overview counts and the card does not. The landing page's
-  calendar runs every hour. README, CLAUDE.md, CONTRIBUTING, SECURITY,
-  RELEASING, the Action's notes, which promised a card without a token, and
-  the pull request and bug report templates say what the code and CI do.
+  the measurements each section reads derived from them, the archived
+  repositories the Overview counts and the card does not, and how the card
+  counts a repository. The landing page's calendar runs every hour. README,
+  CLAUDE.md, CONTRIBUTING, SECURITY, RELEASING, the Action's notes, which
+  promised a card without a token, and the pull request and bug report
+  templates say what the code and CI do, and the stacks' README says the
+  collector-only stack writes to its own log, not to a file. The code comments
+  that still called `deployments` hourly and `achievements` daily, or had the
+  event feed forget work in three days, say what 2.6.0 does.
   `make analyze` runs `check-compose` as CI does, and the site's stats check
   every row of the dashboards README's panel counts, four of which said 152
   where all five files hold 154.
@@ -229,11 +368,24 @@ two reads, in both walks that write it; the upsert on a table made with
 store; the newest reading of "Security features" and "Artifact storage
 counted"; the extremes of "Every bucket"; "Work elsewhere" in Elasticsearch;
 the twenty Graphite tables that add their points up; every description
-above; and the two `achievements` warnings. Where such a test calls something
+above; the two `achievements` warnings; both Dockerfiles shipping the state
+directory owned by the user they run as; the four tables of the SQL stores
+read from their newest row and the seventeen of Elasticsearch from their newest
+document; an extreme of the range read by any panel without a listed reason; a
+`top_metrics` over a field the collectors do not always write; the punch cards
+in every store; the five Elasticsearch figures without the picker their SQL
+twins name; an Elasticsearch ranking by an id its query lacks; a consolidated
+Graphite target under the name `consolidateBy` gives it; and the card's totals
+over two owners' repositories of one name. Where such a test calls something
 the old code lacks, it was run there with that call stubbed. The binary
-against the fake GitHub holds that a one-shot run says its refill at Debug and
-never at Info, and that no comment carries `is_answer`; the containerised
-suite holds the two newest-reading tables against InfluxDB 3, as above.
+against the fake GitHub holds that a one-shot run says its refill at
+Debug and never at Info, and that no comment carries `is_answer`. The
+containerised suite holds the two newest-reading tables against InfluxDB 3, as
+above, and every bar of both punch cards against what the sweep's own points
+add up to, in the four stores that draw them; against the dashboards before
+it, that test failed in InfluxDB, PostgreSQL and Elasticsearch. CI's image job
+and the release workflow read the owner of a new state volume on every image
+they build, a check that fails on the images of 2.6.0.
 
 Not verified, and worth saying plainly:
 
@@ -246,12 +398,26 @@ Not verified, and worth saying plainly:
   the Elasticsearch fold per comment have not read a store holding both. The
   PostgreSQL conflict on the old key was measured by hand against PostgreSQL
   18.6, and is held by a test with the catalog stubbed.
-- The newest-reading tables were checked for their values against InfluxDB 3
-  alone. In the other four stores the containerised suite sends every panel
-  through Grafana and holds that it is accepted and answers, not what it
-  answers.
+- The newest-reading tables were checked for their values against InfluxDB 3,
+  and in Elasticsearch on one branch protection and two achievement badges
+  read by hand; the punch cards are read bar by bar in the four stores that
+  draw them. Beyond those, in the other four stores the containerised suite
+  sends every panel through Grafana and holds that it is accepted and answers,
+  not what it answers.
 - The Graphite sum was measured on one table, the discussion comments, and
-  the other nineteen follow from the same wrapper.
+  the other nineteen follow from the same wrapper. The Graphite names were
+  read on three of the twenty-four consolidated chart targets, and the ranking
+  of the Elasticsearch panels on "Events by type" alone; the rest follow from
+  the same change.
+- The five Elasticsearch figures that now follow the picker are held by a test
+  of their queries; no store was read with a repository picked.
+- The state directory in the image was measured with images built here for
+  linux/amd64, with Docker. The arm64 images, Podman and Docker Desktop were
+  not run, and the check that CI and the release workflow now make was run by
+  hand, against the published 2.6.0 image and one built here from the root
+  Dockerfile, not yet on a runner.
+- The card's count by full name is held by the accumulator's test. No account
+  with two owners' repositories of one name was drawn.
 - The path expansion was run on Linux. The `${LOCALAPPDATA}` paths of the
   Windows page and the cache recipe of the Actions page follow from it and
   were not run on Windows or on a runner.
