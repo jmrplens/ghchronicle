@@ -130,7 +130,7 @@ export const en: HomeContent = {
 		steps: [
 			{
 				title: "Sweep",
-				body: "Each family of metrics has its own cadence, because they move at very different speeds: workflow runs every quarter of an hour, the contribution calendar every twelve.",
+				body: "Each family of metrics has its own cadence, because they move at very different speeds: workflow runs every quarter of an hour, the contribution calendar every hour, the account's keys once a day.",
 			},
 			{
 				title: "Date",
@@ -237,7 +237,7 @@ export const es: HomeContent = {
 		steps: [
 			{
 				title: "Recorrer",
-				body: "Cada familia de métricas tiene su cadencia, porque se mueven a velocidades muy distintas: las ejecuciones de workflows cada cuarto de hora, el calendario de contribuciones cada doce.",
+				body: "Cada familia de métricas tiene su cadencia, porque se mueven a velocidades muy distintas: las ejecuciones de workflows cada cuarto de hora, el calendario de contribuciones cada hora y las claves de la cuenta una vez al día.",
 			},
 			{
 				title: "Fechar",
