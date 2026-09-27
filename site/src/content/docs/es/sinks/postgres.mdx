@@ -1,6 +1,6 @@
 ---
 title: PostgreSQL
-description: Sentencias INSERT que se pasan a psql, el esquema que declaran y por qué la cláusula de conflicto actualiza en vez de no hacer nada.
+description: Las dos maneras de llegar a PostgreSQL, sentencias INSERT que se pasan a psql y un destino que conecta, el esquema que declaran los dos y por qué la cláusula de conflicto actualiza en vez de no hacer nada.
 searchTitle: Guardar métricas de GitHub en PostgreSQL
 ---
 
@@ -95,9 +95,20 @@ campo que aparece en un lote posterior. Los campos nunca van en el
 `CREATE TABLE`, porque esa sentencia no le hace nada a una tabla que creó una
 versión anterior: un campo que esa versión no escribía llegaría al `INSERT`
 sin columna, y PostgreSQL rechaza la sentencia y el lote que la rodea. Añadir
-cada columna si falta significa lo mismo para una tabla nueva y para una
-antigua. Un fichero rotado empieza otra vez sus declaraciones, así que
+la columna de un campo si falta significa lo mismo para una tabla nueva y para
+una antigua. Un fichero rotado empieza otra vez sus declaraciones, así que
 cualquier fichero se puede reproducir por su cuenta.
+
+Así que un fichero reproducido en una base de datos que ya tiene sus tablas
+hace que psql imprima un aviso por cada declaración que encuentra su trabajo
+hecho, uno por el `CREATE TABLE` y uno por cada columna que la tabla ya tiene:
+
+```text
+NOTICE:  relation "gh_traffic" already exists, skipping
+NOTICE:  column "count" of relation "gh_traffic" already exists, skipping
+```
+
+Esos son de esperar. Una línea `ERROR` no lo es.
 
 El sink que conecta no envía todos esos `ALTER TABLE`. Pregunta al catálogo qué
 columnas tiene ya una tabla la primera vez que su proceso se encuentra con ella,
@@ -111,10 +122,36 @@ existía esperó hasta que un `lock_timeout` de un segundo lo rechazó, y un
 `SELECT` detrás de él esperó tres segundos. Una sentencia que el servidor
 rechaza se envía otra vez en la escritura siguiente en vez de darse por hecha.
 
-Una etiqueta vista por primera vez después de declarar la tabla no puede
-unirse a la clave primaria sin reescribirla, así que se convierte en una columna
-normal. Eso solo ocurre cuando un colector cambia su conjunto de etiquetas entre
-pasadas.
+Una etiqueta es otra cosa, porque forma parte de la clave. Una vista por
+primera vez después de declarar la tabla, en el mismo fichero o en el mismo
+proceso, no puede unirse a la clave primaria sin reescribirla, así que se
+convierte en una columna normal. Eso solo ocurre cuando un colector cambia su
+conjunto de etiquetas entre pasadas.
+
+Una tabla que creó una versión anterior es otro asunto, y una versión que
+cambia las etiquetas de una medida cambia lo que se carga en ella. **Medido
+contra PostgreSQL 18.6** el 2026-09-27:
+
+- Una etiqueta que añade una versión posterior no recibe columna de ninguno de
+  los dos destinos, así que cada `INSERT` de esa medida se rechaza con
+  `column ... does not exist`, y en el destino que conecta, con él las demás
+  filas del mismo lote.
+- Una etiqueta que una versión posterior deja de escribir, como 2.6.1 dejó de
+  escribir `is_answer` en `gh_discussion_comment`, deja el `ON CONFLICT` del
+  fichero nombrando una clave que la tabla no tiene. psql rechaza cada una de
+  esas sentencias con "there is no unique or exclusion constraint matching the
+  ON CONFLICT specification", y el resto del fichero se carga. El destino que
+  conecta lee del catálogo la clave propia de la tabla y choca contra esa, así
+  que sigue escribiendo, y sus filas nuevas quedan junto a las viejas con la
+  cadena vacía en la columna que ya no se escribe, las dos formas que guarda
+  también InfluxDB.
+
+La salida limpia de cualquiera de los dos casos es borrar la tabla y dejar que
+las pasadas, y un relleno histórico para la historia, la vuelvan a llenar; un
+colector con el destino que conecta hay que reiniciarlo después del borrado,
+porque declara cada tabla una vez por proceso.
+[Cómo leer las tablas](/ghchronicle/es/collectors/measurements/#cómo-leer-las-tablas)
+enseña cómo reconstruir una clave a mano.
 
 ## TimescaleDB
 
@@ -132,10 +169,13 @@ Nada del dashboard cambia.
 
 <Steps>
 
-1. Apunta el destino a un fichero, o a la salida estándar para una tubería
-    directa.
+1. Elige el destino. El que conecta necesita `sinks.postgres.dsn` y una base
+    de datos a la que esta máquina llegue, y declara sus tablas en su primera
+    escritura. El de fichero necesita `sinks.sql.path`, un fichero o `-` para
+    la salida estándar.
 
-2. Cárgalo.
+2. Con el destino de fichero, carga lo que escribió. El que conecta no tiene
+    nada que cargar.
 
     ```sh
     psql "$DATABASE_URL" -f /var/lib/ghchronicle/points.sql
@@ -145,7 +185,9 @@ Nada del dashboard cambia.
     planificador y encadénalo directamente.
 
 3. Apunta el datasource de PostgreSQL de Grafana a la base de datos e importa
-    `ghchronicle-postgres.json`.
+    `ghchronicle-postgres.json`, o, con el destino que conecta, deja que
+    `-publish-dashboard` cree el datasource a partir del DSN y publique el
+    dashboard.
 
     ```sql
     SELECT time, "count" FROM gh_traffic WHERE kind = 'views' AND repo = $repo
