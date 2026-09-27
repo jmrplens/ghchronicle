@@ -10,7 +10,7 @@ docker compose -f compose.influxdb-grafana.yaml up -d
 
 | File                            | What comes up                                  |
 | ------------------------------- | ---------------------------------------------- |
-| `compose.collector.yaml`        | the collector on its own, writing to a file    |
+| `compose.collector.yaml`        | the collector on its own, writing to its log   |
 | `compose.influxdb.yaml`         | the collector and InfluxDB 3                   |
 | `compose.influxdb-grafana.yaml` | those two and Grafana, dashboard already in it |
 | `compose.postgres.yaml`         | the collector and PostgreSQL                   |
