@@ -17,7 +17,7 @@ body:
     attributes:
       label: Version
       description: The output of `ghchronicle -version`.
-      placeholder: v1.0.0
+      placeholder: "ghchronicle 2.6.0 (commit 00318aa, built 2026-09-27T13:09:30Z)"
     validations:
       required: true
   - type: dropdown
