@@ -152,7 +152,11 @@ func achievementProgress(b *builder) Panel {
 			"the badge today: merged pull requests for Pull Shark, accepted discussion " +
 			"answers for Galaxy Brain, the stars on the most starred repository for " +
 			"Starstruck, and merged pull requests in public repositories with a " +
-			"co-authored commit for Pair Extraordinaire, walked every hour. Next tier " +
+			"co-authored commit for Pair Extraordinaire. That last count is a tally the " +
+			"state file keeps: each hourly pass adds the pull requests merged since the " +
+			"last day it covers, and the whole history is walked again once a week, which " +
+			"is when a count that went down, a repository made private or deleted, comes " +
+			"down here. Without a state file every start walks it whole. Next tier " +
 			"at is the community-observed threshold (Schweinepriester/github-profile-" +
 			"achievements), and Progress is Count against it, full at the top tier. " +
 			"Tier is what the count implies; Page agrees says whether the profile page " +

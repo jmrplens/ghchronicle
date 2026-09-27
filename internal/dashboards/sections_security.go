@@ -295,6 +295,23 @@ const securityResolveDesc = "Dependabot alerts that were fixed or dismissed, new
 	"account scores 9.3 under a word whose mean is 6.1. It is the v4 score where the " +
 	"advisory carries one."
 
+// securityOldestDesc is what the table of open alerts says about itself, out
+// here for the reason securityResolveDesc is.
+const securityOldestDesc = "The alerts still open, oldest first, whatever the dashboard range: an alert " +
+	"is listed while its row says it is open, however long ago it was raised. A " +
+	"Dependabot alert names its package and advisory, a code scanning alert its " +
+	"rule and tool. These are not always the rows the two counts at the top of the " +
+	"section are made of: a sweep writes a row for each of the newest hundred " +
+	"alerts of a repository in every state, and a repository with more has its " +
+	"counts taken from a read of the open ones alone. There an open alert no sweep " +
+	"has reached, behind a hundred newer ones since before the collector started, " +
+	"is counted and not listed here, and an alert fixed while it sat behind the " +
+	"newest hundred stays listed here as open, until a backfill reads the whole " +
+	"list. Open for is counted from " +
+	"the row's own date to now, so it is right when the panel is drawn rather than " +
+	"when the last sweep ran. The " +
+	"link opens the alert, which GitHub shows to the owner alone."
+
 // scanningAndResolution is the other side of the same section: that the scans
 // ran at all, what they returned, and how long an alert stayed open before it
 // was fixed or dismissed.
@@ -521,13 +538,7 @@ func scanningAndResolution(b *builder) []Panel {
 					"severity; no alert survives, and the advisory and the url are strings."),
 			GRNote: cannot("the alerts still open, oldest first, with a link to each.",
 				"Graphite keeps no strings, and has no way to list by date.", "graphite"),
-			Desc: "The two counts at the top of the section, as the rows they are made of, " +
-				"whatever the dashboard range: an alert is listed while it is open, however " +
-				"long ago it was raised. A Dependabot alert names its package and advisory, " +
-				"a code scanning alert its rule and tool. Open for is counted from the row's " +
-				"own date to now, so it is right when the panel is drawn rather than when the " +
-				"last sweep ran. The " +
-				"link opens the alert, which GitHub shows to the owner alone.",
+			Desc: securityOldestDesc,
 			Overrides: []any{
 				when("Raised"), width("Kind", 110), repoColumn(),
 				width("Severity", 90), width("What", 160), unitOf("Open for", "s", 110),

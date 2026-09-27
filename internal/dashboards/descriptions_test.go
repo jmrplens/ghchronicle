@@ -19,6 +19,52 @@ func descriptionOf(p map[string]any) string {
 	return desc
 }
 
+// TestOldestOpenAlertsSaysWhatItsRowsAre: the table said it was the two
+// counts at the top of the section "as the rows they are made of". Since
+// 2.6.0 the counts come from a read of the open alerts alone, while a sweep
+// writes the rows of the newest hundred alerts in every state, so an open
+// alert behind a hundred newer ones is counted and not listed, and one fixed
+// behind them stays listed as open until a backfill reads the whole list.
+func TestOldestOpenAlertsSaysWhatItsRowsAre(t *testing.T) {
+	t.Parallel()
+	checked := 0
+	for _, store := range AllStores() {
+		p, ok := rendered(t, store.Name)["Oldest open alerts"]
+		if !ok || p["type"] != "table" {
+			continue // a store that cannot answer it says why in a note
+		}
+		checked++
+		desc := descriptionOf(p)
+		if strings.Contains(desc, "as the rows they are made of") ||
+			!strings.Contains(desc, "newest hundred") || !strings.Contains(desc, "until a backfill reads the whole list") {
+			t.Errorf("%s: Oldest open alerts does not say its rows are the newest hundred alerts "+
+				"a sweep reads rather than what the counts are made of: %q", store.Name, desc)
+		}
+	}
+	if checked == 0 {
+		t.Fatal("no store answers Oldest open alerts, so this checks nothing")
+	}
+}
+
+// TestTheOverviewSaysPrometheusTakesNoRange: the Repositories group said a
+// range shorter than the totals cadence can leave the archived repositories
+// out, which is true of the four stores that read the dashboard range and not
+// of Prometheus, whose sums are instant queries.
+func TestTheOverviewSaysPrometheusTakesNoRange(t *testing.T) {
+	t.Parallel()
+	for _, store := range AllStores() {
+		desc := descriptionOf(panelOf(t, store.Build(nil), "Repositories", "stat"))
+		if strings.Contains(desc, "by default, so a range shorter than that can leave them out") ||
+			!strings.Contains(desc, "where the sums are taken over the dashboard range") {
+			t.Errorf("%s: the Overview says any range can leave the archived repositories out: %q",
+				store.Name, desc)
+		}
+		if store.Name == "prometheus" && !strings.Contains(desc, "Prometheus takes no range here") {
+			t.Errorf("prometheus: the Overview does not say its sums are instant: %q", desc)
+		}
+	}
+}
+
 // TestWorkElsewhereListsEachItemOnce: Elasticsearch listed the newest forty
 // documents of gh_external_contribution, and an open item is a document for
 // every day it was seen open, so one pull request filled a row per day and
@@ -85,6 +131,22 @@ func TestEveryArtifactFloorNamesBothCauses(t *testing.T) {
 		}
 		if named == 0 {
 			t.Errorf("%s: no panel calls the artifact size a floor, so this checks nothing", store)
+		}
+	}
+}
+
+// TestAchievementProgressSaysHowPairExtraordinaireIsCounted: the description
+// said the co-authored count was walked every hour. Since 2.6.0 it is a tally
+// the state file keeps, added to by each hourly pass and walked whole once a
+// week, which is when a count that went down comes down.
+func TestAchievementProgressSaysHowPairExtraordinaireIsCounted(t *testing.T) {
+	t.Parallel()
+	for _, store := range AllStores() {
+		desc := descriptionOf(panelOf(t, store.Build(nil), "Achievement progress", "table"))
+		if strings.Contains(desc, "walked every hour") || !strings.Contains(desc, "state file") ||
+			!strings.Contains(desc, "once a week") {
+			t.Errorf("%s: Achievement progress does not say the co-authored count is a tally "+
+				"walked whole once a week: %q", store.Name, desc)
 		}
 	}
 }

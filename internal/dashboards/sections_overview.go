@@ -211,7 +211,8 @@ func overview(b *builder) []Panel {
 				"archived repositories the default filter sets aside, which the picker " +
 				"stops listing once the last backfill is behind it: people still star and " +
 				"fork them, and each totals sweep reads their counts again, an hour " +
-				"apart by default, so a range shorter than that can leave them out. An " +
+				"apart by default, so where the sums are taken over the dashboard range, " +
+				"a range shorter than that can leave them out. An " +
 				"archived repository the configuration no longer collects is left out, as " +
 				"the picker leaves out a live one: a row written under an earlier " +
 				"configuration stays in the store, but nothing reads that repository's " +
@@ -226,6 +227,9 @@ func overview(b *builder) []Panel {
 				grNamed("B", "Stars", oneEachGR("stars")),
 				grNamed("C", "Forks", oneEachGR("forks")),
 			},
+			PromDesc: "Prometheus takes no range here: each sum is an instant query over " +
+				"the values the running collector pushed last, so the archived repositories " +
+				"count however short the range is, from the collector's first totals sweep on.",
 			GRDesc: grArchivedWindow,
 			ES:     append(countES, reposES...), ESTF: append(countEStf, reposEStf...),
 			ESOpts: Opts{"calc": "sum"},
