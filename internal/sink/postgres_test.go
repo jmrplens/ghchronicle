@@ -92,6 +92,9 @@ type fakeSchema struct {
 	refuse map[string]int
 	// unreadable fails the catalog read that many times.
 	unreadable int
+	// keys is the primary key each table holds before this process met it; a
+	// table missing here has the key its CREATE TABLE declared.
+	keys map[string][]string
 }
 
 func (f *fakeSchema) exec(_ context.Context, ddl string) error {
@@ -114,6 +117,10 @@ func (f *fakeSchema) columns(_ context.Context, table string) (map[string]string
 		return maps.Clone(cols), nil
 	}
 	return map[string]string{"time": "timestamp with time zone", "full_name": "text", "owner": "text"}, nil
+}
+
+func (f *fakeSchema) primaryKey(_ context.Context, table string) ([]string, error) {
+	return slices.Clone(f.keys[table]), nil
 }
 
 // declared runs declareAll and hands back what it sent this time.
@@ -190,6 +197,63 @@ func TestARestartAltersOnlyWhatTheTableLacks(t *testing.T) {
 	}
 	if len(sent) != 2 || sent[1] != `ALTER TABLE "gh_repo" ADD COLUMN IF NOT EXISTS "archived" BOOLEAN;` {
 		t.Errorf("a table an earlier release made without archived got %v, want that one column added", sent)
+	}
+}
+
+// TestTheUpsertConflictsOnTheKeyTheTableHas: a table an earlier release made
+// keeps the key it was made with, and 2.6.1 stopped writing is_answer, which
+// had been a tag of gh_discussion_comment. An ON CONFLICT on the key this
+// release would declare names no unique constraint of that table, and
+// PostgreSQL 18.6 refused the whole batch with "there is no unique or
+// exclusion constraint matching the ON CONFLICT specification". The key is
+// read from the catalog with the columns, and the column the point no longer
+// carries takes the default the table gave it.
+func TestTheUpsertConflictsOnTheKeyTheTableHas(t *testing.T) {
+	t.Parallel()
+	at := time.Date(2026, 9, 1, 10, 0, 0, 0, time.UTC)
+	tags := map[string]string{
+		"author": "a", "comment": "11", "full_name": "o/r", "is_reply": "false",
+		"number": "7", "own": "false", "owner": "o", "repo": "r", "user": "u",
+	}
+	points := []Point{{
+		Measurement: "gh_discussion_comment", Time: at, Tags: tags,
+		Fields: map[string]any{"comments": 1, "answers": 1},
+	}}
+	older := []string{"time", "author", "comment", "full_name", "is_answer", "is_reply", "number", "own", "owner", "repo", "user"}
+	has := map[string]string{"time": "timestamp with time zone", "answers": "bigint", "comments": "bigint"}
+	for _, c := range older[1:] {
+		has[c] = "text"
+	}
+	db := &fakeSchema{
+		has:  map[string]map[string]string{"gh_discussion_comment": has},
+		keys: map[string][]string{"gh_discussion_comment": older},
+	}
+	p := NewPostgres("postgres://ignored", 100)
+	if _, err := db.declared(t, p, points); err != nil {
+		t.Fatal(err)
+	}
+	rows := p.rowsFor(points, sqlShapes(points))
+	if len(rows) != 1 {
+		t.Fatalf("%d rows, want the one", len(rows))
+	}
+	want := `ON CONFLICT ("time", "author", "comment", "full_name", "is_answer", "is_reply", "number", "own", "owner", "repo", "user")`
+	if !strings.Contains(rows[0].statement, want) {
+		t.Errorf("the upsert does not conflict on the table's own key %s:\n%s", want, rows[0].statement)
+	}
+	if columns, _, _ := strings.Cut(rows[0].statement, " VALUES "); strings.Contains(columns, `"is_answer"`) ||
+		strings.Contains(rows[0].statement, `"is_answer" = EXCLUDED`) {
+		t.Errorf("the upsert writes a column the point does not carry:\n%s", rows[0].statement)
+	}
+
+	// A table this process made has the key it declared, and a catalog that
+	// names no key leaves that one in place.
+	fresh := NewPostgres("postgres://ignored", 100)
+	if _, err := (&fakeSchema{}).declared(t, fresh, points); err != nil {
+		t.Fatal(err)
+	}
+	declared := `ON CONFLICT ("time", "author", "comment", "full_name", "is_reply", "number", "own", "owner", "repo", "user")`
+	if got := fresh.rowsFor(points, sqlShapes(points)); !strings.Contains(got[0].statement, declared) {
+		t.Errorf("a table with no key read from the catalog does not conflict on the declared one %s:\n%s", declared, got[0].statement)
 	}
 }
 
