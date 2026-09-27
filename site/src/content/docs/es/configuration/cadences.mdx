@@ -287,9 +287,9 @@ heartbeat explícito no lo es.
 Una familia toca en el primer tic en que su cadencia ha pasado, con medio tic
 de margen. El bucle lee el reloj unos milisegundos después de despertar, en una
 cantidad que cambia de un tic a otro, y sin ese margen una familia cuya cadencia
-es un número entero de tics esperaba un tic de más la mitad de las veces: antes
-de la 2.5.2 las familias de cuarto de hora corrían cada 24 minutos de media y
-las horarias cada 69. Medio tic absorbe eso y nunca deja correr a una familia un
+es un número entero de tics esperaba un tic de más la mitad de las veces: hasta
+la 2.6.0, que trajo la corrección escrita para la 2.5.2, las familias de cuarto
+de hora corrían cada 24 minutos de media y las horarias cada 69. Medio tic absorbe eso y nunca deja correr a una familia un
 tic antes de tiempo.
 
 Un heartbeat **más largo** que la cadencia más corta frena a esa familia, y el
@@ -367,9 +367,15 @@ el turno que tenía.
 
 ## Hacerlas más lentas
 
-Si el presupuesto aprieta, alarga `artifacts` y después `actions`. Son las dos
-únicas cuyo coste crece con lo activos que estén los repositorios y no con
-cuántos haya. Ver [coste de una pasada](/ghchronicle/es/api/cost/).
+Si el presupuesto que se queda corto es `core`, alarga `artifacts` y después
+`actions`, los dos mayores costes REST, que crecen con lo activos que estén los
+repositorios. Si es `graphql`, alarga `issues`, `issueevents` y `commits`, que
+leen solo los repositorios donde algo se movió y por eso cuestan más cuantos
+más se muevan. No son los únicos que siguen a la actividad y no al tamaño:
+`activity` solo se cobra por un repositorio cuyo registro se movió, y
+`outbound` cuesta un punto más por cada centenar adicional de lo que lee. Ver
+[qué crece con la actividad, no con el
+tamaño](/ghchronicle/es/api/cost/#qué-crece-con-la-actividad-no-con-el-tamaño).
 
 El síntoma de unas cadencias demasiado rápidas es un aviso en cada pasada:
 

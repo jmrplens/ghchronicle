@@ -123,7 +123,13 @@ Set it to `false` to collect only public repositories.
 
 ## The discovery cadence
 
-The repository list is rebuilt at most once an hour. Repositories are created
-rarely and listing them costs a page per hundred, so a new repository can take
-up to an hour to enter the sweep. Naming it in `repos` does not change that;
-restarting the process does.
+The repository list is rebuilt once an hour: at the first sweep an hour after
+the last listing, to within half a tick, the margin [a family's
+cadence](/ghchronicle/configuration/cadences/#heartbeat-the-loops-tick-which-is-not-a-cadence)
+gets too. Repositories are created rarely and listing them costs a page per
+hundred, so a new repository can take up to an hour to enter the sweep. Before
+2.6.1 the list had no margin and could outlive the sweep an hour after it by a
+few milliseconds, so at the quarter-hour tick a new repository waited up to an
+hour and a quarter about half the time. Naming it in `repos` does not change
+that; restarting the process does, and so does each `-once`, which lists them
+afresh.

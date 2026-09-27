@@ -45,11 +45,37 @@ pone a cero dejando que el fichero crezca sin límite.
 
 ## Qué dice el log un día bueno
 
+Tomado del servicio del autor el 2026-09-27, un arranque y las líneas de sus
+pasadas:
+
 ```text
-level=INFO msg="repositories discovered" count=18
-level=INFO msg=written sink=influxdb family=traffic points=629
-level=INFO msg="rate budget" bucket=core remaining=4354 limit=5000
+level=INFO msg="ghchronicle running" tick=15m0s tick_from="shortest cadence"
+level=INFO msg="cache file read" file=/var/lib/ghchronicle/state-cache.bin written=2026-09-27T15:27:41+02:00 answers=1170 runs=672 refusals=100 page_sizes=54 age=1s
+level=INFO msg="repositories discovered" count=37 archived_aside=17
+level=INFO msg="slow families due together take turns" starting=planning waiting=settings,traffic
+level=INFO msg=written sink=influxdb family=repo points=934 unchanged=1955
+level=INFO msg="nothing moved since the window, repositories left unread" family=commits repos=34
+level=INFO msg=written sink=influxdb family=commits points=17 unchanged=0
+level=INFO msg="rate budget" bucket=core remaining=4477 limit=5000
+level=INFO msg="points already written and not sent again" sink=influxdb skipped=54511
+level=INFO msg="sweep finished"
 ```
+
+Las dos primeras salen una vez, cuando arranca el proceso: el tic al que
+despierta el bucle, y lo que devolvió [la caché que hay junto al fichero de
+estado](/ghchronicle/es/configuration/#la-caché-que-hay-a-su-lado). La lista de
+repositorios se rehace una vez por hora, y `archived_aside` cuenta los
+archivados [apartados](/ghchronicle/es/configuration/targets/#por-qué-forks-y-archivados-están-apagados-por-omisión),
+que siguen recibiendo sus dos filas. En `written`, `points` es lo que llegó al
+almacén y `unchanged` lo que el registro de escrituras dejó fuera porque el
+almacén ya lo tiene; ver [qué cuenta la línea de
+escritura](/ghchronicle/es/sinks/#qué-cuenta-la-línea-de-escritura). Una
+familia de seis horas o más a la que le toca detrás de otra aparece en
+`waiting`, ver [las familias lentas se
+turnan](/ghchronicle/es/configuration/cadences/#las-familias-lentas-se-turnan),
+y `commits`, `issues` e `issueevents` dicen cuántos repositorios dejaron sin
+leer porque nada se movió en ellos, ver [preguntar primero qué se
+movió](/ghchronicle/es/api/cost/#preguntar-primero-qué-se-movió).
 
 Una familia que aún no toca sencillamente no aparece. Eso es normal, y es lo
 primero que hay que mirar cuando parece faltar una medida: con una cadencia de
@@ -85,13 +111,28 @@ log:
   level: debug
 ```
 
-Debug añade tres líneas, y ninguna más: con cuántos puntos volvió el libro de
-escrituras al arrancar, que las familias de cuenta se saltaron porque
-`targets.user` está vacío, y cuántas entradas dejó fuera un destino por ser más
-antiguas que su horizonte. Esa última es la única forma de ver que un envío se
-recortó en lugar de rechazarse. No hay registro por petición: el cliente de
-`internal/ghapi` no lleva registrador, así que qué endpoint se llamó y qué
-respuesta volvió 304 no se ven en ningún nivel.
+Debug añade siete líneas, y ninguna más:
+
+- `loaded the written-points ledger`, con cuántos puntos volvió el libro de
+  escrituras, cuando arranca el servicio;
+- `no cache file yet, the first pass of each family pays in full`, en el
+  primer arranque con fichero de estado;
+- `not every store keeps a write ledger`, cuando las ejecuciones que recuerda
+  el fichero de caché se vuelven a listar porque un almacén no lleva registro
+  o la ejecución termina con su pasada;
+- `no targets.user, account-wide families skipped`;
+- `sink dropped old entries`, con cuántas entradas dejó fuera un destino por
+  ser más antiguas que su horizonte, la única forma de ver que un envío se
+  recortó en lugar de rechazarse;
+- `card-only sweep, the state file is left as it was`;
+- `cache file saved`, con cuántas respuestas y ejecuciones guarda y cuánto
+  tardó.
+
+No hay registro por petición: el cliente de `internal/ghapi` no lleva
+registrador, así que qué endpoint se llamó y qué respuesta volvió 304 no se ven
+en ningún nivel. Eso incluye su único reintento: una petición REST respondida
+con 502 o 504 se repite dos segundos después, en silencio, así que un
+`collector failed` que nombra un 502 o un 504 ya ha fallado dos veces.
 
 <Aside type="tip" title="JSON para un agente de envío, texto para una persona">
   `format: json` emite un objeto por línea, que es lo que quieren Promtail,
@@ -102,7 +143,7 @@ respuesta volvió 304 no se ven en ningún nivel.
 
 ## No confundir con el colector de logs de jobs
 
-`log` es el diario de la propia herramienta. `every.joblogs` es un _colector_:
+`log` es el diario de la propia herramienta. `every.families.joblogs` es un _colector_:
 recoge las últimas cuarenta líneas de cada job fallido de GitHub Actions y las
 convierte en puntos. Son ajustes sin relación, y el segundo pertenece a un
 almacén de logs y no a una base de datos de métricas. Ver

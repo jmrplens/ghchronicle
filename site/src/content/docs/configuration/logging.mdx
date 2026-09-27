@@ -45,11 +45,37 @@ grow without bound.
 
 ## What the log says on a good day
 
+Taken from the author's service on 2026-09-27, a start and the lines of its
+sweeps:
+
 ```text
-level=INFO msg="repositories discovered" count=18
-level=INFO msg=written sink=influxdb family=traffic points=629
-level=INFO msg="rate budget" bucket=core remaining=4354 limit=5000
+level=INFO msg="ghchronicle running" tick=15m0s tick_from="shortest cadence"
+level=INFO msg="cache file read" file=/var/lib/ghchronicle/state-cache.bin written=2026-09-27T15:27:41+02:00 answers=1170 runs=672 refusals=100 page_sizes=54 age=1s
+level=INFO msg="repositories discovered" count=37 archived_aside=17
+level=INFO msg="slow families due together take turns" starting=planning waiting=settings,traffic
+level=INFO msg=written sink=influxdb family=repo points=934 unchanged=1955
+level=INFO msg="nothing moved since the window, repositories left unread" family=commits repos=34
+level=INFO msg=written sink=influxdb family=commits points=17 unchanged=0
+level=INFO msg="rate budget" bucket=core remaining=4477 limit=5000
+level=INFO msg="points already written and not sent again" sink=influxdb skipped=54511
+level=INFO msg="sweep finished"
 ```
+
+The first two come once, when the process starts: the tick the loop wakes at,
+and what [the cache beside the state
+file](/ghchronicle/configuration/#the-cache-beside-it) gave back. The list of
+repositories is rebuilt once an hour, and `archived_aside` counts the archived
+ones [set aside](/ghchronicle/configuration/targets/#why-forks-and-archived-are-off-by-default),
+which still get their two rows. In `written`, `points` is what reached the
+store and `unchanged` what the write ledger left out because the store already
+holds it; see [what the written line
+counts](/ghchronicle/sinks/#what-the-written-line-counts). A family of six
+hours or more that is due behind another one is named under `waiting`, see
+[the slow families take
+turns](/ghchronicle/configuration/cadences/#the-slow-families-take-turns), and
+`commits`, `issues` and `issueevents` say how many repositories they left
+unread because nothing moved in them, see [asking first what
+moved](/ghchronicle/api/cost/#asking-first-what-moved).
 
 A family that is not due yet simply does not appear. That is normal, and it is
 the first thing to check when a measurement seems to be missing: with a
@@ -86,13 +112,28 @@ log:
   level: debug
 ```
 
-Debug adds three lines, and no more: how many points the written-points ledger
-came back with at start-up, that the account-wide families were skipped because
-`targets.user` is unset, and how many entries a sink left out for being older
-than its horizon. That last one is the only way to see that a push was trimmed
-rather than rejected. There is no per-request log: the client in
-`internal/ghapi` carries no logger, so which endpoint was called and which
-answer came back 304 are not visible at any level.
+Debug adds seven lines, and no more:
+
+- `loaded the written-points ledger`, with how many points it came back with,
+  when the service starts;
+- `no cache file yet, the first pass of each family pays in full`, at the
+  first start with a state file;
+- `not every store keeps a write ledger`, when the runs the cache file
+  remembers are listed again because a store keeps no ledger or the run ends
+  with its sweep;
+- `no targets.user, account-wide families skipped`;
+- `sink dropped old entries`, with how many a sink left out for being older
+  than its horizon, the only way to see that a push was trimmed rather than
+  rejected;
+- `card-only sweep, the state file is left as it was`;
+- `cache file saved`, with how many answers and runs it holds and how long it
+  took.
+
+There is no per-request log: the client in `internal/ghapi` carries no logger,
+so which endpoint was called and which answer came back 304 are not visible at
+any level. That includes its one retry: a REST request answered 502 or 504 is
+asked again two seconds later, silently, so a `collector failed` naming a 502
+or a 504 has already failed twice.
 
 <Aside type="tip" title="JSON for a shipper, text for a person">
   `format: json` emits one object per line, which is what Promtail, Vector or
@@ -103,7 +144,7 @@ answer came back 304 are not visible at any level.
 
 ## Not to be confused with the job log collector
 
-`log` is the tool's own diary. `every.joblogs` is a _collector_: it fetches the
+`log` is the tool's own diary. `every.families.joblogs` is a _collector_: it fetches the
 last forty lines of every failed GitHub Actions job and turns them into points.
 They are unrelated settings, and the second one belongs in a log store rather
 than in a metrics database. See [Loki](/ghchronicle/sinks/loki/).
