@@ -59,7 +59,19 @@ selector deja de ofrecerlo cuando el último relleno histórico queda atrás, pe
 la gente sigue dándole estrellas y haciéndole fork y cada pasada de `totals`
 vuelve a leer sus contadores. Con All seleccionado las sumas lo incluyen, y un
 rango más corto que la cadencia de `totals`, una hora por omisión, puede
-dejar fuera su fila. Elegir repositorios cuenta solo esos. Cada repositorio
+dejar fuera su fila. Un repositorio archivado que la configuración ya no recoge
+se queda fuera, como el selector deja fuera a uno vivo: la fila que escribió un
+relleno histórico con una configuración anterior sigue en el almacén, y en la
+cuenta con la que se comprobó esto un fork archivado así sumaba 8 estrellas y 3
+forks, 393 y 106 donde GitHub daba 385 y 103 para lo que recogen las pasadas.
+Los dashboards SQL cuentan una fila archivada solo de un repositorio con una
+fila de `gh_repo_total` en los últimos siete días, la ventana del propio
+selector. Elasticsearch y Graphite no pueden preguntar eso de una ventana
+mientras leen otra, así que cuentan un repositorio archivado por sus filas de
+los últimos siete días, y un rango que terminó hace más de una semana deja
+fuera los archivados en esos dos. Prometheus solo guarda lo que empuja el
+recolector en marcha, así que no tiene esa fila que dejar fuera. Elegir
+repositorios cuenta solo esos. Cada repositorio
 cuenta una vez, por su nombre completo: dos repositorios del mismo nombre de
 dos dueños son dos, y uno archivado mientras el recolector funciona no se
 cuenta a la vez por su fila viva y por la archivada. El recuento de
@@ -117,7 +129,13 @@ forks debajo sin dejar ninguno fuera. Con All seleccionado lista también los
 repositorios archivados que el filtro por omisión aparta, con sus contadores
 actuales, los ofrezca o no el selector: ninguna pasada les escribe fila de
 `gh_repo`, que es lo que lista el selector, pero la misma fila de cada uno se
-vuelve a leer en cada pasada de `totals`. Un repositorio archivado dentro del
+vuelve a leer en cada pasada de `totals`. Uno que la configuración ya no recoge
+se queda fuera, como en el Overview. Cada fila es la más reciente del
+repositorio dentro del rango, una por nombre completo, y no el valor más alto
+que alcanzó cada columna en él: estrellas, ramas, etiquetas, releases e issues
+abiertos bajan, y una tabla de máximos daba a un repositorio 4 estrellas por la
+fila de un relleno histórico de hacía nueve días donde GitHub y su fila más
+reciente decían 3. Un repositorio archivado dentro del
 rango tiene filas de antes del archivado y de después, y sigue siendo una fila
 en todos los almacenes, marcada como archivada.
 
@@ -488,11 +506,21 @@ Los dos paneles de caché van del techo. GitHub limita cada repositorio a diez
 gigabytes y expulsa la entrada menos usada al pasarlo, así que la barra es cada
 repositorio contra ese tope y el panel se lee por lo que queda de margen; la
 tabla de entradas dice qué clave se está tirando y cuál lleva una semana sin
-tocarse. Cada fila de esa tabla es una caché de un repositorio: su instantánea
-más reciente en cada ref del rango, sumadas, así que Entries cuenta las
-entradas que guarda GitHub y no las filas que leyó la tabla. Es la misma suma
-en los cinco almacenes; Graphite muestra solo el tamaño, porque una tabla de
-Graphite se queda con una columna.
+tocarse. Cada fila de esa tabla es una caché de un repositorio tal como está:
+las filas del último día del rango en que el recolector leyó las cachés de ese
+repositorio, una por ref, sumadas, así que Entries cuenta las entradas que
+guarda GitHub y no las filas que leyó la tabla. Una ref que GitHub expulsó
+conserva su última fila en el almacén, y sumar la fila más reciente de cada ref
+del rango la contaba: en la cuenta con la que se comprobó esto, una caché daba
+128 entradas y 9,46 GiB en 108 refs donde el día más reciente, y GitHub,
+tenían 44 y 3,08 GiB en 24. InfluxDB, PostgreSQL y Elasticsearch leen el día
+más reciente de cada repositorio. Graphite no puede encontrarlo, así que lee el
+último día UTC del rango: su tabla está vacía desde la medianoche UTC hasta la
+primera pasada de `actions` del día, y muestra solo el tamaño, porque una tabla
+de Graphite se queda con una columna. Prometheus guarda el último valor
+empujado de cada ref, así que una ref expulsada sigue contando ahí hasta que el
+exportador la descarta un día después o, empujada por OTLP, hasta que el
+proceso se reinicia.
 
 Lee `gh_billing_usage`, `gh_actions_cache` y `gh_actions_cache_entry`.
 
@@ -612,7 +640,7 @@ cada recolocación bifurcaría la serie. El filtro de repositorio de la cabecera
 del dashboard no llega a ese panel: un fijado puede ser un gist, que se nombra
 por su hash y no está en ningún repositorio que el filtro conozca.
 
-Los logros se leen una vez al día de la página pública del perfil, porque
+Los logros se leen cada hora de la página pública del perfil, porque
 ninguna API los lista. "Next tier at" es el umbral observado por la comunidad
 (Schweinepriester/github-profile-achievements) y no un número que GitHub
 publique, así que la última columna dice si la página del perfil coincide con

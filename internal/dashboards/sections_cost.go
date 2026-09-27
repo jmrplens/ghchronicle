@@ -79,31 +79,6 @@ func cost(b *builder) []Panel {
 		},
 		[]string{"NOT repo.keyword:" + noneElasticsearch})
 
-	// A row of gh_actions_cache_entry is one cache on one ref, a daily
-	// snapshot with its entries already summed into it, so every store reads
-	// each ref's newest row in the range and adds those up per cache, which
-	// is what the SQL does with ROW_NUMBER. Graphite carries each ref's last
-	// value to the end of the range before adding. Elasticsearch cannot take
-	// the newest of a bucket and sum it in one aggregation, so it takes the
-	// newest document of each ref and the panel adds them: a sum over the
-	// documents would add one snapshot for every day in the range.
-	ce := "gh_actions_cache_entry"
-	entryGR, entryGRtf := gTbl(fmt.Sprintf(`groupByNodes(keepLastValue(%s), "sum", %d, %d)`,
-		rp(ce, "size_bytes"), gn(ce, "repo"), gn(ce, "cache")),
-		"Repository, cache", []col{{"lastNotNull", "Size"}})
-	entryES, entryEStf := esTbl(ce,
-		[]any{b.tm("repo", 500), b.tm("cache", 50), b.tm("ref", 500)},
-		[]any{b.mNewest("size_bytes", "caches", "days_since_use")},
-		[]named{
-			{panelRepoField, "Repository"},
-			{"cache.keyword", "Cache"},
-			{"ref.keyword", "Ref"},
-			{"s", "Size"},
-			{"n", "Entries"},
-			{"d", costCacheIdle},
-		}, []string{ESF}, groupRows([]string{"Repository", "Cache"},
-			map[string]string{"Size": "sum", "Entries": "sum", costCacheIdle: "min"})...)
-
 	cacheGR, cacheGRtf := gTbl(rowsOf("keepLastValue("+rp("gh_actions_cache", "size_bytes")+")",
 		gn("gh_actions_cache", "repo")), "Repository", []col{{"lastNotNull", "Cache"}})
 	cacheES, cacheEStf := esTbl("gh_actions_cache", []any{b.tm("repo", 500)},
@@ -202,32 +177,7 @@ func cost(b *builder) []Panel {
 			GRDesc: "Graphite names each row repository and SKU from the path. " + grRows,
 			ES:     byRepoES, ESTF: byRepoEStf,
 		}),
-		panel("table", "Cache entries by key", box{W: 24, H: 8, X: 0, Y: 21}, []Target{sqlT(
-			`SELECT cache AS "Cache", SUM(size_bytes) AS "Size", repo AS "Repository",` +
-				` SUM(caches) AS "Entries",` +
-				` MIN(days_since_use) AS "` + costCacheIdle + `" FROM (` +
-				"SELECT repo, cache, ref, size_bytes, caches, days_since_use," +
-				" ROW_NUMBER() OVER (PARTITION BY repo, cache, ref ORDER BY time DESC) AS rn" +
-				" FROM gh_actions_cache_entry WHERE $__timeFilter(time) AND " + RF +
-				") x WHERE rn = 1 GROUP BY 1, 3 ORDER BY 2 DESC LIMIT 25",
-		)}, &P{
-			Prom: []Target{
-				promTbl(fmt.Sprintf("topk(25, sum by (repo, cache) (github_actions_cache_entry_size_bytes{%s}))", PF), "A"),
-				promTbl(fmt.Sprintf("min by (repo, cache) (github_actions_cache_entry_days_since_use{%s})", PF), "B"),
-				promTbl(fmt.Sprintf("sum by (repo, cache) (github_actions_cache_entry_caches{%s})", PF), "C"),
-			},
-			PromTF: merged(map[string]string{
-				"repo": "Repository", "cache": "Cache", panelValueA: "Size",
-				panelValueB: costCacheIdle, panelValueC: "Entries",
-			}, nil, map[string]int{"repo": 0, "cache": 1}),
-			Opts: Opts{"sort": "Size"},
-			Desc: "The total says a repository holds twelve gigabytes. This says which key " +
-				"holds them and which has not been touched for a week, which is what decides " +
-				"what GitHub evicts at the ten gigabyte ceiling.",
-			Overrides: []any{unitOf("Size", "bytes", 120), barCell("Entries", "short", 100)},
-			GR:        entryGR, GRTF: entryGRtf, GRDesc: grRows,
-			ES: entryES, ESTF: entryEStf,
-		}),
+		cacheEntries(b),
 		panel("table", "Cache against the ceiling", box{W: 24, H: 8, X: 0, Y: 29}, []Target{sqlT(
 			`SELECT repo AS "Repository", MAX(size_bytes) AS "Cache",` +
 				` MAX(count) AS "Entries"` +
@@ -265,4 +215,90 @@ func cost(b *builder) []Panel {
 			ES: cacheES, ESTF: cacheEStf,
 		}),
 	}
+}
+
+// cacheEntries is "Cache entries by key", out of cost for the length of what
+// its five queries have to say.
+func cacheEntries(b *builder) Panel {
+	// A row of gh_actions_cache_entry is one cache on one ref, its entries
+	// already summed into it, stamped at the start of the UTC day and
+	// rewritten through the day. It is what GitHub holds now, so the panel
+	// reads each repository's newest snapshot and nothing older: the rows of
+	// the last day in the range the collector read that repository's caches.
+	// Each ref's newest row, which is what this summed until 2.6.0 was
+	// checked against GitHub, kept every ref GitHub had evicted since, at its
+	// size on the last day it was listed. Measured on 2026-09-27 over thirty
+	// days: jmrplens/gitlab-mcp-server's golangci-lint read 128 entries and
+	// 9.46 GiB over 108 refs, the oldest row from 2026-09-18, where the rows
+	// of that day held 44 entries and 3.08 GiB over 24 refs, byte for byte
+	// what GitHub listed under that cache's keys. The rows share one
+	// timestamp a day, so the newest snapshot is the rows at a repository's
+	// newest timestamp.
+	//
+	// Elasticsearch takes the same rows with a terms bucket on the timestamp
+	// under each repository, the newest one kept, and sums the caches under
+	// it. Graphite cannot find each repository's newest day, so it reads the
+	// last UTC day of the range: summarize makes a point a day, the refs with
+	// nothing on the last one are dropped, and what is left is added up per
+	// cache. The -1 is a stand-in for "nothing that day", since filterSeries
+	// reads the last value that is not null, and a size is never below zero.
+	// consolidateBy keeps a long range drawn on a narrow screen reading the
+	// last day rather than the mean of the last two, and it names the series
+	// after itself, so aliasByNode names each row by its repository and cache
+	// again, the two nodes groupByNodes left.
+	ce := "gh_actions_cache_entry"
+	lastDay := fmt.Sprintf(`removeBelowValue(filterSeries(transformNull(summarize(%s, "1d", "last"), -1),`+
+		` "last", ">=", 0), 0)`, rp(ce, "size_bytes"))
+	entryGR, entryGRtf := gTbl(rowsOf(fmt.Sprintf(`consolidateBy(groupByNodes(%s, "sum", %d, %d), "last")`,
+		lastDay, gn(ce, "repo"), gn(ce, "cache")), 0, 1),
+		"Repository, cache", []col{{"lastNotNull", "Size"}})
+	entryES, entryEStf := esTbl(ce,
+		[]any{b.tm("repo", 500), b.terms("@timestamp", 1, "_key", "desc"), b.tm("cache", 50)},
+		[]any{b.mSum("size_bytes"), b.mSum("caches"), b.mMin("days_since_use")},
+		[]named{
+			{panelRepoField, "Repository"},
+			{"cache.keyword", "Cache"},
+			{"s", "Size"},
+			{"n", "Entries"},
+			{"d", costCacheIdle},
+		}, []string{ESF}, hideColumns("@timestamp"))
+
+	return panel("table", "Cache entries by key", box{W: 24, H: 8, X: 0, Y: 21}, []Target{sqlT(
+		`SELECT cache AS "Cache", SUM(size_bytes) AS "Size", repo AS "Repository",` +
+			` SUM(caches) AS "Entries",` +
+			` MIN(days_since_use) AS "` + costCacheIdle + `" FROM (` +
+			"SELECT time, repo, cache, size_bytes, caches, days_since_use," +
+			" MAX(time) OVER (PARTITION BY full_name) AS newest" +
+			" FROM gh_actions_cache_entry WHERE $__timeFilter(time) AND " + RF +
+			") x WHERE time = newest GROUP BY 1, 3 ORDER BY 2 DESC LIMIT 25",
+	)}, &P{
+		Prom: []Target{
+			promTbl(fmt.Sprintf("topk(25, sum by (repo, cache) (github_actions_cache_entry_size_bytes{%s}))", PF), "A"),
+			promTbl(fmt.Sprintf("min by (repo, cache) (github_actions_cache_entry_days_since_use{%s})", PF), "B"),
+			promTbl(fmt.Sprintf("sum by (repo, cache) (github_actions_cache_entry_caches{%s})", PF), "C"),
+		},
+		PromTF: merged(map[string]string{
+			"repo": "Repository", "cache": "Cache", panelValueA: "Size",
+			panelValueB: costCacheIdle, panelValueC: "Entries",
+		}, nil, map[string]int{"repo": 0, "cache": 1}),
+		Opts: Opts{"sort": "Size"},
+		Desc: "The total says a repository holds twelve gigabytes. This says which key " +
+			"holds them and which has not been touched for a week, which is what decides " +
+			"what GitHub evicts at the ten gigabyte ceiling. It is what each repository " +
+			"holds now: the entries of its newest snapshot in the range, the last day " +
+			"the collector read its caches, and none of the refs GitHub has evicted " +
+			"since an earlier one.",
+		PromDesc: "In Prometheus each ref is the value last pushed for it, and a ref GitHub " +
+			"evicted is never pushed again: the exporter drops it a day after the last " +
+			"sweep that listed it, and the OTLP sink sends it again until the process " +
+			"restarts, so until then it still counts here.",
+		Overrides: []any{unitOf("Size", "bytes", 120), barCell("Entries", "short", 100)},
+		GR:        entryGR, GRTF: entryGRtf,
+		GRDesc: "Graphite cannot find each repository's newest day, so it reads the last " +
+			"UTC day of the range: from midnight UTC until the day's first pass of the " +
+			"`actions` family, within a quarter of an hour at the default cadence, the " +
+			"table is empty, and a repository that pass could not read is missing from it. " +
+			grRows,
+		ES: entryES, ESTF: entryEStf,
+	})
 }

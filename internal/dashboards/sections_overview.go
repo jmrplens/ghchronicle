@@ -138,7 +138,13 @@ func overview(b *builder) []Panel {
 	// disagree with both by whatever lies between the two sweeps: half a day,
 	// when totals still ran every twelve hours. Under All every store lets the
 	// archived rows through, the SQL ones by RFA and the rest by a wildcard;
-	// with repositories picked, only those count.
+	// with repositories picked, only those count. Only the rows of a
+	// repository the collector still writes, though, for the reason RFA gives:
+	// the SQL stores ask the picker's own question of gh_repo_total, and
+	// Elasticsearch and Graphite, which cannot, keep the archived rows of the
+	// last seven days. Prometheus needs neither: an instant query sees what
+	// the running collector pushed in the last five minutes, and a repository
+	// it does not collect is not among it.
 	//
 	// One row per full_name and not per repo, which is a name two owners can
 	// both use: alice/.github and acme/.github are two repositories with stars
@@ -159,12 +165,12 @@ func overview(b *builder) []Panel {
 			` or github_repo_total_%[1]s{archived="true",%[2]s}))`, field, PF)
 	}
 	oneEachGR := func(field string) string {
-		named := func(m, archived string) string {
-			return fmt.Sprintf("aliasByNode(keepLastValue(%s), %d)",
-				rp(m, field, "archived", archived), gn(m, "full_name"))
+		named := func(path, m string) string {
+			return fmt.Sprintf("aliasByNode(keepLastValue(%s), %d)", path, gn(m, "full_name"))
 		}
 		return fmt.Sprintf(`sumSeries(groupByNode(group(%s, %s), 0, "max"))`,
-			named("gh_repo", "false"), named(rt, "true"))
+			named(rp("gh_repo", field, "archived", "false"), "gh_repo"),
+			named(grCollected(rp(rt, field, "archived", "true")), rt))
 	}
 	countES, countEStf := esTbl("gh_account", []any{b.one()}, []any{b.mNewest("public_repos")},
 		[]named{{"public_repos", "Repositories"}}, nil)
@@ -205,7 +211,11 @@ func overview(b *builder) []Panel {
 				"archived repositories the default filter sets aside, which the picker " +
 				"stops listing once the last backfill is behind it: people still star and " +
 				"fork them, and each totals sweep reads their counts again, an hour " +
-				"apart by default, so a range shorter than that can leave them out. Each " +
+				"apart by default, so a range shorter than that can leave them out. An " +
+				"archived repository the configuration no longer collects is left out, as " +
+				"the picker leaves out a live one: a row written under an earlier " +
+				"configuration stays in the store, but nothing reads that repository's " +
+				"counts any more. Each " +
 				"repository counts once, by its full name. The repository count is GitHub's " +
 				"own count of the account's public repositories and not the set the sums " +
 				"are taken over: those are the repositories the sweeps collect and the " +
@@ -216,8 +226,10 @@ func overview(b *builder) []Panel {
 				grNamed("B", "Stars", oneEachGR("stars")),
 				grNamed("C", "Forks", oneEachGR("forks")),
 			},
-			ES: append(countES, reposES...), ESTF: append(countEStf, reposEStf...),
+			GRDesc: grArchivedWindow,
+			ES:     append(countES, reposES...), ESTF: append(countEStf, reposEStf...),
 			ESOpts: Opts{"calc": "sum"},
+			ESDesc: esArchivedWindow,
 		}),
 		statGroup("Traffic in range", box{W: 8, H: 4, X: 8, Y: brandHeight}, []Target{sqlT(
 			"SELECT " + trafficSQL("views", "count") + ` AS "Views", ` +

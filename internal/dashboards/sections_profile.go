@@ -51,9 +51,9 @@ func profileSection(b *builder) []Panel {
 }
 
 // achievements is the badge shelf of the profile: one row per badge, its
-// tier and the color GitHub gives the tier. A daily snapshot read from the
-// profile page, since no API lists them, so the newest row per badge is the
-// shelf as last seen.
+// tier and the color GitHub gives the tier. A snapshot a day, read from the
+// profile page every hour since no API lists them, so the newest row per
+// badge is the shelf as last seen.
 func achievements(b *builder) Panel {
 	const ac = "gh_achievement"
 	rows := `SELECT name AS "Achievement", tier_number AS "Tier", tier_name AS "Level",` +
@@ -78,7 +78,7 @@ func achievements(b *builder) Panel {
 		PromTF: []any{organize(map[string]string{"achievement": "Achievement", "Value": "Tier"}, []string{"user"}, nil)},
 		Opts:   Opts{"sort": "Tier"},
 		Desc: "The badges on the profile, highest tier first: Pull Shark, Pair " +
-			"Extraordinaire, YOLO and the rest, read once a day from the public " +
+			"Extraordinaire, YOLO and the rest, read every hour from the public " +
 			"profile page because no API lists them. Tier is the number on the " +
 			"badge's label, one where it has none; Level is the color GitHub gives " +
 			"that tier. Empty until the achievements family has run once.",
@@ -152,7 +152,7 @@ func achievementProgress(b *builder) Panel {
 			"the badge today: merged pull requests for Pull Shark, accepted discussion " +
 			"answers for Galaxy Brain, the stars on the most starred repository for " +
 			"Starstruck, and merged pull requests in public repositories with a " +
-			"co-authored commit for Pair Extraordinaire, walked once a day. Next tier " +
+			"co-authored commit for Pair Extraordinaire, walked every hour. Next tier " +
 			"at is the community-observed threshold (Schweinepriester/github-profile-" +
 			"achievements), and Progress is Count against it, full at the top tier. " +
 			"Tier is what the count implies; Page agrees says whether the profile page " +

@@ -33,6 +33,12 @@ the median. The same audit found two things the store said wrong, fixed here
 too: the entries of one Actions cache on one ref overwrote each other, and a
 502 from a slow listing cost a repository its artifact storage row.
 
+2.5.2 was never released on its own. Its changes, the Loki sentences, the
+outbound searches past a hundred, the archived repositories in the totals, the
+threads commented elsewhere and a scheduler that ran families a tick late,
+ship in this release: they are in the
+[2.5.2 section of the changelog](https://github.com/jmrplens/ghchronicle/blob/v2.6.0/CHANGELOG.md#252---2026-09-26).
+
 - **Outbound rows say how large the change was and whether the repository
   is private.** `gh_external_contribution` said where a contribution went and
   what became of it, and nothing about the change or the repository, although
@@ -310,8 +316,8 @@ too: the entries of one Actions cache on one ref overwrote each other, and a
   and the last time it was let start, so a family whose every pass fails does
   not take every turn. Once two have run in different sweeps they stay apart,
   so the wait is paid once, and at worst it is a tick for each other slow
-  family: 2h45m for the last of the twelve at the built-in cadences, 3h15m
-  with `deps` and `history` on at a day. A configuration with more slow
+  family: 2h30m for the last of the eleven at the built-in cadences, 3h with
+  `deps` and `history` on at a day. A configuration with more slow
   families than one a tick can start within their cadences starts the fewest
   that fit. `-once` still runs every family that is due, having no next tick
   to leave one for, and a backfill, a card and the sweep that primes the
@@ -423,6 +429,101 @@ too: the entries of one Actions cache on one ref overwrote each other, and a
   cache file, now runs `totals` before the pull requests, whatever its
   cadence says.
 
+These were found by checking this release, deployed, against GitHub panel by
+panel, and are fixed before the tag:
+
+- **The Overview counts an archived repository only while the collector
+  reads it.** With All selected, the stars and forks let every archived
+  `gh_repo_total` row in the range through, however old, where a live
+  repository counts only while the picker lists it, which is while a sweep has
+  written its `gh_repo` in the last seven days. Measured on 2026-09-27 against
+  the production store over the default thirty days:
+  jmrplens/portainer-mcp-enhanced, an archived fork this configuration does
+  not collect, with `include_forks` off, had one row, from a backfill on
+  2026-09-18 under an earlier configuration, and added 8 stars and 3 forks,
+  so the tile read 393 and 106 where GitHub gives 385 and 103 for what the
+  sweeps collect: 305 and 79 for the 37 live repositories and 80 and 24 for
+  the 17 archived ones set aside. An archived row now counts only for a
+  repository with a `gh_repo_total` row in those same seven days, which every
+  `totals` sweep writes for one set aside, an hour apart by default. InfluxDB
+  and PostgreSQL ask that of the repository, as the picker does, so a range
+  that ended a month ago still counts one the collector reads today; the query
+  now gives 385 and 103 against production. Elasticsearch and Graphite cannot
+  ask one window about another, so they keep the archived rows of the last
+  seven days, and a range that ended more than a week ago leaves the archived
+  repositories out there, which their panels say. Prometheus needs nothing: an
+  instant query sees what the running collector pushed in the last five
+  minutes. ([#78](https://github.com/jmrplens/ghchronicle/issues/78))
+- **"Every repository, ever" is each repository's newest row.** It took
+  `MAX()` of every column over the range, grouped by the short name, and
+  stars, branches, tags, releases and open issues go down: on the same day
+  jmrplens/FFT2octave read 4 stars, from that backfill's row of 2026-09-18,
+  where GitHub and its newest row said 3, and it listed
+  portainer-mcp-enhanced as well. The SQL stores now keep each repository's
+  newest row in the range, one per `full_name`, so two owners' repositories
+  of one name are two rows, with the Overview's rule for archived ones; commits
+  and merges only grow, so they read as before, and the link is the newest
+  row's. InfluxDB 3.11.5 refused the row numbering and the `IN` of that rule
+  in one `SELECT` over `gh_repo_total` ("Window schema has wrong number of
+  fields") and answers with the filter a level below, so that is where it
+  sits.
+  Against production the table lists 54 repositories, FFT2octave at 3 stars
+  and portainer-mcp-enhanced not at all. Elasticsearch buckets by the full
+  name, and hides the column, where it bucketed by the short name, and keeps
+  the archived documents of the last seven days; Graphite keeps the archived
+  points of the last seven days; Prometheus already read each series' current
+  value.
+- **"Cache entries by key" is what each repository holds now.** It added up
+  each ref's newest row anywhere in the range, and a ref whose caches GitHub
+  evicted keeps its last row: jmrplens/gitlab-mcp-server's `golangci-lint`
+  read 128 entries and 9.46 GiB over 108 refs, the oldest row from
+  2026-09-18, more than `gh_actions_cache`, GitHub's own total, gave the whole
+  repository, 87 entries and 9.96 GiB. The rows are stamped at the start of
+  the UTC day and rewritten through it, and the panel now reads only those of
+  the last day in the range the collector read a repository's caches: in
+  InfluxDB and PostgreSQL the rows at each repository's newest timestamp, in
+  Elasticsearch a terms bucket on the timestamp under each repository that
+  keeps the newest, where it read each ref's newest document. Against
+  production the query gives `golangci-lint` 44 entries and 3,312,061,861
+  bytes over 24 refs, byte for byte what GitHub lists for its
+  `golangci-lint-` keys; `?key=golangci-lint` matches by prefix and also
+  lists the 20 entries of `golangci-lint.cache-Linux-2959` and `-2960`, 64
+  and 3.94 GiB in all, which the table shows as caches of their own. Graphite
+  cannot find each repository's newest day, so it reads the last UTC day of
+  the range, and its table is empty from midnight UTC until the day's first
+  `actions` pass; it used to carry each evicted ref to the end of the range.
+  Prometheus holds the value last pushed for each ref, so an evicted one
+  counts there until the exporter drops it a day later or, pushed over OTLP,
+  until the process restarts, and the panel says so there.
+  ([#91](https://github.com/jmrplens/ghchronicle/issues/91))
+- **`-list` says what a sweep writes for an archived repository set aside.**
+  It printed `(archived: the archive date only; a backfill collects it)`
+  beside each, which stopped being true when 2.5.2 began writing its
+  `gh_repo_total` row on every `totals` sweep, as the first production run of
+  this release showed. It now prints
+  `(archived: its archive date and lifetime totals; a backfill collects the rest)`.
+- **The achievements are read every hour.** The family ran once a day because
+  every pass walked the whole merged history, 18 to 24 MB. Since the
+  co-authored count is kept, a pass is the profile page, 36 KB and off the
+  budget, and two GraphQL points for the pull requests merged since the day
+  before, about 48 points a day at the hour. At a day, a tier reached in the
+  morning waited for the next night: on 2026-09-27 the account had 16 accepted
+  answers and GitHub showed Galaxy Brain silver, while the dashboard showed
+  bronze from the 15 of the night's pass. The whole history is still walked
+  once a week, and the rows are still one a day, rewritten until it ends. Out
+  of the families of six hours or more, it no longer takes turns, which is
+  what brings the longest wait above to 2h30m.
+  ([#90](https://github.com/jmrplens/ghchronicle/issues/90))
+
+Each of the three panel fixes carries a test shown to fail against the
+queries before it, in every store it holds: the statement or query each store
+is sent, read offline, and for the archived rule an evaluation of the Graphite
+targets over an account holding a repository nothing has written for nine
+days. The containerised suite writes the three kinds of stale row into
+InfluxDB 3.11.2 beside a sweep, and against the dashboards before the fixes it
+read 91 stars for 83, listed the repository nobody collects, gave the set-aside
+one 8 stars for 3 and a cache 9 entries for 4; after them, none of these.
+
 Measured on 2026-09-26 against the live API with this account's token: the
 five outbound searches cost a point a page with every new field and without
 them, over 102 items in 51 repositories, the answer growing from 35.9 KB to
@@ -506,7 +607,8 @@ binary against the fake GitHub as well as the sink's own.
 
 Not verified, and worth saying plainly:
 
-- None of it has run in production. The cost of the new cadences is projected
+- Production has run it for hours, not days: long enough for the panels to be
+  checked against GitHub, as above. The cost of the new cadences is projected
   from 2.5.1's request log, not read from 2.6.0 running them, and so is what
   the audit's fixes save: every saving above is that log with the waste
   counted out, and the first day after the upgrade is the first reading of
@@ -522,7 +624,7 @@ Not verified, and worth saying plainly:
   is for 2.6.0's own request log to say.
 - The turns were seen in the loop's tests and in a simulated week, not in
   production, where the first day after the upgrade spreads the daily
-  families over up to 3h15m. Whether they stay apart after that is read from
+  families over up to 3h. Whether they stay apart after that is read from
   the state file of the days that follow.
 - A co-authored count that goes down, because a repository was made private
   or deleted, and a cache listing that loses an entry while it is read have

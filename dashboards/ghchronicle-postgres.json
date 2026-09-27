@@ -64,7 +64,7 @@
     },
     {
       "datasource": "${DS_POSTGRES}",
-      "description": "Public repositories of the account, and the current stars and forks of the selected ones, summed over the newest row of each repository rather than over every row in the range. With All selected that includes the archived repositories the default filter sets aside, which the picker stops listing once the last backfill is behind it: people still star and fork them, and each totals sweep reads their counts again, an hour apart by default, so a range shorter than that can leave them out. Each repository counts once, by its full name. The repository count is GitHub's own count of the account's public repositories and not the set the sums are taken over: those are the repositories the sweeps collect and the archived ones above, private ones included, and forks left out unless `include_forks` is on.",
+      "description": "Public repositories of the account, and the current stars and forks of the selected ones, summed over the newest row of each repository rather than over every row in the range. With All selected that includes the archived repositories the default filter sets aside, which the picker stops listing once the last backfill is behind it: people still star and fork them, and each totals sweep reads their counts again, an hour apart by default, so a range shorter than that can leave them out. An archived repository the configuration no longer collects is left out, as the picker leaves out a live one: a row written under an earlier configuration stays in the store, but nothing reads that repository's counts any more. Each repository counts once, by its full name. The repository count is GitHub's own count of the account's public repositories and not the set the sums are taken over: those are the repositories the sweeps collect and the archived ones above, private ones included, and forks left out unless `include_forks` is on.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -120,7 +120,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT SUM(stars) AS \"Stars\", SUM(forks) AS \"Forks\" FROM (SELECT full_name, stars, forks FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn FROM (SELECT time, full_name, stars, forks FROM gh_repo WHERE $__timeFilter(time) AND archived = 'false' AND repo IN (${repo:sqlstring}) UNION ALL SELECT time, full_name, stars, forks FROM gh_repo_total WHERE $__timeFilter(time) AND archived = 'true' AND (repo IN (${repo:sqlstring}) OR (archived = 'true' AND '${repo:text}' = 'All'))) u) x WHERE rn = 1)",
+          "rawSql": "SELECT SUM(stars) AS \"Stars\", SUM(forks) AS \"Forks\" FROM (SELECT full_name, stars, forks FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn FROM (SELECT time, full_name, stars, forks FROM gh_repo WHERE $__timeFilter(time) AND archived = 'false' AND repo IN (${repo:sqlstring}) UNION ALL SELECT time, full_name, stars, forks FROM gh_repo_total WHERE $__timeFilter(time) AND archived = 'true' AND (repo IN (${repo:sqlstring}) OR (archived = 'true' AND '${repo:text}' = 'All' AND full_name IN (SELECT full_name FROM gh_repo_total WHERE time \u003e now() - INTERVAL '7 days' AND archived = 'true')))) u) x WHERE rn = 1)",
           "refId": "B"
         }
       ],
@@ -388,7 +388,7 @@
         },
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "The whole life of each repository in one row: not what happened in the dashboard range, but everything there has ever been. The repository picker holds the repositories the sweeps collect: forks too when `include_forks` is on, and archived ones when `include_archived` is on and for a while after a backfill, which collects them either way. A count here is over every repository the picker holds until it is narrowed. Sorted by commits, a fork of a busy project outranks anything the account wrote, 370,296 commits against 3,385 on the account this was measured on, so the table opens with the account's own repositories first and the forks under them, both ranked by commits. The fork and archived flags are columns here rather than a filter, the title being what it is, and a click on either sorts by it. With All selected the archived repositories the picker does not list are here too, with their current counts: the default filter walks none of their history, but every totals sweep reads this row of each of them again.",
+          "description": "The whole life of each repository in one row: not what happened in the dashboard range, but everything there has ever been. The repository picker holds the repositories the sweeps collect: forks too when `include_forks` is on, and archived ones when `include_archived` is on and for a while after a backfill, which collects them either way. A count here is over every repository the picker holds until it is narrowed. Sorted by commits, a fork of a busy project outranks anything the account wrote, 370,296 commits against 3,385 on the account this was measured on, so the table opens with the account's own repositories first and the forks under them, both ranked by commits. The fork and archived flags are columns here rather than a filter, the title being what it is, and a click on either sorts by it. Each row is the repository's newest reading in the range, so a count that went down, a star taken back or a branch deleted, reads as it stands and not as its highest. With All selected the archived repositories the picker does not list are here too, with their current counts, as long as the collector still reads them: the default filter walks none of their history, but every totals sweep reads this row of each of them again, and one the configuration no longer collects is left out.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -492,7 +492,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT repo AS \"Repository\", MAX(commits) AS \"Commits\", MAX(fork) AS \"Fork\", MAX(archived) AS \"Archived\", MAX(pulls_merged) AS \"Merged\", MAX(issues) AS \"Issues\", MAX(releases) AS \"Releases\", MAX(stars) AS \"Stars\", MAX(branches) AS \"Branches\", MAX(tags) AS \"Tags\", MAX(url) AS \"Link\" FROM gh_repo_total WHERE $__timeFilter(time) AND (repo IN (${repo:sqlstring}) OR (archived = 'true' AND '${repo:text}' = 'All')) GROUP BY 1 ORDER BY 2 DESC",
+              "rawSql": "SELECT repo AS \"Repository\", commits AS \"Commits\", fork AS \"Fork\", archived AS \"Archived\", pulls_merged AS \"Merged\", issues AS \"Issues\", releases AS \"Releases\", stars AS \"Stars\", branches AS \"Branches\", tags AS \"Tags\", url AS \"Link\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn FROM (SELECT time, full_name, repo, commits, fork, archived, pulls_merged, issues, releases, stars, branches, tags, url FROM gh_repo_total WHERE $__timeFilter(time) AND (repo IN (${repo:sqlstring}) OR (archived = 'true' AND '${repo:text}' = 'All' AND full_name IN (SELECT full_name FROM gh_repo_total WHERE time \u003e now() - INTERVAL '7 days' AND archived = 'true')))) f) x WHERE rn = 1 ORDER BY 2 DESC",
               "refId": "A"
             }
           ],
@@ -12151,7 +12151,7 @@
         },
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "The total says a repository holds twelve gigabytes. This says which key holds them and which has not been touched for a week, which is what decides what GitHub evicts at the ten gigabyte ceiling.",
+          "description": "The total says a repository holds twelve gigabytes. This says which key holds them and which has not been touched for a week, which is what decides what GitHub evicts at the ten gigabyte ceiling. It is what each repository holds now: the entries of its newest snapshot in the range, the last day the collector read its caches, and none of the refs GitHub has evicted since an earlier one.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -12252,7 +12252,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT cache AS \"Cache\", SUM(size_bytes) AS \"Size\", repo AS \"Repository\", SUM(caches) AS \"Entries\", MIN(days_since_use) AS \"Days since use\" FROM (SELECT repo, cache, ref, size_bytes, caches, days_since_use, ROW_NUMBER() OVER (PARTITION BY repo, cache, ref ORDER BY time DESC) AS rn FROM gh_actions_cache_entry WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1 GROUP BY 1, 3 ORDER BY 2 DESC LIMIT 25",
+              "rawSql": "SELECT cache AS \"Cache\", SUM(size_bytes) AS \"Size\", repo AS \"Repository\", SUM(caches) AS \"Entries\", MIN(days_since_use) AS \"Days since use\" FROM (SELECT time, repo, cache, size_bytes, caches, days_since_use, MAX(time) OVER (PARTITION BY full_name) AS newest FROM gh_actions_cache_entry WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE time = newest GROUP BY 1, 3 ORDER BY 2 DESC LIMIT 25",
               "refId": "A"
             }
           ],
@@ -16254,7 +16254,7 @@
         },
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "The badges on the profile, highest tier first: Pull Shark, Pair Extraordinaire, YOLO and the rest, read once a day from the public profile page because no API lists them. Tier is the number on the badge's label, one where it has none; Level is the color GitHub gives that tier. Empty until the achievements family has run once.",
+          "description": "The badges on the profile, highest tier first: Pull Shark, Pair Extraordinaire, YOLO and the rest, read every hour from the public profile page because no API lists them. Tier is the number on the badge's label, one where it has none; Level is the color GitHub gives that tier. Empty until the achievements family has run once.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -16363,7 +16363,7 @@
         },
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "How far each tiered badge is from its next tier. Count is what decides the badge today: merged pull requests for Pull Shark, accepted discussion answers for Galaxy Brain, the stars on the most starred repository for Starstruck, and merged pull requests in public repositories with a co-authored commit for Pair Extraordinaire, walked once a day. Next tier at is the community-observed threshold (Schweinepriester/github-profile-achievements), and Progress is Count against it, full at the top tier. Tier is what the count implies; Page agrees says whether the profile page shows the same tier, and a row that disagrees is a rule the page contradicts, so it carries no target and no bar. The single-tier badges are on the shelf above. Empty until the achievements family has run once.",
+          "description": "How far each tiered badge is from its next tier. Count is what decides the badge today: merged pull requests for Pull Shark, accepted discussion answers for Galaxy Brain, the stars on the most starred repository for Starstruck, and merged pull requests in public repositories with a co-authored commit for Pair Extraordinaire, walked every hour. Next tier at is the community-observed threshold (Schweinepriester/github-profile-achievements), and Progress is Count against it, full at the top tier. Tier is what the count implies; Page agrees says whether the profile page shows the same tier, and a row that disagrees is a rule the page contradicts, so it carries no target and no bar. The single-tier badges are on the shelf above. Empty until the achievements family has run once.",
           "fieldConfig": {
             "defaults": {
               "custom": {

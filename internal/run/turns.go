@@ -50,11 +50,11 @@ const slowCadence = 6 * time.Hour
 // others at most once, because a family let start is then due a whole cadence
 // later, past every family already waiting. With n slow families and one start
 // a sweep the worst wait is therefore n-1 ticks, and it happens only to the
-// last of n families due in the same sweep. The built-in table has twelve
-// families of six hours or more, eleven ticks at the quarter hour tick they
-// give, 2h45m; the production account also names deps and history, fourteen
-// and 3h15m; and all three families that ship switched off named at a day or
-// more make fifteen, 3h30m.
+// last of n families due in the same sweep. The built-in table has eleven
+// families of six hours or more, ten ticks at the quarter hour tick they
+// give, 2h30m; the production account also names deps and history, thirteen
+// and 3h; and all three families that ship switched off named at a day or
+// more make fourteen, 3h15m.
 func (r *Runner) takeTurns(now time.Time) {
 	r.held = nil
 	if !r.serving || r.prime || r.Backfill {

@@ -90,6 +90,18 @@ const (
 	esNewest  = "In Elasticsearch this lists the newest 500 documents and the panel sorts them."
 	esPerRepo = "In Elasticsearch the rows are per repository as well, because the newest snapshot is taken per repository."
 
+	// What the two say where they keep the archived rows of the last seven
+	// days in place of asking whether the collector still writes the
+	// repository: see esCollectedWindow in query.go.
+	esArchivedWindow = "In Elasticsearch an archived repository counts from its documents of the " +
+		"last seven days, since a query here cannot ask whether the collector still writes " +
+		"a repository while it reads the range, so a range that ended more than a week ago " +
+		"leaves the archived ones out."
+	grArchivedWindow = "In Graphite an archived repository counts from its points of the last " +
+		"seven days, since a target here cannot ask whether the collector still writes a " +
+		"repository while it reads the range, so a range that ended more than a week ago " +
+		"leaves the archived ones out."
+
 	// What a store says when the InfluxDB table links each row to its page
 	// and this one cannot: the exporter carries no url and Graphite keeps
 	// no string, so the column is not there to draw. Elasticsearch keeps

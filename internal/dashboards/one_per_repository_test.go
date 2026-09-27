@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/jmrplens/ghchronicle/v2/internal/grafana"
 )
@@ -23,6 +24,9 @@ type overviewRepo struct {
 	live, stale *[2]float64
 	// totals are its gh_repo_total series, by the archived tag they carry.
 	totals map[string][2]float64
+	// age is how long before the end of the range its series were last
+	// written: zero for a repository the collector reads every sweep.
+	age time.Duration
 }
 
 // overviewAccount is an account with everything the sums have to get right at
@@ -169,10 +173,25 @@ func overviewPromSeries() []promSample {
 	return out
 }
 
+// overviewGone is an archived repository the collector no longer writes: an
+// archived fork that a backfill under an earlier configuration read nine days
+// before the end of the range, as one read jmrplens/portainer-mcp-enhanced on
+// 2026-09-18, and that nothing has read since. Its one row is still in the
+// store, and it is not the account's.
+var overviewGone = overviewRepo{
+	owner: "bob", name: "gone", totals: map[string][2]float64{"true": {8, 3}},
+	age: 9 * 24 * time.Hour,
+}
+
 // overviewGraphiteSeries is overviewAccount as the Graphite sink writes it:
 // one path per series, a node per tag in the order tags.go gives, each value
 // made a node the way the sink makes it.
 func overviewGraphiteSeries() []grSeries {
+	return graphiteSeriesOf(overviewAccount)
+}
+
+// graphiteSeriesOf is overviewGraphiteSeries for any list of repositories.
+func graphiteSeriesOf(repos []overviewRepo) []grSeries {
 	node := regexp.MustCompile(`[^A-Za-z0-9_:-]`)
 	var out []grSeries
 	add := func(m string, r overviewRepo, archived string, v [2]float64) {
@@ -186,10 +205,13 @@ func overviewGraphiteSeries() []grSeries {
 			parts = append(parts, node.ReplaceAllString(values[tag], "_"))
 		}
 		for i, field := range overviewFields {
-			out = append(out, grSeries{strings.Join(append(slices.Clone(parts), field), "."), overviewValue(field, v, i)})
+			out = append(out, grSeries{
+				name:  strings.Join(append(slices.Clone(parts), field), "."),
+				value: overviewValue(field, v, i), age: r.age,
+			})
 		}
 	}
-	for _, r := range overviewAccount {
+	for _, r := range repos {
 		if r.live != nil {
 			add("gh_repo", r, "false", *r.live)
 		}
@@ -476,10 +498,13 @@ func aggregate(how string, by []string, in []promSample) []promSample {
 // ── A Graphite evaluator for the functions these panels use ──────────────────
 
 // grSeries is one Graphite series reduced to the value keepLastValue leaves at
-// the end of the range, which is the value a stat of it draws.
+// the end of the range, which is the value a stat of it draws, and how long
+// before the end of the range that value was written, which is what timeSlice
+// reads.
 type grSeries struct {
 	name  string
 	value float64
+	age   time.Duration
 }
 
 // evalGraphite evaluates a target made of paths and the functions the two
@@ -520,6 +545,8 @@ func (p *exprParser) graphite(series []grSeries) []grSeries {
 	switch word {
 	case "keepLastValue", "group", "removeEmptySeries":
 		return in
+	case "timeSlice":
+		return p.sliced(in, args)
 	case "alias":
 		out := slices.Clone(in)
 		for i := range out {
@@ -543,31 +570,73 @@ func (p *exprParser) graphite(series []grSeries) []grSeries {
 		for _, s := range in {
 			total += s.value
 		}
-		return []grSeries{{"sumSeries", total}}
-	case "groupByNode", "groupByNodes":
-		// groupByNode(series, node, how) and groupByNodes(series, how, node...).
-		how, nodes := args[len(args)-1], args[:len(args)-1]
-		if word == "groupByNodes" {
-			how, nodes = args[0], args[1:]
-		}
-		samples := make([]promSample, len(in))
-		for i, s := range in {
-			parts := strings.Split(s.name, ".")
-			var key []string
-			for _, a := range nodes {
-				n, _ := strconv.Atoi(a)
-				key = append(key, parts[n])
-			}
-			samples[i] = promSample{map[string]string{"key": strings.Join(key, ".")}, s.value}
-		}
-		var out []grSeries
-		for _, g := range aggregate(how, []string{"key"}, samples) {
-			out = append(out, grSeries{g.labels["key"], g.value})
-		}
-		return out
+		return []grSeries{{name: "sumSeries", value: total, age: newestOf(in)}}
+	case "groupByNode":
+		// groupByNode(series, node, how).
+		return grouped(in, args[len(args)-1], args[:len(args)-1])
+	case "groupByNodes":
+		// groupByNodes(series, how, node...).
+		return grouped(in, args[0], args[1:])
 	}
 	p.t.Fatalf("%s: no evaluator for %s()", p.s, word)
 	return nil
+}
+
+// sliced is timeSlice(series, "-Nd"), which nulls every point before N days
+// ago, so a series last written before then has nothing left to carry.
+func (p *exprParser) sliced(in []grSeries, args []string) []grSeries {
+	p.t.Helper()
+	if len(args) != 1 {
+		p.t.Fatalf("%s: timeSlice(%v) is not a start N days back", p.s, args)
+	}
+	days, err := strconv.Atoi(strings.TrimSuffix(strings.TrimPrefix(args[0], "-"), "d"))
+	if err != nil {
+		p.t.Fatalf("%s: timeSlice(%v) is not a start N days back", p.s, args)
+	}
+	var kept []grSeries
+	for _, s := range in {
+		if s.age <= time.Duration(days)*24*time.Hour {
+			kept = append(kept, s)
+		}
+	}
+	return kept
+}
+
+// grouped is groupByNode and groupByNodes: the series that share the nodes
+// named become one, reduced by how, and named by those nodes.
+func grouped(in []grSeries, how string, nodes []string) []grSeries {
+	samples := make([]promSample, len(in))
+	members := map[string][]grSeries{}
+	for i, s := range in {
+		parts := strings.Split(s.name, ".")
+		var key []string
+		for _, a := range nodes {
+			n, _ := strconv.Atoi(a)
+			key = append(key, parts[n])
+		}
+		joined := strings.Join(key, ".")
+		samples[i] = promSample{map[string]string{"key": joined}, s.value}
+		members[joined] = append(members[joined], s)
+	}
+	var out []grSeries
+	for _, g := range aggregate(how, []string{"key"}, samples) {
+		key := g.labels["key"]
+		out = append(out, grSeries{name: key, value: g.value, age: newestOf(members[key])})
+	}
+	return out
+}
+
+// newestOf is when the newest of several series was last written, which is
+// when a series made of them was.
+func newestOf(in []grSeries) time.Duration {
+	if len(in) == 0 {
+		return 0
+	}
+	newest := in[0].age
+	for _, s := range in[1:] {
+		newest = min(newest, s.age)
+	}
+	return newest
 }
 
 // globbed is every series a path matches, node by node.
@@ -599,9 +668,9 @@ func globbed(pattern string, series []grSeries) []grSeries {
 // archived one inside the range. Since a sweep writes the archived row of a
 // repository the default filter sets aside, that is every archive, and a
 // table that listed a row per tag set showed it twice, once as live with the
-// counts it had before. The SQL stores take MAX(archived), true for it; the
-// others are held to the same answer here: one row for it, archived, with
-// the newer counts.
+// counts it had before. The SQL stores take its newest row, which is the
+// archived one; the others are held to the same answer here: one row for it,
+// archived, with the newer counts.
 func TestEveryRepositoryEverListsARepositoryArchivedInsideTheRangeOnce(t *testing.T) {
 	t.Parallel()
 	for _, store := range AllStores() {
@@ -644,11 +713,86 @@ func checkEveryRepositoryTarget(t *testing.T, store string, target map[string]an
 			}
 		}
 	default:
-		if sql := target["rawSql"].(string); !strings.Contains(sql, `MAX(archived) AS "Archived"`) {
-			t.Errorf("%s: Every repository, ever does not take MAX(archived):\n%s", store, sql)
+		if sql := target["rawSql"].(string); !newestRowEach.MatchString(sql) {
+			t.Errorf("%s: Every repository, ever does not read the newest row of each "+
+				"repository, so one archived inside the range is not one row flagged "+
+				"archived:\n%s", store, sql)
 		}
 	}
 }
+
+// TestEveryRepositoryEverReadsEachRepositorysNewestRow is what checking 2.6.0
+// against GitHub panel by panel found in the Lifetime table: it took MAX() of
+// every column over the range, and stars, branches, tags, releases and open
+// issues go down, so it drew the range's peak as the count. Measured on
+// 2026-09-27 over thirty days, jmrplens/FFT2octave read 4 stars, from a
+// backfill's row of 2026-09-18, where GitHub and its newest row said 3. Each
+// store is held to the newest row of each repository, one per full name, in
+// its own terms: the SQL stores number the rows of each full name newest first,
+// keep the first and take no column's MAX(); Elasticsearch buckets by the full
+// name and reads the newest document of each; Prometheus asks instant queries,
+// which answer each series' current value. Graphite draws commits alone, which
+// only grow, as each series' last value, and groups by the full name, which
+// the test above evaluates.
+func TestEveryRepositoryEverReadsEachRepositorysNewestRow(t *testing.T) {
+	t.Parallel()
+	peak := regexp.MustCompile(`\bMAX\((commits|pulls_merged|issues|releases|stars|branches|tags)\)`)
+	for _, store := range AllStores() {
+		p := panelOf(t, store.Build(nil), "Every repository, ever", "table")
+		for _, raw := range p["targets"].([]any) {
+			target := raw.(map[string]any)
+			switch store.Name {
+			case "influxdb", "postgres":
+				sql, _ := target["rawSql"].(string)
+				if m := peak.FindString(sql); m != "" || !newestRowEach.MatchString(sql) {
+					t.Errorf("%s: Every repository, ever does not read each repository's newest "+
+						"row (takes %q):\n%s", store.Name, m, sql)
+				}
+			case "elasticsearch":
+				checkNewestPerFullName(t, target)
+			case "prometheus":
+				if target["instant"] != true {
+					t.Errorf("prometheus: %v is not an instant query, so it is not the current value", target["expr"])
+				}
+			}
+		}
+	}
+}
+
+// checkNewestPerFullName holds the Elasticsearch target of Every repository,
+// ever to a bucket per full name, so that alice/.github and acme/.github are
+// two rows, and to the newest document of each.
+func checkNewestPerFullName(t *testing.T, target map[string]any) {
+	t.Helper()
+	buckets, _ := target["bucketAggs"].([]any)
+	if len(buckets) == 0 || buckets[0].(map[string]any)["field"] != "full_name.keyword" {
+		t.Errorf("elasticsearch: Every repository, ever buckets first by %v, want one row per "+
+			"full name", bucketFieldsOf(buckets))
+	}
+	metrics, _ := target["metrics"].([]any)
+	for _, raw := range metrics {
+		m := raw.(map[string]any)
+		settings, _ := m["settings"].(map[string]any)
+		if m["type"] != "top_metrics" || settings["order"] != "desc" || settings["orderBy"] != "@timestamp" {
+			t.Errorf("elasticsearch: Every repository, ever reads %v, want the newest document", m)
+		}
+	}
+}
+
+// bucketFieldsOf names the fields of a list of bucket aggregations, for a message.
+func bucketFieldsOf(buckets []any) []any {
+	out := make([]any, len(buckets))
+	for i, raw := range buckets {
+		b, _ := raw.(map[string]any)
+		out[i] = b["field"]
+	}
+	return out
+}
+
+// newestRowEach is a statement that keeps the newest row of each repository,
+// by its full name, and draws the Archived column from that row.
+var newestRowEach = regexp.MustCompile(`(?s)^SELECT .*\barchived AS "Archived".*` +
+	`ROW_NUMBER\(\) OVER \(PARTITION BY full_name ORDER BY time DESC\) AS rn.*\) x WHERE rn = 1\b`)
 
 // overviewRow is one row of a table as the checks below read it: the
 // repository it names, whether it says archived where the store can say, and

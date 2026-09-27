@@ -2,6 +2,7 @@ package dashboards
 
 import (
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
@@ -70,12 +71,14 @@ func checkArchivedAdmitted(t *testing.T, store string, vars grafana.Vars, p map[
 
 // archivedAdmitted is, for one store, the measurement a query has to read to
 // see the archived repositories set aside, and the repository filter as it
-// renders under All, which has to let them through.
+// renders under All, which has to let them through. The SQL filter goes on to
+// ask whether the collector still writes the repository, which the test below
+// holds it to.
 func archivedAdmitted(store string) (reads string, admits *regexp.Regexp) {
 	literal := func(s string) *regexp.Regexp { return regexp.MustCompile(regexp.QuoteMeta(s)) }
 	switch store {
 	case "influxdb", "postgres":
-		return "FROM gh_repo_total", literal("OR (archived = 'true' AND 'All' = 'All')")
+		return "FROM gh_repo_total", literal("OR (archived = 'true' AND 'All' = 'All' AND ")
 	case "prometheus":
 		return "github_repo_total_", literal(`repo=~\".*\"`)
 	case "graphite":
@@ -86,6 +89,116 @@ func archivedAdmitted(store string) (reads string, admits *regexp.Regexp) {
 	default:
 		return "_index:ghchronicle-gh_repo_total", literal("repo.keyword:*")
 	}
+}
+
+// TestAnArchivedRepositoryNoLongerCollectedIsLeftOut is the other half of the
+// rule above, found by checking 2.6.0 in production against GitHub. Under All
+// an archived row was let through however old it was, so the one row of an
+// archived repository the collector no longer writes counted for as long as
+// the range held it: jmrplens/portainer-mcp-enhanced, an archived fork that
+// `include_forks` off leaves out, had one gh_repo_total row, from a backfill
+// under an earlier configuration nine days before, and it added 8 stars and 3
+// forks to the Overview and a row to "Every repository, ever". An archived
+// row now counts only where the collector still writes the repository, which
+// is the question the picker asks of a live one.
+//
+// Graphite is evaluated over overviewAccount and overviewGone. The SQL stores
+// are held to asking the picker's own question, in the picker's own window, of
+// gh_repo_total, since only a store can evaluate a statement and the
+// containerised suite has one run it; Elasticsearch to the window it keeps in
+// its place. Prometheus is not asked: an instant query sees what the running
+// collector pushed in the last five minutes, and a repository it does not
+// collect is not among it, so overviewGone is not a series it could hold.
+func TestAnArchivedRepositoryNoLongerCollectedIsLeftOut(t *testing.T) {
+	t.Parallel()
+	account := graphiteSeriesOf(append(slices.Clone(overviewAccount), overviewGone))
+	for _, store := range AllStores() {
+		doc := store.Build(nil)
+		allValue, _ := store.Variable["allValue"].(string)
+		vars := grafana.Vars{Datasource: store.DS, Repos: []string{"hello-world"}, AllValue: allValue}
+		collected := setAsideCollectedIn(t, store)
+		checked := 0
+		for _, p := range []map[string]any{
+			panelOf(t, doc, "Repositories", "stat"),
+			panelOf(t, doc, "Every repository, ever", "table"),
+		} {
+			for _, raw := range p["targets"].([]any) {
+				target := vars.Apply(raw.(map[string]any))
+				if !strings.Contains(asJSON(t, target), "repo_total") {
+					continue // the repository count, which is the account's own row
+				}
+				checked++
+				switch store.Name {
+				case "prometheus":
+				case "graphite":
+					checkGoneGraphite(t, p["title"], target["target"].(string), account)
+				default:
+					checkGoneAsked(t, store.Name, p["title"], target, collected)
+				}
+			}
+		}
+		if checked == 0 {
+			t.Errorf("%s: no target reads gh_repo_total, so this checks nothing", store.Name)
+		}
+	}
+}
+
+// checkGoneGraphite evaluates one Graphite target over an account holding
+// overviewGone: the Overview's sums have to be the account's without it, and
+// a table must not list it.
+func checkGoneGraphite(t *testing.T, title any, expr string, account []grSeries) {
+	t.Helper()
+	rows := evalGraphiteSeries(t, expr, account)
+	if name := regexp.MustCompile(`, "([^"]+)"\)$`).FindStringSubmatch(expr); name != nil {
+		if len(rows) != 1 || rows[0].value != overviewWant[name[1]] {
+			t.Errorf("graphite: the Overview's %s are %v over an account with %v, "+
+				"counting a repository nothing has written for nine days", name[1], rows, overviewWant[name[1]])
+		}
+		return
+	}
+	for _, r := range rows {
+		if r.name == overviewGone.name {
+			t.Errorf("graphite: %q lists %s, which nothing has written for nine days: %v",
+				title, overviewGone.name, rows)
+		}
+	}
+}
+
+// checkGoneAsked holds a SQL or Elasticsearch target to asking, of an
+// archived row, what setAsideCollectedIn says that store asks. The statement
+// or the Lucene query itself is read, since the JSON of the target escapes the
+// comparison the window is made of.
+func checkGoneAsked(t *testing.T, store string, title any, target map[string]any, collected string) {
+	t.Helper()
+	query, _ := target["rawSql"].(string)
+	if store == "elasticsearch" {
+		query, _ = target["query"].(string)
+	}
+	if !strings.Contains(query, collected) {
+		t.Errorf("%s %q lets an archived row through without asking whether the "+
+			"collector still writes its repository, want %s:\n%s", store, title, collected, query)
+	}
+}
+
+// setAsideCollectedIn is what a query of one store has to say to count an
+// archived row only where the collector still writes its repository. For the
+// SQL stores that is the picker's own window, read out of the variable's
+// query, put to gh_repo_total; Elasticsearch has no such question, so it is
+// the window of documents it keeps instead.
+func setAsideCollectedIn(t *testing.T, store Store) string {
+	t.Helper()
+	switch store.Name {
+	case "influxdb", "postgres":
+		definition, _ := store.Variable["definition"].(string)
+		window := regexp.MustCompile(`WHERE (time > now\(\) - INTERVAL '[^']+')`).FindStringSubmatch(definition)
+		if window == nil {
+			t.Fatalf("%s: the picker's query %q names no window", store.Name, definition)
+		}
+		return "full_name IN (SELECT full_name FROM gh_repo_total WHERE " + window[1] + " AND archived = 'true')"
+	case "elasticsearch":
+		return "@timestamp:[now-7d TO *]"
+	}
+	return ""
 }
 
 // panelOf is the one panel of the dashboard with this title and type. The

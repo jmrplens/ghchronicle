@@ -24,13 +24,28 @@ const (
 	ESF = "repo.keyword:${repo:lucene}"
 )
 
+// pickerWindow is how far back the repository picker of the two SQL stores
+// looks: it lists the repositories with a gh_repo row inside it, which the
+// `repo` family writes every hour for each repository the sweeps collect.
+const pickerWindow = "time > now() - INTERVAL '7 days'"
+
 // RFA is RF for gh_repo_total, the one measurement a sweep writes for a
 // repository set aside for being archived. The picker of the SQL stores lists
-// the repositories with a gh_repo row in the last seven days, and no sweep
+// the repositories with a gh_repo row inside pickerWindow, and no sweep
 // writes one for a repository set aside: only a backfill does, so a week after
 // the last one RF would leave every one of them out of the account's totals.
 // Under All an archived row passes as well; with repositories picked, only
 // those do, as everywhere else.
+//
+// Not every archived row, though: only one of a repository the collector
+// still writes, which is setAsideCollected. The row of an archived repository
+// the configuration no longer collects stays in the store, and under All it
+// passed for as long as the range held it. Measured on 2026-09-27 against the
+// production store over thirty days: jmrplens/portainer-mcp-enhanced, an
+// archived fork that `include_forks` off leaves out, had one gh_repo_total
+// row, from a backfill on 2026-09-18 under an earlier configuration, and it
+// added 8 stars and 3 forks to the Overview's 385 and 103 and a row to "Every
+// repository, ever".
 //
 // "All" is the variable's text rather than its value, because the SQL
 // variables have no allValue and All expands to the list itself: the text
@@ -40,7 +55,22 @@ const (
 // quote, so the text cannot break out of the literal. The other three stores
 // need nothing of the kind: their All is a wildcard, and a wildcard matches
 // the archived repositories already.
-const RFA = "(" + RF + " OR (archived = 'true' AND '${repo:text}' = 'All'))"
+const RFA = "(" + RF + " OR (archived = 'true' AND '${repo:text}' = 'All' AND " + setAsideCollected + "))"
+
+// setAsideCollected is the picker's own test put to an archived repository set
+// aside by the filter: a gh_repo_total row inside pickerWindow, which every
+// `totals` sweep writes for it, an hour apart by default, so a week is a
+// margin and not a cadence. It asks for the repository and not for the row,
+// the way the picker does, so a range that ended a month ago still counts a
+// repository set aside that the collector reads today.
+//
+// A statement that numbers its rows with a window has to take this filter in
+// a subquery of its own: InfluxDB 3.11.5 refused the window and the IN in
+// one SELECT over gh_repo_total ("Window schema has wrong number of fields.
+// Expected 31 got 30", measured on 2026-09-27), and answered with the filter
+// one level down.
+const setAsideCollected = "full_name IN (SELECT full_name FROM gh_repo_total WHERE " +
+	pickerWindow + " AND archived = 'true')"
 
 // Stores names each store as the prose refers to it.
 var Stores = map[string]string{
@@ -510,10 +540,27 @@ func lq(m string, clauses ...string) string {
 
 // liveOrArchivedES is liveOrArchived's documents: a live repository's out of
 // gh_repo and an archived one's out of gh_repo_total, in one query so that a
-// terms bucket per full_name takes the newest of either.
+// terms bucket per full_name takes the newest of either. An archived one's
+// only from inside esCollectedWindow, for the reason RFA gives.
 func liveOrArchivedES() string {
-	return fmt.Sprintf("((_index:%s AND archived.keyword:false) OR (_index:%s AND archived.keyword:true)) AND %s",
-		idx("gh_repo"), idx("gh_repo_total"), ESF)
+	return fmt.Sprintf("((_index:%s AND archived.keyword:false) OR (_index:%s AND archived.keyword:true AND %s)) AND %s",
+		idx("gh_repo"), idx("gh_repo_total"), esCollectedWindow, ESF)
+}
+
+// esCollectedWindow and grCollected are setAsideCollected in the two stores
+// that cannot ask it, as close as each can come. Both ask whether a repository
+// has a row inside pickerWindow of one table while reading another window, a
+// join neither store has, so each keeps the archived rows of the last seven
+// days instead, and the newest of those is the one the SQL stores read for a
+// range that reaches the present. A range that ended more than a week ago holds
+// none, and the repositories set aside drop out of it, which the panels say.
+const esCollectedWindow = "@timestamp:[now-7d TO *]"
+
+// grCollected keeps the points of a Graphite path from the last seven days:
+// timeSlice sets every point before its start to null, so a series whose last
+// point is older has nothing left for keepLastValue to carry.
+func grCollected(path string) string {
+	return fmt.Sprintf(`timeSlice(%s, "-7d")`, path)
 }
 
 func esq(m string, metrics, buckets []any, ref string, where []string, alias string) Target {
@@ -546,6 +593,7 @@ func (b *builder) mCount() any        { return b.metric("count", "", nil) }
 func (b *builder) mSum(f string) any  { return b.metric("sum", f, nil) }
 func (b *builder) mAvg(f string) any  { return b.metric("avg", f, nil) }
 func (b *builder) mMax(f string) any  { return b.metric("max", f, nil) }
+func (b *builder) mMin(f string) any  { return b.metric("min", f, nil) }
 func (b *builder) mUniq(f string) any { return b.metric("cardinality", f+".keyword", nil) }
 
 func (b *builder) mPct(f string, percents ...int) any {
@@ -837,26 +885,20 @@ func groupSum(by, value, nameBy, nameValue string) []any {
 	}
 }
 
-// groupRows is groupSum for more than one column to group by and more than a
-// sum: the rows that share every column in `by` become one, and each column in
-// `reduce` is reduced by the calculation it names and keeps its own name.
-func groupRows(by []string, reduce map[string]string) []any {
-	fields := map[string]any{}
-	rename := map[string]any{}
-	for _, name := range by {
-		fields[name] = map[string]any{"operation": "groupby", "aggregations": []any{}}
+// hideColumns drops columns a table's query returns only to be grouped by: the
+// full name an Elasticsearch table buckets on so that two owners' repositories
+// of one name are two rows, while the row is named by the short name the other
+// stores show. It runs after esTbl's own organize, which leaves a column it
+// was not asked to rename under the name the response parser gave it.
+func hideColumns(names ...string) any {
+	exclude := map[string]any{}
+	for _, name := range names {
+		exclude[name] = true
 	}
-	for name, how := range reduce {
-		fields[name] = map[string]any{"operation": "aggregate", "aggregations": []any{how}}
-		rename[name+" ("+how+")"] = name
-	}
-	return []any{
-		map[string]any{"id": "groupBy", "options": map[string]any{"fields": fields}},
-		map[string]any{"id": "organize", "options": map[string]any{
-			"excludeByName": map[string]any{}, "indexByName": map[string]any{},
-			"renameByName": rename,
-		}},
-	}
+	return map[string]any{"id": "organize", "options": map[string]any{
+		"excludeByName": exclude, "indexByName": map[string]any{},
+		"renameByName": map[string]any{},
+	}}
 }
 
 // esSnapshotStack is a per-repository snapshot drawn as history: the largest

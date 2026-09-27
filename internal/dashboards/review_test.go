@@ -640,15 +640,25 @@ func TestNewFieldsAreShown(t *testing.T) {
 	}
 }
 
-// TestGroupingNeverSplitsOnTheURL: a repository renamed inside the range has
-// two urls, and a GROUP BY that included it was two rows.
+// TestGroupingNeverSplitsOnTheURL: a repository whose url changed inside the
+// range has two, and a GROUP BY that included it was two rows. Clone
+// amplification takes MAX(url) over its grouping. Every repository, ever
+// takes the url of each repository's newest row, since checking 2.6.0 against
+// GitHub found its MAX() of every column reading counts that had gone down at
+// their peak, and the rows it numbers are partitioned by the full name alone.
+// Neither splits a repository on its url.
 func TestGroupingNeverSplitsOnTheURL(t *testing.T) {
 	t.Parallel()
 	panels := rendered(t, "influxdb")
-	for _, title := range []string{"Every repository, ever", "Clone amplification"} {
+	splits := regexp.MustCompile(`GROUP BY 1, \d|PARTITION BY [^)]*\burl\b`)
+	for title, takes := range map[string]string{
+		"Every repository, ever": `url AS "Link" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name`,
+		"Clone amplification":    "MAX(url)",
+	} {
 		sql := sqlOf(t, mustPanel(t, panels, title))
-		if !strings.Contains(sql, "MAX(url)") || regexp.MustCompile(`GROUP BY 1, \d`).MatchString(sql) {
-			t.Errorf("%s groups on the url: %s", title, sql)
+		if !strings.Contains(sql, takes) || splits.MatchString(sql) {
+			t.Errorf("%s groups on the url, or does not take it the way that keeps one row "+
+				"per repository (%s): %s", title, takes, sql)
 		}
 	}
 }

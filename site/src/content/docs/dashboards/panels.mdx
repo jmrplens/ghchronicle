@@ -52,7 +52,18 @@ default filter sets aside for being archived gets no `gh_repo` row from a sweep,
 so the picker stops offering it once the last backfill is behind it, but people
 still star and fork it and every `totals` sweep reads its counts again. With
 All selected the sums include it, and a range shorter than the `totals`
-cadence, an hour by default, can leave its row out. Picking repositories
+cadence, an hour by default, can leave its row out. An archived repository the
+configuration no longer collects is left out, as the picker leaves out a live
+one: a row a backfill wrote under an earlier configuration stays in the store,
+and on the account this was checked against one such archived fork added 8
+stars and 3 forks, 393 and 106 where GitHub gave 385 and 103 for what the
+sweeps collect. The SQL dashboards count an archived row only for a repository
+with a `gh_repo_total` row in the last seven days, the picker's own window.
+Elasticsearch and Graphite cannot ask that of one window while reading
+another, so they count an archived repository from its rows of the last seven
+days, and a range that ended more than a week ago leaves the archived ones out
+there. Prometheus holds only what the running collector pushes, so it has no
+such row to leave out. Picking repositories
 counts those alone. Each repository counts once, by its full name: two owners'
 repositories of the same name are two, and one archived while the collector
 runs is not counted under both its live row and its archived one. The
@@ -108,7 +119,12 @@ own repositories on the first screen and the forks under them without leaving
 one out. With All selected it lists the archived repositories the default
 filter sets aside as well, with their current counts, whether or not the picker
 offers them: a sweep writes them no `gh_repo` row, which is what the picker
-lists, but the same row of each is read again on every `totals` sweep. A
+lists, but the same row of each is read again on every `totals` sweep. One the
+configuration no longer collects is left out, as on the Overview. Each row is
+the repository's newest in the range, one per full name, and not the largest
+value each column reached in it: stars, branches, tags, releases and open
+issues go down, and a table of peaks gave a repository 4 stars from a
+backfill's row nine days old where GitHub and its newest row said 3. A
 repository archived inside the range has rows from before the archive and
 after it, and is still one row in every store, flagged archived.
 
@@ -461,10 +477,20 @@ The two cache panels are about the ceiling. GitHub caps a repository at ten
 gigabytes and evicts the least recently used entry past it, so the bar is each
 repository against that cap and the panel is read for the distance left; the
 entry table says which key is being thrown away and which has not been touched
-for a week. Each row of that table is one cache of one repository: its newest
-snapshot on every ref in the range, added up, so Entries counts the entries
-GitHub holds and not the rows the table read. It is the same sum in the five
-stores; Graphite shows the size alone, since a Graphite table keeps one column.
+for a week. Each row of that table is one cache of one repository as it stands:
+the rows of the last day in the range the collector read that repository's
+caches, one per ref, added up, so Entries counts the entries GitHub holds and
+not the rows the table read. A ref GitHub evicted keeps its last row in the
+store, and adding each ref's newest row in the range counted it: on the
+account this was checked against, one cache read 128 entries and 9.46 GiB over
+108 refs where the newest day, and GitHub, held 44 and 3.08 GiB over 24.
+InfluxDB, PostgreSQL and Elasticsearch read each repository's newest day.
+Graphite cannot find it, so it reads the last UTC day of the range: its table
+is empty from midnight UTC until the day's first `actions` pass, and it shows
+the size alone, since a Graphite table keeps one column. Prometheus holds the
+value last pushed for each ref, so an evicted ref still counts there until the
+exporter drops it a day later, or, pushed over OTLP, until the process
+restarts.
 
 Reads `gh_billing_usage`, `gh_actions_cache` and `gh_actions_cache_entry`.
 
@@ -580,7 +606,7 @@ rearrangement would fork the series. The repository filter at the top of the
 dashboard does not reach that panel: a pin can be a gist, which is named by its
 hash and is in no repository the filter knows.
 
-The achievements are read once a day from the public profile page, because no
+The achievements are read every hour from the public profile page, because no
 API lists them. Next tier at is the community-observed threshold
 (Schweinepriester/github-profile-achievements) rather than a number GitHub
 publishes, so the last column says whether the profile page agrees with the

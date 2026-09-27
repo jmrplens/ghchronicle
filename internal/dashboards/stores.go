@@ -66,8 +66,8 @@ const storeDescLead = "Every metric GitHub will give about an account, kept with
 // AllStores is every dashboard this generates, in the order the files are
 // written.
 func AllStores() []Store {
-	influxRepos := "SELECT DISTINCT repo FROM gh_repo WHERE time > now() - INTERVAL '7 days'"
-	pgRepos := "SELECT DISTINCT repo FROM gh_repo WHERE time > now() - INTERVAL '7 days' ORDER BY 1"
+	influxRepos := "SELECT DISTINCT repo FROM gh_repo WHERE " + pickerWindow
+	pgRepos := "SELECT DISTINCT repo FROM gh_repo WHERE " + pickerWindow + " ORDER BY 1"
 	promRepos := "label_values(github_repo_stars, repo)"
 	// The repository node of gh_repo: every other node is a wildcard, and the
 	// find query returns the names at the last one.

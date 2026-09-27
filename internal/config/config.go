@@ -677,8 +677,8 @@ var defaultEvery = map[string]family{
 		why: "the timeline of what moved in two cadences, one GraphQL point for each repository where an issue or a pull request moved and nothing for the rest, so the hour is how soon a transition is worth seeing",
 	},
 	"achievements": {
-		every: 24 * time.Hour, group: "account",
-		why: "the badges on the public profile page, which no API lists, and how far each tiered one is from its next tier; a badge is earned over weeks, and a day transfers the page, 36 KB, and 0.3 to 0.6 MB of pull requests merged since the day before for two GraphQL points, or the whole history once a week, 24 MB",
+		every: 1 * time.Hour, group: "account",
+		why: "the badges on the public profile page, which no API lists, and how far each tiered one is from its next tier; a pass transfers the page, 36 KB and off the budget, and the pull requests merged since the day before for two GraphQL points, so a tier reached in the afternoon shows in the afternoon, and the whole history is walked once a week, 24 MB",
 	},
 	"keys": {
 		every: 24 * time.Hour, group: "account",

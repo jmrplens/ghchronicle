@@ -36,7 +36,7 @@ func TestListMarksTheArchivedRepositoriesSetAside(t *testing.T) {
 	if err := listRepositories(t.Context(), api, cfg, &out); err != nil {
 		t.Fatal(err)
 	}
-	want := "o/n\no/old (archived: the archive date only; a backfill collects it)\n"
+	want := "o/n\no/old (archived: its archive date and lifetime totals; a backfill collects the rest)\n"
 	if out.String() != want {
 		t.Errorf("-list printed:\n%s\nwant:\n%s", out.String(), want)
 	}

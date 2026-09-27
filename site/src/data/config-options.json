@@ -883,7 +883,7 @@
     {
       "name": "achievements",
       "group": "account",
-      "every": "24h"
+      "every": "1h"
     },
     {
       "name": "actions",
