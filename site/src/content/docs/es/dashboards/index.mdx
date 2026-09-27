@@ -12,13 +12,13 @@ Cinco dashboards, todos en inglés, todos en el formato de exportación comparti
 de Grafana: el datasource es un marcador `${DS_...}` y el bloque `__inputs` pide
 a quien importa que elija el suyo.
 
-| Fichero                          | Paneles | Almacén                                                       |
-| -------------------------------- | ------- | ------------------------------------------------------------- |
-| `ghchronicle-influxdb.json`      | {stats.panels} | InfluxDB 3, consultado con SQL                                |
-| `ghchronicle-prometheus.json`    | {stats.panels} | Prometheus                                                    |
-| `ghchronicle-postgres.json`      | {stats.panels} | PostgreSQL o TimescaleDB, desde el destino SQL                |
-| `ghchronicle-graphite.json`      | {stats.panels} | Graphite, desde el destino de Graphite                        |
-| `ghchronicle-elasticsearch.json` | {stats.panels} | Elasticsearch u OpenSearch, desde el destino de Elasticsearch |
+| Fichero                          | Paneles | Almacén                                                                         |
+| -------------------------------- | ------- | ------------------------------------------------------------------------------- |
+| `ghchronicle-influxdb.json`      | {stats.panels} | InfluxDB 3, consultado con SQL                                                  |
+| `ghchronicle-prometheus.json`    | {stats.panels} | Prometheus                                                                      |
+| `ghchronicle-postgres.json`      | {stats.panels} | PostgreSQL o TimescaleDB, desde el destino que conecta o desde el fichero SQL |
+| `ghchronicle-graphite.json`      | {stats.panels} | Graphite, desde el destino de Graphite                                          |
+| `ghchronicle-elasticsearch.json` | {stats.panels} | Elasticsearch u OpenSearch, desde el destino de Elasticsearch                   |
 
 Las cinco tienen los mismos paneles en el mismo orden. Lo que cambia es
 cuántos puede responder el almacén que hay detrás de cada una.
@@ -238,9 +238,10 @@ este sink emite sentencias y nunca se conecta.
         El Prometheus que consulta el exportador de ghchronicle.
       </TabItem>
       <TabItem label="PostgreSQL">
-        El datasource de PostgreSQL para la base de datos a la que se enviaron
-        las sentencias del destino SQL. TimescaleDB es el mismo datasource con el
-        interruptor de TimescaleDB activado; las consultas no cambian.
+        El datasource de PostgreSQL para la base de datos en la que escribe el
+        destino `postgres`, o a la que se enviaron las sentencias del destino
+        SQL. TimescaleDB es el mismo datasource con el interruptor de TimescaleDB
+        activado; las consultas no cambian.
       </TabItem>
       <TabItem label="Graphite">
         El Graphite en el que escribe el destino. Las rutas suponen el prefijo

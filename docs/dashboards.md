@@ -12,13 +12,13 @@ Five dashboards, all in English, all in Grafana's shareable export format: the
 datasource is a `${DS_...}` placeholder and the `__inputs` block asks the
 importer to choose their own.
 
-| File                             | Panels | Store                                                    |
-| -------------------------------- | ------ | -------------------------------------------------------- |
-| `ghchronicle-influxdb.json`      | 154 | InfluxDB 3, queried with SQL                             |
-| `ghchronicle-prometheus.json`    | 154 | Prometheus                                               |
-| `ghchronicle-postgres.json`      | 154 | PostgreSQL or TimescaleDB, from the SQL sink             |
-| `ghchronicle-graphite.json`      | 154 | Graphite, from the Graphite sink                         |
-| `ghchronicle-elasticsearch.json` | 154 | Elasticsearch or OpenSearch, from the Elasticsearch sink |
+| File                             | Panels | Store                                                                   |
+| -------------------------------- | ------ | ----------------------------------------------------------------------- |
+| `ghchronicle-influxdb.json`      | 154 | InfluxDB 3, queried with SQL                                            |
+| `ghchronicle-prometheus.json`    | 154 | Prometheus                                                              |
+| `ghchronicle-postgres.json`      | 154 | PostgreSQL or TimescaleDB, from the sink that connects or the SQL file |
+| `ghchronicle-graphite.json`      | 154 | Graphite, from the Graphite sink                                        |
+| `ghchronicle-elasticsearch.json` | 154 | Elasticsearch or OpenSearch, from the Elasticsearch sink                |
 
 The five hold the same panels in the same order. What differs is how many of
 them the store behind each one can answer.
@@ -263,9 +263,10 @@ connects.
 
     - **PostgreSQL**
 
-      The PostgreSQL datasource for the database the SQL sink's statements were
-      piped into. TimescaleDB is the same datasource with the TimescaleDB
-      switch on; the queries do not change.
+      The PostgreSQL datasource for the database the `postgres` sink writes
+      to, or the one the SQL sink's statements were piped into. TimescaleDB is
+      the same datasource with the TimescaleDB switch on; the queries do not
+      change.
 
     - **Graphite**
 
