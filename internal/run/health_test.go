@@ -390,9 +390,10 @@ func (c cancelOnFirstFamily) Write(ctx context.Context, points []sink.Point) (in
 // TestAChunkWithNothingToSayStillCountsAsAnAnswer is the corner the first fix
 // left: reading rows as the test for "did the batch answer" reads a collector
 // that legitimately writes nothing as a collector that failed. deployments is
-// the live example, hourly, on an account that has never deployed, so its
-// batch produces no rows on any sweep; one chunk failing would then have left
-// it due on every tick, which is the cost the rule above exists to prevent.
+// the live example, every half hour, on an account that has never deployed,
+// so its batch produces no rows on any sweep; one chunk failing would then
+// have left it due on every tick, which is the cost the rule above exists to
+// prevent.
 func TestAChunkWithNothingToSayStillCountsAsAnAnswer(t *testing.T) {
 	t.Parallel()
 	// Every chunk that answers answers with an empty page, which is what a

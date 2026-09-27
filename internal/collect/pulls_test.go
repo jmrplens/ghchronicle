@@ -765,8 +765,9 @@ func TestReadItemCountsFollowsTheTotalsWireFormat(t *testing.T) {
 }
 
 // TestPullsReadsExactlyThePagesTheWalkAllows is what the daily pass leans on:
-// sized from a count up to twelve hours old, it is allowed one page more than
-// the one it asked for, and no more, however many pages the API offers.
+// sized from lifetime totals up to an hour old by default, and older where a
+// configuration slows them down, it is allowed one page more than the one it
+// asked for, and no more, however many pages the API offers.
 func TestPullsReadsExactlyThePagesTheWalkAllows(t *testing.T) {
 	t.Parallel()
 	for pages, want := range map[int]int{0: 1, 2: 2} {

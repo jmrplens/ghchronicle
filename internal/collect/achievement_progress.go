@@ -211,7 +211,8 @@ const coauthoredRule = 1
 // down: a repository made private or deleted takes its pull requests out of
 // is:public, and only a walk over the whole range sees them gone. A week is
 // how long a count that fell is shown too high, against a whole walk that
-// transfers what about seventy daily passes that add do (measured below).
+// transfers what about seventy passes adding one day do, or two days of the
+// hourly passes that walk the day in progress (measured below).
 const coauthoredWholeEvery = 7
 
 // CoauthoredTally is the Pair Extraordinaire count as far as it is settled,

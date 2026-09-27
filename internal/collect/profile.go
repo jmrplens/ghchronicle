@@ -193,7 +193,7 @@ func gistPoints(ctx context.Context, c *ghapi.Client, base map[string]string, no
 // cannot collide with an account. The ORCID iD the same page shows is in
 // neither endpoint nor in GraphQL's socialAccounts, and there is no ORCID in
 // SocialAccountProvider; it exists in the profile HTML only, and the
-// achievements family, which reads that page once a day, writes it from
+// achievements family, which reads that page on every pass, writes it from
 // there under the provider orcid (see Achievements.vcardSocialPoints).
 func (p Profile) socialAccountPoints(ctx context.Context, c *ghapi.Client, base map[string]string, now time.Time) ([]sink.Point, error) {
 	var socials []struct {

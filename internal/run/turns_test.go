@@ -414,11 +414,12 @@ func accountTurnsRunner(t *testing.T, families map[string]string, at *time.Time)
 	return r, log
 }
 
-// TestAccountFamiliesTakeTurnsToo: three of the built-in families of six hours
-// or more ask about the account and not about a repository, achievements,
-// keys and profile, and they reach the sweep through Runner.family rather than
-// the per-repository loop. All three due at once start one a sweep, the
-// shortest cadence first, and are left with three different last_run values.
+// TestAccountFamiliesTakeTurnsToo: two of the built-in families of six hours or
+// more ask about the account and not about a repository, keys and profile, and
+// achievements joins them at the 24h a configuration copied from 2.5.x still
+// sets. They reach the sweep through Runner.family rather than the
+// per-repository loop. All three due at once start one a sweep, the shortest
+// cadence first, and are left with three different last_run values.
 func TestAccountFamiliesTakeTurnsToo(t *testing.T) {
 	t.Parallel()
 	at := time.Now().UTC().Truncate(time.Second)

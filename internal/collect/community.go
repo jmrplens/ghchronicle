@@ -362,9 +362,9 @@ func (o Outbound) Collect(ctx context.Context, c *ghapi.Client, now time.Time) (
 		return points, failed
 	}
 
-	// Work in repositories the account does not own. Nothing else sees it: it
-	// is not in this account's repositories, and the event feed forgets it in
-	// three days.
+	// Work in repositories the account does not own. Nothing else sees it for
+	// long: it is not in this account's repositories, and the event feed keeps
+	// only its last three hundred events, none older than thirty days.
 	upstream := map[string]upstreamRepository{}
 	for _, s := range outboundSearches {
 		// Kept whether or not the walk failed part way: the pages that

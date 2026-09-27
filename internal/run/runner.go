@@ -812,11 +812,11 @@ func batchFailures(answered bool, covered int) int {
 // Rows are not the test, and reading them as one was a corner that survived
 // the first fix: a collector that legitimately writes nothing for a repository
 // with nothing to report produces zero points from chunks that all answered
-// perfectly. deployments is the live example, hourly, on an account that has
-// never deployed anything, so its batch yields no rows on every sweep and one
-// chunk failing would have left it due on every tick. The collectors say how
-// many repositories were in the chunks that answered, through
-// collect.PartialError, which is the question this is really asking.
+// perfectly. deployments is the live example, every half hour, on an account
+// that has never deployed anything, so its batch yields no rows on every
+// sweep and one chunk failing would have left it due on every tick. The
+// collectors say how many repositories were in the chunks that answered,
+// through collect.PartialError, which is the question this is really asking.
 func batchAnswered(points []sink.Point, err error) bool {
 	if len(points) > 0 {
 		return true
