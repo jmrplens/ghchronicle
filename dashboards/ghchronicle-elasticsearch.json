@@ -5603,7 +5603,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "Time to merge only counts what merged. This is the other half: what is still open and how long it has been, which is the number that decides what to do next rather than describing what already happened. Each pull request is read from its newest row, so one that merged inside the range is not here any more. Archived repositories are left out, since nothing in one can be merged, closed or run until it is unarchived; narrowing the picker to one shows an empty table here rather than rows nobody can act on. A fork's pull request is still one that can be merged, so those stay and Fork says which they are. This store cannot read each item from its newest row, so one that closed inside the range stays listed as open, at the reading of its last open day, until the range moves past that day. Only gh_repo carries the fork and archived flags and this store cannot join one measurement to another, so the rows the SQL dashboards leave out are listed here.",
+          "description": "Time to merge only counts what merged. This is the other half: what is still open and how long it has been, which is the number that decides what to do next rather than describing what already happened. The table keeps the twenty-five open longest, the longest first. Each pull request is read from its newest row, so one that merged inside the range is not here any more. Archived repositories are left out, since nothing in one can be merged, closed or run until it is unarchived; narrowing the picker to one shows an empty table here rather than rows nobody can act on. A fork's pull request is still one that can be merged, so those stay and Fork says which they are. This store cannot read each item from its newest row, so one that closed inside the range stays listed as open, at the reading of its last open day, until the range moves past that day. Only gh_repo carries the fork and archived flags and this store cannot join one measurement to another, so the rows the SQL dashboards leave out are listed here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -5766,29 +5766,29 @@
               "bucketAggs": [
                 {
                   "field": "repo.keyword",
-                  "id": "125",
+                  "id": "126",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
-                    "orderBy": "_count",
+                    "orderBy": "125",
                     "size": "50"
                   },
                   "type": "terms"
                 },
                 {
                   "field": "number.keyword",
-                  "id": "126",
+                  "id": "127",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
-                    "orderBy": "_count",
+                    "orderBy": "125",
                     "size": "25"
                   },
                   "type": "terms"
                 },
                 {
                   "field": "url.keyword",
-                  "id": "127",
+                  "id": "128",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -5802,7 +5802,7 @@
               "metrics": [
                 {
                   "field": "seconds_open",
-                  "id": "128",
+                  "id": "125",
                   "type": "max"
                 },
                 {
@@ -5837,13 +5837,31 @@
                   "url.keyword": "Link"
                 }
               }
+            },
+            {
+              "id": "sortBy",
+              "options": {
+                "fields": {},
+                "sort": [
+                  {
+                    "desc": true,
+                    "field": "Open for"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "limit",
+              "options": {
+                "limitField": 25
+              }
             }
           ],
           "type": "table"
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "The same question for issues: what is still open and for how long. Labels is what the issue was filed as, so an old one reads as a bug nobody fixed or a wish nobody granted. Each issue is read from its newest row, so one closed inside the range is not here any more. Archived repositories are left out, since nothing in one can be merged, closed or run until it is unarchived; narrowing the picker to one shows an empty table here rather than rows nobody can act on. A fork's issues stay, and Fork says which they are. This store cannot read each item from its newest row, so one that closed inside the range stays listed as open, at the reading of its last open day, until the range moves past that day. Only gh_repo carries the fork and archived flags and this store cannot join one measurement to another, so the rows the SQL dashboards leave out are listed here.",
+          "description": "The same question for issues: what is still open and for how long, the twenty-five open longest, the longest first. Labels is what the issue was filed as, so an old one reads as a bug nobody fixed or a wish nobody granted. Each issue is read from its newest row, so one closed inside the range is not here any more. Archived repositories are left out, since nothing in one can be merged, closed or run until it is unarchived; narrowing the picker to one shows an empty table here rather than rows nobody can act on. A fork's issues stay, and Fork says which they are. This store cannot read each item from its newest row, so one that closed inside the range stays listed as open, at the reading of its last open day, until the range moves past that day. Only gh_repo carries the fork and archived flags and this store cannot join one measurement to another, so the rows the SQL dashboards leave out are listed here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -5982,29 +6000,29 @@
               "bucketAggs": [
                 {
                   "field": "repo.keyword",
-                  "id": "131",
+                  "id": "132",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
-                    "orderBy": "_count",
+                    "orderBy": "131",
                     "size": "50"
                   },
                   "type": "terms"
                 },
                 {
                   "field": "number.keyword",
-                  "id": "132",
+                  "id": "133",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
-                    "orderBy": "_count",
+                    "orderBy": "131",
                     "size": "25"
                   },
                   "type": "terms"
                 },
                 {
                   "field": "url.keyword",
-                  "id": "133",
+                  "id": "134",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -6018,7 +6036,7 @@
               "metrics": [
                 {
                   "field": "seconds_open",
-                  "id": "134",
+                  "id": "131",
                   "type": "max"
                 },
                 {
@@ -6046,6 +6064,24 @@
                   "repo.keyword": "Repository",
                   "url.keyword": "Link"
                 }
+              }
+            },
+            {
+              "id": "sortBy",
+              "options": {
+                "fields": {},
+                "sort": [
+                  {
+                    "desc": true,
+                    "field": "Open for"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "limit",
+              "options": {
+                "limitField": 25
               }
             }
           ],
@@ -6759,7 +6795,7 @@
             {
               "bucketAggs": [
                 {
-                  "field": "repo.keyword",
+                  "field": "full_name.keyword",
                   "id": "155",
                   "settings": {
                     "min_doc_count": "1",
@@ -6791,7 +6827,7 @@
             {
               "bucketAggs": [
                 {
-                  "field": "repo.keyword",
+                  "field": "full_name.keyword",
                   "id": "157",
                   "settings": {
                     "min_doc_count": "1",
@@ -14238,7 +14274,7 @@
       "panels": [
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "Release asset downloads, counted by GitHub since each release was published, and how many releases have been downloaded at all, as of the newest reading of each. In Elasticsearch the second counts distinct tags, downloaded or not: a cardinality cannot be filtered on the newest value.",
+          "description": "Release asset downloads, counted by GitHub since each release was published, and how many releases have been downloaded at all, as of the newest reading of each. A repository is counted by its full name, so two owners' repositories of one name are two. In Elasticsearch the second counts distinct tags, downloaded or not: a cardinality cannot be filtered on the newest value.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -14309,7 +14345,7 @@
             {
               "bucketAggs": [
                 {
-                  "field": "repo.keyword",
+                  "field": "full_name.keyword",
                   "id": "326",
                   "settings": {
                     "min_doc_count": "1",
@@ -14807,7 +14843,7 @@
       "panels": [
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "Alerts still open, from the newest reading of each repository. Both are colored by the same thresholds, so one value can be green beside a red one.",
+          "description": "Alerts still open, from the newest reading of each repository, which is counted by its full name, so two owners' repositories of one name are two. Both are colored by the same thresholds, so one value can be green beside a red one.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -14954,7 +14990,7 @@
             {
               "bucketAggs": [
                 {
-                  "field": "repo.keyword",
+                  "field": "full_name.keyword",
                   "id": "340",
                   "settings": {
                     "min_doc_count": "1",
@@ -15008,7 +15044,7 @@
             {
               "bucketAggs": [
                 {
-                  "field": "repo.keyword",
+                  "field": "full_name.keyword",
                   "id": "344",
                   "settings": {
                     "min_doc_count": "1",
@@ -15120,7 +15156,7 @@
                   "type": "terms"
                 },
                 {
-                  "field": "repo.keyword",
+                  "field": "full_name.keyword",
                   "id": "348",
                   "settings": {
                     "min_doc_count": "1",
@@ -15262,7 +15298,7 @@
                   "type": "terms"
                 },
                 {
-                  "field": "repo.keyword",
+                  "field": "full_name.keyword",
                   "id": "352",
                   "settings": {
                     "min_doc_count": "1",

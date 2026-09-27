@@ -3674,7 +3674,7 @@
         },
         {
           "datasource": "${DS_INFLUXDB}",
-          "description": "Time to merge only counts what merged. This is the other half: what is still open and how long it has been, which is the number that decides what to do next rather than describing what already happened. Each pull request is read from its newest row, so one that merged inside the range is not here any more. Archived repositories are left out, since nothing in one can be merged, closed or run until it is unarchived; narrowing the picker to one shows an empty table here rather than rows nobody can act on. A fork's pull request is still one that can be merged, so those stay and Fork says which they are.",
+          "description": "Time to merge only counts what merged. This is the other half: what is still open and how long it has been, which is the number that decides what to do next rather than describing what already happened. The table keeps the twenty-five open longest, the longest first. Each pull request is read from its newest row, so one that merged inside the range is not here any more. Archived repositories are left out, since nothing in one can be merged, closed or run until it is unarchived; narrowing the picker to one shows an empty table here rather than rows nobody can act on. A fork's pull request is still one that can be merged, so those stay and Fork says which they are.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -3846,7 +3846,7 @@
         },
         {
           "datasource": "${DS_INFLUXDB}",
-          "description": "The same question for issues: what is still open and for how long. Labels is what the issue was filed as, so an old one reads as a bug nobody fixed or a wish nobody granted. Each issue is read from its newest row, so one closed inside the range is not here any more. Archived repositories are left out, since nothing in one can be merged, closed or run until it is unarchived; narrowing the picker to one shows an empty table here rather than rows nobody can act on. A fork's issues stay, and Fork says which they are.",
+          "description": "The same question for issues: what is still open and for how long, the twenty-five open longest, the longest first. Labels is what the issue was filed as, so an old one reads as a bug nobody fixed or a wish nobody granted. Each issue is read from its newest row, so one closed inside the range is not here any more. Archived repositories are left out, since nothing in one can be merged, closed or run until it is unarchived; narrowing the picker to one shows an empty table here rather than rows nobody can act on. A fork's issues stay, and Fork says which they are.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -4390,14 +4390,14 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT SUM(live_bytes) AS \"Artifact storage walked\" FROM (SELECT live_bytes, ROW_NUMBER() OVER (PARTITION BY repo ORDER BY time DESC) AS rn FROM gh_artifact_total WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE rn = 1",
+              "rawSql": "SELECT SUM(live_bytes) AS \"Artifact storage walked\" FROM (SELECT live_bytes, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn FROM gh_artifact_total WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE rn = 1",
               "refId": "F"
             },
             {
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT SUM(size_bytes) AS \"Actions cache\" FROM (SELECT size_bytes, ROW_NUMBER() OVER (PARTITION BY repo ORDER BY time DESC) AS rn FROM gh_actions_cache WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE rn = 1",
+              "rawSql": "SELECT SUM(size_bytes) AS \"Actions cache\" FROM (SELECT size_bytes, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn FROM gh_actions_cache WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE rn = 1",
               "refId": "G"
             }
           ],
@@ -9580,7 +9580,7 @@
       "panels": [
         {
           "datasource": "${DS_INFLUXDB}",
-          "description": "Release asset downloads, counted by GitHub since each release was published, and how many releases have been downloaded at all, as of the newest reading of each.",
+          "description": "Release asset downloads, counted by GitHub since each release was published, and how many releases have been downloaded at all, as of the newest reading of each. A repository is counted by its full name, so two owners' repositories of one name are two.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -9627,14 +9627,14 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT SUM(downloads) AS \"Total\" FROM (SELECT downloads, ROW_NUMBER() OVER (PARTITION BY repo, tag ORDER BY time DESC) AS rn FROM gh_release WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE rn = 1",
+              "rawSql": "SELECT SUM(downloads) AS \"Total\" FROM (SELECT downloads, ROW_NUMBER() OVER (PARTITION BY full_name, tag ORDER BY time DESC) AS rn FROM gh_release WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE rn = 1",
               "refId": "A"
             },
             {
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT COUNT(*) AS \"Releases\" FROM (SELECT repo, tag, downloads, ROW_NUMBER() OVER (PARTITION BY repo, tag ORDER BY time DESC) AS rn FROM gh_release WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE rn = 1 AND downloads \u003e 0",
+              "rawSql": "SELECT COUNT(*) AS \"Releases\" FROM (SELECT repo, tag, downloads, ROW_NUMBER() OVER (PARTITION BY full_name, tag ORDER BY time DESC) AS rn FROM gh_release WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE rn = 1 AND downloads \u003e 0",
               "refId": "B"
             }
           ],
@@ -10096,7 +10096,7 @@
       "panels": [
         {
           "datasource": "${DS_INFLUXDB}",
-          "description": "Alerts still open, from the newest reading of each repository. Both are colored by the same thresholds, so one value can be green beside a red one.",
+          "description": "Alerts still open, from the newest reading of each repository, which is counted by its full name, so two owners' repositories of one name are two. Both are colored by the same thresholds, so one value can be green beside a red one.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -10220,14 +10220,14 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT SUM(open) AS \"Dependabot\" FROM (SELECT open, ROW_NUMBER() OVER (PARTITION BY repo, severity, ecosystem ORDER BY time DESC) AS rn FROM gh_dependabot_alert WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE rn = 1",
+              "rawSql": "SELECT SUM(open) AS \"Dependabot\" FROM (SELECT open, ROW_NUMBER() OVER (PARTITION BY full_name, severity, ecosystem ORDER BY time DESC) AS rn FROM gh_dependabot_alert WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE rn = 1",
               "refId": "A"
             },
             {
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT SUM(open) AS \"Code scanning\" FROM (SELECT open, ROW_NUMBER() OVER (PARTITION BY repo, severity, tool ORDER BY time DESC) AS rn FROM gh_code_scanning_alert WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE rn = 1",
+              "rawSql": "SELECT SUM(open) AS \"Code scanning\" FROM (SELECT open, ROW_NUMBER() OVER (PARTITION BY full_name, severity, tool ORDER BY time DESC) AS rn FROM gh_code_scanning_alert WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE rn = 1",
               "refId": "B"
             }
           ],
@@ -10281,7 +10281,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT severity AS \"Severity\", SUM(open) AS \"Open alerts\" FROM (SELECT severity, open, ROW_NUMBER() OVER (PARTITION BY repo, severity, ecosystem ORDER BY time DESC) AS rn FROM gh_dependabot_alert WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE rn = 1 GROUP BY 1 ORDER BY 2 DESC",
+              "rawSql": "SELECT severity AS \"Severity\", SUM(open) AS \"Open alerts\" FROM (SELECT severity, open, ROW_NUMBER() OVER (PARTITION BY full_name, severity, ecosystem ORDER BY time DESC) AS rn FROM gh_dependabot_alert WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE rn = 1 GROUP BY 1 ORDER BY 2 DESC",
               "refId": "A"
             }
           ],
@@ -10335,7 +10335,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT ecosystem AS \"Ecosystem\", SUM(open) AS \"Open alerts\" FROM (SELECT ecosystem, open, ROW_NUMBER() OVER (PARTITION BY repo, severity, ecosystem ORDER BY time DESC) AS rn FROM gh_dependabot_alert WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE rn = 1 GROUP BY 1 ORDER BY 2 DESC",
+              "rawSql": "SELECT ecosystem AS \"Ecosystem\", SUM(open) AS \"Open alerts\" FROM (SELECT ecosystem, open, ROW_NUMBER() OVER (PARTITION BY full_name, severity, ecosystem ORDER BY time DESC) AS rn FROM gh_dependabot_alert WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE rn = 1 GROUP BY 1 ORDER BY 2 DESC",
               "refId": "A"
             }
           ],
@@ -10456,7 +10456,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "time_series",
               "rawQuery": true,
-              "rawSql": "SELECT time, severity AS series, SUM(open) AS alerts FROM (SELECT $__dateBin(time) AS time, severity, open, ROW_NUMBER() OVER (PARTITION BY $__dateBin(time), repo, severity, ecosystem ORDER BY time DESC) AS rn FROM gh_dependabot_alert WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE rn = 1 GROUP BY 1, 2 ORDER BY 1",
+              "rawSql": "SELECT time, severity AS series, SUM(open) AS alerts FROM (SELECT $__dateBin(time) AS time, severity, open, ROW_NUMBER() OVER (PARTITION BY $__dateBin(time), full_name, severity, ecosystem ORDER BY time DESC) AS rn FROM gh_dependabot_alert WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})) x WHERE rn = 1 GROUP BY 1, 2 ORDER BY 1",
               "refId": "A"
             }
           ],

@@ -327,6 +327,43 @@ func TestAnUpstreamRepositoryIsItsNewestReading(t *testing.T) {
 	}
 }
 
+// TestTheSnapshotsTheDashboardsAddUpKeepTwoOwnersApart: the dashboards add
+// the cache and artifact bytes, the downloads and the open alerts up across
+// repositories, and the exporter kept each of the five measurements by `repo`
+// alone. Two owners' repositories of one name were then one series, the newer
+// reading replaced the other's, and every sum lost it, before any query ran.
+// #97 found it beside the same fault in the SQL and Elasticsearch queries.
+func TestTheSnapshotsTheDashboardsAddUpKeepTwoOwnersApart(t *testing.T) {
+	base := time.Date(2026, 9, 27, 10, 0, 0, 0, time.UTC)
+	for m, field := range map[string]string{
+		"gh_actions_cache": "size_bytes", "gh_artifact_total": "live_bytes", "gh_release": "downloads",
+		"gh_dependabot_alert": "open", "gh_code_scanning_alert": "open",
+	} {
+		var points []Point
+		for i, owner := range []string{"alice", "acme"} {
+			points = append(points, Point{
+				Measurement: m,
+				Tags: map[string]string{
+					"owner": owner, "repo": "dotfiles", "full_name": owner + "/dotfiles",
+					"severity": "high", "ecosystem": "npm", "tool": "CodeQL", "tag": "v1.0.0",
+				},
+				Fields: map[string]any{field: float64(i + 1)}, Time: base.Add(time.Duration(i) * time.Hour),
+			})
+		}
+		var total float64
+		names := map[string]bool{}
+		for _, g := range Summarize(points) {
+			v, _ := g.Fields[field].(float64)
+			total += v
+			names[g.Tags["full_name"]] = true
+		}
+		if total != 3 || !names["alice/dotfiles"] || !names["acme/dotfiles"] {
+			t.Errorf("%s: the exporter holds %v in all over %v, want alice/dotfiles and "+
+				"acme/dotfiles apart, 3 in all", m, total, names)
+		}
+	}
+}
+
 func TestSummarizeSumsAWindow(t *testing.T) {
 	base := time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC)
 	var pts []Point

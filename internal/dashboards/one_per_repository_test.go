@@ -263,8 +263,9 @@ type promSample struct {
 }
 
 // evalProm evaluates an instant query made of selectors, `or` and `unless`
-// with an optional `on`, and sum or max with an optional `by`, which is every
-// form the two panels here take, and answers the one value it has to come to.
+// with an optional `on`, sum, max or count with an optional `by`, and a
+// filter by `>` a number, which is every form the panels held by it take, and
+// answers the one value it has to come to.
 func evalProm(t *testing.T, expr string, series []promSample) float64 {
 	t.Helper()
 	out := evalPromSeries(t, expr, series)
@@ -340,7 +341,7 @@ func (p *exprParser) quoted() string {
 // promOr is a chain of `or` and `unless`, which bind alike and from the left.
 // Both match on every label but the name, or on the labels `on` lists.
 func (p *exprParser) promOr(series []promSample) []promSample {
-	left := p.promTerm(series)
+	left := p.promAbove(series)
 	for {
 		var unless bool
 		switch {
@@ -354,7 +355,7 @@ func (p *exprParser) promOr(series []promSample) []promSample {
 		if p.eat("on") {
 			on = p.labelList()
 		}
-		right := p.promTerm(series)
+		right := p.promAbove(series)
 		inRight := map[string]bool{}
 		for _, s := range right {
 			inRight[signature(s.labels, on...)] = true
@@ -408,6 +409,27 @@ func signature(labels map[string]string, on ...string) string {
 	return b.String()
 }
 
+// promAbove is a term and, when a `>` follows it, only the series whose
+// value is above the number after it, which binds tighter than `or`.
+func (p *exprParser) promAbove(series []promSample) []promSample {
+	p.t.Helper()
+	out := p.promTerm(series)
+	if !p.eat("> ") {
+		return out
+	}
+	bound, err := strconv.ParseFloat(p.word(), 64)
+	if err != nil {
+		p.t.Fatalf("%s: a comparison with no number: %v", p.s, err)
+	}
+	var kept []promSample
+	for _, s := range out {
+		if s.value > bound {
+			kept = append(kept, s)
+		}
+	}
+	return kept
+}
+
 func (p *exprParser) promTerm(series []promSample) []promSample {
 	p.skip()
 	if p.eat("(") {
@@ -416,7 +438,7 @@ func (p *exprParser) promTerm(series []promSample) []promSample {
 		return out
 	}
 	name := p.word()
-	if name == "sum" || name == "max" {
+	if name == "sum" || name == "max" || name == "count" {
 		var by []string
 		if p.eat("by") {
 			by = p.labelList()
@@ -475,17 +497,21 @@ func aggregate(how string, by []string, in []promSample) []promSample {
 			labels[l] = s.labels[l]
 		}
 		key := signature(labels)
+		value := s.value
+		if how == "count" {
+			value = 1
+		}
 		g, seen := groups[key]
 		if !seen {
-			groups[key] = &promSample{labels, s.value}
+			groups[key] = &promSample{labels, value}
 			order = append(order, key)
 			continue
 		}
 		switch how {
-		case "sum":
-			g.value += s.value
+		case "sum", "count":
+			g.value += value
 		case "max":
-			g.value = max(g.value, s.value)
+			g.value = max(g.value, value)
 		}
 	}
 	out := make([]promSample, len(order))
@@ -543,8 +569,12 @@ func (p *exprParser) graphite(series []grSeries) []grSeries {
 		in = append(in, l...)
 	}
 	switch word {
-	case "keepLastValue", "group", "removeEmptySeries":
+	case "keepLastValue", "group", "removeEmptySeries", "sortByMaxima":
 		return in
+	case "removeBelowValue":
+		return atLeast(in, args[0])
+	case "countSeries":
+		return []grSeries{{name: "countSeries", value: float64(len(in)), age: newestOf(in)}}
 	case "timeSlice":
 		return p.sliced(in, args)
 	case "alias":
@@ -554,17 +584,7 @@ func (p *exprParser) graphite(series []grSeries) []grSeries {
 		}
 		return out
 	case "aliasByNode":
-		out := slices.Clone(in)
-		for i := range out {
-			nodes := strings.Split(out[i].name, ".")
-			var picked []string
-			for _, a := range args {
-				n, _ := strconv.Atoi(a)
-				picked = append(picked, nodes[n])
-			}
-			out[i].name = strings.Join(picked, ".")
-		}
-		return out
+		return aliasedByNode(in, args)
 	case "sumSeries":
 		total := 0.0
 		for _, s := range in {
@@ -580,6 +600,35 @@ func (p *exprParser) graphite(series []grSeries) []grSeries {
 	}
 	p.t.Fatalf("%s: no evaluator for %s()", p.s, word)
 	return nil
+}
+
+// aliasedByNode is aliasByNode(series, node...): each series named by the
+// nodes of its path the arguments pick, joined by dots.
+func aliasedByNode(in []grSeries, args []string) []grSeries {
+	out := slices.Clone(in)
+	for i := range out {
+		nodes := strings.Split(out[i].name, ".")
+		var picked []string
+		for _, a := range args {
+			n, _ := strconv.Atoi(a)
+			picked = append(picked, nodes[n])
+		}
+		out[i].name = strings.Join(picked, ".")
+	}
+	return out
+}
+
+// atLeast is removeBelowValue(series, n), which empties every point under n:
+// a series reduced to its last point has nothing left when that one is.
+func atLeast(in []grSeries, bound string) []grSeries {
+	n, _ := strconv.ParseFloat(bound, 64)
+	var kept []grSeries
+	for _, s := range in {
+		if s.value >= n {
+			kept = append(kept, s)
+		}
+	}
+	return kept
 }
 
 // sliced is timeSlice(series, "-Nd"), which nulls every point before N days

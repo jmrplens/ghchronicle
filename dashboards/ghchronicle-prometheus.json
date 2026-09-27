@@ -3612,7 +3612,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "Time to merge only counts what merged. This is the other half: what is still open and how long it has been, which is the number that decides what to do next rather than describing what already happened. Each pull request is read from its newest row, so one that merged inside the range is not here any more. Archived repositories are left out, since nothing in one can be merged, closed or run until it is unarchived; narrowing the picker to one shows an empty table here rather than rows nobody can act on. A fork's pull request is still one that can be merged, so those stay and Fork says which they are. In Prometheus this is the mean over the collector's last sweep, not a median over the dashboard range. Only gh_repo carries the fork and archived flags and this store cannot join one measurement to another, so the rows the SQL dashboards leave out are listed here. The Prometheus exporter carries no url, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "Time to merge only counts what merged. This is the other half: what is still open and how long it has been, which is the number that decides what to do next rather than describing what already happened. The table keeps the twenty-five open longest, the longest first. Each pull request is read from its newest row, so one that merged inside the range is not here any more. Archived repositories are left out, since nothing in one can be merged, closed or run until it is unarchived; narrowing the picker to one shows an empty table here rather than rows nobody can act on. A fork's pull request is still one that can be merged, so those stay and Fork says which they are. In Prometheus a row is a repository and not a pull request, since the exporter keeps no pull request of its own: Open for is the mean over the repository's open pull requests at the collector's last sweep, and the twenty-five rows are the repositories where it is longest. Only gh_repo carries the fork and archived flags and this store cannot join one measurement to another, so the rows the SQL dashboards leave out are listed here. The Prometheus exporter carries no url, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -3753,7 +3753,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo, number, author) (github_pull_requests_comments_mean{state=\"OPEN\",repo=~\"$repo\"})",
+              "expr": "max by (repo, number, author) (github_pull_requests_comments_mean{state=\"OPEN\",repo=~\"$repo\"}) and on (repo, number, author) topk(25, max by (repo, number, author) (github_pull_requests_seconds_open_mean{state=\"OPEN\",repo=~\"$repo\"}))",
               "format": "table",
               "instant": true,
               "range": false,
@@ -9381,7 +9381,7 @@
       "panels": [
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "Release asset downloads, counted by GitHub since each release was published, and how many releases have been downloaded at all, as of the newest reading of each.",
+          "description": "Release asset downloads, counted by GitHub since each release was published, and how many releases have been downloaded at all, as of the newest reading of each. A repository is counted by its full name, so two owners' repositories of one name are two.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -9436,7 +9436,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "count(sum by (repo, tag) (github_release_downloads{repo=~\"$repo\"}) \u003e 0)",
+              "expr": "count(sum by (full_name, tag) (github_release_downloads{repo=~\"$repo\"}) \u003e 0)",
               "instant": true,
               "legendFormat": "Releases",
               "range": false,
@@ -9599,7 +9599,7 @@
       "panels": [
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "Alerts still open, from the newest reading of each repository. Both are colored by the same thresholds, so one value can be green beside a red one.",
+          "description": "Alerts still open, from the newest reading of each repository, which is counted by its full name, so two owners' repositories of one name are two. Both are colored by the same thresholds, so one value can be green beside a red one.",
           "fieldConfig": {
             "defaults": {
               "color": {

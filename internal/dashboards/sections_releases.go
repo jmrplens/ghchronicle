@@ -5,7 +5,7 @@ import "fmt"
 // ── Releases ────────────────────────────────────────────────────────────────
 
 func releases(b *builder) []Panel {
-	totalSQL := latestSumSQL("gh_release", "downloads", "repo, tag")
+	totalSQL := latestSumSQL("gh_release", "downloads", "tag")
 	// The release page rides beside the bars as a hidden column, which is
 	// what a click on a bar opens.
 	byTag := `SELECT repo || ' ' || tag AS "Release", downloads AS "Downloads", url AS "Page" FROM (` +
@@ -13,9 +13,10 @@ func releases(b *builder) []Panel {
 		" ORDER BY time DESC) AS rn FROM gh_release WHERE $__timeFilter(time) AND " + RF +
 		") x WHERE rn = 1 AND downloads > 0 ORDER BY 2 DESC LIMIT 12"
 	// How many releases have been downloaded at all: the number beside the
-	// total, so the tile above it is not the only thing in its column.
+	// total, so the tile above it is not the only thing in its column. A
+	// release is a tag of a repository by its full name, as in the total.
 	countSQL := "SELECT COUNT(*) AS value FROM (SELECT repo, tag, downloads," +
-		" ROW_NUMBER() OVER (PARTITION BY repo, tag ORDER BY time DESC) AS rn" +
+		" ROW_NUMBER() OVER (PARTITION BY full_name, tag ORDER BY time DESC) AS rn" +
 		" FROM gh_release WHERE $__timeFilter(time) AND " + RF +
 		") x WHERE rn = 1 AND downloads > 0"
 	// An asset's url is the file itself, so the column says Download; the
@@ -82,12 +83,13 @@ func releases(b *builder) []Panel {
 			Prom: []Target{
 				promNamed("A", "Total", fmt.Sprintf("sum(github_release_downloads{%s})", PF)),
 				promNamed("B", "Releases", fmt.Sprintf(
-					"count(sum by (repo, tag) (github_release_downloads{%s}) > 0)", PF,
+					"count(sum by (full_name, tag) (github_release_downloads{%s}) > 0)", PF,
 				)),
 			},
 			Desc: "Release asset downloads, counted by GitHub since each release was " +
 				"published, and how many releases have been downloaded at all, as of the " +
-				"newest reading of each.",
+				"newest reading of each. A repository is counted by its full name, so two " +
+				"owners' repositories of one name are two.",
 			GR: []Target{
 				grNamed("A", "Total", latestSum(rp(rl, "downloads"))),
 				// Graphite counts the series with a download in them; a series

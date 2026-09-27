@@ -111,15 +111,17 @@ func openAlerts(b *builder) []Panel {
 	// The alert counts are a snapshot per repository, severity and ecosystem,
 	// rewritten on every sweep. Summing them over the range counted each alert
 	// once per sweep: the tile read 3.61K where the account had a few dozen.
-	// One row per series, newest first, and then the sum.
-	dep := latestSumSQL("gh_dependabot_alert", "open", "repo, severity, ecosystem")
-	scan := latestSumSQL("gh_code_scanning_alert", "open", "repo, severity, tool")
+	// One row per series, newest first, and then the sum. A series is a
+	// repository by its full name, and the two breakdowns beside the tile
+	// read the same series, so that their bars add up to it.
+	dep := latestSumSQL("gh_dependabot_alert", "open", "severity", "ecosystem")
+	scan := latestSumSQL("gh_code_scanning_alert", "open", "severity", "tool")
 	bySev := `SELECT severity AS "Severity", SUM(open) AS "Open alerts" FROM (` +
-		"SELECT severity, open, ROW_NUMBER() OVER (PARTITION BY repo, severity, ecosystem" +
+		"SELECT severity, open, ROW_NUMBER() OVER (PARTITION BY full_name, severity, ecosystem" +
 		" ORDER BY time DESC) AS rn FROM gh_dependabot_alert WHERE $__timeFilter(time) AND " + RF +
 		") x WHERE rn = 1 GROUP BY 1 ORDER BY 2 DESC"
 	byEco := `SELECT ecosystem AS "Ecosystem", SUM(open) AS "Open alerts" FROM (` +
-		"SELECT ecosystem, open, ROW_NUMBER() OVER (PARTITION BY repo, severity, ecosystem" +
+		"SELECT ecosystem, open, ROW_NUMBER() OVER (PARTITION BY full_name, severity, ecosystem" +
 		" ORDER BY time DESC) AS rn FROM gh_dependabot_alert WHERE $__timeFilter(time) AND " + RF +
 		") x WHERE rn = 1 GROUP BY 1 ORDER BY 2 DESC"
 	// The newest reading of each repository's feature, not the largest of the
@@ -139,7 +141,7 @@ func openAlerts(b *builder) []Panel {
 	// instead of the sum, and the curve ended at 4 under a tile saying 6.
 	trend := "SELECT time, severity AS series, SUM(open) AS alerts FROM (" +
 		"SELECT " + timeBin + ", severity, open, ROW_NUMBER() OVER (PARTITION BY" +
-		" $__dateBin(time), repo, severity, ecosystem ORDER BY time DESC) AS rn" +
+		" $__dateBin(time), full_name, severity, ecosystem ORDER BY time DESC) AS rn" +
 		" FROM gh_dependabot_alert WHERE $__timeFilter(time) AND " + RF + ") x" +
 		" WHERE rn = 1 GROUP BY 1, 2 ORDER BY 1"
 	enabled := onOff("Enabled", 100)
@@ -155,7 +157,7 @@ func openAlerts(b *builder) []Panel {
 		if tag == "severity" {
 			other = "ecosystem"
 		}
-		es, estf = esTbl(da, []any{b.tm(tag, 20), b.tm("repo", 500), b.tm(other, 20)},
+		es, estf = esTbl(da, []any{b.tm(tag, 20), b.tm("full_name", 500), b.tm(other, 20)},
 			[]any{b.mNewest("open")},
 			[]named{{tag + ".keyword", name}, {"open", securityOpenAlerts}}, []string{ESF},
 			groupSum(name, securityOpenAlerts, name, securityOpenAlerts)...)
@@ -200,8 +202,10 @@ func openAlerts(b *builder) []Panel {
 				promNamed("B", securityCodeScanning,
 					fmt.Sprintf("sum(github_code_scanning_alert_open{%s})", PF)),
 			},
-			Desc: "Alerts still open, from the newest reading of each repository. Both are " +
-				"colored by the same thresholds, so one value can be green beside a red one.",
+			Desc: "Alerts still open, from the newest reading of each repository, which is " +
+				"counted by its full name, so two owners' repositories of one name are two. " +
+				"Both are colored by the same thresholds, so one value can be green beside a " +
+				"red one.",
 			GR: []Target{
 				grNamed("A", "Dependabot", latestSum(depOpen)),
 				grNamed("B", securityCodeScanning, latestSum(rp(cs, "open"))),

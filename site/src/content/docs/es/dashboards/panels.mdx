@@ -295,7 +295,14 @@ que sigue abierto se escribe una vez al día mientras lo esté, y esas filas se
 quedan cuando se cierra, así que los paneles fechados cuentan los abiertos como
 números distintos bajo "Open that day" y los dibujan como una línea junto a la
 pila de lo que se cerró, y las tablas de "open the longest" leen cada elemento
-de su fila más reciente.
+de su fila más reciente. Cada una guarda los veinticinco que llevan más tiempo
+abiertos, el más antiguo primero; Prometheus, que no guarda ninguna pull request
+suelta, lista los veinticinco repositorios cuyas pull requests abiertas llevan
+más tiempo esperando de media. Elasticsearch solo puede quedarse con los valores
+de arriba dentro del bucket de cada repositorio, así que guarda los que llevan
+más tiempo abiertos en cada uno y la tabla los corta a veinticinco; antes de
+2.6.1 guardaba los veinticinco de cada repositorio con más filas, que en un
+repositorio con más elementos abiertos podían ser cualesquiera.
 
 ![La sección Pull requests and issues: un grupo de tarjetas con 467 pull requests fusionadas, 10,3 horas hasta fusionar, 9,81 horas hasta la primera revisión, 137 issues cerradas, 1,75 días hasta cerrar una y 75 líneas por pull request; pull requests e issues por día separados por estado; tiempo hasta fusionar y tamaño de la pull request en el tiempo; las fusionadas más grandes con su título, asociación y etiquetas; pull requests por autor; la tabla por repositorio; la tabla de revisores encabezada por review-bot con 209 revisiones; revisiones por día; las dos tablas de los que llevan más tiempo abiertos; hilos de revisión por día separados en bot y humano; y la tabla de deuda de revisión](../../../../assets/dashboards/pull-requests-and-issues.png)
 
@@ -519,19 +526,23 @@ Los recuentos de alertas son estado actual, reescritos en cada pasada, así que
 todos los paneles que cuentan alertas abiertas toman la fila más reciente de
 cada serie y suman esas, no el rango. Sumar el rango cuenta cada alerta una vez
 por pasada: antes de arreglarlo la tarjeta marcaba 3,61 mil donde la cuenta
-tiene unas pocas decenas. La tabla de funciones y las cuatro tablas del final de
-la sección, los ajustes, la configuración de code scanning, los permisos del
-token y los secretos, también son estado actual, y leen la fila más reciente de
-cada repositorio, así que una función apagada o una alerta arreglada dentro del
-rango se leen como están y no como estaban en su punto más alto. Elasticsearch
-hace lo mismo reduciendo cada serie a su documento más reciente y leyendo ese, y
-es la excepción en un sitio, que lo dice en su descripción: su curva de alertas
-abiertas toma la serie más grande de cada severidad en un bucket en vez de
-sumarlas. Graphite es la excepción en tres, y lo dice en cada una: sus ajustes,
-su configuración de code scanning y sus permisos del token nombran cada fila a
-partir de la ruta, de la que forman parte el `status` de un ajuste, el `state`,
-la `query_suite` y el `schedule` de la configuración, y los `permissions`, así
-que un cambio dentro del rango son dos filas, la vieja y la nueva.
+tiene unas pocas decenas. Una serie es un repositorio por su nombre completo,
+así que dos repositorios de dos propietarios con el mismo nombre son dos, como
+lo son en los bytes de artefactos y de caché de "Runs in range" y en
+"Downloads", que suman sus lecturas más recientes del mismo modo. La tabla de
+funciones y las cuatro tablas del final de la sección, los ajustes, la
+configuración de code scanning, los permisos del token y los secretos, también
+son estado actual, y leen la fila más reciente de cada repositorio, así que una
+función apagada o una alerta arreglada dentro del rango se leen como están y no
+como estaban en su punto más alto. Elasticsearch hace lo mismo reduciendo cada
+serie a su documento más reciente y leyendo ese, y es la excepción en un sitio,
+que lo dice en su descripción: su curva de alertas abiertas toma la serie más
+grande de cada severidad en un bucket en vez de sumarlas. Graphite es la
+excepción en tres, y lo dice en cada una: sus ajustes, su configuración de code
+scanning y sus permisos del token nombran cada fila a partir de la ruta, de la
+que forman parte el `status` de un ajuste, el `state`, la `query_suite` y el
+`schedule` de la configuración, y los `permissions`, así que un cambio dentro
+del rango son dos filas, la vieja y la nueva.
 
 Dos paneles son información nueva, no otra vista. El tiempo hasta
 resolver una alerta de code scanning sale de unas fechas que se descargaban y se

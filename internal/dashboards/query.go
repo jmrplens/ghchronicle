@@ -987,11 +987,25 @@ func groupSum(by, value, nameBy, nameValue string) []any {
 // `sort` option is descending only, and some panels read in an order of their
 // own: a pin by its slot, a flag by its name, and a punch card by its hour,
 // whose rows a groupBy hands on in the order it first met each value.
-func sortAsc(field string) any {
+func sortAsc(field string) any { return sortRows(field, false) }
+
+// sortRows is the sortBy transformation over one column.
+func sortRows(field string, desc bool) any {
 	return map[string]any{"id": "sortBy", "options": map[string]any{
 		"fields": map[string]any{},
-		"sort":   []any{map[string]any{"field": field, "desc": false}},
+		"sort":   []any{map[string]any{"field": field, "desc": desc}},
 	}}
+}
+
+// keepLargest cuts a frame to the n rows with the most of one column, the
+// largest first: the ORDER BY ... DESC LIMIT n of a SQL twin, for an
+// Elasticsearch table whose terms buckets keep the top values inside each
+// bucket above them and never across the whole table.
+func keepLargest(field string, n int) []any {
+	return []any{
+		sortRows(field, true),
+		map[string]any{"id": "limit", "options": map[string]any{"limitField": n}},
+	}
 }
 
 // hideColumns drops columns a table's query returns only to be grouped by: the
@@ -1031,14 +1045,16 @@ func (b *builder) esSnapshotStack(m, field string) Target {
 var esStacked = Opts{"stack": true, "legend": "hidden"}
 
 // esLatestSum is the newest value per repository (and further tags), which the
-// stat sums across rows: the twin of latestSum in SQL, the repository filter
+// stat sums across rows: the twin of latestSumSQL, the repository filter
 // included. Without it every tile built on this read the whole store,
-// whatever the picker held.
+// whatever the picker held. A repository is a bucket by its full name, since
+// two owners' repositories of one name bucketed by the short one were one,
+// read at whichever of the two had the newer document.
 func (b *builder) esLatestSum(m, field string, by ...string) []Target {
 	// The metric before the buckets, because the ids are handed out in the
 	// order they are asked for and a panel's targets are compared as text.
 	metrics := []any{b.mNewest(field)}
-	buckets := []any{b.tm("repo", 500)}
+	buckets := []any{b.tm("full_name", 500)}
 	for _, tag := range by {
 		buckets = append(buckets, b.tm(tag, 500))
 	}

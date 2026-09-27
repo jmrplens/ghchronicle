@@ -116,17 +116,16 @@ func liveOrArchived(fields []string) string {
 		cols, from("gh_repo", "false", RF), from("gh_repo_total", "true", RFA))
 }
 
-// latestSumSQL is the sum of a snapshot field, one row per partition, newest
-// wins.
-func latestSumSQL(table, field string, partition ...string) string {
-	p := "repo"
-	if len(partition) > 0 {
-		p = partition[0]
-	}
+// latestSumSQL is the sum of a snapshot field over the newest row of each
+// series: each repository by its full name, and within it each value of the
+// tags `by` names, the twin of esLatestSum. Partitioned by the short name, two
+// owners' repositories of one name were one series, and the newer reading of
+// either hid the other's from the sum.
+func latestSumSQL(table, field string, by ...string) string {
 	return fmt.Sprintf("SELECT SUM(%s) AS value FROM (SELECT %s,"+
 		" ROW_NUMBER() OVER (PARTITION BY %s ORDER BY time DESC) AS rn"+
 		" FROM %s WHERE $__timeFilter(time) AND %s) x WHERE rn = 1",
-		field, field, p, table, RF)
+		field, field, strings.Join(append([]string{"full_name"}, by...), ", "), table, RF)
 }
 
 // jobLogSelector is the stream the Loki sink writes the job logs to: its

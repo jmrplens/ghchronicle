@@ -271,7 +271,13 @@ repository and by reviewer. An item still open is written once per day for as
 long as it stays open, and those rows stay when it closes, so the dated panels
 count the open ones as distinct numbers under "Open that day" and draw them as
 a line beside the stack of what closed, and the "open the longest" tables read
-each item from its newest row.
+each item from its newest row. Each keeps the twenty-five open longest, the
+longest first; Prometheus, which holds no single pull request, lists the
+twenty-five repositories whose open pull requests have waited longest on
+average. Elasticsearch can keep the top values only inside each repository's
+bucket, so it keeps each repository's longest open and the table cuts them to
+twenty-five; before 2.6.1 it kept the twenty-five of each repository with the
+most rows, which in a repository with more open items than that could be any.
 
 ![The Pull requests and issues section: a tile group reading 467 pull requests merged, 10.3 hours to merge, 9.81 hours to a first review, 137 issues closed, 1.75 days to close one and 75 lines per pull request, pull requests and issues per day split by state, time to merge and pull request size over time, the largest merged pull requests with their titles, associations and labels, pull requests by author, the per repository table, the reviewer table led by review-bot at 209 reviews, reviews per day, the two open the longest tables, review threads per day split into bot and human, and the review debt table](../../../assets/dashboards/pull-requests-and-issues.png)
 
@@ -486,7 +492,10 @@ The alert counts are current state, rewritten on every sweep, so every panel
 that counts open alerts takes the newest row of each series and adds those up
 rather than summing the range. Summing the range counts each alert once per
 sweep: before this was fixed the tile read 3.61 thousand where the account had a
-few dozen. The feature table and the four tables at the foot of the section, the
+few dozen. A series is a repository by its full name, so two owners'
+repositories of one name are two, as they are in the artifact and cache bytes of
+"Runs in range" and in "Downloads", which add up their newest readings the same
+way. The feature table and the four tables at the foot of the section, the
 settings, the code scanning setup, the token permissions and the secrets, are
 current state too, and read each repository's newest row, so a feature switched
 off or an alert fixed inside the range reads as it stands and not as it was at

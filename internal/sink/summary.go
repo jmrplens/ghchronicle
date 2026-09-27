@@ -125,17 +125,23 @@ var promRules = map[string]rule{
 	"gh_repo_topic":     {mode: keepLast, keep: []string{"repo", "topic"}},
 	"gh_repo_community": {mode: keepLast, keep: []string{"repo"}},
 	"gh_workflow":       {mode: keepLast, keep: []string{"repo", "workflow", "state"}},
-	"gh_actions_cache":  {mode: keepLast, keep: []string{"repo"}},
-	"gh_artifact_total": {mode: keepLast, keep: []string{"repo"}},
+	// These two, gh_release and the two alert counts are what the dashboards
+	// add up across repositories, into the cache and artifact bytes, the
+	// downloads and the open alerts, so each keeps all three of a
+	// repository's tags: by `repo` alone two owners' repositories of one name
+	// were one series, the newer reading replaced the other's, and the sum
+	// lost it.
+	"gh_actions_cache":  {mode: keepLast, keep: []string{"owner", "repo", "full_name"}},
+	"gh_artifact_total": {mode: keepLast, keep: []string{"owner", "repo", "full_name"}},
 	// How many runs a repository has ever had. The walk only ever sees the
 	// newest few hundred, so this is a current total in its own right, the
 	// twin of gh_artifact_total above it.
 	"gh_workflow_run_total": {mode: keepLast, keep: []string{"repo"}},
-	"gh_release":            {mode: keepLast, keep: []string{"repo", "tag", "draft", "prerelease"}},
+	"gh_release":            {mode: keepLast, keep: []string{"owner", "repo", "full_name", "tag", "draft", "prerelease"}},
 
 	// Security, which is a current state by definition.
-	"gh_dependabot_alert":    {mode: keepLast, keep: []string{"repo", "severity", "ecosystem"}},
-	"gh_code_scanning_alert": {mode: keepLast, keep: []string{"repo", "severity", "tool"}},
+	"gh_dependabot_alert":    {mode: keepLast, keep: []string{"owner", "repo", "full_name", "severity", "ecosystem"}},
+	"gh_code_scanning_alert": {mode: keepLast, keep: []string{"owner", "repo", "full_name", "severity", "tool"}},
 	"gh_security_feature":    {mode: keepLast, keep: []string{"repo", "feature"}},
 
 	// Windows that only mean anything added up.

@@ -577,6 +577,10 @@ const stillOpenNote = "This store cannot read each item from its newest row, so 
 	"closed inside the range stays listed as open, at the reading of its last open day, " +
 	"until the range moves past that day."
 
+// openLongest is how many rows the two tables of what is still open list, in
+// every store: the items open longest, the longest first.
+const openLongest = 25
+
 // stillOpen is what has not closed yet: the pull requests and the issues
 // that have waited longest, each one a row a reader can open.
 func stillOpen(b *builder) []Panel {
@@ -592,7 +596,7 @@ func stillOpen(b *builder) []Panel {
 		flowFromPulls + RF + " AND " + identified +
 		") x" + repoFlagsJoin("x.repo") +
 		" WHERE x.rn = 1 AND x.state = 'OPEN' AND " + notArchived +
-		" ORDER BY x.seconds_open DESC LIMIT 25"
+		fmt.Sprintf(" ORDER BY x.seconds_open DESC LIMIT %d", openLongest)
 	// The twin for issues, read the same way: until this table no issue was
 	// reachable by unit from any panel, only counted. `label_names` is the
 	// field the collector writes for what the issue is about, which is what
@@ -604,16 +608,24 @@ func stillOpen(b *builder) []Panel {
 		" FROM gh_issue WHERE $__timeFilter(time) AND " + RF + " AND " + identified +
 		") x" + repoFlagsJoin("x.repo") +
 		" WHERE x.rn = 1 AND x.state = 'OPEN' AND " + notArchived +
-		" ORDER BY x.seconds_open DESC LIMIT 25"
+		fmt.Sprintf(" ORDER BY x.seconds_open DESC LIMIT %d", openLongest)
 
-	openGR, openGRtf := gTbl(fmt.Sprintf(`limit(sortBy(groupByNodes(%s, "max", %d, %d), "max", true), 25)`,
+	openGR, openGRtf := gTbl(fmt.Sprintf(`limit(sortBy(groupByNodes(%s, "max", %d, %d), "max", true), %d)`,
 		rp("gh_pull_request", "seconds_open", "state", "OPEN"),
-		gn("gh_pull_request", "repo"), gn("gh_pull_request", "number")),
+		gn("gh_pull_request", "repo"), gn("gh_pull_request", "number"), openLongest),
 		"Repository, number", []col{{"max", flowOpenAge}})
 	// The url as a bucket, never as a metric: a top_metrics over a string
-	// panics the plugin, and a pull request has exactly one url.
-	openES, openEStf := esTbl("gh_pull_request", []any{b.tm("repo", 50), b.tm("number", 25), b.tm("url", 1)},
-		[]any{b.mMax("seconds_open"), b.mMax("comments"), b.mMax("reviews")},
+	// panics the plugin, and a pull request has exactly one url. The
+	// repository and the number both keep their values by the open time: the
+	// repositories whose oldest item is oldest, and in each its twenty-five
+	// longest open, which between them hold the twenty-five longest open of
+	// every picked repository, and keepLargest cuts the rows to those. Kept by
+	// document count, as they were, a repository with more open items than
+	// the bucket kept showed whichever had the most rows in the range.
+	prAge := b.mMax("seconds_open")
+	openES, openEStf := esTbl("gh_pull_request",
+		[]any{b.tmBy("repo", 50, prAge), b.tmBy("number", openLongest, prAge), b.tm("url", 1)},
+		[]any{prAge, b.mMax("comments"), b.mMax("reviews")},
 		[]named{
 			{inventoryRepoTerm, "Repository"},
 			{flowNumberTerm, "Number"},
@@ -622,14 +634,16 @@ func stillOpen(b *builder) []Panel {
 			{"c", "Comments"},
 			{"r", "Reviews"},
 		},
-		[]string{ESF, "state:OPEN"})
+		[]string{ESF, "state:OPEN"}, keepLargest(flowOpenAge, openLongest)...)
 
-	openIssuesGR, openIssuesGRtf := gTbl(fmt.Sprintf(`limit(sortBy(groupByNodes(%s, "max", %d, %d), "max", true), 25)`,
+	openIssuesGR, openIssuesGRtf := gTbl(fmt.Sprintf(`limit(sortBy(groupByNodes(%s, "max", %d, %d), "max", true), %d)`,
 		rp("gh_issue", "seconds_open", "state", "OPEN"),
-		gn("gh_issue", "repo"), gn("gh_issue", "number")),
+		gn("gh_issue", "repo"), gn("gh_issue", "number"), openLongest),
 		"Repository, number", []col{{"max", flowOpenAge}})
-	openIssuesES, openIssuesEStf := esTbl("gh_issue", []any{b.tm("repo", 50), b.tm("number", 25), b.tm("url", 1)},
-		[]any{b.mMax("seconds_open"), b.mMax("comments")},
+	issueAge := b.mMax("seconds_open")
+	openIssuesES, openIssuesEStf := esTbl("gh_issue",
+		[]any{b.tmBy("repo", 50, issueAge), b.tmBy("number", openLongest, issueAge), b.tm("url", 1)},
+		[]any{issueAge, b.mMax("comments")},
 		[]named{
 			{inventoryRepoTerm, "Repository"},
 			{flowNumberTerm, "Number"},
@@ -637,13 +651,22 @@ func stillOpen(b *builder) []Panel {
 			{"s", flowOpenAge},
 			{"c", "Comments"},
 		},
-		[]string{ESF, "state:OPEN"})
+		[]string{ESF, "state:OPEN"}, keepLargest(flowOpenAge, openLongest)...)
 	return []Panel{
 		panel("table", "Open the longest", box{W: 12, H: 8, X: 0, Y: 45}, []Target{sqlT(openest)}, &P{
-			Prom: []Target{
-				promTbl(fmt.Sprintf(`topk(25, max by (repo, number, author) (github_pull_requests_seconds_open_mean{state="OPEN",%s}))`, PF), "A"),
-				promTbl(fmt.Sprintf(`max by (repo, number, author) (github_pull_requests_comments_mean{state="OPEN",%s})`, PF), "B"),
-			},
+			// The comments are kept to the rows the open time ranks: capped
+			// on nothing, they listed every repository with an open pull
+			// request, and the merge showed each one past the twenty-fifth
+			// with an empty Open for.
+			Prom: func() []Target {
+				rank := fmt.Sprintf(`max by (repo, number, author) (github_pull_requests_seconds_open_mean{state="OPEN",%s})`, PF)
+				return []Target{
+					promTbl(promTop(openLongest, rank), "A"),
+					promTbl(promWithin(openLongest, fmt.Sprintf(
+						`max by (repo, number, author) (github_pull_requests_comments_mean{state="OPEN",%s})`, PF,
+					), rank, "repo", "number", "author"), "B"),
+				}
+			}(),
 			PromTF: merged(map[string]string{
 				"repo": "Repository", "number": "Number", "author": "Author",
 				inventoryValueCol + "A": flowOpenAge, inventoryValueCol + "B": "Comments",
@@ -651,11 +674,15 @@ func stillOpen(b *builder) []Panel {
 			Opts: Opts{"sort": flowOpenAge},
 			Desc: "Time to merge only counts what merged. This is the other half: what is " +
 				"still open and how long it has been, which is the number that decides what " +
-				"to do next rather than describing what already happened. Each pull request " +
+				"to do next rather than describing what already happened. The table keeps the " +
+				"twenty-five open longest, the longest first. Each pull request " +
 				"is read from its newest row, so one that merged inside the range is not " +
 				"here any more. " + archivedLeftOut + " A fork's pull request is still one " +
 				"that can be merged, so those stay and Fork says which they are.",
-			PromDesc: lastSweep + " " + noRepoFlagsHere,
+			PromDesc: "In Prometheus a row is a repository and not a pull request, since " +
+				"the exporter keeps no pull request of its own: Open for is the mean over " +
+				"the repository's open pull requests at the collector's last sweep, and the " +
+				"twenty-five rows are the repositories where it is longest. " + noRepoFlagsHere,
 			Overrides: []any{
 				repoColumn(), width("Number", 80), width("Author", 120),
 				unitOf(flowOpenAge, "s", 130),
@@ -671,7 +698,8 @@ func stillOpen(b *builder) []Panel {
 				"The exporter reduces issues to a count and means per repository and "+
 					"state; no individual issue survives."),
 			Opts: Opts{"sort": flowOpenAge},
-			Desc: "The same question for issues: what is still open and for how long. Labels " +
+			Desc: "The same question for issues: what is still open and for how long, the " +
+				"twenty-five open longest, the longest first. Labels " +
 				"is what the issue was filed as, so an old one reads as a bug nobody fixed " +
 				"or a wish nobody granted. Each issue is read from its newest row, so one " +
 				"closed inside the range is not here any more. " + archivedLeftOut +

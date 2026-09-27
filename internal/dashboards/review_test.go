@@ -436,11 +436,12 @@ func TestSuccessRateIsGreenFromNinety(t *testing.T) {
 }
 
 // TestOpenAlertsOverTimeSumTheNewestPerSeries: a MAX per severity took the
-// largest series and ended at 4 under a tile saying 6.
+// largest series and ended at 4 under a tile saying 6. A series is a
+// repository by its full name, as in the tile.
 func TestOpenAlertsOverTimeSumTheNewestPerSeries(t *testing.T) {
 	t.Parallel()
 	sql := sqlOf(t, mustPanel(t, rendered(t, "influxdb"), "Open alerts over time"))
-	if !strings.Contains(sql, "PARTITION BY $__dateBin(time), repo, severity, ecosystem ORDER BY time DESC") ||
+	if !strings.Contains(sql, "PARTITION BY $__dateBin(time), full_name, severity, ecosystem ORDER BY time DESC") ||
 		!strings.Contains(sql, "SUM(open)") {
 		t.Errorf("the curve takes the largest series rather than the sum of the newest: %s", sql)
 	}
