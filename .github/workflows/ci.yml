@@ -758,6 +758,26 @@ jobs:
               ;;
           esac
 
+      # Docker fills a new named volume from the directory it is mounted over,
+      # owner included. Up to 2.6.0 the image had no /var/lib/ghchronicle, so a
+      # volume mounted there, which is what every compose stack does, belonged
+      # to root and the collector, uid 65532, saved neither its state nor its
+      # cache. The daemon does the filling, so the owner is read from the host.
+      - name: Check a new state volume belongs to the collector
+        if: steps.filter.outputs.docker == 'true'
+        env:
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          docker volume create ghchronicle-state > /dev/null
+          docker run --rm --platform "${PLATFORM}" \
+            -v ghchronicle-state:/var/lib/ghchronicle ghchronicle:ci -version > /dev/null
+          owner="$(sudo stat -c '%u:%g' "$(docker volume inspect -f '{{.Mountpoint}}' ghchronicle-state)")"
+          echo "${PLATFORM}: a new state volume belongs to ${owner}"
+          if [ "${owner}" != "65532:65532" ]; then
+            echo "::error::a new volume at /var/lib/ghchronicle belongs to ${owner}, not to the collector's 65532:65532"
+            exit 1
+          fi
+
   # One node for the matrix above: the final job wants one answer for "did the
   # images build" rather than one per platform, and the graph reads better
   # with the fan-in drawn.

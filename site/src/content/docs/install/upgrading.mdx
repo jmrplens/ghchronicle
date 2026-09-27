@@ -144,6 +144,20 @@ is unset or empty stops the start and names the key, rather than leaving the
 path without that part. See [`${VAR}`
 expansion](/ghchronicle/configuration/#var-expansion).
 
+### A Docker state volume needs no `chown`
+
+Up to 2.6.0 the image had no `/var/lib/ghchronicle`, so the volume a compose
+stack or a `docker run` mounted there was created owned by root, and the
+collector, uid 65532, saved neither its state nor its cache in it until the
+volume was handed over with a `chown`. From 2.6.1 the image carries the
+directory, owned by uid 65532, and Docker gives a new volume mounted there that
+owner. An empty volume an earlier image left to root is handed over the same
+way the first time a container of 2.6.1 is created on it, which
+`docker compose pull` followed by `docker compose up -d` does; one already
+handed over is left as it is. A host directory mounted there still needs its
+`chown`. See [what has to be
+writable](/ghchronicle/install/docker/#what-has-to-be-writable).
+
 <Aside type="note" title="What else changed">
   Every release's own notes, with what was measured and what was not, are in
   [the changelog](/ghchronicle/reference/changelog/).

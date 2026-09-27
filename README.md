@@ -195,17 +195,17 @@ or take a binary from the
 container:
 
 ```sh
-docker volume create ghchronicle-state
-docker run --rm -v ghchronicle-state:/v alpine chown 65532:65532 /v
 docker run -v $PWD/config.yaml:/config.yaml:ro -v ghchronicle-state:/var/lib/ghchronicle \
   -e GITHUB_TOKEN ghcr.io/jmrplens/ghchronicle -config /config.yaml
 ```
 
 with `state_file: /var/lib/ghchronicle/state.json` in the configuration. The
-image has no `/var/lib/ghchronicle`, its uid 65532 cannot create one, and a new
-named volume belongs to root, hence the one `chown`; mounted there, the volume
-keeps the state and the cache from one container to the next, and without it
-every sweep warns `state not saved` and `cache file not saved`. A
+image carries `/var/lib/ghchronicle` owned by its uid 65532, and a new named
+volume mounted there takes that owner, so the volume keeps the state and the
+cache from one container to the next with nothing to hand over; a host
+directory mounted there instead needs `sudo chown 65532:65532` first, or every
+sweep warns `state not saved` and `cache file not saved`. Up to 2.6.0 the image
+had no such directory, and a new volume there belonged to root. A
 configuration that names no `state_file` writes to the container's working
 directory instead, which is writable and goes with the container.
 

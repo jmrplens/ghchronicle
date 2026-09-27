@@ -150,6 +150,20 @@ o está vacío detiene el arranque y nombra la clave, en vez de dejar la ruta si
 esa parte. Ver [expansión de
 `${VAR}`](/ghchronicle/es/configuration/#expansión-de-var).
 
+### Un volumen de estado de Docker no necesita `chown`
+
+Hasta la 2.6.0 la imagen no tenía `/var/lib/ghchronicle`, así que el volumen
+que una pila de compose o un `docker run` montaba ahí se creaba como propiedad
+de root, y el colector, uid 65532, no guardaba en él ni su estado ni su caché
+hasta que se le entregaba el volumen con un `chown`. Desde la 2.6.1 la imagen
+trae el directorio, propiedad del uid 65532, y Docker le da ese dueño a un
+volumen nuevo montado ahí. Un volumen vacío que una imagen anterior dejó a root
+se entrega del mismo modo la primera vez que se crea sobre él un contenedor de
+la 2.6.1, que es lo que hacen `docker compose pull` y después
+`docker compose up -d`; uno ya entregado se queda como está. Un directorio del
+anfitrión montado ahí sigue necesitando su `chown`. Ver [qué tiene que ser
+escribible](/ghchronicle/es/install/docker/#qué-tiene-que-ser-escribible).
+
 <Aside type="note" title="Qué más cambió">
   Las notas de cada versión, con lo que se midió y lo que no, están en
   [el historial de versiones](/ghchronicle/es/reference/changelog/).

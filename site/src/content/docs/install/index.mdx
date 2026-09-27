@@ -90,9 +90,9 @@ keep it running once you are done watching it.
     ```
 
     Distroless, static, and running as uid 65532. With `state_file` under
-    `/var/lib/ghchronicle` the volume keeps the state, once it is handed to
-    that user: [what has to be
-    writable](/ghchronicle/install/docker/#what-has-to-be-writable).
+    `/var/lib/ghchronicle` the volume keeps the state, and it belongs to that
+    user from the start, since the image's own directory does: [what has to
+    be writable](/ghchronicle/install/docker/#what-has-to-be-writable).
 
   </TabItem>
   <TabItem label="Action">

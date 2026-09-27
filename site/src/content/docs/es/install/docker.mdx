@@ -18,18 +18,13 @@ Elige una pila, pon dos líneas en un `.env` al lado, y arráncala.
 
 ```sh
 docker compose up -d
-docker run --rm -v ghchronicle_state:/v alpine chown 65532:65532 /v
-docker compose restart ghchronicle
 ```
 
-Las dos líneas de después de `up` hacen falta una vez, la primera. El colector
-corre como uid 65532, y Docker crea el volumen `state` de la pila como
-propiedad de root, así que hasta que se le entrega el volumen el colector no
-puede escribir su estado ni su caché: cada pasada avisa `state not saved` y
-`cache file not saved`, y cada reinicio empieza de cero. Sirve cualquier imagen
-que traiga un `chown`, y `ghchronicle_state` es el nombre del volumen porque
-todas las pilas se llaman `ghchronicle` y compose pone eso delante del nombre
-del propio volumen. Ver [qué tiene que ser escribible](#qué-tiene-que-ser-escribible).
+El volumen `state` de la pila conserva el estado y la caché de un arranque al
+siguiente, y el colector puede escribir en él desde el primero: la imagen trae
+el directorio sobre el que se monta, propiedad del uid con el que corre el
+colector, y Docker le da ese dueño a un volumen nuevo. Ver [qué tiene que ser
+escribible](#qué-tiene-que-ser-escribible).
 
 La primera pasada corre todas las familias, porque aún no ha corrido ninguna,
 salvo que el colector arranca una sola familia de seis horas o más por pasada:
@@ -47,8 +42,6 @@ El resto de esta página es la imagen en sí, para quien la ejecute de otra mane
 ## Un contenedor, a mano
 
 ```sh
-docker volume create ghchronicle-state
-docker run --rm -v ghchronicle-state:/v alpine chown 65532:65532 /v
 docker run -d --name ghchronicle \
   -v /etc/ghchronicle/config.yaml:/config.yaml:ro \
   -v ghchronicle-state:/var/lib/ghchronicle \
@@ -59,9 +52,10 @@ docker run -d --name ghchronicle \
 
 Con `state_file: /var/lib/ghchronicle/state.json` en la configuración, que es
 donde lo pone la configuración de ejemplo. El volumen es lo que conserva el
-estado y la caché de un contenedor al siguiente, y el `chown` es lo que deja al
-colector escribir en él; [qué tiene que ser escribible](#qué-tiene-que-ser-escribible)
-explica por qué hace falta cada cosa.
+estado y la caché de un contenedor al siguiente, y Docker lo crea al primer
+uso, propiedad del uid 65532 como el directorio sobre el que se monta; [qué
+tiene que ser escribible](#qué-tiene-que-ser-escribible) explica por qué hace
+falta cada cosa.
 
 ## La imagen
 
@@ -133,26 +127,42 @@ El fichero de configuración se monta de solo lectura. Cinco cosas no:
 Los tres primeros viven por omisión en el mismo directorio, así que un solo
 directorio montado los cubre, y tiene que ser un directorio. Cada uno de los
 tres se escribe a su lado y se renombra en su sitio, para que nadie lea nunca
-medio fichero, y un fichero montado solo no deja dónde escribir a su lado:
-medido con la imagen 2.6.0, un fichero de estado montado solo no se guardó
-nunca, y cada pasada lo dijo.
+medio fichero, y sobre un fichero montado solo no se puede renombrar: medido
+con la imagen 2.6.1 construida desde su Dockerfile, un fichero de estado
+montado solo no se guardó nunca, y cada pasada lo dijo.
+
+```text
+level=WARN msg="state not saved" err="rename /var/lib/ghchronicle/state.json.tmp /var/lib/ghchronicle/state.json: device or resource busy"
+```
+
+Un directorio en el que el colector no puede escribir da el mismo aviso, con el
+error que toque, y otro por la caché de al lado:
 
 ```text
 level=WARN msg="state not saved" err="open /var/lib/ghchronicle/state.json.tmp: permission denied"
 level=WARN msg="cache file not saved" file=/var/lib/ghchronicle/state-cache.bin err="open /var/lib/ghchronicle/state-cache.bin.tmp: permission denied"
 ```
 
-Los mismos dos avisos, cada uno con el error que toque, son lo que da cualquier
-directorio en el que el colector no puede escribir, y hay tres maneras de
-acabar con uno. No montar nada en la ruta del fichero de estado: la
-configuración de ejemplo nombra `/var/lib/ghchronicle`, que la imagen no tiene y
-el uid 65532 no puede crear. Un volumen con nombre nuevo: Docker lo crea como
-propiedad de root, y por eso los ejemplos de esta página se lo entregan una vez
-al uid 65532, con cualquier imagen que traiga un `chown`. Un directorio del
-anfitrión montado sin cambiarle el dueño: hazle `sudo chown 65532:65532` en el
-anfitrión. Una configuración que no nombra ningún `state_file` escribe en el
-directorio de trabajo del contenedor, que es escribible y se va con el
-contenedor.
+Desde la 2.6.1 la imagen trae `/var/lib/ghchronicle` como propiedad del uid
+65532, y Docker llena un volumen con nombre nuevo desde el directorio sobre el
+que se monta, dueño incluido, así que el directorio que nombra la configuración
+de ejemplo no necesita que se le haga nada: medido con un volumen recién creado,
+y con uno vacío que la imagen 2.6.0 había dejado a root, el colector escribió su
+estado y su caché en los dos sin ningún aviso. Sin nada montado ahí también
+escribe, y el estado se va con el contenedor. Hasta la 2.6.0 la imagen no tenía
+ese directorio: sin nada montado ahí quedaba uno que el uid 65532 no podía
+crear, y un volumen con nombre nuevo ahí era de root, que es de donde salieron
+las dos líneas de arriba.
+
+Quedan dos maneras de acabar con un directorio en el que el colector no puede
+escribir. Un volumen con nombre montado donde la imagen no tiene un directorio
+propio se crea como propiedad de root: entrégaselo una vez al uid 65532, con
+cualquier imagen que traiga un `chown`, como en
+`docker run --rm -v <volumen>:/v alpine chown 65532:65532 /v`. Un directorio
+del anfitrión se monta tal cual, sea de quien sea: hazle
+`sudo chown 65532:65532` en el anfitrión. Una configuración que no nombra
+ningún `state_file` escribe en el directorio de trabajo del contenedor, que es
+escribible y se va con el contenedor.
 
 Sin el estado, cada contenedor nuevo empieza de cero: el recorrido de
 estrellas, el historial entero de estrellas y el recorrido de coautorías otra
@@ -243,6 +253,6 @@ docker run --rm \
   ghcr.io/jmrplens/ghchronicle -config /config.yaml -once
 ```
 
-Monta el volumen de estado también en este modo, entregado al uid 65532 como
-arriba. Es lo que hace barata la segunda ejecución, y lo que mantiene cada
-familia en su cadencia: sin él cada ejecución recoge todas las familias.
+Monta el volumen de estado también en este modo. Es lo que hace barata la
+segunda ejecución, y lo que mantiene cada familia en su cadencia: sin él cada
+ejecución recoge todas las familias.

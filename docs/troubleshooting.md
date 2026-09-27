@@ -125,8 +125,11 @@ ask again with a smaller page instead.
 names cannot be written by the user the collector runs as, or does not exist
 and cannot be created. Nothing a sweep learns then survives a restart: the
 next start collects every family and walks the stargazer list, the whole star
-history and the co-authored pull requests again. In a container this is the
-state volume, which Docker creates owned by root; see [what has to be
+history and the co-authored pull requests again. In a container this is a
+host directory mounted without handing it to uid 65532, a new volume mounted
+anywhere but `/var/lib/ghchronicle`, or any new volume under an image before
+2.6.1, none of which that uid owns, or a state file mounted on its own, which
+cannot be renamed over; see [what has to be
 writable](https://jmrp.io/docs/ghchronicle/install/docker/#what-has-to-be-writable).
 
 **`rate limit reserve reached, family skipped`.** Once is fine. Every sweep

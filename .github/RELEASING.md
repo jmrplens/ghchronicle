@@ -162,8 +162,10 @@ the image to `ghcr.io`, pushes it to Docker Hub when the two Docker Hub secrets
 are set, signs each pushed image with the same keyless identity, and publishes
 the release with the `CHANGELOG.md` section as its notes. GoReleaser pushes
 only the version tag. The job then verifies each image's signature against that
-identity at this exact tag, runs the image on both architectures, and only then
-moves `latest` in each registry onto the same digest, checking that it did.
+identity at this exact tag, runs the image on both architectures, checking on
+each that a new volume mounted at `/var/lib/ghchronicle` belongs to the
+collector's uid 65532, and only then moves `latest` in each registry onto the
+same digest, checking that it did.
 Either check failing fails the release, and `latest` and the major tag stay on
 the previous release. A prerelease never moves `latest`.
 

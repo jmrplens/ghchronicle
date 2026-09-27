@@ -72,9 +72,9 @@ keep it running once you are done watching it.
   ```
 
   Distroless, static, and running as uid 65532. With `state_file` under
-  `/var/lib/ghchronicle` the volume keeps the state, once it is handed to
-  that user: [what has to be
-  writable](https://jmrp.io/docs/ghchronicle/install/docker/#what-has-to-be-writable).
+  `/var/lib/ghchronicle` the volume keeps the state, and it belongs to that
+  user from the start, since the image's own directory does: [what has to
+  be writable](https://jmrp.io/docs/ghchronicle/install/docker/#what-has-to-be-writable).
 
 - **Action**
 
@@ -1800,18 +1800,13 @@ volumes:
 
 ```sh
 docker compose up -d
-docker run --rm -v ghchronicle_state:/v alpine chown 65532:65532 /v
-docker compose restart ghchronicle
 ```
 
-The two lines after `up` are needed once, the first time. The collector runs
-as uid 65532, and Docker creates the stack's `state` volume owned by root, so
-until the volume is handed over the collector cannot write its state or its
-cache: every sweep warns `state not saved` and `cache file not saved`, and
-every restart starts from nothing. Any image with a `chown` in it will do, and
-`ghchronicle_state` is the volume's name because every stack is called
-`ghchronicle` and compose puts that before the volume's own name. See [what has
-to be writable](https://jmrp.io/docs/ghchronicle/install/docker/#what-has-to-be-writable).
+The stack's `state` volume keeps the state and the cache from one start to the
+next, and it is the collector's to write from the first: the image carries the
+directory it is mounted on, owned by the uid the collector runs as, and Docker
+gives a new volume that owner. See [what has to be
+writable](https://jmrp.io/docs/ghchronicle/install/docker/#what-has-to-be-writable).
 
 The first sweep runs every family, since nothing has run yet, except that the
 collector starts one family of six hours or more a sweep: `traffic`, `stats`,
@@ -1829,8 +1824,6 @@ The rest of this page is the image itself, for a reader running it another way.
 ### One container, by hand
 
 ```sh
-docker volume create ghchronicle-state
-docker run --rm -v ghchronicle-state:/v alpine chown 65532:65532 /v
 docker run -d --name ghchronicle \
   -v /etc/ghchronicle/config.yaml:/config.yaml:ro \
   -v ghchronicle-state:/var/lib/ghchronicle \
@@ -1841,9 +1834,9 @@ docker run -d --name ghchronicle \
 
 With `state_file: /var/lib/ghchronicle/state.json` in the configuration, which
 is where the example configuration puts it. The volume is what keeps the state
-and the cache across a new container, and the `chown` is what lets the
-collector write to it; [what has to be writable](https://jmrp.io/docs/ghchronicle/install/docker/#what-has-to-be-writable) says
-why each is needed.
+and the cache across a new container, and Docker creates it on first use,
+owned by uid 65532 like the directory it is mounted on; [what has to be
+writable](https://jmrp.io/docs/ghchronicle/install/docker/#what-has-to-be-writable) says why each is needed.
 
 ### The image
 
@@ -1911,24 +1904,39 @@ The config file is mounted read-only. Five things are not:
 The first three live in the same directory by default, so one mounted
 directory covers them, and it has to be a directory. Each of the three is
 written beside itself and renamed into place, so a reader never sees half a
-file, and a file mounted on its own leaves nowhere to write beside it: measured
-with the 2.6.0 image, a state file bind-mounted alone was never saved, and every
-sweep said so.
+file, and a file mounted on its own cannot be renamed over: measured with the
+2.6.1 image built from its Dockerfile, a state file bind-mounted alone was
+never saved, and every sweep said so.
+
+```text
+level=WARN msg="state not saved" err="rename /var/lib/ghchronicle/state.json.tmp /var/lib/ghchronicle/state.json: device or resource busy"
+```
+
+A directory the collector cannot write gives the same warning, with the error
+that fits, and one for the cache beside it:
 
 ```text
 level=WARN msg="state not saved" err="open /var/lib/ghchronicle/state.json.tmp: permission denied"
 level=WARN msg="cache file not saved" file=/var/lib/ghchronicle/state-cache.bin err="open /var/lib/ghchronicle/state-cache.bin.tmp: permission denied"
 ```
 
-The same two warnings, each with the error that fits, are what any directory
-the collector cannot write gives, and there are three ways to end up with one. Mounting nothing at the state file's path: the
-example configuration names `/var/lib/ghchronicle`, which the image does not
-have and uid 65532 cannot create. A new named volume: Docker creates it owned
-by root, which is why the examples on this page hand it to uid 65532 once,
-with any image that has a `chown`. A host directory mounted without changing
-its owner: `sudo chown 65532:65532` it on the host. A configuration that names
-no `state_file` at all writes to the container's working directory, which is
-writable and goes with the container.
+From 2.6.1 the image carries `/var/lib/ghchronicle` owned by uid 65532, and
+Docker fills a new named volume from the directory it is mounted over, owner
+included, so the directory the example configuration names needs nothing done
+to it: measured with a fresh volume, and with an empty one the 2.6.0 image had
+left to root, the collector wrote its state and its cache into both with no
+warning. With nothing mounted there it writes too, and the state goes with the
+container. Up to 2.6.0 the image had no such directory: nothing mounted there
+left one uid 65532 could not create, and a new named volume there was root's,
+which is where the two lines above came from.
+
+Two ways are left to end up with a directory the collector cannot write. A
+named volume mounted where the image has no directory of its own is created
+owned by root: hand it to uid 65532 once, with any image that has a `chown`,
+as in `docker run --rm -v <volume>:/v alpine chown 65532:65532 /v`. A host
+directory is mounted as it is, whoever owns it: `sudo chown 65532:65532` it on
+the host. A configuration that names no `state_file` at all writes to the
+container's working directory, which is writable and goes with the container.
 
 Without the state, every new container starts from nothing: the stargazer walk,
 the whole star history and the co-authored walk again, and every family at
@@ -2016,9 +2024,9 @@ docker run --rm \
   ghcr.io/jmrplens/ghchronicle -config /config.yaml -once
 ```
 
-Mount the state volume in this mode too, handed to uid 65532 as above. It is
-what makes the second run cheap, and what keeps each family to its own cadence:
-without it every run collects every family.
+Mount the state volume in this mode too. It is what makes the second run
+cheap, and what keeps each family to its own cadence: without it every run
+collects every family.
 
 ## GitHub Actions
 
@@ -2456,6 +2464,20 @@ first start if the walks it saves are worth keeping. A `${VAR}` in a path that
 is unset or empty stops the start and names the key, rather than leaving the
 path without that part. See [`${VAR}`
 expansion](https://jmrp.io/docs/ghchronicle/configuration/#var-expansion).
+
+#### A Docker state volume needs no `chown`
+
+Up to 2.6.0 the image had no `/var/lib/ghchronicle`, so the volume a compose
+stack or a `docker run` mounted there was created owned by root, and the
+collector, uid 65532, saved neither its state nor its cache in it until the
+volume was handed over with a `chown`. From 2.6.1 the image carries the
+directory, owned by uid 65532, and Docker gives a new volume mounted there that
+owner. An empty volume an earlier image left to root is handed over the same
+way the first time a container of 2.6.1 is created on it, which
+`docker compose pull` followed by `docker compose up -d` does; one already
+handed over is left as it is. A host directory mounted there still needs its
+`chown`. See [what has to be
+writable](https://jmrp.io/docs/ghchronicle/install/docker/#what-has-to-be-writable).
 
 > **What else changed**
 >
