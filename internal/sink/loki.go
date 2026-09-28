@@ -69,7 +69,10 @@ type Loki struct {
 	// lookback is sent again by the next pass, the same line at the same
 	// instant, and Loki keeps it once: measured against Loki 3.7.7, a line
 	// sent again after another line, and again after its chunk was flushed,
-	// came back once from a query.
+	// came back once from a query. A line whose tail moved in between is not
+	// the same line: measured against Loki 3.7.7 on 2026-09-28, a merged
+	// contribution sent with comments=1 and then comments=2 at the same
+	// instant came back as two lines.
 	Lookback map[string]time.Duration
 
 	// watermarks remembers the newest entry sent per stream, so the second

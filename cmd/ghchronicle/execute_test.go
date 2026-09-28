@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"maps"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -1082,47 +1083,98 @@ func TestTheLokiSinkKeepsAnHourWhenTheConfigSaysNothing(t *testing.T) {
 	}
 }
 
-// TestTheReleaseStreamLooksBackOneRepoCadence reads the lookback the Loki sink
-// is built with from the repo cadence the configuration resolves, the default
-// hour and a slower one, since the release line is dated at the publication
-// and the first pass to see a release is the one after it.
-func TestTheReleaseStreamLooksBackOneRepoCadence(t *testing.T) {
-	logger, _ := newLogger(config.Log{Level: "error"}, io.Discard)
+// TestEachLateStreamLooksBackItsFamilysCadence reads the lookbacks the Loki
+// sink is built with from the cadences the configuration resolves, the default
+// hour and a slower one of each family, since a release line is dated at the
+// publication and a contribution line at the close, and the first pass to see
+// either is the one after it: `repo` for the release, `outbound` for the
+// contribution. One family's cadence moves its own stream's lookback and no
+// other.
+func TestEachLateStreamLooksBackItsFamilysCadence(t *testing.T) {
 	for _, tc := range []struct {
 		families map[string]string
-		want     time.Duration
+		want     map[string]time.Duration
 	}{
-		{nil, 2 * time.Hour},
-		{map[string]string{"repo": "6h"}, 7 * time.Hour},
+		{nil, map[string]time.Duration{"release": 2 * time.Hour, "external_contribution": 2 * time.Hour}},
+		{map[string]string{"repo": "6h"}, map[string]time.Duration{"release": 7 * time.Hour, "external_contribution": 2 * time.Hour}},
+		{map[string]string{"outbound": "6h"}, map[string]time.Duration{"release": 2 * time.Hour, "external_contribution": 7 * time.Hour}},
 	} {
-		cfg := &config.Config{
-			GitHub:  config.GitHub{Token: "t"},
-			Targets: config.Targets{User: "octocat"},
-			Every:   config.Every{Families: tc.families},
-			Sinks: config.Sinks{
-				Loki:       &config.LokiSink{URL: "http://loki:3100/loki/api/v1/push"},
-				DedupeFile: "off",
-			},
-		}
-		if err := cfg.Validate(); err != nil {
-			t.Fatal(err)
-		}
-		built, _, err := buildSinks(cfg, logger, false)
-		if err != nil {
-			t.Fatal(err)
-		}
-		loki, ok := built[0].(*sink.Loki)
-		if !ok {
-			t.Fatalf("built %s, want the loki sink", sinkNames(built))
-		}
-		if got := loki.Lookback["release"]; got != tc.want {
-			t.Errorf("every.families %v: the release stream looks back %v, want %v", tc.families, got, tc.want)
-		}
-		if len(loki.Lookback) != 1 {
-			t.Errorf("lookbacks %v, want the release stream's alone", loki.Lookback)
+		loki, built := builtLoki(t, tc.families)
+		if !maps.Equal(loki.Lookback, tc.want) {
+			t.Errorf("every.families %v: the streams look back %v, want %v", tc.families, loki.Lookback, tc.want)
 		}
 		closeAll(t, built)
 	}
+}
+
+// TestAContributionMergedAnHourAndAHalfAgoReachesLoki writes through the sink
+// the configuration builds, at the default cadence of `outbound` and the
+// default max_age, both an hour. A contribution's line is dated when the item
+// closed, and the first outbound pass to see it is the one after, so an item
+// merged just after one pass read the searches is most of an hour old when the
+// next pass writes, and more when that pass runs late: max_age alone left out
+// every such line for good. One past the lookback, which an earlier pass would
+// have sent, still stays out.
+func TestAContributionMergedAnHourAndAHalfAgoReachesLoki(t *testing.T) {
+	loki, built := builtLoki(t, nil)
+	defer closeAll(t, built)
+	var body strings.Builder
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		raw, _ := io.ReadAll(r.Body)
+		body.Write(raw)
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+	loki.URL = srv.URL
+
+	now := time.Now()
+	merged := func(number string, at time.Time) sink.Point {
+		return sink.Point{
+			Measurement: "gh_external_contribution",
+			Tags: map[string]string{
+				"user": "octocat", "full_name": "o/r", "owner": "o", "repo": "r",
+				"number": number, "kind": "pull_request", "state": "merged",
+			},
+			Fields: map[string]any{"contributions": 1, "merged": 1}, Time: at,
+		}
+	}
+	written, err := loki.Write(context.Background(), []sink.Point{
+		merged("7", now.Add(-90*time.Minute)), merged("8", now.Add(-2*time.Hour-10*time.Minute)),
+	})
+	if d, ok := errors.AsType[*sink.DroppedError](err); !ok || d.N != 1 {
+		t.Errorf("Write = %v, want the one merged past the lookback reported dropped", err)
+	}
+	if written != 1 || !strings.Contains(body.String(), "o/r#7 was merged") || strings.Contains(body.String(), "o/r#8") {
+		t.Errorf("wrote %d lines, want the one merged an hour and a half ago alone: %s", written, body.String())
+	}
+}
+
+// builtLoki is the Loki sink buildSinks makes of a configuration with these
+// cadences and a `loki:` block that says nothing else, and everything it built.
+func builtLoki(t *testing.T, families map[string]string) (*sink.Loki, []sink.Sink) {
+	t.Helper()
+	logger, _ := newLogger(config.Log{Level: "error"}, io.Discard)
+	cfg := &config.Config{
+		GitHub:  config.GitHub{Token: "t"},
+		Targets: config.Targets{User: "octocat"},
+		Every:   config.Every{Families: families},
+		Sinks: config.Sinks{
+			Loki:       &config.LokiSink{URL: "http://loki:3100/loki/api/v1/push"},
+			DedupeFile: "off",
+		},
+	}
+	if err := cfg.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	built, _, err := buildSinks(cfg, logger, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	loki, ok := built[0].(*sink.Loki)
+	if !ok {
+		t.Fatalf("built %s, want the loki sink", sinkNames(built))
+	}
+	return loki, built
 }
 
 // TestBuildSinksWithTheLedgerOff builds the sinks without the ledger, which

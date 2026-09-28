@@ -144,7 +144,8 @@ sinks:
   #   # default, and much of this history is older than that on purpose. What
   #   # falls outside is left out rather than costing the whole push, which is
   #   # why the default is an hour and not a day. Raise it only alongside
-  #   # max_chunk_age. Releases look back the repo cadence on top of it.
+  #   # max_chunk_age. Releases look back the repo cadence on top of it, and
+  #   # external contributions the outbound one.
   #   max_age: 1h
 
   # A rotating file, for a setup that already runs a log shipper. Also the
