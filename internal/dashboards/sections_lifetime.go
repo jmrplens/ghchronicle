@@ -100,13 +100,21 @@ func everyRepositoryTwins(b *builder) *P {
 		},
 		[]string{ESF, "(archived.keyword:false OR " + esCollectedWindow + ")"},
 		hideColumns("full_name.keyword"))
+	// Each query is wrapped in an aggregation over the labels the table
+	// draws, because `or` and `unless` hand back the series as they are,
+	// metric name included, and the merge that joins the seven columns
+	// joins on every label the frames share: seven metric names were seven
+	// rows per repository, one number each (the 2.6.1 review, on hello-world).
+	// max rather than sum, so that two series of one repository, should the
+	// selection ever leave two, read as one reading and not as their total.
 	var prom []Target
 	for i, field := range []string{
 		"commits", "pulls_merged", "issues", "releases", "stars", "branches", "tags",
 	} {
 		archived := fmt.Sprintf(`github_repo_total_%s{archived="true",%s}`, field, PF)
 		prom = append(prom, promTbl(fmt.Sprintf(
-			"%s or (github_repo_total_%s{%s} unless on (full_name) %s)", archived, field, PF, archived,
+			"max by (full_name, repo, fork, archived) (%s or (github_repo_total_%s{%s} unless on (full_name) %s))",
+			archived, field, PF, archived,
 		), string(rune('A'+i))))
 	}
 	return &P{Prom: prom, GR: gr, GRTF: grtf, ES: es, ESTF: estf}
@@ -257,9 +265,7 @@ func lifetime(b *builder) []Panel {
 					panelValueA: "Commits", panelValueB: "Merged",
 					panelValueC: "Issues", panelValueD: "Releases", panelValueE: "Stars",
 					panelValueF: "Branches", panelValueG: "Tags",
-				}, []string{
-					"owner", "full_name", "visibility", "instance", "job", "__name__",
-				}, map[string]int{"repo": 0, panelValueA: 1, "fork": 2, "archived": 3}),
+				}, nil, map[string]int{"repo": 0, panelValueA: 1, "fork": 2, "archived": 3}),
 				Opts: Opts{"sort": "Commits", "sort_leading": "Fork"},
 				Desc: everyRepositoryDesc,
 				Overrides: []any{

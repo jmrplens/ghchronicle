@@ -602,7 +602,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "github_repo_total_commits{archived=\"true\",repo=~\"$repo\"} or (github_repo_total_commits{repo=~\"$repo\"} unless on (full_name) github_repo_total_commits{archived=\"true\",repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo, fork, archived) (github_repo_total_commits{archived=\"true\",repo=~\"$repo\"} or (github_repo_total_commits{repo=~\"$repo\"} unless on (full_name) github_repo_total_commits{archived=\"true\",repo=~\"$repo\"}))",
               "format": "table",
               "instant": true,
               "range": false,
@@ -611,7 +611,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "github_repo_total_pulls_merged{archived=\"true\",repo=~\"$repo\"} or (github_repo_total_pulls_merged{repo=~\"$repo\"} unless on (full_name) github_repo_total_pulls_merged{archived=\"true\",repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo, fork, archived) (github_repo_total_pulls_merged{archived=\"true\",repo=~\"$repo\"} or (github_repo_total_pulls_merged{repo=~\"$repo\"} unless on (full_name) github_repo_total_pulls_merged{archived=\"true\",repo=~\"$repo\"}))",
               "format": "table",
               "instant": true,
               "range": false,
@@ -620,7 +620,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "github_repo_total_issues{archived=\"true\",repo=~\"$repo\"} or (github_repo_total_issues{repo=~\"$repo\"} unless on (full_name) github_repo_total_issues{archived=\"true\",repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo, fork, archived) (github_repo_total_issues{archived=\"true\",repo=~\"$repo\"} or (github_repo_total_issues{repo=~\"$repo\"} unless on (full_name) github_repo_total_issues{archived=\"true\",repo=~\"$repo\"}))",
               "format": "table",
               "instant": true,
               "range": false,
@@ -629,7 +629,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "github_repo_total_releases{archived=\"true\",repo=~\"$repo\"} or (github_repo_total_releases{repo=~\"$repo\"} unless on (full_name) github_repo_total_releases{archived=\"true\",repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo, fork, archived) (github_repo_total_releases{archived=\"true\",repo=~\"$repo\"} or (github_repo_total_releases{repo=~\"$repo\"} unless on (full_name) github_repo_total_releases{archived=\"true\",repo=~\"$repo\"}))",
               "format": "table",
               "instant": true,
               "range": false,
@@ -638,7 +638,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "github_repo_total_stars{archived=\"true\",repo=~\"$repo\"} or (github_repo_total_stars{repo=~\"$repo\"} unless on (full_name) github_repo_total_stars{archived=\"true\",repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo, fork, archived) (github_repo_total_stars{archived=\"true\",repo=~\"$repo\"} or (github_repo_total_stars{repo=~\"$repo\"} unless on (full_name) github_repo_total_stars{archived=\"true\",repo=~\"$repo\"}))",
               "format": "table",
               "instant": true,
               "range": false,
@@ -647,7 +647,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "github_repo_total_branches{archived=\"true\",repo=~\"$repo\"} or (github_repo_total_branches{repo=~\"$repo\"} unless on (full_name) github_repo_total_branches{archived=\"true\",repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo, fork, archived) (github_repo_total_branches{archived=\"true\",repo=~\"$repo\"} or (github_repo_total_branches{repo=~\"$repo\"} unless on (full_name) github_repo_total_branches{archived=\"true\",repo=~\"$repo\"}))",
               "format": "table",
               "instant": true,
               "range": false,
@@ -656,7 +656,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "github_repo_total_tags{archived=\"true\",repo=~\"$repo\"} or (github_repo_total_tags{repo=~\"$repo\"} unless on (full_name) github_repo_total_tags{archived=\"true\",repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo, fork, archived) (github_repo_total_tags{archived=\"true\",repo=~\"$repo\"} or (github_repo_total_tags{repo=~\"$repo\"} unless on (full_name) github_repo_total_tags{archived=\"true\",repo=~\"$repo\"}))",
               "format": "table",
               "instant": true,
               "range": false,
@@ -678,8 +678,7 @@
                   "full_name": true,
                   "instance": true,
                   "job": true,
-                  "owner": true,
-                  "visibility": true
+                  "owner": true
                 },
                 "indexByName": {
                   "Value #A": 1,
