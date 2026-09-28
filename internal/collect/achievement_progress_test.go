@@ -363,6 +363,108 @@ func TestCoauthoredWalkReportsATruncatedPullRequest(t *testing.T) {
 	}
 }
 
+// bigPull is a merged pull request of the walk whose commits run past the
+// first page: the hundred given carry no trailer, and the connection says
+// where the rest begin.
+func bigPull(id, mergedAt string, total int) string {
+	return fmt.Sprintf(`{"id":%q,"mergedAt":%q,"mergeCommit":{"message":"Big"},"commits":{"totalCount":%d,`+
+		`"pageInfo":{"hasNextPage":true,"endCursor":"MTAw"},"nodes":[{"commit":{"message":"work"}}]}}`, id, mergedAt, total)
+}
+
+// pullCommitsServer answers the walk with one search page of these nodes, and
+// each query for the rest of a pull request's commits from pages, keyed by
+// the node id and cursor asked, recording each key in order. A key with no
+// page is answered with a 502.
+func pullCommitsServer(t *testing.T, nodes []string, pages map[string]string) (*fixtureServer, func() []string) {
+	t.Helper()
+	f := newFixtureServer(t)
+	var mu sync.Mutex
+	var asked []string
+	f.graphQL(func(w http.ResponseWriter, _ *http.Request, query string, vars map[string]any) {
+		if strings.Contains(query, "query coauthoredPulls(") {
+			_, _ = fmt.Fprintf(w, `{"data":{"search":{"issueCount":%d,"pageInfo":{"hasNextPage":false,"endCursor":""},"nodes":[%s]}}}`,
+				len(nodes), strings.Join(nodes, ","))
+			return
+		}
+		var aliases []string
+		for i := 0; vars[fmt.Sprintf("id%d", i)] != nil; i++ {
+			key := fmt.Sprintf("%v@%v", vars[fmt.Sprintf("id%d", i)], vars[fmt.Sprintf("after%d", i)])
+			mu.Lock()
+			asked = append(asked, key)
+			mu.Unlock()
+			page, ok := pages[key]
+			if !ok {
+				w.WriteHeader(http.StatusBadGateway)
+				return
+			}
+			aliases = append(aliases, fmt.Sprintf(`"p%d":{"commits":%s}`, i, page))
+		}
+		_, _ = fmt.Fprintf(w, `{"data":{%s}}`, strings.Join(aliases, ","))
+	})
+	return f, func() []string {
+		mu.Lock()
+		defer mu.Unlock()
+		return append([]string(nil), asked...)
+	}
+}
+
+// TestCoauthoredWalkReadsTheCommitsPastTheFirstHundred follows a pull request
+// whose commits run past the hundred the search page carries to the end of
+// them. Measured on 2026-09-28, the three pull requests of the production
+// account over a hundred commits, 143, 144 and 248, made its count a floor on
+// every pass, and reading the rest of their commits found no trailer in any:
+// the count was exact and the warning a false alarm. Here one of 150 commits
+// carries the trailer on its second page and is counted, settled since it
+// merged before today, and one of 250 with none anywhere is read to its third
+// page and is neither counted nor a floor.
+func TestCoauthoredWalkReadsTheCommitsPastTheFirstHundred(t *testing.T) {
+	t.Parallel()
+	f, asked := pullCommitsServer(t, []string{
+		bigPull("PR_a", "2020-01-01T10:00:00Z", 150),
+		bigPull("PR_b", "2020-01-01T11:00:00Z", 250),
+	}, map[string]string{
+		"PR_a@MTAw": `{"pageInfo":{"hasNextPage":false,"endCursor":"MTUw"},"nodes":[{"commit":{"message":"work"}},` +
+			`{"commit":{"message":"pair\n\nCo-authored-by: A <a@example.com>"}}]}`,
+		"PR_b@MTAw": `{"pageInfo":{"hasNextPage":true,"endCursor":"MjAw"},"nodes":[{"commit":{"message":"work"}}]}`,
+		"PR_b@MjAw": `{"pageInfo":{"hasNextPage":false,"endCursor":"MjUw"},"nodes":[{"commit":{"message":"work"}}]}`,
+	})
+	day := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+	w := coauthoredWalk{login: "o", today: day.AddDate(0, 0, 1)}
+	if err := w.walk(ctx(t), f.Client, day, day); err != nil {
+		t.Fatal(err)
+	}
+	if w.pulls != 1 || w.settled != 1 || w.truncated != 0 {
+		t.Errorf("pulls = %d, settled = %d, truncated = %d, want 1, 1 and 0: every commit was read", w.pulls, w.settled, w.truncated)
+	}
+	if got := strings.Join(asked(), " "); got != "PR_a@MTAw PR_b@MTAw PR_b@MjAw" {
+		t.Errorf("asked for the commits of %s, want both from the hundredth in one query and the longer one on", got)
+	}
+}
+
+// TestCoauthoredWalkKeepsAPullRequestItCouldNotReadAsAFloor asks for the rest
+// of a pull request's commits and is refused: that pull request stays a floor,
+// as it was when nothing past the first page was asked for, and the walk goes
+// on with the count it has.
+func TestCoauthoredWalkKeepsAPullRequestItCouldNotReadAsAFloor(t *testing.T) {
+	t.Parallel()
+	f, asked := pullCommitsServer(t, []string{
+		bigPull("PR_a", "2020-01-01T10:00:00Z", 150),
+		`{"id":"PR_c","mergedAt":"2020-01-01T12:00:00Z","mergeCommit":{"message":"Pair\n\nCo-authored-by: A <a@example.com>"},` +
+			`"commits":{"totalCount":1,"pageInfo":{"hasNextPage":false,"endCursor":"MQ"},"nodes":[{"commit":{"message":"work"}}]}}`,
+	}, nil)
+	day := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+	w := coauthoredWalk{login: "o", today: day.AddDate(0, 0, 1)}
+	if err := w.walk(ctx(t), f.Client, day, day); err != nil {
+		t.Fatalf("walk = %v, want the refused pull request kept as a floor and the walk finished", err)
+	}
+	if w.pulls != 1 || w.truncated != 1 || w.settledTruncated != 1 {
+		t.Errorf("pulls = %d, truncated = %d, settled truncated = %d, want 1, 1 and 1", w.pulls, w.truncated, w.settledTruncated)
+	}
+	if got := strings.Join(asked(), " "); got != "PR_a@MTAw" {
+		t.Errorf("asked for the commits of %q, want the pull request past its first page, once", got)
+	}
+}
+
 // TestAchievementsWriteTheBadgesWhenTheCountsFail pins what a refused count
 // costs: the progress rows of this pass, said through Warn, and never the
 // badges the page already gave. The warning names the pass and not the day:

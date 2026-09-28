@@ -959,6 +959,32 @@ func ledgerForgot(cfg *config.Config, ledger *sink.Ledger) (forgot, everyStart b
 	}
 }
 
+// lokiLateStreams names, for each Loki stream whose line is dated at a moment
+// only the next pass of a family can see, that family. A release is dated at
+// its publication and first seen by the repo pass after it, a contribution at
+// its close and first seen by the outbound pass after it, so one that happened
+// just after a pass read it is a cadence old when the next pass writes, plus
+// however late that pass runs. With both at the hour, max_age alone left it
+// out, and every later pass only saw it older. The stream looks back the
+// family's cadence plus max_age, which lets a pass be as late as the sink lets
+// any entry be.
+var lokiLateStreams = map[string]string{
+	"release":               "repo",
+	"external_contribution": "outbound",
+}
+
+// lokiLookbacks is how far back each of those streams looks, for the families
+// this configuration runs; a family that is off writes nothing to look for.
+func lokiLookbacks(cfg *config.Config, maxAge time.Duration) map[string]time.Duration {
+	out := map[string]time.Duration{}
+	for kind, family := range lokiLateStreams {
+		if every, ok := cfg.Interval(family); ok {
+			out[kind] = every + maxAge
+		}
+	}
+	return out
+}
+
 // buildSinks builds the configured sinks, and hands back the write ledger they
 // share, nil when this run opens none.
 func buildSinks(cfg *config.Config, log *slog.Logger, oneShot bool) ([]sink.Sink, *sink.Ledger, error) {
@@ -1001,15 +1027,7 @@ func buildSinks(cfg *config.Config, log *slog.Logger, oneShot bool) ([]sink.Sink
 	}
 	if l := cfg.Sinks.Loki; l != nil {
 		loki := sink.NewLoki(l.URL, l.TenantID, l.Labels, l.Batch, l.Age(), cfg.GitHub.HTTPTimeout())
-		// A release is dated at its publication and first seen by the repo
-		// pass after it, so one published just after a pass read its
-		// repository is a cadence old when the next pass writes, plus however
-		// late that pass runs. With both at the hour, max_age alone left it
-		// out, and every later pass only saw it older. The cadence plus
-		// max_age lets a pass be as late as the sink lets any entry be.
-		if every, ok := cfg.Interval("repo"); ok {
-			loki.Lookback = map[string]time.Duration{"release": every + loki.MaxAge}
-		}
+		loki.Lookback = lokiLookbacks(cfg, loki.MaxAge)
 		out = append(out, loki)
 	}
 	if f := cfg.Sinks.File; f != nil {

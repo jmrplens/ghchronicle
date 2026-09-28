@@ -158,6 +158,19 @@ handed over is left as it is. A host directory mounted there still needs its
 `chown`. See [what has to be
 writable](/ghchronicle/install/docker/#what-has-to-be-writable).
 
+### `achievements` walks the whole merged history once more
+
+The co-authored count behind Pair Extraordinaire now reads every commit of a
+pull request with more than a hundred, where 2.6.0 read the first hundred and
+counted the rest as a floor. That is a change to the rule the count is kept by,
+so the count a 2.6.0 state file holds is set aside and the first `achievements`
+pass after the upgrade walks every pull request the account has merged: 41
+queries with the counts query, 41 points, in 1 minute 53 seconds over the
+account measured, on 2026-09-28. A `co-authored pull request count is a floor` warning that came
+back on every pass stops with it, unless a pull request's remaining commits
+really could not be read. See
+[`gh_achievement_progress`](/ghchronicle/collectors/measurements/).
+
 <Aside type="note" title="What else changed">
   Every release's own notes, with what was measured and what was not, are in
   [the changelog](/ghchronicle/reference/changelog/).

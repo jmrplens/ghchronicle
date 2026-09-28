@@ -92,6 +92,38 @@ func TestLokiSinkPushesEventsAsLogLines(t *testing.T) {
 		}
 	}
 	assertReleasesAtPublication(t, reqs)
+	assertContributionsAtTheirClose(t, reqs)
+}
+
+// assertContributionsAtTheirClose holds the contribution stream to closings.
+// The fixtures answer each of the five outbound searches with the same two
+// items, a pull request merged 59 days ago and an issue still open, so both
+// open searches write a row of each with the state open, and with ten years of
+// horizon every one of them would reach Loki if it were rendered. None may: an
+// item's row in an open search is a reading repeated every day, not something
+// that happened. The merge is, at the second it happened.
+func assertContributionsAtTheirClose(t *testing.T, reqs []capturedRequest) {
+	t.Helper()
+	mergedAt := strconv.FormatInt(fakegh.DaysAgo(59).Add(10*time.Hour).UnixNano(), 10)
+	merged := false
+	for _, r := range reqs {
+		for _, s := range decodeLoki(t, r.Body).Streams {
+			if s.Stream["kind"] != "external_contribution" {
+				continue
+			}
+			for _, v := range s.Values {
+				message, pairs, _ := splitLogfmt(v[1])
+				if pairs["state"] == "open" {
+					t.Errorf("a row of an open search was sent, which is not an event: %s", v[1])
+				}
+				merged = merged || (pairs["state"] == "merged" && v[0] == mergedAt &&
+					message == login+"'s pull request someone/else#118 was merged")
+			}
+		}
+	}
+	if !merged {
+		t.Errorf("no line says someone/else#118 was merged, stamped %s", mergedAt)
+	}
 }
 
 // assertReleasesAtPublication holds the release stream to the moments the
@@ -328,4 +360,94 @@ func TestLokiSendsAReleaseTheLastPassCouldNotHaveSeen(t *testing.T) {
 			t.Errorf("release %s sent = %v, want %v; the release stream carried %v", tag, sent[tag], want, sent)
 		}
 	}
+}
+
+// TestLokiSendsAContributionTheLastPassCouldNotHaveSeen is the release test
+// above for the contribution stream, through the binary and the configuration
+// it reads. A contribution's line is dated when the item closed, and the first
+// outbound pass to see it is the one after, so at the default hour of both
+// `outbound` and max_age an item merged just after a pass read the searches
+// was more than an hour old when the next pass wrote, and the sink's wall
+// clock left it out for good. The stream looks back an outbound cadence plus
+// max_age instead: an item merged an hour and a half ago arrives, and one
+// merged past the lookback, which an earlier pass would have sent, does not.
+// An item still open sends nothing whenever its row is stamped.
+func TestLokiSendsAContributionTheLastPassCouldNotHaveSeen(t *testing.T) {
+	t.Parallel()
+	now := time.Now().UTC()
+	item := func(number int, created time.Time, closed *time.Time) map[string]any {
+		node := map[string]any{
+			"number": number, "title": "Item " + strconv.Itoa(number),
+			"url":       "https://github.com/someone/else/pull/" + strconv.Itoa(number),
+			"createdAt": created.Format(time.RFC3339), "updatedAt": created.Format(time.RFC3339),
+			"closedAt": nil, "additions": 3, "deletions": 1, "changedFiles": 1,
+			"comments": map[string]any{"totalCount": 0},
+			"repository": map[string]any{
+				"nameWithOwner": "someone/else", "stargazerCount": 5152, "forkCount": 555,
+				"isPrivate": false, "url": "https://github.com/someone/else",
+				"primaryLanguage": map[string]any{"name": "Go"},
+			},
+		}
+		if closed != nil {
+			at := closed.Format(time.RFC3339)
+			node["updatedAt"], node["closedAt"], node["mergedAt"] = at, at, at
+		}
+		return node
+	}
+	ago := func(d time.Duration) *time.Time { at := now.Add(-d); return &at }
+	gh := fakegh.New(t, "testdata", contributionsOverlay(t,
+		item(301, now.Add(-72*time.Hour), ago(90*time.Minute)),
+		item(302, now.Add(-72*time.Hour), ago(2*time.Hour+10*time.Minute)),
+		item(303, now.Add(-72*time.Hour), nil),
+	))
+	rec := newCapture(t, nil)
+	dir := t.TempDir()
+	// Every family runs at a minute here; outbound goes back to its own hour,
+	// and max_age is left to its default, which is the configuration that
+	// lost these lines.
+	sweepOnce(t, writeSinkConfigAt(t, dir, gh.URL(), `  loki:
+    url: `+rec.URL()+`/loki/api/v1/push`, map[string]string{"outbound": "1h"}))
+
+	merged := map[string]bool{}
+	for _, r := range rec.Accepted() {
+		for _, s := range decodeLoki(t, r.Body).Streams {
+			if s.Stream["kind"] != "external_contribution" {
+				continue
+			}
+			for _, v := range s.Values {
+				_, pairs, _ := splitLogfmt(v[1])
+				switch pairs["state"] {
+				case "open":
+					t.Errorf("a row of an open search was sent, which is not an event: %s", v[1])
+				case "merged":
+					merged[pairs["number"]] = true
+				}
+			}
+		}
+	}
+	for number, want := range map[string]bool{"301": true, "302": false} {
+		if merged[number] != want {
+			t.Errorf("someone/else#%s merged sent = %v, want %v; the merged lines were of %v", number, merged[number], want, merged)
+		}
+	}
+}
+
+// contributionsOverlay is a directory holding one page of outbound search
+// results made of these items, which the fake answers every one of the five
+// searches with.
+func contributionsOverlay(t *testing.T, nodes ...map[string]any) string {
+	t.Helper()
+	body, err := json.Marshal(map[string]any{"data": map[string]any{"search": map[string]any{
+		"issueCount": len(nodes),
+		"pageInfo":   map[string]any{"hasNextPage": false, "endCursor": "Y3Vyc29yOjM="},
+		"nodes":      nodes,
+	}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	if err = os.WriteFile(filepath.Join(dir, "graphql_search_issues.json"), body, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return dir
 }

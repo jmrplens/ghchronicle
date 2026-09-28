@@ -61,18 +61,23 @@ consultable en Grafana sin mantener dos copias de los datos.
 someone starred acme/telemetry full_name="acme/telemetry" user="someone" starred=1
 ```
 
-Dos frases cambiaron en 2.6.0, y una línea que ya está en Loki conserva el texto
-con el que se envió:
+Dos representaciones cambiaron en 2.6.0, y una de ellas otra vez en 2.6.1. Una
+línea que ya está en Loki conserva el texto con el que se envió:
 
-- Una contribución externa dice qué le pasó al elemento y no quién lo hizo,
+- Una contribución externa es una línea cuando el elemento se cierra, en el
+  momento en que se cerró, y dice qué le pasó al elemento y no quién lo hizo,
   porque la fila no dice quién lo fusionó o lo cerró: una pull request dice
-  `USER's pull request OWNER/REPO#N is open`,
   `USER's pull request OWNER/REPO#N was merged` o
   `USER's pull request OWNER/REPO#N was closed without merging`, y una issue
-  `USER's issue OWNER/REPO#N is open` o `USER's issue OWNER/REPO#N was closed`.
-  Una fila cuyo estado y cuya marca de fusión no coinciden dice
-  `USER's contribution OWNER/REPO#N`. Antes todas las líneas decían
-  `USER merged OWNER/REPO#N`, issues abiertas incluidas.
+  `USER's issue OWNER/REPO#N was closed`. Una fila cerrada cuyo estado y cuya
+  marca de fusión no coinciden dice `USER's contribution OWNER/REPO#N`. Un
+  elemento todavía abierto no es ninguna línea desde 2.6.1: su fila se sella
+  al principio de cada día en que se ve abierto, lo que es una lectura y no
+  algo que ocurrió, y abrirlo ya es una línea del feed de eventos, con
+  `action="opened"`. 2.6.0 enviaba esa fila como `... is open`, y solo el día
+  en que una pasada de `outbound` escribía en la primera hora del día UTC.
+  Antes todas las líneas decían `USER merged OWNER/REPO#N`, issues abiertas
+  incluidas.
 - Una release dice `published release TAG of OWNER/REPO`, o
   `published prerelease TAG of OWNER/REPO`, en el momento en que se publicó.
   Antes decía `release TAG of OWNER/REPO, N downloads`, así que una consulta
@@ -127,8 +132,8 @@ costar el envío entero.
 Súbelo solo si has subido a juego el `max_chunk_age` de Loki, ya que la ventana
 es la mitad.
 
-Una release es el evento que muestra lo que cuesta el horizonte, y el único
-stream que mira más atrás. Su línea se genera a partir de
+Una release es el evento que muestra lo que cuesta el horizonte, y uno de los
+dos streams que miran más atrás. Su línea se genera a partir de
 `gh_release_published`, en el momento en que se publicó la release. Antes salía
 de `gh_release`, que se sella en la pasada porque sus descargas se mueven, así
 que cada pasada de repositorios volvía a enviar todas las releases. Medido con
@@ -143,17 +148,30 @@ corrieron antes, un reinicio. Con `repo` y `max_age` en su hora por omisión,
 veía más vieja.
 
 Así que el stream de releases mira atrás la cadencia de `repo` más `max_age`:
-dos horas por omisión, siete con `repo: 6h`. Esa mirada atrás tiene un tope de
-seis días, un día menos que la semana que permite `reject_old_samples_max_age`,
-y nunca acorta `max_age`: uno fijado por encima de seis días es el horizonte de
-este stream igual que el de cualquier otro. Loki solo rechaza
-una línea vieja por ir atrasada respecto a una más nueva de su stream, que es lo
-que la segunda comprobación de arriba sigue haciendo. Una release publicada en
-la hora anterior a una pasada la envía esa pasada y otra vez la siguiente, la
-misma línea en el mismo instante, que Loki guarda una sola vez. Con `-once` la
-cadencia que cuenta es la del calendario que lanza el binario, así que pon
-`every.families.repo` a ese valor. La release está en el almacén de métricas en
-cualquier caso.
+dos horas por omisión, siete con `repo: 6h`. Una contribución externa es el
+otro stream que lo hace, por la misma razón: su línea se fecha cuando se cerró
+el elemento, y la primera pasada que lo ve es la de `outbound` siguiente, así
+que el stream mira atrás la cadencia de `outbound` más `max_age`, dos horas por
+omisión. Antes de 2.6.1 tenía solo `max_age`, y un cierre se enviaba solo si la
+pasada siguiente escribía dentro de la hora, cosa que una pasada horaria no
+hace con un elemento cerrado en los segundos posteriores a que la anterior
+leyera las búsquedas, ni, cuando se retrasa, con uno cerrado en los minutos que
+lleva de retraso.
+
+Cada mirada atrás tiene un tope de seis días, un día menos que la semana que
+permite `reject_old_samples_max_age`, y nunca acorta `max_age`: uno fijado por
+encima de seis días es el horizonte de estos streams igual que el de cualquier
+otro. Loki solo rechaza una línea vieja por ir atrasada respecto a una más
+nueva de su stream, que es lo que la segunda comprobación de arriba sigue
+haciendo. Una release publicada en la hora anterior a una pasada la envía esa
+pasada y otra vez la siguiente, la misma línea en el mismo instante, que Loki
+guarda una sola vez. Una contribución se envía dos veces del mismo modo, y su
+línea lleva el número de comentarios y el título del elemento, que pueden
+moverse entre medias: medido contra Loki 3.7.7, una línea enviada otra vez con
+`comments` pasado de 1 a 2 se guardó como una segunda línea en el mismo
+instante. Con `-once` la cadencia que cuenta es la del calendario que lanza el
+binario, así que pon `every.families.repo` y `every.families.outbound` a ese
+valor. Las dos están en el almacén de métricas en cualquier caso.
 
 ## Para qué no sirve Loki
 

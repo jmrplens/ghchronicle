@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/jmrplens/ghchronicle/v2/internal/ghapi"
@@ -190,21 +191,36 @@ query coauthoredPulls($query: String!, $first: Int!, $after: String) {
     pageInfo { hasNextPage endCursor }
     nodes {
       ... on PullRequest {
+        id
         mergedAt
         mergeCommit { message }
-        commits(first: 100) { totalCount nodes { commit { message } } }
+        commits(first: 100) { totalCount pageInfo { hasNextPage endCursor } nodes { commit { message } } }
       }
     }
   }
 }`
+
+// coauthoredCommitsField is the next hundred commits of one pull request the
+// search page left unread, by its node id, aliased so that one query reads
+// the next page of several.
+const coauthoredCommitsField = `
+  p%[1]d: node(id: $id%[1]d) { ... on PullRequest { commits(first: 100, after: $after%[1]d) { pageInfo { hasNextPage endCursor } nodes { commit { message } } } } }`
+
+// coauthoredFollowBatch is how many pull requests one query reads the next
+// hundred commits of. A search page of a hundred pull requests with a hundred
+// commits each is what the gateway can refuse, which the walk answers by
+// halving it; ten is a tenth of that at most, and a refused query leaves only
+// its ten as floors.
+const coauthoredFollowBatch = 10
 
 // coauthoredRule is the version of the rule the Pair Extraordinaire count is
 // made by: which pull requests the walk asks for and what in them it reads
 // as a co-author. A tally kept under another version counted something else,
 // and adding this rule's days to it would mix the two, so it is walked again
 // whole. Raise it with any change to the search, the trailer or the commits
-// read.
-const coauthoredRule = 1
+// read. 2 reads every commit of a pull request, where 1 read the first
+// hundred and kept a tally whose floor 2 can settle.
+const coauthoredRule = 2
 
 // coauthoredWholeEvery is how many days a tally is added to before the whole
 // history is walked again. Adding only ever raises the count, and it can go
@@ -302,12 +318,42 @@ type coauthoredWalk struct {
 	// pull requests, which no range can split further: the count is then a
 	// floor.
 	capped bool
-	// truncated is how many pull requests had more commits than one page
-	// carries and no trailer in the ones read, nor in their merge commit: a
-	// trailer past the hundredth commit is not seen, and the count is a
+	// truncated is how many pull requests had more commits than the search
+	// page carries, no trailer in the ones read nor in their merge commit,
+	// and the rest of their commits not read, because the query that asked
+	// for them failed: a trailer among those is not seen, and the count is a
 	// floor by that many at most. settledTruncated is the part of it merged
 	// before today.
 	truncated, settledTruncated int
+}
+
+// unreadPull is a pull request whose commits run past what has been read,
+// with no trailer in them nor in its merge commit: where the rest begin, and
+// whether it merged before today.
+type unreadPull struct {
+	id, after string
+	settled   bool
+}
+
+// coauthoredCommits is one page of a pull request's commits.
+type coauthoredCommits struct {
+	TotalCount int      `json:"totalCount"`
+	PageInfo   pageInfo `json:"pageInfo"`
+	Nodes      []struct {
+		Commit struct {
+			Message string `json:"message"`
+		} `json:"commit"`
+	} `json:"nodes"`
+}
+
+// coauthored is whether a trailer is in any of the page's commits.
+func (c *coauthoredCommits) coauthored() bool {
+	for i := range c.Nodes {
+		if coauthoredBy.MatchString(c.Nodes[i].Commit.Message) {
+			return true
+		}
+	}
+	return false
 }
 
 // oneDay is the granularity of a merged: range.
@@ -319,18 +365,12 @@ type coauthoredPage struct {
 		IssueCount int      `json:"issueCount"`
 		PageInfo   pageInfo `json:"pageInfo"`
 		Nodes      []struct {
+			ID          string    `json:"id"`
 			MergedAt    time.Time `json:"mergedAt"`
 			MergeCommit *struct {
 				Message string `json:"message"`
 			} `json:"mergeCommit"`
-			Commits struct {
-				TotalCount int `json:"totalCount"`
-				Nodes      []struct {
-					Commit struct {
-						Message string `json:"message"`
-					} `json:"commit"`
-				} `json:"nodes"`
-			} `json:"commits"`
+			Commits coauthoredCommits `json:"commits"`
 		} `json:"nodes"`
 	} `json:"search"`
 }
@@ -362,7 +402,9 @@ func (w *coauthoredWalk) walk(ctx context.Context, c *ghapi.Client, from, to tim
 			}
 			w.capped = true
 		}
-		w.count(res)
+		if unreadErr := w.follow(ctx, c, w.count(res)); unreadErr != nil {
+			return unreadErr
+		}
 		got += len(res.Search.Nodes)
 		if !res.Search.PageInfo.HasNextPage || got >= searchCap {
 			return nil
@@ -390,30 +432,107 @@ func (w *coauthoredWalk) page(ctx context.Context, c *ghapi.Client, from, to tim
 }
 
 // count reads a page: a pull request counts once when its merge commit or
-// any commit read carries the trailer.
-func (w *coauthoredWalk) count(res *coauthoredPage) {
+// any commit read carries the trailer. It hands back the ones whose commits
+// run past the page with no trailer so far, for follow to read on.
+func (w *coauthoredWalk) count(res *coauthoredPage) (unread []unreadPull) {
 	for i := range res.Search.Nodes {
 		n := &res.Search.Nodes[i]
-		found := n.MergeCommit != nil && coauthoredBy.MatchString(n.MergeCommit.Message)
-		for j := range n.Commits.Nodes {
-			if found {
-				break
-			}
-			found = coauthoredBy.MatchString(n.Commits.Nodes[j].Commit.Message)
-		}
 		settled := n.MergedAt.Before(w.today)
 		switch {
-		case found:
-			w.pulls++
-			if settled {
-				w.settled++
+		case n.MergeCommit != nil && coauthoredBy.MatchString(n.MergeCommit.Message), n.Commits.coauthored():
+			w.found(settled)
+		case n.Commits.TotalCount <= len(n.Commits.Nodes):
+		case n.ID != "" && n.Commits.PageInfo.HasNextPage && n.Commits.PageInfo.EndCursor != "":
+			unread = append(unread, unreadPull{id: n.ID, after: n.Commits.PageInfo.EndCursor, settled: settled})
+		default:
+			w.floor(settled)
+		}
+	}
+	return unread
+}
+
+// follow reads the commits of each unread pull request a hundred at a time,
+// several pull requests to a query, until it finds a trailer or the commits
+// run out. Measured on 2026-09-28 on the production account, whose three pull
+// requests over a hundred commits had made its count a floor on every pass:
+// two queries of one point each, 77 KB and 44 KB, read the rest of their
+// commits, and found no trailer in any. A query that fails leaves its pull
+// requests as floors, as they were when nothing past the first page was
+// asked for; one cut short by the pass itself fails the walk.
+func (w *coauthoredWalk) follow(ctx context.Context, c *ghapi.Client, unread []unreadPull) error {
+	for len(unread) > 0 {
+		batch := unread[:min(len(unread), coauthoredFollowBatch)]
+		unread = unread[len(batch):]
+		pages, err := w.commits(ctx, c, batch)
+		if err != nil {
+			if ctx.Err() != nil {
+				return ctx.Err()
 			}
-		case n.Commits.TotalCount > len(n.Commits.Nodes):
-			w.truncated++
-			if settled {
-				w.settledTruncated++
+			for _, u := range batch {
+				w.floor(u.settled)
+			}
+			continue
+		}
+		for i, u := range batch {
+			switch page := pages[i]; {
+			case page == nil:
+				w.floor(u.settled)
+			case page.coauthored():
+				w.found(u.settled)
+			case page.PageInfo.HasNextPage && page.PageInfo.EndCursor != "":
+				unread = append(unread, unreadPull{id: u.id, after: page.PageInfo.EndCursor, settled: u.settled})
 			}
 		}
+	}
+	return nil
+}
+
+// commits asks for the next hundred commits of each pull request of the
+// batch, in one query, and hands back each page in the batch's order, nil
+// for a pull request the answer does not carry.
+func (w *coauthoredWalk) commits(ctx context.Context, c *ghapi.Client, batch []unreadPull) ([]*coauthoredCommits, error) {
+	var params, fields strings.Builder
+	vars := map[string]any{}
+	for i, u := range batch {
+		if i > 0 {
+			params.WriteString(", ")
+		}
+		fmt.Fprintf(&params, "$id%[1]d: ID!, $after%[1]d: String!", i)
+		fmt.Fprintf(&fields, coauthoredCommitsField, i)
+		vars[fmt.Sprintf("id%d", i)] = u.id
+		vars[fmt.Sprintf("after%d", i)] = u.after
+	}
+	w.queries++
+	var res map[string]*struct {
+		Commits *coauthoredCommits `json:"commits"`
+	}
+	query := "query coauthoredCommits(" + params.String() + ") {" + fields.String() + "\n}"
+	if err := c.GraphQL(ctx, query, vars, &res); err != nil {
+		return nil, err
+	}
+	pages := make([]*coauthoredCommits, len(batch))
+	for i := range batch {
+		if node := res[fmt.Sprintf("p%d", i)]; node != nil {
+			pages[i] = node.Commits
+		}
+	}
+	return pages, nil
+}
+
+// found counts a co-authored pull request, and settles it when it merged
+// before today.
+func (w *coauthoredWalk) found(settled bool) {
+	w.pulls++
+	if settled {
+		w.settled++
+	}
+}
+
+// floor counts a pull request the walk could not read to the end.
+func (w *coauthoredWalk) floor(settled bool) {
+	w.truncated++
+	if settled {
+		w.settledTruncated++
 	}
 }
 

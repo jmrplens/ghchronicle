@@ -1051,15 +1051,22 @@ without keeping two copies of the data.
 someone starred acme/telemetry full_name="acme/telemetry" user="someone" starred=1
 ```
 
-Two sentences changed in 2.6.0, and a line already in Loki keeps the text it
-was sent with:
+Two renderings changed in 2.6.0, and one of them again in 2.6.1. A line
+already in Loki keeps the text it was sent with:
 
-- An external contribution says what happened to the item and not who did it,
-  since the row does not say who merged or closed it:
-  `USER's pull request OWNER/REPO#N` is open, was merged or was closed without
-  merging, and `USER's issue OWNER/REPO#N` is open or was closed. A row whose
-  state and merged flag disagree reads `USER's contribution OWNER/REPO#N`.
-  Every line used to say `USER merged OWNER/REPO#N`, open issues included.
+- An external contribution is a line when the item closes, at the moment it
+  closed, and says what happened to the item and not who did it, since the
+  row does not say who merged or closed it:
+  `USER's pull request OWNER/REPO#N was merged` or
+  `USER's pull request OWNER/REPO#N was closed without merging`, and
+  `USER's issue OWNER/REPO#N was closed`. A closed row whose state and merged
+  flag disagree reads `USER's contribution OWNER/REPO#N`. An item still open
+  is no line at all from 2.6.1 on: its row is stamped at the start of every
+  day it is seen open, which is a reading and not something that happened,
+  and opening it is already a line of the event feed, with `action="opened"`.
+  2.6.0 sent that row as `... is open`, and only on a day an `outbound` pass
+  wrote in the first hour of the UTC day. Every line used to say
+  `USER merged OWNER/REPO#N`, open issues included.
 - A release reads `published release TAG of OWNER/REPO`, or
   `published prerelease TAG of OWNER/REPO`, at the moment it was published. It
   used to read `release TAG of OWNER/REPO, N downloads`, so a query filtering
@@ -1113,11 +1120,11 @@ the whole push.
 you have raised Loki's `max_chunk_age` to match, since the window is half of
 it.
 
-A release is the event that shows what the horizon costs, and the one stream
-that looks further back. Its line is rendered from `gh_release_published`, at
-the moment the release was published. It used to come from `gh_release`, which
-is stamped at the sweep because its downloads move, so every repository pass
-pushed every release again. Measured on 2.5.1 in production, over 30.9 hours
+A release is the event that shows what the horizon costs, and one of the two
+streams that look further back. Its line is rendered from
+`gh_release_published`, at the moment the release was published. It used to
+come from `gh_release`, which is stamped at the sweep because its downloads
+move, so every repository pass pushed every release again. Measured on 2.5.1 in production, over 30.9 hours
 and 27 `repo` passes, that was 4,313 of the 10,467 lines the sink sent, 41 per
 cent, for the 2 releases published in those hours. Dated at the publication, a
 release is first seen by the `repo` pass after it, so one published just after
@@ -1128,16 +1135,27 @@ before it, a restart. With `repo` and `max_age` both at their default hour,
 older.
 
 So the release stream looks back the `repo` cadence plus `max_age`: two hours
-at the defaults, seven with `repo: 6h`. That lookback is capped at six days, a
-day short of the week `reject_old_samples_max_age` allows, and it never
-shortens `max_age`: one set past six days is this stream's horizon as it is
-every other's. Loki refuses an old line
-only for being behind a newer one in its stream, which the second check above
-still makes. A release published in the hour before a pass is sent by that pass
-and again by the next, the same line at the same instant, which Loki keeps
-once. Under `-once` the cadence that matters is the schedule that runs the
-binary, so set `every.families.repo` to it. The release is in the metrics store
-either way.
+at the defaults, seven with `repo: 6h`. An external contribution is the other
+stream that does, for the same reason: its line is dated when the item closed,
+and the first pass to see it is the `outbound` pass after that, so the stream
+looks back the `outbound` cadence plus `max_age`, two hours at the defaults.
+Before 2.6.1 it had `max_age` alone, and a closing was sent only when the next
+pass wrote within the hour of it, which an hourly pass does not do for an item
+closed in the seconds after the last one read the searches, nor, when it runs
+late, for one closed in the minutes it is late by.
+
+Each lookback is capped at six days, a day short of the week
+`reject_old_samples_max_age` allows, and it never shortens `max_age`: one set
+past six days is these streams' horizon as it is every other's. Loki refuses an
+old line only for being behind a newer one in its stream, which the second
+check above still makes. A release published in the hour before a pass is sent
+by that pass and again by the next, the same line at the same instant, which
+Loki keeps once. A contribution is sent twice the same way, and its line
+carries the item's comment count and title, which can move in between:
+measured against Loki 3.7.7, a line sent again with `comments` moved from 1 to
+2 was kept as a second line at the same instant. Under `-once` the cadence that
+matters is the schedule that runs the binary, so set `every.families.repo` and
+`every.families.outbound` to it. Both are in the metrics store either way.
 
 ### What Loki is not for
 
