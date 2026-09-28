@@ -501,6 +501,19 @@ func total(expr string) string {
 	return fmt.Sprintf(`summarize(%s, "100y", "sum", true)`, expr)
 }
 
+// countTotal is how many facts of a path the range holds, as a stat reads
+// it: the twin of COUNT(*), which answers 0 over no rows. countOf answers
+// nothing at all for a path the store has never held, there being no series
+// to count, and the tile was then not drawn: comparing what the five stores
+// draw, "Undecided runs" read 0 in three dashboards and was missing from
+// Graphite, for an account that has never had a run canceled or skipped.
+// fallbackSeries draws the constant 0 only when nothing matches, and asPercent
+// over two of them reads 0 of 2 as 0 and 0 of 0 as nothing, which is the
+// no-value text the other stores draw (measured against graphite-web 1.1.10).
+func countTotal(path string) string {
+	return fmt.Sprintf("fallbackSeries(%s, constantLine(0))", total(countOf(path)))
+}
+
 func medianTotal(path string) string {
 	return fmt.Sprintf(`summarize(percentileOfSeries(%s, 50), "100y", "median", true)`, path)
 }
@@ -1261,8 +1274,37 @@ func (b *builder) esLatestSum(m, field string, by ...string) []Target {
 }
 
 func (b *builder) esTotal(m string, met any, where ...string) []Target {
-	return []Target{esq(m, []any{met}, []any{b.one()}, "A", where, "")}
+	bucket := b.one()
+	if answersNothingAsSQL[fmt.Sprint(agg(met)["type"])] {
+		settings, _ := agg(bucket)["settings"].(map[string]any)
+		settings["min_doc_count"] = "0"
+	}
+	return []Target{esq(m, []any{met}, []any{bucket}, "A", where, "")}
 }
+
+// answersNothingAsSQL is every metric an empty bucket answers the way the SQL
+// stores answer no rows, 0, as COUNT(*) does, under whichever reduction the
+// stat applies.
+//
+// A terms bucket keeps no term without a document in it, so a total over
+// nothing returned no frame and its tile was not drawn at all: comparing what
+// the five stores draw, "Issues closed" and "Undecided runs" read 0 in the
+// others and were missing from Elasticsearch. Asked for its empty buckets as
+// well, it returns some term of the index with no document under it, and a
+// count reads 0. The rest cannot be asked the same way, measured against
+// grafana-elasticsearch-datasource in Grafana 13.2.1: the plugin reads the
+// percentile of an empty bucket as 0, a sum of nothing is 0 where SQL's SUM
+// is null, and an average of nothing is null, which a stat that adds its
+// values up, as four here do, draws as 0. A number where the other stores say
+// what the range lacked is worse than no tile, so those keep no empty bucket
+// and esNoMedian says so.
+var answersNothingAsSQL = map[string]bool{"count": true, "cardinality": true}
+
+// esNoMedian is what an Elasticsearch stat taking a median or an average over
+// the range owes its reader, for the reason answersNothingAsSQL gives.
+const esNoMedian = "In Elasticsearch a median or an average with nothing in the range to " +
+	"take it over has no tile at all, where the other stores say what the range lacked: " +
+	"an empty bucket is not returned, since the one it would return reads as 0."
 
 func (b *builder) esDaily(m string, met any, by, span string, where []string, ref string) Target {
 	var buckets []any

@@ -104,7 +104,7 @@ func webhookDeliveries(b *builder) []Panel {
 				"weeks except this.",
 			PromDesc: sinceStart,
 			GR: []Target{grq(fmt.Sprintf("asPercent(%s, %s)",
-				total(countOf(failedPath)), total(countOf(deliv))))},
+				countTotal(failedPath), countTotal(deliv)))},
 			// `ok` is a tag, so it is text in Elasticsearch and no boolean
 			// mean exists: the two counts are reduced and divided server-side.
 			ES: append(collected(

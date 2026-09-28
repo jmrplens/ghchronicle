@@ -214,12 +214,12 @@ func flowRates(b *builder) []Panel {
 				"pull request is the median of added plus removed by a merged one.",
 			PromDesc: sinceStart + " " + lastSweep,
 			GR: []Target{
-				grNamed("A", flowMergedCount, total(countOf(mergedPath("churn")))),
+				grNamed("A", flowMergedCount, countTotal(mergedPath("churn"))),
 				grNamed("B", flowMergeTime, medianTotal(mergedPath("seconds_to_merge"))),
 				grNamed("C", flowFirstReviewTime,
 					medianTotal(anyPath("seconds_to_first_human_review"))),
 				grNamed("D", flowIssuesClosed,
-					total(countOf(rp("gh_issue", "comments", "state", "CLOSED")))),
+					countTotal(rp("gh_issue", "comments", "state", "CLOSED"))),
 				grNamed("E", flowIssueCloseTime,
 					medianTotal(rp("gh_issue", "seconds_to_close", "state", "CLOSED"))),
 				grNamed("F", flowLinesPerPull, medianTotal(mergedPath("churn"))),
@@ -234,6 +234,7 @@ func flowRates(b *builder) []Panel {
 				esRef("E", b.esTotal("gh_issue", b.mPct("seconds_to_close", 50), "state:CLOSED", ESF)),
 				esRef("F", b.esTotal(pr, b.mPct("churn", 50), flowMergedFilter, ESF)),
 			},
+			ESDesc: esNoMedian,
 			ESOver: []any{
 				frameName("A", flowMergedCount), frameName("B", flowMergeTime),
 				frameName("C", flowFirstReviewTime), frameName("D", flowIssuesClosed),

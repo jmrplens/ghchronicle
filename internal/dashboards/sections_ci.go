@@ -209,13 +209,13 @@ func runOutcomes(b *builder) []Panel {
 				"counts beside it.",
 			PromDesc: sinceStart + " " + lastSweep,
 			GR: []Target{
-				grNamed("A", ciRunCount, total(countOf(runSeconds))),
+				grNamed("A", ciRunCount, countTotal(runSeconds)),
 				grNamed("B", ciSuccessRate, fmt.Sprintf("asPercent(%s, %s)",
-					total(countOf(rp(ciRun, "duration_seconds", "conclusion", "success"))),
-					total(countOf(rp(ciRun, "duration_seconds", "conclusion", "{success,failure}"))))),
-				grNamed("C", ciUndecidedRuns, total(countOf(
+					countTotal(rp(ciRun, "duration_seconds", "conclusion", "success")),
+					countTotal(rp(ciRun, "duration_seconds", "conclusion", "{success,failure}")))),
+				grNamed("C", ciUndecidedRuns, countTotal(
 					rp(ciRun, "duration_seconds", "conclusion", "{"+cancelledRun+",skipped}"),
-				))),
+				)),
 				grNamed("D", ciRunTime, medianTotal(runSeconds)),
 				grNamed("E", ciQueueWait, medianTotal(jobQueued)),
 				grNamed("F", ciArtifactStorage, latestSum(artifactBytes)),
@@ -245,7 +245,7 @@ func runOutcomes(b *builder) []Panel {
 			// alone.
 			ESOpts: Opts{"calc": "sum"},
 			ESDesc: "In Elasticsearch the success rate is the mean of the boolean `success` " +
-				"field over those runs, as a fraction.",
+				"field over those runs, as a fraction. " + esNoMedian,
 			Opts: Opts{"thresholds": plainSteps},
 			Overrides: []any{
 				fieldThresholds(ciSuccessRate, "percent", rateThresholds),

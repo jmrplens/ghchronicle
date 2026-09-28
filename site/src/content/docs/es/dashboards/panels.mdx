@@ -58,9 +58,12 @@ hueco bajo su etiqueta: "none merged" bajo el tiempo hasta fusionar y las línea
 por pull request, "no issue closed", "none decided" bajo la tasa de éxito, "no
 runs" y "no jobs" bajo la duración de la ejecución y la espera en cola, "no
 commits" bajo la proporción firmada, y "no deliveries" en la tasa de fallo de
-los webhooks. Un recuento sobre un rango así da 0. En Graphite y Elasticsearch
-un valor cuya consulta no encuentra ninguna ruta o ningún documento no tiene
-campo que lleve ninguno de los dos, y sale de su grupo.
+los webhooks. Un recuento sobre un rango así da 0 en todos los almacenes:
+Graphite dibuja 0 para una ruta que nunca ha tenido, y Elasticsearch para un
+rango sin ningún documento que contar. Una mediana o una media sigue sin tener
+campo que lleve las palabras donde Graphite no encuentra ninguna ruta, y en
+Elasticsearch, cuyo plugin lee como 0 la mediana de un bucket vacío; esa tarjeta
+sale de su grupo, y los paneles de Elasticsearch lo dicen.
 
 ## Overview
 

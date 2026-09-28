@@ -124,12 +124,12 @@ func commitsAndChurn(b *builder) []Panel {
 				"both are counted separately in the chart below. " + forksIncluded + " " + commitBound,
 			PromDesc: sinceStart + " " + sweepCount,
 			GR: []Target{
-				grNamed("A", "Commits", total(countOf(cpath("churn")))),
+				grNamed("A", "Commits", countTotal(cpath("churn"))),
 				grNamed("B", codeLinesAdded, total(fmt.Sprintf("sumSeries(%s)", cpath("additions")))),
 				grNamed("C", codeLinesRemoved, total(fmt.Sprintf("sumSeries(%s)", cpath("deletions")))),
 				grNamed("D", codeSignedCommits, fmt.Sprintf("asPercent(%s, %s)",
-					total(countOf(rp(c, "churn", "signature", "VALID"))),
-					total(countOf(cpath("churn"))))),
+					countTotal(rp(c, "churn", "signature", "VALID")),
+					countTotal(cpath("churn")))),
 			},
 			ES: []Target{
 				esRef("A", b.esTotal(c, b.mCount(), ESF)),
@@ -143,7 +143,7 @@ func commitsAndChurn(b *builder) []Panel {
 				fieldThresholds(codeSignedCommits, "percentunit", fractionOf(signedSteps)),
 			},
 			ESDesc: "In Elasticsearch the signed share is the mean of the boolean `signed` " +
-				"field, as a fraction.",
+				"field, as a fraction. " + esNoMedian,
 			Opts: mergeOpts(Opts{"thresholds": plainSteps}, bounded()),
 			Overrides: []any{
 				fieldThresholds(codeSignedCommits, "percent", signedSteps),

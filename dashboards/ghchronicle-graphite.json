@@ -2850,7 +2850,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "alias(summarize(sumSeries(isNonNull(github.pull_request.*.*.*.*.$repo.MERGED.churn)), \"100y\", \"sum\", true), \"Pull requests merged\")",
+              "target": "alias(fallbackSeries(summarize(sumSeries(isNonNull(github.pull_request.*.*.*.*.$repo.MERGED.churn)), \"100y\", \"sum\", true), constantLine(0)), \"Pull requests merged\")",
               "textEditor": true
             },
             {
@@ -2868,7 +2868,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "D",
-              "target": "alias(summarize(sumSeries(isNonNull(github.issue.*.*.*.*.$repo.CLOSED.comments)), \"100y\", \"sum\", true), \"Issues closed\")",
+              "target": "alias(fallbackSeries(summarize(sumSeries(isNonNull(github.issue.*.*.*.*.$repo.CLOSED.comments)), \"100y\", \"sum\", true), constantLine(0)), \"Issues closed\")",
               "textEditor": true
             },
             {
@@ -4715,19 +4715,19 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "alias(summarize(sumSeries(isNonNull(github.workflow_run.*.*.*.*.*.$repo.*.duration_seconds)), \"100y\", \"sum\", true), \"Workflow runs\")",
+              "target": "alias(fallbackSeries(summarize(sumSeries(isNonNull(github.workflow_run.*.*.*.*.*.$repo.*.duration_seconds)), \"100y\", \"sum\", true), constantLine(0)), \"Workflow runs\")",
               "textEditor": true
             },
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "B",
-              "target": "alias(asPercent(summarize(sumSeries(isNonNull(github.workflow_run.*.success.*.*.*.$repo.*.duration_seconds)), \"100y\", \"sum\", true), summarize(sumSeries(isNonNull(github.workflow_run.*.{success,failure}.*.*.*.$repo.*.duration_seconds)), \"100y\", \"sum\", true)), \"Success rate\")",
+              "target": "alias(asPercent(fallbackSeries(summarize(sumSeries(isNonNull(github.workflow_run.*.success.*.*.*.$repo.*.duration_seconds)), \"100y\", \"sum\", true), constantLine(0)), fallbackSeries(summarize(sumSeries(isNonNull(github.workflow_run.*.{success,failure}.*.*.*.$repo.*.duration_seconds)), \"100y\", \"sum\", true), constantLine(0))), \"Success rate\")",
               "textEditor": true
             },
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "C",
-              "target": "alias(summarize(sumSeries(isNonNull(github.workflow_run.*.{cancelled,skipped}.*.*.*.$repo.*.duration_seconds)), \"100y\", \"sum\", true), \"Undecided runs\")",
+              "target": "alias(fallbackSeries(summarize(sumSeries(isNonNull(github.workflow_run.*.{cancelled,skipped}.*.*.*.$repo.*.duration_seconds)), \"100y\", \"sum\", true), constantLine(0)), \"Undecided runs\")",
               "textEditor": true
             },
             {
@@ -6247,7 +6247,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "alias(summarize(sumSeries(isNonNull(github.commit.*.*.*.*.$repo.*.*.churn)), \"100y\", \"sum\", true), \"Commits\")",
+              "target": "alias(fallbackSeries(summarize(sumSeries(isNonNull(github.commit.*.*.*.*.$repo.*.*.churn)), \"100y\", \"sum\", true), constantLine(0)), \"Commits\")",
               "textEditor": true
             },
             {
@@ -6265,7 +6265,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "D",
-              "target": "alias(asPercent(summarize(sumSeries(isNonNull(github.commit.*.*.*.*.$repo.*.VALID.churn)), \"100y\", \"sum\", true), summarize(sumSeries(isNonNull(github.commit.*.*.*.*.$repo.*.*.churn)), \"100y\", \"sum\", true)), \"Signed commits\")",
+              "target": "alias(asPercent(fallbackSeries(summarize(sumSeries(isNonNull(github.commit.*.*.*.*.$repo.*.VALID.churn)), \"100y\", \"sum\", true), constantLine(0)), fallbackSeries(summarize(sumSeries(isNonNull(github.commit.*.*.*.*.$repo.*.*.churn)), \"100y\", \"sum\", true), constantLine(0))), \"Signed commits\")",
               "textEditor": true
             }
           ],
@@ -8460,7 +8460,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "asPercent(summarize(sumSeries(isNonNull(github.webhook_delivery.*.*.*.*.*.false.*.$repo.*.duration_seconds)), \"100y\", \"sum\", true), summarize(sumSeries(isNonNull(github.webhook_delivery.*.*.*.*.*.*.*.$repo.*.duration_seconds)), \"100y\", \"sum\", true))",
+              "target": "asPercent(fallbackSeries(summarize(sumSeries(isNonNull(github.webhook_delivery.*.*.*.*.*.false.*.$repo.*.duration_seconds)), \"100y\", \"sum\", true), constantLine(0)), fallbackSeries(summarize(sumSeries(isNonNull(github.webhook_delivery.*.*.*.*.*.*.*.$repo.*.duration_seconds)), \"100y\", \"sum\", true), constantLine(0)))",
               "textEditor": true
             }
           ],
