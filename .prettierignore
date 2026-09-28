@@ -38,6 +38,9 @@ site/src/data/layouts.json
 site/src/data/config-options.json
 # cmd/gen_brand
 brand/
+# go test ./internal/migrate -update, checked by the same test: one
+# measurement a line, so an identity change is a one-line diff
+internal/migrate/identity.json
 
 # --- Fixtures: what GitHub actually answered ---
 # API responses kept as they arrived, so that a diff against what GitHub sends
