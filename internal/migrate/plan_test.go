@@ -24,11 +24,15 @@ type fakeStore struct {
 	err          error
 	shapes       map[string]teardown.Shape
 	asked        []string
+	described    int
 }
 
 func (f *fakeStore) Name() string { return f.name }
 
-func (f *fakeStore) Describe(context.Context) (string, error) { return f.server, f.err }
+func (f *fakeStore) Describe(context.Context) (string, error) {
+	f.described++
+	return f.server, f.err
+}
 
 func (f *fakeStore) Shape(_ context.Context, m string, old, values []string) (teardown.Shape, error) {
 	f.asked = append(f.asked, m)

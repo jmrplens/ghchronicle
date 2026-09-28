@@ -9,12 +9,13 @@ import (
 	"time"
 )
 
-// The two settings whose vocabulary, default and membership of the key list
+// The settings whose vocabulary, default and membership of the key list
 // are all written separately: naming them once keeps a rename from leaving one
 // of the three behind.
 const (
 	keyLogLevel  = "log.level"
 	keyLogFormat = "log.format"
+	keyMigrate   = "migrate"
 )
 
 // probeURL is the address the probe configuration gives every sink that
@@ -132,6 +133,8 @@ func choicesOf(key string) []string {
 		return LogLevels()
 	case keyLogFormat:
 		return LogFormats()
+	case keyMigrate:
+		return MigrateModes()
 	}
 	return nil
 }
@@ -171,7 +174,7 @@ func Options() ([]Option, error) {
 	// The two tables above are keyed by path, which is the one thing about
 	// them that can go stale, so each entry has to find its setting.
 	for _, key := range []string{
-		"sinks.file.format", "sinks.stdout_format", "sinks.sql.dialect", keyLogLevel, keyLogFormat,
+		"sinks.file.format", "sinks.stdout_format", "sinks.sql.dialect", keyLogLevel, keyLogFormat, keyMigrate,
 		"groups", "every.groups", "every.families",
 	} {
 		i, found := byKey[key]

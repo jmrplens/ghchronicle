@@ -32,8 +32,9 @@ ghchronicle -config /etc/ghchronicle/config.yaml
 | `-backfill-retry` | `0`           | Cuando un relleno acaba con familias pendientes, espera esto y vuelve a por ellas, hasta que una pasada no anote nada nuevo; `0` no vuelve  |
 | `-publish-dashboard` | off        | Publica el dashboard de Grafana y el datasource del que lee, y sale; necesita la sección `grafana`, no le pregunta nada a GitHub y no necesita token |
 | `-uninstall`      | ninguno       | Quita lo que esto puso y sale: `dashboard`, `data`, `state`, `all`, separados por comas; lista y no quita nada sin `-yes`                  |
-| `-yes`            | off           | Sigue adelante con `-uninstall` en vez de solo listar lo que quitaría                                                                      |
-| `-migrate`        | off           | Imprime, para cada almacén configurado, lo que una versión anterior dejó allí con una forma que esta ya no escribe y lo que haría falta para ponerlo al día, y sale; no cambia nada |
+| `-yes`            | off           | Sigue adelante con `-uninstall` o `-migrate` en vez de solo listar lo que haría                                                            |
+| `-migrate`        | off           | Imprime, para cada almacén configurado, lo que una versión anterior dejó allí con una forma que esta ya no escribe y lo que haría falta para ponerlo al día, y sale; sin `-yes` no cambia nada, y con él aplica cada cambio pendiente y vuelve a leer lo que despejó |
+| `-migrate-others` | off           | Con `-migrate -yes`, aplica también un cambio a un almacén que guarda filas de cuentas que esta configuración no recoge; sin `-migrate` se rechaza con 2 |
 | `-card`           | ninguno       | Hace una pasada y escribe un SVG de resumen en esta ruta; esa pasada recoge todas las familias, digan lo que digan las cadencias          |
 | `-card-only`      | apagada       | Con `-card`, escribe el SVG y nada más: no hace falta ningún destino, no se escribe en ninguno y el fichero de estado se queda como estaba |
 | `-card-theme`     | `auto`        | `dark`, `light`, `auto` o `both`: la tarjeta clara en `-card` y la oscura a su lado con `_dark` antes de la extensión, en una sola pasada |
@@ -78,7 +79,29 @@ preguntas, a GitHub solo se le pide la lista de repositorios, y el fichero de
 estado se lee y nunca se escribe, así que sale con 0 encuentre lo que
 encuentre. Sin token funciona igual y dice lo que no pudo comparar.
 [Migraciones](/ghchronicle/es/install/upgrading/#migraciones) explica cómo se
-decide cada almacén y qué significa cada línea.
+decide cada almacén y qué significa cada línea. Cuando hay algo pendiente, el
+plan termina con la orden que lo aplica y con lo que hace un arranque con el
+ajuste [`migrate`](/ghchronicle/es/configuration/#migrate).
+
+```sh
+ghchronicle -config config.yaml -migrate -yes
+```
+
+Con `-yes` imprime el mismo plan y después aplica cada cambio pendiente,
+también los marcados como necesitados de la palabra de alguien, vuelve a leer
+de GitHub lo que despejó, y dice bajo el plan qué pasó con cada uno. Un almacén
+que guarda filas de cuentas que esta configuración no recoge se deja sin
+aplicar salvo que se dé también `-migrate-others`. Necesita un token y la lista
+de repositorios, y se queda el fichero de estado mientras corre: con el
+servicio en marcha se niega, nombrando el proceso, y no cambia nada, así que
+para antes el servicio. Lo que aplica se registra sobre la marcha, así que
+volver a ejecutarlo tras un fallo sigue sin hacer nada dos veces.
+
+| Salida | Cuándo                                                                                                                |
+| ------ | --------------------------------------------------------------------------------------------------------------------- |
+| `0`    | `-migrate`, encuentre lo que encuentre; `-migrate -yes` cuando todo lo pendiente se aplicó y se volvió a leer, o no había nada |
+| `1`    | `-migrate -yes` dejó algo: un almacén que se negó o no respondió, uno que se dejó sin aplicar, una relectura que no terminó; o se negó a empezar |
+| `2`    | Una línea de órdenes que no se puede leer, entre ellas `-migrate-others` sin `-migrate`                               |
 
 ## Las tres formas de hacer una pasada
 

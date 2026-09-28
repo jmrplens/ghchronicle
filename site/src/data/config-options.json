@@ -712,6 +712,17 @@
       "example": "2y"
     },
     {
+      "key": "migrate",
+      "kind": "string",
+      "group": "run",
+      "default": "auto",
+      "example": "auto",
+      "choices": [
+        "auto",
+        "warn"
+      ]
+    },
+    {
       "key": "grafana",
       "kind": "block",
       "group": "run"

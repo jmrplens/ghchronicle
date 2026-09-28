@@ -32,8 +32,9 @@ ghchronicle -config /etc/ghchronicle/config.yaml
 | `-backfill-retry` | `0`           | After a backfill ends with families left, wait this long and go back for them, until a pass records nothing new; `0` does not go back       |
 | `-publish-dashboard` | off        | Publish the Grafana dashboard and the datasource it reads from, then exit; it needs the `grafana` section, asks GitHub nothing and needs no token |
 | `-uninstall`      | none          | Remove what this put in place and exit: `dashboard`, `data`, `state`, `all`, comma separated; it lists and removes nothing without `-yes` |
-| `-yes`            | off           | Go ahead with `-uninstall` rather than only listing what it would remove                                                                   |
-| `-migrate`        | off           | Print, for every configured store, what an earlier release left there in a shape this one no longer writes and what bringing it along would take, then exit; it changes nothing |
+| `-yes`            | off           | Go ahead with `-uninstall` or `-migrate` rather than only listing what it would do                                                         |
+| `-migrate`        | off           | Print, for every configured store, what an earlier release left there in a shape this one no longer writes and what bringing it along would take, then exit; it changes nothing without `-yes`, and with it applies every pending change and reads what it cleared again |
+| `-migrate-others` | off           | With `-migrate -yes`, also apply a change to a store holding rows of accounts this configuration does not collect; without `-migrate` it is refused with 2 |
 | `-card`           | none          | Run one sweep and write a summary SVG to this path; that sweep runs every family, whatever the cadences say                                |
 | `-card-only`      | off           | With `-card`, write the SVG and nothing else: no sink is needed, none is written to, and the state file is left as it was                  |
 | `-card-theme`     | `auto`        | `dark`, `light`, `auto`, or `both`: the light card at `-card` and the dark one beside it with `_dark` before the extension, from one sweep |
@@ -77,7 +78,30 @@ be read again from GitHub. It changes nothing. The stores are asked questions,
 GitHub is asked for the repository list alone, and the state file is read and
 never written, so it exits 0 whatever it finds. Without a token it still runs
 and says what it could not compare. [Migrations](/ghchronicle/install/upgrading/#migrations)
-says how each store is decided and what each line means.
+says how each store is decided and what each line means. When something is
+pending, the plan ends with the command that applies it and with what a start
+does about it under the [`migrate`](/ghchronicle/configuration/#migrate)
+setting.
+
+```sh
+ghchronicle -config config.yaml -migrate -yes
+```
+
+With `-yes` it prints the same plan and then applies every pending change, the
+ones marked as needing somebody's word too, reads what it cleared again from
+GitHub, and says under the plan what happened to each. A store holding rows of
+accounts this configuration does not collect is held back unless
+`-migrate-others` is given as well. It needs a token and the repository list,
+and it takes the state file for as long as it runs: with the service running it
+refuses, naming the process, and changes nothing, so stop the service first.
+What it applies is recorded as it goes, so running it again after a failure
+carries on without doing anything twice.
+
+| Exit | When                                                                                                                  |
+| ---- | --------------------------------------------------------------------------------------------------------------------- |
+| `0`  | `-migrate`, whatever it finds; `-migrate -yes` when everything pending was applied and read again, or nothing was    |
+| `1`  | `-migrate -yes` left something: a store that refused or did not answer, one held back, a refill that did not finish; or it refused to start |
+| `2`  | A command line that does not parse, `-migrate-others` without `-migrate` among them                                   |
 
 ## The three ways to run a sweep
 

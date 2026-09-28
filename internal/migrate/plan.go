@@ -74,8 +74,17 @@ type Item struct {
 	// Lost is what a refill cannot bring back, one sentence each.
 	Lost []string
 	// Others is the accounts whose rows the store holds and this
-	// configuration does not collect.
-	Others []string
+	// configuration does not collect, and AccountsChecked whether the store
+	// could be compared with the configuration at all: a store that can be
+	// asked and was not is no more known to be this configuration's alone
+	// than one that holds somebody else's rows.
+	Others          []string
+	AccountsChecked bool
+	// Recorded says the record settled the item and the store was not asked.
+	// Asked says the store was asked, which is the only kind of store whose
+	// rows can be told apart by account.
+	Recorded bool
+	Asked    bool
 	// Safe says applying needs nobody's word: GitHub serves the whole
 	// history, the old rows are set aside for 24 hours rather than
 	// destroyed, and every row is this configuration's. Unsafe is why not.
@@ -132,11 +141,55 @@ type Input struct {
 	Repos      []string
 	ReposKnown bool
 	ReposWhy   string
+	// LoadRepos, when set, reads the repository list the first time a store
+	// needs it rather than before planning, and fills the three above. A
+	// start whose stores hold nothing old then asks GitHub nothing for it.
+	LoadRepos func(context.Context) ([]string, error)
+	// TrustRecord settles a migration the record says was applied to a
+	// store, found not needed there or noted there, without asking the store
+	// again. A start sets it, so that once every store is settled a start
+	// costs nothing; the dry run does not, because the store is the
+	// authority and the dry run is where a reader asks it.
+	TrustRecord bool
+	// StoreTimeout bounds the questions put to each store. Zero is no bound.
+	// A start sets one, so that a store that does not answer delays it by
+	// that much and is then said to be unreachable.
+	StoreTimeout time.Duration
+
+	// repos is LoadRepos's answer, read once and shared by every store.
+	repos *lazyRepos
+}
+
+// lazyRepos is the repository list read at most once.
+type lazyRepos struct {
+	load  func(context.Context) ([]string, error)
+	asked bool
+}
+
+// list is the repository list and whether it is known, reading it the first
+// time it is wanted.
+func (in *Input) list(ctx context.Context) ([]string, bool) {
+	if in.repos != nil && !in.repos.asked {
+		in.repos.asked = true
+		repos, err := in.repos.load(ctx)
+		if err != nil {
+			in.ReposWhy = err.Error()
+		} else {
+			in.Repos, in.ReposKnown = repos, true
+		}
+	}
+	return in.Repos, in.ReposKnown
 }
 
 // Make plans every configured store. It only reads: the stores are asked
 // questions, the state file is read as it is, and nothing is recorded.
 func Make(ctx context.Context, in Input) Plan {
+	return in.make(ctx)
+}
+
+// make is Make on a pointer, so that the repository list read for one store
+// is there for the next.
+func (in *Input) make(ctx context.Context) Plan {
 	inspectors := in.Inspectors
 	if inspectors == nil {
 		inspectors = teardown.Inspectors(in.Config)
@@ -146,24 +199,45 @@ func Make(ctx context.Context, in Input) Plan {
 		byName[i.Name()] = i
 	}
 	p := Plan{Release: in.Release}
-	if !in.ReposKnown {
-		p.Notes = append(p.Notes, "the repository list was not read ("+firstOf(in.ReposWhy, "no reason given")+
-			"), so rows of repositories this configuration no longer covers are not counted, and owners are "+
-			"not compared with it")
+	if in.LoadRepos != nil {
+		in.repos = &lazyRepos{load: in.LoadRepos}
 	}
 	for _, st := range storesOf(in.Config) {
 		p.Stores = append(p.Stores, in.plan(ctx, st, byName[st.name]))
+	}
+	// After the stores, because a list read lazily is only known to be
+	// missing once a store has wanted it; one nobody wanted is not a gap.
+	if !in.ReposKnown && (in.repos == nil || in.repos.asked) {
+		p.Notes = append(p.Notes, "the repository list was not read ("+firstOf(in.ReposWhy, "no reason given")+
+			"), so rows of repositories this configuration no longer covers are not counted, and owners are "+
+			"not compared with it")
 	}
 	return p
 }
 
 // plan is one store.
-func (in Input) plan(ctx context.Context, st store, asker teardown.Inspector) StorePlan {
+func (in *Input) plan(ctx context.Context, st store, asker teardown.Inspector) StorePlan {
 	sp := StorePlan{Name: st.name, Destination: st.destination}
-	switch {
-	case st.reach == untouched:
+	if st.reach == untouched {
 		sp.Quiet = st.quiet
 		return sp
+	}
+	if in.StoreTimeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, in.StoreTimeout)
+		defer cancel()
+	}
+	settled := make([]*Item, len(Registry))
+	open := 0
+	for i, m := range Registry {
+		if settled[i] = in.settledByRecord(st, m); settled[i] == nil {
+			open++
+		}
+	}
+	switch {
+	case open == 0:
+		// Every change is settled by the record, so the store is not asked
+		// even which server it is: a steady start costs it nothing.
 	case st.reach == asked && asker == nil:
 		sp.Err = fmt.Errorf("no way to ask %s was built", st.name)
 		return sp
@@ -175,16 +249,50 @@ func (in Input) plan(ctx context.Context, st store, asker teardown.Inspector) St
 		}
 		sp.Server = server
 	}
-	for _, m := range Registry {
+	for i, m := range Registry {
+		if settled[i] != nil {
+			sp.Items = append(sp.Items, *settled[i])
+			continue
+		}
 		sp.Items = append(sp.Items, in.item(ctx, st, asker, sp.Server, m))
 	}
 	return sp
 }
 
+// settledByRecord is the item the record settles without asking the store,
+// or nil. Only a start trusts the record this way, and only for a record
+// kept for the store the sink points at now.
+func (in *Input) settledByRecord(st store, m Migration) *Item {
+	if !in.TrustRecord {
+		return nil
+	}
+	rec := in.State.Stores[st.name]
+	if rec == nil || rec.Destination != st.destination {
+		return nil
+	}
+	it := &Item{Migration: m, Rows: -1, Recorded: true}
+	if when, ok := rec.Applied[m.ID]; ok {
+		it.Status, it.Evidence = Applied, "applied on "+when.UTC().Format(time.DateOnly)
+		return it
+	}
+	if when, ok := rec.NotNeeded[m.ID]; ok {
+		it.Status, it.Evidence = NotNeeded, "found not needed on "+when.UTC().Format(time.DateOnly)
+		return it
+	}
+	// A change nothing can apply is a note for good: what it says of the
+	// store cannot change. Any other change noted was frozen, which lasts
+	// only as long as its families are off, so the store is asked again.
+	if when, ok := rec.Noted[m.ID]; ok && m.noteOnly() {
+		it.Status, it.Evidence = Noted, "noted on "+when.UTC().Format(time.DateOnly)
+		return it
+	}
+	return nil
+}
+
 // item is one migration in one store: first whether the old shape is there,
 // then what would be done about it.
-func (in Input) item(ctx context.Context, st store, asker teardown.Inspector, server string, m Migration) Item {
-	it := Item{Migration: m, Rows: -1}
+func (in *Input) item(ctx context.Context, st store, asker teardown.Inspector, server string, m Migration) Item {
+	it := Item{Migration: m, Rows: -1, Asked: st.reach == asked}
 	rec := in.State.Stores[st.name]
 	// A record kept for another destination is about another store, and a
 	// sink pointed at a store the state file has no history of cannot say
@@ -207,7 +315,7 @@ func (in Input) item(ctx context.Context, st store, asker teardown.Inspector, se
 
 // ask lets the store decide. It reports whether the old shape is there, and
 // otherwise settles the item.
-func (in Input) ask(ctx context.Context, it *Item, asker teardown.Inspector, rec *run.StoreRecord) bool {
+func (in *Input) ask(ctx context.Context, it *Item, asker teardown.Inspector, rec *run.StoreRecord) bool {
 	m := it.Migration
 	shape, err := asker.Shape(ctx, m.Measurement, m.OldTags, nil)
 	if err != nil {
@@ -240,7 +348,7 @@ func (in Input) ask(ctx context.Context, it *Item, asker teardown.Inspector, rec
 // heldValue decides a Value change in a store that can be asked: its rows
 // cannot be told apart, so the record of what first wrote the store is the
 // only thing that can say none of them is older than the change.
-func (in Input) heldValue(it *Item, rec *run.StoreRecord, exists bool) bool {
+func (in *Input) heldValue(it *Item, rec *run.StoreRecord, exists bool) bool {
 	m := it.Migration
 	switch {
 	case !exists:
@@ -258,7 +366,7 @@ func (in Input) heldValue(it *Item, rec *run.StoreRecord, exists bool) bool {
 
 // recall lets the record decide, for a store that cannot be asked. It
 // reports whether the old shape may be there, and otherwise settles the item.
-func (in Input) recall(it *Item, st store, rec *run.StoreRecord, retargeted bool) bool {
+func (in *Input) recall(it *Item, st store, rec *run.StoreRecord, retargeted bool) bool {
 	m := it.Migration
 	if when, applied := appliedOn(rec, m.ID); applied {
 		it.Status, it.Evidence = Applied, "applied on "+when.UTC().Format(time.DateOnly)
@@ -288,7 +396,7 @@ func (in Input) recall(it *Item, st store, rec *run.StoreRecord, retargeted bool
 }
 
 // decide is what would be done about an old shape that is there.
-func (in Input) decide(ctx context.Context, it *Item, st store, asker teardown.Inspector, server string) {
+func (in *Input) decide(ctx context.Context, it *Item, st store, asker teardown.Inspector, server string) {
 	m := it.Migration
 	on, off := in.families(m)
 	switch {
@@ -329,7 +437,7 @@ func (in Input) decide(ctx context.Context, it *Item, st store, asker teardown.I
 
 // families splits a migration's families into the ones this configuration
 // runs and the ones it has switched off.
-func (in Input) families(m Migration) (on, off []string) {
+func (in *Input) families(m Migration) (on, off []string) {
 	for _, f := range m.Families {
 		if _, enabled := in.Config.Interval(f); enabled {
 			on = append(on, f)
@@ -342,7 +450,7 @@ func (in Input) families(m Migration) (on, off []string) {
 
 // whose reads which accounts and repositories the store holds rows of, and
 // reports whether the question could be answered.
-func (in Input) whose(ctx context.Context, it *Item, asker teardown.Inspector) bool {
+func (in *Input) whose(ctx context.Context, it *Item, asker teardown.Inspector) bool {
 	m := it.Migration
 	perRepo := !slices.ContainsFunc(m.Families, func(f string) bool { return !run.PerRepository(f) })
 	values := []string{m.Account}
@@ -354,34 +462,37 @@ func (in Input) whose(ctx context.Context, it *Item, asker teardown.Inspector) b
 		it.Unsafe = append(it.Unsafe, "whose rows these are could not be read: "+err.Error())
 		return false
 	}
-	if perRepo && in.ReposKnown {
-		if gone := missingFrom(shape.Values["full_name"], in.Repos); len(gone) > 0 {
+	repos, known := in.list(ctx)
+	if perRepo && known {
+		if gone := missingFrom(shape.Values["full_name"], repos); len(gone) > 0 {
 			it.Lost = append(it.Lost, fmt.Sprintf("the rows of %d %s this configuration no longer covers: %s",
 				len(gone), plural(len(gone), "repository", "repositories"), sample(gone)))
 		}
 	}
-	mine, known := in.accountsOf(m.Account)
+	mine, known := in.accountsOf(ctx, m.Account)
 	if !known {
 		return false
 	}
 	it.Others = missingFrom(shape.Values[m.Account], mine)
+	it.AccountsChecked = true
 	return true
 }
 
 // accountsOf is every value of an account tag that this configuration's own
 // rows carry, and whether that is known.
-func (in Input) accountsOf(tag string) ([]string, bool) {
+func (in *Input) accountsOf(ctx context.Context, tag string) ([]string, bool) {
 	t := in.Config.Targets
 	out := []string{t.User}
 	if tag == "user" {
 		return out, t.User != ""
 	}
+	repos, known := in.list(ctx)
 	out = append(out, t.Orgs...)
-	for _, full := range slices.Concat(t.Repos, in.Repos) {
+	for _, full := range slices.Concat(t.Repos, repos) {
 		owner, _, _ := strings.Cut(full, "/")
 		out = append(out, owner)
 	}
-	return out, in.ReposKnown
+	return out, known
 }
 
 // unsafe is every reason the migration needs somebody's word before it is
@@ -400,6 +511,13 @@ func unsafe(st store, server string, checked bool, it *Item) []string {
 		why = append(why, fmt.Sprintf("it holds rows of %s, which this configuration does not collect; "+
 			"set aside, they come back only when the configuration that collects them reads them again",
 			quoted(it.Others)))
+	}
+	// Whatever the store: a row the refill does not bring back is a row lost
+	// once the set-aside goes, which is exactly what applying on its own
+	// must never do.
+	if len(it.Lost) > 0 {
+		why = append(why, "reading it again does not bring back every row it holds (see not coming back), "+
+			"and those are gone once the set-aside is purged")
 	}
 	return append(it.Unsafe, why...)
 }

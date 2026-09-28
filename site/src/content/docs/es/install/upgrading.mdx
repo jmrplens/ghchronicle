@@ -56,11 +56,12 @@ Cada línea empieza por lo que encontró la comprobación:
   y lo que no volvería: las filas de repositorios que la configuración ya no
   cubre y las de familias que tiene apagadas. La última línea dice si
   aplicarlo no necesita la palabra de nadie: GitHub todavía sirve toda la
-  historia, las filas antiguas se apartarían 24 horas en vez de borrarse, y
-  todas las filas del almacén son de esta configuración. Un almacén compartido
-  con otro colector, un InfluxDB 2, cuya única vía es un borrado, y todo
-  almacén al que no se le puede preguntar necesitan la palabra de alguien, y la
-  línea dice qué razón aplica.
+  historia, así que volvería cada fila que guarda el almacén, las filas
+  antiguas se apartarían 24 horas en vez de borrarse, y todas las filas del
+  almacén son de esta configuración. Un almacén compartido con otro colector,
+  uno que guarda filas que la relectura no traería de vuelta, un InfluxDB 2,
+  cuya única vía es un borrado, y todo almacén al que no se le puede preguntar
+  necesitan la palabra de alguien, y la línea dice qué razón aplica.
 - `note`: las filas están ahí y nada puede arreglarlas, así que el plan dice
   qué significan y no cambia nada.
 - `frozen`: nada de lo que ejecuta esta configuración escribe ya la medida,
@@ -68,6 +69,78 @@ Cada línea empieza por lo que encontró la comprobación:
 - `applied`: el fichero de estado registra el cambio como aplicado a este
   almacén, y el almacén, si se le puede preguntar, está de acuerdo.
 - `unreachable`: el almacén no respondió, así que no se sabe nada de él.
+
+### Lo que hace un arranque
+
+Toda ejecución que escribe en los almacenes, el servicio, `-once`, `-backfill`
+y una tarjeta dibujada junto a los almacenes, los comprueba igual antes de su
+primera pasada, y lo que hace después lo decide el ajuste
+[`migrate`](/ghchronicle/es/configuration/#migrate):
+
+- `auto`, el valor por omisión, aplica por su cuenta cada cambio pendiente
+  marcado como seguro de aplicar sin supervisión, y nada más. Primero lo dice,
+  en `WARN`, con lo que encontró, por qué existe el cambio y qué hace en ese
+  almacén, incluido dónde se apartan las filas antiguas; después vuelve a leer
+  la medida de GitHub, y solo entonces hace la pasada.
+- `warn` no aplica nada.
+
+Un cambio pendiente que un arranque no aplica es un `WARN` en cada arranque,
+con el almacén, la razón por la que se dejó y las dos órdenes, copiadas de la
+configuración que recibió la ejecución. Una línea en el registro, partida aquí:
+
+```text
+level=WARN msg="migration pending" sink=graphite measurement=gh_discussion_comment
+  migration=2.6.1/gh_discussion_comment/is_answer why="is_answer was a tag, ..."
+  not_applied="only whoever runs the Graphite host can remove its files"
+  plan="ghchronicle -config /etc/ghchronicle/config.yaml -migrate"
+  apply="ghchronicle -config /etc/ghchronicle/config.yaml -migrate -yes"
+  first="stop this service: -migrate -yes refuses to run beside it"
+```
+
+No hay ajuste que aplique el resto por su cuenta: un cambio que podría perder
+filas espera a que alguien lea el plan y dé su palabra. Una nota se dice una vez
+en `INFO` y después en `DEBUG`, porque nada la cambiará nunca, y lo mismo un
+cambio cuya medida ya no escribe nada de lo que ejecuta la configuración. Un
+almacén que no responde en 30 segundos también es un `WARN`, y la pasada sigue
+sin esperar más.
+
+Lo que un arranque encuentra innecesario, y lo que ha aplicado, lo registra, y
+el siguiente arranque se fía del registro: una vez resuelto cada cambio de un
+almacén, un arranque no le pregunta nada a ese almacén. `-migrate` no se fía de
+ese registro y vuelve a preguntar cada vez.
+
+### Aplicarlo a mano
+
+```sh
+systemctl stop ghchronicle
+ghchronicle -config /etc/ghchronicle/config.yaml -migrate -yes
+systemctl start ghchronicle
+```
+
+`-migrate -yes` imprime el mismo plan y después aplica cada cambio pendiente,
+también los que no son seguros, porque `-yes` es la palabra que pedía el plan.
+Cada uno se registra en el fichero de estado al aplicarse, así que parar a
+medias no cuesta nada que la siguiente ejecución no pueda retomar: lo aplicado
+no se hace dos veces. Una línea bajo el plan dice qué pasó con cada uno:
+
+- `applied`: hecho. Donde se guardan las filas antiguas, las nombra; donde tiene
+  que actuar otro, en un servidor de Graphite o detrás de un Telegraf, imprime
+  las órdenes que hay que ejecutar allí.
+- `failed`: el almacén se negó, con su razón. Los demás siguen adelante.
+- `held back`: el almacén guarda filas de cuentas que esta configuración no
+  recoge. Apartadas, esas solo vuelven cuando quien las recoge las lee de
+  nuevo, así que esto lleva `-migrate-others` además de `-yes`.
+- `unreachable`: el almacén no respondió, así que allí no se hizo nada.
+
+Sale con 0 cuando todo lo pendiente se aplicó y se volvió a leer, y con 1
+cuando quedó algo, con la frase que dice cómo seguir. Se niega antes de cambiar
+nada, y sale con 1, sin token de GitHub o sin lista de repositorios, porque nada
+de lo que despeja podría volver a leerse, y mientras otro proceso tiene el
+fichero de estado: el servicio lo tiene mientras corre, junto al fichero de
+estado como `<nombre>-lock`, y `-migrate -yes` nombra ese proceso en vez de
+cambiar los almacenes en los que escribe. Un servicio arrancado mientras corre
+`-migrate -yes` espera a que termine, y un segundo servicio sobre el mismo
+fichero de estado se rechaza.
 
 ### Lo que el fichero de estado recuerda de cada almacén
 

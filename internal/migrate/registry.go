@@ -128,6 +128,10 @@ var Registry = []Migration{
 	},
 }
 
+// noteOnly says whether nothing can ever apply the change: rows that cannot
+// be told apart, or history GitHub no longer serves, are only spoken about.
+func (m Migration) noteOnly() bool { return m.Kind == Value || m.Reach == Current }
+
 // writtenBy says whether a store first written by release was written in the
 // new shape. An unknown release, "" or one that does not parse, says no.
 func (m Migration) writtenBy(release string) bool {

@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -233,4 +234,132 @@ func fileNames(m map[string]string) []string {
 	}
 	slices.Sort(out)
 	return out
+}
+
+// TestTheServiceKeepsMigrateYesAway runs the two as two processes, which is
+// what the lock is for: while the service runs, -migrate -yes names it by
+// process and changes nothing; once it has stopped, the same command runs.
+func TestTheServiceKeepsMigrateYesAway(t *testing.T) {
+	t.Parallel()
+	gh := newFakeGitHub(t)
+	dir := t.TempDir()
+	cfg := writeSinkConfig(t, dir, gh.URL(), "  file:\n    path: "+filepath.Join(dir, "points.lp"))
+	service := serveInBackground(t, cfg)
+	awaitSweep(t, service, 2*time.Minute)
+
+	stdout, stderr, err := runSplit(t, time.Minute, "-config", cfg, "-migrate", "-yes")
+	if err == nil || stdout != "" {
+		t.Fatalf("-migrate -yes beside the service succeeded:\n%s\n%s", stdout, stderr)
+	}
+	for _, want := range []string{
+		"process " + strconv.Itoa(service.cmd.Process.Pid) + " (ghchronicle " + ghchronicle.Version + ", service, since",
+		"nothing was changed",
+	} {
+		if !strings.Contains(stderr, want) {
+			t.Errorf("the refusal does not say %q:\n%s", want, stderr)
+		}
+	}
+
+	service.Stop()
+	stdout, stderr, err = runSplit(t, time.Minute, "-config", cfg, "-migrate", "-yes")
+	if err != nil || !strings.HasSuffix(stdout, "\nNothing to migrate.\n") {
+		t.Errorf("-migrate -yes once the service stopped: %v\n%s\n%s", err, stdout, stderr)
+	}
+}
+
+// TestUnderWarnAStartOnlyAsks: after an upgrade from 2.6.0, a start under
+// migrate: warn says what is pending in each store with the commands that
+// apply it, sends the store nothing but reads before its writes, and
+// changes nothing.
+func TestUnderWarnAStartOnlyAsks(t *testing.T) {
+	t.Parallel()
+	gh := newFakeGitHub(t)
+	store := &oldInflux{}
+	dir := t.TempDir()
+	cfg := migrateConfig(t, dir, gh.URL(), store.start(t))
+	appendToConfig(t, cfg, "migrate: warn\n")
+	if err := os.WriteFile(filepath.Join(dir, "state.json"),
+		[]byte(`{"last_run":{"repo":"2026-09-27T10:00:00Z"}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "points.sql"), []byte("-- written by 2.6.0\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	_, log, err := runSplit(t, 2*time.Minute, "-config", cfg, "-once")
+	if err != nil {
+		t.Fatalf("-once failed: %v\n%s", err, log)
+	}
+	for _, store := range []string{"influxdb", "sql", "graphite"} {
+		want := `msg="migration pending" sink=` + store + ` measurement=gh_discussion_comment migration=2.6.1/gh_discussion_comment/is_answer`
+		if !strings.Contains(log, want) {
+			t.Errorf("the start does not say %s is pending:\n%s", store, log)
+		}
+	}
+	for _, want := range []string{
+		`not_applied="migrate: warn applies nothing on its own"`,
+		`plan="ghchronicle -config ` + cfg + ` -migrate" apply="ghchronicle -config ` + cfg + ` -migrate -yes"`,
+	} {
+		if !strings.Contains(log, want) {
+			t.Errorf("the start does not say %q:\n%s", want, log)
+		}
+	}
+	for _, r := range store.requests() {
+		method, rest, _ := strings.Cut(r, " ")
+		path, q, _ := strings.Cut(rest, " ")
+		read := method == http.MethodGet && (q == "" || strings.HasPrefix(q, "SELECT "))
+		if !read && (method != http.MethodPost || path != "/api/v2/write") {
+			t.Errorf("a start under warn sent the store %.200s", r)
+		}
+	}
+	if strings.Contains(readFile(t, filepath.Join(dir, "points.sql")), "DROP TABLE") {
+		t.Error("a start under warn dropped a table in the SQL file")
+	}
+}
+
+// TestMigrateYesSaysWhatTelegrafNeedsAndRecordsIt: the store behind a
+// Telegraf is out of reach, so -migrate -yes applies its change by saying
+// what to do there, records it, sends Telegraf nothing, and has nothing left
+// to do the next time.
+func TestMigrateYesSaysWhatTelegrafNeedsAndRecordsIt(t *testing.T) {
+	t.Parallel()
+	gh := newFakeGitHub(t)
+	telegraf := newCapture(t, nil)
+	dir := t.TempDir()
+	cfg := writeSinkConfig(t, dir, gh.URL(), "  telegraf:\n    url: "+telegraf.URL())
+	if err := os.WriteFile(filepath.Join(dir, "state.json"),
+		[]byte(`{"last_run":{"repo":"2026-09-27T10:00:00Z"}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	stdout, stderr, err := runSplit(t, time.Minute, "-config", cfg, "-migrate", "-yes")
+	if err != nil {
+		t.Fatalf("-migrate -yes failed: %v\n%s\n%s", err, stdout, stderr)
+	}
+	want := "  applied     2.6.1/gh_discussion_comment/is_answer in telegraf: drop gh_discussion_comment in the " +
+		"store behind Telegraf, then read discussions and outbound again through it with a backfill\n"
+	if !strings.Contains(stdout, want) || !strings.HasSuffix(stdout, "\n1 applied.\n") {
+		t.Errorf("-migrate -yes says:\n%s", stdout)
+	}
+	if n := telegraf.Count(); n != 0 {
+		t.Errorf("Telegraf was sent %d requests", n)
+	}
+	stdout, stderr, err = runSplit(t, time.Minute, "-config", cfg, "-migrate", "-yes")
+	if err != nil || !strings.HasSuffix(stdout, "\nNothing to migrate.\n") ||
+		!strings.Contains(stdout, "applied     2.6.1/gh_discussion_comment/is_answer: applied on ") {
+		t.Errorf("the second -migrate -yes: %v\n%s\n%s", err, stdout, stderr)
+	}
+}
+
+// appendToConfig adds top-level settings to a configuration file.
+func appendToConfig(t *testing.T, path, lines string) {
+	t.Helper()
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = f.WriteString(lines); err != nil {
+		t.Fatal(err)
+	}
+	if err = f.Close(); err != nil {
+		t.Fatal(err)
+	}
 }

@@ -18,6 +18,15 @@ var indent = strings.Repeat(" ", 2+statusWidth)
 // it holds of each registered change and what applying would do, and last a
 // line that says nothing was changed, which a dry run never did.
 func (p Plan) Print(w io.Writer) {
+	p.PrintStores(w)
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, p.summary())
+}
+
+// PrintStores is the plan without its last line, which is what -migrate -yes
+// prints before it applies: the same findings the dry run showed, so what is
+// about to be done is on the screen above what was done.
+func (p Plan) PrintStores(w io.Writer) {
 	fmt.Fprintf(w, "ghchronicle %s: what this release would change in the stores this configuration writes\n",
 		p.Release)
 	for _, note := range p.Notes {
@@ -27,8 +36,93 @@ func (p Plan) Print(w io.Writer) {
 		fmt.Fprintln(w)
 		printStore(w, st)
 	}
+}
+
+// Report is what -migrate -yes did, after the plan: a line for every item it
+// applied, failed to apply or held back, what the refill did, and a last line
+// that counts them and says how to go on.
+type Report struct {
+	Results []Result
+	Held    []Chosen
+	// Unreached is every store or item the plan could not ask, which
+	// nothing was done about.
+	Unreached []string
+	Refill    error
+	// Others is the flag that applies what was held back, and Resume how to
+	// carry on after a failure.
+	Others, Resume string
+}
+
+// Failed says whether anything was left undone.
+func (r Report) Failed() bool {
+	if r.Refill != nil || len(r.Held) > 0 || len(r.Unreached) > 0 {
+		return true
+	}
+	for _, res := range r.Results {
+		if res.Err != nil {
+			return true
+		}
+	}
+	return false
+}
+
+// Print writes the report.
+func (r Report) Print(w io.Writer) {
 	fmt.Fprintln(w)
-	fmt.Fprintln(w, p.summary())
+	if len(r.Results)+len(r.Held)+len(r.Unreached) == 0 {
+		fmt.Fprintln(w, "Nothing to migrate.")
+		return
+	}
+	applied, failed, cleared := 0, 0, 0
+	for _, res := range r.Results {
+		id := res.Item.Migration.ID + " in " + res.Store
+		if res.Err != nil {
+			failed++
+			fmt.Fprintf(w, "  %-*s%s: %s\n", statusWidth, "failed", id, oneLine(res.Err.Error()))
+			continue
+		}
+		applied++
+		if len(res.Item.Refill) > 0 {
+			cleared++
+		}
+		fmt.Fprintf(w, "  %-*s%s: %s\n", statusWidth, "applied", id, firstOf(res.Outcome.Did, "done"))
+		if res.Outcome.Aside != "" {
+			fmt.Fprintf(w, "%sthe old rows are kept as %s\n", indent, res.Outcome.Aside)
+		}
+		for _, c := range res.Outcome.Commands {
+			fmt.Fprintf(w, "%s  %s\n", indent, c)
+		}
+	}
+	for _, c := range r.Held {
+		fmt.Fprintf(w, "  %-*s%s in %s: %s; %s applies it anyway\n", statusWidth, "held back",
+			c.Item.Migration.ID, c.Store, c.HeldBack(), r.Others)
+	}
+	for _, u := range r.Unreached {
+		fmt.Fprintf(w, "  %-*s%s\n", statusWidth, "unreachable", u)
+	}
+	switch {
+	case cleared == 0:
+	case r.Refill != nil:
+		fmt.Fprintf(w, "  %-*sreading the history again did not finish: %s\n", statusWidth, "refill", oneLine(r.Refill.Error()))
+	default:
+		fmt.Fprintf(w, "  %-*sthe history of every store cleared was read again\n", statusWidth, "refill")
+	}
+	fmt.Fprintln(w)
+	parts := []string{fmt.Sprintf("%d applied", applied)}
+	if failed > 0 {
+		parts = append(parts, fmt.Sprintf("%d failed", failed))
+	}
+	if len(r.Held) > 0 {
+		parts = append(parts, fmt.Sprintf("%d held back", len(r.Held)))
+	}
+	if len(r.Unreached) > 0 {
+		parts = append(parts, fmt.Sprintf("%d not asked", len(r.Unreached)))
+	}
+	line := strings.Join(parts, ", ") + "."
+	if r.Failed() {
+		line += " " + r.Resume
+	}
+	fmt.Fprintln(w, line)
 }
 
 // printStore is one store's heading and its items.

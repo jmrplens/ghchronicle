@@ -154,8 +154,11 @@ type options struct {
 	uninstall string
 	yes       bool
 	// migrate prints what this release would change in every configured
-	// store, and changes nothing.
-	migrate bool
+	// store, and changes nothing; with yes it applies every pending change,
+	// and with migrateOthers also the ones in a store holding rows of
+	// accounts this configuration does not collect.
+	migrate       bool
+	migrateOthers bool
 	// publishDashboard reconciles the Grafana datasource and dashboard for
 	// every store this writes to, then exits. Like backfillStatus it asks
 	// GitHub nothing, so it needs no token.
@@ -206,10 +209,14 @@ func parseFlags(args []string, stderr io.Writer) (options, error) {
 		"remove what this put in place and exit: "+strings.Join(uninstallTargets, ", ")+
 			", comma separated; prints the list and removes nothing without -yes")
 	fs.BoolVar(&o.yes, "yes", false,
-		"go ahead with -uninstall rather than only listing what it would remove")
+		"go ahead with -uninstall or -migrate rather than only listing what it would do")
 	fs.BoolVar(&o.migrate, "migrate", false,
 		"print, for every configured store, what an earlier release left there in a shape this one no longer "+
-			"writes and what bringing it along would take, then exit; changes nothing")
+			"writes and what bringing it along would take, then exit; changes nothing without -yes, and with "+
+			"it applies every pending change and reads the history it cleared again")
+	fs.BoolVar(&o.migrateOthers, strings.TrimPrefix(flagOthers, "-"), false,
+		"with -migrate -yes, also apply a change to a store that holds rows of accounts this configuration "+
+			"does not collect, which come back only when whoever collects them reads them again")
 	fs.BoolVar(&o.publishDashboard, "publish-dashboard", false,
 		"publish the Grafana dashboard and the datasource it reads from, then exit; "+
 			"needs the grafana section of the config and asks GitHub nothing")
@@ -239,8 +246,18 @@ func parseFlags(args []string, stderr io.Writer) (options, error) {
 	fs.BoolVar(&o.layouts, "card-layouts", false, "list the card layouts and their fields, then exit")
 	fs.BoolVar(&o.groups, "groups", false, "list the metric groups and the families in each, then exit")
 	fs.BoolVar(&o.cardOnly, "card-only", false, "with -card, write the SVG and nothing else")
-	err := fs.Parse(args[1:])
-	return o, err
+	if err := fs.Parse(args[1:]); err != nil {
+		return o, err
+	}
+	// A command line that asks for something no run does is refused the way
+	// one that does not parse is, rather than run as if the flag were not
+	// there: -migrate-others on a sweep would say nothing and change nothing.
+	if o.migrateOthers && !o.migrate {
+		err := errors.New(flagOthers + " goes with -migrate -yes")
+		fmt.Fprintln(stderr, err)
+		return o, err
+	}
+	return o, nil
 }
 
 // exitProcess is every exit execute takes, so a test can drive execute through
@@ -302,13 +319,22 @@ func execute(args []string, stdout, stderr io.Writer) {
 		return
 	}
 
-	// A one-shot run exits when the sweep does, so an exporter it starts would
-	// serve nobody, and starting one collides with the port a long-running
-	// instance already holds. The push sinks all still run.
-	oneShot := o.once || o.backfill || o.card != ""
-	sinks, ledger, err := buildSinks(cfg, logger, oneShot)
+	// Before anything is read from the state file, so that a service that
+	// waited for a migration starts from what the migration left.
+	lock, goOn := holdIfServing(ctx, cfg, !o.oneShot(), logger, stderr)
+	if !goOn {
+		return
+	}
+	defer func() { _ = lock.Release() }()
+	sinks, ledger, err := buildSinks(cfg, logger, o.oneShot())
 	if err != nil {
 		fatal(stderr, err)
+		return
+	}
+	if o.migrate {
+		// Only -migrate -yes gets this far: the dry run was answered above,
+		// and builds no sink.
+		migrateAndClose(ctx, cfg, api, o, sinks, stdout, stderr, logger)
 		return
 	}
 
@@ -323,7 +349,7 @@ func execute(args []string, stdout, stderr io.Writer) {
 
 	runner := newRunner(cfg, api, sinks, logger, &o)
 	runner.Refill, runner.RefillEveryStart = ledgerForgot(cfg, ledger)
-	stampStores(runner, cfg, &o, logger)
+	stampStores(ctx, runner, cfg, &o, api, sinks, logger)
 	switch {
 	case o.backfill:
 		err = runBackfill(ctx, runner, cfg, accumulator, &o, logger)
@@ -349,15 +375,29 @@ func execute(args []string, stdout, stderr io.Writer) {
 
 // stampStores brings the state file's record of each store up to date before
 // the first sweep marks anything, which is what lets it tell a first start
-// from an upgrade. A card-only run writes to no store and saves no state, so
-// it records nothing either.
-func stampStores(runner *run.Runner, cfg *config.Config, o *options, logger *slog.Logger) {
+// from an upgrade, and then brings along what an upgrade left in them. A
+// card-only run writes to no store and saves no state, so it records nothing
+// and has nothing to bring along.
+func stampStores(ctx context.Context, runner *run.Runner, cfg *config.Config, o *options,
+	api *ghapi.Client, sinks []sink.Sink, logger *slog.Logger,
+) {
 	if o.cardOnly {
 		return
 	}
 	for _, w := range migrate.Stamp(runner.State, cfg, version) {
 		logger.Warn(w)
 	}
+	migrateOnStart(ctx, migration{
+		cfg: cfg, api: api, sinks: sinks, state: runner.State, log: logger, configPath: o.path,
+	}, !o.oneShot())
+}
+
+// oneShot says the run ends after what it was asked to do rather than
+// serving. Such a run starts no exporter, since it would serve nobody and its
+// port collides with the one a long-running instance holds, and it does not
+// hold the state file: the push sinks still all run.
+func (o *options) oneShot() bool {
+	return o.once || o.backfill || o.card != "" || o.migrate
 }
 
 // needsNoToken says whether the run asked for can do without a GitHub token:
@@ -564,10 +604,11 @@ func reported(ctx context.Context, o options, cfg *config.Config,
 	case o.uninstall != "":
 		// Nor this one, which takes away rather than collects.
 		err = uninstall(ctx, cfg, o.uninstall, o.yes, stdout)
-	case o.migrate:
+	case o.migrate && !o.yes:
 		// This one asks GitHub for the repository list alone, and the
-		// stores what they hold.
-		err = migratePlan(ctx, cfg, api, o.yes, stdout, time.Now())
+		// stores what they hold. With -yes it changes them, which takes the
+		// sinks and is not a report.
+		migratePlan(ctx, cfg, api, o.path, stdout, time.Now())
 	case o.list:
 		err = listRepositories(ctx, api, cfg, stdout)
 	default:

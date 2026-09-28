@@ -7,7 +7,7 @@ influxdb  url=http://influx:8181 org=default bucket=github  (InfluxDB 3 Core 3.1
               set aside: InfluxDB renames the table gh_code_scanning_alert_item-<time> and keeps it queryable for 24 hours before it purges it
               read again: security, since 2023-11-14, writing gh_code_scanning_alert_item only
               not coming back: the rows of 1 repository this configuration no longer covers: octocat/gone
-              safe to apply unattended: GitHub serves the whole history, the old rows are set aside for 24 hours, and every row is this configuration's
+              needs your word: reading it again does not bring back every row it holds (see not coming back), and those are gone once the set-aside is purged
   not needed  1.0.0/gh_dependabot_alert_item/state: no row of gh_dependabot_alert_item carries state
   note        2.6.0/gh_actions_cache_entry/sum
               the store holds gh_actions_cache_entry: 90 rows, the oldest dated 2023-11-14
@@ -73,7 +73,7 @@ postgres  host=db port=5432 database=gh  (PostgreSQL 18.6)
               set aside: the table is renamed gh_code_scanning_alert_item-<time>, and dropped 24 hours later
               read again: security, since 2023-11-14, writing gh_code_scanning_alert_item only
               not coming back: the rows of 1 repository this configuration no longer covers: octocat/gone
-              safe to apply unattended: GitHub serves the whole history, the old rows are set aside for 24 hours, and every row is this configuration's
+              needs your word: reading it again does not bring back every row it holds (see not coming back), and those are gone once the set-aside is purged
   not needed  1.0.0/gh_dependabot_alert_item/state: no row of gh_dependabot_alert_item carries state
   note        2.6.0/gh_actions_cache_entry/sum
               the store holds gh_actions_cache_entry: 90 rows, the oldest dated 2023-11-14

@@ -33,6 +33,7 @@ heartbeat: # cada cuánto despierta el bucle, para una prueba
 log: # nivel, formato y un fichero rotatorio opcional
 state_file: # lo que recuerda un reinicio
 backfill: # el límite, al ejecutar con -backfill
+migrate: # lo que hace un arranque con lo que una actualización dejó en los almacenes
 grafana: # dónde se publica el dashboard, cuando se pide
 ```
 
@@ -323,6 +324,37 @@ aparece cuando arranca un relleno, se borra cuando el recorrido llega al final,
 y una pasada normal ni lo escribe ni lo lee. Ver [pararlo, y
 retomarlo](/ghchronicle/es/how/backfill/#pararlo-y-retomarlo).
 
+## `migrate`
+
+```yaml
+migrate: auto
+```
+
+Lo que hace una ejecución que escribe en los almacenes, antes de su primera
+pasada, con un almacén que una versión anterior dejó con una forma que esta ya
+no escribe. `-migrate` imprime lo que cada almacén configurado guarda de cada
+cambio así; ver [Migraciones](/ghchronicle/es/install/upgrading/#migraciones).
+
+| Valor  | Qué hace un arranque                                                                                                |
+| ------ | ------------------------------------------------------------------------------------------------------------------- |
+| `auto` | El valor por omisión. Aplica por su cuenta un cambio pendiente que no pierde nada, lo dice en `WARN`, y avisa de todos los demás en cada arranque |
+| `warn` | No aplica nada, y avisa de cada cambio pendiente en cada arranque                                                    |
+
+Un cambio no pierde nada cuando se cumplen las tres cosas: GitHub todavía sirve
+toda la historia, así que volver a leerla trae de vuelta cada fila que guarda
+el almacén; las filas antiguas se apartan 24 horas en vez de borrarse, que es
+lo que hacen InfluxDB 3, PostgreSQL y Elasticsearch; y todas las filas del
+almacén son de esta configuración. No hay valor que aplique el resto por su
+cuenta. Cada aviso nombra las dos órdenes, `-migrate` para el plan y
+`-migrate -yes` para aplicarlo, con el servicio parado. Cualquier otro valor se
+rechaza al arrancar.
+
+El servicio también tiene un bloqueo junto al fichero de estado,
+`<nombre>-lock`, mientras corre, que es lo que impide que `-migrate -yes`
+cambie los almacenes bajo sus pies. No hay nada que configurar: sigue a
+`state_file`, el sistema operativo lo suelta acabe como acabe el proceso, y el
+fichero que queda solo nombra el último proceso que lo tuvo.
+
 ## Cuando está mal, lo dice al arrancar
 
 La configuración se valida antes de hacer la primera llamada, y los mensajes
@@ -337,6 +369,7 @@ nombran la clave y lo que necesita.
 | `every.families.<name>: unknown collector`                            | El nombre no es una familia. El mensaje lista las que existen      |
 | `sinks.influxdb: url and bucket are required`                         | Cada destino valida sus propias claves obligatorias y dice cuáles  |
 | `sinks.sql.dialect: "mysql" is not postgres, the only dialect so far` | El valor no es uno de los aceptados, y el mensaje los lista        |
+| `migrate: "off" is not auto or warn`                                  | Lo mismo, para `migrate`                                           |
 
 <Aside type="note" title="Una cadencia para una familia inexistente es fatal">
   `every` se comprueba contra la lista de colectores conocidos al arrancar en

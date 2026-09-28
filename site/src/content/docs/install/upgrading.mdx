@@ -53,11 +53,13 @@ Each line starts with what the check found:
   which families would read the measurement again and from when, and what
   would not come back: the rows of repositories the configuration no longer
   covers, and of families it has switched off. The last line says whether
-  applying it needs nobody's word: GitHub still serves the whole history, the
-  old rows would be set aside for 24 hours rather than deleted, and every row in
-  the store is this configuration's. A store shared with another collector, an
-  InfluxDB 2, whose only way is a delete, and every store that cannot be asked
-  need somebody's word, and the line says which reason applies.
+  applying it needs nobody's word: GitHub still serves the whole history, so
+  every row the store holds would come back, the old rows would be set aside
+  for 24 hours rather than deleted, and every row in the store is this
+  configuration's. A store shared with another collector, one holding rows the
+  refill would not bring back, an InfluxDB 2, whose only way is a delete, and
+  every store that cannot be asked need somebody's word, and the line says
+  which reason applies.
 - `note`: the rows are there and nothing can put them right, so the plan says
   what they mean and changes nothing.
 - `frozen`: nothing this configuration runs writes the measurement any more,
@@ -65,6 +67,77 @@ Each line starts with what the check found:
 - `applied`: the state file records the change as applied to this store, and
   the store, where it can be asked, agrees.
 - `unreachable`: the store did not answer, so nothing about it is known.
+
+### What a start does about it
+
+Every run that writes to the stores, the service, `-once`, `-backfill` and a
+card drawn beside the stores, checks them the same way before its first sweep,
+and what it does next is the [`migrate`](/ghchronicle/configuration/#migrate)
+setting's:
+
+- `auto`, the default, applies on its own every pending change marked safe to
+  apply unattended, and nothing else. It says so first, at `WARN`, with what it
+  found, why the change exists and what it does in that store, including where
+  the old rows are set aside; then it reads the measurement again from GitHub
+  and only then sweeps.
+- `warn` applies nothing.
+
+A pending change a start does not apply is a `WARN` at every start, named by
+store, with the reason it was left and the two commands, copied from the
+configuration the run was given. One line in the log, wrapped here:
+
+```text
+level=WARN msg="migration pending" sink=graphite measurement=gh_discussion_comment
+  migration=2.6.1/gh_discussion_comment/is_answer why="is_answer was a tag, ..."
+  not_applied="only whoever runs the Graphite host can remove its files"
+  plan="ghchronicle -config /etc/ghchronicle/config.yaml -migrate"
+  apply="ghchronicle -config /etc/ghchronicle/config.yaml -migrate -yes"
+  first="stop this service: -migrate -yes refuses to run beside it"
+```
+
+There is no setting that applies the rest on its own: a change that could lose
+rows waits for somebody to read the plan and give the word. A note is said once
+at `INFO` and then at `DEBUG`, since nothing will ever change it, and so is a
+change whose measurement nothing the configuration runs writes any more. A
+store that does not answer within 30 seconds is a `WARN` too, and the sweep
+goes on without waiting longer.
+
+What a start finds not needed, and what it has applied, it records, and the
+next start takes the record's word for it: once every change is settled for a
+store, a start does not ask that store anything. `-migrate` does not take that
+word and asks again every time.
+
+### Applying it by hand
+
+```sh
+systemctl stop ghchronicle
+ghchronicle -config /etc/ghchronicle/config.yaml -migrate -yes
+systemctl start ghchronicle
+```
+
+`-migrate -yes` prints the same plan and then applies every pending change, the
+unsafe ones too, since `-yes` is the word the plan asked for. Each one is
+recorded in the state file as it is applied, so a stop half way costs nothing
+the next run cannot pick up: what was applied is not done twice. A line under
+the plan says what happened to each:
+
+- `applied`: done. Where the old rows are kept, it names them; where somebody
+  else has to act, on a Graphite host or behind a Telegraf, it prints the
+  commands to run there.
+- `failed`: the store refused, with its reason. The others still go ahead.
+- `held back`: the store holds rows of accounts this configuration does not
+  collect. Set aside, those come back only when whoever collects them reads
+  them again, so this takes `-migrate-others` as well as `-yes`.
+- `unreachable`: the store did not answer, so nothing was done there.
+
+It exits 0 when everything pending was applied and read again, and 1 when
+anything was left, with the sentence that says how to go on. It refuses before
+it changes anything, and exits 1, with no GitHub token or no repository list,
+since nothing it clears could be read again, and while another process holds
+the state file: the service holds it for as long as it runs, beside the state
+file as `<name>-lock`, and `-migrate -yes` names that process rather than
+changing the stores it writes. A service started while `-migrate -yes` runs
+waits for it to finish, and a second service on the same state file is refused.
 
 ### What the state file remembers of each store
 

@@ -78,6 +78,18 @@ func esIdentity(p esPair) string {
 	return p.Index + "|" + strings.Join(keys, ",")
 }
 
+// assertElasticsearchOnlyAsked holds what a run sends the store before its
+// first sweep, when it counts the documents of the migrated measurements, to
+// questions: which cluster, how many, and since when.
+func assertElasticsearchOnlyAsked(t *testing.T, rec *capture) {
+	t.Helper()
+	for _, r := range rec.Reads() {
+		if r.Path != "/" && !strings.HasSuffix(r.Path, "/_count") && !strings.HasSuffix(r.Path, "/_search") {
+			t.Errorf("before the sweep the store was sent %s %s", r.Method, r.Path)
+		}
+	}
+}
+
 func runElasticsearchSweep(t *testing.T) *capture {
 	t.Helper()
 	gh := newFakeGitHub(t)
@@ -94,10 +106,11 @@ func TestElasticsearchSinkWritesBulkDocuments(t *testing.T) {
 	t.Parallel()
 	rec := runElasticsearchSweep(t)
 
-	reqs := rec.Accepted()
+	reqs := rec.Writes()
 	if len(reqs) == 0 {
 		t.Fatal("nothing reached the _bulk endpoint")
 	}
+	assertElasticsearchOnlyAsked(t, rec)
 	for _, r := range reqs {
 		if r.Method != http.MethodPost || r.Path != "/_bulk" {
 			t.Errorf("%s %s, want POST /_bulk", r.Method, r.Path)

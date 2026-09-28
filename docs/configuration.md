@@ -30,6 +30,7 @@ heartbeat: # how often the sweep loop wakes, for a test run
 log: # level, format, and an optional rotating file
 state_file: # what a restart remembers
 backfill: # the bound, when run with -backfill
+migrate: # what a start does about what an upgrade left in the stores
 grafana: # where the dashboard is published, when asked
 ```
 
@@ -303,6 +304,36 @@ a backfill starts, it is removed when the walk reaches the end, and a sweep
 neither writes nor reads it. See [stopping one, and picking it up
 again](https://jmrp.io/docs/ghchronicle/how/backfill/#stopping-one-and-picking-it-up-again).
 
+### `migrate`
+
+```yaml
+migrate: auto
+```
+
+What a run that writes to the stores does, before its first sweep, about a
+store an earlier release left in a shape this one no longer writes. `-migrate`
+prints what each configured store holds of every such change; see
+[Migrations](https://jmrp.io/docs/ghchronicle/install/upgrading/#migrations).
+
+| Value  | What a start does                                                                                                   |
+| ------ | ------------------------------------------------------------------------------------------------------------------- |
+| `auto` | The default. Applies on its own a pending change that loses nothing, says so at `WARN`, and warns about every other one at every start |
+| `warn` | Applies nothing, and warns about every pending change at every start                                                |
+
+A change loses nothing when all three hold: GitHub still serves the whole
+history, so reading it again brings back every row the store holds; the old
+rows are set aside for 24 hours rather than deleted, which InfluxDB 3,
+PostgreSQL and Elasticsearch do; and every row in the store is this
+configuration's. There is no value that applies the rest on its own. Each
+warning names the two commands, `-migrate` for the plan and `-migrate -yes` to
+apply it, with the service stopped. Any other value is refused at start-up.
+
+The service also holds a lock beside the state file, `<name>-lock`, for as long
+as it runs, which is what keeps `-migrate -yes` from changing the stores under
+it. There is nothing to configure: it follows `state_file`, the operating
+system lets go of it however the process ends, and the file left behind only
+names the last process that held it.
+
 ### When it is wrong, it says so at start-up
 
 Configuration is validated before the first call is made, and the messages name
@@ -317,6 +348,7 @@ the key and what it needs.
 | `every.families.<name>: unknown collector`                            | The name is not a family. The message lists the ones that exist       |
 | `sinks.influxdb: url and bucket are required`                         | Each sink validates its own required keys and says which              |
 | `sinks.sql.dialect: "mysql" is not postgres, the only dialect so far` | The value is not one of the accepted ones, and the message lists them |
+| `migrate: "off" is not auto or warn`                                  | The same, for `migrate`                                               |
 
 > **A cadence for a family that does not exist is fatal**
 >
@@ -502,6 +534,7 @@ This page is a form that writes a configuration. What follows is the inventory i
   - `state_file`: string, defaults to `ghchronicle-state.json`, like `/var/lib/ghchronicle/state.json`
   - `backfill`: a block of settings
   - `backfill.since`: string, like `2y`
+  - `migrate`: string, defaults to `auto`, one of `auto`, `warn`
   - `grafana`: a block of settings
   - `grafana.url`: string, like `http://localhost:3000`
   - `grafana.token`: string, a credential, like `${GRAFANA_TOKEN}`
