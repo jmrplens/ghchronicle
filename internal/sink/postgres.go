@@ -2,6 +2,7 @@ package sink
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"maps"
 	"slices"
@@ -10,6 +11,7 @@ import (
 	"sync"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -95,11 +97,62 @@ func (p *Postgres) Write(ctx context.Context, points []Point) (int, error) {
 	if err := p.connect(ctx); err != nil {
 		return 0, err
 	}
+	return p.write(ctx, poolSchema{p.pool}, p.pool, points)
+}
+
+// Forget drops what this sink remembers of a measurement's table, so that
+// its next write declares it again from the catalog. A migration calls it
+// once it has set the table aside in the same process.
+func (p *Postgres) Forget(measurement string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	delete(p.schema.tables, measurement)
+}
+
+// batchSender is what sending the upserts asks of the database, an interface
+// so that a refusal can be answered without a server.
+type batchSender interface {
+	SendBatch(ctx context.Context, b *pgx.Batch) pgx.BatchResults
+}
+
+// write declares and upserts one batch, and once more after forgetting its
+// tables when the database says one of them is not there.
+//
+// The sink remembers every table it declared for the life of the process, so
+// a table dropped or renamed by anyone else made every later write of it fail
+// with 42P01 and took the rest of its batch along: measured on 18.6, three
+// writes of three after a drop by another connection, the gh_discussion row
+// of the same batch with them, until a restart. A migration sets a table
+// aside exactly that way, and an operator dropping one by hand is the other
+// way it happens. Forgotten, the batch declares the tables again, the one
+// that went is created afresh, and the batch goes through; the cost is a
+// catalog read per table of the batch, 15 ms each, once.
+func (p *Postgres) write(ctx context.Context, conn schemaConn, sender batchSender, points []Point) (int, error) {
 	shapes := sqlShapes(points)
-	if err := p.declareAll(ctx, poolSchema{p.pool}, points, shapes); err != nil {
+	n, err := p.declareAndUpsert(ctx, conn, sender, points, shapes)
+	if !undefinedTable(err) {
+		return n, err
+	}
+	for m := range shapes {
+		delete(p.schema.tables, m)
+	}
+	return p.declareAndUpsert(ctx, conn, sender, points, shapes)
+}
+
+func (p *Postgres) declareAndUpsert(ctx context.Context, conn schemaConn, sender batchSender, points []Point,
+	shapes map[string]*sqlShape,
+) (int, error) {
+	if err := p.declareAll(ctx, conn, points, shapes); err != nil {
 		return 0, err
 	}
-	return p.upsertAll(ctx, points, shapes)
+	return p.upsertAll(ctx, sender, points, shapes)
+}
+
+// undefinedTable says whether PostgreSQL refused a statement for naming a
+// table that is not there.
+func undefinedTable(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "42P01"
 }
 
 // schemaConn is what declaring a table asks of the database: to run a
@@ -262,7 +315,7 @@ func (p *Postgres) rowsFor(points []Point, shapes map[string]*sqlShape) []row {
 	return out
 }
 
-func (p *Postgres) upsertAll(ctx context.Context, points []Point,
+func (p *Postgres) upsertAll(ctx context.Context, sender batchSender, points []Point,
 	shapes map[string]*sqlShape,
 ) (int, error) {
 	rows := p.rowsFor(points, shapes)
@@ -272,7 +325,7 @@ func (p *Postgres) upsertAll(ctx context.Context, points []Point,
 		if batch.Len() == 0 {
 			return nil
 		}
-		results := p.pool.SendBatch(ctx, batch)
+		results := sender.SendBatch(ctx, batch)
 		err := results.Close()
 		batch = &pgx.Batch{}
 		return err

@@ -394,10 +394,10 @@ as NULL. The column appears the first time a point carries something for it.
 **A field changed type and the insert fails.** A column is created with the
 type of the first value seen and is never altered afterwards, so a field that
 was a number and is now a string has nowhere to go. Rename the field, or drop
-the table and restart the collector, whose next sweep declares it again. The
-restart is not optional: the sink declares a table once per process, so while
-it runs it goes on writing into the table it declared, and every insert fails
-until it starts again.
+the table, and the collector's next write declares it again. No restart is
+needed: the sink declares a table once per process, and the first insert after
+the drop is refused because the table is not there, so the sink forgets the
+tables of that batch, declares them again and sends the batch once more.
 
 **The SQL file's `gh_discussion_comment` statements are refused.** With `there
 is no unique or exclusion constraint matching the ON CONFLICT specification`,

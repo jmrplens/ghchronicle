@@ -147,9 +147,14 @@ contra PostgreSQL 18.6** el 2026-09-27:
   también InfluxDB.
 
 La salida limpia de cualquiera de los dos casos es borrar la tabla y dejar que
-las pasadas la vuelvan a llenar, y un relleno histórico lo anterior; un
-colector con el destino que conecta hay que reiniciarlo después del borrado,
-porque declara cada tabla una vez por proceso.
+las pasadas la vuelvan a llenar, y un relleno histórico lo anterior. Un
+colector con el destino que conecta sigue escribiendo tras el borrado. Su
+primera escritura después se rechaza con `relation ... does not exist`, porque
+el destino declara una tabla una vez por proceso; entonces olvida las tablas de
+ese lote, las declara de nuevo y reenvía el lote una vez, lo que crea la tabla
+de cero. **Medido contra PostgreSQL 18.6**: antes de esto, todas las
+escrituras siguientes de la tabla, y el resto de su lote, se rechazaban hasta
+reiniciar.
 [Cómo leer las tablas](/ghchronicle/es/collectors/measurements/#cómo-leer-las-tablas)
 enseña cómo reconstruir una clave a mano.
 

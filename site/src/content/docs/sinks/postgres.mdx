@@ -142,8 +142,13 @@ a measurement's tags changes what loads into it. **Measured against PostgreSQL
   written, the two shapes InfluxDB holds as well.
 
 The clean way out of either is to drop the table and let the sweeps, and a
-backfill for the history, fill it again; a collector with the connecting sink
-has to be restarted after the drop, since it declares a table once per process.
+backfill for the history, fill it again. A collector with the connecting sink
+writes on across the drop. Its first write after it is refused with
+`relation ... does not exist`, since the sink declares a table once per
+process; the sink then forgets the tables of that batch, declares them again
+and sends the batch once more, which creates the table afresh. **Measured
+against PostgreSQL 18.6**: before this, every later write of the table and the
+rest of its batch were refused until a restart.
 [How to read the tables](/ghchronicle/collectors/measurements/#how-to-read-the-tables)
 shows how to rebuild a key by hand instead.
 

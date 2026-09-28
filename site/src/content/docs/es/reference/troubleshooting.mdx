@@ -414,10 +414,10 @@ La columna aparece la primera vez que un punto lleva algo para ella.
 **Un campo cambió de tipo y el insert falla.** Una columna se crea con el tipo
 del primer valor visto y no se altera después, así que un campo que era un
 número y ahora es una cadena no tiene dónde ir. Renombra el campo, o tira la
-tabla y reinicia el colector, cuya siguiente pasada la declara otra vez. El
-reinicio no es opcional: el destino declara una tabla una vez por proceso, así
-que mientras corre sigue escribiendo en la tabla que declaró, y cada insert
-falla hasta que vuelve a arrancar.
+tabla, y la siguiente escritura del colector la declara otra vez. No hace falta
+reiniciar: el destino declara una tabla una vez por proceso, y el primer insert
+tras el borrado se rechaza porque la tabla no está, así que el destino olvida
+las tablas de ese lote, las declara de nuevo y reenvía el lote una vez.
 
 **Se rechazan las sentencias de `gh_discussion_comment` del fichero SQL.** Con
 `there is no unique or exclusion constraint matching the ON CONFLICT
