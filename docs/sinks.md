@@ -831,6 +831,15 @@ repo=edge-cache visibility=public` with a `stars` field becomes:
 github.repo.false.main.false.acme_edge-cache.Go.MIT.acme.edge-cache.public.stars 37 1757280000
 ```
 
+The dashboard names a series or a row by the node it is grouped under, so it
+shows a name as the path holds it: the `(ghost)` the collector writes for a
+deleted account reads `_ghost_`, the `Actions Linux` SKU `Actions_Linux`, the
+`Q&A` category `Q_A`, `another/project` `another_project`, and a cache key
+holding `go-1.27.1` holds `go-1_27_1`. Nothing turns them back on the way out,
+since an underscore in a node may have been one in the name as well, so the
+Graphite dashboard leaves them as they are, and the other four stores show each
+name as the collector wrote it.
+
 A field that shares its name with a tag is skipped, the same rule the line
 protocol applies: the tag wins, because it is the one that can be grouped by.
 

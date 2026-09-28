@@ -54,6 +54,16 @@ como:
 github.repo.false.main.false.acme_edge-cache.Go.MIT.acme.edge-cache.public.stars 37 1757280000
 ```
 
+El dashboard nombra una serie o una fila por el nodo bajo el que la agrupa, así
+que muestra un nombre tal como lo guarda la ruta: el `(ghost)` que el colector
+escribe para una cuenta borrada se lee `_ghost_`, el SKU `Actions Linux`
+`Actions_Linux`, la categoría `Q&A` `Q_A`, `another/project` `another_project`,
+y una clave de caché que contiene `go-1.27.1` contiene `go-1_27_1`. Nada los
+devuelve a su forma al leerlos, porque un guion bajo en un nodo puede haber
+sido uno también en el nombre, así que el dashboard de Graphite los deja como
+están, y los otros cuatro almacenes muestran cada nombre como lo escribió el
+colector.
+
 Un campo que comparte nombre con una etiqueta se salta, la misma regla que
 aplica el line protocol: gana la etiqueta, porque es la que permite agrupar.
 
