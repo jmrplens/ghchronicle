@@ -111,7 +111,14 @@ func TestFileSinkRotatesAtTheConfiguredSize(t *testing.T) {
 	}
 	// Rotation must not corrupt what it splits.
 	for _, name := range []string{out, out + ".1", out + ".2"} {
-		for i, line := range strings.Split(strings.TrimSpace(readFile(t, name)), "\n") {
+		body := strings.TrimSpace(readFile(t, name))
+		// The sink rotates as soon as a line takes the file past max_bytes, so
+		// a sweep whose last line did leaves the current file empty, which
+		// splits into one empty line that is not JSON and is not a line either.
+		if body == "" {
+			continue
+		}
+		for i, line := range strings.Split(body, "\n") {
 			var p point
 			if err := json.Unmarshal([]byte(line), &p); err != nil {
 				t.Fatalf("%s line %d is not JSON: %v\n%s", filepath.Base(name), i+1, err, line)

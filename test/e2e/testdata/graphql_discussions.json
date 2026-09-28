@@ -15,7 +15,40 @@
             "answerChosenAt": "@DAYS_AGO_27@T14:30:00Z",
             "author": {"login": "erin"},
             "category": {"name": "Q&A", "isAnswerable": true},
-            "comments": {"totalCount": 2},
+            "comments": {
+              "totalCount": 2,
+              "nodes": [
+                {
+                  "databaseId": 18300001,
+                  "createdAt": "@DAYS_AGO_27@T11:00:00Z",
+                  "url": "https://github.com/octocat/hello-world/discussions/12#discussioncomment-18300001",
+                  "upvoteCount": 2,
+                  "isAnswer": true,
+                  "author": {"login": "octocat"},
+                  "replies": {
+                    "totalCount": 1,
+                    "nodes": [
+                      {
+                        "databaseId": 18300002,
+                        "createdAt": "@DAYS_AGO_27@T15:00:00Z",
+                        "url": "https://github.com/octocat/hello-world/discussions/12#discussioncomment-18300002",
+                        "upvoteCount": 0,
+                        "author": {"login": "erin"}
+                      }
+                    ]
+                  }
+                },
+                {
+                  "databaseId": 18300003,
+                  "createdAt": "@DAYS_AGO_26@T09:30:00Z",
+                  "url": "https://github.com/octocat/hello-world/discussions/12#discussioncomment-18300003",
+                  "upvoteCount": 0,
+                  "isAnswer": false,
+                  "author": {"login": "mona"},
+                  "replies": {"totalCount": 0, "nodes": []}
+                }
+              ]
+            },
             "reactions": {"totalCount": 1}
           },
           {
@@ -29,7 +62,7 @@
             "answerChosenAt": null,
             "author": null,
             "category": {"name": "Ideas", "isAnswerable": false},
-            "comments": {"totalCount": 0},
+            "comments": {"totalCount": 0, "nodes": []},
             "reactions": {"totalCount": 0}
           }
         ]
