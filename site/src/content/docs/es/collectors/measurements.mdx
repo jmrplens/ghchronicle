@@ -1029,10 +1029,22 @@ level=WARN msg="co-authored pull request count is a floor" capped=false truncate
 
 `capped` es un día que por sí solo tenía más de los mil resultados que pagina
 una búsqueda, y `truncated` cuántas pull requests tenían más commits de los que
-caben en una página de cien y ningún trailer en los leídos, que es lo más que
+caben en una página de cien, ningún trailer en los leídos y el resto de sus
+commits sin leer porque falló la consulta que los pedía, que es lo más que
 puede quedarse corto el recuento. Los dos se guardan en el fichero de estado
 con el recuento, así que una pasada que suma a un mínimo sigue diciendo que lo
 es.
+
+Una pull request con más de cien commits y ningún trailer en los cien primeros
+se sigue leyendo, cien commits cada vez y diez pull requests por consulta, un
+punto cada una, hasta que aparece un trailer o se acaban los commits. Hasta la
+2.6.0 se quedaba ahí y se contaba como un mínimo: en la cuenta medida, tres
+pull requests de 143, 144 y 248 commits hacían que cada pasada avisara de
+`truncated=3`, y leer el resto de sus commits el 2026-09-28, dos consultas y
+121 KB, no encontró ningún trailer en ninguna, así que el recuento de 33 había
+sido exacto desde el principio. Esas consultas las paga el recorrido entero
+semanal, y también cada pasada que recorre el día en que se fusionó una pull
+request así.
 
 `gh_social_account` lleva una fila más que el listado de cuentas sociales: la
 página personal, bajo el proveedor `website`, del `blog` del perfil. El ORCID

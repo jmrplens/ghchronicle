@@ -38,7 +38,9 @@ every one-shot run reported at Info, as news, how it always runs. And
 production, read on 2026-09-28, held no contribution line in Loki for that
 day: the sink rendered the daily reading of each item still open, which
 reached Loki only on a day a pass wrote in the first hour after midnight UTC,
-and held each closing to an hour the pass after it could miss.
+and held each closing to an hour the pass after it could miss. It also warned
+on every pass that the Pair Extraordinaire count was a floor, a false alarm the
+walk could have settled by reading on.
 
 - **A Docker state volume belongs to the collector.** Up to 2.6.0 neither
   image had `/var/lib/ghchronicle`, where the example configuration keeps the
@@ -442,6 +444,30 @@ and held each closing to an hour the pass after it could miss.
   and under `-once` `every.families.outbound` should say the schedule's
   cadence, as the
   [Loki page](https://jmrp.io/docs/ghchronicle/sinks/loki/) says.
+- **The co-authored walk reads every commit of a long pull request.** The
+  walk behind Pair Extraordinaire's progress reads the first hundred commits of
+  each merged pull request beside the search page, and one with more and no
+  `Co-authored-by` trailer in those hundred was counted as not co-authored and
+  as a floor, kept in the state file with the count, so every pass said so.
+  Production warned `co-authored pull request count is a floor` with
+  `capped=false truncated=3` on every pass. Measured on 2026-09-28, the three
+  were
+  [jmrplens/gitlab-mcp-server#108](https://github.com/jmrplens/gitlab-mcp-server/pull/108),
+  [#39](https://github.com/jmrplens/gitlab-mcp-server/pull/39) and
+  [#190](https://github.com/jmrplens/gitlab-mcp-server/pull/190), of 143, 144
+  and 248 commits, and the rest of their commits held no trailer, so the count
+  of 33 was exact and the warning a false alarm. Such a pull request is now
+  read on by its node id, a hundred commits at a time and ten pull requests to
+  one aliased query, until a trailer turns up or the commits run out, and it
+  stays a floor only when the query for its remaining commits fails. Against
+  the live API the same day, the three took two queries of one point each, 77
+  KB and 44 KB, and a whole walk of the account read 33 with nothing
+  truncated: 41 queries with the counts query, in 1 minute 53 seconds. The
+  rule the count is kept by has changed, so the first `achievements` pass
+  after the upgrade walks the whole history once, as the
+  [upgrade page](https://jmrp.io/docs/ghchronicle/install/upgrading/#achievements-walks-the-whole-merged-history-once-more)
+  says; after that the extra queries are paid by the weekly whole walk and by
+  each pass that walks the day such a pull request merged.
 - **The documentation says what 2.6.0 does, in both languages.** The collector
   and measurement pages: `achievements` hourly, the two measurements whose url
   no table links, `gh_account_total` as one GraphQL query and one search, a
@@ -506,17 +532,18 @@ the newest-reading sums in every store and the exporter's five gauges over two
 owners' repositories of one name; the two open-longest tables in every store;
 every query of every store, and every exporter rule that names a repository,
 over two owners' repositories of one name; a Graphite query that fills the
-buckets of a `summarize` not aligned to its range; and the Loki line of every
+buckets of a `summarize` not aligned to its range; the Loki line of every
 kind, state and merged flag of a contribution, an open item's row sent or
 counted as dropped, the lookback of each stream from its family's cadence, and
 a contribution merged an hour and a half before the write, through the sink
-the configuration builds. Where such a test calls
-something the old code lacks, it was run there with that call stubbed. The
-binary
-against the fake GitHub holds that a one-shot run says its refill at
-Debug and never at Info, that no comment carries `is_answer`, that no row of
-an open outbound search reaches Loki, and that a contribution merged an hour
-and a half before the pass does while one merged past the lookback does not. The
+the configuration builds; and a pull request of 150 commits whose trailer is
+on its second page, and one whose remaining commits could not be read. Where
+such a test calls something the old code lacks, it was run there with that
+call stubbed. The binary against the fake GitHub holds that a one-shot run
+says its refill at Debug and never at Info, that no comment carries
+`is_answer`, that no row of an open outbound search reaches Loki, and that a
+contribution merged an hour and a half before the pass does while one merged
+past the lookback does not. The
 containerised suite holds the two newest-reading tables against InfluxDB 3, as
 above, and every bar of both punch cards against what the sweep's own points
 add up to, in the four stores that draw them; against the dashboards before
@@ -578,6 +605,10 @@ Not verified, and worth saying plainly:
   was measured against Loki 3.7.7 in a container; no production pass has
   sent a closing through it yet. How often a comment count or a title moves
   between the two passes that send a closing was not measured.
+- The co-authored walk reading on was run live on one account, whose three
+  long pull requests carry no trailer past their first hundred commits. A
+  trailer found on a later page, and a refused query for the rest, are held to
+  fixtures only, and no production pass has run it yet.
 - Left out rather than unproven: a tool that drops and fills
   `gh_discussion_comment` again, which is
   [#96](https://github.com/jmrplens/ghchronicle/issues/96), and a warning for

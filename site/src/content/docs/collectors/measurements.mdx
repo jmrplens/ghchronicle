@@ -985,9 +985,20 @@ level=WARN msg="co-authored pull request count is a floor" capped=false truncate
 
 `capped` is a day that alone held more than the thousand results a search
 pages, and `truncated` how many pull requests had more commits than a page of a
-hundred and no trailer in the ones read, which is the most the count can be
-short by. Both are kept in the state file with the count, so a pass that adds
-to a floor still says it is one.
+hundred, no trailer in the ones read, and the rest of their commits unread
+because the query that asked for them failed, which is the most the count can
+be short by. Both are kept in the state file with the count, so a pass that
+adds to a floor still says it is one.
+
+A pull request with more than a hundred commits and no trailer in the first
+hundred is read on, a hundred commits at a time and ten pull requests to a
+query, one point each, until a trailer turns up or the commits run out. Up to
+2.6.0 it was left there and counted as a floor: on the account measured, three
+pull requests of 143, 144 and 248 commits made every pass warn `truncated=3`,
+and reading the rest of their commits on 2026-09-28, two queries and 121 KB,
+found no trailer in any, so the count of 33 had been exact all along. The weekly
+whole walk pays those queries, and so does each pass that walks the day such a
+pull request merged.
 
 `gh_social_account` carries one more row than the social accounts listing:
 the homepage, under the provider `website`, from the `blog` of the profile.

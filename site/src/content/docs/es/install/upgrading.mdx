@@ -164,6 +164,20 @@ la 2.6.1, que es lo que hacen `docker compose pull` y después
 anfitrión montado ahí sigue necesitando su `chown`. Ver [qué tiene que ser
 escribible](/ghchronicle/es/install/docker/#qué-tiene-que-ser-escribible).
 
+### `achievements` recorre entero el historial de fusiones otra vez
+
+El recuento de coautorías que hay detrás de Pair Extraordinaire lee ahora todos
+los commits de una pull request que tiene más de cien, donde la 2.6.0 leía los
+cien primeros y contaba el resto como un mínimo. Eso cambia la regla con la que
+se guarda el recuento, así que el recuento que tiene un fichero de estado de la
+2.6.0 se deja a un lado y la primera pasada de `achievements` tras la
+actualización recorre todas las pull requests que la cuenta ha fusionado: 41
+consultas con la de cuentas, 41 puntos, en 1 minuto y 53 segundos sobre la
+cuenta medida, el 2026-09-28. Un aviso `co-authored pull request count is a floor` que volvía en
+cada pasada deja de salir con ello, salvo que de verdad no se pudieran leer los
+commits que le quedaban a una pull request. Ver
+[`gh_achievement_progress`](/ghchronicle/es/collectors/measurements/).
+
 <Aside type="note" title="Qué más cambió">
   Las notas de cada versión, con lo que se midió y lo que no, están en
   [el historial de versiones](/ghchronicle/es/reference/changelog/).
