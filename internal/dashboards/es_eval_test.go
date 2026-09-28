@@ -78,6 +78,16 @@ func evalESPanel(t *testing.T, p map[string]any, docs []esDoc) []map[string]any 
 			rows = mergeFrames(frames)
 		case "organize":
 			rows = organized(rows, options)
+		case "calculateField":
+			rows = calculated(t, rows, options)
+		case "filterByValue":
+			rows = filteredByValue(t, rows, options)
+		case "sortBy":
+			rows = sortedBy(rows, options)
+		case "limit":
+			if n, _ := options["limitField"].(int); n < len(rows) {
+				rows = rows[:n]
+			}
 		default:
 			t.Fatalf("%q: no evaluator for the %v transformation", p["title"], tf["id"])
 		}
@@ -172,6 +182,17 @@ func withMetrics(t *testing.T, row map[string]any, metrics []any, docs []esDoc) 
 				total += v
 			}
 			out[names[0]] = total
+		case "avg":
+			// No value at all is null, as for a percentile.
+			var mean any
+			if len(values) > 0 {
+				total := 0.0
+				for _, v := range values {
+					total += v
+				}
+				mean = total / float64(len(values))
+			}
+			out[names[0]] = mean
 		case "percentiles":
 			for j, p := range settingStrings(m, "percents") {
 				want, _ := strconv.ParseFloat(p, 64)
@@ -192,6 +213,10 @@ func numbersOf(docs []esDoc, field string) []float64 {
 			out = append(out, float64(v))
 		case float64:
 			out = append(out, v)
+		case bool:
+			// A boolean aggregates as 1 and 0, which is what a sum of the
+			// success flag counts.
+			out = append(out, float64(map[bool]int{true: 1}[v]))
 		}
 	}
 	return out
@@ -278,4 +303,69 @@ func organized(rows []map[string]any, options map[string]any) []map[string]any {
 		}
 	}
 	return out
+}
+
+// calculated is the calculateField transformation in its binary mode, between
+// two columns of the row.
+func calculated(t *testing.T, rows []map[string]any, options map[string]any) []map[string]any {
+	t.Helper()
+	binary, _ := options["binary"].(map[string]any)
+	if options["mode"] != "binary" {
+		t.Fatalf("no evaluator for a calculateField in %v mode", options["mode"])
+	}
+	alias, _ := options["alias"].(string)
+	for _, row := range rows {
+		left, _ := row[binary["left"].(string)].(float64)
+		right, _ := row[binary["right"].(string)].(float64)
+		switch binary["operator"] {
+		case "-":
+			row[alias] = left - right
+		case "/":
+			row[alias] = left / right
+		default:
+			t.Fatalf("no evaluator for the operator %v", binary["operator"])
+		}
+	}
+	return rows
+}
+
+// filteredByValue is the filterByValue transformation keeping the rows whose
+// one column is greater than a number.
+func filteredByValue(t *testing.T, rows []map[string]any, options map[string]any) []map[string]any {
+	t.Helper()
+	filters, _ := options["filters"].([]any)
+	if options["type"] != "include" || len(filters) != 1 {
+		t.Fatalf("no evaluator for the filter %v", options)
+	}
+	filter, _ := filters[0].(map[string]any)
+	config, _ := filter["config"].(map[string]any)
+	bound, _ := config["options"].(map[string]any)
+	if config["id"] != "greater" {
+		t.Fatalf("no evaluator for a %v filter", config["id"])
+	}
+	var out []map[string]any
+	for _, row := range rows {
+		v, _ := row[filter["fieldName"].(string)].(float64)
+		if v > float64(bound["value"].(int)) {
+			out = append(out, row)
+		}
+	}
+	return out
+}
+
+// sortedBy is the sortBy transformation over its one column.
+func sortedBy(rows []map[string]any, options map[string]any) []map[string]any {
+	by, _ := options["sort"].([]any)
+	s, _ := by[0].(map[string]any)
+	field, _ := s["field"].(string)
+	desc, _ := s["desc"].(bool)
+	sort.SliceStable(rows, func(i, j int) bool {
+		a, _ := rows[i][field].(float64)
+		b, _ := rows[j][field].(float64)
+		if desc {
+			return a > b
+		}
+		return a < b
+	})
+	return rows
 }

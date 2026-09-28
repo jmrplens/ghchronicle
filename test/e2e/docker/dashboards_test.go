@@ -954,9 +954,16 @@ func dashboardCheckStale(t *testing.T, run *dashboardRun, store string, list map
 // it: "Actions minutes" is now one named value of "Spend in range", and a group
 // answers as long as any of its values does, so the empty column would have
 // drawn as a blank beside three numbers and no test would have spoken.
+// keepsFailingEmpty is why "Workflows that keep failing" answers nothing in
+// the stores that apply its threshold in the query. Elasticsearch applies it
+// in the panel, after the answer this test reads, and Prometheus is left out
+// by promNeedsHistory.
+const keepsFailingEmpty = "the fixture's one workflow failed once in two runs, and the panel lists " +
+	"the ones that failed more than three times"
+
 var dashboardKnownEmpty = map[string]map[int]string{
 	"influxdb": {
-		55:  "every workflow run in the fixture succeeded, and the panel wants the ones that fail",
+		55:  keepsFailingEmpty,
 		104: "the Dependabot alert inside the range is open, so it has no seconds_to_resolve",
 		137: "one sweep is one snapshot, and the panel counts the values that changed between two",
 		// The good case, and the one the panel is built to draw rather than
@@ -967,7 +974,7 @@ var dashboardKnownEmpty = map[string]map[int]string{
 		153: "nothing failed in the sweep, and this panel lists the repositories a collector could not collect",
 	},
 	"postgres": {
-		55:  "every workflow run in the fixture succeeded, and the panel wants the ones that fail",
+		55:  keepsFailingEmpty,
 		68:  "no commit in the fixture shares a sha with a failed run",
 		96:  "one sweep is one snapshot, and the panel is the difference between two download counts",
 		104: "the Dependabot alert inside the range is open, so it has no seconds_to_resolve",
@@ -975,6 +982,7 @@ var dashboardKnownEmpty = map[string]map[int]string{
 		153: "nothing failed in the sweep, and this panel lists the repositories a collector could not collect",
 	},
 	"graphite": {
+		55:  keepsFailingEmpty,
 		96:  "one sweep is one snapshot, and the panel is the difference between two download counts",
 		103: "every code scanning alert here is open, so no seconds_to_resolve was ever written",
 		104: "the Dependabot alert inside the range is open, so it has no seconds_to_resolve",

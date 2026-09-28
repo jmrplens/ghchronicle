@@ -5471,7 +5471,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(aliasSub(consolidateBy(limit(sortBy(aliasByNode(groupByNodes(isNonNull(github.workflow_run.*.failure.*.*.*.$repo.*.duration_seconds), \"sum\", 5, 7, 8), 1, 2), \"sum\", true), 20), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))",
+              "target": "removeEmptySeries(aliasSub(consolidateBy(limit(sortBy(filterSeries(aliasByNode(groupByNodes(isNonNull(exclude(github.workflow_run.*.*.*.*.*.$repo.*.duration_seconds, \"^github\\.workflow_run\\.[^.]+\\.success\\.\")), \"sum\", 5, 7, 8), 1, 2), \"sum\", \"\u003e\", 3), \"sum\", true), 20), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))",
               "textEditor": true
             }
           ],

@@ -1,6 +1,10 @@
 package dashboards
 
-import "fmt"
+import (
+	"fmt"
+	"strconv"
+	"strings"
+)
 
 // ── Continuous integration ──────────────────────────────────────────────────
 
@@ -68,6 +72,7 @@ const ciOnWorkflowPath = " ON w.full_name = r.full_name AND w.path = r.workflow"
 const (
 	ciRunCount        = "Workflow runs"
 	ciSuccessRate     = "Success rate"
+	ciFailureRate     = "Failure rate"
 	ciUndecidedRuns   = "Undecided runs"
 	ciRunTime         = "Run duration"
 	ciQueueWait       = "Queue wait"
@@ -375,7 +380,7 @@ func whereTheTimeGoes(b *builder) []Panel {
 			{"n", ciTimesRun},
 			{"d", "Duration"},
 			{"w", "Worst"},
-		}, []string{ESF}, hideColumns(panelFullNameField))
+		}, []string{ESF})
 
 	stepsGR, stepsGRtf := gTbl(fmt.Sprintf(`limit(sortBy(%s, "median", true), 30)`,
 		grGroupBy(stepSeconds, ciStep, "avg", "step", "job_name", "repo"),
@@ -471,6 +476,51 @@ func whereTheTimeGoes(b *builder) []Panel {
 	}
 }
 
+// keepsFailing is how many failures in the range put a workflow in "Workflows
+// that keep failing", in every store: more than this many. Until the 2.6.1
+// review only the SQL stores and Prometheus asked it, and the same runs read
+// no rows there, a workflow with one failure in Graphite and every workflow
+// that ran in Elasticsearch.
+const keepsFailing = 3
+
+// notSucceeded is the regular expression Graphite's exclude() drops the
+// successful runs of gh_workflow_run by: a path whose conclusion node, counted
+// the way gn counts it, reads success.
+func notSucceeded() string {
+	before := gn(ciRun, "conclusion") - 2 // the prefix and the measurement
+	return `^github\.` + strings.TrimPrefix(ciRun, "gh_") + `\.` +
+		strings.Repeat(`[^.]+\.`, before) + `success\.`
+}
+
+// ciSucceeded is the column the Elasticsearch twin adds up the `success` flag
+// under, to take it from the runs; it is dropped before the table is drawn.
+const ciSucceeded = "Succeeded"
+
+// failingESRows turns the runs and successes of each workflow, the two numbers
+// an Elasticsearch bucket can count, into the columns the SQL stores select:
+// the failures, every conclusion but success, and their share of the runs. It
+// keeps the workflows past keepsFailing and, as the SQL ORDER BY and LIMIT
+// do, the twenty with the highest share.
+func failingESRows() []any {
+	binary := func(alias, left, operator, right string) any {
+		return map[string]any{"id": "calculateField", "options": map[string]any{
+			"mode": "binary", "alias": alias,
+			"binary": map[string]any{"left": left, "operator": operator, "right": right},
+		}}
+	}
+	return append([]any{
+		binary("Failures", "Runs", "-", ciSucceeded),
+		binary(ciFailureRate, "Failures", "/", "Runs"),
+		map[string]any{"id": "filterByValue", "options": map[string]any{
+			"type": "include", "match": "any",
+			"filters": []any{map[string]any{
+				"fieldName": "Failures",
+				"config":    map[string]any{"id": "greater", "options": map[string]any{"value": keepsFailing}},
+			}},
+		}},
+	}, append(keepLargest(ciFailureRate, 20), hideColumns(panelFullNameField, ciSucceeded))...)
+}
+
 // whatKeepsFailing is the cost of the failures: the minutes spent on runs
 // that failed, the workflows and steps that keep failing, and the workflows
 // that never ran at all.
@@ -485,19 +535,24 @@ func whatKeepsFailing(b *builder) []Panel {
 	// A failed run is a 1 in each slot it has a point in, added up per
 	// group. Not countOf, which adds every run into one series first: a
 	// grouping after it had one series to group and drew one row, named
-	// after whichever run came first, with every failure in it.
-	failingGR, failingGRtf := gTbl(fmt.Sprintf(`limit(sortBy(%s, "sum", true), 20)`,
-		grGroupBy(nonNull(rp(ciRun, "duration_seconds", "conclusion", "failure")),
+	// after whichever run came first, with every failure in it. A failure is
+	// any conclusion but success, as in the other stores, which a glob
+	// cannot say and exclude() can, on the conclusion's own node.
+	failingGR, failingGRtf := gTbl(fmt.Sprintf(`limit(sortBy(filterSeries(%s, "sum", ">", %d), "sum", true), 20)`,
+		// Concatenated rather than quoted with %q, which would double every
+		// backslash of the expression and leave it matching nothing.
+		grGroupBy(nonNull(`exclude(`+rp(ciRun, "duration_seconds")+`, "`+notSucceeded()+`")`),
 			ciRun, "sum", "repo", "workflow"),
+		keepsFailing,
 	), "Repository, workflow", []col{{"sum", "Failures"}})
 	failingES, failingEStf := esTbl(ciRun, append(b.tmRepo(50), b.tm("workflow", 30)),
-		[]any{b.mCount(), b.mAvg("success")},
+		[]any{b.mCount(), b.mSum("success")},
 		[]named{
 			{inventoryRepoTerm, "Repository"},
 			{"workflow.keyword", "Workflow"},
 			{"n", "Runs"},
-			{"s", ciSuccessRate},
-		}, []string{ESF}, hideColumns(panelFullNameField))
+			{"s", ciSucceeded},
+		}, []string{ESF}, failingESRows()...)
 
 	failStepsGR, failStepsGRtf := gTbl(fmt.Sprintf(`limit(sortBy(%s, "sum", true), 20)`,
 		grGroupBy(nonNull(rp(ciStep, "duration_seconds", "conclusion", "failure")),
@@ -546,16 +601,17 @@ func whatKeepsFailing(b *builder) []Panel {
 				` SUM(CASE WHEN conclusion <> 'success' THEN 1 ELSE 0 END) AS "Failures",` +
 				` workflow AS "Workflow", COUNT(*) AS "Runs",` +
 				` 100.0 * SUM(CASE WHEN conclusion <> 'success' THEN 1 ELSE 0 END)` +
-				` / COUNT(*) AS "Failure rate", MAX(w.url) AS "Link"` +
+				` / COUNT(*) AS "` + ciFailureRate + `", MAX(w.url) AS "Link"` +
 				" FROM gh_workflow_run r LEFT JOIN (" + declaredWorkflows + ") w" +
 				ciOnWorkflowPath +
 				" WHERE $__timeFilter(time) AND r." + RF +
-				" GROUP BY 1, r.full_name, 3 HAVING SUM(CASE WHEN conclusion <> 'success' THEN 1 ELSE 0 END) > 3" +
-				" ORDER BY 5 DESC, 2 DESC LIMIT 20",
+				" GROUP BY 1, r.full_name, 3 HAVING SUM(CASE WHEN conclusion <> 'success' THEN 1 ELSE 0 END) > " +
+				strconv.Itoa(keepsFailing) + " ORDER BY 5 DESC, 2 DESC LIMIT 20",
 		)}, &P{
 			Prom: func() []Target {
 				rank := fmt.Sprintf(
-					`sum by (full_name, repo, workflow) (increase(github_workflow_runs_total{conclusion!="success",%s}[$__range])) > 3`, PF,
+					`sum by (full_name, repo, workflow) (increase(github_workflow_runs_total{conclusion!="success",%s}[$__range])) > %d`,
+					PF, keepsFailing,
 				)
 				return []Target{
 					promTbl(promTop(20, rank), "A"),
@@ -574,12 +630,13 @@ func whatKeepsFailing(b *builder) []Panel {
 				"workflows here fail on every single run, 108 of 108 and 86 of 86.",
 			PromDesc: sinceStart,
 			Overrides: []any{
-				unitOf("Failure rate", "percent", 120), barCell("Failures", "short", 110),
+				unitOf(ciFailureRate, "percent", 120), barCell("Failures", "short", 110),
 				linkOn("Repository"),
 			},
 			GR: failingGR, GRTF: failingGRtf, GRDesc: grRows + " " + grSlotCounts,
 			ES: failingES, ESTF: failingEStf,
-			ESOver: []any{unitOf(ciSuccessRate, "percentunit", 120)},
+			// The share is worked out by the panel here, as a fraction.
+			ESOver: []any{unitOf(ciFailureRate, "percentunit", 120)},
 		}),
 		panel("table", "Steps that fail", box{W: 12, H: 8, X: 0, Y: 46}, []Target{sqlT(
 			`SELECT step AS "Step", COUNT(*) AS "Failures", repo AS "Repository"` +

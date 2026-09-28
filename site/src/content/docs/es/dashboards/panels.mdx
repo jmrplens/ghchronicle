@@ -375,6 +375,9 @@ esperó dieciocho por un runner es idéntica a una que pasó dieciocho ejecutand
 Dos de ellos son los primeros que hay que mirar. "Workflows that keep failing"
 no va de flakiness: medido, dos workflows habían fallado en todas y cada una de
 sus ejecuciones, decenas de ejecuciones cada uno, y nadie los había apagado.
+Lista un workflow en cuanto ha fallado más de tres veces en el rango, siendo un
+fallo cualquier conclusión que no sea success, y los cinco almacenes hacen esa
+misma pregunta.
 "Workflows that never ran" es la otra cara de lo mismo, y necesita
 `gh_workflow` y `gh_workflow_run` a la vez, que es por lo que es el único panel
 aquí que solo pueden responder los dos almacenes SQL.

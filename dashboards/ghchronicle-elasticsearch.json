@@ -8002,16 +8002,6 @@
                   "repo.keyword": "Repository"
                 }
               }
-            },
-            {
-              "id": "organize",
-              "options": {
-                "excludeByName": {
-                  "full_name.keyword": true
-                },
-                "indexByName": {},
-                "renameByName": {}
-              }
             }
           ],
           "type": "table"
@@ -8472,7 +8462,7 @@
               {
                 "matcher": {
                   "id": "byName",
-                  "options": "Success rate"
+                  "options": "Failure rate"
                 },
                 "properties": [
                   {
@@ -8557,7 +8547,7 @@
                 {
                   "field": "success",
                   "id": "213",
-                  "type": "avg"
+                  "type": "sum"
                 }
               ],
               "query": "_index:ghchronicle-gh_workflow_run AND repo.keyword:${repo:lucene}",
@@ -8573,17 +8563,78 @@
                 "excludeByName": {},
                 "indexByName": {},
                 "renameByName": {
-                  "Average": "Success rate",
                   "Count": "Runs",
+                  "Sum": "Succeeded",
                   "repo.keyword": "Repository",
                   "workflow.keyword": "Workflow"
                 }
               }
             },
             {
+              "id": "calculateField",
+              "options": {
+                "alias": "Failures",
+                "binary": {
+                  "left": "Runs",
+                  "operator": "-",
+                  "right": "Succeeded"
+                },
+                "mode": "binary"
+              }
+            },
+            {
+              "id": "calculateField",
+              "options": {
+                "alias": "Failure rate",
+                "binary": {
+                  "left": "Failures",
+                  "operator": "/",
+                  "right": "Runs"
+                },
+                "mode": "binary"
+              }
+            },
+            {
+              "id": "filterByValue",
+              "options": {
+                "filters": [
+                  {
+                    "config": {
+                      "id": "greater",
+                      "options": {
+                        "value": 3
+                      }
+                    },
+                    "fieldName": "Failures"
+                  }
+                ],
+                "match": "any",
+                "type": "include"
+              }
+            },
+            {
+              "id": "sortBy",
+              "options": {
+                "fields": {},
+                "sort": [
+                  {
+                    "desc": true,
+                    "field": "Failure rate"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "limit",
+              "options": {
+                "limitField": 20
+              }
+            },
+            {
               "id": "organize",
               "options": {
                 "excludeByName": {
+                  "Succeeded": true,
                   "full_name.keyword": true
                 },
                 "indexByName": {},

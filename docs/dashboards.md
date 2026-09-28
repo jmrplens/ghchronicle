@@ -681,7 +681,10 @@ a runner looks identical to one that spent eighteen executing.
 
 Two of these are the ones worth looking at first. "Workflows that keep failing"
 is not about flakiness: measured, two workflows had failed on every single run
-they ever had, dozens of runs apiece, and nobody had switched them off.
+they ever had, dozens of runs apiece, and nobody had switched them off. It
+lists a workflow once it has failed more than three times in the range, a
+failure being any conclusion but success, and all five stores ask that same
+question.
 "Workflows that never ran" is the other side of the same question, and it needs
 both `gh_workflow` and `gh_workflow_run`, which is why it is the one panel here
 that only the two SQL stores can answer.
