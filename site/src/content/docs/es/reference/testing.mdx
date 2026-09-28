@@ -107,6 +107,38 @@ Eso es lo que convierte tres comprobadores manuales en algo que la CI ejecuta, y
 lo que zanja la duda de Elasticsearch de arriba: un panel que no puede agregar
 no devuelve ningún data frame.
 
+Cada panel se envía con su rango resuelto a los dos instantes que manda un
+navegador, y se le hacen tres preguntas: si el datasource lo rechazó, si un
+panel sobre algo que el barrido escribió dentro del rango respondió con algo, y
+si los cinco almacenes dibujan lo mismo. Para la tercera, cada respuesta se
+reproduce a través de lo que Grafana hace entre la consulta y la pantalla, la
+remodelación propia del datasource de Prometheus de una tabla, las
+transformaciones del panel y sus overrides de campo, y cada par de almacenes se
+compara en lo que vería un lector: el número de una tarjeta, su unidad y las
+palabras que muestra cuando no hay nada, las filas de una tabla sobre las
+columnas que dibujan ambos almacenes, y el nombre y la longitud de una barra.
+La revisión de la 2.6.1 encontró once diferencias poniendo los dashboards uno
+junto a otro, entre ellas una tabla que dibujaba siete filas para un
+repositorio y tarjetas que habían perdido su unidad. Nueve estaban en los
+dashboards, y ejecutada contra los dashboards de esa versión esta comprobación
+falla en ocho. La novena eran cuatro columnas de las que carecía "Open the
+longest" en Elasticsearch, y una columna que dibuja un solo almacén no se
+compara: lo que un almacén puede guardar es asunto de su propia descripción.
+
+Un almacén que dibuja un panel de otra forma a propósito dice por qué en su
+propia descripción del panel, y la diferencia se lista en `dashboardsDiffer`, en
+`test/e2e/docker/dashboards_agree_test.go`, con esas palabras. La prueba falla
+cuando las palabras ya no están en la descripción y cuando los almacenes han
+pasado a dibujar el panel igual, así que una entrada no puede sobrevivir a
+ninguna de las dos. Lo que causa el propio arnés se absorbe donde surge en vez
+de listarse: el medio minuto de historia del exporter, los valores que el
+colector calcula con su propio reloj en tres barridos separados por un minuto,
+los valores que una consulta calcula desde `now()` en almacenes consultados con
+segundos de diferencia, y los nombres que Graphite guarda como nodos de ruta.
+Una aserción aparte falla con cualquier panel, series temporales incluidas, que
+dibuje un campo con el nombre que le dio su datasource, como
+`p50.0 seconds_to_merge`.
+
 ## Lo que no detecta ninguna
 
 Todas las capas corren contra el GitHub falso, así que aquí nadie se entera de

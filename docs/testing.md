@@ -104,6 +104,34 @@ That is what turns three manual checkers into something CI runs, and it is what
 settles the Elasticsearch question above: a panel that cannot aggregate returns
 no frame.
 
+Each panel is posted with its range resolved to the two instants a browser
+sends, and asked three questions: did the datasource refuse it, did a panel over
+something the sweep wrote inside the range answer with anything, and do the five
+stores draw the same thing. For the third, each answer is replayed through what
+Grafana does between the query and the screen, the Prometheus datasource's own
+reshaping of a table, the panel's transformations and its field overrides, and
+every pair of stores is compared on what a reader would see: a tile's number,
+its unit and the words it shows for nothing, a table's rows over the columns
+both stores draw, and a bar's name and length. The review of 2.6.1 found eleven
+differences by putting the dashboards side by side, among them a table that
+drew seven rows for one repository and stat tiles that had lost their units.
+Nine of them lived in the dashboards, and run against that release's
+dashboards this fails on eight. The ninth was four columns Elasticsearch's
+"Open the longest" went without, and a column only one store draws is not
+compared: what a store can hold at all is its own description's business.
+
+A store that draws a panel differently on purpose says why in its own
+description of the panel, and the difference is listed in `dashboardsDiffer`,
+in `test/e2e/docker/dashboards_agree_test.go`, under those words. The test fails
+when the words are no longer in the description and when the stores have come
+to draw the panel alike, so an entry cannot outlive either. What the harness
+itself causes is absorbed where it arises rather than listed: the exporter's
+half minute of history, values the collector computes from its own clock across
+three sweeps a minute apart, values a query computes from `now()` across stores
+asked seconds apart, and names Graphite holds as path nodes. A separate
+assertion fails on any panel, time series included, that draws a field under the
+name its datasource gave it, such as `p50.0 seconds_to_merge`.
+
 ## What none of them catch
 
 Every layer runs against the fake GitHub, so nothing here notices GitHub

@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"maps"
-	"math"
 	"net/http"
 	"net/url"
 	"os"
@@ -40,7 +39,8 @@ import (
 //
 //  1. did the datasource reject it,
 //  2. did a panel the sweep has something to show in answer with something,
-//  3. do the stores agree where they claim to hold the same fact.
+//  3. do the stores draw the same values, which dashboards_agree_test.go asks
+//     of what each panel puts on the screen.
 //
 // The run itself is cmd/check_dashboards' own, lifted into internal/grafana so
 // that the command and this suite cannot drift into asking different
@@ -111,12 +111,9 @@ type dashboardOutcome struct {
 	// is not the time; numbers is those of them that are numbers.
 	values  int
 	numbers []float64
-	// named is the subset of those numbers that a column name identifies: a
-	// column holding exactly one number, which is the shape of a stat. It is
-	// what lets the cross-store comparison read a group of named values one
-	// value at a time, rather than skipping any panel that draws more than
-	// one number.
-	named map[string]float64
+	// answer is the whole reply, which is what the comparison of what each
+	// store draws reads, after the panel's own transformations.
+	answer map[string]any
 }
 
 // answered reports whether the panel put anything on the screen.
@@ -155,6 +152,14 @@ type dashboardRun struct {
 	// the sweep. The exporter is scraped rather than pushed to, and a machine
 	// that firewalls its docker bridge will not let the container reach it.
 	promSkip string
+	// sweeps is the points of every sweep that loaded a store: the SQL
+	// stores', the push stores' and the exporter's, which ran a minute apart
+	// from the same fixtures. The comparison of what the stores draw reads
+	// from them how far a value moved between one sweep and the next.
+	sweeps [][]sqlStoresPoint
+	// asked is when each store's panels were asked, first to last: a value
+	// a query computes from now() moves by as much between two stores.
+	asked map[string][2]time.Time
 }
 
 var (
@@ -183,7 +188,7 @@ func dashboardsRunInto(t *testing.T, s *Stack) (*dashboardRun, error) {
 	// The context is the first test's, which is the one the whole run happens
 	// under: everything below is issued inside the sync.Once above.
 	ctx := t.Context()
-	run := &dashboardRun{outcomes: map[string]map[int]dashboardOutcome{}}
+	run := &dashboardRun{outcomes: map[string]map[int]dashboardOutcome{}, asked: map[string][2]time.Time{}}
 	sweep := sqlStoresRun(ctx, t, s)
 	oracle := sqlStoresPoints(t, sweep)
 	run.inWindow, run.written = dashboardOracle(oracle, time.Now().Add(-dashboardWindow))
@@ -201,7 +206,9 @@ func dashboardsRunInto(t *testing.T, s *Stack) (*dashboardRun, error) {
 	if err := dashboardAwaitGraphite(ctx, s); err != nil {
 		return nil, err
 	}
-	run.promSkip = dashboardsLoadPrometheus(t, s)
+	var exporter []sqlStoresPoint
+	run.promSkip, exporter = dashboardsLoadPrometheus(t, s)
+	run.sweeps = [][]sqlStoresPoint{oracle, pushPoints(t, push), exporter}
 
 	client := grafana.Client{URL: s.GrafanaURL, Token: s.GrafanaToken}
 	repos := dashboardRepos(oracle)
@@ -231,6 +238,7 @@ func dashboardsRunInto(t *testing.T, s *Stack) (*dashboardRun, error) {
 			})
 		run.outcomes[store.name] = dashboardOutcomes(results)
 		dashboardRetryEmpty(ctx, t, client, store.name, panels, dashboardVars(doc, store, repos), run.outcomes[store.name])
+		run.asked[store.name] = [2]time.Time{started, time.Now()}
 		t.Logf("%-14s %d panels in %s", store.name, len(panels), time.Since(started).Round(time.Millisecond))
 		if reportErr := dashboardReport(store.name, results, run.outcomes[store.name]); reportErr != nil {
 			return nil, reportErr
@@ -242,9 +250,9 @@ func dashboardsRunInto(t *testing.T, s *Stack) (*dashboardRun, error) {
 func dashboardOutcomes(results []grafana.Result) map[int]dashboardOutcome {
 	out := make(map[int]dashboardOutcome, len(results))
 	for _, r := range results {
-		values, numbers, named := dashboardAnswer(r.Answer)
+		values, numbers := dashboardAnswer(r.Answer)
 		out[r.Panel.Index] = dashboardOutcome{
-			panel: r.Panel, err: r.Err, values: values, numbers: numbers, named: named,
+			panel: r.Panel, err: r.Err, values: values, numbers: numbers, answer: r.Answer,
 		}
 	}
 	return out
@@ -331,13 +339,15 @@ func dashboardRetryEmpty(ctx context.Context, t *testing.T, client grafana.Clien
 // dashboardsLoadPrometheus starts an exporter and points Prometheus at it, and
 // says why it could not when it could not. The scrape is the one thing on this
 // machine a firewall can refuse, and a suite that failed for it would be
-// reporting the firewall rather than the dashboard.
-func dashboardsLoadPrometheus(t *testing.T, s *Stack) string {
+// reporting the firewall rather than the dashboard. It also hands back the
+// points the exporter's sweep wrote to its file sink beside the exporter.
+func dashboardsLoadPrometheus(t *testing.T, s *Stack) (skip string, points []sqlStoresPoint) {
 	t.Helper()
 	run := startExporterSweep(t)
+	points = pushPoints(t, &pushSweep{Points: filepath.Join(run.Dir, "points.jsonl")})
 	if err := s.SetPrometheusTarget(t.Context(), run.Port); err != nil {
 		if errors.Is(err, ErrExporterUnreachable) {
-			return err.Error()
+			return err.Error(), points
 		}
 		t.Fatalf("pointing Prometheus at the exporter: %v", err)
 	}
@@ -357,9 +367,9 @@ func dashboardsLoadPrometheus(t *testing.T, s *Stack) string {
 			}
 			return nil
 		}); err != nil {
-		return err.Error()
+		return err.Error(), points
 	}
-	return ""
+	return "", points
 }
 
 // dashboardPromScalar is the first value of an instant query.
@@ -611,45 +621,29 @@ func dashboardReport(store string, results []grafana.Result, outcomes map[int]da
 	return os.WriteFile(filepath.Join(dir, store+".json"), raw, 0o600)
 }
 
-// dashboardAnswer is what a panel put on the screen: how many values it drew,
-// and those of them that are numbers. The time column is skipped: a timestamp
-// is the axis, not an answer.
-func dashboardAnswer(res map[string]any) (values int, numbers []float64, named map[string]float64) {
+// dashboardAnswer is what a panel's queries answered: how many values, and
+// those of them that are numbers. The time column is skipped: a timestamp is
+// the axis, not an answer.
+func dashboardAnswer(res map[string]any) (values int, numbers []float64) {
 	results, _ := res["results"].(map[string]any)
-	named = map[string]float64{}
 	for _, ref := range slices.Sorted(maps.Keys(results)) {
 		answer, _ := results[ref].(map[string]any)
 		frames, _ := answer["frames"].([]any)
 		for _, raw := range frames {
 			frame, _ := raw.(map[string]any)
-			n, nums, cols := dashboardFrameAnswer(frame)
+			n, nums := dashboardFrameAnswer(frame)
 			values += n
 			numbers = append(numbers, nums...)
-			for name, v := range cols {
-				// A name two frames both answer is not one value, so it is
-				// not comparable and neither copy is kept.
-				if _, clash := named[name]; clash {
-					named[name] = math.NaN()
-					continue
-				}
-				named[name] = v
-			}
 		}
 	}
-	return values, numbers, named
+	return values, numbers
 }
 
-// dashboardFrameAnswer also returns every column that holds exactly one
-// number, by its own name. That is a stat's shape, one tile or one value of a
-// group, and it is the only shape a number can be compared across stores by
-// name at all: a column of many rows has no single reading, and a column of
-// none has nothing to read.
-func dashboardFrameAnswer(frame map[string]any) (values int, numbers []float64, named map[string]float64) {
+func dashboardFrameAnswer(frame map[string]any) (values int, numbers []float64) {
 	schema, _ := frame["schema"].(map[string]any)
 	fields, _ := schema["fields"].([]any)
 	data, _ := frame["data"].(map[string]any)
 	columns, _ := data["values"].([]any)
-	named = map[string]float64{}
 	for i, raw := range fields {
 		if i >= len(columns) {
 			break
@@ -659,7 +653,6 @@ func dashboardFrameAnswer(frame map[string]any) (values int, numbers []float64, 
 			continue
 		}
 		column, _ := columns[i].([]any)
-		var only []float64
 		for _, v := range column {
 			if v == nil {
 				continue
@@ -667,15 +660,10 @@ func dashboardFrameAnswer(frame map[string]any) (values int, numbers []float64, 
 			values++
 			if n, ok := v.(float64); ok {
 				numbers = append(numbers, n)
-				only = append(only, n)
 			}
 		}
-		name, _ := field["name"].(string)
-		if name != "" && len(only) == 1 && len(column) == 1 {
-			named[name] = only[0]
-		}
 	}
-	return values, numbers, named
+	return values, numbers
 }
 
 // ── 1. No panel query errors ────────────────────────────────────────────────
@@ -1120,195 +1108,4 @@ func dashboardCheckStaleEmpty(t *testing.T, run *dashboardRun, store string) {
 				"take the entry out", index, o.panel.Title, store)
 		}
 	}
-}
-
-// ── 3. The dashboards agree ─────────────────────────────────────────────────
-
-// dashboardDisagrees is every panel where two stores answer the same question
-// with different numbers although the panel says nothing about differing. It is
-// meant to stay empty: a reader comparing two dashboards that disagree without
-// a word would be right to think one of them is wrong, so the difference is
-// fixed or the description says it, which takes the panel out of this
-// comparison on its own.
-//
-// Its last entry was "Queue wait": the InfluxDB SQL estimated every median with
-// approx_percentile_cont, a t-digest, which answered 52 for the jobs here where
-// PostgreSQL and Elasticsearch answered the exact 47.5. The medians are exact
-// in InfluxDB now, and the three agree.
-//
-// Keyed by the name a reader sees rather than by ordinal: a panel's title, or
-// a value's own name where the reading is one value of a grouped stat. An
-// ordinal moves every time a panel is added above it, and an entry here once
-// drifted from the stat it described to a timeseries three sections away
-// without anything noticing.
-var dashboardDisagrees = map[string]string{}
-
-// TestTheDashboardsAgreeOnTheSameNumber is the third question. Two stores
-// asked the same panel should not answer two different numbers, and where they
-// honestly differ the specification already says so in the panel's own
-// description: the Prometheus sentences about scrape time, the Graphite ones
-// about storage slots, the Elasticsearch one about the range. So the
-// description is the allowance, and a panel whose description is identical in
-// two dashboards is a panel claiming the same fact in both.
-//
-// Only panels that reduce to a single number are compared. A table or a
-// timeseries is not comparable across these stores even when both are right:
-// each returns its own columns and its own bucketing, so summing them measures
-// the shape of the answer rather than the fact.
-func TestTheDashboardsAgreeOnTheSameNumber(t *testing.T) {
-	s := Start(t)
-	run := dashboardsRun(t, s)
-
-	compared, agreed := 0, 0
-	for _, index := range slices.Sorted(maps.Keys(run.subject)) {
-		answers := dashboardComparable(run, index)
-		if len(answers) < 2 {
-			continue
-		}
-		compared++
-		title := dashboardTitle(run, index)
-		if dashboardSameNumber(answers) {
-			agreed++
-			if _, listed := dashboardDisagrees[title]; listed {
-				t.Errorf("panel %d %q is listed as one the stores disagree on and they now agree (%v): "+
-					"take the entry out", index, title, answers)
-			}
-			continue
-		}
-		if _, listed := dashboardDisagrees[title]; listed {
-			continue
-		}
-		t.Errorf("panel %d %q answers differently in stores whose description of it is identical, "+
-			"so nothing warns a reader that it would: %v",
-			index, title, answers)
-	}
-	// A grouped stat draws several numbers, so the loop above skips it whole.
-	// Its values are still one number each and still comparable, by the name
-	// the group gives them, and this is where the tiles that were folded into
-	// groups are asked the same question they were asked as tiles.
-	for _, index := range slices.Sorted(maps.Keys(run.subject)) {
-		c, a := dashboardCompareValues(t, run, index)
-		compared += c
-		agreed += a
-	}
-	t.Logf("%d readings reduce to one number in two or more stores and describe it identically; "+
-		"%d of them agree", compared, agreed)
-	// The floor is a floor, not a measurement: it is here so that a change
-	// that quietly stops the comparison reducing anything fails instead of
-	// passing with nothing asked. Both shapes count towards it, a panel that
-	// is one number and a named value of a group, which is what kept it
-	// standing when twenty-two tiles became seven groups.
-	if compared < 40 {
-		t.Errorf("only %d readings were comparable, which is too few for this to have asked "+
-			"anything: the sweep or the descriptions have changed shape", compared)
-	}
-}
-
-// dashboardCompareValues asks the question of every named value of one panel
-// and reports how many were comparable and how many agreed.
-func dashboardCompareValues(t *testing.T, run *dashboardRun, index int) (compared, agreed int) {
-	t.Helper()
-	values := dashboardComparableValues(run, index)
-	for _, name := range slices.Sorted(maps.Keys(values)) {
-		answers := values[name]
-		if len(answers) < 2 {
-			continue
-		}
-		compared++
-		_, listed := dashboardDisagrees[name]
-		switch {
-		case dashboardSameNumber(answers):
-			agreed++
-			if listed {
-				t.Errorf("value %q of panel %d %q is listed as one the stores disagree on and "+
-					"they now agree (%v): take the entry out",
-					name, index, dashboardTitle(run, index), answers)
-			}
-		case !listed:
-			t.Errorf("value %q of panel %d %q answers differently in stores whose description of "+
-				"it is identical, so nothing warns a reader that it would: %v",
-				name, index, dashboardTitle(run, index), answers)
-		}
-	}
-	return compared, agreed
-}
-
-// dashboardComparableValues is dashboardComparable for a panel that draws more
-// than one number: every value InfluxDB names, against the stores that name it
-// too and describe the panel identically.
-func dashboardComparableValues(run *dashboardRun, index int) map[string]map[string]float64 {
-	reference, ok := run.outcomes["influxdb"][index]
-	if !ok || reference.err != "" || len(reference.numbers) < 2 {
-		return nil
-	}
-	out := map[string]map[string]float64{}
-	for name, v := range reference.named {
-		if math.IsNaN(v) {
-			continue
-		}
-		answers := map[string]float64{"influxdb": v}
-		for _, store := range dashboardStores {
-			if store.name == "influxdb" {
-				continue
-			}
-			o, found := run.outcomes[store.name][index]
-			if !found || o.err != "" || o.panel.Description != reference.panel.Description {
-				continue
-			}
-			if n, has := o.named[name]; has && !math.IsNaN(n) {
-				answers[store.name] = n
-			}
-		}
-		out[name] = answers
-	}
-	return out
-}
-
-// dashboardComparable is the stores that answered this panel with exactly one
-// number and describe it in the same words as the InfluxDB dashboard does.
-func dashboardComparable(run *dashboardRun, index int) map[string]float64 {
-	reference, found := dashboardOneNumber(run, "influxdb", index)
-	if !found {
-		return nil
-	}
-	out := map[string]float64{}
-	for _, store := range dashboardStores {
-		o, ok := dashboardOneNumber(run, store.name, index)
-		if !ok || o.panel.Description != reference.panel.Description {
-			continue
-		}
-		out[store.name] = o.numbers[0]
-	}
-	return out
-}
-
-// dashboardOneNumber is one store's outcome for the panel, reported only when
-// the panel ran without an error and reduced to exactly one number.
-func dashboardOneNumber(run *dashboardRun, store string, index int) (dashboardOutcome, bool) {
-	o, ok := run.outcomes[store][index]
-	return o, ok && o.err == "" && len(o.numbers) == 1
-}
-
-// dashboardSameNumber compares to a millionth of the value rather than exactly,
-// because Elasticsearch keeps a float as a float32 and hands it back widened:
-// the same 11.712 that the other three answer arrives from it as
-// 11.712000012397766. That is the format of the store, not a different answer,
-// and the one disagreement this suite does report is off by ten per cent.
-func dashboardSameNumber(answers map[string]float64) bool {
-	var first float64
-	seen := false
-	for _, v := range answers {
-		if !seen {
-			first, seen = v, true
-			continue
-		}
-		if math.Abs(v-first) > 1e-6*max(math.Abs(first), 1) {
-			return false
-		}
-	}
-	return true
-}
-
-func dashboardTitle(run *dashboardRun, index int) string {
-	return run.outcomes["influxdb"][index].panel.Title
 }
