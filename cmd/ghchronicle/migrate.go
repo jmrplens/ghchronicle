@@ -157,7 +157,10 @@ func migrateOnStart(ctx context.Context, m migration, service bool) {
 	}
 	start := migrate.Start{
 		Plan: migrate.Make(ctx, in), Auto: m.cfg.MigratesOnItsOwn(),
-		CanApply: func(store string) bool { return ways[store] != nil },
+		// A store cleared with no way to read its history again holds
+		// nothing of it until somebody runs a backfill, which is a loss a
+		// start may never cause on its own, however safe the set-aside.
+		CanApply: func(store string) bool { return ways[store] != nil && refill != nil },
 		DryRun:   commandLine(m.configPath, "-migrate"),
 		Apply:    commandLine(m.configPath, "-migrate", "-yes"),
 		Others:   flagOthers, Service: service, State: m.state, Now: time.Now(), Log: m.log,

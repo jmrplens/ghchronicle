@@ -146,6 +146,8 @@ type recordingWays struct {
 	at       time.Time
 	refilled []string
 	fail     error
+	// noRefill installs no way to read the history again.
+	noRefill bool
 }
 
 func (r *recordingWays) Apply(_ context.Context, it migrate.Item) (migrate.Outcome, error) {
@@ -165,7 +167,11 @@ func (r *recordingWays) install(t *testing.T) {
 	t.Helper()
 	previous := storeWays
 	storeWays = func(migration) (map[string]migrate.Applier, migrate.Refiller) {
-		return map[string]migrate.Applier{"influxdb": r, "graphite": migrate.Instructions{}},
+		ways := map[string]migrate.Applier{"influxdb": r, "graphite": migrate.Instructions{}}
+		if r.noRefill {
+			return ways, nil
+		}
+		return ways,
 			func(_ context.Context, cleared []migrate.Chosen) error {
 				r.mu.Lock()
 				defer r.mu.Unlock()
@@ -268,14 +274,18 @@ func TestAStartAppliesNothingItMayNot(t *testing.T) {
 		name, body string
 		users      []string
 		hold       bool
+		noRefill   bool
 		want       string
 	}{
-		{"under warn", "migrate: warn\n", []string{fakegh.Login}, false, `not_applied="migrate: warn applies nothing on its own"`},
-		{"shared", "", []string{fakegh.Login, "hubot"}, false, "-migrate -yes -migrate-others"},
-		{"beside the service", "", []string{fakegh.Login}, true, "the state file is not this run's to change: process "},
+		{"under warn", "migrate: warn\n", []string{fakegh.Login}, false, false, `not_applied="migrate: warn applies nothing on its own"`},
+		{"shared", "", []string{fakegh.Login, "hubot"}, false, false, "-migrate -yes -migrate-others"},
+		{"beside the service", "", []string{fakegh.Login}, true, false, "the state file is not this run's to change: process "},
+		// A set-aside is safe only if the history comes back: a build with
+		// no way to read it again leaves the store as it is.
+		{"no refill", "", []string{fakegh.Login}, false, true, `not_applied="this build has no way to bring influxdb along on its own"`},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			ways := &recordingWays{}
+			ways := &recordingWays{noRefill: tc.noRefill}
 			ways.install(t)
 			dir := t.TempDir()
 			store := &oldComments{users: tc.users}
