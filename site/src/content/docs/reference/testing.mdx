@@ -129,8 +129,12 @@ differences by putting the dashboards side by side, among them a table that
 drew seven rows for one repository and stat tiles that had lost their units.
 Nine of them lived in the dashboards, and run against that release's
 dashboards this fails on eight. The ninth was four columns Elasticsearch's
-"Open the longest" went without, and a column only one store draws is not
-compared: what a store can hold at all is its own description's business.
+"Open the longest" went without, which no comparison of values can see. What a
+store can hold at all is its own description's business, so another assertion
+holds every column the SQL stores draw in a table to being drawn by each other
+store that draws the table, or named in that store's own words about the
+panel: on the 2.6.2 branch 33 tables of the other three stores lacked a column
+their descriptions did not name, and each now draws it or says why not.
 
 A store that draws a panel differently on purpose says why in its own
 description of the panel, and the difference is listed in `dashboardsDiffer`,

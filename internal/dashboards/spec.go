@@ -469,9 +469,12 @@ func placeLinks(title string, overrides []any, stores map[string]*store) []any {
 	}
 	for name, st := range stores {
 		var kept []any
+		var lost []string
 		for _, o := range links {
 			if st.returns(linkedColumn(o)) {
 				kept = append(kept, o)
+			} else if !slices.Contains(lost, linkedColumn(o)) {
+				lost = append(lost, linkedColumn(o))
 			}
 		}
 		st.Overrides = append(kept, st.Overrides...)
@@ -482,7 +485,7 @@ func placeLinks(title string, overrides []any, stores map[string]*store) []any {
 		case st.Q == nil:
 			st.Note = strings.TrimSpace(st.Note + "\n\n" + noteLink)
 		case noLink[name] != "":
-			st.Desc = strings.TrimSpace(st.Desc + " " + noLink[name])
+			st.Desc = strings.TrimSpace(st.Desc + " " + namingLinks(noLink[name], lost))
 		default:
 			// The SQL stores select the column by name, so a link column
 			// their statement does not alias is a mistake in the panel.
@@ -490,6 +493,26 @@ func placeLinks(title string, overrides []any, stores map[string]*store) []any {
 		}
 	}
 	return shared
+}
+
+// namingLinks is a store's sentence about the link columns it lacks, naming
+// them. The one every panel has is Link, which the SQL stores hide behind the
+// row's first column; a panel with a second one draws it, "Live" beside a
+// deployment's environment, and a sentence that named Link alone left a
+// column the reader sees in the InfluxDB dashboard unexplained here.
+func namingLinks(sentence string, lost []string) string {
+	if len(lost) == 1 && lost[0] == "Link" {
+		return sentence
+	}
+	names := lost[0] + " column"
+	if len(lost) > 1 {
+		names = strings.Join(lost[:len(lost)-1], ", ") + " and " + lost[len(lost)-1] + " columns"
+	}
+	sentence = strings.Replace(sentence, "the Link column", "the "+names, 1)
+	if len(lost) > 1 {
+		sentence = strings.Replace(sentence, "dashboard is absent", "dashboard are absent", 1)
+	}
+	return sentence
 }
 
 // returns reports whether this store's answer has a column of that name:

@@ -1728,6 +1728,15 @@
               "instant": true,
               "range": false,
               "refId": "C"
+            },
+            {
+              "datasource": "${DS_PROMETHEUS}",
+              "editorMode": "code",
+              "expr": "sum by (full_name, repo) (github_traffic_count{kind=\"clones\",repo=~\"$repo\"}) / (sum by (full_name, repo) (github_traffic_uniques{kind=\"clones\",repo=~\"$repo\"}) \u003e 0)",
+              "format": "table",
+              "instant": true,
+              "range": false,
+              "refId": "D"
             }
           ],
           "title": "Clone amplification",
@@ -1752,6 +1761,7 @@
                   "Value #A": "Clones",
                   "Value #B": "Cloners",
                   "Value #C": "Views",
+                  "Value #D": "Clones each",
                   "repo": "Repository"
                 }
               }
@@ -1761,10 +1771,11 @@
               "options": {
                 "excludeByName": {},
                 "indexByName": {
-                  "Cloners": 2,
-                  "Clones": 1,
+                  "Cloners": 3,
+                  "Clones": 2,
+                  "Clones each": 1,
                   "Repository": 0,
-                  "Views": 3
+                  "Views": 4
                 },
                 "renameByName": {}
               }
@@ -4134,7 +4145,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "Time to merge only counts what merged. This is the other half: what is still open and how long it has been, which is the number that decides what to do next rather than describing what already happened. The table keeps the twenty-five open longest, the longest first. Each pull request is read from its newest row, so one that merged inside the range is not here any more. Archived repositories are left out, since nothing in one can be merged, closed or run until it is unarchived; narrowing the picker to one shows an empty table here rather than rows nobody can act on. A fork's pull request is still one that can be merged, so those stay and Fork says which they are. In Prometheus a row is a repository and not a pull request, since the exporter keeps no pull request of its own: Open for is the mean over the repository's open pull requests at the collector's last sweep, and the twenty-five rows are the repositories where it is longest. Only gh_repo carries the fork and archived flags and this store cannot join one measurement to another, so the rows the SQL dashboards leave out are listed here. The Prometheus exporter carries no url, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "Time to merge only counts what merged. This is the other half: what is still open and how long it has been, which is the number that decides what to do next rather than describing what already happened. The table keeps the twenty-five open longest, the longest first. Each pull request is read from its newest row, so one that merged inside the range is not here any more. Archived repositories are left out, since nothing in one can be merged, closed or run until it is unarchived; narrowing the picker to one shows an empty table here rather than rows nobody can act on. A fork's pull request is still one that can be merged, so those stay and Fork says which they are. In Prometheus a row is a repository and not a pull request, since the exporter keeps no pull request of its own: Open for is the mean over the repository's open pull requests at the collector's last sweep, and the twenty-five rows are the repositories where it is longest. Comments and Reviews are the means over the same pull requests, and there is no Number, Title, Author or Labels column. Only gh_repo carries the fork and archived flags and this store cannot join one measurement to another, so the rows the SQL dashboards leave out are listed here. The Prometheus exporter carries no url, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -4280,6 +4291,15 @@
               "instant": true,
               "range": false,
               "refId": "B"
+            },
+            {
+              "datasource": "${DS_PROMETHEUS}",
+              "editorMode": "code",
+              "expr": "max by (full_name, repo) (github_pull_requests_reviews_mean{state=\"OPEN\",repo=~\"$repo\"}) and on (full_name, repo) topk(25, max by (full_name, repo) (github_pull_requests_seconds_open_mean{state=\"OPEN\",repo=~\"$repo\"}))",
+              "format": "table",
+              "instant": true,
+              "range": false,
+              "refId": "C"
             }
           ],
           "title": "Open the longest",
@@ -4303,6 +4323,7 @@
                 "renameByName": {
                   "Value #A": "Open for",
                   "Value #B": "Comments",
+                  "Value #C": "Reviews",
                   "repo": "Repository"
                 }
               }
@@ -4314,7 +4335,8 @@
                 "indexByName": {
                   "Comments": 2,
                   "Open for": 0,
-                  "Repository": 1
+                  "Repository": 1,
+                  "Reviews": 3
                 },
                 "renameByName": {}
               }
@@ -5337,7 +5359,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "Over the runs whose jobs were expanded, which is the newest runs of each sweep and, after a backfill, every run GitHub still holds, which from 1 October 2026 means the repository's retention period, ninety days by default; not every run the run count includes. In Prometheus this is the mean over the collector's last sweep, not a median over the dashboard range. In Prometheus this counts the collector's last sweep, not the dashboard range.",
+          "description": "Over the runs whose jobs were expanded, which is the newest runs of each sweep and, after a backfill, every run GitHub still holds, which from 1 October 2026 means the repository's retention period, ninety days by default; not every run the run count includes. In Prometheus this is the mean over the collector's last sweep, not a median over the dashboard range. In Prometheus this counts the collector's last sweep, not the dashboard range. The exporter keeps the mean duration of a job and not its longest, so there is no Worst column.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -5624,6 +5646,15 @@
               "instant": true,
               "range": false,
               "refId": "B"
+            },
+            {
+              "datasource": "${DS_PROMETHEUS}",
+              "editorMode": "code",
+              "expr": "sum by (full_name, repo) (100 * (sum by (full_name, repo) (increase(github_workflow_runs_total{conclusion!=\"success\",repo=~\"$repo\"}[$__range])) * on (full_name, repo) group_left avg by (full_name, repo) (github_workflow_runs_duration_seconds_mean{repo=~\"$repo\"})) / ((sum by (full_name, repo) (increase(github_workflow_runs_total{repo=~\"$repo\"}[$__range])) * on (full_name, repo) group_left avg by (full_name, repo) (github_workflow_runs_duration_seconds_mean{repo=~\"$repo\"})) \u003e 0))",
+              "format": "table",
+              "instant": true,
+              "range": false,
+              "refId": "C"
             }
           ],
           "title": "Minutes spent on failed runs",
@@ -5647,6 +5678,7 @@
                 "renameByName": {
                   "Value #A": "Wasted",
                   "Value #B": "Total",
+                  "Value #C": "Share",
                   "repo": "Repository"
                 }
               }
@@ -5657,6 +5689,7 @@
                 "excludeByName": {},
                 "indexByName": {
                   "Repository": 0,
+                  "Share": 3,
                   "Total": 2,
                   "Wasted": 1
                 },
@@ -6446,7 +6479,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "The twenty authors with the most commits in the window. The repository picker holds the repositories the sweeps collect: forks too when `include_forks` is on, and archived ones when `include_archived` is on and for a while after a backfill, which collects them either way. A count here is over every repository the picker holds until it is narrowed. On an account with forks of busy projects the upstream authors are the top of this table, which is the honest answer to the question as asked: narrow the picker to read it as the account's own work. This panel keeps its own range of ninety days whatever the page is set to. Every commit is a row of its own in the store, and at about ten months of them the query is refused for opening too many files, which the reader would see as an empty panel rather than as an error. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date. In Prometheus this is the mean over the collector's last sweep, not a median over the dashboard range.",
+          "description": "The twenty authors with the most commits in the window. The repository picker holds the repositories the sweeps collect: forks too when `include_forks` is on, and archived ones when `include_archived` is on and for a while after a backfill, which collects them either way. A count here is over every repository the picker holds until it is narrowed. On an account with forks of busy projects the upstream authors are the top of this table, which is the honest answer to the question as asked: narrow the picker to read it as the account's own work. This panel keeps its own range of ninety days whatever the page is set to. Every commit is a row of its own in the store, and at about ten months of them the query is refused for opening too many files, which the reader would see as an empty panel rather than as an error. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date. In Prometheus this is the mean over the collector's last sweep, not a median over the dashboard range. The exporter keeps the mean lines a commit added and removed and not their sum, so there is no Added or Removed column.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -6702,7 +6735,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "Each force push, newest first. Prometheus keeps no branch or actor, so this counts them per repository over the range. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date.",
+          "description": "Each force push, newest first. Prometheus keeps no branch or actor, so this counts them per repository over the range, with no When, Branch or By column. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -6995,7 +7028,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "Everything Actions runs is already in the two sections above, in far more detail. These are the other gates: the code quality service, the dependency bot, the commit statuses an older integration still writes. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date.",
+          "description": "Everything Actions runs is already in the two sections above, in far more detail. These are the other gates: the code quality service, the dependency bot, the commit statuses an older integration still writes. The exporter keeps the app and the conclusion of a check run and not the check's name, so a row is an app and a conclusion, with no Check column, and the failed runs are the rows that conclude in failure rather than a Failed column. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -7102,7 +7135,7 @@
                 "renameByName": {
                   "Value": "Runs",
                   "app": "App",
-                  "conclusion": "Check"
+                  "conclusion": "Conclusion"
                 }
               }
             },
@@ -7112,7 +7145,6 @@
                 "excludeByName": {},
                 "indexByName": {
                   "App": 0,
-                  "Check": 2,
                   "Runs": 1
                 },
                 "renameByName": {}
@@ -8127,7 +8159,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "Comments on issues and pull requests, in any repository. The ones outside this account are the half a sweep over one's own repositories cannot see. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date.",
+          "description": "Comments on issues and pull requests, in any repository. The ones outside this account are the half a sweep over one's own repositories cannot see. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date. There is no Elsewhere column here: the owner in each full name says whose repository it is.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -8264,7 +8296,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "Discussions are the one surface where the work is almost entirely in other people's repositories: gh_discussion sees three rows inside this account, and this sees sixty six across twenty six repositories. Each comment counts once, however many rows a store holds of it, which Answers elsewhere explains. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date.",
+          "description": "Discussions are the one surface where the work is almost entirely in other people's repositories: gh_discussion sees three rows inside this account, and this sees sixty six across twenty six repositories. Each comment counts once, however many rows a store holds of it, which Answers elsewhere explains. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date. The exporter keeps the mean answers and upvotes of a comment and not their sum, so there is no Accepted answers or Upvotes column.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -8564,7 +8596,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "Only the host is stored. The path of a webhook URL usually carries a secret. A retried delivery is a different fact from a first one that failed, and counting them together makes an endpoint look worse than it is. Prometheus keeps the hook name rather than the host, and the retries as a fraction rather than a count. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date.",
+          "description": "Only the host is stored. The path of a webhook URL usually carries a secret. A retried delivery is a different fact from a first one that failed, and counting them together makes an endpoint look worse than it is. Prometheus keeps the hook name rather than the host, so Hook stands where the other stores draw Endpoint, and the retries as a fraction rather than a count. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -8781,7 +8813,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "A 404 from branch protection does not mean unprotected: a repository can be governed entirely by rulesets, which that endpoint knows nothing about. The Prometheus exporter carries no url, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "A 404 from branch protection does not mean unprotected: a repository can be governed entirely by rulesets, which that endpoint knows nothing about. The exporter keeps a ruleset's enforcement and not its target, so there is no Target column. The Prometheus exporter carries no url, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -9996,7 +10028,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "Every saved version of every ruleset, dated the moment GitHub saved it. The Rulesets panel says a protection exists and how many days ago it last changed; this is the changelog that number summarizes, and it is the only record GitHub keeps of the moment a protection was switched off and back on. GitHub names the actor by type and id and not by login, so the row does too. Every store answers inside the dashboard range: a ruleset nobody has touched in the range is absent here, not unprotected. Prometheus counts versions per ruleset and actor type and drops the dates, because a series per version would never move again. In Prometheus this counts the collector's last sweep, not the dashboard range. The Prometheus exporter carries no url, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "Every saved version of every ruleset, dated the moment GitHub saved it. The Rulesets panel says a protection exists and how many days ago it last changed; this is the changelog that number summarizes, and it is the only record GitHub keeps of the moment a protection was switched off and back on. GitHub names the actor by type and id and not by login, so the row does too. Every store answers inside the dashboard range: a ruleset nobody has touched in the range is absent here, not unprotected. Prometheus counts versions per ruleset and actor type and drops the dates, because a series per version would never move again. It keeps no target either, so there is no Target column. In Prometheus this counts the collector's last sweep, not the dashboard range. The Prometheus exporter carries no url, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -10210,7 +10242,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "To status is the median time the deployment took to report one; Live for the median time it stayed the current one. They are the same subtraction against two different meanings, so each keeps its own field and neither is written over the other. The pending rows are kept on purpose: one deployment on this account has been held at an approval for seventy four days, and a filter that hid the states that are not terminal would delete the most interesting row. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date. In Prometheus this is the mean over the collector's last sweep, not a median over the dashboard range. The Prometheus exporter carries no url, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "To status is the median time the deployment took to report one; Live for the median time it stayed the current one. They are the same subtraction against two different meanings, so each keeps its own field and neither is written over the other. The pending rows are kept on purpose: one deployment on this account has been held at an approval for seventy four days, and a filter that hid the states that are not terminal would delete the most interesting row. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date. In Prometheus this is the mean over the collector's last sweep, not a median over the dashboard range. The Prometheus exporter carries no url, so the Link and Live columns of the InfluxDB dashboard are absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -10388,7 +10420,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (full_name, repo, environment) (increase(github_deployments_total{outcome=\"success\",repo=~\"$repo\"}[$__range]))",
+              "expr": "sum by (full_name, repo, environment) (increase(github_deployments_total{outcome=\"success\",repo=~\"$repo\"}[$__range])) or sum by (full_name, repo, environment) (0 * increase(github_deployments_total{repo=~\"$repo\"}[$__range]))",
               "format": "table",
               "instant": true,
               "range": false,
@@ -10397,7 +10429,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (full_name, repo, environment) (increase(github_deployments_total{outcome=\"pending\",repo=~\"$repo\"}[$__range]))",
+              "expr": "sum by (full_name, repo, environment) (increase(github_deployments_total{outcome=\"pending\",repo=~\"$repo\"}[$__range])) or sum by (full_name, repo, environment) (0 * increase(github_deployments_total{repo=~\"$repo\"}[$__range]))",
               "format": "table",
               "instant": true,
               "range": false,
@@ -10560,7 +10592,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "The twelve most downloaded releases. A click on a bar opens the release page. The Prometheus exporter carries no url, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "The twelve most downloaded releases. A click on a bar opens the release page. The Prometheus exporter carries no url, so the Page column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -11957,6 +11989,15 @@
               "instant": true,
               "range": false,
               "refId": "B"
+            },
+            {
+              "datasource": "${DS_PROMETHEUS}",
+              "editorMode": "code",
+              "expr": "max by (tool, full_name, repo) (github_code_scanning_analyses_rules_mean{repo=~\"$repo\"})",
+              "format": "table",
+              "instant": true,
+              "range": false,
+              "refId": "C"
             }
           ],
           "title": "Scan results by tool",
@@ -11980,6 +12021,7 @@
                 "renameByName": {
                   "Value #A": "Runs",
                   "Value #B": "Results",
+                  "Value #C": "Rules",
                   "repo": "Repository",
                   "tool": "Tool"
                 }
@@ -11992,6 +12034,7 @@
                 "indexByName": {
                   "Repository": 2,
                   "Results": 1,
+                  "Rules": 4,
                   "Runs": 3,
                   "Tool": 0
                 },
@@ -14020,7 +14063,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "Pull requests and issues opened in repositories this account does not own, with the state each ended in. Nothing else sees them: they are not in these repositories, and the event feed keeps only its last three hundred events, none older than thirty days. Seen is the row's own date, which for an open item is the day it was last seen open; Opened is when it was opened. Stars is the repository's own count at the last sweep inside the range. Prometheus keeps the repository only, so this is contributions per repository over the range, the share merged and the mean comments, with no Seen or Opened column, since an item's dates do not survive the exporter. Its Stars is the count the exporter holds at the end of the range, whenever the sweep that read it ran. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date. The Prometheus exporter carries no url, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "Pull requests and issues opened in repositories this account does not own, with the state each ended in. Nothing else sees them: they are not in these repositories, and the event feed keeps only its last three hundred events, none older than thirty days. Seen is the row's own date, which for an open item is the day it was last seen open; Opened is when it was opened. Stars is the repository's own count at the last sweep inside the range. Prometheus keeps the repository only, so this is contributions per repository over the range, the share merged and the mean comments, with no Kind, State or Title column, and no Seen or Opened column, since an item's dates do not survive the exporter. Its Stars is the count the exporter holds at the end of the range, whenever the sweep that read it ran. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date. The Prometheus exporter carries no url, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -14366,7 +14409,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "Whether the account stars small projects or famous ones, which the language breakdown cannot say. The exporter keeps the language of a star and not its repository, so in Prometheus a row is a language the account starred in, and Its stars the mean over the repositories starred in it. In Prometheus this is the mean over the collector's last sweep, not a median over the dashboard range. The Prometheus exporter carries no url, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "Whether the account stars small projects or famous ones, which the language breakdown cannot say. The exporter keeps the language of a star and not its repository, so in Prometheus a row is a language the account starred in, and Its stars the mean over the repositories starred in it, with no Repository or When column. In Prometheus this is the mean over the collector's last sweep, not a median over the dashboard range. The Prometheus exporter carries no url, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -16413,7 +16456,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "What the profile links to. It is small and it is a check rather than a measurement: these are the same links a personal site publishes as sameAs, and a row that disappears is the signal. The exporter keeps the provider and whether it is present. The Prometheus exporter carries no url, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "What the profile links to. It is small and it is a check rather than a measurement: these are the same links a personal site publishes as sameAs, and a row that disappears is the signal. The exporter keeps the provider and whether it is present. The Prometheus exporter carries no url, so the URL column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -17166,7 +17209,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "Every sponsorship in either direction, dated the day it began and not the day of any payment. Amount is the price of the tier it was made at, which is a rate per month unless the column beside it says the payment was one-time: a five dollar a month sponsorship running since 2021 is one row, dated 2021, reading five dollars, and the lifetime tile above is the only figure here that adds the money up. Both connections are read with activeOnly off, which is what recovers a lapsed one, so a row here can be a sponsorship from years ago that no current count still shows. Sponsorable is the literal word private when the sponsorship hides the other party, and no link is written then rather than one being guessed at. There is deliberately no curve of this beside it: on a real account the dated record is a handful of rows spread across years, and drawn against any range a reader would pick it is an empty axis. It is an inventory, so it names its own window rather than taking the dashboard's: a sponsorship made in 2021 is listed at the default thirty days, and the Sponsoring tile on the Overview and this table count the same thing. Prometheus counts sponsorships per direction and drops the other party, because a series per sponsorable would never move again. So this is one row for money in and one for money out, with the mean amount and the two shares beside the count. In Prometheus this counts the collector's last sweep, not the dashboard range. It is the one store here that is not bound by the dashboard range, so a lapsed sponsorship is counted in it whatever range is selected. The Prometheus exporter carries no url, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "Every sponsorship in either direction, dated the day it began and not the day of any payment. Amount is the price of the tier it was made at, which is a rate per month unless the column beside it says the payment was one-time: a five dollar a month sponsorship running since 2021 is one row, dated 2021, reading five dollars, and the lifetime tile above is the only figure here that adds the money up. Both connections are read with activeOnly off, which is what recovers a lapsed one, so a row here can be a sponsorship from years ago that no current count still shows. Sponsorable is the literal word private when the sponsorship hides the other party, and no link is written then rather than one being guessed at. There is deliberately no curve of this beside it: on a real account the dated record is a handful of rows spread across years, and drawn against any range a reader would pick it is an empty axis. It is an inventory, so it names its own window rather than taking the dashboard's: a sponsorship made in 2021 is listed at the default thirty days, and the Sponsoring tile on the Overview and this table count the same thing. Prometheus counts sponsorships per direction and drops the other party, the date and the tier, because a series per sponsorable would never move again. So this is one row for money in and one for money out, with the mean amount and the two shares beside the count. In Prometheus this counts the collector's last sweep, not the dashboard range. It is the one store here that is not bound by the dashboard range, so a lapsed sponsorship is counted in it whatever range is selected. The Prometheus exporter carries no url, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -18260,7 +18303,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "The badges on the profile, highest tier first: Pull Shark, Pair Extraordinaire, YOLO and the rest, read every hour from the public profile page because no API lists them. Tier is the number on the badge's label, one where it has none; Level is the color GitHub gives that tier. Empty until the achievements family has run once. Prometheus keeps the badge by its slug and its tier; the display name and the tier's color are strings and do not survive as metrics. The Prometheus exporter carries no url, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "The badges on the profile, highest tier first: Pull Shark, Pair Extraordinaire, YOLO and the rest, read every hour from the public profile page because no API lists them. Tier is the number on the badge's label, one where it has none; Level is the color GitHub gives that tier. Empty until the achievements family has run once. Prometheus keeps the badge by its slug and its tier; the display name and Level, the tier's color, are strings and do not survive as metrics. The Prometheus exporter carries no url, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {

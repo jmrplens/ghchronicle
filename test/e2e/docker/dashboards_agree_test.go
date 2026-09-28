@@ -37,10 +37,11 @@ import (
 // Then every pair of stores is compared on the panel: a stat, a gauge, a bar
 // gauge and a pie by the values they draw, each with its unit and the text it
 // shows for nothing; a table by the rows it draws over the columns both
-// stores have, and apart from that by the order it heads them in; a bar
-// chart by its bars, the name each is drawn under and its length. A time
-// series is not compared, nor a bar chart over time: each store buckets those
-// by a step of its own, which is not a difference a reader can see.
+// stores have, and apart from that by the order it heads them in and by the
+// columns one store lacks; a bar chart by its bars, the name each is drawn
+// under and its length. A time series is not compared, nor a bar chart over
+// time: each store buckets those by a step of its own, which is not a
+// difference a reader can see.
 //
 // Four things are the harness's and not the dashboards', and each is absorbed
 // where it arises rather than listed:
@@ -426,6 +427,187 @@ func dashboardTables(t *testing.T, run *dashboardRun, index int) map[string]graf
 		}
 	}
 	return out
+}
+
+// TestAColumnAStoreLacksIsSaidInItsDescription holds every column the SQL
+// stores draw in a table to being drawn by each other store that draws the
+// table, or named in that store's own words about the panel. The comparison
+// of values is over the columns two stores share and says nothing of one a
+// store lacks, which is how Elasticsearch's "Open the longest" went without
+// Title, Author, Labels and Fork through the first comparison and was found
+// by a reader: what a store can hold at all is its description's business,
+// and this holds the description to it. Measured on the 2.6.2 branch before
+// the descriptions said them, 33 tables of Graphite, Elasticsearch and
+// Prometheus lacked a column their own words did not name.
+//
+// A store's own words are what its description adds to the one every store
+// shares, so a column the shared text happens to mention is not taken for one
+// the store explains. A column is said when those words name it, a hyphen for
+// a space and a plural allowed, or when the store draws it under the SQL name
+// with a word more or a letter less, "Active share" for Active; in Graphite
+// also when it is a node of the name a row is drawn under, "Repository, host",
+// and wherever dashboardDropsColumns applies.
+func TestAColumnAStoreLacksIsSaidInItsDescription(t *testing.T) {
+	s := Start(t)
+	run := dashboardsRun(t, s)
+	held := 0
+	indexes := map[int]bool{}
+	for _, store := range []string{"influxdb", "postgres"} {
+		for i := range run.outcomes[store] {
+			indexes[i] = true
+		}
+	}
+	for _, index := range slices.Sorted(maps.Keys(indexes)) {
+		tables := dashboardTables(t, run, index)
+		sqlColumns := sqlColumnsOf(tables)
+		if len(sqlColumns) == 0 {
+			continue
+		}
+		for _, store := range []string{"graphite", "elasticsearch", "prometheus"} {
+			pic, ok := tables[store]
+			if !ok {
+				continue
+			}
+			held++
+			o := run.outcomes[store][index]
+			own := ownWords(o.panel.Description, dashboardPanelDescription(run, index))
+			if unsaid := columnsUnsaid(store, &o, &pic, sqlColumns, own); len(unsaid) > 0 {
+				t.Errorf("panel %d %q in %s draws no %s, which the SQL stores draw, and its description "+
+					"does not say so: draw the column or name it where the description says what %s "+
+					"cannot hold. What it adds to the shared text: %q",
+					index, dashboardPanelTitle(run, index), store, strings.Join(unsaid, ", "), store, own)
+			}
+		}
+	}
+	t.Logf("%d tables of Graphite, Elasticsearch and Prometheus were held to the SQL stores' columns", held)
+	// A floor rather than a count, so a change that stops the tables drawing
+	// rows fails instead of passing with nothing held. Measured at 204 on the
+	// 2.6.2 branch.
+	if held < 100 {
+		t.Errorf("only %d tables were held to the SQL stores' columns, which is too few for this "+
+			"to have held anything", held)
+	}
+}
+
+// sqlColumnsOf is every column InfluxDB or PostgreSQL draws in a table, in
+// the order they head it.
+func sqlColumnsOf(tables map[string]grafana.Picture) []string {
+	var out []string
+	for _, store := range []string{"influxdb", "postgres"} {
+		pic, ok := tables[store]
+		if !ok {
+			continue
+		}
+		for _, name := range pic.Names() {
+			if !slices.Contains(out, name) {
+				out = append(out, name)
+			}
+		}
+	}
+	return out
+}
+
+// columnsUnsaid is every column of the SQL stores one store's table does not
+// draw and its own words about the panel do not name.
+func columnsUnsaid(store string, o *dashboardOutcome, pic *grafana.Picture, sqlColumns []string, own string) []string {
+	drawn := pic.Names()
+	if store == "prometheus" && promNeedsHistory(&o.panel) {
+		// A column of a range function over the exporter's half minute can be
+		// no series at all, which is no column: the one the panel names is
+		// what a Prometheus with history draws.
+		drawn = append(drawn, panelNamesGiven(o.panel.Source)...)
+	}
+	var out []string
+	for _, column := range sqlColumns {
+		if !columnSaid(store, own, drawn, sqlColumns, column) {
+			out = append(out, column)
+		}
+	}
+	return out
+}
+
+// dashboardDropsColumns is, per store, the one sentence that says of a table
+// that it keeps a number and drops every other column, and so names each
+// column it lacks at once. Graphite says it of a table that reduces each
+// series to one number: "Graphite has no rows: each series is one number
+// reduced over the range, so this table keeps the column it is sorted by and
+// drops the others", or the same with the column named and "drops the other
+// columns" or "the other settings". A sentence that names what it drops, "and
+// drops the limit and the most used", is held to naming each of them.
+var dashboardDropsColumns = map[string]*regexp.Regexp{
+	"graphite": regexp.MustCompile(`Graphite has no rows: each series is one number[^.]* drops the other`),
+}
+
+// panelNamesGiven is every column name a panel's transformations give, what
+// an organize renames a column to and what a calculation names its result.
+func panelNamesGiven(panel map[string]any) []string {
+	var out []string
+	tfs, _ := panel["transformations"].([]any)
+	for _, raw := range tfs {
+		tf, _ := raw.(map[string]any)
+		options, _ := tf["options"].(map[string]any)
+		rename, _ := options["renameByName"].(map[string]any)
+		for _, to := range rename {
+			if name, ok := to.(string); ok {
+				out = append(out, name)
+			}
+		}
+		if alias, ok := options["alias"].(string); ok && tf["id"] == "calculateField" {
+			out = append(out, alias)
+		}
+	}
+	return out
+}
+
+// dashboardPanelDescription is the panel's description in the SQL stores,
+// which is the text every store shares.
+func dashboardPanelDescription(run *dashboardRun, index int) string {
+	for _, store := range []string{"influxdb", "postgres"} {
+		if o, ok := run.outcomes[store][index]; ok {
+			return o.panel.Description
+		}
+	}
+	return ""
+}
+
+// ownWords is what a store's description adds to the shared one: the text
+// after the longest start the two have in common.
+func ownWords(desc, shared string) string {
+	i := 0
+	for i < len(desc) && i < len(shared) && desc[i] == shared[i] {
+		i++
+	}
+	return desc[i:]
+}
+
+// columnSaid reports whether a store that does not draw a column under the
+// SQL stores' name says so: see TestAColumnAStoreLacksIsSaidInItsDescription.
+// A name the SQL stores draw themselves stands for no other column: "Live
+// for" is not the Live link beside it.
+func columnSaid(store, own string, drawn, sqlColumns []string, column string) bool {
+	for _, name := range drawn {
+		variant := !slices.Contains(sqlColumns, name) &&
+			(strings.HasPrefix(name, column+" ") || column == name+"s")
+		if name == column || variant {
+			return true
+		}
+		if store != "graphite" {
+			continue
+		}
+		for node := range strings.SplitSeq(name, ", ") {
+			if strings.EqualFold(node, column) {
+				return true
+			}
+		}
+	}
+	if drops := dashboardDropsColumns[store]; drops != nil && drops.MatchString(own) {
+		return true
+	}
+	words := strings.Fields(column)
+	for i, w := range words {
+		words[i] = regexp.QuoteMeta(w)
+	}
+	return regexp.MustCompile(`(?i)\b` + strings.Join(words, `[\s-]+`) + `s?\b`).MatchString(own)
 }
 
 // rawFieldName is a name a datasource gives a field that the panel is meant

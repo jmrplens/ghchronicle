@@ -6501,7 +6501,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Artifact storage, and how much of it was counted. Three counts, because the live size is on neither of the other two: Declared is GitHub's own total and counts the artifacts it has already expired, Walked is how far the walk went, and Live is the artifacts still held among those, which is what the live size is the size of. A sweep's walk stops at five pages, five hundred artifacts, and any walk stops sooner when a page of the listing fails, the pass writing what it had read: either way Walked is lower than Declared and the live size is a floor rather than a total. Here it is short by a factor of fifty six, and without these columns the tile above would say so nowhere. All four are the newest row of each repository, which is the one the tile reads. Graphite has no rows: each series is one number, so this table keeps the live size, the newest of each repository, and drops the three counts, which leaves it unable to say whether that size is a floor.",
+          "description": "Artifact storage, and how much of it was counted. Three counts, because the live size is on neither of the other two: Declared is GitHub's own total and counts the artifacts it has already expired, Walked is how far the walk went, and Live is the artifacts still held among those, which is what the live size is the size of. A sweep's walk stops at five pages, five hundred artifacts, and any walk stops sooner when a page of the listing fails, the pass writing what it had read: either way Walked is lower than Declared and the live size is a floor rather than a total. Here it is short by a factor of fifty six, and without these columns the tile above would say so nowhere. All four are the newest row of each repository, which is the one the tile reads. Graphite has no rows: each series is one number, so this table keeps the live size, the newest of each repository, and drops the three counts, Declared, Walked and Live, which leaves it unable to say whether that size is a floor.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -7242,7 +7242,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Each force push, newest first. Graphite has no way to sort by date, so this counts them per repository, branch and actor over the range.",
+          "description": "Each force push, newest first. Graphite has no way to sort by date, so this counts them per repository, branch and actor over the range, with no When column.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -10326,7 +10326,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Ruleset rules, and who may walk past them. The Rulesets panel above says a ruleset exists and is enforced. This says what it does and who it does not apply to: a ruleset reported ACTIVE with every actor on ALWAYS protects nobody, and neither that panel nor branch protection would ever say so. Always is counted over a page of five while Bypass actors is the exact total, so Sampled says how many were really read, and the comparison is sound only while the three agree. Graphite names each row repository, ruleset and rule from the path, and has no rows: each series is one number reduced over the range, so this table keeps one of the three bypass columns. It keeps Bypass actors, the exact total, and not the column the panel is sorted by: a count on ALWAYS read alone, against a total this table cannot show beside it, is exactly the misreading the panel exists to prevent.",
+          "description": "Ruleset rules, and who may walk past them. The Rulesets panel above says a ruleset exists and is enforced. This says what it does and who it does not apply to: a ruleset reported ACTIVE with every actor on ALWAYS protects nobody, and neither that panel nor branch protection would ever say so. Always is counted over a page of five while Bypass actors is the exact total, so Sampled says how many were really read, and the comparison is sound only while the three agree. Graphite names each row repository, ruleset and rule from the path, and has no rows: each series is one number reduced over the range, so this table keeps one of the three bypass columns. It keeps Bypass actors, the exact total, and drops Sampled and Always, the column the panel is sorted by: a count on ALWAYS read alone, against a total this table cannot show beside it, is exactly the misreading the panel exists to prevent.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -10473,7 +10473,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Every saved version of every ruleset, dated the moment GitHub saved it. The Rulesets panel says a protection exists and how many days ago it last changed; this is the changelog that number summarizes, and it is the only record GitHub keeps of the moment a protection was switched off and back on. GitHub names the actor by type and id and not by login, so the row does too. Every store answers inside the dashboard range: a ruleset nobody has touched in the range is absent here, not unprotected. Graphite has no way to list by date, so this is the number of versions per repository, ruleset and actor type over the range, named from the path. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "Every saved version of every ruleset, dated the moment GitHub saved it. The Rulesets panel says a protection exists and how many days ago it last changed; this is the changelog that number summarizes, and it is the only record GitHub keeps of the moment a protection was switched off and back on. GitHub names the actor by type and id and not by login, so the row does too. Every store answers inside the dashboard range: a ruleset nobody has touched in the range is absent here, not unprotected. Graphite has no way to list by date, so this is the number of versions per repository, ruleset and actor type over the range, named from the path, which groups by no target: there is no Target column. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -10655,7 +10655,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "To status is the median time the deployment took to report one; Live for the median time it stayed the current one. They are the same subtraction against two different meanings, so each keeps its own field and neither is written over the other. The pending rows are kept on purpose: one deployment on this account has been held at an approval for seventy four days, and a filter that hid the states that are not terminal would delete the most interesting row. Graphite names each row repository and environment from the path and keeps no strings, so the outcome is out of reach there: Successes counts the success flag, and the pending deployments are not told apart. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "To status is the median time the deployment took to report one; Live for the median time it stayed the current one. They are the same subtraction against two different meanings, so each keeps its own field and neither is written over the other. The pending rows are kept on purpose: one deployment on this account has been held at an approval for seventy four days, and a filter that hid the states that are not terminal would delete the most interesting row. Graphite names each row repository and environment from the path and keeps no strings, so the outcome is out of reach there: Successes counts the success flag, and the pending deployments are not told apart. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others. Graphite keeps no string beside a number, so the Link and Live columns of the InfluxDB dashboard are absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -10952,7 +10952,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "The twelve most downloaded releases. A click on a bar opens the release page. Graphite names each bar repository and tag from the path. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "The twelve most downloaded releases. A click on a bar opens the release page. Graphite names each bar repository and tag from the path. Graphite keeps no string beside a number, so the Page column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -11046,7 +11046,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Download fetches the file itself, which is what an asset's url is; the asset's name opens the release page it was published on. Graphite names each row repository, tag and asset from the path. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "Download fetches the file itself, which is what an asset's url is; the asset's name opens the release page it was published on. Graphite names each row repository, tag and asset from the path. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others. Graphite keeps no string beside a number, so the Download and Link columns of the InfluxDB dashboard are absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -11200,7 +11200,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "The counter is cumulative, so what matters is the difference across the range. A day of it here: ninety seven per cent of the downloads are one Linux binary and its checksum file, which is an installer rather than a person. Graphite names each row repository, tag and asset from the path, and differentiates the series itself. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "The counter is cumulative, so what matters is the difference across the range. A day of it here: ninety seven per cent of the downloads are one Linux binary and its checksum file, which is an installer rather than a person. Graphite names each row repository, tag and asset from the path, and differentiates the series itself. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others. Graphite keeps no string beside a number, so the Download column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -11826,7 +11826,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Recorded explicitly, so a repository with the feature switched off is distinguishable from one with no alerts. Each row is the newest reading of the repository's feature, so a feature switched off or an alert fixed inside the range reads as it stands and not as it was at its highest. Graphite names each row repository and feature from the path and keeps one number per row, the open alerts, so whether the feature is on is not shown here. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "Recorded explicitly, so a repository with the feature switched off is distinguishable from one with no alerts. Each row is the newest reading of the repository's feature, so a feature switched off or an alert fixed inside the range reads as it stands and not as it was at its highest. Graphite names each row repository and feature from the path and keeps one number per row, the open alerts, so Enabled, whether the feature is on, is not shown here. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -14917,7 +14917,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "GitHub's own score, and the boxes it is made of. The score alone hides which one is missing: here eight of thirty-five repositories have no license. GitHub's page and score do count a templates directory, but the API's issue_template flag reports only the legacy single file, so it reads false on a repository that scores 100 with four issue forms: on this account seven repositories carry templates and the flag is false on all of them (community/community#207706). In the InfluxDB, PostgreSQL and Prometheus dashboards, which can join two measurements, Issue templates is how many the repository actually has, forms and Markdown, from gh_repo_policy. Graphite has the percentage; the boxes are not metrics there. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "GitHub's own score, and the boxes it is made of. The score alone hides which one is missing: here eight of thirty-five repositories have no license. GitHub's page and score do count a templates directory, but the API's issue_template flag reports only the legacy single file, so it reads false on a repository that scores 100 with four issue forms: on this account seven repositories carry templates and the flag is false on all of them (community/community#207706). In the InfluxDB, PostgreSQL and Prometheus dashboards, which can join two measurements, Issue templates is how many the repository actually has, forms and Markdown, from gh_repo_policy. Graphite has the percentage; the boxes, Readme, License, Contributing, Conduct, Issue templates and PR template, are not metrics there. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -16530,7 +16530,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "What the profile links to. It is small and it is a check rather than a measurement: these are the same links a personal site publishes as sameAs, and a row that disappears is the signal. Graphite has no strings either, so this is presence by provider. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "What the profile links to. It is small and it is a check rather than a measurement: these are the same links a personal site publishes as sameAs, and a row that disappears is the signal. Graphite has no strings either, so this is presence by provider and there is no URL column. Graphite keeps no string beside a number, so the URL column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {

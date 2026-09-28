@@ -84,13 +84,13 @@ func achievements(b *builder) Panel {
 			"badge's label, one where it has none; Level is the color GitHub gives " +
 			"that tier. Empty until the achievements family has run once.",
 		PromDesc: "Prometheus keeps the badge by its slug and its tier; the display name " +
-			"and the tier's color are strings and do not survive as metrics.",
+			"and Level, the tier's color, are strings and do not survive as metrics.",
 		Overrides: []any{width("Tier", 80), width("Level", 100), linkOn("Achievement")},
 		GR:        gr, GRTF: grtf,
 		GRDesc: "Graphite names each row by the badge's slug and keeps its tier. " + grRows,
 		ES:     es, ESTF: estf,
 		ESDesc: "Elasticsearch names each row by the badge's slug; the display name and " +
-			"the tier's color are strings a top metric cannot carry.",
+			"Level, the tier's color, are strings a top metric cannot carry.",
 	})
 }
 
@@ -380,7 +380,7 @@ func sponsorship(b *builder) []Panel {
 		{"@timestamp", "Date"},
 		{"direction", "Direction"},
 		{"sponsorable", "Sponsorable"},
-		{"tier_number", "Tier"},
+		{"tier", "Tier"},
 		{"amount_cents", "Amount (cents)"},
 		{"active", "Active"},
 		{"one_time", profileOneTime},
@@ -451,7 +451,7 @@ func sponsorship(b *builder) []Panel {
 				"is listed at the default thirty days, and the Sponsoring tile on the " +
 				"Overview and this table count the same thing.",
 			PromDesc: "Prometheus counts sponsorships per direction and drops the other party, " +
-				"because a series per sponsorable would never move again. So this is one row " +
+				"the date and the tier, because a series per sponsorable would never move again. So this is one row " +
 				"for money in and one for money out, with the mean amount and the two shares " +
 				"beside the count. " + sweepCount + " It is the one store here that is not " +
 				"bound by the dashboard range, so a lapsed sponsorship is counted in it " +

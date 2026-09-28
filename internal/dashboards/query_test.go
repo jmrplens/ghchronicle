@@ -247,3 +247,23 @@ func TestAColumnTheSQLDoesNotSelectStandsWhereItIsPlaced(t *testing.T) {
 		t.Errorf("a placement of a column the store does not draw: %s", msg)
 	}
 }
+
+// TestALostLinkColumnIsNamed: the sentence a store carries for the link
+// columns it cannot return named the Link column alone, which the SQL stores
+// hide, and so said nothing of "Live", the column "Deployments by
+// environment" draws beside it.
+func TestALostLinkColumnIsNamed(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		lost []string
+		want string
+	}{
+		{[]string{"Link"}, promNoLink},
+		{[]string{"Live"}, "so the Live column of the InfluxDB dashboard is absent here."},
+		{[]string{"Link", "Live"}, "so the Link and Live columns of the InfluxDB dashboard are absent here."},
+	} {
+		if got := namingLinks(promNoLink, tc.lost); !strings.HasSuffix(got, tc.want) {
+			t.Errorf("namingLinks(%v) = %q, want it to end %q", tc.lost, got, tc.want)
+		}
+	}
+}

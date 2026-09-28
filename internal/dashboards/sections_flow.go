@@ -736,11 +736,15 @@ func stillOpen(b *builder) []Panel {
 					promTbl(promWithin(openLongest, fmt.Sprintf(
 						`max by (full_name, repo) (github_pull_requests_comments_mean{state="OPEN",%s})`, PF,
 					), rank, "full_name", "repo"), "B"),
+					promTbl(promWithin(openLongest, fmt.Sprintf(
+						`max by (full_name, repo) (github_pull_requests_reviews_mean{state="OPEN",%s})`, PF,
+					), rank, "full_name", "repo"), "C"),
 				}
 			}(),
 			PromTF: merged(map[string]string{
 				"repo":                  "Repository",
 				inventoryValueCol + "A": flowOpenAge, inventoryValueCol + "B": "Comments",
+				inventoryValueCol + "C": "Reviews",
 			}, nil),
 
 			Opts: Opts{"sort": flowOpenAge},
@@ -754,7 +758,9 @@ func stillOpen(b *builder) []Panel {
 			PromDesc: "In Prometheus a row is a repository and not a pull request, since " +
 				"the exporter keeps no pull request of its own: Open for is the mean over " +
 				"the repository's open pull requests at the collector's last sweep, and the " +
-				"twenty-five rows are the repositories where it is longest. " + noRepoFlagsHere,
+				"twenty-five rows are the repositories where it is longest. Comments and " +
+				"Reviews are the means over the same pull requests, and there is no Number, " +
+				"Title, Author or Labels column. " + noRepoFlagsHere,
 			Overrides: []any{
 				repoColumn(), width("Number", 80), width("Author", 120),
 				unitOf(flowOpenAge, "s", 130),

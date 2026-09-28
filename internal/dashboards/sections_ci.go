@@ -442,7 +442,8 @@ func whereTheTimeGoes(b *builder) []Panel {
 			GR: wfGR, GRTF: wfGRtf,
 			GRDesc: "Graphite names each row workflow and repository from the path; the failures are in the chart above. " + grRows,
 			ES:     wfES, ESTF: wfEStf,
-			ESDesc: "In Elasticsearch the failures are a success rate, the mean of the boolean `success` field.",
+			ESDesc: "In Elasticsearch the failures are a success rate in place of Not successful, " +
+				"the mean of the boolean `success` field.",
 			ESOver: []any{unitOf(ciSuccessRate, "percentunit", 110)},
 		}),
 		panel("table", "Slowest jobs", box{W: 12, H: 9, X: 12, Y: 21}, []Target{sqlT(jobs)}, &P{
@@ -461,9 +462,10 @@ func whereTheTimeGoes(b *builder) []Panel {
 				inventoryValueCol + "B": ciTimesRun,
 			}, nil),
 
-			Opts:     Opts{"sort": "Duration"},
-			Desc:     expanded,
-			PromDesc: lastSweep + " " + sweepCount,
+			Opts: Opts{"sort": "Duration"},
+			Desc: expanded,
+			PromDesc: lastSweep + " " + sweepCount + " The exporter keeps the mean duration of a " +
+				"job and not its longest, so there is no Worst column.",
 			Overrides: []any{
 				repoColumn(), width(ciTimesRun, 90),
 				unitOf("Duration", "s", 100), unitOf("Worst", "s", 90),
@@ -598,6 +600,13 @@ func whatKeepsFailing(b *builder) []Panel {
 			{"s", ciSucceeded},
 		}, []string{ESF}, failingESRows()...)
 
+	// Minutes as a count of runs times their mean duration, which is what the
+	// exporter keeps of them.
+	wastedProm := fmt.Sprintf(`sum by (full_name, repo) (increase(github_workflow_runs_total{conclusion!="success",%s}[$__range]))`+
+		` * on (full_name, repo) group_left avg by (full_name, repo) (github_workflow_runs_duration_seconds_mean{%s})`, PF, PF)
+	totalProm := fmt.Sprintf(`sum by (full_name, repo) (increase(github_workflow_runs_total{%s}[$__range]))`+
+		` * on (full_name, repo) group_left avg by (full_name, repo) (github_workflow_runs_duration_seconds_mean{%s})`, PF, PF)
+
 	failStepsGR, failStepsGRtf := gTbl(fmt.Sprintf(`limit(sortBy(%s, "sum", true), 20)`,
 		grGroupBy(counted(rp(ciStep, "duration_seconds", "conclusion", "failure")),
 			ciStep, "sum", "step", "repo"),
@@ -618,11 +627,15 @@ func whatKeepsFailing(b *builder) []Panel {
 				" GROUP BY full_name, repo ORDER BY 2 DESC, full_name",
 		)}, &P{
 			Prom: []Target{
-				promTbl(fmt.Sprintf(`sum by (full_name, repo) (increase(github_workflow_runs_total{conclusion!="success",%s}[$__range])) * on (full_name, repo) group_left avg by (full_name, repo) (github_workflow_runs_duration_seconds_mean{%s})`, PF, PF), "A"),
-				promTbl(fmt.Sprintf(`sum by (full_name, repo) (increase(github_workflow_runs_total{%s}[$__range])) * on (full_name, repo) group_left avg by (full_name, repo) (github_workflow_runs_duration_seconds_mean{%s})`, PF, PF), "B"),
+				promTbl(wastedProm, "A"),
+				promTbl(totalProm, "B"),
+				// The share as the SQL takes it, and none for a repository
+				// with no minutes rather than a division by nothing.
+				promTbl(fmt.Sprintf("sum by (full_name, repo) (100 * (%s) / ((%s) > 0))", wastedProm, totalProm), "C"),
 			},
 			PromTF: merged(map[string]string{
 				"repo": "Repository", inventoryValueCol + "A": "Wasted", inventoryValueCol + "B": "Total",
+				inventoryValueCol + "C": "Share",
 			}, nil),
 
 			Opts: Opts{"sort": "Wasted"},
@@ -825,7 +838,8 @@ func artifactStorage(b *builder) []Panel {
 				GR: walkedGR, GRTF: walkedGRtf,
 				GRDesc: "Graphite has no rows: each series is one number, so this table keeps " +
 					"the live size, the newest of each repository, and drops the three counts, " +
-					"which leaves it unable to say whether that size is a floor.",
+					"Declared, Walked and Live, which leaves it unable to say whether that size " +
+					"is a floor.",
 				ES: walkedES, ESTF: walkedEStf,
 			}),
 	}

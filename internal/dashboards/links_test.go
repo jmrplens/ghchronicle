@@ -106,7 +106,8 @@ func checkLinkPlacement(t *testing.T, store string, p map[string]any, influxLink
 	desc, _ := p["description"].(string)
 	options, _ := p["options"].(map[string]any)
 	content, _ := options["content"].(string)
-	if !strings.Contains(desc, noLink[store]) && !strings.Contains(content, noteLink) {
+	why, _, _ := strings.Cut(noLink[store], ", so the ")
+	if !strings.Contains(desc, why) && !strings.Contains(content, noteLink) {
 		t.Errorf("%s: %q lost a link column the InfluxDB dashboard has and does not say so", store, title)
 	}
 }

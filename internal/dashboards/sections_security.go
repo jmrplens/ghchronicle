@@ -283,7 +283,8 @@ func openAlerts(b *builder) []Panel {
 			Overrides: []any{enabled, width(securityOpenAlerts, 120), ownerLinkOn("Feature", "the security overview")},
 			GR:        featGR, GRTF: featGRtf,
 			GRDesc: "Graphite names each row repository and feature from the path and keeps one " +
-				"number per row, the open alerts, so whether the feature is on is not shown here.",
+				"number per row, the open alerts, so Enabled, whether the feature is on, is not " +
+				"shown here.",
 			ES: featES, ESTF: featEStf,
 		}),
 	}
@@ -433,20 +434,6 @@ func scanningAndResolution(b *builder) []Panel {
 			{"m", "Raised"},
 		}, []string{ESF, "alert_state:open"}, hideColumns(panelFullNameField))
 
-	toolGR, toolGRtf := gTbl(fmt.Sprintf(`limit(sortBy(%s, "sum", true), 25)`,
-		grGroupBy(rp(an, "results"), an, "sum", "tool", "repo"),
-	),
-		"Tool, repository", []col{{"sum", "Results"}})
-	toolES, toolEStf := esTbl(an, append([]any{b.tm("tool", 10)}, b.tmRepo(50)...),
-		[]any{b.mCount(), b.mSum("results"), b.mMax("rules")},
-		[]named{
-			{"tool.keyword", "Tool"},
-			{inventoryRepoTerm, "Repository"},
-			{"n", "Runs"},
-			{"r", "Results"},
-			{"u", "Rules"},
-		}, []string{ESF}, hideColumns(panelFullNameField))
-
 	return []Panel{
 		panel("timeseries", "Code scanning runs", box{W: 12, H: 8, X: 0, Y: 12}, []Target{sqlTS(analyses)}, &P{
 			Prom: []Target{daily(fmt.Sprintf(
@@ -514,33 +501,7 @@ func scanningAndResolution(b *builder) []Panel {
 				"and keeps no text, so the advisory is missing. " + grSlot,
 			ES: resES, ESTF: resEStf, ESDesc: esNewest,
 		}),
-		panel("table", "Scan results by tool", box{W: 24, H: 7, X: 0, Y: 27}, []Target{sqlT(
-			`SELECT tool AS "Tool", SUM(results) AS "Results", repo AS "Repository",` +
-				` COUNT(*) AS "Runs", MAX(rules) AS "Rules"` +
-				" FROM gh_code_scanning_analysis WHERE $__timeFilter(time) AND " + RF +
-				" GROUP BY 1, full_name, 3 ORDER BY 2 DESC, 1, full_name LIMIT 25",
-		)}, &P{
-			Prom: []Target{
-				promTbl(fmt.Sprintf("sum by (tool, full_name, repo) (increase(github_code_scanning_analyses_total{%s}[$__range]))", PF), "A"),
-				promTbl(fmt.Sprintf("avg by (tool, full_name, repo) (github_code_scanning_analyses_results_mean{%s})", PF), "B"),
-			},
-			PromTF: merged(map[string]string{
-				"tool": "Tool", "repo": "Repository", inventoryValueCol + "A": "Runs", inventoryValueCol + "B": "Results",
-			}, nil),
-
-			Opts: Opts{"sort": "Results"},
-			Desc: "The panel beside this one says the scan ran. This says what it found, which " +
-				"is what explains a jump in the alert count: one tool here returns sixty " +
-				"three results in three runs and another fifty two in nine hundred and " +
-				"fifty three.",
-			PromDesc: sinceStart + " " + lastSweep,
-			Overrides: []any{
-				barCell("Results", "short", 120), width("Runs", 100),
-				width("Rules", 100),
-			},
-			GR: toolGR, GRTF: toolGRtf, GRDesc: grRows + " " + grSlotTotals,
-			ES: toolES, ESTF: toolEStf,
-		}),
+		scanResultsByTool(b),
 		panel("table", "Oldest open alerts", box{W: 24, H: 7, X: 0, Y: 34}, []Target{sqlT(oldest)}, &P{
 			PromNote: cannot("the alerts still open, oldest first, from both families, with "+
 				"the advisory or the rule and a link to each.",
@@ -556,10 +517,11 @@ func scanningAndResolution(b *builder) []Panel {
 			},
 			ES: oldestES, ESTF: oldestEStf,
 			ESDesc: "Elasticsearch lists the Dependabot alerts alone, the two families " +
-				"being two indices, and the advisory is text, which a bucket cannot show. " +
-				"It gives the date each alert was raised rather than how long it has been " +
-				"open, that being the row's own date subtracted from now and not something " +
-				"a bucket can compute, and it is not sorted by that date: ordering a bucket " +
+				"being two indices, so there is no Kind column, and the advisory is text, " +
+				"which a bucket cannot show, so there is no Detail column. " +
+				"It gives the date each alert was raised rather than Open for, how long it " +
+				"has been open, that being the row's own date subtracted from now and not " +
+				"something a bucket can compute, and it is not sorted by that date: ordering a bucket " +
 				"by a metric needs the metric to be its own child, and this one is four " +
 				"buckets deeper. It also lists only the " +
 				"ones raised inside the dashboard range, since every Elasticsearch query " +
@@ -795,4 +757,53 @@ func posture(b *builder) []Panel {
 				ES: scES, ESTF: scEStf,
 			}),
 	}
+}
+
+// scanResultsByTool is what each scanning tool found in each repository, the
+// results that explain a jump in the alert count.
+func scanResultsByTool(b *builder) Panel {
+	an := "gh_code_scanning_analysis"
+	toolGR, toolGRtf := gTbl(fmt.Sprintf(`limit(sortBy(%s, "sum", true), 25)`,
+		grGroupBy(rp(an, "results"), an, "sum", "tool", "repo"),
+	),
+		"Tool, repository", []col{{"sum", "Results"}})
+	toolES, toolEStf := esTbl(an, append([]any{b.tm("tool", 10)}, b.tmRepo(50)...),
+		[]any{b.mCount(), b.mSum("results"), b.mMax("rules")},
+		[]named{
+			{"tool.keyword", "Tool"},
+			{inventoryRepoTerm, "Repository"},
+			{"n", "Runs"},
+			{"r", "Results"},
+			{"u", "Rules"},
+		}, []string{ESF}, hideColumns(panelFullNameField))
+
+	return panel("table", "Scan results by tool", box{W: 24, H: 7, X: 0, Y: 27}, []Target{sqlT(
+		`SELECT tool AS "Tool", SUM(results) AS "Results", repo AS "Repository",` +
+			` COUNT(*) AS "Runs", MAX(rules) AS "Rules"` +
+			" FROM gh_code_scanning_analysis WHERE $__timeFilter(time) AND " + RF +
+			" GROUP BY 1, full_name, 3 ORDER BY 2 DESC, 1, full_name LIMIT 25",
+	)}, &P{
+		Prom: []Target{
+			promTbl(fmt.Sprintf("sum by (tool, full_name, repo) (increase(github_code_scanning_analyses_total{%s}[$__range]))", PF), "A"),
+			promTbl(fmt.Sprintf("avg by (tool, full_name, repo) (github_code_scanning_analyses_results_mean{%s})", PF), "B"),
+			promTbl(fmt.Sprintf("max by (tool, full_name, repo) (github_code_scanning_analyses_rules_mean{%s})", PF), "C"),
+		},
+		PromTF: merged(map[string]string{
+			"tool": "Tool", "repo": "Repository", inventoryValueCol + "A": "Runs", inventoryValueCol + "B": "Results",
+			inventoryValueCol + "C": "Rules",
+		}, nil),
+
+		Opts: Opts{"sort": "Results"},
+		Desc: "The panel beside this one says the scan ran. This says what it found, which " +
+			"is what explains a jump in the alert count: one tool here returns sixty " +
+			"three results in three runs and another fifty two in nine hundred and " +
+			"fifty three.",
+		PromDesc: sinceStart + " " + lastSweep,
+		Overrides: []any{
+			barCell("Results", "short", 120), width("Runs", 100),
+			width("Rules", 100),
+		},
+		GR: toolGR, GRTF: toolGRtf, GRDesc: grRows + " " + grSlotTotals,
+		ES: toolES, ESTF: toolEStf,
+	})
 }

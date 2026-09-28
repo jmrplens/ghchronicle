@@ -209,7 +209,8 @@ func commitsAndChurn(b *builder) []Panel {
 				"authors are the top of this table, which is the honest answer to the " +
 				"question as asked: narrow the picker to read it as the account's own work. " +
 				commitBound,
-			PromDesc: sinceStart + " " + lastSweep,
+			PromDesc: sinceStart + " " + lastSweep + " The exporter keeps the mean lines a " +
+				"commit added and removed and not their sum, so there is no Added or Removed column.",
 			Overrides: []any{
 				barCell("Commits", "short", 130), width("Added", 110),
 				width("Removed", 110), width(codeLinesPerCommit, 130),
@@ -234,12 +235,12 @@ func commitsAndChurn(b *builder) []Panel {
 			PromTF: []any{organize(map[string]string{"repo": "Repository", "Value": codeForcePushes}, nil)},
 			Desc:   "Each force push, newest first.",
 			PromDesc: "Prometheus keeps no branch or actor, so this counts them per " +
-				"repository over the range. " + sinceStart,
+				"repository over the range, with no When, Branch or By column. " + sinceStart,
 			Overrides: []any{when("When")},
 			PromOver:  []any{barCell(codeForcePushes, "short", 120)},
 			GR:        forceGR, GRTF: forceGRtf,
 			GRDesc: "Graphite has no way to sort by date, so this counts them per repository, " +
-				"branch and actor over the range.",
+				"branch and actor over the range, with no When column.",
 			GROver: []any{barCell(codeForcePushes, "short", 120)},
 			ES:     forceES, ESTF: forceEStf,
 		}),
@@ -314,13 +315,16 @@ func commitChecks(b *builder) []Panel {
 				"sum by (app, conclusion) (increase(github_commit_checks_total{%s}[$__range]))", PF,
 			))},
 			PromTF: []any{organize(map[string]string{
-				"app": "App", "conclusion": "Check", "Value": "Runs",
+				"app": "App", "conclusion": "Conclusion", "Value": "Runs",
 			}, nil)},
 			Opts: Opts{"sort": "Runs"},
 			Desc: "Everything Actions runs is already in the two sections above, in far more " +
 				"detail. These are the other gates: the code quality service, the dependency " +
 				"bot, the commit statuses an older integration still writes.",
-			PromDesc:  sinceStart,
+			PromDesc: "The exporter keeps the app and the conclusion of a check run and not the " +
+				"check's name, so a row is an app and a conclusion, with no Check column, and " +
+				"the failed runs are the rows that conclude in failure rather than a Failed " +
+				"column. " + sinceStart,
 			Overrides: []any{barCell("Runs", "short", 120)},
 			GR:        checksGR, GRTF: checksGRtf, GRDesc: grRows + " " + grSlotCounts,
 			ES: checksES, ESTF: checksEStf,

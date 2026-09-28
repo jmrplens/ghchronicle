@@ -511,10 +511,14 @@ func audience(b *builder) []Panel {
 				promTbl(fmt.Sprintf(`sum by (full_name, repo) (github_traffic_count{kind="clones",%s})`, PF), "A"),
 				promTbl(fmt.Sprintf(`sum by (full_name, repo) (github_traffic_uniques{kind="clones",%s})`, PF), "B"),
 				promTbl(fmt.Sprintf(`sum by (full_name, repo) (github_traffic_count{kind="views",%s})`, PF), "C"),
+				// The ratio as the SQL takes it, and a repository nobody
+				// cloned has none rather than a division by nothing.
+				promTbl(fmt.Sprintf(`sum by (full_name, repo) (github_traffic_count{kind="clones",%s})`+
+					` / (sum by (full_name, repo) (github_traffic_uniques{kind="clones",%s}) > 0)`, PF, PF), "D"),
 			},
 			PromTF: merged(map[string]string{
 				"repo": "Repository", panelValueA: "Clones", panelValueB: "Cloners",
-				panelValueC: "Views",
+				panelValueC: "Views", panelValueD: "Clones each",
 			}, nil),
 
 			Opts: Opts{"sort": "Clones each"},
@@ -530,8 +534,9 @@ func audience(b *builder) []Panel {
 			GR: cloneGR, GRTF: cloneGRtf,
 			GRDesc: "Graphite divides series, not columns, so the ratio is not in this table. " + grRows,
 			ES:     cloneES, ESTF: cloneEStf,
-			ESDesc: "In Elasticsearch this is clones and cloners; the ratio is the one column " +
-				"a bucket aggregation cannot divide.",
+			ESDesc: "In Elasticsearch this is clones and cloners: Clones each, the ratio, is " +
+				"the one column a bucket aggregation cannot divide, and Views are documents of " +
+				"the other kind, which a query of the clones does not read.",
 		}),
 	}
 }

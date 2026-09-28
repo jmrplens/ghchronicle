@@ -235,8 +235,9 @@ func repositoryList(b *builder) []Panel {
 				"Issue templates is how many the repository actually has, forms and " +
 				"Markdown, from gh_repo_policy.",
 			GR: healthGR, GRTF: healthGRtf,
-			GRDesc: "Graphite has the percentage; the boxes are not metrics there.",
-			ES:     healthES, ESTF: healthEStf,
+			GRDesc: "Graphite has the percentage; the boxes, Readme, License, Contributing, " +
+				"Conduct, Issue templates and PR template, are not metrics there.",
+			ES: healthES, ESTF: healthEStf,
 			ESDesc: "Issue template here is " +
 				"the API's own flag, which reports only the legacy single file and not a " +
 				"templates directory the page and the score count: " +
@@ -610,8 +611,9 @@ func settingsAndKeys(b *builder) []Panel {
 			PromDesc:  "The exporter keeps the provider and whether it is present.",
 			Overrides: []any{width("Provider", 140), rawURLColumn("URL")},
 			GR:        socGR, GRTF: socGRtf,
-			GRDesc: "Graphite has no strings either, so this is presence by provider.",
-			ES:     socES, ESTF: socEStf,
+			GRDesc: "Graphite has no strings either, so this is presence by provider and there " +
+				"is no URL column.",
+			ES: socES, ESTF: socEStf,
 		}),
 		panel("table", "Configuration changes", box{W: 12, H: 7, X: 12, Y: 50}, []Target{sqlT(
 			`SELECT repo AS "Repository",` +

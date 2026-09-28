@@ -134,8 +134,13 @@ junto a otro, entre ellas una tabla que dibujaba siete filas para un
 repositorio y tarjetas que habían perdido su unidad. Nueve estaban en los
 dashboards, y ejecutada contra los dashboards de esa versión esta comprobación
 falla en ocho. La novena eran cuatro columnas de las que carecía "Open the
-longest" en Elasticsearch, y una columna que dibuja un solo almacén no se
-compara: lo que un almacén puede guardar es asunto de su propia descripción.
+longest" en Elasticsearch, que ninguna comparación de valores puede ver. Lo que
+un almacén puede guardar es asunto de su propia descripción, así que otra
+aserción exige que cada columna que dibujan los almacenes SQL en una tabla la
+dibuje también cada otro almacén que dibuja la tabla, o que la nombren las
+palabras propias de ese almacén sobre el panel: en la rama 2.6.2, 33 tablas de
+los otros tres almacenes carecían de una columna que su descripción no
+nombraba, y cada una la dibuja ahora o dice por qué no.
 
 Un almacén que dibuja un panel de otra forma a propósito dice por qué en su
 propia descripción del panel, y la diferencia se lista en `dashboardsDiffer`, en

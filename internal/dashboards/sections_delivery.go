@@ -153,8 +153,9 @@ func webhookDeliveries(b *builder) []Panel {
 			Desc: "Only the host is stored. The path of a webhook URL usually carries a secret. " +
 				"A retried delivery is a different fact from a first one that failed, and " +
 				"counting them together makes an endpoint look worse than it is.",
-			PromDesc: "Prometheus keeps the hook name rather than the host, and the retries as " +
-				"a fraction rather than a count. " + sinceStart,
+			PromDesc: "Prometheus keeps the hook name rather than the host, so Hook stands where " +
+				"the other stores draw Endpoint, and the retries as a fraction rather than a " +
+				"count. " + sinceStart,
 			Overrides: []any{
 				width("Endpoint", 150), barCell("Deliveries", "short", 120),
 				width("Failed", 90), width("Retried", 90), unitOf("Latency", "s", 100),
@@ -163,7 +164,9 @@ func webhookDeliveries(b *builder) []Panel {
 			GRDesc: "Graphite names each row host, repository and whether the delivery succeeded " +
 				"from the path, so the failures are their own rows. " + grRows,
 			ES: hooksES, ESTF: hooksEStf,
-			ESDesc: "In Elasticsearch the failures are their own rows, split by the `ok` tag.",
+			ESDesc: "In Elasticsearch the failures are their own rows, split by the `ok` tag, " +
+				"rather than a Failed column, and a redelivery is counted among the deliveries " +
+				"rather than in a Retried column.",
 		}),
 	}
 }
@@ -223,11 +226,12 @@ func accessConfiguration(b *builder) []Panel {
 	whGR, whGRtf := gTbl(rowsOf("keepLastValue("+rp("gh_webhook", "events")+")",
 		gn("gh_webhook", "repo"), gn("gh_webhook", "host")),
 		"Repository, host", []col{{"lastNotNull", deliveryHookEvents}})
-	whES, whEStf := esTbl("gh_webhook", append(b.tmRepo(500), b.tm("host", 50), b.tm("active", 2)),
+	whES, whEStf := esTbl("gh_webhook", append(b.tmRepo(500), b.tm("host", 50), b.tm("hook", 50), b.tm("active", 2)),
 		[]any{b.mNewest("events")},
 		[]named{
 			{inventoryRepoTerm, "Repository"},
 			{"host.keyword", "Host"},
+			{"hook.keyword", "Hook"},
 			{"active.keyword", "Active"},
 			{"events", deliveryHookEvents},
 		}, []string{ESF}, hideColumns(panelFullNameField))
@@ -257,6 +261,8 @@ func accessConfiguration(b *builder) []Panel {
 			PromAt: map[string]string{"Active": deliveryLastChanged},
 			Desc: "A 404 from branch protection does not mean unprotected: a repository can be " +
 				"governed entirely by rulesets, which that endpoint knows nothing about.",
+			PromDesc: "The exporter keeps a ruleset's enforcement and not its target, so there " +
+				"is no Target column.",
 			Overrides: []any{
 				width("Enforcement", 120), width("Target", 100),
 				unitOf(deliveryLastChanged, "d", 130), ownerLinkOn("Ruleset", "the ruleset settings"),
@@ -586,9 +592,9 @@ func branchesAndProtections(b *builder) []Panel {
 				GRDesc: "Graphite names each row repository, ruleset and rule from the path, and " +
 					"has no rows: each series is one number reduced over the range, so this " +
 					"table keeps one of the three bypass columns. It keeps Bypass actors, the " +
-					"exact total, and not the column the panel is sorted by: a count on ALWAYS " +
-					"read alone, against a total this table cannot show beside it, is exactly " +
-					"the misreading the panel exists to prevent.",
+					"exact total, and drops Sampled and Always, the column the panel is sorted " +
+					"by: a count on ALWAYS read alone, against a total this table cannot show " +
+					"beside it, is exactly the misreading the panel exists to prevent.",
 				ES: ruleES, ESTF: ruleEStf,
 			}),
 		rulesetChanges(b),
@@ -650,14 +656,16 @@ func rulesetChanges(b *builder) Panel {
 			"Every store answers inside the dashboard range: a ruleset nobody has touched " +
 			"in the range is absent here, not unprotected.",
 		PromDesc: "Prometheus counts versions per ruleset and actor type and drops the " +
-			"dates, because a series per version would never move again. " + sweepCount,
+			"dates, because a series per version would never move again. It keeps no " +
+			"target either, so there is no Target column. " + sweepCount,
 		Overrides: []any{
 			when("Date"), width("Target", 90), width("Actor", 110), linkOn("Ruleset"),
 		},
 		PromOver: []any{width("Actor", 110), width("Versions", 100)},
 		GR:       verGR, GRTF: verGRtf,
 		GRDesc: "Graphite has no way to list by date, so this is the number of versions per " +
-			"repository, ruleset and actor type over the range, named from the path.",
+			"repository, ruleset and actor type over the range, named from the path, which " +
+			"groups by no target: there is no Target column.",
 		ES: verES, ESTF: verEStf,
 		ESDesc: "Elasticsearch lists the documents themselves, newest first.",
 	})
@@ -764,8 +772,13 @@ func deploymentsToEnvironments(b *builder) []Panel {
 				promTbl(fmt.Sprintf("sum by (full_name, repo, environment) (increase(github_deployments_total{%s}[$__range]))", PF), "A"),
 				promTbl(fmt.Sprintf("avg by (full_name, repo, environment) (github_deployments_seconds_to_status_mean{%s})", PF), "B"),
 				promTbl(fmt.Sprintf("avg by (full_name, repo, environment) (github_deployments_seconds_live_mean{%s})", PF), "C"),
-				promTbl(fmt.Sprintf(`sum by (full_name, repo, environment) (increase(github_deployments_total{outcome="success",%s}[$__range]))`, PF), "D"),
-				promTbl(fmt.Sprintf(`sum by (full_name, repo, environment) (increase(github_deployments_total{outcome="pending",%s}[$__range]))`, PF), "E"),
+				// An outcome with no deployment in the range is no series at
+				// all, and a query that finds none answers no column: the
+				// zero of every environment keeps the column, as the SQL does.
+				promTbl(fmt.Sprintf(`sum by (full_name, repo, environment) (increase(github_deployments_total{outcome="success",%s}[$__range]))`+
+					` or sum by (full_name, repo, environment) (0 * increase(github_deployments_total{%s}[$__range]))`, PF, PF), "D"),
+				promTbl(fmt.Sprintf(`sum by (full_name, repo, environment) (increase(github_deployments_total{outcome="pending",%s}[$__range]))`+
+					` or sum by (full_name, repo, environment) (0 * increase(github_deployments_total{%s}[$__range]))`, PF, PF), "E"),
 			},
 			PromTF: merged(map[string]string{
 				"repo": "Repository", "environment": "Environment", inventoryValueCol + "A": "Deployments",
@@ -793,7 +806,8 @@ func deploymentsToEnvironments(b *builder) []Panel {
 				"no strings, so the outcome is out of reach there: Successes counts the " +
 				"success flag, and the pending deployments are not told apart. " + grRows,
 			ES: depES, ESTF: depEStf,
-			ESDesc: "In Elasticsearch each outcome is its own row, split by the `outcome` field.",
+			ESDesc: "In Elasticsearch each outcome is its own row, split by the `outcome` field, " +
+				"rather than a Successes and a Pending column.",
 		}),
 	}
 }

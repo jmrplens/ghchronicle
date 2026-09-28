@@ -294,7 +294,8 @@ func workElsewhere(b *builder) Panel {
 				"last sweep inside the range.",
 			PromDesc: "Prometheus keeps the repository only, so this is contributions per " +
 				"repository over the range, the share merged and the mean comments, with no " +
-				"Seen or Opened column, since an item's dates do not survive the exporter. " +
+				"Kind, State or Title column, and no Seen or Opened column, since an item's " +
+				"dates do not survive the exporter. " +
 				"Its Stars is the count the exporter holds at the end of the range, whenever " +
 				"the sweep that read it ran. " + sinceStart,
 			Overrides: []any{
@@ -377,7 +378,7 @@ func starsGiven(b *builder) []Panel {
 				"breakdown cannot say.",
 			PromDesc: "The exporter keeps the language of a star and not its repository, so in " +
 				"Prometheus a row is a language the account starred in, and Its stars the mean " +
-				"over the repositories starred in it. " + lastSweep,
+				"over the repositories starred in it, with no Repository or When column. " + lastSweep,
 			Overrides: []any{
 				when("When"), width("Language", 120), fullNameColumn(),
 				barCell(activityItsStars, "short", 120), linkOn("Repository"),

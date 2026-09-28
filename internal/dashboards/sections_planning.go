@@ -366,13 +366,18 @@ func discussionAndComments(b *builder) []Panel {
 			Opts:   Opts{"sort": "Comments"},
 			Desc: "Comments on issues and pull requests, in any repository. The ones outside " +
 				"this account are the half a sweep over one's own repositories cannot see.",
-			PromDesc:  sinceStart,
+			PromDesc:  sinceStart + " " + noElsewhereColumn,
 			Overrides: []any{barCell("Comments", "short", 120), fullNameColumn()},
 			GR:        commentsGR, GRTF: commentsGRtf, GRDesc: grRows + " " + grSlotCounts,
-			ES: commentsES, ESTF: commentsEStf,
+			ES: commentsES, ESTF: commentsEStf, ESDesc: noElsewhereColumn,
 		}),
 	}, answersGiven(b, perItem, grPerItem)...)
 }
+
+// noElsewhereColumn is why a store that counts comments per repository and
+// reads no flag beside the count has no Elsewhere column.
+const noElsewhereColumn = "There is no Elsewhere column here: the owner in each full name " +
+	"says whose repository it is."
 
 // answersGiven is the two tables over gh_discussion_comment: the comments of
 // the range per repository, and the ones left in other people's discussions
@@ -458,7 +463,8 @@ func answersGiven(b *builder, perItem, grPerItem string) []Panel {
 				"people's repositories: gh_discussion sees three rows inside this account, " +
 				"and this sees sixty six across twenty six repositories. Each comment counts " +
 				"once, however many rows a store holds of it, which Answers elsewhere explains.",
-			PromDesc:  sinceStart,
+			PromDesc: sinceStart + " The exporter keeps the mean answers and upvotes of a " +
+				"comment and not their sum, so there is no Accepted answers or Upvotes column.",
 			Overrides: []any{barCell("Comments", "short", 120), fullNameColumn()},
 			GR:        answersGR, GRTF: answersGRtf,
 			GRDesc: "Graphite has no rows: each series is one number, so this table keeps the " +
