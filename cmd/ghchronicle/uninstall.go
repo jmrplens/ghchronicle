@@ -205,6 +205,10 @@ func dataRemovals(ctx context.Context, cfg *config.Config, out io.Writer) ([]rem
 				drop: func(ctx context.Context) error { return store.Drop(ctx, item) },
 			})
 		}
+		if l, ok := store.(teardown.Lingerer); ok && len(l.Lingering()) > 0 {
+			fmt.Fprintf(out, "note: %s: deleted already, and purged by the server itself 24 hours after the "+
+				"delete, which refuses to be asked again sooner: %s\n", store.Name(), strings.Join(l.Lingering(), ", "))
+		}
 	}
 	return found, nil
 }

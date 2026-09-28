@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"time"
@@ -39,6 +40,8 @@ type influx struct {
 	// InfluxDB 2, which is asked in Flux rather than in SQL.
 	described string
 	v2        bool
+	// lingering is what the last Holds found deleted and not yet purged.
+	lingering []string
 }
 
 func (i *influx) Name() string { return "influxdb" }
@@ -46,27 +49,62 @@ func (i *influx) Name() string { return "influxdb" }
 // Holds asks the catalog rather than guessing. A table this wrote and no
 // longer writes is still in information_schema, which is the whole point of
 // asking: those are the ones an uninstall is for.
+//
+// A table InfluxDB 3 has already deleted is left out. The server renames it
+// to <name>-<instant>, keeps listing it and answering queries of it until it
+// purges it 24 hours later, and answers a delete of it with a 409 whether or
+// not hard_delete_at is sent (measured on 3.11.2). Listed, it was "removed"
+// on every uninstall and still there after. Lingering says which they are.
 func (i *influx) Holds(ctx context.Context) ([]string, error) {
-	const q = "SELECT table_name FROM information_schema.tables " +
-		"WHERE table_schema = 'iox' ORDER BY table_name"
-	endpoint := strings.TrimSuffix(i.sink.URL, "/") + "/api/v3/query_sql?" + url.Values{
-		"db": {i.sink.Bucket}, "q": {q}, "format": {"json"},
-	}.Encode()
-	body, _, err := i.call(ctx, http.MethodGet, endpoint, nil)
+	names, err := i.tables(ctx)
 	if err != nil {
 		return nil, err
 	}
+	var out []string
+	i.lingering = nil
+	for _, name := range names {
+		switch {
+		case !ours(name):
+		case softDeleted(name):
+			i.lingering = append(i.lingering, name)
+		default:
+			out = append(out, name)
+		}
+	}
+	return out, nil
+}
+
+// softDeleted says whether an InfluxDB 3 table name is one the server gave a
+// table it deleted: the name, a dash and the instant. Such a table is still
+// listed and still answers queries until the server purges it.
+func softDeleted(name string) bool {
+	i := strings.LastIndexByte(name, '-')
+	return i > 0 && asideStamp.MatchString(name[i:])
+}
+
+// asideStamp is the tail of the name InfluxDB 3 gives a table it deleted: a
+// dash and the instant, YYYYMMDDTHHMMSS in UTC (measured on 3.11.2). A copy
+// a migration keeps elsewhere is named the same way, in lower case in an
+// Elasticsearch index.
+var asideStamp = regexp.MustCompile(`^-(\d{8}[Tt]\d{6})$`)
+
+// Lingering is the tables of this project's that the last Holds found
+// deleted and not yet purged.
+func (i *influx) Lingering() []string { return i.lingering }
+
+// tables is every table of the database, sorted.
+func (i *influx) tables(ctx context.Context) ([]string, error) {
+	const q = "SELECT table_name FROM information_schema.tables " +
+		"WHERE table_schema = 'iox' ORDER BY table_name"
 	var rows []struct {
 		Name string `json:"table_name"`
 	}
-	if err = json.Unmarshal(body, &rows); err != nil {
+	if err := i.sql(ctx, q, &rows); err != nil {
 		return nil, fmt.Errorf("reading the table list: %w", err)
 	}
-	var out []string
+	out := make([]string, 0, len(rows))
 	for _, row := range rows {
-		if ours(row.Name) {
-			out = append(out, row.Name)
-		}
+		out = append(out, row.Name)
 	}
 	slices.Sort(out)
 	return out, nil

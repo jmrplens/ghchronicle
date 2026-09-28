@@ -35,6 +35,14 @@ type Store interface {
 	Drop(ctx context.Context, item string) error
 }
 
+// Lingerer is a store that keeps for a while what it was told to delete and
+// purges it itself, and refuses to be told again.
+type Lingerer interface {
+	// Lingering is what the last Holds found deleted and not yet purged,
+	// which Holds leaves out.
+	Lingering() []string
+}
+
 // Unsupported is a sink whose store cannot be emptied from here, with the
 // reason, which is worth printing: silence would read as nothing to remove.
 type Unsupported struct {

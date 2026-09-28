@@ -36,6 +36,14 @@ func (s *teardownStub) serve(t *testing.T) string {
 			target := r.URL.Path
 			if table := r.URL.Query().Get("table"); table != "" {
 				target = "table:" + table
+				// What InfluxDB 3.11.2 answers a delete of a table it has
+				// already deleted, which it lists under this name until it
+				// purges it.
+				if strings.Contains(table, "-2026") {
+					w.WriteHeader(http.StatusConflict)
+					_, _ = io.WriteString(w, "attempted to modify resource that was already deleted")
+					return
+				}
 			}
 			s.deleted = append(s.deleted, target)
 			return
@@ -129,6 +137,32 @@ func TestWithYesItActuallyRemoves(t *testing.T) {
 	}
 	if _, err := os.Stat(strings.TrimSuffix(cfg.StateFile, ".json") + "-written.bin"); !os.IsNotExist(err) {
 		t.Error("the dedupe ledger beside the state file was left behind")
+	}
+}
+
+// TestATableInfluxDBAlreadyDeletedIsNotReportedRemoved. InfluxDB 3 keeps a
+// table it deleted, renamed <name>-<instant>, for 24 hours, lists it with the
+// others and answers a delete of it with a 409, which Drop takes as the table
+// being gone. Listed, every uninstall said "removed" of a table that was still
+// there afterwards; a migration sets a table aside exactly that way. It is
+// said once as the server's to purge, and not offered.
+func TestATableInfluxDBAlreadyDeletedIsNotReportedRemoved(t *testing.T) {
+	t.Parallel()
+	s := &teardownStub{tables: []string{"gh_discussion_comment", "gh_discussion_comment-20260928T222330", "gh_repo"}}
+	cfg := teardownConfig(t, s.serve(t))
+	var said strings.Builder
+	if err := uninstall(t.Context(), cfg, targetData, true, &said); err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Join(s.deleted, " "); got != "table:gh_discussion_comment table:gh_repo" {
+		t.Errorf("deleted %q, want the two live tables alone", got)
+	}
+	if strings.Contains(said.String(), "removed gh_discussion_comment-20260928T222330") {
+		t.Errorf("it reported removed a table the server keeps:\n%s", said.String())
+	}
+	if !strings.Contains(said.String(), "purged by the server itself") ||
+		!strings.Contains(said.String(), "gh_discussion_comment-20260928T222330") {
+		t.Errorf("it does not say whose the deleted table is to purge:\n%s", said.String())
 	}
 }
 

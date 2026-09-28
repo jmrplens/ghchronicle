@@ -406,3 +406,23 @@ func TestBothWaysIntoPostgresAreOfferedSeparately(t *testing.T) {
 		t.Errorf("the sql sink said %q, want it to say rows already loaded are not its to remove", said)
 	}
 }
+
+// TestATableInfluxDBHasDeletedIsNotOffered: InfluxDB 3 lists a table it has
+// deleted, under <name>-<instant>, until it purges it, and refuses a delete
+// of it with a 409 that Drop would take as done. It is left out of what the
+// store holds and said to be lingering instead.
+func TestATableInfluxDBHasDeletedIsNotOffered(t *testing.T) {
+	t.Parallel()
+	s := &influxServer{tables: []string{"gh_repo", "gh_repo-20260928T222330", "gh_repo-2026", "payments-20260928T222330"}}
+	store := &influx{sink: s.start(t)}
+	held, err := store.Holds(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(held, ",") != "gh_repo,gh_repo-2026" {
+		t.Errorf("holds = %v, want the live tables alone", held)
+	}
+	if got := store.Lingering(); strings.Join(got, ",") != "gh_repo-20260928T222330" {
+		t.Errorf("lingering = %v", got)
+	}
+}
