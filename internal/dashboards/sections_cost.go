@@ -51,7 +51,7 @@ func cost(b *builder) []Panel {
 		` SUM(quantity) AS "Quantity", MAX(unit) AS "Unit",` +
 		` MAX(price_per_unit) AS "Price", SUM(net) AS "Net"` +
 		" FROM gh_billing_usage WHERE $__timeFilter(time) AND repo <> " + noneSQL +
-		" GROUP BY 1, full_name, 3 ORDER BY 2 DESC LIMIT 40"
+		" GROUP BY 1, full_name, 3 ORDER BY 2 DESC, full_name, 3 LIMIT 40"
 	minutes := "SELECT " + timeBin + ", sku AS series," +
 		" SUM(quantity) AS quantity FROM gh_billing_usage" +
 		" WHERE $__timeFilter(time) AND unit = 'Minutes' GROUP BY 1, 2 ORDER BY 1"
@@ -187,7 +187,7 @@ func cost(b *builder) []Panel {
 				` count AS "Entries" FROM (` +
 				"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn" +
 				" FROM gh_actions_cache WHERE $__timeFilter(time) AND " + RF +
-				") x WHERE rn = 1 ORDER BY 2 DESC",
+				") x WHERE rn = 1 ORDER BY 2 DESC, full_name",
 		)}, &P{
 			Prom: []Target{
 				promTbl(fmt.Sprintf("max by (full_name, repo) (github_actions_cache_size_bytes{%s})", PF), "A"),
@@ -294,7 +294,7 @@ func cacheEntries(b *builder) Panel {
 			"SELECT time, full_name, repo, cache, size_bytes, caches, days_since_use," +
 			" MAX(time) OVER (PARTITION BY full_name) AS newest" +
 			" FROM gh_actions_cache_entry WHERE $__timeFilter(time) AND " + RF +
-			") x WHERE time = newest GROUP BY 1, full_name, 3 ORDER BY 2 DESC LIMIT 25",
+			") x WHERE time = newest GROUP BY 1, full_name, 3 ORDER BY 2 DESC, 1, full_name LIMIT 25",
 	)}, &P{
 		Prom: []Target{
 			promTbl(fmt.Sprintf("topk(25, sum by (full_name, repo, cache) (github_actions_cache_entry_size_bytes{%s}))", PF), "A"),

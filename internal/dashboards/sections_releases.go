@@ -16,7 +16,7 @@ func releases(b *builder) []Panel {
 		` url AS "Page" FROM (` +
 		"SELECT repo, full_name, tag, downloads, url, ROW_NUMBER() OVER (PARTITION BY full_name, tag" +
 		" ORDER BY time DESC) AS rn FROM gh_release WHERE $__timeFilter(time) AND " + RF +
-		") x WHERE rn = 1 AND downloads > 0 ORDER BY 2 DESC LIMIT 12"
+		") x WHERE rn = 1 AND downloads > 0 ORDER BY 2 DESC, full_name, tag LIMIT 12"
 	// How many releases have been downloaded at all: the number beside the
 	// total, so the tile above it is not the only thing in its column. A
 	// release is a tag of a repository by its full name, as in the total.
@@ -37,7 +37,7 @@ func releases(b *builder) []Panel {
 		"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, tag, asset ORDER BY time DESC) AS rn" +
 		" FROM gh_release_asset WHERE $__timeFilter(time) AND " + RF + ") a" +
 		" LEFT JOIN (" + release + ") r ON r.full_name = a.full_name AND r.tag = a.tag AND r.rn = 1" +
-		" WHERE a.rn = 1 ORDER BY a.downloads DESC LIMIT 40"
+		" WHERE a.rn = 1 ORDER BY a.downloads DESC, a.full_name, a.tag, a.asset LIMIT 40"
 	rl, ra := "gh_release", "gh_release_asset"
 
 	// A release nobody has downloaded is left out, as the SQL stores' WHERE
@@ -163,7 +163,7 @@ func releases(b *builder) []Panel {
 				` MAX(url) AS "Download"` +
 				" FROM gh_release_asset WHERE $__timeFilter(time) AND " + RF +
 				" GROUP BY 1, 4, full_name, 5 HAVING MAX(downloads) > MIN(downloads)" +
-				" ORDER BY 2 DESC LIMIT 25",
+				" ORDER BY 2 DESC, full_name, 4, 1 LIMIT 25",
 		)}, &P{
 			PromNote: cannot("what each release asset gained across the range, as the "+
 				"difference of a cumulative counter.",

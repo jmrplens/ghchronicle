@@ -94,6 +94,34 @@ func TestCompareRows(t *testing.T) {
 	}
 }
 
+// TestOrderIsHeldOnlyWhereTheRowsAgree: two stores that draw the same rows
+// are held to one order, over the columns both draw, and two that draw
+// different rows are left to Compare.
+func TestOrderIsHeldOnlyWhereTheRowsAgree(t *testing.T) {
+	t.Parallel()
+	influx := table(col("Repository", "string", "someone/else", "another/project"), col("Comments", "number", 2.0, 0.0),
+		col("Kind", "string", "pull_request", "issue"))
+	postgres := table(col("Repository", "string", "another/project", "someone/else"), col("Comments", "number", 0.0, 2.0),
+		col("Kind", "string", "issue", "pull_request"))
+	if got := Order(influx, postgres, Likeness{}); !strings.Contains(got, `row 1 over [Repository Comments Kind] is ["someone/else" | 2 | "pull_request"]`) {
+		t.Errorf("the same two rows swapped: Order = %q", got)
+	}
+	if got := Order(influx, influx, Likeness{}); got != "" {
+		t.Errorf("one drawing against itself: Order = %q", got)
+	}
+	fewer := table(col("Repository", "string", "someone/else", "another/project"), col("Comments", "number", 2.0, 0.0))
+	if got := Order(postgres, fewer, Likeness{}); got == "" {
+		t.Error("the same rows in another order, over the columns both draw, read as one order")
+	}
+	other := table(col("Repository", "string", "another/project", "hello-world"), col("Comments", "number", 0.0, 2.0))
+	if got := Order(influx, other, Likeness{}); got != "" {
+		t.Errorf("different rows are Compare's to report, and Order = %q", got)
+	}
+	if got := Order(tiles(map[string]any{"Merged": 1.0}, ""), tiles(map[string]any{"Merged": 1.0}, ""), Likeness{}); got != "" {
+		t.Errorf("a stat has no rows to order, and Order = %q", got)
+	}
+}
+
 // TestLikenessIsWhatTheCallerAllows: a name as Graphite holds it and a number
 // that moved between two sweeps are the caller's to allow, and nothing else is.
 func TestLikenessIsWhatTheCallerAllows(t *testing.T) {

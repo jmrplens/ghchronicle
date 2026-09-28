@@ -36,7 +36,7 @@ func activity(b *builder) []Panel {
 	// side by side, PushEvent and IssueCommentEvent two greens. The three
 	// smallest were one or two pixels of arc, which no finger can hit.
 	byType := otherRows(`SELECT type AS "Type", SUM(events) AS "Events",`+
-		" ROW_NUMBER() OVER (ORDER BY SUM(events) DESC) AS rn FROM gh_event"+
+		" ROW_NUMBER() OVER (ORDER BY SUM(events) DESC, type) AS rn FROM gh_event"+
 		" WHERE $__timeFilter(time) GROUP BY 1", "Type", "Events", topSeriesKept)
 	// Ten bars and the rest folded: twenty labels in seven units of height
 	// could not be read at all.
@@ -46,14 +46,14 @@ func activity(b *builder) []Panel {
 	// given are mostly about other people's repositories, where a bare name
 	// identifies nothing and two owners using the same one become one row.
 	byRepo := otherRows(`SELECT full_name AS "Repository", SUM(events) AS "Events",`+
-		" ROW_NUMBER() OVER (ORDER BY SUM(events) DESC) AS rn FROM gh_event"+
+		" ROW_NUMBER() OVER (ORDER BY SUM(events) DESC, full_name) AS rn FROM gh_event"+
 		" WHERE $__timeFilter(time) GROUP BY 1", "Repository", "Events", 10)
 	notif := "SELECT " + timeBin + ", reason AS series," +
 		" SUM(notifications) AS notifications FROM gh_notification" +
 		" WHERE $__timeFilter(time) GROUP BY 1, 2 ORDER BY 1"
 	notifTbl := `SELECT reason AS "Reason", SUM(notifications) AS "Notifications",` +
 		` subject_type AS "Kind" FROM gh_notification` +
-		" WHERE $__timeFilter(time) GROUP BY 1, 3 ORDER BY 2 DESC LIMIT 25"
+		" WHERE $__timeFilter(time) GROUP BY 1, 3 ORDER BY 2 DESC, 1, 3 LIMIT 25"
 	// The threads themselves, newest first: the table above counts them by
 	// reason and the curve by day, and neither can open the comment that
 	// caused one. `notifications` is how many updates the thread had in the
@@ -61,7 +61,7 @@ func activity(b *builder) []Panel {
 	latest := `SELECT title AS "Title", time AS "Updated", full_name AS "Repository",` +
 		` subject_type AS "Kind", reason AS "Reason", notifications AS "Updates",` +
 		` url AS "Link"` +
-		" FROM gh_notification WHERE $__timeFilter(time) ORDER BY time DESC LIMIT 25"
+		" FROM gh_notification WHERE $__timeFilter(time) ORDER BY time DESC, full_name, subject_type, reason LIMIT 25"
 	ev, nt := "gh_event", "gh_notification"
 	notes := gp(nt, "notifications")
 
@@ -207,13 +207,18 @@ func workElsewhere(b *builder) Panel {
 	// the count as it stood then.
 	//
 	// The state is a tag, so an item has a row for each state it was seen in
-	// and the newest decides. Two of them at one instant cannot come from
-	// GitHub, whose searches for each state are disjoint and date a closed
-	// item when it closed; the containerised suite's fake answers every
-	// search with the same items, and InfluxDB and PostgreSQL then drew the
-	// one pull request as open and as closed, a different one each run. The
-	// state's name breaks such a tie the same way in both, and the way the
-	// Elasticsearch buckets, ordered by their key, already break it.
+	// and the newest decides. Two of those rows share an instant only when an
+	// item closed at the very midnight its last open row is stamped with,
+	// since GitHub's searches for each state are disjoint and date a closed
+	// item when it closed; the state's name makes the pick the same in both
+	// SQL stores then, as the Elasticsearch buckets, ordered by their key,
+	// already make it.
+	//
+	// The rows themselves tie on the instant as a rule: every item still
+	// open is stamped at the start of the day it was last seen, so all of
+	// them are one Seen, and the order among them was whatever each store's
+	// sort left, which was not the same in InfluxDB and PostgreSQL. The
+	// item's own identity breaks that tie.
 	external := `SELECT x.full_name AS "Repository", ` + agoSQL("x.time", "x.seconds_open") + ` AS "Opened",` +
 		` x.time AS "Seen", x.kind AS "Kind",` +
 		` x.state AS "State", x.title AS "Title", u.stars AS "Stars", x.comments AS "Comments",` +
@@ -222,7 +227,7 @@ func workElsewhere(b *builder) Panel {
 		" FROM gh_external_contribution WHERE $__timeFilter(time)) x" +
 		" LEFT JOIN (SELECT full_name, stars, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn" +
 		" FROM gh_upstream_repo WHERE $__timeFilter(time)) u ON u.full_name = x.full_name AND u.rn = 1" +
-		" WHERE x.rn = 1 ORDER BY x.time DESC LIMIT 40"
+		" WHERE x.rn = 1 ORDER BY x.time DESC, x.full_name, x.kind, x.number LIMIT 40"
 	ec := "gh_external_contribution"
 	extGR, extGRtf := gTbl(rowsOf(gp(ec, "comments"), gn(ec, "full_name"), gn(ec, "kind"),
 		gn(ec, "number"), gn(ec, "state")),
@@ -327,7 +332,7 @@ func starsGiven(b *builder) []Panel {
 		panel("barchart", "Languages starred", box{W: 12, H: 8, X: 0, Y: 40}, []Target{sqlT(
 			`SELECT language AS "Language", COUNT(*) AS "Stars given"` +
 				" FROM gh_star_given WHERE $__timeFilter(time) AND language <> ''" +
-				" GROUP BY 1 ORDER BY 2 DESC LIMIT 12",
+				" GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT 12",
 		)}, &P{
 			Prom: []Target{promTbl(
 				"topk(12, sum by (language) (increase(github_stars_given_total[$__range])))",
@@ -346,7 +351,7 @@ func starsGiven(b *builder) []Panel {
 				` language AS "Language", repo_stars AS "Its stars",` +
 				` url AS "Link"` +
 				" FROM gh_star_given WHERE $__timeFilter(time)" +
-				" ORDER BY time DESC LIMIT 25",
+				" ORDER BY time DESC, full_name LIMIT 25",
 		)}, &P{
 			Prom: []Target{promTbl("topk(25, github_stars_given_repo_stars_mean)")},
 			PromTF: []any{organize(map[string]string{

@@ -271,6 +271,55 @@ func TestTheStoresDrawTheSameValues(t *testing.T) {
 	}
 }
 
+// TestTheSQLStoresDrawTheRowsInOneOrder holds InfluxDB and PostgreSQL to the
+// order of what they draw, which the comparison above leaves out: they run one
+// statement, translated between dialects, over the rows of one sweep, so a
+// table or a bar chart they draw with the same rows draws them in the order
+// the statement gives. Where it gives none, each store's sort breaks the tie
+// its own way. Measured on the 2.6.2 branch before the statements named their
+// tie-breakers, twelve and then eleven of the 49 panels both stores draw with
+// more than one row drew the same rows in another order on two runs: two open
+// items elsewhere, two authors with one pull request each and two ecosystems
+// of one repository among them.
+func TestTheSQLStoresDrawTheRowsInOneOrder(t *testing.T) {
+	s := Start(t)
+	run := dashboardsRun(t, s)
+	drift := sweepDrift(run.sweeps)
+	apart := askedApart(run, "influxdb", "postgres")
+	held := 0
+	for _, index := range slices.Sorted(maps.Keys(run.outcomes["influxdb"])) {
+		pictures := dashboardPictures(t, run, index)
+		a, okA := pictures["influxdb"]
+		b, okB := pictures["postgres"]
+		if !okA || !okB {
+			continue
+		}
+		sql := dashboardPanelSQL(run, index)
+		slack, fromNow := columnSlack(sql, drift), nowColumns(sql)
+		like := grafana.Likeness{Slack: func(name string) float64 {
+			if fromNow[name] {
+				return max(slack[name], apart)
+			}
+			return slack[name]
+		}}
+		if diff := grafana.Order(&a, &b, like); diff != "" {
+			t.Errorf("panel %d %q draws the same rows in another order in InfluxDB and PostgreSQL, "+
+				"so its ORDER BY leaves a tie to each store's sort: %s", index, dashboardPanelTitle(run, index), diff)
+		}
+		if len(a.Columns) > 0 && len(a.Columns[0].Values) > 1 {
+			held++
+		}
+	}
+	t.Logf("%d tables and bar charts of more than one row were drawn by both SQL stores", held)
+	// A floor rather than a count, so a change that stops drawing tables in
+	// both stores fails instead of passing with nothing held. Measured at 49
+	// on the 2.6.2 branch.
+	if held < 30 {
+		t.Errorf("only %d tables and bar charts of more than one row were drawn by both SQL stores, "+
+			"which is too few for this to have held anything", held)
+	}
+}
+
 // rawFieldName is a name a datasource gives a field that the panel is meant
 // to give another: an Elasticsearch bucket's field, a metric as the response
 // parser names it, a Prometheus value column, the metric name label. The

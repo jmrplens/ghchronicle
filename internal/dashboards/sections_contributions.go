@@ -60,9 +60,9 @@ func contributionTotals(b *builder) []Panel {
 	// name, so the window partitions by `full_name`: the newest row is picked
 	// per repository and not per name.
 	byRepo := `SELECT repo AS "Repository", commits AS "Commits", url AS "Link" FROM (` +
-		"SELECT repo, commits, url, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn" +
+		"SELECT repo, full_name, commits, url, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn" +
 		" FROM gh_contribution_repo WHERE $__timeFilter(time) AND kind = 'commits') x WHERE rn = 1" +
-		" ORDER BY 2 DESC LIMIT 25"
+		" ORDER BY 2 DESC, full_name LIMIT 25"
 	totals := `SELECT commits AS "Commits", pull_requests AS "Pull requests",` +
 		` reviews AS "Reviews", issues AS "Issues", repositories AS "New repositories",` +
 		` restricted AS "Private" FROM gh_contributions_total` +
@@ -248,7 +248,7 @@ func punchCards(b *builder) (hour, day Panel) {
 			node, name, node, RF, order)
 	}
 	byHour := punchSQL("hour", "Hour", "1")
-	byDay := punchSQL("weekday", "Weekday", "2 DESC")
+	byDay := punchSQL("weekday", "Weekday", "2 DESC, 1")
 
 	punchcardWhy := "The exporter skips `gh_commit_punchcard`: on an account with eighteen " +
 		"repositories it is 1,217 series, four fifths of the whole exporter, for " +
@@ -344,7 +344,7 @@ func commitsPerRepository(b *builder) []Panel {
 		` WHEN own = 'true' THEN 'Yours, public'` +
 		` ELSE 'Somebody else''s, public' END AS "Where",` +
 		` SUM(commits) AS "Commits" FROM ` + dayRepo +
-		" WHERE $__timeFilter(time) GROUP BY 1 ORDER BY 2 DESC"
+		" WHERE $__timeFilter(time) GROUP BY 1 ORDER BY 2 DESC, 1"
 
 	why := "The exporter skips `gh_contribution_day_repo` for the reason it skips " +
 		"`gh_contribution_day`: it is history with no current value, and counting it would " +

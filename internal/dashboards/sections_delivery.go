@@ -16,8 +16,10 @@ const deliveryNewestRow = ") x WHERE rn = 1"
 // deliveryIdlestFirst orders the three tables whose second column is how long
 // something has sat untouched, a deploy key unused, an environment unchanged
 // or a branch without a commit, with the longest first: that is the one a
-// reader removes or asks about.
-const deliveryIdlestFirst = " ORDER BY 2 DESC"
+// reader removes or asks about. Two of them untouched for as long are told
+// apart by what the row is, which each table names, or each store's sort
+// breaks the tie its own way.
+func deliveryIdlestFirst(identity string) string { return " ORDER BY 2 DESC, " + identity }
 
 // What the columns of this section are called wherever they are read. The same
 // name has to reach the panel from all five stores, since the overrides, the
@@ -64,7 +66,7 @@ func webhookDeliveries(b *builder) []Panel {
 		` SUM(CASE WHEN redelivery THEN 1 ELSE 0 END) AS "Retried",` +
 		` median(CAST(duration_seconds AS DOUBLE)) AS "Latency"` +
 		" FROM gh_webhook_delivery WHERE $__timeFilter(time) AND " + RF +
-		" GROUP BY 1, full_name, 4 ORDER BY 2 DESC, 3 DESC LIMIT 25"
+		" GROUP BY 1, full_name, 4 ORDER BY 2 DESC, 3 DESC, 1, full_name LIMIT 25"
 	overTime := "SELECT " + timeBin + ", code AS series," +
 		" COUNT(*) AS n FROM gh_webhook_delivery WHERE $__timeFilter(time) AND " + RF +
 		" GROUP BY 1, 2 ORDER BY 1"
@@ -172,12 +174,12 @@ func accessConfiguration(b *builder) []Panel {
 		` days_since_change AS "Last changed", url AS "Link" FROM (` +
 		"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, ruleset ORDER BY time DESC) AS rn" +
 		" FROM gh_ruleset WHERE $__timeFilter(time) AND " + RF + deliveryNewestRow +
-		" ORDER BY 1, 2"
+		" ORDER BY 1, 2, full_name"
 	keys := `SELECT repo AS "Repository", days_since_use AS "Unused for", key AS "Key",` +
 		` read_only AS "Read only" FROM (` +
 		"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, key ORDER BY time DESC) AS rn" +
 		" FROM gh_deploy_key WHERE $__timeFilter(time) AND " + RF + deliveryNewestRow +
-		deliveryIdlestFirst
+		deliveryIdlestFirst("full_name, key")
 	rs, dk := "gh_ruleset", "gh_deploy_key"
 
 	rulesGR, rulesGRtf := gTbl(rowsOf(rp(rs, "days_since_change"), gn(rs, "repo"),
@@ -297,7 +299,7 @@ func accessConfiguration(b *builder) []Panel {
 				"SELECT full_name, repo, host, hook, active, events, ROW_NUMBER() OVER (" +
 				"PARTITION BY full_name, hook, host ORDER BY time DESC) AS rn FROM gh_webhook" +
 				" WHERE $__timeFilter(time) AND " + RF + deliveryNewestRow +
-				" GROUP BY full_name, 1, 2, 3, 4 ORDER BY 1, 2",
+				" GROUP BY full_name, 1, 2, 3, 4 ORDER BY 1, 2, full_name, 3, 4",
 		)}, &P{
 			Prom: []Target{promTbl(fmt.Sprintf(
 				"max by (full_name, repo, host, hook, active) (github_webhook_events{%s})", PF,
@@ -326,7 +328,7 @@ func accessConfiguration(b *builder) []Panel {
 				` repo AS "Repository", url AS "Link" FROM (` +
 				"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, environment" +
 				" ORDER BY time DESC) AS rn FROM gh_environment" + ciInRange + RF +
-				deliveryNewestRow + deliveryIdlestFirst,
+				deliveryNewestRow + deliveryIdlestFirst("1, full_name"),
 		)}, &P{
 			Prom: []Target{promTbl(fmt.Sprintf(
 				"min by (full_name, repo, environment) (github_environment_days_since_change{%s})", PF,
@@ -393,7 +395,7 @@ func branchesAndProtections(b *builder) []Panel {
 		" FROM gh_branch WHERE $__timeFilter(time) AND " + RF + ") b" +
 		repoFlagsJoin("b") +
 		" WHERE b.rn = 1 AND " + notAFork + " AND " + notArchived +
-		deliveryIdlestFirst
+		deliveryIdlestFirst("b.full_name, 1")
 	protections := `SELECT repo AS "Repository", pattern AS "Pattern",` +
 		` required_reviews AS "Reviews",` +
 		` CAST(requires_commit_signatures AS INT) AS "Signatures",` +
@@ -403,13 +405,13 @@ func branchesAndProtections(b *builder) []Panel {
 		` required_checks AS "Checks", url AS "Link" FROM (` +
 		"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, pattern ORDER BY time DESC) AS rn" +
 		" FROM gh_branch_protection WHERE $__timeFilter(time) AND " + RF + deliveryNewestRow +
-		" ORDER BY 1, 2"
+		" ORDER BY 1, 2, full_name"
 	ruleRows := `SELECT rule AS "Rule", bypass_always AS "Always", repo AS "Repository",` +
 		` ruleset AS "Ruleset", bypass_actors AS "Bypass actors",` +
 		` bypass_sampled AS "Sampled" FROM (` +
 		"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, ruleset, rule ORDER BY time DESC) AS rn" +
 		" FROM gh_ruleset_rule WHERE $__timeFilter(time) AND " + RF + deliveryNewestRow +
-		" ORDER BY 2 DESC, 3, 4, 1"
+		" ORDER BY 2 DESC, 3, 4, 1, full_name"
 	branchGR, branchGRtf := gTbl(rowsOf(rp(gb, "days_since_commit"),
 		gn(gb, "repo"), gn(gb, "branch"), gn(gb, "is_default")),
 		"Repository, branch, default", []col{{"lastNotNull", "Idle"}})
@@ -601,7 +603,7 @@ func rulesetChanges(b *builder) Panel {
 	versions := `SELECT ruleset AS "Ruleset", time AS "Date", repo AS "Repository",` +
 		` target AS "Target", actor_type AS "Actor", url AS "Link"` +
 		" FROM gh_ruleset_version WHERE $__timeFilter(time) AND " + RF +
-		" ORDER BY time DESC LIMIT 200"
+		" ORDER BY time DESC, full_name, ruleset LIMIT 200"
 	// Graphite has no rows and no dates to list by, so the versions become a
 	// count per ruleset and actor type, named from the path.
 	verGR, verGRtf := gTbl(fmt.Sprintf(`sortBy(%s, "sum", true)`,
@@ -724,7 +726,7 @@ func deploymentsToEnvironments(b *builder) []Panel {
 		// url is what the newest deployment put live, when it put anything.
 		` MAX(url) AS "Link", MAX(environment_url) AS "Live"` +
 		" FROM gh_deployment WHERE $__timeFilter(time) AND " + RF +
-		" GROUP BY 1, full_name, 3 ORDER BY 2 DESC"
+		" GROUP BY 1, full_name, 3 ORDER BY 2 DESC, 1, full_name"
 
 	// The outcome is a bucket in Elasticsearch, so the pending deployments
 	// are rows of their own there rather than a column. Graphite keeps no

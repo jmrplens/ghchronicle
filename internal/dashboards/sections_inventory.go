@@ -55,7 +55,7 @@ func repositoryList(b *builder) []Panel {
 	langs := `SELECT language AS "Language", SUM(bytes) AS "Bytes" FROM (` +
 		"SELECT language, bytes, ROW_NUMBER() OVER (PARTITION BY full_name, language" +
 		" ORDER BY time DESC) AS rn FROM gh_repo_language WHERE $__timeFilter(time) AND " + RF +
-		") x WHERE rn = 1 GROUP BY 1 ORDER BY 2 DESC LIMIT 12"
+		") x WHERE rn = 1 GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT 12"
 	repoFields := []string{
 		"language", "stars", "forks", "network", "open_issues", "watchers",
 		"size_kb", "age_days", "days_since_push", "visibility", "license", "url",
@@ -66,7 +66,7 @@ func repositoryList(b *builder) []Panel {
 		` size_kb AS "Size", age_days AS "Age", days_since_push AS "Idle",` +
 		` visibility AS "Visibility", license AS "License",` +
 		` url AS "Link"` +
-		" FROM (" + latestPerRepo(repoFields) + ") ORDER BY stars DESC"
+		" FROM (" + latestPerRepo(repoFields) + ") ORDER BY stars DESC, full_name"
 	// The six boxes the score is made of, which are stored and were shown
 	// nowhere: eight of thirty-five repositories have no license, which the
 	// percentage alone does not say. Five of them are GitHub's own flags.
@@ -95,7 +95,7 @@ func repositoryList(b *builder) []Panel {
 		" ORDER BY time DESC) AS rn FROM gh_repo_community WHERE $__timeFilter(time) AND " + RF +
 		") c LEFT JOIN (SELECT full_name, issue_templates, ROW_NUMBER() OVER (PARTITION BY full_name" +
 		" ORDER BY time DESC) AS rn FROM gh_repo_policy WHERE $__timeFilter(time) AND " + RF +
-		") p ON p.full_name = c.full_name AND p.rn = 1 WHERE c.rn = 1 ORDER BY 2 DESC"
+		") p ON p.full_name = c.full_name AND p.rn = 1 WHERE c.rn = 1 ORDER BY 2 DESC, c.full_name"
 	repoBy := "full_name, repo, language, visibility, license"
 	repoCols := []named{
 		{"stars", "Stars"},
@@ -275,20 +275,20 @@ func whatTheyPublish(b *builder) []Panel {
 	topics := `SELECT topic AS "Topic", COUNT(DISTINCT full_name) AS "Repositories",` +
 		` url AS "Link"` +
 		" FROM gh_repo_topic WHERE $__timeFilter(time) AND " + RF +
-		" GROUP BY 1, 3 ORDER BY 2 DESC LIMIT 30"
+		" GROUP BY 1, 3 ORDER BY 2 DESC, 1, 3 LIMIT 30"
 	packages := `SELECT package AS "Package", versions AS "Versions", type AS "Type",` +
 		` tagged_versions AS "Tagged",` +
 		` days_since_update AS "Idle", url AS "Link" FROM (` +
 		"SELECT *, ROW_NUMBER() OVER (PARTITION BY package, type ORDER BY time DESC) AS rn" +
-		" FROM gh_package WHERE $__timeFilter(time)) x WHERE rn = 1 ORDER BY 2 DESC"
+		" FROM gh_package WHERE $__timeFilter(time)) x WHERE rn = 1 ORDER BY 2 DESC, 1, 3"
 	gists := `SELECT gist AS "Gist", description AS "Description", files AS "Files",` +
 		` comments AS "Comments", size_bytes AS "Size",` +
 		` days_since_update AS "Idle", url AS "Link" FROM (` +
 		"SELECT *, ROW_NUMBER() OVER (PARTITION BY gist ORDER BY time DESC) AS rn" +
-		" FROM gh_gist WHERE $__timeFilter(time)) x WHERE rn = 1 ORDER BY 6 LIMIT 25"
+		" FROM gh_gist WHERE $__timeFilter(time)) x WHERE rn = 1 ORDER BY 6, 1 LIMIT 25"
 	tags := `SELECT package AS "Package", time AS "Published", tag AS "Tag",` +
 		` url AS "Link"` +
-		" FROM gh_package_version WHERE $__timeFilter(time) ORDER BY time DESC LIMIT 30"
+		" FROM gh_package_version WHERE $__timeFilter(time) ORDER BY time DESC, package, tag LIMIT 30"
 	rt, pk, gs, pv := "gh_repo_topic", "gh_package", "gh_gist", "gh_package_version"
 
 	topicsGR, topicsGRtf := gTbl(fmt.Sprintf(
@@ -510,7 +510,7 @@ func settingsAndKeys(b *builder) []Panel {
 				` url AS "Link" FROM (` +
 				"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn" +
 				" FROM gh_repo_policy" + ciInRange + RF + deliveryNewestRow +
-				" ORDER BY 1",
+				" ORDER BY 1, full_name",
 		)}, &P{
 			Prom: []Target{
 				promTbl(fmt.Sprintf("max by (full_name, repo) (github_repo_policy_security_policy{%s})", PF), "A"),
@@ -575,7 +575,7 @@ func settingsAndKeys(b *builder) []Panel {
 		// expression, and twelve of them in seven units of height were cut off.
 		panel("barchart", "Dependencies by license", box{W: 12, H: 7, X: 12, Y: 43}, []Target{sqlT(
 			otherRows(`SELECT license AS "License", SUM(packages) AS "Packages",`+
-				" ROW_NUMBER() OVER (ORDER BY SUM(packages) DESC) AS rn FROM ("+
+				" ROW_NUMBER() OVER (ORDER BY SUM(packages) DESC, license) AS rn FROM ("+
 				"SELECT license, packages, ROW_NUMBER() OVER (PARTITION BY full_name, license"+
 				" ORDER BY time DESC) AS rn FROM gh_dependency_license"+
 				ciInRange+RF+") x WHERE rn = 1"+
@@ -625,7 +625,7 @@ func settingsAndKeys(b *builder) []Panel {
 				" FROM gh_repo WHERE $__timeFilter(time) AND " + RF + " GROUP BY full_name, repo" +
 				" HAVING COUNT(DISTINCT visibility) > 1 OR COUNT(DISTINCT archived) > 1" +
 				" OR COUNT(DISTINCT default_branch) > 1 OR COUNT(DISTINCT license) > 1" +
-				" OR COUNT(DISTINCT language) > 1 ORDER BY 1",
+				" OR COUNT(DISTINCT language) > 1 ORDER BY 1, full_name",
 		)}, &P{
 			PromNote: cannot("the repositories whose visibility, archived flag, default branch, "+
 				"license or main language changed inside the range, counted as "+
@@ -687,11 +687,11 @@ func policyAndDependencies(b *builder) []Panel {
 	policy := `SELECT repo AS "Repository", file AS "File",` +
 		` CAST(present AS INT) AS "Present", path AS "Path",` +
 		` changes AS "Changes", url AS "Link" FROM (` +
-		"SELECT repo, file, present, path, changes, url," +
+		"SELECT repo, full_name, file, present, path, changes, url," +
 		" ROW_NUMBER() OVER (PARTITION BY full_name, file ORDER BY time DESC) AS rn" +
 		// The missing files first: ordered by repository the table showed six
 		// rows of whichever repository sorts first, out of 228.
-		" FROM " + pf + " " + everSince + ") x WHERE rn = 1 ORDER BY 3, 1, 2"
+		" FROM " + pf + " " + everSince + ") x WHERE rn = 1 ORDER BY 3, 1, 2, full_name"
 	// `interval` is a type name in PostgreSQL and a keyword in DataFusion, so
 	// the tag is quoted here rather than left to toPG, whose list of reserved
 	// words this one is not on.
@@ -707,14 +707,14 @@ func policyAndDependencies(b *builder) []Panel {
 	// is what makes that reachable, so the two go together.
 	ecosystems := `SELECT repo AS "Repository", blocks AS "Blocks", ecosystem AS "Ecosystem",` +
 		` "interval" AS "Interval" FROM (` +
-		`SELECT repo, ecosystem, "interval", blocks, time,` +
+		`SELECT repo, full_name, ecosystem, "interval", blocks, time,` +
 		" MAX(time) OVER (PARTITION BY full_name) AS newest" +
-		" FROM " + de + " " + everSince + ") x WHERE time = newest ORDER BY 1, 2"
+		" FROM " + de + " " + everSince + ") x WHERE time = newest ORDER BY 1, 2, full_name, 3, 4"
 	packages := `SELECT ecosystem AS "Ecosystem", SUM(packages) AS "Packages" FROM (` +
 		"SELECT ecosystem, packages, ROW_NUMBER() OVER (PARTITION BY full_name, ecosystem" +
 		" ORDER BY time DESC) AS rn FROM " + dep +
 		ciInRange + RF + ") x WHERE rn = 1" +
-		" GROUP BY 1 ORDER BY 2 DESC LIMIT 12"
+		" GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT 12"
 	// Summed, not deduplicated: see the note on the function.
 	changes := "SELECT " + timeBin + ", change AS series," +
 		" SUM(packages) AS packages FROM " + dc +

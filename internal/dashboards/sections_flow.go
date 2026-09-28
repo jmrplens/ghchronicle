@@ -328,15 +328,15 @@ func pullsAndReviewers(b *builder) []Panel {
 		` changed_files AS "Files", reviews AS "Reviews", seconds_to_merge AS "Time to merge",` +
 		` url AS "Link"` +
 		flowFromPulls + RF + " AND " + identified +
-		" AND state = 'MERGED' ORDER BY churn DESC LIMIT 25"
+		" AND state = 'MERGED' ORDER BY churn DESC, full_name, number LIMIT 25"
 	authors := `SELECT author AS "Author", COUNT(*) AS "Pull requests"` +
 		flowFromPulls + RF + " AND " + identified +
-		" GROUP BY 1 ORDER BY 2 DESC LIMIT 15"
+		" GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT 15"
 	byRepo := `SELECT repo AS "Repository", COUNT(*) AS "Merged",` +
 		` median(CAST(seconds_to_merge AS DOUBLE)) AS "Time to merge",` +
 		` median(CAST(churn AS DOUBLE)) AS "Lines changed"` +
 		flowFromPulls + RF + " AND " + identified +
-		" AND state = 'MERGED' GROUP BY full_name, repo ORDER BY 2 DESC"
+		" AND state = 'MERGED' GROUP BY full_name, repo ORDER BY 2 DESC, full_name"
 	// Who is a reviewer: a bot is named as one, and an author answering a
 	// review on their own pull request is not reviewing it, so those rows
 	// read "own" rather than the reviewer's login. Otherwise the busiest
@@ -346,7 +346,7 @@ func pullsAndReviewers(b *builder) []Panel {
 	reviewers := `SELECT ` + who + ` AS "Reviewer", COUNT(*) AS "Reviews",` +
 		` median(CAST(seconds_to_review AS DOUBLE)) AS "Wait"` +
 		" FROM gh_pull_request_review WHERE $__timeFilter(time) AND " + RF +
-		" GROUP BY 1 ORDER BY 2 DESC LIMIT 20"
+		" GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT 20"
 	reviewsDay := flowSelect + timeBin + ", " + who + flowSeriesAlias +
 		" COUNT(*) AS reviews FROM gh_pull_request_review WHERE $__timeFilter(time)" +
 		" AND " + RF + flowByBucketAndSeries
@@ -524,7 +524,7 @@ func reviewDebt(b *builder) []Panel {
 		` SUM(outdated * (1 - resolved)) AS "Outdated",` +
 		` SUM(comments * (1 - resolved)) AS "Comments"` +
 		" FROM gh_review_thread WHERE $__timeFilter(time) AND " + RF +
-		" GROUP BY 1, full_name, 3 ORDER BY 2 DESC LIMIT 25"
+		" GROUP BY 1, full_name, 3 ORDER BY 2 DESC, full_name, 1 LIMIT 25"
 
 	// `comments` is on every thread, so counting the points of that leaf is
 	// one point per thread; `resolved` is the flag the debt is computed from.
@@ -651,7 +651,7 @@ func stillOpen(b *builder) []Panel {
 		flowFromPulls + RF + " AND " + identified +
 		") x" + repoFlagsJoin("x") +
 		" WHERE x.rn = 1 AND x.state = 'OPEN' AND " + notArchived +
-		fmt.Sprintf(" ORDER BY x.seconds_open DESC LIMIT %d", openLongest)
+		fmt.Sprintf(" ORDER BY x.seconds_open DESC, x.full_name, x.number LIMIT %d", openLongest)
 	// The twin for issues, read the same way: until this table no issue was
 	// reachable by unit from any panel, only counted. `label_names` is the
 	// field the collector writes for what the issue is about, which is what
@@ -663,7 +663,7 @@ func stillOpen(b *builder) []Panel {
 		" FROM gh_issue WHERE $__timeFilter(time) AND " + RF + " AND " + identified +
 		") x" + repoFlagsJoin("x") +
 		" WHERE x.rn = 1 AND x.state = 'OPEN' AND " + notArchived +
-		fmt.Sprintf(" ORDER BY x.seconds_open DESC LIMIT %d", openLongest)
+		fmt.Sprintf(" ORDER BY x.seconds_open DESC, x.full_name, x.number LIMIT %d", openLongest)
 
 	openGR, openGRtf := gTbl(fmt.Sprintf(`limit(sortBy(%s, "max", true), %d)`,
 		grGroupBy(rp("gh_pull_request", "seconds_open", "state", "OPEN"), "gh_pull_request", "max", "repo", "number"),

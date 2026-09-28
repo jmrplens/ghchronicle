@@ -165,7 +165,7 @@ func lifetime(b *builder) []Panel {
 		"SELECT time, full_name, repo, commits, fork, archived, pulls_merged, issues," +
 		" releases, stars, branches, tags, url" +
 		" FROM gh_repo_total WHERE $__timeFilter(time) AND " + RFA +
-		") f) x WHERE rn = 1 ORDER BY 2 DESC"
+		") f) x WHERE rn = 1 ORDER BY 2 DESC, full_name"
 	twins := everyRepositoryTwins(b)
 
 	// The two dated measurements on the row below sit years outside any range a
@@ -176,7 +176,7 @@ func lifetime(b *builder) []Panel {
 	const everSince = " WHERE " + wholeHistory
 	created := `SELECT repo AS "Repository", time AS "Created", fork AS "Fork",` +
 		` private AS "Private", url AS "Link" FROM gh_repo_created` + everSince +
-		" ORDER BY time DESC"
+		" ORDER BY time DESC, full_name"
 	// No repository filter, in any store: the $repo variable lists the
 	// repositories a sweep collects, and these rows are the ones the filter
 	// set aside, so "All" would name none of them and the table would be
@@ -184,7 +184,7 @@ func lifetime(b *builder) []Panel {
 	// store, none on the panel, until the filter came off.
 	archived := `SELECT repo AS "Repository", time AS "Archived",` +
 		` age_days_at_archive AS "Age at archive", url AS "Link"` +
-		" FROM gh_repo_archived" + everSince + " ORDER BY time DESC"
+		" FROM gh_repo_archived" + everSince + " ORDER BY time DESC, full_name"
 	// gh_workflow_run_total is current state rewritten on every sweep, so the
 	// newest row per repository is the count; adding the range up would
 	// multiply it by however many sweeps landed in the range.
@@ -192,7 +192,7 @@ func lifetime(b *builder) []Panel {
 	// were seven pixels each and overlapped. A repository is a bar by its full
 	// name and named by repoNameSQL, since the fold groups by the label.
 	runsEver := otherRows(`SELECT `+repoNameSQL+` AS "Repository", runs AS "Runs",`+
-		" ROW_NUMBER() OVER (ORDER BY runs DESC) AS rn FROM ("+
+		" ROW_NUMBER() OVER (ORDER BY runs DESC, full_name) AS rn FROM ("+
 		"SELECT repo, full_name, runs, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn"+
 		" FROM gh_workflow_run_total WHERE $__timeFilter(time) AND "+RF+
 		") x WHERE rn = 1", "Repository", "Runs", 10)
@@ -402,7 +402,7 @@ func collectorSection(b *builder) []Panel {
 		" WHERE ever > 0 ORDER BY 1"
 	tableQ := `SELECT resource AS "Bucket", MAX(used) AS "Most used", MAX(limit) AS "Limit",` +
 		` MIN(remaining) AS "Lowest remaining"` +
-		" FROM gh_rate_limit WHERE $__timeFilter(time) GROUP BY 1 ORDER BY 2 DESC"
+		" FROM gh_rate_limit WHERE $__timeFilter(time) GROUP BY 1 ORDER BY 2 DESC, 1"
 	rl := "gh_rate_limit"
 
 	// The extremes of the range in every store, as the SQL takes them. The
@@ -441,10 +441,10 @@ func collectorSection(b *builder) []Panel {
 	ranQ := `SELECT family AS "Family", SUM(failed) AS "Failures", reason AS "Why",` +
 		` COUNT(*) AS "Sweeps", MAX(repos) AS "Repositories"` +
 		" FROM " + cf + " WHERE $__timeFilter(time) AND scope = 'family'" +
-		" GROUP BY 1, 3 ORDER BY 2 DESC, 1"
+		" GROUP BY 1, 3 ORDER BY 2 DESC, 1, 3"
 	lostQ := `SELECT time AS "When", family AS "Family", repo AS "Repository",` +
 		` reason AS "Why", error AS "What GitHub said" FROM ` + cf +
-		" WHERE $__timeFilter(time) AND scope = 'repo' ORDER BY time DESC LIMIT 100"
+		" WHERE $__timeFilter(time) AND scope = 'repo' ORDER BY time DESC, family, full_name, reason LIMIT 100"
 
 	ranGR, ranGRtf := gTbl(rowsOf(gp(cf, "failed", "scope", scopeFamilyTag),
 		gn(cf, "family"), gn(cf, "reason")),

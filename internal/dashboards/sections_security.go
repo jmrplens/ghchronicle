@@ -116,11 +116,11 @@ func openAlerts(b *builder) []Panel {
 	bySev := `SELECT severity AS "Severity", SUM(open) AS "Open alerts" FROM (` +
 		"SELECT severity, open, ROW_NUMBER() OVER (PARTITION BY full_name, severity, ecosystem" +
 		" ORDER BY time DESC) AS rn FROM gh_dependabot_alert WHERE $__timeFilter(time) AND " + RF +
-		") x WHERE rn = 1 GROUP BY 1 ORDER BY 2 DESC"
+		") x WHERE rn = 1 GROUP BY 1 ORDER BY 2 DESC, 1"
 	byEco := `SELECT ecosystem AS "Ecosystem", SUM(open) AS "Open alerts" FROM (` +
 		"SELECT ecosystem, open, ROW_NUMBER() OVER (PARTITION BY full_name, severity, ecosystem" +
 		" ORDER BY time DESC) AS rn FROM gh_dependabot_alert WHERE $__timeFilter(time) AND " + RF +
-		") x WHERE rn = 1 GROUP BY 1 ORDER BY 2 DESC"
+		") x WHERE rn = 1 GROUP BY 1 ORDER BY 2 DESC, 1"
 	// The newest reading of each repository's feature, not the largest of the
 	// range: MAX(enabled) read a feature switched off inside the range as on,
 	// and MAX(open_alerts) an alert fixed inside it as still open, which is
@@ -131,7 +131,7 @@ func openAlerts(b *builder) []Panel {
 		` url AS "Link" FROM (` +
 		"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, feature ORDER BY time DESC) AS rn" +
 		securityFrom + "gh_security_feature" + ciInRange + RF + deliveryNewestRow +
-		" ORDER BY 1, 2"
+		" ORDER BY 1, 2, full_name"
 	// A snapshot per repository, severity and ecosystem: the value of a
 	// bucket is the newest row of each series inside it, and the severity's
 	// line is those added up. A MAX per severity took the largest series
@@ -340,7 +340,7 @@ func scanningAndResolution(b *builder) []Panel {
 		` COALESCE(cvss_v4, cvss) AS "` + securityCVSS + `", alert_state AS "` + securityOutcome + `",` +
 		` seconds_to_resolve AS "Time to resolve", url AS "Link"` +
 		" FROM gh_dependabot_alert_item WHERE $__timeFilter(time) AND " + RF +
-		" AND seconds_to_resolve IS NOT NULL ORDER BY time DESC LIMIT 25"
+		" AND seconds_to_resolve IS NOT NULL ORDER BY time DESC, full_name, number LIMIT 25"
 	// Both alert families spell "no longer open" the same way. The state is a
 	// field on the row, since it moves after the date the row carries, and
 	// the exporter reads it back as a label.
@@ -349,7 +349,7 @@ func scanningAndResolution(b *builder) []Panel {
 	scanResolve := `SELECT severity AS "Severity", COUNT(*) AS "Alerts",` +
 		` median(CAST(seconds_to_resolve AS DOUBLE)) AS "Time to resolve"` +
 		securityFrom + csi + ciInRange + RF +
-		" AND seconds_to_resolve IS NOT NULL GROUP BY 1 ORDER BY 2 DESC"
+		" AND seconds_to_resolve IS NOT NULL GROUP BY 1 ORDER BY 2 DESC, 1"
 	an, di := "gh_code_scanning_analysis", "gh_dependabot_alert_item"
 	// The alerts still open, oldest first, from both families in one list:
 	// the two stats at the top count them and this is the one place that
@@ -376,7 +376,7 @@ func scanningAndResolution(b *builder) []Panel {
 		` repo AS "Repository", severity AS "Severity", tool AS "Detail",` +
 		" " + openFor + `, url AS "Link"` +
 		securityFrom + csi + openAlerts +
-		" ORDER BY 2 LIMIT 25"
+		" ORDER BY 2, 3, 4, 1, 8 LIMIT 25"
 
 	scanResGR, scanResGRtf := gTbl(fmt.Sprintf(`groupByNode(%s, %d, "avg")`,
 		rp(csi, "seconds_to_resolve"), gn(csi, "severity")),
@@ -508,7 +508,7 @@ func scanningAndResolution(b *builder) []Panel {
 			`SELECT tool AS "Tool", SUM(results) AS "Results", repo AS "Repository",` +
 				` COUNT(*) AS "Runs", MAX(rules) AS "Rules"` +
 				" FROM gh_code_scanning_analysis WHERE $__timeFilter(time) AND " + RF +
-				" GROUP BY 1, full_name, 3 ORDER BY 2 DESC LIMIT 25",
+				" GROUP BY 1, full_name, 3 ORDER BY 2 DESC, 1, full_name LIMIT 25",
 		)}, &P{
 			Prom: []Target{
 				promTbl(fmt.Sprintf("sum by (tool, full_name, repo) (increase(github_code_scanning_analyses_total{%s}[$__range]))", PF), "A"),
@@ -590,23 +590,23 @@ func posture(b *builder) []Panel {
 		// this was measured against was an archived MATLAB repository, and
 		// with 57 repositories in the picker it returns 285 rows and shows
 		// six: the six the reader saw said nothing was wrong anywhere.
-		" ORDER BY 4, 1, 2"
+		" ORDER BY 4, 1, 2, full_name"
 	setup := `SELECT repo AS "Repository", state AS "State", query_suite AS "Query suite",` +
 		` schedule AS "Schedule", languages AS "Languages",` +
 		` days_since_change AS "Last changed" FROM (` +
 		"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn" +
 		securityFrom + csu + ciInRange + RF + deliveryNewestRow +
-		" ORDER BY 1"
+		" ORDER BY 1, full_name"
 	policy := `SELECT repo AS "Repository", permissions AS "Permissions",` +
 		` CAST(can_approve_pr AS INT) AS "Can approve pull requests" FROM (` +
 		"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn" +
 		securityFrom + ap + ciInRange + RF + deliveryNewestRow +
-		" ORDER BY 1"
+		" ORDER BY 1, full_name"
 	secrets := `SELECT secret AS "Secret", days_since_rotation AS "Last rotated",` +
 		` age_days AS "Age", repo AS "Repository", kind AS "Kind" FROM (` +
 		"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, kind, secret ORDER BY time DESC) AS rn" +
 		securityFrom + sc + ciInRange + RF + deliveryNewestRow +
-		" ORDER BY 2 DESC"
+		" ORDER BY 2 DESC, 1, full_name, 5"
 
 	// Graphite carries every tag as a path node, so the identity columns come
 	// free; the number is the one column each table keeps.

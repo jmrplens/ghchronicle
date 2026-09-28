@@ -193,9 +193,9 @@ func TestRunTablesJoinOneDeclarationPerWorkflow(t *testing.T) {
 func TestRedBranchCommitsAreNewestFirst(t *testing.T) {
 	t.Parallel()
 	sql := sqlOf(t, mustPanel(t, rendered(t, "influxdb"), "Commits behind a red branch"))
-	m := regexp.MustCompile(`ORDER BY (\d+) DESC LIMIT`).FindStringSubmatch(sql)
+	m := regexp.MustCompile(`ORDER BY (\d+) DESC\b`).FindStringSubmatch(sql)
 	if m == nil {
-		t.Fatalf("no positional ORDER BY ... DESC LIMIT in %s", sql)
+		t.Fatalf("no positional ORDER BY ... DESC in %s", sql)
 	}
 	columns := regexp.MustCompile(`AS "([^"]+)"`).FindAllStringSubmatch(sql[:strings.Index(sql, " FROM ")], -1)
 	n, _ := strconv.Atoi(m[1])

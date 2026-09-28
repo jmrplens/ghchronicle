@@ -350,16 +350,16 @@ func whereTheTimeGoes(b *builder) []Panel {
 		" FROM gh_workflow_run r LEFT JOIN (" + declaredWorkflows + ") w" +
 		ciOnWorkflowPath +
 		" WHERE $__timeFilter(time) AND r." + RF +
-		" GROUP BY 1, r.full_name, 3 ORDER BY 2 DESC LIMIT 30"
+		" GROUP BY 1, r.full_name, 3 ORDER BY 2 DESC, 1, r.full_name LIMIT 30"
 	jobs := `SELECT job_name AS "Job", median(CAST(duration_seconds AS DOUBLE)) AS "Duration",` +
 		` repo AS "Repository", COUNT(*) AS "Times run",` +
 		` MAX(duration_seconds) AS "Worst" FROM gh_workflow_job` +
-		ciInRange + RF + " GROUP BY 1, full_name, 3 ORDER BY 2 DESC LIMIT 30"
+		ciInRange + RF + " GROUP BY 1, full_name, 3 ORDER BY 2 DESC, 1, full_name LIMIT 30"
 	steps := `SELECT step AS "Step", median(CAST(duration_seconds AS DOUBLE)) AS "Duration",` +
 		` job_name AS "Job", repo AS "Repository", COUNT(*) AS "Times run",` +
 		` MAX(duration_seconds) AS "Worst" FROM gh_workflow_step` +
 		ciInRange + RF + " GROUP BY 1, 3, full_name, 4" +
-		" ORDER BY 2 DESC LIMIT 30"
+		" ORDER BY 2 DESC, 1, 3, full_name LIMIT 30"
 	// HAVING drops repositories with no live artifacts: a series pinned at
 	// zero is a legend entry and nothing else.
 
@@ -578,7 +578,7 @@ func whatKeepsFailing(b *builder) []Panel {
 				` 100.0 * SUM(CASE WHEN conclusion <> 'success' THEN duration_seconds ELSE 0 END)` +
 				` / NULLIF(SUM(duration_seconds), 0) AS "Share"` +
 				ciFromRuns + RF +
-				" GROUP BY full_name, repo ORDER BY 2 DESC",
+				" GROUP BY full_name, repo ORDER BY 2 DESC, full_name",
 		)}, &P{
 			Prom: []Target{
 				promTbl(fmt.Sprintf(`sum by (full_name, repo) (increase(github_workflow_runs_total{conclusion!="success",%s}[$__range])) * on (full_name, repo) group_left avg by (full_name, repo) (github_workflow_runs_duration_seconds_mean{%s})`, PF, PF), "A"),
@@ -613,7 +613,7 @@ func whatKeepsFailing(b *builder) []Panel {
 				ciOnWorkflowPath +
 				" WHERE $__timeFilter(time) AND r." + RF +
 				" GROUP BY 1, r.full_name, 3 HAVING SUM(CASE WHEN conclusion <> 'success' THEN 1 ELSE 0 END) > " +
-				strconv.Itoa(keepsFailing) + " ORDER BY 5 DESC, 2 DESC LIMIT 20",
+				strconv.Itoa(keepsFailing) + " ORDER BY 5 DESC, 2 DESC, r.full_name, 3 LIMIT 20",
 		)}, &P{
 			Prom: func() []Target {
 				rank := fmt.Sprintf(
@@ -648,7 +648,7 @@ func whatKeepsFailing(b *builder) []Panel {
 		panel("table", "Steps that fail", box{W: 12, H: 8, X: 0, Y: 46}, []Target{sqlT(
 			`SELECT step AS "Step", COUNT(*) AS "Failures", repo AS "Repository"` +
 				" FROM gh_workflow_step WHERE $__timeFilter(time) AND " + RF +
-				" AND conclusion = 'failure' GROUP BY 1, full_name, 3 ORDER BY 2 DESC LIMIT 20",
+				" AND conclusion = 'failure' GROUP BY 1, full_name, 3 ORDER BY 2 DESC, 1, full_name LIMIT 20",
 		)}, &P{
 			PromNote: cannot("which step failed and how often, rather than which job.",
 				"The exporter skips gh_workflow_step: a gauge per step of every "+
@@ -678,7 +678,7 @@ func whatKeepsFailing(b *builder) []Panel {
 				ciInRange + RF + ") r" +
 				ciOnWorkflowPath +
 				repoFlagsJoin("w") +
-				" WHERE r.workflow IS NULL AND " + notArchived + " ORDER BY 1, 2",
+				" WHERE r.workflow IS NULL AND " + notArchived + " ORDER BY 1, 2, w.full_name, w.path, 3",
 		)}, &P{
 			PromNote: cannot("the workflows that are declared in a repository and did not run "+
 				"in the range, which is a join between two measurements.",
@@ -755,7 +755,7 @@ func artifactStorage(b *builder) []Panel {
 				` live_bytes AS "Live size" FROM (` +
 				"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn" +
 				" FROM gh_artifact_total" + ciInRange + RF + deliveryNewestRow +
-				" ORDER BY 2 DESC")}, &P{
+				" ORDER BY 2 DESC, full_name")}, &P{
 				Prom: []Target{
 					promTbl(fmt.Sprintf("max by (full_name, repo) (github_artifact_total_count{%s})", PF), "A"),
 					promTbl(fmt.Sprintf("max by (full_name, repo) (github_artifact_total_walked{%s})", PF), "B"),

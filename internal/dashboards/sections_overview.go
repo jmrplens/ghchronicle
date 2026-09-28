@@ -353,7 +353,7 @@ func audience(b *builder) []Panel {
 		"SELECT referrer, count, uniques, referrer_url, ROW_NUMBER() OVER (" +
 		"PARTITION BY full_name, referrer ORDER BY time DESC) AS rn" +
 		" FROM gh_traffic_referrer WHERE $__timeFilter(time) AND " + RF +
-		") x WHERE rn = 1 GROUP BY 1 ORDER BY 2 DESC LIMIT 25"
+		") x WHERE rn = 1 GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT 25"
 	// The column the table is sorted by comes second, so it is on the screen
 	// beside the identifier on a phone; the title, which can be long, after.
 	paths := `SELECT path AS "Path", SUM(count) AS "Views", SUM(uniques) AS "Unique",` +
@@ -361,7 +361,7 @@ func audience(b *builder) []Panel {
 		"SELECT path, title, count, uniques, url, ROW_NUMBER() OVER (" +
 		"PARTITION BY full_name, path ORDER BY time DESC) AS rn" +
 		" FROM gh_traffic_path WHERE $__timeFilter(time) AND " + RF +
-		") x WHERE rn = 1 GROUP BY 1, 5 ORDER BY 2 DESC LIMIT 25"
+		") x WHERE rn = 1 GROUP BY 1, 5 ORDER BY 2 DESC, 1, 5 LIMIT 25"
 
 	refsGR, refsGRtf := gTbl(fmt.Sprintf(`limit(sortByMaxima(groupByNode(%s, %d, "sum")), 25)`,
 		rp("gh_traffic_referrer", "count"), gn("gh_traffic_referrer", "referrer")),
@@ -460,7 +460,7 @@ func audience(b *builder) []Panel {
 				` SUM(CASE WHEN kind = 'views' THEN count ELSE 0 END) AS "Views",` +
 				` MAX(url) AS "Link"` +
 				" FROM gh_traffic WHERE $__timeFilter(time) AND " + RF +
-				" GROUP BY full_name, repo ORDER BY 2 DESC",
+				" GROUP BY full_name, repo ORDER BY 2 DESC, full_name",
 		)}, &P{
 			Prom: []Target{
 				promTbl(fmt.Sprintf(`sum by (full_name, repo) (github_traffic_count{kind="clones",%s})`, PF), "A"),

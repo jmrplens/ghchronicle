@@ -35,9 +35,9 @@ func commitsAndChurn(b *builder) []Panel {
 		` SUM(additions) AS "Added", SUM(deletions) AS "Removed",` +
 		` median(CAST(churn AS DOUBLE)) AS "Lines per commit"` +
 		" FROM gh_commit WHERE $__timeFilter(time) AND " + RF +
-		" GROUP BY 1 ORDER BY 2 DESC LIMIT 20"
+		" GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT 20"
 	sigs := `SELECT signature AS "Signature", COUNT(*) AS "Commits" FROM gh_commit` +
-		codeInRange + RF + " GROUP BY 1 ORDER BY 2 DESC"
+		codeInRange + RF + " GROUP BY 1 ORDER BY 2 DESC, 1"
 	activity := codeSelect + timeBin + ", activity AS series," +
 		" SUM(events) AS n FROM gh_repo_activity WHERE $__timeFilter(time) AND " + RF +
 		" GROUP BY 1, 2 ORDER BY 1"
@@ -46,7 +46,7 @@ func commitsAndChurn(b *builder) []Panel {
 	// one push moved them all in the same second.
 	force := `SELECT repo AS "Repository", time AS "When", ref_name AS "Branch",` +
 		` actor AS "By" FROM gh_repo_activity WHERE $__timeFilter(time)` +
-		" AND " + RF + " AND activity = 'force_push' ORDER BY time DESC LIMIT 25"
+		" AND " + RF + " AND activity = 'force_push' ORDER BY time DESC, full_name, actor LIMIT 25"
 
 	totalM := fmt.Sprintf("github_commits_total{%s}", PF)
 	// The exporter serves a mean per commit and a count per sweep. Their
@@ -256,7 +256,7 @@ func commitChecks(b *builder) []Panel {
 	otherChecks := `SELECT app AS "App", COUNT(*) AS "Runs", check AS "Check",` +
 		` SUM(failed) AS "Failed"` +
 		" FROM gh_commit_check WHERE $__timeFilter(time) AND " + RF +
-		" GROUP BY 1, 3 ORDER BY 2 DESC LIMIT 20"
+		" GROUP BY 1, 3 ORDER BY 2 DESC, 1, 3 LIMIT 20"
 
 	// Each check run is a 1 added up per app and check. countOf added every
 	// run into one series first, and the table drew that as one row named
@@ -344,7 +344,7 @@ func commitChecks(b *builder) []Panel {
 				" ON c.full_name = r.full_name AND c.oid = r.head_sha" +
 				// Newest first: the cap is 25 rows, and ordered by the first
 				// column it kept the alphabetically last repositories instead.
-				" ORDER BY 2 DESC LIMIT 25",
+				" ORDER BY 2 DESC, c.full_name, c.oid LIMIT 25",
 		)}, &P{
 			PromNote: cannot("each commit that left the default branch red, with its message, "+
 				"its author and how many runs failed on it.",

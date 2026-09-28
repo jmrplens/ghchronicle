@@ -28,16 +28,16 @@ func labelsMilestonesAndForks(b *builder) []Panel {
 	// summed across repositories had nothing to link to.
 	labels := `SELECT label AS "Label", used AS "Used", repo AS "Repository",` +
 		` issues AS "Issues", pull_requests AS "Pull requests", url AS "Link" FROM (` +
-		"SELECT repo, label, used, issues, pull_requests, url, ROW_NUMBER() OVER (" +
+		"SELECT repo, full_name, label, used, issues, pull_requests, url, ROW_NUMBER() OVER (" +
 		"PARTITION BY full_name, label ORDER BY time DESC) AS rn FROM gh_label" +
 		" WHERE $__timeFilter(time) AND " + RF + planningNewestRow +
-		" ORDER BY 2 DESC LIMIT 25"
+		" ORDER BY 2 DESC, full_name, 1 LIMIT 25"
 	miles := `SELECT milestone AS "Milestone", progress AS "Progress", repo AS "Repository",` +
 		` state AS "State", issues AS "Issues",` +
 		` pull_requests AS "Pull requests", url AS "Link" FROM (` +
 		"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, milestone ORDER BY time DESC) AS rn" +
 		" FROM gh_milestone WHERE $__timeFilter(time) AND " + RF + planningNewestRow +
-		" ORDER BY 2 DESC LIMIT 25"
+		" ORDER BY 2 DESC, full_name, 1 LIMIT 25"
 	forks := topRepoSeries("gh_fork", "1", "forks", RF)
 	// Idle is computed rather than stored: the row is dated when the fork was
 	// created and `seconds_to_push` says how long after that its last push
@@ -48,7 +48,7 @@ func labelsMilestonesAndForks(b *builder) []Panel {
 	forkTbl := `SELECT by AS "By", time AS "Forked", repo AS "Repository",` +
 		` advanced AS "` + planningPushedTo + `", ` + forkIdle + `,` +
 		` url AS "Link"` +
-		" FROM gh_fork WHERE $__timeFilter(time) AND " + RF + " ORDER BY time DESC LIMIT 25"
+		" FROM gh_fork WHERE $__timeFilter(time) AND " + RF + " ORDER BY time DESC, full_name, 1 LIMIT 25"
 	// seconds_to_answer is a field only once a discussion has been answered:
 	// InfluxDB creates the column on first write, and naming it before then
 	// fails the whole query. Same reason the milestone due date is not shown.
@@ -221,7 +221,7 @@ func discussionAndComments(b *builder) []Panel {
 	disc := `SELECT category AS "Category", COUNT(*) AS "Discussions",` +
 		` CAST(has_answer AS INT) AS "Answered", AVG(comments) AS "Comments each",` +
 		` AVG(upvotes) AS "Upvotes each" FROM gh_discussion` +
-		" WHERE $__timeFilter(time) AND " + RF + " GROUP BY 1, 3 ORDER BY 2 DESC"
+		" WHERE $__timeFilter(time) AND " + RF + " GROUP BY 1, 3 ORDER BY 2 DESC, 1, 3"
 	dc := "gh_discussion"
 	// The discussions one by one, whatever the range: an account has a
 	// handful and a thirty day range hid all but one of them under a row
@@ -237,7 +237,7 @@ func discussionAndComments(b *builder) []Panel {
 		` url AS "Link" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, number` +
 		" ORDER BY time DESC, comments DESC) AS rn FROM gh_discussion" +
 		" WHERE " + wholeHistory + " AND " + RF + planningNewestRow +
-		" ORDER BY 2 DESC LIMIT 50"
+		" ORDER BY 2 DESC, full_name, number LIMIT 50"
 	latestGR, latestGRtf := gTbl(rowsOf(gp(dc, "comments"), gn(dc, "repo"), gn(dc, "number"),
 		gn(dc, "category")), "Repository, number, category", []col{{"lastNotNull", "Comments"}})
 	latestES, latestEStf := b.esRaw(dc, 50, []named{
@@ -353,7 +353,7 @@ func discussionAndComments(b *builder) []Panel {
 			`SELECT full_name AS "Repository", COUNT(*) AS "Comments",` +
 				` MAX(CASE WHEN own = 'false' THEN 1 ELSE 0 END) AS "Elsewhere"` +
 				" FROM gh_issue_comment WHERE $__timeFilter(time)" +
-				" GROUP BY 1 ORDER BY 2 DESC LIMIT 20",
+				" GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT 20",
 		)}, &P{
 			Prom:   []Target{promTbl("topk(20, sum by (full_name) (increase(github_issue_comments_total[$__range])))")},
 			PromTF: []any{organize(map[string]string{"full_name": "Repository", "Value": "Comments"}, nil, nil)},
@@ -390,7 +390,7 @@ func answersGiven(b *builder, perItem, grPerItem string) []Panel {
 		` answers AS "Accepted", url AS "Link" FROM (SELECT *, ROW_NUMBER() OVER` +
 		" (PARTITION BY comment ORDER BY answers DESC) AS rn FROM gh_discussion_comment" +
 		" WHERE " + wholeHistory + " AND own = 'false') x WHERE rn = 1" +
-		" ORDER BY 2 DESC LIMIT 50"
+		" ORDER BY 2 DESC, comment LIMIT 50"
 	// The comments of the range per repository, one row per comment for the
 	// same reason: counted row by row, a comment read before and after it was
 	// accepted was two comments and two accepted answers.
@@ -398,7 +398,7 @@ func answersGiven(b *builder, perItem, grPerItem string) []Panel {
 		` COUNT(*) AS "Comments", SUM(upvotes) AS "Upvotes" FROM (SELECT full_name,` +
 		" answers, upvotes, ROW_NUMBER() OVER (PARTITION BY comment ORDER BY answers DESC," +
 		" upvotes DESC) AS rn FROM gh_discussion_comment WHERE $__timeFilter(time)) x" +
-		" WHERE rn = 1 GROUP BY 1 ORDER BY 2 DESC, 3 DESC LIMIT 20"
+		" WHERE rn = 1 GROUP BY 1 ORDER BY 2 DESC, 3 DESC, 1 LIMIT 20"
 	dcc := "gh_discussion_comment"
 	// What the list of comments says about the rows it is made of; the
 	// table of counts points at it, since in Prometheus it has no rows to

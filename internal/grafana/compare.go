@@ -355,6 +355,37 @@ func compareRows(a, b *Picture, like Likeness) []string {
 	return out
 }
 
+// Order says where two drawings of a table or a bar chart that hold the same
+// rows put them in a different order, and nothing when the order is the same
+// or the rows are not, which is Compare's to report.
+//
+// Compare holds two stores to the same set of rows because each store orders
+// and buckets rows its own way. Two stores that run one statement do not: the
+// statement's ORDER BY is the order a reader sees, and one that leaves a tie
+// leaves it to each store's sort, which put the same two items in opposite
+// places in InfluxDB and PostgreSQL and, with a LIMIT, can keep a different
+// item in each.
+func Order(a, b *Picture, like Likeness) string {
+	if (a.Kind != "table" && a.Kind != "barchart") || a.Kind != b.Kind || len(Compare(a, b, like)) > 0 {
+		return ""
+	}
+	aCols, bCols := columnsByName(a.Columns), columnsByName(b.Columns)
+	var common []string
+	for _, f := range a.Columns {
+		if bCols[f.Display] != nil && !slices.Contains(common, f.Display) {
+			common = append(common, f.Display)
+		}
+	}
+	aRows, bRows := rowsOf(aCols, common), rowsOf(bCols, common)
+	for i := range min(len(aRows), len(bRows)) {
+		if !sameRow(aRows[i], bRows[i], common, like) {
+			return fmt.Sprintf("row %d over %v is %s in the first and %s in the second",
+				i+1, common, rowString(aRows[i]), rowString(bRows[i]))
+		}
+	}
+	return ""
+}
+
 func columnsByName(columns []*Field) map[string]*Field {
 	out := map[string]*Field{}
 	for _, f := range columns {

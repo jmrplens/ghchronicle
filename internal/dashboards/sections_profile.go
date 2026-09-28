@@ -60,7 +60,7 @@ func achievements(b *builder) Panel {
 	rows := `SELECT name AS "Achievement", tier_number AS "Tier", tier_name AS "Level",` +
 		` url AS "Link" FROM (` +
 		"SELECT *, ROW_NUMBER() OVER (PARTITION BY achievement ORDER BY time DESC) AS rn" +
-		profileFrom + ac + " WHERE $__timeFilter(time)) x WHERE rn = 1 ORDER BY 2 DESC, 1"
+		profileFrom + ac + " WHERE $__timeFilter(time)) x WHERE rn = 1 ORDER BY 2 DESC, 1, achievement"
 	gr, grtf := gTbl(rowsOf(profileKeepLast+gp(ac, "tier_number")+")", gn(ac, "achievement")),
 		"Achievement", []col{{"lastNotNull", "Tier"}})
 	es, estf := esTbl(ac, []any{b.tm("achievement", 50, "_key", "asc"), b.tmURL()},
@@ -109,7 +109,7 @@ func achievementProgress(b *builder) Panel {
 		` next_threshold AS "Next tier at", tier_number AS "Tier", agrees AS "Page agrees",` +
 		` url AS "Link" FROM (` +
 		"SELECT *, ROW_NUMBER() OVER (PARTITION BY achievement ORDER BY time DESC) AS rn" +
-		profileFrom + ap + " WHERE $__timeFilter(time)) x WHERE rn = 1 ORDER BY 3 DESC, 2"
+		profileFrom + ap + " WHERE $__timeFilter(time)) x WHERE rn = 1 ORDER BY 3 DESC, 2, achievement"
 	gr, grtf := gTbl(rowsOf(profileKeepLast+gp(ap, "percent")+")", gn(ap, "achievement")),
 		"Achievement", []col{{"lastNotNull", "Progress"}})
 	// The badge image and the url reach the table as buckets of one value
@@ -355,12 +355,12 @@ func sponsorship(b *builder) []Panel {
 		` amount_cents / 100.0 AS "Amount",` +
 		` CAST(active AS INT) AS "Active", CAST(one_time AS INT) AS "One-time",` +
 		` url AS "Link"` +
-		profileFrom + sp + " WHERE " + wholeHistory + " ORDER BY time DESC LIMIT 200"
+		profileFrom + sp + " WHERE " + wholeHistory + " ORDER BY time DESC, direction, sponsorable LIMIT 200"
 	tiers := `SELECT tier AS "Tier", price_cents / 100.0 AS "Price",` +
 		` CAST(one_time AS INT) AS "One-time", CAST(retired AS INT) AS "Retired",` +
 		` age_days AS "Age", url AS "Link" FROM (` +
 		"SELECT *, ROW_NUMBER() OVER (PARTITION BY tier ORDER BY time DESC) AS rn" +
-		profileFrom + st + " WHERE $__timeFilter(time)) x WHERE rn = 1 ORDER BY 2 DESC"
+		profileFrom + st + " WHERE $__timeFilter(time)) x WHERE rn = 1 ORDER BY 2 DESC, 1"
 
 	// Graphite has no rows and no dates to list by, so the sponsorships become
 	// the price of the tier each was made at, named from the path. A sponsorship
@@ -507,7 +507,7 @@ func profileStanding(b *builder) []Panel {
 	pins := `SELECT "position" AS "Position", repo AS "Item", kind AS "Kind",` +
 		` stars AS "Stars", days_since_push AS "Idle", url AS "Link" FROM (` +
 		"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn" +
-		profileFrom + pi + " WHERE $__timeFilter(time)) x WHERE rn = 1 ORDER BY 1"
+		profileFrom + pi + " WHERE $__timeFilter(time)) x WHERE rn = 1 ORDER BY 1, full_name"
 	// Two columns and the link. The measurement carries a third field, the
 	// days since the availability status was set, but on one row of eight,
 	// and on live data that row read four years on a flag that was off: it
@@ -649,7 +649,7 @@ func starLists(b *builder) Panel {
 	lists := `SELECT list AS "List", items AS "Items", CAST(private AS INT) AS "Private",` +
 		` age_days AS "Age", days_since_add AS "Last added", url AS "Link" FROM (` +
 		"SELECT *, ROW_NUMBER() OVER (PARTITION BY list ORDER BY time DESC) AS rn" +
-		profileFrom + sl + " WHERE $__timeFilter(time)) x WHERE rn = 1 ORDER BY 2 DESC"
+		profileFrom + sl + " WHERE $__timeFilter(time)) x WHERE rn = 1 ORDER BY 2 DESC, 1"
 
 	listGR, listGRtf := gTbl(rowsOf(profileKeepLast+gp(sl, "items")+")", gn(sl, "list")),
 		"List", []col{{"lastNotNull", "Items"}})

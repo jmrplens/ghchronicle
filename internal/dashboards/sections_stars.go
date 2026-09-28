@@ -86,12 +86,12 @@ func stars(b *builder) []Panel {
 	// by hand: every other link is a value GitHub returned, so this one is too.
 	newest := `SELECT user AS "User", time AS "Starred at", repo AS "Repository",` +
 		` user_url AS "Link"` +
-		" FROM gh_star WHERE $__timeFilter(time) AND " + RF + " ORDER BY time DESC LIMIT 50"
+		" FROM gh_star WHERE $__timeFilter(time) AND " + RF + " ORDER BY time DESC, full_name, user LIMIT 50"
 	// Twelve bars and the rest folded: the axis of a bar per repository was
 	// cut off at the bottom of the panel. A bar per full name, named by
 	// repoNameSQL, since the fold groups by the label.
 	byRepo := otherRows(`SELECT `+repoNameSQL+` AS "Repository", stars AS "Stars",`+
-		" ROW_NUMBER() OVER (ORDER BY stars DESC) AS rn FROM ("+
+		" ROW_NUMBER() OVER (ORDER BY stars DESC, full_name) AS rn FROM ("+
 		latestPerRepo([]string{"stars"})+") WHERE stars > 0", "Repository", "Stars", 12)
 	// One series per repository, where gh_star had one per stargazer, and
 	// the value is the day's count rather than a 1 to be counted.
