@@ -288,7 +288,7 @@ func pullsAndReviewers(b *builder) []Panel {
 		` approx_percentile_cont(seconds_to_merge, 0.5) AS "Time to merge",` +
 		` approx_percentile_cont(churn, 0.5) AS "Lines changed"` +
 		flowFromPulls + RF + " AND " + identified +
-		" AND state = 'MERGED' GROUP BY 1 ORDER BY 2 DESC"
+		" AND state = 'MERGED' GROUP BY full_name, repo ORDER BY 2 DESC"
 	// Who is a reviewer: a bot is named as one, and an author answering a
 	// review on their own pull request is not reviewing it, so those rows
 	// read "own" rather than the reviewer's login. Otherwise the busiest
@@ -330,17 +330,16 @@ func pullsAndReviewers(b *builder) []Panel {
 		[]named{{"author.keyword", "Author"}, {"n", "Pull requests"}},
 		[]string{ESF, esIdentified})
 
-	byRepoGR, byRepoGRtf := gTbl(fmt.Sprintf(`groupByNode(%s, %d, "avg")`,
-		mergedPath("seconds_to_merge"), gn(pr, "repo")), "Repository",
+	byRepoGR, byRepoGRtf := gTbl(grGroupBy(mergedPath("seconds_to_merge"), pr, "avg", "repo"), "Repository",
 		[]col{{"count", "Merged"}, {"median", flowMergeTime}})
-	byRepoES, byRepoEStf := esTbl(pr, []any{b.tm("repo", 50)},
+	byRepoES, byRepoEStf := esTbl(pr, b.tmRepo(50),
 		[]any{b.mCount(), b.mPct("seconds_to_merge", 50), b.mPct("churn", 50)},
 		[]named{
 			{inventoryRepoTerm, "Repository"},
 			{"n", "Merged"},
 			{"t", flowMergeTime},
 			{"c", flowChurn},
-		}, esMerged)
+		}, esMerged, hideColumns(panelFullNameField))
 
 	reviewersGR, reviewersGRtf := gTbl(fmt.Sprintf(
 		`limit(sortByTotal(groupByNode(%s, %d, "avg")), 20)`,
@@ -372,16 +371,16 @@ func pullsAndReviewers(b *builder) []Panel {
 		}),
 		panel("barchart", "Pull requests by author", box{W: 8, H: 9, X: 16, Y: 20}, []Target{sqlT(authors)}, &P{
 			PromNote: cannot("pull requests per author over the range.",
-				"The exporter keeps only `repo` and `state` on pull requests: "+
+				"The exporter keeps only the repository and `state` on pull requests: "+
 					"an author label would be a series per contributor per state."),
 			GR: authorsGR, GRTF: authorsGRtf,
 			ES: authorsES, ESTF: authorsEStf,
 		}),
 		panel("table", "Pull requests by repository", box{W: 12, H: 8, X: 0, Y: 29}, []Target{sqlT(byRepo)}, &P{
 			Prom: []Target{
-				promTbl(fmt.Sprintf("sum by (repo) (increase(github_pull_requests_total{%s}[$__range]))", promMerged), "A"),
-				promTbl(fmt.Sprintf("avg by (repo) (github_pull_requests_seconds_to_merge_mean{%s})", promMerged), "B"),
-				promTbl(fmt.Sprintf("avg by (repo) (github_pull_requests_churn_mean{%s})", promMerged), "C"),
+				promTbl(fmt.Sprintf("sum by (full_name, repo) (increase(github_pull_requests_total{%s}[$__range]))", promMerged), "A"),
+				promTbl(fmt.Sprintf("avg by (full_name, repo) (github_pull_requests_seconds_to_merge_mean{%s})", promMerged), "B"),
+				promTbl(fmt.Sprintf("avg by (full_name, repo) (github_pull_requests_churn_mean{%s})", promMerged), "C"),
 			},
 			PromTF: merged(map[string]string{
 				"repo": "Repository", inventoryValueCol + "A": "Merged",
@@ -477,7 +476,7 @@ func reviewDebt(b *builder) []Panel {
 		` SUM(outdated * (1 - resolved)) AS "Outdated",` +
 		` SUM(comments * (1 - resolved)) AS "Comments"` +
 		" FROM gh_review_thread WHERE $__timeFilter(time) AND " + RF +
-		" GROUP BY 1, 3 ORDER BY 2 DESC LIMIT 25"
+		" GROUP BY 1, full_name, 3 ORDER BY 2 DESC LIMIT 25"
 
 	// `comments` is on every thread, so counting the points of that leaf is
 	// one point per thread; `resolved` is the flag the debt is computed from.
@@ -498,11 +497,11 @@ func reviewDebt(b *builder) []Panel {
 	// Summarizing each thread over the whole range first leaves one point per
 	// series and nothing to average. It goes inside groupByNodes, not around
 	// it, because the node indices are read off the series name and the name
-	// groupByNodes writes is the clean `repo.number` the table shows.
-	debtGR, debtGRtf := gTbl(fmt.Sprintf(
-		`limit(sortByTotal(groupByNodes(%s, "sum", %d, %d)), 25)`,
-		total(fmt.Sprintf("offset(scale(%s,-1),1)", resolvedPath)),
-		gn(reviewThread, "repo"), gn(reviewThread, "number"),
+	// groupByNodes writes is the clean one grGroupBy then cuts to the
+	// `repo.number` the table shows.
+	debtGR, debtGRtf := gTbl(fmt.Sprintf(`limit(sortByTotal(%s), 25)`,
+		grGroupBy(total(fmt.Sprintf("offset(scale(%s,-1),1)", resolvedPath)),
+			reviewThread, "sum", "repo", "number"),
 	),
 		"Repository, pull request", []col{{"sum", "Unresolved"}})
 
@@ -513,7 +512,7 @@ func reviewDebt(b *builder) []Panel {
 	// multiplication to mean what the SQL ones mean. `path`, `subject_type`
 	// and `resolved_by` are string fields and stay out of it entirely: a
 	// top_metrics over a string panics the plugin.
-	debtES, debtEStf := esTbl(reviewThread, []any{b.tm("repo", 50), b.tm("number", 25)},
+	debtES, debtEStf := esTbl(reviewThread, append(b.tmRepo(50), b.tm("number", 25)),
 		[]any{b.mCount(), b.mSum("outdated"), b.mSum("comments")},
 		[]named{
 			{inventoryRepoTerm, "Repository"},
@@ -522,7 +521,7 @@ func reviewDebt(b *builder) []Panel {
 			{"o", "Outdated"},
 			{"c", "Comments"},
 		},
-		[]string{ESF, "resolved:0"})
+		[]string{ESF, "resolved:0"}, hideColumns(panelFullNameField))
 
 	return []Panel{
 		panel("timeseries", "Review threads over time", box{W: 12, H: 7, X: 0, Y: 53},
@@ -577,6 +576,10 @@ const stillOpenNote = "This store cannot read each item from its newest row, so 
 	"closed inside the range stays listed as open, at the reading of its last open day, " +
 	"until the range moves past that day."
 
+// openLongest is how many rows the two tables of what is still open list, in
+// every store: the items open longest, the longest first.
+const openLongest = 25
+
 // stillOpen is what has not closed yet: the pull requests and the issues
 // that have waited longest, each one a row a reader can open.
 func stillOpen(b *builder) []Panel {
@@ -588,11 +591,11 @@ func stillOpen(b *builder) []Panel {
 		` x.title AS "Title", x.author AS "Author", x.label_names AS "Labels",` +
 		` x.comments AS "Comments", x.reviews AS "Reviews", f.fork AS "Fork",` +
 		` x.url AS "Link" FROM (` +
-		"SELECT *, ROW_NUMBER() OVER (PARTITION BY repo, number ORDER BY time DESC) AS rn" +
+		"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, number ORDER BY time DESC) AS rn" +
 		flowFromPulls + RF + " AND " + identified +
-		") x" + repoFlagsJoin("x.repo") +
+		") x" + repoFlagsJoin("x") +
 		" WHERE x.rn = 1 AND x.state = 'OPEN' AND " + notArchived +
-		" ORDER BY x.seconds_open DESC LIMIT 25"
+		fmt.Sprintf(" ORDER BY x.seconds_open DESC LIMIT %d", openLongest)
 	// The twin for issues, read the same way: until this table no issue was
 	// reachable by unit from any panel, only counted. `label_names` is the
 	// field the collector writes for what the issue is about, which is what
@@ -600,20 +603,28 @@ func stillOpen(b *builder) []Panel {
 	openIssues := `SELECT x.number AS "Number", x.seconds_open AS "Open for", x.repo AS "Repository",` +
 		` x.author AS "Author", x.comments AS "Comments",` +
 		` x.label_names AS "Labels", f.fork AS "Fork", x.url AS "Link" FROM (` +
-		"SELECT *, ROW_NUMBER() OVER (PARTITION BY repo, number ORDER BY time DESC) AS rn" +
+		"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, number ORDER BY time DESC) AS rn" +
 		" FROM gh_issue WHERE $__timeFilter(time) AND " + RF + " AND " + identified +
-		") x" + repoFlagsJoin("x.repo") +
+		") x" + repoFlagsJoin("x") +
 		" WHERE x.rn = 1 AND x.state = 'OPEN' AND " + notArchived +
-		" ORDER BY x.seconds_open DESC LIMIT 25"
+		fmt.Sprintf(" ORDER BY x.seconds_open DESC LIMIT %d", openLongest)
 
-	openGR, openGRtf := gTbl(fmt.Sprintf(`limit(sortBy(groupByNodes(%s, "max", %d, %d), "max", true), 25)`,
-		rp("gh_pull_request", "seconds_open", "state", "OPEN"),
-		gn("gh_pull_request", "repo"), gn("gh_pull_request", "number")),
+	openGR, openGRtf := gTbl(fmt.Sprintf(`limit(sortBy(%s, "max", true), %d)`,
+		grGroupBy(rp("gh_pull_request", "seconds_open", "state", "OPEN"), "gh_pull_request", "max", "repo", "number"),
+		openLongest),
 		"Repository, number", []col{{"max", flowOpenAge}})
 	// The url as a bucket, never as a metric: a top_metrics over a string
-	// panics the plugin, and a pull request has exactly one url.
-	openES, openEStf := esTbl("gh_pull_request", []any{b.tm("repo", 50), b.tm("number", 25), b.tm("url", 1)},
-		[]any{b.mMax("seconds_open"), b.mMax("comments"), b.mMax("reviews")},
+	// panics the plugin, and a pull request has exactly one url. The
+	// repository and the number both keep their values by the open time: the
+	// repositories whose oldest item is oldest, and in each its twenty-five
+	// longest open, which between them hold the twenty-five longest open of
+	// every picked repository, and keepLargest cuts the rows to those. Kept by
+	// document count, as they were, a repository with more open items than
+	// the bucket kept showed whichever had the most rows in the range.
+	prAge := b.mMax("seconds_open")
+	openES, openEStf := esTbl("gh_pull_request",
+		append(b.tmRepoBy(50, prAge), b.tmBy("number", openLongest, prAge), b.tm("url", 1)),
+		[]any{prAge, b.mMax("comments"), b.mMax("reviews")},
 		[]named{
 			{inventoryRepoTerm, "Repository"},
 			{flowNumberTerm, "Number"},
@@ -622,14 +633,17 @@ func stillOpen(b *builder) []Panel {
 			{"c", "Comments"},
 			{"r", "Reviews"},
 		},
-		[]string{ESF, "state:OPEN"})
+		[]string{ESF, "state:OPEN"}, append([]any{hideColumns(panelFullNameField)},
+			keepLargest(flowOpenAge, openLongest)...)...)
 
-	openIssuesGR, openIssuesGRtf := gTbl(fmt.Sprintf(`limit(sortBy(groupByNodes(%s, "max", %d, %d), "max", true), 25)`,
-		rp("gh_issue", "seconds_open", "state", "OPEN"),
-		gn("gh_issue", "repo"), gn("gh_issue", "number")),
+	openIssuesGR, openIssuesGRtf := gTbl(fmt.Sprintf(`limit(sortBy(%s, "max", true), %d)`,
+		grGroupBy(rp("gh_issue", "seconds_open", "state", "OPEN"), "gh_issue", "max", "repo", "number"),
+		openLongest),
 		"Repository, number", []col{{"max", flowOpenAge}})
-	openIssuesES, openIssuesEStf := esTbl("gh_issue", []any{b.tm("repo", 50), b.tm("number", 25), b.tm("url", 1)},
-		[]any{b.mMax("seconds_open"), b.mMax("comments")},
+	issueAge := b.mMax("seconds_open")
+	openIssuesES, openIssuesEStf := esTbl("gh_issue",
+		append(b.tmRepoBy(50, issueAge), b.tmBy("number", openLongest, issueAge), b.tm("url", 1)),
+		[]any{issueAge, b.mMax("comments")},
 		[]named{
 			{inventoryRepoTerm, "Repository"},
 			{flowNumberTerm, "Number"},
@@ -637,13 +651,23 @@ func stillOpen(b *builder) []Panel {
 			{"s", flowOpenAge},
 			{"c", "Comments"},
 		},
-		[]string{ESF, "state:OPEN"})
+		[]string{ESF, "state:OPEN"}, append([]any{hideColumns(panelFullNameField)},
+			keepLargest(flowOpenAge, openLongest)...)...)
 	return []Panel{
 		panel("table", "Open the longest", box{W: 12, H: 8, X: 0, Y: 45}, []Target{sqlT(openest)}, &P{
-			Prom: []Target{
-				promTbl(fmt.Sprintf(`topk(25, max by (repo, number, author) (github_pull_requests_seconds_open_mean{state="OPEN",%s}))`, PF), "A"),
-				promTbl(fmt.Sprintf(`max by (repo, number, author) (github_pull_requests_comments_mean{state="OPEN",%s})`, PF), "B"),
-			},
+			// The comments are kept to the rows the open time ranks: capped
+			// on nothing, they listed every repository with an open pull
+			// request, and the merge showed each one past the twenty-fifth
+			// with an empty Open for.
+			Prom: func() []Target {
+				rank := fmt.Sprintf(`max by (full_name, repo, number, author) (github_pull_requests_seconds_open_mean{state="OPEN",%s})`, PF)
+				return []Target{
+					promTbl(promTop(openLongest, rank), "A"),
+					promTbl(promWithin(openLongest, fmt.Sprintf(
+						`max by (full_name, repo, number, author) (github_pull_requests_comments_mean{state="OPEN",%s})`, PF,
+					), rank, "full_name", "repo", "number", "author"), "B"),
+				}
+			}(),
 			PromTF: merged(map[string]string{
 				"repo": "Repository", "number": "Number", "author": "Author",
 				inventoryValueCol + "A": flowOpenAge, inventoryValueCol + "B": "Comments",
@@ -651,18 +675,22 @@ func stillOpen(b *builder) []Panel {
 			Opts: Opts{"sort": flowOpenAge},
 			Desc: "Time to merge only counts what merged. This is the other half: what is " +
 				"still open and how long it has been, which is the number that decides what " +
-				"to do next rather than describing what already happened. Each pull request " +
+				"to do next rather than describing what already happened. The table keeps the " +
+				"twenty-five open longest, the longest first. Each pull request " +
 				"is read from its newest row, so one that merged inside the range is not " +
 				"here any more. " + archivedLeftOut + " A fork's pull request is still one " +
 				"that can be merged, so those stay and Fork says which they are.",
-			PromDesc: lastSweep + " " + noRepoFlagsHere,
+			PromDesc: "In Prometheus a row is a repository and not a pull request, since " +
+				"the exporter keeps no pull request of its own: Open for is the mean over " +
+				"the repository's open pull requests at the collector's last sweep, and the " +
+				"twenty-five rows are the repositories where it is longest. " + noRepoFlagsHere,
 			Overrides: []any{
 				repoColumn(), width("Number", 80), width("Author", 120),
 				unitOf(flowOpenAge, "s", 130),
 				width("Comments", 100), width("Reviews", 90), width("Fork", 70),
 				linkOn("Number"),
 			},
-			GR: openGR, GRTF: openGRtf, GRDesc: grSlot + " " + stillOpenNote + " " + noRepoFlagsHere,
+			GR: openGR, GRTF: openGRtf, GRDesc: grRows + " " + stillOpenNote + " " + noRepoFlagsHere,
 			ES: openES, ESTF: openEStf, ESDesc: stillOpenNote + " " + noRepoFlagsHere,
 		}),
 		panel("table", "Open issues the longest", box{W: 12, H: 8, X: 12, Y: 45}, []Target{sqlT(openIssues)}, &P{
@@ -671,7 +699,8 @@ func stillOpen(b *builder) []Panel {
 				"The exporter reduces issues to a count and means per repository and "+
 					"state; no individual issue survives."),
 			Opts: Opts{"sort": flowOpenAge},
-			Desc: "The same question for issues: what is still open and for how long. Labels " +
+			Desc: "The same question for issues: what is still open and for how long, the " +
+				"twenty-five open longest, the longest first. Labels " +
 				"is what the issue was filed as, so an old one reads as a bug nobody fixed " +
 				"or a wish nobody granted. Each issue is read from its newest row, so one " +
 				"closed inside the range is not here any more. " + archivedLeftOut +
@@ -682,7 +711,7 @@ func stillOpen(b *builder) []Panel {
 				linkOn("Number"),
 			},
 			GR: openIssuesGR, GRTF: openIssuesGRtf,
-			GRDesc: grSlot + " " + stillOpenNote + " " + noRepoFlagsHere,
+			GRDesc: grRows + " " + stillOpenNote + " " + noRepoFlagsHere,
 			ES:     openIssuesES, ESTF: openIssuesEStf,
 			ESDesc: stillOpenNote + " " + noRepoFlagsHere,
 		}),

@@ -362,6 +362,22 @@ jobs:
                 exit 1
                 ;;
             esac
+            # A new named volume takes the owner of the directory it is
+            # mounted over. Up to 2.6.0 the image had no /var/lib/ghchronicle,
+            # where every compose stack mounts its state volume, so the volume
+            # was root's and the collector could save neither its state nor its
+            # cache. The daemon fills the volume, so the owner is read from the
+            # host.
+            volume="ghchronicle-state-${platform//\//-}"
+            docker volume create "${volume}" > /dev/null
+            docker run --rm --platform "${platform}" -v "${volume}:/var/lib/ghchronicle" \
+              "ghcr.io/jmrplens/ghchronicle:v${VERSION}" -version > /dev/null
+            owner="$(sudo stat -c '%u:%g' "$(docker volume inspect -f '{{.Mountpoint}}' "${volume}")")"
+            if [ "${owner}" != "65532:65532" ]; then
+              echo "::error::on ${platform} a new volume at /var/lib/ghchronicle belongs to ${owner}, not to the collector's 65532:65532. The release is published and latest was not moved."
+              exit 1
+            fi
+            echo "${platform}: a new state volume belongs to ${owner}"
           done
           case "${VERSION}" in
             *-*)

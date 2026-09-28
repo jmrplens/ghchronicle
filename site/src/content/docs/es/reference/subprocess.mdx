@@ -201,8 +201,10 @@ escribiendo ese programa: consérvalo y léelo.
 
 <Tabs syncKey="adhoc-cheap">
   <TabItem label="-list">
-    Imprime los repositorios en alcance, un nombre completo por línea, y cuesta
-    las llamadas de descubrimiento y nada más.
+    Imprime los repositorios en alcance, un nombre completo por línea, y
+    después los archivados que el filtro aparta, cada uno seguido de
+    `(archived: its archive date and lifetime totals; a backfill collects the
+    rest)`, y cuesta las llamadas de descubrimiento y nada más.
 
     ```sh
     ghchronicle -config adhoc.yaml -list
@@ -236,8 +238,12 @@ que falla se registra y la pasada continúa, porque un repositorio con una
 función apagada no debe detener la pasada de los otros cuarenta.
 
 ```text
-level=ERROR msg="collector failed" family=issueevents repo=acme/parser err="/repos/acme/parser/issues/events?per_page=100&page=1: 504 Gateway Timeout"
+level=ERROR msg="collector failed" family=artifacts repo=acme/parser err="/repos/acme/parser/actions/artifacts?per_page=100&page=2: 502 Bad Gateway: {\n  \"message\": \"Server Error\"\n}"
 ```
+
+Un 502 o un 504 en una línea así ya ha fallado dos veces: el cliente pregunta
+una vez más, dos segundos después, antes de rendirse con una petición REST, y
+no registra ninguno de los dos intentos.
 
 Quien llame y necesite enterarse de eso tiene que leer la salida de error. No
 hay código de salida para ello, a propósito: en una cuenta grande alguna familia
@@ -282,15 +288,18 @@ parece un fallo y es el freno funcionando. En nivel `info` el log lo dice por
 ausencia:
 
 ```text
-level=INFO msg="repositories discovered" count=1
+level=INFO msg="cache file read" file=/tmp/ghchronicle-adhoc-cache.bin ...
+level=INFO msg="repositories discovered" count=1 archived_aside=0
 level=INFO msg="rate budget" bucket=core remaining=3949 limit=5000
 level=INFO msg="sweep finished"
 ```
 
 Ninguna línea `written`, porque no tocaba nada. Borrar el fichero de estado
-recoge todo otra vez a precio completo, incluido el recorrido único de todas las
-estrellas, así que apunta `state_file` a un sitio que controle la aplicación y
-déjalo ahí.
+recoge todo otra vez, incluido el recorrido único de todas las estrellas, así
+que apunta `state_file` a un sitio que controle la aplicación y déjalo ahí. El
+fichero de caché que hay a su lado, `/tmp/ghchronicle-adhoc-cache.bin` aquí,
+guarda los ETags, así que lo que no ha cambiado desde entonces recibe un 304
+gratis; borrar también ese es lo que cuesta el precio completo.
 
 <Aside type="note" title="Cuando no es puntual">
   Si lo que el programa quiere es un flujo continuo y no una respuesta ahora,

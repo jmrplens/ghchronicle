@@ -26,7 +26,7 @@ func stars(b *builder) []Panel {
 	// here. Of the 17 repositories that gained a star in two years, nine
 	// gained between one and three, against 40 and 37 for the two busiest:
 	// the legend ran to 17 entries and hid 86 pixels of the plot behind them.
-	perDay := topSeries("gh_star_day", "repo", "stars", "stars", RF)
+	perDay := topRepoSeries("gh_star_day", "stars", "stars", RF)
 	// The curve starts from the stars given before the range, so it is a
 	// star count rather than the range's gains, on the same scale as the
 	// Prometheus gauge. The forks are drawn the same way from gh_fork, each
@@ -88,27 +88,28 @@ func stars(b *builder) []Panel {
 		` user_url AS "Link"` +
 		" FROM gh_star WHERE $__timeFilter(time) AND " + RF + " ORDER BY time DESC LIMIT 50"
 	// Twelve bars and the rest folded: the axis of a bar per repository was
-	// cut off at the bottom of the panel.
-	byRepo := otherRows(`SELECT repo AS "Repository", stars AS "Stars",`+
+	// cut off at the bottom of the panel. A bar per full name, named by
+	// repoNameSQL, since the fold groups by the label.
+	byRepo := otherRows(`SELECT `+repoNameSQL+` AS "Repository", stars AS "Stars",`+
 		" ROW_NUMBER() OVER (ORDER BY stars DESC) AS rn FROM ("+
 		latestPerRepo([]string{"stars"})+") WHERE stars > 0", "Repository", "Stars", 12)
 	// One series per repository, where gh_star had one per stargazer, and
 	// the value is the day's count rather than a 1 to be counted.
 	dayPath := rp("gh_star_day", "stars")
-	dayRepo := gn("gh_star_day", "repo")
 
 	byRepoGR, byRepoGRtf := gTbl(fmt.Sprintf("sortByMaxima(%s)",
 		rowsOf(rp("gh_repo", "stars"), gn("gh_repo", "repo"))),
 		"Repository", []col{{"lastNotNull", "Stars"}})
-	byRepoES, byRepoEStf := esTbl("gh_repo", []any{b.tm("repo", 500)}, []any{b.mNewest("stars")},
-		[]named{{"repo.keyword", "Repository"}, {"stars", "Stars"}}, []string{ESF})
+	byRepoES, byRepoEStf := esTbl("gh_repo", b.tmRepo(500), []any{b.mNewest("stars")},
+		[]named{{"repo.keyword", "Repository"}, {"stars", "Stars"}}, []string{ESF},
+		hideColumns(panelFullNameField))
 
 	// Graphite keeps no names, so its twin of the newest stargazers was
 	// always a count per repository; reading the history makes it the same
 	// count Stars gained over time draws, repositories with a hidden list
 	// included, rather than a count of its own.
-	newestGR, newestGRtf := gTbl(fmt.Sprintf(`groupByNode(%s, %d, "sum")`,
-		dayPath, dayRepo), "Repository", []col{{"sum", "Stars"}})
+	newestGR, newestGRtf := gTbl(grGroupBy(dayPath, "gh_star_day", "sum", "repo"),
+		"Repository", []col{{"sum", "Stars"}})
 	newestES, newestEStf := b.esRaw("gh_star", 50, []named{
 		{"@timestamp", "Starred at"},
 		{"user", "User"},
@@ -119,7 +120,7 @@ func stars(b *builder) []Panel {
 	return []Panel{
 		panel("timeseries", "Stars gained over time", box{W: 12, H: 8, X: 0, Y: 0}, []Target{sqlTS(perDay)}, &P{
 			Prom: []Target{daily(fmt.Sprintf(
-				"sum by (repo) (increase(github_stars_gained_total{%s}[1d]))", PF,
+				"sum by (full_name, repo) (increase(github_stars_gained_total{%s}[1d]))", PF,
 			), "{{repo}}")},
 			Desc: "Stars per day from GitHub's daily star history, which it serves for " +
 				"every repository whatever the token may see of its stargazers. Each day " +
@@ -143,7 +144,7 @@ func stars(b *builder) []Panel {
 				"time holds every repository's count.",
 			Opts:    mergeOpts(Opts{"bars": true, "stack": true}, dayBins),
 			SQLOpts: seriesOpts,
-			GR:      []Target{grq(perBucket(dayPath, dayRepo))},
+			GR:      []Target{grq(perRepoBucket(dayPath, "gh_star_day"))},
 			// Only the days that hold a star. The sums are the same without
 			// the filter, but the terms bucket ranks repositories by document
 			// count, and every repository writes a zero row for each day of
@@ -178,7 +179,7 @@ func stars(b *builder) []Panel {
 			ESOpts: esStacked, ESDesc: esSnapshot,
 		}),
 		panel("barchart", "Stars by repository", box{W: 12, H: 8, X: 0, Y: 8}, []Target{sqlT(byRepo)}, &P{
-			Prom:     []Target{promTbl(fmt.Sprintf("topk(12, sum by (repo) (github_repo_stars{%s}) > 0)", PF))},
+			Prom:     []Target{promTbl(fmt.Sprintf("topk(12, max by (full_name, repo) (github_repo_stars{%s}) > 0)", PF))},
 			Desc:     "The twelve most starred; the rest are one bar called other.",
 			PromDesc: "Prometheus shows the twelve and folds nothing.",
 			PromTF:   []any{organize(map[string]string{"repo": "Repository", "Value": "Stars"}, nil, nil)},
@@ -187,7 +188,7 @@ func stars(b *builder) []Panel {
 		}),
 		panel("table", "Recent stars", box{W: 12, H: 8, X: 12, Y: 8}, []Target{sqlT(newest)}, &P{
 			Prom: []Target{promTbl(fmt.Sprintf(
-				"sum by (repo) (increase(github_stars_gained_total{%s}[$__range])) > 0", PF,
+				"sum by (full_name, repo) (increase(github_stars_gained_total{%s}[$__range])) > 0", PF,
 			))},
 			PromTF: []any{organize(map[string]string{"repo": "Repository", "Value": "Stars"}, nil, nil)},
 			Desc: "The newest stargazers, one row each. A repository whose stargazer list " +

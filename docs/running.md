@@ -49,7 +49,7 @@ keep it running once you are done watching it.
   ship as `tar.gz` (`zip` on Windows).
 
   ```sh
-  tar -xzf ghchronicle_2.6.0_linux_amd64.tar.gz
+  tar -xzf ghchronicle_2.6.1_linux_amd64.tar.gz
   sudo install -m 755 ghchronicle /usr/local/bin/
   ```
 
@@ -66,11 +66,15 @@ keep it running once you are done watching it.
 - **Container**
 
   ```sh
-  docker run -v $PWD/config.yaml:/config.yaml:ro -e GITHUB_TOKEN \
+  docker run -v $PWD/config.yaml:/config.yaml:ro \
+    -v ghchronicle-state:/var/lib/ghchronicle -e GITHUB_TOKEN \
     ghcr.io/jmrplens/ghchronicle -config /config.yaml
   ```
 
-  Distroless, static, and running as uid 65532.
+  Distroless, static, and running as uid 65532. With `state_file` under
+  `/var/lib/ghchronicle` the volume keeps the state, and it belongs to that
+  user from the start, since the image's own directory does: [what has to
+  be writable](https://jmrp.io/docs/ghchronicle/install/docker/#what-has-to-be-writable).
 
 - **Action**
 
@@ -89,8 +93,8 @@ keep it running once you are done watching it.
 
 The collector pushes to every store it supports, so it does not need to be
 reachable from anywhere. It needs to reach GitHub and to reach its databases.
-That is the only constraint, and it is what makes all five of these viable.
-Four of the five want a host you own: systemd, Docker and cron. GitHub Actions
+That is the only constraint, and it is what makes all four of these viable.
+Three of the four want a host you own: systemd, Docker and cron. GitHub Actions
 is the one that does not. The system pages above are where the scheduler lives,
 one per system: systemd or cron on Linux, launchd on macOS, a scheduled task on
 Windows.
@@ -116,9 +120,17 @@ Plus two that write nothing: `-list` prints the repositories in scope, and
 
 > **The state file is the one thing that must persist**
 >
-> Whichever way it runs, keep `state_file` on a path that survives a restart. It
-> is what stops the full stargazer walk and the year-by-year contribution
-> backfill happening again on every run.
+> Whichever way it runs, keep `state_file` on a path that survives a restart,
+> in a directory the collector can write, since the cache file and the write
+> ledger live beside it. Without it every run collects every family whatever
+> its cadence says, and walks the stargazer list, the whole star history and
+> the co-authored pull requests again.
+
+### Upgrading
+
+A new release goes over the old one the way the old one was installed, and
+the configuration and the state carry over. What the first hours after it look
+like, from 2.5.x to 2.6.x and to 2.6.1, is on [upgrading](https://jmrp.io/docs/ghchronicle/install/upgrading/).
 
 ## Linux
 
@@ -153,7 +165,7 @@ the version you see is the file it just wrote, and it says so when another
 Pin a version, or choose where it goes:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.sh | VERSION=2.6.0 BIN_DIR=~/bin bash
+curl -fsSL https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.sh | VERSION=2.6.1 BIN_DIR=~/bin bash
 ```
 
 > **Reading it first is the whole point of a short script**
@@ -178,7 +190,7 @@ Release archives are named
 | `aarch64`          | `linux_arm64`       |
 
 ```sh
-VERSION=2.6.0
+VERSION=2.6.1
 arch=$(uname -m); case "$arch" in x86_64) arch=amd64 ;; aarch64) arch=arm64 ;; esac
 base=https://github.com/jmrplens/ghchronicle/releases/download/v$VERSION
 curl -fsSLO "$base/ghchronicle_${VERSION}_linux_${arch}.tar.gz"
@@ -216,7 +228,7 @@ the file, then verify the archive against the file.
     ```
 
     ```text
-    ghchronicle_2.6.0_linux_amd64.tar.gz: OK
+    ghchronicle_2.6.1_linux_amd64.tar.gz: OK
     ```
 
 3. Check the checksum file itself, if you have
@@ -286,7 +298,7 @@ meant to.
 the build date of that release.
 
 ```text
-ghchronicle 2.6.0 (commit <commit>, built <date>)
+ghchronicle 2.6.1 (commit <commit>, built <date>)
 ```
 
 ### Run it once
@@ -305,7 +317,10 @@ ghchronicle -config config.yaml -once   # one sweep, then exit
 [systemd](https://jmrp.io/docs/ghchronicle/install/systemd/) is the arrangement this documentation
 treats as the default on Linux, and the unit there is hardened rather than
 minimal, because this is very likely the only process on the host holding a
-GitHub token with read access to every repository of an account.
+GitHub token with read access to every repository of an account. A service
+started on a state file nothing has written yet brings its eleven families of
+six hours or more into the store over its first two and a half hours, one a
+sweep, and only that once; the systemd page says why.
 
 A scheduler works too:
 [cron with `-once`](https://jmrp.io/docs/ghchronicle/install/systemd/#cron-instead-of-a-service) is
@@ -333,7 +348,7 @@ find.
   the go command fetched and the Go release that compiled it:
 
   ```text
-  ghchronicle 2.6.0 (module v2.6.0, built with <go version>)
+  ghchronicle 2.6.1 (module v2.6.1, built with <go version>)
   ```
 
   The first version comes from the `VERSION` file the module embeds.
@@ -362,7 +377,7 @@ on every invocation. What the rest of this documentation assumes:
 | ------------------ | ---------------------------------- | --------------------------- |
 | Configuration      | `/etc/ghchronicle/config.yaml`     | world readable, no secrets  |
 | Tokens             | `/etc/ghchronicle/ghchronicle.env` | `600`                       |
-| State and ledger   | `/var/lib/ghchronicle/`            | written by the service user |
+| State, ledger, cache | `/var/lib/ghchronicle/`          | written by the service user |
 
 `state_file` has a default of its own, `ghchronicle-state.json` in the working
 directory, with the write ledger beside it as
@@ -404,7 +419,7 @@ the version you see is the file it just wrote, and it says so when another
 Pin a version, or choose where it goes:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.sh | VERSION=2.6.0 BIN_DIR=~/bin bash
+curl -fsSL https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.sh | VERSION=2.6.1 BIN_DIR=~/bin bash
 ```
 
 > **Reading it first is the whole point of a short script**
@@ -429,7 +444,7 @@ architecture.
 | `x86_64`           | Intel              | `darwin_amd64`      |
 
 ```sh
-VERSION=2.6.0
+VERSION=2.6.1
 arch=$(uname -m); case "$arch" in x86_64) arch=amd64 ;; esac
 base=https://github.com/jmrplens/ghchronicle/releases/download/v$VERSION
 curl -fsSLO "$base/ghchronicle_${VERSION}_darwin_${arch}.tar.gz"
@@ -467,7 +482,7 @@ signature over that file.
     ```
 
     ```text
-    ghchronicle_2.6.0_darwin_arm64.tar.gz: OK
+    ghchronicle_2.6.1_darwin_arm64.tar.gz: OK
     ```
 
 3. Check the checksum file itself, if you have
@@ -656,9 +671,10 @@ suits it. Replace `KeepAlive` with it and add `-once` to `ProgramArguments`:
   <integer>3600</integer>
 ```
 
-Keep `state_file` on a path that survives, in this mode above all: it is what
-stops the whole stargazer walk and the year by year contribution backfill
-happening again on every run.
+Keep `state_file` on a path that survives, in this mode above all. Without it
+every run collects every family, whatever its cadence, and walks the stargazer
+list, the whole star history and the co-authored pull requests again; the cache
+file beside it is what lets a run ask GitHub only for what changed.
 
 ### Build it from source
 
@@ -679,7 +695,7 @@ so the Xcode command line tools are not needed for it.
   module version the go command fetched and the Go release that compiled it:
 
   ```text
-  ghchronicle 2.6.0 (module v2.6.0, built with <go version>)
+  ghchronicle 2.6.1 (module v2.6.1, built with <go version>)
   ```
 
 - **make**
@@ -704,13 +720,17 @@ the conventional places rather than ones the tool knows:
 | File             | For an agent                                        | For a daemon                     |
 | ---------------- | --------------------------------------------------- | -------------------------------- |
 | Configuration    | `~/Library/Application Support/ghchronicle/`        | `/usr/local/etc/ghchronicle/`    |
-| State and ledger | `~/Library/Application Support/ghchronicle/`        | `/usr/local/var/ghchronicle/`    |
+| State, ledger, cache | `~/Library/Application Support/ghchronicle/`    | `/usr/local/var/ghchronicle/`    |
 | Log              | `~/Library/Logs/ghchronicle.log`                    | `/usr/local/var/log/`            |
 
 `state_file` has a default of its own, `ghchronicle-state.json` in the working
 directory, with the write ledger beside it as `ghchronicle-state-written.bin`
 and the cache as `ghchronicle-state-cache.bin`. A launchd job's working
-directory is not something to rely on. Set it.
+directory is not something to rely on. Set it. From 2.6.1 on a path setting
+takes a leading `~` as the home directory, so an agent's configuration can say
+`state_file: ~/Library/Application Support/ghchronicle/state.json`; an older
+release reads the `~` as a directory name, and wants `/Users/you/...` written
+out.
 
 ## Windows
 
@@ -754,7 +774,7 @@ takes parameters, which needs the slightly longer form because `iex` has
 nowhere to put them:
 
 ```powershell
-& ([scriptblock]::Create((irm https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.ps1))) -Version 2.6.0 -BinDir C:\tools -NoPathUpdate
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.ps1))) -Version 2.6.1 -BinDir C:\tools -NoPathUpdate
 ```
 
 > **Reading it first is the whole point of a short script**
@@ -816,7 +836,7 @@ rather than the shell:
 ```
 
 ```powershell
-$version = "2.6.0"
+$version = "2.6.1"
 $arch = if ($env:PROCESSOR_ARCHITECTURE -eq "ARM64") { "arm64" } else { "amd64" }
 $base = "https://github.com/jmrplens/ghchronicle/releases/download/v$version"
 $zip = "ghchronicle_${version}_windows_${arch}.zip"
@@ -939,7 +959,7 @@ It answers with one line: the release number, then the commit and the build
 date of that release.
 
 ```text
-ghchronicle 2.6.0 (commit <commit>, built <date>)
+ghchronicle 2.6.1 (commit <commit>, built <date>)
 ```
 
 > **If Windows warns about the file**
@@ -956,8 +976,9 @@ ghchronicle 2.6.0 (commit <commit>, built <date>)
 
 ### The token, and the rest of the environment
 
-Every `${VAR}` in the configuration file is read from the environment when the
-process starts, so the token never has to be in the file.
+A `${VAR}` in a credential, an address or a file path of the configuration
+file is read from the environment when the process starts, so the token never
+has to be in the file.
 
 - **PowerShell**
 
@@ -1069,8 +1090,9 @@ and there are two shapes of it.
   of its own and the task is then registered carrying no duration at all.
 
   Two conditions come with this shape, and neither is cron's. An hourly task
-  gives every family an hourly cadence at best, so the fifteen-minute rhythm
-  of `actions` is lost, which is the same trade
+  gives every family an hourly cadence at best, so the five that run every
+  fifteen minutes, `actions`, `events`, `notifs`, `activity` and
+  `ratelimit`, run four times less often, which is the same trade
   [cron makes on Linux](https://jmrp.io/docs/ghchronicle/install/systemd/#cron-instead-of-a-service).
   And `Register-ScheduledTask` here names no `-User` and no `-Principal`, so
   the task is registered under the calling account with the default logon
@@ -1136,7 +1158,7 @@ means no MSVC, no MinGW and no Windows SDK.
   compiled it:
 
   ```text
-  ghchronicle 2.6.0 (module v2.6.0, built with <go version>)
+  ghchronicle 2.6.1 (module v2.6.1, built with <go version>)
   ```
 
 - **From a checkout**
@@ -1161,22 +1183,32 @@ rely on, so give every path in the file absolutely.
 | File             | For a machine-wide task          | For one account                     |
 | ---------------- | -------------------------------- | ----------------------------------- |
 | Configuration    | `C:/ProgramData/ghchronicle/`    | `${LOCALAPPDATA}/ghchronicle/`      |
-| State and ledger | `C:/ProgramData/ghchronicle/`    | `${LOCALAPPDATA}/ghchronicle/`      |
+| State, ledger, cache | `C:/ProgramData/ghchronicle/` | `${LOCALAPPDATA}/ghchronicle/`      |
 | Log              | `C:/ProgramData/ghchronicle/`    | `${LOCALAPPDATA}/ghchronicle/`      |
 
 `${LOCALAPPDATA}` is written that way because `${VAR}` is the one form the
-collector expands, from the environment, as the process starts. `%VAR%` is a
-shell notation and means nothing to the file: a `%LOCALAPPDATA%` copied into
-the YAML gives you a directory literally named `%LOCALAPPDATA%`, next to
-wherever the task happened to be working. It is `%LOCALAPPDATA%` in `cmd` and
-`$env:LOCALAPPDATA` in PowerShell that create the directory in the first place.
+collector expands, from the environment, as the process starts, and it does so
+in `state_file`, `sinks.dedupe_file` and `log.file` from 2.6.1 on. An older
+release expands no path, and reads `${LOCALAPPDATA}/ghchronicle/state.json` as
+a directory literally named `${LOCALAPPDATA}`; with one of those, write the
+path out. `%VAR%` is a shell notation and means nothing to the file: a
+`%LOCALAPPDATA%` copied into the YAML gives you a directory literally named
+`%LOCALAPPDATA%`, next to wherever the task happened to be working. It is
+`%LOCALAPPDATA%` in `cmd` and `$env:LOCALAPPDATA` in PowerShell that create the
+directory in the first place.
+
+The configuration's own path is the exception in the table: it is given on the
+command line, where the collector expands nothing, so a scheduled task's
+`-config` names it in full, `C:\Users\you\AppData\Local\ghchronicle\config.yaml`.
 
 A directory under `C:\ProgramData` is writable by its creator and readable by
 everyone, so create it elevated and then grant write to the account the task
-runs as. The state file and its write ledger are the two the collector rewrites
-on every sweep; if one of them is marked read-only the collector clears that
-attribute itself, because NTFS refuses to replace a read-only file even when
-asked to replace it, and a sweep should not fail over a file property.
+runs as. Leave the state file and the cache file beside it writable. The
+collector replaces both by writing a new file and renaming it over the old one,
+and NTFS refuses to replace a read-only file even when asked to replace it, so
+a read-only state file stops being saved and every sweep warns `state not
+saved`. The write ledger and the file sink's rotated files are the two it
+clears that attribute on itself, and a sweep does not fail over them.
 
 ## systemd
 
@@ -1312,14 +1344,25 @@ losing the cache, one sweep at full price:
     sudo systemctl status ghchronicle
     ```
 
+    The first sweep runs every family, since none has run yet, except that
+    the service starts at most one family of six hours or more a sweep:
+    `traffic`, `stats`, `forks` and the rest of the eleven reach the store
+    over the first two and a half hours, and only this once. See [the slow
+    families take
+    turns](https://jmrp.io/docs/ghchronicle/configuration/cadences/#the-slow-families-take-turns).
+
 ### What to watch
 
 The log says what was written and where.
 
 ```text
-level=INFO msg=written sink=influxdb family=traffic points=629
-level=INFO msg="rate budget" bucket=core remaining=4354 limit=5000
+level=INFO msg=written sink=influxdb family=repo points=934 unchanged=1955
+level=INFO msg="rate budget" bucket=core remaining=4477 limit=5000
 ```
+
+[What the log says on a good
+day](https://jmrp.io/docs/ghchronicle/configuration/logging/#what-the-log-says-on-a-good-day) has
+every routine line.
 
 Two warnings are worth an alert:
 
@@ -1348,10 +1391,15 @@ journalctl -u ghchronicle -p warning --since today
 0 * * * * /usr/local/bin/ghchronicle -config /etc/ghchronicle/config.yaml -once
 ```
 
-Keep the state file on a persistent path even in this mode. It is what stops
-the stargazer walk and the year-by-year contribution backfill happening again
-on every run. Note that an hourly cron gives every family an hourly cadence at
-best, so the fifteen-minute rhythm of `actions` is lost.
+Keep the state file on a persistent path even in this mode. Without it every
+run collects every family, whatever its cadence, and walks the stargazer list,
+the whole star history and the co-authored pull requests again; the cache file
+beside it is what lets a run ask GitHub only for what changed. Note that an
+hourly cron gives every family an hourly cadence at best, so the five that run
+every fifteen minutes, `actions`, `events`, `notifs`, `activity` and
+`ratelimit`, run four times less often: a workflow run's queue time is read
+after it is over, and a notification thread moved twice inside the hour shows
+only its second move.
 
 ## Docker
 
@@ -1754,6 +1802,18 @@ volumes:
 docker compose up -d
 ```
 
+The stack's `state` volume keeps the state and the cache from one start to the
+next, and it is the collector's to write from the first: the image carries the
+directory it is mounted on, owned by the uid the collector runs as, and Docker
+gives a new volume that owner. See [what has to be
+writable](https://jmrp.io/docs/ghchronicle/install/docker/#what-has-to-be-writable).
+
+The first sweep runs every family, since nothing has run yet, except that the
+collector starts one family of six hours or more a sweep: `traffic`, `stats`,
+`forks` and the rest of the eleven reach the store over the first two and a
+half hours, and only the first time. See [the slow families take
+turns](https://jmrp.io/docs/ghchronicle/configuration/cadences/#the-slow-families-take-turns).
+
 With Grafana it is on `http://localhost:3000`, user `admin`,
 password `ghchronicle` unless you set `GRAFANA_PASSWORD`. The dashboard is
 already there: the collector publishes it when it starts and points it at the
@@ -1766,10 +1826,17 @@ The rest of this page is the image itself, for a reader running it another way.
 ```sh
 docker run -d --name ghchronicle \
   -v /etc/ghchronicle/config.yaml:/config.yaml:ro \
+  -v ghchronicle-state:/var/lib/ghchronicle \
   -e GITHUB_TOKEN -e INFLUX_TOKEN \
   -p 9605:9605 \
   ghcr.io/jmrplens/ghchronicle -config /config.yaml
 ```
+
+With `state_file: /var/lib/ghchronicle/state.json` in the configuration, which
+is where the example configuration puts it. The volume is what keeps the state
+and the cache across a new container, and Docker creates it on first use,
+owned by uid 65532 like the directory it is mounted on; [what has to be
+writable](https://jmrp.io/docs/ghchronicle/install/docker/#what-has-to-be-writable) says why each is needed.
 
 ### The image
 
@@ -1796,11 +1863,11 @@ tag, recorded in a public transparency log. With
 cosign verify \
   --certificate-identity-regexp 'https://github.com/jmrplens/ghchronicle/.github/workflows/release.yml@refs/tags/.*' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-  ghcr.io/jmrplens/ghchronicle:v2.6.0 > /dev/null
+  ghcr.io/jmrplens/ghchronicle:v2.6.1 > /dev/null
 ```
 
 ```text
-Verification for ghcr.io/jmrplens/ghchronicle:v2.6.0 --
+Verification for ghcr.io/jmrplens/ghchronicle:v2.6.1 --
 The following checks were performed on each of these signatures:
   - The cosign claims were validated
   - Existence of the claims in the transparency log was verified offline
@@ -1830,26 +1897,54 @@ The config file is mounted read-only. Five things are not:
 | ------------------- | --------------------------------------------------------------------------------- |
 | `state_file`        | Always. Without a persistent path the stargazer walk repeats on every restart     |
 | `<name>-cache.bin`  | Always. The cache, which sits beside the state file and has no setting of its own |
-| `sinks.dedupe_file` | Always. The write ledger, which defaults to sitting beside the state file         |
+| `sinks.dedupe_file` | The long-running service, with a sink that keeps it. A `-once` run opens none     |
 | `sinks.file.path`   | Only with the file sink                                                           |
 | `log.file`          | Only with a log file configured                                                   |
 
-The first three live in the same directory by default, so one mounted volume
-covers them. Mounting only the state file loses the ledger and the cache on
-every restart, and every restart then costs a whole sweep of rewriting, which is
-the one thing the ledger exists to prevent:
-[only what changed is written](https://jmrp.io/docs/ghchronicle/sinks/#only-what-changed-is-written),
-and a whole sweep of asking GitHub again what the cache already knew:
-[the cache beside it](https://jmrp.io/docs/ghchronicle/configuration/#the-cache-beside-it).
+The first three live in the same directory by default, so one mounted
+directory covers them, and it has to be a directory. Each of the three is
+written beside itself and renamed into place, so a reader never sees half a
+file, and a file mounted on its own cannot be renamed over: measured with the
+2.6.1 image built from its Dockerfile, a state file bind-mounted alone was
+never saved, and every sweep said so.
 
-```sh
-docker volume create ghchronicle-state
-docker run -d --name ghchronicle \
-  -v /etc/ghchronicle/config.yaml:/config.yaml:ro \
-  -v ghchronicle-state:/var/lib/ghchronicle \
-  -e GITHUB_TOKEN \
-  ghcr.io/jmrplens/ghchronicle -config /config.yaml
+```text
+level=WARN msg="state not saved" err="rename /var/lib/ghchronicle/state.json.tmp /var/lib/ghchronicle/state.json: device or resource busy"
 ```
+
+A directory the collector cannot write gives the same warning, with the error
+that fits, and one for the cache beside it:
+
+```text
+level=WARN msg="state not saved" err="open /var/lib/ghchronicle/state.json.tmp: permission denied"
+level=WARN msg="cache file not saved" file=/var/lib/ghchronicle/state-cache.bin err="open /var/lib/ghchronicle/state-cache.bin.tmp: permission denied"
+```
+
+From 2.6.1 the image carries `/var/lib/ghchronicle` owned by uid 65532, and
+Docker fills a new named volume from the directory it is mounted over, owner
+included, so the directory the example configuration names needs nothing done
+to it: measured with a fresh volume, and with an empty one the 2.6.0 image had
+left to root, the collector wrote its state and its cache into both with no
+warning. With nothing mounted there it writes too, and the state goes with the
+container. Up to 2.6.0 the image had no such directory: nothing mounted there
+left one uid 65532 could not create, and a new named volume there was root's,
+which is where the two lines above came from.
+
+Two ways are left to end up with a directory the collector cannot write. A
+named volume mounted where the image has no directory of its own is created
+owned by root: hand it to uid 65532 once, with any image that has a `chown`,
+as in `docker run --rm -v <volume>:/v alpine chown 65532:65532 /v`. A host
+directory is mounted as it is, whoever owns it: `sudo chown 65532:65532` it on
+the host. A configuration that names no `state_file` at all writes to the
+container's working directory, which is writable and goes with the container.
+
+Without the state, every new container starts from nothing: the stargazer walk,
+the whole star history and the co-authored walk again, and every family at
+once. Without the cache, a whole sweep of asking GitHub again what it already
+knew: [the cache beside it](https://jmrp.io/docs/ghchronicle/configuration/#the-cache-beside-it).
+Without the ledger, a whole sweep of rewriting, which is the one thing it exists
+to prevent: [only what changed is
+written](https://jmrp.io/docs/ghchronicle/sinks/#only-what-changed-is-written).
 
 ### The port
 
@@ -1929,7 +2024,9 @@ docker run --rm \
   ghcr.io/jmrplens/ghchronicle -config /config.yaml -once
 ```
 
-Mount the state volume in this mode too. It is what makes the second run cheap.
+Mount the state volume in this mode too. It is what makes the second run
+cheap, and what keeps each family to its own cadence: without it every run
+collects every family.
 
 ## GitHub Actions
 
@@ -1953,7 +2050,7 @@ it downloads a release binary and calls it.
 | Input             | Default              | What it does                                                                                                      |
 | ----------------- | -------------------- | ----------------------------------------------------------------------------------------------------------------- |
 | `token`           | required             | A personal access token. The automatic `GITHUB_TOKEN` is not enough                                               |
-| `config`          | `""`                 | Path to a configuration file. Omit to run with defaults built from `user`                                         |
+| `config`          | `""`                 | Path to a configuration file. Omit to run with defaults built from `user`, whose state lasts one run and cannot be cached |
 | `user`            | the repository owner | The account to collect when no config file is given                                                               |
 | `mode`            | `once`               | `once`, `backfill` or `card`                                                                                      |
 | `backfill-since`  | `""`                 | Bound for `backfill`: a date, `90d`, `2y` or a Go duration. Empty means no bound                                  |
@@ -1965,7 +2062,7 @@ it downloads a release binary and calls it.
 | `card-width`      | `""`                 | Card width in pixels. Empty draws the layout at its own width; each one draws between two ends of its own, stated in its [section](https://jmrp.io/docs/ghchronicle/card/layouts/). Only `activity-heatmap` spends the room on data, a whole year of the calendar at its far end |
 | `card-speed`      | `""`                 | How fast an animated layout plays, as a decimal from 0 to 1. Empty means 0.5, the pace every card has always been drawn at; below it the card is slower, above it faster, and every animated layout scales together. 0 is the slowest animation and not a still card, `card-motion: off` is |
 | `include-private` | `false`              | `true` counts private repositories when no config file is given. See the warning below |
-| `version`         | `latest`             | The release to install: `latest` for the newest, or a release with or without its `v`, so `2.6.0` and `v2.6.0` are the same one. The major tag `v2` is what `uses:` takes, not a release, and is refused |
+| `version`         | `latest`             | The release to install: `latest` for the newest, or a release with or without its `v`, so `2.6.1` and `v2.6.1` are the same one. The major tag `v2` is what `uses:` takes, not a release, and is refused |
 
 ### The three modes
 
@@ -2165,30 +2262,50 @@ in the `<picture>` are relative to the README, so a `docs/README.md` points at
 > `security_events`, no `read:packages`, and is not a user, so nothing
 > account-wide works with it. See [the token](https://jmrp.io/docs/ghchronicle/start/token/).
 
-**The state file does not survive between runs.** Each run therefore does the
-full stargazer walk again, and reads every repository's daily star history
-whole, a page per thirty weeks of its life. On a small account that is a
-handful of calls; on an account with many stars or old repositories, cache it:
+**The state file does not survive between runs.** Without it every run is a
+first run. Every family runs, whatever its cadence says, because nothing
+remembers when it last did. The full stargazer walk is done again, and every
+repository's daily star history is read whole, a page per thirty weeks of its
+life. `achievements` walks the account's merged pull requests whole for its
+co-authored count, which was 35 queries and 23.7 MB on an account with 2,315
+of them. And with no [cache file](https://jmrp.io/docs/ghchronicle/configuration/#the-cache-beside-it)
+beside the state, nothing is asked with an ETag, so no answer is a free 304. On
+a small account that is a handful of calls; on an account with many stars, old
+repositories or a long history, cache it.
+
+Caching needs a `config:` file. Without one the Action writes a configuration
+of its own and puts the state in a new temporary directory under `RUNNER_TEMP`
+on every run, which no cache step can name. With one, point `state_file` at the
+home directory:
 
 ```yaml
-- uses: actions/cache@v4
+state_file: ~/.ghchronicle/state.json
+```
+
+and restore and save that directory with a step before the ghchronicle one:
+
+```yaml
+- uses: actions/cache@v6
   with:
     path: ~/.ghchronicle
     key: ghchronicle-state-${{ github.run_id }}
     restore-keys: ghchronicle-state-
 ```
 
-and point `state_file` at `~/.ghchronicle/state.json` in the config. The
-directory holds [the cache beside the state
-file](https://jmrp.io/docs/ghchronicle/configuration/#the-cache-beside-it) as well, which a `once`
-step writes and a `backfill` step only reads, so a run restored from it also
-asks GitHub with the validators the last one stored, and pays only for what
-changed. A `card` mode run reads a restored state file, which
+A `~` in `state_file` is the home directory from 2.6.1 on. An older release
+reads it as written, a directory called `~` in the checkout that the cache step
+never sees, so with a `version` older than 2.6.1 write the path out:
+`/home/runner/.ghchronicle/state.json` on a GitHub-hosted Ubuntu runner.
+
+The directory then holds the cache file as well, which a `once` step writes and
+a `backfill` step only reads, so a run restored from it also asks GitHub with
+the validators the last one stored, and pays only for what changed. A `card` mode run reads a restored state file, which
 is what lets it skip both walks, and never writes one back, nor the cache file
 beside it: it delivers its points to the card and to no store, so nothing it
 learned may tell the next collection that a family is already done. What fills
 the `actions/cache` entry is a `once` step, with both files, or a `backfill`
-step, with the state file alone.
+step, with the state file alone. No step keeps a write ledger there: a run that
+ends with its sweep opens none.
 
 ### Without the Action
 
@@ -2203,3 +2320,166 @@ The same thing by hand, if you would rather not depend on it:
   env:
     GITHUB_TOKEN: ${{ secrets.GHCHRONICLE_TOKEN }}
 ```
+
+## Upgrading
+
+What the first hours after an upgrade from 2.5.x to 2.6.x look like, each of them once and on purpose, and what 2.6.1 changes in a store written before it.
+
+Source: <https://jmrp.io/docs/ghchronicle/install/upgrading/>
+
+Install the new release the way the old one was installed, over it, and start
+the collector again. The configuration, the state file and the write ledger
+carry over as they are, and nothing has to be migrated by hand. What follows is
+what the first hours after the upgrade look like, so that none of it reads as a
+fault, and the few things worth doing about them.
+
+The dashboards are generated from the binary, so publish them again after an
+upgrade, with `-publish-dashboard` or `grafana.publish_on_start`: see [letting
+the binary do it](https://jmrp.io/docs/ghchronicle/dashboards/#letting-the-binary-do-it).
+
+### From 2.5.x to 2.6.x
+
+#### The first start pays in full, once
+
+2.6.0 keeps what a sweep learned about GitHub in [a cache file beside the state
+file](https://jmrp.io/docs/ghchronicle/configuration/#the-cache-beside-it), and 2.5.x wrote none. So
+the first start finds nothing to read, says so at `debug` as `no cache file
+yet, the first pass of each family pays in full`, and asks everything once
+without an ETag. That is the price every 2.5.x restart paid: measured on the
+author's service on 2026-09-26, the first 38 minutes after a restart spent
+1,092 charged `core` requests on passes that cost about 66 with the cache warm.
+From the second start on the file is there, and the log says `cache file read`.
+
+#### `achievements` walks the whole merged history, once
+
+The co-authored pull request count behind Pair Extraordinaire is kept in the
+state file from 2.6.0 on, and a 2.5.x state file holds none. The first
+`achievements` pass therefore walks every pull request the account has merged:
+35 queries and 23.7 MB over 2,315 of them, measured on 2026-09-27. After that a
+pass walks the days since the count it keeps, and the whole history again once
+a week.
+
+#### `totals` runs first
+
+The pull request query is sized per repository from the counts `totals` reads,
+and 2.6.0 keeps those sizes in the cache file. The first sweep has none, so it
+runs `totals` before the pull requests whatever its cadence says. At its hourly
+cadence `totals` is usually due anyway after an upgrade, and then it simply
+runs first; only when it is not due, and the sweep is not a primed one, which
+runs every family, does the log say why it runs:
+
+```text
+level=INFO msg="no page sizes remembered, running totals before the pull requests it sizes"
+```
+
+#### The slow families spread out
+
+A 2.5.x state file has the account's daily families marked at one instant and
+its twelve-hour ones at another, because that is when they ran, together. 2.6.0
+starts at most one family of six hours or more a sweep, so the first day after
+the upgrade brings them in one a tick: over up to two and a half hours at the
+built-in cadences, and longer with `deps`, `history` or `joblogs` switched on.
+The log names who starts and who waits, under `slow families due together take
+turns`, and from then on each keeps its own time. See [the slow families take
+turns](https://jmrp.io/docs/ghchronicle/configuration/cadences/#the-slow-families-take-turns).
+
+#### `commented_elsewhere` drops
+
+The search behind `gh_account_total.commented_elsewhere` used to count the
+threads the account commented on in its own repositories too. From 2.5.2, whose
+changes shipped in 2.6.0, it leaves them out, as its two siblings already did,
+and the field keeps its name. So every store's series drops by the difference
+on the first `totals` sweep after the upgrade, from 125 to 55 on the account it
+was measured on. It is a correction, not a loss.
+
+#### PostgreSQL tables gain columns
+
+2.6.0 adds fields to measurements whose tables an earlier release made, and a
+table an earlier release made has no column for them. The PostgreSQL sink that
+connects reads each table's columns the first time its process meets it and
+adds the missing ones with `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`. The SQL
+file sink cannot ask, so its file carries that statement for every field, and
+replaying it into a database an earlier release filled makes psql print a
+notice for every table and every column that is already there. They are
+expected:
+
+```text
+NOTICE:  relation "gh_repo" already exists, skipping
+NOTICE:  column "stars" of relation "gh_repo" already exists, skipping
+```
+
+See [how the declarations arrive](https://jmrp.io/docs/ghchronicle/sinks/postgres/#how-the-declarations-arrive).
+
+#### The Stars column of Work elsewhere waits for `outbound`
+
+The "Work elsewhere" table joins `gh_upstream_repo`, a measurement 2.6.0 adds,
+for the stars of each repository. Until the first `outbound` pass of the new
+version writes it, which is within the hour, InfluxDB and PostgreSQL refuse the
+whole table rather than leave the column empty, and a range that ends before the
+upgrade has no stars to show in any store. Wait for that pass, or publish the
+dashboards after it; see [the data looks
+wrong](https://jmrp.io/docs/ghchronicle/reference/troubleshooting/#the-data-looks-wrong).
+
+#### A configuration copied from an older example keeps the old cadences
+
+Up to 2.6.0 the example configuration set every family under `every.families`
+to the built-in value of its release, so a `config.yaml` copied from it sets
+them all. One copied from 2.5.x keeps twelve of them slower than 2.6.0 runs
+them: `account`, `outbound` and `totals` at `12h`, `achievements` at `24h`,
+`stars`, `billing` and `analyses` at `6h`, `discussions` at `2h`, `deployments`
+at `1h`, and `activity`, `events` and `notifs` at `30m`. Nothing warns, since
+the warning is for a cadence four times faster than the built-in one. Deleting
+those lines is what picks up the current values; from 2.6.1 the example shows
+them commented out, so a copy of it sets none. See [every family, its group and
+its built-in
+cadence](https://jmrp.io/docs/ghchronicle/configuration/cadences/#every-family-its-group-and-its-built-in-cadence).
+
+### To 2.6.1
+
+#### Whether a comment is the accepted answer is a field
+
+`gh_discussion_comment` carried `is_answer` as a tag, and a maintainer accepts
+an answer days after the comment was written, so one comment read before and
+after that was two rows at the same instant. 2.6.1 writes no `is_answer` at
+all: the `answers` field every row already carried, 1 for the accepted answer
+and 0 for any other comment, says the same thing. A store written before 2.6.1
+and since holds the measurement in two shapes until the measurement is dropped
+and filled again with a [backfill](https://jmrp.io/docs/ghchronicle/how/backfill/). The dashboards
+read both shapes, one row per comment, and [the measurements
+page](https://jmrp.io/docs/ghchronicle/collectors/measurements/#how-to-read-the-tables) says what
+each store keeps and how to drop it. A tool that makes the change for you is
+planned for a later release, in
+[issue #96](https://github.com/jmrplens/ghchronicle/issues/96).
+
+#### A path setting is expanded
+
+`state_file`, `sinks.dedupe_file`, `log.file`, `sinks.file.path` and
+`sinks.sql.path` take a leading `~` as the home directory and a `${VAR}` from
+the environment, as credentials and addresses always did. A configuration that
+wrote either one used to get a directory named with those characters, under
+the working directory, and now gets the path it meant. Where that was the
+state file, the state the old release kept is in the directory with the odd
+name, and the new one starts without it: move the files across before the
+first start if the walks it saves are worth keeping. A `${VAR}` in a path that
+is unset or empty stops the start and names the key, rather than leaving the
+path without that part. See [`${VAR}`
+expansion](https://jmrp.io/docs/ghchronicle/configuration/#var-expansion).
+
+#### A Docker state volume needs no `chown`
+
+Up to 2.6.0 the image had no `/var/lib/ghchronicle`, so the volume a compose
+stack or a `docker run` mounted there was created owned by root, and the
+collector, uid 65532, saved neither its state nor its cache in it until the
+volume was handed over with a `chown`. From 2.6.1 the image carries the
+directory, owned by uid 65532, and Docker gives a new volume mounted there that
+owner. An empty volume an earlier image left to root is handed over the same
+way the first time a container of 2.6.1 is created on it, which
+`docker compose pull` followed by `docker compose up -d` does; one already
+handed over is left as it is. A host directory mounted there still needs its
+`chown`. See [what has to be
+writable](https://jmrp.io/docs/ghchronicle/install/docker/#what-has-to-be-writable).
+
+> **What else changed**
+>
+> Every release's own notes, with what was measured and what was not, are in
+> [the changelog](https://jmrp.io/docs/ghchronicle/reference/changelog/).

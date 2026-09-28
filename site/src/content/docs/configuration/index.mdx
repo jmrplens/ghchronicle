@@ -1,6 +1,6 @@
 ---
 title: The file
-description: "The ghchronicle configuration: one YAML file, every value expandable from the environment, and what each top-level block is for."
+description: "The ghchronicle configuration: one YAML file, its credentials, addresses and paths expandable from the environment, and what each top-level block is for."
 searchTitle: The ghchronicle configuration file
 defaultColumns:
   - table: Key
@@ -33,6 +33,7 @@ heartbeat: # how often the sweep loop wakes, for a test run
 log: # level, format, and an optional rotating file
 state_file: # what a restart remembers
 backfill: # the bound, when run with -backfill
+grafana: # where the dashboard is published, when asked
 ```
 
 Only `github.token` and one of `targets.user`, `targets.orgs` or
@@ -41,8 +42,9 @@ has a default.
 
 ## `${VAR}` expansion
 
-Every string value is expanded from the environment at start-up. `${GITHUB_TOKEN}`
-becomes the value of that variable, or an empty string if it is not set.
+A credential, an address or a file path is expanded from the environment at
+start-up. `${GITHUB_TOKEN}` becomes the value of that variable, or an empty
+string if it is not set, except in a file path, below.
 
 ```yaml
 github:
@@ -52,6 +54,34 @@ sinks:
     url: http://localhost:8181
     token: ${INFLUX_TOKEN}
 ```
+
+Expansion is per key, not over the whole file, and these are the keys it
+reaches:
+
+- credentials: `github.token`, `sinks.influxdb.token`, every value of
+  `sinks.otlp.headers`, `sinks.telegraf.username` and `password`,
+  `sinks.postgres.dsn`, `sinks.elasticsearch.api_key`, `username` and
+  `password`, and `grafana.token`, `user` and `password`;
+- addresses: `github.base_url` and `web_url`, the `url` of `influxdb`, `loki`,
+  `telegraf` and `elasticsearch`, `sinks.otlp.endpoint`,
+  `sinks.graphite.addr`, `grafana.url` and `grafana.datasource.url`;
+- the identifiers of what Grafana already has: `grafana.dashboard_uid`,
+  `grafana.datasource.uid` and `grafana.datasource.loki_uid`;
+- file paths: `state_file`, `sinks.dedupe_file`, `log.file`,
+  `sinks.file.path` and `sinks.sql.path`, where a leading `~` is also the home
+  directory, so `state_file: ~/.ghchronicle/state.json` is a file under it.
+  Only `~` on its own or before a separator is read that way, `~name` is left
+  as written, and a `~` where the process has no home directory is refused at
+  start-up naming the key. So is a `${VAR}` in a path that is unset or empty,
+  since the path left without it is not the one written:
+  `state_file: ${STATE_DIRECTORY}/state.json` would be `/state.json`, with the
+  ledger and the cache file beside it at the root of the filesystem. Before
+  2.6.1 no path was expanded, and that `~` in a `state_file` was a directory
+  called `~` under the working directory.
+
+Every other value is read as written, so a `${VAR}` in `sinks.loki.tenant_id`,
+`sinks.influxdb.bucket`, `sinks.prometheus.listen`, a label, a prefix or a
+cadence reaches the collector as those characters.
 
 This is the whole reason the file can be committed. The configuration is the
 shape of the deployment and belongs in version control; the tokens are
@@ -123,7 +153,10 @@ Eight things, and deleting the file costs a different one for each:
   pull requests merged since that day, and the whole history again once a week
   or when the rule has changed. Without it the next pass walks the account's
   merged pull requests whole, which on an account with 2,315 of them was 35
-  queries and 24 MB, where a day's pass is one query and 0.3 to 0.6 MB.
+  queries and 23.7 MB, where a pass that has it walks only the day in progress:
+  the counts query and one page of the walk, two points, and 468 to 513 KB for
+  each hourly pass the production proxy logged against the same account on
+  2026-09-27, a size that grows through the day with what is merged.
 
 Seven of the eight cost only quota, because what is collected again is keyed by
 measurement, tags and timestamp and overwrites what is already stored.
@@ -185,11 +218,41 @@ stores hold, which is the case once the ledger is deleted to fill a wiped store
 again, with `dedupe_file: off` or a store's own `dedupe: false`, and in a run
 that ends with its sweep; and where a destination has been added since the file
 was written. Their jobs are then listed and offered again with every other
-point.
+point. Two of those cases are news, a ledger the configuration keeps that reads
+empty and a destination added, and start-up says them:
+
+```text
+level=INFO msg="the write ledger remembers nothing, listing the jobs of the runs the cache file remembers again" runs=666
+level=INFO msg="a store was added since the cache file was written, listing the jobs of the runs it remembers again" stores=influxdb,loki,postgres written_to=influxdb,loki runs=666
+```
+
+The others are how the configuration always runs, a store kept without a
+ledger or a run that ends with its sweep, and are said only at `debug`, as
+`not every store keeps a write ledger`.
+
+Every start that finds the file says what it read, at its first sweep, and
+one that finds none says so at `debug`:
+
+```text
+level=INFO msg="cache file read" file=/var/lib/ghchronicle/state-cache.bin written=2026-09-27T15:27:41+02:00 answers=1170 runs=672 refusals=100 page_sizes=54 age=1s
+```
 
 It is written at most every five minutes while the collector runs, and once more
-when it stops, however it stops. A run with `-card-only` reads it and does not
-write it, for the reason it leaves the state file alone. A `-backfill` reads it
+when it stops: at the end of a `-once`, and when the service is asked to stop
+with `SIGTERM` or `SIGINT`, which is what `systemctl stop`, `docker stop` and
+Ctrl-C send. A process killed outright
+cannot, so `SIGKILL`, the kernel's out-of-memory killer, `docker kill`,
+`taskkill /F` and `Stop-ScheduledTask` lose what it learned since the last save,
+five minutes at most, and the next start asks those answers again. A save that
+fails says so, and so does a start that finds a file it cannot read:
+
+```text
+level=WARN msg="cache file not saved" file=/var/lib/ghchronicle/state-cache.bin err="open /var/lib/ghchronicle/state-cache.bin.tmp: permission denied"
+level=WARN msg="cache file not read, the first pass of each family pays in full" file=/var/lib/ghchronicle/state-cache.bin err="..."
+```
+
+A run with `-card-only` reads it and does not write it, for the reason it
+leaves the state file alone. A `-backfill` reads it
 and does not write it either: the pages it walks are pages no sweep asks for,
 and kept they would crowd the sweeps' own answers out of the file. An upgrade
 keeps it: an answer is kept under the shape of what its collector reads, so the
@@ -212,10 +275,16 @@ paid before it existed, and loses nothing. Every answer is asked for again,
 every refused feature is asked about again, which is also how to have a feature
 switched on today noticed before its day is out, the jobs of the newest runs are
 listed once more, and the first sweep runs `totals` before the pull requests,
-whatever its cadence says, so their pages are sized again. A file that does not
-load in full, cut short, damaged or written in another format, is set aside
-with a warning and costs the same. It wants the same persistent path as the
-other two.
+whatever its cadence says, so their pages are sized again. When `totals` was
+not due anyway, it says so:
+
+```text
+level=INFO msg="no page sizes remembered, running totals before the pull requests it sizes"
+```
+
+A file that does not load in full, cut short, damaged or written in another
+format, is not read at all, with the warning above, and costs the same; the
+next save writes over it. It wants the same persistent path as the other two.
 
 ## `backfill`
 
@@ -242,6 +311,7 @@ the key and what it needs.
 | Message                                                               | Means                                                                 |
 | --------------------------------------------------------------------- | --------------------------------------------------------------------- |
 | `github.token is empty and GITHUB_TOKEN is unset`                     | Exactly what it says                                                  |
+| `state_file: "${X}/state.json" names ${X}, which is unset, ...`       | A path names a variable with no value: set it, or write the path out  |
 | `targets: set at least one of user, orgs or repos`                    | Nothing to collect                                                    |
 | `sinks: enable at least one of ...`                                   | A run that collects and discards is almost never what anyone meant    |
 | `every.families.<name>: unknown collector`                            | The name is not a family. The message lists the ones that exist       |
@@ -264,3 +334,5 @@ the key and what it needs.
   rotating file.
 - [Choosing a store](/ghchronicle/sinks/): the `sinks` block, one page per
   store.
+- [Letting the binary publish the dashboard](/ghchronicle/dashboards/#letting-the-binary-do-it):
+  the `grafana` block.

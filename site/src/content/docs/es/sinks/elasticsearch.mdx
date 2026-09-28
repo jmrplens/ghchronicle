@@ -105,12 +105,23 @@ apuntando a `<prefijo>-*`, porque cada objetivo nombra su propio índice en su
 consulta.
 
 Pon el campo de tiempo del datasource a `@timestamp`. Una tabla por elemento
-allí son los documentos más nuevos en sí; todo lo demás es una agregación por
-cubos. OpenSearch funciona con el mismo plugin.
+allí son los documentos más nuevos en sí, o el más nuevo de cada elemento
+cuando un elemento tiene varios; todo lo demás es una agregación por cubos.
+OpenSearch funciona con el mismo plugin.
+
+Hay dos cosas que una consulta no puede hacer allí, y los paneles que las
+necesitan lo dicen. No puede unir dos índices, así que Work elsewhere no tiene
+columna Stars y el perfil de comunidad conserva la bandera de plantilla de
+issue de la API en vez del número de plantillas. Y no puede preguntar por una
+ventana mientras lee otra: el Overview y Every repository, ever cuentan un
+repositorio archivado que el filtro por omisión aparta por sus documentos de
+los últimos siete días, donde los almacenes SQL preguntan si el colector lo
+sigue escribiendo, así que un rango que terminó hace más de una semana deja
+fuera esos repositorios.
 
 ## Por dónde seguir
 
-- [Elegir almacén](/ghchronicle/es/sinks/) compara Elasticsearch con los otros nueve, y
+- [Elegir almacén](/ghchronicle/es/sinks/) compara Elasticsearch con los demás, y
   lleva el registro de escrituras que todos comparten.
 - [Los dashboards](/ghchronicle/es/dashboards/) dice cuál de los cinco se dibuja
   contra cada almacén, y en qué se convierte un panel que un almacén no puede

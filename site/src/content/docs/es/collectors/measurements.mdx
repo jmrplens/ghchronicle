@@ -110,12 +110,20 @@ válido y devuelve nada en silencio; pasa a ser `full_name = 'owner/name'`.
 Casi todas llevan además un campo
 `url`: la página de GitHub de aquello de lo que habla la fila, para que una fila
 de un dashboard que nombra algo también pueda abrirlo. Una `url` es absoluta o
-está ausente, porque los dashboards enlazan al propio valor, y toda medida que
-la lleva se enlaza por unidad desde al menos una tabla, salvo las ocho que solo
-se dibujan como curva o barra (`gh_pull_request_review`, `gh_workflow_job`,
-`gh_event`, `gh_issue_event`, `gh_artifact`, `gh_contribution_day`,
-`gh_contribution_day_repo` y `gh_commit_check`), donde una url por ítem no
-tiene fila en la que sentarse.
+está ausente, porque los dashboards enlazan al propio valor. Toda medida que la
+lleva se enlaza ítem a ítem desde al menos una tabla, con dos clases de
+excepción. Las filas de algunas solo se cuentan o se suman, en una curva, una
+barra, un stat o una línea de tabla por repositorio, revisor, job o check, donde
+una url por ítem no tiene fila en la que sentarse: `gh_pull_request_review`,
+`gh_workflow_job`, `gh_event`, `gh_issue_event`, `gh_artifact`,
+`gh_contribution_day`, `gh_contribution_day_repo`, `gh_commit_check`,
+`gh_issue_comment`, `gh_billing_usage`, `gh_dependabot_alert`,
+`gh_code_scanning_alert`, y las de toda la cuenta `gh_account`,
+`gh_account_total`, `gh_contributions_total` y `gh_sponsors_listing`. Y dos
+llevan una url que ninguna tabla enlaza: `gh_release_published`, que no lee
+ningún panel, porque la tabla de releases enlaza cada release desde
+`gh_release`, y `gh_upstream_repo`, que _Work elsewhere_ une para su columna
+Stars mientras cada una de sus filas enlaza el ítem y no el repositorio.
 
 Una etiqueta que GitHub deja vacía se escribe como `(none)`, una sola grafía en
 todas las medidas, y ese mismo `(none)` va en unos pocos campos de texto que no
@@ -128,8 +136,8 @@ entonces.
 
 Los paréntesis son lo que importa de la grafía. GitHub contesta `unknown` él
 mismo en el `relationship` de una alerta de Dependabot, y `none` es un valor de
-más de uno de sus enums, así que un relleno escrito de cualquiera de las dos
-maneras no se distinguiría de una respuesta; `(none)` no es nunca un valor que
+más de uno de sus enums, así que un valor de reserva escrito de cualquiera de
+las dos maneras no se distinguiría de una respuesta; `(none)` no es nunca un valor que
 GitHub devuelva. Un valor sí lee `none` sin ellos y lo dice en serio: `gate` en
 `gh_commit` es el estado de la puerta del commit, y `none` es el estado de un
 commit sobre el que no corrió ninguna, junto a `SUCCESS` y `FAILURE`.
@@ -150,11 +158,34 @@ campo en la primera escritura: `gh_artifact.expired` es `live`,
 de `gh_pull_request` son `is_draft` y `decision`, `gh_discussion.answered` es
 `has_answer`, `gh_pull_request_review.state` es `review_state`,
 `gh_deployment.state` es `outcome` y `gh_notification.unread` es `is_unread`.
+`gh_discussion_comment.is_answer`, que 2.6.1 dejó de escribir, no necesitó
+nombre nuevo: es el campo `answers` que ya traía cada fila de esa medida, 1
+para la respuesta aceptada y 0 para cualquier otro comentario.
 `state` en una pull request, una issue y una contribución externa sigue siendo
 etiqueta porque su fecha se mueve con él: la fila abierta se sella al inicio
 del día y la cerrada cuando se cerró. El exportador de Prometheus
 vuelve a leer los valores degradados como `labels` de Prometheus; Graphite, que
 no guarda texto, no puede agrupar por ellos y sus paneles lo dicen.
+
+**Un almacén escrito antes de 2.6.1 y después guarda `gh_discussion_comment`
+con dos formas.** Un comentario que una versión anterior leyó antes de que lo
+aceptaran y otra vez después son dos filas en el mismo instante, una por cada
+valor de `is_answer`. Un comentario que leyó una versión anterior gana una
+fila más sin esa etiqueta cuando una pasada de 2.6.1 lo vuelve a leer: la
+segunda para la mayoría, la tercera para uno que ya tenía dos. Las dos tablas
+del dashboard sobre esta medida leen una fila por comentario en todos los
+almacenes, aceptado si cualquiera de sus filas lo dice, así que una respuesta
+aceptada antes de 2.6.1 y retirada después sigue apareciendo como aceptada. Borrar la medida y lanzar un `-backfill` deja una fila
+por comentario: la tabla en InfluxDB 3 y en PostgreSQL, las rutas
+`github.discussion_comment` en Graphite, el índice
+`ghchronicle-gh_discussion_comment` en Elasticsearch. El destino PostgreSQL
+que se conecta sigue escribiendo en una tabla creada por una versión
+anterior, resolviendo el conflicto sobre la clave de esa misma tabla, y sus
+filas nuevas llevan la cadena vacía en `is_answer`. El fichero SQL no puede
+conocer esa clave, así que, reproducido contra una tabla así, sus sentencias de
+`gh_discussion_comment` se rechazan mientras el resto del fichero se carga,
+hasta que se borre la tabla. El exportador de Prometheus no conserva nada entre
+reinicios y cuenta cada comentario una sola vez.
 
 ### De una fila a una consulta
 
@@ -371,9 +402,9 @@ medida por la que agrupar un calendario de releases o de la que leer "la
 `gh_release` sigue sellada en la pasada, porque sus descargas se mueven, y su
 `age_days` son días enteros truncados contados hacia atrás desde la pasada: la
 fecha que reconstruye llega un día tarde para toda release publicada más tarde
-dentro del día que la hora de la pasada. `published` vale 1 en todas las
-filas, así que contar releases es una suma. `prerelease` es aquí un campo,
-donde en `gh_release` es una etiqueta: una pre-release se promueve desmarcando
+dentro del día que la hora de la pasada. `published` vale el entero 1 en
+todas las filas, así que contar releases es una suma. `prerelease` es aquí un
+campo booleano, donde en `gh_release` es una etiqueta: una pre-release se promueve desmarcando
 la casilla en la release ya publicada, y como etiqueta una promoción que
 conserve la fecha de la publicación escribiría una segunda fila en el mismo
 instante, que la suma contaría dos veces. Una release que vuelve a borrador y se
@@ -530,12 +561,15 @@ cuesta un punto por página con ello igual que sin ello.
 
 `gh_upstream_repo` es el lado del repositorio de esas mismas búsquedas: una
 fila por repositorio al que llegaron en la pasada, fechada en la pasada, con
-sus `stars`, sus `forks`, su `language` principal y `private`, y su página. El
-recuento de estrellas no está en `gh_external_contribution` porque esa fila
-está fechada cuando se cerró el elemento, y un recuento que se mueve casi cada
-día reescribiría una fila del pasado cada vez. La tabla "Work elsewhere" une a
-cada elemento la más reciente de estas filas dentro del rango, como Stars. Un
-repositorio tiene fila siempre que una búsqueda lee un elemento suyo: cada
+sus `stars` y sus `forks` como enteros, `private` como booleano, su `language`
+principal, ausente cuando GitHub no detecta ninguno, y su página. El recuento
+de estrellas no está en `gh_external_contribution` porque esa fila está
+fechada cuando se cerró el elemento, y un recuento que se mueve casi cada día
+reescribiría una fila del pasado cada vez. En InfluxDB y en PostgreSQL la
+tabla "Work elsewhere" une a cada elemento la más reciente de estas filas
+dentro del rango, como Stars, y en Prometheus su Stars es el recuento que
+guarda el exportador; Graphite y Elasticsearch no pueden unir una medida con
+otra, y sus tablas no tienen columna Stars. Un repositorio tiene fila siempre que una búsqueda lee un elemento suyo: cada
 estado abierto se lee entero en cada pasada, y cada estado cerrado desde su
 página más reciente, así que un repositorio cuyos elementos están todos
 cerrados y más atrás que esa página conserva la fila de la última pasada que
@@ -704,10 +738,14 @@ cachés de CodeQL en main de jmrplens/jmrplens, 57,9 MB entre todas, quedaron
 guardadas como una de 3,8 MB. El listado se lee en páginas de cien entradas,
 hasta diez, donde antes se paraba en la primera: el 2026-09-27 dos
 repositorios de la cuenta tenían 118 y 232 entradas. Se lee de la creada más
-recientemente a la más antigua, un orden que un acierto de caché no cambia, y
-una pasada que lee menos entradas de las que el listado decía tener, porque una
-se borró entre dos de sus páginas, no escribe la fila: la escribe la siguiente
-pasada del día.
+recientemente a la más antigua, un orden que un acierto de caché no cambia.
+Una pasada que lee menos entradas de las que el listado decía tener, porque una
+se borró entre dos de sus páginas, no escribe ninguna fila de
+`gh_actions_cache_entry`, y tampoco una a la que le falló una página posterior:
+sumada, una parte de una caché se escribiría sobre la caché entera que guardaron
+las pasadas anteriores del día, y las filas las escribe la siguiente pasada del
+día. El total de `gh_actions_cache`, leído antes que el listado, se escribe en
+los dos casos.
 
 ## Seguridad
 
@@ -825,7 +863,7 @@ en ambos casos, y quedan completas tras un backfill.
 | `gh_account_total`       | ahora                                    |                                                                       | `pulls_opened`, `pulls_merged`, `pulls_open_now`, `pulls_merged_elsewhere`, `pulls_reviewed`, `issues_opened`, `issues_closed`, `issues_elsewhere`, `commented_elsewhere`, `commits`, `repositories`, `url`                                                                               |
 | `gh_repo_created`        | fechado, al crearse                      | `fork`                                                        | `created`, `private`, `url`                                                                                                                                                                                                                                                               |
 | `gh_key`                 | diario                                   | `kind` (ssh, gpg), `key`                                              | `keys`, `age_days`, `days_since_use`, `never_used`, `days_to_expiry`, `verified`, `revoked`, `can_sign`, `emails`, `url`                                                                                                                                                                  |
-| `gh_discussion_comment` | fechado | `own`, `is_answer`, `is_reply`, `author`, `comment`, `number` | `comments`, `answers`, `upvotes`, `title`, `reply_to`, `private`, `discussion_answered`, `discussion_answerable`, `discussion_closed`, `answered_by`, `answer_chosen_by`, `state_reason`, `category`, `seconds_to_answer`, `seconds_to_close`, `url` |
+| `gh_discussion_comment` | fechado | `own`, `is_reply`, `author`, `comment`, `number` | `comments`, `answers`, `upvotes`, `title`, `reply_to`, `private`, `discussion_answered`, `discussion_answerable`, `discussion_closed`, `answered_by`, `answer_chosen_by`, `state_reason`, `category`, `seconds_to_answer`, `seconds_to_close`, `url` |
 | `gh_issue_comment`       | fechado                                  | `own`, `number`                                               | `comments`, `private`, `url`                                                                                                                                                                                                                                                                         |
 
 `following` es el número del propio perfil, y cuenta organizaciones además de
@@ -890,8 +928,8 @@ renombrar una lista. Viaja en la consulta de cuenta que ya se pagaba: medido el
 2026-09-11, once listas con sus recuentos no añadieron nada a un coste de uno.
 
 `gh_contribution_day` es el único sitio donde los cuadrados verdes existen como
-datos. Con `every.history` puesto, llega hasta el año en que se creó la cuenta,
-a un punto de GraphQL por año. Su `level` es el tono del cuadrado, el cuartil
+datos. Con `every.families.history` puesto, llega hasta el año en que se creó
+la cuenta, a un punto de GraphQL por año. Su `level` es el tono del cuadrado, el cuartil
 del año que calcula el propio GitHub como el 0 a 4 que dibuja el perfil, y no
 es función del recuento: en una cuenta, 83 contribuciones un día y 52 otro
 fueron ambas el segundo cuartil. El cuartil es el de la ventana que se pidió,
@@ -966,14 +1004,35 @@ Sobre la vida entera de una cuenta son unas pocas docenas de puntos y 24 MB (35
 consultas y 94 segundos sobre 2.315 pull requests, medido el 2026-09-27), así
 que se hace una vez y luego se guarda: el fichero de estado tiene el recuento
 con el último día UTC que cubre, y cada pasada recorre solo las pull requests
-fusionadas desde entonces, una página de 0,3 a 0,6 MB al día en esa cuenta. En
-el día en que corre una pasada todavía se fusiona, así que sus pull requests
-están en la fila de ese día y la pasada siguiente las vuelve a recorrer. El
-historial entero se vuelve a recorrer una vez por semana, porque el recuento
-puede bajar (un repositorio que pasa a privado o se borra saca sus pull requests
-de `is:public`), y siempre que haya cambiado la regla con la que se guardó el
-recuento. Un recuento que la API no dé es un día sin filas de progreso, nunca un
-día sin insignias.
+fusionadas desde entonces, una página por pasada: de 468 a 513 KB en esa
+cuenta en cada pasada horaria que registró el proxy de producción el
+2026-09-27, un tamaño que crece a lo largo del día con lo que se fusiona. En el
+día en que corre una pasada todavía se fusiona, así que sus pull requests están
+en la fila de ese día y la pasada siguiente las vuelve a recorrer. El historial entero se vuelve a recorrer una vez por semana, porque
+el recuento puede bajar (un repositorio que pasa a privado o se borra saca sus
+pull requests de `is:public`), y siempre que haya cambiado la regla con la que
+se guardó el recuento.
+
+Una pasada a la que la API no responde escribe las insignias y ninguna fila de
+progreso, y dice qué lectura falló con un aviso que lleva el error:
+`achievement counts unavailable, no progress rows this pass` o `co-authored
+pull requests unavailable, no progress rows this pass`. Cuesta esa pasada y
+nada más. Las filas son las del día, así que las escribe la pasada de una hora
+después, y un recorrido que se queda a medias deja el recuento guardado como
+estaba, para que la pasada siguiente vuelva a recorrer sus días. Un recuento
+que el recorrido no pudo cerrar entero se escribe como un mínimo, y se dice una
+vez por proceso mientras sus números no cambien:
+
+```text
+level=WARN msg="co-authored pull request count is a floor" capped=false truncated=3
+```
+
+`capped` es un día que por sí solo tenía más de los mil resultados que pagina
+una búsqueda, y `truncated` cuántas pull requests tenían más commits de los que
+caben en una página de cien y ningún trailer en los leídos, que es lo más que
+puede quedarse corto el recuento. Los dos se guardan en el fichero de estado
+con el recuento, así que una pasada que suma a un mínimo sigue diciendo que lo
+es.
 
 `gh_social_account` lleva una fila más que el listado de cuentas sociales: la
 página personal, bajo el proveedor `website`, del `blog` del perfil. El ORCID
@@ -997,7 +1056,7 @@ página de una pasada son los cien comentarios más recientes. Después se leen
 aparte las respuestas aceptadas de la cuenta, las quinientas más recientes en
 una pasada y todas en un relleno, así que un comentario aceptado como
 respuesta cuando ya había salido de esos cien se escribe igualmente con
-`is_answer` a true en la siguiente pasada. Un comentario que devuelven las dos
+`answers` a 1 en la siguiente pasada. Un comentario que devuelven las dos
 lecturas se escribe una sola vez. Las dos medidas llevan `private`, si el
 repositorio en el que se dejó el comentario es privado, por la misma razón que
 `gh_external_contribution`: `own` no lo dice, porque los repositorios propios
@@ -1019,9 +1078,11 @@ contenedores. Si un listado falla, se mantiene el recuento de GraphQL.
 
 `gh_account_total` es la respuesta a "cuántos ha habido en total". Todas las demás
 medidas de aquí son una fila por hecho, que es la forma correcta para "cuántos
-en julio" y la equivocada para un total de por vida. GitHub los cuenta él mismo,
-con una petición de búsqueda cada uno, así que el número es una fila y es
-correcto en la primera pasada de una instalación recién hecha.
+en julio" y la equivocada para un total de por vida. GitHub los cuenta él mismo:
+diez son una consulta GraphQL con un alias de búsqueda para cada uno, y
+`commits`, que la búsqueda de GraphQL no sabe contar, es una búsqueda REST
+propia. Así que cada número es una fila y es correcto en la primera pasada de
+una instalación recién hecha.
 
 Los tres campos que acaban en `_elsewhere` comparten un mismo sentido de fuera:
 en un repositorio que no es de la cuenta, porque el calificador de búsqueda
@@ -1177,8 +1238,11 @@ presupuesto es idéntica a una familia sin nada que contar.
 
 La segunda es lo que cada barrido consiguió hacer. Una fila por familia
 ejecutada, siempre, con cuántos repositorios se le preguntaron (`repos`),
-cuántos de ellos no pudo recoger (`failed`) y cuántas filas produjo (`points`);
-y una fila más por cada repositorio que perdió, nombrándolo como lo nombra
+cuántos de ellos no pudo recoger (`failed`) y cuántas filas produjo (`points`).
+En `commits`, `issueevents` e `issues`, `repos` cuenta también los repositorios
+en los que la [consulta de movimiento](/ghchronicle/es/api/cost/#preguntar-primero-qué-se-movió)
+no encontró nada nuevo, que la familia dejó sin leer y por los que no escribió
+ninguna fila. Y una fila más por cada repositorio que perdió, nombrándolo como lo nombra
 cualquier otra medida y con `reason`, una palabra acotada de qué la detuvo (el
 estado HTTP, `rate limited`, `query too large`, `canceled`), con el mensaje
 entero en el campo `error`. `scope` es lo que distingue las dos: `family` para
@@ -1252,8 +1316,8 @@ que leerlos como contador y no como valor.
 | ------------ | ------------------------------------ | ----------------------------- | --------------------- |
 | `gh_job_log` | fechado, cuando se imprimió la línea | `workflow`, `job_name`, `run` | `line`, `head_branch` |
 
-Apagado por omisión: pon `every.joblogs`. Es texto y no una medida, así que se
-excluye del destino de InfluxDB por omisión y el exportador de Prometheus lo
+Apagado por omisión: pon `every.families.joblogs`. Es texto y no una medida,
+así que se excluye del destino de InfluxDB por omisión y el exportador de Prometheus lo
 salta; Loki es donde le corresponde. Los dashboards exportados llevan un
 panel de texto, "Where failure output went", en el sitio que ocuparían las
 líneas, porque quien los importa puede no tener Loki;
@@ -1339,8 +1403,12 @@ necesita un cierre, toda `url` de un ítem para el que GitHub no envía direcci�
 los campos opcionales del aviso en una alerta, `checks_total` y `checks_failed`
 en un commit por el que pasó una puerta, `label_names` en un ítem con etiqueta,
 `resolved_by` en un hilo resuelto, `queued_seconds` en el primer intento de una
-ejecución, y `pull_request`, `pull_requests`, `headline` y `head_repo` en una
-ejecución que GitHub enlazó, describió o tomó de un fork. Dos más conviene
+ejecución, `pull_request`, `pull_requests`, `headline` y `head_repo` en una
+ejecución que GitHub enlazó, describió o tomó de un fork, `merged` en el
+trabajo fuera que se fusionó y `additions`, `deletions` y `changed_files` en el
+trabajo fuera que es una pull request, que una cuenta que solo ha abierto
+issues en repositorios ajenos no ha escrito nunca, y `language` en un
+repositorio de fuera en el que GitHub detectó uno. Dos más conviene
 nombrarlas, porque las tablas de arriba las listan junto a campos que sí están
 siempre: `gh_dependabot_alert_item.dismissed_comment`, que solo se escribe
 cuando quien descartó una alerta tecleó un motivo, y `gh_event.commits`, que

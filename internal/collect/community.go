@@ -362,9 +362,9 @@ func (o Outbound) Collect(ctx context.Context, c *ghapi.Client, now time.Time) (
 		return points, failed
 	}
 
-	// Work in repositories the account does not own. Nothing else sees it: it
-	// is not in this account's repositories, and the event feed forgets it in
-	// three days.
+	// Work in repositories the account does not own. Nothing else sees it for
+	// long: it is not in this account's repositories, and the event feed keeps
+	// only its last three hundred events, none older than thirty days.
 	upstream := map[string]upstreamRepository{}
 	for _, s := range outboundSearches {
 		// Kept whether or not the walk failed part way: the pages that
@@ -484,7 +484,7 @@ func (n *discussionCommentNode) context() *discussionContext {
 // was closed.
 //
 // Without it an unanswered discussion and one somebody else answered are the
-// same row, both carrying is_answer=false. Measured against the live API on
+// same row, both carrying answers=0. Measured against the live API on
 // 2026-09-10 over the 71 comments this account has left anywhere: 61 sit on
 // discussions with no accepted answer, 5 are the accepted answer, and 5 sit on
 // answered threads without being the answer, two of them on threads a
@@ -556,8 +556,14 @@ func (n *discussionCommentNode) point(login, repo string) sink.Point {
 	fields := map[string]any{
 		"comments": 1, "upvotes": n.UpvoteCount,
 		"title": n.Discussion.Title,
-		// Answered, as a field of its own, so a panel can total accepted
-		// answers without grouping by a tag.
+		// Whether this comment is its discussion's accepted answer, and
+		// only as a field. A maintainer accepts an answer days after the
+		// comment was written, and unaccepts it as easily, so the value
+		// moves after the row's own date; until 2.6.1 it was also the tag
+		// is_answer, and a comment read before it was accepted and again
+		// after was two rows at the same instant, the stale one kept for
+		// ever. As a field the row is rewritten in place, and a panel
+		// totals accepted answers by adding it up.
 		"answers": boolInt(n.IsAnswer),
 		"url":     n.URL,
 		"private": n.Discussion.Repository.IsPrivate,
@@ -566,9 +572,8 @@ func (n *discussionCommentNode) point(login, repo string) sink.Point {
 	return sink.Point{
 		Measurement: "gh_discussion_comment",
 		Tags: merge(fullNameTags(repo), map[string]string{
-			"user":      login,
-			"own":       boolTag(isOwn(repo, login)),
-			"is_answer": boolTag(n.IsAnswer),
+			"user": login,
+			"own":  boolTag(isOwn(repo, login)),
 			// A reply to a reply is a different thing from a comment on the
 			// discussion itself, and only this tag separates them.
 			"is_reply": boolTag(n.ReplyTo != nil),

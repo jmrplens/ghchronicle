@@ -201,7 +201,10 @@ ghchronicle -config config.yaml -once   # una pasada y termina
 documentación toma por omisión en Linux, y la unidad de ahí está blindada en
 vez de ser mínima, porque este es con mucha probabilidad el único proceso de la
 máquina que guarda un token de GitHub con acceso de lectura a todos los
-repositorios de una cuenta.
+repositorios de una cuenta. Un servicio que arranca sobre un fichero de estado
+que nadie ha escrito aún trae sus once familias de seis horas o más al almacén
+a lo largo de sus dos primeras horas y media, una por pasada, y solo esa vez;
+la página de systemd explica por qué.
 
 Un planificador también vale:
 [cron con `-once`](/ghchronicle/es/install/systemd/#cron-en-vez-de-un-servicio)
@@ -262,7 +265,7 @@ documentación:
 | ------------------ | ---------------------------------- | --------------------------------- |
 | Configuración      | `/etc/ghchronicle/config.yaml`     | legible por todos, sin secretos   |
 | Tokens             | `/etc/ghchronicle/ghchronicle.env` | `600`                             |
-| Estado y registro  | `/var/lib/ghchronicle/`            | lo escribe el usuario del servicio |
+| Estado, registro, caché | `/var/lib/ghchronicle/`       | lo escribe el usuario del servicio |
 
 `state_file` tiene un valor por omisión propio, `ghchronicle-state.json` en el
 directorio de trabajo, con el registro de escrituras al lado como

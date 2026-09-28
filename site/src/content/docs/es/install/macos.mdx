@@ -304,9 +304,11 @@ va. Sustituye `KeepAlive` por él y añade `-once` a `ProgramArguments`:
   <integer>3600</integer>
 ```
 
-Deja `state_file` en una ruta que sobreviva, en este modo sobre todo: es lo que
-evita que el recorrido completo de estrellas y el relleno año por año del
-calendario de contribuciones vuelvan a ocurrir en cada ejecución.
+Deja `state_file` en una ruta que sobreviva, en este modo sobre todo. Sin él
+cada ejecución recoge todas las familias, diga lo que diga su cadencia, y
+vuelve a recorrer la lista de estrellas, el historial entero de estrellas y las
+pull requests en coautoría; el fichero de caché que hay a su lado es lo que
+deja a una ejecución preguntar a GitHub solo por lo que cambió.
 
 ## Compilarlo desde fuente
 
@@ -358,11 +360,15 @@ la herramienta conozca:
 | Fichero           | Para un agente                                | Para un demonio                |
 | ----------------- | --------------------------------------------- | ------------------------------ |
 | Configuración     | `~/Library/Application Support/ghchronicle/`  | `/usr/local/etc/ghchronicle/`  |
-| Estado y registro | `~/Library/Application Support/ghchronicle/`  | `/usr/local/var/ghchronicle/`  |
+| Estado, registro, caché | `~/Library/Application Support/ghchronicle/` | `/usr/local/var/ghchronicle/` |
 | Log               | `~/Library/Logs/ghchronicle.log`              | `/usr/local/var/log/`          |
 
 `state_file` tiene un valor por omisión propio, `ghchronicle-state.json` en el
 directorio de trabajo, con el registro de escrituras al lado como
 `ghchronicle-state-written.bin` y la caché como `ghchronicle-state-cache.bin`.
 El directorio de trabajo de un trabajo de launchd no es algo en lo que
-apoyarse. Ponlo.
+apoyarse. Ponlo. Desde la 2.6.1 un ajuste de ruta toma una `~` inicial como el
+directorio personal, así que la configuración de un agente puede decir
+`state_file: ~/Library/Application Support/ghchronicle/state.json`; una versión
+anterior lee la `~` como el nombre de un directorio, y quiere
+`/Users/tu/...` escrito entero.

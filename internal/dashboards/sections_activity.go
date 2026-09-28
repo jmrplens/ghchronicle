@@ -47,39 +47,21 @@ func activity(b *builder) []Panel {
 		` subject_type AS "Kind", reason AS "Reason", notifications AS "Updates",` +
 		` url AS "Link"` +
 		" FROM gh_notification WHERE $__timeFilter(time) ORDER BY time DESC LIMIT 25"
-	// An open item is a row per day at midnight while it stays open, so its
-	// row's time is when it was seen and not when it was opened; the day it
-	// was opened is the row's time minus how long it has been open, and the
-	// newest row of each item is the one listed.
-	//
-	// The repository's stars are not on the item's row, which is dated when
-	// the item closed: they are gh_upstream_repo's, stamped at each sweep,
-	// and the newest of those inside the range is joined on. Inside the
-	// range and not the whole history, because that measurement is a row
-	// per repository per sweep, and because a range in the past then shows
-	// the count as it stood then.
-	external := `SELECT x.full_name AS "Repository", ` + agoSQL("x.time", "x.seconds_open") + ` AS "Opened",` +
-		` x.time AS "Seen", x.kind AS "Kind",` +
-		` x.state AS "State", x.title AS "Title", u.stars AS "Stars", x.comments AS "Comments",` +
-		` x.url AS "Link" FROM (` +
-		"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, kind, number ORDER BY time DESC) AS rn" +
-		" FROM gh_external_contribution WHERE $__timeFilter(time)) x" +
-		" LEFT JOIN (SELECT full_name, stars, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn" +
-		" FROM gh_upstream_repo WHERE $__timeFilter(time)) u ON u.full_name = x.full_name AND u.rn = 1" +
-		" WHERE x.rn = 1 ORDER BY x.time DESC LIMIT 40"
-	ev, nt, ec := "gh_event", "gh_notification", "gh_external_contribution"
+	ev, nt := "gh_event", "gh_notification"
 	notes := gp(nt, "notifications")
 
 	typeGR, typeGRtf := gTbl(fmt.Sprintf(`groupByNode(%s, -2, "sum")`, events("events")),
 		"Type", []col{{"sum", "Events"}})
-	typeES, typeEStf := esTbl(ev, []any{b.tm("type", 30, "1")}, []any{b.mSum("events")},
+	typeEvents := b.mSum("events")
+	typeES, typeEStf := esTbl(ev, []any{b.tmBy("type", 30, typeEvents)}, []any{typeEvents},
 		[]named{{"type.keyword", "Type"}, {"e", "Events"}}, nil)
 
 	repoGR, repoGRtf := gTbl(fmt.Sprintf(
 		`limit(sortByTotal(groupByNode(%s, %d, "sum")), 20)`, events("events"), gn(ev, "full_name"),
 	),
 		"Repository", []col{{"sum", "Events"}})
-	repoES, repoEStf := esTbl(ev, []any{b.tm("full_name", 20, "1")}, []any{b.mSum("events")},
+	repoEvents := b.mSum("events")
+	repoES, repoEStf := esTbl(ev, []any{b.tmBy("full_name", 20, repoEvents)}, []any{repoEvents},
 		[]named{{"full_name.keyword", "Repository"}, {"e", "Events"}}, nil)
 
 	notifGR, notifGRtf := gTbl(fmt.Sprintf(
@@ -87,8 +69,9 @@ func activity(b *builder) []Panel {
 		notes, gn(nt, "reason"), gn(nt, "subject_type"),
 	),
 		"Reason, kind", []col{{"sum", "Notifications"}})
-	notifES, notifEStf := esTbl(nt, []any{b.tm("reason", 25, "1"), b.tm("subject_type", 10)},
-		[]any{b.mSum("notifications")},
+	notified := b.mSum("notifications")
+	notifES, notifEStf := esTbl(nt, []any{b.tmBy("reason", 25, notified), b.tm("subject_type", 10)},
+		[]any{notified},
 		[]named{
 			{"reason.keyword", "Reason"},
 			{"subject_type.keyword", "Kind"},
@@ -102,19 +85,6 @@ func activity(b *builder) []Panel {
 		{"reason", "Reason"},
 		{"title", "Title"},
 		{"notifications", "Updates"},
-		{"url", "Link"},
-	}, nil)
-
-	extGR, extGRtf := gTbl(rowsOf(gp(ec, "comments"), gn(ec, "full_name"), gn(ec, "kind"),
-		gn(ec, "number"), gn(ec, "state")),
-		"Repository, kind, number, state", []col{{"lastNotNull", "Comments"}})
-	extES, extEStf := b.esRaw(ec, 40, []named{
-		{panelESTime, "Seen"},
-		{"full_name", "Repository"},
-		{"kind", "Kind"},
-		{"state", "State"},
-		{"title", "Title"},
-		{"comments", "Comments"},
 		{"url", "Link"},
 	}, nil)
 
@@ -197,53 +167,121 @@ func activity(b *builder) []Panel {
 			},
 			ES: latestES, ESTF: latestEStf, ESDesc: esNewest,
 		}),
-		panel("table", "Work elsewhere", box{W: 24, H: 9, X: 0, Y: 31},
-			[]Target{sqlT(external)}, &P{
-				Prom: []Target{
-					promTbl("sum by (full_name) (increase(github_external_contributions_total[$__range]))", "A"),
-					promTbl("avg by (full_name) (github_external_contributions_merged_mean)", "B"),
-					promTbl("avg by (full_name) (github_external_contributions_comments_mean)", "C"),
-					promTbl("max by (full_name) (github_upstream_repo_stars)", "D"),
-				},
-				PromTF: merged(map[string]string{
-					"full_name": "Repository", panelValueA: "Contributions", panelValueB: "Merged",
-					panelValueC: "Comments", panelValueD: "Stars",
-				}, nil, nil),
-				Desc: "Pull requests and issues opened in repositories this account does not own, " +
-					"with the state each ended in. Nothing else sees them: they are not in these " +
-					"repositories and the event feed forgets them in three days. Seen is the " +
-					"row's own date, which for an open item is the day it was last seen open; " +
-					"Opened is when it was opened. Stars is the repository's own count at the " +
-					"last sweep inside the range.",
-				PromDesc: "Prometheus keeps the repository only, so this is contributions per " +
-					"repository over the range, the share merged and the mean comments, beside " +
-					"the stars at the last sweep. " + sinceStart,
-				Overrides: []any{
-					when("Opened"), when("Seen"), repoColumn(),
-					width("Kind", 110), width("State", 90), width("Comments", 100),
-					unitOf("Stars", "short", 90), linkOn("Repository"),
-				},
-				PromOver: []any{
-					barCell("Contributions", "short", 160),
-					unitOf("Merged", "percentunit", 100),
-				},
-				GR: extGR, GRTF: extGRtf,
-				GRDesc: "Graphite names each row from the path and keeps no text, so the title is missing, " +
-					"and it cannot join the repository's stars, which sit under another measurement's " +
-					"path, onto an item's row. " + grRows,
-				ES: extES, ESTF: extEStf,
-				ESDesc: "Elasticsearch lists the contributions' own documents and cannot join the " +
-					"repository's stars, which are documents of another index, onto them.",
-			}),
+		workElsewhere(b),
 	}, starsGiven(b)...)
+}
+
+// workElsewhere is the pull requests and issues this account opened in other
+// people's repositories, one row per item. It is a function of its own
+// because each store reads it in its own way, and inside activity() the five
+// of them pushed that function past the maintainability the linter holds it to.
+func workElsewhere(b *builder) Panel {
+	// An open item is a row per day at midnight while it stays open, so its
+	// row's time is when it was seen and not when it was opened; the day it
+	// was opened is the row's time minus how long it has been open, and the
+	// newest row of each item is the one listed.
+	//
+	// The repository's stars are not on the item's row, which is dated when
+	// the item closed: they are gh_upstream_repo's, stamped at each sweep,
+	// and the newest of those inside the range is joined on. Inside the
+	// range and not the whole history, because that measurement is a row
+	// per repository per sweep, and because a range in the past then shows
+	// the count as it stood then.
+	external := `SELECT x.full_name AS "Repository", ` + agoSQL("x.time", "x.seconds_open") + ` AS "Opened",` +
+		` x.time AS "Seen", x.kind AS "Kind",` +
+		` x.state AS "State", x.title AS "Title", u.stars AS "Stars", x.comments AS "Comments",` +
+		` x.url AS "Link" FROM (` +
+		"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, kind, number ORDER BY time DESC) AS rn" +
+		" FROM gh_external_contribution WHERE $__timeFilter(time)) x" +
+		" LEFT JOIN (SELECT full_name, stars, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn" +
+		" FROM gh_upstream_repo WHERE $__timeFilter(time)) u ON u.full_name = x.full_name AND u.rn = 1" +
+		" WHERE x.rn = 1 ORDER BY x.time DESC LIMIT 40"
+	ec := "gh_external_contribution"
+	extGR, extGRtf := gTbl(rowsOf(gp(ec, "comments"), gn(ec, "full_name"), gn(ec, "kind"),
+		gn(ec, "number"), gn(ec, "state")),
+		"Repository, kind, number, state", []col{{"lastNotNull", "Comments"}})
+	// One row per item, its newest document, as the SQL stores read it. The
+	// newest forty documents listed an open item once for every day it was
+	// seen open, since each of those days is a document of its own, and left
+	// the older items out to make room. So each item is a bucket, its newest
+	// timestamp the one below it, and what the row shows is that document's:
+	// its state, its title and its url as one-value buckets, the way a string
+	// reaches an Elasticsearch table, and its comments. Seen is the newest
+	// timestamp again as a metric, since a bucket above the last one reaches
+	// the table as its key's text and not as a date the override can draw,
+	// the way "Oldest open alerts" reads the date an alert was raised.
+	extES, extEStf := esTbl(ec, []any{
+		b.tm("full_name", 100), b.tm("kind", 2), b.tm("number", 200),
+		b.terms(panelESTime, 1, "_key", "desc"),
+		b.tm("state", 1), b.tmURL("title"), b.tmURL(),
+	}, []any{b.mMax(panelESTime), b.mMax("comments")},
+		[]named{
+			{panelFullNameField, "Repository"},
+			{"kind.keyword", "Kind"},
+			{"state.keyword", "State"},
+			{"title.keyword", "Title"},
+			{panelURLField, "Link"},
+			{"s", "Seen"},
+			{"c", "Comments"},
+		}, nil, hideColumns("number.keyword", panelESTime))
+
+	return panel("table", "Work elsewhere", box{W: 24, H: 9, X: 0, Y: 31},
+		[]Target{sqlT(external)}, &P{
+			Prom: []Target{
+				promTbl("sum by (full_name) (increase(github_external_contributions_total[$__range]))", "A"),
+				promTbl("avg by (full_name) (github_external_contributions_merged_mean)", "B"),
+				promTbl("avg by (full_name) (github_external_contributions_comments_mean)", "C"),
+				promTbl("max by (full_name) (github_upstream_repo_stars)", "D"),
+			},
+			PromTF: merged(map[string]string{
+				"full_name": "Repository", panelValueA: "Contributions", panelValueB: "Merged",
+				panelValueC: "Comments", panelValueD: "Stars",
+			}, nil, nil),
+			Desc: "Pull requests and issues opened in repositories this account does not own, " +
+				"with the state each ended in. Nothing else sees them: they are not in these " +
+				"repositories, and the event feed keeps only its last three hundred events, " +
+				"none older than thirty days. Seen is the " +
+				"row's own date, which for an open item is the day it was last seen open; " +
+				"Opened is when it was opened. Stars is the repository's own count at the " +
+				"last sweep inside the range.",
+			PromDesc: "Prometheus keeps the repository only, so this is contributions per " +
+				"repository over the range, the share merged and the mean comments, with no " +
+				"Seen or Opened column, since an item's dates do not survive the exporter. " +
+				"Its Stars is the count the exporter holds at the end of the range, whenever " +
+				"the sweep that read it ran. " + sinceStart,
+			Overrides: []any{
+				when("Opened"), when("Seen"), repoColumn(),
+				width("Kind", 110), width("State", 90), width("Comments", 100),
+				unitOf("Stars", "short", 90), linkOn("Repository"),
+			},
+			PromOver: []any{
+				barCell("Contributions", "short", 160),
+				unitOf("Merged", "percentunit", 100),
+			},
+			GR: extGR, GRTF: extGRtf,
+			GRDesc: "Graphite names each row from the path and keeps one number per row, the " +
+				"comments, so the title and the Seen and Opened dates are missing, and it cannot " +
+				"join the repository's stars, which sit under another measurement's path, onto " +
+				"an item's row. The state is part of the path, so an item that was seen open and " +
+				"then closed inside the range is a row for each.",
+			ES: extES, ESTF: extEStf, ESOpts: Opts{"sort": "Seen"},
+			ESDesc: "Elasticsearch reads each item's newest document in the range, over the " +
+				"hundred repositories with the most documents, rather than the newest forty " +
+				"items. It has no Opened column, that being the row's date less how long the " +
+				"item was open, which a bucket cannot subtract, and it cannot join the " +
+				"repository's stars, which are documents of another index, onto an item.",
+		})
 }
 
 // starsGiven is the outbound direction of the section: what this account
 // starred in other people's repositories, by language and by repository.
 func starsGiven(b *builder) []Panel {
+	// A star is a 1 added up per language, and not countOf, which added
+	// every star into one series first: the grouping had one series to group
+	// and drew one bar.
 	langGR, langGRtf := gTbl(fmt.Sprintf(
-		`limit(sortByMaxima(groupByNode(%s, %d, "sum")), 12)`,
-		countOf(gp("gh_star_given", "stars")), gn("gh_star_given", "language"),
+		`limit(sortByMaxima(groupByNode(isNonNull(%s), %d, "sum")), 12)`,
+		gp("gh_star_given", "stars"), gn("gh_star_given", "language"),
 	),
 		"Language", []col{{"sum", overviewStarsGiven}})
 	langES, langEStf := esTbl("gh_star_given", []any{b.tm("language", 12)}, []any{b.mCount()},
@@ -294,7 +332,10 @@ func starsGiven(b *builder) []Panel {
 				when("When"), width("Language", 120),
 				barCell(activityItsStars, "short", 120), linkOn("Repository"),
 			},
-			GR: starGR, GRTF: starGRtf, GRDesc: grSlot,
+			GR: starGR, GRTF: starGRtf,
+			GRDesc: "Graphite has no rows: each series is one number, so this table keeps the " +
+				"star count of each repository starred in the range and drops when it was " +
+				"starred and its language.",
 			ES: starES, ESTF: starEStf,
 		}),
 	}

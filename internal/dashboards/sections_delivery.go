@@ -1,6 +1,9 @@
 package dashboards
 
-import "fmt"
+import (
+	"fmt"
+	"slices"
+)
 
 // ── Delivery and access ─────────────────────────────────────────────────────
 
@@ -9,6 +12,12 @@ import "fmt"
 // kept, so a setting read on thirty sweeps is one row and not thirty. The
 // security section reads its own snapshots with the same tail.
 const deliveryNewestRow = ") x WHERE rn = 1"
+
+// deliveryIdlestFirst orders the three tables whose second column is how long
+// something has sat untouched, a deploy key unused, an environment unchanged
+// or a branch without a commit, with the longest first: that is the one a
+// reader removes or asks about.
+const deliveryIdlestFirst = " ORDER BY 2 DESC"
 
 // What the columns of this section are called wherever they are read. The same
 // name has to reach the panel from all five stores, since the overrides, the
@@ -55,7 +64,7 @@ func webhookDeliveries(b *builder) []Panel {
 		` SUM(CASE WHEN redelivery THEN 1 ELSE 0 END) AS "Retried",` +
 		` approx_percentile_cont(duration_seconds, 0.5) AS "Latency"` +
 		" FROM gh_webhook_delivery WHERE $__timeFilter(time) AND " + RF +
-		" GROUP BY 1, 4 ORDER BY 2 DESC, 3 DESC LIMIT 25"
+		" GROUP BY 1, full_name, 4 ORDER BY 2 DESC, 3 DESC LIMIT 25"
 	overTime := "SELECT " + timeBin + ", code AS series," +
 		" COUNT(*) AS n FROM gh_webhook_delivery WHERE $__timeFilter(time) AND " + RF +
 		" GROUP BY 1, 2 ORDER BY 1"
@@ -67,12 +76,11 @@ func webhookDeliveries(b *builder) []Panel {
 	deliv := rp(wd, "duration_seconds")
 	failedPath := rp(wd, "duration_seconds", "ok", "false")
 
-	hooksGR, hooksGRtf := gTbl(fmt.Sprintf(
-		`limit(sortBy(groupByNodes(%s, "avg", %d, %d, %d), "count", true), 25)`,
-		deliv, gn(wd, "host"), gn(wd, "repo"), gn(wd, "ok"),
+	hooksGR, hooksGRtf := gTbl(fmt.Sprintf(`limit(sortBy(%s, "count", true), 25)`,
+		grGroupBy(deliv, wd, "avg", "host", "repo", "ok"),
 	),
 		"Endpoint, repository, ok", []col{{"count", "Deliveries"}, {"median", "Latency"}})
-	hooksES, hooksEStf := esTbl(wd, []any{b.tm("host", 25), b.tm("repo", 50), b.tm("ok", 2)},
+	hooksES, hooksEStf := esTbl(wd, slices.Concat([]any{b.tm("host", 25)}, b.tmRepo(50), []any{b.tm("ok", 2)}),
 		[]any{b.mCount(), b.mPct("duration_seconds", 50)},
 		[]named{
 			{"host.keyword", "Endpoint"},
@@ -80,7 +88,7 @@ func webhookDeliveries(b *builder) []Panel {
 			{"ok.keyword", "OK"},
 			{"n", "Deliveries"},
 			{"l", "Latency"},
-		}, []string{ESF})
+		}, []string{ESF}, hideColumns(panelFullNameField))
 
 	return []Panel{
 		panel("gauge", "Webhook failure rate", box{W: 6, H: 8, X: 0, Y: 0}, []Target{sqlT(failRate)}, &P{
@@ -121,16 +129,16 @@ func webhookDeliveries(b *builder) []Panel {
 				Opts:     mergeOpts(Opts{"bars": true, "stack": true, "legend": "hidden"}, hourBins),
 				SQLOpts:  seriesOpts,
 				PromDesc: sinceStart,
-				GR:       []Target{grq(perBucket("isNonNull("+deliv+")", gn(wd, "code"), "1h"))},
+				GR:       []Target{grq(perBucket(nonNull(deliv), gn(wd, "code"), "1h"))},
 				ES:       []Target{b.esDaily(wd, b.mCount(), "code", "1h", []string{ESF}, "")},
 				Desc:     bucketFollowsRange,
 			}),
 		panel("table", "Webhook endpoints", box{W: 12, H: 8, X: 0, Y: 8}, []Target{sqlT(hooks)}, &P{
 			Prom: []Target{
-				promTbl(fmt.Sprintf("sum by (repo, hook) (increase(%s[$__range]))", totalM), "A"),
-				promTbl(fmt.Sprintf("sum by (repo, hook) (increase(%s[$__range]))", failed), "B"),
-				promTbl(fmt.Sprintf("avg by (repo, hook) (github_webhook_deliveries_redelivery_mean{%s})", PF), "C"),
-				promTbl(fmt.Sprintf("avg by (repo, hook) (github_webhook_deliveries_duration_seconds_mean{%s})", PF), "D"),
+				promTbl(fmt.Sprintf("sum by (full_name, repo, hook) (increase(%s[$__range]))", totalM), "A"),
+				promTbl(fmt.Sprintf("sum by (full_name, repo, hook) (increase(%s[$__range]))", failed), "B"),
+				promTbl(fmt.Sprintf("avg by (full_name, repo, hook) (github_webhook_deliveries_redelivery_mean{%s})", PF), "C"),
+				promTbl(fmt.Sprintf("avg by (full_name, repo, hook) (github_webhook_deliveries_duration_seconds_mean{%s})", PF), "D"),
 			},
 			PromTF: merged(map[string]string{
 				"repo": "Repository", "hook": "Hook", inventoryValueCol + "A": "Deliveries",
@@ -162,23 +170,22 @@ func accessConfiguration(b *builder) []Panel {
 	rules := `SELECT repo AS "Repository", ruleset AS "Ruleset",` +
 		` enforcement AS "Enforcement", target AS "Target",` +
 		` days_since_change AS "Last changed", url AS "Link" FROM (` +
-		"SELECT *, ROW_NUMBER() OVER (PARTITION BY repo, ruleset ORDER BY time DESC) AS rn" +
+		"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, ruleset ORDER BY time DESC) AS rn" +
 		" FROM gh_ruleset WHERE $__timeFilter(time) AND " + RF + deliveryNewestRow +
 		" ORDER BY 1, 2"
 	keys := `SELECT repo AS "Repository", days_since_use AS "Unused for", key AS "Key",` +
 		` read_only AS "Read only" FROM (` +
-		"SELECT *, ROW_NUMBER() OVER (PARTITION BY repo, key ORDER BY time DESC) AS rn" +
+		"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, key ORDER BY time DESC) AS rn" +
 		" FROM gh_deploy_key WHERE $__timeFilter(time) AND " + RF + deliveryNewestRow +
-		" ORDER BY 2 DESC"
+		deliveryIdlestFirst
 	rs, dk := "gh_ruleset", "gh_deploy_key"
 
 	rulesGR, rulesGRtf := gTbl(rowsOf(rp(rs, "days_since_change"), gn(rs, "repo"),
 		gn(rs, "ruleset"), gn(rs, "enforcement"), gn(rs, "target")),
 		"Ruleset", []col{{"lastNotNull", deliveryLastChanged}})
-	rulesES, rulesEStf := esTbl(rs, []any{
-		b.tm("repo", 50), b.tm("ruleset", 50),
-		b.tm("enforcement", 5), b.tm("target", 5), b.tmURL(),
-	}, []any{b.mNewest("days_since_change")},
+	rulesES, rulesEStf := esTbl(rs, append(b.tmRepo(50),
+		b.tm("ruleset", 50), b.tm("enforcement", 5), b.tm("target", 5), b.tmURL(),
+	), []any{b.mNewest("days_since_change")},
 		[]named{
 			{inventoryRepoTerm, "Repository"},
 			{"ruleset.keyword", "Ruleset"},
@@ -186,55 +193,56 @@ func accessConfiguration(b *builder) []Panel {
 			{"target.keyword", "Target"},
 			{inventoryURLTerm, "Link"},
 			{"d", deliveryLastChanged},
-		}, []string{ESF})
+		}, []string{ESF}, hideColumns(panelFullNameField))
 
 	keysGR, keysGRtf := gTbl(rowsOf(rp(dk, "days_since_use"), gn(dk, "repo"),
 		gn(dk, "key"), gn(dk, "read_only")), "Key", []col{{"lastNotNull", deliveryKeyUnused}})
-	// A `max` rather than the newest reading, because `days_since_use` is
-	// written only for a key GitHub has seen used and a top_metrics has no
-	// value to hand back for the others. Grafana's Elasticsearch plugin
-	// appends nothing at all in that case, so the metric column came back one
-	// row shorter than the three bucket columns and the whole panel failed
-	// with `frame has different field lengths, field 0 is len 2 but field 3 is
-	// len 1`. Every other aggregation appends a null instead and the row keeps
-	// its shape, which is what an unused key should look like: an empty cell.
-	keysES, keysEStf := esTbl(dk, []any{b.tm("repo", 50), b.tm("key", 50), b.tm("read_only", 2)},
+	// A `max` inside each key's newest document rather than a top_metrics,
+	// because `days_since_use` is written only for a key GitHub has seen used
+	// and a top_metrics has no value to hand back for the others. Grafana's
+	// Elasticsearch plugin appends nothing at all in that case, so the metric
+	// column came back one row shorter than the three bucket columns and the
+	// whole panel failed with `frame has different field lengths, field 0 is
+	// len 2 but field 3 is len 1`. Every other aggregation appends a null
+	// instead and the row keeps its shape, which is what an unused key should
+	// look like: an empty cell. See newestDoc.
+	keysES, keysEStf := esTbl(dk, append(b.tmRepo(50), b.tm("key", 50), b.newestDoc(), b.tm("read_only", 2)),
 		[]any{b.mMax("days_since_use")},
 		[]named{
 			{inventoryRepoTerm, "Repository"},
 			{"key.keyword", "Key"},
 			{"read_only.keyword", deliveryKeyReadOnly},
 			{"d", deliveryKeyUnused},
-		}, []string{ESF})
+		}, []string{ESF}, hideColumns(panelFullNameField, panelESTime))
 
 	whGR, whGRtf := gTbl(rowsOf("keepLastValue("+rp("gh_webhook", "events")+")",
 		gn("gh_webhook", "repo"), gn("gh_webhook", "host")),
 		"Repository, host", []col{{"lastNotNull", deliveryHookEvents}})
-	whES, whEStf := esTbl("gh_webhook", []any{b.tm("repo", 500), b.tm("host", 50), b.tm("active", 2)},
+	whES, whEStf := esTbl("gh_webhook", append(b.tmRepo(500), b.tm("host", 50), b.tm("active", 2)),
 		[]any{b.mNewest("events")},
 		[]named{
 			{inventoryRepoTerm, "Repository"},
 			{"host.keyword", "Host"},
 			{"active.keyword", "Active"},
 			{"events", deliveryHookEvents},
-		}, []string{ESF})
+		}, []string{ESF}, hideColumns(panelFullNameField))
 
 	envGR, envGRtf := gTbl(rowsOf("keepLastValue("+rp("gh_environment", "days_since_change")+")",
 		gn("gh_environment", "repo"), gn("gh_environment", "environment")),
 		"Repository, environment", []col{{"lastNotNull", "Idle"}})
-	envES, envEStf := esTbl("gh_environment", []any{b.tm("repo", 500), b.tm("environment", 50), b.tmURL()},
+	envES, envEStf := esTbl("gh_environment", append(b.tmRepo(500), b.tm("environment", 50), b.tmURL()),
 		[]any{b.mNewest("days_since_change")},
 		[]named{
 			{inventoryRepoTerm, "Repository"},
 			{"environment.keyword", "Environment"},
 			{inventoryURLTerm, "Link"},
 			{"days_since_change", "Idle"},
-		}, []string{ESF})
+		}, []string{ESF}, hideColumns(panelFullNameField))
 	return []Panel{
 		panel("table", "Rulesets", box{W: 12, H: 8, X: 12, Y: 8}, []Target{sqlT(rules)}, &P{
 			Prom: []Target{
-				promTbl(fmt.Sprintf("sum by (repo, ruleset, enforcement) (github_ruleset_active{%s})", PF), "A"),
-				promTbl(fmt.Sprintf("sum by (repo, ruleset, enforcement) (github_ruleset_days_since_change{%s})", PF), "B"),
+				promTbl(fmt.Sprintf("sum by (full_name, repo, ruleset, enforcement) (github_ruleset_active{%s})", PF), "A"),
+				promTbl(fmt.Sprintf("sum by (full_name, repo, ruleset, enforcement) (github_ruleset_days_since_change{%s})", PF), "B"),
 			},
 			PromTF: merged(map[string]string{
 				"repo": "Repository", "ruleset": "Ruleset", "enforcement": "Enforcement",
@@ -253,7 +261,7 @@ func accessConfiguration(b *builder) []Panel {
 		}),
 		panel("table", "Deploy keys", box{W: 8, H: 8, X: 0, Y: 16}, []Target{sqlT(keys)}, &P{
 			Prom: []Target{promTbl(fmt.Sprintf(
-				"sum by (repo, key, read_only) (github_deploy_key_days_since_use{%s})", PF,
+				"sum by (full_name, repo, key, read_only) (github_deploy_key_days_since_use{%s})", PF,
 			))},
 			PromTF: []any{organize(map[string]string{
 				"repo": "Repository", "key": "Key", "read_only": deliveryKeyReadOnly,
@@ -265,10 +273,8 @@ func accessConfiguration(b *builder) []Panel {
 			GR:        keysGR, GRTF: keysGRtf,
 			GRDesc: "Graphite names each row repository, key and whether it is read-only from the path.",
 			ES:     keysES, ESTF: keysEStf,
-			ESDesc: "Elasticsearch answers with the largest number of days inside the range " +
-				"rather than with the newest reading. A key GitHub has never seen used has " +
-				"no reading at all, in this dashboard or any of the others, and its cell " +
-				"is empty.",
+			ESDesc: "A key GitHub has never seen used has no reading at all, in this " +
+				"dashboard or any of the others, and its cell is empty.",
 		}),
 		panel("text", "Where failure output went", box{W: 16, H: 8, X: 8, Y: 16}, nil, &P{
 			Opts: Opts{"content": logNote},
@@ -284,13 +290,13 @@ func accessConfiguration(b *builder) []Panel {
 		panel("table", "Webhooks configured", box{W: 12, H: 8, X: 0, Y: 24}, []Target{sqlT(
 			`SELECT repo AS "Repository", host AS "Host", hook AS "Hook",` +
 				` active AS "Active", MAX(events) AS "Events subscribed" FROM (` +
-				"SELECT repo, host, hook, active, events, ROW_NUMBER() OVER (" +
-				"PARTITION BY repo, hook, host ORDER BY time DESC) AS rn FROM gh_webhook" +
+				"SELECT full_name, repo, host, hook, active, events, ROW_NUMBER() OVER (" +
+				"PARTITION BY full_name, hook, host ORDER BY time DESC) AS rn FROM gh_webhook" +
 				" WHERE $__timeFilter(time) AND " + RF + deliveryNewestRow +
-				" GROUP BY 1, 2, 3, 4 ORDER BY 1, 2",
+				" GROUP BY full_name, 1, 2, 3, 4 ORDER BY 1, 2",
 		)}, &P{
 			Prom: []Target{promTbl(fmt.Sprintf(
-				"max by (repo, host, hook, active) (github_webhook_events{%s})", PF,
+				"max by (full_name, repo, host, hook, active) (github_webhook_events{%s})", PF,
 			))},
 			PromTF: []any{organize(map[string]string{
 				"repo": "Repository", "host": "Host", "hook": "Hook",
@@ -302,17 +308,24 @@ func accessConfiguration(b *builder) []Panel {
 				"number in its settings page: GitHub names every webhook \"web\", so the name " +
 				"told nothing apart.",
 			Overrides: []any{width("Host", 200), width("Active", 90), width(deliveryHookEvents, 150)},
-			GR:        whGR, GRTF: whGRtf, GRDesc: grSlot,
+			GR:        whGR, GRTF: whGRtf,
+			GRDesc: "Graphite has no rows: each series is one number, so this table keeps the " +
+				"events each hook subscribes to and drops its id and whether it is active.",
 			ES: whES, ESTF: whEStf,
 		}),
 		panel("table", "Environments", box{W: 12, H: 8, X: 12, Y: 24}, []Target{sqlT(
-			`SELECT environment AS "Environment", MIN(days_since_change) AS "Idle",` +
-				` repo AS "Repository", MAX(url) AS "Link" FROM gh_environment` +
-				" WHERE $__timeFilter(time) AND " + RF +
-				" GROUP BY 1, 3 ORDER BY 2 DESC",
+			// Each environment's newest row. The row is a daily snapshot and its
+			// days since change climb by one a day, so the least of the range
+			// was the reading of the range's first day, a month short on an
+			// environment nobody touches.
+			`SELECT environment AS "Environment", days_since_change AS "Idle",` +
+				` repo AS "Repository", url AS "Link" FROM (` +
+				"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, environment" +
+				" ORDER BY time DESC) AS rn FROM gh_environment" + ciInRange + RF +
+				deliveryNewestRow + deliveryIdlestFirst,
 		)}, &P{
 			Prom: []Target{promTbl(fmt.Sprintf(
-				"min by (repo, environment) (github_environment_days_since_change{%s})", PF,
+				"min by (full_name, repo, environment) (github_environment_days_since_change{%s})", PF,
 			))},
 			PromTF: []any{organize(map[string]string{
 				"repo": "Repository", "environment": "Environment", "Value": "Idle",
@@ -325,7 +338,7 @@ func accessConfiguration(b *builder) []Panel {
 				unitOf("Idle", "d", 100), width("Environment", 150),
 				ownerLinkOn("Environment", "the deployment log"),
 			},
-			GR: envGR, GRTF: envGRtf, GRDesc: grSlot,
+			GR: envGR, GRTF: envGRtf, GRDesc: grRows,
 			ES: envES, ESTF: envEStf,
 		}),
 	}
@@ -372,11 +385,11 @@ func branchesAndProtections(b *builder) []Panel {
 	// backup tool at 10.1 years.
 	branches := `SELECT b.branch AS "Branch", b.days_since_commit AS "Idle",` +
 		` b.repo AS "Repository", b.is_default AS "Default" FROM (` +
-		"SELECT *, ROW_NUMBER() OVER (PARTITION BY repo, branch ORDER BY time DESC) AS rn" +
+		"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, branch ORDER BY time DESC) AS rn" +
 		" FROM gh_branch WHERE $__timeFilter(time) AND " + RF + ") b" +
-		repoFlagsJoin("b.repo") +
+		repoFlagsJoin("b") +
 		" WHERE b.rn = 1 AND " + notAFork + " AND " + notArchived +
-		" ORDER BY 2 DESC"
+		deliveryIdlestFirst
 	protections := `SELECT repo AS "Repository", pattern AS "Pattern",` +
 		` required_reviews AS "Reviews",` +
 		` CAST(requires_commit_signatures AS INT) AS "Signatures",` +
@@ -384,48 +397,46 @@ func branchesAndProtections(b *builder) []Panel {
 		` CAST(allows_force_pushes AS INT) AS "Force push",` +
 		` CAST(requires_conversation_resolution AS INT) AS "Threads",` +
 		` required_checks AS "Checks", url AS "Link" FROM (` +
-		"SELECT *, ROW_NUMBER() OVER (PARTITION BY repo, pattern ORDER BY time DESC) AS rn" +
+		"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, pattern ORDER BY time DESC) AS rn" +
 		" FROM gh_branch_protection WHERE $__timeFilter(time) AND " + RF + deliveryNewestRow +
 		" ORDER BY 1, 2"
 	ruleRows := `SELECT rule AS "Rule", bypass_always AS "Always", repo AS "Repository",` +
 		` ruleset AS "Ruleset", bypass_actors AS "Bypass actors",` +
 		` bypass_sampled AS "Sampled" FROM (` +
-		"SELECT *, ROW_NUMBER() OVER (PARTITION BY repo, ruleset, rule ORDER BY time DESC) AS rn" +
+		"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, ruleset, rule ORDER BY time DESC) AS rn" +
 		" FROM gh_ruleset_rule WHERE $__timeFilter(time) AND " + RF + deliveryNewestRow +
 		" ORDER BY 2 DESC, 3, 4, 1"
 	branchGR, branchGRtf := gTbl(rowsOf(rp(gb, "days_since_commit"),
 		gn(gb, "repo"), gn(gb, "branch"), gn(gb, "is_default")),
 		"Repository, branch, default", []col{{"lastNotNull", "Idle"}})
-	// A `max` rather than the newest reading, for the reason the deploy keys
-	// table above carries one. `days_since_commit` is written only for a ref
-	// whose target is a commit, and a ref that points at anything else is
-	// stored with no age at all, which the collector has a test for. A
-	// top_metrics hands back nothing for a bucket where the field never
-	// appears, leaving the metric column shorter than the three bucket columns
-	// and killing the whole panel with `frame has different field lengths`.
-	// `max` appends a null instead and the row keeps its shape.
+	// A `max` inside each branch's newest document rather than a top_metrics,
+	// for the reason the deploy keys table above carries one.
+	// `days_since_commit` is written only for a ref whose target is a commit,
+	// and a ref that points at anything else is stored with no age at all,
+	// which the collector has a test for. A top_metrics hands back nothing for
+	// a bucket where the field never appears, leaving the metric column
+	// shorter than the three bucket columns and killing the whole panel with
+	// `frame has different field lengths`. `max` appends a null instead and
+	// the row keeps its shape.
 	branchES, branchEStf := esTbl(gb,
-		[]any{b.tm("repo", 500), b.tm("branch", 500), b.tm("is_default", 2)},
+		append(b.tmRepo(500), b.tm("branch", 500), b.newestDoc(), b.tm("is_default", 2)),
 		[]any{b.mMax("days_since_commit")},
 		[]named{
 			{inventoryRepoTerm, "Repository"},
 			{"branch.keyword", "Branch"},
 			{"is_default.keyword", "Default"},
 			{"days_since_commit", "Idle"},
-		}, []string{ESF})
+		}, []string{ESF}, hideColumns(panelFullNameField, panelESTime))
 
-	// A boolean is not a metric in Graphite, so the four switches have no series
-	// there to read at all, and a table there carries one column: the number of
-	// status checks, which is the column a reader would sort this by.
+	// Graphite holds the four switches as 1 and 0 like any number, but a table
+	// there carries one number per row, and the one a reader would sort this
+	// by is the number of status checks.
 	protGR, protGRtf := gTbl(rowsOf(rp(bp, "required_checks"), gn(bp, "repo"), gn(bp, "pattern")),
 		"Repository, pattern", []col{{"lastNotNull", "Checks"}})
-	// A `max` per column rather than the newest reading, for the reason the
-	// repository settings table carries one: four of these six are booleans,
-	// and Elasticsearch hands a boolean out of a top_metrics as the string
-	// "true", which panics Grafana's plugin and takes the whole panel with it.
-	// `max` is answered as a number over a boolean, and appends a null rather
-	// than nothing where `required_reviews` was never written.
-	protES, protEStf := esTbl(bp, []any{b.tm("repo", 500), b.tm("pattern", 100), b.tmURL()},
+	// Each pattern's newest document, then a max of each column inside it:
+	// four of these six are booleans, which a top_metrics would hand back as
+	// text, and `required_reviews` is not always written. See newestDoc.
+	protES, protEStf := esTbl(bp, append(b.tmRepo(500), b.tm("pattern", 100), b.newestDoc(), b.tmURL()),
 		[]any{
 			b.mMax("required_reviews"), b.mMax("requires_commit_signatures"),
 			b.mMax("requires_linear_history"), b.mMax("allows_force_pushes"),
@@ -441,7 +452,7 @@ func branchesAndProtections(b *builder) []Panel {
 			{"allows_force_pushes", deliveryForcePush},
 			{"requires_conversation_resolution", "Threads"},
 			{"required_checks", "Checks"},
-		}, []string{ESF})
+		}, []string{ESF}, hideColumns(panelFullNameField, panelESTime))
 
 	// Graphite keeps one column of the three, so it keeps `bypass_actors`: the
 	// exact total, which means the same thing standing alone as it does beside
@@ -449,8 +460,10 @@ func branchesAndProtections(b *builder) []Panel {
 	ruleGR, ruleGRtf := gTbl(rowsOf(rp(rr, "bypass_actors"),
 		gn(rr, "repo"), gn(rr, "ruleset"), gn(rr, "rule")),
 		"Repository, ruleset, rule", []col{{"lastNotNull", deliveryBypassActors}})
+	// All three from each rule's newest document, so they come from one
+	// reading and agree with each other the way the SQL twin's newest row does.
 	ruleES, ruleEStf := esTbl(rr,
-		[]any{b.tm("repo", 500), b.tm("ruleset", 100), b.tm("rule", 100)},
+		append(b.tmRepo(500), b.tm("ruleset", 100), b.tm("rule", 100), b.newestDoc()),
 		[]any{b.mMax("bypass_actors"), b.mMax("bypass_always"), b.mMax("bypass_sampled")},
 		[]named{
 			{inventoryRepoTerm, "Repository"},
@@ -459,12 +472,12 @@ func branchesAndProtections(b *builder) []Panel {
 			{"bypass_actors", deliveryBypassActors},
 			{"bypass_always", "Always"},
 			{"bypass_sampled", "Sampled"},
-		}, []string{ESF})
+		}, []string{ESF}, hideColumns(panelFullNameField, panelESTime))
 
 	return []Panel{
 		panel("table", "Stale branches", box{W: 12, H: 8, X: 0, Y: 32}, []Target{sqlT(branches)}, &P{
 			Prom: []Target{promTbl(promTop(50, fmt.Sprintf(
-				"max by (repo, branch, is_default) (github_branch_days_since_commit{%s})", PF,
+				"max by (full_name, repo, branch, is_default) (github_branch_days_since_commit{%s})", PF,
 			)))},
 			PromTF: []any{organize(map[string]string{
 				"repo": "Repository", "branch": "Branch", "is_default": "Default",
@@ -489,20 +502,19 @@ func branchesAndProtections(b *builder) []Panel {
 			GRDesc: "Graphite names each row repository, branch and whether it is the default " +
 				"from the path. " + noRepoFlagsHere,
 			ES: branchES, ESTF: branchEStf,
-			ESDesc: "Elasticsearch answers with the largest number of days inside the range " +
-				"rather than with the newest reading. A branch whose ref points at something " +
-				"that is not a commit has no age at all, in this dashboard or any of the " +
-				"others, and its cell is empty. " + noRepoFlagsHere,
+			ESDesc: "A branch whose ref points at something that is not a commit has no age " +
+				"at all, in this dashboard or any of the others, and its cell is empty. " +
+				noRepoFlagsHere,
 		}),
 		panel("table", "Branch protection rules", box{W: 12, H: 8, X: 12, Y: 32},
 			[]Target{sqlT(protections)}, &P{
 				Prom: []Target{
-					promTbl(fmt.Sprintf("max by (repo, pattern) (github_branch_protection_required_reviews{%s})", PF), "A"),
-					promTbl(fmt.Sprintf("max by (repo, pattern) (github_branch_protection_requires_commit_signatures{%s})", PF), "B"),
-					promTbl(fmt.Sprintf("max by (repo, pattern) (github_branch_protection_requires_linear_history{%s})", PF), "C"),
-					promTbl(fmt.Sprintf("max by (repo, pattern) (github_branch_protection_allows_force_pushes{%s})", PF), "D"),
-					promTbl(fmt.Sprintf("max by (repo, pattern) (github_branch_protection_requires_conversation_resolution{%s})", PF), "E"),
-					promTbl(fmt.Sprintf("max by (repo, pattern) (github_branch_protection_required_checks{%s})", PF), "F"),
+					promTbl(fmt.Sprintf("max by (full_name, repo, pattern) (github_branch_protection_required_reviews{%s})", PF), "A"),
+					promTbl(fmt.Sprintf("max by (full_name, repo, pattern) (github_branch_protection_requires_commit_signatures{%s})", PF), "B"),
+					promTbl(fmt.Sprintf("max by (full_name, repo, pattern) (github_branch_protection_requires_linear_history{%s})", PF), "C"),
+					promTbl(fmt.Sprintf("max by (full_name, repo, pattern) (github_branch_protection_allows_force_pushes{%s})", PF), "D"),
+					promTbl(fmt.Sprintf("max by (full_name, repo, pattern) (github_branch_protection_requires_conversation_resolution{%s})", PF), "E"),
+					promTbl(fmt.Sprintf("max by (full_name, repo, pattern) (github_branch_protection_required_checks{%s})", PF), "F"),
 				},
 				PromTF: merged(map[string]string{
 					"repo": "Repository", "pattern": "Pattern",
@@ -529,21 +541,17 @@ func branchesAndProtections(b *builder) []Panel {
 					width("Checks", 80), ownerLinkOn("Pattern", "the branch settings"),
 				},
 				GR: protGR, GRTF: protGRtf,
-				GRDesc: "Graphite names each row repository and pattern from the path, and a boolean " +
-					"is not a metric there at all, so what the protection requires beyond the " +
-					"number of status checks is missing. " + grRows,
+				GRDesc: "Graphite names each row repository and pattern from the path and keeps " +
+					"one number per row, the status checks, so what else the protection requires " +
+					"is missing. " + grRows,
 				ES: protES, ESTF: protEStf,
-				ESDesc: "In Elasticsearch all six columns are the largest value inside the range " +
-					"rather than the newest reading, because a top_metrics over a boolean panics " +
-					"the plugin: a protection switched off inside the range still reads as on " +
-					"until the range has moved past the day it was on.",
 			}),
 		panel("table", "Ruleset rules and bypasses", box{W: 24, H: 8, X: 0, Y: 40},
 			[]Target{sqlT(ruleRows)}, &P{
 				Prom: []Target{
-					promTbl(fmt.Sprintf("max by (repo, ruleset, rule) (github_ruleset_rule_bypass_actors{%s})", PF), "A"),
-					promTbl(fmt.Sprintf("max by (repo, ruleset, rule) (github_ruleset_rule_bypass_always{%s})", PF), "B"),
-					promTbl(fmt.Sprintf("max by (repo, ruleset, rule) (github_ruleset_rule_bypass_sampled{%s})", PF), "C"),
+					promTbl(fmt.Sprintf("max by (full_name, repo, ruleset, rule) (github_ruleset_rule_bypass_actors{%s})", PF), "A"),
+					promTbl(fmt.Sprintf("max by (full_name, repo, ruleset, rule) (github_ruleset_rule_bypass_always{%s})", PF), "B"),
+					promTbl(fmt.Sprintf("max by (full_name, repo, ruleset, rule) (github_ruleset_rule_bypass_sampled{%s})", PF), "C"),
 				},
 				PromTF: merged(map[string]string{
 					"repo": "Repository", "ruleset": "Ruleset", "rule": "Rule",
@@ -569,8 +577,6 @@ func branchesAndProtections(b *builder) []Panel {
 					"read alone, against a total this table cannot show beside it, is exactly " +
 					"the misreading the panel exists to prevent.",
 				ES: ruleES, ESTF: ruleEStf,
-				ESDesc: "In Elasticsearch the three bypass numbers are the largest inside the range " +
-					"rather than the newest reading, so they still agree with each other.",
 			}),
 		rulesetChanges(b),
 	}
@@ -594,8 +600,8 @@ func rulesetChanges(b *builder) Panel {
 		" ORDER BY time DESC LIMIT 200"
 	// Graphite has no rows and no dates to list by, so the versions become a
 	// count per ruleset and actor type, named from the path.
-	verGR, verGRtf := gTbl(fmt.Sprintf(`sortBy(groupByNodes(isNonNull(%s), "sum", %d, %d, %d), "sum", true)`,
-		rp(rv, "versions"), gn(rv, "repo"), gn(rv, "ruleset"), gn(rv, "actor_type")),
+	verGR, verGRtf := gTbl(fmt.Sprintf(`sortBy(%s, "sum", true)`,
+		grGroupBy(nonNull(rp(rv, "versions")), rv, "sum", "repo", "ruleset", "actor_type")),
 		"Repository, ruleset, actor", []col{{"sum", "Versions"}})
 	// The documents themselves, newest first, which is the one shape that
 	// returns the target, the actor and the link as strings: a top_metrics
@@ -617,7 +623,7 @@ func rulesetChanges(b *builder) Panel {
 		// re-reads the same finite changelog, so the total rises once and an
 		// increase() over it reads 0 for every range after the first.
 		Prom: []Target{promTbl(fmt.Sprintf(
-			"sum by (repo, ruleset, actor_type) (github_ruleset_versions_count{%s})", PF,
+			"sum by (full_name, repo, ruleset, actor_type) (github_ruleset_versions_count{%s})", PF,
 		))},
 		PromTF: []any{organize(map[string]string{
 			"repo": "Repository", "ruleset": "Ruleset", "actor_type": "Actor",
@@ -672,17 +678,17 @@ func deploymentsToEnvironments(b *builder) []Panel {
 		// url is what the newest deployment put live, when it put anything.
 		` MAX(url) AS "Link", MAX(environment_url) AS "Live"` +
 		" FROM gh_deployment WHERE $__timeFilter(time) AND " + RF +
-		" GROUP BY 1, 3 ORDER BY 2 DESC"
+		" GROUP BY 1, full_name, 3 ORDER BY 2 DESC"
 
 	// The outcome is a bucket in Elasticsearch, so the pending deployments
 	// are rows of their own there rather than a column. Graphite keeps no
 	// strings and the outcome is one now, so its rows are the repository and
 	// the environment, with the successes counted from the flag beside it.
-	depGR, depGRtf := gTbl(fmt.Sprintf(`sortBy(groupByNodes(%s, "sum", %d, %d), "sum", true)`,
-		rp(dp, "success"), gn(dp, "repo"), gn(dp, "environment")),
+	depGR, depGRtf := gTbl(fmt.Sprintf(`sortBy(%s, "sum", true)`,
+		grGroupBy(rp(dp, "success"), dp, "sum", "repo", "environment")),
 		"Repository, environment", []col{{"count", "Deployments"}, {"sum", "Successes"}})
 	depES, depEStf := esTbl(dp,
-		[]any{b.tm("repo", 500), b.tm("environment", 50), b.tm("outcome", 10), b.tmURL(), b.tmURL("environment_url")},
+		append(b.tmRepo(500), b.tm("environment", 50), b.tm("outcome", 10), b.tmURL(), b.tmURL("environment_url")),
 		[]any{b.mCount(), b.mPct("seconds_to_status", 50), b.mPct("seconds_live", 50)},
 		[]named{
 			{inventoryRepoTerm, "Repository"},
@@ -693,7 +699,7 @@ func deploymentsToEnvironments(b *builder) []Panel {
 			{"n", "Deployments"},
 			{"s", deliveryTimeToStatus},
 			{"l", deliveryTimeLive},
-		}, []string{ESF})
+		}, []string{ESF}, hideColumns(panelFullNameField))
 
 	return []Panel{
 		panel("timeseries", "Deployments over time", box{W: 12, H: 8, X: 0, Y: 56},
@@ -708,16 +714,16 @@ func deploymentsToEnvironments(b *builder) []Panel {
 					"that read it and not at its latest status: the status goes on moving for " +
 					"years afterwards, and the deployment happened once. " + bucketFollowsRange,
 				PromDesc: sinceStart,
-				GR:       []Target{grq(perBucket("isNonNull("+rp(dp, "deployments")+")", gn(dp, "environment")))},
+				GR:       []Target{grq(perBucket(nonNull(rp(dp, "deployments")), gn(dp, "environment")))},
 				ES:       []Target{b.esDaily(dp, b.mCount(), "environment", "", []string{ESF}, "")},
 			}),
 		panel("table", "Deployments by environment", box{W: 12, H: 8, X: 12, Y: 56}, []Target{sqlT(deploys)}, &P{
 			Prom: []Target{
-				promTbl(fmt.Sprintf("sum by (repo, environment) (increase(github_deployments_total{%s}[$__range]))", PF), "A"),
-				promTbl(fmt.Sprintf("avg by (repo, environment) (github_deployments_seconds_to_status_mean{%s})", PF), "B"),
-				promTbl(fmt.Sprintf("avg by (repo, environment) (github_deployments_seconds_live_mean{%s})", PF), "C"),
-				promTbl(fmt.Sprintf(`sum by (repo, environment) (increase(github_deployments_total{outcome="success",%s}[$__range]))`, PF), "D"),
-				promTbl(fmt.Sprintf(`sum by (repo, environment) (increase(github_deployments_total{outcome="pending",%s}[$__range]))`, PF), "E"),
+				promTbl(fmt.Sprintf("sum by (full_name, repo, environment) (increase(github_deployments_total{%s}[$__range]))", PF), "A"),
+				promTbl(fmt.Sprintf("avg by (full_name, repo, environment) (github_deployments_seconds_to_status_mean{%s})", PF), "B"),
+				promTbl(fmt.Sprintf("avg by (full_name, repo, environment) (github_deployments_seconds_live_mean{%s})", PF), "C"),
+				promTbl(fmt.Sprintf(`sum by (full_name, repo, environment) (increase(github_deployments_total{outcome="success",%s}[$__range]))`, PF), "D"),
+				promTbl(fmt.Sprintf(`sum by (full_name, repo, environment) (increase(github_deployments_total{outcome="pending",%s}[$__range]))`, PF), "E"),
 			},
 			PromTF: merged(map[string]string{
 				"repo": "Repository", "environment": "Environment", inventoryValueCol + "A": "Deployments",

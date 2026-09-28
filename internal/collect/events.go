@@ -41,7 +41,8 @@ type Events struct {
 	// Measured on 2026-09-11: three pages of 100 every thirty minutes, never
 	// a 304 because the feed moves with every event, for eleven events an
 	// hour. One page a sweep is two requests of the three saved, ninety six
-	// core points a day.
+	// core points a day at that cadence and twice that at the quarter hour
+	// the family runs at now.
 	After string
 	// Newest is set by Collect to the id of the first event on the feed,
 	// which is what the next sweep hands back as After.

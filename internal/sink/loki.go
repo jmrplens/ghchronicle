@@ -164,9 +164,10 @@ var lokiEvents = map[string]lokiEvent{
 	}},
 	// The publication, not gh_release. That row is stamped at the sweep
 	// because its download count moves, so rendered it pushed every release
-	// again on every repository pass: 3,360 lines in a day on the account
-	// this was measured on, a third of everything the sink sent, each one
-	// saying a release had happened at the hour of a pass. The download count
+	// again on every repository pass, each line saying a release had happened
+	// at the hour of a pass: measured on 2.5.1 in production, over 30.9 hours
+	// and 27 repo passes, 4,313 of the 10,467 lines the sink sent, 41 per
+	// cent, for the 2 releases published in those hours. The download count
 	// is a gauge, and the stream keeps its name so a query written against it
 	// still reads it.
 	"gh_release_published": {kind: "release", message: func(p Point) string {

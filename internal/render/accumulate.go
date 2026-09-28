@@ -3,6 +3,7 @@ package render
 import (
 	"context"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/jmrplens/ghchronicle/v2/internal/sink"
@@ -17,6 +18,7 @@ type Accumulator struct {
 	Login string
 
 	account map[string]float64
+	// repos and languages are keyed by repoKey, never by the short name.
 	repos   map[string]*repoRow
 	traffic map[string]float64
 	days    map[time.Time]int
@@ -29,6 +31,7 @@ type Accumulator struct {
 }
 
 type repoRow struct {
+	key      string
 	name     string
 	language string
 	stars    int
@@ -80,7 +83,7 @@ func (a *Accumulator) Write(_ context.Context, points []sink.Point) (int, error)
 			}
 		case "gh_repo_language":
 			taken++
-			repo, lang := p.Tags["repo"], p.Tags["language"]
+			repo, lang := repoKey(p.Tags), p.Tags["language"]
 			if repo == "" || lang == "" {
 				break
 			}
@@ -115,20 +118,36 @@ func (a *Accumulator) takeLatest(prefix string, p sink.Point) {
 	}
 }
 
+// repoKey is what tells one repository from another. The short name does
+// not: two owners can give a repository the same one, and a sweep of an
+// account and its organizations meets both, a user's .github and an
+// organization's, so keyed by it one repository's stars and forks replaced
+// the other's. full_name is owner/name, which the Overview keys by too. The
+// collectors write (none) there when either part is missing, so a value
+// without the slash, like a point without the tag, leaves the short name as
+// the only key there is.
+func repoKey(tags map[string]string) string {
+	if full := tags["full_name"]; strings.Contains(full, "/") {
+		return full
+	}
+	return tags["repo"]
+}
+
 func (a *Accumulator) takeRepo(p sink.Point) {
 	name := p.Tags["repo"]
 	if name == "" {
 		return
 	}
-	key := "repo." + name
+	id := repoKey(p.Tags)
+	key := "repo." + id
 	if last, ok := a.seen[key]; ok && p.Time.Before(last) {
 		return
 	}
 	a.seen[key] = p.Time
-	r, known := a.repos[name]
+	r, known := a.repos[id]
 	if !known {
-		r = &repoRow{name: name}
-		a.repos[name] = r
+		r = &repoRow{key: id, name: name}
+		a.repos[id] = r
 	}
 	r.language = p.Tags["language"]
 	if v, ok := numberOf(p.Fields["stars"]); ok {
@@ -178,22 +197,31 @@ func (a *Accumulator) Card() Card {
 	// neither a star nor a fork total. That means the card counts what the
 	// sweep collected, so excluding forks or archived repositories from the
 	// targets is visible here too, which is the honest reading.
+	rows := make([]*repoRow, 0, len(a.repos))
 	for _, r := range a.repos {
 		c.Stars += r.stars
 		c.Forks += r.forks
-		c.TopRepos = append(c.TopRepos, TopRepo{
-			Name: r.name, Language: r.language, Stars: r.stars,
-		})
+		rows = append(rows, r)
 	}
 
 	// Sorted here as well as in the renderer: the map iteration above is
 	// random, and a caller reading TopRepos directly deserves a stable order.
-	sort.Slice(c.TopRepos, func(i, j int) bool {
-		if c.TopRepos[i].Stars != c.TopRepos[j].Stars {
-			return c.TopRepos[i].Stars > c.TopRepos[j].Stars
+	// Two owners' repositories of one name and one star count are told apart
+	// by the key, which the list does not show.
+	sort.Slice(rows, func(i, j int) bool {
+		if rows[i].stars != rows[j].stars {
+			return rows[i].stars > rows[j].stars
 		}
-		return c.TopRepos[i].Name < c.TopRepos[j].Name
+		if rows[i].name != rows[j].name {
+			return rows[i].name < rows[j].name
+		}
+		return rows[i].key < rows[j].key
 	})
+	for _, r := range rows {
+		c.TopRepos = append(c.TopRepos, TopRepo{
+			Name: r.name, Language: r.language, Stars: r.stars,
+		})
+	}
 
 	if len(a.days) > 0 {
 		keys := make([]time.Time, 0, len(a.days))

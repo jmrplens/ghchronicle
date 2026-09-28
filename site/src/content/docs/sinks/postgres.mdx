@@ -1,6 +1,6 @@
 ---
 title: PostgreSQL
-description: INSERT statements you pipe into psql, the schema they declare, and why the conflict clause updates rather than does nothing.
+description: The two ways into PostgreSQL, INSERT statements you pipe into psql and a sink that connects, the schema both declare, and why the conflict clause updates rather than does nothing.
 searchTitle: Store GitHub metrics in PostgreSQL
 ---
 
@@ -93,9 +93,20 @@ the key is made of. Each field of the union that batch carries follows it as
 in a later batch. The fields are never in the `CREATE TABLE`, because that
 statement does nothing to a table an earlier release made: a field the release
 did not write would reach the `INSERT` with no column, and PostgreSQL refuses
-the statement and the batch around it. Adding each column if it is missing
-means the same thing to a new table and an old one. A rotated file starts its
-declarations again, so any one file can be replayed on its own.
+the statement and the batch around it. Adding a field's column if it is
+missing means the same thing to a new table and an old one. A rotated file
+starts its declarations again, so any one file can be replayed on its own.
+
+So a file replayed into a database that already holds its tables makes psql
+print a notice for every declaration that finds its work done, one for the
+`CREATE TABLE` and one for each column the table already has:
+
+```text
+NOTICE:  relation "gh_traffic" already exists, skipping
+NOTICE:  column "count" of relation "gh_traffic" already exists, skipping
+```
+
+Those are expected. An `ERROR` line is not.
 
 The connecting sink does not send every one of those `ALTER TABLE`s. It asks
 the catalog which columns a table already has the first time its process meets
@@ -109,9 +120,32 @@ second `lock_timeout` refused it, and a `SELECT` behind it waited three seconds.
 A statement the server refuses is sent again on the next write rather than
 taken as done.
 
-A tag first seen after the table was declared cannot join the primary key
-without rewriting it, so it becomes a plain column. That only happens when a
-collector changes its tag set between sweeps.
+A tag is different, because it is part of the key. One first seen after the
+table was declared, in the same file or the same process, cannot join the
+primary key without rewriting it, so it becomes a plain column. That only
+happens when a collector changes its tag set between sweeps.
+
+A table an earlier release made is another matter, and a release that changes
+a measurement's tags changes what loads into it. **Measured against PostgreSQL
+18.6** on 2026-09-27:
+
+- A tag a later release adds gets no column from either sink, so every `INSERT`
+  of that measurement is refused with `column ... does not exist`, and in the
+  connecting sink the other rows of the same batch with it.
+- A tag a later release stops writing, as 2.6.1 stopped writing `is_answer` on
+  `gh_discussion_comment`, leaves the file's `ON CONFLICT` naming a key the
+  table does not have. psql refuses each of those statements with "there is no
+  unique or exclusion constraint matching the ON CONFLICT specification", and
+  the rest of the file loads. The connecting sink reads the table's own key
+  from the catalog and conflicts on that, so it goes on writing, and its new
+  rows sit beside the old ones with the empty string in the column no longer
+  written, the two shapes InfluxDB holds as well.
+
+The clean way out of either is to drop the table and let the sweeps, and a
+backfill for the history, fill it again; a collector with the connecting sink
+has to be restarted after the drop, since it declares a table once per process.
+[How to read the tables](/ghchronicle/collectors/measurements/#how-to-read-the-tables)
+shows how to rebuild a key by hand instead.
 
 ## TimescaleDB
 
@@ -129,9 +163,13 @@ Nothing in the dashboard changes.
 
 <Steps>
 
-1. Point the sink at a file, or at standard output for a direct pipe.
+1. Choose the sink. The one that connects needs `sinks.postgres.dsn` and a
+    database this machine can reach, and declares its tables on its first
+    write. The file sink needs `sinks.sql.path`, a file or `-` for standard
+    output.
 
-2. Load it.
+2. With the file sink, load what it wrote. The connecting sink has nothing to
+    load.
 
     ```sh
     psql "$DATABASE_URL" -f /var/lib/ghchronicle/points.sql
@@ -141,7 +179,9 @@ Nothing in the dashboard changes.
     scheduler and pipe it straight in.
 
 3. Point Grafana's PostgreSQL datasource at the database and import
-    `ghchronicle-postgres.json`.
+    `ghchronicle-postgres.json`, or, with the connecting sink, let
+    `-publish-dashboard` make the datasource out of the DSN and publish the
+    dashboard.
 
     ```sql
     SELECT time, "count" FROM gh_traffic WHERE kind = 'views' AND repo = $repo
@@ -154,7 +194,7 @@ one, with every query translated to PostgreSQL against this schema.
 
 ## Where to go next
 
-- [Choosing a store](/ghchronicle/sinks/) compares PostgreSQL with the other nine,
+- [Choosing a store](/ghchronicle/sinks/) compares PostgreSQL with the others,
   and holds the write ledger every one of them shares.
 - [The dashboards](/ghchronicle/dashboards/) says which of the five is drawn
   against which store, and what a panel a store cannot answer becomes.

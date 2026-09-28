@@ -1,6 +1,6 @@
 ---
 title: El fichero
-description: "La configuración de ghchronicle: un fichero YAML, todos los valores expandibles desde el entorno, y para qué sirve cada bloque de primer nivel."
+description: "La configuración de ghchronicle: un fichero YAML, sus credenciales, direcciones y rutas expandibles desde el entorno, y para qué sirve cada bloque de primer nivel."
 searchTitle: El fichero de configuración de ghchronicle
 defaultColumns:
   - table: Clave
@@ -33,6 +33,7 @@ heartbeat: # cada cuánto despierta el bucle, para una prueba
 log: # nivel, formato y un fichero rotatorio opcional
 state_file: # lo que recuerda un reinicio
 backfill: # el límite, al ejecutar con -backfill
+grafana: # dónde se publica el dashboard, cuando se pide
 ```
 
 Solo `github.token` y uno de `targets.user`, `targets.orgs` o `targets.repos`
@@ -41,9 +42,10 @@ valor por defecto.
 
 ## Expansión de `${VAR}`
 
-Todo valor de tipo cadena se expande desde el entorno al arrancar.
-`${GITHUB_TOKEN}` se convierte en el valor de esa variable, o en una cadena
-vacía si no está definida.
+Una credencial, una dirección o una ruta de fichero se expande desde el
+entorno al arrancar. `${GITHUB_TOKEN}` se convierte en el valor de esa
+variable, o en una cadena vacía si no está definida, salvo en una ruta de
+fichero, más abajo.
 
 ```yaml
 github:
@@ -53,6 +55,36 @@ sinks:
     url: http://localhost:8181
     token: ${INFLUX_TOKEN}
 ```
+
+La expansión va por clave, no sobre el fichero entero, y estas son las claves
+a las que llega:
+
+- credenciales: `github.token`, `sinks.influxdb.token`, cada valor de
+  `sinks.otlp.headers`, `sinks.telegraf.username` y `password`,
+  `sinks.postgres.dsn`, `sinks.elasticsearch.api_key`, `username` y
+  `password`, y `grafana.token`, `user` y `password`;
+- direcciones: `github.base_url` y `web_url`, la `url` de `influxdb`, `loki`,
+  `telegraf` y `elasticsearch`, `sinks.otlp.endpoint`,
+  `sinks.graphite.addr`, `grafana.url` y `grafana.datasource.url`;
+- los identificadores de lo que Grafana ya tiene: `grafana.dashboard_uid`,
+  `grafana.datasource.uid` y `grafana.datasource.loki_uid`;
+- rutas de fichero: `state_file`, `sinks.dedupe_file`, `log.file`,
+  `sinks.file.path` y `sinks.sql.path`, donde una `~` inicial es además el
+  directorio personal, así que `state_file: ~/.ghchronicle/state.json` es un
+  fichero dentro de él. Solo se lee así una `~` sola o seguida de un
+  separador, `~nombre` se deja como está escrito, y una `~` cuando el proceso
+  no tiene directorio personal se rechaza al arrancar nombrando la clave.
+  También un `${VAR}` en una ruta que no está definido o está vacío, porque la
+  ruta que queda sin él no es la escrita:
+  `state_file: ${STATE_DIRECTORY}/state.json` sería `/state.json`, con el
+  registro de escrituras y el fichero de caché a su lado en la raíz del sistema
+  de ficheros. Antes de 2.6.1 no se expandía ninguna ruta, y esa `~` en un
+  `state_file` era un directorio llamado `~` dentro del directorio de trabajo.
+
+Cualquier otro valor se lee tal como está escrito, así que un `${VAR}` en
+`sinks.loki.tenant_id`, `sinks.influxdb.bucket`, `sinks.prometheus.listen`,
+una etiqueta, un prefijo o una cadencia le llega al colector como esos
+caracteres.
 
 Esta es toda la razón de que el fichero se pueda versionar. La configuración es
 la forma del despliegue y le corresponde estar en control de versiones; los
@@ -126,7 +158,11 @@ Ocho cosas, y borrar el fichero cuesta una distinta por cada una:
   ese día, y el historial entero otra vez una vez por semana o cuando la regla
   ha cambiado. Sin él la pasada siguiente recorre enteras las pull requests
   fusionadas de la cuenta, que en una cuenta con 2.315 fueron 35 consultas y
-  24 MB, donde la pasada de un día es una consulta y de 0,3 a 0,6 MB.
+  23,7 MB, donde una pasada que lo tiene recorre solo el día en curso: la
+  consulta de recuentos y una página del recorrido, dos puntos, y de 468 a
+  513 KB en cada pasada horaria que registró el proxy de producción contra la
+  misma cuenta el 2026-09-27, un tamaño que crece a lo largo del día con lo que
+  se fusiona.
 
 Siete de las ocho cuestan solo cuota, porque lo que se vuelve a recoger se
 indexa por medida, etiquetas y marca de tiempo y sobrescribe lo que ya está
@@ -191,11 +227,43 @@ escrituras recuerda lo que tienen los almacenes, que es lo que pasa al borrar el
 registro para volver a llenar un almacén vaciado, con `dedupe_file: off` o con
 el `dedupe: false` de un almacén, y en una ejecución que termina con su pasada;
 y donde se ha añadido un destino desde que se escribió el fichero. Sus jobs se
-vuelven a listar entonces y se ofrecen otra vez con todos los demás puntos.
+vuelven a listar entonces y se ofrecen otra vez con todos los demás puntos. Dos
+de esos casos son noticia, un registro que la configuración mantiene y que se
+lee vacío y un destino añadido, y el arranque los dice:
+
+```text
+level=INFO msg="the write ledger remembers nothing, listing the jobs of the runs the cache file remembers again" runs=666
+level=INFO msg="a store was added since the cache file was written, listing the jobs of the runs it remembers again" stores=influxdb,loki,postgres written_to=influxdb,loki runs=666
+```
+
+Los demás son como corre siempre la configuración, un almacén sin registro o
+una ejecución que termina con su pasada, y solo se dicen en `debug`, como
+`not every store keeps a write ledger`.
+
+Cada arranque que encuentra el fichero dice lo que ha leído, en su primera
+pasada, y uno que no encuentra ninguno lo dice en `debug`:
+
+```text
+level=INFO msg="cache file read" file=/var/lib/ghchronicle/state-cache.bin written=2026-09-27T15:27:41+02:00 answers=1170 runs=672 refusals=100 page_sizes=54 age=1s
+```
 
 Se escribe como mucho cada cinco minutos mientras el recolector corre, y una vez
-más cuando se para, se pare como se pare. Una pasada con `-card-only` lo lee y
-no lo escribe, por la misma razón por la que deja en paz el fichero de estado.
+más cuando se para: al final de un `-once`, y cuando al servicio se le pide
+parar con `SIGTERM` o `SIGINT`, que es lo que envían `systemctl stop`,
+`docker stop` y Ctrl-C. Un proceso matado sin más no puede, así que `SIGKILL`,
+el OOM killer del núcleo, `docker kill`, `taskkill /F` y
+`Stop-ScheduledTask` pierden lo que aprendió desde el último guardado, cinco
+minutos como mucho, y el siguiente arranque vuelve a pedir esas respuestas. Un
+guardado que falla lo dice, y también un arranque que encuentra un fichero que
+no puede leer:
+
+```text
+level=WARN msg="cache file not saved" file=/var/lib/ghchronicle/state-cache.bin err="open /var/lib/ghchronicle/state-cache.bin.tmp: permission denied"
+level=WARN msg="cache file not read, the first pass of each family pays in full" file=/var/lib/ghchronicle/state-cache.bin err="..."
+```
+
+Una pasada con `-card-only` lo lee y no lo escribe, por la misma razón por la
+que deja en paz el fichero de estado.
 Un `-backfill` lo lee y tampoco lo escribe: las páginas que recorre son páginas
 que ninguna pasada pide, y guardadas desplazarían del fichero las respuestas de
 las propias pasadas. Una actualización lo conserva: una respuesta se guarda bajo
@@ -219,9 +287,16 @@ vuelve a pedir, cada función rechazada se vuelve a preguntar, que es también l
 manera de que una función activada hoy se note antes de que acabe su día, los
 jobs de las ejecuciones más recientes se vuelven a listar una vez, y la primera
 pasada corre `totals` antes de las pull requests, diga lo que diga su cadencia,
-así que sus páginas se vuelven a dimensionar. Un fichero que no se carga entero,
-cortado, dañado o escrito en otro formato, se aparta con un aviso y cuesta lo
-mismo. Quiere la misma ruta persistente que los otros dos.
+así que sus páginas se vuelven a dimensionar. Cuando `totals` no tocaba de
+todos modos, lo dice:
+
+```text
+level=INFO msg="no page sizes remembered, running totals before the pull requests it sizes"
+```
+
+Un fichero que no se carga entero, cortado, dañado o escrito en otro formato,
+no se lee en absoluto, con el aviso de arriba, y cuesta lo mismo; el siguiente
+guardado lo sobrescribe. Quiere la misma ruta persistente que los otros dos.
 
 ## `backfill`
 
@@ -248,6 +323,7 @@ nombran la clave y lo que necesita.
 | Mensaje                                                               | Significa                                                          |
 | --------------------------------------------------------------------- | ------------------------------------------------------------------ |
 | `github.token is empty and GITHUB_TOKEN is unset`                     | Exactamente lo que dice                                            |
+| `state_file: "${X}/state.json" names ${X}, which is unset, ...`       | Una ruta nombra una variable sin valor: defínela, o escribe la ruta entera |
 | `targets: set at least one of user, orgs or repos`                    | No hay nada que recoger                                            |
 | `sinks: enable at least one of ...`                                   | Una ejecución que recoge y tira casi nunca es lo que alguien quiso |
 | `every.families.<name>: unknown collector`                            | El nombre no es una familia. El mensaje lista las que existen      |
@@ -271,3 +347,5 @@ nombran la clave y lo que necesita.
   fichero rotatorio.
 - [Elegir almacén](/ghchronicle/es/sinks/): el bloque `sinks`, una página por
   almacén.
+- [Dejar que el binario publique el dashboard](/ghchronicle/es/dashboards/#dejárselo-al-binario):
+  el bloque `grafana`.

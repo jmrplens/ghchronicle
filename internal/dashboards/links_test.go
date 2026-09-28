@@ -178,9 +178,9 @@ func TestRunTablesJoinOneDeclarationPerWorkflow(t *testing.T) {
 	panels := rendered(t, "influxdb")
 	for _, title := range []string{"Workflows", "Workflows that keep failing"} {
 		sql := sqlOf(t, mustPanel(t, panels, title))
-		if !strings.Contains(sql, "LEFT JOIN (SELECT repo, path, MAX(url) AS url FROM gh_workflow") ||
-			!strings.Contains(sql, "GROUP BY 1, 2) w ON") {
-			t.Errorf("%s joins gh_workflow without one row per (repo, path): %s", title, sql)
+		if !strings.Contains(sql, "LEFT JOIN (SELECT full_name, path, MAX(url) AS url FROM gh_workflow") ||
+			!strings.Contains(sql, "GROUP BY 1, 2) w ON w.full_name = r.full_name AND w.path = r.workflow") {
+			t.Errorf("%s joins gh_workflow without one row per (full_name, path): %s", title, sql)
 		}
 	}
 }

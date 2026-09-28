@@ -101,6 +101,11 @@ type Runner struct {
 	// every run of the window without its jobs. The command sets it: see its
 	// ledgerForgot.
 	Refill bool
+	// RefillEveryStart says Refill is how this configuration always starts,
+	// a run that opens no ledger or stores that keep none, so the refill is
+	// said at Debug; otherwise a ledger that is kept read empty, and that is
+	// worth an Info line.
+	RefillEveryStart bool
 	// cacheLoaded is whether CacheFile has been read, which happens once, at
 	// the first sweep. cacheSaved is when it was last written, and
 	// cacheDirty whether a family has run since.
@@ -318,8 +323,14 @@ func (r *Runner) clock() time.Time {
 
 // discoverRepos rebuilds the repository list when it has gone stale, and
 // leaves the previous one in place otherwise.
+//
+// Stale to within half a tick, for the reason due gives: the sweep an hour
+// after the one that listed the repositories reads its clock a few
+// milliseconds either side of the hour, and asked to the millisecond the
+// list outlived it about half the time, so a repository created in between
+// waited a tick more, an hour and a quarter at the quarter hour tick.
 func (r *Runner) discoverRepos(ctx context.Context, now time.Time) error {
-	if r.repos != nil && now.Sub(r.reposAt) <= discoverInterval {
+	if r.repos != nil && now.Sub(r.reposAt) < discoverInterval-r.slack() {
 		return nil
 	}
 	found, err := collect.Discover(ctx, r.API, &collect.Filter{
@@ -416,9 +427,9 @@ func (r *Runner) accountFamilies(ctx context.Context, now time.Time) {
 	})
 	// The whole green-squares history of every past year, for one point of
 	// GraphQL each, and the year so far as a daily snapshot. Disabled by
-	// default; setting `every.history` to any duration runs it, the past
-	// years are there after the first sweep, and a daily cadence is what keeps
-	// this year's row current.
+	// default; setting `every.families.history` to any duration runs it, the
+	// past years are there after the first sweep, and a daily cadence is what
+	// keeps this year's row current.
 	r.family(ctx, "history", now, func() ([]sink.Point, error) {
 		return collect.History{Login: user}.Collect(ctx, r.API, now)
 	})
@@ -801,11 +812,11 @@ func batchFailures(answered bool, covered int) int {
 // Rows are not the test, and reading them as one was a corner that survived
 // the first fix: a collector that legitimately writes nothing for a repository
 // with nothing to report produces zero points from chunks that all answered
-// perfectly. deployments is the live example, hourly, on an account that has
-// never deployed anything, so its batch yields no rows on every sweep and one
-// chunk failing would have left it due on every tick. The collectors say how
-// many repositories were in the chunks that answered, through
-// collect.PartialError, which is the question this is really asking.
+// perfectly. deployments is the live example, every half hour, on an account
+// that has never deployed anything, so its batch yields no rows on every
+// sweep and one chunk failing would have left it due on every tick. The
+// collectors say how many repositories were in the chunks that answered,
+// through collect.PartialError, which is the question this is really asking.
 func batchAnswered(points []sink.Point, err error) bool {
 	if len(points) > 0 {
 		return true

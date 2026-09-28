@@ -957,30 +957,37 @@ func countUnstorable(t *testing.T, built []sink.Sink) int {
 // while a write ledger says what the stores hold. Deleting the ledger is how
 // the documentation has a wiped store filled again, and a store with no ledger
 // of its own, or a run that opens none, is offered every point every time; in
-// each of those the runner is told, and lists the jobs with the rest.
+// each of those the runner is told, and lists the jobs with the rest. Only the
+// deleted ledger is this start's doing, and only it is news: the others
+// forget at every start of the same configuration, which the runner is told
+// too, so that it does not report them at Info every time.
 func TestTheRunnerIsToldWhenNoLedgerRemembersTheStores(t *testing.T) {
 	remembers := sink.LoadLedger("", 0, 0)
 	_, commit := remembers.Reserve("influxdb", []sink.Point{{
 		Measurement: "gh_repo", Fields: map[string]any{"stars": 1}, Time: time.Now(),
 	}})
 	commit()
+	empty := func() *sink.Ledger { return sink.LoadLedger(filepath.Join(t.TempDir(), "state-written.bin"), 0, 0) }
 	off := false
 	influx := func(dedupe *bool) *config.Config {
 		return &config.Config{Sinks: config.Sinks{Influx: &config.InfluxSink{URL: "http://influx:8181", Dedupe: dedupe}}}
 	}
+	lokiOnly := &config.Config{Sinks: config.Sinks{Loki: &config.LokiSink{URL: "http://loki:3100/loki/api/v1/push"}}}
 	for _, tc := range []struct {
-		name   string
-		cfg    *config.Config
-		ledger *sink.Ledger
-		want   bool
+		name               string
+		cfg                *config.Config
+		ledger             *sink.Ledger
+		forgot, everyStart bool
 	}{
-		{"a ledger that remembers", influx(nil), remembers, false},
-		{"a run that opens no ledger", influx(nil), nil, true},
-		{"a ledger file deleted", influx(nil), sink.LoadLedger(filepath.Join(t.TempDir(), "state-written.bin"), 0, 0), true},
-		{"a store that keeps no ledger", influx(&off), remembers, true},
+		{"a ledger that remembers", influx(nil), remembers, false, false},
+		{"a run that opens no ledger", influx(nil), nil, true, true},
+		{"a ledger file deleted", influx(nil), empty(), true, false},
+		{"a store that keeps no ledger", influx(&off), remembers, true, true},
+		{"sinks none of which can keep one", lokiOnly, empty(), true, true},
 	} {
-		if got := ledgerForgot(tc.cfg, tc.ledger); got != tc.want {
-			t.Errorf("%s: ledgerForgot = %v, want %v", tc.name, got, tc.want)
+		forgot, everyStart := ledgerForgot(tc.cfg, tc.ledger)
+		if forgot != tc.forgot || everyStart != tc.everyStart {
+			t.Errorf("%s: ledgerForgot = %v, %v, want %v, %v", tc.name, forgot, everyStart, tc.forgot, tc.everyStart)
 		}
 	}
 

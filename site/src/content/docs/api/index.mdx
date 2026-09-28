@@ -14,7 +14,7 @@ says which one it just charged in the `x-ratelimit-resource` header.
 | Bucket    | Limit                | Spent by                                                         |
 | --------- | -------------------- | ---------------------------------------------------------------- |
 | `core`    | 5000 per hour        | Every REST call                                                  |
-| `graphql` | 5000 points per hour | The account, commits, discussions, labels and milestones queries, and since 2026-09-11 the newest stars and forks, the starred list, the outbound searches and ten of the eleven totals counts |
+| `graphql` | 5000 points per hour | Every GraphQL query: the pull requests and issues, the account, commits, discussions, deployments and the rest, which the [cost table](/ghchronicle/api/cost/) prices family by family, and the query that asks which repositories moved |
 | `search`  | 30 per minute        | The commit count of `totals`, and nothing else: GraphQL search has no COMMIT type |
 
 Two more are charged by one family each: `webhook_deliveries` (500 a minute) by
@@ -181,6 +181,8 @@ dips is normal; a family skipped every sweep is a configuration problem.
 
 A [backfill](/ghchronicle/how/backfill/) is the opposite intention and says so.
 When a bucket runs out it waits for the window to reset rather than giving up,
-because a backfill that stops half way has spent the expensive part of the
-budget and keeps only the families it finished: each one is written and marked
-as it completes, and the rest has to be run again.
+because what it was asked for is the whole walk, and a family skipped for want
+of budget would be a family left to walk again. Stopped half way, it loses
+little: a checkpoint beside the state file keeps its place, repository by
+repository, and [the same command carries on from
+there](/ghchronicle/how/backfill/#stopping-one-and-picking-it-up-again).

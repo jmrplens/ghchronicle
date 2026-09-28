@@ -75,8 +75,18 @@ un número, así que:
 - No se puede construir una tabla que necesite varios campos de una misma fila.
   El dashboard incluido conserva la columna por la que ordena y dice en la
   descripción qué columnas descartó.
-- Un booleano no es una métrica allí en absoluto, ni tampoco un título ni
-  ninguna otra cadena. Esos paneles lo dicen.
+- Un título o cualquier otra cadena no es una métrica allí en absoluto, y el
+  destino la descarta; los paneles que mostrarían una lo dicen. Un booleano se
+  guarda como 1 o 0, igual que cualquier número.
+- Un panel no puede unir dos medidas, porque cada una vive bajo su propia
+  ruta. Work elsewhere no tiene columna Stars, y el perfil de comunidad
+  conserva la bandera de plantilla de issue de la API en vez del número de
+  plantillas, que vive bajo otra medida.
+- Un objetivo no puede preguntar por una ventana mientras lee otra. El Overview
+  y Every repository, ever cuentan un repositorio archivado que el filtro por
+  omisión aparta por sus puntos de los últimos siete días, donde los almacenes
+  SQL preguntan si el colector lo sigue escribiendo, así que un rango que
+  terminó hace más de una semana deja fuera esos repositorios.
 
 Todo lo que tiene forma de tiempo funciona con normalidad, que es la mayor parte
 del dashboard.
@@ -93,7 +103,7 @@ prefijo es el primer nodo de cada ruta.
 
 ## Por dónde seguir
 
-- [Elegir almacén](/ghchronicle/es/sinks/) compara Graphite con los otros nueve, y
+- [Elegir almacén](/ghchronicle/es/sinks/) compara Graphite con los demás, y
   lleva el registro de escrituras que todos comparten.
 - [Los dashboards](/ghchronicle/es/dashboards/) dice cuál de los cinco se dibuja
   contra cada almacén, y en qué se convierte un panel que un almacén no puede

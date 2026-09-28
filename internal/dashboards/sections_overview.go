@@ -3,6 +3,7 @@ package dashboards
 import (
 	"fmt"
 	"maps"
+	"slices"
 	"strings"
 )
 
@@ -211,7 +212,8 @@ func overview(b *builder) []Panel {
 				"archived repositories the default filter sets aside, which the picker " +
 				"stops listing once the last backfill is behind it: people still star and " +
 				"fork them, and each totals sweep reads their counts again, an hour " +
-				"apart by default, so a range shorter than that can leave them out. An " +
+				"apart by default, so where the sums are taken over the dashboard range, " +
+				"a range shorter than that can leave them out. An " +
 				"archived repository the configuration no longer collects is left out, as " +
 				"the picker leaves out a live one: a row written under an earlier " +
 				"configuration stays in the store, but nothing reads that repository's " +
@@ -226,6 +228,9 @@ func overview(b *builder) []Panel {
 				grNamed("B", "Stars", oneEachGR("stars")),
 				grNamed("C", "Forks", oneEachGR("forks")),
 			},
+			PromDesc: "Prometheus takes no range here: each sum is an instant query over " +
+				"the values the running collector pushed last, so the archived repositories " +
+				"count however short the range is, from the collector's first totals sweep on.",
 			GRDesc: grArchivedWindow,
 			ES:     append(countES, reposES...), ESTF: append(countEStf, reposEStf...),
 			ESOpts: Opts{"calc": "sum"},
@@ -311,24 +316,25 @@ func overview(b *builder) []Panel {
 func audience(b *builder) []Panel {
 	// The eight busiest repositories of the range and the rest as `other`:
 	// a series per repository put the busiest one, phonometry, under the
-	// panel's edge behind thirty legend entries. topSeries drops the days a
-	// repository had nothing, so a stacked bar of zeros is not a legend entry.
+	// panel's edge behind thirty legend entries. topRepoSeries drops the days
+	// a repository had nothing, so a stacked bar of zeros is not a legend
+	// entry, and keeps two owners' repositories of one name two series in
+	// every store.
 	perDay := func(field, kind, alias string) string {
-		return topSeries("gh_traffic", "repo", field, alias, "kind = '"+kind+"' AND "+RF)
+		return topRepoSeries("gh_traffic", field, alias, "kind = '"+kind+"' AND "+RF)
 	}
 	window := func(field, kind, title string, at box, desc string) Panel {
 		alias := lowerFirstWord(title)
 		return panel("timeseries", title, at,
 			[]Target{sqlTS(perDay(field, kind, alias))}, &P{
-				Prom: []Target{promq(fmt.Sprintf(`sum by (repo) (github_traffic_%s{kind=%q,%s})`,
+				Prom: []Target{promq(fmt.Sprintf(`sum by (full_name, repo) (github_traffic_%s{kind=%q,%s})`,
 					field, kind, PF), legend("{{repo}}"))},
 				Desc: desc + " The eight repositories with the most in the range are named; " +
 					"the rest are `other`. " + bucketFollowsRange, PromDesc: windowNote,
 				Opts:     mergeOpts(Opts{"stack": true, "bars": true}, dayBins),
 				SQLOpts:  seriesOpts,
 				PromOpts: Opts{"bars": false},
-				GR: []Target{grq(perBucket(rp("gh_traffic", field, "kind", kind),
-					gn("gh_traffic", "repo")))},
+				GR:       []Target{grq(perRepoBucket(rp("gh_traffic", field, "kind", kind), "gh_traffic"))},
 				ES: []Target{b.esDaily("gh_traffic", b.mSum(field), "repo", "",
 					[]string{"kind:" + kind, ESF}, "")},
 			})
@@ -337,22 +343,23 @@ func audience(b *builder) []Panel {
 	// Referrers and paths are a snapshot of the same fourteen days, rewritten
 	// daily. Adding the days together would report the window once per day it
 	// was captured, so the newest snapshot per repository is taken first and
-	// only then summed across repositories.
+	// only then summed across repositories, a repository by its full name so
+	// that two owners' repositories of one name are two snapshots.
 	// referrer_url is the host as a page, the same for every repository it
 	// sent visitors to; a search engine GitHub names without a host has none
 	// and its cell stays empty.
 	refs := `SELECT referrer AS "Referrer", SUM(count) AS "Views",` +
 		` SUM(uniques) AS "Unique", MAX(referrer_url) AS "Link" FROM (` +
-		"SELECT repo, referrer, count, uniques, referrer_url, ROW_NUMBER() OVER (" +
-		"PARTITION BY repo, referrer ORDER BY time DESC) AS rn" +
+		"SELECT referrer, count, uniques, referrer_url, ROW_NUMBER() OVER (" +
+		"PARTITION BY full_name, referrer ORDER BY time DESC) AS rn" +
 		" FROM gh_traffic_referrer WHERE $__timeFilter(time) AND " + RF +
 		") x WHERE rn = 1 GROUP BY 1 ORDER BY 2 DESC LIMIT 25"
 	// The column the table is sorted by comes second, so it is on the screen
 	// beside the identifier on a phone; the title, which can be long, after.
 	paths := `SELECT path AS "Path", SUM(count) AS "Views", SUM(uniques) AS "Unique",` +
 		` MAX(title) AS "Title", url AS "Link" FROM (` +
-		"SELECT repo, path, title, count, uniques, url, ROW_NUMBER() OVER (" +
-		"PARTITION BY repo, path ORDER BY time DESC) AS rn" +
+		"SELECT path, title, count, uniques, url, ROW_NUMBER() OVER (" +
+		"PARTITION BY full_name, path ORDER BY time DESC) AS rn" +
 		" FROM gh_traffic_path WHERE $__timeFilter(time) AND " + RF +
 		") x WHERE rn = 1 GROUP BY 1, 5 ORDER BY 2 DESC LIMIT 25"
 
@@ -360,20 +367,22 @@ func audience(b *builder) []Panel {
 		rp("gh_traffic_referrer", "count"), gn("gh_traffic_referrer", "referrer")),
 		"Referrer", []col{{"lastNotNull", "Views"}})
 	refsES, refsEStf := esTbl("gh_traffic_referrer",
-		[]any{b.tm("referrer", 25), b.tm("repo", 50), b.tmURL("referrer_url")}, []any{b.mNewest("count", "uniques")},
+		slices.Concat([]any{b.tm("referrer", 25)}, b.tmRepo(50), []any{b.tmURL("referrer_url")}),
+		[]any{b.mNewest("count", "uniques")},
 		[]named{
 			{"referrer.keyword", "Referrer"},
 			{panelRepoField, "Repository"},
 			{"referrer_url.keyword", "Link"},
 			{"count", "Views"},
 			{"uniques", "Unique"},
-		}, []string{ESF})
+		}, []string{ESF}, hideColumns(panelFullNameField))
 
 	pathsGR, pathsGRtf := gTbl(fmt.Sprintf(`limit(sortByMaxima(groupByNode(%s, %d, "sum")), 25)`,
 		rp("gh_traffic_path", "count"), gn("gh_traffic_path", "path")),
 		"Path", []col{{"lastNotNull", "Views"}})
 	pathsES, pathsEStf := esTbl("gh_traffic_path",
-		[]any{b.tm("path", 25), b.tm("repo", 50), b.tm("title", 1), b.tmURL()}, []any{b.mNewest("count", "uniques")},
+		slices.Concat([]any{b.tm("path", 25)}, b.tmRepo(50), []any{b.tm("title", 1), b.tmURL()}),
+		[]any{b.mNewest("count", "uniques")},
 		[]named{
 			{"path.keyword", "Path"},
 			{panelRepoField, "Repository"},
@@ -382,15 +391,17 @@ func audience(b *builder) []Panel {
 			{"count", "Views"},
 			{"uniques", "Unique"},
 		},
-		[]string{ESF})
+		[]string{ESF}, hideColumns(panelFullNameField))
 
-	cloneGR, cloneGRtf := gTbl(rowsOf(fmt.Sprintf("sumSeries(%s)",
-		rp("gh_traffic", "count", "kind", "clones")), gn("gh_traffic", "repo")),
+	// A path per repository once the kind is pinned, so each is a row as it
+	// is. It was a sumSeries first, which added every repository into one
+	// series and named it after whichever came first.
+	cloneGR, cloneGRtf := gTbl(rowsOf(rp("gh_traffic", "count", "kind", "clones"), gn("gh_traffic", "repo")),
 		"Repository", []col{{"sum", "Clones"}})
-	cloneES, cloneEStf := esTbl("gh_traffic", []any{b.tm("repo", 500), b.tmURL()},
+	cloneES, cloneEStf := esTbl("gh_traffic", append(b.tmRepo(500), b.tmURL()),
 		[]any{b.mSum("count"), b.mSum("uniques")},
 		[]named{{panelRepoField, "Repository"}, {"url.keyword", "Link"}, {"c", "Clones"}, {"u", "Cloners"}},
-		[]string{ESF, "kind:clones"})
+		[]string{ESF, "kind:clones"}, hideColumns(panelFullNameField))
 
 	return []Panel{
 		window("count", "views", "Views over time", box{W: 12, H: 8, X: 0, Y: 0},
@@ -449,12 +460,12 @@ func audience(b *builder) []Panel {
 				` SUM(CASE WHEN kind = 'views' THEN count ELSE 0 END) AS "Views",` +
 				` MAX(url) AS "Link"` +
 				" FROM gh_traffic WHERE $__timeFilter(time) AND " + RF +
-				" GROUP BY 1 ORDER BY 2 DESC",
+				" GROUP BY full_name, repo ORDER BY 2 DESC",
 		)}, &P{
 			Prom: []Target{
-				promTbl(fmt.Sprintf(`sum by (repo) (github_traffic_count{kind="clones",%s})`, PF), "A"),
-				promTbl(fmt.Sprintf(`sum by (repo) (github_traffic_uniques{kind="clones",%s})`, PF), "B"),
-				promTbl(fmt.Sprintf(`sum by (repo) (github_traffic_count{kind="views",%s})`, PF), "C"),
+				promTbl(fmt.Sprintf(`sum by (full_name, repo) (github_traffic_count{kind="clones",%s})`, PF), "A"),
+				promTbl(fmt.Sprintf(`sum by (full_name, repo) (github_traffic_uniques{kind="clones",%s})`, PF), "B"),
+				promTbl(fmt.Sprintf(`sum by (full_name, repo) (github_traffic_count{kind="views",%s})`, PF), "C"),
 			},
 			PromTF: merged(map[string]string{
 				"repo": "Repository", panelValueA: "Clones", panelValueB: "Cloners",

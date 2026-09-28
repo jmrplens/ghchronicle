@@ -252,11 +252,12 @@ repositorios, cuántas estrellas tiene cada uno y si es privado. Todo
 es GraphQL, un punto por página: la lista de estrellas dadas, cinco búsquedas
 de issues, los dos recorridos de comentarios y las respuestas aceptadas que
 escribió la cuenta, que se leen aparte de los comentarios para que no se pierda
-una respuesta aceptada semanas después de escribirse. Una pasada lee todas las
-páginas de las dos búsquedas de lo que sigue abierto, y las otras tres, que van
-ordenadas por lo que se movió último, hasta una cadencia antes de la pasada
-anterior: su primera página, salvo que en ese tiempo se hayan movido más de
-cien elementos. Un relleno lee también esas tres hasta el final.
+una respuesta aceptada semanas después de escribirse. Una pasada lee hasta
+cinco páginas de la lista de estrellas dadas, todas las páginas de las dos
+búsquedas de lo que sigue abierto, y las otras tres, que van ordenadas por lo
+que se movió último, hasta una cadencia antes de la pasada anterior: su primera
+página, salvo que en ese tiempo se hayan movido más de cien elementos. Un
+backfill lee también la lista de estrellas dadas y esas tres hasta el final.
 
 **`totals`** le pide a GitHub los números que son ciertos desde el principio:
 pull requests fusionadas alguna vez, commits totales, issues abiertas alguna
@@ -291,7 +292,7 @@ omisión porque solo hace falta una vez.
 
 **`achievements`** recoge las insignias de la página pública del perfil, y es la
 única familia que no sale de la API: GitHub no lista los logros ni en REST ni en
-GraphQL, así que la página se lee una vez al día como visitante anónimo, sin el
+GraphQL, así que la página se lee cada hora como visitante anónimo, sin el
 token y sin cargarse a ningún presupuesto. Junto a cada insignia escribe cuánto
 le falta a la cuenta para el siguiente nivel de esa insignia, que eso sí sale de
 la API. El analizador es estricto a propósito: cuando GitHub rediseñe la página

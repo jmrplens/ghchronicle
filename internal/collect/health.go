@@ -40,7 +40,9 @@ import (
 // FamilyRun is one family's pass in one sweep.
 //
 // Repos is how many repositories it was asked about, which is zero for a
-// family that asks about the account rather than about repositories. Failures
+// family that asks about the account rather than about repositories. For the
+// three families that ask the movement query first it counts the repositories
+// that query left unread too, since those were covered: nothing had moved. Failures
 // are the repositories it could not collect; Err is a failure that belongs to
 // no repository in particular, which is either an account-wide family's own
 // error or the batched query some per-repository families begin with.

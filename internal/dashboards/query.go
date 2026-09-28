@@ -29,13 +29,14 @@ const (
 // `repo` family writes every hour for each repository the sweeps collect.
 const pickerWindow = "time > now() - INTERVAL '7 days'"
 
-// RFA is RF for gh_repo_total, the one measurement a sweep writes for a
-// repository set aside for being archived. The picker of the SQL stores lists
-// the repositories with a gh_repo row inside pickerWindow, and no sweep
-// writes one for a repository set aside: only a backfill does, so a week after
-// the last one RF would leave every one of them out of the account's totals.
-// Under All an archived row passes as well; with repositories picked, only
-// those do, as everywhere else.
+// RFA is RF for gh_repo_total, the row a sweep writes dated now for a
+// repository set aside for being archived; its other row, gh_repo_archived, is
+// dated at the archive and read with no repository filter. The picker of the
+// SQL stores lists the repositories with a gh_repo row inside pickerWindow,
+// and no sweep writes one for a repository set aside: only a backfill does,
+// so a week after the last one RF would leave every one of them out of the
+// account's totals. Under All an archived row passes as well; with
+// repositories picked, only those do, as everywhere else.
 //
 // Not every archived row, though: only one of a repository the collector
 // still writes, which is setAsideCollected. The row of an archived repository
@@ -177,13 +178,19 @@ func hourly(e, leg string, ref ...string) Target {
 const binStep = "[$__interval]"
 
 // organize drops the columns Prometheus adds to every table frame and names
-// the rest.
+// the rest. The owner and the full name are dropped too, unless the panel
+// names one of them: a row per repository is kept apart by its full name and
+// shows the short one, and a table of other people's repositories shows the
+// full name. Grafana drops an excluded column before it renames any, so a
+// full name excluded and renamed at once was no column at all.
 func organize(rename map[string]string, exclude []string, order map[string]int) any {
 	excludeBy := map[string]any{}
 	for _, k := range append([]string{
 		"Time", "__name__", "job", "instance", "owner", "full_name",
 	}, exclude...) {
-		excludeBy[k] = true
+		if _, named := rename[k]; !named {
+			excludeBy[k] = true
+		}
 	}
 	if rename == nil {
 		rename = map[string]string{}
@@ -370,12 +377,18 @@ func pgOf(qs []Target) []Target {
 
 // gp is the path of one field: a wildcard for every tag not pinned by name.
 func gp(m, field string, fixed ...string) string {
+	return gpIn(tagsOf(m), m, field, fixed...)
+}
+
+// gpIn is gp over one of the tag sets the measurement's paths have had, which
+// shapesOf lists, rather than over the one it is written with now.
+func gpIn(shape []string, m, field string, fixed ...string) string {
 	pinned := map[string]string{}
 	for i := 0; i+1 < len(fixed); i += 2 {
 		pinned[fixed[i]] = fixed[i+1]
 	}
 	parts := []string{"github", strings.TrimPrefix(m, "gh_")}
-	for _, tag := range tagsOf(m) {
+	for _, tag := range shape {
 		if v, ok := pinned[tag]; ok {
 			parts = append(parts, v)
 		} else {
@@ -391,8 +404,11 @@ func rp(m, field string, fixed ...string) string {
 }
 
 // gn is the node index of a tag, for groupByNode and aliasByNode.
-func gn(m, tag string) int {
-	for i, t := range tagsOf(m) {
+func gn(m, tag string) int { return gnIn(tagsOf(m), m, tag) }
+
+// gnIn is gn in one of the shapes shapesOf lists.
+func gnIn(shape []string, m, tag string) int {
+	for i, t := range shape {
 		if t == tag {
 			return 2 + i
 		}
@@ -408,6 +424,36 @@ func tagsOf(m string) []string {
 	return t
 }
 
+// shapesOf is every tag set a measurement's paths have had, the one it is
+// written with now first: see formerTags.
+func shapesOf(m string) [][]string {
+	out := [][]string{tagsOf(m)}
+	if former, ok := formerTags[m]; ok {
+		out = append(out, former)
+	}
+	return out
+}
+
+// everyShape is one field of a measurement in every shape its paths have had,
+// each series named by the tags asked for, so that series of two depths carry
+// names of one and a grouping by those nodes joins them: the same item written
+// before and after a tag became a field is then one series. The pinned tags
+// are pinned in each shape.
+func everyShape(m, field string, names []string, fixed ...string) string {
+	var parts []string
+	for _, shape := range shapesOf(m) {
+		nodes := make([]int, len(names))
+		for i, name := range names {
+			nodes[i] = gnIn(shape, m, name)
+		}
+		parts = append(parts, rowsOf(gpIn(shape, m, field, fixed...), nodes...))
+	}
+	if len(parts) == 1 {
+		return parts[0]
+	}
+	return "group(" + strings.Join(parts, ", ") + ")"
+}
+
 // events is the path of one gh_event field. The collector writes `action` and
 // `ref_type` on every row now, with the fallback where the payload has none,
 // so the depth is fixed and the tag table applies; the callers still count
@@ -420,7 +466,12 @@ func grq(expr string, ref ...string) Target {
 
 // countOf is one point per fact, whatever the field's value: the twin of
 // COUNT(*).
-func countOf(path string) string { return "sumSeries(isNonNull(" + path + "))" }
+func countOf(path string) string { return "sumSeries(" + nonNull(path) + ")" }
+
+// nonNull is a 1 at every point a series holds anything and a 0 elsewhere, so
+// that a grouping over it adds up how many series had a point: a count per
+// group, where countOf is a count of them all.
+func nonNull(expr string) string { return "isNonNull(" + expr + ")" }
 
 // total makes the whole range one bucket, so a stat can show a sum over it.
 // The bucket is aligned to the range start and outlives any range a dashboard
@@ -434,7 +485,8 @@ func medianTotal(path string) string {
 }
 
 // perBucket is one series per value of a tag node, one point per bucket.
-// Counts are consolidated by sum so a long range does not average them away.
+// Counts are consolidated by sum so a long range does not average them away,
+// under the tag's value as the series name, which is the legend entry.
 func perBucket(expr string, node int, spanHow ...string) string {
 	span, how := "1d", "sum"
 	if len(spanHow) > 0 {
@@ -443,8 +495,42 @@ func perBucket(expr string, node int, spanHow ...string) string {
 	if len(spanHow) > 1 {
 		how = spanHow[1]
 	}
-	return fmt.Sprintf(`consolidateBy(groupByNode(summarize(%s, %q, %q), %d, %q), %q)`,
-		expr, span, how, node, how, how)
+	return consolidated(fmt.Sprintf(`groupByNode(summarize(%s, %q, %q), %d, %q)`,
+		expr, span, how, node, how), how)
+}
+
+// perRepoBucket is perBucket with a series per repository of measurement m,
+// grouped by grGroupBy and so named by the short name.
+func perRepoBucket(expr, m string, spanHow ...string) string {
+	span, how := "1d", "sum"
+	if len(spanHow) > 0 {
+		span = spanHow[0]
+	}
+	if len(spanHow) > 1 {
+		how = spanHow[1]
+	}
+	return consolidated(grGroupBy(fmt.Sprintf(`summarize(%s, %q, %q)`, expr, span, how), m, how, "repo"), how)
+}
+
+// grGroupBy groups the series of measurement m by the tags named, in that
+// order, and names each group by them: groupByNodes, and aliasByNode over the
+// nodes the name keeps. A repository is grouped by its full name and named by
+// its short one, which is the only name its row or its series has in the
+// other stores. Grouped by the short name, two owners' repositories of one
+// name, alice/x and acme/x, were one series holding both. The name reads the
+// nodes of the group's own name, which groupByNodes joins with dots, and no
+// node holds a dot: the sink writes one as an underscore.
+func grGroupBy(expr, m, how string, by ...string) string {
+	var nodes, kept []string
+	for _, tag := range by {
+		if tag == "repo" {
+			nodes = append(nodes, strconv.Itoa(gn(m, "full_name")))
+		}
+		kept = append(kept, strconv.Itoa(len(nodes)))
+		nodes = append(nodes, strconv.Itoa(gn(m, tag)))
+	}
+	return fmt.Sprintf(`aliasByNode(groupByNodes(%s, %q, %s), %s)`,
+		expr, how, strings.Join(nodes, ", "), strings.Join(kept, ", "))
 }
 
 func medianBucket(path string, span ...string) string {
@@ -483,7 +569,7 @@ func topRowsBy(path string, n int, by string, nodes ...int) string {
 
 var reducers = map[string]string{
 	"lastNotNull": "Last *", "sum": "Total", "mean": "Mean", "median": "Median",
-	"max": "Max", "count": "Count",
+	"max": "Max", "min": "Min", "count": "Count",
 }
 
 // gTbl renders a Graphite series list as a table: one row per series, one
@@ -510,12 +596,44 @@ func removeEmptySeries(expr string) string {
 	return "removeEmptySeries(" + expr + ")"
 }
 
+// sumConsolidated is the series of a table that adds its points up,
+// consolidated by sum, which is perBucket's reason in a table.
+//
+// A table panel sends no maxDataPoints of its own, so Grafana sends the
+// panel's width in pixels, and graphite-web fits a series with more points
+// than that by averaging neighbors, its default. Averaged, a count halves:
+// against graphiteapp/graphite-statsd:1.1.10-5 with this repository's storage
+// schema, three discussion comments 5, 12 and 20 days back read 3 over
+// now-30d with no maxDataPoints and 1.5 with 500 or 600, the width of a
+// third of the page, because the 720 hourly slots became 360 and each
+// comment's 1 was averaged with the 0 isNonNull had put beside it. Summed,
+// they read 3 at 500. The consolidation belongs on the outermost series:
+// graphite-web gives every series a function makes the default again, and
+// the ones that only rename, sort, pick or drop series keep theirs.
+func sumConsolidated(expr string) string { return consolidated(expr, "sum") }
+
+// consolidated is a series list consolidated by `how` under the names it came
+// with. consolidateBy also renames each series, to consolidateBy(name,"how"),
+// and Grafana draws that name as it is: in a table it is the text of the
+// row's first column, and in a chart the legend entry, which read
+// consolidateBy(r1,"sum") against graphiteapp/graphite-statsd:1.1.10-5 and
+// Grafana 13.2.1. aliasSub gives the name back, and leaves the consolidation
+// in place, since it renames the series rather than making new ones.
+func consolidated(expr, how string) string {
+	return `aliasSub(consolidateBy(` + expr + `, "` + how + `"), "^consolidateBy\((.*),.` + how + `.\)$", "\1")`
+}
+
 func gTbl(expr, name string, cols []col) (targets []Target, tf []any) {
 	names := map[string]any{"Field": name}
 	list := make([]any, len(cols))
+	adds := false
 	for i, c := range cols {
 		list[i] = c.Reducer
 		names[reducers[c.Reducer]] = c.Name
+		adds = adds || c.Reducer == "sum"
+	}
+	if adds {
+		expr = sumConsolidated(expr)
 	}
 	return []Target{grq(removeEmptySeries(expr))}, []any{
 		map[string]any{"id": "reduce", "options": map[string]any{
@@ -661,6 +779,49 @@ func (b *builder) terms(field string, size int, order ...string) any {
 			"size": strconv.Itoa(size), "order": direction, "orderBy": by, "min_doc_count": "1",
 		},
 	}
+}
+
+// newestDoc is the bucket that keeps, of the documents the buckets above it
+// hold, only those of the newest timestamp: a snapshot's newest reading, which
+// the metrics below it then read as it stands. Buckets above it say whose
+// reading it is and buckets below it are what that reading says, so a tag that
+// can change, a status or a url, goes below and takes the newest value too.
+//
+// A max over every document of the range read the largest the range had held
+// instead: a protection switched off, a key used again or a count that fell
+// inside the range read as it had been. top_metrics would read the newest
+// document too, but it hands a boolean back as the text "true", which the
+// plugin panics on, and appends nothing for a field the document lacks, which
+// fails the frame; a max inside this bucket answers 1 or 0 for the first and
+// null for the second. The key reaches the table as a column, which
+// hideColumns(panelESTime) drops.
+func (b *builder) newestDoc() any { return b.terms(panelESTime, 1, "_key", "desc") }
+
+// tmRepo is a repository as buckets: one per full name, keeping `size` of
+// them, ordered as tm orders, and inside each its short name, which is one
+// value there and is what the row or the series is named by. Bucketed by the
+// short name alone, two owners' repositories of one name, alice/x and
+// acme/x, were one bucket: counts added together, and a newest reading that
+// stood for both. A table drops the full name's column with
+// hideColumns(panelFullNameField).
+func (b *builder) tmRepo(size int, order ...string) []any {
+	return []any{b.tm("full_name", size, order...), b.tm("repo", 1)}
+}
+
+// tmBy is a terms bucket on a tag that keeps the `size` values with the most
+// of `metric`, largest first. The metric has to be one of the same query's,
+// since the bucket names it by its id; renumberES carries that reference to
+// the id the metric ends up with.
+func (b *builder) tmBy(tag string, size int, metric any) any {
+	id, _ := agg(metric)["id"].(string)
+	return b.tm(tag, size, id)
+}
+
+// tmRepoBy is tmRepo keeping the `size` repositories with the most of
+// `metric`, as tmBy keeps a tag's values.
+func (b *builder) tmRepoBy(size int, metric any) []any {
+	id, _ := agg(metric)["id"].(string)
+	return b.tmRepo(size, id)
 }
 
 // tmURL is the url of an item as a bucket, which is the one way a string
@@ -885,6 +1046,31 @@ func groupSum(by, value, nameBy, nameValue string) []any {
 	}
 }
 
+// sortAsc orders a frame's rows by one column, ascending. A table's own
+// `sort` option is descending only, and some panels read in an order of their
+// own: a pin by its slot, a flag by its name, and a punch card by its hour,
+// whose rows a groupBy hands on in the order it first met each value.
+func sortAsc(field string) any { return sortRows(field, false) }
+
+// sortRows is the sortBy transformation over one column.
+func sortRows(field string, desc bool) any {
+	return map[string]any{"id": "sortBy", "options": map[string]any{
+		"fields": map[string]any{},
+		"sort":   []any{map[string]any{"field": field, "desc": desc}},
+	}}
+}
+
+// keepLargest cuts a frame to the n rows with the most of one column, the
+// largest first: the ORDER BY ... DESC LIMIT n of a SQL twin, for an
+// Elasticsearch table whose terms buckets keep the top values inside each
+// bucket above them and never across the whole table.
+func keepLargest(field string, n int) []any {
+	return []any{
+		sortRows(field, true),
+		map[string]any{"id": "limit", "options": map[string]any{"limitField": n}},
+	}
+}
+
 // hideColumns drops columns a table's query returns only to be grouped by: the
 // full name an Elasticsearch table buckets on so that two owners' repositories
 // of one name are two rows, while the row is named by the short name the other
@@ -911,8 +1097,10 @@ func hideColumns(names ...string) any {
 // count that only climbs it is the newest. Every repository is a bucket, not
 // the fifty of esDailyTerms: a repository left out is stars missing from the
 // total.
+//
+// A series per full name, named by the short one, as tmRepo explains.
 func (b *builder) esSnapshotStack(m, field string) Target {
-	return esq(m, []any{b.mMax(field)}, []any{b.tm("repo", 500), b.dh()}, "A",
+	return esq(m, []any{b.mMax(field)}, append(b.tmRepo(500), b.dh()), "A",
 		[]string{ESF}, "{{term repo.keyword}}")
 }
 
@@ -922,16 +1110,20 @@ func (b *builder) esSnapshotStack(m, field string) Target {
 var esStacked = Opts{"stack": true, "legend": "hidden"}
 
 // esLatestSum is the newest value per repository (and further tags), which the
-// stat sums across rows: the twin of latestSum in SQL.
+// stat sums across rows: the twin of latestSumSQL, the repository filter
+// included. Without it every tile built on this read the whole store,
+// whatever the picker held. A repository is a bucket by its full name, since
+// two owners' repositories of one name bucketed by the short one were one,
+// read at whichever of the two had the newer document.
 func (b *builder) esLatestSum(m, field string, by ...string) []Target {
 	// The metric before the buckets, because the ids are handed out in the
 	// order they are asked for and a panel's targets are compared as text.
 	metrics := []any{b.mNewest(field)}
-	buckets := []any{b.tm("repo", 500)}
+	buckets := []any{b.tm("full_name", 500)}
 	for _, tag := range by {
 		buckets = append(buckets, b.tm(tag, 500))
 	}
-	return []Target{esq(m, metrics, buckets, "A", nil, "")}
+	return []Target{esq(m, metrics, buckets, "A", []string{ESF}, "")}
 }
 
 func (b *builder) esTotal(m string, met any, where ...string) []Target {
@@ -940,7 +1132,11 @@ func (b *builder) esTotal(m string, met any, where ...string) []Target {
 
 func (b *builder) esDaily(m string, met any, by, span string, where []string, ref string) Target {
 	var buckets []any
-	if by != "" {
+	switch by {
+	case "":
+	case "repo":
+		buckets = b.tmRepo(esDailyTerms)
+	default:
 		buckets = append(buckets, b.tm(by, esDailyTerms))
 	}
 	if span == "" {

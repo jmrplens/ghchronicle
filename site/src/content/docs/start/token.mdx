@@ -92,7 +92,10 @@ passed in as the `token` input. See
 
 ## Running without a token
 
-Possible, and honest about what it costs. A card of public numbers can be drawn
-from unauthenticated calls, but the traffic and alert panels will be empty and
-the log will say `not available (403)` for each of them. That is the collector
+Only for the three commands that ask GitHub nothing: `-backfill-status`,
+`-publish-dashboard` and `-uninstall`. Everything that collects, a card of
+public numbers included, needs one, and without it stops at start-up with
+`github.token is empty and GITHUB_TOKEN is unset`. What a token short of a
+scope costs is the table above: the part it cannot see is left empty, and the
+log says `not available (403)` for each of them, which is the collector
 reporting a permission, not a failure.

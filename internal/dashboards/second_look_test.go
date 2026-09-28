@@ -19,7 +19,7 @@ import (
 // account. The count of templates a repository actually has is what the
 // totals family writes to gh_repo_policy.issue_templates. The two SQL stores
 // join the newest policy row to the newest profile row per repository and
-// show the count; Prometheus lines the two families up on the repo label;
+// show the count; Prometheus lines the two families up on the repository's labels;
 // Graphite and Elasticsearch cannot join and keep the flag, under the flag's
 // own name, saying whose flag it is.
 func TestIssueTemplatesAreCountedNotFlagged(t *testing.T) {
@@ -29,7 +29,7 @@ func TestIssueTemplatesAreCountedNotFlagged(t *testing.T) {
 		for _, want := range []string{
 			`p.issue_templates AS "Issue templates"`,
 			"FROM gh_repo_policy WHERE $__timeFilter(time) AND repo IN (",
-			") p ON p.repo = c.repo AND p.rn = 1 WHERE c.rn = 1",
+			") p ON p.full_name = c.full_name AND p.rn = 1 WHERE c.rn = 1",
 			"LEFT JOIN",
 			`c.url AS "Link"`,
 			`CAST(c.has_pull_request_template AS INT) AS "PR template"`,
@@ -44,7 +44,7 @@ func TestIssueTemplatesAreCountedNotFlagged(t *testing.T) {
 	}
 	prom := mustPanel(t, rendered(t, "prometheus"), "Community profile")
 	exprs := asJSON(t, prom["targets"])
-	if !strings.Contains(exprs, "max by (repo) (github_repo_policy_issue_templates{") {
+	if !strings.Contains(exprs, "max by (full_name, repo) (github_repo_policy_issue_templates{") {
 		t.Errorf("Prometheus does not read the policy count: %s", exprs)
 	}
 	if strings.Contains(exprs, "github_repo_community_has_issue_template") {

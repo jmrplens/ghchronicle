@@ -137,7 +137,7 @@ const NUMBER_WORDS = {
 };
 
 const docs = "src/content/docs";
-/** @type {{file: string, locale: "en"|"es", key: keyof typeof stats, pattern: RegExp}[]} */
+/** @type {{file: string, row?: string, locale: "en"|"es", key: keyof typeof stats, pattern: RegExp}[]} */
 const CLAIMS = [
 	{
 		file: "../README.md",
@@ -265,12 +265,19 @@ const CLAIMS = [
 		pattern:
 			/Diecisiete secciones, ([a-zá-ú\n ]+?) paneles, en los mismos sitios/,
 	},
-	{
+	// One row per generated file, each holding its own count. Only the
+	// InfluxDB row used to be checked, and the four below it said 152 while
+	// all five files held 154.
+	...dashboards.map((name) => ({
 		file: "../dashboards/README.md",
+		row: name,
 		locale: "en",
 		key: "panels",
-		pattern: /^\| `ghchronicle-influxdb\.json` \| (\d+) \|/m,
-	},
+		pattern: new RegExp(
+			`^\\| \`${name.replaceAll(".", "\\.")}\` \\| (\\d+) \\|`,
+			"m",
+		),
+	})),
 ];
 
 /**
@@ -283,7 +290,9 @@ function staleClaims() {
 		const file = path.join(site, claim.file);
 		const text = fs.readFileSync(file, "utf8");
 		const found = text.match(claim.pattern);
-		const shown = path.relative(repo, file);
+		// A file holding several claims names the one that is stale.
+		const shown =
+			path.relative(repo, file) + (claim.row ? ` (the ${claim.row} row)` : "");
 		if (!found) {
 			problems.push(
 				`${shown} no longer states the ${claim.key} count (looked for ${claim.pattern})`,

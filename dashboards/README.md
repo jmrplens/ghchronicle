@@ -7,10 +7,10 @@ importer to choose their own.
 | File | Panels | Store |
 |---|---|---|
 | `ghchronicle-influxdb.json` | 154 | InfluxDB 3, queried with SQL |
-| `ghchronicle-prometheus.json` | 152 | Prometheus |
-| `ghchronicle-postgres.json` | 152 | PostgreSQL or TimescaleDB, from the SQL sink |
-| `ghchronicle-graphite.json` | 152 | Graphite, from the Graphite sink |
-| `ghchronicle-elasticsearch.json` | 152 | Elasticsearch or OpenSearch, from the Elasticsearch sink |
+| `ghchronicle-prometheus.json` | 154 | Prometheus |
+| `ghchronicle-postgres.json` | 154 | PostgreSQL or TimescaleDB, from either PostgreSQL sink |
+| `ghchronicle-graphite.json` | 154 | Graphite, from the Graphite sink |
+| `ghchronicle-elasticsearch.json` | 154 | Elasticsearch or OpenSearch, from the Elasticsearch sink |
 
 ## Importing
 
@@ -19,10 +19,12 @@ ask which datasource to use:
 
 - InfluxDB: the InfluxDB 3 datasource for the database the sink writes to, in
   SQL mode.
-- Prometheus: the Prometheus that scrapes ghchronicle's exporter.
-- PostgreSQL: the PostgreSQL datasource for the database the SQL sink's
-  statements were piped into. TimescaleDB is the same datasource with the
-  TimescaleDB switch on; the queries do not change.
+- Prometheus: the Prometheus that holds ghchronicle's metrics, whether the OTLP
+  sink pushes them to its OTLP receiver or it scrapes the exporter.
+- PostgreSQL: the PostgreSQL datasource for the database the `postgres` sink
+  connects to and inserts into, or the one the SQL sink's statements were piped
+  into. TimescaleDB is the same datasource with the TimescaleDB switch on; the
+  queries do not change.
 - Graphite: the Graphite the sink writes to. The paths assume the default
   prefix, `github`, and the functions need Graphite 1.1 or later.
 - Elasticsearch: an Elasticsearch datasource whose index pattern is
@@ -53,23 +55,25 @@ the same places with the same titles, and a user who chose any store gets the
 whole dashboard rather than a smaller cousin. `cmd/gen_dashboards` checks that
 promise on every run and fails rather than write files that have drifted apart.
 
-The stores cannot answer identical questions, and the panels say so rather
-than pretend. InfluxDB and PostgreSQL hold a row per fact, dated when the fact
+The stores cannot answer identical questions, and the panels say so rather than
+pretend. InfluxDB and PostgreSQL hold a row per fact, dated when the fact
 happened, so they can draw the traffic of a particular Tuesday, the star curve
 since 2018 and the merge time of a pull request closed in July; the PostgreSQL
-set is the InfluxDB SQL translated by `toPG` in `query.go`, because the SQL
-sink writes the same facts as tables. Prometheus stamps every sample at scrape
-time, so the exporter reduces the per-item rows to current values plus, for the
-counted measurements, a monotonic `_total` of distinct items seen since the
-exporter started; `increase()` over that is how "per day" and "over the range"
-panels are answered. Graphite keeps the dated points but has no rows: a table
-there is one number per series reduced over the range, so a table that needs
-several fields of one row keeps the column it is sorted by and says which it
-dropped, and a boolean is not a metric there at all. Elasticsearch keeps the
-dated documents, so a per-item table is the newest documents themselves and
-everything else is a bucket aggregation; the sink writes no mapping, so the
-aggregations use the `.keyword` sub-field of each tag. Each panel whose twin
-in another store is richer says so in one sentence of its description.
+set is the InfluxDB SQL translated by `toPG` in `query.go`, because both
+PostgreSQL sinks, the one that connects and the one that writes SQL for psql,
+write the same facts as tables. Prometheus takes no sample dated far from now,
+scraped or pushed, so the reduction the exporter and the OTLP sink share turns
+the per-item rows into current values plus, for the counted measurements, a
+monotonic `_total` of distinct items seen since the process started;
+`increase()` over that is how "per day" and "over the range" panels are
+answered. Graphite keeps the dated points but has no rows: a table there is one
+number per series reduced over the range, so a table that needs several fields
+of one row keeps one of them and says which it dropped, and a boolean is kept
+as 1 or 0 like any number. Elasticsearch keeps the dated documents, so a
+per-item table is the newest documents themselves and everything else is a
+bucket aggregation; the sink writes no mapping, so the aggregations use the
+`.keyword` sub-field of each tag. Each panel whose twin in another store is
+richer says so in one sentence of its description.
 
 Twenty-four panels have no Prometheus answer at all, because the exporter
 skips the measurement, drops the identity the panel is about, or the panel is
@@ -118,12 +122,12 @@ go run ./cmd/publish_dashboard -loki <loki-uid> influxdb <uid>   # and read the 
 the exporter's own `/metrics`, because a typo in a metric name is not a syntax
 error: PromQL parses it happily and returns nothing forever.
 
-`check_postgres` needs no data: it declares the SQL sink's schema in a
-scratch database inside a transaction it rolls back, and asks PostgreSQL to
-EXPLAIN each panel query with Grafana's macros replaced by literals. A column
-that does not exist or a reserved word left unquoted fails there. The schema
-comes from an InfluxDB that has seen every measurement; `--dump <uid>` fetches
-it through Grafana.
+`check_postgres` needs no data: it declares the schema the PostgreSQL sinks
+write in a scratch database inside a transaction it rolls back, and asks
+PostgreSQL to EXPLAIN each panel query with Grafana's macros replaced by
+literals. A column that does not exist or a reserved word left unquoted fails
+there. The schema comes from an InfluxDB that has seen every measurement;
+`--dump <uid>` fetches it through Grafana.
 
 The Graphite and Elasticsearch files have no parser to hand. They are checked
 by importing them into a Grafana and by the shape of each target: every

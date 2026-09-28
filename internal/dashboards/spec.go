@@ -73,8 +73,15 @@ const (
 	// The same for Graphite and Elasticsearch.
 	grRows = "Graphite has no rows: each series is one number reduced over the range, so " +
 		"this table keeps the column it is sorted by and drops the others."
-	grSlot = "In Graphite two facts landing in the same storage slot of one series are " +
-		"reduced to one point, so the medians are over what the storage kept."
+	grSlot = grSlotLead + "the medians are over what the storage kept."
+	// grSlotCounts and grSlotTotals are grSlot for a table that counts or adds
+	// up the points of a series and takes no median: a table that reads the
+	// last value of each series loses nothing to the slot, since the point the
+	// storage keeps is the newest, and says nothing about it.
+	grSlotCounts = grSlotLead + "the counts are over what the storage kept."
+	grSlotTotals = grSlotLead + "the totals are over what the storage kept."
+	grSlotLead   = "In Graphite two facts landing in the same storage slot of one series are " +
+		"reduced to one point, so "
 	grRange    = "Graphite answers only inside the dashboard range, so years outside it are missing."
 	grSnapshot = "In Graphite the curve is the repositories' star count as each sweep read it, " +
 		"so it starts the day the collector did and sits at GitHub's count."
@@ -699,12 +706,33 @@ func Render(storeName string, ds, logs any) []map[string]any {
 // builds a panel's helpers before its neighbors would otherwise hand out the
 // numbers in a different order every time the file is reshuffled; this keeps
 // the exported JSON stable against that.
+//
+// A terms bucket that keeps its top values by a metric names that metric's
+// id, so the reference is renumbered with it. Grafana orders by a metric id
+// only when a metric of the query carries it, and otherwise leaves the bucket
+// in Elasticsearch's order by document count without a word: four tables kept
+// the values with the most documents that way, ordered by an id no metric had.
 func renumberES(panels []map[string]any) {
 	n := 0
 	for _, t := range targetsOf(panels) {
+		metrics := map[string]map[string]any{}
+		for _, e := range asList(t["metrics"]) {
+			m, _ := e.(map[string]any)
+			if id, ok := m["id"].(string); ok {
+				metrics[id] = m
+			}
+		}
 		for _, e := range numbered(t) {
 			n++
 			e["id"] = strconv.Itoa(n)
+		}
+		for _, e := range asList(t["bucketAggs"]) {
+			bucket, _ := e.(map[string]any)
+			settings, _ := bucket["settings"].(map[string]any)
+			by, _ := settings["orderBy"].(string)
+			if m, ok := metrics[by]; ok {
+				settings["orderBy"] = m["id"]
+			}
 		}
 	}
 }

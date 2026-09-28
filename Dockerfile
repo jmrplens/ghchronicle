@@ -41,6 +41,17 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     -ldflags "-s -w -X main.version=${VERSION} -X main.commit=${COMMIT} -X main.date=${BUILD_DATE}" \
     -o /ghchronicle ./cmd/ghchronicle
 
+# The directory the example configuration and every compose file keep the
+# state and the cache in. It has to exist in the image, owned by the user the
+# collector runs as, because Docker fills a new named volume from the directory
+# it is mounted over, ownership included: without it the volume was created
+# owned by root, uid 65532 could not write to it, and every sweep warned "state
+# not saved" and started from nothing after a restart. The runtime image has
+# no shell to mkdir with, and WORKDIR makes a directory without one. The same
+# stage is in docker/Dockerfile.goreleaser; change both together.
+FROM scratch AS state
+WORKDIR /var/lib/ghchronicle
+
 # Distroless ships no shell and no package manager, so an attacker who reaches
 # code execution here has nothing to pivot with; the `static` variant suffices
 # because CGO is disabled above. The `nonroot` tag bakes in uid 65532, which
@@ -71,6 +82,7 @@ LABEL org.opencontainers.image.title="ghchronicle" \
     org.opencontainers.image.created="${BUILD_DATE}"
 
 COPY --from=build /ghchronicle /ghchronicle
+COPY --from=state --chown=65532:65532 /var/lib/ghchronicle /var/lib/ghchronicle
 
 # The `nonroot` user of the base image, by number rather than by name. A name is
 # resolved against the image's /etc/passwd, which the host cannot see, so a

@@ -13,12 +13,24 @@ Elige una pila, pon dos líneas en un `.env` al lado, y arráncala.
   store="Almacén"
   grafana="Traer Grafana, con el dashboard ya dentro"
   none="Ninguno, el colector solo"
-  hint="Cada combinación de aquí se levanta contra las imágenes de verdad antes de cada release."
+  hint="Cada combinación de aquí la escribe un único generador, y la CI falla cuando un fichero deja de coincidir con él."
 />
 
 ```sh
 docker compose up -d
 ```
+
+El volumen `state` de la pila conserva el estado y la caché de un arranque al
+siguiente, y el colector puede escribir en él desde el primero: la imagen trae
+el directorio sobre el que se monta, propiedad del uid con el que corre el
+colector, y Docker le da ese dueño a un volumen nuevo. Ver [qué tiene que ser
+escribible](#qué-tiene-que-ser-escribible).
+
+La primera pasada corre todas las familias, porque aún no ha corrido ninguna,
+salvo que el colector arranca una sola familia de seis horas o más por pasada:
+`traffic`, `stats`, `forks` y el resto de las once llegan al almacén a lo largo
+de las dos primeras horas y media, y solo la primera vez. Ver [las familias
+lentas se turnan](/ghchronicle/es/configuration/cadences/#las-familias-lentas-se-turnan).
 
 Con Grafana está en `http://localhost:3000`, usuario `admin` y
 contraseña `ghchronicle` salvo que pongas `GRAFANA_PASSWORD`. El dashboard ya
@@ -32,10 +44,18 @@ El resto de esta página es la imagen en sí, para quien la ejecute de otra mane
 ```sh
 docker run -d --name ghchronicle \
   -v /etc/ghchronicle/config.yaml:/config.yaml:ro \
+  -v ghchronicle-state:/var/lib/ghchronicle \
   -e GITHUB_TOKEN -e INFLUX_TOKEN \
   -p 9605:9605 \
   ghcr.io/jmrplens/ghchronicle -config /config.yaml
 ```
+
+Con `state_file: /var/lib/ghchronicle/state.json` en la configuración, que es
+donde lo pone la configuración de ejemplo. El volumen es lo que conserva el
+estado y la caché de un contenedor al siguiente, y Docker lo crea al primer
+uso, propiedad del uid 65532 como el directorio sobre el que se monta; [qué
+tiene que ser escribible](#qué-tiene-que-ser-escribible) explica por qué hace
+falta cada cosa.
 
 ## La imagen
 
@@ -100,26 +120,58 @@ El fichero de configuración se monta de solo lectura. Cinco cosas no:
 | -------------------- | -------------------------------------------------------------------------------------- |
 | `state_file`         | Siempre. Sin una ruta persistente el recorrido de estrellas se repite en cada reinicio |
 | `<nombre>-cache.bin` | Siempre. La caché, que vive junto al fichero de estado y no tiene ajuste propio        |
-| `sinks.dedupe_file`  | Siempre. El registro de escrituras, que por omisión vive junto al fichero de estado    |
+| `sinks.dedupe_file`  | El servicio permanente, con un destino que lo lleve. Una ejecución `-once` no abre ninguno |
 | `sinks.file.path`    | Solo con el destino de fichero                                                         |
 | `log.file`           | Solo con un fichero de log configurado                                                 |
 
 Los tres primeros viven por omisión en el mismo directorio, así que un solo
-volumen montado los cubre. Montar solo el fichero de estado pierde el registro y
-la caché en cada reinicio, y entonces cada reinicio cuesta una pasada entera de
-reescritura, que es justo lo que el registro existe para evitar:
-[solo se escribe lo que ha cambiado](/ghchronicle/es/sinks/#solo-se-escribe-lo-que-ha-cambiado),
-y una pasada entera volviendo a preguntar a GitHub lo que la caché ya sabía:
-[la caché que hay a su lado](/ghchronicle/es/configuration/#la-caché-que-hay-a-su-lado).
+directorio montado los cubre, y tiene que ser un directorio. Cada uno de los
+tres se escribe a su lado y se renombra en su sitio, para que nadie lea nunca
+medio fichero, y sobre un fichero montado solo no se puede renombrar: medido
+con la imagen 2.6.1 construida desde su Dockerfile, un fichero de estado
+montado solo no se guardó nunca, y cada pasada lo dijo.
 
-```sh
-docker volume create ghchronicle-state
-docker run -d --name ghchronicle \
-  -v /etc/ghchronicle/config.yaml:/config.yaml:ro \
-  -v ghchronicle-state:/var/lib/ghchronicle \
-  -e GITHUB_TOKEN \
-  ghcr.io/jmrplens/ghchronicle -config /config.yaml
+```text
+level=WARN msg="state not saved" err="rename /var/lib/ghchronicle/state.json.tmp /var/lib/ghchronicle/state.json: device or resource busy"
 ```
+
+Un directorio en el que el colector no puede escribir da el mismo aviso, con el
+error que toque, y otro por la caché de al lado:
+
+```text
+level=WARN msg="state not saved" err="open /var/lib/ghchronicle/state.json.tmp: permission denied"
+level=WARN msg="cache file not saved" file=/var/lib/ghchronicle/state-cache.bin err="open /var/lib/ghchronicle/state-cache.bin.tmp: permission denied"
+```
+
+Desde la 2.6.1 la imagen trae `/var/lib/ghchronicle` como propiedad del uid
+65532, y Docker llena un volumen con nombre nuevo desde el directorio sobre el
+que se monta, dueño incluido, así que el directorio que nombra la configuración
+de ejemplo no necesita que se le haga nada: medido con un volumen recién creado,
+y con uno vacío que la imagen 2.6.0 había dejado a root, el colector escribió su
+estado y su caché en los dos sin ningún aviso. Sin nada montado ahí también
+escribe, y el estado se va con el contenedor. Hasta la 2.6.0 la imagen no tenía
+ese directorio: sin nada montado ahí quedaba uno que el uid 65532 no podía
+crear, y un volumen con nombre nuevo ahí era de root, que es de donde salieron
+las dos líneas de arriba.
+
+Quedan dos maneras de acabar con un directorio en el que el colector no puede
+escribir. Un volumen con nombre montado donde la imagen no tiene un directorio
+propio se crea como propiedad de root: entrégaselo una vez al uid 65532, con
+cualquier imagen que traiga un `chown`, como en
+`docker run --rm -v <volumen>:/v alpine chown 65532:65532 /v`. Un directorio
+del anfitrión se monta tal cual, sea de quien sea: hazle
+`sudo chown 65532:65532` en el anfitrión. Una configuración que no nombra
+ningún `state_file` escribe en el directorio de trabajo del contenedor, que es
+escribible y se va con el contenedor.
+
+Sin el estado, cada contenedor nuevo empieza de cero: el recorrido de
+estrellas, el historial entero de estrellas y el recorrido de coautorías otra
+vez, y todas las familias a la vez. Sin la caché, una pasada entera volviendo a
+preguntar a GitHub lo que ya sabía:
+[la caché que hay a su lado](/ghchronicle/es/configuration/#la-caché-que-hay-a-su-lado).
+Sin el registro, una pasada entera de reescritura, que es justo lo que existe
+para evitar:
+[solo se escribe lo que ha cambiado](/ghchronicle/es/sinks/#solo-se-escribe-lo-que-ha-cambiado).
 
 ## El puerto
 
@@ -202,4 +254,5 @@ docker run --rm \
 ```
 
 Monta el volumen de estado también en este modo. Es lo que hace barata la
-segunda ejecución.
+segunda ejecución, y lo que mantiene cada familia en su cadencia: sin él cada
+ejecución recoge todas las familias.

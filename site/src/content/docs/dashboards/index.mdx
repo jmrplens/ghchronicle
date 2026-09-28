@@ -12,13 +12,13 @@ Five dashboards, all in English, all in Grafana's shareable export format: the
 datasource is a `${DS_...}` placeholder and the `__inputs` block asks the
 importer to choose their own.
 
-| File                             | Panels | Store                                                    |
-| -------------------------------- | ------ | -------------------------------------------------------- |
-| `ghchronicle-influxdb.json`      | {stats.panels} | InfluxDB 3, queried with SQL                             |
-| `ghchronicle-prometheus.json`    | {stats.panels} | Prometheus                                               |
-| `ghchronicle-postgres.json`      | {stats.panels} | PostgreSQL or TimescaleDB, from the SQL sink             |
-| `ghchronicle-graphite.json`      | {stats.panels} | Graphite, from the Graphite sink                         |
-| `ghchronicle-elasticsearch.json` | {stats.panels} | Elasticsearch or OpenSearch, from the Elasticsearch sink |
+| File                             | Panels | Store                                                                   |
+| -------------------------------- | ------ | ----------------------------------------------------------------------- |
+| `ghchronicle-influxdb.json`      | {stats.panels} | InfluxDB 3, queried with SQL                                            |
+| `ghchronicle-prometheus.json`    | {stats.panels} | Prometheus                                                              |
+| `ghchronicle-postgres.json`      | {stats.panels} | PostgreSQL or TimescaleDB, from the sink that connects or the SQL file |
+| `ghchronicle-graphite.json`      | {stats.panels} | Graphite, from the Graphite sink                                        |
+| `ghchronicle-elasticsearch.json` | {stats.panels} | Elasticsearch or OpenSearch, from the Elasticsearch sink                |
 
 The five hold the same panels in the same order. What differs is how many of
 them the store behind each one can answer.
@@ -238,9 +238,10 @@ connects.
         The Prometheus that scrapes ghchronicle's exporter.
       </TabItem>
       <TabItem label="PostgreSQL">
-        The PostgreSQL datasource for the database the SQL sink's statements were
-        piped into. TimescaleDB is the same datasource with the TimescaleDB
-        switch on; the queries do not change.
+        The PostgreSQL datasource for the database the `postgres` sink writes
+        to, or the one the SQL sink's statements were piped into. TimescaleDB is
+        the same datasource with the TimescaleDB switch on; the queries do not
+        change.
       </TabItem>
       <TabItem label="Graphite">
         The Graphite the sink writes to. The paths assume the default prefix,

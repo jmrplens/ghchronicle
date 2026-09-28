@@ -140,36 +140,31 @@ func checkCadences(t *testing.T, path string, documented map[string]string) {
 // block a reader copies, comments and all, not a decoded value.
 //
 // Only families, because that is the layer that carries one row per family.
-// default and groups are shown commented out, and a reader who uncomments one
-// has not changed the reference this pins.
+// The block is commented out on purpose, like default and groups above it, so
+// each line is read with its comment marker taken off. A line left
+// uncommented fails here: it would set that family's cadence in every file
+// copied from the example, and keep setting it after a release changed the
+// built-in value, which is what the example did until 2.6.1. So does a line
+// with no reason beside it or above it.
 func exampleEvery(t *testing.T) map[string]string {
 	t.Helper()
 	out := map[string]string{}
-	inEvery, inFamilies := false, false
-	for _, line := range readLines(t, exampleConfig) {
-		if line == "every:" {
-			inEvery = true
-			continue
+	for i, line := range familiesBlock(t) {
+		_, text, _ := uncomment(line)
+		name, value, found := strings.Cut(text, ": ")
+		if !found || strings.HasPrefix(text, "#") {
+			continue // a reason written above the line it is for
 		}
-		if !inEvery {
-			continue
+		if !strings.HasPrefix(strings.TrimLeft(line, " "), "#") {
+			t.Errorf("%s:%d sets every.families.%s rather than showing it: a file copied from the example "+
+				"would keep that cadence after a release changed the built-in one", exampleConfig, i, name)
 		}
-		if line != "" && !strings.HasPrefix(line, " ") {
-			break // the next top-level key ends the block
+		value, why, _ := strings.Cut(value, "#")
+		if strings.TrimSpace(why) == "" && !reasonAbove(t, i) {
+			t.Errorf("%s:%d shows every.families.%s with no reason for its value", exampleConfig, i, name)
 		}
-		if line == "  families:" {
-			inFamilies = true
-			continue
-		}
-		if !inFamilies || (line != "" && !strings.HasPrefix(line, "    ")) {
-			continue
-		}
-		name, value, ok := strings.Cut(strings.TrimSpace(line), ": ")
-		if !ok || strings.HasPrefix(name, "#") {
-			continue
-		}
-		if value, _, _ = strings.Cut(value, "#"); value != "" {
-			out[name] = strings.TrimSpace(value)
+		if value = strings.TrimSpace(value); value != "" {
+			out[name] = value
 		}
 	}
 	if len(out) == 0 {
@@ -178,6 +173,59 @@ func exampleEvery(t *testing.T) map[string]string {
 		t.Fatalf("%s: no every.families block found, so this test proves nothing", exampleConfig)
 	}
 	return out
+}
+
+// familiesBlock is the lines of every.families in config.example.yaml, keyed
+// by their line number, with the marker of the commented-out block still on
+// them: a family's own line at four spaces, and a prose line above one.
+func familiesBlock(t *testing.T) map[int]string {
+	t.Helper()
+	out := map[int]string{}
+	inEvery, inFamilies := false, false
+	for i, line := range readLines(t, exampleConfig) {
+		switch {
+		case line == "every:":
+			inEvery = true
+			continue
+		case !inEvery:
+			continue
+		case line != "" && !strings.HasPrefix(line, " "):
+			return out // the next top-level key ends the block
+		}
+		indent, text, ok := uncomment(line)
+		if ok && indent == 2 {
+			inFamilies = text == "families:"
+		} else if inFamilies && ok && indent == 4 {
+			out[i+1] = line
+		}
+	}
+	return out
+}
+
+// reasonAbove reports whether the line before a family's own is a comment of
+// the block's, which is where the reason of the three families that ship off
+// is written, since it runs to several lines.
+func reasonAbove(t *testing.T, line int) bool {
+	t.Helper()
+	_, text, _ := uncomment(familiesBlock(t)[line-1])
+	return strings.HasPrefix(text, "#")
+}
+
+// TestTheExampleConfigPinsNoCadence: a reader copies the example, and a
+// family's cadence in that copy has to be whatever the binary running it
+// ships with. Until 2.6.1 the example set all thirty-four, so a configuration
+// copied from 2.5.x ran account at the twelve hours it had then and never
+// the hour 2.6.0 gave it.
+func TestTheExampleConfigPinsNoCadence(t *testing.T) {
+	t.Setenv("GITHUB_TOKEN", "x")
+	c, err := Load(exampleConfig)
+	if err != nil {
+		t.Fatalf("%s does not load: %v", exampleConfig, err)
+	}
+	if c.Every.Default != "" || len(c.Every.Groups) != 0 || len(c.Every.Families) != 0 {
+		t.Errorf("%s sets cadences (default %q, groups %v, families %v); a copy of it would keep them after a release changed the built-in ones",
+			exampleConfig, c.Every.Default, c.Every.Groups, c.Every.Families)
+	}
 }
 
 // TestTheExampleConfigLoads is the check no amount of table pinning gives: the
@@ -189,8 +237,8 @@ func TestTheExampleConfigLoads(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%s does not load: %v", exampleConfig, err)
 	}
-	// It documents the built-in values, so it must ask for nothing the audit
-	// did not already choose and must earn no warning at all.
+	// It shows the built-in values without setting them, so it must ask for
+	// nothing the audit did not already choose and must earn no warning.
 	if got := c.Warnings(); len(got) != 0 {
 		t.Errorf("%s starts with warnings, which the reference configuration should never do: %v", exampleConfig, got)
 	}

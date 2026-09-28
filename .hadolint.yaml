@@ -3,12 +3,13 @@
 # to two copies of it inside the workflow.
 
 # A warning fails the build. Neither of these files is long: one is a build
-# stage and a distroless image, the other is a distroless image and a COPY.
+# stage and a distroless image, the other is a distroless image and a COPY,
+# and both make the state directory in an empty stage of their own.
 failure-threshold: warning
 
 # Nothing is ignored, and that is worth saying out loud. The workflow used to
 # pass ignore: DL3008,DL3018, the two rules about pinning apt and apk package
 # versions. Neither file installs a package with either tool: the build stage
 # is golang:alpine and runs only `go mod download` and `go build`, and what
-# ships is distroless plus the binary. The ignores had been carried over from
-# somewhere else and were suppressing nothing.
+# ships is distroless plus the binary and one empty directory. The ignores had
+# been carried over from somewhere else and were suppressing nothing.

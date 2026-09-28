@@ -80,8 +80,3 @@ it as the `token` input. A classic token needs `repo`, `read:user`,
 `read:gpg_key`. A fine-grained token needs read access to the repositories,
 including the repository permission Administration, plus the account
 permissions for followers, gists, packages, plan, Git SSH keys and GPG keys.
-
-A token is not needed at all if the only thing wanted is a card of public
-numbers, but the traffic and alert panels will be empty, and the log will say
-`not available (403)` for each, which is the collector reporting a permission
-rather than a failure.

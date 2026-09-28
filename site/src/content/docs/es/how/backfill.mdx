@@ -23,7 +23,7 @@ intenciones opuestas y la herramienta las trata como tales.
 | ---------------------- | ----------------------------------------- | -------------------------------------------------------- |
 | Páginas por colector   | el pequeño valor por defecto del colector | hasta que se acabe la API, o hasta el límite dado        |
 | Al llegar a la reserva | saltar la familia y avisar                | esperar a que la ventana se reinicie y seguir            |
-| Qué familias corren    | las que tienen el intervalo vencido       | todas las activas, diga lo que diga el fichero de estado |
+| Qué familias corren    | las que tienen el intervalo vencido, las lentas [por turnos](/ghchronicle/es/configuration/cadences/#las-familias-lentas-se-turnan) en el servicio | todas las activas, diga lo que diga el fichero de estado |
 | Si se para             | no hay nada que guardar; el siguiente tic barre | un punto de control guarda su sitio, y el mismo comando sigue desde ahí |
 | Con qué frecuencia     | según horario, siempre                    | a propósito, normalmente una vez                         |
 
@@ -266,6 +266,16 @@ los cien de cada uno que lee una pasada.
   de code scanning, donde una pasada lee cinco, dos y una.
 - Cada release, despliegue y discusión, y cada alerta de Dependabot y de code
   scanning, donde una pasada lee la página más reciente de cada lista.
+- Cada comentario en issues y en discusiones que la cuenta dejó en cualquier
+  sitio, y cada respuesta suya que se aceptó, donde una pasada lee los cien
+  comentarios más recientes de cada tipo y las quinientas respuestas aceptadas
+  más recientes.
+- Cada estrella que dio la cuenta, donde una pasada lee las quinientas más
+  recientes.
+- Las pull requests en coautoría que hay detrás del progreso de Pair
+  Extraordinaire, recorridas sobre toda la vida de la cuenta, donde una pasada
+  suma los días desde la anterior y recorre la historia entera una vez por
+  semana.
 - Todas las páginas de cada lista de stargazers, donde una pasada lee las cien
   estrellas más recientes de un repositorio cuya lista ya recorrió entera una
   vez. Hasta la 2.5.0 un primer recorrido que fallaba se anotaba como hecho, y
@@ -280,6 +290,14 @@ los cien de cada uno que lee una pasada.
   treinta.
 - Como mucho 500 logs de jobs fallidos por repositorio, ninguno de hace más de
   noventa días, si `joblogs` tiene cadencia; una pasada lee como mucho diez.
+
+Dos cosas que una pasada recuerda, un relleno las deja de lado. Un 403 o 404
+que una pasada [recuerda durante un día](/ghchronicle/es/api/#un-rechazo-también-se-recuerda)
+se vuelve a preguntar, porque un relleno no consulta esa memoria. Y lee el
+[fichero de caché](/ghchronicle/es/configuration/#la-caché-que-hay-a-su-lado)
+que hay junto al de estado pero no escribe nada en él: las páginas que recorre
+son unas que ninguna pasada pide, y guardadas allí echarían las de las pasadas,
+así que un servicio arrancado después empezaría más frío de lo que se paró.
 
 ## Qué no enciende
 
@@ -312,9 +330,9 @@ cursores.
 **La pasarela de GraphQL se rinde con cien pull requests.** Pedir cien pull
 requests con sus revisiones en una consulta responde un **502 en HTML** al cabo
 de unos diez segundos. El recorrido de pull requests parte su página por la
-mitad y reintenta sobre el mismo cursor, en silencio: los colectores no llevan
-registrador, así que un relleno de un repositorio activo lo muestra solo como
-una familia más lenta, nunca como una línea.
+mitad y reintenta sobre el mismo cursor, en silencio: el colector de pull
+requests no lleva registrador, así que un relleno de un repositorio activo lo
+muestra solo como una familia más lenta, nunca como una línea.
 
 <Aside type="caution" title="Tres cosas no se pueden rellenar a ningún precio">
 Ninguna espera cambia esto, y son la razón de que el proyecto exista.

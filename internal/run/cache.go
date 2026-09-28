@@ -177,8 +177,11 @@ func (r *Runner) loadCache(now time.Time) {
 	r.expanded = make(map[collect.RunKey]time.Time, len(head.Expanded))
 	switch stores := r.storeNames(); {
 	case len(head.Expanded) == 0:
+	case r.Refill && r.RefillEveryStart:
+		r.Log.Debug("not every store keeps a write ledger, listing the jobs of the runs the cache file remembers again",
+			"runs", len(head.Expanded))
 	case r.Refill:
-		r.Log.Info("no write ledger remembers what the stores hold, listing the jobs of the runs the cache file remembers again",
+		r.Log.Info("the write ledger remembers nothing, listing the jobs of the runs the cache file remembers again",
 			"runs", len(head.Expanded))
 	case !subset(stores, head.Stores):
 		r.Log.Info("a store was added since the cache file was written, listing the jobs of the runs it remembers again",

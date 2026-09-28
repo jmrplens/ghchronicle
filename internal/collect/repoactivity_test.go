@@ -300,8 +300,8 @@ func TestDiscussionsCommentsCarryTheSameContextAsTheAccountWalk(t *testing.T) {
 	// The account's own comment lost the thread: it is not the answer, and
 	// only discussion_answered tells that apart from nobody answering.
 	mine := find(t, points, "gh_discussion_comment", map[string]string{"comment": "9724102"})
-	if mine.Tags["is_answer"] != "false" || mine.Tags["author"] != "octocat" || mine.Tags["own"] != "true" {
-		t.Errorf("own comment = %v", mine.Tags)
+	if fieldInt(t, mine, "answers") != 0 || mine.Tags["author"] != "octocat" || mine.Tags["own"] != "true" {
+		t.Errorf("own comment = %v %v", mine.Tags, mine.Fields)
 	}
 	reply := find(t, points, "gh_discussion_comment", map[string]string{"comment": "9724110"})
 	if reply.Tags["is_reply"] != "true" || fieldInt(t, reply, "reply_to") != 9724102 {

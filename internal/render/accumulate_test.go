@@ -2,6 +2,7 @@ package render
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -208,6 +209,68 @@ func TestAccumulatorIgnoresStaleAndNamelessRepositoryRows(t *testing.T) {
 	}
 	if len(c.TopRepos) != 1 || c.TopRepos[0].Name != "a" {
 		t.Errorf("top repos = %+v, want only a", c.TopRepos)
+	}
+}
+
+// Two owners can give a repository the same short name, and a sweep of an
+// account with its organizations meets both: a user's .github and an
+// organization's, or a fork and the repository it was forked from. Each is its
+// own repository, keyed by full_name as the Overview keys it, so neither one's
+// stars, forks or languages overwrite the other's. A point that carries no
+// full_name, or the (none) the collectors write when a part of it is missing,
+// falls back to the short name.
+func TestAccumulatorTellsTwoOwnersRepositoriesOfOneNameApart(t *testing.T) {
+	now := time.Date(2026, 9, 7, 12, 0, 0, 0, time.UTC)
+	repo := func(owner string, stars, forks int, at time.Time) Point {
+		return Point{
+			Measurement: "gh_repo",
+			Tags:        map[string]string{"owner": owner, "repo": "dotfiles", "full_name": owner + "/dotfiles", "language": "Shell"},
+			Fields:      map[string]any{"stars": stars, "forks": forks}, Time: at,
+		}
+	}
+	lang := func(full, name string, bytes int) Point {
+		return Point{
+			Measurement: "gh_repo_language",
+			Tags:        map[string]string{"repo": "dotfiles", "full_name": full, "language": name},
+			Fields:      map[string]any{"bytes": bytes}, Time: now,
+		}
+	}
+	a := NewAccumulator("someone")
+	_, _ = a.Write(context.Background(), []Point{
+		repo("someone", 5, 1, now),
+		repo("acme", 7, 2, now.Add(time.Minute)),
+		// A later reading of someone's own replaces that one alone.
+		repo("someone", 6, 1, now.Add(time.Hour)),
+		lang("someone/dotfiles", "Shell", 100),
+		lang("acme/dotfiles", "Shell", 40),
+		// No full_name, and the sentinel for one: the short name is all there is.
+		{
+			Measurement: "gh_repo", Tags: map[string]string{"repo": "notes", "full_name": "(none)"},
+			Fields: map[string]any{"stars": 2, "forks": 0}, Time: now,
+		},
+		{
+			Measurement: "gh_repo", Tags: map[string]string{"repo": "notes"},
+			Fields: map[string]any{"stars": 3, "forks": 0}, Time: now.Add(time.Hour),
+		},
+		{
+			Measurement: "gh_repo_language", Tags: map[string]string{"repo": "notes", "language": "Shell"},
+			Fields: map[string]any{"bytes": 1}, Time: now,
+		},
+	})
+	c := a.Card()
+	if c.Stars != 6+7+3 || c.Forks != 1+2 {
+		t.Errorf("stars = %d, forks = %d, want 16 and 3: both dotfiles, and notes once at its newest",
+			c.Stars, c.Forks)
+	}
+	var got []string
+	for _, r := range c.TopRepos {
+		got = append(got, fmt.Sprintf("%s:%d", r.Name, r.Stars))
+	}
+	if strings.Join(got, " ") != "dotfiles:7 dotfiles:6 notes:3" {
+		t.Errorf("top repos = %v, want both dotfiles and notes once", got)
+	}
+	if len(c.Languages) != 1 || c.Languages[0] != (Language{Name: "Shell", Bytes: 141}) {
+		t.Errorf("languages = %+v, want Shell at 141 bytes from all three repositories", c.Languages)
 	}
 }
 

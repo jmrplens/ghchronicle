@@ -74,7 +74,7 @@ the same membership.
 
 | Group       | Family         | Default | Why that value                                                                                                                                                                                                                                                                                                                                             |
 | ----------- | -------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `account`   | `account`      | `1h`    | the contribution calendar moves with every contribution and the profile's counts with every follow and star, and a pass is one GraphQL point and seven REST requests, of which only the profile is charged: GitHub never answered it with a 304, and the six package listings answer one until a package changes                                           |
+| `account`   | `account`      | `1h`    | the contribution calendar moves with every contribution and the profile's counts with every follow and star, and a pass is one GraphQL point and seven REST requests, of which only the profile is charged: GitHub all but never answered it with a 304, once in 48 conditional reads, and the six package listings answer one until a package changes                                           |
 | `account`   | `achievements` | `1h`    | the badges on the public profile page, which no API lists, and how far each tiered one is from its next tier; a pass transfers the page, 36 KB and off the budget, and the pull requests merged since the day before for two GraphQL points, so a tier reached in the afternoon shows in the afternoon, and the whole history is walked once a week, 24 MB |
 | `account`   | `billing`      | `1h`    | the month in progress moves while continuous integration runs: it had changed at every one of 46 six-hourly reads measured, and a pass is two requests, that month and the one before, of which only the first is charged                                                                                                                                  |
 | `account`   | `history`      | `0`     | off until asked for by name: it walks every past year and the year so far, and the rows are idempotent                                                                                                                                                                                                                                                     |
@@ -288,8 +288,8 @@ A family is due on the first tick at which its cadence has elapsed, to within
 half a tick. The loop reads the clock a few milliseconds after it wakes, by an
 amount that changes from tick to tick, and without that margin a family whose
 cadence is a whole number of ticks waited one tick more about half the time:
-before 2.5.2 the quarter hour families ran every 24 minutes on average and the
-hourly ones every 69. Half a tick absorbs that and never lets a family run a
+until 2.6.0, which shipped the fix written for 2.5.2, the quarter hour families
+ran every 24 minutes on average and the hourly ones every 69. Half a tick absorbs that and never lets a family run a
 tick early.
 
 A heartbeat **longer** than the shortest cadence holds that family back, and
@@ -302,8 +302,9 @@ level=WARN msg="heartbeat is 1h and the shortest cadence is 15m (actions), so
 
 ## The slow families take turns
 
-The running service starts at most one family whose cadence is six hours or
-more in each sweep, and leaves any other that is due for the next tick.
+The running service starts one family whose cadence is six hours or more in
+each sweep, or the fewest that still keep every cadence when one cannot
+(below), and leaves any other that is due for the next tick.
 
 Families that run in the same sweep are marked with the same instant in the
 state file, so they come due together again at every cadence, for ever. A group
@@ -363,9 +364,15 @@ instant, and each keeps the turn it had.
 
 ## Making them slower
 
-If the budget is tight, lengthen `artifacts` and then `actions`. They are the
-only two whose cost scales with how busy the repositories are rather than with
-how many there are. See [cost of a sweep](/ghchronicle/api/cost/).
+If `core` is the budget that runs short, lengthen `artifacts` and then
+`actions`, the two largest REST costs, which grow with how busy the
+repositories are. If it is `graphql`, lengthen `issues`, `issueevents` and
+`commits`, which read only the repositories where something moved and so cost
+more the more of them move. They are not the only ones that follow activity
+rather than size: `activity` is charged only for a repository whose log moved,
+and `outbound` a point more for each further hundred of what it reads. See
+[what scales with activity, not with
+size](/ghchronicle/api/cost/#what-scales-with-activity-not-with-size).
 
 The symptom of cadences that are too fast is a warning every sweep:
 

@@ -304,9 +304,10 @@ suits it. Replace `KeepAlive` with it and add `-once` to `ProgramArguments`:
   <integer>3600</integer>
 ```
 
-Keep `state_file` on a path that survives, in this mode above all: it is what
-stops the whole stargazer walk and the year by year contribution backfill
-happening again on every run.
+Keep `state_file` on a path that survives, in this mode above all. Without it
+every run collects every family, whatever its cadence, and walks the stargazer
+list, the whole star history and the co-authored pull requests again; the cache
+file beside it is what lets a run ask GitHub only for what changed.
 
 ## Build it from source
 
@@ -355,10 +356,14 @@ the conventional places rather than ones the tool knows:
 | File             | For an agent                                        | For a daemon                     |
 | ---------------- | --------------------------------------------------- | -------------------------------- |
 | Configuration    | `~/Library/Application Support/ghchronicle/`        | `/usr/local/etc/ghchronicle/`    |
-| State and ledger | `~/Library/Application Support/ghchronicle/`        | `/usr/local/var/ghchronicle/`    |
+| State, ledger, cache | `~/Library/Application Support/ghchronicle/`    | `/usr/local/var/ghchronicle/`    |
 | Log              | `~/Library/Logs/ghchronicle.log`                    | `/usr/local/var/log/`            |
 
 `state_file` has a default of its own, `ghchronicle-state.json` in the working
 directory, with the write ledger beside it as `ghchronicle-state-written.bin`
 and the cache as `ghchronicle-state-cache.bin`. A launchd job's working
-directory is not something to rely on. Set it.
+directory is not something to rely on. Set it. From 2.6.1 on a path setting
+takes a leading `~` as the home directory, so an agent's configuration can say
+`state_file: ~/Library/Application Support/ghchronicle/state.json`; an older
+release reads the `~` as a directory name, and wants `/Users/you/...` written
+out.

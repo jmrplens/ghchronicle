@@ -256,8 +256,9 @@ ghchronicle __VERSION__ (commit <commit>, built <date>)
 
 ## The token, and the rest of the environment
 
-Every `${VAR}` in the configuration file is read from the environment when the
-process starts, so the token never has to be in the file.
+A `${VAR}` in a credential, an address or a file path of the configuration
+file is read from the environment when the process starts, so the token never
+has to be in the file.
 
 <Tabs syncKey="windows-shell">
   <TabItem label="PowerShell">
@@ -370,8 +371,9 @@ and there are two shapes of it.
     of its own and the task is then registered carrying no duration at all.
 
     Two conditions come with this shape, and neither is cron's. An hourly task
-    gives every family an hourly cadence at best, so the fifteen-minute rhythm
-    of `actions` is lost, which is the same trade
+    gives every family an hourly cadence at best, so the five that run every
+    fifteen minutes, `actions`, `events`, `notifs`, `activity` and
+    `ratelimit`, run four times less often, which is the same trade
     [cron makes on Linux](/ghchronicle/install/systemd/#cron-instead-of-a-service).
     And `Register-ScheduledTask` here names no `-User` and no `-Principal`, so
     the task is registered under the calling account with the default logon
@@ -468,19 +470,29 @@ rely on, so give every path in the file absolutely.
 | File             | For a machine-wide task          | For one account                     |
 | ---------------- | -------------------------------- | ----------------------------------- |
 | Configuration    | `C:/ProgramData/ghchronicle/`    | `${LOCALAPPDATA}/ghchronicle/`      |
-| State and ledger | `C:/ProgramData/ghchronicle/`    | `${LOCALAPPDATA}/ghchronicle/`      |
+| State, ledger, cache | `C:/ProgramData/ghchronicle/` | `${LOCALAPPDATA}/ghchronicle/`      |
 | Log              | `C:/ProgramData/ghchronicle/`    | `${LOCALAPPDATA}/ghchronicle/`      |
 
 `${LOCALAPPDATA}` is written that way because `${VAR}` is the one form the
-collector expands, from the environment, as the process starts. `%VAR%` is a
-shell notation and means nothing to the file: a `%LOCALAPPDATA%` copied into
-the YAML gives you a directory literally named `%LOCALAPPDATA%`, next to
-wherever the task happened to be working. It is `%LOCALAPPDATA%` in `cmd` and
-`$env:LOCALAPPDATA` in PowerShell that create the directory in the first place.
+collector expands, from the environment, as the process starts, and it does so
+in `state_file`, `sinks.dedupe_file` and `log.file` from 2.6.1 on. An older
+release expands no path, and reads `${LOCALAPPDATA}/ghchronicle/state.json` as
+a directory literally named `${LOCALAPPDATA}`; with one of those, write the
+path out. `%VAR%` is a shell notation and means nothing to the file: a
+`%LOCALAPPDATA%` copied into the YAML gives you a directory literally named
+`%LOCALAPPDATA%`, next to wherever the task happened to be working. It is
+`%LOCALAPPDATA%` in `cmd` and `$env:LOCALAPPDATA` in PowerShell that create the
+directory in the first place.
+
+The configuration's own path is the exception in the table: it is given on the
+command line, where the collector expands nothing, so a scheduled task's
+`-config` names it in full, `C:\Users\you\AppData\Local\ghchronicle\config.yaml`.
 
 A directory under `C:\ProgramData` is writable by its creator and readable by
 everyone, so create it elevated and then grant write to the account the task
-runs as. The state file and its write ledger are the two the collector rewrites
-on every sweep; if one of them is marked read-only the collector clears that
-attribute itself, because NTFS refuses to replace a read-only file even when
-asked to replace it, and a sweep should not fail over a file property.
+runs as. Leave the state file and the cache file beside it writable. The
+collector replaces both by writing a new file and renaming it over the old one,
+and NTFS refuses to replace a read-only file even when asked to replace it, so
+a read-only state file stops being saved and every sweep warns `state not
+saved`. The write ledger and the file sink's rotated files are the two it
+clears that attribute on itself, and a sweep does not fail over them.

@@ -27,8 +27,8 @@ import (
 // reader picks the live repositories by name.
 //
 // Then the rows checking 2.6.0 against GitHub found three panels reading as
-// current, written into the same database beside the sweep's own: see
-// staleRows.
+// current, and the documentation audit of 2.6.0 two more, written into the
+// same database beside the sweep's own: see staleRows.
 //
 // InfluxDB alone, in a database of its own: the SQL is the same in
 // PostgreSQL but for the list formatter, and the shared stores belong to the
@@ -102,6 +102,8 @@ func TestAnArchivedRepositorySetAsideReachesTheAccountTotals(t *testing.T) {
 		stars:           func() float64 { return stars(all) },
 		everyRepository: everyRepository,
 		cache:           archivedPanelSQL(t, doc, all, "Cache entries by key", "SUM(caches)"),
+		features:        archivedPanelSQL(t, doc, all, "Security features", `AS "Enabled"`),
+		artifacts:       archivedPanelSQL(t, doc, all, "Artifact storage counted", `AS "Walked"`),
 		wantStars:       liveStars + archivedStars,
 		aside:           aside,
 		archivedStars:   archivedStars,
@@ -121,6 +123,9 @@ type currentPanels struct {
 	archivedStars   float64
 	// cache is the statement of "Cache entries by key".
 	cache string
+	// features and artifacts are the statements of "Security features" and
+	// "Artifact storage counted".
+	features, artifacts string
 }
 
 // holdToWhatIsCurrent writes the stale rows beside the sweep's own and holds
@@ -165,6 +170,42 @@ func holdToWhatIsCurrent(ctx context.Context, t *testing.T, s *Stack, database s
 	// What the sweep read today, and not the ref GitHub evicted three days ago.
 	wantNumber(t, cacheRows[i], "Entries", stale.entries)
 	wantNumber(t, cacheRows[i], "Size", stale.size)
+
+	holdToTheNewestReading(ctx, t, s, database, stale, panels)
+}
+
+// holdToTheNewestReading holds the two tables the documentation audit of
+// 2.6.0 found taking MAX() over the range to the newest row of each: the
+// reading after the sweep's that found a feature switched off and its alerts
+// gone, and the sweep's own artifact total past an older one that walked
+// further and held more.
+func holdToTheNewestReading(ctx context.Context, t *testing.T, s *Stack, database string, stale staleWrite, panels currentPanels) {
+	t.Helper()
+	rows, err := influxSQL(ctx, s, database, panels.features)
+	if err != nil {
+		t.Fatalf("Security features: %v", err)
+	}
+	i := slices.IndexFunc(rows, func(row map[string]any) bool {
+		return row["Repository"] == stale.feature.repo && row["Feature"] == stale.feature.name
+	})
+	if i < 0 {
+		t.Fatalf("Security features lists %v, and not %s of %s", rows, stale.feature.name, stale.feature.repo)
+	}
+	// The flag and the count as the newest reading has them, not the largest
+	// the range held: a feature switched off inside the range read as on.
+	wantNumber(t, rows[i], "Enabled", stale.feature.enabled)
+	wantNumber(t, rows[i], "Open alerts", stale.feature.open)
+
+	rows, err = influxSQL(ctx, s, database, panels.artifacts)
+	if err != nil {
+		t.Fatalf("Artifact storage counted: %v", err)
+	}
+	i = slices.IndexFunc(rows, func(row map[string]any) bool { return row["Repository"] == stale.artifacts.repo })
+	if i < 0 {
+		t.Fatalf("Artifact storage counted lists %v, and not %s", rows, stale.artifacts.repo)
+	}
+	wantNumber(t, rows[i], "Walked", stale.artifacts.walked)
+	wantNumber(t, rows[i], "Live size", stale.artifacts.live)
 }
 
 // staleWrite is what staleRows writes and what the panels have to read past it.
@@ -177,6 +218,24 @@ type staleWrite struct {
 	// entries and size are what the sweep read of it today.
 	cache, cacheRepo string
 	entries, size    float64
+	// feature is the security feature a reading newer than the sweep's finds
+	// switched off, and artifacts the repository an older row says walked
+	// further and held more; each carries what its newest row says.
+	feature   staleFeature
+	artifacts staleArtifacts
+}
+
+// staleFeature is one repository's security feature as its newest row has
+// it: enabled as 1 or 0, the way the table casts it, and its open alerts.
+type staleFeature struct {
+	repo, name    string
+	enabled, open float64
+}
+
+// staleArtifacts is one repository's artifact total as the sweep read it.
+type staleArtifacts struct {
+	repo         string
+	walked, live float64
 }
 
 // staleRows are the rows checking 2.6.0 against GitHub panel by panel found
@@ -187,7 +246,11 @@ type staleWrite struct {
 // jmrplens/portainer-mcp-enhanced; an older row of the repository set aside
 // with more stars than it has now, as a backfill left jmrplens/FFT2octave at
 // 4 where GitHub said 3; and a cache on a ref GitHub evicted three days ago,
-// as 108 refs of jmrplens/gitlab-mcp-server's golangci-lint were.
+// as 108 refs of jmrplens/gitlab-mcp-server's golangci-lint were. Then the
+// two the documentation audit of 2.6.0 found: a reading of a security feature
+// taken after the sweep's, which finds it switched off and its alerts gone,
+// so that the sweep's reading is the older one and the one MAX() kept; and an
+// older artifact total that walked further and held more than the sweep's.
 func staleRows(t *testing.T, points []sqlStoresPoint, archivedStars int) staleWrite {
 	t.Helper()
 	var aside, cache *sqlStoresPoint
@@ -246,7 +309,62 @@ func staleRows(t *testing.T, points []sqlStoresPoint, archivedStars int) staleWr
 			Time: day.Add(-3 * 24 * time.Hour),
 		},
 	}
+	newestReadingRows(t, points, now, &out)
 	return out
+}
+
+// newestReadingRows adds the two rows of the documentation audit to what
+// staleRows writes: a reading of a security feature taken after the sweep's,
+// which finds it switched off and its alerts gone, and an older artifact
+// total that walked further and held more than the sweep's.
+func newestReadingRows(t *testing.T, points []sqlStoresPoint, now time.Time, out *staleWrite) {
+	t.Helper()
+	var feature, artifacts *sqlStoresPoint
+	for i := range points {
+		p := &points[i]
+		switch {
+		case feature == nil && p.Measurement == "gh_security_feature" && p.Fields["enabled"] == true &&
+			p.Fields["open_alerts"] != 0.0:
+			// A feature the sweep read as on and with alerts open, so that the
+			// newer reading switching it off changes both columns.
+			feature = p
+		case artifacts == nil && p.Measurement == "gh_artifact_total":
+			artifacts = p
+		}
+	}
+	if feature == nil || artifacts == nil {
+		t.Fatalf("the sweep wrote no security feature that is on with alerts open (%v) or no "+
+			"artifact total (%v)", feature != nil, artifacts != nil)
+	}
+	out.feature = staleFeature{repo: feature.Tags["repo"], name: feature.Tags["feature"]}
+	switchedOff := map[string]any{"enabled": false, "open_alerts": int64(0)}
+	if url, ok := feature.Fields["url"].(string); ok {
+		// The same url, so that the reading is the same row of the table and
+		// not one a grouping on the url would split off.
+		switchedOff["url"] = url
+	}
+	walked, _ := artifacts.Fields["walked"].(float64)
+	live, _ := artifacts.Fields["live_bytes"].(float64)
+	declared, _ := artifacts.Fields["count"].(float64)
+	liveCount, _ := artifacts.Fields["live_count"].(float64)
+	out.artifacts = staleArtifacts{repo: artifacts.Tags["repo"], walked: walked, live: live}
+	out.rows = append(out.rows,
+		sink.Point{
+			// After the sweep's own reading, since now is read once the sweep
+			// has finished, and inside the range the statement is rendered
+			// with, which is open at its end.
+			Measurement: "gh_security_feature", Tags: feature.Tags, Fields: switchedOff,
+			Time: now,
+		},
+		sink.Point{
+			Measurement: "gh_artifact_total", Tags: artifacts.Tags,
+			Fields: map[string]any{
+				"walked": int64(walked) + 7, "count": int64(declared) + 7,
+				"live_bytes": int64(live) + 1000, "live_count": int64(liveCount) + 3,
+			},
+			Time: now.Add(-2 * 24 * time.Hour),
+		},
+	)
 }
 
 // influxAwaitStale waits until each row staleRows wrote can be read back, so
@@ -257,6 +375,9 @@ func influxAwaitStale(ctx context.Context, t *testing.T, s *Stack, database stri
 		"SELECT stars FROM gh_repo_total WHERE full_name = '" + stale.gone + "'",
 		"SELECT stars FROM gh_repo_total WHERE full_name = '" + fakegh.SetAside + "' AND time < now() - INTERVAL '1 day'",
 		"SELECT caches FROM gh_actions_cache_entry WHERE ref = 'refs/pull/1/merge'",
+		"SELECT open_alerts FROM gh_security_feature WHERE repo = '" + stale.feature.repo +
+			"' AND feature = '" + stale.feature.name + "' AND NOT enabled",
+		"SELECT walked FROM gh_artifact_total WHERE time < now() - INTERVAL '1 day'",
 	} {
 		if _, err := influxAwaitRow(ctx, s, database, q); err != nil {
 			t.Fatalf("%s: %v", q, err)

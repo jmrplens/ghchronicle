@@ -56,8 +56,9 @@ func aliasBatch[T any](ctx context.Context, c *ghapi.Client, repos []Repo, size 
 // repository with nothing to report, deployments on an account that has never
 // deployed, produces zero points from chunks that all answered perfectly; read
 // as "the batch brought back nothing" that leaves the family unmarked and due
-// again on the next tick, which for an hourly family is every fifteen minutes
-// for as long as one repository keeps failing.
+// again on the next tick, which at the built-in cadences is every fifteen
+// minutes, twice as often as deployments runs, for as long as one repository
+// keeps failing.
 type PartialError struct {
 	Asked int
 	Err   error

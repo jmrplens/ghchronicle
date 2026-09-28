@@ -27,8 +27,9 @@ internal/ghapi      REST and GraphQL client, ETag cache, rate state, typed error
 internal/collect    one file per family of metrics
 internal/sink       Point, line protocol, the sinks, the Reducer that makes gauges
 internal/render     the SVG card
-internal/config     YAML with ${VAR} expansion, per-family cadences
-internal/run        the sweep scheduler and its state file
+internal/config     YAML with ${VAR} expansion (and ~ in paths), per-family cadences
+internal/run        the sweep scheduler, its state file, the cache file beside
+                    it, and the turns the slow families take
 internal/dashboards the dashboard specification, shared by the generators
                     and by the binary that publishes it
 test/e2e            the binary against a fake GitHub, and against real stores
@@ -38,9 +39,17 @@ site/               the documentation, from which docs/ is generated
 ## Before you open a pull request
 
 ```sh
-go build ./... && go vet ./... && go test -race ./...
-golangci-lint run ./...
+make build vet test-race   # the end-to-end suite runs in test-race too
+make golangci-lint         # the config check, the formatter's diff, then the linters
 ```
+
+The targets name the packages rather than `./...`, which on a machine with the
+git-ignored `plan/` directory would take in a Go package of its own; and
+`make golangci-lint` is what CI runs, formatter included, where a plain
+`golangci-lint run` skips the formatting gate. `make analyze` runs CI's Go,
+Markdown, shell and generated-artifact checks and reports each failure at once;
+actionlint, hadolint, the site's lint below and `go vet` for the other
+platforms CI type-checks run only in CI.
 
 For a change under `site/`:
 
@@ -55,32 +64,59 @@ still what these pages generate, and that the markdown twin of every page still
 builds; `pnpm run build` is where every internal link and anchor is resolved,
 by the validator plugin, and an unresolved one fails it.
 
-For a change to the dashboards:
+For a change to the Go code, the six checks of CI's Generated artifacts job,
+which regenerates nothing and fails on anything committed that the code no
+longer produces:
 
 ```sh
-go run ./cmd/gen_dashboards          # writes the five files
-go run ./cmd/gen_dashboards -check   # writes nothing, fails if they are stale
+make check-dashboards check-gallery check-layouts check-config-options check-compose check-config-cases
 ```
 
-The five JSON files are generated and never hand-edited.
-
-For a change to a card layout:
-
-```sh
-make gallery         # regenerates the pictures under site/src/assets/
-make check-gallery   # writes nothing, fails if they no longer match the renderer
-```
-
-The card pictures are generated and never hand-edited.
+Each is fixed by the same target without `check-`, and the dashboards by
+`go run ./cmd/gen_dashboards`: the five dashboard files, the card pictures
+under `site/src/assets/`, `site/src/data/layouts.json`,
+`site/src/data/config-options.json`, the compose files under `deploy/` and
+`internal/config/testdata/config-cases.json` are generated and never
+hand-edited. `config-cases.json` is written from `config-options.json`, so
+run `make config-options` before `make config-cases`; a new setting or a
+changed cadence moves both.
 
 ## What a change owes
 
 **A new collector** means: a file in `internal/collect` that takes a
-`collect.Walk`, a call in `internal/run`, an entry in `config.defaultEvery` (a
-cadence missing there is rejected at start-up), a rule in `sink.promRules`, a
-Loki rendering if it is an event, a fixture and a test, a route in
-`test/e2e/fakegh` with an entry in that package's `Measurements`, a panel in
-`internal/dashboards`, and a row in the measurements page of the site.
+`collect.Walk`; a place in `internal/run` (`perRepoFamilies` and a case in
+`repoFamily` or `familyBatch` for a family that runs per repository, an
+`r.family` call in `accountFamilies` for one about the account); an entry in
+`config.defaultEvery`, with its group and a measured reason for its cadence (a
+cadence missing there is rejected at start-up); the family's row in the
+cadence table of `configuration/cadences.mdx`, whose English reason is the
+code's word for word, which `internal/config/documented_test.go` checks; its
+row in the cost table of `api/cost.mdx`; a rule in `sink.promRules`; a Loki
+rendering if it is an event; a fixture and a test; a route in
+`test/e2e/fakegh` with an entry in that package's `Measurements`; a panel in
+`internal/dashboards`; and a row in the measurements page of the site. All of
+it in both languages where it is a page.
+
+**A new measurement in an existing family** means its rule in
+`sink.promRules`, a Loki rendering if it is an event, its row on the
+measurements page, and the counts the site states in prose:
+`site/scripts/gen-stats.mjs` holds each of them to the code, and a count it has
+no word for in `NUMBER_WORDS` fails until one is added.
+
+**A new field on an existing measurement** is a field and never a tag: a new
+tag gives every row written after it an identity the rows already stored do
+not have, so each item becomes two series, and PostgreSQL keys a table on the
+tags it was created with. A value that can change after the row's own date is
+a field for the same reason. One the
+collector writes only under a condition goes in `conditionalColumns`
+(`internal/dashboards/conditional_columns_test.go`) when a SQL panel reads it;
+the test fails until it is there.
+
+**A cadence change** means a measured reason in `config.defaultEvery`, the
+cadence table in both languages, `make config-options` then
+`make config-cases`, the figures (`cd site && pnpm run figures`), `make docs`,
+and the table of how long the slow families wait on the cadences page when a
+family crosses six hours, which no test holds.
 
 **A new sink** means: a file in `internal/sink` with an httptest-backed test of
 its exact wire format, a struct in `config.Sinks` with a validation message
@@ -89,8 +125,11 @@ that says what is required, a branch in `buildSinks`, a commented block in
 Spanish twin, and a store in `internal/dashboards/stores.go` if Grafana can
 query it.
 
-**A new setting** means `config.example.yaml` and the configuration pages. A
-test walks the `yaml:` tags and fails on a setting the example does not name.
+**A new setting or Action input** means `config.example.yaml` and the
+configuration pages, or `action.yml` and the inputs table of
+`install/actions.mdx`, in both languages, then `make config-options` and
+`make config-cases`. A test walks the `yaml:` tags and fails on a setting the
+example does not name.
 
 **A behaviour change** means a test that fails before it and passes after it.
 

@@ -277,7 +277,7 @@ func TestEveryWholeHistoryWindowIsOnTheList(t *testing.T) {
 // two is loose enough to hide a panel that reads its whole measurement by
 // accident, which is the thing the rule above exists to catch.
 var flagsLookup = regexp.MustCompile(
-	`LEFT JOIN \(SELECT repo, fork, archived FROM .*?\) f ON f\.repo = \w+\.repo`,
+	`LEFT JOIN \(SELECT repo, full_name, fork, archived FROM .*?\) f ON f\.full_name = \w+\.full_name`,
 )
 
 // carriesWholeHistory says whether any store of a panel reads from the

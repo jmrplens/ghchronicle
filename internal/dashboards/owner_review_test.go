@@ -280,12 +280,13 @@ func TestDiscussionsAreListedOneByOne(t *testing.T) {
 	for title, want := range map[string][]string{
 		"Latest discussions": {
 			`title AS "Title"`, `category AS "Category"`, `comments AS "Comments"`,
-			`url AS "Link"`, "INTERVAL '30 years'", "PARTITION BY repo, number ORDER BY time DESC, comments DESC",
+			`url AS "Link"`, "INTERVAL '30 years'", "PARTITION BY full_name, number ORDER BY time DESC, comments DESC",
 			"WHEN answerable = 'false' THEN NULL WHEN has_answer THEN 1 ELSE 0 END",
 		},
-		// One row per comment, whichever of its rows says accepted: is_answer
-		// is a tag, so a comment seen before it was accepted and again after
-		// is two rows at one instant, and without the partition it read twice.
+		// One row per comment, whichever of its rows says accepted: until
+		// 2.6.1 is_answer was a tag, so a comment seen before it was accepted
+		// and again after is two rows at one instant, and without the
+		// partition it read twice.
 		"Answers elsewhere": {
 			`title AS "Title"`, `full_name AS "Repository"`, `url AS "Link"`, `answers AS "Accepted"`,
 			"INTERVAL '30 years'", "own = 'false'", "PARTITION BY comment ORDER BY answers DESC",
@@ -408,5 +409,91 @@ func TestAchievementProgressIsABarPerBadge(t *testing.T) {
 		if other["type"] == "table" && other["title"] != "Achievement progress" && theirs["cellHeight"] != "sm" {
 			t.Errorf("%q has cellHeight %v", other["title"], theirs["cellHeight"])
 		}
+	}
+}
+
+// TestTheCommentTablesReadOneRowPerCommentAndNameNoAnswerTag: whether a
+// comment is its discussion's accepted answer moved from the tag is_answer
+// to the answers field in 2.6.1. A store written by 2.6.0 and by 2.6.1 holds a
+// comment in two shapes, and up to three rows, until gh_discussion_comment is
+// dropped and filled again; after that no row carries the tag, and InfluxDB 3
+// refuses a query naming a column no row has. So no query of any store names
+// it, and the two tables over the measurement read one row per comment in
+// every shape: the SQL stores by partitioning on the comment, Graphite by
+// reading both depths of path and joining a comment's series by name, and
+// Elasticsearch by folding its documents per comment in the table.
+func TestTheCommentTablesReadOneRowPerCommentAndNameNoAnswerTag(t *testing.T) {
+	t.Parallel()
+	for _, store := range []string{"influxdb", "prometheus", "postgres", "graphite", "elasticsearch"} {
+		for title, p := range rendered(t, store) {
+			if q := asJSON(t, p["targets"]) + asJSON(t, p["transformations"]); strings.Contains(q, "is_answer") {
+				t.Errorf("%s: %s names is_answer, which a store dropped and filled again has no column for", store, title)
+			}
+		}
+	}
+	checkCommentsPartitionedInSQL(t)
+	checkCommentsJoinedAcrossGraphiteDepths(t)
+	checkCommentsFoldedInElasticsearch(t)
+}
+
+// checkCommentsPartitionedInSQL: the two SQL stores keep one row per comment
+// by numbering a comment's rows and keeping the first.
+func checkCommentsPartitionedInSQL(t *testing.T) {
+	t.Helper()
+	for _, store := range []string{"influxdb", "postgres"} {
+		panels := rendered(t, store)
+		for _, title := range []string{"Answers elsewhere", "Discussion answers"} {
+			sql := sqlOf(t, mustPanel(t, panels, title))
+			if !strings.Contains(sql, "PARTITION BY comment ORDER BY answers DESC") || !strings.Contains(sql, "WHERE rn = 1") {
+				t.Errorf("%s: %s does not read one row per comment: %s", store, title, sql)
+			}
+		}
+	}
+}
+
+// checkCommentsJoinedAcrossGraphiteDepths: Graphite keeps the paths written
+// before 2.6.1 one node deeper, so both tables read both depths and join a
+// comment's series by name.
+func checkCommentsJoinedAcrossGraphiteDepths(t *testing.T) {
+	t.Helper()
+	dcc := "gh_discussion_comment"
+	if len(shapesOf(dcc)) != 2 {
+		t.Fatalf("%s has %d shapes of path, want the one it is written with and the one before 2.6.1", dcc, len(shapesOf(dcc)))
+	}
+	graphite := rendered(t, "graphite")
+	for title, leaf := range map[string][]string{
+		"Answers elsewhere":  {"answers", "own", "false"},
+		"Discussion answers": {"comments"},
+	} {
+		target := asJSON(t, mustPanel(t, graphite, title)["targets"])
+		for _, shape := range shapesOf(dcc) {
+			if path := gpIn(shape, dcc, leaf[0], leaf[1:]...); !strings.Contains(target, path) {
+				t.Errorf("graphite: %s does not read the %d-node paths %s: %s", title, len(shape), path, target)
+			}
+		}
+		if !strings.Contains(target, "groupByNodes(group(") {
+			t.Errorf("graphite: %s does not join a comment's series across the shapes: %s", title, target)
+		}
+	}
+}
+
+// checkCommentsFoldedInElasticsearch: Elasticsearch keeps a document per
+// shape and no query can collapse them, so each table folds them per comment.
+func checkCommentsFoldedInElasticsearch(t *testing.T) {
+	t.Helper()
+	es := rendered(t, "elasticsearch")
+	for title, fold := range map[string]string{
+		"Answers elsewhere":  `"Comment":{"aggregations":[],"operation":"groupby"}`,
+		"Discussion answers": `"Comment":{"aggregations":["count"],"operation":"aggregate"}`,
+	} {
+		if tf := asJSON(t, mustPanel(t, es, title)["transformations"]); !strings.Contains(tf, fold) {
+			t.Errorf("elasticsearch: %s does not fold its documents per comment: %s", title, tf)
+		}
+	}
+	if q := asJSON(t, mustPanel(t, es, "Discussion answers")["targets"]); !strings.Contains(q, `"field":"comment.keyword"`) {
+		t.Errorf("elasticsearch: Discussion answers does not bucket per comment: %s", q)
+	}
+	if tf := asJSON(t, mustPanel(t, es, "Answers elsewhere")["transformations"]); !strings.Contains(tf, `"limitField":50`) {
+		t.Errorf("elasticsearch: Answers elsewhere does not keep the newest fifty comments: %s", tf)
 	}
 }

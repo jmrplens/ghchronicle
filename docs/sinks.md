@@ -302,7 +302,7 @@ SELECT time, "count" FROM gh_traffic WHERE kind = 'views' AND repo = 'ghchronicl
 
 ### Where to go next
 
-- [Choosing a store](https://jmrp.io/docs/ghchronicle/sinks/) compares InfluxDB with the other nine,
+- [Choosing a store](https://jmrp.io/docs/ghchronicle/sinks/) compares InfluxDB with the others,
   and holds the write ledger every one of them shares.
 - [The dashboards](https://jmrp.io/docs/ghchronicle/dashboards/) says which of the five is drawn
   against which store, and what a panel a store cannot answer becomes.
@@ -466,7 +466,7 @@ the port publication decide who can reach it.
 
 ### Where to go next
 
-- [Choosing a store](https://jmrp.io/docs/ghchronicle/sinks/) compares Prometheus with the other nine,
+- [Choosing a store](https://jmrp.io/docs/ghchronicle/sinks/) compares Prometheus with the others,
   and holds the write ledger every one of them shares.
 - [The dashboards](https://jmrp.io/docs/ghchronicle/dashboards/) says which of the five is drawn
   against which store, and what a panel a store cannot answer becomes.
@@ -577,14 +577,14 @@ Prometheus, and the constraint follows the data rather than the protocol.
 
 ### Where to go next
 
-- [Choosing a store](https://jmrp.io/docs/ghchronicle/sinks/) compares OpenTelemetry with the other nine,
+- [Choosing a store](https://jmrp.io/docs/ghchronicle/sinks/) compares OpenTelemetry with the others,
   and holds the write ledger every one of them shares.
 - [The dashboards](https://jmrp.io/docs/ghchronicle/dashboards/) says which of the five is drawn
   against which store, and what a panel a store cannot answer becomes.
 
 ## PostgreSQL
 
-INSERT statements you pipe into psql, the schema they declare, and why the conflict clause updates rather than does nothing.
+The two ways into PostgreSQL, INSERT statements you pipe into psql and a sink that connects, the schema both declare, and why the conflict clause updates rather than does nothing.
 
 Source: <https://jmrp.io/docs/ghchronicle/sinks/postgres/>
 
@@ -674,9 +674,20 @@ the key is made of. Each field of the union that batch carries follows it as
 in a later batch. The fields are never in the `CREATE TABLE`, because that
 statement does nothing to a table an earlier release made: a field the release
 did not write would reach the `INSERT` with no column, and PostgreSQL refuses
-the statement and the batch around it. Adding each column if it is missing
-means the same thing to a new table and an old one. A rotated file starts its
-declarations again, so any one file can be replayed on its own.
+the statement and the batch around it. Adding a field's column if it is
+missing means the same thing to a new table and an old one. A rotated file
+starts its declarations again, so any one file can be replayed on its own.
+
+So a file replayed into a database that already holds its tables makes psql
+print a notice for every declaration that finds its work done, one for the
+`CREATE TABLE` and one for each column the table already has:
+
+```text
+NOTICE:  relation "gh_traffic" already exists, skipping
+NOTICE:  column "count" of relation "gh_traffic" already exists, skipping
+```
+
+Those are expected. An `ERROR` line is not.
 
 The connecting sink does not send every one of those `ALTER TABLE`s. It asks
 the catalog which columns a table already has the first time its process meets
@@ -690,9 +701,32 @@ second `lock_timeout` refused it, and a `SELECT` behind it waited three seconds.
 A statement the server refuses is sent again on the next write rather than
 taken as done.
 
-A tag first seen after the table was declared cannot join the primary key
-without rewriting it, so it becomes a plain column. That only happens when a
-collector changes its tag set between sweeps.
+A tag is different, because it is part of the key. One first seen after the
+table was declared, in the same file or the same process, cannot join the
+primary key without rewriting it, so it becomes a plain column. That only
+happens when a collector changes its tag set between sweeps.
+
+A table an earlier release made is another matter, and a release that changes
+a measurement's tags changes what loads into it. **Measured against PostgreSQL
+18.6** on 2026-09-27:
+
+- A tag a later release adds gets no column from either sink, so every `INSERT`
+  of that measurement is refused with `column ... does not exist`, and in the
+  connecting sink the other rows of the same batch with it.
+- A tag a later release stops writing, as 2.6.1 stopped writing `is_answer` on
+  `gh_discussion_comment`, leaves the file's `ON CONFLICT` naming a key the
+  table does not have. psql refuses each of those statements with "there is no
+  unique or exclusion constraint matching the ON CONFLICT specification", and
+  the rest of the file loads. The connecting sink reads the table's own key
+  from the catalog and conflicts on that, so it goes on writing, and its new
+  rows sit beside the old ones with the empty string in the column no longer
+  written, the two shapes InfluxDB holds as well.
+
+The clean way out of either is to drop the table and let the sweeps, and a
+backfill for the history, fill it again; a collector with the connecting sink
+has to be restarted after the drop, since it declares a table once per process.
+[How to read the tables](https://jmrp.io/docs/ghchronicle/collectors/measurements/#how-to-read-the-tables)
+shows how to rebuild a key by hand instead.
 
 ### TimescaleDB
 
@@ -708,9 +742,13 @@ Nothing in the dashboard changes.
 
 ### Setting it up
 
-1. Point the sink at a file, or at standard output for a direct pipe.
+1. Choose the sink. The one that connects needs `sinks.postgres.dsn` and a
+    database this machine can reach, and declares its tables on its first
+    write. The file sink needs `sinks.sql.path`, a file or `-` for standard
+    output.
 
-2. Load it.
+2. With the file sink, load what it wrote. The connecting sink has nothing to
+    load.
 
     ```sh
     psql "$DATABASE_URL" -f /var/lib/ghchronicle/points.sql
@@ -720,7 +758,9 @@ Nothing in the dashboard changes.
     scheduler and pipe it straight in.
 
 3. Point Grafana's PostgreSQL datasource at the database and import
-    `ghchronicle-postgres.json`.
+    `ghchronicle-postgres.json`, or, with the connecting sink, let
+    `-publish-dashboard` make the datasource out of the DSN and publish the
+    dashboard.
 
     ```sql
     SELECT time, "count" FROM gh_traffic WHERE kind = 'views' AND repo = $repo
@@ -731,7 +771,7 @@ one, with every query translated to PostgreSQL against this schema.
 
 ### Where to go next
 
-- [Choosing a store](https://jmrp.io/docs/ghchronicle/sinks/) compares PostgreSQL with the other nine,
+- [Choosing a store](https://jmrp.io/docs/ghchronicle/sinks/) compares PostgreSQL with the others,
   and holds the write ledger every one of them shares.
 - [The dashboards](https://jmrp.io/docs/ghchronicle/dashboards/) says which of the five is drawn
   against which store, and what a panel a store cannot answer becomes.
@@ -804,8 +844,18 @@ number, so:
 - A table that needs several fields of one row cannot be built. The shipped
   dashboard keeps the column it is sorted by and says in the panel description
   which columns it dropped.
-- A boolean is not a metric there at all, and neither is a title or any other
-  string. Those panels say so.
+- A title or any other string is not a metric there at all, and the sink
+  drops it; the panels that would show one say so. A boolean is kept as 1 or 0
+  like any number.
+- A panel cannot join two measurements, since each lives under its own path.
+  Work elsewhere has no Stars column, and the community profile keeps the API's
+  issue template flag rather than the count of templates, which lives under
+  another measurement.
+- A target cannot ask about one window while it reads another. The Overview
+  and Every repository, ever count an archived repository the default filter
+  sets aside from its points of the last seven days, where the SQL stores ask
+  whether the collector still writes it, so a range that ended more than a week
+  ago leaves those repositories out.
 
 Everything time-shaped works normally, which is most of the dashboard.
 
@@ -821,7 +871,7 @@ prefix is the first node of every path.
 
 ### Where to go next
 
-- [Choosing a store](https://jmrp.io/docs/ghchronicle/sinks/) compares Graphite with the other nine,
+- [Choosing a store](https://jmrp.io/docs/ghchronicle/sinks/) compares Graphite with the others,
   and holds the write ledger every one of them shares.
 - [The dashboards](https://jmrp.io/docs/ghchronicle/dashboards/) says which of the five is drawn
   against which store, and what a panel a store cannot answer becomes.
@@ -922,12 +972,22 @@ InfluxDB one, as Lucene filters and aggregations over **one** datasource
 pointing at `<prefix>-*`, because each target names its own index in its query.
 
 Set the datasource's time field to `@timestamp`. A per-item table there is the
-newest documents themselves; everything else is a bucket aggregation.
-OpenSearch works through the same plugin.
+newest documents themselves, or the newest document of each item where an item
+has several; everything else is a bucket aggregation. OpenSearch works through
+the same plugin.
+
+Two things a query cannot do there, and the panels that need them say so. It
+cannot join two indices, so Work elsewhere has no Stars column and the
+community profile keeps the API's issue template flag rather than the count of
+templates. And it cannot ask about one window while it reads another: the
+Overview and Every repository, ever count an archived repository the default
+filter sets aside from its documents of the last seven days, where the SQL
+stores ask whether the collector still writes it, so a range that ended more
+than a week ago leaves those repositories out.
 
 ### Where to go next
 
-- [Choosing a store](https://jmrp.io/docs/ghchronicle/sinks/) compares Elasticsearch with the other nine,
+- [Choosing a store](https://jmrp.io/docs/ghchronicle/sinks/) compares Elasticsearch with the others,
   and holds the write ledger every one of them shares.
 - [The dashboards](https://jmrp.io/docs/ghchronicle/dashboards/) says which of the five is drawn
   against which store, and what a panel a store cannot answer becomes.
@@ -991,6 +1051,20 @@ without keeping two copies of the data.
 someone starred acme/telemetry full_name="acme/telemetry" user="someone" starred=1
 ```
 
+Two sentences changed in 2.6.0, and a line already in Loki keeps the text it
+was sent with:
+
+- An external contribution says what happened to the item and not who did it,
+  since the row does not say who merged or closed it:
+  `USER's pull request OWNER/REPO#N` is open, was merged or was closed without
+  merging, and `USER's issue OWNER/REPO#N` is open or was closed. A row whose
+  state and merged flag disagree reads `USER's contribution OWNER/REPO#N`.
+  Every line used to say `USER merged OWNER/REPO#N`, open issues included.
+- A release reads `published release TAG of OWNER/REPO`, or
+  `published prerelease TAG of OWNER/REPO`, at the moment it was published. It
+  used to read `release TAG of OWNER/REPO, N downloads`, so a query filtering
+  on `downloads` matches only the old lines.
+
 `batch` is how many entries go in one push, 1000 unless it is lowered.
 
 The stream label is `kind`, which is what you filter on first.
@@ -1043,8 +1117,9 @@ A release is the event that shows what the horizon costs, and the one stream
 that looks further back. Its line is rendered from `gh_release_published`, at
 the moment the release was published. It used to come from `gh_release`, which
 is stamped at the sweep because its downloads move, so every repository pass
-pushed every release again: 3,360 lines in a day on the account this was
-measured on, a third of everything the sink sent. Dated at the publication, a
+pushed every release again. Measured on 2.5.1 in production, over 30.9 hours
+and 27 `repo` passes, that was 4,313 of the 10,467 lines the sink sent, 41 per
+cent, for the 2 releases published in those hours. Dated at the publication, a
 release is first seen by the `repo` pass after it, so one published just after
 a pass read its repository is a whole cadence old when the next pass writes,
 plus however late that pass runs: a tick it lost, the slower families that ran
@@ -1053,8 +1128,10 @@ before it, a restart. With `repo` and `max_age` both at their default hour,
 older.
 
 So the release stream looks back the `repo` cadence plus `max_age`: two hours
-at the defaults, seven with `repo: 6h`, and never more than six days, a day
-short of the week `reject_old_samples_max_age` allows. Loki refuses an old line
+at the defaults, seven with `repo: 6h`. That lookback is capped at six days, a
+day short of the week `reject_old_samples_max_age` allows, and it never
+shortens `max_age`: one set past six days is this stream's horizon as it is
+every other's. Loki refuses an old line
 only for being behind a newer one in its stream, which the second check above
 still makes. A release published in the hour before a pass is sent by that pass
 and again by the next, the same line at the same instant, which Loki keeps
@@ -1070,8 +1147,9 @@ recently, in order"; a time series answers "how much, over which period".
 
 ### Job logs belong here
 
-`every.joblogs` collects the last forty lines of every failed GitHub Actions
-job. It is text rather than a measurement, so the InfluxDB sink excludes it by
+The `joblogs` family, off until `every.families.joblogs` gives it a cadence,
+collects the last forty lines of every failed GitHub Actions job. It is text
+rather than a measurement, so the InfluxDB sink excludes it by
 default and the Prometheus exporter skips it. Loki is where it belongs, and the
 query is:
 
@@ -1094,7 +1172,7 @@ publishes every dashboard with the note.
 
 ### Where to go next
 
-- [Choosing a store](https://jmrp.io/docs/ghchronicle/sinks/) compares Loki with the other nine,
+- [Choosing a store](https://jmrp.io/docs/ghchronicle/sinks/) compares Loki with the others,
   and holds the write ledger every one of them shares.
 - [The dashboards](https://jmrp.io/docs/ghchronicle/dashboards/) says which of the five is drawn
   against which store, and what a panel a store cannot answer becomes.
@@ -1179,7 +1257,7 @@ One sweep, both destinations, and the collector knows about neither.
 
 ### Where to go next
 
-- [Choosing a store](https://jmrp.io/docs/ghchronicle/sinks/) compares Telegraf with the other nine,
+- [Choosing a store](https://jmrp.io/docs/ghchronicle/sinks/) compares Telegraf with the others,
   and holds the write ledger every one of them shares.
 - [The dashboards](https://jmrp.io/docs/ghchronicle/dashboards/) says which of the five is drawn
   against which store, and what a panel a store cannot answer becomes.
@@ -1328,7 +1406,7 @@ two clothes: the process is deliberately allowed to write almost nowhere.
 
 ### Where to go next
 
-- [Choosing a store](https://jmrp.io/docs/ghchronicle/sinks/) compares the file sink with the other nine,
+- [Choosing a store](https://jmrp.io/docs/ghchronicle/sinks/) compares the file sink with the others,
   and holds the write ledger every one of them shares.
 - [The dashboards](https://jmrp.io/docs/ghchronicle/dashboards/) says which of the five is drawn
   against which store, and what a panel a store cannot answer becomes.

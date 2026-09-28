@@ -60,7 +60,7 @@ Grafana is on `http://localhost:3000` with the dashboard already in it: the
 collector publishes it on start and points it at the store beside it, so there
 is nothing to import and no datasource to fill in. The
 [Docker page](https://jmrp.io/docs/ghchronicle/install/docker/) has one compose
-file per store, each brought up against the real images before a release.
+file per store, written by one generator that CI holds them to.
 
 ```sh
 ghchronicle -config config.yaml    # what the service ends up running
@@ -129,7 +129,7 @@ a personal or organisation account exposes.
 | Traffic       | Views, unique visitors and clones per day, referrers and paths. GitHub's window is 14 days; this rewrites it whole on every sweep, so a collector that was down for a day repairs itself on the next run                               |
 | Stars         | Stars per day for every repository, from GitHub's daily star history, back to the first. Where the token may read the stargazer list (since July 2026: admins, collaborators), one point per star as well, naming who gave it and when |
 | Repositories  | Stars, forks, watchers, open issues, size, age, idle days, licence, visibility, languages by bytes, topics, community profile score                                                                                                    |
-| Releases      | Downloads per release and per asset, asset sizes, draft and prerelease state                                                                                                                                                           |
+| Releases      | Downloads per release and per asset, asset sizes, draft and prerelease state, and the moment each release was published                                                                                                                |
 | Pull requests | Per item: time to first review, time to merge, lines added and deleted, files changed, review rounds, comments, commits                                                                                                                |
 | Issues        | Per item: time to close, comments, reactions, label count                                                                                                                                                                              |
 | Actions       | Runs with duration and queue time, jobs, individual steps, workflows and their state, artifacts and their expiry, cache usage                                                                                                          |
@@ -138,6 +138,7 @@ a personal or organisation account exposes.
 | Activity      | The event feed, which GitHub caps at three hundred events and thirty days, and the notification inbox, which it keeps for three months unless saved                                                                                    |
 | Billing       | Usage per day, product, SKU and repository, with gross, discount and net                                                                                                                                                               |
 | Account       | Followers, following, packages, gists, social accounts, sponsors                                                                                                                                                                       |
+| Elsewhere     | Pull requests and issues in other people's repositories, with their size and what became of them, the comments and accepted answers left there, and the stars of each repository they went to                                          |
 
 ## Where it writes
 
@@ -146,17 +147,17 @@ Everything but the Prometheus exporter is pushed, and Prometheus itself can be
 fed through its OTLP receiver, so nothing here needs to be scraped and the
 collector runs wherever it can reach its databases.
 
-| Store                      | Keeps                                          | Good for                                                  |
-| -------------------------- | ---------------------------------------------- | --------------------------------------------------------- |
-| InfluxDB                   | the dated history                              | "how fast were we merging in July"                        |
-| PostgreSQL / TimescaleDB   | the dated history, as SQL you pipe into `psql` | a Grafana user who has a Postgres and no InfluxDB         |
-| Graphite                   | the dated history                              | an existing Graphite                                      |
-| Elasticsearch / OpenSearch | the dated history, as documents                | search across everything collected                        |
-| Prometheus                 | the current value                              | alerting, and a number on a wall                          |
-| OpenTelemetry              | either, depending on the backend               | an existing collector pipeline                            |
-| Loki                       | the events, as log lines                       | "what happened, in order"                                 |
-| Telegraf                   | whatever Telegraf can reach                    | Kafka, Graphite, Datadog, anything with a Telegraf output |
-| File and stdout            | line protocol or JSON                          | a shipper you already run, and a durable buffer           |
+| Store                      | Keeps                                                                | Good for                                                  |
+| -------------------------- | -------------------------------------------------------------------- | --------------------------------------------------------- |
+| InfluxDB                   | the dated history                                                    | "how fast were we merging in July"                        |
+| PostgreSQL / TimescaleDB   | the dated history, in a database it connects to or as SQL for `psql` | a Grafana user who has a Postgres and no InfluxDB         |
+| Graphite                   | the dated history                                                    | an existing Graphite                                      |
+| Elasticsearch / OpenSearch | the dated history, as documents                                      | search across everything collected                        |
+| Prometheus                 | the current value                                                    | alerting, and a number on a wall                          |
+| OpenTelemetry              | either, depending on the backend                                     | an existing collector pipeline                            |
+| Loki                       | the events, as log lines                                             | "what happened, in order"                                 |
+| Telegraf                   | whatever Telegraf can reach                                          | Kafka, Graphite, Datadog, anything with a Telegraf output |
+| File and stdout            | line protocol or JSON                                                | a shipper you already run, and a durable buffer           |
 
 The difference that decides which to use is dating. InfluxDB keys a point by
 measurement, tag set and timestamp, so replaying the same fourteen-day traffic
@@ -177,8 +178,8 @@ and in Grafana's shareable export format, so importing asks you to pick your
 own datasource.
 
 Import from the Grafana UI (Dashboards, New, Import) or with the API. They are
-generated from one specification by the scripts beside them; edit those rather
-than the JSON.
+generated from one specification, `internal/dashboards`, by
+`go run ./cmd/gen_dashboards`; edit the specification rather than the JSON.
 
 ## The other ways in
 
@@ -194,10 +195,21 @@ or take a binary from the
 container:
 
 ```sh
-docker run -v $PWD/config.yaml:/config.yaml -e GITHUB_TOKEN ghcr.io/jmrplens/ghchronicle -config /config.yaml
+docker run -v $PWD/config.yaml:/config.yaml:ro -v ghchronicle-state:/var/lib/ghchronicle \
+  -e GITHUB_TOKEN ghcr.io/jmrplens/ghchronicle -config /config.yaml
 ```
 
-For the whole path on one system rather than the one line:
+with `state_file: /var/lib/ghchronicle/state.json` in the configuration. The
+image carries `/var/lib/ghchronicle` owned by its uid 65532, and a new named
+volume mounted there takes that owner, so the volume keeps the state and the
+cache from one container to the next with nothing to hand over; a host
+directory mounted there instead needs `sudo chown 65532:65532` first, or every
+sweep warns `state not saved` and `cache file not saved`. Up to 2.6.0 the image
+had no such directory, and a new volume there belonged to root. A
+configuration that names no `state_file` writes to the container's working
+directory instead, which is writable and goes with the container.
+
+For the whole path on one system rather than these few lines:
 [Linux](https://jmrp.io/docs/ghchronicle/install/linux/),
 [macOS](https://jmrp.io/docs/ghchronicle/install/macos/) and
 [Windows](https://jmrp.io/docs/ghchronicle/install/windows/) each name the
@@ -222,11 +234,14 @@ sinks:
   stdout: true
 ```
 
-Every `${VAR}` is read from the environment, so the file can be committed while
-the secrets stay out of it. `config.example.yaml` in this repository is the
-documented version, with a comment on every option there is. It collects every metric it knows how to unless
-`groups` names the groups you want, in which case the rest are neither read nor
-written; `ghchronicle -groups` lists them.
+A `${VAR}` in a credential, an address or a file path is read from the
+environment, so the file can be committed while the secrets stay out of it;
+any other value is read as written. `config.example.yaml` in this repository is the
+documented version, with a comment on every option there is. It collects every
+family it knows except three that ship switched off, `deps`, `history` and
+`joblogs`, each turned on by giving it a cadence under `every.families`; and
+when `groups` names the groups you want, the rest are neither read nor
+written. `ghchronicle -groups` lists them.
 
 ```sh
 ghchronicle -list          # the repositories that would be collected

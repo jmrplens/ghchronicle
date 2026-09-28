@@ -103,12 +103,13 @@ func (p *Postgres) Write(ctx context.Context, points []Point) (int, error) {
 }
 
 // schemaConn is what declaring a table asks of the database: to run a
-// statement, and to say which columns a table already has. An interface so
-// that what is sent, and what a failed statement leaves recorded, can be read
-// without a server.
+// statement, and to say which columns a table already has and which of them
+// are its primary key. An interface so that what is sent, and what a failed
+// statement leaves recorded, can be read without a server.
 type schemaConn interface {
 	exec(ctx context.Context, ddl string) error
 	columns(ctx context.Context, table string) (map[string]string, error)
+	primaryKey(ctx context.Context, table string) ([]string, error)
 }
 
 // poolSchema is schemaConn over the sink's own pool.
@@ -131,6 +132,25 @@ func (c poolSchema) columns(ctx context.Context, table string) (map[string]strin
 	var name, typ string
 	_, err = pgx.ForEachRow(rows, []any{&name, &typ}, func() error {
 		out[name] = typ
+		return nil
+	})
+	return out, err
+}
+
+// primaryKey reads the columns of the table's primary key, in the key's own
+// order, from the same schema columns reads. None for a table without one.
+func (c poolSchema) primaryKey(ctx context.Context, table string) ([]string, error) {
+	rows, err := c.pool.Query(ctx, `SELECT a.attname FROM pg_index i `+
+		`JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey) `+
+		`WHERE i.indisprimary AND i.indrelid = to_regclass(quote_ident(current_schema()) || '.' || quote_ident($1)) `+
+		`ORDER BY array_position(i.indkey::int2[], a.attnum)`, table)
+	if err != nil {
+		return nil, err
+	}
+	var out []string
+	var name string
+	_, err = pgx.ForEachRow(rows, []any{&name}, func() error {
+		out = append(out, name)
 		return nil
 	})
 	return out, err
@@ -160,6 +180,18 @@ func (c poolSchema) columns(ctx context.Context, table string) (map[string]strin
 // fails, to a lock_timeout, a statement_timeout or a dropped connection, is
 // then sent again on the next write rather than taken as done, which had left
 // every INSERT naming that column refused until the process restarted.
+//
+// The upsert conflicts on the key the table has, read from the catalog with
+// its columns, rather than on the key this release would declare. The two
+// differ once a tag has moved to a field: 2.6.1 stopped writing is_answer on
+// gh_discussion_comment, whose tables made earlier keep it in their key, and
+// an ON CONFLICT without it matches no unique constraint. Measured on
+// 2026-09-27 against PostgreSQL 18.6, "there is no unique or exclusion
+// constraint matching the ON CONFLICT specification" refused the batch, and
+// the gh_discussion row in the same batch with it. Conflicting on the table's
+// own key, a column the point no longer carries takes its default, the empty
+// string, and the new rows sit beside the old ones, the two shapes InfluxDB
+// holds too, until the table is dropped and filled again.
 func (p *Postgres) declareAll(ctx context.Context, conn schemaConn, points []Point,
 	shapes map[string]*sqlShape,
 ) error {
@@ -181,7 +213,14 @@ func (p *Postgres) declareAll(ctx context.Context, conn schemaConn, points []Poi
 			if err != nil {
 				return fmt.Errorf("reading the columns of %s: %w", ident(m), err)
 			}
+			key, err := conn.primaryKey(ctx, m)
+			if err != nil {
+				return fmt.Errorf("reading the primary key of %s: %w", ident(m), err)
+			}
 			maps.Copy(fresh.cols, existing)
+			if len(key) > 0 {
+				fresh.key = key
+			}
 			p.schema.tables[m], tbl = fresh, fresh
 		}
 		for _, c := range tbl.missing(m, sh) {

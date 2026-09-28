@@ -85,11 +85,16 @@ cómo dejarlo corriendo cuando termines de mirarlo.
   </TabItem>
   <TabItem label="Contenedor">
     ```sh
-    docker run -v $PWD/config.yaml:/config.yaml:ro -e GITHUB_TOKEN \
+    docker run -v $PWD/config.yaml:/config.yaml:ro \
+      -v ghchronicle-state:/var/lib/ghchronicle -e GITHUB_TOKEN \
       ghcr.io/jmrplens/ghchronicle -config /config.yaml
     ```
 
-    Distroless, estático y corriendo como uid 65532.
+    Distroless, estático y corriendo como uid 65532. Con `state_file` dentro de
+    `/var/lib/ghchronicle` el volumen guarda el estado, y es de ese usuario
+    desde el principio, porque lo es el directorio propio de la imagen: [qué
+    tiene que ser
+    escribible](/ghchronicle/es/install/docker/#qué-tiene-que-ser-escribible).
 
   </TabItem>
   <TabItem label="Action">
@@ -112,9 +117,8 @@ cómo dejarlo corriendo cuando termines de mirarlo.
 El colector envía por push a todos los almacenes que soporta, así que no hace
 falta que sea alcanzable desde ningún sitio. Necesita alcanzar GitHub y alcanzar
 sus bases de datos. Esa es la única restricción, y es lo que hace viables las
-cinco opciones.
-Cuatro de las cinco quieren una máquina propia: systemd, Docker y cron. GitHub
-Actions es la que no. Las páginas por sistema de arriba son donde vive el
+cuatro opciones. Tres de las cuatro quieren una máquina propia: systemd, Docker
+y cron. GitHub Actions es la que no. Las páginas por sistema de arriba son donde vive el
 planificador, uno por sistema: systemd o cron en Linux, launchd en macOS y una
 tarea programada en Windows.
 
@@ -153,7 +157,17 @@ Más dos que no escriben nada: `-list` imprime los repositorios en alcance, y
 `-card ... -card-only` dibuja el SVG sin tocar una base de datos.
 
 <Aside type="note" title="El fichero de estado es lo único que debe persistir">
-  Corra como corra, deja `state_file` en una ruta que sobreviva a un reinicio.
-  Es lo que evita que el recorrido completo de estrellas y el relleno año por
-  año del calendario de contribuciones vuelvan a ocurrir en cada ejecución.
+  Corra como corra, deja `state_file` en una ruta que sobreviva a un reinicio,
+  en un directorio en el que el colector pueda escribir, porque el fichero de
+  caché y el registro de escrituras viven a su lado. Sin él cada ejecución
+  recoge todas las familias diga lo que diga su cadencia, y vuelve a recorrer
+  la lista de estrellas, el historial entero de estrellas y las pull requests
+  en coautoría.
 </Aside>
+
+## Actualizar
+
+Una versión nueva se instala encima de la anterior como se instaló esa, y la
+configuración y el estado pasan tal cual. Cómo son las primeras horas tras
+ella, de la 2.5.x a la 2.6.x y a la 2.6.1, está en
+[actualizar](/ghchronicle/es/install/upgrading/).

@@ -130,7 +130,14 @@ Ponlo a `false` para recoger solo repositorios públicos.
 
 ## La cadencia del descubrimiento
 
-La lista de repositorios se rehace como mucho una vez por hora. Los repositorios
-se crean pocas veces y listarlos cuesta una página por cada cien, así que un
-repositorio nuevo puede tardar hasta una hora en entrar en la pasada. Nombrarlo
-en `repos` no cambia eso; reiniciar el proceso sí.
+La lista de repositorios se rehace una vez por hora: en la primera pasada una
+hora después del último listado, con medio tic de margen, el mismo que recibe
+[la cadencia de una
+familia](/ghchronicle/es/configuration/cadences/#heartbeat-el-tic-del-bucle-que-no-es-una-cadencia).
+Los repositorios se crean pocas veces y listarlos cuesta una página por cada
+cien, así que un repositorio nuevo puede tardar hasta una hora en entrar en la
+pasada. Antes de la 2.6.1 la lista no tenía margen y podía sobrevivir por unos
+milisegundos a la pasada de una hora después, así que con el tic de cuarto de
+hora un repositorio nuevo esperaba hasta una hora y cuarto la mitad de las
+veces. Nombrarlo en `repos` no cambia eso; reiniciar el proceso sí, y también
+cada `-once`, que los lista de nuevo.

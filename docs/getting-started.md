@@ -152,8 +152,9 @@ themselves or wants to know what they just agreed to.
       stdout: true # swap for influxdb once you have somewhere to put it
     ```
 
-    Every `${VAR}` is read from the environment at start-up, so the file itself
-    holds no secrets and can be committed. Everything else has a default.
+    A `${VAR}` in a credential, an address or a file path is read from the
+    environment at start-up, so the file itself holds no secrets and can be
+    committed. Everything else has a default.
 
     The documented version, which comments every option there is, lives in the
     repository rather than in the install, so take it from there when you want
@@ -195,7 +196,7 @@ themselves or wants to know what they just agreed to.
 
 ### What the first sweep does that later ones do not
 
-Three things happen once, and they are why the first run is the expensive one.
+Four things happen once, and they are why the first run is the expensive one.
 
 - The daily star history of every repository, whatever the token may see, is
   read back to the repository's first week, and the whole stargazer list of
@@ -209,9 +210,19 @@ Three things happen once, and they are why the first run is the expensive one.
 - A month of workflow runs, so a fresh install does not chart a CI history that
   begins fifteen minutes ago. After that, twice the cadence, and never less
   than two hours.
-- Every year's contribution calendar, if `every.history` is set, back to the
-  day the account was created. After that, only the year in progress, rewritten
-  at its cadence.
+- The co-authored pull requests of the account's whole life, which
+  `achievements` walks for the Pair Extraordinaire count: 35 queries and
+  23.7 MB over 2,315 merged pull requests, measured on 2026-09-27. After that a
+  pass walks the days since, one page, and the whole history again once a
+  week.
+- Every year's contribution calendar, if `every.families.history` is set, back
+  to the day the account was created. After that, only the year in progress,
+  rewritten at its cadence.
+
+Nothing is cached yet either, so every answer of the first sweep is paid in
+full, where a later one asks with the ETag the last answer came with and is
+mostly answered a free 304; see [the cache beside the state
+file](https://jmrp.io/docs/ghchronicle/configuration/#the-cache-beside-it).
 
 Expect a few thousand points from a first sweep of twenty repositories, and a
 few hundred from each one after.
@@ -330,9 +341,12 @@ passed in as the `token` input. See
 
 ### Running without a token
 
-Possible, and honest about what it costs. A card of public numbers can be drawn
-from unauthenticated calls, but the traffic and alert panels will be empty and
-the log will say `not available (403)` for each of them. That is the collector
+Only for the three commands that ask GitHub nothing: `-backfill-status`,
+`-publish-dashboard` and `-uninstall`. Everything that collects, a card of
+public numbers included, needs one, and without it stops at start-up with
+`github.token is empty and GITHUB_TOKEN is unset`. What a token short of a
+scope costs is the table above: the part it cannot see is left empty, and the
+log says `not available (403)` for each of them, which is the collector
 reporting a permission, not a failure.
 
 ## Compared with the alternatives
@@ -668,9 +682,11 @@ a backfill or a card render. It needs a personal access token, because the
 automatic `GITHUB_TOKEN` lacks push access to other repositories, [cannot read
 traffic even in its
 own](https://docs.github.com/en/rest/metrics/traffic#get-repository-clones--fine-grained-access-tokens),
-and is not a user. A hosted runner keeps no state file between runs, so each
-run walks the stargazers and the whole star history again unless the state is
-cached.
+and is not a user. A hosted runner keeps no state file between runs, so unless
+the state is cached, which needs a configuration file, every run is a first
+run: it collects every family whatever its cadence, walks the stargazers, the
+whole star history and the account's co-authored pull requests again, and pays
+for every answer in full, with no ETag to be answered a free 304.
 
 The modes, the inputs and the cache step are on [GitHub
 Actions](https://jmrp.io/docs/ghchronicle/install/actions/).

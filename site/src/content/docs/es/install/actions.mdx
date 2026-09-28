@@ -25,7 +25,7 @@ cadena de herramientas de Go: descarga un binario de release y lo llama.
 | Entrada           | Por omisión              | Qué hace                                                                                                                                              |
 | ----------------- | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `token`           | obligatoria              | Un token personal. El `GITHUB_TOKEN` automático no basta                                                                                              |
-| `config`          | `""`                     | Ruta a un fichero de configuración. Omítela para usar valores por defecto a partir de `user`                                                          |
+| `config`          | `""`                     | Ruta a un fichero de configuración. Omítela para usar valores por defecto a partir de `user`, cuyo estado dura una ejecución y no se puede guardar en caché |
 | `user`            | el dueño del repositorio | La cuenta que recoger cuando no se da fichero de configuración                                                                                        |
 | `mode`            | `once`                   | `once`, `backfill` o `card`                                                                                                                           |
 | `backfill-since`  | `""`                     | Límite para `backfill`: una fecha, `90d`, `2y` o una duración de Go. Vacío es sin límite                                                              |
@@ -244,32 +244,55 @@ apunta a `../generated/card.svg`.
   ámbito de cuenta funciona con él. Ver [el token](/ghchronicle/es/start/token/).
 </Aside>
 
-**El fichero de estado no sobrevive entre ejecuciones.** Cada ejecución vuelve
-por tanto a recorrer entera la lista de estrellas, y lee entero el historial
-diario de estrellas de cada repositorio, una página por cada treinta semanas de
-su vida. En una cuenta pequeña son un puñado de llamadas; en una cuenta con
-muchas estrellas o con repositorios antiguos, guárdalo en caché:
+**El fichero de estado no sobrevive entre ejecuciones.** Sin él cada ejecución
+es una primera ejecución. Corren todas las familias, diga lo que diga su
+cadencia, porque nada recuerda cuándo corrieron por última vez. Se vuelve a
+recorrer entera la lista de estrellas, y se lee entero el historial diario de
+estrellas de cada repositorio, una página por cada treinta semanas de su vida.
+`achievements` recorre enteras las pull requests fusionadas de la cuenta para
+su recuento de coautorías, que fueron 35 consultas y 23,7 MB en una cuenta con
+2.315. Y sin [fichero de caché](/ghchronicle/es/configuration/#la-caché-que-hay-a-su-lado)
+junto al estado, nada se pregunta con un ETag, así que ninguna respuesta es un
+304 gratis. En una cuenta pequeña son un puñado de llamadas; en una cuenta con
+muchas estrellas, repositorios antiguos o una historia larga, guárdalo en
+caché.
+
+Guardarlo en caché necesita un fichero `config:`. Sin él la Action escribe una
+configuración propia y pone el estado en un directorio temporal nuevo dentro de
+`RUNNER_TEMP` en cada ejecución, que ningún paso de caché puede nombrar. Con
+él, apunta `state_file` al directorio personal:
 
 ```yaml
-- uses: actions/cache@v4
+state_file: ~/.ghchronicle/state.json
+```
+
+y restaura y guarda ese directorio con un paso anterior al de ghchronicle:
+
+```yaml
+- uses: actions/cache@v6
   with:
     path: ~/.ghchronicle
     key: ghchronicle-state-${{ github.run_id }}
     restore-keys: ghchronicle-state-
 ```
 
-y apunta `state_file` a `~/.ghchronicle/state.json` en la configuración. El
-directorio guarda también [la caché junto al fichero de
-estado](/ghchronicle/es/configuration/#la-caché-que-hay-a-su-lado), que un paso
-`once` escribe y un paso `backfill` solo lee, así que una ejecución restaurada
-de él pregunta además a GitHub con los validadores que guardó la anterior, y
-solo paga lo que cambió. Una pasada en modo `card` lee el
+Una `~` en `state_file` es el directorio personal a partir de la 2.6.1. Una
+versión anterior la lee tal como está escrita, un directorio llamado `~` dentro
+del checkout que el paso de caché nunca ve, así que con un `version` anterior a
+la 2.6.1 escribe la ruta entera: `/home/runner/.ghchronicle/state.json` en un
+runner Ubuntu alojado por GitHub.
+
+El directorio guarda entonces también el fichero de caché, que un paso `once`
+escribe y un paso `backfill` solo lee, así que una ejecución restaurada de él
+pregunta además a GitHub con los validadores que guardó la anterior, y solo
+paga lo que cambió. Una pasada en modo `card` lee el
 estado restaurado, que es lo que le permite saltarse los dos recorridos, y nunca
 lo vuelve a escribir, ni tampoco el fichero de caché que hay a su lado: entrega
 sus puntos a la tarjeta y a ningún almacén, así que nada de lo que aprendió
 puede decirle a la siguiente recogida que una familia ya está hecha. Quien llena
 la entrada de `actions/cache` es un paso `once`, con los dos ficheros, o un paso
-`backfill`, solo con el fichero de estado.
+`backfill`, solo con el fichero de estado. Ningún paso deja ahí un registro de
+escrituras: una ejecución que termina con su pasada no abre ninguno.
 
 ## Sin la Action
 

@@ -142,6 +142,13 @@ perder la caché, una pasada a precio completo:
     sudo systemctl status ghchronicle
     ```
 
+    La primera pasada corre todas las familias, porque aún no ha corrido
+    ninguna, salvo que el servicio arranca como mucho una familia de seis horas
+    o más por pasada: `traffic`, `stats`, `forks` y el resto de las once llegan
+    al almacén a lo largo de las dos primeras horas y media, y solo esta vez.
+    Ver [las familias lentas se
+    turnan](/ghchronicle/es/configuration/cadences/#las-familias-lentas-se-turnan).
+
 </Steps>
 
 ## Qué vigilar
@@ -149,9 +156,13 @@ perder la caché, una pasada a precio completo:
 El log dice qué se escribió y dónde.
 
 ```text
-level=INFO msg=written sink=influxdb family=traffic points=629
-level=INFO msg="rate budget" bucket=core remaining=4354 limit=5000
+level=INFO msg=written sink=influxdb family=repo points=934 unchanged=1955
+level=INFO msg="rate budget" bucket=core remaining=4477 limit=5000
 ```
+
+[Qué dice el log un día
+bueno](/ghchronicle/es/configuration/logging/#qué-dice-el-log-un-día-bueno)
+tiene todas las líneas de rutina.
 
 Dos avisos merecen una alerta:
 
@@ -182,8 +193,14 @@ planificador.
 0 * * * * /usr/local/bin/ghchronicle -config /etc/ghchronicle/config.yaml -once
 ```
 
-Deja el fichero de estado en una ruta persistente también en este modo. Es lo
-que evita que el recorrido de estrellas y el relleno año por año del calendario
-de contribuciones vuelvan a ocurrir en cada ejecución. Ten en cuenta que un cron
-horario da a cada familia una cadencia horaria como mucho, así que el ritmo de
-quince minutos de `actions` se pierde.
+Deja el fichero de estado en una ruta persistente también en este modo. Sin él
+cada ejecución recoge todas las familias, diga lo que diga su cadencia, y
+vuelve a recorrer la lista de estrellas, el historial entero de estrellas y las
+pull requests en coautoría; el fichero de caché que hay a su lado es lo que
+deja a una ejecución preguntar a GitHub solo por lo que cambió. Ten en cuenta
+que un cron horario da a cada familia una cadencia horaria como mucho, así que
+las cinco que corren cada quince minutos, `actions`, `events`, `notifs`,
+`activity` y `ratelimit`, corren cuatro veces menos: el tiempo en cola de una
+ejecución de workflow se lee cuando ya ha terminado, y un hilo de
+notificaciones que se movió dos veces dentro de la hora muestra solo su segundo
+movimiento.

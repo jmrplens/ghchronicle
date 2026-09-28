@@ -46,9 +46,20 @@ is not.
       The preflight job now refuses such a tag. A tag already pushed keeps
       the `go.mod` it was cut from, so the first release under a new path is
       always a new tag.
-- [ ] `go build ./... && go vet ./... && go test -race ./...` and
-      `golangci-lint run ./...` are green on `main`.
-- [ ] `go run ./cmd/gen_dashboards -check` writes nothing.
+- [ ] CI is green on the commit being tagged, every job of it. By hand, the
+      same gates are:
+
+      ```sh
+      make build vet test-race golangci-lint
+      make check-dashboards check-gallery check-layouts check-config-options check-compose check-config-cases
+      make check-docs mdlint check-doc-links
+      ```
+
+      The targets name the packages rather than `./...`, which on the
+      maintainer's machine also takes in the git-ignored `plan/`, and
+      `make golangci-lint` includes the formatter's diff, which a plain
+      `golangci-lint run` does not.
+
 - [ ] Every panel has been run against a store holding a real account, not
       only against the fixture:
 
@@ -70,7 +81,12 @@ is not.
       is a gate and not a reading exercise. A panel over a family the store has
       not collected yet is reported as `WAIT` and counted on its own line,
       because that fills itself; `EMPTY` is not a failure either, a panel can
-      be honestly empty. Anything under `FAIL` is the release's problem.
+      be honestly empty. Anything under `FAIL` is the release's problem, with
+      one kind that clears itself: a panel reading a field this release adds to
+      a measurement the store already holds is `FAIL`, not `WAIT`, until the
+      new binary has written that field, because the table is there and the
+      column is not. Run it again after the new binary's first sweep before
+      reading such a `FAIL` as a defect.
 
       Run it for each store you have a datasource for. It needs a Grafana, so
       CI can never do it.
@@ -131,8 +147,13 @@ is not.
 ## The tag
 
 ```sh
-git tag -a vX.Y.Z -m "vX.Y.Z" && git push origin vX.Y.Z
+git tag -s vX.Y.Z -m "vX.Y.Z" && git verify-tag vX.Y.Z && git push origin vX.Y.Z
 ```
+
+Every numbered tag is signed, `-s` and not `-a`: until this line said so, they
+were signed only because `tag.gpgSign` is set on the maintainer's machine, and
+a tag cut anywhere else would have gone out unsigned. The moving major tag `v2` is
+unsigned by design, since the workflow moves it.
 
 That runs `.github/workflows/release.yml`: the end-to-end and race suites, then
 GoReleaser, which builds the binaries for the three operating systems and two
@@ -141,8 +162,10 @@ the image to `ghcr.io`, pushes it to Docker Hub when the two Docker Hub secrets
 are set, signs each pushed image with the same keyless identity, and publishes
 the release with the `CHANGELOG.md` section as its notes. GoReleaser pushes
 only the version tag. The job then verifies each image's signature against that
-identity at this exact tag, runs the image on both architectures, and only then
-moves `latest` in each registry onto the same digest, checking that it did.
+identity at this exact tag, runs the image on both architectures, checking on
+each that a new volume mounted at `/var/lib/ghchronicle` belongs to the
+collector's uid 65532, and only then moves `latest` in each registry onto the
+same digest, checking that it did.
 Either check failing fails the release, and `latest` and the major tag stay on
 the previous release. A prerelease never moves `latest`.
 
@@ -172,6 +195,34 @@ the previous release. A prerelease never moves `latest`.
       `--new-bundle-format`, 2.5.0 not even then, and 2.4.2 does not know the
       flag, so a failure here with anything but cosign 3 says nothing about
       the image. Every image up to 2.5.0 is unsigned.
+
+- [ ] The checksums verify the way the release footer tells a user to, from
+      outside the workflow. Cosign need not be installed; its own image runs
+      the check:
+
+      ```sh
+      gh release download vX.Y.Z -p checksums.txt -p checksums.txt.sigstore.json
+      docker run --rm -v "$PWD":/w:ro ghcr.io/sigstore/cosign/cosign:v2.6.1 verify-blob \
+        --bundle /w/checksums.txt.sigstore.json \
+        --certificate-identity-regexp 'https://github.com/jmrplens/ghchronicle/.github/workflows/release.yml@refs/tags/.*' \
+        --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+        /w/checksums.txt
+      ```
+
+      It must print `Verified OK`, which it did for v2.6.0 on 2026-09-27.
+      That is cosign 2.6.1 on purpose: for a blob's bundle any cosign from
+      2.4.2 reads it, as the footer says, and only the image check above
+      needs cosign 3.
+
+- [ ] The installer takes the release. `install.sh` resolves GitHub's latest
+      release, so until the release page is published and marked latest it
+      installs the previous one:
+
+      ```sh
+      d="$(mktemp -d)" && curl -fsSL https://raw.githubusercontent.com/jmrplens/ghchronicle/main/install.sh | bash -s -- --dir "$d" && "$d/ghchronicle" -version
+      ```
+
+      The last line must print `ghchronicle X.Y.Z (commit ..., built ...)`.
 
 - [ ] `go install` reaches the release. Asking the module mirror for the
       exact version makes it fetch the tag now, and pkg.go.dev with it,
@@ -222,6 +273,32 @@ the previous release. A prerelease never moves `latest`.
       <https://jmrp.io/docs/ghchronicle/>, and the topics are set. That URL
       301s to the Pages one: the canonical domain is what a fiche, a scrape
       or a citation carries, and the reader still lands on the docs.
+
+## Putting it on a server
+
+A machine that runs the service takes the release binary, never one built
+locally, and keeps the one before it until the new one has swept. For the
+systemd layout the install pages give, on linux/amd64:
+
+```sh
+cd "$(mktemp -d)" && chmod 0755 .   # the -list below runs as the service's user
+gh release download vX.Y.Z -p 'ghchronicle_X.Y.Z_linux_amd64.tar.gz' -p checksums.txt -p checksums.txt.sigstore.json
+sha256sum -c --ignore-missing checksums.txt
+# the cosign verify-blob above, against this checksums.txt
+tar -xzf ghchronicle_X.Y.Z_linux_amd64.tar.gz ghchronicle
+sudo systemd-run --wait --pipe -p User=ghchronicle -p EnvironmentFile=/etc/ghchronicle/ghchronicle.env \
+  "$PWD/ghchronicle" -config /etc/ghchronicle/config.yaml -list
+sudo cp /usr/local/bin/ghchronicle /usr/local/bin/ghchronicle.bak-<previous version>
+sudo install -m 0755 ghchronicle /usr/local/bin/ghchronicle
+sudo systemctl restart ghchronicle
+journalctl -u ghchronicle -f
+```
+
+`sha256sum -c` must say `OK` for the archive, and the `-list` run, as the
+service's own user with its own environment, must list the repositories: a
+configuration the new release refuses is found there rather than by a service
+that will not start. Follow the journal until `sweep finished`. Going back is
+the `.bak` copy installed the same way.
 
 ## When something goes wrong
 

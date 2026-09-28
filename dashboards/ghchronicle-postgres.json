@@ -64,7 +64,7 @@
     },
     {
       "datasource": "${DS_POSTGRES}",
-      "description": "Public repositories of the account, and the current stars and forks of the selected ones, summed over the newest row of each repository rather than over every row in the range. With All selected that includes the archived repositories the default filter sets aside, which the picker stops listing once the last backfill is behind it: people still star and fork them, and each totals sweep reads their counts again, an hour apart by default, so a range shorter than that can leave them out. An archived repository the configuration no longer collects is left out, as the picker leaves out a live one: a row written under an earlier configuration stays in the store, but nothing reads that repository's counts any more. Each repository counts once, by its full name. The repository count is GitHub's own count of the account's public repositories and not the set the sums are taken over: those are the repositories the sweeps collect and the archived ones above, private ones included, and forks left out unless `include_forks` is on.",
+      "description": "Public repositories of the account, and the current stars and forks of the selected ones, summed over the newest row of each repository rather than over every row in the range. With All selected that includes the archived repositories the default filter sets aside, which the picker stops listing once the last backfill is behind it: people still star and fork them, and each totals sweep reads their counts again, an hour apart by default, so where the sums are taken over the dashboard range, a range shorter than that can leave them out. An archived repository the configuration no longer collects is left out, as the picker leaves out a live one: a row written under an earlier configuration stays in the store, but nothing reads that repository's counts any more. Each repository counts once, by its full name. The repository count is GitHub's own count of the account's public repositories and not the set the sums are taken over: those are the repositories the sweeps collect and the archived ones above, private ones included, and forks left out unless `include_forks` is on.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -779,7 +779,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT \"Repository\", \"Runs\" FROM (SELECT CASE WHEN rn \u003c= 10 THEN \"Repository\" ELSE 'other' END AS \"Repository\", SUM(\"Runs\") AS \"Runs\", MIN(rn) AS o FROM (SELECT repo AS \"Repository\", runs AS \"Runs\", ROW_NUMBER() OVER (ORDER BY runs DESC) AS rn FROM (SELECT repo, runs, ROW_NUMBER() OVER (PARTITION BY repo ORDER BY time DESC) AS rn FROM gh_workflow_run_total WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1) z GROUP BY 1) w ORDER BY o",
+              "rawSql": "SELECT \"Repository\", \"Runs\" FROM (SELECT CASE WHEN rn \u003c= 10 THEN \"Repository\" ELSE 'other' END AS \"Repository\", SUM(\"Runs\") AS \"Runs\", MIN(rn) AS o FROM (SELECT CASE WHEN MIN(full_name) OVER (PARTITION BY repo) = MAX(full_name) OVER (PARTITION BY repo) THEN repo ELSE full_name END AS \"Repository\", runs AS \"Runs\", ROW_NUMBER() OVER (ORDER BY runs DESC) AS rn FROM (SELECT repo, full_name, runs, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn FROM gh_workflow_run_total WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1) z GROUP BY 1) w ORDER BY o",
               "refId": "A"
             }
           ],
@@ -854,7 +854,7 @@
               "editorMode": "code",
               "format": "time_series",
               "rawQuery": true,
-              "rawSql": "SELECT time, CASE WHEN rk \u003c= 8 THEN repo ELSE 'other' END AS metric, SUM(v) AS views FROM (SELECT time, repo, v, DENSE_RANK() OVER (ORDER BY total DESC, repo) AS rk FROM (SELECT $__timeGroupAlias(time, $__interval), repo, SUM(count) AS v, SUM(SUM(count)) OVER (PARTITION BY repo) AS total FROM gh_traffic WHERE $__timeFilter(time) AND kind = 'views' AND repo IN (${repo:sqlstring}) GROUP BY 1, 2) y) x GROUP BY 1, 2 HAVING SUM(v) \u003e 0 ORDER BY 1",
+              "rawSql": "SELECT time, CASE WHEN rk \u003c= 8 THEN name ELSE 'other' END AS metric, SUM(v) AS views FROM (SELECT time, name, v, DENSE_RANK() OVER (ORDER BY total DESC, full_name) AS rk FROM (SELECT $__timeGroupAlias(time, $__interval), full_name, name, SUM(count) AS v, SUM(SUM(count)) OVER (PARTITION BY full_name) AS total FROM (SELECT time, full_name, CASE WHEN MIN(full_name) OVER (PARTITION BY repo) = MAX(full_name) OVER (PARTITION BY repo) THEN repo ELSE full_name END AS name, count FROM gh_traffic WHERE $__timeFilter(time) AND kind = 'views' AND repo IN (${repo:sqlstring})) n GROUP BY 1, 2, 3) y) x GROUP BY 1, 2 HAVING SUM(v) \u003e 0 ORDER BY 1",
               "refId": "A"
             }
           ],
@@ -915,7 +915,7 @@
               "editorMode": "code",
               "format": "time_series",
               "rawQuery": true,
-              "rawSql": "SELECT time, CASE WHEN rk \u003c= 8 THEN repo ELSE 'other' END AS metric, SUM(v) AS unique FROM (SELECT time, repo, v, DENSE_RANK() OVER (ORDER BY total DESC, repo) AS rk FROM (SELECT $__timeGroupAlias(time, $__interval), repo, SUM(uniques) AS v, SUM(SUM(uniques)) OVER (PARTITION BY repo) AS total FROM gh_traffic WHERE $__timeFilter(time) AND kind = 'views' AND repo IN (${repo:sqlstring}) GROUP BY 1, 2) y) x GROUP BY 1, 2 HAVING SUM(v) \u003e 0 ORDER BY 1",
+              "rawSql": "SELECT time, CASE WHEN rk \u003c= 8 THEN name ELSE 'other' END AS metric, SUM(v) AS unique FROM (SELECT time, name, v, DENSE_RANK() OVER (ORDER BY total DESC, full_name) AS rk FROM (SELECT $__timeGroupAlias(time, $__interval), full_name, name, SUM(uniques) AS v, SUM(SUM(uniques)) OVER (PARTITION BY full_name) AS total FROM (SELECT time, full_name, CASE WHEN MIN(full_name) OVER (PARTITION BY repo) = MAX(full_name) OVER (PARTITION BY repo) THEN repo ELSE full_name END AS name, uniques FROM gh_traffic WHERE $__timeFilter(time) AND kind = 'views' AND repo IN (${repo:sqlstring})) n GROUP BY 1, 2, 3) y) x GROUP BY 1, 2 HAVING SUM(v) \u003e 0 ORDER BY 1",
               "refId": "A"
             }
           ],
@@ -976,7 +976,7 @@
               "editorMode": "code",
               "format": "time_series",
               "rawQuery": true,
-              "rawSql": "SELECT time, CASE WHEN rk \u003c= 8 THEN repo ELSE 'other' END AS metric, SUM(v) AS clones FROM (SELECT time, repo, v, DENSE_RANK() OVER (ORDER BY total DESC, repo) AS rk FROM (SELECT $__timeGroupAlias(time, $__interval), repo, SUM(count) AS v, SUM(SUM(count)) OVER (PARTITION BY repo) AS total FROM gh_traffic WHERE $__timeFilter(time) AND kind = 'clones' AND repo IN (${repo:sqlstring}) GROUP BY 1, 2) y) x GROUP BY 1, 2 HAVING SUM(v) \u003e 0 ORDER BY 1",
+              "rawSql": "SELECT time, CASE WHEN rk \u003c= 8 THEN name ELSE 'other' END AS metric, SUM(v) AS clones FROM (SELECT time, name, v, DENSE_RANK() OVER (ORDER BY total DESC, full_name) AS rk FROM (SELECT $__timeGroupAlias(time, $__interval), full_name, name, SUM(count) AS v, SUM(SUM(count)) OVER (PARTITION BY full_name) AS total FROM (SELECT time, full_name, CASE WHEN MIN(full_name) OVER (PARTITION BY repo) = MAX(full_name) OVER (PARTITION BY repo) THEN repo ELSE full_name END AS name, count FROM gh_traffic WHERE $__timeFilter(time) AND kind = 'clones' AND repo IN (${repo:sqlstring})) n GROUP BY 1, 2, 3) y) x GROUP BY 1, 2 HAVING SUM(v) \u003e 0 ORDER BY 1",
               "refId": "A"
             }
           ],
@@ -1112,7 +1112,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT referrer AS \"Referrer\", SUM(count) AS \"Views\", SUM(uniques) AS \"Unique\", MAX(referrer_url) AS \"Link\" FROM (SELECT repo, referrer, count, uniques, referrer_url, ROW_NUMBER() OVER (PARTITION BY repo, referrer ORDER BY time DESC) AS rn FROM gh_traffic_referrer WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1 GROUP BY 1 ORDER BY 2 DESC LIMIT 25",
+              "rawSql": "SELECT referrer AS \"Referrer\", SUM(count) AS \"Views\", SUM(uniques) AS \"Unique\", MAX(referrer_url) AS \"Link\" FROM (SELECT referrer, count, uniques, referrer_url, ROW_NUMBER() OVER (PARTITION BY full_name, referrer ORDER BY time DESC) AS rn FROM gh_traffic_referrer WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1 GROUP BY 1 ORDER BY 2 DESC LIMIT 25",
               "refId": "A"
             }
           ],
@@ -1260,7 +1260,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT path AS \"Path\", SUM(count) AS \"Views\", SUM(uniques) AS \"Unique\", MAX(title) AS \"Title\", url AS \"Link\" FROM (SELECT repo, path, title, count, uniques, url, ROW_NUMBER() OVER (PARTITION BY repo, path ORDER BY time DESC) AS rn FROM gh_traffic_path WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1 GROUP BY 1, 5 ORDER BY 2 DESC LIMIT 25",
+              "rawSql": "SELECT path AS \"Path\", SUM(count) AS \"Views\", SUM(uniques) AS \"Unique\", MAX(title) AS \"Title\", url AS \"Link\" FROM (SELECT path, title, count, uniques, url, ROW_NUMBER() OVER (PARTITION BY full_name, path ORDER BY time DESC) AS rn FROM gh_traffic_path WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1 GROUP BY 1, 5 ORDER BY 2 DESC LIMIT 25",
               "refId": "A"
             }
           ],
@@ -1420,7 +1420,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT repo AS \"Repository\", SUM(CASE WHEN kind = 'clones' THEN count ELSE 0 END) * 1.0 / NULLIF(SUM(CASE WHEN kind = 'clones' THEN uniques ELSE 0 END), 0) AS \"Clones each\", SUM(CASE WHEN kind = 'clones' THEN count ELSE 0 END) AS \"Clones\", SUM(CASE WHEN kind = 'clones' THEN uniques ELSE 0 END) AS \"Cloners\", SUM(CASE WHEN kind = 'views' THEN count ELSE 0 END) AS \"Views\", MAX(url) AS \"Link\" FROM gh_traffic WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring}) GROUP BY 1 ORDER BY 2 DESC",
+              "rawSql": "SELECT repo AS \"Repository\", SUM(CASE WHEN kind = 'clones' THEN count ELSE 0 END) * 1.0 / NULLIF(SUM(CASE WHEN kind = 'clones' THEN uniques ELSE 0 END), 0) AS \"Clones each\", SUM(CASE WHEN kind = 'clones' THEN count ELSE 0 END) AS \"Clones\", SUM(CASE WHEN kind = 'clones' THEN uniques ELSE 0 END) AS \"Cloners\", SUM(CASE WHEN kind = 'views' THEN count ELSE 0 END) AS \"Views\", MAX(url) AS \"Link\" FROM gh_traffic WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring}) GROUP BY full_name, repo ORDER BY 2 DESC",
               "refId": "A"
             }
           ],
@@ -1495,7 +1495,7 @@
               "editorMode": "code",
               "format": "time_series",
               "rawQuery": true,
-              "rawSql": "SELECT time, CASE WHEN rk \u003c= 8 THEN repo ELSE 'other' END AS metric, SUM(v) AS stars FROM (SELECT time, repo, v, DENSE_RANK() OVER (ORDER BY total DESC, repo) AS rk FROM (SELECT $__timeGroupAlias(time, $__interval), repo, SUM(stars) AS v, SUM(SUM(stars)) OVER (PARTITION BY repo) AS total FROM gh_star_day WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring}) GROUP BY 1, 2) y) x GROUP BY 1, 2 HAVING SUM(v) \u003e 0 ORDER BY 1",
+              "rawSql": "SELECT time, CASE WHEN rk \u003c= 8 THEN name ELSE 'other' END AS metric, SUM(v) AS stars FROM (SELECT time, name, v, DENSE_RANK() OVER (ORDER BY total DESC, full_name) AS rk FROM (SELECT $__timeGroupAlias(time, $__interval), full_name, name, SUM(stars) AS v, SUM(SUM(stars)) OVER (PARTITION BY full_name) AS total FROM (SELECT time, full_name, CASE WHEN MIN(full_name) OVER (PARTITION BY repo) = MAX(full_name) OVER (PARTITION BY repo) THEN repo ELSE full_name END AS name, stars FROM gh_star_day WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) n GROUP BY 1, 2, 3) y) x GROUP BY 1, 2 HAVING SUM(v) \u003e 0 ORDER BY 1",
               "refId": "A"
             }
           ],
@@ -1613,7 +1613,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT \"Repository\", \"Stars\" FROM (SELECT CASE WHEN rn \u003c= 12 THEN \"Repository\" ELSE 'other' END AS \"Repository\", SUM(\"Stars\") AS \"Stars\", MIN(rn) AS o FROM (SELECT repo AS \"Repository\", stars AS \"Stars\", ROW_NUMBER() OVER (ORDER BY stars DESC) AS rn FROM (SELECT repo, stars FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo ORDER BY time DESC) AS rn FROM gh_repo WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1) WHERE stars \u003e 0) z GROUP BY 1) w ORDER BY o",
+              "rawSql": "SELECT \"Repository\", \"Stars\" FROM (SELECT CASE WHEN rn \u003c= 12 THEN \"Repository\" ELSE 'other' END AS \"Repository\", SUM(\"Stars\") AS \"Stars\", MIN(rn) AS o FROM (SELECT CASE WHEN MIN(full_name) OVER (PARTITION BY repo) = MAX(full_name) OVER (PARTITION BY repo) THEN repo ELSE full_name END AS \"Repository\", stars AS \"Stars\", ROW_NUMBER() OVER (ORDER BY stars DESC) AS rn FROM (SELECT repo, full_name, stars FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn FROM gh_repo WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1) WHERE stars \u003e 0) z GROUP BY 1) w ORDER BY o",
               "refId": "A"
             }
           ],
@@ -2207,7 +2207,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT hour AS \"Hour\", SUM(commits) AS \"Commits\" FROM (SELECT hour, commits, ROW_NUMBER() OVER (PARTITION BY repo, hour ORDER BY time DESC) AS rn FROM gh_commit_punchcard WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1 GROUP BY 1 ORDER BY 1",
+              "rawSql": "SELECT hour AS \"Hour\", SUM(commits) AS \"Commits\" FROM (SELECT time, hour, commits, MAX(time) OVER (PARTITION BY full_name) AS newest FROM gh_commit_punchcard WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE time = newest GROUP BY 1 ORDER BY 1",
               "refId": "A"
             }
           ],
@@ -2262,7 +2262,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT weekday AS \"Weekday\", SUM(commits) AS \"Commits\" FROM (SELECT weekday, commits, ROW_NUMBER() OVER (PARTITION BY repo, weekday ORDER BY time DESC) AS rn FROM gh_commit_punchcard WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1 GROUP BY 1 ORDER BY 2 DESC",
+              "rawSql": "SELECT weekday AS \"Weekday\", SUM(commits) AS \"Commits\" FROM (SELECT time, weekday, commits, MAX(time) OVER (PARTITION BY full_name) AS newest FROM gh_commit_punchcard WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE time = newest GROUP BY 1 ORDER BY 2 DESC",
               "refId": "A"
             }
           ],
@@ -3542,7 +3542,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT repo AS \"Repository\", COUNT(*) AS \"Merged\", percentile_cont(0.5) WITHIN GROUP (ORDER BY seconds_to_merge) AS \"Time to merge\", percentile_cont(0.5) WITHIN GROUP (ORDER BY churn) AS \"Lines changed\" FROM gh_pull_request WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring}) AND number \u003c\u003e '' AND state = 'MERGED' GROUP BY 1 ORDER BY 2 DESC",
+              "rawSql": "SELECT repo AS \"Repository\", COUNT(*) AS \"Merged\", percentile_cont(0.5) WITHIN GROUP (ORDER BY seconds_to_merge) AS \"Time to merge\", percentile_cont(0.5) WITHIN GROUP (ORDER BY churn) AS \"Lines changed\" FROM gh_pull_request WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring}) AND number \u003c\u003e '' AND state = 'MERGED' GROUP BY full_name, repo ORDER BY 2 DESC",
               "refId": "A"
             }
           ],
@@ -3722,7 +3722,7 @@
         },
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "Time to merge only counts what merged. This is the other half: what is still open and how long it has been, which is the number that decides what to do next rather than describing what already happened. Each pull request is read from its newest row, so one that merged inside the range is not here any more. Archived repositories are left out, since nothing in one can be merged, closed or run until it is unarchived; narrowing the picker to one shows an empty table here rather than rows nobody can act on. A fork's pull request is still one that can be merged, so those stay and Fork says which they are.",
+          "description": "Time to merge only counts what merged. This is the other half: what is still open and how long it has been, which is the number that decides what to do next rather than describing what already happened. The table keeps the twenty-five open longest, the longest first. Each pull request is read from its newest row, so one that merged inside the range is not here any more. Archived repositories are left out, since nothing in one can be merged, closed or run until it is unarchived; narrowing the picker to one shows an empty table here rather than rows nobody can act on. A fork's pull request is still one that can be merged, so those stay and Fork says which they are.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -3886,7 +3886,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT x.number AS \"Number\", x.seconds_open AS \"Open for\", x.repo AS \"Repository\", x.title AS \"Title\", x.author AS \"Author\", x.label_names AS \"Labels\", x.comments AS \"Comments\", x.reviews AS \"Reviews\", f.fork AS \"Fork\", x.url AS \"Link\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo, number ORDER BY time DESC) AS rn FROM gh_pull_request WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring}) AND number \u003c\u003e '') x LEFT JOIN (SELECT repo, fork, archived FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo ORDER BY time DESC) AS rn FROM gh_repo WHERE time \u003e now() - INTERVAL '30 years' AND repo IN (${repo:sqlstring})) x WHERE rn = 1) f ON f.repo = x.repo WHERE x.rn = 1 AND x.state = 'OPEN' AND COALESCE(f.archived, 'false') \u003c\u003e 'true' ORDER BY x.seconds_open DESC LIMIT 25",
+              "rawSql": "SELECT x.number AS \"Number\", x.seconds_open AS \"Open for\", x.repo AS \"Repository\", x.title AS \"Title\", x.author AS \"Author\", x.label_names AS \"Labels\", x.comments AS \"Comments\", x.reviews AS \"Reviews\", f.fork AS \"Fork\", x.url AS \"Link\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, number ORDER BY time DESC) AS rn FROM gh_pull_request WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring}) AND number \u003c\u003e '') x LEFT JOIN (SELECT repo, full_name, fork, archived FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn FROM gh_repo WHERE time \u003e now() - INTERVAL '30 years' AND repo IN (${repo:sqlstring})) x WHERE rn = 1) f ON f.full_name = x.full_name WHERE x.rn = 1 AND x.state = 'OPEN' AND COALESCE(f.archived, 'false') \u003c\u003e 'true' ORDER BY x.seconds_open DESC LIMIT 25",
               "refId": "A"
             }
           ],
@@ -3895,7 +3895,7 @@
         },
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "The same question for issues: what is still open and for how long. Labels is what the issue was filed as, so an old one reads as a bug nobody fixed or a wish nobody granted. Each issue is read from its newest row, so one closed inside the range is not here any more. Archived repositories are left out, since nothing in one can be merged, closed or run until it is unarchived; narrowing the picker to one shows an empty table here rather than rows nobody can act on. A fork's issues stay, and Fork says which they are.",
+          "description": "The same question for issues: what is still open and for how long, the twenty-five open longest, the longest first. Labels is what the issue was filed as, so an old one reads as a bug nobody fixed or a wish nobody granted. Each issue is read from its newest row, so one closed inside the range is not here any more. Archived repositories are left out, since nothing in one can be merged, closed or run until it is unarchived; narrowing the picker to one shows an empty table here rather than rows nobody can act on. A fork's issues stay, and Fork says which they are.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -4035,7 +4035,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT x.number AS \"Number\", x.seconds_open AS \"Open for\", x.repo AS \"Repository\", x.author AS \"Author\", x.comments AS \"Comments\", x.label_names AS \"Labels\", f.fork AS \"Fork\", x.url AS \"Link\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo, number ORDER BY time DESC) AS rn FROM gh_issue WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring}) AND number \u003c\u003e '') x LEFT JOIN (SELECT repo, fork, archived FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo ORDER BY time DESC) AS rn FROM gh_repo WHERE time \u003e now() - INTERVAL '30 years' AND repo IN (${repo:sqlstring})) x WHERE rn = 1) f ON f.repo = x.repo WHERE x.rn = 1 AND x.state = 'OPEN' AND COALESCE(f.archived, 'false') \u003c\u003e 'true' ORDER BY x.seconds_open DESC LIMIT 25",
+              "rawSql": "SELECT x.number AS \"Number\", x.seconds_open AS \"Open for\", x.repo AS \"Repository\", x.author AS \"Author\", x.comments AS \"Comments\", x.label_names AS \"Labels\", f.fork AS \"Fork\", x.url AS \"Link\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, number ORDER BY time DESC) AS rn FROM gh_issue WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring}) AND number \u003c\u003e '') x LEFT JOIN (SELECT repo, full_name, fork, archived FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn FROM gh_repo WHERE time \u003e now() - INTERVAL '30 years' AND repo IN (${repo:sqlstring})) x WHERE rn = 1) f ON f.full_name = x.full_name WHERE x.rn = 1 AND x.state = 'OPEN' AND COALESCE(f.archived, 'false') \u003c\u003e 'true' ORDER BY x.seconds_open DESC LIMIT 25",
               "refId": "A"
             }
           ],
@@ -4250,7 +4250,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT number AS \"Pull request\", SUM(1 - resolved) AS \"Unresolved\", repo AS \"Repository\", COUNT(*) AS \"Threads\", SUM(outdated * (1 - resolved)) AS \"Outdated\", SUM(comments * (1 - resolved)) AS \"Comments\" FROM gh_review_thread WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring}) GROUP BY 1, 3 ORDER BY 2 DESC LIMIT 25",
+              "rawSql": "SELECT number AS \"Pull request\", SUM(1 - resolved) AS \"Unresolved\", repo AS \"Repository\", COUNT(*) AS \"Threads\", SUM(outdated * (1 - resolved)) AS \"Outdated\", SUM(comments * (1 - resolved)) AS \"Comments\" FROM gh_review_thread WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring}) GROUP BY 1, full_name, 3 ORDER BY 2 DESC LIMIT 25",
               "refId": "A"
             }
           ],
@@ -4273,7 +4273,7 @@
       "panels": [
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "How many runs the range holds and how they ended. The success rate is the runs that succeeded as a share of the runs that succeeded or failed: a run canceled by a newer push under a concurrency group, or skipped by its own condition, decided nothing and is counted beside it as undecided rather than as a failure. The run duration is the median over the range and the queue wait is the time a job spent waiting for a runner, which only exists at job level, the run-level number folding the wait into the duration. Over the runs whose jobs were expanded, which is the newest runs of each sweep and, after a backfill, every run GitHub still holds, which from 1 October 2026 means the repository's retention period, ninety days by default; not every run the run count includes. Last come the bytes the runs left behind, which are the artifacts the walk reached: GitHub lists thousands of them per repository and the walk stops at five hundred, so this is a floor wherever it did. \"Artifact storage counted\" below puts the two counts beside it.",
+          "description": "How many runs the range holds and how they ended. The success rate is the runs that succeeded as a share of the runs that succeeded or failed: a run canceled by a newer push under a concurrency group, or skipped by its own condition, decided nothing and is counted beside it as undecided rather than as a failure. The run duration is the median over the range and the queue wait is the time a job spent waiting for a runner, which only exists at job level, the run-level number folding the wait into the duration. Over the runs whose jobs were expanded, which is the newest runs of each sweep and, after a backfill, every run GitHub still holds, which from 1 October 2026 means the repository's retention period, ninety days by default; not every run the run count includes. Last come the bytes the runs left behind, which are the artifacts the walk reached: GitHub lists thousands of them per repository and the walk stops at five hundred, or sooner when a page of the listing fails and the pass keeps what it had read, so this is a floor wherever it stopped short. \"Artifact storage counted\" below puts the two counts beside it.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -4448,7 +4448,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT SUM(live_bytes) AS \"Artifact storage walked\" FROM (SELECT live_bytes, ROW_NUMBER() OVER (PARTITION BY repo ORDER BY time DESC) AS rn FROM gh_artifact_total WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1",
+              "rawSql": "SELECT SUM(live_bytes) AS \"Artifact storage walked\" FROM (SELECT live_bytes, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn FROM gh_artifact_total WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1",
               "refId": "F"
             },
             {
@@ -4456,7 +4456,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT SUM(size_bytes) AS \"Actions cache\" FROM (SELECT size_bytes, ROW_NUMBER() OVER (PARTITION BY repo ORDER BY time DESC) AS rn FROM gh_actions_cache WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1",
+              "rawSql": "SELECT SUM(size_bytes) AS \"Actions cache\" FROM (SELECT size_bytes, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn FROM gh_actions_cache WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1",
               "refId": "G"
             }
           ],
@@ -4741,7 +4741,7 @@
         },
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "Artifacts that have not expired, over the ones the walk reached, which is a floor on any repository with more than five hundred: \"Artifact storage counted\" further down has the counts that say which those are. GitHub deletes artifacts on their own schedule, which is why this falls without anyone doing anything. A reading taken at each sweep, so the curve starts the day the collector did: there is no history of it to rebuild. The eight repositories holding the most are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "Artifacts that have not expired, over the ones the walk reached, which is a floor on any repository with more than five hundred, and on one whose walk a failed page of the listing cut short: \"Artifact storage counted\" further down has the counts that say which those are. GitHub deletes artifacts on their own schedule, which is why this falls without anyone doing anything. A reading taken at each sweep, so the curve starts the day the collector did: there is no history of it to rebuild. The eight repositories holding the most are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -4792,7 +4792,7 @@
               "editorMode": "code",
               "format": "time_series",
               "rawQuery": true,
-              "rawSql": "SELECT time, CASE WHEN rk \u003c= 8 THEN repo ELSE 'other' END AS metric, SUM(live_bytes) AS bytes FROM (SELECT time, repo, live_bytes, DENSE_RANK() OVER (ORDER BY newest DESC, repo) AS rk FROM (SELECT $__timeGroupAlias(time, $__interval), repo, live_bytes, ROW_NUMBER() OVER (PARTITION BY ($__timeGroup(time, $__interval)), repo ORDER BY time DESC) AS rn, FIRST_VALUE(live_bytes) OVER (PARTITION BY repo ORDER BY time DESC) AS newest FROM gh_artifact_total WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) y WHERE rn = 1) x GROUP BY 1, 2 HAVING SUM(live_bytes) \u003e 0 ORDER BY 1",
+              "rawSql": "SELECT time, CASE WHEN rk \u003c= 8 THEN name ELSE 'other' END AS metric, SUM(live_bytes) AS bytes FROM (SELECT time, name, live_bytes, DENSE_RANK() OVER (ORDER BY newest DESC, full_name) AS rk FROM (SELECT $__timeGroupAlias(time, $__interval), full_name, CASE WHEN MIN(full_name) OVER (PARTITION BY repo) = MAX(full_name) OVER (PARTITION BY repo) THEN repo ELSE full_name END AS name, live_bytes, ROW_NUMBER() OVER (PARTITION BY ($__timeGroup(time, $__interval)), full_name ORDER BY time DESC) AS rn, FIRST_VALUE(live_bytes) OVER (PARTITION BY full_name ORDER BY time DESC) AS newest FROM gh_artifact_total WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) y WHERE rn = 1) x GROUP BY 1, 2 HAVING SUM(live_bytes) \u003e 0 ORDER BY 1",
               "refId": "A"
             }
           ],
@@ -4956,7 +4956,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT REPLACE(workflow, '.github/workflows/', '') AS \"Workflow\", COUNT(*) AS \"Runs\", r.repo AS \"Repository\", SUM(CASE WHEN conclusion \u003c\u003e 'success' THEN 1 ELSE 0 END) AS \"Not successful\", percentile_cont(0.5) WITHIN GROUP (ORDER BY duration_seconds) AS \"Duration\", MAX(w.url) AS \"Link\" FROM gh_workflow_run r LEFT JOIN (SELECT repo, path, MAX(url) AS url FROM gh_workflow WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring}) GROUP BY 1, 2) w ON w.repo = r.repo AND w.path = r.workflow WHERE $__timeFilter(time) AND r.repo IN (${repo:sqlstring}) GROUP BY 1, 3 ORDER BY 2 DESC LIMIT 30",
+              "rawSql": "SELECT REPLACE(workflow, '.github/workflows/', '') AS \"Workflow\", COUNT(*) AS \"Runs\", r.repo AS \"Repository\", SUM(CASE WHEN conclusion \u003c\u003e 'success' THEN 1 ELSE 0 END) AS \"Not successful\", percentile_cont(0.5) WITHIN GROUP (ORDER BY duration_seconds) AS \"Duration\", MAX(w.url) AS \"Link\" FROM gh_workflow_run r LEFT JOIN (SELECT full_name, path, MAX(url) AS url FROM gh_workflow WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring}) GROUP BY 1, 2) w ON w.full_name = r.full_name AND w.path = r.workflow WHERE $__timeFilter(time) AND r.repo IN (${repo:sqlstring}) GROUP BY 1, r.full_name, 3 ORDER BY 2 DESC LIMIT 30",
               "refId": "A"
             }
           ],
@@ -5067,7 +5067,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT job_name AS \"Job\", percentile_cont(0.5) WITHIN GROUP (ORDER BY duration_seconds) AS \"Duration\", repo AS \"Repository\", COUNT(*) AS \"Times run\", MAX(duration_seconds) AS \"Worst\" FROM gh_workflow_job WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring}) GROUP BY 1, 3 ORDER BY 2 DESC LIMIT 30",
+              "rawSql": "SELECT job_name AS \"Job\", percentile_cont(0.5) WITHIN GROUP (ORDER BY duration_seconds) AS \"Duration\", repo AS \"Repository\", COUNT(*) AS \"Times run\", MAX(duration_seconds) AS \"Worst\" FROM gh_workflow_job WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring}) GROUP BY 1, full_name, 3 ORDER BY 2 DESC LIMIT 30",
               "refId": "A"
             }
           ],
@@ -5190,7 +5190,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT step AS \"Step\", percentile_cont(0.5) WITHIN GROUP (ORDER BY duration_seconds) AS \"Duration\", job_name AS \"Job\", repo AS \"Repository\", COUNT(*) AS \"Times run\", MAX(duration_seconds) AS \"Worst\" FROM gh_workflow_step WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring}) GROUP BY 1, 3, 4 ORDER BY 2 DESC LIMIT 30",
+              "rawSql": "SELECT step AS \"Step\", percentile_cont(0.5) WITHIN GROUP (ORDER BY duration_seconds) AS \"Duration\", job_name AS \"Job\", repo AS \"Repository\", COUNT(*) AS \"Times run\", MAX(duration_seconds) AS \"Worst\" FROM gh_workflow_step WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring}) GROUP BY 1, 3, full_name, 4 ORDER BY 2 DESC LIMIT 30",
               "refId": "A"
             }
           ],
@@ -5293,7 +5293,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT repo AS \"Repository\", SUM(CASE WHEN conclusion \u003c\u003e 'success' THEN duration_seconds ELSE 0 END) AS \"Wasted\", SUM(duration_seconds) AS \"Total\", 100.0 * SUM(CASE WHEN conclusion \u003c\u003e 'success' THEN duration_seconds ELSE 0 END) / NULLIF(SUM(duration_seconds), 0) AS \"Share\" FROM gh_workflow_run WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring}) GROUP BY 1 ORDER BY 2 DESC",
+              "rawSql": "SELECT repo AS \"Repository\", SUM(CASE WHEN conclusion \u003c\u003e 'success' THEN duration_seconds ELSE 0 END) AS \"Wasted\", SUM(duration_seconds) AS \"Total\", 100.0 * SUM(CASE WHEN conclusion \u003c\u003e 'success' THEN duration_seconds ELSE 0 END) / NULLIF(SUM(duration_seconds), 0) AS \"Share\" FROM gh_workflow_run WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring}) GROUP BY full_name, repo ORDER BY 2 DESC",
               "refId": "A"
             }
           ],
@@ -5433,7 +5433,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT r.repo AS \"Repository\", SUM(CASE WHEN conclusion \u003c\u003e 'success' THEN 1 ELSE 0 END) AS \"Failures\", workflow AS \"Workflow\", COUNT(*) AS \"Runs\", 100.0 * SUM(CASE WHEN conclusion \u003c\u003e 'success' THEN 1 ELSE 0 END) / COUNT(*) AS \"Failure rate\", MAX(w.url) AS \"Link\" FROM gh_workflow_run r LEFT JOIN (SELECT repo, path, MAX(url) AS url FROM gh_workflow WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring}) GROUP BY 1, 2) w ON w.repo = r.repo AND w.path = r.workflow WHERE $__timeFilter(time) AND r.repo IN (${repo:sqlstring}) GROUP BY 1, 3 HAVING SUM(CASE WHEN conclusion \u003c\u003e 'success' THEN 1 ELSE 0 END) \u003e 3 ORDER BY 5 DESC, 2 DESC LIMIT 20",
+              "rawSql": "SELECT r.repo AS \"Repository\", SUM(CASE WHEN conclusion \u003c\u003e 'success' THEN 1 ELSE 0 END) AS \"Failures\", workflow AS \"Workflow\", COUNT(*) AS \"Runs\", 100.0 * SUM(CASE WHEN conclusion \u003c\u003e 'success' THEN 1 ELSE 0 END) / COUNT(*) AS \"Failure rate\", MAX(w.url) AS \"Link\" FROM gh_workflow_run r LEFT JOIN (SELECT full_name, path, MAX(url) AS url FROM gh_workflow WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring}) GROUP BY 1, 2) w ON w.full_name = r.full_name AND w.path = r.workflow WHERE $__timeFilter(time) AND r.repo IN (${repo:sqlstring}) GROUP BY 1, r.full_name, 3 HAVING SUM(CASE WHEN conclusion \u003c\u003e 'success' THEN 1 ELSE 0 END) \u003e 3 ORDER BY 5 DESC, 2 DESC LIMIT 20",
               "refId": "A"
             }
           ],
@@ -5539,7 +5539,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT step AS \"Step\", COUNT(*) AS \"Failures\", repo AS \"Repository\" FROM gh_workflow_step WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring}) AND conclusion = 'failure' GROUP BY 1, 3 ORDER BY 2 DESC LIMIT 20",
+              "rawSql": "SELECT step AS \"Step\", COUNT(*) AS \"Failures\", repo AS \"Repository\" FROM gh_workflow_step WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring}) AND conclusion = 'failure' GROUP BY 1, full_name, 3 ORDER BY 2 DESC LIMIT 20",
               "refId": "A"
             }
           ],
@@ -5655,7 +5655,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT w.repo AS \"Repository\", w.workflow AS \"Workflow\", w.state AS \"State\", f.fork AS \"Fork\", w.url AS \"Link\" FROM (SELECT DISTINCT repo, workflow, path, state, url FROM gh_workflow WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) w LEFT JOIN (SELECT DISTINCT repo, workflow FROM gh_workflow_run WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) r ON w.repo = r.repo AND w.path = r.workflow LEFT JOIN (SELECT repo, fork, archived FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo ORDER BY time DESC) AS rn FROM gh_repo WHERE time \u003e now() - INTERVAL '30 years' AND repo IN (${repo:sqlstring})) x WHERE rn = 1) f ON f.repo = w.repo WHERE r.workflow IS NULL AND COALESCE(f.archived, 'false') \u003c\u003e 'true' ORDER BY 1, 2",
+              "rawSql": "SELECT w.repo AS \"Repository\", w.workflow AS \"Workflow\", w.state AS \"State\", f.fork AS \"Fork\", w.url AS \"Link\" FROM (SELECT DISTINCT full_name, repo, workflow, path, state, url FROM gh_workflow WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) w LEFT JOIN (SELECT DISTINCT full_name, workflow FROM gh_workflow_run WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) r ON w.full_name = r.full_name AND w.path = r.workflow LEFT JOIN (SELECT repo, full_name, fork, archived FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn FROM gh_repo WHERE time \u003e now() - INTERVAL '30 years' AND repo IN (${repo:sqlstring})) x WHERE rn = 1) f ON f.full_name = w.full_name WHERE r.workflow IS NULL AND COALESCE(f.archived, 'false') \u003c\u003e 'true' ORDER BY 1, 2",
               "refId": "A"
             }
           ],
@@ -5715,7 +5715,7 @@
               "editorMode": "code",
               "format": "time_series",
               "rawQuery": true,
-              "rawSql": "SELECT time, CASE WHEN rk \u003c= 8 THEN repo ELSE 'other' END AS metric, SUM(v) AS bytes FROM (SELECT time, repo, v, DENSE_RANK() OVER (ORDER BY total DESC, repo) AS rk FROM (SELECT $__timeGroupAlias(time, $__interval), repo, SUM(size_bytes) AS v, SUM(SUM(size_bytes)) OVER (PARTITION BY repo) AS total FROM gh_artifact WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring}) GROUP BY 1, 2) y) x GROUP BY 1, 2 HAVING SUM(v) \u003e 0 ORDER BY 1",
+              "rawSql": "SELECT time, CASE WHEN rk \u003c= 8 THEN name ELSE 'other' END AS metric, SUM(v) AS bytes FROM (SELECT time, name, v, DENSE_RANK() OVER (ORDER BY total DESC, full_name) AS rk FROM (SELECT $__timeGroupAlias(time, $__interval), full_name, name, SUM(size_bytes) AS v, SUM(SUM(size_bytes)) OVER (PARTITION BY full_name) AS total FROM (SELECT time, full_name, CASE WHEN MIN(full_name) OVER (PARTITION BY repo) = MAX(full_name) OVER (PARTITION BY repo) THEN repo ELSE full_name END AS name, size_bytes FROM gh_artifact WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) n GROUP BY 1, 2, 3) y) x GROUP BY 1, 2 HAVING SUM(v) \u003e 0 ORDER BY 1",
               "refId": "A"
             }
           ],
@@ -5724,7 +5724,7 @@
         },
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "Artifact storage, and how much of it was counted. Three counts, because the live size is on neither of the other two: Declared is GitHub's own total and counts the artifacts it has already expired, Walked is how far the page cap let the walk go, and Live is the artifacts still held among those, which is what the live size is the size of. When Walked is lower than Declared the live size is a floor rather than a total: here it is short by a factor of fifty six, and without these columns the tile above would say so nowhere.",
+          "description": "Artifact storage, and how much of it was counted. Three counts, because the live size is on neither of the other two: Declared is GitHub's own total and counts the artifacts it has already expired, Walked is how far the walk went, and Live is the artifacts still held among those, which is what the live size is the size of. A sweep's walk stops at five pages, five hundred artifacts, and any walk stops sooner when a page of the listing fails, the pass writing what it had read: either way Walked is lower than Declared and the live size is a floor rather than a total. Here it is short by a factor of fifty six, and without these columns the tile above would say so nowhere. All four are the newest row of each repository, which is the one the tile reads.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -5822,7 +5822,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT repo AS \"Repository\", MAX(count) AS \"Declared\", MAX(walked) AS \"Walked\", MAX(live_count) AS \"Live\", MAX(live_bytes) AS \"Live size\" FROM gh_artifact_total WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring}) GROUP BY 1 ORDER BY 2 DESC",
+              "rawSql": "SELECT repo AS \"Repository\", count AS \"Declared\", walked AS \"Walked\", live_count AS \"Live\", live_bytes AS \"Live size\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn FROM gh_artifact_total WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1 ORDER BY 2 DESC",
               "refId": "A"
             }
           ],
@@ -6771,7 +6771,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT c.repo AS \"Repository\", c.time AS \"When\", c.author AS \"Author\", c.headline AS \"Commit\", r.failures AS \"Failed runs\", r.run_number AS \"Run number\", c.url AS \"Link\", r.url AS \"Run\" FROM (SELECT repo, author, time, oid, headline, url FROM gh_commit WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring}) AND gate = 'FAILURE') c JOIN (SELECT repo, head_sha, COUNT(*) AS failures, MAX(url) AS url, MAX(run_number) AS run_number FROM gh_workflow_run WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring}) AND conclusion \u003c\u003e 'success' GROUP BY 1, 2) r ON c.repo = r.repo AND c.oid = r.head_sha ORDER BY 2 DESC LIMIT 25",
+              "rawSql": "SELECT c.repo AS \"Repository\", c.time AS \"When\", c.author AS \"Author\", c.headline AS \"Commit\", r.failures AS \"Failed runs\", r.run_number AS \"Run number\", c.url AS \"Link\", r.url AS \"Run\" FROM (SELECT full_name, repo, author, time, oid, headline, url FROM gh_commit WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring}) AND gate = 'FAILURE') c JOIN (SELECT full_name, head_sha, COUNT(*) AS failures, MAX(url) AS url, MAX(run_number) AS run_number FROM gh_workflow_run WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring}) AND conclusion \u003c\u003e 'success' GROUP BY 1, 2) r ON c.full_name = r.full_name AND c.oid = r.head_sha ORDER BY 2 DESC LIMIT 25",
               "refId": "A"
             }
           ],
@@ -6934,7 +6934,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT label AS \"Label\", used AS \"Used\", repo AS \"Repository\", issues AS \"Issues\", pull_requests AS \"Pull requests\", url AS \"Link\" FROM (SELECT repo, label, used, issues, pull_requests, url, ROW_NUMBER() OVER (PARTITION BY repo, label ORDER BY time DESC) AS rn FROM gh_label WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1 ORDER BY 2 DESC LIMIT 25",
+              "rawSql": "SELECT label AS \"Label\", used AS \"Used\", repo AS \"Repository\", issues AS \"Issues\", pull_requests AS \"Pull requests\", url AS \"Link\" FROM (SELECT repo, label, used, issues, pull_requests, url, ROW_NUMBER() OVER (PARTITION BY full_name, label ORDER BY time DESC) AS rn FROM gh_label WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1 ORDER BY 2 DESC LIMIT 25",
               "refId": "A"
             }
           ],
@@ -7094,7 +7094,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT milestone AS \"Milestone\", progress AS \"Progress\", repo AS \"Repository\", state AS \"State\", issues AS \"Issues\", pull_requests AS \"Pull requests\", url AS \"Link\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo, milestone ORDER BY time DESC) AS rn FROM gh_milestone WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1 ORDER BY 2 DESC LIMIT 25",
+              "rawSql": "SELECT milestone AS \"Milestone\", progress AS \"Progress\", repo AS \"Repository\", state AS \"State\", issues AS \"Issues\", pull_requests AS \"Pull requests\", url AS \"Link\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, milestone ORDER BY time DESC) AS rn FROM gh_milestone WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1 ORDER BY 2 DESC LIMIT 25",
               "refId": "A"
             }
           ],
@@ -7155,7 +7155,7 @@
               "editorMode": "code",
               "format": "time_series",
               "rawQuery": true,
-              "rawSql": "SELECT time, CASE WHEN rk \u003c= 8 THEN repo ELSE 'other' END AS metric, SUM(v) AS forks FROM (SELECT time, repo, v, DENSE_RANK() OVER (ORDER BY total DESC, repo) AS rk FROM (SELECT $__timeGroupAlias(time, $__interval), repo, SUM(1) AS v, SUM(SUM(1)) OVER (PARTITION BY repo) AS total FROM gh_fork WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring}) GROUP BY 1, 2) y) x GROUP BY 1, 2 HAVING SUM(v) \u003e 0 ORDER BY 1",
+              "rawSql": "SELECT time, CASE WHEN rk \u003c= 8 THEN name ELSE 'other' END AS metric, SUM(v) AS forks FROM (SELECT time, name, v, DENSE_RANK() OVER (ORDER BY total DESC, full_name) AS rk FROM (SELECT $__timeGroupAlias(time, $__interval), full_name, name, SUM(1) AS v, SUM(SUM(1)) OVER (PARTITION BY full_name) AS total FROM (SELECT time, full_name, CASE WHEN MIN(full_name) OVER (PARTITION BY repo) = MAX(full_name) OVER (PARTITION BY repo) THEN repo ELSE full_name END AS name FROM gh_fork WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) n GROUP BY 1, 2, 3) y) x GROUP BY 1, 2 HAVING SUM(v) \u003e 0 ORDER BY 1",
               "refId": "A"
             }
           ],
@@ -7621,7 +7621,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT title AS \"Title\", time AS \"Opened\", repo AS \"Repository\", category AS \"Category\", comments AS \"Comments\", CASE WHEN answerable = 'false' THEN NULL WHEN has_answer THEN 1 ELSE 0 END AS \"Answered\", url AS \"Link\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo, number ORDER BY time DESC, comments DESC) AS rn FROM gh_discussion WHERE time \u003e now() - INTERVAL '30 years' AND repo IN (${repo:sqlstring})) x WHERE rn = 1 ORDER BY 2 DESC LIMIT 50",
+              "rawSql": "SELECT title AS \"Title\", time AS \"Opened\", repo AS \"Repository\", category AS \"Category\", comments AS \"Comments\", CASE WHEN answerable = 'false' THEN NULL WHEN has_answer THEN 1 ELSE 0 END AS \"Answered\", url AS \"Link\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, number ORDER BY time DESC, comments DESC) AS rn FROM gh_discussion WHERE time \u003e now() - INTERVAL '30 years' AND repo IN (${repo:sqlstring})) x WHERE rn = 1 ORDER BY 2 DESC LIMIT 50",
               "refId": "A"
             }
           ],
@@ -7785,7 +7785,7 @@
         },
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "Discussions are the one surface where the work is almost entirely in other people's repositories: gh_discussion sees three rows inside this account, and this sees sixty six across twenty six repositories.",
+          "description": "Discussions are the one surface where the work is almost entirely in other people's repositories: gh_discussion sees three rows inside this account, and this sees sixty six across twenty six repositories. Each comment counts once, however many rows a store holds of it, which Answers elsewhere explains.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -7870,7 +7870,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT full_name AS \"Repository\", SUM(answers) AS \"Accepted answers\", COUNT(*) AS \"Comments\", SUM(upvotes) AS \"Upvotes\" FROM gh_discussion_comment WHERE $__timeFilter(time) GROUP BY 1 ORDER BY 2 DESC, 3 DESC LIMIT 20",
+              "rawSql": "SELECT full_name AS \"Repository\", SUM(answers) AS \"Accepted answers\", COUNT(*) AS \"Comments\", SUM(upvotes) AS \"Upvotes\" FROM (SELECT full_name, answers, upvotes, ROW_NUMBER() OVER (PARTITION BY comment ORDER BY answers DESC, upvotes DESC) AS rn FROM gh_discussion_comment WHERE $__timeFilter(time)) x WHERE rn = 1 GROUP BY 1 ORDER BY 2 DESC, 3 DESC LIMIT 20",
               "refId": "A"
             }
           ],
@@ -7879,7 +7879,7 @@
         },
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "Every comment this account left in a discussion of a repository it does not own, newest first and whatever the range; Accepted says whether the maintainer marked it the answer. The link opens the comment in its thread.",
+          "description": "Every comment this account left in a discussion of a repository it does not own, newest first and whatever the range; Accepted says whether the maintainer marked it the answer. The link opens the comment in its thread. One row per comment, accepted when any of its rows says so. Until 2.6.1 whether a comment was accepted was part of its row's identity, so a store written before then holds a comment read before and after it was accepted as two rows, and one written by 2.6.0 and 2.6.1 holds a third without that part. An answer accepted before 2.6.1 and taken back since reads accepted until gh_discussion_comment is dropped and filled again with a backfill.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -8304,7 +8304,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT host AS \"Endpoint\", SUM(CASE WHEN ok = 'false' THEN 1 ELSE 0 END) AS \"Failed\", COUNT(*) AS \"Deliveries\", repo AS \"Repository\", SUM(CASE WHEN redelivery THEN 1 ELSE 0 END) AS \"Retried\", percentile_cont(0.5) WITHIN GROUP (ORDER BY duration_seconds) AS \"Latency\" FROM gh_webhook_delivery WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring}) GROUP BY 1, 4 ORDER BY 2 DESC, 3 DESC LIMIT 25",
+              "rawSql": "SELECT host AS \"Endpoint\", SUM(CASE WHEN ok = 'false' THEN 1 ELSE 0 END) AS \"Failed\", COUNT(*) AS \"Deliveries\", repo AS \"Repository\", SUM(CASE WHEN redelivery THEN 1 ELSE 0 END) AS \"Retried\", percentile_cont(0.5) WITHIN GROUP (ORDER BY duration_seconds) AS \"Latency\" FROM gh_webhook_delivery WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring}) GROUP BY 1, full_name, 4 ORDER BY 2 DESC, 3 DESC LIMIT 25",
               "refId": "A"
             }
           ],
@@ -8424,7 +8424,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT repo AS \"Repository\", ruleset AS \"Ruleset\", enforcement AS \"Enforcement\", target AS \"Target\", days_since_change AS \"Last changed\", url AS \"Link\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo, ruleset ORDER BY time DESC) AS rn FROM gh_ruleset WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1 ORDER BY 1, 2",
+              "rawSql": "SELECT repo AS \"Repository\", ruleset AS \"Ruleset\", enforcement AS \"Enforcement\", target AS \"Target\", days_since_change AS \"Last changed\", url AS \"Link\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, ruleset ORDER BY time DESC) AS rn FROM gh_ruleset WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1 ORDER BY 1, 2",
               "refId": "A"
             }
           ],
@@ -8507,7 +8507,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT repo AS \"Repository\", days_since_use AS \"Unused for\", \"key\" AS \"Key\", read_only AS \"Read only\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo, \"key\" ORDER BY time DESC) AS rn FROM gh_deploy_key WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1 ORDER BY 2 DESC",
+              "rawSql": "SELECT repo AS \"Repository\", days_since_use AS \"Unused for\", \"key\" AS \"Key\", read_only AS \"Read only\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, \"key\" ORDER BY time DESC) AS rn FROM gh_deploy_key WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1 ORDER BY 2 DESC",
               "refId": "A"
             }
           ],
@@ -8528,7 +8528,7 @@
           },
           "id": 94,
           "options": {
-            "content": "### Failed job output\n\nThe last lines of every job that failed are collected too, but they are text\nrather than measurements, so they go to a log store rather than here. With the\nLoki sink enabled, this is the query:\n\n```\n{job=\"ghchronicle\", kind=\"job_log\"} |= \"error\"\n```\n\nSet `every.joblogs` to switch the collection on. GitHub deletes job logs after\nthe repository's retention period, ninety days by default, and answers 410\nafterwards, so an older log cannot be backfilled: what exists is what was\ncaptured while it was there.\n\nPublished to a Grafana that has a Loki datasource, with\n`cmd/publish_dashboard -loki \u003cdatasource-uid\u003e`, this panel shows those lines\ninstead of this note.\n",
+            "content": "### Failed job output\n\nThe last lines of every job that failed are collected too, but they are text\nrather than measurements, so they go to a log store rather than here. With the\nLoki sink enabled, this is the query:\n\n```\n{job=\"ghchronicle\", kind=\"job_log\"} |= \"error\"\n```\n\nSet `every.families.joblogs` to switch the collection on. GitHub deletes job\nlogs after the repository's retention period, ninety days by default, and\nanswers 410 afterwards, so an older log cannot be backfilled: what exists is\nwhat was captured while it was there.\n\nPublished to a Grafana that has a Loki datasource, with\n`cmd/publish_dashboard -loki \u003cdatasource-uid\u003e`, this panel shows those lines\ninstead of this note.\n",
             "mode": "markdown"
           },
           "targets": [],
@@ -8614,7 +8614,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT repo AS \"Repository\", host AS \"Host\", hook AS \"Hook\", active AS \"Active\", MAX(events) AS \"Events subscribed\" FROM (SELECT repo, host, hook, active, events, ROW_NUMBER() OVER (PARTITION BY repo, hook, host ORDER BY time DESC) AS rn FROM gh_webhook WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1 GROUP BY 1, 2, 3, 4 ORDER BY 1, 2",
+              "rawSql": "SELECT repo AS \"Repository\", host AS \"Host\", hook AS \"Hook\", active AS \"Active\", MAX(events) AS \"Events subscribed\" FROM (SELECT full_name, repo, host, hook, active, events, ROW_NUMBER() OVER (PARTITION BY full_name, hook, host ORDER BY time DESC) AS rn FROM gh_webhook WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1 GROUP BY full_name, 1, 2, 3, 4 ORDER BY 1, 2",
               "refId": "A"
             }
           ],
@@ -8727,7 +8727,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT environment AS \"Environment\", MIN(days_since_change) AS \"Idle\", repo AS \"Repository\", MAX(url) AS \"Link\" FROM gh_environment WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring}) GROUP BY 1, 3 ORDER BY 2 DESC",
+              "rawSql": "SELECT environment AS \"Environment\", days_since_change AS \"Idle\", repo AS \"Repository\", url AS \"Link\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, environment ORDER BY time DESC) AS rn FROM gh_environment WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1 ORDER BY 2 DESC",
               "refId": "A"
             }
           ],
@@ -8834,7 +8834,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT b.branch AS \"Branch\", b.days_since_commit AS \"Idle\", b.repo AS \"Repository\", b.is_default AS \"Default\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo, branch ORDER BY time DESC) AS rn FROM gh_branch WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) b LEFT JOIN (SELECT repo, fork, archived FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo ORDER BY time DESC) AS rn FROM gh_repo WHERE time \u003e now() - INTERVAL '30 years' AND repo IN (${repo:sqlstring})) x WHERE rn = 1) f ON f.repo = b.repo WHERE b.rn = 1 AND COALESCE(f.fork, 'false') \u003c\u003e 'true' AND COALESCE(f.archived, 'false') \u003c\u003e 'true' ORDER BY 2 DESC",
+              "rawSql": "SELECT b.branch AS \"Branch\", b.days_since_commit AS \"Idle\", b.repo AS \"Repository\", b.is_default AS \"Default\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, branch ORDER BY time DESC) AS rn FROM gh_branch WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) b LEFT JOIN (SELECT repo, full_name, fork, archived FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn FROM gh_repo WHERE time \u003e now() - INTERVAL '30 years' AND repo IN (${repo:sqlstring})) x WHERE rn = 1) f ON f.full_name = b.full_name WHERE b.rn = 1 AND COALESCE(f.fork, 'false') \u003c\u003e 'true' AND COALESCE(f.archived, 'false') \u003c\u003e 'true' ORDER BY 2 DESC",
               "refId": "A"
             }
           ],
@@ -8907,6 +8907,16 @@
                             "color": "green",
                             "index": 0,
                             "text": "on"
+                          },
+                          "false": {
+                            "color": "text",
+                            "index": 3,
+                            "text": "off"
+                          },
+                          "true": {
+                            "color": "green",
+                            "index": 2,
+                            "text": "on"
                           }
                         },
                         "type": "value"
@@ -8944,6 +8954,16 @@
                           "1": {
                             "color": "green",
                             "index": 0,
+                            "text": "on"
+                          },
+                          "false": {
+                            "color": "text",
+                            "index": 3,
+                            "text": "off"
+                          },
+                          "true": {
+                            "color": "green",
+                            "index": 2,
                             "text": "on"
                           }
                         },
@@ -9020,6 +9040,16 @@
                           "1": {
                             "color": "green",
                             "index": 0,
+                            "text": "on"
+                          },
+                          "false": {
+                            "color": "text",
+                            "index": 3,
+                            "text": "off"
+                          },
+                          "true": {
+                            "color": "green",
+                            "index": 2,
                             "text": "on"
                           }
                         },
@@ -9102,7 +9132,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT repo AS \"Repository\", pattern AS \"Pattern\", required_reviews AS \"Reviews\", CAST(requires_commit_signatures AS INT) AS \"Signatures\", CAST(requires_linear_history AS INT) AS \"Linear\", CAST(allows_force_pushes AS INT) AS \"Force push\", CAST(requires_conversation_resolution AS INT) AS \"Threads\", required_checks AS \"Checks\", url AS \"Link\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo, pattern ORDER BY time DESC) AS rn FROM gh_branch_protection WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1 ORDER BY 1, 2",
+              "rawSql": "SELECT repo AS \"Repository\", pattern AS \"Pattern\", required_reviews AS \"Reviews\", CAST(requires_commit_signatures AS INT) AS \"Signatures\", CAST(requires_linear_history AS INT) AS \"Linear\", CAST(allows_force_pushes AS INT) AS \"Force push\", CAST(requires_conversation_resolution AS INT) AS \"Threads\", required_checks AS \"Checks\", url AS \"Link\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, pattern ORDER BY time DESC) AS rn FROM gh_branch_protection WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1 ORDER BY 1, 2",
               "refId": "A"
             }
           ],
@@ -9217,7 +9247,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT rule AS \"Rule\", bypass_always AS \"Always\", repo AS \"Repository\", ruleset AS \"Ruleset\", bypass_actors AS \"Bypass actors\", bypass_sampled AS \"Sampled\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo, ruleset, rule ORDER BY time DESC) AS rn FROM gh_ruleset_rule WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1 ORDER BY 2 DESC, 3, 4, 1",
+              "rawSql": "SELECT rule AS \"Rule\", bypass_always AS \"Always\", repo AS \"Repository\", ruleset AS \"Ruleset\", bypass_actors AS \"Bypass actors\", bypass_sampled AS \"Sampled\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, ruleset, rule ORDER BY time DESC) AS rn FROM gh_ruleset_rule WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1 ORDER BY 2 DESC, 3, 4, 1",
               "refId": "A"
             }
           ],
@@ -9631,7 +9661,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT environment AS \"Environment\", COUNT(*) AS \"Deployments\", repo AS \"Repository\", percentile_cont(0.5) WITHIN GROUP (ORDER BY seconds_to_status) AS \"To status\", percentile_cont(0.5) WITHIN GROUP (ORDER BY seconds_live) AS \"Live for\", SUM(CASE WHEN success THEN 1 ELSE 0 END) AS \"Successes\", SUM(CASE WHEN outcome = 'pending' THEN 1 ELSE 0 END) AS \"Pending\", MAX(url) AS \"Link\", MAX(environment_url) AS \"Live\" FROM gh_deployment WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring}) GROUP BY 1, 3 ORDER BY 2 DESC",
+              "rawSql": "SELECT environment AS \"Environment\", COUNT(*) AS \"Deployments\", repo AS \"Repository\", percentile_cont(0.5) WITHIN GROUP (ORDER BY seconds_to_status) AS \"To status\", percentile_cont(0.5) WITHIN GROUP (ORDER BY seconds_live) AS \"Live for\", SUM(CASE WHEN success THEN 1 ELSE 0 END) AS \"Successes\", SUM(CASE WHEN outcome = 'pending' THEN 1 ELSE 0 END) AS \"Pending\", MAX(url) AS \"Link\", MAX(environment_url) AS \"Live\" FROM gh_deployment WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring}) GROUP BY 1, full_name, 3 ORDER BY 2 DESC",
               "refId": "A"
             }
           ],
@@ -9654,7 +9684,7 @@
       "panels": [
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "Release asset downloads, counted by GitHub since each release was published, and how many releases have been downloaded at all, as of the newest reading of each.",
+          "description": "Release asset downloads, counted by GitHub since each release was published, and how many releases have been downloaded at all, as of the newest reading of each. A repository is counted by its full name, so two owners' repositories of one name are two.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -9702,7 +9732,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT SUM(downloads) AS \"Total\" FROM (SELECT downloads, ROW_NUMBER() OVER (PARTITION BY repo, tag ORDER BY time DESC) AS rn FROM gh_release WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1",
+              "rawSql": "SELECT SUM(downloads) AS \"Total\" FROM (SELECT downloads, ROW_NUMBER() OVER (PARTITION BY full_name, tag ORDER BY time DESC) AS rn FROM gh_release WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1",
               "refId": "A"
             },
             {
@@ -9710,7 +9740,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT COUNT(*) AS \"Releases\" FROM (SELECT repo, tag, downloads, ROW_NUMBER() OVER (PARTITION BY repo, tag ORDER BY time DESC) AS rn FROM gh_release WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1 AND downloads \u003e 0",
+              "rawSql": "SELECT COUNT(*) AS \"Releases\" FROM (SELECT repo, tag, downloads, ROW_NUMBER() OVER (PARTITION BY full_name, tag ORDER BY time DESC) AS rn FROM gh_release WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1 AND downloads \u003e 0",
               "refId": "B"
             }
           ],
@@ -9800,7 +9830,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT repo || ' ' || tag AS \"Release\", downloads AS \"Downloads\", url AS \"Page\" FROM (SELECT repo, tag, downloads, url, ROW_NUMBER() OVER (PARTITION BY repo, tag ORDER BY time DESC) AS rn FROM gh_release WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1 AND downloads \u003e 0 ORDER BY 2 DESC LIMIT 12",
+              "rawSql": "SELECT (CASE WHEN MIN(full_name) OVER (PARTITION BY repo) = MAX(full_name) OVER (PARTITION BY repo) THEN repo ELSE full_name END) || ' ' || tag AS \"Release\", downloads AS \"Downloads\", url AS \"Page\" FROM (SELECT repo, full_name, tag, downloads, url, ROW_NUMBER() OVER (PARTITION BY full_name, tag ORDER BY time DESC) AS rn FROM gh_release WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1 AND downloads \u003e 0 ORDER BY 2 DESC LIMIT 12",
               "refId": "A"
             }
           ],
@@ -9993,7 +10023,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT a.asset AS \"Asset\", a.downloads AS \"Downloads\", a.tag AS \"Tag\", a.repo AS \"Repository\", a.size_bytes AS \"Size\", a.url AS \"Download\", r.url AS \"Link\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo, tag, asset ORDER BY time DESC) AS rn FROM gh_release_asset WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) a LEFT JOIN (SELECT repo, tag, url, ROW_NUMBER() OVER (PARTITION BY repo, tag ORDER BY time DESC) AS rn FROM gh_release WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) r ON r.repo = a.repo AND r.tag = a.tag AND r.rn = 1 WHERE a.rn = 1 ORDER BY a.downloads DESC LIMIT 40",
+              "rawSql": "SELECT a.asset AS \"Asset\", a.downloads AS \"Downloads\", a.tag AS \"Tag\", a.repo AS \"Repository\", a.size_bytes AS \"Size\", a.url AS \"Download\", r.url AS \"Link\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, tag, asset ORDER BY time DESC) AS rn FROM gh_release_asset WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) a LEFT JOIN (SELECT full_name, tag, url, ROW_NUMBER() OVER (PARTITION BY full_name, tag ORDER BY time DESC) AS rn FROM gh_release WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) r ON r.full_name = a.full_name AND r.tag = a.tag AND r.rn = 1 WHERE a.rn = 1 ORDER BY a.downloads DESC LIMIT 40",
               "refId": "A"
             }
           ],
@@ -10152,7 +10182,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT asset AS \"Asset\", MAX(downloads) - MIN(downloads) AS \"Gained\", MAX(downloads) AS \"Total\", tag AS \"Tag\", repo AS \"Repository\", MAX(url) AS \"Download\" FROM gh_release_asset WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring}) GROUP BY 1, 4, 5 HAVING MAX(downloads) \u003e MIN(downloads) ORDER BY 2 DESC LIMIT 25",
+              "rawSql": "SELECT asset AS \"Asset\", MAX(downloads) - MIN(downloads) AS \"Gained\", MAX(downloads) AS \"Total\", tag AS \"Tag\", repo AS \"Repository\", MAX(url) AS \"Download\" FROM gh_release_asset WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring}) GROUP BY 1, 4, full_name, 5 HAVING MAX(downloads) \u003e MIN(downloads) ORDER BY 2 DESC LIMIT 25",
               "refId": "A"
             }
           ],
@@ -10175,7 +10205,7 @@
       "panels": [
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "Alerts still open, from the newest reading of each repository. Both are colored by the same thresholds, so one value can be green beside a red one.",
+          "description": "Alerts still open, from the newest reading of each repository, which is counted by its full name, so two owners' repositories of one name are two. Both are colored by the same thresholds, so one value can be green beside a red one.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -10300,7 +10330,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT SUM(open) AS \"Dependabot\" FROM (SELECT open, ROW_NUMBER() OVER (PARTITION BY repo, severity, ecosystem ORDER BY time DESC) AS rn FROM gh_dependabot_alert WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1",
+              "rawSql": "SELECT SUM(open) AS \"Dependabot\" FROM (SELECT open, ROW_NUMBER() OVER (PARTITION BY full_name, severity, ecosystem ORDER BY time DESC) AS rn FROM gh_dependabot_alert WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1",
               "refId": "A"
             },
             {
@@ -10308,7 +10338,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT SUM(open) AS \"Code scanning\" FROM (SELECT open, ROW_NUMBER() OVER (PARTITION BY repo, severity, tool ORDER BY time DESC) AS rn FROM gh_code_scanning_alert WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1",
+              "rawSql": "SELECT SUM(open) AS \"Code scanning\" FROM (SELECT open, ROW_NUMBER() OVER (PARTITION BY full_name, severity, tool ORDER BY time DESC) AS rn FROM gh_code_scanning_alert WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1",
               "refId": "B"
             }
           ],
@@ -10363,7 +10393,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT severity AS \"Severity\", SUM(open) AS \"Open alerts\" FROM (SELECT severity, open, ROW_NUMBER() OVER (PARTITION BY repo, severity, ecosystem ORDER BY time DESC) AS rn FROM gh_dependabot_alert WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1 GROUP BY 1 ORDER BY 2 DESC",
+              "rawSql": "SELECT severity AS \"Severity\", SUM(open) AS \"Open alerts\" FROM (SELECT severity, open, ROW_NUMBER() OVER (PARTITION BY full_name, severity, ecosystem ORDER BY time DESC) AS rn FROM gh_dependabot_alert WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1 GROUP BY 1 ORDER BY 2 DESC",
               "refId": "A"
             }
           ],
@@ -10418,7 +10448,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT ecosystem AS \"Ecosystem\", SUM(open) AS \"Open alerts\" FROM (SELECT ecosystem, open, ROW_NUMBER() OVER (PARTITION BY repo, severity, ecosystem ORDER BY time DESC) AS rn FROM gh_dependabot_alert WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1 GROUP BY 1 ORDER BY 2 DESC",
+              "rawSql": "SELECT ecosystem AS \"Ecosystem\", SUM(open) AS \"Open alerts\" FROM (SELECT ecosystem, open, ROW_NUMBER() OVER (PARTITION BY full_name, severity, ecosystem ORDER BY time DESC) AS rn FROM gh_dependabot_alert WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1 GROUP BY 1 ORDER BY 2 DESC",
               "refId": "A"
             }
           ],
@@ -10540,7 +10570,7 @@
               "editorMode": "code",
               "format": "time_series",
               "rawQuery": true,
-              "rawSql": "SELECT time, severity AS metric, SUM(open) AS alerts FROM (SELECT $__timeGroupAlias(time, $__interval), severity, open, ROW_NUMBER() OVER (PARTITION BY ($__timeGroup(time, $__interval)), repo, severity, ecosystem ORDER BY time DESC) AS rn FROM gh_dependabot_alert WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1 GROUP BY 1, 2 ORDER BY 1",
+              "rawSql": "SELECT time, severity AS metric, SUM(open) AS alerts FROM (SELECT $__timeGroupAlias(time, $__interval), severity, open, ROW_NUMBER() OVER (PARTITION BY ($__timeGroup(time, $__interval)), full_name, severity, ecosystem ORDER BY time DESC) AS rn FROM gh_dependabot_alert WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1 GROUP BY 1, 2 ORDER BY 1",
               "refId": "A"
             }
           ],
@@ -10549,7 +10579,7 @@
         },
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "Recorded explicitly, so a repository with the feature switched off is distinguishable from one with no alerts.",
+          "description": "Recorded explicitly, so a repository with the feature switched off is distinguishable from one with no alerts. Each row is the newest reading of the repository's feature, so a feature switched off or an alert fixed inside the range reads as it stands and not as it was at its highest.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -10588,6 +10618,16 @@
                           "1": {
                             "color": "green",
                             "index": 0,
+                            "text": "on"
+                          },
+                          "false": {
+                            "color": "text",
+                            "index": 3,
+                            "text": "off"
+                          },
+                          "true": {
+                            "color": "green",
+                            "index": 2,
                             "text": "on"
                           }
                         },
@@ -10670,7 +10710,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT repo AS \"Repository\", feature AS \"Feature\", MAX(CAST(enabled AS INT)) AS \"Enabled\", MAX(open_alerts) AS \"Open alerts\", url AS \"Link\" FROM gh_security_feature WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring}) GROUP BY 1, 2, 5 ORDER BY 1, 2",
+              "rawSql": "SELECT repo AS \"Repository\", feature AS \"Feature\", CAST(enabled AS INT) AS \"Enabled\", open_alerts AS \"Open alerts\", url AS \"Link\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, feature ORDER BY time DESC) AS rn FROM gh_security_feature WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1 ORDER BY 1, 2",
               "refId": "A"
             }
           ],
@@ -11136,7 +11176,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT tool AS \"Tool\", SUM(results) AS \"Results\", repo AS \"Repository\", COUNT(*) AS \"Runs\", MAX(rules) AS \"Rules\" FROM gh_code_scanning_analysis WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring}) GROUP BY 1, 3 ORDER BY 2 DESC LIMIT 25",
+              "rawSql": "SELECT tool AS \"Tool\", SUM(results) AS \"Results\", repo AS \"Repository\", COUNT(*) AS \"Runs\", MAX(rules) AS \"Rules\" FROM gh_code_scanning_analysis WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring}) GROUP BY 1, full_name, 3 ORDER BY 2 DESC LIMIT 25",
               "refId": "A"
             }
           ],
@@ -11145,7 +11185,7 @@
         },
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "The two counts at the top of the section, as the rows they are made of, whatever the dashboard range: an alert is listed while it is open, however long ago it was raised. A Dependabot alert names its package and advisory, a code scanning alert its rule and tool. Open for is counted from the row's own date to now, so it is right when the panel is drawn rather than when the last sweep ran. The link opens the alert, which GitHub shows to the owner alone.",
+          "description": "The alerts still open, oldest first, whatever the dashboard range: an alert is listed while its row says it is open, however long ago it was raised. A Dependabot alert names its package and advisory, a code scanning alert its rule and tool. These are not always the rows the two counts at the top of the section are made of: a sweep writes a row for each of the newest hundred alerts of a repository in every state, and a repository with more has its counts taken from a read of the open ones alone. There an open alert no sweep has reached, behind a hundred newer ones since before the collector started, is counted and not listed here, and an alert fixed while it sat behind the newest hundred stays listed here as open, until a backfill reads the whole list. Open for is counted from the row's own date to now, so it is right when the panel is drawn rather than when the last sweep ran. The link opens the alert, which GitHub shows to the owner alone.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -11439,7 +11479,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT repo AS \"Repository\", setting AS \"Setting\", status AS \"Status\", CAST(enabled AS INT) AS \"Enabled\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo, setting ORDER BY time DESC) AS rn FROM gh_security_setting WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1 ORDER BY 4, 1, 2",
+              "rawSql": "SELECT repo AS \"Repository\", setting AS \"Setting\", status AS \"Status\", CAST(enabled AS INT) AS \"Enabled\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, setting ORDER BY time DESC) AS rn FROM gh_security_setting WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1 ORDER BY 4, 1, 2",
               "refId": "A"
             }
           ],
@@ -11553,7 +11593,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT repo AS \"Repository\", state AS \"State\", query_suite AS \"Query suite\", schedule AS \"Schedule\", languages AS \"Languages\", days_since_change AS \"Last changed\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo ORDER BY time DESC) AS rn FROM gh_code_scanning_setup WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1 ORDER BY 1",
+              "rawSql": "SELECT repo AS \"Repository\", state AS \"State\", query_suite AS \"Query suite\", schedule AS \"Schedule\", languages AS \"Languages\", days_since_change AS \"Last changed\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn FROM gh_code_scanning_setup WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1 ORDER BY 1",
               "refId": "A"
             }
           ],
@@ -11614,6 +11654,16 @@
                             "color": "green",
                             "index": 0,
                             "text": "on"
+                          },
+                          "false": {
+                            "color": "text",
+                            "index": 3,
+                            "text": "off"
+                          },
+                          "true": {
+                            "color": "green",
+                            "index": 2,
+                            "text": "on"
                           }
                         },
                         "type": "value"
@@ -11653,7 +11703,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT repo AS \"Repository\", permissions AS \"Permissions\", CAST(can_approve_pr AS INT) AS \"Can approve pull requests\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo ORDER BY time DESC) AS rn FROM gh_actions_policy WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1 ORDER BY 1",
+              "rawSql": "SELECT repo AS \"Repository\", permissions AS \"Permissions\", CAST(can_approve_pr AS INT) AS \"Can approve pull requests\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn FROM gh_actions_policy WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1 ORDER BY 1",
               "refId": "A"
             }
           ],
@@ -11764,7 +11814,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT secret AS \"Secret\", days_since_rotation AS \"Last rotated\", age_days AS \"Age\", repo AS \"Repository\", kind AS \"Kind\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo, kind, secret ORDER BY time DESC) AS rn FROM gh_secret WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1 ORDER BY 2 DESC",
+              "rawSql": "SELECT secret AS \"Secret\", days_since_rotation AS \"Last rotated\", age_days AS \"Age\", repo AS \"Repository\", kind AS \"Kind\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, kind, secret ORDER BY time DESC) AS rn FROM gh_secret WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1 ORDER BY 2 DESC",
               "refId": "A"
             }
           ],
@@ -12142,7 +12192,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT repo AS \"Repository\", SUM(gross) AS \"Gross\", sku AS \"SKU\", SUM(quantity) AS \"Quantity\", MAX(unit) AS \"Unit\", MAX(price_per_unit) AS \"Price\", SUM(net) AS \"Net\" FROM gh_billing_usage WHERE $__timeFilter(time) AND repo \u003c\u003e '(none)' GROUP BY 1, 3 ORDER BY 2 DESC LIMIT 40",
+              "rawSql": "SELECT repo AS \"Repository\", SUM(gross) AS \"Gross\", sku AS \"SKU\", SUM(quantity) AS \"Quantity\", MAX(unit) AS \"Unit\", MAX(price_per_unit) AS \"Price\", SUM(net) AS \"Net\" FROM gh_billing_usage WHERE $__timeFilter(time) AND repo \u003c\u003e '(none)' GROUP BY 1, full_name, 3 ORDER BY 2 DESC LIMIT 40",
               "refId": "A"
             }
           ],
@@ -12252,7 +12302,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT cache AS \"Cache\", SUM(size_bytes) AS \"Size\", repo AS \"Repository\", SUM(caches) AS \"Entries\", MIN(days_since_use) AS \"Days since use\" FROM (SELECT time, repo, cache, size_bytes, caches, days_since_use, MAX(time) OVER (PARTITION BY full_name) AS newest FROM gh_actions_cache_entry WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE time = newest GROUP BY 1, 3 ORDER BY 2 DESC LIMIT 25",
+              "rawSql": "SELECT cache AS \"Cache\", SUM(size_bytes) AS \"Size\", repo AS \"Repository\", SUM(caches) AS \"Entries\", MIN(days_since_use) AS \"Days since use\" FROM (SELECT time, full_name, repo, cache, size_bytes, caches, days_since_use, MAX(time) OVER (PARTITION BY full_name) AS newest FROM gh_actions_cache_entry WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE time = newest GROUP BY 1, full_name, 3 ORDER BY 2 DESC LIMIT 25",
               "refId": "A"
             }
           ],
@@ -12366,7 +12416,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT repo AS \"Repository\", MAX(size_bytes) AS \"Cache\", MAX(count) AS \"Entries\" FROM gh_actions_cache WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring}) GROUP BY 1 ORDER BY 2 DESC",
+              "rawSql": "SELECT repo AS \"Repository\", size_bytes AS \"Cache\", count AS \"Entries\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn FROM gh_actions_cache WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1 ORDER BY 2 DESC",
               "refId": "A"
             }
           ],
@@ -12878,7 +12928,7 @@
         },
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "Pull requests and issues opened in repositories this account does not own, with the state each ended in. Nothing else sees them: they are not in these repositories and the event feed forgets them in three days. Seen is the row's own date, which for an open item is the day it was last seen open; Opened is when it was opened. Stars is the repository's own count at the last sweep inside the range.",
+          "description": "Pull requests and issues opened in repositories this account does not own, with the state each ended in. Nothing else sees them: they are not in these repositories, and the event feed keeps only its last three hundred events, none older than thirty days. Seen is the row's own date, which for an open item is the day it was last seen open; Opened is when it was opened. Stars is the repository's own count at the last sweep inside the range.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -13316,7 +13366,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT language AS \"Language\", SUM(bytes) AS \"Bytes\" FROM (SELECT repo, language, bytes, ROW_NUMBER() OVER (PARTITION BY repo, language ORDER BY time DESC) AS rn FROM gh_repo_language WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1 GROUP BY 1 ORDER BY 2 DESC LIMIT 12",
+              "rawSql": "SELECT language AS \"Language\", SUM(bytes) AS \"Bytes\" FROM (SELECT language, bytes, ROW_NUMBER() OVER (PARTITION BY full_name, language ORDER BY time DESC) AS rn FROM gh_repo_language WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1 GROUP BY 1 ORDER BY 2 DESC LIMIT 12",
               "refId": "A"
             }
           ],
@@ -13680,7 +13730,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT c.repo AS \"Repository\", c.health_percentage AS \"Community profile\", CAST(c.has_readme AS INT) AS \"Readme\", CAST(c.has_license AS INT) AS \"License\", CAST(c.has_contributing AS INT) AS \"Contributing\", CAST(c.has_code_of_conduct AS INT) AS \"Conduct\", p.issue_templates AS \"Issue templates\", CAST(c.has_pull_request_template AS INT) AS \"PR template\", c.url AS \"Link\" FROM (SELECT repo, health_percentage, url, has_readme, has_license, has_contributing, has_code_of_conduct, has_pull_request_template, ROW_NUMBER() OVER (PARTITION BY repo ORDER BY time DESC) AS rn FROM gh_repo_community WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) c LEFT JOIN (SELECT repo, issue_templates, ROW_NUMBER() OVER (PARTITION BY repo ORDER BY time DESC) AS rn FROM gh_repo_policy WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) p ON p.repo = c.repo AND p.rn = 1 WHERE c.rn = 1 ORDER BY 2 DESC",
+              "rawSql": "SELECT c.repo AS \"Repository\", c.health_percentage AS \"Community profile\", CAST(c.has_readme AS INT) AS \"Readme\", CAST(c.has_license AS INT) AS \"License\", CAST(c.has_contributing AS INT) AS \"Contributing\", CAST(c.has_code_of_conduct AS INT) AS \"Conduct\", p.issue_templates AS \"Issue templates\", CAST(c.has_pull_request_template AS INT) AS \"PR template\", c.url AS \"Link\" FROM (SELECT full_name, repo, health_percentage, url, has_readme, has_license, has_contributing, has_code_of_conduct, has_pull_request_template, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn FROM gh_repo_community WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) c LEFT JOIN (SELECT full_name, issue_templates, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn FROM gh_repo_policy WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) p ON p.full_name = c.full_name AND p.rn = 1 WHERE c.rn = 1 ORDER BY 2 DESC",
               "refId": "A"
             }
           ],
@@ -13921,7 +13971,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT repo AS \"Repository\", stars AS \"Stars\", language AS \"Language\", forks AS \"Forks\", network AS \"Network\", open_issues AS \"Open issues\", watchers AS \"Watchers\", size_kb AS \"Size\", age_days AS \"Age\", days_since_push AS \"Idle\", visibility AS \"Visibility\", license AS \"License\", url AS \"Link\" FROM (SELECT repo, language, stars, forks, network, open_issues, watchers, size_kb, age_days, days_since_push, visibility, license, url FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo ORDER BY time DESC) AS rn FROM gh_repo WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1) ORDER BY stars DESC",
+              "rawSql": "SELECT repo AS \"Repository\", stars AS \"Stars\", language AS \"Language\", forks AS \"Forks\", network AS \"Network\", open_issues AS \"Open issues\", watchers AS \"Watchers\", size_kb AS \"Size\", age_days AS \"Age\", days_since_push AS \"Idle\", visibility AS \"Visibility\", license AS \"License\", url AS \"Link\" FROM (SELECT repo, full_name, language, stars, forks, network, open_issues, watchers, size_kb, age_days, days_since_push, visibility, license, url FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn FROM gh_repo WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1) ORDER BY stars DESC",
               "refId": "A"
             }
           ],
@@ -14018,7 +14068,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT topic AS \"Topic\", COUNT(DISTINCT repo) AS \"Repositories\", url AS \"Link\" FROM gh_repo_topic WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring}) GROUP BY 1, 3 ORDER BY 2 DESC LIMIT 30",
+              "rawSql": "SELECT topic AS \"Topic\", COUNT(DISTINCT full_name) AS \"Repositories\", url AS \"Link\" FROM gh_repo_topic WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring}) GROUP BY 1, 3 ORDER BY 2 DESC LIMIT 30",
               "refId": "A"
             }
           ],
@@ -14617,7 +14667,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT repo AS \"Repository\", MAX(CAST(security_policy AS INT)) AS \"Security policy\", MAX(CAST(delete_branch_on_merge AS INT)) AS \"Delete on merge\", MAX(CAST(auto_merge AS INT)) AS \"Auto merge\", MAX(branch_protection_rules) AS \"Protection rules\", MAX(issue_templates) AS \"Issue templates\", MAX(codeowners_errors) AS \"CODEOWNERS errors\", url AS \"Link\" FROM gh_repo_policy WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring}) GROUP BY 1, 8 ORDER BY 1",
+              "rawSql": "SELECT repo AS \"Repository\", CAST(security_policy AS INT) AS \"Security policy\", CAST(delete_branch_on_merge AS INT) AS \"Delete on merge\", CAST(auto_merge AS INT) AS \"Auto merge\", branch_protection_rules AS \"Protection rules\", issue_templates AS \"Issue templates\", codeowners_errors AS \"CODEOWNERS errors\", url AS \"Link\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn FROM gh_repo_policy WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1 ORDER BY 1",
               "refId": "A"
             }
           ],
@@ -14697,7 +14747,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT \"key\" AS \"Key\", kind AS \"Kind\", MIN(days_since_use) AS \"Days since use\", MAX(never_used) AS \"Never used\", MIN(days_to_expiry) AS \"Days to expiry\", MAX(url) AS \"Link\" FROM gh_key WHERE $__timeFilter(time) GROUP BY 1, 2 ORDER BY 2, 1",
+              "rawSql": "SELECT \"key\" AS \"Key\", kind AS \"Kind\", days_since_use AS \"Days since use\", never_used AS \"Never used\", days_to_expiry AS \"Days to expiry\", url AS \"Link\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY \"key\", kind ORDER BY time DESC) AS rn FROM gh_key WHERE $__timeFilter(time)) x WHERE rn = 1 ORDER BY 2, 1",
               "refId": "A"
             }
           ],
@@ -14752,7 +14802,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT \"License\", \"Packages\" FROM (SELECT CASE WHEN rn \u003c= 8 THEN \"License\" ELSE 'other' END AS \"License\", SUM(\"Packages\") AS \"Packages\", MIN(rn) AS o FROM (SELECT license AS \"License\", SUM(packages) AS \"Packages\", ROW_NUMBER() OVER (ORDER BY SUM(packages) DESC) AS rn FROM (SELECT license, packages, ROW_NUMBER() OVER (PARTITION BY repo, license ORDER BY time DESC) AS rn FROM gh_dependency_license WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1 GROUP BY 1) z GROUP BY 1) w ORDER BY o",
+              "rawSql": "SELECT \"License\", \"Packages\" FROM (SELECT CASE WHEN rn \u003c= 8 THEN \"License\" ELSE 'other' END AS \"License\", SUM(\"Packages\") AS \"Packages\", MIN(rn) AS o FROM (SELECT license AS \"License\", SUM(packages) AS \"Packages\", ROW_NUMBER() OVER (ORDER BY SUM(packages) DESC) AS rn FROM (SELECT license, packages, ROW_NUMBER() OVER (PARTITION BY full_name, license ORDER BY time DESC) AS rn FROM gh_dependency_license WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1 GROUP BY 1) z GROUP BY 1) w ORDER BY o",
               "refId": "A"
             }
           ],
@@ -14924,7 +14974,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT repo AS \"Repository\", COUNT(DISTINCT visibility) AS \"Visibility\", COUNT(DISTINCT archived) AS \"Archived\", COUNT(DISTINCT default_branch) AS \"Default branch\", COUNT(DISTINCT license) AS \"License\", COUNT(DISTINCT language) AS \"Language\", COUNT(DISTINCT repo_id) AS \"Identity\", MAX(url) AS \"Link\" FROM gh_repo WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring}) GROUP BY 1 HAVING COUNT(DISTINCT visibility) \u003e 1 OR COUNT(DISTINCT archived) \u003e 1 OR COUNT(DISTINCT default_branch) \u003e 1 OR COUNT(DISTINCT license) \u003e 1 OR COUNT(DISTINCT language) \u003e 1 ORDER BY 1",
+              "rawSql": "SELECT repo AS \"Repository\", COUNT(DISTINCT visibility) AS \"Visibility\", COUNT(DISTINCT archived) AS \"Archived\", COUNT(DISTINCT default_branch) AS \"Default branch\", COUNT(DISTINCT license) AS \"License\", COUNT(DISTINCT language) AS \"Language\", COUNT(DISTINCT repo_id) AS \"Identity\", MAX(url) AS \"Link\" FROM gh_repo WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring}) GROUP BY full_name, repo HAVING COUNT(DISTINCT visibility) \u003e 1 OR COUNT(DISTINCT archived) \u003e 1 OR COUNT(DISTINCT default_branch) \u003e 1 OR COUNT(DISTINCT license) \u003e 1 OR COUNT(DISTINCT language) \u003e 1 ORDER BY 1",
               "refId": "A"
             }
           ],
@@ -15090,7 +15140,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT repo AS \"Repository\", file AS \"File\", CAST(present AS INT) AS \"Present\", path AS \"Path\", changes AS \"Changes\", url AS \"Link\" FROM (SELECT repo, file, present, path, changes, url, ROW_NUMBER() OVER (PARTITION BY repo, file ORDER BY time DESC) AS rn FROM gh_policy_file WHERE time \u003e now() - INTERVAL '30 years' AND repo IN (${repo:sqlstring})) x WHERE rn = 1 ORDER BY 3, 1, 2",
+              "rawSql": "SELECT repo AS \"Repository\", file AS \"File\", CAST(present AS INT) AS \"Present\", path AS \"Path\", changes AS \"Changes\", url AS \"Link\" FROM (SELECT repo, file, present, path, changes, url, ROW_NUMBER() OVER (PARTITION BY full_name, file ORDER BY time DESC) AS rn FROM gh_policy_file WHERE time \u003e now() - INTERVAL '30 years' AND repo IN (${repo:sqlstring})) x WHERE rn = 1 ORDER BY 3, 1, 2",
               "refId": "A"
             }
           ],
@@ -15220,7 +15270,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT repo AS \"Repository\", blocks AS \"Blocks\", ecosystem AS \"Ecosystem\", \"interval\" AS \"Interval\" FROM (SELECT repo, ecosystem, \"interval\", blocks, time, MAX(time) OVER (PARTITION BY repo) AS newest FROM gh_dependabot_ecosystem WHERE time \u003e now() - INTERVAL '30 years' AND repo IN (${repo:sqlstring})) x WHERE time = newest ORDER BY 1, 2",
+              "rawSql": "SELECT repo AS \"Repository\", blocks AS \"Blocks\", ecosystem AS \"Ecosystem\", \"interval\" AS \"Interval\" FROM (SELECT repo, ecosystem, \"interval\", blocks, time, MAX(time) OVER (PARTITION BY full_name) AS newest FROM gh_dependabot_ecosystem WHERE time \u003e now() - INTERVAL '30 years' AND repo IN (${repo:sqlstring})) x WHERE time = newest ORDER BY 1, 2",
               "refId": "A"
             }
           ],
@@ -15275,7 +15325,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT ecosystem AS \"Ecosystem\", SUM(packages) AS \"Packages\" FROM (SELECT ecosystem, packages, ROW_NUMBER() OVER (PARTITION BY repo, ecosystem ORDER BY time DESC) AS rn FROM gh_dependency WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1 GROUP BY 1 ORDER BY 2 DESC LIMIT 12",
+              "rawSql": "SELECT ecosystem AS \"Ecosystem\", SUM(packages) AS \"Packages\" FROM (SELECT ecosystem, packages, ROW_NUMBER() OVER (PARTITION BY full_name, ecosystem ORDER BY time DESC) AS rn FROM gh_dependency WHERE $__timeFilter(time) AND repo IN (${repo:sqlstring})) x WHERE rn = 1 GROUP BY 1 ORDER BY 2 DESC LIMIT 12",
               "refId": "A"
             }
           ],
@@ -15948,7 +15998,7 @@
               "editorMode": "code",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT \"position\" AS \"Position\", repo AS \"Item\", kind AS \"Kind\", stars AS \"Stars\", days_since_push AS \"Idle\", url AS \"Link\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY repo ORDER BY time DESC) AS rn FROM gh_pinned_item WHERE $__timeFilter(time)) x WHERE rn = 1 ORDER BY 1",
+              "rawSql": "SELECT \"position\" AS \"Position\", repo AS \"Item\", kind AS \"Kind\", stars AS \"Stars\", days_since_push AS \"Idle\", url AS \"Link\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn FROM gh_pinned_item WHERE $__timeFilter(time)) x WHERE rn = 1 ORDER BY 1",
               "refId": "A"
             }
           ],
@@ -16363,7 +16413,7 @@
         },
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "How far each tiered badge is from its next tier. Count is what decides the badge today: merged pull requests for Pull Shark, accepted discussion answers for Galaxy Brain, the stars on the most starred repository for Starstruck, and merged pull requests in public repositories with a co-authored commit for Pair Extraordinaire, walked every hour. Next tier at is the community-observed threshold (Schweinepriester/github-profile-achievements), and Progress is Count against it, full at the top tier. Tier is what the count implies; Page agrees says whether the profile page shows the same tier, and a row that disagrees is a rule the page contradicts, so it carries no target and no bar. The single-tier badges are on the shelf above. Empty until the achievements family has run once.",
+          "description": "How far each tiered badge is from its next tier. Count is what decides the badge today: merged pull requests for Pull Shark, accepted discussion answers for Galaxy Brain, the stars on the most starred repository for Starstruck, and merged pull requests in public repositories with a co-authored commit for Pair Extraordinaire. That last count is a tally the state file keeps: each hourly pass adds the pull requests merged since the last day it covers, and the whole history is walked again once a week, which is when a count that went down, a repository made private or deleted, comes down here. Without a state file every start walks it whole. Next tier at is the community-observed threshold (Schweinepriester/github-profile-achievements), and Progress is Count against it, full at the top tier. Tier is what the count implies; Page agrees says whether the profile page shows the same tier, and a row that disagrees is a rule the page contradicts, so it carries no target and no bar. The single-tier badges are on the shelf above. Empty until the achievements family has run once.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -16730,7 +16780,7 @@
         },
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "Every budget GitHub reports, and the one that runs out first decides what a sweep can collect. Reading them costs nothing: GET /rate_limit is free.",
+          "description": "Every budget GitHub reports, and the one that runs out first decides what a sweep can collect. Reading them costs nothing: GET /rate_limit is free. Most used is the most any reading in the range had spent, and Lowest remaining the least any had left, so a bucket spent an hour ago still says so after it has refilled.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -16784,7 +16834,7 @@
         },
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "Every collector that ran in the range, with what stopped it where something did, how many sweeps it ran in, and how many repositories it was asked about. A family with no row here did not run at all, which is the one thing an empty panel could never say: not due, switched off, or skipped because a rate budget was spent. Why is what separates the two kinds of failure that would otherwise read alike: a spent search budget sorts apart from the 502 that cost a repository its history, and a family that had both has a row for each. Failures is the sweep's own count, so a family that failed on some of its repositories and was still marked as having run says so here; a batched query that failed names no repository and counts as one. One row here is not a family: `discover` is the repository listing, which every family depends on, and it appears only when it failed, because a listing that worked is stated by every other row of the same sweep. No repository filter: these rows belong to the collector rather than to a repository.",
+          "description": "Every collector that ran in the range, with what stopped it where something did, how many sweeps it ran in, and the most repositories one of those sweeps asked it about. For commits, issueevents and issues that count includes the repositories the movement query found nothing new in, which the family left unread and wrote no row for. A family with no row here did not run at all, which is the one thing an empty panel could never say: not due, switched off, or skipped because a rate budget was spent. Why is what separates the two kinds of failure that would otherwise read alike: a spent search budget sorts apart from the 502 that cost a repository its history, and a family that had both has a row for each. Failures is the sweep's own count, so a family that failed on some of its repositories and was still marked as having run says so here; a batched query that failed names no repository and counts as one. One row here is not a family: `discover` is the repository listing, which every family depends on, and it appears only when it failed, because a listing that worked is stated by every other row of the same sweep. No repository filter: these rows belong to the collector rather than to a repository.",
           "fieldConfig": {
             "defaults": {
               "custom": {

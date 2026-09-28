@@ -117,7 +117,7 @@ export const en: HomeContent = {
 		install,
 		configTitle: "Configure",
 		configNote:
-			"The smallest configuration that does something. Every ${VAR} is read from the environment, so this file holds no secrets.",
+			"The smallest configuration that does something. A ${VAR} in a credential, an address or a path is read from the environment, so this file holds no secrets.",
 		config,
 		outputTitle: "Collect",
 		outputNote:
@@ -130,7 +130,7 @@ export const en: HomeContent = {
 		steps: [
 			{
 				title: "Sweep",
-				body: "Each family of metrics has its own cadence, because they move at very different speeds: workflow runs every quarter of an hour, the contribution calendar every twelve.",
+				body: "Each family of metrics has its own cadence, because they move at very different speeds: workflow runs every quarter of an hour, the contribution calendar every hour, the account's keys once a day.",
 			},
 			{
 				title: "Date",
@@ -224,7 +224,7 @@ export const es: HomeContent = {
 		install,
 		configTitle: "Configurar",
 		configNote:
-			"La configuración mínima que hace algo. Cada ${VAR} se lee del entorno, así que este fichero no guarda secretos.",
+			"La configuración mínima que hace algo. Un ${VAR} en una credencial, una dirección o una ruta se lee del entorno, así que este fichero no guarda secretos.",
 		config,
 		outputTitle: "Recoger",
 		outputNote:
@@ -237,7 +237,7 @@ export const es: HomeContent = {
 		steps: [
 			{
 				title: "Recorrer",
-				body: "Cada familia de métricas tiene su cadencia, porque se mueven a velocidades muy distintas: las ejecuciones de workflows cada cuarto de hora, el calendario de contribuciones cada doce.",
+				body: "Cada familia de métricas tiene su cadencia, porque se mueven a velocidades muy distintas: las ejecuciones de workflows cada cuarto de hora, el calendario de contribuciones cada hora y las claves de la cuenta una vez al día.",
 			},
 			{
 				title: "Fechar",

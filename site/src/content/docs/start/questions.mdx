@@ -168,9 +168,11 @@ a backfill or a card render. It needs a personal access token, because the
 automatic `GITHUB_TOKEN` lacks push access to other repositories, [cannot read
 traffic even in its
 own](https://docs.github.com/en/rest/metrics/traffic#get-repository-clones--fine-grained-access-tokens),
-and is not a user. A hosted runner keeps no state file between runs, so each
-run walks the stargazers and the whole star history again unless the state is
-cached.
+and is not a user. A hosted runner keeps no state file between runs, so unless
+the state is cached, which needs a configuration file, every run is a first
+run: it collects every family whatever its cadence, walks the stargazers, the
+whole star history and the account's co-authored pull requests again, and pays
+for every answer in full, with no ETag to be answered a free 304.
 
 The modes, the inputs and the cache step are on [GitHub
 Actions](/ghchronicle/install/actions/).

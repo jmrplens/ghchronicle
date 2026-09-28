@@ -361,6 +361,19 @@ func TestARestartKeepsWhatTheCacheLearned(t *testing.T) {
 	if !bytes.Contains(out, []byte("cache file read")) {
 		t.Errorf("the second process did not say it read the cache file:\n%s", out)
 	}
+	// A one-shot run opens no write ledger, so it lists the jobs of the runs
+	// the cache file remembers at every run. That is how it always runs, not
+	// news: it is said at Debug, and never at Info, where it used to be the
+	// one line a cron job, the Action and a Docker one-shot all printed about
+	// a ledger they had never been meant to keep.
+	if !bytes.Contains(out, []byte("not every store keeps a write ledger")) {
+		t.Errorf("the second process did not say at Debug why it lists the remembered runs' jobs again:\n%s", out)
+	}
+	for line := range strings.SplitSeq(string(out), "\n") {
+		if strings.Contains(line, "listing the jobs of the runs the cache file remembers again") && strings.Contains(line, "level=INFO") {
+			t.Errorf("a one-shot run reported its refill at Info: %s", line)
+		}
+	}
 	all := gh.Requests()
 	assertRepeatsWereRevalidated(t, all[:afterFirst], all[afterFirst:])
 }
@@ -668,7 +681,10 @@ func assertCacheRowsAddUpToTheTotals(t *testing.T, points []point) {
 // assertAcceptedAnswersWereRead: the accepted answers are a walk of their own
 // beside the newest page of discussion comments. The fake's answers hold one
 // comment older than that page, which reaches the sink only through them,
-// and one the page holds too, which reaches it once.
+// and one the page holds too, which reaches it once. Whether a comment is the
+// answer is the answers field and no tag: it moves after the comment's date,
+// and as the tag is_answer, until 2.6.1, it gave an accepted comment a second
+// identity.
 func assertAcceptedAnswersWereRead(t *testing.T, points []point) {
 	t.Helper()
 	written := map[string]int{}
@@ -677,7 +693,10 @@ func assertAcceptedAnswersWereRead(t *testing.T, points []point) {
 			continue
 		}
 		written[p.Tags["comment"]]++
-		if p.Tags["comment"] == "7654321" && (p.Tags["is_answer"] != "true" || p.Fields["answers"] != float64(1)) {
+		if _, tagged := p.Tags["is_answer"]; tagged {
+			t.Errorf("comment %s carries is_answer as a tag: %v", p.Tags["comment"], p.Tags)
+		}
+		if p.Tags["comment"] == "7654321" && p.Fields["answers"] != float64(1) {
 			t.Errorf("the answer older than the newest page was written as %v %v", p.Tags, p.Fields)
 		}
 	}

@@ -64,7 +64,7 @@
     },
     {
       "datasource": "${DS_PROMETHEUS}",
-      "description": "Public repositories of the account, and the current stars and forks of the selected ones, summed over the newest row of each repository rather than over every row in the range. With All selected that includes the archived repositories the default filter sets aside, which the picker stops listing once the last backfill is behind it: people still star and fork them, and each totals sweep reads their counts again, an hour apart by default, so a range shorter than that can leave them out. An archived repository the configuration no longer collects is left out, as the picker leaves out a live one: a row written under an earlier configuration stays in the store, but nothing reads that repository's counts any more. Each repository counts once, by its full name. The repository count is GitHub's own count of the account's public repositories and not the set the sums are taken over: those are the repositories the sweeps collect and the archived ones above, private ones included, and forks left out unless `include_forks` is on.",
+      "description": "Public repositories of the account, and the current stars and forks of the selected ones, summed over the newest row of each repository rather than over every row in the range. With All selected that includes the archived repositories the default filter sets aside, which the picker stops listing once the last backfill is behind it: people still star and fork them, and each totals sweep reads their counts again, an hour apart by default, so where the sums are taken over the dashboard range, a range shorter than that can leave them out. An archived repository the configuration no longer collects is left out, as the picker leaves out a live one: a row written under an earlier configuration stays in the store, but nothing reads that repository's counts any more. Each repository counts once, by its full name. The repository count is GitHub's own count of the account's public repositories and not the set the sums are taken over: those are the repositories the sweeps collect and the archived ones above, private ones included, and forks left out unless `include_forks` is on. Prometheus takes no range here: each sum is an instant query over the values the running collector pushed last, so the archived repositories count however short the range is, from the collector's first totals sweep on.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1017,7 +1017,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "topk(10, max by (repo) (github_workflow_run_total_runs{repo=~\"$repo\"}))",
+              "expr": "topk(10, max by (full_name, repo) (github_workflow_run_total_runs{repo=~\"$repo\"}))",
               "format": "table",
               "instant": true,
               "range": false,
@@ -1115,7 +1115,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo) (github_traffic_count{kind=\"views\",repo=~\"$repo\"})",
+              "expr": "sum by (full_name, repo) (github_traffic_count{kind=\"views\",repo=~\"$repo\"})",
               "instant": false,
               "legendFormat": "{{repo}}",
               "range": true,
@@ -1179,7 +1179,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo) (github_traffic_uniques{kind=\"views\",repo=~\"$repo\"})",
+              "expr": "sum by (full_name, repo) (github_traffic_uniques{kind=\"views\",repo=~\"$repo\"})",
               "instant": false,
               "legendFormat": "{{repo}}",
               "range": true,
@@ -1243,7 +1243,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo) (github_traffic_count{kind=\"clones\",repo=~\"$repo\"})",
+              "expr": "sum by (full_name, repo) (github_traffic_count{kind=\"clones\",repo=~\"$repo\"})",
               "instant": false,
               "legendFormat": "{{repo}}",
               "range": true,
@@ -1536,7 +1536,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo) (github_traffic_count{kind=\"clones\",repo=~\"$repo\"})",
+              "expr": "sum by (full_name, repo) (github_traffic_count{kind=\"clones\",repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -1545,7 +1545,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo) (github_traffic_uniques{kind=\"clones\",repo=~\"$repo\"})",
+              "expr": "sum by (full_name, repo) (github_traffic_uniques{kind=\"clones\",repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -1554,7 +1554,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo) (github_traffic_count{kind=\"views\",repo=~\"$repo\"})",
+              "expr": "sum by (full_name, repo) (github_traffic_count{kind=\"views\",repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -1658,7 +1658,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo) (increase(github_stars_gained_total{repo=~\"$repo\"}[$__interval]))",
+              "expr": "sum by (full_name, repo) (increase(github_stars_gained_total{repo=~\"$repo\"}[$__interval]))",
               "instant": false,
               "interval": "1d",
               "legendFormat": "{{repo}}",
@@ -1779,7 +1779,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "topk(12, sum by (repo) (github_repo_stars{repo=~\"$repo\"}) \u003e 0)",
+              "expr": "topk(12, max by (full_name, repo) (github_repo_stars{repo=~\"$repo\"}) \u003e 0)",
               "format": "table",
               "instant": true,
               "range": false,
@@ -1905,7 +1905,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo) (increase(github_stars_gained_total{repo=~\"$repo\"}[$__range])) \u003e 0",
+              "expr": "sum by (full_name, repo) (increase(github_stars_gained_total{repo=~\"$repo\"}[$__range])) \u003e 0",
               "format": "table",
               "instant": true,
               "range": false,
@@ -2530,7 +2530,6 @@
                 "excludeByName": {
                   "Time": true,
                   "__name__": true,
-                  "full_name": true,
                   "instance": true,
                   "job": true,
                   "owner": true
@@ -3226,7 +3225,7 @@
           },
           "id": 44,
           "options": {
-            "content": "**Not available from Prometheus.** In the InfluxDB dashboard this panel shows pull requests per author over the range.\n\nThe exporter keeps only `repo` and `state` on pull requests: an author label would be a series per contributor per state.",
+            "content": "**Not available from Prometheus.** In the InfluxDB dashboard this panel shows pull requests per author over the range.\n\nThe exporter keeps only the repository and `state` on pull requests: an author label would be a series per contributor per state.",
             "mode": "markdown"
           },
           "targets": [],
@@ -3346,7 +3345,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo) (increase(github_pull_requests_total{state=\"MERGED\",repo=~\"$repo\"}[$__range]))",
+              "expr": "sum by (full_name, repo) (increase(github_pull_requests_total{state=\"MERGED\",repo=~\"$repo\"}[$__range]))",
               "format": "table",
               "instant": true,
               "range": false,
@@ -3355,7 +3354,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "avg by (repo) (github_pull_requests_seconds_to_merge_mean{state=\"MERGED\",repo=~\"$repo\"})",
+              "expr": "avg by (full_name, repo) (github_pull_requests_seconds_to_merge_mean{state=\"MERGED\",repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -3364,7 +3363,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "avg by (repo) (github_pull_requests_churn_mean{state=\"MERGED\",repo=~\"$repo\"})",
+              "expr": "avg by (full_name, repo) (github_pull_requests_churn_mean{state=\"MERGED\",repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -3612,7 +3611,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "Time to merge only counts what merged. This is the other half: what is still open and how long it has been, which is the number that decides what to do next rather than describing what already happened. Each pull request is read from its newest row, so one that merged inside the range is not here any more. Archived repositories are left out, since nothing in one can be merged, closed or run until it is unarchived; narrowing the picker to one shows an empty table here rather than rows nobody can act on. A fork's pull request is still one that can be merged, so those stay and Fork says which they are. In Prometheus this is the mean over the collector's last sweep, not a median over the dashboard range. Only gh_repo carries the fork and archived flags and this store cannot join one measurement to another, so the rows the SQL dashboards leave out are listed here. The Prometheus exporter carries no url, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "Time to merge only counts what merged. This is the other half: what is still open and how long it has been, which is the number that decides what to do next rather than describing what already happened. The table keeps the twenty-five open longest, the longest first. Each pull request is read from its newest row, so one that merged inside the range is not here any more. Archived repositories are left out, since nothing in one can be merged, closed or run until it is unarchived; narrowing the picker to one shows an empty table here rather than rows nobody can act on. A fork's pull request is still one that can be merged, so those stay and Fork says which they are. In Prometheus a row is a repository and not a pull request, since the exporter keeps no pull request of its own: Open for is the mean over the repository's open pull requests at the collector's last sweep, and the twenty-five rows are the repositories where it is longest. Only gh_repo carries the fork and archived flags and this store cannot join one measurement to another, so the rows the SQL dashboards leave out are listed here. The Prometheus exporter carries no url, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -3744,7 +3743,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "topk(25, max by (repo, number, author) (github_pull_requests_seconds_open_mean{state=\"OPEN\",repo=~\"$repo\"}))",
+              "expr": "topk(25, max by (full_name, repo, number, author) (github_pull_requests_seconds_open_mean{state=\"OPEN\",repo=~\"$repo\"}))",
               "format": "table",
               "instant": true,
               "range": false,
@@ -3753,7 +3752,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo, number, author) (github_pull_requests_comments_mean{state=\"OPEN\",repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo, number, author) (github_pull_requests_comments_mean{state=\"OPEN\",repo=~\"$repo\"}) and on (full_name, repo, number, author) topk(25, max by (full_name, repo, number, author) (github_pull_requests_seconds_open_mean{state=\"OPEN\",repo=~\"$repo\"}))",
               "format": "table",
               "instant": true,
               "range": false,
@@ -3917,7 +3916,7 @@
       "panels": [
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "How many runs the range holds and how they ended. The success rate is the runs that succeeded as a share of the runs that succeeded or failed: a run canceled by a newer push under a concurrency group, or skipped by its own condition, decided nothing and is counted beside it as undecided rather than as a failure. The run duration is the median over the range and the queue wait is the time a job spent waiting for a runner, which only exists at job level, the run-level number folding the wait into the duration. Over the runs whose jobs were expanded, which is the newest runs of each sweep and, after a backfill, every run GitHub still holds, which from 1 October 2026 means the repository's retention period, ninety days by default; not every run the run count includes. Last come the bytes the runs left behind, which are the artifacts the walk reached: GitHub lists thousands of them per repository and the walk stops at five hundred, so this is a floor wherever it did. \"Artifact storage counted\" below puts the two counts beside it. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date. In Prometheus this is the mean over the collector's last sweep, not a median over the dashboard range.",
+          "description": "How many runs the range holds and how they ended. The success rate is the runs that succeeded as a share of the runs that succeeded or failed: a run canceled by a newer push under a concurrency group, or skipped by its own condition, decided nothing and is counted beside it as undecided rather than as a failure. The run duration is the median over the range and the queue wait is the time a job spent waiting for a runner, which only exists at job level, the run-level number folding the wait into the duration. Over the runs whose jobs were expanded, which is the newest runs of each sweep and, after a backfill, every run GitHub still holds, which from 1 October 2026 means the repository's retention period, ninety days by default; not every run the run count includes. Last come the bytes the runs left behind, which are the artifacts the walk reached: GitHub lists thousands of them per repository and the walk stops at five hundred, or sooner when a page of the listing fails and the pass keeps what it had read, so this is a floor wherever it stopped short. \"Artifact storage counted\" below puts the two counts beside it. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date. In Prometheus this is the mean over the collector's last sweep, not a median over the dashboard range.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -4407,7 +4406,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "Artifacts that have not expired, over the ones the walk reached, which is a floor on any repository with more than five hundred: \"Artifact storage counted\" further down has the counts that say which those are. GitHub deletes artifacts on their own schedule, which is why this falls without anyone doing anything. A reading taken at each sweep, so the curve starts the day the collector did: there is no history of it to rebuild. The eight repositories holding the most are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "Artifacts that have not expired, over the ones the walk reached, which is a floor on any repository with more than five hundred, and on one whose walk a failed page of the listing cut short: \"Artifact storage counted\" further down has the counts that say which those are. GitHub deletes artifacts on their own schedule, which is why this falls without anyone doing anything. A reading taken at each sweep, so the curve starts the day the collector did: there is no history of it to rebuild. The eight repositories holding the most are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -4458,7 +4457,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo) (github_artifact_total_live_bytes{repo=~\"$repo\"}) \u003e 0",
+              "expr": "sum by (full_name, repo) (github_artifact_total_live_bytes{repo=~\"$repo\"}) \u003e 0",
               "instant": false,
               "legendFormat": "{{repo}}",
               "range": true,
@@ -4593,7 +4592,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "topk(30, sum by (repo, workflow) (increase(github_workflow_runs_total{repo=~\"$repo\"}[$__range])))",
+              "expr": "topk(30, sum by (full_name, repo, workflow) (increase(github_workflow_runs_total{repo=~\"$repo\"}[$__range])))",
               "format": "table",
               "instant": true,
               "range": false,
@@ -4602,7 +4601,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo, workflow) (increase(github_workflow_runs_total{conclusion!=\"success\",repo=~\"$repo\"}[$__range])) and on (repo, workflow) topk(30, sum by (repo, workflow) (increase(github_workflow_runs_total{repo=~\"$repo\"}[$__range])))",
+              "expr": "sum by (full_name, repo, workflow) (increase(github_workflow_runs_total{conclusion!=\"success\",repo=~\"$repo\"}[$__range])) and on (full_name, repo, workflow) topk(30, sum by (full_name, repo, workflow) (increase(github_workflow_runs_total{repo=~\"$repo\"}[$__range])))",
               "format": "table",
               "instant": true,
               "range": false,
@@ -4611,7 +4610,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "avg by (repo, workflow) (github_workflow_runs_duration_seconds_mean{repo=~\"$repo\"}) and on (repo, workflow) topk(30, sum by (repo, workflow) (increase(github_workflow_runs_total{repo=~\"$repo\"}[$__range])))",
+              "expr": "avg by (full_name, repo, workflow) (github_workflow_runs_duration_seconds_mean{repo=~\"$repo\"}) and on (full_name, repo, workflow) topk(30, sum by (full_name, repo, workflow) (increase(github_workflow_runs_total{repo=~\"$repo\"}[$__range])))",
               "format": "table",
               "instant": true,
               "range": false,
@@ -4753,7 +4752,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "topk(30, avg by (repo, job_name) (github_workflow_jobs_duration_seconds_mean{repo=~\"$repo\"}))",
+              "expr": "topk(30, avg by (full_name, repo, job_name) (github_workflow_jobs_duration_seconds_mean{repo=~\"$repo\"}))",
               "format": "table",
               "instant": true,
               "range": false,
@@ -4762,7 +4761,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo, job_name) (github_workflow_jobs_count{repo=~\"$repo\"}) and on (repo, job_name) topk(30, avg by (repo, job_name) (github_workflow_jobs_duration_seconds_mean{repo=~\"$repo\"}))",
+              "expr": "sum by (full_name, repo, job_name) (github_workflow_jobs_count{repo=~\"$repo\"}) and on (full_name, repo, job_name) topk(30, avg by (full_name, repo, job_name) (github_workflow_jobs_duration_seconds_mean{repo=~\"$repo\"}))",
               "format": "table",
               "instant": true,
               "range": false,
@@ -4916,7 +4915,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo) (increase(github_workflow_runs_total{conclusion!=\"success\",repo=~\"$repo\"}[$__range])) * on (repo) group_left avg by (repo) (github_workflow_runs_duration_seconds_mean{repo=~\"$repo\"})",
+              "expr": "sum by (full_name, repo) (increase(github_workflow_runs_total{conclusion!=\"success\",repo=~\"$repo\"}[$__range])) * on (full_name, repo) group_left avg by (full_name, repo) (github_workflow_runs_duration_seconds_mean{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -4925,7 +4924,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo) (increase(github_workflow_runs_total{repo=~\"$repo\"}[$__range])) * on (repo) group_left avg by (repo) (github_workflow_runs_duration_seconds_mean{repo=~\"$repo\"})",
+              "expr": "sum by (full_name, repo) (increase(github_workflow_runs_total{repo=~\"$repo\"}[$__range])) * on (full_name, repo) group_left avg by (full_name, repo) (github_workflow_runs_duration_seconds_mean{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -5061,7 +5060,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "topk(20, sum by (repo, workflow) (increase(github_workflow_runs_total{conclusion!=\"success\",repo=~\"$repo\"}[$__range])) \u003e 3)",
+              "expr": "topk(20, sum by (full_name, repo, workflow) (increase(github_workflow_runs_total{conclusion!=\"success\",repo=~\"$repo\"}[$__range])) \u003e 3)",
               "format": "table",
               "instant": true,
               "range": false,
@@ -5070,7 +5069,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo, workflow) (increase(github_workflow_runs_total{repo=~\"$repo\"}[$__range])) and on (repo, workflow) topk(20, sum by (repo, workflow) (increase(github_workflow_runs_total{conclusion!=\"success\",repo=~\"$repo\"}[$__range])) \u003e 3)",
+              "expr": "sum by (full_name, repo, workflow) (increase(github_workflow_runs_total{repo=~\"$repo\"}[$__range])) and on (full_name, repo, workflow) topk(20, sum by (full_name, repo, workflow) (increase(github_workflow_runs_total{conclusion!=\"success\",repo=~\"$repo\"}[$__range])) \u003e 3)",
               "format": "table",
               "instant": true,
               "range": false,
@@ -5144,7 +5143,7 @@
           },
           "id": 64,
           "options": {
-            "content": "**Not available from Prometheus.** In the InfluxDB dashboard this panel shows the workflows that are declared in a repository and did not run in the range, which is a join between two measurements.\n\nThe exporter keeps one series per label set and no way to subtract one set from another: `unless` compares label sets that would have to be identical. Both sides still carry a `workflow` label and it no longer holds the same string on each, the run's being the workflow file and the declaration's the human name, and the file path that would match is not exported at all: the declaration keeps `repo`, `workflow` and `state` and nothing else.\n\nEach row of it links to the item on GitHub.",
+            "content": "**Not available from Prometheus.** In the InfluxDB dashboard this panel shows the workflows that are declared in a repository and did not run in the range, which is a join between two measurements.\n\nThe exporter keeps one series per label set and no way to subtract one set from another: `unless` compares label sets that would have to be identical. Both sides still carry a `workflow` label and it no longer holds the same string on each, the run's being the workflow file and the declaration's the human name, and the file path that would match is not exported at all: the declaration keeps the repository, `workflow` and `state` and nothing else.\n\nEach row of it links to the item on GitHub.",
             "mode": "markdown"
           },
           "targets": [],
@@ -5174,7 +5173,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "Artifact storage, and how much of it was counted. Three counts, because the live size is on neither of the other two: Declared is GitHub's own total and counts the artifacts it has already expired, Walked is how far the page cap let the walk go, and Live is the artifacts still held among those, which is what the live size is the size of. When Walked is lower than Declared the live size is a floor rather than a total: here it is short by a factor of fifty six, and without these columns the tile above would say so nowhere.",
+          "description": "Artifact storage, and how much of it was counted. Three counts, because the live size is on neither of the other two: Declared is GitHub's own total and counts the artifacts it has already expired, Walked is how far the walk went, and Live is the artifacts still held among those, which is what the live size is the size of. A sweep's walk stops at five pages, five hundred artifacts, and any walk stops sooner when a page of the listing fails, the pass writing what it had read: either way Walked is lower than Declared and the live size is a floor rather than a total. Here it is short by a factor of fifty six, and without these columns the tile above would say so nowhere. All four are the newest row of each repository, which is the one the tile reads.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -5270,7 +5269,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo) (github_artifact_total_count{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo) (github_artifact_total_count{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -5279,7 +5278,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo) (github_artifact_total_walked{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo) (github_artifact_total_walked{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -5288,7 +5287,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo) (github_artifact_total_live_bytes{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo) (github_artifact_total_live_bytes{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -5297,7 +5296,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo) (github_artifact_total_live_count{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo) (github_artifact_total_live_count{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -5981,7 +5980,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo) (increase(github_repo_activities_total{activity=\"force_push\",repo=~\"$repo\"}[$__range])) \u003e 0",
+              "expr": "sum by (full_name, repo) (increase(github_repo_activities_total{activity=\"force_push\",repo=~\"$repo\"}[$__range])) \u003e 0",
               "format": "table",
               "instant": true,
               "range": false,
@@ -6428,7 +6427,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "topk(25, max by (repo, label) (github_label_used{repo=~\"$repo\"}))",
+              "expr": "topk(25, max by (full_name, repo, label) (github_label_used{repo=~\"$repo\"}))",
               "format": "table",
               "instant": true,
               "range": false,
@@ -6437,7 +6436,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo, label) (github_label_issues{repo=~\"$repo\"}) and on (repo, label) topk(25, max by (repo, label) (github_label_used{repo=~\"$repo\"}))",
+              "expr": "max by (full_name, repo, label) (github_label_issues{repo=~\"$repo\"}) and on (full_name, repo, label) topk(25, max by (full_name, repo, label) (github_label_used{repo=~\"$repo\"}))",
               "format": "table",
               "instant": true,
               "range": false,
@@ -6446,7 +6445,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo, label) (github_label_pull_requests{repo=~\"$repo\"}) and on (repo, label) topk(25, max by (repo, label) (github_label_used{repo=~\"$repo\"}))",
+              "expr": "max by (full_name, repo, label) (github_label_pull_requests{repo=~\"$repo\"}) and on (full_name, repo, label) topk(25, max by (full_name, repo, label) (github_label_used{repo=~\"$repo\"}))",
               "format": "table",
               "instant": true,
               "range": false,
@@ -6607,7 +6606,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo, milestone, state) (github_milestone_progress{repo=~\"$repo\"})",
+              "expr": "sum by (full_name, repo, milestone, state) (github_milestone_progress{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -6616,7 +6615,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo, milestone, state) (github_milestone_issues{repo=~\"$repo\"})",
+              "expr": "sum by (full_name, repo, milestone, state) (github_milestone_issues{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -6625,7 +6624,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo, milestone, state) (github_milestone_pull_requests{repo=~\"$repo\"})",
+              "expr": "sum by (full_name, repo, milestone, state) (github_milestone_pull_requests{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -6721,7 +6720,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo) (increase(github_forks_seen_total{repo=~\"$repo\"}[$__interval]))",
+              "expr": "sum by (full_name, repo) (increase(github_forks_seen_total{repo=~\"$repo\"}[$__interval]))",
               "instant": false,
               "interval": "1d",
               "legendFormat": "{{repo}}",
@@ -6888,7 +6887,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo) (increase(github_forks_seen_total{repo=~\"$repo\"}[$__range]))",
+              "expr": "sum by (full_name, repo) (increase(github_forks_seen_total{repo=~\"$repo\"}[$__range]))",
               "format": "table",
               "instant": true,
               "range": false,
@@ -6897,7 +6896,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "avg by (repo) (github_forks_seen_advanced_mean{repo=~\"$repo\"})",
+              "expr": "avg by (full_name, repo) (github_forks_seen_advanced_mean{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -6906,7 +6905,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "avg by (repo) (github_forks_seen_seconds_to_push_mean{repo=~\"$repo\"})",
+              "expr": "avg by (full_name, repo) (github_forks_seen_seconds_to_push_mean{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -7280,7 +7279,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "topk(20, sum by (repo) (increase(github_issue_comments_total[$__range])))",
+              "expr": "topk(20, sum by (full_name) (increase(github_issue_comments_total[$__range])))",
               "format": "table",
               "instant": true,
               "range": false,
@@ -7295,7 +7294,6 @@
                 "excludeByName": {
                   "Time": true,
                   "__name__": true,
-                  "full_name": true,
                   "instance": true,
                   "job": true,
                   "owner": true
@@ -7303,7 +7301,7 @@
                 "indexByName": {},
                 "renameByName": {
                   "Value": "Comments",
-                  "repo": "Repository"
+                  "full_name": "Repository"
                 }
               }
             }
@@ -7312,7 +7310,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "Discussions are the one surface where the work is almost entirely in other people's repositories: gh_discussion sees three rows inside this account, and this sees sixty six across twenty six repositories. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date.",
+          "description": "Discussions are the one surface where the work is almost entirely in other people's repositories: gh_discussion sees three rows inside this account, and this sees sixty six across twenty six repositories. Each comment counts once, however many rows a store holds of it, which Answers elsewhere explains. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -7395,7 +7393,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "topk(20, sum by (repo) (increase(github_discussion_comments_total[$__range])))",
+              "expr": "topk(20, sum by (full_name) (increase(github_discussion_comments_total[$__range])))",
               "format": "table",
               "instant": true,
               "range": false,
@@ -7410,7 +7408,6 @@
                 "excludeByName": {
                   "Time": true,
                   "__name__": true,
-                  "full_name": true,
                   "instance": true,
                   "job": true,
                   "owner": true
@@ -7418,7 +7415,7 @@
                 "indexByName": {},
                 "renameByName": {
                   "Value": "Comments",
-                  "repo": "Repository"
+                  "full_name": "Repository"
                 }
               }
             }
@@ -7724,7 +7721,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo, hook) (increase(github_webhook_deliveries_total{repo=~\"$repo\"}[$__range]))",
+              "expr": "sum by (full_name, repo, hook) (increase(github_webhook_deliveries_total{repo=~\"$repo\"}[$__range]))",
               "format": "table",
               "instant": true,
               "range": false,
@@ -7733,7 +7730,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo, hook) (increase(github_webhook_deliveries_total{ok=\"false\",repo=~\"$repo\"}[$__range]))",
+              "expr": "sum by (full_name, repo, hook) (increase(github_webhook_deliveries_total{ok=\"false\",repo=~\"$repo\"}[$__range]))",
               "format": "table",
               "instant": true,
               "range": false,
@@ -7742,7 +7739,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "avg by (repo, hook) (github_webhook_deliveries_redelivery_mean{repo=~\"$repo\"})",
+              "expr": "avg by (full_name, repo, hook) (github_webhook_deliveries_redelivery_mean{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -7751,7 +7748,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "avg by (repo, hook) (github_webhook_deliveries_duration_seconds_mean{repo=~\"$repo\"})",
+              "expr": "avg by (full_name, repo, hook) (github_webhook_deliveries_duration_seconds_mean{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -7885,7 +7882,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo, ruleset, enforcement) (github_ruleset_active{repo=~\"$repo\"})",
+              "expr": "sum by (full_name, repo, ruleset, enforcement) (github_ruleset_active{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -7894,7 +7891,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo, ruleset, enforcement) (github_ruleset_days_since_change{repo=~\"$repo\"})",
+              "expr": "sum by (full_name, repo, ruleset, enforcement) (github_ruleset_days_since_change{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -8009,7 +8006,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo, key, read_only) (github_deploy_key_days_since_use{repo=~\"$repo\"})",
+              "expr": "sum by (full_name, repo, key, read_only) (github_deploy_key_days_since_use{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -8059,7 +8056,7 @@
           },
           "id": 94,
           "options": {
-            "content": "### Failed job output\n\nThe last lines of every job that failed are collected too, but they are text\nrather than measurements, so they go to a log store rather than here. With the\nLoki sink enabled, this is the query:\n\n```\n{job=\"ghchronicle\", kind=\"job_log\"} |= \"error\"\n```\n\nSet `every.joblogs` to switch the collection on. GitHub deletes job logs after\nthe repository's retention period, ninety days by default, and answers 410\nafterwards, so an older log cannot be backfilled: what exists is what was\ncaptured while it was there.\n\nPublished to a Grafana that has a Loki datasource, with\n`cmd/publish_dashboard -loki \u003cdatasource-uid\u003e`, this panel shows those lines\ninstead of this note.\n",
+            "content": "### Failed job output\n\nThe last lines of every job that failed are collected too, but they are text\nrather than measurements, so they go to a log store rather than here. With the\nLoki sink enabled, this is the query:\n\n```\n{job=\"ghchronicle\", kind=\"job_log\"} |= \"error\"\n```\n\nSet `every.families.joblogs` to switch the collection on. GitHub deletes job\nlogs after the repository's retention period, ninety days by default, and\nanswers 410 afterwards, so an older log cannot be backfilled: what exists is\nwhat was captured while it was there.\n\nPublished to a Grafana that has a Loki datasource, with\n`cmd/publish_dashboard -loki \u003cdatasource-uid\u003e`, this panel shows those lines\ninstead of this note.\n",
             "mode": "markdown"
           },
           "targets": [],
@@ -8143,7 +8140,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo, host, hook, active) (github_webhook_events{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo, host, hook, active) (github_webhook_events{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -8250,7 +8247,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "min by (repo, environment) (github_environment_days_since_change{repo=~\"$repo\"})",
+              "expr": "min by (full_name, repo, environment) (github_environment_days_since_change{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -8379,7 +8376,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "topk(50, max by (repo, branch, is_default) (github_branch_days_since_commit{repo=~\"$repo\"}))",
+              "expr": "topk(50, max by (full_name, repo, branch, is_default) (github_branch_days_since_commit{repo=~\"$repo\"}))",
               "format": "table",
               "instant": true,
               "range": false,
@@ -8481,6 +8478,16 @@
                             "color": "green",
                             "index": 0,
                             "text": "on"
+                          },
+                          "false": {
+                            "color": "text",
+                            "index": 3,
+                            "text": "off"
+                          },
+                          "true": {
+                            "color": "green",
+                            "index": 2,
+                            "text": "on"
                           }
                         },
                         "type": "value"
@@ -8518,6 +8525,16 @@
                           "1": {
                             "color": "green",
                             "index": 0,
+                            "text": "on"
+                          },
+                          "false": {
+                            "color": "text",
+                            "index": 3,
+                            "text": "off"
+                          },
+                          "true": {
+                            "color": "green",
+                            "index": 2,
                             "text": "on"
                           }
                         },
@@ -8595,6 +8612,16 @@
                             "color": "green",
                             "index": 0,
                             "text": "on"
+                          },
+                          "false": {
+                            "color": "text",
+                            "index": 3,
+                            "text": "off"
+                          },
+                          "true": {
+                            "color": "green",
+                            "index": 2,
+                            "text": "on"
                           }
                         },
                         "type": "value"
@@ -8644,7 +8671,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo, pattern) (github_branch_protection_required_reviews{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo, pattern) (github_branch_protection_required_reviews{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -8653,7 +8680,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo, pattern) (github_branch_protection_requires_commit_signatures{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo, pattern) (github_branch_protection_requires_commit_signatures{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -8662,7 +8689,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo, pattern) (github_branch_protection_requires_linear_history{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo, pattern) (github_branch_protection_requires_linear_history{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -8671,7 +8698,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo, pattern) (github_branch_protection_allows_force_pushes{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo, pattern) (github_branch_protection_allows_force_pushes{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -8680,7 +8707,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo, pattern) (github_branch_protection_requires_conversation_resolution{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo, pattern) (github_branch_protection_requires_conversation_resolution{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -8689,7 +8716,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo, pattern) (github_branch_protection_required_checks{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo, pattern) (github_branch_protection_required_checks{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -8838,7 +8865,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo, ruleset, rule) (github_ruleset_rule_bypass_actors{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo, ruleset, rule) (github_ruleset_rule_bypass_actors{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -8847,7 +8874,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo, ruleset, rule) (github_ruleset_rule_bypass_always{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo, ruleset, rule) (github_ruleset_rule_bypass_always{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -8856,7 +8883,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo, ruleset, rule) (github_ruleset_rule_bypass_sampled{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo, ruleset, rule) (github_ruleset_rule_bypass_sampled{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -9003,7 +9030,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo, ruleset, actor_type) (github_ruleset_versions_count{repo=~\"$repo\"})",
+              "expr": "sum by (full_name, repo, ruleset, actor_type) (github_ruleset_versions_count{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -9257,7 +9284,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo, environment) (increase(github_deployments_total{repo=~\"$repo\"}[$__range]))",
+              "expr": "sum by (full_name, repo, environment) (increase(github_deployments_total{repo=~\"$repo\"}[$__range]))",
               "format": "table",
               "instant": true,
               "range": false,
@@ -9266,7 +9293,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "avg by (repo, environment) (github_deployments_seconds_to_status_mean{repo=~\"$repo\"})",
+              "expr": "avg by (full_name, repo, environment) (github_deployments_seconds_to_status_mean{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -9275,7 +9302,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "avg by (repo, environment) (github_deployments_seconds_live_mean{repo=~\"$repo\"})",
+              "expr": "avg by (full_name, repo, environment) (github_deployments_seconds_live_mean{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -9284,7 +9311,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo, environment) (increase(github_deployments_total{outcome=\"success\",repo=~\"$repo\"}[$__range]))",
+              "expr": "sum by (full_name, repo, environment) (increase(github_deployments_total{outcome=\"success\",repo=~\"$repo\"}[$__range]))",
               "format": "table",
               "instant": true,
               "range": false,
@@ -9293,7 +9320,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo, environment) (increase(github_deployments_total{outcome=\"pending\",repo=~\"$repo\"}[$__range]))",
+              "expr": "sum by (full_name, repo, environment) (increase(github_deployments_total{outcome=\"pending\",repo=~\"$repo\"}[$__range]))",
               "format": "table",
               "instant": true,
               "range": false,
@@ -9351,7 +9378,7 @@
       "panels": [
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "Release asset downloads, counted by GitHub since each release was published, and how many releases have been downloaded at all, as of the newest reading of each.",
+          "description": "Release asset downloads, counted by GitHub since each release was published, and how many releases have been downloaded at all, as of the newest reading of each. A repository is counted by its full name, so two owners' repositories of one name are two.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -9406,7 +9433,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "count(sum by (repo, tag) (github_release_downloads{repo=~\"$repo\"}) \u003e 0)",
+              "expr": "count(sum by (full_name, tag) (github_release_downloads{repo=~\"$repo\"}) \u003e 0)",
               "instant": true,
               "legendFormat": "Releases",
               "range": false,
@@ -9479,7 +9506,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "label_join(topk(12, sum by (repo, tag) (github_release_downloads{repo=~\"$repo\"}) \u003e 0), \"release\", \" \", \"repo\", \"tag\")",
+              "expr": "label_join(topk(12, sum by (full_name, repo, tag) (github_release_downloads{repo=~\"$repo\"}) \u003e 0), \"release\", \" \", \"repo\", \"tag\")",
               "format": "table",
               "instant": true,
               "range": false,
@@ -9569,7 +9596,7 @@
       "panels": [
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "Alerts still open, from the newest reading of each repository. Both are colored by the same thresholds, so one value can be green beside a red one.",
+          "description": "Alerts still open, from the newest reading of each repository, which is counted by its full name, so two owners' repositories of one name are two. Both are colored by the same thresholds, so one value can be green beside a red one.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -9990,7 +10017,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "Recorded explicitly, so a repository with the feature switched off is distinguishable from one with no alerts. The Prometheus exporter carries no url, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "Recorded explicitly, so a repository with the feature switched off is distinguishable from one with no alerts. Each row is the newest reading of the repository's feature, so a feature switched off or an alert fixed inside the range reads as it stands and not as it was at its highest. The Prometheus exporter carries no url, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -10029,6 +10056,16 @@
                           "1": {
                             "color": "green",
                             "index": 0,
+                            "text": "on"
+                          },
+                          "false": {
+                            "color": "text",
+                            "index": 3,
+                            "text": "off"
+                          },
+                          "true": {
+                            "color": "green",
+                            "index": 2,
                             "text": "on"
                           }
                         },
@@ -10079,7 +10116,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo, feature) (github_security_feature_enabled{repo=~\"$repo\"})",
+              "expr": "sum by (full_name, repo, feature) (github_security_feature_enabled{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -10088,7 +10125,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo, feature) (github_security_feature_open_alerts{repo=~\"$repo\"})",
+              "expr": "sum by (full_name, repo, feature) (github_security_feature_open_alerts{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -10705,7 +10742,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (tool, repo) (increase(github_code_scanning_analyses_total{repo=~\"$repo\"}[$__range]))",
+              "expr": "sum by (tool, full_name, repo) (increase(github_code_scanning_analyses_total{repo=~\"$repo\"}[$__range]))",
               "format": "table",
               "instant": true,
               "range": false,
@@ -10714,7 +10751,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "avg by (tool, repo) (github_code_scanning_analyses_results_mean{repo=~\"$repo\"})",
+              "expr": "avg by (tool, full_name, repo) (github_code_scanning_analyses_results_mean{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -10908,7 +10945,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo, setting, status) (github_security_setting_enabled{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo, setting, status) (github_security_setting_enabled{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -11049,7 +11086,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo, state, query_suite, schedule) (github_code_scanning_setup_setups{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo, state, query_suite, schedule) (github_code_scanning_setup_setups{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -11058,7 +11095,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo, state, query_suite, schedule) (github_code_scanning_setup_languages{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo, state, query_suite, schedule) (github_code_scanning_setup_languages{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -11067,7 +11104,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo, state, query_suite, schedule) (github_code_scanning_setup_days_since_change{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo, state, query_suite, schedule) (github_code_scanning_setup_days_since_change{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -11165,6 +11202,16 @@
                             "color": "green",
                             "index": 0,
                             "text": "on"
+                          },
+                          "false": {
+                            "color": "text",
+                            "index": 3,
+                            "text": "off"
+                          },
+                          "true": {
+                            "color": "green",
+                            "index": 2,
+                            "text": "on"
                           }
                         },
                         "type": "value"
@@ -11202,7 +11249,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo, permissions) (github_actions_policy_can_approve_pr{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo, permissions) (github_actions_policy_can_approve_pr{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -11338,7 +11385,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo, kind, secret) (github_secret_age_days{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo, kind, secret) (github_secret_age_days{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -11347,7 +11394,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo, kind, secret) (github_secret_days_since_rotation{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo, kind, secret) (github_secret_days_since_rotation{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -11791,7 +11838,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo, sku, unit) (github_billing_usage_quantity{repo!=\"(none)\"})",
+              "expr": "sum by (full_name, repo, sku, unit) (github_billing_usage_quantity{repo!=\"(none)\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -11800,7 +11847,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo, sku, unit) (github_billing_usage_price_per_unit{repo!=\"(none)\"})",
+              "expr": "max by (full_name, repo, sku, unit) (github_billing_usage_price_per_unit{repo!=\"(none)\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -11809,7 +11856,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo, sku, unit) (github_billing_usage_gross{repo!=\"(none)\"})",
+              "expr": "sum by (full_name, repo, sku, unit) (github_billing_usage_gross{repo!=\"(none)\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -11818,7 +11865,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo, sku, unit) (github_billing_usage_net{repo!=\"(none)\"})",
+              "expr": "sum by (full_name, repo, sku, unit) (github_billing_usage_net{repo!=\"(none)\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -11958,7 +12005,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "topk(25, sum by (repo, cache) (github_actions_cache_entry_size_bytes{repo=~\"$repo\"}))",
+              "expr": "topk(25, sum by (full_name, repo, cache) (github_actions_cache_entry_size_bytes{repo=~\"$repo\"}))",
               "format": "table",
               "instant": true,
               "range": false,
@@ -11967,7 +12014,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "min by (repo, cache) (github_actions_cache_entry_days_since_use{repo=~\"$repo\"})",
+              "expr": "min by (full_name, repo, cache) (github_actions_cache_entry_days_since_use{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -11976,7 +12023,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo, cache) (github_actions_cache_entry_caches{repo=~\"$repo\"})",
+              "expr": "sum by (full_name, repo, cache) (github_actions_cache_entry_caches{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -12121,7 +12168,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo) (github_actions_cache_size_bytes{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo) (github_actions_cache_size_bytes{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -12130,7 +12177,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo) (github_actions_cache_count{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo) (github_actions_cache_count{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -12549,7 +12596,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "Pull requests and issues opened in repositories this account does not own, with the state each ended in. Nothing else sees them: they are not in these repositories and the event feed forgets them in three days. Seen is the row's own date, which for an open item is the day it was last seen open; Opened is when it was opened. Stars is the repository's own count at the last sweep inside the range. Prometheus keeps the repository only, so this is contributions per repository over the range, the share merged and the mean comments, beside the stars at the last sweep. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date. The Prometheus exporter carries no url, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "Pull requests and issues opened in repositories this account does not own, with the state each ended in. Nothing else sees them: they are not in these repositories, and the event feed keeps only its last three hundred events, none older than thirty days. Seen is the row's own date, which for an open item is the day it was last seen open; Opened is when it was opened. Stars is the repository's own count at the last sweep inside the range. Prometheus keeps the repository only, so this is contributions per repository over the range, the share merged and the mean comments, with no Seen or Opened column, since an item's dates do not survive the exporter. Its Stars is the count the exporter holds at the end of the range, whenever the sweep that read it ran. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date. The Prometheus exporter carries no url, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -12785,7 +12832,6 @@
                 "excludeByName": {
                   "Time": true,
                   "__name__": true,
-                  "full_name": true,
                   "instance": true,
                   "job": true,
                   "owner": true
@@ -13434,7 +13480,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo) (github_repo_community_health_percentage{repo=~\"$repo\"})",
+              "expr": "sum by (full_name, repo) (github_repo_community_health_percentage{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -13443,7 +13489,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo) (github_repo_community_has_readme{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo) (github_repo_community_has_readme{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -13452,7 +13498,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo) (github_repo_community_has_license{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo) (github_repo_community_has_license{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -13461,7 +13507,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo) (github_repo_community_has_contributing{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo) (github_repo_community_has_contributing{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -13470,7 +13516,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo) (github_repo_community_has_code_of_conduct{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo) (github_repo_community_has_code_of_conduct{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -13479,7 +13525,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo) (github_repo_policy_issue_templates{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo) (github_repo_policy_issue_templates{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -13488,7 +13534,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo) (github_repo_community_has_pull_request_template{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo) (github_repo_community_has_pull_request_template{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -13732,7 +13778,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo, language, visibility, license) (github_repo_stars{repo=~\"$repo\"})",
+              "expr": "sum by (full_name, repo, language, visibility, license) (github_repo_stars{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -13741,7 +13787,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo, language, visibility, license) (github_repo_forks{repo=~\"$repo\"})",
+              "expr": "sum by (full_name, repo, language, visibility, license) (github_repo_forks{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -13750,7 +13796,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo, language, visibility, license) (github_repo_network{repo=~\"$repo\"})",
+              "expr": "sum by (full_name, repo, language, visibility, license) (github_repo_network{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -13759,7 +13805,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo, language, visibility, license) (github_repo_open_issues{repo=~\"$repo\"})",
+              "expr": "sum by (full_name, repo, language, visibility, license) (github_repo_open_issues{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -13768,7 +13814,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo, language, visibility, license) (github_repo_watchers{repo=~\"$repo\"})",
+              "expr": "sum by (full_name, repo, language, visibility, license) (github_repo_watchers{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -13777,7 +13823,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo, language, visibility, license) (github_repo_size_kb{repo=~\"$repo\"})",
+              "expr": "sum by (full_name, repo, language, visibility, license) (github_repo_size_kb{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -13786,7 +13832,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo, language, visibility, license) (github_repo_age_days{repo=~\"$repo\"})",
+              "expr": "sum by (full_name, repo, language, visibility, license) (github_repo_age_days{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -13795,7 +13841,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (repo, language, visibility, license) (github_repo_days_since_push{repo=~\"$repo\"})",
+              "expr": "sum by (full_name, repo, language, visibility, license) (github_repo_days_since_push{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -14466,7 +14512,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo) (github_repo_policy_security_policy{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo) (github_repo_policy_security_policy{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -14475,7 +14521,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo) (github_repo_policy_delete_branch_on_merge{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo) (github_repo_policy_delete_branch_on_merge{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -14484,7 +14530,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo) (github_repo_policy_auto_merge{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo) (github_repo_policy_auto_merge{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -14493,7 +14539,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo) (github_repo_policy_branch_protection_rules{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo) (github_repo_policy_branch_protection_rules{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -14502,7 +14548,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo) (github_repo_policy_issue_templates{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo) (github_repo_policy_issue_templates{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -14511,7 +14557,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo) (github_repo_policy_codeowners_errors{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo) (github_repo_policy_codeowners_errors{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -14958,7 +15004,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo, file) (github_policy_file_present{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo, file) (github_policy_file_present{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -14967,7 +15013,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo, file) (github_policy_file_changes{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo, file) (github_policy_file_changes{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -15127,7 +15173,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo, ecosystem, interval) (github_dependabot_ecosystem_blocks{repo=~\"$repo\"})",
+              "expr": "max by (full_name, repo, ecosystem, interval) (github_dependabot_ecosystem_blocks{repo=~\"$repo\"})",
               "format": "table",
               "instant": true,
               "range": false,
@@ -16017,7 +16063,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo) (github_pinned_item_position)",
+              "expr": "max by (full_name, repo) (github_pinned_item_position)",
               "format": "table",
               "instant": true,
               "range": false,
@@ -16026,7 +16072,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo) (github_pinned_item_stars)",
+              "expr": "max by (full_name, repo) (github_pinned_item_stars)",
               "format": "table",
               "instant": true,
               "range": false,
@@ -16035,7 +16081,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (repo) (github_pinned_item_days_since_push)",
+              "expr": "max by (full_name, repo) (github_pinned_item_days_since_push)",
               "format": "table",
               "instant": true,
               "range": false,
@@ -16520,7 +16566,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "How far each tiered badge is from its next tier. Count is what decides the badge today: merged pull requests for Pull Shark, accepted discussion answers for Galaxy Brain, the stars on the most starred repository for Starstruck, and merged pull requests in public repositories with a co-authored commit for Pair Extraordinaire, walked every hour. Next tier at is the community-observed threshold (Schweinepriester/github-profile-achievements), and Progress is Count against it, full at the top tier. Tier is what the count implies; Page agrees says whether the profile page shows the same tier, and a row that disagrees is a rule the page contradicts, so it carries no target and no bar. The single-tier badges are on the shelf above. Empty until the achievements family has run once. Prometheus keeps the badge by its slug and its numbers; the display name and the badge image are strings and do not survive as metrics. The Prometheus exporter carries no url, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "How far each tiered badge is from its next tier. Count is what decides the badge today: merged pull requests for Pull Shark, accepted discussion answers for Galaxy Brain, the stars on the most starred repository for Starstruck, and merged pull requests in public repositories with a co-authored commit for Pair Extraordinaire. That last count is a tally the state file keeps: each hourly pass adds the pull requests merged since the last day it covers, and the whole history is walked again once a week, which is when a count that went down, a repository made private or deleted, comes down here. Without a state file every start walks it whole. Next tier at is the community-observed threshold (Schweinepriester/github-profile-achievements), and Progress is Count against it, full at the top tier. Tier is what the count implies; Page agrees says whether the profile page shows the same tier, and a row that disagrees is a rule the page contradicts, so it carries no target and no bar. The single-tier badges are on the shelf above. Empty until the achievements family has run once. Prometheus keeps the badge by its slug and its numbers; the display name and the badge image are strings and do not survive as metrics. The Prometheus exporter carries no url, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -16926,7 +16972,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "Every budget GitHub reports, and the one that runs out first decides what a sweep can collect. Reading them costs nothing: GET /rate_limit is free.",
+          "description": "Every budget GitHub reports, and the one that runs out first decides what a sweep can collect. Reading them costs nothing: GET /rate_limit is free. Most used is the most any reading in the range had spent, and Lowest remaining the least any had left, so a bucket spent an hour ago still says so after it has refilled.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -16969,7 +17015,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (resource) (github_rate_limit_limit)",
+              "expr": "max by (resource) (max_over_time(github_rate_limit_limit[$__range]))",
               "format": "table",
               "instant": true,
               "range": false,
@@ -16978,7 +17024,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "min by (resource) (github_rate_limit_remaining)",
+              "expr": "min by (resource) (min_over_time(github_rate_limit_remaining[$__range]))",
               "format": "table",
               "instant": true,
               "range": false,
@@ -16987,7 +17033,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (resource) (github_rate_limit_used)",
+              "expr": "max by (resource) (max_over_time(github_rate_limit_used[$__range]))",
               "format": "table",
               "instant": true,
               "range": false,
@@ -17025,7 +17071,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "Every collector that ran in the range, with what stopped it where something did, how many sweeps it ran in, and how many repositories it was asked about. A family with no row here did not run at all, which is the one thing an empty panel could never say: not due, switched off, or skipped because a rate budget was spent. Why is what separates the two kinds of failure that would otherwise read alike: a spent search budget sorts apart from the 502 that cost a repository its history, and a family that had both has a row for each. Failures is the sweep's own count, so a family that failed on some of its repositories and was still marked as having run says so here; a batched query that failed names no repository and counts as one. One row here is not a family: `discover` is the repository listing, which every family depends on, and it appears only when it failed, because a listing that worked is stated by every other row of the same sweep. No repository filter: these rows belong to the collector rather than to a repository. In Prometheus this counts the collector's last sweep, not the dashboard range. There is no Sweeps column here for the same reason: the exporter holds one sweep, so the count would be one on every row.",
+          "description": "Every collector that ran in the range, with what stopped it where something did, how many sweeps it ran in, and the most repositories one of those sweeps asked it about. For commits, issueevents and issues that count includes the repositories the movement query found nothing new in, which the family left unread and wrote no row for. A family with no row here did not run at all, which is the one thing an empty panel could never say: not due, switched off, or skipped because a rate budget was spent. Why is what separates the two kinds of failure that would otherwise read alike: a spent search budget sorts apart from the 502 that cost a repository its history, and a family that had both has a row for each. Failures is the sweep's own count, so a family that failed on some of its repositories and was still marked as having run says so here; a batched query that failed names no repository and counts as one. One row here is not a family: `discover` is the repository listing, which every family depends on, and it appears only when it failed, because a listing that worked is stated by every other row of the same sweep. No repository filter: these rows belong to the collector rather than to a repository. In Prometheus this counts the collector's last sweep, not the dashboard range. There is no Sweeps column here for the same reason: the exporter holds one sweep, so the count would be one on every row.",
           "fieldConfig": {
             "defaults": {
               "custom": {

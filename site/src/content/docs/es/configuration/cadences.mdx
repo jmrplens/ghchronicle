@@ -75,7 +75,7 @@ cambie de coste sin que esta tabla la siga rompe la compilación.
 
 | Grupo       | Familia        | Por omisión | Motivo                                                                                                                                                                                                                                                                                                                                                                                                   |
 | ----------- | -------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `account`   | `account`      | `1h`        | el calendario de contribuciones se mueve con cada contribución y los contadores del perfil con cada seguimiento y cada estrella, y una pasada es un punto de GraphQL y siete peticiones REST, de las que solo se cobra la del perfil: GitHub nunca la respondió con un 304, y los seis listados de paquetes lo responden hasta que cambia un paquete                                                     |
+| `account`   | `account`      | `1h`        | el calendario de contribuciones se mueve con cada contribución y los contadores del perfil con cada seguimiento y cada estrella, y una pasada es un punto de GraphQL y siete peticiones REST, de las que solo se cobra la del perfil: GitHub casi nunca la respondió con un 304, una vez en 48 lecturas condicionales, y los seis listados de paquetes lo responden hasta que cambia un paquete                                                     |
 | `account`   | `achievements` | `1h`        | las insignias de la página pública del perfil, que ninguna API lista, y lo que le falta a cada una con niveles para el siguiente; una pasada transfiere la página, 36 KB y fuera del presupuesto, y las pull requests fusionadas desde el día anterior por dos puntos de GraphQL, así que un nivel alcanzado por la tarde se ve por la tarde, y el historial entero se recorre una vez por semana, 24 MB |
 | `account`   | `billing`      | `1h`        | el mes en curso se mueve mientras corre la integración continua: había cambiado en cada una de las 46 lecturas cada seis horas medidas, y una pasada son dos peticiones, ese mes y el anterior, de las que solo se cobra la primera                                                                                                                                                                      |
 | `account`   | `history`      | `0`         | apagada hasta que se la nombre: recorre cada año pasado y lo que va de este, y las filas son idempotentes                                                                                                                                                                                                                                                                                                |
@@ -287,9 +287,9 @@ heartbeat explícito no lo es.
 Una familia toca en el primer tic en que su cadencia ha pasado, con medio tic
 de margen. El bucle lee el reloj unos milisegundos después de despertar, en una
 cantidad que cambia de un tic a otro, y sin ese margen una familia cuya cadencia
-es un número entero de tics esperaba un tic de más la mitad de las veces: antes
-de la 2.5.2 las familias de cuarto de hora corrían cada 24 minutos de media y
-las horarias cada 69. Medio tic absorbe eso y nunca deja correr a una familia un
+es un número entero de tics esperaba un tic de más la mitad de las veces: hasta
+la 2.6.0, que trajo la corrección escrita para la 2.5.2, las familias de cuarto
+de hora corrían cada 24 minutos de media y las horarias cada 69. Medio tic absorbe eso y nunca deja correr a una familia un
 tic antes de tiempo.
 
 Un heartbeat **más largo** que la cadencia más corta frena a esa familia, y el
@@ -302,8 +302,9 @@ level=WARN msg="heartbeat is 1h and the shortest cadence is 15m (actions), so
 
 ## Las familias lentas se turnan
 
-El servicio en marcha arranca como mucho una familia de cadencia de seis horas o
-más en cada pasada, y deja cualquier otra que toque para el tic siguiente.
+El servicio en marcha arranca una familia de cadencia de seis horas o más en
+cada pasada, o las menos que aún mantienen todas las cadencias cuando una no
+basta (más abajo), y deja cualquier otra que toque para el tic siguiente.
 
 Las familias que corren en la misma pasada quedan marcadas con el mismo instante
 en el fichero de estado, así que vuelven a tocar juntas en cada cadencia, para
@@ -367,9 +368,15 @@ el turno que tenía.
 
 ## Hacerlas más lentas
 
-Si el presupuesto aprieta, alarga `artifacts` y después `actions`. Son las dos
-únicas cuyo coste crece con lo activos que estén los repositorios y no con
-cuántos haya. Ver [coste de una pasada](/ghchronicle/es/api/cost/).
+Si el presupuesto que se queda corto es `core`, alarga `artifacts` y después
+`actions`, los dos mayores costes REST, que crecen con lo activos que estén los
+repositorios. Si es `graphql`, alarga `issues`, `issueevents` y `commits`, que
+leen solo los repositorios donde algo se movió y por eso cuestan más cuantos
+más se muevan. No son los únicos que siguen a la actividad y no al tamaño:
+`activity` solo se cobra por un repositorio cuyo log se movió, y
+`outbound` cuesta un punto más por cada centenar adicional de lo que lee. Ver
+[qué crece con la actividad, no con el
+tamaño](/ghchronicle/es/api/cost/#qué-crece-con-la-actividad-no-con-el-tamaño).
 
 El síntoma de unas cadencias demasiado rápidas es un aviso en cada pasada:
 

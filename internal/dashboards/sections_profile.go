@@ -36,15 +36,16 @@ const (
 // lifetime_received_cents would report the lifetime total once per sweep,
 // which is the 3.61K alert tile in a new costume.
 //
-// Some Elasticsearch columns cannot have the newest row, and each says so
-// where it is built. A top_metrics there hands a boolean back as the string
+// Some Elasticsearch columns cannot be read with a top_metrics, and each says
+// so where it is built. A top_metrics hands a boolean back as the string
 // "true" and panics Grafana's plugin, and for a document that is missing the
 // field it appends nothing at all rather than a null, which leaves the metric
 // column shorter than the bucket columns and fails the whole panel. Those
-// columns take the largest reading inside the range instead. That is the
-// newest reading for anything that only grows, and it is not for the two that
-// can fall back: `enabled` on a flag somebody switches off, and
-// `days_since_push` on a pin somebody pushes to.
+// columns take a max inside each item's newest document instead, which is
+// the newest reading all the same (see newestDoc). The largest reading of the
+// range stood there before, and it was not the newest for the two that can
+// fall back: `enabled` on a flag somebody switches off, and `days_since_push`
+// on a pin somebody pushes to.
 func profileSection(b *builder) []Panel {
 	out := append(sponsorship(b), profileStanding(b)...)
 	return append(out, starLists(b), achievements(b), achievementProgress(b))
@@ -114,9 +115,18 @@ func achievementProgress(b *builder) Panel {
 	// The badge image and the url reach the table as buckets of one value
 	// each, the way the url does everywhere: a top metric over a string
 	// panics the plugin. The badge is named by its slug, as on the shelf,
-	// and the numbers are the newest document's own.
-	es, estf := esTbl(ap, []any{b.tm("achievement", 50, "_key", "asc"), b.tmURL("image"), b.tmURL()},
-		[]any{b.mNewest("percent", "count", "next_threshold", "tier_number", "agrees")},
+	// and the numbers are the newest document's own, each a max inside it
+	// rather than a top_metrics: a badge whose page disagrees with its count
+	// carries no percent and no next threshold, and a top_metrics appends
+	// nothing for them. Measured against Grafana 13.2.1 and Elasticsearch
+	// 9.5.3 with one badge of each kind, the whole panel failed with "frame
+	// has different field lengths"; a max answers null. See newestDoc.
+	es, estf := esTbl(ap, []any{
+		b.tm("achievement", 50, "_key", "asc"), b.newestDoc(), b.tmURL("image"), b.tmURL(),
+	}, []any{
+		b.mMax("percent"), b.mMax("count"), b.mMax("next_threshold"),
+		b.mMax("tier_number"), b.mMax("agrees"),
+	},
 		[]named{
 			{"achievement.keyword", "Achievement"},
 			{"image.keyword", "Badge"},
@@ -126,7 +136,7 @@ func achievementProgress(b *builder) Panel {
 			{"next_threshold", profileNextTier},
 			{"tier_number", "Tier"},
 			{"agrees", profilePageAgrees},
-		}, nil)
+		}, nil, hideColumns(panelESTime))
 	var prom []Target
 	for i, field := range []string{"percent", "count", "next_threshold", "tier_number", "agrees"} {
 		prom = append(prom, promTbl(fmt.Sprintf("max by (achievement) (github_achievement_progress_%s)", field), string(rune('A'+i))))
@@ -152,7 +162,11 @@ func achievementProgress(b *builder) Panel {
 			"the badge today: merged pull requests for Pull Shark, accepted discussion " +
 			"answers for Galaxy Brain, the stars on the most starred repository for " +
 			"Starstruck, and merged pull requests in public repositories with a " +
-			"co-authored commit for Pair Extraordinaire, walked every hour. Next tier " +
+			"co-authored commit for Pair Extraordinaire. That last count is a tally the " +
+			"state file keeps: each hourly pass adds the pull requests merged since the " +
+			"last day it covers, and the whole history is walked again once a week, which " +
+			"is when a count that went down, a repository made private or deleted, comes " +
+			"down here. Without a state file every start walks it whole. Next tier " +
 			"at is the community-observed threshold (Schweinepriester/github-profile-" +
 			"achievements), and Progress is Count against it, full at the top tier. " +
 			"Tier is what the count implies; Page agrees says whether the profile page " +
@@ -284,16 +298,6 @@ func profileBool(name string, w int) any {
 	})
 }
 
-// profileSortAsc orders a table's rows by one column, ascending. A table's own
-// `sort` option is descending only, and these two panels read in the order the
-// account arranged them: a pin by its slot, a flag by its name.
-func profileSortAsc(field string) any {
-	return map[string]any{"id": "sortBy", "options": map[string]any{
-		"fields": map[string]any{},
-		"sort":   []any{map[string]any{"field": field, "desc": false}},
-	}}
-}
-
 // sponsorship is the money: what the sponsors listing holds right now, every
 // sponsorship that was ever made in either direction, and the tiers on offer.
 func sponsorship(b *builder) []Panel {
@@ -394,14 +398,13 @@ func sponsorship(b *builder) []Panel {
 
 	tierGR, tierGRtf := gTbl(rowsOf(fmt.Sprintf("scale(keepLastValue(%s), 0.01)", gp(st, "price_cents")),
 		gn(st, "tier")), "Tier", []col{{"lastNotNull", "Price"}})
-	// The price and the age as the newest reading of each tier, the two
-	// booleans as a max. A top_metrics hands a boolean back as the string
-	// "true" and Grafana's Elasticsearch plugin converts a top_metrics value to
-	// a float without checking the type, which takes the whole panel with it.
-	// A max over the same field is answered as 1 or 0, and retiring a tier only
-	// ever goes one way, so the largest reading inside the range is the newest
-	// one.
-	tierES, tierEStf := esTbl(st, []any{b.tm("tier", 50), b.tm("url", 5)},
+	// The price as the newest reading of each tier, the two booleans and the
+	// age as a max inside the tier's newest document. A top_metrics hands a
+	// boolean back as the string "true" and Grafana's Elasticsearch plugin
+	// converts a top_metrics value to a float without checking the type, which
+	// takes the whole panel with it. A max over the same field is answered as
+	// 1 or 0.
+	tierES, tierEStf := esTbl(st, []any{b.tm("tier", 50), b.newestDoc(), b.tm("url", 5)},
 		[]any{b.mNewest("price_cents"), b.mMax("one_time"), b.mMax("retired"), b.mMax("age_days")},
 		[]named{
 			{"tier.keyword", "Tier"},
@@ -410,7 +413,7 @@ func sponsorship(b *builder) []Panel {
 			{"one_time", profileOneTime},
 			{"retired", "Retired"},
 			{"age_days", "Age"},
-		}, nil)
+		}, nil, hideColumns(panelESTime))
 
 	return []Panel{
 		statGroup("Sponsorship", box{W: 24, H: 4, X: 0, Y: 0}, []Target{sqlT(
@@ -498,10 +501,7 @@ func sponsorship(b *builder) []Panel {
 			GRDesc: "Graphite keeps the price, which is the column this table sorts by. " + grRows,
 			ES:     tierES, ESTF: tierEStf,
 			ESOpts: Opts{"sort": "Price (cents)"},
-			ESDesc: "Elasticsearch takes the newest price of each tier and the largest reading " +
-				"of the rest inside the range: an age only grows and a retirement only " +
-				"happens once, so the two agree, and a max over a boolean is the one form " +
-				"the datasource can render. " + esCents,
+			ESDesc: esCents,
 		}),
 	}
 }
@@ -516,7 +516,7 @@ func profileStanding(b *builder) []Panel {
 	// list of both dialects.
 	pins := `SELECT "position" AS "Position", repo AS "Item", kind AS "Kind",` +
 		` stars AS "Stars", days_since_push AS "Idle", url AS "Link" FROM (` +
-		"SELECT *, ROW_NUMBER() OVER (PARTITION BY repo ORDER BY time DESC) AS rn" +
+		"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn" +
 		profileFrom + pi + " WHERE $__timeFilter(time)) x WHERE rn = 1 ORDER BY 1"
 	// Two columns and the link. The measurement carries a third field, the
 	// days since the availability status was set, but on one row of eight,
@@ -538,7 +538,7 @@ func profileStanding(b *builder) []Panel {
 	// sort by hand, on the one store of the five where the rows arrive by name.
 	pinGR, pinGRtf := gTbl(rowsOf(profileKeepLast+gp(pi, "position")+")", gn(pi, "repo")),
 		"Item", []col{{"lastNotNull", "Position"}})
-	pinGRtf = append(pinGRtf, profileSortAsc("Position"))
+	pinGRtf = append(pinGRtf, sortAsc("Position"))
 	// The kind and the link as buckets and never as metrics: they are strings,
 	// and a top_metrics over one panics Grafana's Elasticsearch plugin. A pin
 	// has exactly one of each, so bucketing by them costs no rows. `position`
@@ -551,13 +551,10 @@ func profileStanding(b *builder) []Panel {
 	// appends nothing at all rather than a null, so the metric column comes
 	// back shorter than the bucket columns and the whole panel fails with
 	// `frame has different field lengths`. A max appends a null and the gist
-	// keeps its row with two empty cells. The cost is paid on
-	// `days_since_push` alone: it resets to 0 on a push, so the largest
-	// reading inside the range is the staleness from before the push rather
-	// than the current one, and this panel exists to find stale pins.
-	// Widening the range makes that worse rather than better, which is why the
-	// description says it.
-	pinES, pinEStf := esTbl(pi, []any{b.tm("repo", 20), b.tm("kind", 5), b.tm("url", 20)},
+	// keeps its row with two empty cells, and taken inside the pin's newest
+	// document it is the newest reading: `days_since_push` resets to 0 on a
+	// push, and the largest of the range was the staleness from before it.
+	pinES, pinEStf := esTbl(pi, append(b.tmRepo(20), b.newestDoc(), b.tm("kind", 5), b.tm("url", 20)),
 		[]any{b.mNewest("position"), b.mMax("stars"), b.mMax("days_since_push")},
 		[]named{
 			{"repo.keyword", "Item"},
@@ -566,18 +563,20 @@ func profileStanding(b *builder) []Panel {
 			{"position", "Position"},
 			{"stars", "Stars"},
 			{"days_since_push", "Idle"},
-		}, nil, profileSortAsc("Position"))
+		}, nil, hideColumns(panelFullNameField, panelESTime), sortAsc("Position"))
 
 	flagGR, flagGRtf := gTbl(rowsOf(profileKeepLast+gp(pf, "enabled")+")", gn(pf, "flag")),
 		"Flag", []col{{"lastNotNull", "Enabled"}})
-	flagGRtf = append(flagGRtf, profileSortAsc("Flag"))
-	flagES, flagEStf := esTbl(pf, []any{b.tm("flag", 10, "_key", "asc"), b.tmURL()},
+	flagGRtf = append(flagGRtf, sortAsc("Flag"))
+	// A max inside each flag's newest document: `enabled` is a boolean, which a
+	// top_metrics hands back as text. See newestDoc.
+	flagES, flagEStf := esTbl(pf, []any{b.tm("flag", 10, "_key", "asc"), b.newestDoc(), b.tmURL()},
 		[]any{b.mMax("enabled")},
 		[]named{
 			{"flag.keyword", "Flag"},
 			{panelURLField, "Link"},
 			{"enabled", "Enabled"},
-		}, nil)
+		}, nil, hideColumns(panelESTime))
 
 	return []Panel{
 		// No repository filter anywhere in this panel. `repo` is the bare
@@ -594,14 +593,14 @@ func profileStanding(b *builder) []Panel {
 		// showed six of.
 		panel("table", "Pinned items", box{W: 12, H: 10, X: 0, Y: 14}, []Target{sqlT(pins)}, &P{
 			Prom: []Target{
-				promTbl("max by (repo) (github_pinned_item_position)", "A"),
-				promTbl("max by (repo) (github_pinned_item_stars)", "B"),
-				promTbl("max by (repo) (github_pinned_item_days_since_push)", "C"),
+				promTbl("max by (full_name, repo) (github_pinned_item_position)", "A"),
+				promTbl("max by (full_name, repo) (github_pinned_item_stars)", "B"),
+				promTbl("max by (full_name, repo) (github_pinned_item_days_since_push)", "C"),
 			},
 			PromTF: append(merged(map[string]string{
 				"repo": "Item", panelValueA: "Position", panelValueB: "Stars",
 				panelValueC: "Idle",
-			}, []string{"user"}, map[string]int{"repo": 0}), profileSortAsc("Position")),
+			}, []string{"user"}, map[string]int{"repo": 0}), sortAsc("Position")),
 			Desc: "What the profile shows first, in the order it shows it. The row worth seeing " +
 				"is a pinned repository nobody has pushed to in two years. Position is a field " +
 				"and not a tag on purpose: a repository that moves from slot two to slot three " +
@@ -618,18 +617,12 @@ func profileStanding(b *builder) []Panel {
 			GR: pinGR, GRTF: pinGRtf,
 			GRDesc: "Graphite has no strings either, so this is the slot each pin sits in. " + grRows,
 			ES:     pinES, ESTF: pinEStf,
-			ESDesc: "Elasticsearch takes the newest position of each pin, and the largest " +
-				"stars and idle days inside the range rather than the newest ones, because a " +
-				"gist carries neither field and only an aggregation that can answer null keeps " +
-				"its row. Stars only grow, so the largest is the current count. Idle days reset " +
-				"to 0 on a push, so a pin that was pushed to inside the range still reads as " +
-				"idle here until the range has rolled past the push.",
 		}),
 		panel("table", "Profile flags", box{W: 12, H: 10, X: 12, Y: 14}, []Target{sqlT(flags)}, &P{
 			Prom: []Target{promTbl("max by (flag) (github_profile_flag_enabled)")},
 			PromTF: []any{organize(map[string]string{
 				"flag": "Flag", "Value": "Enabled",
-			}, []string{"user"}, map[string]int{"flag": 0}), profileSortAsc("Flag")},
+			}, []string{"user"}, map[string]int{"flag": 0}), sortAsc("Flag")},
 			Desc: "A closed list of eight flags the profile advertises, as they read at the " +
 				"last sweep. Seven are booleans that change once in years, and the day one " +
 				"does is the day worth being able to point at: hireable, developer program, " +
@@ -647,10 +640,6 @@ func profileStanding(b *builder) []Panel {
 			GR: flagGR, GRTF: flagGRtf,
 			GRDesc: "Graphite carries all eight booleans. " + grRows,
 			ES:     flagES, ESTF: flagEStf,
-			ESDesc: "Elasticsearch answers Enabled with the largest reading inside the " +
-				"range rather than the newest one: it keeps enabled as a boolean, and the " +
-				"aggregation that would take the newest reading returns a boolean as text, " +
-				"which the datasource cannot render.",
 		}),
 	}
 }
@@ -675,13 +664,13 @@ func starLists(b *builder) Panel {
 	listGR, listGRtf := gTbl(rowsOf(profileKeepLast+gp(sl, "items")+")", gn(sl, "list")),
 		"List", []col{{"lastNotNull", "Items"}})
 	// The item count as the newest reading of each list, the age and the days
-	// since the last addition as a max: `days_since_add` is written only for
-	// a list a star has ever gone into, so a top_metrics over an empty list
-	// appends nothing and the metric column comes back shorter than the
-	// bucket columns. A max appends a null and the row keeps its shape, at
-	// the cost the pins panel already pays: the days reset to 0 on an
-	// addition, so the largest reading inside the range is the staleness
-	// from before it.
+	// since the last addition as a max inside the list's newest document:
+	// `days_since_add` is written only for a list a star has ever gone into,
+	// so a top_metrics over an empty list appends nothing and the metric
+	// column comes back shorter than the bucket columns. A max appends a null
+	// and the row keeps its shape, and inside the newest document it is the
+	// newest reading, where the largest of the range was the staleness from
+	// before the last addition.
 	//
 	// No Private column here. The datasource asks every aggregation of the
 	// whole `ghchronicle-*` pattern, and `private` is a tag, so text, on
@@ -689,7 +678,7 @@ func starLists(b *builder) Panel {
 	// on those shards and the panel answers with no rows at all, which is how
 	// the Social accounts panel was blank before the containerised suite
 	// measured it. The boolean is the store's to show the other four ways.
-	listES, listEStf := esTbl(sl, []any{b.tm("list", 100), b.tm("url", 5)},
+	listES, listEStf := esTbl(sl, []any{b.tm("list", 100), b.newestDoc(), b.tm("url", 5)},
 		[]any{b.mNewest("items"), b.mMax("age_days"), b.mMax("days_since_add")},
 		[]named{
 			{"list.keyword", "List"},
@@ -697,7 +686,7 @@ func starLists(b *builder) Panel {
 			{"items", "Items"},
 			{"age_days", "Age"},
 			{"days_since_add", profileLastAdded},
-		}, nil)
+		}, nil, hideColumns(panelESTime))
 
 	// No repository filter: a list is the account's, not a repository's.
 	return panel("table", "Star lists", box{W: 24, H: 7, X: 0, Y: 24}, []Target{sqlT(lists)}, &P{
@@ -726,11 +715,8 @@ func starLists(b *builder) Panel {
 		GR: listGR, GRTF: listGRtf,
 		GRDesc: "Graphite keeps the item count, which is the column this table sorts by. " + grRows,
 		ES:     listES, ESTF: listEStf,
-		ESDesc: "Elasticsearch takes the newest item count of each list and the largest " +
-			"reading of the two ages inside the range: an age only grows, and a list " +
-			"nobody has added to has no Last added at all and keeps its row with an " +
-			"empty cell. Last added resets on an addition, so a list added to inside " +
-			"the range still reads as idle here until the range has rolled past it. " +
+		ESDesc: "A list nobody has added to has no Last added at all, in this dashboard " +
+			"or any of the others, and its cell is empty. " +
 			"Private is not a column here: the datasource aggregates over every " +
 			"index at once, and the same name is a text tag on notifications and " +
 			"daily contributions, whose shards refuse a max over it.",

@@ -27,7 +27,7 @@ const securityFrom = " FROM "
 // securitySetupBy keeps the identity of a code scanning setup on the
 // Prometheus side: three queries group by the same four labels so the merge
 // lines their columns up on one row per repository.
-const securitySetupBy = "max by (repo, state, query_suite, schedule) "
+const securitySetupBy = "max by (full_name, repo, state, query_suite, schedule) "
 
 // What this section calls its numbers and its columns wherever they appear.
 // One value reaches a panel from five stores and each of them has to name it
@@ -44,17 +44,22 @@ const (
 )
 
 // onOff renders a genuinely two-state boolean column as a word rather than as
-// 1 and 0. Two panels of this section carry one, and every store hands the
-// value over as a number: SQL casts it, Prometheus and Graphite hold a boolean
-// as 1 or 0, and the Elasticsearch panels take a max for the reason posture()
-// gives. A boolean that is false for two different reasons is threeStates().
+// 1 and 0. SQL casts the flag, Prometheus and Graphite hold a boolean as 1 or
+// 0, and an Elasticsearch metric over one reads 1 or 0 too. An Elasticsearch
+// bucket on one does not: Grafana names a bucket that has another below it by
+// the key's text, `true` or `false` (measured against Grafana 13.2.1 in the
+// containerised suite), which is how Security features reads its flag there,
+// and with the two numbers alone mapped the word was drawn bare. A boolean
+// that is false for two different reasons is threeStates().
 func onOff(name string, w int) any {
 	return override(name, []any{
 		map[string]any{"id": securityCellOptions, "value": map[string]any{"type": securityColoredText}},
 		map[string]any{"id": "mappings", "value": []any{map[string]any{
 			"type": "value", "options": map[string]any{
-				"0": map[string]any{"text": "off", "color": "text", "index": 1},
-				"1": map[string]any{"text": "on", "color": "green", "index": 0},
+				"0":     map[string]any{"text": "off", "color": "text", "index": 1},
+				"1":     map[string]any{"text": "on", "color": "green", "index": 0},
+				"false": map[string]any{"text": "off", "color": "text", "index": 3},
+				"true":  map[string]any{"text": "on", "color": "green", "index": 2},
 			},
 		}}},
 		map[string]any{"id": securityCellWidth, "value": w},
@@ -106,29 +111,37 @@ func openAlerts(b *builder) []Panel {
 	// The alert counts are a snapshot per repository, severity and ecosystem,
 	// rewritten on every sweep. Summing them over the range counted each alert
 	// once per sweep: the tile read 3.61K where the account had a few dozen.
-	// One row per series, newest first, and then the sum.
-	dep := latestSumSQL("gh_dependabot_alert", "open", "repo, severity, ecosystem")
-	scan := latestSumSQL("gh_code_scanning_alert", "open", "repo, severity, tool")
+	// One row per series, newest first, and then the sum. A series is a
+	// repository by its full name, and the two breakdowns beside the tile
+	// read the same series, so that their bars add up to it.
+	dep := latestSumSQL("gh_dependabot_alert", "open", "severity", "ecosystem")
+	scan := latestSumSQL("gh_code_scanning_alert", "open", "severity", "tool")
 	bySev := `SELECT severity AS "Severity", SUM(open) AS "Open alerts" FROM (` +
-		"SELECT severity, open, ROW_NUMBER() OVER (PARTITION BY repo, severity, ecosystem" +
+		"SELECT severity, open, ROW_NUMBER() OVER (PARTITION BY full_name, severity, ecosystem" +
 		" ORDER BY time DESC) AS rn FROM gh_dependabot_alert WHERE $__timeFilter(time) AND " + RF +
 		") x WHERE rn = 1 GROUP BY 1 ORDER BY 2 DESC"
 	byEco := `SELECT ecosystem AS "Ecosystem", SUM(open) AS "Open alerts" FROM (` +
-		"SELECT ecosystem, open, ROW_NUMBER() OVER (PARTITION BY repo, severity, ecosystem" +
+		"SELECT ecosystem, open, ROW_NUMBER() OVER (PARTITION BY full_name, severity, ecosystem" +
 		" ORDER BY time DESC) AS rn FROM gh_dependabot_alert WHERE $__timeFilter(time) AND " + RF +
 		") x WHERE rn = 1 GROUP BY 1 ORDER BY 2 DESC"
+	// The newest reading of each repository's feature, not the largest of the
+	// range: MAX(enabled) read a feature switched off inside the range as on,
+	// and MAX(open_alerts) an alert fixed inside it as still open, which is
+	// the difference this table is here to show. By full name, since two
+	// owners' repositories of one name are two rows with two answers.
 	feats := `SELECT repo AS "Repository", feature AS "Feature",` +
-		` MAX(CAST(enabled AS INT)) AS "Enabled", MAX(open_alerts) AS "Open alerts",` +
-		` url AS "Link"` +
-		" FROM gh_security_feature WHERE $__timeFilter(time) AND " + RF +
-		" GROUP BY 1, 2, 5 ORDER BY 1, 2"
+		` CAST(enabled AS INT) AS "Enabled", open_alerts AS "Open alerts",` +
+		` url AS "Link" FROM (` +
+		"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, feature ORDER BY time DESC) AS rn" +
+		securityFrom + "gh_security_feature" + ciInRange + RF + deliveryNewestRow +
+		" ORDER BY 1, 2"
 	// A snapshot per repository, severity and ecosystem: the value of a
 	// bucket is the newest row of each series inside it, and the severity's
 	// line is those added up. A MAX per severity took the largest series
 	// instead of the sum, and the curve ended at 4 under a tile saying 6.
 	trend := "SELECT time, severity AS series, SUM(open) AS alerts FROM (" +
 		"SELECT " + timeBin + ", severity, open, ROW_NUMBER() OVER (PARTITION BY" +
-		" $__dateBin(time), repo, severity, ecosystem ORDER BY time DESC) AS rn" +
+		" $__dateBin(time), full_name, severity, ecosystem ORDER BY time DESC) AS rn" +
 		" FROM gh_dependabot_alert WHERE $__timeFilter(time) AND " + RF + ") x" +
 		" WHERE rn = 1 GROUP BY 1, 2 ORDER BY 1"
 	enabled := onOff("Enabled", 100)
@@ -144,7 +157,7 @@ func openAlerts(b *builder) []Panel {
 		if tag == "severity" {
 			other = "ecosystem"
 		}
-		es, estf = esTbl(da, []any{b.tm(tag, 20), b.tm("repo", 500), b.tm(other, 20)},
+		es, estf = esTbl(da, []any{b.tm(tag, 20), b.tm("full_name", 500), b.tm(other, 20)},
 			[]any{b.mNewest("open")},
 			[]named{{tag + ".keyword", name}, {"open", securityOpenAlerts}}, []string{ESF},
 			groupSum(name, securityOpenAlerts, name, securityOpenAlerts)...)
@@ -154,10 +167,20 @@ func openAlerts(b *builder) []Panel {
 	sevGR, sevGRtf, sevES, sevEStf := byTag("severity", "Severity")
 	ecoGR, ecoGRtf, ecoES, ecoEStf := byTag("ecosystem", "Ecosystem")
 
-	featGR, featGRtf := gTbl(rowsOf(rp(sf, "open_alerts"), gn(sf, "repo"), gn(sf, "feature")),
-		"Repository, feature", []col{{"max", securityOpenAlerts}})
+	// The last value of each series, and consolidated by the last value too:
+	// a narrow panel asks for fewer points than the range holds, and the
+	// average Graphite consolidates by otherwise drew the mean of an alert's
+	// last two readings.
+	featGR, featGRtf := gTbl(rowsOf(fmt.Sprintf(`consolidateBy(%s, "last")`, rp(sf, "open_alerts")),
+		gn(sf, "repo"), gn(sf, "feature")),
+		"Repository, feature", []col{{"lastNotNull", securityOpenAlerts}})
+	// Each full name and feature, then its newest timestamp, which holds the
+	// one document of the newest sweep: the flag and the count are read from
+	// that, as the cache table reads its newest day. The flag stays a bucket,
+	// since a top_metrics over a boolean hands the plugin a string.
 	featES, featEStf := esTbl(sf, []any{
-		b.tm("repo", 500), b.tm("feature", 5),
+		b.tm("full_name", 500), b.tm("repo", 1), b.tm("feature", 5),
+		b.terms(panelESTime, 1, "_key", "desc"),
 		// A boolean is mapped as itself, with no keyword sub-field to ask for.
 		b.terms("enabled", 2), b.tmURL(),
 	}, []any{b.mMax("open_alerts")},
@@ -167,7 +190,7 @@ func openAlerts(b *builder) []Panel {
 			{"feature.keyword", "Feature"},
 			{"enabled", "Enabled"},
 			{"o", securityOpenAlerts},
-		}, []string{ESF})
+		}, []string{ESF}, hideColumns(panelFullNameField, panelESTime))
 
 	return []Panel{
 		statGroup(securityOpenAlerts, box{W: 12, H: 4, X: 0, Y: 0}, []Target{
@@ -179,8 +202,10 @@ func openAlerts(b *builder) []Panel {
 				promNamed("B", securityCodeScanning,
 					fmt.Sprintf("sum(github_code_scanning_alert_open{%s})", PF)),
 			},
-			Desc: "Alerts still open, from the newest reading of each repository. Both are " +
-				"colored by the same thresholds, so one value can be green beside a red one.",
+			Desc: "Alerts still open, from the newest reading of each repository, which is " +
+				"counted by its full name, so two owners' repositories of one name are two. " +
+				"Both are colored by the same thresholds, so one value can be green beside a " +
+				"red one.",
 			GR: []Target{
 				grNamed("A", "Dependabot", latestSum(depOpen)),
 				grNamed("B", securityCodeScanning, latestSum(rp(cs, "open"))),
@@ -233,8 +258,8 @@ func openAlerts(b *builder) []Panel {
 			// Each series reduced to its newest per bucket, then the group
 			// summed: summing per series first is what keeps the sum from
 			// counting one sweep twice.
-			GR: []Target{grq(fmt.Sprintf(`consolidateBy(groupByNode(summarize(%s, "1d", "last"), %d, "sum"), "max")`,
-				depOpen, gn(da, "severity")))},
+			GR: []Target{grq(consolidated(fmt.Sprintf(`groupByNode(summarize(%s, "1d", "last"), %d, "sum")`,
+				depOpen, gn(da, "severity")), "max"))},
 			ES: []Target{b.esDaily(da, b.mMax("open"), "severity", "", []string{ESF}, "")},
 			ESDesc: "In Elasticsearch this is the largest single series of each severity " +
 				"in the day rather than the sum across repositories: a date histogram " +
@@ -242,19 +267,22 @@ func openAlerts(b *builder) []Panel {
 		}),
 		panel("table", "Security features", box{W: 12, H: 8, X: 12, Y: 4}, []Target{sqlT(feats)}, &P{
 			Prom: []Target{
-				promTbl(fmt.Sprintf("sum by (repo, feature) (github_security_feature_enabled{%s})", PF), "A"),
-				promTbl(fmt.Sprintf("sum by (repo, feature) (github_security_feature_open_alerts{%s})", PF), "B"),
+				promTbl(fmt.Sprintf("sum by (full_name, repo, feature) (github_security_feature_enabled{%s})", PF), "A"),
+				promTbl(fmt.Sprintf("sum by (full_name, repo, feature) (github_security_feature_open_alerts{%s})", PF), "B"),
 			},
 			PromTF: merged(map[string]string{
 				"repo": "Repository", "feature": "Feature", inventoryValueCol + "A": "Enabled",
 				inventoryValueCol + "B": securityOpenAlerts,
 			}, nil, map[string]int{"repo": 0, "feature": 1}),
 			Desc: "Recorded explicitly, so a repository with the feature switched off is " +
-				"distinguishable from one with no alerts.",
+				"distinguishable from one with no alerts. Each row is the newest reading of " +
+				"the repository's feature, so a feature switched off or an alert fixed inside " +
+				"the range reads as it stands and not as it was at its highest.",
 			Overrides: []any{enabled, width(securityOpenAlerts, 120), ownerLinkOn("Feature", "the security overview")},
 			GR:        featGR, GRTF: featGRtf,
-			GRDesc: "Graphite names each row repository and feature from the path. " + grRows,
-			ES:     featES, ESTF: featEStf,
+			GRDesc: "Graphite names each row repository and feature from the path and keeps one " +
+				"number per row, the open alerts, so whether the feature is on is not shown here.",
+			ES: featES, ESTF: featEStf,
 		}),
 	}
 }
@@ -270,6 +298,23 @@ const securityResolveDesc = "Dependabot alerts that were fixed or dismissed, new
 	"The score is there because the word rounds it away: one alert in the measured " +
 	"account scores 9.3 under a word whose mean is 6.1. It is the v4 score where the " +
 	"advisory carries one."
+
+// securityOldestDesc is what the table of open alerts says about itself, out
+// here for the reason securityResolveDesc is.
+const securityOldestDesc = "The alerts still open, oldest first, whatever the dashboard range: an alert " +
+	"is listed while its row says it is open, however long ago it was raised. A " +
+	"Dependabot alert names its package and advisory, a code scanning alert its " +
+	"rule and tool. These are not always the rows the two counts at the top of the " +
+	"section are made of: a sweep writes a row for each of the newest hundred " +
+	"alerts of a repository in every state, and a repository with more has its " +
+	"counts taken from a read of the open ones alone. There an open alert no sweep " +
+	"has reached, behind a hundred newer ones since before the collector started, " +
+	"is counted and not listed here, and an alert fixed while it sat behind the " +
+	"newest hundred stays listed here as open, until a backfill reads the whole " +
+	"list. Open for is counted from " +
+	"the row's own date to now, so it is right when the panel is drawn rather than " +
+	"when the last sweep ran. The " +
+	"link opens the alert, which GitHub shows to the owner alone."
 
 // scanningAndResolution is the other side of the same section: that the scans
 // ran at all, what they returned, and how long an alert stayed open before it
@@ -344,8 +389,7 @@ func scanningAndResolution(b *builder) []Panel {
 		[]named{{"severity.keyword", "Severity"}, {"n", "Alerts"}, {"t", securityResolveTime}},
 		[]string{ESF, "NOT alert_state:open"})
 
-	resGR, resGRtf := gTbl(fmt.Sprintf(`groupByNodes(%s, "avg", %d, %d, %d)`,
-		rp(di, "seconds_to_resolve"), gn(di, "repo"), gn(di, "severity"), gn(di, "package")),
+	resGR, resGRtf := gTbl(grGroupBy(rp(di, "seconds_to_resolve"), di, "avg", "repo", "severity", "package"),
 		"Repository, severity, package", []col{{"count", "Alerts"}, {"median", securityResolveTime}})
 	// The documents themselves: the advisory text is a string, and a
 	// top_metrics over a string panics the plugin.
@@ -376,7 +420,7 @@ func scanningAndResolution(b *builder) []Panel {
 	// requires the metric to be its own direct child, and this one sits four
 	// buckets deeper, so Elasticsearch would refuse the order path outright.
 	oldestES, oldestEStf := esTbl(di,
-		[]any{b.tm("repo", 50), b.tm("number", 25), b.tm("severity", 5), b.tm("package", 5), b.tmURL()},
+		append(b.tmRepo(50), b.tm("number", 25), b.tm("severity", 5), b.tm("package", 5), b.tmURL()),
 		[]any{b.metric("min", "@timestamp", nil)},
 		[]named{
 			{inventoryRepoTerm, "Repository"},
@@ -385,14 +429,13 @@ func scanningAndResolution(b *builder) []Panel {
 			{"package.keyword", "What"},
 			{"url.keyword", "Link"},
 			{"m", "Raised"},
-		}, []string{ESF, "alert_state:open"})
+		}, []string{ESF, "alert_state:open"}, hideColumns(panelFullNameField))
 
-	toolGR, toolGRtf := gTbl(fmt.Sprintf(
-		`limit(sortBy(groupByNodes(%s, "sum", %d, %d), "sum", true), 25)`,
-		rp(an, "results"), gn(an, "tool"), gn(an, "repo"),
+	toolGR, toolGRtf := gTbl(fmt.Sprintf(`limit(sortBy(%s, "sum", true), 25)`,
+		grGroupBy(rp(an, "results"), an, "sum", "tool", "repo"),
 	),
 		"Tool, repository", []col{{"sum", "Results"}})
-	toolES, toolEStf := esTbl(an, []any{b.tm("tool", 10), b.tm("repo", 50)},
+	toolES, toolEStf := esTbl(an, append([]any{b.tm("tool", 10)}, b.tmRepo(50)...),
 		[]any{b.mCount(), b.mSum("results"), b.mMax("rules")},
 		[]named{
 			{"tool.keyword", "Tool"},
@@ -400,7 +443,7 @@ func scanningAndResolution(b *builder) []Panel {
 			{"n", "Runs"},
 			{"r", "Results"},
 			{"u", "Rules"},
-		}, []string{ESF})
+		}, []string{ESF}, hideColumns(panelFullNameField))
 
 	return []Panel{
 		panel("timeseries", "Code scanning runs", box{W: 12, H: 8, X: 0, Y: 12}, []Target{sqlTS(analyses)}, &P{
@@ -415,7 +458,7 @@ func scanningAndResolution(b *builder) []Panel {
 				"that ran the most in the range are named; the rest are `other`. " +
 				bucketFollowsRange,
 			PromDesc: sinceStart,
-			GR:       []Target{grq(perBucket("isNonNull("+rp(an, "analyses")+")", gn(an, "tool")))},
+			GR:       []Target{grq(perBucket(nonNull(rp(an, "analyses")), gn(an, "tool")))},
 			ES:       []Target{b.esDaily(an, b.mCount(), "tool", "", []string{ESF}, "")},
 		}),
 		panel("table", "Scanning alerts resolved", box{W: 24, H: 7, X: 0, Y: 20},
@@ -468,11 +511,11 @@ func scanningAndResolution(b *builder) []Panel {
 			`SELECT tool AS "Tool", SUM(results) AS "Results", repo AS "Repository",` +
 				` COUNT(*) AS "Runs", MAX(rules) AS "Rules"` +
 				" FROM gh_code_scanning_analysis WHERE $__timeFilter(time) AND " + RF +
-				" GROUP BY 1, 3 ORDER BY 2 DESC LIMIT 25",
+				" GROUP BY 1, full_name, 3 ORDER BY 2 DESC LIMIT 25",
 		)}, &P{
 			Prom: []Target{
-				promTbl(fmt.Sprintf("sum by (tool, repo) (increase(github_code_scanning_analyses_total{%s}[$__range]))", PF), "A"),
-				promTbl(fmt.Sprintf("avg by (tool, repo) (github_code_scanning_analyses_results_mean{%s})", PF), "B"),
+				promTbl(fmt.Sprintf("sum by (tool, full_name, repo) (increase(github_code_scanning_analyses_total{%s}[$__range]))", PF), "A"),
+				promTbl(fmt.Sprintf("avg by (tool, full_name, repo) (github_code_scanning_analyses_results_mean{%s})", PF), "B"),
 			},
 			PromTF: merged(map[string]string{
 				"tool": "Tool", "repo": "Repository", inventoryValueCol + "A": "Runs", inventoryValueCol + "B": "Results",
@@ -487,7 +530,7 @@ func scanningAndResolution(b *builder) []Panel {
 				barCell("Results", "short", 120), width("Runs", 100),
 				width("Rules", 100),
 			},
-			GR: toolGR, GRTF: toolGRtf, GRDesc: grSlot,
+			GR: toolGR, GRTF: toolGRtf, GRDesc: grRows + " " + grSlotTotals,
 			ES: toolES, ESTF: toolEStf,
 		}),
 		panel("table", "Oldest open alerts", box{W: 24, H: 7, X: 0, Y: 34}, []Target{sqlT(oldest)}, &P{
@@ -497,13 +540,7 @@ func scanningAndResolution(b *builder) []Panel {
 					"severity; no alert survives, and the advisory and the url are strings."),
 			GRNote: cannot("the alerts still open, oldest first, with a link to each.",
 				"Graphite keeps no strings, and has no way to list by date.", "graphite"),
-			Desc: "The two counts at the top of the section, as the rows they are made of, " +
-				"whatever the dashboard range: an alert is listed while it is open, however " +
-				"long ago it was raised. A Dependabot alert names its package and advisory, " +
-				"a code scanning alert its rule and tool. Open for is counted from the row's " +
-				"own date to now, so it is right when the panel is drawn rather than when the " +
-				"last sweep ran. The " +
-				"link opens the alert, which GitHub shows to the owner alone.",
+			Desc: securityOldestDesc,
 			Overrides: []any{
 				when("Raised"), width("Kind", 110), repoColumn(),
 				width("Severity", 90), width("What", 160), unitOf("Open for", "s", 110),
@@ -532,18 +569,24 @@ func scanningAndResolution(b *builder) []Panel {
 // adds anything over the range. Thirty days of a daily snapshot is thirty
 // identical rows, which is how the open-alert tile above once read 3.61K.
 //
-// Elasticsearch is the exception, and only where a top_metrics cannot be used:
-// it panics on a boolean and shortens the frame on a number that is absent
-// rather than zero, so three of these panels take the largest reading inside
-// the range instead and say so in their own descriptions. The fourth reads a
-// number that can go down, so it takes the newest.
+// Elasticsearch cannot use a top_metrics for three of them: it panics on a
+// boolean and shortens the frame on a number that is absent rather than zero.
+// Those three take a max inside each series' newest document instead, which
+// is the newest reading all the same (see newestDoc), and the fourth, whose
+// numbers are always written, takes the newest with a top_metrics.
+//
+// Graphite reads the newest point of each series too, but a series there is
+// the whole path, and the status, the state, suite and schedule, and the
+// permissions are tags: a change inside the range leaves the old row beside
+// the new one. Grouping those nodes away would keep one row and lose the words
+// the row exists to show, so the three panels say it instead.
 func posture(b *builder) []Panel {
 	ss, csu := "gh_security_setting", "gh_code_scanning_setup"
 	ap, sc := "gh_actions_policy", "gh_secret"
 
 	settings := `SELECT repo AS "Repository", setting AS "Setting", status AS "Status",` +
 		` CAST(enabled AS INT) AS "Enabled" FROM (` +
-		"SELECT *, ROW_NUMBER() OVER (PARTITION BY repo, setting ORDER BY time DESC) AS rn" +
+		"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, setting ORDER BY time DESC) AS rn" +
 		securityFrom + ss + ciInRange + RF + deliveryNewestRow +
 		// The ones that are off first. Ordered by repository name the table
 		// opened on whatever sorts first alphabetically, which on the account
@@ -554,17 +597,17 @@ func posture(b *builder) []Panel {
 	setup := `SELECT repo AS "Repository", state AS "State", query_suite AS "Query suite",` +
 		` schedule AS "Schedule", languages AS "Languages",` +
 		` days_since_change AS "Last changed" FROM (` +
-		"SELECT *, ROW_NUMBER() OVER (PARTITION BY repo ORDER BY time DESC) AS rn" +
+		"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn" +
 		securityFrom + csu + ciInRange + RF + deliveryNewestRow +
 		" ORDER BY 1"
 	policy := `SELECT repo AS "Repository", permissions AS "Permissions",` +
 		` CAST(can_approve_pr AS INT) AS "Can approve pull requests" FROM (` +
-		"SELECT *, ROW_NUMBER() OVER (PARTITION BY repo ORDER BY time DESC) AS rn" +
+		"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn" +
 		securityFrom + ap + ciInRange + RF + deliveryNewestRow +
 		" ORDER BY 1"
 	secrets := `SELECT secret AS "Secret", days_since_rotation AS "Last rotated",` +
 		` age_days AS "Age", repo AS "Repository", kind AS "Kind" FROM (` +
-		"SELECT *, ROW_NUMBER() OVER (PARTITION BY repo, kind, secret ORDER BY time DESC) AS rn" +
+		"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, kind, secret ORDER BY time DESC) AS rn" +
 		securityFrom + sc + ciInRange + RF + deliveryNewestRow +
 		" ORDER BY 2 DESC"
 
@@ -586,24 +629,29 @@ func posture(b *builder) []Panel {
 	// read them: top_metrics hands a boolean back as the string "true", and the
 	// Elasticsearch plugin panics on it with `interface {} is string, not
 	// float64`, which is the bug gh_repo_community's has_* columns already met.
-	// A max of a boolean is 1 or 0, which the word mapping reads.
-	setES, setEStf := esTbl(ss, []any{b.tm("repo", 500), b.tm("setting", 10), b.tm("status", 5)},
+	// A max of a boolean is 1 or 0, which the word mapping reads, and taken
+	// inside the newest document it is the newest reading. The status is below
+	// that document, so a setting whose status changed inside the range is one
+	// row, as it is in the SQL twin.
+	setES, setEStf := esTbl(ss, append(b.tmRepo(500), b.tm("setting", 10), b.newestDoc(), b.tm("status", 5)),
 		[]any{b.mMax("enabled")},
 		[]named{
 			{inventoryRepoTerm, "Repository"},
 			{"setting.keyword", "Setting"},
 			{"status.keyword", "Status"},
 			{"e", "Enabled"},
-		}, []string{ESF})
+		}, []string{ESF}, hideColumns(panelFullNameField, panelESTime))
 	// Both numbers are deliberately absent on some rows: GitHub sends no
 	// change date for a setup it has never changed, and a repository that
 	// answers 403 has neither that nor a language count. So they are asked for
-	// with a max as the deploy keys panel is: an aggregation appends a null
-	// there and the row keeps its shape, where a top_metrics appends nothing at
-	// all and the panel dies with `frame has different field lengths`.
-	csuES, csuEStf := esTbl(csu, []any{
-		b.tm("repo", 500), b.tm("state", 5), b.tm("query_suite", 10), b.tm("schedule", 10),
-	}, []any{b.mMax("languages"), b.mMax("days_since_change")},
+	// with a max inside the newest document, as the deploy keys panel does: an
+	// aggregation appends a null there and the row keeps its shape, where a
+	// top_metrics appends nothing at all and the panel dies with `frame has
+	// different field lengths`. The SQL twin reads one row per repository, so
+	// the state, suite and schedule are of that document too.
+	csuES, csuEStf := esTbl(csu, append(b.tmRepo(500),
+		b.newestDoc(), b.tm("state", 5), b.tm("query_suite", 10), b.tm("schedule", 10),
+	), []any{b.mMax("languages"), b.mMax("days_since_change")},
 		[]named{
 			{inventoryRepoTerm, "Repository"},
 			{"state.keyword", "State"},
@@ -611,23 +659,21 @@ func posture(b *builder) []Panel {
 			{"schedule.keyword", "Schedule"},
 			{"l", "Languages"},
 			{"d", deliveryLastChanged},
-		}, []string{ESF})
-	apES, apEStf := esTbl(ap, []any{b.tm("repo", 500), b.tm("permissions", 5)},
+		}, []string{ESF}, hideColumns(panelFullNameField, panelESTime))
+	apES, apEStf := esTbl(ap, append(b.tmRepo(500), b.newestDoc(), b.tm("permissions", 5)),
 		[]any{b.mMax("can_approve_pr")},
 		[]named{
 			{inventoryRepoTerm, "Repository"},
 			{"permissions.keyword", "Permissions"},
 			{"c", securityCanApprovePR},
-		}, []string{ESF})
-	// The newest reading rather than the largest, which is what the other three
-	// panels here settle for and what this one must not. `days_since_rotation`
-	// is the one number in this section that goes down: it climbs with the
-	// secret's age until somebody rotates the credential and then restarts at
-	// zero. A max over the range would hand back the value from the day before
-	// the rotation, closing the gap between the two columns and hiding the only
-	// rotation the panel exists to show. Both fields are written on every point,
-	// so there is no absent value to shorten the frame here.
-	scES, scEStf := esTbl(sc, []any{b.tm("repo", 500), b.tm("kind", 5), b.tm("secret", 500)},
+		}, []string{ESF}, hideColumns(panelFullNameField, panelESTime))
+	// The newest reading, and here with a top_metrics: `days_since_rotation`
+	// climbs with the secret's age until somebody rotates the credential and
+	// then restarts at zero, so a max over the range would hand back the value
+	// from the day before the rotation, closing the gap between the two columns
+	// and hiding the only rotation the panel exists to show. Both fields are
+	// written on every point, so there is no absent value to shorten the frame.
+	scES, scEStf := esTbl(sc, append(b.tmRepo(500), b.tm("kind", 5), b.tm("secret", 500)),
 		[]any{b.mNewest("age_days", "days_since_rotation")},
 		[]named{
 			{inventoryRepoTerm, "Repository"},
@@ -635,16 +681,12 @@ func posture(b *builder) []Panel {
 			{"secret.keyword", "Secret"},
 			{"a", "Age"},
 			{"r", securityLastRotated},
-		}, []string{ESF})
-
-	esMaxNote := "In Elasticsearch this is the largest reading inside the range rather than " +
-		"the newest, because reading a boolean as the newest document's own value hands " +
-		"the panel back the string `true` and the plugin fails on it."
+		}, []string{ESF}, hideColumns(panelFullNameField))
 
 	return []Panel{
 		panel("table", "Security settings", box{W: 12, H: 12, X: 0, Y: 41}, []Target{sqlT(settings)}, &P{
 			Prom: []Target{promTbl(fmt.Sprintf(
-				"max by (repo, setting, status) (github_security_setting_enabled{%s})", PF,
+				"max by (full_name, repo, setting, status) (github_security_setting_enabled{%s})", PF,
 			))},
 			PromTF: []any{organize(map[string]string{
 				"repo": "Repository", "setting": "Setting", "status": "Status",
@@ -658,8 +700,10 @@ func posture(b *builder) []Panel {
 				"the two disagree is the row worth reading.",
 			Overrides: append([]any{width("Setting", 200)}, threeStates()...),
 			GR:        setGR, GRTF: setGRtf,
-			GRDesc: "Graphite names each row repository, setting and status from the path.",
-			ES:     setES, ESTF: setEStf, ESDesc: esMaxNote,
+			GRDesc: "Graphite names each row repository, setting and status from the path, so a " +
+				"setting whose status changed inside the range is two rows, the old status and " +
+				"the new, each with its last reading.",
+			ES: setES, ESTF: setEStf,
 		}),
 		panel("table", "Default code scanning setup", box{W: 12, H: 12, X: 12, Y: 41}, []Target{sqlT(setup)}, &P{
 			Prom: []Target{
@@ -692,15 +736,14 @@ func posture(b *builder) []Panel {
 			GRDesc: grRows + " The number it keeps is `days_since_change`, which GitHub " +
 				"gives only for a setup it has actually changed, so a repository that answers " +
 				"not-configured or unavailable has no series here and no row at all: the other " +
-				"four dashboards list it with the cell empty.",
+				"four dashboards list it with the cell empty. The state, the query suite and " +
+				"the schedule are part of the path, so a setup that changed one of them inside " +
+				"the range is two rows, the old and the new.",
 			ES: csuES, ESTF: csuEStf,
-			ESDesc: "In Elasticsearch both numbers are the largest reading inside the range " +
-				"rather than the newest. A setup with no change date has no reading at all, " +
-				"and its cell is empty.",
 		}),
 		panel("table", "Workflow token permissions", box{W: 12, H: 7, X: 0, Y: 53}, []Target{sqlT(policy)}, &P{
 			Prom: []Target{promTbl(fmt.Sprintf(
-				"max by (repo, permissions) (github_actions_policy_can_approve_pr{%s})", PF,
+				"max by (full_name, repo, permissions) (github_actions_policy_can_approve_pr{%s})", PF,
 			))},
 			PromTF: []any{organize(map[string]string{
 				"repo": "Repository", "permissions": "Permissions",
@@ -714,14 +757,15 @@ func posture(b *builder) []Panel {
 				width("Permissions", 130), onOff(securityCanApprovePR, 220),
 			},
 			GR: apGR, GRTF: apGRtf,
-			GRDesc: "Graphite names each row repository and permissions from the path.",
-			ES:     apES, ESTF: apEStf, ESDesc: esMaxNote,
+			GRDesc: "Graphite names each row repository and permissions from the path, so " +
+				"permissions changed inside the range are two rows, the old and the new.",
+			ES: apES, ESTF: apEStf,
 		}),
 		panel("table", "Secret rotation", box{W: 12, H: 7, X: 12, Y: 53},
 			[]Target{sqlT(secrets)}, &P{
 				Prom: []Target{
-					promTbl(fmt.Sprintf("max by (repo, kind, secret) (github_secret_age_days{%s})", PF), "A"),
-					promTbl(fmt.Sprintf("max by (repo, kind, secret) (github_secret_days_since_rotation{%s})", PF), "B"),
+					promTbl(fmt.Sprintf("max by (full_name, repo, kind, secret) (github_secret_age_days{%s})", PF), "A"),
+					promTbl(fmt.Sprintf("max by (full_name, repo, kind, secret) (github_secret_days_since_rotation{%s})", PF), "B"),
 				},
 				PromTF: merged(map[string]string{
 					"repo": "Repository", "kind": "Kind", "secret": "Secret",

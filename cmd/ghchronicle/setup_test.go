@@ -175,6 +175,15 @@ func TestTheConfigurationNamesCredentialsRatherThanCarryingThem(t *testing.T) {
 			t.Errorf("%s configuration does not read the token from the environment:\n%s",
 				answers.Sink, written)
 		}
+		// The header is the rule a reader keeps editing the file by, so it
+		// names the keys expansion reaches rather than every value: a ${VAR}
+		// in a bucket or a Loki tenant reaches the collector as those
+		// characters.
+		if strings.Contains(written, "Every ${VAR}") ||
+			!strings.Contains(written, "# A ${VAR} in a credential, an address or a file path") {
+			t.Errorf("%s configuration's header does not say which keys are expanded:\n%s",
+				answers.Sink, written)
+		}
 	}
 }
 

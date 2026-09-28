@@ -181,10 +181,11 @@ func lifetime(b *builder) []Panel {
 	// newest row per repository is the count; adding the range up would
 	// multiply it by however many sweeps landed in the range.
 	// Ten bars and the rest folded: twenty two labels in eight units of height
-	// were seven pixels each and overlapped.
-	runsEver := otherRows(`SELECT repo AS "Repository", runs AS "Runs",`+
+	// were seven pixels each and overlapped. A repository is a bar by its full
+	// name and named by repoNameSQL, since the fold groups by the label.
+	runsEver := otherRows(`SELECT `+repoNameSQL+` AS "Repository", runs AS "Runs",`+
 		" ROW_NUMBER() OVER (ORDER BY runs DESC) AS rn FROM ("+
-		"SELECT repo, runs, ROW_NUMBER() OVER (PARTITION BY repo ORDER BY time DESC) AS rn"+
+		"SELECT repo, full_name, runs, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn"+
 		" FROM gh_workflow_run_total WHERE $__timeFilter(time) AND "+RF+
 		") x WHERE rn = 1", "Repository", "Runs", 10)
 	rcr, rar, wrt := "gh_repo_created", "gh_repo_archived", "gh_workflow_run_total"
@@ -197,8 +198,8 @@ func lifetime(b *builder) []Panel {
 	// ones it does not: forks and private repositories that include_forks off
 	// never discovers. Filtering by that list would hide exactly the rows the
 	// panel exists for.
-	createdGR, createdGRtf := gTbl(fmt.Sprintf(`groupByNode(isNonNull(%s), %d, "sum")`,
-		gp(rcr, "created"), gn(rcr, "repo")), "Repository", []col{{"sum", "Created"}})
+	createdGR, createdGRtf := gTbl(grGroupBy(nonNull(gp(rcr, "created")), rcr, "sum", "repo"),
+		"Repository", []col{{"sum", "Created"}})
 	// esRaw rather than a bucket aggregation, and that is what makes the two
 	// string columns possible: `fork` and `private` reach Grafana as the
 	// document's own values, where a top_metrics over either would hand the
@@ -224,8 +225,9 @@ func lifetime(b *builder) []Panel {
 
 	runsGR, runsGRtf := gTbl(rowsOf(fmt.Sprintf("keepLastValue(%s)", rp(wrt, "runs")),
 		gn(wrt, "repo")), "Repository", []col{{"lastNotNull", "Runs"}})
-	runsES, runsEStf := esTbl(wrt, []any{b.tm("repo", 500)}, []any{b.mNewest("runs")},
-		[]named{{"repo.keyword", "Repository"}, {"runs", "Runs"}}, []string{ESF})
+	runsES, runsEStf := esTbl(wrt, b.tmRepo(500), []any{b.mNewest("runs")},
+		[]named{{"repo.keyword", "Repository"}, {"runs", "Runs"}}, []string{ESF},
+		hideColumns(panelFullNameField))
 
 	return []Panel{
 		fieldGroup(b, "gh_account_total", "Since the account began", box{W: 24, H: 5, X: 0, Y: 0}, []named{
@@ -263,7 +265,9 @@ func lifetime(b *builder) []Panel {
 				Overrides: []any{
 					linkOn("Repository"), width("Fork", 70), width("Archived", 90),
 				},
-				GR: twins.GR, GRTF: twins.GRTF, GRDesc: grSlot + " " + grArchivedWindow,
+				GR: twins.GR, GRTF: twins.GRTF, GRDesc: "Graphite has no rows: each series is one number, so this table keeps the " +
+					"commits it is ranked by and drops the other columns, the fork and archived " +
+					"flags among them. " + grArchivedWindow,
 				ES: twins.ES, ESTF: twins.ESTF, ESDesc: esArchivedWindow,
 			}),
 		// The description leads with the window rather than explaining it in
@@ -342,7 +346,7 @@ func lifetime(b *builder) []Panel {
 		}),
 		panel("barchart", "Workflow runs, ever", box{W: 8, H: 8, X: 16, Y: 17}, []Target{sqlT(runsEver)}, &P{
 			Prom: []Target{promTbl(fmt.Sprintf(
-				"topk(10, max by (repo) (github_workflow_run_total_runs{%s}))", PF,
+				"topk(10, max by (full_name, repo) (github_workflow_run_total_runs{%s}))", PF,
 			))},
 			PromDesc: "Prometheus shows the ten and folds nothing.",
 			PromTF: []any{organize(map[string]string{
@@ -395,10 +399,15 @@ func collectorSection(b *builder) []Panel {
 		" FROM gh_rate_limit WHERE $__timeFilter(time) GROUP BY 1 ORDER BY 2 DESC"
 	rl := "gh_rate_limit"
 
-	bucketsGR, bucketsGRtf := gTbl(rowsOf(fmt.Sprintf("keepLastValue(%s)", gp(rl, "remaining")),
-		gn(rl, "resource")), "Bucket", []col{{"lastNotNull", lifetimeLowestRemaining}})
+	// The extremes of the range in every store, as the SQL takes them. The
+	// newest reading stood under these names in Graphite and Elasticsearch,
+	// so a bucket spent to its last request an hour ago read as untouched
+	// there once it had refilled. Consolidated by the least too, since the
+	// average of a narrow panel's points would lift the lowest.
+	bucketsGR, bucketsGRtf := gTbl(rowsOf(fmt.Sprintf(`consolidateBy(%s, "min")`, gp(rl, "remaining")),
+		gn(rl, "resource")), "Bucket", []col{{"min", lifetimeLowestRemaining}})
 	bucketsES, bucketsEStf := esTbl(rl, []any{b.tm("resource", 20)},
-		[]any{b.mNewest("limit", "remaining", "used")},
+		[]any{b.mMax("limit"), b.mMin("remaining"), b.mMax("used")},
 		[]named{
 			{"resource.keyword", "Bucket"},
 			{"limit", "Limit"},
@@ -478,9 +487,9 @@ func collectorSection(b *builder) []Panel {
 			}),
 		panel("table", "Every bucket", box{W: 12, H: 11, X: 12, Y: 0}, []Target{sqlT(tableQ)}, &P{
 			Prom: []Target{
-				promTbl("max by (resource) (github_rate_limit_limit)", "A"),
-				promTbl("min by (resource) (github_rate_limit_remaining)", "B"),
-				promTbl("max by (resource) (github_rate_limit_used)", "C"),
+				promTbl("max by (resource) (max_over_time(github_rate_limit_limit[$__range]))", "A"),
+				promTbl("min by (resource) (min_over_time(github_rate_limit_remaining[$__range]))", "B"),
+				promTbl("max by (resource) (max_over_time(github_rate_limit_used[$__range]))", "C"),
 			},
 			PromTF: merged(map[string]string{
 				"resource": "Bucket", panelValueA: "Limit",
@@ -488,8 +497,13 @@ func collectorSection(b *builder) []Panel {
 			}, nil, nil),
 			Opts: Opts{"sort": lifetimeMostUsed},
 			Desc: "Every budget GitHub reports, and the one that runs out first decides what " +
-				"a sweep can collect. Reading them costs nothing: GET /rate_limit is free.",
-			GR: bucketsGR, GRTF: bucketsGRtf, GRDesc: grSlot,
+				"a sweep can collect. Reading them costs nothing: GET /rate_limit is free. " +
+				"Most used is the most any reading in the range had spent, and Lowest " +
+				"remaining the least any had left, so a bucket spent an hour ago still says " +
+				"so after it has refilled.",
+			GR: bucketsGR, GRTF: bucketsGRtf,
+			GRDesc: "Graphite has no rows: each series is one number, so this table keeps the " +
+				"lowest remaining of each bucket and drops the limit and the most used.",
 			ES: bucketsES, ESTF: bucketsEStf,
 		}),
 		panel("table", "Every family", box{W: 12, H: 9, X: 0, Y: 11}, []Target{sqlT(ranQ)}, &P{
@@ -509,8 +523,11 @@ func collectorSection(b *builder) []Panel {
 				width("Why", 110), width("Sweeps", 80), width("Repositories", 100),
 			},
 			Desc: "Every collector that ran in the range, with what stopped it where " +
-				"something did, how many sweeps it ran in, and how many repositories it " +
-				"was asked about. A family with no row here did not run at all, which is " +
+				"something did, how many sweeps it ran in, and the most repositories one " +
+				"of those sweeps asked it about. For commits, issueevents and issues that " +
+				"count includes the repositories the movement query found nothing new in, " +
+				"which the family left unread and wrote no row for. A family with no row " +
+				"here did not run at all, which is " +
 				"the one thing an empty panel could never say: not due, switched off, or " +
 				"skipped because a rate budget was spent. Why is what separates the two " +
 				"kinds of failure that would otherwise read alike: a spent search budget " +

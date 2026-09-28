@@ -21,7 +21,7 @@
  * What this adds on top of the twin, and why:
  *
  *   - Several pages per file. docs/sinks.md is the ten pages under /sinks/,
- *     docs/running.md the four under /install/. The names are the ones the
+ *     docs/running.md the pages under /install/. The names are the ones the
  *     repository already links to, from CLAUDE.md and from the README, so the
  *     mapping is a manifest here rather than one file per page.
  *   - Links into the site become absolute. A page writes /ghchronicle/sinks/
@@ -126,6 +126,7 @@ const MANIFEST = [
 			"install/systemd",
 			"install/docker",
 			"install/actions",
+			"install/upgrading",
 		],
 	},
 	{

@@ -441,6 +441,8 @@ func discussionComment(user string, repo Repo, d *discussionNode, c threadCommen
 	full := repo.FullName
 	fields := map[string]any{
 		"comments": 1, "upvotes": c.Upvotes, "title": d.Title,
+		// The accepted answer as a field only, for the account walk's
+		// reason: see discussionCommentNode.point.
 		"answers": boolInt(c.IsAnswer), "url": c.URL,
 		// The account walk reads this off the comment's repository; here the
 		// listing that found the repository has already said it.
@@ -456,13 +458,12 @@ func discussionComment(user string, repo Repo, d *discussionNode, c threadCommen
 	return sink.Point{
 		Measurement: "gh_discussion_comment",
 		Tags: merge(fullNameTags(full), map[string]string{
-			"user":      user,
-			"own":       boolTag(isOwn(full, user)),
-			"is_answer": boolTag(c.IsAnswer),
-			"is_reply":  boolTag(c.ReplyTo != 0),
-			"author":    c.By,
-			"comment":   strconv.FormatInt(c.ID, 10),
-			"number":    strconv.Itoa(d.Number),
+			"user":     user,
+			"own":      boolTag(isOwn(full, user)),
+			"is_reply": boolTag(c.ReplyTo != 0),
+			"author":   c.By,
+			"comment":  strconv.FormatInt(c.ID, 10),
+			"number":   strconv.Itoa(d.Number),
 		}),
 		Fields: fields,
 		Time:   c.When,
