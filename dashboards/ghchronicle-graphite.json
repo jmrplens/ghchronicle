@@ -794,6 +794,7 @@
                 "gradientMode": "hue",
                 "lineWidth": 1
               },
+              "decimals": 0,
               "unit": "short"
             },
             "overrides": []
@@ -1620,6 +1621,7 @@
                 "gradientMode": "hue",
                 "lineWidth": 1
               },
+              "decimals": 0,
               "unit": "short"
             },
             "overrides": []
@@ -2181,6 +2183,7 @@
                 "gradientMode": "hue",
                 "lineWidth": 1
               },
+              "decimals": 0,
               "unit": "short"
             },
             "overrides": []
@@ -2257,6 +2260,7 @@
                 "gradientMode": "hue",
                 "lineWidth": 1
               },
+              "decimals": 0,
               "unit": "short"
             },
             "overrides": []
@@ -2636,6 +2640,7 @@
                 "gradientMode": "hue",
                 "lineWidth": 1
               },
+              "decimals": 0,
               "unit": "short"
             },
             "overrides": []
@@ -3558,6 +3563,7 @@
                 "gradientMode": "hue",
                 "lineWidth": 1
               },
+              "decimals": 0,
               "unit": "short"
             },
             "overrides": []
@@ -6594,6 +6600,7 @@
                 "gradientMode": "hue",
                 "lineWidth": 1
               },
+              "decimals": 0,
               "unit": "short"
             },
             "overrides": []
@@ -7819,6 +7826,16 @@
                             "color": "green",
                             "index": 0,
                             "text": "yes"
+                          },
+                          "false": {
+                            "color": "text",
+                            "index": 3,
+                            "text": "no"
+                          },
+                          "true": {
+                            "color": "green",
+                            "index": 2,
+                            "text": "yes"
                           }
                         },
                         "type": "value"
@@ -7828,7 +7845,7 @@
                           "match": "null",
                           "result": {
                             "color": "text",
-                            "index": 2,
+                            "index": 4,
                             "text": "n/a"
                           }
                         },
@@ -8023,6 +8040,18 @@
                     "value": 120
                   }
                 ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Repository"
+                },
+                "properties": [
+                  {
+                    "id": "custom.minWidth",
+                    "value": 160
+                  }
+                ]
               }
             ]
           },
@@ -8138,6 +8167,18 @@
                     "value": 120
                   }
                 ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Repository"
+                },
+                "properties": [
+                  {
+                    "id": "custom.minWidth",
+                    "value": 160
+                  }
+                ]
               }
             ]
           },
@@ -8238,8 +8279,8 @@
                 },
                 "properties": [
                   {
-                    "id": "custom.width",
-                    "value": 110
+                    "id": "custom.minWidth",
+                    "value": 160
                   }
                 ]
               },
@@ -8262,6 +8303,16 @@
                           "1": {
                             "color": "green",
                             "index": 0,
+                            "text": "yes"
+                          },
+                          "false": {
+                            "color": "text",
+                            "index": 3,
+                            "text": "no"
+                          },
+                          "true": {
+                            "color": "green",
+                            "index": 2,
                             "text": "yes"
                           }
                         },
@@ -10092,6 +10143,7 @@
                 "gradientMode": "hue",
                 "lineWidth": 1
               },
+              "decimals": 0,
               "unit": "short"
             },
             "overrides": [
@@ -10619,6 +10671,7 @@
                 "gradientMode": "hue",
                 "lineWidth": 1
               },
+              "decimals": 0,
               "unit": "short"
             },
             "overrides": []
@@ -10695,6 +10748,7 @@
                 "gradientMode": "hue",
                 "lineWidth": 1
               },
+              "decimals": 0,
               "unit": "short"
             },
             "overrides": []
@@ -11630,6 +11684,16 @@
                           "1": {
                             "color": "green",
                             "index": 0,
+                            "text": "yes"
+                          },
+                          "false": {
+                            "color": "text",
+                            "index": 3,
+                            "text": "no"
+                          },
+                          "true": {
+                            "color": "green",
+                            "index": 2,
                             "text": "yes"
                           }
                         },
@@ -12964,6 +13028,7 @@
                 "gradientMode": "hue",
                 "lineWidth": 1
               },
+              "decimals": 0,
               "unit": "short"
             },
             "overrides": []
@@ -13278,8 +13343,8 @@
                 },
                 "properties": [
                   {
-                    "id": "custom.width",
-                    "value": 110
+                    "id": "custom.minWidth",
+                    "value": 160
                   }
                 ]
               },
@@ -13404,6 +13469,7 @@
                 "gradientMode": "hue",
                 "lineWidth": 1
               },
+              "decimals": 0,
               "unit": "short"
             },
             "overrides": []
@@ -13507,6 +13573,18 @@
                   {
                     "id": "custom.width",
                     "value": 120
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Repository"
+                },
+                "properties": [
+                  {
+                    "id": "custom.minWidth",
+                    "value": 160
                   }
                 ]
               },
@@ -13769,6 +13847,16 @@
                             "color": "green",
                             "index": 0,
                             "text": "yes"
+                          },
+                          "false": {
+                            "color": "text",
+                            "index": 3,
+                            "text": "no"
+                          },
+                          "true": {
+                            "color": "green",
+                            "index": 2,
+                            "text": "yes"
                           }
                         },
                         "type": "value"
@@ -13806,6 +13894,16 @@
                           "1": {
                             "color": "green",
                             "index": 0,
+                            "text": "yes"
+                          },
+                          "false": {
+                            "color": "text",
+                            "index": 3,
+                            "text": "no"
+                          },
+                          "true": {
+                            "color": "green",
+                            "index": 2,
                             "text": "yes"
                           }
                         },
@@ -13845,6 +13943,16 @@
                             "color": "green",
                             "index": 0,
                             "text": "yes"
+                          },
+                          "false": {
+                            "color": "text",
+                            "index": 3,
+                            "text": "no"
+                          },
+                          "true": {
+                            "color": "green",
+                            "index": 2,
+                            "text": "yes"
                           }
                         },
                         "type": "value"
@@ -13882,6 +13990,16 @@
                           "1": {
                             "color": "green",
                             "index": 0,
+                            "text": "yes"
+                          },
+                          "false": {
+                            "color": "text",
+                            "index": 3,
+                            "text": "no"
+                          },
+                          "true": {
+                            "color": "green",
+                            "index": 2,
                             "text": "yes"
                           }
                         },
@@ -13933,6 +14051,16 @@
                             "color": "green",
                             "index": 0,
                             "text": "yes"
+                          },
+                          "false": {
+                            "color": "text",
+                            "index": 3,
+                            "text": "no"
+                          },
+                          "true": {
+                            "color": "green",
+                            "index": 2,
+                            "text": "yes"
                           }
                         },
                         "type": "value"
@@ -13970,6 +14098,16 @@
                           "1": {
                             "color": "green",
                             "index": 0,
+                            "text": "yes"
+                          },
+                          "false": {
+                            "color": "text",
+                            "index": 3,
+                            "text": "no"
+                          },
+                          "true": {
+                            "color": "green",
+                            "index": 2,
                             "text": "yes"
                           }
                         },
@@ -14834,6 +14972,16 @@
                             "color": "green",
                             "index": 0,
                             "text": "yes"
+                          },
+                          "false": {
+                            "color": "text",
+                            "index": 3,
+                            "text": "no"
+                          },
+                          "true": {
+                            "color": "green",
+                            "index": 2,
+                            "text": "yes"
                           }
                         },
                         "type": "value"
@@ -14872,6 +15020,16 @@
                             "color": "green",
                             "index": 0,
                             "text": "yes"
+                          },
+                          "false": {
+                            "color": "text",
+                            "index": 3,
+                            "text": "no"
+                          },
+                          "true": {
+                            "color": "green",
+                            "index": 2,
+                            "text": "yes"
                           }
                         },
                         "type": "value"
@@ -14909,6 +15067,16 @@
                           "1": {
                             "color": "green",
                             "index": 0,
+                            "text": "yes"
+                          },
+                          "false": {
+                            "color": "text",
+                            "index": 3,
+                            "text": "no"
+                          },
+                          "true": {
+                            "color": "green",
+                            "index": 2,
                             "text": "yes"
                           }
                         },
@@ -15067,6 +15235,7 @@
                 "gradientMode": "hue",
                 "lineWidth": 1
               },
+              "decimals": 0,
               "unit": "short"
             },
             "overrides": []
@@ -15292,6 +15461,16 @@
                           "1": {
                             "color": "green",
                             "index": 0,
+                            "text": "yes"
+                          },
+                          "false": {
+                            "color": "text",
+                            "index": 3,
+                            "text": "no"
+                          },
+                          "true": {
+                            "color": "green",
+                            "index": 2,
                             "text": "yes"
                           }
                         },
@@ -15555,6 +15734,7 @@
                 "gradientMode": "hue",
                 "lineWidth": 1
               },
+              "decimals": 0,
               "unit": "short"
             },
             "overrides": []
@@ -15867,6 +16047,16 @@
                             "color": "green",
                             "index": 0,
                             "text": "yes"
+                          },
+                          "false": {
+                            "color": "text",
+                            "index": 3,
+                            "text": "no"
+                          },
+                          "true": {
+                            "color": "green",
+                            "index": 2,
+                            "text": "yes"
                           }
                         },
                         "type": "value"
@@ -15904,6 +16094,16 @@
                           "1": {
                             "color": "green",
                             "index": 0,
+                            "text": "yes"
+                          },
+                          "false": {
+                            "color": "text",
+                            "index": 3,
+                            "text": "no"
+                          },
+                          "true": {
+                            "color": "green",
+                            "index": 2,
                             "text": "yes"
                           }
                         },
@@ -16030,6 +16230,16 @@
                             "color": "green",
                             "index": 0,
                             "text": "yes"
+                          },
+                          "false": {
+                            "color": "text",
+                            "index": 3,
+                            "text": "no"
+                          },
+                          "true": {
+                            "color": "green",
+                            "index": 2,
+                            "text": "yes"
                           }
                         },
                         "type": "value"
@@ -16067,6 +16277,16 @@
                           "1": {
                             "color": "green",
                             "index": 0,
+                            "text": "yes"
+                          },
+                          "false": {
+                            "color": "text",
+                            "index": 3,
+                            "text": "no"
+                          },
+                          "true": {
+                            "color": "green",
+                            "index": 2,
                             "text": "yes"
                           }
                         },
@@ -16345,6 +16565,16 @@
                             "color": "green",
                             "index": 0,
                             "text": "yes"
+                          },
+                          "false": {
+                            "color": "text",
+                            "index": 3,
+                            "text": "no"
+                          },
+                          "true": {
+                            "color": "green",
+                            "index": 2,
+                            "text": "yes"
                           }
                         },
                         "type": "value"
@@ -16477,6 +16707,16 @@
                           "1": {
                             "color": "green",
                             "index": 0,
+                            "text": "yes"
+                          },
+                          "false": {
+                            "color": "text",
+                            "index": 3,
+                            "text": "no"
+                          },
+                          "true": {
+                            "color": "green",
+                            "index": 2,
                             "text": "yes"
                           }
                         },
@@ -16838,6 +17078,16 @@
                           "1": {
                             "color": "green",
                             "index": 0,
+                            "text": "yes"
+                          },
+                          "false": {
+                            "color": "red",
+                            "index": 3,
+                            "text": "disagrees"
+                          },
+                          "true": {
+                            "color": "green",
+                            "index": 2,
                             "text": "yes"
                           }
                         },

@@ -94,10 +94,7 @@ func threeStates() []any {
 		override("Enabled", []any{
 			map[string]any{"id": securityCellOptions, "value": map[string]any{"type": securityColoredText}},
 			map[string]any{"id": "mappings", "value": []any{map[string]any{
-				"type": "value", "options": map[string]any{
-					"0": map[string]any{"text": "no", "color": "text", "index": 1},
-					"1": map[string]any{"text": "yes", "color": "green", "index": 0},
-				},
+				"type": "value", "options": flagWords("no", "text"),
 			}}},
 			map[string]any{"id": securityCellWidth, "value": 100},
 		}),

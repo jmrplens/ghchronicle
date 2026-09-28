@@ -298,8 +298,12 @@ func discussionAndComments(b *builder) []Panel {
 				width("Category", 150), width("Answered", 100),
 				barCell("Discussions", "short", 120),
 			},
-			SQLOver: []any{profileBool("Answered", 100)},
-			GR:      discGR, GRTF: discGRtf,
+			// Every store but Graphite, whose Answered is a share of the
+			// category and would read a whole one as yes.
+			SQLOver:  []any{profileBool("Answered", 100)},
+			PromOver: []any{profileBool("Answered", 100)},
+			ESOver:   []any{profileBool("Answered", 100)},
+			GR:       discGR, GRTF: discGRtf,
 			GROver: []any{unitOf("Answered", "percentunit", 100)},
 			GRDesc: "Graphite keeps no strings and cannot group by the answered flag, so each " +
 				"category is one row and Answered is the share of its discussions that have " +
@@ -320,10 +324,11 @@ func discussionAndComments(b *builder) []Panel {
 				width("Comments", 100), answeredCell("Answered", 100), linkOn("Title"),
 			},
 			GR: latestGR, GRTF: latestGRtf,
-			ES: latestES, ESTF: latestEStf, ESDesc: esNewest + " " + esRange,
-			// Elasticsearch's raw documents carry the JSON boolean, which
-			// reads as true and false without a mapping.
-			ESOver: []any{width("Answered", 100)},
+			ES: latestES, ESTF: latestEStf,
+			ESDesc: esNewest + " " + esRange + " Its rows are the documents as stored, so " +
+				"Answered is each discussion's own flag, which a row cannot read against its " +
+				"category's: a discussion in a category that takes no answer reads yes or no " +
+				"here rather than n/a.",
 		}),
 		// The eight commonest transitions of the range and the rest as
 		// `other`: the legend listed eighty one series.
@@ -356,7 +361,7 @@ func discussionAndComments(b *builder) []Panel {
 			Desc: "Comments on issues and pull requests, in any repository. The ones outside " +
 				"this account are the half a sweep over one's own repositories cannot see.",
 			PromDesc:  sinceStart,
-			Overrides: []any{barCell("Comments", "short", 120)},
+			Overrides: []any{barCell("Comments", "short", 120), fullNameColumn()},
 			GR:        commentsGR, GRTF: commentsGRtf, GRDesc: grRows + " " + grSlotCounts,
 			ES: commentsES, ESTF: commentsEStf,
 		}),
@@ -448,7 +453,7 @@ func answersGiven(b *builder, perItem, grPerItem string) []Panel {
 				"and this sees sixty six across twenty six repositories. Each comment counts " +
 				"once, however many rows a store holds of it, which Answers elsewhere explains.",
 			PromDesc:  sinceStart,
-			Overrides: []any{barCell("Comments", "short", 120)},
+			Overrides: []any{barCell("Comments", "short", 120), fullNameColumn()},
 			GR:        answersGR, GRTF: answersGRtf,
 			GRDesc: "Graphite has no rows: each series is one number, so this table keeps the " +
 				"comments of each repository and drops the accepted answers and the upvotes.",
@@ -468,7 +473,7 @@ func answersGiven(b *builder, perItem, grPerItem string) []Panel {
 				onceEach,
 			Opts: Opts{"sort": "When"},
 			Overrides: []any{
-				when("When"), repoColumn(),
+				when("When"), fullNameColumn(),
 				profileBool("Accepted", 100), linkOn("Title"),
 			},
 			GR: elsewhereGR, GRTF: elsewhereGRtf,
@@ -547,13 +552,10 @@ func perRepositoryFromComments() []any {
 func answeredCell(name string, w int) any {
 	return override(name, []any{
 		map[string]any{"id": "mappings", "value": []any{
-			map[string]any{"type": "value", "options": map[string]any{
-				"0": map[string]any{"text": "no", "color": "text", "index": 1},
-				"1": map[string]any{"text": "yes", "color": "green", "index": 0},
-			}},
+			map[string]any{"type": "value", "options": flagWords("no", "text")},
 			map[string]any{"type": "special", "options": map[string]any{
 				"match":  "null",
-				"result": map[string]any{"text": "n/a", "color": "text", "index": 2},
+				"result": map[string]any{"text": "n/a", "color": "text", "index": 4},
 			}},
 		}},
 		map[string]any{"id": "custom.cellOptions", "value": map[string]any{"type": "color-text"}},

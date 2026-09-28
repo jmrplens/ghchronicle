@@ -249,15 +249,20 @@ func binned(p map[string]any, o Opts) {
 
 func barchart(a panelArgs, o Opts) map[string]any {
 	p := base("barchart", a)
-	p["fieldConfig"] = map[string]any{
-		"defaults": map[string]any{
-			"unit": optString(o, "unit", "short"), "color": map[string]any{"mode": panelClassicPalette},
-			"custom": map[string]any{
-				"lineWidth": 1, "fillOpacity": 80, "gradientMode": "hue", "axisSoftMin": 0,
-			},
+	unit := optString(o, "unit", "short")
+	defaults := map[string]any{
+		"unit": unit, "color": map[string]any{"mode": panelClassicPalette},
+		"custom": map[string]any{
+			"lineWidth": 1, "fillOpacity": 80, "gradientMode": "hue", "axisSoftMin": 0,
 		},
-		"overrides": overridesOf(o),
 	}
+	// `short` on a bar is a count, as on a line: a bar of one open alert
+	// stood on an axis ticked every 0.05 up to 2, and three events on one
+	// ticked every 0.2. Whole numbers put the ticks on whole numbers too.
+	if unit == "short" {
+		defaults["decimals"] = 0
+	}
+	p["fieldConfig"] = map[string]any{"defaults": defaults, "overrides": overridesOf(o)}
 	orientation := "horizontal"
 	if !optBool(o, "horizontal", true) {
 		orientation = "vertical"

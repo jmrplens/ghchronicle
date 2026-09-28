@@ -328,3 +328,123 @@ func TestGraphiteContributionTotalsReadAsTheOthers(t *testing.T) {
 		}
 	}
 }
+
+// TestACountAxisTicksWholeNumbers: a bar chart of counts drew its axis in
+// Grafana's default decimals, so one open alert stood on ticks every 0.05 up
+// to 2 and three events on ticks every 0.2. A count is `short`, and every
+// chart of one keeps whole numbers, the line charts as the bar charts.
+func TestACountAxisTicksWholeNumbers(t *testing.T) {
+	t.Parallel()
+	checked := 0
+	for _, store := range AllStores() {
+		for _, p := range renderedPanels(t, store.Name) {
+			if p["type"] != "barchart" && p["type"] != "timeseries" {
+				continue
+			}
+			defaults := defaultsOf(t, p)
+			if defaults["unit"] != "short" {
+				continue
+			}
+			checked++
+			if defaults["decimals"] != 0 {
+				t.Errorf("%s %q counts in %v decimals, so its axis ticks fractions of one",
+					store.Name, p["title"], defaults["decimals"])
+			}
+		}
+	}
+	if checked == 0 {
+		t.Fatal("no chart of counts was checked")
+	}
+}
+
+// TestAFlagReadsYesOrNoInEveryStoreThatDrawsIt: the SQL stores map a flag's
+// 1 and 0 to yes and no, and Elasticsearch's raw documents answer the JSON
+// true and false, its terms bucket 1 and 0, and an exporter label the text
+// "true" and "false": "Sponsorships" read true and false in Elasticsearch and
+// "Discussions" 0 and 1 there and false and true in Prometheus. Every column
+// the SQL stores draw as yes or no reads so in the other stores that draw it
+// under that name, whichever spelling they answer with.
+func TestAFlagReadsYesOrNoInEveryStoreThatDrawsIt(t *testing.T) {
+	t.Parallel()
+	checked := 0
+	for title, p := range rendered(t, "influxdb") {
+		if p["type"] != "table" {
+			continue
+		}
+		for _, raw := range overridesOfPanel(p) {
+			if column := matcherName(raw); yesNo(overrideProperty(p, column, "mappings")) != nil {
+				checked += checkFlagWords(t, title, column)
+			}
+		}
+	}
+	if checked == 0 {
+		t.Fatal("no flag column of another store was checked")
+	}
+}
+
+// checkFlagWords holds a flag column of Prometheus and Elasticsearch to the
+// yes and no of the SQL stores, in every spelling a store answers it with,
+// and reports how many stores it checked.
+func checkFlagWords(t *testing.T, title, column string) int {
+	t.Helper()
+	checked := 0
+	for _, store := range []string{"prometheus", "elasticsearch"} {
+		other := mustPanel(t, rendered(t, store), title)
+		if other["type"] != "table" || !namesGivenIn(other)[column] {
+			continue
+		}
+		checked++
+		words := yesNo(overrideProperty(other, column, "mappings"))
+		for _, spelled := range []string{"0", "1", "false", "true"} {
+			if words[spelled] == "" {
+				t.Errorf("%s %q: %s reads %s as it is, where the SQL stores read yes or no",
+					store, title, column, spelled)
+			}
+		}
+	}
+	return checked
+}
+
+// yesNo is the text a value mapping gives each value it maps, or nil when the
+// mapping is not the yes and no of a flag.
+func yesNo(mappings any) map[string]string {
+	list, _ := mappings.([]any)
+	for _, raw := range list {
+		m, _ := raw.(map[string]any)
+		options, _ := m["options"].(map[string]any)
+		out := map[string]string{}
+		for value, rawResult := range options {
+			result, _ := rawResult.(map[string]any)
+			out[value], _ = result["text"].(string)
+		}
+		if out["1"] == "yes" {
+			return out
+		}
+	}
+	return nil
+}
+
+// TestAFullNameIsNotCut: repoWidth is measured against short names, and a
+// table that names each repository in full, because its rows are mostly
+// other people's, cut the name at 110 pixels: another/projec, octocat/hello-w.
+// Such a column keeps a minimum of fullNameWidth and no fixed width below it.
+func TestAFullNameIsNotCut(t *testing.T) {
+	t.Parallel()
+	fullName := regexp.MustCompile(`\bfull_name AS "Repository"`)
+	checked := 0
+	for title, p := range rendered(t, "influxdb") {
+		if p["type"] != "table" || !fullName.MatchString(everySQL(t, p)) {
+			continue
+		}
+		checked++
+		if w, fixed := overrideProperty(p, "Repository", panelWidthField).(int); fixed && w < fullNameWidth {
+			t.Errorf("%q draws its full names %d pixels wide", title, w)
+		}
+		if w, _ := overrideProperty(p, "Repository", "custom.minWidth").(int); w < fullNameWidth {
+			t.Errorf("%q lets its full names shrink to %d pixels, want %d", title, w, fullNameWidth)
+		}
+	}
+	if checked == 0 {
+		t.Fatal("no table names its repositories in full, so this checked nothing")
+	}
+}

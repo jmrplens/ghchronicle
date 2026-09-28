@@ -62,6 +62,25 @@ func esRefs(ref string, ts []Target) []Target {
 	return ts
 }
 
+// flagWords is the value mapping that draws a flag as a word, yes in green
+// for set and `no` in noColor for unset. The SQL twins cast a flag to
+// 1 or 0, the exporter publishes a gauge of one that way, and an
+// Elasticsearch max or terms bucket over a boolean field answers a number.
+// Two answers carry words instead: Elasticsearch's raw documents hand back
+// the JSON true and false, and an exporter label is the text "true" or
+// "false". Grafana matches a value mapping against the value's text, so both
+// spellings are mapped: measured on the 2.6.1 review, "Sponsorships" read
+// true and false in Elasticsearch and "Discussions" false and true in
+// Prometheus beside the SQL stores' yes and no.
+func flagWords(no, noColor string) map[string]any {
+	return map[string]any{
+		"1":     map[string]any{"text": "yes", "color": "green", "index": 0},
+		"0":     map[string]any{"text": no, "color": noColor, "index": 1},
+		"true":  map[string]any{"text": "yes", "color": "green", "index": 2},
+		"false": map[string]any{"text": no, "color": noColor, "index": 3},
+	}
+}
+
 // repoWidth is what a Repository column of a per-repository table is worth on
 // a phone.
 //
@@ -77,3 +96,20 @@ const repoWidth = 110
 
 // repoColumn is the Repository column of a per-repository table.
 func repoColumn() any { return width("Repository", repoWidth) }
+
+// fullNameWidth is the narrowest a Repository column of full names is drawn.
+// repoWidth is measured against short names, and an owner and a slash cost
+// most of it: at 110 "Work elsewhere" read another/projec and "Latest
+// notifications" octocat/hello-w on the 2.6.1 review, on a desktop with room
+// to spare. At 160, an owner and a name of twenty characters between them
+// fit, and on a phone the column and the one beside it still leave the third
+// in view.
+const fullNameWidth = 160
+
+// fullNameColumn is the Repository column of a table that names each
+// repository in full, because the rows are mostly other people's. A minimum
+// rather than a width, so on a desktop it takes a share of the room the
+// fixed columns leave, as the title beside it does.
+func fullNameColumn() any {
+	return override("Repository", []any{map[string]any{"id": "custom.minWidth", "value": fullNameWidth}})
+}

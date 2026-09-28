@@ -223,10 +223,7 @@ func progressCell(name string) any {
 func agreesCell(name string) any {
 	return override(name, []any{
 		map[string]any{"id": "mappings", "value": []any{map[string]any{
-			"type": "value", "options": map[string]any{
-				"0": map[string]any{"text": "disagrees", "color": "red", "index": 1},
-				"1": map[string]any{"text": "yes", "color": "green", "index": 0},
-			},
+			"type": "value", "options": flagWords("disagrees", "red"),
 		}}},
 		map[string]any{"id": panelCellOptionsField, "value": map[string]any{"type": "color-text"}},
 		map[string]any{"id": panelWidthField, "value": 110},
@@ -280,18 +277,11 @@ const esCents = "Elasticsearch hands the stored field back as it is. The arithme
 const esMoney = "In Elasticsearch each day is reduced to its largest reading, the last day that " +
 	"has one is taken, and the division into dollars is a server-side expression."
 
-// profileBool renders a stored boolean as a word. Every store that carries one
-// at all carries it as 1 or 0: the SQL twins cast it, the exporter publishes it
-// that way, and an Elasticsearch max over a boolean field is answered as a
-// number. Elasticsearch's raw documents are the one exception and show the
-// JSON true and false, which needs no mapping to be read.
+// profileBool renders a stored boolean as a word.
 func profileBool(name string, w int) any {
 	return override(name, []any{
 		map[string]any{"id": "mappings", "value": []any{map[string]any{
-			"type": "value", "options": map[string]any{
-				"0": map[string]any{"text": "no", "color": "text", "index": 1},
-				"1": map[string]any{"text": "yes", "color": "green", "index": 0},
-			},
+			"type": "value", "options": flagWords("no", "text"),
 		}}},
 		map[string]any{"id": panelCellOptionsField, "value": map[string]any{"type": "color-text"}},
 		map[string]any{"id": panelWidthField, "value": w},

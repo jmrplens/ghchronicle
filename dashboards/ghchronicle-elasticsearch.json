@@ -1319,6 +1319,7 @@
                 "gradientMode": "hue",
                 "lineWidth": 1
               },
+              "decimals": 0,
               "unit": "short"
             },
             "overrides": []
@@ -2712,6 +2713,7 @@
                 "gradientMode": "hue",
                 "lineWidth": 1
               },
+              "decimals": 0,
               "unit": "short"
             },
             "overrides": []
@@ -3585,6 +3587,7 @@
                 "gradientMode": "hue",
                 "lineWidth": 1
               },
+              "decimals": 0,
               "unit": "short"
             },
             "overrides": []
@@ -3733,6 +3736,7 @@
                 "gradientMode": "hue",
                 "lineWidth": 1
               },
+              "decimals": 0,
               "unit": "short"
             },
             "overrides": []
@@ -4328,6 +4332,7 @@
                 "gradientMode": "hue",
                 "lineWidth": 1
               },
+              "decimals": 0,
               "unit": "short"
             },
             "overrides": []
@@ -5695,6 +5700,7 @@
                 "gradientMode": "hue",
                 "lineWidth": 1
               },
+              "decimals": 0,
               "unit": "short"
             },
             "overrides": []
@@ -10616,6 +10622,7 @@
                 "gradientMode": "hue",
                 "lineWidth": 1
               },
+              "decimals": 0,
               "unit": "short"
             },
             "overrides": []
@@ -12077,6 +12084,54 @@
                     "value": 120
                   }
                 ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Answered"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "0": {
+                            "color": "text",
+                            "index": 1,
+                            "text": "no"
+                          },
+                          "1": {
+                            "color": "green",
+                            "index": 0,
+                            "text": "yes"
+                          },
+                          "false": {
+                            "color": "text",
+                            "index": 3,
+                            "text": "no"
+                          },
+                          "true": {
+                            "color": "green",
+                            "index": 2,
+                            "text": "yes"
+                          }
+                        },
+                        "type": "value"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "custom.cellOptions",
+                    "value": {
+                      "type": "color-text"
+                    }
+                  },
+                  {
+                    "id": "custom.width",
+                    "value": 100
+                  }
+                ]
               }
             ]
           },
@@ -12187,7 +12242,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "The newest fifty, whatever the range: an account has a handful, and a range of a month hid all but one of them. Answered reads n/a where the category takes no answer at all, an announcement or an idea. In Elasticsearch this lists the newest 500 documents and the panel sorts them. Elasticsearch answers only inside the dashboard range, so years outside it are missing.",
+          "description": "The newest fifty, whatever the range: an account has a handful, and a range of a month hid all but one of them. Answered reads n/a where the category takes no answer at all, an announcement or an idea. In Elasticsearch this lists the newest 500 documents and the panel sorts them. Elasticsearch answers only inside the dashboard range, so years outside it are missing. Its rows are the documents as stored, so Answered is each discussion's own flag, which a row cannot read against its category's: a discussion in a category that takes no answer reads yes or no here rather than n/a.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -12273,6 +12328,16 @@
                             "color": "green",
                             "index": 0,
                             "text": "yes"
+                          },
+                          "false": {
+                            "color": "text",
+                            "index": 3,
+                            "text": "no"
+                          },
+                          "true": {
+                            "color": "green",
+                            "index": 2,
+                            "text": "yes"
                           }
                         },
                         "type": "value"
@@ -12282,7 +12347,7 @@
                           "match": "null",
                           "result": {
                             "color": "text",
-                            "index": 2,
+                            "index": 4,
                             "text": "n/a"
                           }
                         },
@@ -12317,18 +12382,6 @@
                         "url": "${__data.fields.Link}"
                       }
                     ]
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byName",
-                  "options": "Answered"
-                },
-                "properties": [
-                  {
-                    "id": "custom.width",
-                    "value": 100
                   }
                 ]
               },
@@ -12589,6 +12642,18 @@
                     "value": 120
                   }
                 ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Repository"
+                },
+                "properties": [
+                  {
+                    "id": "custom.minWidth",
+                    "value": 160
+                  }
+                ]
               }
             ]
           },
@@ -12722,6 +12787,18 @@
                   {
                     "id": "custom.width",
                     "value": 120
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Repository"
+                },
+                "properties": [
+                  {
+                    "id": "custom.minWidth",
+                    "value": 160
                   }
                 ]
               }
@@ -12914,8 +12991,8 @@
                 },
                 "properties": [
                   {
-                    "id": "custom.width",
-                    "value": 110
+                    "id": "custom.minWidth",
+                    "value": 160
                   }
                 ]
               },
@@ -12938,6 +13015,16 @@
                           "1": {
                             "color": "green",
                             "index": 0,
+                            "text": "yes"
+                          },
+                          "false": {
+                            "color": "text",
+                            "index": 3,
+                            "text": "no"
+                          },
+                          "true": {
+                            "color": "green",
+                            "index": 2,
                             "text": "yes"
                           }
                         },
@@ -16228,6 +16315,7 @@
                 "gradientMode": "hue",
                 "lineWidth": 1
               },
+              "decimals": 0,
               "unit": "short"
             },
             "overrides": [
@@ -16969,6 +17057,7 @@
                 "gradientMode": "hue",
                 "lineWidth": 1
               },
+              "decimals": 0,
               "unit": "short"
             },
             "overrides": []
@@ -17111,6 +17200,7 @@
                 "gradientMode": "hue",
                 "lineWidth": 1
               },
+              "decimals": 0,
               "unit": "short"
             },
             "overrides": []
@@ -18729,6 +18819,16 @@
                           "1": {
                             "color": "green",
                             "index": 0,
+                            "text": "yes"
+                          },
+                          "false": {
+                            "color": "text",
+                            "index": 3,
+                            "text": "no"
+                          },
+                          "true": {
+                            "color": "green",
+                            "index": 2,
                             "text": "yes"
                           }
                         },
@@ -20839,6 +20939,7 @@
                 "gradientMode": "hue",
                 "lineWidth": 1
               },
+              "decimals": 0,
               "unit": "short"
             },
             "overrides": []
@@ -21191,8 +21292,8 @@
                 },
                 "properties": [
                   {
-                    "id": "custom.width",
-                    "value": 110
+                    "id": "custom.minWidth",
+                    "value": 160
                   }
                 ]
               },
@@ -21424,8 +21525,8 @@
                 },
                 "properties": [
                   {
-                    "id": "custom.width",
-                    "value": 110
+                    "id": "custom.minWidth",
+                    "value": 160
                   }
                 ]
               },
@@ -21700,6 +21801,7 @@
                 "gradientMode": "hue",
                 "lineWidth": 1
               },
+              "decimals": 0,
               "unit": "short"
             },
             "overrides": []
@@ -21812,6 +21914,18 @@
                   {
                     "id": "custom.width",
                     "value": 120
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Repository"
+                },
+                "properties": [
+                  {
+                    "id": "custom.minWidth",
+                    "value": 160
                   }
                 ]
               },
@@ -22191,6 +22305,16 @@
                             "color": "green",
                             "index": 0,
                             "text": "yes"
+                          },
+                          "false": {
+                            "color": "text",
+                            "index": 3,
+                            "text": "no"
+                          },
+                          "true": {
+                            "color": "green",
+                            "index": 2,
+                            "text": "yes"
                           }
                         },
                         "type": "value"
@@ -22228,6 +22352,16 @@
                           "1": {
                             "color": "green",
                             "index": 0,
+                            "text": "yes"
+                          },
+                          "false": {
+                            "color": "text",
+                            "index": 3,
+                            "text": "no"
+                          },
+                          "true": {
+                            "color": "green",
+                            "index": 2,
                             "text": "yes"
                           }
                         },
@@ -22267,6 +22401,16 @@
                             "color": "green",
                             "index": 0,
                             "text": "yes"
+                          },
+                          "false": {
+                            "color": "text",
+                            "index": 3,
+                            "text": "no"
+                          },
+                          "true": {
+                            "color": "green",
+                            "index": 2,
+                            "text": "yes"
                           }
                         },
                         "type": "value"
@@ -22304,6 +22448,16 @@
                           "1": {
                             "color": "green",
                             "index": 0,
+                            "text": "yes"
+                          },
+                          "false": {
+                            "color": "text",
+                            "index": 3,
+                            "text": "no"
+                          },
+                          "true": {
+                            "color": "green",
+                            "index": 2,
                             "text": "yes"
                           }
                         },
@@ -22355,6 +22509,16 @@
                             "color": "green",
                             "index": 0,
                             "text": "yes"
+                          },
+                          "false": {
+                            "color": "text",
+                            "index": 3,
+                            "text": "no"
+                          },
+                          "true": {
+                            "color": "green",
+                            "index": 2,
+                            "text": "yes"
                           }
                         },
                         "type": "value"
@@ -22392,6 +22556,16 @@
                           "1": {
                             "color": "green",
                             "index": 0,
+                            "text": "yes"
+                          },
+                          "false": {
+                            "color": "text",
+                            "index": 3,
+                            "text": "no"
+                          },
+                          "true": {
+                            "color": "green",
+                            "index": 2,
                             "text": "yes"
                           }
                         },
@@ -23802,6 +23976,16 @@
                             "color": "green",
                             "index": 0,
                             "text": "yes"
+                          },
+                          "false": {
+                            "color": "text",
+                            "index": 3,
+                            "text": "no"
+                          },
+                          "true": {
+                            "color": "green",
+                            "index": 2,
+                            "text": "yes"
                           }
                         },
                         "type": "value"
@@ -23840,6 +24024,16 @@
                             "color": "green",
                             "index": 0,
                             "text": "yes"
+                          },
+                          "false": {
+                            "color": "text",
+                            "index": 3,
+                            "text": "no"
+                          },
+                          "true": {
+                            "color": "green",
+                            "index": 2,
+                            "text": "yes"
                           }
                         },
                         "type": "value"
@@ -23877,6 +24071,16 @@
                           "1": {
                             "color": "green",
                             "index": 0,
+                            "text": "yes"
+                          },
+                          "false": {
+                            "color": "text",
+                            "index": 3,
+                            "text": "no"
+                          },
+                          "true": {
+                            "color": "green",
+                            "index": 2,
                             "text": "yes"
                           }
                         },
@@ -24282,6 +24486,7 @@
                 "gradientMode": "hue",
                 "lineWidth": 1
               },
+              "decimals": 0,
               "unit": "short"
             },
             "overrides": []
@@ -24613,6 +24818,16 @@
                           "1": {
                             "color": "green",
                             "index": 0,
+                            "text": "yes"
+                          },
+                          "false": {
+                            "color": "text",
+                            "index": 3,
+                            "text": "no"
+                          },
+                          "true": {
+                            "color": "green",
+                            "index": 2,
                             "text": "yes"
                           }
                         },
@@ -25087,6 +25302,7 @@
                 "gradientMode": "hue",
                 "lineWidth": 1
               },
+              "decimals": 0,
               "unit": "short"
             },
             "overrides": []
@@ -25726,6 +25942,16 @@
                             "color": "green",
                             "index": 0,
                             "text": "yes"
+                          },
+                          "false": {
+                            "color": "text",
+                            "index": 3,
+                            "text": "no"
+                          },
+                          "true": {
+                            "color": "green",
+                            "index": 2,
+                            "text": "yes"
                           }
                         },
                         "type": "value"
@@ -25763,6 +25989,16 @@
                           "1": {
                             "color": "green",
                             "index": 0,
+                            "text": "yes"
+                          },
+                          "false": {
+                            "color": "text",
+                            "index": 3,
+                            "text": "no"
+                          },
+                          "true": {
+                            "color": "green",
+                            "index": 2,
                             "text": "yes"
                           }
                         },
@@ -25963,6 +26199,16 @@
                             "color": "green",
                             "index": 0,
                             "text": "yes"
+                          },
+                          "false": {
+                            "color": "text",
+                            "index": 3,
+                            "text": "no"
+                          },
+                          "true": {
+                            "color": "green",
+                            "index": 2,
+                            "text": "yes"
                           }
                         },
                         "type": "value"
@@ -26000,6 +26246,16 @@
                           "1": {
                             "color": "green",
                             "index": 0,
+                            "text": "yes"
+                          },
+                          "false": {
+                            "color": "text",
+                            "index": 3,
+                            "text": "no"
+                          },
+                          "true": {
+                            "color": "green",
+                            "index": 2,
                             "text": "yes"
                           }
                         },
@@ -26520,6 +26776,16 @@
                             "color": "green",
                             "index": 0,
                             "text": "yes"
+                          },
+                          "false": {
+                            "color": "text",
+                            "index": 3,
+                            "text": "no"
+                          },
+                          "true": {
+                            "color": "green",
+                            "index": 2,
+                            "text": "yes"
                           }
                         },
                         "type": "value"
@@ -26726,6 +26992,16 @@
                           "1": {
                             "color": "green",
                             "index": 0,
+                            "text": "yes"
+                          },
+                          "false": {
+                            "color": "text",
+                            "index": 3,
+                            "text": "no"
+                          },
+                          "true": {
+                            "color": "green",
+                            "index": 2,
                             "text": "yes"
                           }
                         },
@@ -27263,6 +27539,16 @@
                           "1": {
                             "color": "green",
                             "index": 0,
+                            "text": "yes"
+                          },
+                          "false": {
+                            "color": "red",
+                            "index": 3,
+                            "text": "disagrees"
+                          },
+                          "true": {
+                            "color": "green",
+                            "index": 2,
                             "text": "yes"
                           }
                         },

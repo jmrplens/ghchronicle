@@ -180,7 +180,7 @@ func activity(b *builder) []Panel {
 				"times the thread moved in one sweep; the link opens the comment or " +
 				"review that caused the newest one.",
 			Overrides: []any{
-				when("Updated"), repoColumn(), width("Kind", 110),
+				when("Updated"), fullNameColumn(), width("Kind", 110),
 				width("Reason", 120), width("Updates", 90), width("Title", 200), linkOn("Title"),
 			},
 			ES: latestES, ESTF: latestEStf, ESDesc: esNewest,
@@ -268,7 +268,7 @@ func workElsewhere(b *builder) Panel {
 				"Its Stars is the count the exporter holds at the end of the range, whenever " +
 				"the sweep that read it ran. " + sinceStart,
 			Overrides: []any{
-				when("Opened"), when("Seen"), repoColumn(),
+				when("Opened"), when("Seen"), fullNameColumn(),
 				width("Kind", 110), width("State", 90), width("Comments", 100),
 				unitOf("Stars", "short", 90), linkOn("Repository"),
 			},
@@ -349,7 +349,7 @@ func starsGiven(b *builder) []Panel {
 				"Prometheus a row is a language the account starred in, and Its stars the mean " +
 				"over the repositories starred in it. " + lastSweep,
 			Overrides: []any{
-				when("When"), width("Language", 120),
+				when("When"), width("Language", 120), fullNameColumn(),
 				barCell(activityItsStars, "short", 120), linkOn("Repository"),
 			},
 			GR: starGR, GRTF: starGRtf,
