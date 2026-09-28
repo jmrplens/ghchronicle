@@ -6,6 +6,7 @@ import "fmt"
 // Elasticsearch, Graphite and Prometheus twins: the twin renames its value
 // column to one of these, and a column named anything else arrives empty.
 const (
+	lifetimeArchived        = "Repositories archived"
 	lifetimeAgeAtArchive    = "Age at archive"
 	lifetimeLowestRemaining = "Lowest remaining"
 	lifetimeMostUsed        = "Most used"
@@ -313,7 +314,7 @@ func lifetime(b *builder) []Panel {
 				"is one number, so the Fork and Private flags are not in this table.",
 			ES: createdES, ESTF: createdEStf, ESDesc: esRange,
 		}),
-		panel("table", "Repositories archived", box{W: 8, H: 8, X: 8, Y: 17}, []Target{sqlT(archived)}, &P{
+		panel("table", lifetimeArchived, box{W: 8, H: 8, X: 8, Y: 17}, []Target{sqlT(archived)}, &P{
 			// Counted, so the count is not all that survives: the reduction
 			// takes the mean of every number the archived rows carried, and
 			// `age_days_at_archive` is one of them. Two of the panel's four
@@ -324,11 +325,11 @@ func lifetime(b *builder) []Panel {
 				promTbl("avg by (owner) (github_repos_archived_age_days_at_archive_mean)", "B"),
 			},
 			PromTF: merged(map[string]string{
-				panelValueA: "Repositories archived", panelValueB: lifetimeAgeAtArchive,
+				panelValueA: lifetimeArchived, panelValueB: lifetimeAgeAtArchive,
 			}, nil),
 
 			// The count stands for the repositories the SQL stores list.
-			PromAt: map[string]string{"Repositories archived": "Repository"},
+			PromAt: map[string]string{lifetimeArchived: "Repository"},
 			PromDesc: "The exporter reduces `gh_repo_archived` to a count by owner, which names " +
 				"the account and not the repository, so Prometheus holds how many have " +
 				"been archived and how long they lived on average, and neither which they " +

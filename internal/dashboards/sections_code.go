@@ -2,9 +2,10 @@ package dashboards
 
 import "fmt"
 
-// The SQL every commit query opens with, and the column titles each panel
-// here shares with its Elasticsearch, Graphite and Prometheus twins: a twin
-// that renames a column to anything else arrives beside an empty one.
+// The SQL every commit query opens with, the column titles each panel
+// here shares with its Elasticsearch, Graphite and Prometheus twins (a twin
+// that renames a column to anything else arrives beside an empty one), and
+// what a commit stat reads over a range with no commit in it.
 const (
 	codeSelect         = "SELECT "
 	codeInRange        = " WHERE $__timeFilter(time) AND "
@@ -13,6 +14,7 @@ const (
 	codeLinesAdded     = "Lines added"
 	codeLinesRemoved   = "Lines removed"
 	codeSignedCommits  = "Signed commits"
+	codeNoCommits      = "no commits"
 )
 
 // ── Code ────────────────────────────────────────────────────────────────────
@@ -147,8 +149,8 @@ func commitsAndChurn(b *builder) []Panel {
 			Opts: mergeOpts(Opts{"thresholds": plainSteps}, bounded()),
 			Overrides: []any{
 				fieldThresholds(codeSignedCommits, "percent", signedSteps),
-				noValueOf(codeSignedCommits, "no commits"),
-				noValueOf(codeLinesAdded, "no commits"), noValueOf(codeLinesRemoved, "no commits"),
+				noValueOf(codeSignedCommits, codeNoCommits),
+				noValueOf(codeLinesAdded, codeNoCommits), noValueOf(codeLinesRemoved, codeNoCommits),
 			},
 		}),
 		panel("timeseries", "Lines changed over time", box{W: 12, H: 8, X: 0, Y: 4}, []Target{sqlTS(churn)}, &P{

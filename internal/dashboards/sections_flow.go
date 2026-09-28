@@ -123,6 +123,11 @@ const flowNonNull = "isNonNull("
 // it, which is a term to group by rather than a number to measure.
 const flowNumberTerm = "number.keyword"
 
+// flowAuthorTerm is the author as Elasticsearch keeps it: the term the pull
+// requests by author are counted under, and the one each open pull request
+// and issue is listed with.
+const flowAuthorTerm = "author.keyword"
+
 // flow is how much moved and how fast, and then which pull requests and
 // which people moved it.
 func flow(b *builder) []Panel {
@@ -374,7 +379,7 @@ func pullsAndReviewers(b *builder) []Panel {
 		counted(anyPath("churn")), gn(pr, "author"),
 	), "Author", []col{{"sum", "Pull requests"}})
 	authorsES, authorsEStf := esTbl(pr, []any{b.tm("author", 15)}, []any{b.mCount()},
-		[]named{{"author.keyword", "Author"}, {"n", "Pull requests"}},
+		[]named{{flowAuthorTerm, "Author"}, {"n", "Pull requests"}},
 		[]string{ESF, esIdentified})
 
 	byRepoGR, byRepoGRtf := gTbl(grGroupBy(mergedPath("seconds_to_merge"), pr, "avg", "repo"), "Repository",
@@ -690,7 +695,7 @@ func stillOpen(b *builder) []Panel {
 			{flowNumberTerm, "Number"},
 			{"url.keyword", "Link"},
 			{"title.keyword", "Title"},
-			{"author.keyword", "Author"},
+			{flowAuthorTerm, "Author"},
 			{"label_names.keyword", "Labels"},
 			{"s", flowOpenAge},
 			{"c", "Comments"},
@@ -714,7 +719,7 @@ func stillOpen(b *builder) []Panel {
 			{inventoryRepoTerm, "Repository"},
 			{flowNumberTerm, "Number"},
 			{"url.keyword", "Link"},
-			{"author.keyword", "Author"},
+			{flowAuthorTerm, "Author"},
 			{"label_names.keyword", "Labels"},
 			{"s", flowOpenAge},
 			{"c", "Comments"},

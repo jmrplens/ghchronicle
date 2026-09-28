@@ -110,7 +110,7 @@ func TestOrderIsHeldOnlyWhereTheRowsAgree(t *testing.T) {
 		t.Errorf("one drawing against itself: Order = %q", got)
 	}
 	fewer := table(col("Repository", "string", "someone/else", "another/project"), col("Comments", "number", 2.0, 0.0))
-	if got := Order(postgres, fewer, Likeness{}); got == "" {
+	if Order(postgres, fewer, Likeness{}) == "" {
 		t.Error("the same rows in another order, over the columns both draw, read as one order")
 	}
 	other := table(col("Repository", "string", "another/project", "hello-world"), col("Comments", "number", 0.0, 2.0))

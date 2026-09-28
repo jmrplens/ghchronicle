@@ -214,7 +214,7 @@ func TestNoGraphiteRowIsAGroupWithNothingInRange(t *testing.T) {
 				continue
 			}
 			titles = append(titles, title)
-			if n := strings.Count(expr, "isNonNull("); n != strings.Count(expr, "isNonNull(removeEmptySeries(") {
+			if strings.Count(expr, "isNonNull(") != strings.Count(expr, "isNonNull(removeEmptySeries(") {
 				t.Errorf("the Graphite panel %q turns the nulls of a series with nothing in the range "+
 					"into zeros before dropping it, so it draws a row that reads 0 for a group the "+
 					"SQL stores do not have: %s", title, expr)

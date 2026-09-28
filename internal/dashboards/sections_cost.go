@@ -18,6 +18,7 @@ const (
 	costActionsMinutes = "Actions minutes"
 	costSumSeries      = "sumSeries("
 	costCacheIdle      = "Days since use"
+	costNoUsage        = "no usage"
 )
 
 // promByRepo is one column of the cost table in Prometheus: a billing field
@@ -126,8 +127,8 @@ func cost(b *builder) []Panel {
 				unitOf(costActionsMinutes, "short", 0),
 				// GitHub answers the products that were used, so no row is no
 				// usage.
-				noValueOf("Gross", "no usage"), noValueOf(costCovered, "no usage"),
-				noValueOf(costBilled, "no usage"), noValueOf(costActionsMinutes, "no usage"),
+				noValueOf("Gross", costNoUsage), noValueOf(costCovered, costNoUsage),
+				noValueOf(costBilled, costNoUsage), noValueOf(costActionsMinutes, costNoUsage),
 			},
 		}),
 		panel("timeseries", "Cost over time by product", box{W: 12, H: 8, X: 0, Y: 4},

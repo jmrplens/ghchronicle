@@ -40,6 +40,7 @@ const (
 	securityCanApprovePR = "Can approve pull requests"
 	securityLastRotated  = "Last rotated"
 	securityCVSS         = "CVSS"
+	securityWorstCVSS    = "Worst CVSS"
 	securityOutcome      = "Outcome"
 )
 
@@ -477,12 +478,12 @@ func scanningAndResolution(b *builder) []Panel {
 			},
 			PromTF: merged(map[string]string{
 				"severity": "Severity", inventoryValueCol + "A": "Alerts",
-				inventoryValueCol + "B": "Worst CVSS", inventoryValueCol + "C": securityResolveTime,
+				inventoryValueCol + "B": securityWorstCVSS, inventoryValueCol + "C": securityResolveTime,
 			}, nil),
 
 			// The count stands for the alerts the SQL stores list, and the
 			// worst of the scores where they draw each one.
-			PromAt: map[string]string{"Alerts": "Advisory", "Worst CVSS": securityCVSS},
+			PromAt: map[string]string{"Alerts": "Advisory", securityWorstCVSS: securityCVSS},
 			Opts:   Opts{"sort": "Raised"},
 			Desc:   securityResolveDesc,
 			PromDesc: "Prometheus keeps the severity only, so this is the alerts resolved per " +
@@ -496,7 +497,7 @@ func scanningAndResolution(b *builder) []Panel {
 			},
 			PromOver: []any{
 				unitOf(securityResolveTime, "s", 170), barCell("Alerts", "short", 130),
-				width("Worst CVSS", 120),
+				width(securityWorstCVSS, 120),
 			},
 			GR: resGR, GRTF: resGRtf, GRAt: map[string]string{"Alerts": "Advisory"},
 			GRDesc: "Graphite names each row repository, severity and package from the path " +

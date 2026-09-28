@@ -16,6 +16,7 @@ const (
 	profilePageAgrees = "Page agrees"
 	profileOneTime    = "One-time"
 	profileLastAdded  = "Last added"
+	profileMeanAmount = "Mean amount"
 )
 
 // ── Profile and sponsorship ─────────────────────────────────────────────────
@@ -422,13 +423,13 @@ func sponsorship(b *builder) []Panel {
 			},
 			PromTF: merged(map[string]string{
 				"direction": "Direction", panelValueA: "Sponsorships",
-				panelValueB: "Mean amount", panelValueC: "Active share",
+				panelValueB: profileMeanAmount, panelValueC: "Active share",
 				panelValueD: "One-time share",
 			}, []string{"user"}),
 
 			// The count where the SQL stores draw the tier each one is at,
 			// and the mean where they draw each amount.
-			PromAt: map[string]string{"Sponsorships": "Tier", "Mean amount": "Amount"},
+			PromAt: map[string]string{"Sponsorships": "Tier", profileMeanAmount: "Amount"},
 			Desc: "Every sponsorship in either direction, dated the day it began and not the day " +
 				"of any payment. Amount is the price of the tier it was made at, which is a rate " +
 				"per month unless the column beside it says the payment was one-time: a five " +
@@ -456,7 +457,7 @@ func sponsorship(b *builder) []Panel {
 				profileBool("Active", 80), profileBool(profileOneTime, 90), linkOn("Sponsorable"),
 			},
 			PromOver: []any{
-				unitOf("Mean amount", "currencyUSD", 130),
+				unitOf(profileMeanAmount, "currencyUSD", 130),
 				unitOf("Active share", "percentunit", 110),
 				unitOf("One-time share", "percentunit", 130),
 			},

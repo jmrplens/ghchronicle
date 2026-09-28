@@ -10,13 +10,16 @@ import (
 // overviewNewestRow ends the queries over gh_account: the table is rewritten
 // whole every sweep, so the account as it stands is the last row of it, never
 // a sum over the range. The titles beside it are what the Elasticsearch,
-// Graphite and Prometheus twins rename their own columns to.
+// Graphite and Prometheus twins rename their own columns to, and the last is
+// what a traffic stat reads over a range with no traffic day in it.
 const (
 	overviewNewestRow      = " WHERE $__timeFilter(time) ORDER BY time DESC LIMIT 1"
 	overviewAccountAge     = "Account age"
 	overviewStarsGiven     = "Stars given"
 	overviewUniqueVisitors = "Unique visitors"
 	overviewUniqueCloners  = "Unique cloners"
+	overviewClonesEach     = "Clones each"
+	overviewNoTraffic      = "no traffic"
 )
 
 // ── Overview ────────────────────────────────────────────────────────────────
@@ -338,8 +341,8 @@ func overview(b *builder) []Panel {
 			},
 			// GitHub answers the days that had traffic, so no row is none.
 			Overrides: []any{
-				noValueOf("Views", "no traffic"), noValueOf(overviewUniqueVisitors, "no traffic"),
-				noValueOf(overviewUniqueCloners, "no traffic"),
+				noValueOf("Views", overviewNoTraffic), noValueOf(overviewUniqueVisitors, overviewNoTraffic),
+				noValueOf(overviewUniqueCloners, overviewNoTraffic),
 			},
 		}),
 		fieldGroup(b, "gh_account", "Community", box{W: 8, H: 4, X: 16, Y: brandHeight}, []named{
@@ -553,17 +556,17 @@ func audience(b *builder) []Panel {
 			},
 			PromTF: merged(map[string]string{
 				"repo": "Repository", panelValueA: "Clones", panelValueB: "Cloners",
-				panelValueC: "Views", panelValueD: "Clones each",
+				panelValueC: "Views", panelValueD: overviewClonesEach,
 			}, nil),
 
-			Opts: Opts{"sort": "Clones each"},
+			Opts: Opts{"sort": overviewClonesEach},
 			Desc: "Clones divided by the people who made them. There are panels for clones and " +
 				"for views and none for the ratio, which is the only thing that separates " +
 				"adoption from machinery: one repository here is cloned seventy three times " +
 				"per unique cloner and viewed six hundred times in the same month.",
 			PromDesc: windowNote,
 			Overrides: []any{
-				barCell("Clones each", "short", 120), width("Clones", 100),
+				barCell(overviewClonesEach, "short", 120), width("Clones", 100),
 				width("Cloners", 100), width("Views", 100), ownerLinkOn("Repository", "the traffic graph"),
 			},
 			GR: cloneGR, GRTF: cloneGRtf,

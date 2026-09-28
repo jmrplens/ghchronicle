@@ -5,6 +5,14 @@ import (
 	"strings"
 )
 
+// The column and series titles a panel here shares with its Elasticsearch,
+// Graphite and Prometheus twins, which have to spell them alike or the twin
+// arrives beside an empty column or a legend nothing overrides.
+const (
+	contributionsAllCommits = "All commits"
+	contributionsLastYear   = "Last year"
+)
+
 // ── Contributions ───────────────────────────────────────────────────────────
 
 // contributions is the profile's own account of the work, and then the split
@@ -91,9 +99,9 @@ func contributionTotals(b *builder) []Panel {
 	// first, so the rename holds for all of them.
 	transpose := []any{
 		map[string]any{"id": "transpose", "options": map[string]any{
-			"firstFieldName": "Metric", "restFieldsName": "Last year",
+			"firstFieldName": "Metric", "restFieldsName": contributionsLastYear,
 		}},
-		organize(map[string]string{"Last year 1": "Last year"}, nil),
+		organize(map[string]string{contributionsLastYear + " 1": contributionsLastYear}, nil),
 	}
 	weekPath := func(field string) string { return rp("gh_commits_week", field) }
 
@@ -108,7 +116,7 @@ func contributionTotals(b *builder) []Panel {
 		totalRows[i] = fmt.Sprintf("alias(%s, %q)", gp("gh_contributions_total", c.From), c.To)
 	}
 	totalsGR, totalsGRtf := gTbl("group("+strings.Join(totalRows, ", ")+")",
-		"Metric", []col{{"lastNotNull", "Last year"}})
+		"Metric", []col{{"lastNotNull", contributionsLastYear}})
 	totalsES, totalsEStf := b.esRaw("gh_contributions_total", 1, totalCols, nil)
 
 	// Grouped by the full name in these three, where the SQL twin shows the
@@ -159,7 +167,7 @@ func contributionTotals(b *builder) []Panel {
 		contributionMix(b),
 		panel("timeseries", "Commits per week", box{W: 12, H: 7, X: 0, Y: 12}, []Target{sqlTS(weekly)}, &P{
 			Prom: []Target{promq(fmt.Sprintf("sum(increase(github_commits_total{%s}[7d]))", PF),
-				legend("All commits"), step("7d"))},
+				legend(contributionsAllCommits), step("7d"))},
 			PromDesc: sinceStart,
 			Desc: "One bar per week, at the Sunday the week starts on, which is how GitHub " +
 				"serves it and how the rows are stamped.",
@@ -173,15 +181,15 @@ func contributionTotals(b *builder) []Panel {
 			// 3, 6 and 2 commits at the Thursdays 08-27 to 09-24, and the
 			// first of them before a thirty-day range began and not drawn.
 			GR: []Target{
-				grq(fmt.Sprintf(`alias(summarize(sumSeries(%s), "1d", "sum"), "All commits")`,
-					weekPath("commits")), "A"),
+				grq(fmt.Sprintf(`alias(summarize(sumSeries(%s), "1d", "sum"), %q)`,
+					weekPath("commits"), contributionsAllCommits), "A"),
 				grq(fmt.Sprintf(`alias(summarize(sumSeries(%s), "1d", "sum"), "Own commits")`,
 					weekPath("owner_commits")), "B"),
 			},
-			GRTF: []any{keepsAnyValue("All commits", "Own commits")},
+			GRTF: []any{keepsAnyValue(contributionsAllCommits, "Own commits")},
 			ES: []Target{
 				esq("gh_commits_week", []any{b.mSum("commits")}, []any{b.sundayWeeks()}, "A",
-					[]string{ESF}, "All commits"),
+					[]string{ESF}, contributionsAllCommits),
 				esq("gh_commits_week", []any{b.mSum("owner_commits")}, []any{b.sundayWeeks()}, "B",
 					[]string{ESF}, "Own commits"),
 			},
