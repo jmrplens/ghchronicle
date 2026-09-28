@@ -205,11 +205,20 @@ func workElsewhere(b *builder) Panel {
 	// range and not the whole history, because that measurement is a row
 	// per repository per sweep, and because a range in the past then shows
 	// the count as it stood then.
+	//
+	// The state is a tag, so an item has a row for each state it was seen in
+	// and the newest decides. Two of them at one instant cannot come from
+	// GitHub, whose searches for each state are disjoint and date a closed
+	// item when it closed; the containerised suite's fake answers every
+	// search with the same items, and InfluxDB and PostgreSQL then drew the
+	// one pull request as open and as closed, a different one each run. The
+	// state's name breaks such a tie the same way in both, and the way the
+	// Elasticsearch buckets, ordered by their key, already break it.
 	external := `SELECT x.full_name AS "Repository", ` + agoSQL("x.time", "x.seconds_open") + ` AS "Opened",` +
 		` x.time AS "Seen", x.kind AS "Kind",` +
 		` x.state AS "State", x.title AS "Title", u.stars AS "Stars", x.comments AS "Comments",` +
 		` x.url AS "Link" FROM (` +
-		"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, kind, number ORDER BY time DESC) AS rn" +
+		"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, kind, number ORDER BY time DESC, state) AS rn" +
 		" FROM gh_external_contribution WHERE $__timeFilter(time)) x" +
 		" LEFT JOIN (SELECT full_name, stars, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn" +
 		" FROM gh_upstream_repo WHERE $__timeFilter(time)) u ON u.full_name = x.full_name AND u.rn = 1" +

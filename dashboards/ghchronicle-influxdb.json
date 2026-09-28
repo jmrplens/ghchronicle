@@ -13135,7 +13135,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT x.full_name AS \"Repository\", x.time - arrow_cast(x.seconds_open * 1000000000, 'Duration(Nanosecond)') AS \"Opened\", x.time AS \"Seen\", x.kind AS \"Kind\", x.state AS \"State\", x.title AS \"Title\", u.stars AS \"Stars\", x.comments AS \"Comments\", x.url AS \"Link\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, kind, number ORDER BY time DESC) AS rn FROM gh_external_contribution WHERE $__timeFilter(time)) x LEFT JOIN (SELECT full_name, stars, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn FROM gh_upstream_repo WHERE $__timeFilter(time)) u ON u.full_name = x.full_name AND u.rn = 1 WHERE x.rn = 1 ORDER BY x.time DESC LIMIT 40",
+              "rawSql": "SELECT x.full_name AS \"Repository\", x.time - arrow_cast(x.seconds_open * 1000000000, 'Duration(Nanosecond)') AS \"Opened\", x.time AS \"Seen\", x.kind AS \"Kind\", x.state AS \"State\", x.title AS \"Title\", u.stars AS \"Stars\", x.comments AS \"Comments\", x.url AS \"Link\" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, kind, number ORDER BY time DESC, state) AS rn FROM gh_external_contribution WHERE $__timeFilter(time)) x LEFT JOIN (SELECT full_name, stars, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn FROM gh_upstream_repo WHERE $__timeFilter(time)) u ON u.full_name = x.full_name AND u.rn = 1 WHERE x.rn = 1 ORDER BY x.time DESC LIMIT 40",
               "refId": "A"
             }
           ],
