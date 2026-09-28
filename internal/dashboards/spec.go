@@ -578,7 +578,7 @@ func materialize(id *ids, p *Panel, storeName string, ds, logs any, y0 int) map[
 	opts := mergeOpts(p.Opts, st.Opts)
 	// Every kind takes the shared overrides and the store's own: a stat of
 	// several values names them through overrides as much as a table does.
-	opts["overrides"] = append(append([]any{}, p.Overrides...), st.Overrides...)
+	opts["overrides"] = namingFirst(append(append([]any{}, p.Overrides...), st.Overrides...))
 
 	// Every kind is placed and identified the same way, so the arguments are
 	// built once and the switch chooses nothing but the builder.
@@ -625,6 +625,44 @@ func materialize(id *ids, p *Panel, storeName string, ds, logs any, y0 int) map[
 		out["timeFrom"] = v
 	}
 	return out
+}
+
+// namingFirst moves every override that gives a field its name ahead of the
+// others, keeping each group in the order it had.
+//
+// Grafana applies overrides in the order the list gives, and a byName matcher
+// reads the name a field carries when its turn comes. The shared overrides
+// address a value by the name the panel draws, and in Elasticsearch that name
+// is given by an override of the store's own, a displayName on the query's
+// refId, since the response parser names a median "p50.0 seconds_to_merge".
+// Appended after the shared list, those names came too late: measured on the
+// 2.6.1 review, Time to merge read "194 K" there against 2.25 days in the
+// other four stores, and Run duration "260" without its seconds, while the
+// Success rate the store set again after its own names kept its unit.
+func namingFirst(overrides []any) []any {
+	out := make([]any, 0, len(overrides))
+	var rest []any
+	for _, o := range overrides {
+		if givesName(o) {
+			out = append(out, o)
+		} else {
+			rest = append(rest, o)
+		}
+	}
+	return append(out, rest...)
+}
+
+// givesName reports whether an override sets the name its fields are drawn
+// under.
+func givesName(o any) bool {
+	m, _ := o.(map[string]any)
+	props, _ := m["properties"].([]any)
+	for _, raw := range props {
+		if p, _ := raw.(map[string]any); p["id"] == "displayName" {
+			return true
+		}
+	}
+	return false
 }
 
 func nonEmpty(parts ...string) []string {

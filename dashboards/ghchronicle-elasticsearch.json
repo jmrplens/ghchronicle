@@ -4310,54 +4310,6 @@
             "overrides": [
               {
                 "matcher": {
-                  "id": "byName",
-                  "options": "Time to merge"
-                },
-                "properties": [
-                  {
-                    "id": "unit",
-                    "value": "s"
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byName",
-                  "options": "Time to review by someone else"
-                },
-                "properties": [
-                  {
-                    "id": "unit",
-                    "value": "s"
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byName",
-                  "options": "Time to close an issue"
-                },
-                "properties": [
-                  {
-                    "id": "unit",
-                    "value": "s"
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byName",
-                  "options": "Time to review by someone else"
-                },
-                "properties": [
-                  {
-                    "id": "noValue",
-                    "value": "no human review"
-                  }
-                ]
-              },
-              {
-                "matcher": {
                   "id": "byFrameRefID",
                   "options": "A"
                 },
@@ -4425,6 +4377,54 @@
                   {
                     "id": "displayName",
                     "value": "Lines per pull request"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Time to merge"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "s"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Time to review by someone else"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "s"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Time to close an issue"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "s"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Time to review by someone else"
+                },
+                "properties": [
+                  {
+                    "id": "noValue",
+                    "value": "no human review"
                   }
                 ]
               }
@@ -6679,6 +6679,90 @@
             "overrides": [
               {
                 "matcher": {
+                  "id": "byFrameRefID",
+                  "options": "A"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "Workflow runs"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byFrameRefID",
+                  "options": "B"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "Success rate"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byFrameRefID",
+                  "options": "C"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "Undecided runs"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byFrameRefID",
+                  "options": "D"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "Run duration"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byFrameRefID",
+                  "options": "E"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "Queue wait"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byFrameRefID",
+                  "options": "F"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "Artifact storage walked"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byFrameRefID",
+                  "options": "G"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "Actions cache"
+                  }
+                ]
+              },
+              {
+                "matcher": {
                   "id": "byName",
                   "options": "Success rate"
                 },
@@ -6760,90 +6844,6 @@
                   {
                     "id": "unit",
                     "value": "bytes"
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byFrameRefID",
-                  "options": "A"
-                },
-                "properties": [
-                  {
-                    "id": "displayName",
-                    "value": "Workflow runs"
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byFrameRefID",
-                  "options": "B"
-                },
-                "properties": [
-                  {
-                    "id": "displayName",
-                    "value": "Success rate"
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byFrameRefID",
-                  "options": "C"
-                },
-                "properties": [
-                  {
-                    "id": "displayName",
-                    "value": "Undecided runs"
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byFrameRefID",
-                  "options": "D"
-                },
-                "properties": [
-                  {
-                    "id": "displayName",
-                    "value": "Run duration"
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byFrameRefID",
-                  "options": "E"
-                },
-                "properties": [
-                  {
-                    "id": "displayName",
-                    "value": "Queue wait"
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byFrameRefID",
-                  "options": "F"
-                },
-                "properties": [
-                  {
-                    "id": "displayName",
-                    "value": "Artifact storage walked"
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byFrameRefID",
-                  "options": "G"
-                },
-                "properties": [
-                  {
-                    "id": "displayName",
-                    "value": "Actions cache"
                   }
                 ]
               },
@@ -9094,44 +9094,6 @@
             "overrides": [
               {
                 "matcher": {
-                  "id": "byName",
-                  "options": "Signed commits"
-                },
-                "properties": [
-                  {
-                    "id": "unit",
-                    "value": "percent"
-                  },
-                  {
-                    "id": "color",
-                    "value": {
-                      "mode": "thresholds"
-                    }
-                  },
-                  {
-                    "id": "thresholds",
-                    "value": {
-                      "mode": "absolute",
-                      "steps": [
-                        {
-                          "color": "red",
-                          "value": null
-                        },
-                        {
-                          "color": "orange",
-                          "value": 50
-                        },
-                        {
-                          "color": "green",
-                          "value": 90
-                        }
-                      ]
-                    }
-                  }
-                ]
-              },
-              {
-                "matcher": {
                   "id": "byFrameRefID",
                   "options": "A"
                 },
@@ -9175,6 +9137,44 @@
                   {
                     "id": "displayName",
                     "value": "Signed commits"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Signed commits"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "percent"
+                  },
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "thresholds"
+                    }
+                  },
+                  {
+                    "id": "thresholds",
+                    "value": {
+                      "mode": "absolute",
+                      "steps": [
+                        {
+                          "color": "red",
+                          "value": null
+                        },
+                        {
+                          "color": "orange",
+                          "value": 50
+                        },
+                        {
+                          "color": "green",
+                          "value": 90
+                        }
+                      ]
+                    }
                   }
                 ]
               },
@@ -15527,6 +15527,30 @@
             "overrides": [
               {
                 "matcher": {
+                  "id": "byFrameRefID",
+                  "options": "A"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "Dependabot"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byFrameRefID",
+                  "options": "B"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "Code scanning"
+                  }
+                ]
+              },
+              {
+                "matcher": {
                   "id": "byName",
                   "options": "Dependabot"
                 },
@@ -15598,30 +15622,6 @@
                         }
                       ]
                     }
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byFrameRefID",
-                  "options": "A"
-                },
-                "properties": [
-                  {
-                    "id": "displayName",
-                    "value": "Dependabot"
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byFrameRefID",
-                  "options": "B"
-                },
-                "properties": [
-                  {
-                    "id": "displayName",
-                    "value": "Code scanning"
                   }
                 ]
               }
@@ -18236,18 +18236,6 @@
             "overrides": [
               {
                 "matcher": {
-                  "id": "byName",
-                  "options": "Actions minutes"
-                },
-                "properties": [
-                  {
-                    "id": "unit",
-                    "value": "short"
-                  }
-                ]
-              },
-              {
-                "matcher": {
                   "id": "byFrameRefID",
                   "options": "A"
                 },
@@ -18291,6 +18279,18 @@
                   {
                     "id": "displayName",
                     "value": "Actions minutes"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Actions minutes"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "short"
                   }
                 ]
               }
