@@ -13065,7 +13065,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(aliasSub(consolidateBy(groupByNode(github.event.*.*.*.*.*.*.events, -2, \"sum\"), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))",
+              "target": "removeEmptySeries(aliasSub(consolidateBy(group(limit(sortByTotal(sortByName(groupByNode(github.event.*.*.*.*.*.*.events, -2, \"sum\"))), 8), alias(removeBelowValue(diffSeries(sumSeries(groupByNode(github.event.*.*.*.*.*.*.events, -2, \"sum\")), sumSeries(limit(sortByTotal(sortByName(groupByNode(github.event.*.*.*.*.*.*.events, -2, \"sum\"))), 8))), 1), \"other\")), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))",
               "textEditor": true
             }
           ],

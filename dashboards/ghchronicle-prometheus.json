@@ -12827,7 +12827,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (type) (increase(github_events_total[$__range]))",
+              "expr": "topk(8, sum by (type) (increase(github_events_total[$__range]))) or label_replace((sum(sum by (type) (increase(github_events_total[$__range]))) - sum(topk(8, sum by (type) (increase(github_events_total[$__range]))))) and on () (count(sum by (type) (increase(github_events_total[$__range]))) \u003e 8), \"type\", \"other\", \"\", \"\")",
               "format": "table",
               "instant": true,
               "range": false,

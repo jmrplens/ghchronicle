@@ -1,7 +1,9 @@
 package dashboards
 
 import (
+	"fmt"
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -42,6 +44,42 @@ func TestEventsByTypeDrawsEachTypeAsASliceOfItsOwn(t *testing.T) {
 			if !names[column] {
 				t.Errorf("%s: the slices are made of a %s column the query does not draw: it draws %v",
 					store.Name, column, slices.Sorted(keysOf(names)))
+			}
+		}
+	}
+}
+
+// TestEventsByTypeFoldsTheRestIntoOtherWhereAStoreCan holds "Events by type"
+// to its description, which says the eight busiest types are named and the
+// rest are one slice called other. The SQL stores folded and the other three
+// drew every type there was: the 2.6.2 review found Graphite and
+// Elasticsearch listing each, and Prometheus did the same. Graphite and
+// Prometheus now fold as the SQL does, and Elasticsearch, which cannot, says
+// so in its own description.
+func TestEventsByTypeFoldsTheRestIntoOtherWhereAStoreCan(t *testing.T) {
+	t.Parallel()
+	for _, store := range AllStores() {
+		p := mustPanel(t, rendered(t, store.Name), "Events by type")
+		text := queriesOf(p)
+		var want []string
+		switch store.Name {
+		case "influxdb", "postgres":
+			want = []string{fmt.Sprintf("WHEN rn <= %d THEN", topSeriesKept), "'other'"}
+		case "prometheus":
+			want = []string{fmt.Sprintf("topk(%d, sum by (type)", topSeriesKept), `"type", "other"`}
+		case "graphite":
+			want = []string{fmt.Sprintf("limit(sortByTotal(sortByName(groupByNode(%s, -2, \"sum\"))), %d)",
+				gp("gh_event", "events"), topSeriesKept), `"other")`}
+		case "elasticsearch":
+			if desc, _ := p["description"].(string); !strings.Contains(desc, esNoOther) {
+				t.Errorf("elasticsearch draws every type and its description does not say so: %q", desc)
+			}
+			continue
+		}
+		for _, w := range want {
+			if !strings.Contains(text, w) {
+				t.Errorf("%s: Events by type lacks %s, so it does not fold the types past the "+
+					"busiest %d into other as its description says:\n%s", store.Name, w, topSeriesKept, text)
 			}
 		}
 	}

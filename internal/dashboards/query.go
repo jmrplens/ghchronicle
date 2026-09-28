@@ -518,6 +518,22 @@ func medianTotal(path string) string {
 	return fmt.Sprintf(`summarize(percentileOfSeries(%s, 50), "100y", "median", true)`, path)
 }
 
+// grOther is otherRows in Graphite: the n series with the biggest total over
+// the range, a tie going to the name that sorts first as the SQL's ORDER BY
+// breaks it, and one series called other for the rest, which is the sum of
+// every series less the sum of those n, point by point. A point where nothing
+// is left over is dropped, so with n series or fewer the rest holds nothing,
+// the removeEmptySeries a table puts around it takes it out, and there is no
+// other row, as the SQL has none. Measured against graphite-web 1.1.10: ten
+// types of 20 events down to 2 drew the eight busiest and other at 6, five
+// types drew the five, and four types of 5 events each kept the three that
+// sort first.
+func grOther(n int, expr string) string {
+	top := fmt.Sprintf("limit(sortByTotal(sortByName(%s)), %d)", expr, n)
+	return fmt.Sprintf(`group(%s, alias(removeBelowValue(diffSeries(sumSeries(%s), sumSeries(%s)), 1), "other"))`,
+		top, expr, top)
+}
+
 // perBucket is one series per value of a tag node, one point per bucket.
 // Counts are consolidated by sum so a long range does not average them away,
 // under the tag's value as the series name, which is the legend entry.

@@ -21024,7 +21024,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "The share of each event type in the range, in the legend. The eight busiest types are named; the rest are one slice called `other`.",
+          "description": "The share of each event type in the range, in the legend. The eight busiest types are named; the rest are one slice called `other`. In Elasticsearch every type in the range is a slice of its own, up to thirty: a terms aggregation answers the types it keeps and nothing about the others, so there is no remainder to fold into other.",
           "fieldConfig": {
             "defaults": {
               "color": {

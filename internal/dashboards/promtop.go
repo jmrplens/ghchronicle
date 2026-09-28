@@ -33,3 +33,14 @@ func promTop(n int, expr string) string {
 func promWithin(n int, expr, rank string, on ...string) string {
 	return fmt.Sprintf("%s and on (%s) %s", expr, strings.Join(on, ", "), promTop(n, rank))
 }
+
+// promOther is otherRows in Prometheus: the n biggest series of a sum by one
+// label, and the rest added up as one series whose label reads other. The rest
+// is the whole sum less the n, which is there only when the sum has more than
+// n series, so a range of eight types or fewer has no other slice, as the SQL
+// has no row for it. A tie at the cut is broken however topk breaks it, which
+// is not by name as the SQL's ORDER BY breaks it.
+func promOther(n int, expr, label string) string {
+	return fmt.Sprintf(`topk(%d, %s) or label_replace((sum(%s) - sum(topk(%d, %s))) and on () (count(%s) > %d), %q, "other", "", "")`,
+		n, expr, expr, n, expr, expr, n, label)
+}

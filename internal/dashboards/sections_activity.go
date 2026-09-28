@@ -22,6 +22,17 @@ var eachTypeASlice = map[string]any{"id": "rowsToFields", "options": map[string]
 	map[string]any{"fieldName": "Events", "handlerKey": "field.value"},
 }}}
 
+// esNoOther is what the Elasticsearch pie says in place of folding: a terms
+// aggregation answers a bucket per value it keeps and nothing about the ones
+// it does not, and a panel's transformations cannot keep the first eight rows
+// and add the rest up under a name of their own, so the types past the
+// busiest eight have no slice to go into. The pie keeps thirty of them rather
+// than eight, since a pie of the eight alone would draw each share of those
+// eight and read larger than it is.
+const esNoOther = "In Elasticsearch every type in the range is a slice of its own, up to " +
+	"thirty: a terms aggregation answers the types it keeps and nothing about the " +
+	"others, so there is no remainder to fold into other."
+
 // ── Activity ────────────────────────────────────────────────────────────────
 
 func activity(b *builder) []Panel {
@@ -65,7 +76,7 @@ func activity(b *builder) []Panel {
 	ev, nt := "gh_event", "gh_notification"
 	notes := gp(nt, "notifications")
 
-	typeGR, typeGRtf := gTbl(fmt.Sprintf(`groupByNode(%s, -2, "sum")`, events("events")),
+	typeGR, typeGRtf := gTbl(grOther(topSeriesKept, fmt.Sprintf(`groupByNode(%s, -2, "sum")`, events("events"))),
 		"Type", []col{{"sum", "Events"}})
 	typeEvents := b.mSum("events")
 	typeES, typeEStf := esTbl(ev, []any{b.tmBy("type", 30, typeEvents)}, []any{typeEvents},
@@ -126,7 +137,8 @@ func activity(b *builder) []Panel {
 		// three lines of legend, which reads; a legend beside it did not
 		// survive the phone.
 		panel("piechart", "Events by type", box{W: 8, H: 16, X: 16, Y: 0}, []Target{sqlT(byType)}, &P{
-			Prom: []Target{promTbl("sum by (type) (increase(github_events_total[$__range]))")},
+			Prom: []Target{promTbl(promOther(topSeriesKept,
+				"sum by (type) (increase(github_events_total[$__range]))", "type"))},
 			PromTF: []any{
 				organize(map[string]string{"type": "Type", "Value": "Events"}, nil, nil),
 				eachTypeASlice,
@@ -138,6 +150,7 @@ func activity(b *builder) []Panel {
 			SQLTF: []any{eachTypeASlice},
 			GR:    typeGR, GRTF: append(typeGRtf, eachTypeASlice),
 			ES: typeES, ESTF: append(typeEStf, eachTypeASlice),
+			ESDesc: esNoOther,
 		}),
 		panel("barchart", "Events by repository", box{W: 8, H: 8, X: 0, Y: 8}, []Target{sqlT(byRepo)}, &P{
 			Desc: "The ten repositories with the most events; the rest are one bar called other.",
