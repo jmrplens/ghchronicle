@@ -133,6 +133,10 @@ type lokiEvent struct {
 	// message builds the human-readable half of the line. The structured half
 	// is every tag and field, attached as JSON.
 	message func(p Point) string
+	// only says which rows of the measurement are events, for one that
+	// writes rows of both kinds; nil is every row. A row it turns away is not
+	// counted as dropped, since no horizon kept it out: it was never a line.
+	only func(p Point) bool
 }
 
 // A tag or field is quoted into the message by name. The rendering is
@@ -242,7 +246,13 @@ var lokiEvents = map[string]lokiEvent{
 	"gh_job_log": {kind: "job_log", message: func(p Point) string {
 		return fieldOf(p, "line")
 	}},
-	"gh_external_contribution": {kind: "external_contribution", message: contributionMessage},
+	// A closing, at the second the item closed. The collector also writes a
+	// row for every item still open, stamped at 00:00 UTC of each day it is
+	// seen open, and that row is a reading, not something that happened:
+	// rendered, it reached Loki only when an outbound pass fell in the first
+	// hour of the UTC day, and on 2026-09-28 in production none did. Opening
+	// the item is already a line of the account's event feed.
+	"gh_external_contribution": {kind: "external_contribution", message: contributionMessage, only: contributionClosed},
 	// The environment is what a reader is looking for here, so it goes in the
 	// sentence rather than only in the logfmt tail: "which of my environments
 	// moved, and did it come up" is the question a deployment log answers.
@@ -281,28 +291,33 @@ type contributionState struct {
 }
 
 // contributionPredicates is what can truthfully be said about an item the
-// account opened in someone else's repository, by the combinations the five
-// outbound searches produce. The account opened the item, and that is all the
-// row says it did: who merged or closed it is not in the row, and in someone
-// else's repository it is usually a maintainer, so those are said of the item
-// and not put in the account's name. An open item is stamped at the start of
-// each day it is seen open, one line a day, so its sentence says it is open,
-// which is true every day, and not that it was opened, which is true on one
-// of them.
+// account opened in someone else's repository and that has since closed, by
+// the combinations the three closed outbound searches produce. The account
+// opened the item, and that is all the row says it did: who merged or closed
+// it is not in the row, and in someone else's repository it is usually a
+// maintainer, so those are said of the item and not put in the account's
+// name.
 var contributionPredicates = map[contributionState]string{
-	{"pull_request", "open", false}:   "is open",
 	{"pull_request", "merged", true}:  "was merged",
 	{"pull_request", "closed", false}: "was closed without merging",
-	{"issue", "open", false}:          "is open",
 	{"issue", "closed", false}:        "was closed",
+}
+
+// contributionClosed is whether a row is its item's closing: its state names
+// one of the closed searches. A row of an open search is not an event, and a
+// state nobody wrote is not known to be one.
+func contributionClosed(p Point) bool {
+	state := tagOf(p, "state")
+	return state == "merged" || state == "closed"
 }
 
 // contributionMessage renders a sentence only where the state tag and the
 // merged field agree. Every line used to say "merged", open issues included,
 // and a sentence a reader has to check against the logfmt tail is worse than
-// none, so any other combination names the item and says nothing about it.
-// GitHub itself does not produce one: measured on 2026-09-26, the 33 items of
-// the merged search all had mergedAt, and none of the 69 of the other four.
+// none, so a closing where they disagree names the item and says nothing
+// about it. GitHub itself does not produce one: measured on 2026-09-26, the 33
+// items of the merged search all had mergedAt, and none of the 69 of the
+// other four.
 func contributionMessage(p Point) string {
 	kind := tagOf(p, "kind")
 	merged, _ := numeric(p.Fields["merged"])
@@ -409,7 +424,7 @@ func (l *Loki) eventsByStream(points []Point) (grouped map[string][]lokiEntry, d
 	now := time.Now()
 	for _, p := range points {
 		ev, ok := lokiEvents[p.Measurement]
-		if !ok {
+		if !ok || (ev.only != nil && !ev.only(p)) {
 			continue
 		}
 		stamp := stampOf(p)

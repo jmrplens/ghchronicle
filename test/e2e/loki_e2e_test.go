@@ -92,6 +92,38 @@ func TestLokiSinkPushesEventsAsLogLines(t *testing.T) {
 		}
 	}
 	assertReleasesAtPublication(t, reqs)
+	assertContributionsAtTheirClose(t, reqs)
+}
+
+// assertContributionsAtTheirClose holds the contribution stream to closings.
+// The fixtures answer each of the five outbound searches with the same two
+// items, a pull request merged 59 days ago and an issue still open, so both
+// open searches write a row of each with the state open, and with ten years of
+// horizon every one of them would reach Loki if it were rendered. None may: an
+// item's row in an open search is a reading repeated every day, not something
+// that happened. The merge is, at the second it happened.
+func assertContributionsAtTheirClose(t *testing.T, reqs []capturedRequest) {
+	t.Helper()
+	mergedAt := strconv.FormatInt(fakegh.DaysAgo(59).Add(10*time.Hour).UnixNano(), 10)
+	merged := false
+	for _, r := range reqs {
+		for _, s := range decodeLoki(t, r.Body).Streams {
+			if s.Stream["kind"] != "external_contribution" {
+				continue
+			}
+			for _, v := range s.Values {
+				message, pairs, _ := splitLogfmt(v[1])
+				if pairs["state"] == "open" {
+					t.Errorf("a row of an open search was sent, which is not an event: %s", v[1])
+				}
+				merged = merged || (pairs["state"] == "merged" && v[0] == mergedAt &&
+					message == login+"'s pull request someone/else#118 was merged")
+			}
+		}
+	}
+	if !merged {
+		t.Errorf("no line says someone/else#118 was merged, stamped %s", mergedAt)
+	}
 }
 
 // assertReleasesAtPublication holds the release stream to the moments the

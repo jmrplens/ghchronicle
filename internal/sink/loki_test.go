@@ -537,53 +537,116 @@ func TestLokiReadsTheDemotedStatesFromFields(t *testing.T) {
 }
 
 // TestLokiSaysWhatHappenedToAnExternalContribution walks every kind, state and
-// merged flag an outbound item can carry. Every line used to read "USER
-// merged REPO#N", open issues included, when who merged a pull request in
-// someone else's repository is not in the row and is seldom its author. The
-// five combinations the searches produce each get their own sentence, and the
-// seven that contradict themselves, an issue merged or a pull request whose
-// state and merged flag disagree, get the neutral one along with a kind or
-// state nobody wrote.
+// merged flag an outbound item can carry, through Write, since what matters is
+// the line Loki is sent or that none is. Every line used to read "USER merged
+// REPO#N", open issues included, when who merged a pull request in someone
+// else's repository is not in the row and is seldom its author. The three
+// closings the searches produce each get their own sentence, and a closed row
+// that contradicts itself, an issue merged or a pull request whose state and
+// merged flag disagree, gets the neutral one, as does a closing of a kind
+// nobody wrote. A row whose state is not a closing sends nothing: an open
+// item's row is stamped at the start of every day it is seen open, which is a
+// reading and not something that happened.
 func TestLokiSaysWhatHappenedToAnExternalContribution(t *testing.T) {
-	const neutral = "octocat's contribution o/r#7"
-	for _, c := range []struct {
+	const neutral = "octocat's contribution o/r#%d"
+	cases := []struct {
 		kind, state string
 		merged      any
-		want        string
+		want        string // "" is no line at all
 	}{
-		{"pull_request", "open", nil, "octocat's pull request o/r#7 is open"},
-		{"pull_request", "merged", 1, "octocat's pull request o/r#7 was merged"},
-		{"pull_request", "closed", nil, "octocat's pull request o/r#7 was closed without merging"},
-		{"issue", "open", nil, "octocat's issue o/r#7 is open"},
-		{"issue", "closed", nil, "octocat's issue o/r#7 was closed"},
+		{"pull_request", "open", nil, ""},
+		{"pull_request", "merged", 1, "octocat's pull request o/r#%d was merged"},
+		{"pull_request", "closed", nil, "octocat's pull request o/r#%d was closed without merging"},
+		{"issue", "open", nil, ""},
+		{"issue", "closed", nil, "octocat's issue o/r#%d was closed"},
 
-		{"pull_request", "open", 1, neutral},
+		{"pull_request", "open", 1, ""},
 		{"pull_request", "merged", nil, neutral},
 		{"pull_request", "closed", 1, neutral},
-		{"issue", "open", 1, neutral},
+		{"issue", "open", 1, ""},
 		{"issue", "closed", 1, neutral},
 		{"issue", "merged", nil, neutral},
 		{"issue", "merged", 1, neutral},
 
-		{"discussion", "open", nil, neutral},
-		{"pull_request", "draft", nil, neutral},
-		{"", "", nil, neutral},
-	} {
+		{"discussion", "closed", nil, neutral},
+		{"discussion", "open", nil, ""},
+		{"pull_request", "draft", nil, ""},
+		{"", "", nil, ""},
+	}
+	now := time.Now()
+	points := make([]Point, 0, len(cases))
+	for i, c := range cases {
 		fields := map[string]any{"contributions": 1}
 		if c.merged != nil {
 			fields["merged"] = c.merged
 		}
-		p := Point{
+		points = append(points, Point{
 			Measurement: "gh_external_contribution",
 			Tags: map[string]string{
 				"user": "octocat", "full_name": "o/r", "owner": "o", "repo": "r",
-				"number": "7", "kind": c.kind, "state": c.state,
+				"number": strconv.Itoa(i + 1), "kind": c.kind, "state": c.state,
 			},
-			Fields: fields,
+			Fields: fields, Time: now.Add(-time.Duration(i) * time.Second),
+		})
+	}
+	rec, url := newLokiRecorder(t, 0)
+	if _, err := NewLoki(url, "", nil, 0, 0, 0).Write(context.Background(), points); err != nil {
+		t.Fatalf("Write = %v, want every line sent and nothing counted as dropped", err)
+	}
+	sent := map[string]string{}
+	for _, push := range rec.pushes {
+		for _, s := range push.Streams {
+			for _, v := range s.Values {
+				_, tail, _ := strings.Cut(v[1], ` number="`)
+				number, _, _ := strings.Cut(tail, `"`)
+				sent[number] = v[1]
+			}
 		}
-		if got := lokiEvents["gh_external_contribution"].message(p); got != c.want {
-			t.Errorf("kind %q, state %q, merged %v: message = %q, want %q", c.kind, c.state, c.merged, got, c.want)
+	}
+	for i, c := range cases {
+		line, ok := sent[strconv.Itoa(i+1)]
+		switch {
+		case c.want == "" && ok:
+			t.Errorf("kind %q, state %q, merged %v: sent %q, want no line", c.kind, c.state, c.merged, line)
+		case c.want == "":
+		case !ok:
+			t.Errorf("kind %q, state %q, merged %v: no line, want %q", c.kind, c.state, c.merged, fmt.Sprintf(c.want, i+1))
+		case !strings.HasPrefix(line, fmt.Sprintf(c.want, i+1)+" "):
+			t.Errorf("kind %q, state %q, merged %v: line = %q, want it to read %q",
+				c.kind, c.state, c.merged, line, fmt.Sprintf(c.want, i+1))
 		}
+	}
+}
+
+// TestLokiSendsNothingForAnOpenContribution holds the daily row of an item
+// still open to what it is, a reading and not an event: nothing is sent for
+// it, and nothing is counted as dropped either, since it was never going to be
+// sent. Its row is stamped at 00:00 UTC every day the item is seen open, so
+// its line reached Loki only when an outbound pass fell in the first hour of
+// the UTC day: measured in production on 2026-09-28, the pass before midnight
+// ran at 23:59 UTC and the next at 01:01, and the stream held no line that day.
+// Opening the item is already a line of the account's event feed.
+func TestLokiSendsNothingForAnOpenContribution(t *testing.T) {
+	rec, url := newLokiRecorder(t, 0)
+	now := time.Now()
+	open := func(number string, at time.Time) Point {
+		return Point{
+			Measurement: "gh_external_contribution",
+			Tags: map[string]string{
+				"user": "octocat", "full_name": "o/r", "owner": "o", "repo": "r",
+				"number": number, "kind": "pull_request", "state": "open",
+			},
+			Fields: map[string]any{"contributions": 1}, Time: at,
+		}
+	}
+	written, err := NewLoki(url, "", nil, 0, time.Hour, 0).Write(context.Background(), []Point{
+		open("7", now.Add(-10*time.Minute)), open("8", now.Add(-3*time.Hour)),
+	})
+	if err != nil {
+		t.Errorf("Write = %v, want no error: an open row is not an entry the horizon left out", err)
+	}
+	if written != 0 || len(rec.pushes) != 0 {
+		t.Errorf("wrote %d lines in %d pushes for two open items, want none: %+v", written, len(rec.pushes), rec.pushes)
 	}
 }
 
