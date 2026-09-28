@@ -39,6 +39,14 @@ la primera vez volvió 304 la segunda, que la segunda pasada cobró menos de la
 mitad de las peticiones core de la primera, y que `own_cost` en la fila
 `gh_rate_limit` es el número de consultas que hizo el proceso y no cero.
 
+También busca como GitHub. Cada una de las cinco búsquedas salientes pide un
+tipo en un estado, `is:pr is:merged` o `is:issue is:open`, y el falso le sirve
+solo los elementos de su fixture que seleccionan esos calificadores, descontando
+los demás de `issueCount`; un calificador que no sabe leer hace fallar la
+prueba. Hasta 2.6.2 respondía a todas las búsquedas con todos los elementos, así
+que una pasada escribía la única pull request fusionada cinco veces, una de
+ellas como issue abierta, y los dashboards dibujaban esas filas.
+
 Una fixture nunca escribe una fecha reciente. La deletrea como un desplazamiento
 que el falso resuelve al servir el fichero, `"@DAYS_AGO_12@T00:00:00Z"`, junto a
 los `@NOW@`, `@TODAY@` y `@SOON@` que ya resolvía, y `@DAYS_AHEAD_n@` para lo que

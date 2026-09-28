@@ -39,6 +39,14 @@ half the core requests of the first, and that `own_cost` on the
 `gh_rate_limit` row is the number of queries the process made rather than
 zero.
 
+It searches the way GitHub does, too. Each of the five outbound searches asks
+for one kind in one state, `is:pr is:merged` or `is:issue is:open`, and the
+fake serves it only the items of its fixture those qualifiers select, counting
+the others out of `issueCount`; a qualifier it cannot read fails the test.
+Until 2.6.2 it answered every search with every item, so a sweep wrote the one
+merged pull request five times, once as an open issue, and the dashboards drew
+those rows.
+
 A fixture never writes out a recent date. It spells one as an offset the fake
 resolves when it serves the file, `"@DAYS_AGO_12@T00:00:00Z"`, beside the
 `@NOW@`, `@TODAY@` and `@SOON@` it already resolved, and `@DAYS_AHEAD_n@` for

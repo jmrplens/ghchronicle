@@ -1,9 +1,51 @@
 {
   "data": {
     "search": {
-      "issueCount": 2,
-      "pageInfo": {"hasNextPage": false, "endCursor": "Y3Vyc29yOjI="},
+      "issueCount": 5,
+      "pageInfo": {"hasNextPage": false, "endCursor": "Y3Vyc29yOjU="},
       "nodes": [
+        {
+          "number": 131,
+          "title": "Retry a 502 from the GraphQL gateway",
+          "url": "https://github.com/someone/else/pull/131",
+          "createdAt": "@DAYS_AGO_3@T09:00:00Z",
+          "updatedAt": "@DAYS_AGO_1@T15:00:00Z",
+          "closedAt": null,
+          "mergedAt": null,
+          "additions": 58,
+          "deletions": 9,
+          "changedFiles": 3,
+          "comments": {"totalCount": 2},
+          "repository": {
+            "nameWithOwner": "someone/else",
+            "stargazerCount": 5152,
+            "forkCount": 555,
+            "isPrivate": false,
+            "url": "https://github.com/someone/else",
+            "primaryLanguage": {"name": "Go"}
+          }
+        },
+        {
+          "number": 124,
+          "title": "Accept the token from a file",
+          "url": "https://github.com/someone/else/pull/124",
+          "createdAt": "@DAYS_AGO_24@T11:00:00Z",
+          "updatedAt": "@DAYS_AGO_20@T16:00:00Z",
+          "closedAt": "@DAYS_AGO_20@T16:00:00Z",
+          "mergedAt": null,
+          "additions": 31,
+          "deletions": 4,
+          "changedFiles": 2,
+          "comments": {"totalCount": 4},
+          "repository": {
+            "nameWithOwner": "someone/else",
+            "stargazerCount": 5152,
+            "forkCount": 555,
+            "isPrivate": false,
+            "url": "https://github.com/someone/else",
+            "primaryLanguage": {"name": "Go"}
+          }
+        },
         {
           "number": 118,
           "title": "Handle 422 from the events feed",
@@ -33,6 +75,23 @@
           "updatedAt": "@DAYS_AGO_6@T10:00:00Z",
           "closedAt": null,
           "comments": {"totalCount": 0},
+          "repository": {
+            "nameWithOwner": "another/project",
+            "stargazerCount": 21,
+            "forkCount": 4,
+            "isPrivate": false,
+            "url": "https://github.com/another/project",
+            "primaryLanguage": null
+          }
+        },
+        {
+          "number": 7,
+          "title": "The example config names a setting that is gone",
+          "url": "https://github.com/another/project/issues/7",
+          "createdAt": "@DAYS_AGO_17@T08:00:00Z",
+          "updatedAt": "@DAYS_AGO_15@T12:00:00Z",
+          "closedAt": "@DAYS_AGO_15@T12:00:00Z",
+          "comments": {"totalCount": 1},
           "repository": {
             "nameWithOwner": "another/project",
             "stargazerCount": 21,

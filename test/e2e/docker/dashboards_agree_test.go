@@ -136,7 +136,7 @@ var dashboardsDiffer = []dashboardDiffer{
 		title: "Discussions", stores: []string{"graphite"},
 		reason: "Answered is the share of its discussions that have an answer", only: []string{"Answered"},
 	},
-	// The fixture's categories take no answer, which the SQL stores read
+	// The idea, whose category takes no answer, which the SQL stores read
 	// from the category and Elasticsearch cannot.
 	{
 		title: "Latest discussions", stores: []string{"elasticsearch"},
@@ -186,10 +186,6 @@ var dashboardsDiffer = []dashboardDiffer{
 	{
 		title: "Oldest open alerts", stores: []string{"elasticsearch"},
 		reason: "Elasticsearch lists the Dependabot alerts alone",
-	},
-	{
-		title: "Work elsewhere", stores: []string{"graphite"},
-		reason: "an item that was seen open and then closed inside the range is a row for each",
 	},
 	// The tags were published before the thirty days.
 	{

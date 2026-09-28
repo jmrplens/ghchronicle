@@ -240,6 +240,8 @@ func TestOnceAgainstFakeGitHub(t *testing.T) {
 	assertAcceptedAnswersWereRead(t, points)
 	assertCacheRowsAddUpToTheTotals(t, points)
 	assertOutboundSaysWhereTheWorkWent(t, points)
+	assertEachItemElsewhereIsInItsOwnState(t, points)
+	assertDiscussionsSayWhetherTheyTakeAnAnswer(t, points)
 	assertAchievementProgressAgreesWithThePage(t, points, out)
 	assertStateRecordsTheSweep(t, readState(t, filepath.Join(dir, "state.json")))
 
@@ -724,8 +726,6 @@ func assertOutboundSaysWhereTheWorkWent(t *testing.T, points []point) {
 			if _, ok := p.Fields["private"].(bool); !ok {
 				t.Errorf("%s in %s carries no private: %v", p.Measurement, p.Tags["full_name"], p.Fields)
 			}
-			// The fake answers every search with the same page, so the pull
-			// request is found by its number rather than by its state.
 			if p.Measurement == "gh_external_contribution" && p.Tags["number"] == "118" &&
 				(p.Fields["additions"] != float64(167) || p.Fields["changed_files"] != float64(6)) {
 				t.Errorf("the pull request carries no size: %v", p.Fields)
@@ -745,6 +745,74 @@ func assertOutboundSaysWhereTheWorkWent(t *testing.T, points []point) {
 	}
 	if at, err := time.Parse(time.RFC3339Nano, goRepo.Time); err != nil || time.Since(at) > time.Hour {
 		t.Errorf("gh_upstream_repo stamped %s, want the sweep", goRepo.Time)
+	}
+}
+
+// assertEachItemElsewhereIsInItsOwnState holds the outbound rows to what
+// GitHub's searches return. Each of the five asks for one kind in one state,
+// no two of them can find the same item, and the row takes its kind and its
+// state from the search that found it, so each item is one row, in the state
+// it is in. Until 2.6.2 the fake ignored the qualifiers and answered every
+// search with every item, and the stores held the merged pull request as an
+// open issue among four other things; the dashboards drew those rows, and a
+// tie between two of them was blamed on the SQL.
+func assertEachItemElsewhereIsInItsOwnState(t *testing.T, points []point) {
+	t.Helper()
+	want := map[string]string{
+		"someone/else#118":  "pull_request merged",
+		"someone/else#131":  "pull_request open",
+		"someone/else#124":  "pull_request closed",
+		"another/project#9": "issue open",
+		"another/project#7": "issue closed",
+	}
+	got := map[string][]string{}
+	for _, p := range points {
+		if p.Measurement != "gh_external_contribution" {
+			continue
+		}
+		item := p.Tags["full_name"] + "#" + p.Tags["number"]
+		got[item] = append(got[item], p.Tags["kind"]+" "+p.Tags["state"])
+		if merged := p.Fields["merged"] == float64(1); merged != (p.Tags["state"] == "merged") {
+			t.Errorf("%s is %s with merged=%v", item, p.Tags["state"], p.Fields["merged"])
+		}
+	}
+	for item, state := range want {
+		if rows := got[item]; len(rows) != 1 || rows[0] != state {
+			t.Errorf("%s was written as %v, want the one row of the search it is in: %s", item, rows, state)
+		}
+	}
+	for item, rows := range got {
+		if _, known := want[item]; !known {
+			t.Errorf("%s was written as %v, and no search of the fixture holds it", item, rows)
+		}
+	}
+}
+
+// assertDiscussionsSayWhetherTheyTakeAnAnswer: a discussion is tagged with
+// whether its category takes an answer at all, which is what lets a panel say
+// n/a for an idea rather than "not answered". The fixture's categories did not
+// carry the flag until 2.6.2, so every discussion read as one that takes no
+// answer, and "Latest discussions" drew n/a beside the question erin had
+// answered.
+func assertDiscussionsSayWhetherTheyTakeAnAnswer(t *testing.T, points []point) {
+	t.Helper()
+	want := map[string]string{"Q&A": "true", "Ideas": "false"}
+	seen := map[string]bool{}
+	for _, p := range points {
+		if p.Measurement != "gh_discussion" {
+			continue
+		}
+		category := p.Tags["category"]
+		seen[category] = true
+		if p.Tags["answerable"] != want[category] {
+			t.Errorf("discussion %s in %q is answerable=%q, want %q", p.Tags["number"], category,
+				p.Tags["answerable"], want[category])
+		}
+	}
+	for category := range want {
+		if !seen[category] {
+			t.Errorf("no discussion in %q was written, so whether it takes an answer was not asked", category)
+		}
 	}
 }
 

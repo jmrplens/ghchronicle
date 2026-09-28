@@ -14,7 +14,7 @@
             "upvoteCount": 3,
             "answerChosenAt": "@DAYS_AGO_27@T14:30:00Z",
             "author": {"login": "erin"},
-            "category": {"name": "Q&A"},
+            "category": {"name": "Q&A", "isAnswerable": true},
             "comments": {"totalCount": 2},
             "reactions": {"totalCount": 1}
           },
@@ -24,11 +24,11 @@
             "url": "https://github.com/octocat/hello-world/discussions/13",
             "createdAt": "@DAYS_AGO_9@T09:00:00Z",
             "updatedAt": "@DAYS_AGO_9@T09:00:00Z",
-            "isAnswered": false,
+            "isAnswered": null,
             "upvoteCount": 0,
             "answerChosenAt": null,
             "author": null,
-            "category": {"name": "Ideas"},
+            "category": {"name": "Ideas", "isAnswerable": false},
             "comments": {"totalCount": 0},
             "reactions": {"totalCount": 0}
           }

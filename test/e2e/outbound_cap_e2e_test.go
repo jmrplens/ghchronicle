@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -21,10 +23,11 @@ const capWarning = "outbound search read fewer items than it counts"
 // there is no next page, while issueCount still says how many there are:
 // measured on 2026-09-26, 2,860 merged pull requests served ten pages of a
 // hundred and stopped. Nothing fails when that happens, so up to 2.5.1 the
-// rows past the cap were missing and the family reported success. Here every
-// search counts 1,500 and serves its two items: the rows served reach the
-// store, the family does not fail, and each of the five searches says it came
-// up short, once, at warning.
+// rows past the cap were missing and the family reported success. Here the
+// search counts 1,500 and serves its five items, and each of the five
+// searches is served the one of its kind and state and counts what the other
+// four leave of the 1,500: the rows served reach the store, the family does
+// not fail, and each search says it came up short, once, at warning.
 func TestAnOutboundSearchPastGitHubsCapIsSaid(t *testing.T) {
 	t.Parallel()
 	gh := fakegh.New(t, "testdata", cappedSearchOverlay(t))
@@ -65,8 +68,10 @@ state_file: %s
 		t.Fatalf("the cap was said %d times, want once for each of the five searches:\n%s", len(said), log)
 	}
 	for _, line := range said {
-		if !strings.Contains(line, "level=WARN") || !strings.Contains(line, "count=1500 read=2") {
-			t.Errorf("the cap was said as %q, want a warning with what was counted and what was read", line)
+		m := countAndRead.FindStringSubmatch(line)
+		if !strings.Contains(line, "level=WARN") || m == nil || m[1] != strconv.Itoa(cappedEachSearch) || m[2] != "1" {
+			t.Errorf("the cap was said as %q, want a warning that it counted %d and read 1",
+				line, cappedEachSearch)
 		}
 	}
 
@@ -76,10 +81,18 @@ state_file: %s
 			contributions++
 		}
 	}
-	if contributions != 10 {
-		t.Errorf("wrote %d contributions, want the 2 served by each of the 5 searches", contributions)
+	if contributions != 5 {
+		t.Errorf("wrote %d contributions, want the one served to each of the 5 searches", contributions)
 	}
 }
+
+// cappedEachSearch is what each search of the capped overlay counts: the
+// 1,500 the overlay declares, less the four items the fake leaves out of a
+// search for one kind in one state.
+const cappedEachSearch = 1500 - 4
+
+// countAndRead is what the cap warning says it counted and read.
+var countAndRead = regexp.MustCompile(`count=(\d+) read=(\d+)`)
 
 // cappedSearchOverlay is a fixture directory whose outbound search counts
 // more items than it serves and says there is no next page, which is what
@@ -98,8 +111,8 @@ func cappedSearchOverlay(t *testing.T) string {
 	if err = json.Unmarshal(raw, &answer); err != nil {
 		t.Fatalf("graphql_search_issues.json: %v", err)
 	}
-	if string(answer.Data.Search["issueCount"]) != "2" {
-		t.Fatalf("graphql_search_issues.json counts %s, want the 2 items it serves", answer.Data.Search["issueCount"])
+	if string(answer.Data.Search["issueCount"]) != "5" {
+		t.Fatalf("graphql_search_issues.json counts %s, want the 5 items it serves", answer.Data.Search["issueCount"])
 	}
 	answer.Data.Search["issueCount"] = json.RawMessage("1500")
 	capped, err := json.Marshal(answer)
