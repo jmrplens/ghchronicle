@@ -171,10 +171,19 @@ func timeseries(a panelArgs, o Opts) map[string]any {
 	if stack == "normal" && drawStyle == "bars" {
 		fill, gradient = 50, "none"
 	}
+	// Points where the series is sparse, and none where it is dense. A line
+	// needs two points, so under `never` a series with one value in the range
+	// drew nothing at all while its legend read the value: measured on the
+	// 2.6.1 review against Grafana 13.2.1, the one merged pull request of the
+	// fixture left "Time to merge over time" an empty grid in all five
+	// stores, and a snapshot written once (stars, artifact storage, the rate
+	// budget) did the same in Graphite and Elasticsearch. `auto` draws the
+	// points while they are fewer than the plot has room for, which is every
+	// daily bin of a month, and leaves a year of them a line.
 	custom := map[string]any{
 		"drawStyle": drawStyle, "lineWidth": 1,
 		"fillOpacity": optInt(o, "fill", fill), "gradientMode": gradient,
-		"showPoints": "never", "spanNulls": false,
+		"showPoints": "auto", "spanNulls": false,
 		"stacking": map[string]any{"mode": stack, "group": "A"},
 	}
 	if optBool(o, "min_zero", true) {
