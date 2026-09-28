@@ -34,7 +34,11 @@ they meant them all, some Elasticsearch panels read every repository whatever
 the picker held, ranked by a measure they did not name or failed outright, the
 Graphite charts were labelled with the function that consolidated them, the
 Graphite cache table was empty for the last hour of every UTC day, and
-every one-shot run reported at Info, as news, how it always runs.
+every one-shot run reported at Info, as news, how it always runs. And
+production, read on 2026-09-28, held no contribution line in Loki for that
+day: the sink rendered the daily reading of each item still open, which
+reached Loki only on a day a pass wrote in the first hour after midnight UTC,
+and held each closing to an hour the pass after it could miss.
 
 - **A Docker state volume belongs to the collector.** Up to 2.6.0 neither
   image had `/var/lib/ghchronicle`, where the example configuration keeps the
@@ -406,6 +410,38 @@ every one-shot run reported at Info, as news, how it always runs.
   progress rows today" say "no progress rows this pass", since the family runs
   every hour and the next pass writes the day's rows. A filter on the old
   texts stops matching.
+- **Loki gets a contribution when it closes, and gets every closing.** The
+  `external_contribution` stream rendered every row of
+  `gh_external_contribution`, and the row of an item still open is stamped at
+  00:00 UTC of each day it is seen open, so its line was sent only when an
+  `outbound` pass wrote within an hour of that, and `max_age`, an hour by
+  default, left it out otherwise. Measured in production on 2026-09-28: the
+  pass before midnight ran at 23:59 UTC and the next, after a restart at
+  00:44, at 01:01, and Loki held no contribution line for that day, against
+  32 to 40 lines of open items on each of the five days before, all stamped
+  00:00, and 3 lines of closings in all five. A closing is stamped when the item
+  closed, and it had `max_age` alone as well, so it was sent only when the
+  next pass wrote within the hour of it: an hourly pass does not, for an item
+  closed in the seconds after the last one read the searches, nor, when it
+  runs late, for one closed in the minutes it is late by, and no later pass
+  sees it younger. Loki now gets what is an event: a pull request merged, one
+  closed without merging and an issue closed, each at the moment it closed,
+  in the sentences 2.5.2 gave them
+  ([#83](https://github.com/jmrplens/ghchronicle/issues/83)). The row of an
+  open search is no line at all, since it is a reading and not something that
+  happened, and opening the item is already a line of the event feed; a
+  closed row whose state and merged flag disagree still reads
+  `USER's contribution OWNER/REPO#N`. The stream looks back the `outbound`
+  cadence plus `max_age`, as the release stream has looked back the `repo`
+  one since 2.6.0: two hours at the defaults, never more than six days and
+  never less than `max_age`. A closing inside the lookback is sent by two
+  passes, and its line carries the item's comment count and title, which can
+  move in between: measured against Loki 3.7.7, the same line sent twice was
+  kept once, and one whose `comments` had moved from 1 to 2 was kept as a
+  second line at the same instant. Lines already in Loki keep what they said,
+  and under `-once` `every.families.outbound` should say the schedule's
+  cadence, as the
+  [Loki page](https://jmrp.io/docs/ghchronicle/sinks/loki/) says.
 - **The documentation says what 2.6.0 does, in both languages.** The collector
   and measurement pages: `achievements` hourly, the two measurements whose url
   no table links, `gh_account_total` as one GraphQL query and one search, a
@@ -469,12 +505,18 @@ Graphite target under the name `consolidateBy` gives it; the card's totals,
 the newest-reading sums in every store and the exporter's five gauges over two
 owners' repositories of one name; the two open-longest tables in every store;
 every query of every store, and every exporter rule that names a repository,
-over two owners' repositories of one name; and a Graphite query that fills the
-buckets of a `summarize` not aligned to its range. Where such a test calls
+over two owners' repositories of one name; a Graphite query that fills the
+buckets of a `summarize` not aligned to its range; and the Loki line of every
+kind, state and merged flag of a contribution, an open item's row sent or
+counted as dropped, the lookback of each stream from its family's cadence, and
+a contribution merged an hour and a half before the write, through the sink
+the configuration builds. Where such a test calls
 something the old code lacks, it was run there with that call stubbed. The
 binary
 against the fake GitHub holds that a one-shot run says its refill at
-Debug and never at Info, and that no comment carries `is_answer`. The
+Debug and never at Info, that no comment carries `is_answer`, that no row of
+an open outbound search reaches Loki, and that a contribution merged an hour
+and a half before the pass does while one merged past the lookback does not. The
 containerised suite holds the two newest-reading tables against InfluxDB 3, as
 above, and every bar of both punch cards against what the sweep's own points
 add up to, in the four stores that draw them; against the dashboards before
@@ -531,6 +573,11 @@ Not verified, and worth saying plainly:
   Windows page and the cache recipe of the Actions page follow from it and
   were not run on Windows or on a runner.
 - The discovery margin is held by the loop's tests, not seen in production.
+- The contribution lookback is held by the sink's tests and the binary's
+  against the fake GitHub, and the second line a moved comment count makes
+  was measured against Loki 3.7.7 in a container; no production pass has
+  sent a closing through it yet. How often a comment count or a title moves
+  between the two passes that send a closing was not measured.
 - Left out rather than unproven: a tool that drops and fills
   `gh_discussion_comment` again, which is
   [#96](https://github.com/jmrplens/ghchronicle/issues/96), and a warning for
