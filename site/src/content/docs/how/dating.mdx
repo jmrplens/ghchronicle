@@ -110,13 +110,21 @@ Prometheus or an OTLP backend with `raw: false` ever sees the data.
 | Rule       | What it does                                                  | Used for                                                                     |
 | ---------- | ------------------------------------------------------------- | ---------------------------------------------------------------------------- |
 | `keepLast` | The most recent point per label set wins                      | Snapshots: `gh_repo`, `gh_account`, `gh_release`                             |
-| `sum`      | Every point in the batch is added up                          | Windows: views over the fourteen days                                        |
+| `sum`      | Every row in the batch is added up                            | Windows: views over the fourteen days                                        |
 | `count`    | The points become a count plus the mean of each numeric field | Dated items: pull requests become "how many merged" and "how long they took" |
 | `skip`     | Nothing is served                                             | History with no honest current value                                         |
 
 A measurement with no rule is skipped rather than guessed at. That is the safe
 default, and it is deliberate: without it, a new collector could quietly flood
 an exporter with one series per star.
+
+A batch is reduced the way the stores hold it. Two points with the same
+measurement, tags and time are one row in InfluxDB, PostgreSQL, Graphite and
+Elasticsearch, the later one's fields written over the earlier one's, so they
+are one row here too: `sum` adds it once, `count` counts and averages it once,
+and `keepLast` keeps the later of two readings stamped at the same instant.
+Across sweeps nothing more is needed, since each sweep's gauge replaces the
+last one and `total` remembers every item it has already counted.
 
 `count` averages each of their numbers except the identifiers. A field that
 joins one row to another, `run_id`, `workflow_id`, `pull_request`, `number`,

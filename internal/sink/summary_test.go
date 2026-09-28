@@ -301,6 +301,78 @@ func TestSummarizeKeepsTheNewestSnapshot(t *testing.T) {
 	}
 }
 
+// TestAPointReadTwiceIsOneRow holds every rule kind to what the row stores
+// keep: one row per measurement, tag set and time, the later point's fields
+// written over the earlier one's. The billing collector reads two months, and
+// a report that answers both with the same rows hands the sinks each row
+// twice; InfluxDB, PostgreSQL, Graphite and Elasticsearch each kept one and
+// the exporter added up two, so the Prometheus Spend panel read exactly double
+// the other four. A count read the same pull request as two items and
+// averaged it twice, and a snapshot kept the first of two readings stamped at
+// the same instant where every store keeps the last.
+func TestAPointReadTwiceIsOneRow(t *testing.T) {
+	day := time.Date(2026, 9, 18, 0, 0, 0, 0, time.UTC)
+	repo := map[string]string{"owner": "octocat", "repo": "hello-world", "full_name": "octocat/hello-world"}
+	with := func(extra map[string]string) map[string]string {
+		tags := maps.Clone(repo)
+		maps.Copy(tags, extra)
+		return tags
+	}
+	minutes := Point{
+		Measurement: "gh_billing_usage",
+		Tags:        with(map[string]string{"user": "octocat", "product": "Actions", "sku": "Actions Linux", "unit": "Minutes"}),
+		Fields:      map[string]any{"quantity": 214.0, "gross": 1.712, "net": 0.0},
+		Time:        day,
+	}
+	// The same row, its tags spelled with an empty one: the line protocol
+	// and every other store write no tag for an empty value, so it is the
+	// same row there too.
+	again := minutes
+	again.Tags = with(map[string]string{"user": "octocat", "product": "Actions", "sku": "Actions Linux", "unit": "Minutes", "org": ""})
+	merged := func(n int, seconds float64) Point {
+		return Point{
+			Measurement: "gh_pull_request",
+			Tags:        with(map[string]string{"state": "MERGED", "author": "octocat"}),
+			Fields:      map[string]any{"number": n, "seconds_to_merge": seconds},
+			Time:        day.Add(time.Duration(n) * time.Hour),
+		}
+	}
+	reading := func(stars int) Point {
+		return Point{Measurement: "gh_repo", Tags: maps.Clone(repo), Fields: map[string]any{"stars": stars}, Time: day}
+	}
+	batch := []Point{
+		minutes, again,
+		merged(1, 100), merged(2, 300), merged(1, 100),
+		reading(5), reading(9),
+	}
+
+	rd := NewReducer()
+	for sweep := 1; sweep <= 2; sweep++ {
+		out, taken := rd.Reduce(batch)
+		if taken != len(batch) {
+			// A point that rewrites a row the batch already had is taken,
+			// the way a store accepts it, and not reported as filtered.
+			t.Errorf("sweep %d: took %d of %d points", sweep, taken, len(batch))
+		}
+		got := map[string]map[string]any{}
+		for _, p := range out {
+			got[p.Measurement] = p.Fields
+		}
+		if bill := got["gh_billing_usage"]; bill["quantity"] != 214.0 || bill["gross"] != 1.712 {
+			t.Errorf("sweep %d: the same billing row twice summed to %v, want the one row's 214 minutes and 1.712",
+				sweep, bill)
+		}
+		prs := got["gh_pull_requests"]
+		if prs["count"] != 2 || prs["total"] != 2 || prs["seconds_to_merge_mean"] != 200.0 {
+			t.Errorf("sweep %d: two pull requests, one read twice, reduced to count %v total %v mean %v; want 2, 2 and 200",
+				sweep, prs["count"], prs["total"], prs["seconds_to_merge_mean"])
+		}
+		if stars := got["gh_repo"]["stars"]; stars != 9 {
+			t.Errorf("sweep %d: two readings at one instant kept %v stars, want the later 9", sweep, stars)
+		}
+	}
+}
+
 // TestAnUpstreamRepositoryIsItsNewestReading: the repositories the account
 // contributed to are read on every outbound sweep, and the exporter serves
 // each one's newest star count, visibility and forks, one series per

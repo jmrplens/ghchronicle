@@ -115,13 +115,22 @@ que Prometheus o un backend OTLP con `raw: false` vean los datos.
 | Regla      | Qué hace                                                              | Se usa para                                                                                   |
 | ---------- | --------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
 | `keepLast` | Gana el punto más reciente de cada conjunto de etiquetas              | Instantáneas: `gh_repo`, `gh_account`, `gh_release`                                           |
-| `sum`      | Se suman todos los puntos del lote                                    | Ventanas: las visitas de los catorce días                                                     |
+| `sum`      | Se suman todas las filas del lote                                     | Ventanas: las visitas de los catorce días                                                     |
 | `count`    | Los puntos pasan a ser un recuento más la media de cada campo numérico | Elementos fechados: las pull requests pasan a ser "cuántas se fusionaron" y "cuánto tardaron" |
 | `skip`     | No se sirve nada                                                      | Historia sin valor actual honesto                                                             |
 
 Una medida sin regla se salta en vez de adivinarse. Ese es el valor por defecto
 seguro, y es deliberado: sin él, un colector nuevo podría inundar en silencio un
 exportador con una serie por estrella.
+
+Un lote se reduce tal como lo guardan los almacenes. Dos puntos con la misma
+medida, las mismas etiquetas y la misma hora son una fila en InfluxDB,
+PostgreSQL, Graphite y Elasticsearch, con los campos del último escritos sobre
+los del anterior, así que aquí también son una fila: `sum` la suma una vez,
+`count` la cuenta y la promedia una vez, y `keepLast` se queda con la última de
+dos lecturas fechadas en el mismo instante. Entre pasadas no hace falta nada
+más, porque el gauge de cada pasada sustituye al anterior y `total` recuerda
+cada elemento que ya ha contado.
 
 `count` promedia cada uno de sus números excepto los identificadores. Un campo
 que une una fila con otra, `run_id`, `workflow_id`, `pull_request`, `number`,

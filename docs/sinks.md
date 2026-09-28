@@ -354,12 +354,17 @@ Before serving, `Summarize` reduces each measurement according to a rule.
 | Rule       | What survives                                                     |
 | ---------- | ----------------------------------------------------------------- |
 | `keepLast` | The most recent value per label set. Snapshots                    |
-| `sum`      | The batch added up. Windows, such as views over the fourteen days |
+| `sum`      | The rows added up. Windows, such as views over the fourteen days  |
 | `count`    | A count plus the mean of each numeric field. Dated items          |
 | `skip`     | Nothing                                                           |
 
 A measurement with no rule is skipped, so a new collector cannot quietly flood
 the exporter with one series per star.
+
+The batch is read the way the stores hold it. A point with the same
+measurement, tags and time as an earlier one is the same row, its fields
+written over the earlier one's, so it is added, counted and averaged once, as
+the history stores keep it once.
 
 Each mean is over the items that carried the field, not over the count. A
 collector leaves a field out when it has no honest value for it: a job with no

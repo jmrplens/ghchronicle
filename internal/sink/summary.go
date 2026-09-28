@@ -22,8 +22,9 @@ import (
 // So each measurement gets a rule saying how to reduce it:
 //
 //   - keepLast: a snapshot. The most recent point per label set wins.
-//   - sum: a window. Every point in the batch is added up, which is what makes
-//     "views over GitHub's 14-day window" a single number.
+//   - sum: a window. Every row in the batch is added up, which is what makes
+//     "views over GitHub's 14-day window" a single number. A row is what a
+//     store would keep, so a point offered twice is added once: see rows.
 //   - count: dated items. The points become a count plus the mean of each of
 //     their numeric fields, so "how many pull requests merged and how long they
 //     took" survives as two gauges instead of four hundred series. Each mean is
@@ -455,12 +456,53 @@ func (rd *Reducer) Reduce(points []Point) (gauges []Point, taken int) {
 	defer rd.mu.Unlock()
 
 	var s series
-	for _, p := range points {
-		if rd.fold(&s, p) {
-			taken++
-		}
+	distinct, taken := rows(points)
+	for _, p := range distinct {
+		rd.fold(&s, p)
 	}
 	return s.gauges(time.Now()), taken
+}
+
+// rows is the batch as the stores hold it: one point per identity, the
+// measurement, the tags that are set and the time, with the fields of a later
+// point written over those of an earlier one, in the order each identity first
+// appeared. InfluxDB, PostgreSQL, Graphite and Elasticsearch key a row that
+// way, so a point offered twice is one row in each of them, and a reduction
+// over the raw batch would count, add up or average it twice. Measured on the containerised suite, where the
+// fake GitHub answers both months the billing collector reads with the same
+// rows: the four row stores showed 214 Actions minutes and the exporter 428.
+// Across batches the reduction already agrees with them: a gauge is replaced
+// by the next sweep's rather than added to, and total remembers identities.
+//
+// Taken counts every point with a rule, the repeated ones too, the way a
+// store accepts a write that rewrites a row it already has.
+func rows(points []Point) (out []Point, taken int) {
+	at := map[string]int{}
+	for _, p := range points {
+		if r, known := promRules[p.Measurement]; !known || r.mode == skip {
+			continue
+		}
+		taken++
+		id := identity(p)
+		i, seen := at[id]
+		if !seen {
+			at[id] = len(out)
+			out = append(out, p)
+			continue
+		}
+		fields := make(map[string]any, len(out[i].Fields)+len(p.Fields))
+		maps.Copy(fields, out[i].Fields)
+		maps.Copy(fields, p.Fields)
+		out[i].Fields = fields
+	}
+	return out, taken
+}
+
+// identity is what makes a point one row in a store: its measurement, the
+// tags that are set, since no store writes a tag with an empty value, and its
+// own time.
+func identity(p Point) string {
+	return p.Measurement + "|" + tagKey(presentTags(p.Tags)) + "@" + strconv.FormatInt(p.Time.UnixNano(), 10)
 }
 
 // series is the set of accumulators a reduction is building, in the order each
@@ -490,14 +532,10 @@ func (s *series) at(key, name string, r rule, tags map[string]string) *acc {
 	return a
 }
 
-// fold adds one point to the series its rule reduces it to, and reports
-// whether it took it. A measurement with no rule, or one whose rule is skip,
-// has no honest current value and is left out entirely.
-func (rd *Reducer) fold(s *series, p Point) bool {
-	r, known := promRules[p.Measurement]
-	if !known || r.mode == skip {
-		return false
-	}
+// fold adds one point to the series its rule reduces it to. rows has already
+// left out every point whose rule is skip or that has none.
+func (rd *Reducer) fold(s *series, p Point) {
+	r := promRules[p.Measurement]
 	name := p.Measurement
 	if r.as != "" {
 		name = r.as
@@ -519,7 +557,6 @@ func (rd *Reducer) fold(s *series, p Point) bool {
 	case sum:
 		a.addNumbers(p.Fields)
 	}
-	return true
 }
 
 // keptTags is the reduced label set: the tags the rule names and nothing else,
@@ -563,7 +600,7 @@ func promote(tags map[string]string, fields map[string]any, labels []string) {
 
 // countDistinct remembers this item under its reduced series and reports how
 // many distinct items that series has seen since the process started. The
-// identity of an item is its full tag set and its own time, which is exactly
+// identity of an item is the one rows dedups a batch by, which is exactly
 // what makes it one row in InfluxDB.
 //
 // An item that stands for several events counts as that many: gh_repo_activity
@@ -574,7 +611,7 @@ func promote(tags map[string]string, fields map[string]any, labels []string) {
 // weight it was seen with, so a row rewritten with a larger count corrects
 // the total rather than adding to it.
 func (rd *Reducer) countDistinct(key string, p Point) int {
-	ident := tagKey(p.Tags) + "@" + strconv.FormatInt(p.Time.UnixNano(), 10)
+	ident := identity(p)
 	if rd.seen[key] == nil {
 		rd.seen[key] = map[string]int{}
 	}
