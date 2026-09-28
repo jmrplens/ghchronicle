@@ -2,6 +2,7 @@ package dashboards
 
 import (
 	"fmt"
+	"maps"
 	"slices"
 )
 
@@ -34,8 +35,9 @@ const stateWord = "CASE WHEN state = 'MERGED' THEN 'Merged' WHEN state = 'CLOSED
 
 // stateOverrides draws those three the way each is meant: the two events as
 // stacked bars in the colors the words carry, the open count as a line on its
-// own, outside the stack. They match the words the SQL spells, so they go to
-// the two SQL stores alone.
+// own, outside the stack. They match the words the SQL spells, which the
+// other three stores give their series through stateWords, so they hold in
+// every store.
 var stateOverrides = []any{
 	colorOf("Merged", "purple"),
 	colorOf("Closed", "red"),
@@ -45,6 +47,33 @@ var stateOverrides = []any{
 		map[string]any{"id": "custom.fillOpacity", "value": 0},
 		map[string]any{"id": "color", "value": map[string]any{"mode": "fixed", "fixedColor": "orange"}},
 	}),
+}
+
+// stateWords names the series of the three stores that split on the `state`
+// tag itself, and draw its value, with the words stateWord spells in SQL.
+// Graphite's path node, Elasticsearch's terms bucket and Prometheus's label
+// all read MERGED, CLOSED and OPEN, so the legends were the tag's and the
+// colors and the line of stateOverrides, matched by the words, missed them:
+// measured on the 2.6.1 review, the merged bar was yellow in Graphite and
+// the open count stacked on it.
+var stateWords = seriesWords(map[string]string{
+	"MERGED": "Merged", "CLOSED": "Closed", "OPEN": "Open that day",
+})
+
+// botWords is stateWords for the `bot` tag of a review thread, which the SQL
+// spells Bot and Human and the other three stores drew as true and false.
+var botWords = seriesWords(map[string]string{"true": "Bot", "false": "Human"})
+
+// seriesWords draws each series named by a tag's raw value under the word
+// the SQL stores give that value. A displayName, so the byName overrides
+// that address the word find it: namingFirst puts it ahead of them.
+func seriesWords(words map[string]string) []any {
+	raw := slices.Sorted(maps.Keys(words))
+	out := make([]any, len(raw))
+	for i, value := range raw {
+		out[i] = override(value, []any{map[string]any{"id": "displayName", "value": words[value]}})
+	}
+	return out
 }
 
 // The pieces every query in this section is assembled from: the head of a
@@ -225,12 +254,15 @@ func flowRates(b *builder) []Panel {
 			Desc: "Merged and closed are dated at the moment it happened and stacked. " +
 				"Open that day is the line: how many were open on that day, which is a " +
 				"state and not an event, so it is not part of the stack. " + bucketFollowsRange,
-			PromDesc: sinceStart,
-			Opts:     mergeOpts(Opts{"bars": true, "stack": true}, dayBins),
-			SQLOpts:  seriesOpts,
-			SQLOver:  stateOverrides,
-			GR:       []Target{grq(perBucket(flowNonNull+anyPath("churn")+")", gn(pr, "state")))},
-			ES:       []Target{b.esDaily(pr, b.mCount(), "state", "", []string{ESF, esIdentified}, "")},
+			PromDesc:  sinceStart,
+			Opts:      mergeOpts(Opts{"bars": true, "stack": true}, dayBins),
+			SQLOpts:   seriesOpts,
+			Overrides: stateOverrides,
+			PromOver:  stateWords,
+			GR:        []Target{grq(perBucket(flowNonNull+anyPath("churn")+")", gn(pr, "state")))},
+			GROver:    stateWords,
+			ES:        []Target{b.esDaily(pr, b.mCount(), "state", "", []string{ESF, esIdentified}, "")},
+			ESOver:    stateWords,
 		}),
 		panel("timeseries", "Time to merge over time", box{W: 12, H: 8, X: 12, Y: 5}, []Target{sqlTS(mergeTime)}, &P{
 			Prom: []Target{promq(fmt.Sprintf("avg(github_pull_requests_seconds_to_merge_mean{%s})", promMerged),
@@ -257,13 +289,16 @@ func flowRates(b *builder) []Panel {
 			Desc: "Closed is dated at the moment it happened. Open that day is the line: " +
 				"how many were open on that day, a state rather than an event, so it " +
 				"is not stacked. " + bucketFollowsRange,
-			PromDesc: sinceStart,
-			Opts:     mergeOpts(Opts{"bars": true, "stack": true}, dayBins),
-			SQLOpts:  seriesOpts,
-			SQLOver:  stateOverrides,
+			PromDesc:  sinceStart,
+			Opts:      mergeOpts(Opts{"bars": true, "stack": true}, dayBins),
+			SQLOpts:   seriesOpts,
+			Overrides: stateOverrides,
+			PromOver:  stateWords,
 			GR: []Target{grq(perBucket(flowNonNull+issuePath("comments")+")",
 				gn("gh_issue", "state")))},
-			ES: []Target{b.esDaily("gh_issue", b.mCount(), "state", "", []string{ESF, esIdentified}, "")},
+			GROver: stateWords,
+			ES:     []Target{b.esDaily("gh_issue", b.mCount(), "state", "", []string{ESF, esIdentified}, "")},
+			ESOver: stateWords,
 		}),
 		panel("timeseries", "Pull request size", box{W: 12, H: 7, X: 12, Y: 13}, []Target{sqlTS(sizeTime)}, &P{
 			Prom: []Target{promq(fmt.Sprintf("avg(github_pull_requests_churn_mean{%s})", promMerged),
@@ -548,9 +583,12 @@ func reviewDebt(b *builder) []Panel {
 				PromDesc: sinceStart,
 				Opts:     mergeOpts(Opts{"bars": true, "stack": true}, dayBins),
 				SQLOpts:  seriesOpts,
+				PromOver: botWords,
 				GR: []Target{grq(perBucket(flowNonNull+openedPath+")",
 					gn(reviewThread, "bot")))},
-				ES: []Target{b.esDaily(reviewThread, b.mCount(), "bot", "", []string{ESF}, "")},
+				GROver: botWords,
+				ES:     []Target{b.esDaily(reviewThread, b.mCount(), "bot", "", []string{ESF}, "")},
+				ESOver: botWords,
 			}),
 		panel("table", "The review debt", box{W: 12, H: 7, X: 12, Y: 53}, []Target{sqlT(debt)}, &P{
 			Desc: "A review thread is one objection, which GitHub keeps open until somebody " +

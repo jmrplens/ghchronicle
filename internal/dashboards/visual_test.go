@@ -251,3 +251,49 @@ func TestElasticsearchTablesKeepTheSQLColumnOrder(t *testing.T) {
 		t.Fatal("no Elasticsearch table was checked")
 	}
 }
+
+// TestEnumSeriesAreDrawnUnderTheSQLWords: the SQL stores name the series of a
+// split on a tag with words, Merged and "Open that day", Bot and Human, and
+// the other three drew the tag's raw value, MERGED and true, so the legends
+// read differently and the colors and the line matched by the words missed.
+// Every word the SQL's CASE spells is a name the other three give their
+// series, before any override that addresses it.
+func TestEnumSeriesAreDrawnUnderTheSQLWords(t *testing.T) {
+	t.Parallel()
+	words := regexp.MustCompile(`(?:THEN|ELSE) '([^']+)'`)
+	influx := rendered(t, "influxdb")
+	for _, title := range []string{"Pull requests over time", "Issues over time", "Review threads over time"} {
+		var spelled []string
+		for _, m := range words.FindAllStringSubmatch(sqlOf(t, mustPanel(t, influx, title)), -1) {
+			spelled = append(spelled, m[1])
+		}
+		if len(spelled) == 0 {
+			t.Fatalf("%q spells no word in SQL, so this checks nothing", title)
+		}
+		for _, store := range []string{"prometheus", "graphite", "elasticsearch"} {
+			given := map[string]int{}
+			addressed := map[string]int{}
+			for i, raw := range overridesOfPanel(mustPanel(t, rendered(t, store), title)) {
+				o, _ := raw.(map[string]any)
+				matcher, _ := o["matcher"].(map[string]any)
+				name, _ := matcher["options"].(string)
+				if givesName(o) {
+					props, _ := o["properties"].([]any)
+					prop, _ := props[0].(map[string]any)
+					word, _ := prop["value"].(string)
+					given[word] = i + 1
+				} else if _, seen := addressed[name]; !seen {
+					addressed[name] = i + 1
+				}
+			}
+			for _, word := range spelled {
+				switch {
+				case given[word] == 0:
+					t.Errorf("%s %q draws no series under %q, the SQL's word", store, title, word)
+				case addressed[word] != 0 && addressed[word] < given[word]:
+					t.Errorf("%s %q addresses %q before any series is named so", store, title, word)
+				}
+			}
+		}
+	}
+}

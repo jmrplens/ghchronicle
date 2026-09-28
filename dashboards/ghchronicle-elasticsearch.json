@@ -4818,7 +4818,104 @@
               "decimals": 0,
               "unit": "short"
             },
-            "overrides": []
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "CLOSED"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "Closed"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "MERGED"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "Merged"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "OPEN"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "Open that day"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Merged"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "purple",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Closed"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "red",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Open that day"
+                },
+                "properties": [
+                  {
+                    "id": "custom.drawStyle",
+                    "value": "line"
+                  },
+                  {
+                    "id": "custom.stacking",
+                    "value": {
+                      "group": "A",
+                      "mode": "none"
+                    }
+                  },
+                  {
+                    "id": "custom.fillOpacity",
+                    "value": 0
+                  },
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "orange",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              }
+            ]
           },
           "gridPos": {
             "h": 8,
@@ -5025,7 +5122,104 @@
               "decimals": 0,
               "unit": "short"
             },
-            "overrides": []
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "CLOSED"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "Closed"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "MERGED"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "Merged"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "OPEN"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "Open that day"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Merged"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "purple",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Closed"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "red",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Open that day"
+                },
+                "properties": [
+                  {
+                    "id": "custom.drawStyle",
+                    "value": "line"
+                  },
+                  {
+                    "id": "custom.stacking",
+                    "value": {
+                      "group": "A",
+                      "mode": "none"
+                    }
+                  },
+                  {
+                    "id": "custom.fillOpacity",
+                    "value": 0
+                  },
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "orange",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              }
+            ]
           },
           "gridPos": {
             "h": 7,
@@ -6683,7 +6877,32 @@
               "decimals": 0,
               "unit": "short"
             },
-            "overrides": []
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "false"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "Human"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "true"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "Bot"
+                  }
+                ]
+              }
+            ]
           },
           "gridPos": {
             "h": 7,

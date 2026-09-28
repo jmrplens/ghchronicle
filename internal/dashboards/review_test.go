@@ -345,9 +345,14 @@ func TestOpenItemsAreReadFromTheirNewestRow(t *testing.T) {
 			t.Errorf("%s stacks the open count with the events: %s", title, raw)
 		}
 	}
-	promRaw := asJSON(t, mustPanel(t, rendered(t, "prometheus"), "Pull requests over time")["fieldConfig"])
-	if strings.Contains(promRaw, "Open that day") {
-		t.Error("the SQL-only overrides reached the Prometheus dashboard")
+	// The other three stores name the series by the tag's raw value, and draw
+	// it under the SQL's word, so the line holds there too: see
+	// TestEnumSeriesAreDrawnUnderTheSQLWords.
+	for _, store := range []string{"prometheus", "graphite", "elasticsearch"} {
+		raw := asJSON(t, mustPanel(t, rendered(t, store), "Pull requests over time")["fieldConfig"])
+		if !strings.Contains(raw, `"custom.drawStyle","value":"line"`) {
+			t.Errorf("%s stacks the open count with the events: %s", store, raw)
+		}
 	}
 	sql := sqlOf(t, mustPanel(t, panels, "Work elsewhere"))
 	if !strings.Contains(sql, `AS "Opened"`) || !strings.Contains(sql, `time AS "Seen"`) ||
