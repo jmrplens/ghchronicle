@@ -15,6 +15,7 @@ import (
 	"github.com/jmrplens/ghchronicle/v2/internal/migrate"
 	"github.com/jmrplens/ghchronicle/v2/internal/run"
 	"github.com/jmrplens/ghchronicle/v2/internal/sink"
+	"github.com/jmrplens/ghchronicle/v2/internal/teardown"
 )
 
 // flagOthers is the flag that lets -migrate -yes clear a store holding rows
@@ -43,6 +44,9 @@ type migration struct {
 	// configPath is -config as it was given, for the command lines a warning
 	// names: the reader copies them into the same shell.
 	configPath string
+	// fresh says the state file had recorded nothing before this run, so it
+	// cannot name a copy an earlier run set aside, and the stores are asked.
+	fresh bool
 }
 
 // storeWays is how this build brings each store along, by the sink's name,
@@ -50,15 +54,41 @@ type migration struct {
 // entry is one this build has no way to change: its items are said and left
 // pending.
 //
-// Graphite and whatever is behind a Telegraf are changed by whoever runs
-// them, so their way is to say what the plan says; the plan marks both as
-// needing somebody's word, so only -migrate -yes ever applies them. A
-// variable so that a test can put a store's way in place of the real one.
-var storeWays = func(migration) (map[string]migrate.Applier, migrate.Refiller) {
-	return map[string]migrate.Applier{
+// InfluxDB, PostgreSQL and Elasticsearch clear the measurement themselves,
+// keeping the old rows aside for a day where they can; the SQL file is told
+// to write the drop into its stream. Graphite and whatever is behind a
+// Telegraf are changed by whoever runs them, so their way is to say what the
+// plan says; the plan marks both, and the SQL file, as needing somebody's
+// word, so only -migrate -yes ever applies them. A variable so that a test
+// can put a store's way in place of the real one.
+var storeWays = func(m migration) (map[string]migrate.Applier, migrate.Refiller) {
+	ways := map[string]migrate.Applier{
 		"graphite": migrate.Instructions{},
 		"telegraf": migrate.Instructions{},
-	}, nil
+	}
+	for _, c := range teardown.Clearers(m.cfg) {
+		clearing := migrate.Clearing{Store: c}
+		if pg, ok := sinkOf[*sink.Postgres](m.sinks); ok && c.Name() == pg.Name() {
+			clearing.Forget = pg.Forget
+		}
+		ways[c.Name()] = clearing
+	}
+	if q, ok := sinkOf[*sink.SQL](m.sinks); ok && m.cfg.Sinks.SQL != nil {
+		ways[q.Name()] = migrate.Dropping{Sink: q, Path: m.cfg.Sinks.SQL.Path}
+	}
+	return ways, nil
+}
+
+// sinkOf is the sink of one type among a run's sinks, behind whatever ledger
+// wraps it.
+func sinkOf[T sink.Sink](sinks []sink.Sink) (T, bool) {
+	for _, s := range sinks {
+		if found, ok := sink.Inner(s).(T); ok {
+			return found, true
+		}
+	}
+	var none T
+	return none, false
 }
 
 // forgetCleared is what a run forgets once a migration has cleared a store:
@@ -86,6 +116,14 @@ func saltLedger(ledger *sink.Ledger, state *run.State) {
 		for measurement, salt := range measurements {
 			ledger.Salt(store, measurement, salt)
 		}
+	}
+}
+
+// purging is how a run purges the copies migrations set aside once they have
+// been kept their day.
+func purging(m migration, ask bool) migrate.Purging {
+	return migrate.Purging{
+		Config: m.cfg, State: m.state, Save: m.state.Save, Ask: ask, Now: time.Now(), Log: m.log,
 	}
 }
 
@@ -125,12 +163,13 @@ func migrateOnStart(ctx context.Context, m migration, service bool) {
 		Others:   flagOthers, Service: service, State: m.state, Now: time.Now(), Log: m.log,
 	}
 	chosen := start.Decide(ctx)
-	if len(chosen) == 0 {
+	purge := purging(m, m.fresh)
+	if len(chosen) == 0 && !purge.Owed() {
 		return
 	}
 	// The service holds the state file for as long as it runs. A one-shot
-	// run takes it for as long as it applies, and applies nothing when
-	// somebody else has it: two processes changing one store at once is
+	// run takes it for as long as it applies or purges, and does neither
+	// when somebody else has it: two processes changing one store at once is
 	// what the lock exists to stop.
 	if !service {
 		lock, err := run.TakeLock(m.cfg.LockFile(), run.HeldByStart, version, time.Now())
@@ -140,14 +179,18 @@ func migrateOnStart(ctx context.Context, m migration, service bool) {
 		}
 		defer func() { _ = lock.Release() }()
 	}
-	resume := "the next start tries again, and " + commandLine(m.configPath, "-migrate") + " says what is left"
-	_, err := migrate.Applying{
-		State: m.state, Save: m.state.Save, Appliers: ways, Refill: refill,
-		Cleared: forgetCleared(m), Log: m.log, Resume: resume,
-	}.Apply(ctx, chosen)
-	if err != nil {
-		m.log.Error("reading the history of what was cleared again did not finish", "err", err, "resume", resume)
+	if len(chosen) > 0 {
+		resume := "the next start tries again, and " + commandLine(m.configPath, "-migrate") + " says what is left"
+		_, err := migrate.Applying{
+			State: m.state, Save: m.state.Save, Appliers: ways, Refill: refill,
+			Cleared: forgetCleared(m), Log: m.log, Resume: resume,
+		}.Apply(ctx, chosen)
+		if err != nil {
+			m.log.Error("reading the history of what was cleared again did not finish", "err", err, "resume", resume)
+		}
 	}
+	purge.Now = time.Now()
+	purge.Run(ctx)
 }
 
 // holdStateFile takes the state file for the service's whole life.
@@ -280,6 +323,11 @@ func migrateApply(ctx context.Context, cfg *config.Config, api *ghapi.Client, o 
 			Log: logger, Resume: report.Resume,
 		}.Apply(ctx, chosen)
 	}
+	// Copies set aside a day ago or more, by an earlier run of this command
+	// or by a service, are purged here as the service would purge them. The
+	// stores are asked as well, since a state file this command did not
+	// keep, the Action's for one, does not name them.
+	purging(m, true).Run(ctx)
 	if err = state.Save(); err != nil {
 		logger.Warn("state not saved", "err", err)
 	}

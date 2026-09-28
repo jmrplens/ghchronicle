@@ -335,3 +335,41 @@ func TestAnEmptyStringIsNoCellAtAll(t *testing.T) {
 		t.Errorf("columns = %v, want the field that has a value", cols)
 	}
 }
+
+// TestADroppedTableIsDeclaredAgainAfterTheDrop: a migration writes the drop
+// into the stream, and the next point of the measurement has to declare the
+// table again after it, since replayed in order the table is gone by then.
+// Every other table the stream declared stays declared.
+func TestADroppedTableIsDeclaredAgainAfterTheDrop(t *testing.T) {
+	s, buf := sqlToBuffer()
+	at := time.Unix(1700000000, 0)
+	comment := Point{
+		Measurement: "gh_discussion_comment", Tags: map[string]string{"comment": "1"},
+		Fields: map[string]any{"answers": 1}, Time: at,
+	}
+	repo := Point{Measurement: "gh_repo", Tags: map[string]string{"repo": "a"}, Fields: map[string]any{"stars": 1}, Time: at}
+	if _, err := s.Write(context.Background(), []Point{comment, repo}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Drop("gh_discussion_comment"); err != nil {
+		t.Fatal(err)
+	}
+	before := buf.Len()
+	if _, err := s.Write(context.Background(), []Point{comment, repo}); err != nil {
+		t.Fatal(err)
+	}
+	all := buf.String()
+	after := all[before:]
+	if !strings.HasSuffix(all[:before], "DROP TABLE IF EXISTS \"gh_discussion_comment\";\n") {
+		t.Errorf("the drop is not the last statement before the next write:\n%s", all[:before])
+	}
+	if !strings.HasPrefix(after, `CREATE TABLE IF NOT EXISTS "gh_discussion_comment"`) {
+		t.Errorf("the dropped table was not declared again before its next row:\n%s", after)
+	}
+	if strings.Contains(after, `CREATE TABLE IF NOT EXISTS "gh_repo"`) {
+		t.Errorf("a table nobody dropped was declared again:\n%s", after)
+	}
+	if strings.Count(all, "DROP TABLE") != 1 {
+		t.Errorf("the drop was written %d times", strings.Count(all, "DROP TABLE"))
+	}
+}

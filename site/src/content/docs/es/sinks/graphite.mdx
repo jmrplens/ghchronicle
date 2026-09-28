@@ -161,6 +161,33 @@ el resto en una llamada other hace aquí lo mismo que en los dashboards SQL: se
 nombran las más activas de todo el rango, y other es todas las series menos
 esas, punto a punto, dibujada solo donde queda algo.
 
+## Qué hace aquí una migración
+
+Graphite no se puede vaciar desde aquí. Nada en el puerto de ingesta de carbon
+borra una ruta, y graphite-web no borra ninguna que no lleve etiquetas:
+**medido contra graphite-statsd 1.1.10-5**, `/metrics/delete` responde 404 y
+`/tags/delSeries` responde `true` y deja la serie donde estaba. Lo que una
+versión dejó con otra forma lo decide el registro del fichero de estado de la
+versión que escribió primero el almacén, y aplicar el cambio es que
+`-migrate -yes` imprima, una vez, las órdenes para la máquina de Graphite, y
+registre el cambio como aplicado, porque si se ejecutaron solo lo sabe quien
+las ejecuta:
+
+```sh
+find <storage>/whisper/github/discussion_comment -mindepth 11 -name '*.wsp' -delete
+find <storage>/whisper/github/discussion_comment -type d -empty -delete
+```
+
+`<storage>` es el directorio de almacenamiento de carbon,
+`/opt/graphite/storage` en la imagen oficial, y `github` es el prefijo. Una
+ruta es un nodo por etiqueta y después el campo, así que la forma antigua de
+una medida que perdió una etiqueta queda un nivel más abajo que la nueva, y
+`-mindepth` llega a ese nivel y a nada por encima. Medido en esa imagen: la
+orden se llevó los dos ficheros de la forma antigua y dejó los de la forma
+nueva y los de todas las demás medidas. Los ficheros son de la máquina, y el
+orden da igual, porque las dos formas son ficheros distintos. Un arranque nunca
+lo aplica por su cuenta.
+
 ## Por dónde seguir
 
 - [Elegir almacén](/ghchronicle/es/sinks/) compara Graphite con los demás, y

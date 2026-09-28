@@ -196,6 +196,14 @@ does a Grafana that reaches Loki by another address. A token that may not make
 the datasource costs this panel and nothing else: the run warns once and
 publishes every dashboard with the note.
 
+## Nothing to migrate
+
+A stream is its job, its kind and the configured labels, and a point's tags go
+into the line, so a release that moves a tag changes no stream, and
+[`-migrate`](/ghchronicle/install/upgrading/#migrations) has nothing to do
+here. A line is what was said when it was said, and Loki refuses entries older
+than its window anyway.
+
 ## Where to go next
 
 - [Choosing a store](/ghchronicle/sinks/) compares Loki with the others,

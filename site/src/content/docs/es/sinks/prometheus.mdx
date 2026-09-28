@@ -176,6 +176,15 @@ El ejemplo escucha en `127.0.0.1`, que dentro de un contenedor es el loopback
 del propio contenedor e inalcanzable desde la máquina anfitriona. Ahí usa
 `0.0.0.0:9605` y deja que la publicación del puerto decida quién llega.
 
+## Nada que migrar
+
+El exportador guarda en memoria los valores de hoy, y un reinicio con la versión
+nueva los sirve con su forma, así que
+[`-migrate`](/ghchronicle/es/install/upgrading/#migraciones) no tiene nada que
+hacer aquí. El servidor de Prometheus conserva las series antiguas hasta su
+retención, y terminan donde empiezan las nuevas, así que ninguna consulta
+cuenta un elemento dos veces.
+
 ## Por dónde seguir
 
 - [Elegir almacén](/ghchronicle/es/sinks/) compara Prometheus con los demás, y

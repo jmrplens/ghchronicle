@@ -113,6 +113,37 @@ filter sets aside from its documents of the last seven days, where the SQL
 stores ask whether the collector still writes it, so a range that ended more
 than a week ago leaves those repositories out.
 
+## What a migration does here
+
+When a release changes what a measurement's documents are keyed by,
+[`-migrate`](/ghchronicle/install/upgrading/#migrations) finds the documents
+of the old shape by counting the ones that carry the old tag, and applying the
+change sets the index aside in three steps. **Measured against Elasticsearch
+9.5.3**:
+
+1. The index stops taking writes, through `PUT <index>/_block/write`.
+2. It is cloned to `<index>-<instant>`, the instant in UTC and in lower case,
+   as an index name has to be, for example
+   `ghchronicle-gh_discussion_comment-20261001t091004`, and the clone has to
+   hold as many documents as the index before anything else happens.
+3. The index is deleted, and the sink's next write creates it again, with a
+   mapping of its own.
+
+A step that fails before the delete takes the write block off again, so a
+cluster that refused the clone goes on taking the sink's writes, and the
+change stays pending with the cluster's reason. The API key needs the
+`manage` and `delete_index` privileges on the prefix's indices; a key that can
+only write is refused that way.
+
+The clone keeps the write block, and ghchronicle deletes it once it has been
+kept 24 hours: after a sweep of the service, at the next start of any run, or
+at the next `-migrate -yes`. Until then undoing the change is deleting the new
+index and cloning the copy back under its name. Every query of the shipped
+dashboard names its index whole, `_index:ghchronicle-gh_discussion_comment`,
+so no panel reads the clone: a panel's query over `ghchronicle-*` counted the
+one new document and not the clone's three. A Kibana data view over the same
+pattern without that filter does read it, for the day it is kept.
+
 ## Where to go next
 
 - [Choosing a store](/ghchronicle/sinks/) compares Elasticsearch with the others,

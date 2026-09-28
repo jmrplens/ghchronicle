@@ -1,6 +1,9 @@
 package run
 
-import "time"
+import (
+	"slices"
+	"time"
+)
 
 // StoreRecord is what the state file remembers about one store, for the one
 // question a store that cannot be asked leaves open: whether rows an earlier
@@ -38,6 +41,37 @@ type StoreRecord struct {
 	// writes any more. Later starts say it at Debug, since a line at every
 	// start about rows that will never change is a line nobody reads.
 	Noted map[string]time.Time `json:"noted,omitempty"`
+	// SetAside is every copy of a measurement's rows a migration kept out of
+	// the way in this store and nobody has purged yet: the copy's name is
+	// what undoing the migration needs, and its instant is when it falls due
+	// to be purged.
+	SetAside []Aside `json:"set_aside,omitempty"`
+}
+
+// Aside is one copy of a measurement's rows a migration set aside.
+type Aside struct {
+	Name        string    `json:"name"`
+	Measurement string    `json:"measurement"`
+	Migration   string    `json:"migration,omitempty"`
+	At          time.Time `json:"at"`
+	// ByServer says the store purges the copy itself, InfluxDB 3's soft
+	// delete, so the record is only forgotten once it falls due.
+	ByServer bool `json:"by_server,omitempty"`
+}
+
+// KeepAside records a copy, replacing a record of the same name.
+func (r *StoreRecord) KeepAside(a Aside) {
+	a.At = a.At.UTC()
+	r.DropAside(a.Name)
+	r.SetAside = append(r.SetAside, a)
+}
+
+// DropAside forgets a copy that was purged or is the store's own to purge.
+func (r *StoreRecord) DropAside(name string) {
+	r.SetAside = slices.DeleteFunc(r.SetAside, func(a Aside) bool { return a.Name == name })
+	if len(r.SetAside) == 0 {
+		r.SetAside = nil
+	}
 }
 
 // MarkApplied records a migration as applied here, which also ends any

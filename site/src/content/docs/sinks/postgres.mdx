@@ -142,8 +142,9 @@ a measurement's tags changes what loads into it. **Measured against PostgreSQL
   written, the two shapes InfluxDB holds as well.
 
 The clean way out of either is to drop the table and let the sweeps, and a
-backfill for the history, fill it again. A collector with the connecting sink
-writes on across the drop. Its first write after it is refused with
+backfill for the history, fill it again, which is what `-migrate -yes` does for
+the changes the binary knows of: see below. A collector with the connecting
+sink writes on across the drop. Its first write after it is refused with
 `relation ... does not exist`, since the sink declares a table once per
 process; the sink then forgets the tables of that batch, declares them again
 and sends the batch once more, which creates the table afresh. **Measured
@@ -151,6 +152,56 @@ against PostgreSQL 18.6**: before this, every later write of the table and the
 rest of its batch were refused until a restart.
 [How to read the tables](/ghchronicle/collectors/measurements/#how-to-read-the-tables)
 shows how to rebuild a key by hand instead.
+
+## What a migration does here
+
+When a release changes what a measurement's rows are keyed by,
+[`-migrate`](/ghchronicle/install/upgrading/#migrations) asks the connecting
+sink's database whether any row holds a value in the old tag's column, in the
+schema the sink writes to, and applying the change renames that one table in
+that schema, which keeps every row, index and key it had:
+
+```sql
+ALTER TABLE "<schema>"."gh_discussion_comment" RENAME TO "gh_discussion_comment-20261001T091004";
+```
+
+The name is the measurement, a dash and the instant in UTC, so it has to be
+quoted. The rename takes the same exclusive lock a drop does, which waits
+behind every Grafana query reading the table, so it is sent under a 5 second
+`lock_timeout`, three times; a table that stays busy longer leaves the change
+pending with the lock's reason. The sink's next write creates the table under
+the old name with the new key, whose index takes the name
+`gh_discussion_comment_pkey1` beside the copy's. **Measured against PostgreSQL
+18.6**: the rename took 7 ms, touched no other schema, and a sink that had
+written the table before it wrote on after it.
+
+ghchronicle drops the copy once it has been kept 24 hours: after a sweep of the
+service, at the next start of any run, or at the next `-migrate -yes`, each
+with its own `lock_timeout`. `-uninstall data` lists it with the other `gh_`
+tables. Until then undoing the change is two statements:
+
+```sql
+DROP TABLE "gh_discussion_comment";
+ALTER TABLE "gh_discussion_comment-20261001T091004" RENAME TO "gh_discussion_comment";
+```
+
+The SQL file cannot be asked, so the state file's record of the release that
+first wrote it decides, and applying the change writes the drop into the file,
+after everything already there:
+
+```sql
+DROP TABLE IF EXISTS "gh_discussion_comment";
+```
+
+The sink then forgets the table, so the next rows of that measurement declare
+it again after the drop. Replayed in order, the database loses the table in the
+old shape and gains it in the new one. **Measured with psql against PostgreSQL
+18.6**: without the drop, the new rows are refused against the old key; with
+it, the file loads whole. The drop reaches whatever the file is replayed into,
+where nothing is kept aside, so a start never applies it on its own; `-migrate
+-yes` does. A file replayed on its own, without the one that holds the drop,
+still meets the old table, and a rotation that deletes that file before it was
+replayed takes the drop with it.
 
 ## TimescaleDB
 

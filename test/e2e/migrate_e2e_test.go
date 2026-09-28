@@ -26,6 +26,9 @@ type oldInflux struct {
 	sent []string
 	// fresh answers as a store with no table at all.
 	fresh bool
+	// deleted is the name the table was given when a delete set it aside,
+	// the way 3.11.2 renames it, and empty before.
+	deleted string
 }
 
 func (s *oldInflux) start(t *testing.T) string {
@@ -36,10 +39,23 @@ func (s *oldInflux) start(t *testing.T) string {
 		s.mu.Lock()
 		s.sent = append(s.sent, r.Method+" "+r.URL.Path+" "+q+string(body))
 		s.mu.Unlock()
+		s.mu.Lock()
+		deleted := s.deleted
+		s.mu.Unlock()
 		switch {
 		case r.URL.Path == "/ping":
 			_, _ = io.WriteString(w, `{"product_name":"InfluxDB 3 Core","version":"3.11.2"}`)
-		case s.fresh || !strings.Contains(q, "'gh_discussion_comment'") && strings.Contains(q, "information_schema"):
+		case r.Method == http.MethodDelete && r.URL.Path == "/api/v3/configure/table" && !s.fresh && deleted == "":
+			s.mu.Lock()
+			s.deleted = r.URL.Query().Get("table") + "-20261001T091004"
+			s.mu.Unlock()
+		case strings.Contains(q, "information_schema.tables") && !s.fresh:
+			name := "gh_discussion_comment"
+			if deleted != "" {
+				name = deleted
+			}
+			_, _ = io.WriteString(w, `[{"table_name":"gh_repo"},{"table_name":"`+name+`"}]`)
+		case s.fresh || deleted != "" || !strings.Contains(q, "'gh_discussion_comment'") && strings.Contains(q, "information_schema"):
 			_, _ = io.WriteString(w, `[]`)
 		case strings.Contains(q, "information_schema.columns"):
 			_, _ = io.WriteString(w, `[{"column_name":"comment","data_type":"Dictionary(Int32, Utf8)"},`+
@@ -346,6 +362,84 @@ func TestMigrateYesSaysWhatTelegrafNeedsAndRecordsIt(t *testing.T) {
 	if err != nil || !strings.HasSuffix(stdout, "\nNothing to migrate.\n") ||
 		!strings.Contains(stdout, "applied     2.6.1/gh_discussion_comment/is_answer: applied on ") {
 		t.Errorf("the second -migrate -yes: %v\n%s\n%s", err, stdout, stderr)
+	}
+}
+
+// TestMigrateYesClearsOnlyTheMeasurementItNames: after an upgrade from
+// 2.6.0, -migrate -yes deletes the one InfluxDB table, which InfluxDB keeps
+// aside, and records the copy; writes the drop of that one table into the
+// SQL file after everything already in it; and sends the store nothing else
+// that changes it. A second run finds the store cleared and applies nothing.
+func TestMigrateYesClearsOnlyTheMeasurementItNames(t *testing.T) {
+	t.Parallel()
+	gh := newFakeGitHub(t)
+	store := &oldInflux{}
+	dir := t.TempDir()
+	cfg := migrateConfig(t, dir, gh.URL(), store.start(t))
+	statePath, sqlPath := filepath.Join(dir, "state.json"), filepath.Join(dir, "points.sql")
+	if err := os.WriteFile(statePath, []byte(`{"last_run":{"repo":"2026-09-27T10:00:00Z"}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	const earlier = "-- written by 2.6.0\nINSERT INTO \"gh_repo\" VALUES (1);\n"
+	if err := os.WriteFile(sqlPath, []byte(earlier), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	stdout, stderr, _ := runSplit(t, time.Minute, "-config", cfg, "-migrate", "-yes")
+	for _, want := range []string{
+		"  applied     2.6.1/gh_discussion_comment/is_answer in influxdb: InfluxDB set the table gh_discussion_comment aside",
+		"the old rows are kept as gh_discussion_comment-20261001T091004",
+		"  applied     2.6.1/gh_discussion_comment/is_answer in sql: wrote DROP TABLE IF EXISTS \"gh_discussion_comment\";",
+	} {
+		if !strings.Contains(stdout, want) {
+			t.Errorf("-migrate -yes does not say %q:\n%s\n%s", want, stdout, stderr)
+		}
+	}
+	var changed []string
+	for _, r := range store.requests() {
+		method, rest, _ := strings.Cut(r, " ")
+		_, q, _ := strings.Cut(rest, " ")
+		if method != http.MethodGet || q != "" && !strings.HasPrefix(q, "SELECT ") {
+			changed = append(changed, r)
+		}
+	}
+	if !slices.Equal(changed, []string{"DELETE /api/v3/configure/table "}) {
+		t.Errorf("the store was sent %q, want the one delete", changed)
+	}
+	if got := readFile(t, sqlPath); got != earlier+"DROP TABLE IF EXISTS \"gh_discussion_comment\";\n" {
+		t.Errorf("the SQL file is now:\n%s", got)
+	}
+	var saved struct {
+		Stores map[string]struct {
+			Applied  map[string]time.Time `json:"applied"`
+			SetAside []struct {
+				Name, Migration string
+				ByServer        bool `json:"by_server"`
+			} `json:"set_aside"`
+		} `json:"stores"`
+	}
+	if err := json.Unmarshal([]byte(readFile(t, statePath)), &saved); err != nil {
+		t.Fatal(err)
+	}
+	influx := saved.Stores["influxdb"]
+	if _, ok := influx.Applied["2.6.1/gh_discussion_comment/is_answer"]; !ok || len(influx.SetAside) != 1 ||
+		influx.SetAside[0].Name != "gh_discussion_comment-20261001T091004" || !influx.SetAside[0].ByServer {
+		t.Errorf("the record of influxdb is %+v", influx)
+	}
+
+	store.mu.Lock()
+	store.sent = nil
+	store.mu.Unlock()
+	stdout, _, _ = runSplit(t, time.Minute, "-config", cfg, "-migrate", "-yes")
+	if strings.Contains(stdout, "  applied     2.6.1/gh_discussion_comment/is_answer in") {
+		t.Errorf("the second run applied again:\n%s", stdout)
+	}
+	for _, r := range store.requests() {
+		if !strings.HasPrefix(r, "GET ") {
+			t.Errorf("the second run sent the store %s", r)
+		}
+	}
+	if strings.Count(readFile(t, sqlPath), "DROP TABLE") != 1 {
+		t.Error("the second run wrote the drop again")
 	}
 }
 

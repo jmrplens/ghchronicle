@@ -272,7 +272,10 @@ of.
 > DELETE /api/v3/configure/table
 > ```
 >
-> This is the usual cause of `influx write: 400`.
+> This is the usual cause of `influx write: 400`. The delete does not destroy the
+> table at once: InfluxDB renames it `<name>-<instant>`, keeps it queryable and
+> purges it 24 hours later, and the name takes new writes straight away. For the
+> changes the binary knows of, `-migrate -yes` sends it: see below.
 
 ### Rejected lines
 
@@ -299,6 +302,46 @@ rather than carrying somebody else's uid.
 ```sql
 SELECT time, "count" FROM gh_traffic WHERE kind = 'views' AND repo = 'ghchronicle'
 ```
+
+### What a migration does here
+
+When a release changes what a measurement's rows are keyed by,
+[`-migrate`](https://jmrp.io/docs/ghchronicle/install/upgrading/#migrations) asks InfluxDB 3's
+catalog whether the old tag is a tag column of the live table, and applying the
+change deletes that one table:
+
+```http
+DELETE /api/v3/configure/table?db=<bucket>&table=<measurement>
+```
+
+That delete is InfluxDB's own way of setting a table aside. **Measured against
+InfluxDB 3 Core 3.0.0 to 3.11.5**: the table is renamed `<measurement>-<instant>`,
+the instant in UTC, for example `gh_discussion_comment-20261001T091004`, stays
+listed and answers queries under that name, and the next write under the old
+name creates the table afresh, in the new shape, even where a column changes
+from a tag to a field. The binary reads the name back from the catalog, prints
+it, and keeps it in the state file. From 3.4.0 the server purges the copy 24
+hours after the delete; 3.0.0 has no purge at all, and the plan says so for a
+server older than 3.4.0. Nothing else can purge it: a delete of the renamed
+table is answered with a 409, with or without `hard_delete_at`, so ghchronicle
+forgets the copy once its day is over and leaves it to the server.
+`hard_delete_at` is never sent: measured on 3.11.5, `now` had not removed the
+rows eleven minutes later, and it takes the day to undo the change away. Until
+then the copy's rows can be read with SQL and written back through the sink.
+
+The token has to be allowed to delete a table. A refused delete leaves the
+change pending, and the error names the same request to send by hand.
+
+InfluxDB 2 has no rename. Applying the change there deletes every row of the
+measurement in the bucket, over every instant it can hold, through
+`POST /api/v2/delete` with the predicate `_measurement="<measurement>"`, and
+that is final. **Measured against InfluxDB 2.7.12**: it took that measurement
+and left `gh_discussion_comment_x`, the other measurements of the bucket and
+the same measurement in another bucket as they were. So a start never applies
+it on its own; `-migrate -yes` does.
+
+`-uninstall data` leaves out the tables InfluxDB 3 has already deleted, and
+says they are the server's to purge.
 
 ### Where to go next
 
@@ -474,6 +517,14 @@ The example listens on `127.0.0.1`, which inside a container is the container's
 own loopback and unreachable from the host. Use `0.0.0.0:9605` there and let
 the port publication decide who can reach it.
 
+### Nothing to migrate
+
+The exporter holds today's values in memory, and a restart of the new release
+serves them in its shape, so [`-migrate`](https://jmrp.io/docs/ghchronicle/install/upgrading/#migrations)
+has nothing to do here. The Prometheus server keeps the old series until its
+retention, and they end where the new ones begin, so no query counts an item
+twice.
+
 ### Where to go next
 
 - [Choosing a store](https://jmrp.io/docs/ghchronicle/sinks/) compares Prometheus with the others,
@@ -584,6 +635,12 @@ service:
 
 With that pipeline, keep `raw: false`: the exporter at the far end is
 Prometheus, and the constraint follows the data rather than the protocol.
+
+### Nothing to migrate
+
+The sink pushes today's values, in the shape of the release that runs it, so
+[`-migrate`](https://jmrp.io/docs/ghchronicle/install/upgrading/#migrations) has nothing to do
+here. What the receiver keeps of an old series ends where the new one begins.
 
 ### Where to go next
 
@@ -733,8 +790,9 @@ a measurement's tags changes what loads into it. **Measured against PostgreSQL
   written, the two shapes InfluxDB holds as well.
 
 The clean way out of either is to drop the table and let the sweeps, and a
-backfill for the history, fill it again. A collector with the connecting sink
-writes on across the drop. Its first write after it is refused with
+backfill for the history, fill it again, which is what `-migrate -yes` does for
+the changes the binary knows of: see below. A collector with the connecting
+sink writes on across the drop. Its first write after it is refused with
 `relation ... does not exist`, since the sink declares a table once per
 process; the sink then forgets the tables of that batch, declares them again
 and sends the batch once more, which creates the table afresh. **Measured
@@ -742,6 +800,56 @@ against PostgreSQL 18.6**: before this, every later write of the table and the
 rest of its batch were refused until a restart.
 [How to read the tables](https://jmrp.io/docs/ghchronicle/collectors/measurements/#how-to-read-the-tables)
 shows how to rebuild a key by hand instead.
+
+### What a migration does here
+
+When a release changes what a measurement's rows are keyed by,
+[`-migrate`](https://jmrp.io/docs/ghchronicle/install/upgrading/#migrations) asks the connecting
+sink's database whether any row holds a value in the old tag's column, in the
+schema the sink writes to, and applying the change renames that one table in
+that schema, which keeps every row, index and key it had:
+
+```sql
+ALTER TABLE "<schema>"."gh_discussion_comment" RENAME TO "gh_discussion_comment-20261001T091004";
+```
+
+The name is the measurement, a dash and the instant in UTC, so it has to be
+quoted. The rename takes the same exclusive lock a drop does, which waits
+behind every Grafana query reading the table, so it is sent under a 5 second
+`lock_timeout`, three times; a table that stays busy longer leaves the change
+pending with the lock's reason. The sink's next write creates the table under
+the old name with the new key, whose index takes the name
+`gh_discussion_comment_pkey1` beside the copy's. **Measured against PostgreSQL
+18.6**: the rename took 7 ms, touched no other schema, and a sink that had
+written the table before it wrote on after it.
+
+ghchronicle drops the copy once it has been kept 24 hours: after a sweep of the
+service, at the next start of any run, or at the next `-migrate -yes`, each
+with its own `lock_timeout`. `-uninstall data` lists it with the other `gh_`
+tables. Until then undoing the change is two statements:
+
+```sql
+DROP TABLE "gh_discussion_comment";
+ALTER TABLE "gh_discussion_comment-20261001T091004" RENAME TO "gh_discussion_comment";
+```
+
+The SQL file cannot be asked, so the state file's record of the release that
+first wrote it decides, and applying the change writes the drop into the file,
+after everything already there:
+
+```sql
+DROP TABLE IF EXISTS "gh_discussion_comment";
+```
+
+The sink then forgets the table, so the next rows of that measurement declare
+it again after the drop. Replayed in order, the database loses the table in the
+old shape and gains it in the new one. **Measured with psql against PostgreSQL
+18.6**: without the drop, the new rows are refused against the old key; with
+it, the file loads whole. The drop reaches whatever the file is replayed into,
+where nothing is kept aside, so a start never applies it on its own; `-migrate
+-yes` does. A file replayed on its own, without the one that holds the drop,
+still meets the old table, and a rotation that deletes that file before it was
+replayed takes the drop with it.
 
 ### TimescaleDB
 
@@ -939,6 +1047,31 @@ one called other does the same here as in the SQL dashboards: the busiest over
 the whole range are named, and other is every series less those, point by
 point, drawn only where something is left over.
 
+### What a migration does here
+
+Graphite cannot be cleared from here. Nothing on carbon's ingest port deletes a
+path, and graphite-web deletes none that has no tags: **measured against
+graphite-statsd 1.1.10-5**, `/metrics/delete` answers 404 and `/tags/delSeries`
+answers `true` and leaves the series where it was. What a release left in
+another shape is decided by the state file's record of the release that first
+wrote the store, and applying the change is `-migrate -yes` printing, once, the
+commands for the Graphite host, and recording the change as applied, since
+whether they were run is something only whoever runs them knows:
+
+```sh
+find <storage>/whisper/github/discussion_comment -mindepth 11 -name '*.wsp' -delete
+find <storage>/whisper/github/discussion_comment -type d -empty -delete
+```
+
+`<storage>` is carbon's storage directory, `/opt/graphite/storage` in the
+official image, and `github` is the prefix. A path is a node per tag and then
+the field, so the old shape of a measurement that lost a tag sits one level
+deeper than the new one, and `-mindepth` reaches that level and nothing above
+it. Measured in that image: the command took the two files of the old shape and
+left the new shape's and every other measurement's. The files are the host's
+and the order does not matter, since the two shapes are different files. A
+start never applies this on its own.
+
 ### Where to go next
 
 - [Choosing a store](https://jmrp.io/docs/ghchronicle/sinks/) compares Graphite with the others,
@@ -1054,6 +1187,37 @@ Overview and Every repository, ever count an archived repository the default
 filter sets aside from its documents of the last seven days, where the SQL
 stores ask whether the collector still writes it, so a range that ended more
 than a week ago leaves those repositories out.
+
+### What a migration does here
+
+When a release changes what a measurement's documents are keyed by,
+[`-migrate`](https://jmrp.io/docs/ghchronicle/install/upgrading/#migrations) finds the documents
+of the old shape by counting the ones that carry the old tag, and applying the
+change sets the index aside in three steps. **Measured against Elasticsearch
+9.5.3**:
+
+1. The index stops taking writes, through `PUT <index>/_block/write`.
+2. It is cloned to `<index>-<instant>`, the instant in UTC and in lower case,
+   as an index name has to be, for example
+   `ghchronicle-gh_discussion_comment-20261001t091004`, and the clone has to
+   hold as many documents as the index before anything else happens.
+3. The index is deleted, and the sink's next write creates it again, with a
+   mapping of its own.
+
+A step that fails before the delete takes the write block off again, so a
+cluster that refused the clone goes on taking the sink's writes, and the
+change stays pending with the cluster's reason. The API key needs the
+`manage` and `delete_index` privileges on the prefix's indices; a key that can
+only write is refused that way.
+
+The clone keeps the write block, and ghchronicle deletes it once it has been
+kept 24 hours: after a sweep of the service, at the next start of any run, or
+at the next `-migrate -yes`. Until then undoing the change is deleting the new
+index and cloning the copy back under its name. Every query of the shipped
+dashboard names its index whole, `_index:ghchronicle-gh_discussion_comment`,
+so no panel reads the clone: a panel's query over `ghchronicle-*` counted the
+one new document and not the clone's three. A Kibana data view over the same
+pattern without that filter does read it, for the day it is kept.
 
 ### Where to go next
 
@@ -1258,6 +1422,14 @@ does a Grafana that reaches Loki by another address. A token that may not make
 the datasource costs this panel and nothing else: the run warns once and
 publishes every dashboard with the note.
 
+### Nothing to migrate
+
+A stream is its job, its kind and the configured labels, and a point's tags go
+into the line, so a release that moves a tag changes no stream, and
+[`-migrate`](https://jmrp.io/docs/ghchronicle/install/upgrading/#migrations) has nothing to do
+here. A line is what was said when it was said, and Loki refuses entries older
+than its window anyway.
+
 ### Where to go next
 
 - [Choosing a store](https://jmrp.io/docs/ghchronicle/sinks/) compares Loki with the others,
@@ -1342,6 +1514,15 @@ does not.
 ```
 
 One sweep, both destinations, and the collector knows about neither.
+
+### What a migration does here
+
+ghchronicle cannot see the store behind Telegraf, so what a release left there
+in another shape is decided by the state file's record of the release that
+first wrote it. Applying the change is `-migrate -yes` saying what to do there,
+dropping the measurement in that store and then reading the families that
+write it again through Telegraf with a backfill, and recording it as applied.
+A start never applies it on its own, and Telegraf is sent nothing.
 
 ### Where to go next
 
@@ -1491,6 +1672,14 @@ puts it back to `0600`.
 Under the hardened systemd unit, the directory has to be in `ReadWritePaths`.
 In a container it has to be writable by uid 65532. Both are the same mistake in
 two clothes: the process is deliberately allowed to write almost nowhere.
+
+### Nothing to migrate
+
+The file, and standard output, are a record of what was written when, in the
+shape of the release that wrote it, and
+[`-migrate`](https://jmrp.io/docs/ghchronicle/install/upgrading/#migrations) leaves them as they
+are. Replayed into a store, a file brings back every shape it holds, and the
+store then needs the migration again.
 
 ### Where to go next
 

@@ -356,6 +356,12 @@ func execute(args []string, stdout, stderr io.Writer) {
 	case o.once || o.card != "":
 		err = runSweep(ctx, runner, accumulator, &o, logger)
 	default:
+		// A service runs for weeks, so what a migration set aside is purged
+		// between its sweeps once it has been kept its day, rather than at
+		// the next restart. Nothing is asked of a store until a copy is due.
+		runner.AfterSweep = func(ctx context.Context) {
+			purging(migration{cfg: cfg, state: runner.State, log: logger}, false).Run(ctx)
+		}
 		// Serve ends when the context does, and a stop asked for by a signal
 		// is a clean exit, not a failure.
 		if err = runner.Serve(ctx); err != nil && ctx.Err() != nil {
@@ -383,7 +389,7 @@ func stampStores(ctx context.Context, runner *run.Runner, cfg *config.Config, o 
 	if o.cardOnly {
 		return
 	}
-	m.cfg, m.state, m.configPath = cfg, runner.State, o.path
+	m.cfg, m.state, m.configPath, m.fresh = cfg, runner.State, o.path, runner.State.Fresh()
 	for _, w := range migrate.Stamp(runner.State, cfg, version) {
 		m.log.Warn(w)
 	}

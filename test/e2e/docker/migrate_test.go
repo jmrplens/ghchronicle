@@ -43,9 +43,9 @@ gh_dependabot_alert_item,full_name=o/r,number=1,owner=o,repo=r,severity=high ale
 func TestThePlanFindsTheOldShapeInEveryStoreAndChangesNothing(t *testing.T) {
 	ctx := context.Background()
 	s := Start(t)
-	seedInflux(ctx, t, s)
-	seedPostgres(ctx, t, s)
-	seedElasticsearch(ctx, t, s)
+	seedInflux(ctx, t, s, migrateNamespace)
+	seedPostgres(ctx, t, s, migrateNamespace)
+	seedElasticsearch(ctx, t, s, migrateNamespace)
 
 	dir := t.TempDir()
 	cfg := &config.Config{
@@ -112,58 +112,58 @@ func counts(ctx context.Context, t *testing.T, s *Stack) string {
 
 // seedInflux writes the old shape into a database of its own, and drops that
 // database when the test ends.
-func seedInflux(ctx context.Context, t *testing.T, s *Stack) {
+func seedInflux(ctx context.Context, t *testing.T, s *Stack, ns string) {
 	t.Helper()
 	write := s.InfluxURL + "/api/v2/write?" + url.Values{
-		"bucket": {migrateNamespace}, "org": {"x"}, "precision": {"s"},
+		"bucket": {ns}, "org": {"x"}, "precision": {"s"},
 	}.Encode()
 	storeCall(ctx, t, http.MethodPost, write, oldComments, "")
 	t.Cleanup(func() {
 		storeCall(context.WithoutCancel(ctx), t, http.MethodDelete,
-			s.InfluxURL+"/api/v3/configure/database?db="+migrateNamespace, "", "")
+			s.InfluxURL+"/api/v3/configure/database?db="+ns, "", "")
 	})
 }
 
 // seedPostgres makes the table 2.6.0's sink made, is_answer in its key, in a
 // schema of its own.
-func seedPostgres(ctx context.Context, t *testing.T, s *Stack) {
+func seedPostgres(ctx context.Context, t *testing.T, s *Stack, ns string) {
 	t.Helper()
 	for _, stmt := range []string{
-		"DROP SCHEMA IF EXISTS " + migrateNamespace + " CASCADE;",
-		"CREATE SCHEMA " + migrateNamespace + ";",
-		`CREATE TABLE ` + migrateNamespace + `.gh_discussion_comment ("time" TIMESTAMPTZ NOT NULL, ` +
+		"DROP SCHEMA IF EXISTS " + ns + " CASCADE;",
+		"CREATE SCHEMA " + ns + ";",
+		`CREATE TABLE ` + ns + `.gh_discussion_comment ("time" TIMESTAMPTZ NOT NULL, ` +
 			`"comment" TEXT NOT NULL DEFAULT '', "is_answer" TEXT NOT NULL DEFAULT '', ` +
 			`"user" TEXT NOT NULL DEFAULT '', "answers" BIGINT, PRIMARY KEY ("time", "comment", "is_answer", "user"));`,
-		`INSERT INTO ` + migrateNamespace + `.gh_discussion_comment VALUES ` +
+		`INSERT INTO ` + ns + `.gh_discussion_comment VALUES ` +
 			`('2023-11-14T22:13:20Z', '1', 'false', 'octocat', 0), ('2023-11-14T22:13:20Z', '1', 'true', 'octocat', 1);`,
-		`CREATE TABLE ` + migrateNamespace + `.gh_dependabot_alert_item ("time" TIMESTAMPTZ NOT NULL, ` +
+		`CREATE TABLE ` + ns + `.gh_dependabot_alert_item ("time" TIMESTAMPTZ NOT NULL, ` +
 			`"number" TEXT NOT NULL DEFAULT '', "owner" TEXT NOT NULL DEFAULT '', "alert_state" TEXT, PRIMARY KEY ("time", "number", "owner"));`,
-		`INSERT INTO ` + migrateNamespace + `.gh_dependabot_alert_item VALUES ('2024-01-11T19:06:40Z', '1', 'o', 'open');`,
+		`INSERT INTO ` + ns + `.gh_dependabot_alert_item VALUES ('2024-01-11T19:06:40Z', '1', 'o', 'open');`,
 	} {
 		if _, err := s.Psql(ctx, stmt); err != nil {
 			t.Fatal(err)
 		}
 	}
 	t.Cleanup(func() {
-		_, _ = s.Psql(context.WithoutCancel(ctx), "DROP SCHEMA IF EXISTS "+migrateNamespace+" CASCADE;")
+		_, _ = s.Psql(context.WithoutCancel(ctx), "DROP SCHEMA IF EXISTS "+ns+" CASCADE;")
 	})
 }
 
 // seedElasticsearch indexes the old shape under a prefix of its own.
-func seedElasticsearch(ctx context.Context, t *testing.T, s *Stack) {
+func seedElasticsearch(ctx context.Context, t *testing.T, s *Stack, ns string) {
 	t.Helper()
-	index := migrateNamespace + "-gh_discussion_comment"
+	index := ns + "-gh_discussion_comment"
 	bulk := `{"index":{"_index":"` + index + `","_id":"a1"}}
 {"@timestamp":"2023-11-14T22:13:20Z","comment":"1","is_answer":"false","user":"octocat","answers":0}
 {"index":{"_index":"` + index + `","_id":"a2"}}
 {"@timestamp":"2023-11-14T22:13:20Z","comment":"1","is_answer":"true","user":"octocat","answers":1}
-{"index":{"_index":"` + migrateNamespace + `-gh_dependabot_alert_item","_id":"d1"}}
+{"index":{"_index":"` + ns + `-gh_dependabot_alert_item","_id":"d1"}}
 {"@timestamp":"2024-01-11T19:06:40Z","number":"1","owner":"o","alert_state":"open"}
 `
 	storeCall(ctx, t, http.MethodPost, s.ElasticsearchURL+"/_bulk?refresh=true", bulk, "application/x-ndjson")
 	t.Cleanup(func() {
 		for _, m := range []string{"gh_discussion_comment", "gh_dependabot_alert_item"} {
-			storeCall(context.WithoutCancel(ctx), t, http.MethodDelete, s.ElasticsearchURL+"/"+migrateNamespace+"-"+m, "", "")
+			storeCall(context.WithoutCancel(ctx), t, http.MethodDelete, s.ElasticsearchURL+"/"+ns+"-"+m, "", "")
 		}
 	})
 }

@@ -147,8 +147,9 @@ contra PostgreSQL 18.6** el 2026-09-27:
   también InfluxDB.
 
 La salida limpia de cualquiera de los dos casos es borrar la tabla y dejar que
-las pasadas la vuelvan a llenar, y un relleno histórico lo anterior. Un
-colector con el destino que conecta sigue escribiendo tras el borrado. Su
+las pasadas la vuelvan a llenar, y un relleno histórico lo anterior, que es lo
+que hace `-migrate -yes` con los cambios que el binario conoce: mira más abajo.
+Un colector con el destino que conecta sigue escribiendo tras el borrado. Su
 primera escritura después se rechaza con `relation ... does not exist`, porque
 el destino declara una tabla una vez por proceso; entonces olvida las tablas de
 ese lote, las declara de nuevo y reenvía el lote una vez, lo que crea la tabla
@@ -157,6 +158,60 @@ escrituras siguientes de la tabla, y el resto de su lote, se rechazaban hasta
 reiniciar.
 [Cómo leer las tablas](/ghchronicle/es/collectors/measurements/#cómo-leer-las-tablas)
 enseña cómo reconstruir una clave a mano.
+
+## Qué hace aquí una migración
+
+Cuando una versión cambia aquello por lo que se identifican las filas de una
+medida, [`-migrate`](/ghchronicle/es/install/upgrading/#migraciones) pregunta a
+la base de datos del destino que conecta si alguna fila tiene un valor en
+la columna de la etiqueta antigua, en el esquema en el que escribe el destino,
+y aplicar el cambio renombra esa única tabla en ese esquema, lo que conserva
+todas sus filas, índices y claves:
+
+```sql
+ALTER TABLE "<esquema>"."gh_discussion_comment" RENAME TO "gh_discussion_comment-20261001T091004";
+```
+
+El nombre es la medida, un guion y el instante en UTC, así que hay que ponerlo
+entre comillas. El renombrado toma el mismo bloqueo exclusivo que un borrado,
+que espera detrás de cada consulta de Grafana que lee la tabla, así que se
+envía con un `lock_timeout` de 5 segundos, tres veces; una tabla que sigue
+ocupada más tiempo deja el cambio pendiente con la razón del bloqueo. La
+siguiente escritura del destino crea la tabla con el nombre antiguo y la clave
+nueva, cuyo índice toma el nombre `gh_discussion_comment_pkey1` junto al de la
+copia. **Medido contra PostgreSQL 18.6**: el renombrado tardó 7 ms, no tocó
+ningún otro esquema, y un destino que había escrito la tabla antes siguió
+escribiendo después.
+
+ghchronicle borra la copia cuando lleva 24 horas guardada: tras una pasada del
+servicio, en el siguiente arranque de cualquier ejecución o en el siguiente
+`-migrate -yes`, cada uno con su propio `lock_timeout`. `-uninstall data` la
+lista con las demás tablas `gh_`. Hasta entonces, deshacer el cambio son dos
+sentencias:
+
+```sql
+DROP TABLE "gh_discussion_comment";
+ALTER TABLE "gh_discussion_comment-20261001T091004" RENAME TO "gh_discussion_comment";
+```
+
+Al fichero SQL no se le puede preguntar, así que decide el registro del
+fichero de estado de la versión que lo escribió primero, y aplicar el cambio
+escribe el borrado en el fichero, después de todo lo que ya tiene:
+
+```sql
+DROP TABLE IF EXISTS "gh_discussion_comment";
+```
+
+Después el destino olvida la tabla, así que las siguientes filas de esa medida
+la declaran de nuevo tras el borrado. Reproducido en orden, la base de datos
+pierde la tabla con la forma antigua y gana la de la forma nueva. **Medido con
+psql contra PostgreSQL 18.6**: sin el borrado, las filas nuevas se rechazan
+contra la clave antigua; con él, el fichero carga entero. El borrado llega a
+donde se reproduzca el fichero, donde no se aparta nada, así que un arranque
+nunca lo aplica por su cuenta; `-migrate -yes` sí. Un fichero reproducido
+solo, sin el que lleva el borrado, sigue encontrando la tabla antigua, y una
+rotación que borra ese fichero antes de reproducirlo se lleva el borrado con
+él.
 
 ## TimescaleDB
 

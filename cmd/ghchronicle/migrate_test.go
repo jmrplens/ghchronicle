@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -496,6 +497,47 @@ func TestACommandLineNamesTheConfigurationSoTheShellReadsItBack(t *testing.T) {
 		if got := commandLine(path, "-migrate"); got != want {
 			t.Errorf("commandLine(%q) = %q, want %q", path, got, want)
 		}
+	}
+}
+
+// TestEveryStoreThatCanBeClearedHasItsWay: this build clears InfluxDB,
+// PostgreSQL and Elasticsearch itself, tells the SQL file to write the drop,
+// and says what to do on the Graphite host and behind Telegraf; the stores
+// that keep nothing a release could reshape have no way at all, so nothing
+// is ever applied to them.
+func TestEveryStoreThatCanBeClearedHasItsWay(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	cfg := &config.Config{
+		GitHub: config.GitHub{Token: "t"}, Targets: config.Targets{User: "octocat"},
+		Sinks: config.Sinks{
+			Influx:        &config.InfluxSink{URL: "http://influx:8181", Bucket: "github"},
+			Postgres:      &config.PostgresSink{DSN: "postgres://gh@db:5432/gh"},
+			Elasticsearch: &config.ElasticsearchSink{URL: "http://es:9200"},
+			SQL:           &config.SQLSink{Path: filepath.Join(dir, "points.sql")},
+			Graphite:      &config.GraphiteSink{Addr: "graphite:2003"},
+			Telegraf:      &config.TelegrafSink{URL: "http://telegraf:8186/telegraf"},
+			Loki:          &config.LokiSink{URL: "http://loki:3100/loki/api/v1/push"},
+			File:          &config.FileSink{Path: filepath.Join(dir, "points.lp")},
+		},
+	}
+	if err := cfg.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	sinks, _, err := buildSinks(cfg, slog.New(slog.DiscardHandler), true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ways, _ := storeWays(migration{cfg: cfg, sinks: sinks})
+	names := slices.Sorted(maps.Keys(ways))
+	if want := []string{"elasticsearch", "graphite", "influxdb", "postgres", "sql", "telegraf"}; !slices.Equal(names, want) {
+		t.Errorf("ways for %v, want %v", names, want)
+	}
+	if c, ok := ways["postgres"].(migrate.Clearing); !ok || c.Forget == nil {
+		t.Errorf("postgres is brought along by %T, without its sink told to forget the table", ways["postgres"])
+	}
+	if _, ok := ways["sql"].(migrate.Dropping); !ok {
+		t.Errorf("the SQL file is brought along by %T", ways["sql"])
 	}
 }
 

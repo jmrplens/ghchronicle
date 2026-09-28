@@ -91,7 +91,10 @@ between the two, the table has to be dropped rather than repaired:
 DELETE /api/v3/configure/table
 ```
 
-This is the usual cause of `influx write: 400`.
+This is the usual cause of `influx write: 400`. The delete does not destroy the
+table at once: InfluxDB renames it `<name>-<instant>`, keeps it queryable and
+purges it 24 hours later, and the name takes new writes straight away. For the
+changes the binary knows of, `-migrate -yes` sends it: see below.
 
 </Aside>
 
@@ -120,6 +123,46 @@ rather than carrying somebody else's uid.
 ```sql
 SELECT time, "count" FROM gh_traffic WHERE kind = 'views' AND repo = 'ghchronicle'
 ```
+
+## What a migration does here
+
+When a release changes what a measurement's rows are keyed by,
+[`-migrate`](/ghchronicle/install/upgrading/#migrations) asks InfluxDB 3's
+catalog whether the old tag is a tag column of the live table, and applying the
+change deletes that one table:
+
+```http
+DELETE /api/v3/configure/table?db=<bucket>&table=<measurement>
+```
+
+That delete is InfluxDB's own way of setting a table aside. **Measured against
+InfluxDB 3 Core 3.0.0 to 3.11.5**: the table is renamed `<measurement>-<instant>`,
+the instant in UTC, for example `gh_discussion_comment-20261001T091004`, stays
+listed and answers queries under that name, and the next write under the old
+name creates the table afresh, in the new shape, even where a column changes
+from a tag to a field. The binary reads the name back from the catalog, prints
+it, and keeps it in the state file. From 3.4.0 the server purges the copy 24
+hours after the delete; 3.0.0 has no purge at all, and the plan says so for a
+server older than 3.4.0. Nothing else can purge it: a delete of the renamed
+table is answered with a 409, with or without `hard_delete_at`, so ghchronicle
+forgets the copy once its day is over and leaves it to the server.
+`hard_delete_at` is never sent: measured on 3.11.5, `now` had not removed the
+rows eleven minutes later, and it takes the day to undo the change away. Until
+then the copy's rows can be read with SQL and written back through the sink.
+
+The token has to be allowed to delete a table. A refused delete leaves the
+change pending, and the error names the same request to send by hand.
+
+InfluxDB 2 has no rename. Applying the change there deletes every row of the
+measurement in the bucket, over every instant it can hold, through
+`POST /api/v2/delete` with the predicate `_measurement="<measurement>"`, and
+that is final. **Measured against InfluxDB 2.7.12**: it took that measurement
+and left `gh_discussion_comment_x`, the other measurements of the bucket and
+the same measurement in another bucket as they were. So a start never applies
+it on its own; `-migrate -yes` does.
+
+`-uninstall data` leaves out the tables InfluxDB 3 has already deleted, and
+says they are the server's to purge.
 
 ## Where to go next
 

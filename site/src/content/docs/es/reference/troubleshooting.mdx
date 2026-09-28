@@ -400,6 +400,17 @@ Prometheus se raspaba en vez de recibir escrituras, y el fichero del sink SQL
 se va pero las filas que ya cargaste de ahí a una base de verdad las cargaste
 tú.
 
+**Tablas o índices llamados `gh_...-20261001T091004`.** Una migración apartó
+las filas antiguas de la medida con ese nombre, la medida, un guion y el
+instante en UTC: la tabla renombrada de PostgreSQL, el clon de Elasticsearch,
+allí en minúsculas, y el nombre que InfluxDB 3 da a una tabla que borró.
+Ninguno de los paneles que se distribuyen lee ninguna. ghchronicle purga las de
+PostgreSQL y Elasticsearch cuando llevan 24 horas guardadas, e InfluxDB 3 purga
+las suyas; `-migrate` las lista bajo su almacén como `kept aside`.
+`-uninstall data` quita las de PostgreSQL y Elasticsearch con todo lo demás, y
+deja fuera las de InfluxDB 3 con una nota, porque el servidor rechaza el
+borrado de una tabla que ya ha borrado.
+
 ## El PostgreSQL que conecta
 
 **`could not reach its database`.** El sink conecta en la primera escritura y
@@ -425,7 +436,11 @@ specification`, reproducido en una tabla que creó una versión anterior a la
 2.6.1. Esa tabla conserva `is_answer` en su clave, que la 2.6.1 ya no escribe,
 y el fichero no puede leer la clave de una tabla como hace el destino que
 conecta, así que sus upserts nombran una clave que la tabla no tiene. El resto
-del fichero se carga. Tira la tabla, como describe [la página de
+del fichero se carga. `-migrate -yes` escribe en el fichero el borrado de esa
+tabla, antes de las filas que vuelve a leer, así que el fichero reproducido en
+orden carga entero: ver [qué hace aplicarlo en cada
+almacén](/ghchronicle/es/install/upgrading/#qué-hace-aplicarlo-en-cada-almacén).
+A mano, tira la tabla, como describe [la página de
 medidas](/ghchronicle/es/collectors/measurements/#cómo-leer-las-tablas), y
 vuelve a llenarla con un relleno histórico.
 

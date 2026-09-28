@@ -119,6 +119,38 @@ los últimos siete días, donde los almacenes SQL preguntan si el colector lo
 sigue escribiendo, así que un rango que terminó hace más de una semana deja
 fuera esos repositorios.
 
+## Qué hace aquí una migración
+
+Cuando una versión cambia aquello por lo que se identifican los documentos de
+una medida, [`-migrate`](/ghchronicle/es/install/upgrading/#migraciones)
+encuentra los documentos de la forma antigua contando los que llevan la
+etiqueta antigua, y aplicar el cambio aparta el índice en tres pasos.
+**Medido contra Elasticsearch 9.5.3**:
+
+1. El índice deja de aceptar escrituras, con `PUT <índice>/_block/write`.
+2. Se clona a `<índice>-<instante>`, el instante en UTC y en minúsculas, como
+   exige el nombre de un índice, por ejemplo
+   `ghchronicle-gh_discussion_comment-20261001t091004`, y el clon tiene que
+   tener tantos documentos como el índice antes de que ocurra nada más.
+3. Se borra el índice, y la siguiente escritura del destino lo crea de nuevo,
+   con un mapping propio.
+
+Un paso que falla antes del borrado vuelve a quitar el bloqueo de escritura,
+así que un clúster que rechazó el clon sigue aceptando las escrituras del
+destino, y el cambio sigue pendiente con la razón del clúster. La clave de API
+necesita los privilegios `manage` y `delete_index` sobre los índices del
+prefijo; una clave que solo puede escribir se rechaza así.
+
+El clon conserva el bloqueo de escritura, y ghchronicle lo borra cuando lleva
+24 horas guardado: tras una pasada del servicio, en el siguiente arranque de
+cualquier ejecución o en el siguiente `-migrate -yes`. Hasta entonces, deshacer
+el cambio es borrar el índice nuevo y clonar la copia de vuelta con su nombre.
+Toda consulta del dashboard que se distribuye nombra su índice entero,
+`_index:ghchronicle-gh_discussion_comment`, así que ningún panel lee el clon:
+la consulta de un panel sobre `ghchronicle-*` contó el único documento nuevo y
+no los tres del clon. Una data view de Kibana sobre el mismo patrón sin ese
+filtro sí lo lee, durante el día que se guarda.
+
 ## Por dónde seguir
 
 - [Elegir almacén](/ghchronicle/es/sinks/) compara Elasticsearch con los demás, y

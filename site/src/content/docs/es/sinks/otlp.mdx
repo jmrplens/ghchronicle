@@ -111,6 +111,13 @@ service:
 Con ese pipeline, deja `raw: false`: el exportador del otro extremo es
 Prometheus, y la restricción sigue a los datos y no al protocolo.
 
+## Nada que migrar
+
+El destino envía los valores de hoy, con la forma de la versión que lo ejecuta,
+así que [`-migrate`](/ghchronicle/es/install/upgrading/#migraciones) no tiene
+nada que hacer aquí. Lo que el receptor conserva de una serie antigua termina
+donde empieza la nueva.
+
 ## Por dónde seguir
 
 - [Elegir almacén](/ghchronicle/es/sinks/) compara OpenTelemetry con los demás, y

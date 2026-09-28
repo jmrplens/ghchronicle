@@ -205,6 +205,14 @@ llega a Loki por otra dirección. Un token que no puede crear el datasource
 cuesta este panel y nada más: la ejecución avisa una vez y publica todos los
 dashboards con la nota.
 
+## Nada que migrar
+
+Un stream es su job, su tipo y las etiquetas configuradas, y las etiquetas de
+un punto van dentro de la línea, así que una versión que mueve una etiqueta no
+cambia ningún stream, y [`-migrate`](/ghchronicle/es/install/upgrading/#migraciones)
+no tiene nada que hacer aquí. Una línea es lo que se dijo cuando se dijo, y
+Loki rechaza de todos modos las entradas más antiguas que su ventana.
+
 ## Por dónde seguir
 
 - [Elegir almacén](/ghchronicle/es/sinks/) compara Loki con los demás, y

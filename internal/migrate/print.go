@@ -5,6 +5,8 @@ import (
 	"io"
 	"strings"
 	"time"
+
+	"github.com/jmrplens/ghchronicle/v2/internal/teardown"
 )
 
 // statusWidth is the status column: the longest word, "unreachable", and a
@@ -146,7 +148,18 @@ func printStore(w io.Writer, st StorePlan) {
 	for _, it := range st.Items {
 		printItem(w, it)
 	}
+	for _, a := range st.Kept {
+		purged := "purged by ghchronicle after "
+		if a.ByServer {
+			purged = "purged by the store itself after "
+		}
+		fmt.Fprintf(w, "  %-*s%s: %s, set aside %s, %s%s\n", statusWidth, "kept aside", a.Migration, a.Name,
+			a.At.UTC().Format(timeLayout), purged, a.At.Add(teardown.Grace).UTC().Format(timeLayout))
+	}
 }
+
+// timeLayout is an instant as the plan says it.
+const timeLayout = "2006-01-02 15:04 UTC"
 
 // printItem is one migration in one store: a line for a settled one, and
 // what would be done for one that is not.

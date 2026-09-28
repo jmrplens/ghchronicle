@@ -2506,6 +2506,34 @@ waits for it to finish, and a second service on the same state file is refused.
 In the GitHub Action, `mode: migrate` runs `-migrate -yes`: see [the
 inputs](https://jmrp.io/docs/ghchronicle/install/actions/#inputs).
 
+#### What applying does in each store
+
+| Store                                                                         | What applying does                                                                                                        |
+| ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| [InfluxDB 3](https://jmrp.io/docs/ghchronicle/sinks/influxdb/#what-a-migration-does-here)         | Deletes the one table, which InfluxDB keeps as `<measurement>-<instant>`, queryable, and purges itself 24 hours later     |
+| InfluxDB 2                                                                    | Deletes every row of the measurement in the bucket. Nothing is kept, so a start never does it on its own                  |
+| [PostgreSQL](https://jmrp.io/docs/ghchronicle/sinks/postgres/#what-a-migration-does-here)         | Renames the table `<measurement>-<instant>` in the sink's schema; ghchronicle drops it 24 hours later                     |
+| [Elasticsearch](https://jmrp.io/docs/ghchronicle/sinks/elasticsearch/#what-a-migration-does-here) | Blocks writes to the index, clones it to `<index>-<instant>` and deletes it; ghchronicle deletes the clone 24 hours later |
+| SQL file                                                                      | Writes `DROP TABLE IF EXISTS` for the measurement into the file, ahead of the rows written after it                       |
+| Graphite                                                                      | Prints the commands that remove the old paths on the Graphite host                                                        |
+| Telegraf                                                                      | Says what to do in the store behind it                                                                                    |
+
+Each store touches that one measurement and nothing else: the table, index or
+paths named exactly, in the database, bucket, schema or prefix the sink writes
+to. A measurement that looks like it, another collector's tables and another
+prefix's indices are never reached. A store that can be asked is only changed
+once it has been asked and found holding the old shape, and a dry run sends it
+nothing but questions.
+
+Where a store keeps the old rows aside, the plan names each copy under the
+store, with a `kept aside` line saying when it was set aside and when it goes,
+and the state file keeps it until then. ghchronicle purges its own copies once
+they have been kept 24 hours: the service after a sweep, any run at its next
+start, and `-migrate -yes` whenever it runs. A run on a new state file, which is
+every run of the Action, asks PostgreSQL and Elasticsearch for copies named the
+way a migration names them, since its state file cannot name them. Until a
+copy goes, undoing the change is on each store's page.
+
 A store that was cleared is written again whole. The [write
 ledger](https://jmrp.io/docs/ghchronicle/sinks/#only-what-changed-is-written) forgets the
 measurement in that store alone, every other measurement and every other store

@@ -169,6 +169,14 @@ The example listens on `127.0.0.1`, which inside a container is the container's
 own loopback and unreachable from the host. Use `0.0.0.0:9605` there and let
 the port publication decide who can reach it.
 
+## Nothing to migrate
+
+The exporter holds today's values in memory, and a restart of the new release
+serves them in its shape, so [`-migrate`](/ghchronicle/install/upgrading/#migrations)
+has nothing to do here. The Prometheus server keeps the old series until its
+retention, and they end where the new ones begin, so no query counts an item
+twice.
+
 ## Where to go next
 
 - [Choosing a store](/ghchronicle/sinks/) compares Prometheus with the others,

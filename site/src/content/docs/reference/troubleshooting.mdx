@@ -381,6 +381,16 @@ cannot be emptied from here and say so: Graphite has no delete, the Prometheus
 sink was scraped rather than written to, and the SQL sink's file goes but rows
 already loaded from it into a real database were loaded by you.
 
+**Tables or indices named `gh_...-20261001T091004`.** A migration set the
+measurement's old rows aside under that name, the measurement, a dash and the
+instant in UTC: PostgreSQL's renamed table, Elasticsearch's clone, lower case
+there, and the name InfluxDB 3 gives a table it deleted. None of the shipped
+panels reads one. ghchronicle purges PostgreSQL's and Elasticsearch's once they
+have been kept 24 hours, and InfluxDB 3 purges its own; `-migrate` lists them
+under their store as `kept aside`. `-uninstall data` removes PostgreSQL's and
+Elasticsearch's with everything else, and leaves out InfluxDB 3's with a note,
+since the server refuses a delete of a table it has already deleted.
+
 ## The PostgreSQL that connects
 
 **`could not reach its database`.** The sink connects on the first write rather
@@ -404,9 +414,13 @@ is no unique or exclusion constraint matching the ON CONFLICT specification`,
 replayed into a table a release before 2.6.1 made. That table keeps
 `is_answer` in its key, which 2.6.1 no longer writes, and the file cannot read
 a table's key the way the connecting sink does, so its upserts name a key the
-table does not have. The rest of the file loads. Drop the table, as [the
-measurements page](/ghchronicle/collectors/measurements/#how-to-read-the-tables)
-describes, and fill it again with a backfill.
+table does not have. The rest of the file loads. `-migrate -yes` writes the
+drop of that table into the file, ahead of the rows it reads again, so the file
+replayed in order loads whole: see [what applying does in each
+store](/ghchronicle/install/upgrading/#what-applying-does-in-each-store). By
+hand, drop the table, as [the measurements
+page](/ghchronicle/collectors/measurements/#how-to-read-the-tables) describes,
+and fill it again with a backfill.
 
 **The file sink and this one disagree.** Apart from the key above, they cannot:
 both render the same schema from the same code, and `cmd/check_postgres` plans every panel query

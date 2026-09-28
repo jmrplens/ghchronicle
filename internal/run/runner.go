@@ -107,6 +107,12 @@ type Runner struct {
 	// said at Debug; otherwise a ledger that is kept read empty, and that is
 	// worth an Info line.
 	RefillEveryStart bool
+	// AfterSweep, when set, is called after every sweep Serve runs, on the
+	// goroutine that runs the sweeps, so that what it changes in State is
+	// never changed under a sweep. The command purges what a migration set
+	// aside once it falls due with it: a service that runs for weeks would
+	// otherwise keep every copy until its next restart.
+	AfterSweep func(ctx context.Context)
 	// cacheLoaded is whether CacheFile has been read, which happens once, at
 	// the first sweep. cacheSaved is when it was last written, and
 	// cacheDirty whether a family has run since.
@@ -1595,9 +1601,15 @@ func (r *Runner) Serve(ctx context.Context) error {
 	r.serving = true
 	tick, from := r.tick()
 	r.Log.Info("ghchronicle running", "tick", tick.String(), "tick_from", from)
-	if err := r.Once(ctx); err != nil {
-		r.Log.Error("sweep failed", "err", err)
+	sweep := func() {
+		if err := r.Once(ctx); err != nil {
+			r.Log.Error("sweep failed", "err", err)
+		}
+		if r.AfterSweep != nil && ctx.Err() == nil {
+			r.AfterSweep(ctx)
+		}
 	}
+	sweep()
 	t := time.NewTicker(tick)
 	defer t.Stop()
 	for {
@@ -1605,9 +1617,7 @@ func (r *Runner) Serve(ctx context.Context) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-t.C:
-			if err := r.Once(ctx); err != nil {
-				r.Log.Error("sweep failed", "err", err)
-			}
+			sweep()
 		}
 	}
 }

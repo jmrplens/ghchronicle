@@ -103,6 +103,9 @@ type StorePlan struct {
 	// Err is why the store could not be asked at all.
 	Err   error
 	Items []Item
+	// Kept is the copies of old rows a migration set aside here that the
+	// state file names and nobody has purged yet: what undoing it needs.
+	Kept []run.Aside
 }
 
 // Plan is every configured store and what this release would change in it.
@@ -221,6 +224,9 @@ func (in *Input) plan(ctx context.Context, st store, asker teardown.Inspector) S
 	if st.reach == untouched {
 		sp.Quiet = st.quiet
 		return sp
+	}
+	if rec := in.State.Stores[st.name]; rec != nil && rec.Destination == st.destination {
+		sp.Kept = rec.SetAside
 	}
 	if in.StoreTimeout > 0 {
 		var cancel context.CancelFunc

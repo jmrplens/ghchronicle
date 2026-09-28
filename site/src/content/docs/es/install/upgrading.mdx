@@ -145,6 +145,36 @@ fichero de estado se rechaza.
 En la GitHub Action, `mode: migrate` ejecuta `-migrate -yes`: ver [las
 entradas](/ghchronicle/es/install/actions/#entradas).
 
+### Qué hace aplicarlo en cada almacén
+
+| Almacén                                                                           | Qué hace aplicarlo                                                                                                         |
+| --------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| [InfluxDB 3](/ghchronicle/es/sinks/influxdb/#qué-hace-aquí-una-migración)         | Borra esa tabla, que InfluxDB guarda como `<medida>-<instante>`, consultable, y purga él mismo 24 horas después            |
+| InfluxDB 2                                                                        | Borra todas las filas de la medida en el bucket. No se guarda nada, así que un arranque nunca lo hace por su cuenta        |
+| [PostgreSQL](/ghchronicle/es/sinks/postgres/#qué-hace-aquí-una-migración)         | Renombra la tabla `<medida>-<instante>` en el esquema del destino; ghchronicle la borra 24 horas después                   |
+| [Elasticsearch](/ghchronicle/es/sinks/elasticsearch/#qué-hace-aquí-una-migración) | Bloquea las escrituras del índice, lo clona a `<índice>-<instante>` y lo borra; ghchronicle borra el clon 24 horas después |
+| Fichero SQL                                                                       | Escribe `DROP TABLE IF EXISTS` de la medida en el fichero, antes de las filas escritas después                             |
+| Graphite                                                                          | Imprime las órdenes que quitan las rutas antiguas en la máquina de Graphite                                                |
+| Telegraf                                                                          | Dice qué hacer en el almacén que tiene detrás                                                                              |
+
+Cada almacén toca esa medida y nada más: la tabla, el índice o las rutas
+nombrados exactamente, en la base de datos, el bucket, el esquema o el prefijo
+en el que escribe el destino. Una medida que se le parece, las tablas de otro
+colector y los índices de otro prefijo no se alcanzan nunca. Un almacén al que
+se le puede preguntar solo se cambia después de preguntarle y encontrar que
+guarda la forma antigua, y una prueba en seco no le envía más que preguntas.
+
+Donde un almacén guarda aparte las filas antiguas, el plan nombra cada copia
+bajo el almacén, con una línea `kept aside` que dice cuándo se apartó y cuándo
+se va, y el fichero de estado la guarda hasta entonces. ghchronicle purga sus
+propias copias cuando llevan 24 horas guardadas: el servicio tras una pasada,
+cualquier ejecución en su siguiente arranque, y `-migrate -yes` cada vez que se
+ejecuta. Una ejecución sobre un fichero de estado nuevo, que es cada ejecución
+de la Action, pregunta a PostgreSQL y a Elasticsearch por las copias con el
+nombre que les da una migración, porque su fichero de estado no puede
+nombrarlas. Hasta que una copia se va, cómo deshacer el cambio está en la
+página de cada almacén.
+
 Un almacén despejado se vuelve a escribir entero. El [registro de
 escrituras](/ghchronicle/es/sinks/#solo-se-escribe-lo-que-ha-cambiado) olvida la
 medida solo en ese almacén, y cada otra medida y cada otro almacén conservan lo

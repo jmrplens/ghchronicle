@@ -80,11 +80,14 @@ func esIdentity(p esPair) string {
 
 // assertElasticsearchOnlyAsked holds what a run sends the store before its
 // first sweep, when it counts the documents of the migrated measurements, to
-// questions: which cluster, how many, and since when.
+// questions: which cluster, how many, and since when, and, on a state file
+// that is new, which indices under the prefix are copies a migration set
+// aside.
 func assertElasticsearchOnlyAsked(t *testing.T, rec *capture) {
 	t.Helper()
 	for _, r := range rec.Reads() {
-		if r.Path != "/" && !strings.HasSuffix(r.Path, "/_count") && !strings.HasSuffix(r.Path, "/_search") {
+		if r.Path != "/" && !strings.HasSuffix(r.Path, "/_count") && !strings.HasSuffix(r.Path, "/_search") &&
+			r.Path != "/_cat/indices/ghchronicle*" {
 			t.Errorf("before the sweep the store was sent %s %s", r.Method, r.Path)
 		}
 	}

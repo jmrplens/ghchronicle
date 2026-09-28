@@ -30,6 +30,10 @@ type Outcome struct {
 	// Commands is what somebody else still has to run where ghchronicle
 	// cannot.
 	Commands []string
+	// Kept is the record of the copy the old rows are kept in, for the state
+	// file, which is what purges it once it has been kept its day. Nil
+	// where nothing is kept.
+	Kept *run.Aside
 }
 
 // Instructions is the Applier of a store ghchronicle cannot change itself,
@@ -143,6 +147,9 @@ func (a Applying) one(ctx context.Context, c Chosen) (Outcome, error) {
 		a.State.Stores[c.Store] = rec
 	}
 	rec.MarkApplied(m.ID, a.now())
+	if out.Kept != nil {
+		rec.KeepAside(*out.Kept)
+	}
 	if a.Cleared != nil {
 		a.Cleared(c)
 	}
