@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"maps"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -305,6 +306,22 @@ func panel(kind, title string, at box, sql []Target, p *P) Panel {
 	for name, st := range stores {
 		if st.Q == nil && st.Note == "" && kind != "text" {
 			panic(title + ": a panel without a " + Stores[name] + " query needs a note")
+		}
+	}
+	// An Elasticsearch table's columns come in the order its response parser
+	// meets them, the buckets and then the metrics, or the document's own
+	// fields for raw data, whatever the SQL twin selects: measured on the
+	// 2.6.1 review, "Every repository, ever" led with Fork, "Security
+	// features" with Enabled and "Oldest open alerts" with a wide number.
+	// So the table takes the order the SQL stores' statement selects its
+	// columns in, the order both of them draw. Only there: Prometheus and
+	// Graphite name the column a row is identified by after the label or
+	// the path node it comes from, and the SQL order would put it last. A
+	// SQL twin that reshapes its own frame, as a transpose does, draws
+	// columns its statement does not name, so there is no order to take.
+	if es := stores["elasticsearch"]; kind == "table" && es.Q != nil && p.SQLTF == nil {
+		if order := orderLike(selectedColumns(sql), namesGiven(es.TF)); len(order) > 0 {
+			es.TF = append(slices.Clone(es.TF), columnOrder(order...))
 		}
 	}
 	if p.Logs != nil && kind != "text" {

@@ -947,6 +947,26 @@
                 "indexByName": {},
                 "renameByName": {}
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Archived": 3,
+                  "Branches": 8,
+                  "Commits": 1,
+                  "Fork": 2,
+                  "Issues": 5,
+                  "Link": 10,
+                  "Merged": 4,
+                  "Releases": 6,
+                  "Repository": 0,
+                  "Stars": 7,
+                  "Tags": 9
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -1106,6 +1126,20 @@
                   "url": "Link"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Created": 1,
+                  "Fork": 2,
+                  "Link": 4,
+                  "Private": 3,
+                  "Repository": 0
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -1253,6 +1287,19 @@
                   "repo": "Repository",
                   "url": "Link"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Age at archive": 2,
+                  "Archived": 1,
+                  "Link": 3,
+                  "Repository": 0
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -1911,6 +1958,19 @@
                 "indexByName": {},
                 "renameByName": {}
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Link": 3,
+                  "Referrer": 0,
+                  "Unique": 2,
+                  "Views": 1
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -2156,6 +2216,20 @@
                 "indexByName": {},
                 "renameByName": {}
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Link": 4,
+                  "Path": 0,
+                  "Title": 3,
+                  "Unique": 2,
+                  "Views": 1
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -2385,6 +2459,19 @@
                   "full_name.keyword": true
                 },
                 "indexByName": {},
+                "renameByName": {}
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Cloners": 2,
+                  "Clones": 1,
+                  "Link": 3,
+                  "Repository": 0
+                },
                 "renameByName": {}
               }
             }
@@ -2851,6 +2938,19 @@
                   "user": "User",
                   "user_url": "Link"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Link": 3,
+                  "Repository": 2,
+                  "Starred at": 1,
+                  "User": 0
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -3937,6 +4037,18 @@
                   "url.keyword": "Link"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Commits": 1,
+                  "Link": 2,
+                  "Repository": 0
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -4089,6 +4201,22 @@
                   "Top Metrics reviews": "Reviews",
                   "year.keyword": "Year"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Commits": 2,
+                  "Contributions": 1,
+                  "Issues": 5,
+                  "New repos": 6,
+                  "Pull requests": 3,
+                  "Reviews": 4,
+                  "Year": 0
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -5334,6 +5462,27 @@
                   "url": "Link"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Association": 6,
+                  "Author": 5,
+                  "Closed": 4,
+                  "Files": 8,
+                  "Labels": 7,
+                  "Lines changed": 1,
+                  "Link": 11,
+                  "Number": 0,
+                  "Repository": 2,
+                  "Reviews": 9,
+                  "Time to merge": 10,
+                  "Title": 3
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -5614,6 +5763,19 @@
                 "indexByName": {},
                 "renameByName": {}
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Lines changed": 3,
+                  "Merged": 1,
+                  "Repository": 0,
+                  "Time to merge": 2
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -5764,6 +5926,18 @@
                   "p50.0 seconds_to_review": "Wait",
                   "reviewer.keyword": "Reviewer"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Reviewer": 0,
+                  "Reviews": 1,
+                  "Wait": 2
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -6157,23 +6331,6 @@
               }
             },
             {
-              "id": "organize",
-              "options": {
-                "excludeByName": {},
-                "indexByName": {
-                  "Author": 4,
-                  "Comments": 6,
-                  "Labels": 5,
-                  "Number": 0,
-                  "Open for": 1,
-                  "Repository": 2,
-                  "Reviews": 7,
-                  "Title": 3
-                },
-                "renameByName": {}
-              }
-            },
-            {
               "id": "sortBy",
               "options": {
                 "fields": {},
@@ -6189,6 +6346,24 @@
               "id": "limit",
               "options": {
                 "limitField": 25
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Author": 4,
+                  "Comments": 6,
+                  "Labels": 5,
+                  "Link": 8,
+                  "Number": 0,
+                  "Open for": 1,
+                  "Repository": 2,
+                  "Reviews": 7,
+                  "Title": 3
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -6448,21 +6623,6 @@
               }
             },
             {
-              "id": "organize",
-              "options": {
-                "excludeByName": {},
-                "indexByName": {
-                  "Author": 3,
-                  "Comments": 4,
-                  "Labels": 5,
-                  "Number": 0,
-                  "Open for": 1,
-                  "Repository": 2
-                },
-                "renameByName": {}
-              }
-            },
-            {
               "id": "sortBy",
               "options": {
                 "fields": {},
@@ -6478,6 +6638,22 @@
               "id": "limit",
               "options": {
                 "limitField": 25
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Author": 3,
+                  "Comments": 4,
+                  "Labels": 5,
+                  "Link": 6,
+                  "Number": 0,
+                  "Open for": 1,
+                  "Repository": 2
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -6797,6 +6973,20 @@
                   "full_name.keyword": true
                 },
                 "indexByName": {},
+                "renameByName": {}
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Comments": 4,
+                  "Outdated": 3,
+                  "Pull request": 0,
+                  "Repository": 2,
+                  "Unresolved": 1
+                },
                 "renameByName": {}
               }
             }
@@ -8050,6 +8240,19 @@
                 "indexByName": {},
                 "renameByName": {}
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Duration": 3,
+                  "Repository": 2,
+                  "Runs": 1,
+                  "Workflow": 0
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -8239,6 +8442,20 @@
                   "full_name.keyword": true
                 },
                 "indexByName": {},
+                "renameByName": {}
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Duration": 1,
+                  "Job": 0,
+                  "Repository": 2,
+                  "Times run": 3,
+                  "Worst": 4
+                },
                 "renameByName": {}
               }
             }
@@ -8456,6 +8673,21 @@
                 "indexByName": {},
                 "renameByName": {}
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Duration": 1,
+                  "Job": 2,
+                  "Repository": 3,
+                  "Step": 0,
+                  "Times run": 4,
+                  "Worst": 5
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -8631,6 +8863,17 @@
                   "full_name.keyword": true
                 },
                 "indexByName": {},
+                "renameByName": {}
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Repository": 0,
+                  "Total": 1
+                },
                 "renameByName": {}
               }
             }
@@ -8889,6 +9132,20 @@
                 "indexByName": {},
                 "renameByName": {}
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Failure rate": 4,
+                  "Failures": 1,
+                  "Repository": 0,
+                  "Runs": 3,
+                  "Workflow": 2
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -9056,6 +9313,18 @@
                   "full_name.keyword": true
                 },
                 "indexByName": {},
+                "renameByName": {}
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Failures": 1,
+                  "Repository": 2,
+                  "Step": 0
+                },
                 "renameByName": {}
               }
             }
@@ -9350,6 +9619,20 @@
                   "full_name.keyword": true
                 },
                 "indexByName": {},
+                "renameByName": {}
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Declared": 1,
+                  "Live": 3,
+                  "Live size": 4,
+                  "Repository": 0,
+                  "Walked": 2
+                },
                 "renameByName": {}
               }
             }
@@ -10082,6 +10365,20 @@
                   "p50.0 churn": "Lines per commit"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Added": 2,
+                  "Author": 0,
+                  "Commits": 1,
+                  "Lines per commit": 4,
+                  "Removed": 3
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -10269,6 +10566,19 @@
                   "ref_name": "Branch",
                   "repo": "Repository"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Branch": 2,
+                  "By": 3,
+                  "Repository": 0,
+                  "When": 1
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -10595,6 +10905,19 @@
                   "check.keyword": "Check"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "App": 0,
+                  "Check": 2,
+                  "Failed": 3,
+                  "Runs": 1
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -10865,6 +11188,21 @@
                 "indexByName": {},
                 "renameByName": {}
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Issues": 3,
+                  "Label": 0,
+                  "Link": 5,
+                  "Pull requests": 4,
+                  "Repository": 2,
+                  "Used": 1
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -11122,6 +11460,22 @@
                   "full_name.keyword": true
                 },
                 "indexByName": {},
+                "renameByName": {}
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Issues": 4,
+                  "Link": 6,
+                  "Milestone": 0,
+                  "Progress": 1,
+                  "Pull requests": 5,
+                  "Repository": 2,
+                  "State": 3
+                },
                 "renameByName": {}
               }
             }
@@ -11408,6 +11762,20 @@
                   "url": "Link"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "By": 0,
+                  "Forked": 1,
+                  "Link": 4,
+                  "Pushed to": 3,
+                  "Repository": 2
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -11579,6 +11947,20 @@
                   "category.keyword": "Category",
                   "has_answer": "Answered"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Answered": 2,
+                  "Category": 0,
+                  "Comments each": 3,
+                  "Discussions": 1,
+                  "Upvotes each": 4
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -11823,6 +12205,22 @@
                   "url": "Link"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Answered": 5,
+                  "Category": 3,
+                  "Comments": 4,
+                  "Link": 6,
+                  "Opened": 1,
+                  "Repository": 2,
+                  "Title": 0
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -12038,6 +12436,17 @@
                   "full_name.keyword": "Repository"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Comments": 1,
+                  "Repository": 0
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -12226,6 +12635,22 @@
                   "Comment (count)": "Comments",
                   "Up (sum)": "Upvotes"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Accepted": 2,
+                  "Accepted answers": 1,
+                  "Comment": 4,
+                  "Comments": 3,
+                  "Repository": 0,
+                  "Up": 6,
+                  "Upvotes": 5
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -12488,6 +12913,20 @@
               "id": "limit",
               "options": {
                 "limitField": 50
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Accepted": 3,
+                  "Link": 4,
+                  "Repository": 2,
+                  "Title": 0,
+                  "When": 1
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -12968,6 +13407,19 @@
                 "indexByName": {},
                 "renameByName": {}
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Deliveries": 1,
+                  "Endpoint": 0,
+                  "Latency": 3,
+                  "Repository": 2
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -13195,6 +13647,21 @@
                 "indexByName": {},
                 "renameByName": {}
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Enforcement": 2,
+                  "Last changed": 4,
+                  "Link": 5,
+                  "Repository": 0,
+                  "Ruleset": 1,
+                  "Target": 3
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -13364,6 +13831,19 @@
                   "full_name.keyword": true
                 },
                 "indexByName": {},
+                "renameByName": {}
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Key": 2,
+                  "Read only": 3,
+                  "Repository": 0,
+                  "Unused for": 1
+                },
                 "renameByName": {}
               }
             }
@@ -13553,6 +14033,19 @@
                   "full_name.keyword": true
                 },
                 "indexByName": {},
+                "renameByName": {}
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Active": 2,
+                  "Events subscribed": 3,
+                  "Host": 1,
+                  "Repository": 0
+                },
                 "renameByName": {}
               }
             }
@@ -13751,6 +14244,19 @@
                 "indexByName": {},
                 "renameByName": {}
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Environment": 0,
+                  "Idle": 1,
+                  "Link": 3,
+                  "Repository": 2
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -13944,6 +14450,19 @@
                   "full_name.keyword": true
                 },
                 "indexByName": {},
+                "renameByName": {}
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Branch": 0,
+                  "Default": 3,
+                  "Idle": 1,
+                  "Repository": 2
+                },
                 "renameByName": {}
               }
             }
@@ -14363,6 +14882,24 @@
                 "indexByName": {},
                 "renameByName": {}
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Checks": 7,
+                  "Force push": 5,
+                  "Linear": 4,
+                  "Link": 8,
+                  "Pattern": 1,
+                  "Repository": 0,
+                  "Reviews": 2,
+                  "Signatures": 3,
+                  "Threads": 6
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -14578,6 +15115,21 @@
                 "indexByName": {},
                 "renameByName": {}
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Always": 1,
+                  "Bypass actors": 4,
+                  "Repository": 2,
+                  "Rule": 0,
+                  "Ruleset": 3,
+                  "Sampled": 5
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -14739,6 +15291,21 @@
                   "target": "Target",
                   "url": "Link"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Actor": 4,
+                  "Date": 1,
+                  "Link": 5,
+                  "Repository": 2,
+                  "Ruleset": 0,
+                  "Target": 3
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -15249,6 +15816,22 @@
                   "full_name.keyword": true
                 },
                 "indexByName": {},
+                "renameByName": {}
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Deployments": 1,
+                  "Environment": 0,
+                  "Link": 5,
+                  "Live": 6,
+                  "Live for": 4,
+                  "Repository": 2,
+                  "To status": 3
+                },
                 "renameByName": {}
               }
             }
@@ -15839,6 +16422,21 @@
                   "full_name.keyword": true
                 },
                 "indexByName": {},
+                "renameByName": {}
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Asset": 0,
+                  "Download": 5,
+                  "Downloads": 1,
+                  "Repository": 3,
+                  "Size": 4,
+                  "Tag": 2
+                },
                 "renameByName": {}
               }
             }
@@ -16812,6 +17410,20 @@
                 "indexByName": {},
                 "renameByName": {}
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Enabled": 2,
+                  "Feature": 1,
+                  "Link": 4,
+                  "Open alerts": 3,
+                  "Repository": 0
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -17054,6 +17666,18 @@
                   "severity.keyword": "Severity"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Alerts": 1,
+                  "Severity": 0,
+                  "Time to resolve": 2
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -17285,6 +17909,25 @@
                   "url": "Link"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Advisory": 4,
+                  "CVSS": 5,
+                  "CVSS v4": 6,
+                  "Link": 9,
+                  "Outcome": 7,
+                  "Package": 0,
+                  "Raised": 1,
+                  "Repository": 2,
+                  "Severity": 3,
+                  "Time to resolve": 8
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -17476,6 +18119,20 @@
                   "full_name.keyword": true
                 },
                 "indexByName": {},
+                "renameByName": {}
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Repository": 2,
+                  "Results": 1,
+                  "Rules": 4,
+                  "Runs": 3,
+                  "Tool": 0
+                },
                 "renameByName": {}
               }
             }
@@ -17739,6 +18396,20 @@
                 "indexByName": {},
                 "renameByName": {}
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Link": 4,
+                  "Raised": 1,
+                  "Repository": 2,
+                  "Severity": 3,
+                  "What": 0
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -17970,6 +18641,19 @@
                 "indexByName": {},
                 "renameByName": {}
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Enabled": 3,
+                  "Repository": 0,
+                  "Setting": 1,
+                  "Status": 2
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -18190,6 +18874,21 @@
                 "indexByName": {},
                 "renameByName": {}
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Languages": 4,
+                  "Last changed": 5,
+                  "Query suite": 2,
+                  "Repository": 0,
+                  "Schedule": 3,
+                  "State": 1
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -18374,6 +19073,18 @@
                   "full_name.keyword": true
                 },
                 "indexByName": {},
+                "renameByName": {}
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Can approve pull requests": 2,
+                  "Permissions": 1,
+                  "Repository": 0
+                },
                 "renameByName": {}
               }
             }
@@ -18569,6 +19280,20 @@
                   "full_name.keyword": true
                 },
                 "indexByName": {},
+                "renameByName": {}
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Age": 2,
+                  "Kind": 4,
+                  "Last rotated": 1,
+                  "Repository": 3,
+                  "Secret": 0
+                },
                 "renameByName": {}
               }
             }
@@ -19249,6 +19974,22 @@
                 "indexByName": {},
                 "renameByName": {}
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Gross": 1,
+                  "Net": 6,
+                  "Price": 5,
+                  "Quantity": 3,
+                  "Repository": 0,
+                  "SKU": 2,
+                  "Unit": 4
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -19447,6 +20188,20 @@
                 "indexByName": {},
                 "renameByName": {}
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Cache": 0,
+                  "Days since use": 4,
+                  "Entries": 3,
+                  "Repository": 2,
+                  "Size": 1
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -19619,6 +20374,18 @@
                   "full_name.keyword": true
                 },
                 "indexByName": {},
+                "renameByName": {}
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Cache": 1,
+                  "Entries": 2,
+                  "Repository": 0
+                },
                 "renameByName": {}
               }
             }
@@ -20058,6 +20825,18 @@
                   "subject_type.keyword": "Kind"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Kind": 2,
+                  "Notifications": 1,
+                  "Reason": 0
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -20350,6 +21129,22 @@
                   "title": "Title",
                   "url": "Link"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Kind": 3,
+                  "Link": 6,
+                  "Reason": 4,
+                  "Repository": 2,
+                  "Title": 0,
+                  "Updated": 1,
+                  "Updates": 5
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -20652,6 +21447,22 @@
                 "indexByName": {},
                 "renameByName": {}
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Comments": 5,
+                  "Kind": 2,
+                  "Link": 6,
+                  "Repository": 0,
+                  "Seen": 1,
+                  "State": 3,
+                  "Title": 4
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -20922,6 +21733,20 @@
                   "repo_stars": "Its stars",
                   "url": "Link"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Its stars": 3,
+                  "Language": 2,
+                  "Link": 4,
+                  "Repository": 0,
+                  "When": 1
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -21545,6 +22370,24 @@
                 "indexByName": {},
                 "renameByName": {}
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Community profile": 1,
+                  "Conduct": 5,
+                  "Contributing": 4,
+                  "Issue template": 6,
+                  "License": 3,
+                  "Link": 8,
+                  "PR template": 7,
+                  "Readme": 2,
+                  "Repository": 0
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -21907,6 +22750,28 @@
                 "indexByName": {},
                 "renameByName": {}
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Age": 8,
+                  "Forks": 3,
+                  "Idle": 9,
+                  "Language": 2,
+                  "License": 11,
+                  "Link": 12,
+                  "Network": 4,
+                  "Open issues": 5,
+                  "Repository": 0,
+                  "Size": 7,
+                  "Stars": 1,
+                  "Visibility": 10,
+                  "Watchers": 6
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -22047,6 +22912,18 @@
                   "topic.keyword": "Topic",
                   "url.keyword": "Link"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Link": 2,
+                  "Repositories": 1,
+                  "Topic": 0
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -22250,6 +23127,21 @@
                   "type.keyword": "Type",
                   "url.keyword": "Link"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Idle": 4,
+                  "Link": 5,
+                  "Package": 0,
+                  "Tagged": 3,
+                  "Type": 2,
+                  "Versions": 1
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -22479,6 +23371,21 @@
                   "url.keyword": "Link"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Comments": 2,
+                  "Files": 1,
+                  "Gist": 0,
+                  "Idle": 4,
+                  "Link": 5,
+                  "Size": 3
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -22622,6 +23529,19 @@
                   "tag": "Tag",
                   "url": "Link"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Link": 3,
+                  "Package": 0,
+                  "Published": 1,
+                  "Tag": 2
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -22924,6 +23844,23 @@
                 "indexByName": {},
                 "renameByName": {}
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Auto merge": 3,
+                  "CODEOWNERS errors": 6,
+                  "Delete on merge": 2,
+                  "Issue templates": 5,
+                  "Link": 7,
+                  "Protection rules": 4,
+                  "Repository": 0,
+                  "Security policy": 1
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -23091,6 +24028,21 @@
                   "@timestamp": true
                 },
                 "indexByName": {},
+                "renameByName": {}
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Days since use": 2,
+                  "Days to expiry": 4,
+                  "Key": 0,
+                  "Kind": 1,
+                  "Link": 5,
+                  "Never used": 3
+                },
                 "renameByName": {}
               }
             }
@@ -23346,6 +24298,17 @@
                   "provider.keyword": "Provider",
                   "url.keyword": "URL"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Provider": 0,
+                  "URL": 1
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -23641,6 +24604,21 @@
                 "indexByName": {},
                 "renameByName": {}
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Changes": 4,
+                  "File": 1,
+                  "Link": 5,
+                  "Path": 3,
+                  "Present": 2,
+                  "Repository": 0
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -23857,6 +24835,19 @@
                   "full_name.keyword": true
                 },
                 "indexByName": {},
+                "renameByName": {}
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Blocks": 1,
+                  "Ecosystem": 2,
+                  "Interval": 3,
+                  "Repository": 0
+                },
                 "renameByName": {}
               }
             }
@@ -24680,6 +25671,23 @@
                   "url": "Link"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Active": 5,
+                  "Amount (cents)": 4,
+                  "Date": 1,
+                  "Direction": 2,
+                  "Link": 7,
+                  "One-time": 6,
+                  "Sponsorable": 0,
+                  "Tier": 3
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -24961,6 +25969,21 @@
                 "indexByName": {},
                 "renameByName": {}
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Age": 4,
+                  "Link": 5,
+                  "One-time": 2,
+                  "Price (cents)": 1,
+                  "Retired": 3,
+                  "Tier": 0
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -25211,6 +26234,21 @@
                   }
                 ]
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Idle": 4,
+                  "Item": 1,
+                  "Kind": 2,
+                  "Link": 5,
+                  "Position": 0,
+                  "Stars": 3
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -25404,6 +26442,18 @@
                   "@timestamp": true
                 },
                 "indexByName": {},
+                "renameByName": {}
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Enabled": 1,
+                  "Flag": 0,
+                  "Link": 2
+                },
                 "renameByName": {}
               }
             }
@@ -25655,6 +26705,20 @@
                 "indexByName": {},
                 "renameByName": {}
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Age": 2,
+                  "Items": 1,
+                  "Last added": 3,
+                  "Link": 4,
+                  "List": 0
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -25813,6 +26877,18 @@
                   "achievement.keyword": "Achievement",
                   "url.keyword": "Link"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Achievement": 0,
+                  "Link": 2,
+                  "Tier": 1
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -26209,6 +27285,23 @@
                 "indexByName": {},
                 "renameByName": {}
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Achievement": 1,
+                  "Badge": 0,
+                  "Count": 3,
+                  "Link": 7,
+                  "Next tier at": 4,
+                  "Page agrees": 6,
+                  "Progress": 2,
+                  "Tier": 5
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -26411,6 +27504,19 @@
                   "resource.keyword": "Bucket"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Bucket": 0,
+                  "Limit": 2,
+                  "Lowest remaining": 3,
+                  "Most used": 1
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -26595,6 +27701,20 @@
                   "reason.keyword": "Why"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Failures": 1,
+                  "Family": 0,
+                  "Repositories": 4,
+                  "Sweeps": 3,
+                  "Why": 2
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -26723,6 +27843,20 @@
                   "reason": "Why",
                   "repo": "Repository"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Family": 1,
+                  "Repository": 2,
+                  "What GitHub said": 4,
+                  "When": 0,
+                  "Why": 3
+                },
+                "renameByName": {}
               }
             }
           ],

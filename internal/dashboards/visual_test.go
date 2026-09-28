@@ -145,3 +145,109 @@ func noValues(t *testing.T, p map[string]any) map[string]string {
 	}
 	return out
 }
+
+// checkPlaced holds one column of an Elasticsearch table to the place the
+// SQL statement selects it at, relative to every other column both order.
+func checkPlaced(t *testing.T, title, name string, selected map[string]int, index map[string]any) {
+	t.Helper()
+	got, ordered := index[name].(int)
+	if !ordered {
+		t.Errorf("%q: Elasticsearch leaves %s where its parser put it, not where the SQL selects it",
+			title, name)
+		return
+	}
+	for other, otherAt := range selected {
+		if otherGot, ok := index[other].(int); ok && (otherAt < selected[name]) != (otherGot < got) {
+			t.Errorf("%q: Elasticsearch orders %s and %s the other way round from the SQL",
+				title, name, other)
+		}
+	}
+}
+
+// selectedAt is, for every column a SQL panel's statements select, its place
+// among them, the first place a UNION's second half repeats.
+func selectedAt(t *testing.T, p map[string]any) map[string]int {
+	t.Helper()
+	selected := map[string]int{}
+	targets, _ := p["targets"].([]any)
+	for _, raw := range targets {
+		target, _ := raw.(map[string]any)
+		sql, _ := target["rawSql"].(string)
+		for _, item := range selectList(sql) {
+			at := strings.LastIndex(item, ` AS "`)
+			if at < 0 {
+				continue
+			}
+			if name := strings.Trim(item[at+len(" AS "):], `"`); !hasKey(selected, name) {
+				selected[name] = len(selected)
+			}
+		}
+	}
+	return selected
+}
+
+func hasKey(m map[string]int, key string) bool {
+	_, ok := m[key]
+	return ok
+}
+
+// finalOrder is the column order a panel's last transformation gives, or
+// nil when the last one is not an organize.
+func finalOrder(p map[string]any) map[string]any {
+	tfs, _ := p["transformations"].([]any)
+	if len(tfs) == 0 {
+		return nil
+	}
+	last, _ := tfs[len(tfs)-1].(map[string]any)
+	options, _ := last["options"].(map[string]any)
+	if last["id"] != "organize" {
+		return nil
+	}
+	index, _ := options["indexByName"].(map[string]any)
+	return index
+}
+
+// namesGivenIn is every column name a panel's organize transformations give.
+func namesGivenIn(p map[string]any) map[string]bool {
+	out := map[string]bool{}
+	tfs, _ := p["transformations"].([]any)
+	for _, raw := range tfs {
+		tf, _ := raw.(map[string]any)
+		options, _ := tf["options"].(map[string]any)
+		rename, _ := options["renameByName"].(map[string]any)
+		for _, to := range rename {
+			if name, ok := to.(string); ok {
+				out[name] = true
+			}
+		}
+	}
+	return out
+}
+
+// TestElasticsearchTablesKeepTheSQLColumnOrder: an Elasticsearch table's
+// columns came in the order the response parser met them, so "Every
+// repository, ever" led with Fork, "Security features" with Enabled and
+// "Largest merged pull requests" with the date. Every Elasticsearch table
+// ends by ordering the columns it draws under a SQL name as the SQL stores'
+// statement selects them.
+func TestElasticsearchTablesKeepTheSQLColumnOrder(t *testing.T) {
+	t.Parallel()
+	es := rendered(t, "elasticsearch")
+	checked := 0
+	for title, p := range rendered(t, "influxdb") {
+		e := mustPanel(t, es, title)
+		if p["type"] != "table" || e["type"] != "table" || p["transformations"] != nil {
+			continue
+		}
+		checked++
+		selected, index := selectedAt(t, p), finalOrder(e)
+		for name := range namesGivenIn(e) {
+			if _, isSQL := selected[name]; isSQL {
+				checkPlaced(t, title, name, selected, index)
+			}
+		}
+	}
+	if checked == 0 {
+		t.Fatal("no Elasticsearch table was checked")
+	}
+}

@@ -2,7 +2,9 @@ package dashboards
 
 import (
 	"fmt"
+	"maps"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -1106,10 +1108,11 @@ func keepLargest(field string, n int) []any {
 	}
 }
 
-// columnOrder puts a table's columns in the order given, the order the SQL
-// stores' query selects them in. An Elasticsearch table's columns otherwise
-// come in the order the datasource's response parser meets them, which led
-// "Open the longest" with the author once the author was one of them.
+// columnOrder puts a table's columns in the order given, and a column it does
+// not name after them, in the order they came. Grafana's organize keys the
+// order by the name a column carries when its turn comes, so the names are the
+// ones the table draws, after every rename before it. panel() gives every
+// Elasticsearch table the order of its SQL twin through this.
 func columnOrder(names ...string) any {
 	index := map[string]any{}
 	for i, name := range names {
@@ -1119,6 +1122,87 @@ func columnOrder(names ...string) any {
 		"excludeByName": map[string]any{}, "indexByName": index,
 		"renameByName": map[string]any{},
 	}}
+}
+
+// selectedColumns is the columns a SQL table selects, in the order it selects
+// them: every quoted alias outside a parenthesis, so a subquery's own aliases
+// are not taken for the table's, and each name once, since the two halves of
+// a UNION select the same columns.
+func selectedColumns(sql []Target) []string {
+	var out []string
+	seen := map[string]bool{}
+	for i := range sql {
+		q := sql[i].SQL
+		depth := 0
+		for at := range len(q) {
+			switch q[at] {
+			case '(':
+				depth++
+			case ')':
+				depth--
+			}
+			if depth != 0 || !strings.HasPrefix(q[at:], ` AS "`) {
+				continue
+			}
+			name, _, closed := strings.Cut(q[at+len(` AS "`):], `"`)
+			if closed && !seen[name] {
+				seen[name] = true
+				out = append(out, name)
+			}
+		}
+	}
+	return out
+}
+
+// orderLike is the columns a table draws, `drawn`, in the order the SQL twin
+// selects its own, `selected`. A column drawn under a name of its own that is
+// the SQL column's name with a word more or a letter less takes that column's
+// place: Elasticsearch shows "Amount (cents)" where the SQL divides and says
+// Amount, "CVSS v4" beside CVSS, and GitHub's "Issue template" flag where the
+// SQL stores count "Issue templates". A column the SQL does not select at all
+// is left out, and columnOrder puts it after the others.
+func orderLike(selected []string, drawn map[string]bool) []string {
+	variants := slices.Sorted(maps.Keys(drawn))
+	var out []string
+	for _, column := range selected {
+		if drawn[column] {
+			out = append(out, column)
+		}
+		for _, name := range variants {
+			if !drawn[name] || slices.Contains(selected, name) {
+				continue
+			}
+			if strings.HasPrefix(name, column+" ") || strings.HasPrefix(column, name) {
+				out = append(out, name)
+				drawn[name] = false
+			}
+		}
+	}
+	return out
+}
+
+// namesGiven is every column name a table's transformations give: what an
+// organize renames a column to and what a calculation names its result. An
+// Elasticsearch table draws its columns under those, since the response
+// parser's own names are renamed or hidden (see
+// TestNoElasticsearchNameReachesTheScreenAsTheParserSpellsIt), so these are
+// the names its column order can be given in.
+func namesGiven(tf []any) map[string]bool {
+	out := map[string]bool{}
+	for _, raw := range tf {
+		t, _ := raw.(map[string]any)
+		options, _ := t["options"].(map[string]any)
+		rename, _ := options["renameByName"].(map[string]any)
+		for _, to := range rename {
+			if name, ok := to.(string); ok {
+				out[name] = true
+			}
+		}
+		if alias, ok := options["alias"].(string); ok && t["id"] == "calculateField" {
+			out[alias] = true
+		}
+	}
+	return out
 }
 
 // hideColumns drops columns a table's query returns only to be grouped by: the

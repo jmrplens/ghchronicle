@@ -656,10 +656,8 @@ func stillOpen(b *builder) []Panel {
 			{"c", "Comments"},
 			{"r", "Reviews"},
 		},
-		[]string{ESF, "state:OPEN"}, append([]any{
-			hideColumns(panelFullNameField),
-			columnOrder("Number", flowOpenAge, "Repository", "Title", "Author", "Labels", "Comments", "Reviews"),
-		}, keepLargest(flowOpenAge, openLongest)...)...)
+		[]string{ESF, "state:OPEN"}, append([]any{hideColumns(panelFullNameField)},
+			keepLargest(flowOpenAge, openLongest)...)...)
 
 	openIssuesGR, openIssuesGRtf := gTbl(fmt.Sprintf(`limit(sortBy(%s, "max", true), %d)`,
 		grGroupBy(rp("gh_issue", "seconds_open", "state", "OPEN"), "gh_issue", "max", "repo", "number"),
@@ -681,10 +679,8 @@ func stillOpen(b *builder) []Panel {
 			{"s", flowOpenAge},
 			{"c", "Comments"},
 		},
-		[]string{ESF, "state:OPEN"}, append([]any{
-			hideColumns(panelFullNameField),
-			columnOrder("Number", flowOpenAge, "Repository", "Author", "Comments", "Labels"),
-		}, keepLargest(flowOpenAge, openLongest)...)...)
+		[]string{ESF, "state:OPEN"}, append([]any{hideColumns(panelFullNameField)},
+			keepLargest(flowOpenAge, openLongest)...)...)
 	return []Panel{
 		panel("table", "Open the longest", box{W: 12, H: 8, X: 0, Y: 45}, []Target{sqlT(openest)}, &P{
 			// The comments are kept to the rows the open time ranks: capped
