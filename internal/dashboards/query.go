@@ -1306,6 +1306,18 @@ const esNoMedian = "In Elasticsearch a median or an average with nothing in the 
 	"take it over has no tile at all, where the other stores say what the range lacked: " +
 	"an empty bucket is not returned, since the one it would return reads as 0."
 
+// aboveZero keeps the rows whose `field` is more than 0, which is what the
+// SQL stores' WHERE says of a table they only list what has any of.
+func aboveZero(field string) any {
+	return map[string]any{"id": "filterByValue", "options": map[string]any{
+		"type": "include", "match": "any",
+		"filters": []any{map[string]any{
+			"fieldName": field,
+			"config":    map[string]any{"id": "greater", "options": map[string]any{"value": 0}},
+		}},
+	}}
+}
+
 func (b *builder) esDaily(m string, met any, by, span string, where []string, ref string) Target {
 	var buckets []any
 	switch by {

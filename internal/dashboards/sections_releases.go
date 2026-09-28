@@ -40,7 +40,12 @@ func releases(b *builder) []Panel {
 		" WHERE a.rn = 1 ORDER BY a.downloads DESC LIMIT 40"
 	rl, ra := "gh_release", "gh_release_asset"
 
-	byTagGR, byTagGRtf := gTbl(topRows(rp(rl, "downloads"), 12, gn(rl, "repo"), gn(rl, "tag")),
+	// A release nobody has downloaded is left out, as the SQL stores' WHERE
+	// leaves it out: a series of zeros is not an empty one, so Graphite drew
+	// it as a bar of nothing and Elasticsearch as a row of 0, and the chart
+	// the other stores draw had a release more in these two.
+	byTagGR, byTagGRtf := gTbl(topRows(fmt.Sprintf("removeBelowValue(%s, 1)", rp(rl, "downloads")),
+		12, gn(rl, "repo"), gn(rl, "tag")),
 		"Release", []col{{"lastNotNull", "Downloads"}})
 	byTagES, byTagEStf := esTbl(rl, slices.Concat([]any{b.tm("tag", 500)}, b.tmRepo(50), []any{b.tmURL()}),
 		[]any{b.mNewest("downloads")},
@@ -125,7 +130,11 @@ func releases(b *builder) []Panel {
 			Desc:      "The twelve most downloaded releases. A click on a bar opens the release page.",
 			Overrides: barLink("Downloads", "Page", "Open the release"),
 			GR:        byTagGR, GRTF: byTagGRtf,
-			ES: byTagES, ESTF: byTagEStf,
+			GRDesc: "Graphite names each bar repository and tag from the path.",
+			// A bar chart names its bars by its first string field, and the
+			// repository's bucket stands ahead of the tag's in the frame, so
+			// both of the suite's releases were bars called hello-world.
+			ES: byTagES, ESTF: append(byTagEStf, aboveZero("Downloads"), columnOrder("Release")),
 			ESDesc: "In Elasticsearch the bars are named by tag; the repository is the next column.",
 		}),
 		panel("table", "Release assets", box{W: 24, H: 9, X: 0, Y: 8}, []Target{sqlT(assets)}, &P{

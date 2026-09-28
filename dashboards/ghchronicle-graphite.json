@@ -10131,7 +10131,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "The twelve most downloaded releases. A click on a bar opens the release page. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "The twelve most downloaded releases. A click on a bar opens the release page. Graphite names each bar repository and tag from the path. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -10193,7 +10193,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(aliasByNode(limit(sortByMaxima(github.release.*.*.*.*.$repo.*.downloads), 12), 6, 7))",
+              "target": "removeEmptySeries(aliasByNode(limit(sortByMaxima(removeBelowValue(github.release.*.*.*.*.$repo.*.downloads, 1)), 12), 6, 7))",
               "textEditor": true
             }
           ],
