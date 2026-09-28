@@ -20,6 +20,9 @@ type Store struct {
 	Inputs      []any
 	Requires    []any
 	Variable    map[string]any
+	// Hidden is the variables a store's panels read and a reader never picks:
+	// the Graphite dashboard's bucket variables (see grBin).
+	Hidden []any
 }
 
 // esFind is the Elasticsearch variable query: which field to list the terms
@@ -156,6 +159,7 @@ func AllStores() []Store {
 			// selected repositories become one brace list in the path.
 			Variable: variable("${DS_GRAPHITE}", grRepos, grRepos,
 				map[string]any{"allValue": "*", "multiFormat": "glob"}),
+			Hidden: grBucketVariables(),
 		},
 		{
 			Name: "elasticsearch", DS: "${DS_ELASTICSEARCH}", UID: "ghchronicle-elasticsearch",

@@ -470,6 +470,15 @@ func dashboardVars(doc map[string]any, store dashboardStore, repos []string) gra
 	if v.AllValue == "" {
 		v.Repos = repos
 	}
+	// The Graphite dashboard bins its charts by variables a render computes
+	// from the range, which /api/ds/query would hand Graphite by name.
+	span, err := grafana.RangeSpan(dashboardRange, "now", time.Now())
+	if err == nil {
+		v.Intervals, err = grafana.AutoIntervals(doc, span)
+	}
+	if err != nil {
+		panic(fmt.Sprintf("the %s dashboard's interval variables over %s: %v", store.name, dashboardRange, err))
+	}
 	// InfluxDB 3 in SQL mode has no macro of its own, so the dashboard's
 	// $__timeFilter(time) is expanded here, the way cmd/check_dashboards
 	// expands it. The PostgreSQL plugin expands its own, $__timeGroupAlias

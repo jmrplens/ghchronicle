@@ -904,8 +904,8 @@ func policyAndDependencies(b *builder) []Panel {
 				GR: []Target{
 					grq(perBucket(fmt.Sprintf(`exclude(%s, "\.`+noneGraphiteNode+`\.")`, rp(dc, "packages")), gn(dc, "change")), "A"),
 					grq(fmt.Sprintf(
-						`alias(consolidateBy(summarize(sumSeries(%s), "1d", "sum"), "sum"), "vulnerable")`,
-						rp(dc, "vulnerable"),
+						`alias(consolidateBy(summarize(sumSeries(%s), %s, "sum"), "sum"), "vulnerable")`,
+						rp(dc, "vulnerable"), grBin("1d"),
 					), "B"),
 				},
 				ES: []Target{

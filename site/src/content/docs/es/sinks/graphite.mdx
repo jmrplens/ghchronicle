@@ -111,17 +111,24 @@ una serie no pueda llevar lo dice en su descripción.
 Cambia `prefix` y los objetivos del dashboard tienen que cambiar con él, ya que el
 prefijo es el primer nodo de cada ruta.
 
-Una gráfica en el tiempo pide a Graphite como mucho cien puntos, dos de ellas
-tantos como píxeles tienen de ancho, y graphite-web encaja una serie con más en
-bandas, moviendo cada punto un paso de almacenamiento más tarde al hacerlo.
-Medido contra `graphiteapp/graphite-statsd:1.1.10-5` con una hora por paso, un
-punto escrito a las 07:30 UTC y leído a las 07:59 sobre treinta días volvió
-fechado a las 08:00, el inicio de la siguiente banda de ocho horas y después
-del final del rango; pidiendo mil puntos volvió a las 07:00. Así que en la
-última hora antes del límite de cada banda la hora más reciente de una gráfica
-queda más allá de su borde derecho, y una gráfica cuyo único punto es ese dice
-"Data outside time range" hasta que el reloj alcanza el límite, y entonces se
-dibuja donde le corresponde.
+Cada gráfica en el tiempo suma sus puntos en cubos del ancho que pide el
+rango, el ancho por el que agrupan los dashboards SQL: el rango entre cien,
+redondeado como Grafana redondea un intervalo y nunca por debajo del mínimo de
+la gráfica, un día, una hora o cinco minutos. El dashboard los calcula en tres
+variables ocultas, `bucket_1d`, `bucket_1h` y `bucket_5m`, y cada gráfica pide
+5.000 puntos, más de los cubos que tiene, así que graphite-web devuelve los
+cubos tal cual. Si se le piden menos puntos de los que tiene una serie,
+graphite-web la encaja en bandas y mueve cada punto un paso más tarde al
+hacerlo, y antes de la 2.6.2 eso dejaba la hora más reciente de una gráfica más
+allá de su borde derecho en la última hora antes de cada límite de banda.
+Medido contra `graphiteapp/graphite-statsd:1.1.10-5` con una hora por paso a
+las 15:35 UTC, el recuento de estrellas que un barrido había escrito en esa
+hora volvió fechado a las 16:00 con cien puntos, después del final del rango, y
+una gráfica cuyo único punto era ese decía "Data outside time range"; sumado en
+el cubo del día volvió a las 00:00, y el almacenamiento de artefactos en su
+cubo de seis horas a las 12:00. Un cubo sigue el rango del dashboard, así que una
+gráfica fijada a su propio rango, como lo están dos de los paneles de Code,
+suma en días sea cual sea el rango de la página.
 
 ## Por dónde seguir
 

@@ -148,7 +148,9 @@ func contributionTotals(b *builder) []Panel {
 				"as it moves: it falls when a busy week ages out of the window.",
 			Opts:     Opts{"bars": true, "fill": 60, "legend": "hidden"},
 			PromOpts: Opts{"bars": false, "legend": "bottom"},
-			GR: []Target{grq(fmt.Sprintf(`alias(%s, "Contributions")`,
+			// A day each, as the SQL's rows are, rather than a point per
+			// storage step with nothing in all but one of them.
+			GR: []Target{grq(fmt.Sprintf(`alias(summarize(%s, "1d", "sum"), "Contributions")`,
 				gp("gh_contribution_day", "contributions")))},
 			ES: []Target{esq("gh_contribution_day", []any{b.mSum("contributions")},
 				[]any{b.dh()}, "A", nil, "Contributions")},

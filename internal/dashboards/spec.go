@@ -627,6 +627,18 @@ func materialize(id *ids, p *Panel, storeName string, ds, logs any, y0 int) map[
 	if len(st.TF) > 0 {
 		out["transformations"] = st.TF
 	}
+	return withPanelOptions(out, p.Kind, storeName, opts)
+}
+
+// withPanelOptions is what a panel of any kind carries beside its queries and
+// its field configuration.
+func withPanelOptions(out map[string]any, kind, storeName string, opts Opts) map[string]any {
+	// Every Graphite chart over time is summarized into buckets, and asks
+	// for more points than it has buckets so that graphite-web does not fit
+	// it into bands a step late (see grBin).
+	if storeName == "graphite" && kind == "timeseries" {
+		out["maxDataPoints"] = grMaxDataPoints
+	}
 	// A panel whose whole subject is one page on GitHub carries the page as
 	// a panel link, in the header, since no row of it has a url of its own.
 	if links := optList(opts, "links"); links != nil {
@@ -894,7 +906,7 @@ func Dashboard(s *Store, ds, logs any, variable map[string]any) map[string]any {
 		"schemaVersion": 39,
 		"refresh":       "5m",
 		"time":          map[string]any{"from": "now-30d", "to": "now"},
-		"templating":    map[string]any{"list": []any{variable}},
+		"templating":    map[string]any{"list": append([]any{variable}, s.Hidden...)},
 		"panels":        Render(s.Name, ds, logs),
 	}
 }

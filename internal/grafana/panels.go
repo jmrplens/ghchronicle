@@ -206,6 +206,11 @@ type Vars struct {
 	// left empty the panel's own range still moves the request's from and to
 	// and the plugin does the rest.
 	TimeFilterFormat string
+	// Intervals is what each interval variable of the dashboard becomes, by
+	// name, which AutoIntervals computes for a range. A render substitutes
+	// them from the dashboard's range, not a panel's own, so they are the
+	// same for every panel.
+	Intervals map[string]string
 }
 
 // The repository variable, in each of the forms the five dashboards ask for.
@@ -251,6 +256,12 @@ func (v Vars) Apply(target map[string]any) map[string]any {
 func (v Vars) text(s string) string {
 	if v.TimeFilter != "" {
 		s = strings.ReplaceAll(s, "$__timeFilter(time)", v.TimeFilter)
+	}
+	// Longest first, so that no name eats the head of a longer one.
+	names := slices.SortedFunc(maps.Keys(v.Intervals), func(a, b string) int { return cmp.Compare(len(b), len(a)) })
+	for _, name := range names {
+		s = strings.ReplaceAll(s, "${"+name+"}", v.Intervals[name])
+		s = strings.ReplaceAll(s, "$"+name, v.Intervals[name])
 	}
 	for _, r := range repoTokens {
 		if !strings.Contains(s, r.token) {

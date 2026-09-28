@@ -486,8 +486,10 @@ func collectorSection(b *builder) []Panel {
 					"one of them, and a Most used of 0 is where that absence belongs. A reading " +
 					"taken at each sweep, so the curve starts the day the collector did. " +
 					bucketFollowsRange,
-				GR: []Target{grq(fmt.Sprintf("aliasByNode(keepLastValue(%s), %d)",
-					gp(rl, "used_ratio"), gn(rl, "resource")))},
+				// The newest reading of each bucket, as the SQL's ROW_NUMBER
+				// keeps it.
+				GR: []Target{grq(fmt.Sprintf(`aliasByNode(summarize(keepLastValue(%s), %s, "last"), %d)`,
+					gp(rl, "used_ratio"), grBin("5m"), gn(rl, "resource")))},
 				ES:     []Target{b.esDaily(rl, b.mMax("used_ratio"), "resource", "5m", nil, "")},
 				ESDesc: "In Elasticsearch each point is the largest reading of its five minutes.",
 			}),

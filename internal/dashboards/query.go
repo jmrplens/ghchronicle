@@ -534,6 +534,86 @@ func grOther(n int, expr string) string {
 		top, expr, top)
 }
 
+// Binning a Graphite chart over time.
+//
+// A chart over time asks Graphite for at most maxDataPoints points, and
+// graphite-web fits a series with more than that into bands, moving each point
+// one step of the series later as it does: it moves the first band's start to
+// the next band boundary and drops one value fewer than the steps it moved
+// (graphite-web 1.1.10, render/views.py). So in the last step before each band
+// boundary the newest point of a chart was drawn past its right edge, and a
+// chart whose one point was that one read "Data outside time range". Measured
+// against graphiteapp/graphite-statsd:1.1.10-5 with the suite's one hour step:
+// a point written at 15:30 UTC and read at 15:59 over thirty days came back
+// stamped 16:00 at a hundred points and 15:00 at a thousand.
+//
+// How many points a chart has once graphite-web has read it depends on the
+// retention the reader's Graphite keeps, which no dashboard can know, so
+// raising maxDataPoints alone does not stop the banding. Summarizing every
+// dated chart into a bucket of the dashboard's choosing does: the chart then
+// has a point per bucket whatever the storage step, and a maxDataPoints above
+// that count leaves graphite-web nothing to fit. The bucket is the one the SQL
+// stores bin into, $__dateBin's: the range over a hundred, rounded by
+// Grafana's table and never under the panel's floor. $__interval is that
+// number too, but Grafana computes it from the panel's own maxDataPoints, the
+// number that has to be large for graphite-web to leave the points alone, so
+// the Graphite dashboard carries a hidden interval variable per floor instead,
+// computed from the range and a hundred steps the way $__interval is.
+
+// grBucketFloors is every floor a Graphite chart over time is binned at, each
+// the name of a bucket variable of the Graphite dashboard.
+var grBucketFloors = []string{"1d", "1h", "5m"}
+
+// grBucketSteps is how many buckets the range is cut into before Grafana's
+// rounding, the maxDataPoints the SQL twins bin by (see binned in panels.go).
+const grBucketSteps = 100
+
+// grMaxDataPoints is what a Graphite chart over time asks for, so that
+// graphite-web never fits it into bands. A bucket is never shorter than the
+// range over seven hundred, where Grafana rounds up to seven days a raw
+// interval it would otherwise round down to one, so a binned chart has at most
+// some seven hundred points; a chart of one point a day, the contribution
+// calendar, has one per day the daily archive keeps, twelve years of them in
+// the schema the containerised suite keeps.
+const grMaxDataPoints = 5000
+
+// grBucketVar is the name of the bucket variable of a floor.
+func grBucketVar(floor string) string { return "bucket_" + floor }
+
+// grBin is the bucket a Graphite chart over time sums into for its floor, as
+// the variable the dashboard computes it in. In single quotes, which is what
+// Grafana's Graphite datasource rewrites a bucket in minutes in, from its own
+// "5m" to Graphite's "5min", in the browser and in /api/ds/query alike.
+func grBin(floor string) string {
+	if !slices.Contains(grBucketFloors, floor) {
+		panic("no bucket variable for a floor of " + floor)
+	}
+	return "'$" + grBucketVar(floor) + "'"
+}
+
+// grBucketVariables is the Graphite dashboard's bucket variables: hidden,
+// computed from the range, a hundred steps and the floor, which is how
+// Grafana computes a panel's $__interval.
+func grBucketVariables() []any {
+	out := make([]any, len(grBucketFloors))
+	for i, floor := range grBucketFloors {
+		name := grBucketVar(floor)
+		auto := "$__auto_interval_" + name
+		options := []any{map[string]any{"selected": true, "text": "auto", "value": auto}}
+		for _, v := range []string{floor, "7d", "30d"} {
+			options = append(options, map[string]any{"selected": false, "text": v, "value": v})
+		}
+		out[i] = map[string]any{
+			"name": name, "label": "Bucket " + floor, "type": "interval", "hide": 2,
+			"auto": true, "auto_count": grBucketSteps, "auto_min": floor,
+			"query":   floor + ",7d,30d",
+			"current": map[string]any{"selected": false, "text": "auto", "value": auto},
+			"options": options, "refresh": 2, "skipUrlSync": false,
+		}
+	}
+	return out
+}
+
 // perBucket is one series per value of a tag node, one point per bucket.
 // Counts are consolidated by sum so a long range does not average them away,
 // under the tag's value as the series name, which is the legend entry.
@@ -545,8 +625,8 @@ func perBucket(expr string, node int, spanHow ...string) string {
 	if len(spanHow) > 1 {
 		how = spanHow[1]
 	}
-	return consolidated(fmt.Sprintf(`groupByNode(summarize(%s, %q, %q), %d, %q)`,
-		expr, span, how, node, how), how)
+	return consolidated(fmt.Sprintf(`groupByNode(summarize(%s, %s, %q), %d, %q)`,
+		expr, grBin(span), how, node, how), how)
 }
 
 // perRepoBucket is perBucket with a series per repository of measurement m,
@@ -559,7 +639,7 @@ func perRepoBucket(expr, m string, spanHow ...string) string {
 	if len(spanHow) > 1 {
 		how = spanHow[1]
 	}
-	return consolidated(grGroupBy(fmt.Sprintf(`summarize(%s, %q, %q)`, expr, span, how), m, how, "repo"), how)
+	return consolidated(grGroupBy(fmt.Sprintf(`summarize(%s, %s, %q)`, expr, grBin(span), how), m, how, "repo"), how)
 }
 
 // grGroupBy groups the series of measurement m by the tags named, in that
@@ -588,7 +668,7 @@ func medianBucket(path string, span ...string) string {
 	if len(span) > 0 {
 		s = span[0]
 	}
-	return fmt.Sprintf(`summarize(percentileOfSeries(%s, 50), %q, "median")`, path, s)
+	return fmt.Sprintf(`summarize(percentileOfSeries(%s, 50), %s, "median")`, path, grBin(s))
 }
 
 func worstBucket(path string, span ...string) string {
@@ -596,7 +676,7 @@ func worstBucket(path string, span ...string) string {
 	if len(span) > 0 {
 		s = span[0]
 	}
-	return fmt.Sprintf(`summarize(maxSeries(%s), %q, "max")`, path, s)
+	return fmt.Sprintf(`summarize(maxSeries(%s), %s, "max")`, path, grBin(s))
 }
 
 func latestSum(path string) string { return "sumSeries(keepLastValue(" + path + "))" }

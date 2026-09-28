@@ -888,16 +888,23 @@ says so in its description.
 Change `prefix` and the dashboard targets have to change with it, since the
 prefix is the first node of every path.
 
-A chart over time asks Graphite for at most a hundred points, two of them for
-as many as they are pixels wide, and graphite-web fits a series with more into
-bands, moving each point one storage step later as it does. Measured against
-`graphiteapp/graphite-statsd:1.1.10-5` with one hour a step, a point written at
-07:30 UTC and read at 07:59 over thirty days came back stamped 08:00, the start
-of the next eight-hour band and after the end of the range; asked for a
-thousand points, it came back at 07:00. So in the last hour before each band's
-boundary the newest hour of a chart sits past its right edge, and a chart whose
-one point is that one reads "Data outside time range" until the clock reaches
-the boundary, when it is drawn where it belongs.
+Every chart over time adds its points up into buckets the width the range
+calls for, the width the SQL dashboards bin by: the range over a hundred,
+rounded the way Grafana rounds an interval and never under the chart's floor of
+a day, an hour or five minutes. The dashboard computes them in three hidden
+variables, `bucket_1d`, `bucket_1h` and `bucket_5m`, and each chart asks for
+5,000 points, more than it has buckets, so graphite-web hands the buckets back
+as they are. Asked for fewer points than a series holds, graphite-web fits the
+series into bands and moves each point one step later as it does, and before
+2.6.2 that put the newest hour of a chart past its right edge in the last hour
+before each band boundary. Measured against
+`graphiteapp/graphite-statsd:1.1.10-5` with one hour a step at 15:35 UTC, the
+star count a sweep had written in that hour came back stamped 16:00 at a
+hundred points, after the end of the range, and a chart whose one point was
+that one read "Data outside time range"; summed into the day's bucket it came
+back at 00:00, and the artifact storage in its six-hour bucket at 12:00. A bucket
+follows the dashboard's range, so a chart pinned to its own range, as two of
+the Code panels are, sums into days whatever the page is set to.
 
 ### Where to go next
 

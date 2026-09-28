@@ -259,8 +259,8 @@ func openAlerts(b *builder) []Panel {
 			// Each series reduced to its newest per bucket, then the group
 			// summed: summing per series first is what keeps the sum from
 			// counting one sweep twice.
-			GR: []Target{grq(consolidated(fmt.Sprintf(`groupByNode(summarize(%s, "1d", "last"), %d, "sum")`,
-				depOpen, gn(da, "severity")), "max"))},
+			GR: []Target{grq(consolidated(fmt.Sprintf(`groupByNode(summarize(%s, %s, "last"), %d, "sum")`,
+				depOpen, grBin("1d"), gn(da, "severity")), "max"))},
 			ES: []Target{b.esDaily(da, b.mMax("open"), "severity", "", []string{ESF}, "")},
 			ESDesc: "In Elasticsearch this is the largest single series of each severity " +
 				"in the day rather than the sum across repositories: a date histogram " +

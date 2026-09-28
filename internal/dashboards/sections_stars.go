@@ -172,8 +172,8 @@ func stars(b *builder) []Panel {
 			PromDesc: "In Prometheus the curve is the repositories' star count as the " +
 				"exporter read it, so it starts the day the exporter did and sits at " +
 				"GitHub's count.",
-			GR: []Target{grq(fmt.Sprintf(`alias(%s, "Stars")`,
-				latestSum(rp("gh_repo", "stars"))))},
+			GR: []Target{grq(fmt.Sprintf(`alias(summarize(%s, %s, "last"), "Stars")`,
+				latestSum(rp("gh_repo", "stars")), grBin("1d")))},
 			GRDesc: grSnapshot,
 			ES:     []Target{b.esSnapshotStack("gh_repo", "stars")},
 			ESOpts: esStacked, ESDesc: esSnapshot,
@@ -218,8 +218,8 @@ func stars(b *builder) []Panel {
 				"the range. " + bucketFollowsRange,
 			Opts:     dayBins,
 			PromDesc: "In Prometheus the curve starts the day the exporter did.",
-			GR: []Target{grq(fmt.Sprintf(`alias(%s, "Forks")`,
-				latestSum(rp("gh_repo", "forks"))))},
+			GR: []Target{grq(fmt.Sprintf(`alias(summarize(%s, %s, "last"), "Forks")`,
+				latestSum(rp("gh_repo", "forks")), grBin("1d")))},
 			GRDesc: "In Graphite the curve is the daily fork count as collected, so it starts the day the collector did.",
 			ES:     []Target{b.esSnapshotStack("gh_repo", "forks")},
 			ESOpts: esStacked,
