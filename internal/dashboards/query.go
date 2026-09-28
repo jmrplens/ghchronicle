@@ -569,12 +569,12 @@ var grBucketFloors = []string{"1d", "1h", "5m"}
 const grBucketSteps = 100
 
 // grMaxDataPoints is what a Graphite chart over time asks for, so that
-// graphite-web never fits it into bands. A bucket is never shorter than the
-// range over seven hundred, where Grafana rounds up to seven days a raw
-// interval it would otherwise round down to one, so a binned chart has at most
-// some seven hundred points; a chart of one point a day, the contribution
-// calendar, has one per day the daily archive keeps, twelve years of them in
-// the schema the containerised suite keeps.
+// graphite-web never fits it into bands. Grafana rounds a raw interval
+// anywhere between a day and a week down to a day, so a bucket can be as short
+// as the range over seven hundred, and a binned chart has at most some seven
+// hundred points; a chart of one point a day, the contribution calendar, has
+// one per day the daily archive keeps, twelve years of them in the schema the
+// containerised suite keeps.
 const grMaxDataPoints = 5000
 
 // grBucketVar is the name of the bucket variable of a floor.
