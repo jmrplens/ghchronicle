@@ -651,6 +651,48 @@ func rulesetChanges(b *builder) Panel {
 	})
 }
 
+// deploymentsES is "Deployments by environment" in Elasticsearch: two queries
+// on the same four buckets, repository, environment and outcome, merged on
+// them into one row each.
+//
+// The address the environment was put live at is a url per deployment, not
+// per environment, and a bucket holds the documents it keeps and nothing
+// else: as a bucket of one under the others, it kept the deployments of one
+// address and left every other one out of the count and the medians beneath
+// it. Measured on the 2.6.1 review, github-pages read 1 deployment and a To
+// status of 0 s where the two SQL stores, which read the same two
+// deployments, read 2 and 33 s. So the counts and medians are one query,
+// whose url bucket is the repository's deployments page and so one value for
+// every document of it, and the address is a second query that keeps, of each
+// row's addresses, the one that sorts last, as MAX(environment_url) does in
+// SQL. Its metric is only there because a query must have one, and the merge
+// drops it along with the full name.
+func deploymentsES(b *builder, dp string) (targets []Target, tf []any) {
+	keys := func() []any {
+		return append(b.tmRepo(500), b.tm("environment", 50), b.tm("outcome", 10))
+	}
+	targets, tf = esTbl(dp, append(keys(), b.tmURL()),
+		[]any{b.mCount(), b.mPct("seconds_to_status", 50), b.mPct("seconds_live", 50)},
+		[]named{
+			{inventoryRepoTerm, "Repository"},
+			{"environment.keyword", "Environment"},
+			{"outcome.keyword", "Outcome"},
+			{inventoryURLTerm, "Link"},
+			{"n", "Deployments"},
+			{"s", deliveryTimeToStatus},
+			{"l", deliveryTimeLive},
+		}, []string{ESF})
+	live := b.tm("environment_url", 1, "_key", "desc")
+	settings, _ := agg(live)["settings"].(map[string]any)
+	settings["missing"] = ""
+	targets = append(targets, esq(dp, []any{b.mSum("deployments")}, append(keys(), live), "B", []string{ESF}, ""))
+	options, _ := agg(tf[0])["options"].(map[string]any)
+	rename, _ := options["renameByName"].(map[string]any)
+	rename["environment_url.keyword"] = "Live"
+	tf = append([]any{map[string]any{"id": "merge", "options": map[string]any{}}}, tf...)
+	return targets, append(tf, hideColumns(panelFullNameField, esNames["sum"]))
+}
+
 // deploymentsToEnvironments is what reached the environments the section lists
 // above: how many deployments a day each one took, and how they went.
 //
@@ -687,19 +729,7 @@ func deploymentsToEnvironments(b *builder) []Panel {
 	depGR, depGRtf := gTbl(fmt.Sprintf(`sortBy(%s, "sum", true)`,
 		grGroupBy(rp(dp, "success"), dp, "sum", "repo", "environment")),
 		"Repository, environment", []col{{"count", "Deployments"}, {"sum", "Successes"}})
-	depES, depEStf := esTbl(dp,
-		append(b.tmRepo(500), b.tm("environment", 50), b.tm("outcome", 10), b.tmURL(), b.tmURL("environment_url")),
-		[]any{b.mCount(), b.mPct("seconds_to_status", 50), b.mPct("seconds_live", 50)},
-		[]named{
-			{inventoryRepoTerm, "Repository"},
-			{"environment.keyword", "Environment"},
-			{"outcome.keyword", "Outcome"},
-			{inventoryURLTerm, "Link"},
-			{"environment_url.keyword", "Live"},
-			{"n", "Deployments"},
-			{"s", deliveryTimeToStatus},
-			{"l", deliveryTimeLive},
-		}, []string{ESF}, hideColumns(panelFullNameField))
+	depES, depEStf := deploymentsES(b, dp)
 
 	return []Panel{
 		panel("timeseries", "Deployments over time", box{W: 12, H: 8, X: 0, Y: 56},
