@@ -1289,6 +1289,47 @@ func (b *builder) esLatestSum(m, field string, by ...string) []Target {
 	return []Target{esq(m, metrics, buckets, "A", []string{ESF}, "")}
 }
 
+// esOverRange is one value of an Elasticsearch stat over the dashboard range,
+// answering a range with nothing in it the way the SQL stores do: 0 for a
+// count, and no value for anything else, which the tile draws as the words
+// its panel gives a value that is not there. It is for a stat that reads the
+// last value of each field; one that adds its values up reads no value as 0
+// (see esLeftOut).
+//
+// A count asks its terms bucket for the empty buckets as well, which
+// answersNothingAsSQL explains. Anything else is taken over one date
+// histogram bucket a century wide, which the datasource returns whether or
+// not a document falls in it: measured against the Elasticsearch datasource
+// of Grafana 13.2.1, a median or an average of that bucket with no document in
+// it reads null, where a terms bucket reads the median of nothing as 0 and is
+// not returned at all when it has to hold a document. A sum of nothing is 0 in
+// Elasticsearch whichever bucket it is taken in, so a sum is asked beside a
+// count, both hidden, and a bucket script keeps it only where the count is not
+// 0: a script that answers null leaves the bucket without a value, the
+// datasource returns no row for it, and a stat reads no row as no value.
+func (b *builder) esOverRange(m string, met any, where ...string) []Target {
+	switch agg(met)["type"] {
+	case "count", "cardinality":
+		return b.esTotal(m, met, where...)
+	case "sum":
+		sum, count := agg(met), agg(b.mCount())
+		sum["hide"], count["hide"] = true, true
+		guarded := b.metric("bucket_script", "", map[string]any{
+			"script": "params.n > 0 ? params.s : null",
+		})
+		agg(guarded)["pipelineVariables"] = []any{
+			map[string]any{"name": "s", "pipelineAgg": sum["id"]},
+			map[string]any{"name": "n", "pipelineAgg": count["id"]},
+		}
+		return []Target{esq(m, []any{sum, count, guarded}, []any{b.dh(esWholeRange)}, "A", where, "")}
+	}
+	return []Target{esq(m, []any{met}, []any{b.dh(esWholeRange)}, "A", where, "")}
+}
+
+// esWholeRange is a date histogram interval no dashboard range reaches across
+// the edge of: buckets are counted from 1970, so the first one ends in 2069.
+const esWholeRange = "36500d"
+
 func (b *builder) esTotal(m string, met any, where ...string) []Target {
 	bucket := b.one()
 	if answersNothingAsSQL[fmt.Sprint(agg(met)["type"])] {
@@ -1309,22 +1350,35 @@ func (b *builder) esTotal(m string, met any, where ...string) []Target {
 // well, it returns some term of the index with no document under it, and a
 // count reads 0. The rest cannot be asked the same way, measured against
 // grafana-elasticsearch-datasource in Grafana 13.2.1: the plugin reads the
-// percentile of an empty bucket as 0, a sum of nothing is 0 where SQL's SUM
-// is null, and an average of nothing is null, which a stat that adds its
-// values up, as four here do, draws as 0. A number where the other stores say
-// what the range lacked is worse than no tile, so those keep no empty bucket
-// and esNoMedian says so.
+// percentile of an empty bucket as 0 and a sum of nothing is 0 where SQL's
+// SUM is null. esOverRange asks those over a bucket that answers null.
 var answersNothingAsSQL = map[string]bool{"count": true, "cardinality": true}
 
-// esNoMedian is what an Elasticsearch stat taking a median or an average over
-// the range owes its reader, for the reason answersNothingAsSQL gives. It
-// names Graphite's case beside it rather than saying every other store draws
-// the words: medianTotal over a path never written answers no series, and
-// that tile leaves its group too.
-const esNoMedian = "In Elasticsearch a median or an average with nothing in the range to " +
-	"take it over has no tile at all, as in Graphite for a path it has never held, where " +
-	"the SQL stores say what the range lacked: an empty bucket is not returned, since " +
-	"the one it would return reads as 0."
+// esLeftOut is the sentence an Elasticsearch stat that adds its values up owes
+// its reader for the values it leaves out over a range, or a repository, with
+// nothing in them, where the other stores draw the tile without a value.
+//
+// Such a stat adds up the newest document of each repository, release or
+// alert, since a bucket cannot take the newest of each and add them, and the
+// datasource fails outright on that newest-document aggregation over a bucket
+// with nothing in it (measured against Grafana 13.2.1: a 500, "An error
+// occurred within the plugin", for the whole panel), so the query cannot ask
+// for the empty one and the tile has no field. What else the stat reads is
+// added up as well, and Grafana's sum reads a value that is not there as 0, so
+// a median or a share of nothing is not asked for either rather than drawn as
+// 0: a wrong number is worse than a tile left out.
+func esLeftOut(value, why string) string {
+	return "In Elasticsearch " + value + " leaves its group when the range holds no document " +
+		"of it, where the other stores draw it without a value: " + why
+}
+
+// esNewestAddedUp is esLeftOut's reason for a value added up from the newest
+// document of each item.
+func esNewestAddedUp(item string) string {
+	return "it is the newest document of each " + item + " added up by the panel, and the " +
+		"datasource fails on a newest-document aggregation that finds nothing, so the query " +
+		"cannot ask for the empty one."
+}
 
 // binaryField is a column computed from two others of the same row, which is
 // how an Elasticsearch table derives what a SQL statement selects as an

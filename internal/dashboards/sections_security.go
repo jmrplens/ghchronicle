@@ -195,8 +195,8 @@ func openAlerts(b *builder) []Panel {
 			{Kind: "sql", Format: "table", Ref: "B", SQL: namedValue(scan, securityCodeScanning)},
 		}, &P{
 			Prom: []Target{
-				promNamed("A", "Dependabot", fmt.Sprintf("sum(github_dependabot_alert_open{%s})", PF)),
-				promNamed("B", securityCodeScanning,
+				promAggregated("A", "Dependabot", fmt.Sprintf("sum(github_dependabot_alert_open{%s})", PF)),
+				promAggregated("B", securityCodeScanning,
 					fmt.Sprintf("sum(github_code_scanning_alert_open{%s})", PF)),
 			},
 			Desc: "Alerts still open, from the newest reading of each repository, which is " +
@@ -213,10 +213,14 @@ func openAlerts(b *builder) []Panel {
 			),
 			ESOver: []any{frameName("A", "Dependabot"), frameName("B", securityCodeScanning)},
 			ESOpts: Opts{"calc": "sum"},
+			ESDesc: esLeftOut("an alert count", esNewestAddedUp("alert")),
 			Opts:   Opts{"thresholds": plainSteps},
 			Overrides: []any{
 				fieldThresholds("Dependabot", "short", alertThresholds),
 				fieldThresholds(securityCodeScanning, "short", alertThresholds),
+				// The collector writes a row per group of alerts that are open
+				// and none for a group with none, so no row is none open.
+				noValueOf("Dependabot", "none open"), noValueOf(securityCodeScanning, "none open"),
 			},
 		}),
 		panel("barchart", "Alerts by severity", box{W: 6, H: 4, X: 12, Y: 0}, []Target{sqlT(bySev)}, &P{

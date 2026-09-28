@@ -94,10 +94,10 @@ func cost(b *builder) []Panel {
 				" FROM gh_billing_usage WHERE $__timeFilter(time)",
 		)}, &P{
 			Prom: []Target{
-				promNamed("A", "Gross", "sum(github_billing_usage_gross)"),
-				promNamed("B", costCovered, "sum(github_billing_usage_discount)"),
-				promNamed("C", costBilled, "sum(github_billing_usage_net)"),
-				promNamed("D", costActionsMinutes, `sum(github_billing_usage_quantity{unit="Minutes"})`),
+				promAggregated("A", "Gross", "sum(github_billing_usage_gross)"),
+				promAggregated("B", costCovered, "sum(github_billing_usage_discount)"),
+				promAggregated("C", costBilled, "sum(github_billing_usage_net)"),
+				promAggregated("D", costActionsMinutes, `sum(github_billing_usage_quantity{unit="Minutes"})`),
 			},
 			Desc: "What the usage would have cost at list price, what the plan covered, and " +
 				"what was actually billed, which is not always zero because the monthly " +
@@ -112,17 +112,23 @@ func cost(b *builder) []Panel {
 				grNamed("D", costActionsMinutes, total(costSumSeries+mins+")")),
 			},
 			ES: []Target{
-				esRef("A", b.esTotal(bu, b.mSum("gross"))),
-				esRef("B", b.esTotal(bu, b.mSum("discount"))),
-				esRef("C", b.esTotal(bu, b.mSum("net"))),
-				esRef("D", b.esTotal(bu, b.mSum("quantity"), "unit:Minutes")),
+				esRef("A", b.esOverRange(bu, b.mSum("gross"))),
+				esRef("B", b.esOverRange(bu, b.mSum("discount"))),
+				esRef("C", b.esOverRange(bu, b.mSum("net"))),
+				esRef("D", b.esOverRange(bu, b.mSum("quantity"), "unit:Minutes")),
 			},
 			ESOver: []any{
 				frameName("A", "Gross"), frameName("B", costCovered),
 				frameName("C", costBilled), frameName("D", costActionsMinutes),
 			},
-			Opts:      Opts{"unit": "currencyUSD"},
-			Overrides: []any{unitOf(costActionsMinutes, "short", 0)},
+			Opts: Opts{"unit": "currencyUSD"},
+			Overrides: []any{
+				unitOf(costActionsMinutes, "short", 0),
+				// GitHub answers the products that were used, so no row is no
+				// usage.
+				noValueOf("Gross", "no usage"), noValueOf(costCovered, "no usage"),
+				noValueOf(costBilled, "no usage"), noValueOf(costActionsMinutes, "no usage"),
+			},
 		}),
 		panel("timeseries", "Cost over time by product", box{W: 12, H: 8, X: 0, Y: 4},
 			[]Target{sqlTS(perDay)}, &P{

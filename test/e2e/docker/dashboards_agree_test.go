@@ -72,6 +72,10 @@ type dashboardDiffer struct {
 	// title is the panel's, since an ordinal moves every time a panel is
 	// added above it.
 	title string
+	// kind is the panel's type, for a title two panels share: the Overview's
+	// stat group and the Inventory table are both "Repositories". Empty, the
+	// entry is about every panel of its title.
+	kind string
 	// stores are the stores the reason is about. A difference between two
 	// stores is excused when either of them is named here.
 	stores []string
@@ -116,11 +120,6 @@ var dashboardsDiffer = []dashboardDiffer{
 	{
 		title: "Contributions by year", stores: []string{"graphite", "elasticsearch"},
 		reason: "answers only inside the dashboard range",
-	},
-	// No issue closed in the range: the others say so on the tile.
-	{
-		title: "Merged and closed in range", stores: []string{"elasticsearch"},
-		reason: "a median or an average with nothing in the range", only: []string{"Time to close an issue"},
 	},
 	// Two of the four jobs queued in the same hour: 50 where the others
 	// read 47.5.
@@ -236,7 +235,8 @@ func TestTheStoresDrawTheSameValues(t *testing.T) {
 	s := Start(t)
 	run := dashboardsRun(t, s)
 	c := &dashboardComparison{
-		run: run, drift: sweepDrift(run.sweeps), used: map[int]bool{}, compared: map[string]map[string]bool{},
+		run: run, entries: dashboardsDiffer, drift: sweepDrift(run.sweeps),
+		used: map[int]bool{}, compared: map[string]map[string]bool{},
 	}
 	indexes := map[int]bool{}
 	for _, store := range dashboardStores {
@@ -369,9 +369,11 @@ func TestNoPanelDrawsAFieldUnderTheNameItsDatasourceGave(t *testing.T) {
 // dashboardComparison is one pass of the comparison over every panel, and
 // what it found.
 type dashboardComparison struct {
-	run   *dashboardRun
-	drift map[string]float64
-	used  map[int]bool
+	run *dashboardRun
+	// entries is what excuses a difference in this pass.
+	entries []dashboardDiffer
+	drift   map[string]float64
+	used    map[int]bool
 	// compared is, per panel title, the stores whose picture of it was
 	// compared with another store's. An entry none of whose stores is here
 	// was never asked, which is not the same as no longer being needed.
@@ -384,7 +386,12 @@ type dashboardComparison struct {
 // differences no entry excuses, one line per pair.
 func (c *dashboardComparison) panel(t *testing.T, index int) []string {
 	t.Helper()
-	pictures := dashboardPictures(t, c.run, index)
+	return c.compare(index, dashboardPictures(t, c.run, index))
+}
+
+// compare is panel over pictures drawn elsewhere, from another question put
+// to the same panels.
+func (c *dashboardComparison) compare(index int, pictures map[string]grafana.Picture) []string {
 	title := dashboardPanelTitle(c.run, index)
 	sql := dashboardPanelSQL(c.run, index)
 	slack, fromNow := columnSlack(sql, c.drift), nowColumns(sql)
@@ -418,7 +425,7 @@ func (c *dashboardComparison) panel(t *testing.T, index int) []string {
 			}
 			pair := a.name + " against " + b.name
 			verdict := "DIFFER "
-			if dashboardExcused(title, a.name, b.name, &pa, &pb, like, c.used) {
+			if dashboardExcused(c.entries, title, a.name, b.name, &pa, &pb, like, c.used) {
 				verdict = "EXCUSED"
 			} else {
 				failures = append(failures, pair+": "+strings.Join(diffs, "; "))
@@ -520,13 +527,14 @@ func graphiteSameName(graphite, other string, nodes bool) bool {
 // every difference between the two on the panel, and marks the ones that did.
 // An entry without `only` excuses the pair; entries that name tiles or columns
 // excuse it when the pair draws the rest alike.
-func dashboardExcused(title, a, b string, pa, pb *grafana.Picture, like grafana.Likeness,
-	used map[int]bool,
+func dashboardExcused(differ []dashboardDiffer, title, a, b string, pa, pb *grafana.Picture,
+	like grafana.Likeness, used map[int]bool,
 ) bool {
 	var entries []int
 	var only []string
-	for i, e := range dashboardsDiffer {
-		if e.title != title || (!slices.Contains(e.stores, a) && !slices.Contains(e.stores, b)) {
+	for i, e := range differ {
+		if e.title != title || (!slices.Contains(e.stores, a) && !slices.Contains(e.stores, b)) ||
+			(e.kind != "" && e.kind != pa.Kind) {
 			continue
 		}
 		if len(e.only) == 0 {
@@ -567,7 +575,7 @@ func dashboardDifferProblems(entries []dashboardDiffer, run *dashboardRun, used 
 		found := false
 		for _, store := range e.stores {
 			for _, o := range run.outcomes[store] {
-				if o.panel.Title != e.title {
+				if o.panel.Title != e.title || (e.kind != "" && o.panel.Type != e.kind) {
 					continue
 				}
 				found = true

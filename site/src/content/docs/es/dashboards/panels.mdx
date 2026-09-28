@@ -60,12 +60,33 @@ runs" y "no jobs" bajo la duración de la ejecución y la espera en cola, "no
 commits" bajo la proporción firmada, y "no deliveries" en la tasa de fallo de
 los webhooks. Las palabras bajo una tarjeta se dibujan en el color del texto, no
 en el del umbral más bajo de la tarjeta, que es rojo para la tasa de éxito y la
-proporción firmada: "none decided" no es una compilación fallida. Un recuento sobre un rango así da 0 en todos los almacenes:
-Graphite dibuja 0 para una ruta que nunca ha tenido, y Elasticsearch para un
-rango sin ningún documento que contar. Una mediana o una media sigue sin tener
-campo que lleve las palabras donde Graphite no encuentra ninguna ruta, y en
-Elasticsearch, cuyo plugin lee como 0 la mediana de un bucket vacío; esa tarjeta
-sale de su grupo, y los paneles de Elasticsearch lo dicen.
+proporción firmada: "none decided" no es una compilación fallida. Un recuento
+sobre un rango así da 0. Un total tampoco tiene número, ya que en los almacenes
+SQL la suma de ninguna fila es nula, y también dice qué le faltó al rango: "no
+traffic" bajo las visitas y los dos recuentos únicos, "not read" bajo las
+estrellas y los forks, el almacenamiento de artefactos y la caché, "no commits"
+bajo las líneas añadidas y eliminadas, "no releases" bajo el total de
+descargas, "none open" bajo las alertas abiertas, y "no usage" bajo el gasto.
+Antes de la 2.6.2 un grupo de totales de los que el rango no tenía ninguno, el
+tráfico o las alertas abiertas de un repositorio sin ellos, era un panel sin
+nada en absoluto, ni siquiera los nombres: Grafana dimensiona el texto de una
+tarjeta por su valor, y uno vacío se dibuja sin tamaño.
+
+Sobre un rango o un repositorio sin nada, todos los almacenes dibujan las
+tarjetas que dibujan los almacenes SQL, con 0 o sin valor donde ellos lo hacen:
+Graphite para una ruta que nunca ha tenido, Elasticsearch para un rango en el
+que no tiene ningún documento, y Prometheus para una consulta que no encuentra
+ninguna serie. Antes de la 2.6.2 una tarjeta así salía de su grupo en esos tres,
+y sobre un repositorio sin nada faltaban dieciocho tarjetas en Graphite y veinte
+en Elasticsearch. Queda un caso, en Elasticsearch, y los cuatro paneles a los
+que afecta lo dicen: un valor sumado del documento más reciente de cada
+repositorio, release o alerta, los recuentos de estrellas y forks, el
+almacenamiento de artefactos y la caché, el total de descargas y las alertas
+abiertas, sigue saliendo de su grupo cuando no hay tal documento, ya que el
+datasource falla sin más con esa agregación sobre nada. La tasa de éxito, la
+duración de la ejecución y la espera en cola junto a los dos totales de bytes
+salen también, porque ese panel suma cada valor y leería como 0 un valor de
+nada.
 
 ## Overview
 

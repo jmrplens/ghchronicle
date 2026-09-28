@@ -171,26 +171,26 @@ func runOutcomes(b *builder) []Panel {
 			)},
 		}, &P{
 			Prom: []Target{
-				promNamed("A", ciRunCount, fmt.Sprintf("sum(increase(%s[$__range]))", promRuns)),
-				promNamed("B", ciSuccessRate, fmt.Sprintf(
+				promCounted("A", ciRunCount, fmt.Sprintf("sum(increase(%s[$__range]))", promRuns)),
+				promAggregated("B", ciSuccessRate, fmt.Sprintf(
 					`100 * sum(increase(github_workflow_runs_total{conclusion="success",%s}[$__range]))`+
 						` / sum(increase(github_workflow_runs_total{conclusion=~"success|failure",%s}[$__range]))`,
 					PF, PF,
 				)),
-				promNamed("C", ciUndecidedRuns, fmt.Sprintf(
+				promCounted("C", ciUndecidedRuns, fmt.Sprintf(
 					`sum(increase(github_workflow_runs_total{conclusion=~"%s|skipped",%s}[$__range]))`,
 					cancelledRun, PF,
 				)),
-				promNamed("D", ciRunTime, fmt.Sprintf(
+				promAggregated("D", ciRunTime, fmt.Sprintf(
 					"avg(github_workflow_runs_duration_seconds_mean{%s})", PF,
 				)),
-				promNamed("E", ciQueueWait, fmt.Sprintf(
+				promAggregated("E", ciQueueWait, fmt.Sprintf(
 					"avg(github_workflow_jobs_queued_seconds_mean{%s})", PF,
 				)),
-				promNamed("F", ciArtifactStorage, fmt.Sprintf(
+				promAggregated("F", ciArtifactStorage, fmt.Sprintf(
 					"sum(github_artifact_total_live_bytes{%s})", PF,
 				)),
-				promNamed("G", ciCacheSize, fmt.Sprintf(
+				promAggregated("G", ciCacheSize, fmt.Sprintf(
 					"sum(github_actions_cache_size_bytes{%s})", PF,
 				)),
 			},
@@ -222,6 +222,8 @@ func runOutcomes(b *builder) []Panel {
 				grNamed("G", ciCacheSize, latestSum(rp("gh_actions_cache", "size_bytes"))),
 			},
 			GRDesc: grSlot,
+			// esTotal and not esOverRange: this stat adds its values up for the
+			// two byte totals, and a value of nothing would be added up to 0.
 			ES: func() []Target {
 				out := []Target{
 					esRef("A", b.esTotal(ciRun, b.mCount(), ESF)),
@@ -245,7 +247,12 @@ func runOutcomes(b *builder) []Panel {
 			// alone.
 			ESOpts: Opts{"calc": "sum"},
 			ESDesc: "In Elasticsearch the success rate is the mean of the boolean `success` " +
-				"field over those runs, as a fraction. " + esNoMedian,
+				"field over those runs, as a fraction. " + esLeftOut("a value",
+				"the artifact storage and the cache are the newest document of each repository "+
+					"added up by the panel, and the datasource fails on a newest-document "+
+					"aggregation that finds nothing, so the query cannot ask for the empty one; "+
+					"and since the panel adds up every value, a success rate, a run duration or "+
+					"a queue wait of nothing would read 0, so it is not asked for either."),
 			Opts: Opts{"thresholds": plainSteps},
 			Overrides: []any{
 				fieldThresholds(ciSuccessRate, "percent", rateThresholds),
@@ -255,6 +262,7 @@ func runOutcomes(b *builder) []Panel {
 				// the tile says which of the two the range lacked.
 				noValueOf(ciSuccessRate, "none decided"), noValueOf(ciRunTime, "no runs"),
 				noValueOf(ciQueueWait, "no jobs"),
+				noValueOf(ciArtifactStorage, notRead), noValueOf(ciCacheSize, notRead),
 			},
 		}),
 		panel("timeseries", "Runs by outcome over time", box{W: 12, H: 8, X: 0, Y: 5}, []Target{sqlTS(perDay)}, &P{

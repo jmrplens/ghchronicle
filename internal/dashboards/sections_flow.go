@@ -183,22 +183,22 @@ func flowRates(b *builder) []Panel {
 			{Kind: "sql", Format: "table", Ref: "F", SQL: namedValue(prSize50, flowLinesPerPull)},
 		}, &P{
 			Prom: []Target{
-				promNamed("A", flowMergedCount, fmt.Sprintf(
+				promCounted("A", flowMergedCount, fmt.Sprintf(
 					"sum(increase(github_pull_requests_total{%s}[$__range]))", promMerged,
 				)),
-				promNamed("B", flowMergeTime, fmt.Sprintf(
+				promAggregated("B", flowMergeTime, fmt.Sprintf(
 					"avg(github_pull_requests_seconds_to_merge_mean{%s})", promMerged,
 				)),
-				promNamed("C", flowFirstReviewTime, fmt.Sprintf(
+				promAggregated("C", flowFirstReviewTime, fmt.Sprintf(
 					"avg(github_pull_requests_seconds_to_first_human_review_mean{%s})", PF,
 				)),
-				promNamed("D", flowIssuesClosed, fmt.Sprintf(
+				promCounted("D", flowIssuesClosed, fmt.Sprintf(
 					`sum(increase(github_issues_total{state="CLOSED",%s}[$__range]))`, PF,
 				)),
-				promNamed("E", flowIssueCloseTime, fmt.Sprintf(
+				promAggregated("E", flowIssueCloseTime, fmt.Sprintf(
 					`avg(github_issues_seconds_to_close_mean{state="CLOSED",%s})`, PF,
 				)),
-				promNamed("F", flowLinesPerPull, fmt.Sprintf(
+				promAggregated("F", flowLinesPerPull, fmt.Sprintf(
 					"avg(github_pull_requests_churn_mean{%s})", promMerged,
 				)),
 			},
@@ -226,15 +226,14 @@ func flowRates(b *builder) []Panel {
 			},
 			GRDesc: grSlot,
 			ES: []Target{
-				esRef("A", b.esTotal(pr, b.mCount(), esMerged...)),
-				esRef("B", b.esTotal(pr, b.mPct("seconds_to_merge", 50), ESF, flowMergedFilter)),
-				esRef("C", b.esTotal(pr, b.mPct("seconds_to_first_human_review", 50), ESF,
+				esRef("A", b.esOverRange(pr, b.mCount(), esMerged...)),
+				esRef("B", b.esOverRange(pr, b.mPct("seconds_to_merge", 50), ESF, flowMergedFilter)),
+				esRef("C", b.esOverRange(pr, b.mPct("seconds_to_first_human_review", 50), ESF,
 					"_exists_:seconds_to_first_human_review")),
-				esRef("D", b.esTotal("gh_issue", b.mCount(), "state:CLOSED", ESF, esIdentified)),
-				esRef("E", b.esTotal("gh_issue", b.mPct("seconds_to_close", 50), "state:CLOSED", ESF)),
-				esRef("F", b.esTotal(pr, b.mPct("churn", 50), flowMergedFilter, ESF)),
+				esRef("D", b.esOverRange("gh_issue", b.mCount(), "state:CLOSED", ESF, esIdentified)),
+				esRef("E", b.esOverRange("gh_issue", b.mPct("seconds_to_close", 50), "state:CLOSED", ESF)),
+				esRef("F", b.esOverRange(pr, b.mPct("churn", 50), flowMergedFilter, ESF)),
 			},
-			ESDesc: esNoMedian,
 			ESOver: []any{
 				frameName("A", flowMergedCount), frameName("B", flowMergeTime),
 				frameName("C", flowFirstReviewTime), frameName("D", flowIssuesClosed),

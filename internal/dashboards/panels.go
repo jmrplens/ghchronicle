@@ -576,6 +576,13 @@ const dayWidth = 100
 // means something, not for a zero: a count that is genuinely zero already
 // prints 0.
 //
+// A total of nothing is null as well, the SQL stores' SUM of no rows, and a
+// stat group whose every value was null drew a panel with nothing in it at
+// all, not even the names: Grafana sizes a tile's text by its value, and an
+// empty one is drawn at nought pixels (measured on Grafana 13.2.1, "Open
+// alerts" and "Traffic in range" over a repository with nothing in it). So
+// every value a group can have none of says so.
+//
 // It is a value mapping of the null, in the text color, rather than
 // Grafana's `noValue`, which is drawn in the color of the field's lowest
 // threshold. The success rate and the signed share start at red, so over a
@@ -584,7 +591,17 @@ const dayWidth = 100
 // (Grafana 13.2.1, on the 2.6.2 review). NaN is matched as well as null, so
 // that a share of nothing a store answers as NaN reads as the words and not as
 // "NaN".
+// notRead is what a tile says where the store holds no reading of the
+// selection at all: the collector writes the stars and forks, the artifact
+// storage and the cache as one row per repository each time it reads them, 0
+// when there is nothing to count, so no row is no reading rather than none of
+// it.
+const notRead = "not read"
+
 func noValueOf(name, text string) any {
+	if text == "" {
+		panic("a value with nothing to read needs words: " + name)
+	}
 	return override(name, []any{map[string]any{"id": "mappings", "value": []any{
 		map[string]any{"type": "special", "options": map[string]any{
 			"match":  "null+nan",

@@ -93,8 +93,8 @@ func releases(b *builder) []Panel {
 			{Kind: "sql", Format: "table", Ref: "B", SQL: namedValue(countSQL, "Releases")},
 		}, &P{
 			Prom: []Target{
-				promNamed("A", "Total", fmt.Sprintf("sum(github_release_downloads{%s})", PF)),
-				promNamed("B", "Releases", fmt.Sprintf(
+				promAggregated("A", "Total", fmt.Sprintf("sum(github_release_downloads{%s})", PF)),
+				promCounted("B", "Releases", fmt.Sprintf(
 					"count(sum by (full_name, tag) (github_release_downloads{%s}) > 0)", PF,
 				)),
 			},
@@ -119,9 +119,13 @@ func releases(b *builder) []Panel {
 				esRef("B", b.esTotal(rl, b.mUniq("tag"), ESF)),
 			),
 			ESOver: []any{frameName("A", "Total"), frameName("B", "Releases")},
-			ESOpts: Opts{"calc": "sum"},
+			// Every release is a row each time the releases are read, 0
+			// downloads and all, so no row is no release.
+			Overrides: []any{noValueOf("Total", "no releases")},
+			ESOpts:    Opts{"calc": "sum"},
 			ESDesc: "In Elasticsearch the second counts distinct tags, downloaded or not: a " +
-				"cardinality cannot be filtered on the newest value.",
+				"cardinality cannot be filtered on the newest value. " +
+				esLeftOut("the download total", esNewestAddedUp("release")),
 		}),
 		panel("barchart", "Downloads by release", box{W: 18, H: 8, X: 6, Y: 0}, []Target{sqlT(byTag)}, &P{
 			Prom: []Target{promTbl(fmt.Sprintf(

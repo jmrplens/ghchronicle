@@ -263,9 +263,9 @@ type promSample struct {
 }
 
 // evalProm evaluates an instant query made of selectors, `or` and `unless`
-// with an optional `on`, sum, max or count with an optional `by`, and a
-// filter by `>` a number, which is every form the panels held by it take, and
-// answers the one value it has to come to.
+// with an optional `on`, sum, max or count with an optional `by`, a filter by
+// `>` a number and a constant vector(), which is every form the panels held by
+// it take, and answers the one value it has to come to.
 func evalProm(t *testing.T, expr string, series []promSample) float64 {
 	t.Helper()
 	out := evalPromSeries(t, expr, series)
@@ -438,6 +438,15 @@ func (p *exprParser) promTerm(series []promSample) []promSample {
 		return out
 	}
 	name := p.word()
+	if name == "vector" {
+		p.want("(")
+		v, err := strconv.ParseFloat(p.word(), 64)
+		if err != nil {
+			p.t.Fatalf("%s: a vector of no number: %v", p.s, err)
+		}
+		p.want(")")
+		return []promSample{{labels: map[string]string{}, value: v}}
+	}
 	if name == "sum" || name == "max" || name == "count" {
 		var by []string
 		if p.eat("by") {

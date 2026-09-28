@@ -43,10 +43,47 @@ func promNamed(ref, name, expr string) Target {
 	return promq(expr, instant(), legend(name), withRef(ref))
 }
 
-// grNamed is one Graphite series drawn under its own name.
+// promCounted and promAggregated are promNamed for a value that aggregates
+// series, and so carries no label: a count, which reads 0 where it finds no
+// series at all, and anything else, which reads NaN there. Over a repository
+// nothing was written for, an aggregation of no series is an empty answer,
+// and a stat draws no tile for it, where the SQL stores draw a count of
+// nothing as 0 and anything else of nothing as null. A stat draws NaN as it
+// draws null: as the words its panel gives a value that is not there. Only an
+// aggregation, since `or` keeps a vector() beside any series whose labels it
+// does not share, which is every series a selector returns, and the fallback
+// would be a second value rather than the one.
+func promCounted(ref, name, expr string) Target {
+	return promNamed(ref, name, "("+expr+") or vector(0)")
+}
+
+func promAggregated(ref, name, expr string) Target {
+	return promNamed(ref, name, "("+expr+") or vector(NaN)")
+}
+
+// grNamed is one Graphite series drawn under its own name, and a series with
+// nothing in it under that name when the expression matches no path at all.
+//
+// Graphite answers a path it has never held with no series, and a stat draws
+// no tile for a series that is not there, so a value of a repository with no
+// runs, no releases or no alerts left its group where the SQL stores draw it:
+// comparing what the five stores draw over a repository with nothing in it,
+// eighteen tiles of seven groups were missing from Graphite. The fallback is
+// the SQL stores' null, which the tile draws as the words its panel gives a
+// value that is not there; a count falls back to 0 inside its own expression
+// first (see countTotal), and so never reaches this one.
 func grNamed(ref, name, expr string) Target {
+	if !strings.HasPrefix(expr, "fallbackSeries(") {
+		expr = fmt.Sprintf("fallbackSeries(%s, %s)", expr, grNothing)
+	}
 	return grq(fmt.Sprintf("alias(%s, %q)", expr, name), ref)
 }
+
+// grNothing is a series with no value at all: constantLine draws its three
+// points at the start, the middle and the end of the range, and
+// removeBelowValue takes each of them out (measured against graphite-web
+// 1.1.10).
+const grNothing = "removeBelowValue(constantLine(0), 1)"
 
 // frameName names every field a query returns, for the stores whose response
 // parser gives two queries the same column name.
@@ -112,13 +149,13 @@ func overview(b *builder) []Panel {
 		return fmt.Sprintf("SUM(CASE WHEN kind = '%s' THEN %s ELSE 0 END)", kind, field)
 	}
 	trafficProm := func(ref, name, kind, field string) Target {
-		return promNamed(ref, name, fmt.Sprintf(`sum(github_traffic_%s{kind=%q,%s})`, field, kind, PF))
+		return promAggregated(ref, name, fmt.Sprintf(`sum(github_traffic_%s{kind=%q,%s})`, field, kind, PF))
 	}
 	trafficGR := func(ref, name, kind, field string) Target {
 		return grNamed(ref, name, total(fmt.Sprintf("sumSeries(%s)", rp("gh_traffic", field, "kind", kind))))
 	}
 	trafficES := func(ref, kind, field string) Target {
-		t := b.esTotal("gh_traffic", b.mSum(field), "kind:"+kind, ESF)[0]
+		t := b.esOverRange("gh_traffic", b.mSum(field), "kind:"+kind, ESF)[0]
 		t.Ref = ref
 		return t
 	}
@@ -203,8 +240,8 @@ func overview(b *builder) []Panel {
 		}, &P{
 			Prom: []Target{
 				promNamed("A", "Repositories", "github_account_public_repos"),
-				promNamed("B", "Stars", oneEach("stars")),
-				promNamed("C", "Forks", oneEach("forks")),
+				promAggregated("B", "Stars", oneEach("stars")),
+				promAggregated("C", "Forks", oneEach("forks")),
 			},
 			Desc: "Public repositories of the account, and the current stars and forks of " +
 				"the selected ones, summed over the newest row of each repository rather " +
@@ -234,7 +271,9 @@ func overview(b *builder) []Panel {
 			GRDesc: grArchivedWindow,
 			ES:     append(countES, reposES...), ESTF: append(countEStf, reposEStf...),
 			ESOpts: Opts{"calc": "sum"},
-			ESDesc: esArchivedWindow,
+			ESDesc: esArchivedWindow + " " + esLeftOut("a star or a fork count",
+				esNewestAddedUp("repository")),
+			Overrides: []any{noValueOf("Stars", notRead), noValueOf("Forks", notRead)},
 		}),
 		statGroup("Traffic in range", box{W: 8, H: 4, X: 8, Y: brandHeight}, []Target{sqlT(
 			"SELECT " + trafficSQL("views", "count") + ` AS "Views", ` +
@@ -263,6 +302,11 @@ func overview(b *builder) []Panel {
 			ESOver: []any{
 				frameName("A", "Views"), frameName("B", overviewUniqueVisitors),
 				frameName("C", overviewUniqueCloners),
+			},
+			// GitHub answers the days that had traffic, so no row is none.
+			Overrides: []any{
+				noValueOf("Views", "no traffic"), noValueOf(overviewUniqueVisitors, "no traffic"),
+				noValueOf(overviewUniqueCloners, "no traffic"),
 			},
 		}),
 		fieldGroup(b, "gh_account", "Community", box{W: 8, H: 4, X: 16, Y: brandHeight}, []named{

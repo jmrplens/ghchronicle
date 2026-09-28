@@ -389,12 +389,31 @@ rate, "no runs" and "no jobs" under the run duration and the queue wait, "no
 commits" under the signed share, and "no deliveries" on the webhook failure
 rate. The words under a tile are drawn in the color of the text, not in that
 of the tile's lowest threshold, which is red for the success rate and the
-signed share: "none decided" is not a failed build. A count over such a range reads 0 in every store: Graphite draws 0 for a
-path it has never held, and Elasticsearch for a range with no document to
-count. A median or an average still has no field to carry the words where
-Graphite finds no path at all, and in Elasticsearch, whose plugin reads the
-median of an empty bucket as 0; such a tile leaves its group, and the
-Elasticsearch panels say so.
+signed share: "none decided" is not a failed build. A count over such a range
+reads 0. A total has no number either, since the SQL stores' sum of no rows is
+null, and it says what the range lacked too: "no traffic" under the views and
+the two unique counts, "not read" under the stars and forks, the artifact
+storage and the cache, "no commits" under the lines added and removed, "no
+releases" under the download total, "none open" under the open alerts, and "no
+usage" under the spend. Before 2.6.2 a group of totals the range held none of,
+the traffic or the open alerts of a repository without any, was a panel with
+nothing in it at all, not even the names: Grafana sizes a tile's text by its
+value, and an empty one is drawn at no size.
+
+Over a range or a repository with nothing in it, every store draws the tiles
+the SQL stores draw, reading 0 or no value where they do: Graphite for a path
+it has never held, Elasticsearch for a range it holds no document in, and
+Prometheus for a query that finds no series. Before 2.6.2 such a tile left its
+group in those three, and over a repository with nothing in it eighteen tiles
+were missing from Graphite and twenty from Elasticsearch. One case is left, in
+Elasticsearch, and the four panels it touches say so: a value added up from the
+newest document of each repository, release or alert, the star and fork
+counts, the artifact storage and the cache, the download total and the open
+alerts, still leaves its group when there is no such document, since the
+datasource fails outright on that aggregation over nothing. The success rate,
+the run duration and the queue wait beside the two byte totals leave it as
+well, because that panel adds each value up and would read a value of nothing
+as 0.
 
 ### Overview
 

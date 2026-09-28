@@ -43,3 +43,33 @@ func TestAnEntryNoStoreComparedIsNotCalledStale(t *testing.T) {
 		t.Errorf("an entry that excused a difference is reported: %v", problems)
 	}
 }
+
+// TestAnEntryOfOneKindIsNotHeldToAnotherPanelOfItsTitle needs no stack either.
+// "Repositories" is the Overview's stat group and the Inventory table, and an
+// entry about a tile of the first was held to the second's description, which
+// has no reason to say anything about tiles, and called wrong; nor may it
+// excuse a difference in the table.
+func TestAnEntryOfOneKindIsNotHeldToAnotherPanelOfItsTitle(t *testing.T) {
+	reason := "leaves its group when the range holds no document of it"
+	entries := []dashboardDiffer{{
+		title: "Repositories", kind: "stat", stores: []string{"elasticsearch"}, reason: reason,
+		only: []string{"Stars"},
+	}}
+	run := &dashboardRun{outcomes: map[string]map[int]dashboardOutcome{"elasticsearch": {
+		1:  {panel: grafana.PanelQuery{Index: 1, Title: "Repositories", Type: "stat", Description: "So " + reason + "."}},
+		40: {panel: grafana.PanelQuery{Index: 40, Title: "Repositories", Type: "table", Description: "A table."}},
+	}}}
+	compared := map[string]map[string]bool{"Repositories": {"elasticsearch": true}}
+	if problems, _ := dashboardDifferProblems(entries, run, map[int]bool{0: true}, compared); len(problems) > 0 {
+		t.Errorf("an entry about a stat is held to a table of the same title: %v", problems)
+	}
+	table := func(stars float64) grafana.Picture {
+		return grafana.Picture{Kind: "table", Columns: []*grafana.Field{
+			{Name: "Stars", Display: "Stars", Type: "number", Values: []any{stars}},
+		}}
+	}
+	a, b := table(1), table(2)
+	if dashboardExcused(entries, "Repositories", "influxdb", "elasticsearch", &a, &b, grafana.Likeness{}, map[int]bool{}) {
+		t.Error("an entry about a stat excuses a table of the same title")
+	}
+}

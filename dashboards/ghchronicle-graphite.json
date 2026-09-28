@@ -83,7 +83,56 @@
           },
           "unit": "short"
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Stars"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "match": "null+nan",
+                      "result": {
+                        "color": "text",
+                        "index": 0,
+                        "text": "not read"
+                      }
+                    },
+                    "type": "special"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Forks"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "match": "null+nan",
+                      "result": {
+                        "color": "text",
+                        "index": 0,
+                        "text": "not read"
+                      }
+                    },
+                    "type": "special"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 4,
@@ -110,19 +159,19 @@
         {
           "datasource": "${DS_GRAPHITE}",
           "refId": "A",
-          "target": "alias(github.account.*.public_repos, \"Repositories\")",
+          "target": "alias(fallbackSeries(github.account.*.public_repos, removeBelowValue(constantLine(0), 1)), \"Repositories\")",
           "textEditor": true
         },
         {
           "datasource": "${DS_GRAPHITE}",
           "refId": "B",
-          "target": "alias(sumSeries(groupByNode(group(aliasByNode(keepLastValue(github.repo.false.*.*.*.*.*.*.$repo.*.stars), 5), aliasByNode(keepLastValue(timeSlice(github.repo_total.true.*.*.*.$repo.*.stars, \"-7d\")), 4)), 0, \"max\")), \"Stars\")",
+          "target": "alias(fallbackSeries(sumSeries(groupByNode(group(aliasByNode(keepLastValue(github.repo.false.*.*.*.*.*.*.$repo.*.stars), 5), aliasByNode(keepLastValue(timeSlice(github.repo_total.true.*.*.*.$repo.*.stars, \"-7d\")), 4)), 0, \"max\")), removeBelowValue(constantLine(0), 1)), \"Stars\")",
           "textEditor": true
         },
         {
           "datasource": "${DS_GRAPHITE}",
           "refId": "C",
-          "target": "alias(sumSeries(groupByNode(group(aliasByNode(keepLastValue(github.repo.false.*.*.*.*.*.*.$repo.*.forks), 5), aliasByNode(keepLastValue(timeSlice(github.repo_total.true.*.*.*.$repo.*.forks, \"-7d\")), 4)), 0, \"max\")), \"Forks\")",
+          "target": "alias(fallbackSeries(sumSeries(groupByNode(group(aliasByNode(keepLastValue(github.repo.false.*.*.*.*.*.*.$repo.*.forks), 5), aliasByNode(keepLastValue(timeSlice(github.repo_total.true.*.*.*.$repo.*.forks, \"-7d\")), 4)), 0, \"max\")), removeBelowValue(constantLine(0), 1)), \"Forks\")",
           "textEditor": true
         }
       ],
@@ -150,7 +199,80 @@
           },
           "unit": "short"
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Views"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "match": "null+nan",
+                      "result": {
+                        "color": "text",
+                        "index": 0,
+                        "text": "no traffic"
+                      }
+                    },
+                    "type": "special"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Unique visitors"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "match": "null+nan",
+                      "result": {
+                        "color": "text",
+                        "index": 0,
+                        "text": "no traffic"
+                      }
+                    },
+                    "type": "special"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Unique cloners"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "match": "null+nan",
+                      "result": {
+                        "color": "text",
+                        "index": 0,
+                        "text": "no traffic"
+                      }
+                    },
+                    "type": "special"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 4,
@@ -177,19 +299,19 @@
         {
           "datasource": "${DS_GRAPHITE}",
           "refId": "A",
-          "target": "alias(summarize(sumSeries(github.traffic.*.views.*.$repo.count), \"100y\", \"sum\", true), \"Views\")",
+          "target": "alias(fallbackSeries(summarize(sumSeries(github.traffic.*.views.*.$repo.count), \"100y\", \"sum\", true), removeBelowValue(constantLine(0), 1)), \"Views\")",
           "textEditor": true
         },
         {
           "datasource": "${DS_GRAPHITE}",
           "refId": "B",
-          "target": "alias(summarize(sumSeries(github.traffic.*.views.*.$repo.uniques), \"100y\", \"sum\", true), \"Unique visitors\")",
+          "target": "alias(fallbackSeries(summarize(sumSeries(github.traffic.*.views.*.$repo.uniques), \"100y\", \"sum\", true), removeBelowValue(constantLine(0), 1)), \"Unique visitors\")",
           "textEditor": true
         },
         {
           "datasource": "${DS_GRAPHITE}",
           "refId": "C",
-          "target": "alias(summarize(sumSeries(github.traffic.*.clones.*.$repo.uniques), \"100y\", \"sum\", true), \"Unique cloners\")",
+          "target": "alias(fallbackSeries(summarize(sumSeries(github.traffic.*.clones.*.$repo.uniques), \"100y\", \"sum\", true), removeBelowValue(constantLine(0), 1)), \"Unique cloners\")",
           "textEditor": true
         }
       ],
@@ -244,25 +366,25 @@
         {
           "datasource": "${DS_GRAPHITE}",
           "refId": "A",
-          "target": "alias(keepLastValue(github.account.*.followers), \"Followers\")",
+          "target": "alias(fallbackSeries(keepLastValue(github.account.*.followers), removeBelowValue(constantLine(0), 1)), \"Followers\")",
           "textEditor": true
         },
         {
           "datasource": "${DS_GRAPHITE}",
           "refId": "B",
-          "target": "alias(keepLastValue(github.account.*.following), \"Following\")",
+          "target": "alias(fallbackSeries(keepLastValue(github.account.*.following), removeBelowValue(constantLine(0), 1)), \"Following\")",
           "textEditor": true
         },
         {
           "datasource": "${DS_GRAPHITE}",
           "refId": "C",
-          "target": "alias(keepLastValue(github.account.*.sponsors), \"Sponsors\")",
+          "target": "alias(fallbackSeries(keepLastValue(github.account.*.sponsors), removeBelowValue(constantLine(0), 1)), \"Sponsors\")",
           "textEditor": true
         },
         {
           "datasource": "${DS_GRAPHITE}",
           "refId": "D",
-          "target": "alias(keepLastValue(github.account.*.sponsoring), \"Sponsoring\")",
+          "target": "alias(fallbackSeries(keepLastValue(github.account.*.sponsoring), removeBelowValue(constantLine(0), 1)), \"Sponsoring\")",
           "textEditor": true
         }
       ],
@@ -330,37 +452,37 @@
         {
           "datasource": "${DS_GRAPHITE}",
           "refId": "A",
-          "target": "alias(github.contributions_total.*.calendar_total, \"Contributions\")",
+          "target": "alias(fallbackSeries(github.contributions_total.*.calendar_total, removeBelowValue(constantLine(0), 1)), \"Contributions\")",
           "textEditor": true
         },
         {
           "datasource": "${DS_GRAPHITE}",
           "refId": "B",
-          "target": "alias(github.account.*.account_age_days, \"Account age\")",
+          "target": "alias(fallbackSeries(github.account.*.account_age_days, removeBelowValue(constantLine(0), 1)), \"Account age\")",
           "textEditor": true
         },
         {
           "datasource": "${DS_GRAPHITE}",
           "refId": "C",
-          "target": "alias(github.account.*.watching, \"Watching\")",
+          "target": "alias(fallbackSeries(github.account.*.watching, removeBelowValue(constantLine(0), 1)), \"Watching\")",
           "textEditor": true
         },
         {
           "datasource": "${DS_GRAPHITE}",
           "refId": "D",
-          "target": "alias(github.account.*.starred, \"Stars given\")",
+          "target": "alias(fallbackSeries(github.account.*.starred, removeBelowValue(constantLine(0), 1)), \"Stars given\")",
           "textEditor": true
         },
         {
           "datasource": "${DS_GRAPHITE}",
           "refId": "E",
-          "target": "alias(github.account.*.gists, \"Gists\")",
+          "target": "alias(fallbackSeries(github.account.*.gists, removeBelowValue(constantLine(0), 1)), \"Gists\")",
           "textEditor": true
         },
         {
           "datasource": "${DS_GRAPHITE}",
           "refId": "F",
-          "target": "alias(github.account.*.packages, \"Packages\")",
+          "target": "alias(fallbackSeries(github.account.*.packages, removeBelowValue(constantLine(0), 1)), \"Packages\")",
           "textEditor": true
         }
       ],
@@ -425,37 +547,37 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "alias(keepLastValue(github.account_total.*.pulls_merged), \"Pull requests merged\")",
+              "target": "alias(fallbackSeries(keepLastValue(github.account_total.*.pulls_merged), removeBelowValue(constantLine(0), 1)), \"Pull requests merged\")",
               "textEditor": true
             },
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "B",
-              "target": "alias(keepLastValue(github.account_total.*.pulls_reviewed), \"Pull requests reviewed\")",
+              "target": "alias(fallbackSeries(keepLastValue(github.account_total.*.pulls_reviewed), removeBelowValue(constantLine(0), 1)), \"Pull requests reviewed\")",
               "textEditor": true
             },
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "C",
-              "target": "alias(keepLastValue(github.account_total.*.commits), \"Commits\")",
+              "target": "alias(fallbackSeries(keepLastValue(github.account_total.*.commits), removeBelowValue(constantLine(0), 1)), \"Commits\")",
               "textEditor": true
             },
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "D",
-              "target": "alias(keepLastValue(github.account_total.*.issues_opened), \"Issues opened\")",
+              "target": "alias(fallbackSeries(keepLastValue(github.account_total.*.issues_opened), removeBelowValue(constantLine(0), 1)), \"Issues opened\")",
               "textEditor": true
             },
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "E",
-              "target": "alias(keepLastValue(github.account_total.*.pulls_merged_elsewhere), \"Merged elsewhere\")",
+              "target": "alias(fallbackSeries(keepLastValue(github.account_total.*.pulls_merged_elsewhere), removeBelowValue(constantLine(0), 1)), \"Merged elsewhere\")",
               "textEditor": true
             },
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "F",
-              "target": "alias(keepLastValue(github.account_total.*.commented_elsewhere), \"Threads commented elsewhere\")",
+              "target": "alias(fallbackSeries(keepLastValue(github.account_total.*.commented_elsewhere), removeBelowValue(constantLine(0), 1)), \"Threads commented elsewhere\")",
               "textEditor": true
             }
           ],
@@ -2009,25 +2131,25 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "alias(asPercent(keepLastValue(github.contributions_total.*.commits), sumSeries(keepLastValue(github.contributions_total.*.{commits,pull_requests,issues,reviews}))), \"Commits\")",
+              "target": "alias(fallbackSeries(asPercent(keepLastValue(github.contributions_total.*.commits), sumSeries(keepLastValue(github.contributions_total.*.{commits,pull_requests,issues,reviews}))), removeBelowValue(constantLine(0), 1)), \"Commits\")",
               "textEditor": true
             },
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "B",
-              "target": "alias(asPercent(keepLastValue(github.contributions_total.*.pull_requests), sumSeries(keepLastValue(github.contributions_total.*.{commits,pull_requests,issues,reviews}))), \"Pull requests\")",
+              "target": "alias(fallbackSeries(asPercent(keepLastValue(github.contributions_total.*.pull_requests), sumSeries(keepLastValue(github.contributions_total.*.{commits,pull_requests,issues,reviews}))), removeBelowValue(constantLine(0), 1)), \"Pull requests\")",
               "textEditor": true
             },
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "C",
-              "target": "alias(asPercent(keepLastValue(github.contributions_total.*.issues), sumSeries(keepLastValue(github.contributions_total.*.{commits,pull_requests,issues,reviews}))), \"Issues\")",
+              "target": "alias(fallbackSeries(asPercent(keepLastValue(github.contributions_total.*.issues), sumSeries(keepLastValue(github.contributions_total.*.{commits,pull_requests,issues,reviews}))), removeBelowValue(constantLine(0), 1)), \"Issues\")",
               "textEditor": true
             },
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "D",
-              "target": "alias(asPercent(keepLastValue(github.contributions_total.*.reviews), sumSeries(keepLastValue(github.contributions_total.*.{commits,pull_requests,issues,reviews}))), \"Code review\")",
+              "target": "alias(fallbackSeries(asPercent(keepLastValue(github.contributions_total.*.reviews), sumSeries(keepLastValue(github.contributions_total.*.{commits,pull_requests,issues,reviews}))), removeBelowValue(constantLine(0), 1)), \"Code review\")",
               "textEditor": true
             }
           ],
@@ -2904,13 +3026,13 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "B",
-              "target": "alias(summarize(percentileOfSeries(github.pull_request.*.*.*.*.$repo.MERGED.seconds_to_merge, 50), \"100y\", \"median\", true), \"Time to merge\")",
+              "target": "alias(fallbackSeries(summarize(percentileOfSeries(github.pull_request.*.*.*.*.$repo.MERGED.seconds_to_merge, 50), \"100y\", \"median\", true), removeBelowValue(constantLine(0), 1)), \"Time to merge\")",
               "textEditor": true
             },
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "C",
-              "target": "alias(summarize(percentileOfSeries(github.pull_request.*.*.*.*.$repo.*.seconds_to_first_human_review, 50), \"100y\", \"median\", true), \"Time to review by someone else\")",
+              "target": "alias(fallbackSeries(summarize(percentileOfSeries(github.pull_request.*.*.*.*.$repo.*.seconds_to_first_human_review, 50), \"100y\", \"median\", true), removeBelowValue(constantLine(0), 1)), \"Time to review by someone else\")",
               "textEditor": true
             },
             {
@@ -2922,13 +3044,13 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "E",
-              "target": "alias(summarize(percentileOfSeries(github.issue.*.*.*.*.$repo.CLOSED.seconds_to_close, 50), \"100y\", \"median\", true), \"Time to close an issue\")",
+              "target": "alias(fallbackSeries(summarize(percentileOfSeries(github.issue.*.*.*.*.$repo.CLOSED.seconds_to_close, 50), \"100y\", \"median\", true), removeBelowValue(constantLine(0), 1)), \"Time to close an issue\")",
               "textEditor": true
             },
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "F",
-              "target": "alias(summarize(percentileOfSeries(github.pull_request.*.*.*.*.$repo.MERGED.churn, 50), \"100y\", \"median\", true), \"Lines per pull request\")",
+              "target": "alias(fallbackSeries(summarize(percentileOfSeries(github.pull_request.*.*.*.*.$repo.MERGED.churn, 50), \"100y\", \"median\", true), removeBelowValue(constantLine(0), 1)), \"Lines per pull request\")",
               "textEditor": true
             }
           ],
@@ -4771,6 +4893,54 @@
                     ]
                   }
                 ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Artifact storage walked"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "not read"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Actions cache"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "not read"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
               }
             ]
           },
@@ -4805,7 +4975,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "B",
-              "target": "alias(asPercent(fallbackSeries(summarize(sumSeries(isNonNull(github.workflow_run.*.success.*.*.*.$repo.*.duration_seconds)), \"100y\", \"sum\", true), constantLine(0)), fallbackSeries(summarize(sumSeries(isNonNull(github.workflow_run.*.{success,failure}.*.*.*.$repo.*.duration_seconds)), \"100y\", \"sum\", true), constantLine(0))), \"Success rate\")",
+              "target": "alias(fallbackSeries(asPercent(fallbackSeries(summarize(sumSeries(isNonNull(github.workflow_run.*.success.*.*.*.$repo.*.duration_seconds)), \"100y\", \"sum\", true), constantLine(0)), fallbackSeries(summarize(sumSeries(isNonNull(github.workflow_run.*.{success,failure}.*.*.*.$repo.*.duration_seconds)), \"100y\", \"sum\", true), constantLine(0))), removeBelowValue(constantLine(0), 1)), \"Success rate\")",
               "textEditor": true
             },
             {
@@ -4817,25 +4987,25 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "D",
-              "target": "alias(summarize(percentileOfSeries(github.workflow_run.*.*.*.*.*.$repo.*.duration_seconds, 50), \"100y\", \"median\", true), \"Run duration\")",
+              "target": "alias(fallbackSeries(summarize(percentileOfSeries(github.workflow_run.*.*.*.*.*.$repo.*.duration_seconds, 50), \"100y\", \"median\", true), removeBelowValue(constantLine(0), 1)), \"Run duration\")",
               "textEditor": true
             },
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "E",
-              "target": "alias(summarize(percentileOfSeries(github.workflow_job.*.*.*.*.*.*.$repo.*.*.queued_seconds, 50), \"100y\", \"median\", true), \"Queue wait\")",
+              "target": "alias(fallbackSeries(summarize(percentileOfSeries(github.workflow_job.*.*.*.*.*.*.$repo.*.*.queued_seconds, 50), \"100y\", \"median\", true), removeBelowValue(constantLine(0), 1)), \"Queue wait\")",
               "textEditor": true
             },
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "F",
-              "target": "alias(sumSeries(keepLastValue(github.artifact_total.*.*.$repo.live_bytes)), \"Artifact storage walked\")",
+              "target": "alias(fallbackSeries(sumSeries(keepLastValue(github.artifact_total.*.*.$repo.live_bytes)), removeBelowValue(constantLine(0), 1)), \"Artifact storage walked\")",
               "textEditor": true
             },
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "G",
-              "target": "alias(sumSeries(keepLastValue(github.actions_cache.*.*.$repo.size_bytes)), \"Actions cache\")",
+              "target": "alias(fallbackSeries(sumSeries(keepLastValue(github.actions_cache.*.*.$repo.size_bytes)), removeBelowValue(constantLine(0), 1)), \"Actions cache\")",
               "textEditor": true
             }
           ],
@@ -6315,6 +6485,54 @@
                     ]
                   }
                 ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Lines added"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "no commits"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Lines removed"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "no commits"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
               }
             ]
           },
@@ -6349,19 +6567,19 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "B",
-              "target": "alias(summarize(sumSeries(github.commit.*.*.*.*.$repo.*.*.additions), \"100y\", \"sum\", true), \"Lines added\")",
+              "target": "alias(fallbackSeries(summarize(sumSeries(github.commit.*.*.*.*.$repo.*.*.additions), \"100y\", \"sum\", true), removeBelowValue(constantLine(0), 1)), \"Lines added\")",
               "textEditor": true
             },
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "C",
-              "target": "alias(summarize(sumSeries(github.commit.*.*.*.*.$repo.*.*.deletions), \"100y\", \"sum\", true), \"Lines removed\")",
+              "target": "alias(fallbackSeries(summarize(sumSeries(github.commit.*.*.*.*.$repo.*.*.deletions), \"100y\", \"sum\", true), removeBelowValue(constantLine(0), 1)), \"Lines removed\")",
               "textEditor": true
             },
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "D",
-              "target": "alias(asPercent(fallbackSeries(summarize(sumSeries(isNonNull(github.commit.*.*.*.*.$repo.*.VALID.churn)), \"100y\", \"sum\", true), constantLine(0)), fallbackSeries(summarize(sumSeries(isNonNull(github.commit.*.*.*.*.$repo.*.*.churn)), \"100y\", \"sum\", true), constantLine(0))), \"Signed commits\")",
+              "target": "alias(fallbackSeries(asPercent(fallbackSeries(summarize(sumSeries(isNonNull(github.commit.*.*.*.*.$repo.*.VALID.churn)), \"100y\", \"sum\", true), constantLine(0)), fallbackSeries(summarize(sumSeries(isNonNull(github.commit.*.*.*.*.$repo.*.*.churn)), \"100y\", \"sum\", true), constantLine(0))), removeBelowValue(constantLine(0), 1)), \"Signed commits\")",
               "textEditor": true
             }
           ],
@@ -10185,7 +10403,32 @@
               },
               "unit": "short"
             },
-            "overrides": []
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Total"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "no releases"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
           },
           "gridPos": {
             "h": 8,
@@ -10212,7 +10455,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "alias(sumSeries(keepLastValue(github.release.*.*.*.*.$repo.*.downloads)), \"Total\")",
+              "target": "alias(fallbackSeries(sumSeries(keepLastValue(github.release.*.*.*.*.$repo.*.downloads)), removeBelowValue(constantLine(0), 1)), \"Total\")",
               "textEditor": true
             },
             {
@@ -10712,6 +10955,54 @@
                     }
                   }
                 ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Dependabot"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "none open"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Code scanning"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "none open"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
               }
             ]
           },
@@ -10740,13 +11031,13 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "alias(sumSeries(keepLastValue(github.dependabot_alert.*.*.*.$repo.*.open)), \"Dependabot\")",
+              "target": "alias(fallbackSeries(sumSeries(keepLastValue(github.dependabot_alert.*.*.*.$repo.*.open)), removeBelowValue(constantLine(0), 1)), \"Dependabot\")",
               "textEditor": true
             },
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "B",
-              "target": "alias(sumSeries(keepLastValue(github.code_scanning_alert.*.*.$repo.*.*.open)), \"Code scanning\")",
+              "target": "alias(fallbackSeries(sumSeries(keepLastValue(github.code_scanning_alert.*.*.$repo.*.*.open)), removeBelowValue(constantLine(0), 1)), \"Code scanning\")",
               "textEditor": true
             }
           ],
@@ -12303,6 +12594,102 @@
                     "value": "short"
                   }
                 ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Gross"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "no usage"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Covered by the plan"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "no usage"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Actually billed"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "no usage"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Actions minutes"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "no usage"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
               }
             ]
           },
@@ -12331,25 +12718,25 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "alias(summarize(sumSeries(github.billing_usage.*.*.*.*.*.*.*.gross), \"100y\", \"sum\", true), \"Gross\")",
+              "target": "alias(fallbackSeries(summarize(sumSeries(github.billing_usage.*.*.*.*.*.*.*.gross), \"100y\", \"sum\", true), removeBelowValue(constantLine(0), 1)), \"Gross\")",
               "textEditor": true
             },
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "B",
-              "target": "alias(summarize(sumSeries(github.billing_usage.*.*.*.*.*.*.*.discount), \"100y\", \"sum\", true), \"Covered by the plan\")",
+              "target": "alias(fallbackSeries(summarize(sumSeries(github.billing_usage.*.*.*.*.*.*.*.discount), \"100y\", \"sum\", true), removeBelowValue(constantLine(0), 1)), \"Covered by the plan\")",
               "textEditor": true
             },
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "C",
-              "target": "alias(summarize(sumSeries(github.billing_usage.*.*.*.*.*.*.*.net), \"100y\", \"sum\", true), \"Actually billed\")",
+              "target": "alias(fallbackSeries(summarize(sumSeries(github.billing_usage.*.*.*.*.*.*.*.net), \"100y\", \"sum\", true), removeBelowValue(constantLine(0), 1)), \"Actually billed\")",
               "textEditor": true
             },
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "D",
-              "target": "alias(summarize(sumSeries(github.billing_usage.*.*.*.*.*.Minutes.*.quantity), \"100y\", \"sum\", true), \"Actions minutes\")",
+              "target": "alias(fallbackSeries(summarize(sumSeries(github.billing_usage.*.*.*.*.*.Minutes.*.quantity), \"100y\", \"sum\", true), removeBelowValue(constantLine(0), 1)), \"Actions minutes\")",
               "textEditor": true
             }
           ],
@@ -16050,25 +16437,25 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "alias(scale(github.sponsors_listing.*.lifetime_received_cents, 0.01), \"Lifetime received\")",
+              "target": "alias(fallbackSeries(scale(github.sponsors_listing.*.lifetime_received_cents, 0.01), removeBelowValue(constantLine(0), 1)), \"Lifetime received\")",
               "textEditor": true
             },
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "B",
-              "target": "alias(scale(github.sponsors_listing.*.monthly_income_cents, 0.01), \"Monthly income\")",
+              "target": "alias(fallbackSeries(scale(github.sponsors_listing.*.monthly_income_cents, 0.01), removeBelowValue(constantLine(0), 1)), \"Monthly income\")",
               "textEditor": true
             },
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "C",
-              "target": "alias(scale(github.sponsors_listing.*.next_payout_cents, 0.01), \"Next payout\")",
+              "target": "alias(fallbackSeries(scale(github.sponsors_listing.*.next_payout_cents, 0.01), removeBelowValue(constantLine(0), 1)), \"Next payout\")",
               "textEditor": true
             },
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "D",
-              "target": "alias(scale(github.sponsors_listing.*.sponsor_spend_cents, 0.01), \"Spent sponsoring\")",
+              "target": "alias(fallbackSeries(scale(github.sponsors_listing.*.sponsor_spend_cents, 0.01), removeBelowValue(constantLine(0), 1)), \"Spent sponsoring\")",
               "textEditor": true
             }
           ],

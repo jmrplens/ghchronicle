@@ -110,10 +110,10 @@ func commitsAndChurn(b *builder) []Panel {
 	return []Panel{
 		statGroup("Commits", box{W: 24, H: 4, X: 0, Y: 0}, []Target{sqlT(commitStats)}, &P{
 			Prom: []Target{
-				promNamed("A", "Commits", fmt.Sprintf("sum(increase(%s[$__range]))", totalM)),
-				promNamed("B", codeLinesAdded, added),
-				promNamed("C", codeLinesRemoved, removed),
-				promNamed("D", codeSignedCommits, fmt.Sprintf(
+				promCounted("A", "Commits", fmt.Sprintf("sum(increase(%s[$__range]))", totalM)),
+				promAggregated("B", codeLinesAdded, added),
+				promAggregated("C", codeLinesRemoved, removed),
+				promAggregated("D", codeSignedCommits, fmt.Sprintf(
 					`100 * sum(increase(github_commits_total{signature="VALID",%s}[$__range])) / sum(increase(%s[$__range]))`,
 					PF, totalM,
 				)),
@@ -132,10 +132,10 @@ func commitsAndChurn(b *builder) []Panel {
 					countTotal(cpath("churn")))),
 			},
 			ES: []Target{
-				esRef("A", b.esTotal(c, b.mCount(), ESF)),
-				esRef("B", b.esTotal(c, b.mSum("additions"), ESF)),
-				esRef("C", b.esTotal(c, b.mSum("deletions"), ESF)),
-				esRef("D", b.esTotal(c, b.mAvg("signed"), ESF)),
+				esRef("A", b.esOverRange(c, b.mCount(), ESF)),
+				esRef("B", b.esOverRange(c, b.mSum("additions"), ESF)),
+				esRef("C", b.esOverRange(c, b.mSum("deletions"), ESF)),
+				esRef("D", b.esOverRange(c, b.mAvg("signed"), ESF)),
 			},
 			ESOver: []any{
 				frameName("A", "Commits"), frameName("B", codeLinesAdded),
@@ -143,11 +143,12 @@ func commitsAndChurn(b *builder) []Panel {
 				fieldThresholds(codeSignedCommits, "percentunit", fractionOf(signedSteps)),
 			},
 			ESDesc: "In Elasticsearch the signed share is the mean of the boolean `signed` " +
-				"field, as a fraction. " + esNoMedian,
+				"field, as a fraction.",
 			Opts: mergeOpts(Opts{"thresholds": plainSteps}, bounded()),
 			Overrides: []any{
 				fieldThresholds(codeSignedCommits, "percent", signedSteps),
 				noValueOf(codeSignedCommits, "no commits"),
+				noValueOf(codeLinesAdded, "no commits"), noValueOf(codeLinesRemoved, "no commits"),
 			},
 		}),
 		panel("timeseries", "Lines changed over time", box{W: 12, H: 8, X: 0, Y: 4}, []Target{sqlTS(churn)}, &P{

@@ -777,9 +777,24 @@ func renumberES(panels []map[string]any) {
 				metrics[id] = m
 			}
 		}
+		renamed := map[string]string{}
 		for _, e := range numbered(t) {
 			n++
-			e["id"] = strconv.Itoa(n)
+			old, _ := e["id"].(string)
+			renamed[old] = strconv.Itoa(n)
+			e["id"] = renamed[old]
+		}
+		// A bucket script reads the metrics it names by id, so they are
+		// renamed with them: left as they were, it read whichever metric of
+		// the query now carried the old number, or none.
+		for _, e := range asList(t["metrics"]) {
+			m, _ := e.(map[string]any)
+			for _, v := range asList(m["pipelineVariables"]) {
+				variable, _ := v.(map[string]any)
+				if id, ok := variable["pipelineAgg"].(string); ok {
+					variable["pipelineAgg"] = renamed[id]
+				}
+			}
 		}
 		for _, e := range asList(t["bucketAggs"]) {
 			bucket, _ := e.(map[string]any)

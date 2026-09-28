@@ -83,7 +83,56 @@
           },
           "unit": "short"
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Stars"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "match": "null+nan",
+                      "result": {
+                        "color": "text",
+                        "index": 0,
+                        "text": "not read"
+                      }
+                    },
+                    "type": "special"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Forks"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "match": "null+nan",
+                      "result": {
+                        "color": "text",
+                        "index": 0,
+                        "text": "not read"
+                      }
+                    },
+                    "type": "special"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 4,
@@ -119,7 +168,7 @@
         {
           "datasource": "${DS_PROMETHEUS}",
           "editorMode": "code",
-          "expr": "sum(max by (full_name) (github_repo_stars{archived=\"false\",repo=~\"$repo\"} or github_repo_total_stars{archived=\"true\",repo=~\"$repo\"}))",
+          "expr": "(sum(max by (full_name) (github_repo_stars{archived=\"false\",repo=~\"$repo\"} or github_repo_total_stars{archived=\"true\",repo=~\"$repo\"}))) or vector(NaN)",
           "instant": true,
           "legendFormat": "Stars",
           "range": false,
@@ -128,7 +177,7 @@
         {
           "datasource": "${DS_PROMETHEUS}",
           "editorMode": "code",
-          "expr": "sum(max by (full_name) (github_repo_forks{archived=\"false\",repo=~\"$repo\"} or github_repo_total_forks{archived=\"true\",repo=~\"$repo\"}))",
+          "expr": "(sum(max by (full_name) (github_repo_forks{archived=\"false\",repo=~\"$repo\"} or github_repo_total_forks{archived=\"true\",repo=~\"$repo\"}))) or vector(NaN)",
           "instant": true,
           "legendFormat": "Forks",
           "range": false,
@@ -159,7 +208,80 @@
           },
           "unit": "short"
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Views"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "match": "null+nan",
+                      "result": {
+                        "color": "text",
+                        "index": 0,
+                        "text": "no traffic"
+                      }
+                    },
+                    "type": "special"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Unique visitors"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "match": "null+nan",
+                      "result": {
+                        "color": "text",
+                        "index": 0,
+                        "text": "no traffic"
+                      }
+                    },
+                    "type": "special"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Unique cloners"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "match": "null+nan",
+                      "result": {
+                        "color": "text",
+                        "index": 0,
+                        "text": "no traffic"
+                      }
+                    },
+                    "type": "special"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 4,
@@ -186,7 +308,7 @@
         {
           "datasource": "${DS_PROMETHEUS}",
           "editorMode": "code",
-          "expr": "sum(github_traffic_count{kind=\"views\",repo=~\"$repo\"})",
+          "expr": "(sum(github_traffic_count{kind=\"views\",repo=~\"$repo\"})) or vector(NaN)",
           "instant": true,
           "legendFormat": "Views",
           "range": false,
@@ -195,7 +317,7 @@
         {
           "datasource": "${DS_PROMETHEUS}",
           "editorMode": "code",
-          "expr": "sum(github_traffic_uniques{kind=\"views\",repo=~\"$repo\"})",
+          "expr": "(sum(github_traffic_uniques{kind=\"views\",repo=~\"$repo\"})) or vector(NaN)",
           "instant": true,
           "legendFormat": "Unique visitors",
           "range": false,
@@ -204,7 +326,7 @@
         {
           "datasource": "${DS_PROMETHEUS}",
           "editorMode": "code",
-          "expr": "sum(github_traffic_uniques{kind=\"clones\",repo=~\"$repo\"})",
+          "expr": "(sum(github_traffic_uniques{kind=\"clones\",repo=~\"$repo\"})) or vector(NaN)",
           "instant": true,
           "legendFormat": "Unique cloners",
           "range": false,
@@ -2963,7 +3085,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum(increase(github_pull_requests_total{state=\"MERGED\",repo=~\"$repo\"}[$__range]))",
+              "expr": "(sum(increase(github_pull_requests_total{state=\"MERGED\",repo=~\"$repo\"}[$__range]))) or vector(0)",
               "instant": true,
               "legendFormat": "Pull requests merged",
               "range": false,
@@ -2972,7 +3094,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "avg(github_pull_requests_seconds_to_merge_mean{state=\"MERGED\",repo=~\"$repo\"})",
+              "expr": "(avg(github_pull_requests_seconds_to_merge_mean{state=\"MERGED\",repo=~\"$repo\"})) or vector(NaN)",
               "instant": true,
               "legendFormat": "Time to merge",
               "range": false,
@@ -2981,7 +3103,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "avg(github_pull_requests_seconds_to_first_human_review_mean{repo=~\"$repo\"})",
+              "expr": "(avg(github_pull_requests_seconds_to_first_human_review_mean{repo=~\"$repo\"})) or vector(NaN)",
               "instant": true,
               "legendFormat": "Time to review by someone else",
               "range": false,
@@ -2990,7 +3112,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum(increase(github_issues_total{state=\"CLOSED\",repo=~\"$repo\"}[$__range]))",
+              "expr": "(sum(increase(github_issues_total{state=\"CLOSED\",repo=~\"$repo\"}[$__range]))) or vector(0)",
               "instant": true,
               "legendFormat": "Issues closed",
               "range": false,
@@ -2999,7 +3121,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "avg(github_issues_seconds_to_close_mean{state=\"CLOSED\",repo=~\"$repo\"})",
+              "expr": "(avg(github_issues_seconds_to_close_mean{state=\"CLOSED\",repo=~\"$repo\"})) or vector(NaN)",
               "instant": true,
               "legendFormat": "Time to close an issue",
               "range": false,
@@ -3008,7 +3130,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "avg(github_pull_requests_churn_mean{state=\"MERGED\",repo=~\"$repo\"})",
+              "expr": "(avg(github_pull_requests_churn_mean{state=\"MERGED\",repo=~\"$repo\"})) or vector(NaN)",
               "instant": true,
               "legendFormat": "Lines per pull request",
               "range": false,
@@ -4393,6 +4515,54 @@
                     ]
                   }
                 ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Artifact storage walked"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "not read"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Actions cache"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "not read"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
               }
             ]
           },
@@ -4421,7 +4591,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum(increase(github_workflow_runs_total{repo=~\"$repo\"}[$__range]))",
+              "expr": "(sum(increase(github_workflow_runs_total{repo=~\"$repo\"}[$__range]))) or vector(0)",
               "instant": true,
               "legendFormat": "Workflow runs",
               "range": false,
@@ -4430,7 +4600,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "100 * sum(increase(github_workflow_runs_total{conclusion=\"success\",repo=~\"$repo\"}[$__range])) / sum(increase(github_workflow_runs_total{conclusion=~\"success|failure\",repo=~\"$repo\"}[$__range]))",
+              "expr": "(100 * sum(increase(github_workflow_runs_total{conclusion=\"success\",repo=~\"$repo\"}[$__range])) / sum(increase(github_workflow_runs_total{conclusion=~\"success|failure\",repo=~\"$repo\"}[$__range]))) or vector(NaN)",
               "instant": true,
               "legendFormat": "Success rate",
               "range": false,
@@ -4439,7 +4609,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum(increase(github_workflow_runs_total{conclusion=~\"cancelled|skipped\",repo=~\"$repo\"}[$__range]))",
+              "expr": "(sum(increase(github_workflow_runs_total{conclusion=~\"cancelled|skipped\",repo=~\"$repo\"}[$__range]))) or vector(0)",
               "instant": true,
               "legendFormat": "Undecided runs",
               "range": false,
@@ -4448,7 +4618,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "avg(github_workflow_runs_duration_seconds_mean{repo=~\"$repo\"})",
+              "expr": "(avg(github_workflow_runs_duration_seconds_mean{repo=~\"$repo\"})) or vector(NaN)",
               "instant": true,
               "legendFormat": "Run duration",
               "range": false,
@@ -4457,7 +4627,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "avg(github_workflow_jobs_queued_seconds_mean{repo=~\"$repo\"})",
+              "expr": "(avg(github_workflow_jobs_queued_seconds_mean{repo=~\"$repo\"})) or vector(NaN)",
               "instant": true,
               "legendFormat": "Queue wait",
               "range": false,
@@ -4466,7 +4636,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum(github_artifact_total_live_bytes{repo=~\"$repo\"})",
+              "expr": "(sum(github_artifact_total_live_bytes{repo=~\"$repo\"})) or vector(NaN)",
               "instant": true,
               "legendFormat": "Artifact storage walked",
               "range": false,
@@ -4475,7 +4645,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum(github_actions_cache_size_bytes{repo=~\"$repo\"})",
+              "expr": "(sum(github_actions_cache_size_bytes{repo=~\"$repo\"})) or vector(NaN)",
               "instant": true,
               "legendFormat": "Actions cache",
               "range": false,
@@ -5802,6 +5972,54 @@
                     ]
                   }
                 ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Lines added"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "no commits"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Lines removed"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "no commits"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
               }
             ]
           },
@@ -5830,7 +6048,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum(increase(github_commits_total{repo=~\"$repo\"}[$__range]))",
+              "expr": "(sum(increase(github_commits_total{repo=~\"$repo\"}[$__range]))) or vector(0)",
               "instant": true,
               "legendFormat": "Commits",
               "range": false,
@@ -5839,7 +6057,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum(github_commits_additions_mean{repo=~\"$repo\"} * github_commits_count{repo=~\"$repo\"})",
+              "expr": "(sum(github_commits_additions_mean{repo=~\"$repo\"} * github_commits_count{repo=~\"$repo\"})) or vector(NaN)",
               "instant": true,
               "legendFormat": "Lines added",
               "range": false,
@@ -5848,7 +6066,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum(github_commits_deletions_mean{repo=~\"$repo\"} * github_commits_count{repo=~\"$repo\"})",
+              "expr": "(sum(github_commits_deletions_mean{repo=~\"$repo\"} * github_commits_count{repo=~\"$repo\"})) or vector(NaN)",
               "instant": true,
               "legendFormat": "Lines removed",
               "range": false,
@@ -5857,7 +6075,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "100 * sum(increase(github_commits_total{signature=\"VALID\",repo=~\"$repo\"}[$__range])) / sum(increase(github_commits_total{repo=~\"$repo\"}[$__range]))",
+              "expr": "(100 * sum(increase(github_commits_total{signature=\"VALID\",repo=~\"$repo\"}[$__range])) / sum(increase(github_commits_total{repo=~\"$repo\"}[$__range]))) or vector(NaN)",
               "instant": true,
               "legendFormat": "Signed commits",
               "range": false,
@@ -9867,7 +10085,32 @@
               },
               "unit": "short"
             },
-            "overrides": []
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Total"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "no releases"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
           },
           "gridPos": {
             "h": 8,
@@ -9894,7 +10137,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum(github_release_downloads{repo=~\"$repo\"})",
+              "expr": "(sum(github_release_downloads{repo=~\"$repo\"})) or vector(NaN)",
               "instant": true,
               "legendFormat": "Total",
               "range": false,
@@ -9903,7 +10146,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "count(sum by (full_name, tag) (github_release_downloads{repo=~\"$repo\"}) \u003e 0)",
+              "expr": "(count(sum by (full_name, tag) (github_release_downloads{repo=~\"$repo\"}) \u003e 0)) or vector(0)",
               "instant": true,
               "legendFormat": "Releases",
               "range": false,
@@ -10162,6 +10405,54 @@
                     }
                   }
                 ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Dependabot"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "none open"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Code scanning"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "none open"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
               }
             ]
           },
@@ -10190,7 +10481,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum(github_dependabot_alert_open{repo=~\"$repo\"})",
+              "expr": "(sum(github_dependabot_alert_open{repo=~\"$repo\"})) or vector(NaN)",
               "instant": true,
               "legendFormat": "Dependabot",
               "range": false,
@@ -10199,7 +10490,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum(github_code_scanning_alert_open{repo=~\"$repo\"})",
+              "expr": "(sum(github_code_scanning_alert_open{repo=~\"$repo\"})) or vector(NaN)",
               "instant": true,
               "legendFormat": "Code scanning",
               "range": false,
@@ -11965,6 +12256,102 @@
                     "value": "short"
                   }
                 ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Gross"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "no usage"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Covered by the plan"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "no usage"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Actually billed"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "no usage"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Actions minutes"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "no usage"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
+                  }
+                ]
               }
             ]
           },
@@ -11993,7 +12380,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum(github_billing_usage_gross)",
+              "expr": "(sum(github_billing_usage_gross)) or vector(NaN)",
               "instant": true,
               "legendFormat": "Gross",
               "range": false,
@@ -12002,7 +12389,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum(github_billing_usage_discount)",
+              "expr": "(sum(github_billing_usage_discount)) or vector(NaN)",
               "instant": true,
               "legendFormat": "Covered by the plan",
               "range": false,
@@ -12011,7 +12398,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum(github_billing_usage_net)",
+              "expr": "(sum(github_billing_usage_net)) or vector(NaN)",
               "instant": true,
               "legendFormat": "Actually billed",
               "range": false,
@@ -12020,7 +12407,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum(github_billing_usage_quantity{unit=\"Minutes\"})",
+              "expr": "(sum(github_billing_usage_quantity{unit=\"Minutes\"})) or vector(NaN)",
               "instant": true,
               "legendFormat": "Actions minutes",
               "range": false,
