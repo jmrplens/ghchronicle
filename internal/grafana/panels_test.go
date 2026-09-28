@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"slices"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -667,19 +668,67 @@ func TestAPanelsOwnRangeIsWhatItIsAskedOver(t *testing.T) {
 				req := <-seen
 				queries, _ := req.body["queries"].([]any)
 				q, _ := queries[0].(map[string]any)
-				wantFrom, wantSQL := "now-2y", "WHERE time >= $dashboard"
+				wantSQL := "WHERE time >= $dashboard"
+				to := instant(t, req.body["to"])
+				wantFrom := to.AddDate(-2, 0, 0)
 				if q["refId"] == "A" {
-					wantFrom, wantSQL = "now-90d", tc.pinned
+					wantFrom, wantSQL = to.AddDate(0, 0, -90), tc.pinned
 				}
-				if req.body["from"] != wantFrom || req.body["to"] != "now" {
-					t.Errorf("%v was asked from %v to %v, want from %s to now",
-						q["refId"], req.body["from"], req.body["to"], wantFrom)
+				if from := instant(t, req.body["from"]); !from.Equal(wantFrom) {
+					t.Errorf("%v was asked from %s to %s, want from %s",
+						q["refId"], from, to, wantFrom)
 				}
 				if q["rawSql"] != wantSQL {
 					t.Errorf("%v was sent %q, want %q", q["refId"], q["rawSql"], wantSQL)
 				}
 			}
 		})
+	}
+}
+
+// instant reads a range bound posted as epoch milliseconds.
+func instant(t *testing.T, v any) time.Time {
+	t.Helper()
+	s, _ := v.(string)
+	ms, err := strconv.ParseInt(s, 10, 64)
+	if err != nil {
+		t.Fatalf("the range was posted as %v, want the epoch milliseconds a browser sends", v)
+	}
+	return time.UnixMilli(ms)
+}
+
+// TestCheckPanelsAsksAtTheInstantABrowserWould posts the range as the two
+// instants a browser resolves it to before it asks, not as "now": Grafana
+// resolves "now" once per query, so the seven instant queries of one panel
+// were answered a millisecond apart and a merge on their time column joined
+// none of their rows.
+func TestCheckPanelsAsksAtTheInstantABrowserWould(t *testing.T) {
+	t.Parallel()
+	c, seen := fakeGrafana(t, http.StatusOK, `{"results":{}}`)
+	panel := []PanelQuery{{Title: "Merged", Targets: []map[string]any{
+		{"refId": "A", "expr": "a"}, {"refId": "B", "expr": "b"},
+	}}}
+	before := time.Now().Truncate(time.Millisecond)
+	c.CheckPanels(t.Context(), "now-30d", "now", panel, Vars{Datasource: "ds"},
+		Options{Timeout: 5 * time.Second, Workers: 1})
+	after := time.Now()
+	req := <-seen
+	to := instant(t, req.body["to"])
+	if to.Before(before) || to.After(after) {
+		t.Errorf("to = %s, want the moment the panel was asked, between %s and %s", to, before, after)
+	}
+	if from := instant(t, req.body["from"]); !from.Equal(to.AddDate(0, 0, -30)) {
+		t.Errorf("from = %s, want thirty days before %s", from, to)
+	}
+	for _, tc := range []struct{ in, want string }{
+		{"now-6h", strconv.FormatInt(before.Add(-6*time.Hour).UnixMilli(), 10)},
+		{"now-1y", strconv.FormatInt(before.AddDate(-1, 0, 0).UnixMilli(), 10)},
+		{"now/d", "now/d"},
+		{"1790000000000", "1790000000000"},
+	} {
+		if got := resolveTime(tc.in, before); got != tc.want {
+			t.Errorf("resolveTime(%q) = %q, want %q", tc.in, got, tc.want)
+		}
 	}
 }
 

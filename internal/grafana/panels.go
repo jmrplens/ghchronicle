@@ -7,6 +7,7 @@ import (
 	"maps"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -411,6 +412,7 @@ func (c Client) checkPanel(ctx context.Context, from, to string,
 			vars.TimeFilter = fmt.Sprintf(vars.TimeFilterFormat, panel.From)
 		}
 	}
+	from, to = resolveRange(from, to, time.Now())
 	queries := make([]any, 0, len(panel.Targets))
 	for _, t := range panel.Targets {
 		q := vars.Apply(t)
@@ -437,6 +439,55 @@ func (c Client) checkPanel(ctx context.Context, from, to string,
 		r.Err = linksAnswered(res, panel)
 	}
 	return r
+}
+
+// resolveRange turns a relative range into the two instants a browser sends.
+//
+// A dashboard resolves "now" once, in the browser, before it asks, so every
+// query of a panel is answered at the same instant. Posted as "now", Grafana
+// resolves it once per query instead, and the instant queries of one panel
+// come back a millisecond apart: a merge keys its rows on every field the
+// frames share, the time included, so "Contributions by year" in Prometheus
+// came back as six half rows a year where the rendered panel draws three
+// whole ones. A form this does not know, a rounding such as now/d, is sent as
+// it is.
+func resolveRange(from, to string, now time.Time) (fromAt, toAt string) {
+	return resolveTime(from, now), resolveTime(to, now)
+}
+
+// relativeTime is the date math a dashboard range is written in: now, or now
+// minus a count of one unit.
+var relativeTime = regexp.MustCompile(`^now(?:-(\d+)([smhdwMy]))?$`)
+
+func resolveTime(s string, now time.Time) string {
+	m := relativeTime.FindStringSubmatch(s)
+	if m == nil {
+		return s
+	}
+	at := now
+	if m[1] != "" {
+		n, err := strconv.Atoi(m[1])
+		if err != nil {
+			return s
+		}
+		switch m[2] {
+		case "s":
+			at = now.Add(-time.Duration(n) * time.Second)
+		case "m":
+			at = now.Add(-time.Duration(n) * time.Minute)
+		case "h":
+			at = now.Add(-time.Duration(n) * time.Hour)
+		case "d":
+			at = now.AddDate(0, 0, -n)
+		case "w":
+			at = now.AddDate(0, 0, -7*n)
+		case "M":
+			at = now.AddDate(0, -n, 0)
+		case "y":
+			at = now.AddDate(-n, 0, 0)
+		}
+	}
+	return strconv.FormatInt(at.UnixMilli(), 10)
 }
 
 // linkValue is what a link column may hold: an absolute url, which the value
