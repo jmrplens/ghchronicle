@@ -116,7 +116,7 @@ func evalESTable(t *testing.T, target map[string]any, docs []esDoc) []map[string
 		field, _ := b["field"].(string)
 		settings, _ := b["settings"].(map[string]any)
 		groups := termsOf(strings.TrimSuffix(field, ".keyword"), settings, docs)
-		for _, key := range orderedKeys(t, groups, settings) {
+		for _, key := range orderedKeys(t, groups, settings, metrics) {
 			next := maps.Clone(row)
 			next[field] = key
 			walk(level+1, groups[key], next)
@@ -148,8 +148,10 @@ func termsOf(field string, settings map[string]any, docs []esDoc) map[string][]e
 
 // orderedKeys is the buckets a terms aggregation keeps, in its order: by
 // document count, largest first and the key breaking a tie as Elasticsearch
-// breaks it, or by the key itself, cut to its size.
-func orderedKeys(t *testing.T, groups map[string][]esDoc, settings map[string]any) []string {
+// breaks it, by the key itself, or by one of the query's metrics, which the
+// datasource computes inside each bucket of the terms it orders; cut to its
+// size.
+func orderedKeys(t *testing.T, groups map[string][]esDoc, settings map[string]any, metrics []any) []string {
 	t.Helper()
 	keys := slices.Sorted(maps.Keys(groups))
 	switch by, order := settings["orderBy"], settings["order"]; {
@@ -158,6 +160,16 @@ func orderedKeys(t *testing.T, groups map[string][]esDoc, settings map[string]an
 	case by == "_key" && order == "desc":
 		slices.Reverse(keys)
 	case by == "_key" && order == "asc":
+	case order == "desc" && metricByID(metrics, by) != nil:
+		m := metricByID(metrics, by)
+		value := func(key string) float64 {
+			v, _ := maxOf(numbersOf(groups[key], m["field"].(string))).(float64)
+			return v
+		}
+		if m["type"] != "max" {
+			t.Fatalf("no evaluator for a terms bucket ordered by a %v metric", m["type"])
+		}
+		sort.SliceStable(keys, func(i, j int) bool { return value(keys[i]) > value(keys[j]) })
 	default:
 		t.Fatalf("no evaluator for a terms bucket ordered by %v %v", by, order)
 	}
@@ -176,6 +188,8 @@ func withMetrics(t *testing.T, row map[string]any, metrics []any, docs []esDoc) 
 		switch m["type"] {
 		case "count":
 			out[names[0]] = float64(len(docs))
+		case "max":
+			out[names[0]] = maxOf(values)
 		case "sum":
 			total := 0.0
 			for _, v := range values {
@@ -203,6 +217,26 @@ func withMetrics(t *testing.T, row map[string]any, metrics []any, docs []esDoc) 
 		}
 	}
 	return out
+}
+
+// metricByID is the query's metric a terms bucket names to order by, or nil
+// when the name is not one of them.
+func metricByID(metrics []any, id any) map[string]any {
+	for _, raw := range metrics {
+		if m, _ := raw.(map[string]any); m["id"] == id {
+			return m
+		}
+	}
+	return nil
+}
+
+// maxOf is a max aggregation: the largest value, or null when no document
+// carries one.
+func maxOf(values []float64) any {
+	if len(values) == 0 {
+		return nil
+	}
+	return slices.Max(values)
 }
 
 func numbersOf(docs []esDoc, field string) []float64 {

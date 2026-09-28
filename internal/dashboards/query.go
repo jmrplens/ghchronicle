@@ -851,6 +851,22 @@ func (b *builder) tmURL(field ...string) any {
 	return t
 }
 
+// tmNewest is a string of an item as a bucket of one value under it, which is
+// how an Elasticsearch table carries a title or a list of labels: the value
+// of the documents with the most of `metric`, one of the same query's. For an
+// age that only grows that is the item's newest reading, so a title edited or
+// a label added inside the range reads as it stands, as the SQL stores read it
+// from the newest row; kept by document count, the older value won whenever
+// more of the range's rows held it. A document without the field stays in the
+// table under the empty string, the empty cell the SQL stores draw for a null,
+// where without `missing` the item left the table.
+func (b *builder) tmNewest(tag string, metric any) any {
+	t := b.tmBy(tag, 1, metric)
+	settings, _ := agg(t)["settings"].(map[string]any)
+	settings["missing"] = ""
+	return t
+}
+
 // one is a single bucket for the whole range: every document of an index
 // carries the same `measurement`. A metric without a bucket is not a valid
 // query, and a `filters` bucket is not rendered as a table.
@@ -1079,6 +1095,21 @@ func keepLargest(field string, n int) []any {
 		sortRows(field, true),
 		map[string]any{"id": "limit", "options": map[string]any{"limitField": n}},
 	}
+}
+
+// columnOrder puts a table's columns in the order given, the order the SQL
+// stores' query selects them in. An Elasticsearch table's columns otherwise
+// come in the order the datasource's response parser meets them, which led
+// "Open the longest" with the author once the author was one of them.
+func columnOrder(names ...string) any {
+	index := map[string]any{}
+	for i, name := range names {
+		index[name] = i
+	}
+	return map[string]any{"id": "organize", "options": map[string]any{
+		"excludeByName": map[string]any{}, "indexByName": index,
+		"renameByName": map[string]any{},
+	}}
 }
 
 // hideColumns drops columns a table's query returns only to be grouped by: the

@@ -1,6 +1,9 @@
 package dashboards
 
-import "fmt"
+import (
+	"fmt"
+	"slices"
+)
 
 // ── Pull requests and issues ────────────────────────────────────────────────
 
@@ -580,6 +583,11 @@ const stillOpenNote = "This store cannot read each item from its newest row, so 
 	"closed inside the range stays listed as open, at the reading of its last open day, " +
 	"until the range moves past that day."
 
+// noForkColumn is why the two tables of what is still open have no Fork column
+// in a store that can carry every other string of the row: the flag is
+// gh_repo's, which noRepoFlagsHere says this store cannot join.
+const noForkColumn = "For the same reason there is no Fork column."
+
 // openLongest is how many rows the two tables of what is still open list, in
 // every store: the items open longest, the longest first.
 const openLongest = 25
@@ -627,18 +635,26 @@ func stillOpen(b *builder) []Panel {
 	// the bucket kept showed whichever had the most rows in the range.
 	prAge := b.mMax("seconds_open")
 	openES, openEStf := esTbl("gh_pull_request",
-		append(b.tmRepoBy(50, prAge), b.tmBy("number", openLongest, prAge), b.tm("url", 1)),
+		slices.Concat(b.tmRepoBy(50, prAge), []any{
+			b.tmBy("number", openLongest, prAge), b.tm("url", 1),
+			b.tmNewest("title", prAge), b.tm("author", 1), b.tmNewest("label_names", prAge),
+		}),
 		[]any{prAge, b.mMax("comments"), b.mMax("reviews")},
 		[]named{
 			{inventoryRepoTerm, "Repository"},
 			{flowNumberTerm, "Number"},
 			{"url.keyword", "Link"},
+			{"title.keyword", "Title"},
+			{"author.keyword", "Author"},
+			{"label_names.keyword", "Labels"},
 			{"s", flowOpenAge},
 			{"c", "Comments"},
 			{"r", "Reviews"},
 		},
-		[]string{ESF, "state:OPEN"}, append([]any{hideColumns(panelFullNameField)},
-			keepLargest(flowOpenAge, openLongest)...)...)
+		[]string{ESF, "state:OPEN"}, append([]any{
+			hideColumns(panelFullNameField),
+			columnOrder("Number", flowOpenAge, "Repository", "Title", "Author", "Labels", "Comments", "Reviews"),
+		}, keepLargest(flowOpenAge, openLongest)...)...)
 
 	openIssuesGR, openIssuesGRtf := gTbl(fmt.Sprintf(`limit(sortBy(%s, "max", true), %d)`,
 		grGroupBy(rp("gh_issue", "seconds_open", "state", "OPEN"), "gh_issue", "max", "repo", "number"),
@@ -646,17 +662,24 @@ func stillOpen(b *builder) []Panel {
 		"Repository, number", []col{{"max", flowOpenAge}})
 	issueAge := b.mMax("seconds_open")
 	openIssuesES, openIssuesEStf := esTbl("gh_issue",
-		append(b.tmRepoBy(50, issueAge), b.tmBy("number", openLongest, issueAge), b.tm("url", 1)),
+		slices.Concat(b.tmRepoBy(50, issueAge), []any{
+			b.tmBy("number", openLongest, issueAge), b.tm("url", 1), b.tm("author", 1),
+			b.tmNewest("label_names", issueAge),
+		}),
 		[]any{issueAge, b.mMax("comments")},
 		[]named{
 			{inventoryRepoTerm, "Repository"},
 			{flowNumberTerm, "Number"},
 			{"url.keyword", "Link"},
+			{"author.keyword", "Author"},
+			{"label_names.keyword", "Labels"},
 			{"s", flowOpenAge},
 			{"c", "Comments"},
 		},
-		[]string{ESF, "state:OPEN"}, append([]any{hideColumns(panelFullNameField)},
-			keepLargest(flowOpenAge, openLongest)...)...)
+		[]string{ESF, "state:OPEN"}, append([]any{
+			hideColumns(panelFullNameField),
+			columnOrder("Number", flowOpenAge, "Repository", "Author", "Comments", "Labels"),
+		}, keepLargest(flowOpenAge, openLongest)...)...)
 	return []Panel{
 		panel("table", "Open the longest", box{W: 12, H: 8, X: 0, Y: 45}, []Target{sqlT(openest)}, &P{
 			// The comments are kept to the rows the open time ranks: capped
@@ -697,7 +720,7 @@ func stillOpen(b *builder) []Panel {
 				linkOn("Number"),
 			},
 			GR: openGR, GRTF: openGRtf, GRDesc: grRows + " " + stillOpenNote + " " + noRepoFlagsHere,
-			ES: openES, ESTF: openEStf, ESDesc: stillOpenNote + " " + noRepoFlagsHere,
+			ES: openES, ESTF: openEStf, ESDesc: stillOpenNote + " " + noRepoFlagsHere + " " + noForkColumn,
 		}),
 		panel("table", "Open issues the longest", box{W: 12, H: 8, X: 12, Y: 45}, []Target{sqlT(openIssues)}, &P{
 			PromNote: cannot("the twenty-five open issues that have waited longest, with "+
@@ -719,7 +742,7 @@ func stillOpen(b *builder) []Panel {
 			GR: openIssuesGR, GRTF: openIssuesGRtf,
 			GRDesc: grRows + " " + stillOpenNote + " " + noRepoFlagsHere,
 			ES:     openIssuesES, ESTF: openIssuesEStf,
-			ESDesc: stillOpenNote + " " + noRepoFlagsHere,
+			ESDesc: stillOpenNote + " " + noRepoFlagsHere + " " + noForkColumn,
 		}),
 	}
 }
