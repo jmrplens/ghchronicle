@@ -50,6 +50,10 @@ type PanelQuery struct {
 	// years they came back with the file limit error under a dashboard that
 	// draws them perfectly.
 	From string
+	// Source is the panel as the dashboard holds it. Its transformations and
+	// field configuration are what Draw replays over an answer, since they
+	// decide what the reader sees and /api/ds/query applies none of them.
+	Source map[string]any
 }
 
 // Panels walks a dashboard document and yields every panel that queries
@@ -85,6 +89,7 @@ func appendPanels(out []PanelQuery, panels any, seen *int) []PanelQuery {
 		q.Links = LinkColumns(p)
 		q.Renames = Renames(p)
 		q.From, _ = p["timeFrom"].(string)
+		q.Source = p
 		for _, t := range targets {
 			if tgt, isObject := t.(map[string]any); isObject {
 				q.Targets = append(q.Targets, tgt)
