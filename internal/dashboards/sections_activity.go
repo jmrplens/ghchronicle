@@ -7,6 +7,21 @@ import "fmt"
 // Prometheus twins rename their value column to the same words.
 const activityItsStars = "Its stars"
 
+// eachTypeASlice turns the table "Events by type" answers, a row per type
+// with its name and its count, into one field per type, named by the type,
+// which is the shape a pie colors slice by slice.
+//
+// With the rows as they come, every slice was the one count field, and the
+// palette gives a color per field: the 2.6.1 review found every slice the same
+// green in all five stores. It named every slice "Events" in Graphite and
+// Elasticsearch as well, since a rename is a display name on the count field
+// and the pie names a row by it before the row's own text. A field made of a
+// row carries neither.
+var eachTypeASlice = map[string]any{"id": "rowsToFields", "options": map[string]any{"mappings": []any{
+	map[string]any{"fieldName": "Type", "handlerKey": "field.name"},
+	map[string]any{"fieldName": "Events", "handlerKey": "field.value"},
+}}}
+
 // ── Activity ────────────────────────────────────────────────────────────────
 
 func activity(b *builder) []Panel {
@@ -112,14 +127,17 @@ func activity(b *builder) []Panel {
 		// survive the phone.
 		panel("piechart", "Events by type", box{W: 8, H: 16, X: 16, Y: 0}, []Target{sqlT(byType)}, &P{
 			Prom: []Target{promTbl("sum by (type) (increase(github_events_total[$__range]))")},
-			// No rename: a displayName on the value column would name every
-			// slice "Events"; without it the pie names each slice by its row.
-			PromTF: []any{organize(nil, nil, nil)}, PromDesc: sinceStart,
+			PromTF: []any{
+				organize(map[string]string{"type": "Type", "Value": "Events"}, nil, nil),
+				eachTypeASlice,
+			},
+			PromDesc: sinceStart,
 			Desc: "The share of each event type in the range, in the legend. The eight " +
 				"busiest types are named; the rest are one slice called `other`.",
-			Opts: Opts{"legend": "bottom"},
-			GR:   typeGR, GRTF: typeGRtf,
-			ES: typeES, ESTF: typeEStf,
+			Opts:  Opts{"legend": "bottom"},
+			SQLTF: []any{eachTypeASlice},
+			GR:    typeGR, GRTF: append(typeGRtf, eachTypeASlice),
+			ES: typeES, ESTF: append(typeEStf, eachTypeASlice),
 		}),
 		panel("barchart", "Events by repository", box{W: 8, H: 8, X: 0, Y: 8}, []Target{sqlT(byRepo)}, &P{
 			Desc: "The ten repositories with the most events; the rest are one bar called other.",

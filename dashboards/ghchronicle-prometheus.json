@@ -12360,7 +12360,25 @@
                   "owner": true
                 },
                 "indexByName": {},
-                "renameByName": {}
+                "renameByName": {
+                  "Value": "Events",
+                  "type": "Type"
+                }
+              }
+            },
+            {
+              "id": "rowsToFields",
+              "options": {
+                "mappings": [
+                  {
+                    "fieldName": "Type",
+                    "handlerKey": "field.name"
+                  },
+                  {
+                    "fieldName": "Events",
+                    "handlerKey": "field.value"
+                  }
+                ]
               }
             }
           ],

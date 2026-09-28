@@ -942,7 +942,10 @@ every legend under the chart and caps it at 35 per cent of the panel, whatever
 the panel asks for, and a legend placed beside the chart is drawn there as a
 column, one entry per line, that ended after seven entries on a phone; a list
 placed under the chart wraps, and at the height the pie has, the eleven types
-of a month all fit at 360 pixels.
+of a month all fit at 360 pixels. Each type is a slice in a color of its own
+and under its own name in every store: the query answers a row per type, and
+the panel makes each row a field, because Grafana colors a pie by field and a
+column of counts is one field, which drew every slice the same green.
 
 The last two panels are the mirror of the stars section: what this account
 starred rather than what was starred, by language and by project, dated when

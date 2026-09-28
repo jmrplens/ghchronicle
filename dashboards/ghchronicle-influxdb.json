@@ -12426,6 +12426,23 @@
             }
           ],
           "title": "Events by type",
+          "transformations": [
+            {
+              "id": "rowsToFields",
+              "options": {
+                "mappings": [
+                  {
+                    "fieldName": "Type",
+                    "handlerKey": "field.name"
+                  },
+                  {
+                    "fieldName": "Events",
+                    "handlerKey": "field.value"
+                  }
+                ]
+              }
+            }
+          ],
           "type": "piechart"
         },
         {
