@@ -14,11 +14,13 @@ import (
 
 // State is what a sweep has to remember between runs.
 //
-// Eight things, and deleting the file costs a different thing for each of
-// them. Seven of the eight cost only rate limit, because what is collected
+// Nine things, and deleting the file costs a different thing for each of
+// them. Seven of the nine cost only rate limit, because what is collected
 // again overwrites what is already stored. last_head is the one that loses
 // something: the dependency changes between the head it held and the next one
-// are read from a range that nothing can name once the head is gone.
+// are read from a range that nothing can name once the head is gone. stores
+// is the one that costs a question nobody can answer afterwards: which
+// release first wrote a store that cannot be asked what shape its rows are in.
 //
 //   - last_run: when each family last ran, so a restart does not re-collect
 //     everything at once.
@@ -40,6 +42,9 @@ import (
 //   - coauthored: the Pair Extraordinaire count and the last day it covers,
 //     so the achievements family walks the pull requests merged since instead
 //     of the account's whole history. Absent walks the whole history.
+//   - stores: per configured store, where it points, which release first
+//     wrote it and which last did, and the migrations applied to it. See
+//     StoreRecord.
 type State struct {
 	path     string
 	LastRun  map[string]time.Time `json:"last_run"`
@@ -70,12 +75,18 @@ type State struct {
 	// file reads as, is a count made by no rule, and the next pass walks the
 	// whole history for it.
 	Coauthored collect.CoauthoredTally `json:"coauthored,omitzero"`
+	// Stores is what this file remembers about each store it has written,
+	// keyed by the sink's name in the configuration. Absent in a state file
+	// written before 2.6.2, which is itself an answer: every store it served
+	// was first written by a release that kept no record.
+	Stores map[string]*StoreRecord `json:"stores,omitempty"`
 }
 
 func LoadState(path string) *State {
 	s := &State{
 		path: path, LastRun: map[string]time.Time{}, FirstSaw: map[string]time.Time{},
 		HistoryRead: map[string]time.Time{}, LastHead: map[string]string{}, LastFull: map[string]time.Time{},
+		Stores: map[string]*StoreRecord{},
 	}
 	b, err := os.ReadFile(path)
 	if err != nil {
@@ -96,6 +107,14 @@ func LoadState(path string) *State {
 	}
 	if s.LastFull == nil {
 		s.LastFull = map[string]time.Time{}
+	}
+	if s.Stores == nil {
+		s.Stores = map[string]*StoreRecord{}
+	}
+	for name, rec := range s.Stores {
+		if rec == nil {
+			delete(s.Stores, name)
+		}
 	}
 	s.path = path
 	return s

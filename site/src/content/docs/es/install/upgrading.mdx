@@ -16,6 +16,79 @@ Los dashboards se generan desde el binario, así que vuelve a publicarlos tras
 una actualización, con `-publish-dashboard` o `grafana.publish_on_start`: ver
 [dejárselo al binario](/ghchronicle/es/dashboards/#dejárselo-al-binario).
 
+## Migraciones
+
+A veces una versión cambia la clave de una fila guardada. Lo habitual es una
+etiqueta que pasa a ser campo: cada fila escrita antes del cambio es una serie
+distinta de las escritas después, así que el almacén guarda las dos para
+siempre, y un recuento sobre ellas crece en uno por cada elemento leído a los
+dos lados del cambio. El binario lleva la lista de todos los cambios así que
+todavía puede guardar un almacén escrito por una versión 2.x, cada uno con un
+ID que nombra la versión y la medida, como
+`2.6.1/gh_discussion_comment/is_answer`, y `-migrate` contrasta con ella cada
+almacén configurado:
+
+```sh
+ghchronicle -config /etc/ghchronicle/config.yaml -migrate
+```
+
+Imprime un bloque por almacén y una línea por cambio, y no cambia nada: a los
+almacenes se les hacen preguntas, a GitHub solo se le pide la lista de
+repositorios, y el fichero de estado se lee y nunca se escribe. Un almacén al
+que se le puede preguntar decide por sí mismo; uno al que no, lo decide lo que
+el fichero de estado recuerda de él.
+
+| Almacén                              | Qué decide                                                                                                         |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| InfluxDB 3                           | Si la etiqueta antigua es una columna de etiqueta de la tabla viva, según el catálogo. Una tabla que InfluxDB ha apartado aparece con otro nombre y no se pregunta |
+| InfluxDB 2                           | Si alguna fila lleva la etiqueta antigua. Las claves de etiqueta siguen listadas tras un borrado, así que no se preguntan |
+| PostgreSQL                           | Si alguna fila tiene un valor en la columna de la etiqueta antigua, en el esquema donde escribe el destino           |
+| Elasticsearch                        | Un recuento de los documentos que llevan la etiqueta antigua. El mapping conserva un campo después de irse sus documentos |
+| Fichero SQL, Graphite, Telegraf      | La versión que el fichero de estado registra como la primera que escribió en el almacén                              |
+| Loki, Prometheus, OTLP, file, stdout | Nada: ninguno guarda una fila cuya identidad pueda cambiar una versión                                               |
+
+Cada línea empieza por lo que encontró la comprobación:
+
+- `not needed`: el almacén no guarda nada de la forma antigua.
+- `pending`: guarda la forma antigua o, en un almacén al que no se le puede
+  preguntar, puede guardarla. Las líneas de debajo dicen por qué, qué haría
+  allí ponerlo al día, qué familias volverían a leer la medida y desde cuándo,
+  y lo que no volvería: las filas de repositorios que la configuración ya no
+  cubre y las de familias que tiene apagadas. La última línea dice si
+  aplicarlo no necesita la palabra de nadie: GitHub todavía sirve toda la
+  historia, las filas antiguas se apartarían 24 horas en vez de borrarse, y
+  todas las filas del almacén son de esta configuración. Un almacén compartido
+  con otro colector, un InfluxDB 2, cuya única vía es un borrado, y todo
+  almacén al que no se le puede preguntar necesitan la palabra de alguien, y la
+  línea dice qué razón aplica.
+- `note`: las filas están ahí y nada puede arreglarlas, así que el plan dice
+  qué significan y no cambia nada.
+- `frozen`: nada de lo que ejecuta esta configuración escribe ya la medida,
+  así que sus filas son historia y se dejan como están.
+- `applied`: el fichero de estado registra el cambio como aplicado a este
+  almacén, y el almacén, si se le puede preguntar, está de acuerdo.
+- `unreachable`: el almacén no respondió, así que no se sabe nada de él.
+
+### Lo que el fichero de estado recuerda de cada almacén
+
+La clave `stores` del [fichero de estado](/ghchronicle/es/configuration/#state_file)
+guarda, para cada almacén en el que escribe una ejecución, adónde apunta, la
+versión que escribió en él primero y la que lo hizo por última vez. Un primer
+arranque, sobre un fichero de estado sin historia, registra la versión en
+marcha como la primera que escribió en cada almacén, así que una instalación
+nueva no tiene nada que migrar. El primer arranque tras actualizar desde la
+2.6.1 o anterior registra la primera versión como desconocida, lo que para un
+fichero SQL, un Graphite o un Telegraf se lee como anterior a cualquier cambio,
+así que esos muestran cada cambio de una versión 2.x como pendiente, o como
+nota donde nada puede arreglarlo, hasta que se aplique. Un
+destino apuntado a otro almacén empieza un registro nuevo. Un fichero de estado
+borrado tras una actualización se lleva el registro consigo, y los almacenes a
+los que no se puede preguntar se toman entonces por de la versión en marcha.
+
+Un cambio hecho antes de la 1.0.0, las etiquetas `state` y `reason` de los
+elementos de alerta, no lo escribió nunca una versión publicada, así que solo
+puede mostrarlo un almacén al que se le puede preguntar.
+
 ## De la 2.5.x a la 2.6.x
 
 ### El primer arranque paga todo, una vez
@@ -131,9 +204,9 @@ la medida con dos formas hasta que se borra la medida y se vuelve a llenar con
 un [relleno histórico](/ghchronicle/es/how/backfill/). Los dashboards leen las
 dos formas, una fila por comentario, y [la página de
 medidas](/ghchronicle/es/collectors/measurements/#cómo-leer-las-tablas) dice
-qué guarda cada almacén y cómo borrarla. Una herramienta que haga el cambio por
-ti está prevista para una versión posterior, en
-[la issue #96](https://github.com/jmrplens/ghchronicle/issues/96).
+qué guarda cada almacén y cómo borrarla. `-migrate` dice cuáles de los
+almacenes configurados guardan todavía la forma antigua, bajo
+`2.6.1/gh_discussion_comment/is_answer`: ver [Migraciones](#migraciones).
 
 ### Un ajuste de ruta se expande
 

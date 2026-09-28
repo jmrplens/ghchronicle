@@ -33,6 +33,7 @@ ghchronicle -config /etc/ghchronicle/config.yaml
 | `-publish-dashboard` | off        | Publica el dashboard de Grafana y el datasource del que lee, y sale; necesita la sección `grafana`, no le pregunta nada a GitHub y no necesita token |
 | `-uninstall`      | ninguno       | Quita lo que esto puso y sale: `dashboard`, `data`, `state`, `all`, separados por comas; lista y no quita nada sin `-yes`                  |
 | `-yes`            | off           | Sigue adelante con `-uninstall` en vez de solo listar lo que quitaría                                                                      |
+| `-migrate`        | off           | Imprime, para cada almacén configurado, lo que una versión anterior dejó allí con una forma que esta ya no escribe y lo que haría falta para ponerlo al día, y sale; no cambia nada |
 | `-card`           | ninguno       | Hace una pasada y escribe un SVG de resumen en esta ruta; esa pasada recoge todas las familias, digan lo que digan las cadencias          |
 | `-card-only`      | apagada       | Con `-card`, escribe el SVG y nada más: no hace falta ningún destino, no se escribe en ninguno y el fichero de estado se queda como estaba |
 | `-card-theme`     | `auto`        | `dark`, `light`, `auto` o `both`: la tarjeta clara en `-card` y la oscura a su lado con `_dark` antes de la extensión, en una sola pasada |
@@ -61,6 +62,23 @@ ghchronicle -card-layouts
 ghchronicle -config config.yaml -list
 ghchronicle -config config.yaml -backfill-status
 ```
+
+## Lo que una actualización dejó en los almacenes
+
+```sh
+ghchronicle -config config.yaml -migrate
+```
+
+`-migrate` contrasta cada almacén configurado con la lista de cambios que lleva
+el binario, cada uno una medida que una versión anterior escribió con una clave
+que esta ya no usa, e imprime un bloque por almacén: lo que cada cambio
+encuentra allí, la prueba, lo que haría falta para ponerlo al día y lo que se
+volvería a leer de GitHub. No cambia nada. A los almacenes se les hacen
+preguntas, a GitHub solo se le pide la lista de repositorios, y el fichero de
+estado se lee y nunca se escribe, así que sale con 0 encuentre lo que
+encuentre. Sin token funciona igual y dice lo que no pudo comparar.
+[Migraciones](/ghchronicle/es/install/upgrading/#migraciones) explica cómo se
+decide cada almacén y qué significa cada línea.
 
 ## Las tres formas de hacer una pasada
 

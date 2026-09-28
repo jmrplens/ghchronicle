@@ -22,6 +22,7 @@ import (
 	"github.com/jmrplens/ghchronicle/v2/internal/collect"
 	"github.com/jmrplens/ghchronicle/v2/internal/config"
 	"github.com/jmrplens/ghchronicle/v2/internal/ghapi"
+	"github.com/jmrplens/ghchronicle/v2/internal/migrate"
 	"github.com/jmrplens/ghchronicle/v2/internal/render"
 	"github.com/jmrplens/ghchronicle/v2/internal/run"
 	"github.com/jmrplens/ghchronicle/v2/internal/sink"
@@ -152,6 +153,9 @@ type options struct {
 	// the alternative is a typo that empties a store.
 	uninstall string
 	yes       bool
+	// migrate prints what this release would change in every configured
+	// store, and changes nothing.
+	migrate bool
 	// publishDashboard reconciles the Grafana datasource and dashboard for
 	// every store this writes to, then exits. Like backfillStatus it asks
 	// GitHub nothing, so it needs no token.
@@ -203,6 +207,9 @@ func parseFlags(args []string, stderr io.Writer) (options, error) {
 			", comma separated; prints the list and removes nothing without -yes")
 	fs.BoolVar(&o.yes, "yes", false,
 		"go ahead with -uninstall rather than only listing what it would remove")
+	fs.BoolVar(&o.migrate, "migrate", false,
+		"print, for every configured store, what an earlier release left there in a shape this one no longer "+
+			"writes and what bringing it along would take, then exit; changes nothing")
 	fs.BoolVar(&o.publishDashboard, "publish-dashboard", false,
 		"publish the Grafana dashboard and the datasource it reads from, then exit; "+
 			"needs the grafana section of the config and asks GitHub nothing")
@@ -271,7 +278,7 @@ func execute(args []string, stdout, stderr io.Writer) {
 
 	cfg, err := config.LoadWith(o.path, config.Relax{
 		NoSinks: o.cardOnly,
-		NoToken: o.backfillStatus || o.publishDashboard || o.uninstall != "",
+		NoToken: o.needsNoToken(),
 	})
 	if err != nil {
 		fatal(stderr, err)
@@ -316,6 +323,7 @@ func execute(args []string, stdout, stderr io.Writer) {
 
 	runner := newRunner(cfg, api, sinks, logger, &o)
 	runner.Refill, runner.RefillEveryStart = ledgerForgot(cfg, ledger)
+	stampStores(runner, cfg, &o, logger)
 	switch {
 	case o.backfill:
 		err = runBackfill(ctx, runner, cfg, accumulator, &o, logger)
@@ -337,6 +345,27 @@ func execute(args []string, stdout, stderr io.Writer) {
 	if err != nil {
 		fatal(stderr, err)
 	}
+}
+
+// stampStores brings the state file's record of each store up to date before
+// the first sweep marks anything, which is what lets it tell a first start
+// from an upgrade. A card-only run writes to no store and saves no state, so
+// it records nothing either.
+func stampStores(runner *run.Runner, cfg *config.Config, o *options, logger *slog.Logger) {
+	if o.cardOnly {
+		return
+	}
+	for _, w := range migrate.Stamp(runner.State, cfg, version) {
+		logger.Warn(w)
+	}
+}
+
+// needsNoToken says whether the run asked for can do without a GitHub token:
+// the runs that report on a configuration or on its stores ask GitHub nothing
+// they cannot do without, and -migrate, which asks for the repository list,
+// says in its plan what it could not compare when there is no token.
+func (o *options) needsNoToken() bool {
+	return o.backfillStatus || o.publishDashboard || o.uninstall != "" || o.migrate
 }
 
 // readCommandLine parses args and answers the flags that print and stop. It
@@ -535,6 +564,10 @@ func reported(ctx context.Context, o options, cfg *config.Config,
 	case o.uninstall != "":
 		// Nor this one, which takes away rather than collects.
 		err = uninstall(ctx, cfg, o.uninstall, o.yes, stdout)
+	case o.migrate:
+		// This one asks GitHub for the repository list alone, and the
+		// stores what they hold.
+		err = migratePlan(ctx, cfg, api, o.yes, stdout, time.Now())
 	case o.list:
 		err = listRepositories(ctx, api, cfg, stdout)
 	default:

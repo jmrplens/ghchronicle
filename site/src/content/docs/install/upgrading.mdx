@@ -16,6 +16,73 @@ The dashboards are generated from the binary, so publish them again after an
 upgrade, with `-publish-dashboard` or `grafana.publish_on_start`: see [letting
 the binary do it](/ghchronicle/dashboards/#letting-the-binary-do-it).
 
+## Migrations
+
+A release sometimes changes what a stored row is keyed by. A tag that becomes a
+field is the usual case: every row written before the change is a series the
+rows written after it are not, so the store keeps both for ever, and a count
+over them grows by one for every item read on both sides of the change. The
+binary carries the list of every such change a store written by a 2.x release
+can still hold, each under an ID that names the release and the measurement,
+such as `2.6.1/gh_discussion_comment/is_answer`, and `-migrate` checks every
+configured store against it:
+
+```sh
+ghchronicle -config /etc/ghchronicle/config.yaml -migrate
+```
+
+It prints one block per store and one line per change, and changes nothing: the
+stores are asked questions, GitHub is asked for the repository list alone, and
+the state file is read and never written. A store that can be asked decides for
+itself; one that cannot is decided by what the state file remembers of it.
+
+| Store                                | What decides                                                                                                       |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| InfluxDB 3                           | Whether the old tag is a tag column of the live table, asked of the catalog. A table InfluxDB has set aside is listed under another name and is not asked |
+| InfluxDB 2                           | Whether any row carries the old tag. The tag keys stay listed after a delete, so they are not asked                 |
+| PostgreSQL                           | Whether any row holds a value in the old tag's column, in the schema the sink writes to                             |
+| Elasticsearch                        | A count of the documents that carry the old tag. The mapping keeps a field after its documents are gone             |
+| SQL file, Graphite, Telegraf         | The release the state file records as the first to write the store                                                  |
+| Loki, Prometheus, OTLP, file, stdout | Nothing: none of them keeps a row whose identity a release could change                                             |
+
+Each line starts with what the check found:
+
+- `not needed`: the store holds nothing of the old shape.
+- `pending`: it holds the old shape, or, for a store that cannot be asked, may
+  hold it. The lines under it say why, what bringing it along would do there,
+  which families would read the measurement again and from when, and what
+  would not come back: the rows of repositories the configuration no longer
+  covers, and of families it has switched off. The last line says whether
+  applying it needs nobody's word: GitHub still serves the whole history, the
+  old rows would be set aside for 24 hours rather than deleted, and every row in
+  the store is this configuration's. A store shared with another collector, an
+  InfluxDB 2, whose only way is a delete, and every store that cannot be asked
+  need somebody's word, and the line says which reason applies.
+- `note`: the rows are there and nothing can put them right, so the plan says
+  what they mean and changes nothing.
+- `frozen`: nothing this configuration runs writes the measurement any more,
+  so its rows are history and are left as they are.
+- `applied`: the state file records the change as applied to this store, and
+  the store, where it can be asked, agrees.
+- `unreachable`: the store did not answer, so nothing about it is known.
+
+### What the state file remembers of each store
+
+The `stores` key of [the state file](/ghchronicle/configuration/#state_file)
+keeps, for every store a run writes to, where it points, the release that first
+wrote it and the release that last did. A first start, on a state file with no
+history, records the running release as the first writer of every store, so a
+fresh install has nothing to migrate. The first start after an upgrade from
+2.6.1 or earlier records the first writer as unknown, which for a SQL file, a
+Graphite or a Telegraf reads as older than any change, so those show each
+change of a 2.x release as pending, or as a note where nothing can put it
+right, until it is applied. A sink pointed at another store starts a
+new record. A state file deleted after an upgrade takes the record with it, and
+the stores that cannot be asked are then taken to be the running release's.
+
+A change made before 1.0.0, the `state` and `reason` tags of the alert items,
+was never written by a release, so only a store that can be asked can show it.
+
 ## From 2.5.x to 2.6.x
 
 ### The first start pays in full, once
@@ -126,9 +193,9 @@ and since holds the measurement in two shapes until the measurement is dropped
 and filled again with a [backfill](/ghchronicle/how/backfill/). The dashboards
 read both shapes, one row per comment, and [the measurements
 page](/ghchronicle/collectors/measurements/#how-to-read-the-tables) says what
-each store keeps and how to drop it. A tool that makes the change for you is
-planned for a later release, in
-[issue #96](https://github.com/jmrplens/ghchronicle/issues/96).
+each store keeps and how to drop it. `-migrate` says which of the configured
+stores still hold the old shape, under
+`2.6.1/gh_discussion_comment/is_answer`: see [Migrations](#migrations).
 
 ### A path setting is expanded
 

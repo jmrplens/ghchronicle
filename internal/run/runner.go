@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"time"
 
 	"github.com/jmrplens/ghchronicle/v2/internal/collect"
@@ -333,17 +334,7 @@ func (r *Runner) discoverRepos(ctx context.Context, now time.Time) error {
 	if r.repos != nil && now.Sub(r.reposAt) < discoverInterval-r.slack() {
 		return nil
 	}
-	found, err := collect.Discover(ctx, r.API, &collect.Filter{
-		User: r.Cfg.Targets.User, Orgs: r.Cfg.Targets.Orgs, Repos: r.Cfg.Targets.Repos,
-		Exclude: r.Cfg.Targets.Exclude, IncludeForks: r.Cfg.Targets.IncludeForks,
-		// A backfill is the one walk that wants the whole history, and an
-		// archived repository has one: its pull requests, releases and runs
-		// are as much the account's as a live repository's, they just never
-		// move again, which is exactly why a sweep leaves them out. Forks
-		// stay as configured either way.
-		IncludeArchived: r.Cfg.Targets.IncludeArchived || r.Backfill,
-		IncludePrivate:  r.Cfg.Targets.PrivateIncluded(),
-	})
+	found, err := collect.Discover(ctx, r.API, DiscoveryFilter(r.Cfg, r.Backfill))
 	if err != nil {
 		r.noteFamily(discoverFamily, 0, 1, 0)
 		r.noteFamilyFailure(discoverFamily, err)
@@ -353,6 +344,22 @@ func (r *Runner) discoverRepos(ctx context.Context, now time.Time) error {
 	r.cacheDirty = true
 	r.Log.Info("repositories discovered", "count", len(r.repos), "archived_aside", len(r.archived))
 	return nil
+}
+
+// DiscoveryFilter is which repositories a sweep, or a backfill, of cfg
+// covers.
+func DiscoveryFilter(cfg *config.Config, backfill bool) *collect.Filter {
+	return &collect.Filter{
+		User: cfg.Targets.User, Orgs: cfg.Targets.Orgs, Repos: cfg.Targets.Repos,
+		Exclude: cfg.Targets.Exclude, IncludeForks: cfg.Targets.IncludeForks,
+		// A backfill is the one walk that wants the whole history, and an
+		// archived repository has one: its pull requests, releases and runs
+		// are as much the account's as a live repository's, they just never
+		// move again, which is exactly why a sweep leaves them out. Forks
+		// stay as configured either way.
+		IncludeArchived: cfg.Targets.IncludeArchived || backfill,
+		IncludePrivate:  cfg.Targets.PrivateIncluded(),
+	}
 }
 
 // accountFamilies runs the families that ask about the account rather than
@@ -488,6 +495,10 @@ var perRepoFamilies = []string{
 	"analyses", "forks", "planning", "joblogs", "settings", "rulesets", "inventory",
 	"deployments", "policyfiles", "deps",
 }
+
+// PerRepository says whether a family runs once per repository, so that
+// every row it writes names one of the repositories the configuration covers.
+func PerRepository(family string) bool { return slices.Contains(perRepoFamilies, family) }
 
 // batchOnlyFamilies collect entirely in familyBatch and have no per-repository
 // part, so a failed batch is the whole family failing rather than one

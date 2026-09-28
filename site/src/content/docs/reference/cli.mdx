@@ -33,6 +33,7 @@ ghchronicle -config /etc/ghchronicle/config.yaml
 | `-publish-dashboard` | off        | Publish the Grafana dashboard and the datasource it reads from, then exit; it needs the `grafana` section, asks GitHub nothing and needs no token |
 | `-uninstall`      | none          | Remove what this put in place and exit: `dashboard`, `data`, `state`, `all`, comma separated; it lists and removes nothing without `-yes` |
 | `-yes`            | off           | Go ahead with `-uninstall` rather than only listing what it would remove                                                                   |
+| `-migrate`        | off           | Print, for every configured store, what an earlier release left there in a shape this one no longer writes and what bringing it along would take, then exit; it changes nothing |
 | `-card`           | none          | Run one sweep and write a summary SVG to this path; that sweep runs every family, whatever the cadences say                                |
 | `-card-only`      | off           | With `-card`, write the SVG and nothing else: no sink is needed, none is written to, and the state file is left as it was                  |
 | `-card-theme`     | `auto`        | `dark`, `light`, `auto`, or `both`: the light card at `-card` and the dark one beside it with `_dark` before the extension, from one sweep |
@@ -61,6 +62,22 @@ ghchronicle -card-layouts
 ghchronicle -config config.yaml -list
 ghchronicle -config config.yaml -backfill-status
 ```
+
+## What an upgrade left in the stores
+
+```sh
+ghchronicle -config config.yaml -migrate
+```
+
+`-migrate` checks every configured store against the list of changes the
+binary carries, each a measurement an earlier release wrote under a key this
+one no longer uses, and prints one block per store: what each change finds
+there, the evidence, what bringing the store along would take and what would
+be read again from GitHub. It changes nothing. The stores are asked questions,
+GitHub is asked for the repository list alone, and the state file is read and
+never written, so it exits 0 whatever it finds. Without a token it still runs
+and says what it could not compare. [Migrations](/ghchronicle/install/upgrading/#migrations)
+says how each store is decided and what each line means.
 
 ## The three ways to run a sweep
 

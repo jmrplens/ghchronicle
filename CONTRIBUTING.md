@@ -101,7 +101,11 @@ it in both languages where it is a page.
 `sink.promRules`, a Loki rendering if it is an event, its row on the
 measurements page, and the counts the site states in prose:
 `site/scripts/gen-stats.mjs` holds each of them to the code, and a count it has
-no word for in `NUMBER_WORDS` fails until one is added.
+no word for in `NUMBER_WORDS` fails until one is added. Its tag keys go in
+`internal/migrate/identity.json`, written by
+`go test ./internal/migrate -run TestEveryChangeOfIdentityIsRegistered -update`
+once the fake GitHub answers it; the same holds for every measurement of a new
+collector.
 
 **A new field on an existing measurement** is a field and never a tag: a new
 tag gives every row written after it an identity the rows already stored do
@@ -111,6 +115,19 @@ a field for the same reason. One the
 collector writes only under a condition goes in `conditionalColumns`
 (`internal/dashboards/conditional_columns_test.go`) when a SQL panel reads it;
 the test fails until it is there.
+
+**A change to a measurement's tag keys**, a tag that becomes a field or one
+that is renamed or removed, means an entry in `migrate.Registry`
+(`internal/migrate/registry.go`): the release, the tags only the old shape
+carries, and every family that writes the measurement, so `-migrate` can find
+the old shape in a store and say what bringing it along takes.
+`TestEveryChangeOfIdentityIsRegistered` sweeps the fake GitHub, compares every
+measurement's tag keys with `internal/migrate/identity.json`, and refuses to
+rewrite that file with `-update` while a tag that went away has no entry;
+`TestEveryMigrationNamesEveryFamilyThatWritesIt` sweeps it one family at a
+time and fails on an entry whose families are not the ones that write it. A
+tag added to an existing measurement is refused outright, for the reason in
+the paragraph above.
 
 **A panel one store draws differently from the others** means the reason in
 that store's own description of the panel, and an entry in `dashboardsDiffer`

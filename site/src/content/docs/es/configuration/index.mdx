@@ -126,7 +126,7 @@ La reserva se escala por cubo; ver [límites de la API](/ghchronicle/es/api/).
 state_file: /var/lib/ghchronicle/state.json
 ```
 
-Ocho cosas, y borrar el fichero cuesta una distinta por cada una:
+Nueve cosas, y borrar el fichero cuesta una distinta por cada una:
 
 - `last_run`, cuándo corrió cada familia por última vez. Sin él todas las
   familias vencen a la vez, así que la pasada siguiente es completa, salvo que
@@ -163,14 +163,22 @@ Ocho cosas, y borrar el fichero cuesta una distinta por cada una:
   513 KB en cada pasada horaria que registró el proxy de producción contra la
   misma cuenta el 2026-09-27, un tamaño que crece a lo largo del día con lo que
   se fusiona.
+- `stores`, para cada almacén en el que escribe una ejecución, adónde apunta,
+  la versión que escribió en él primero, la que lo hizo por última vez y las
+  [migraciones](/ghchronicle/es/install/upgrading/#migraciones) que se le han
+  aplicado. Sin él un fichero SQL, un Graphite o un Telegraf se toman por de la
+  versión en marcha, así que lo que dejó en ellos una versión anterior ya no se
+  muestra.
 
-Siete de las ocho cuestan solo cuota, porque lo que se vuelve a recoger se
+Siete de las nueve cuestan solo cuota, porque lo que se vuelve a recoger se
 indexa por medida, etiquetas y marca de tiempo y sobrescribe lo que ya está
 guardado. `last_head` es la que pierde algo: los cambios de dependencias entre
 la cabeza que tenía y la siguiente se leen de un rango que nadie puede nombrar
-una vez que la cabeza ha desaparecido.
+una vez que la cabeza ha desaparecido. `stores` cuesta una pregunta que nada
+puede responder después: qué versión escribió primero en un almacén al que no
+se le puede preguntar cuál es la clave de sus filas.
 
-Una pasada con `-card-only` no escribe ninguna de las ocho. Sus puntos llegan a
+Una pasada con `-card-only` no escribe ninguna de las nueve. Sus puntos llegan a
 [la tarjeta](/ghchronicle/es/card/) y a ningún almacén, así que una marca suya
 haría que la siguiente recogida se saltara una familia, o estrechara una
 lectura, cuyos datos fueron a parar a una imagen y a ningún otro sitio. El
