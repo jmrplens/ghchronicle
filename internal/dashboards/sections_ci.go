@@ -509,15 +509,9 @@ const ciSucceeded = "Succeeded"
 // keeps the workflows past keepsFailing and, as the SQL ORDER BY and LIMIT
 // do, the twenty with the highest share.
 func failingESRows() []any {
-	binary := func(alias, left, operator, right string) any {
-		return map[string]any{"id": "calculateField", "options": map[string]any{
-			"mode": "binary", "alias": alias,
-			"binary": map[string]any{"left": left, "operator": operator, "right": right},
-		}}
-	}
 	return append([]any{
-		binary("Failures", "Runs", "-", ciSucceeded),
-		binary(ciFailureRate, "Failures", "/", "Runs"),
+		binaryField("Failures", "Runs", "-", ciSucceeded),
+		binaryField(ciFailureRate, "Failures", "/", "Runs"),
 		map[string]any{"id": "filterByValue", "options": map[string]any{
 			"type": "include", "match": "any",
 			"filters": []any{map[string]any{
@@ -528,16 +522,48 @@ func failingESRows() []any {
 	}, append(keepLargest(ciFailureRate, 20), hideColumns(panelFullNameField, ciSucceeded))...)
 }
 
+// wastedESTable is "Minutes spent on failed runs" in Elasticsearch: the time
+// each repository's runs took, the time the ones that did not succeed took,
+// and the share of the one in the other, the three columns the SQL stores
+// select.
+//
+// A bucket cannot add up a field over some of its documents, so the failed
+// runs are a query of their own, merged onto the repository's row. Their time
+// is their mean times their count rather than their sum: the two sums would
+// both be the column the response parser calls Sum, and a merge joins rows on
+// every column the frames share by name, so it would have kept apart every
+// repository whose two sums differ. A repository none of whose runs failed has
+// no row in the second query, and its mean and count are then empty, which the
+// calculation reads as 0, as the SQL CASE does. The 2.6.1 review found the
+// table drawing the success rate of the runs under a sentence calling it the
+// complement of the wasted share, which it is not: it counts runs and the
+// share weighs them by their minutes.
+func wastedESTable(b *builder) (targets []Target, tf []any) {
+	total := b.mSum("duration_seconds")
+	failedMean, failedRuns := b.mAvg("duration_seconds"), b.mCount()
+	targets = []Target{
+		esq(ciRun, []any{total}, b.tmRepo(50), "A", []string{ESF}, ""),
+		esq(ciRun, []any{failedMean, failedRuns}, b.tmRepo(50), "B", []string{ESF, "success:false"}, ""),
+	}
+	return targets, []any{
+		map[string]any{"id": "merge", "options": map[string]any{}},
+		binaryField("Wasted", esNames["avg"], "*", esNames["count"]),
+		organize(map[string]string{inventoryRepoTerm: "Repository", esNames["sum"]: "Total"},
+			[]string{panelFullNameField, esNames["avg"], esNames["count"]}, nil),
+		binaryField("Share", "Wasted", "/", "Total"),
+		// A repository among the fifty with the most failed runs and not among
+		// the fifty with the most runs has no total to take a share of.
+		keepsValue("Total"),
+	}
+}
+
 // whatKeepsFailing is the cost of the failures: the minutes spent on runs
 // that failed, the workflows and steps that keep failing, and the workflows
 // that never ran at all.
 func whatKeepsFailing(b *builder) []Panel {
 	wastedGR, wastedGRtf := gTbl(grGroupBy(rp(ciRun, "duration_seconds"), ciRun, "sum", "repo"),
 		"Repository", []col{{"sum", "Total"}})
-	wastedES, wastedEStf := esTbl(ciRun, b.tmRepo(50),
-		[]any{b.mSum("duration_seconds"), b.mAvg("success")},
-		[]named{{inventoryRepoTerm, "Repository"}, {"t", "Total"}, {"s", ciSuccessRate}},
-		[]string{ESF}, hideColumns(panelFullNameField))
+	wastedES, wastedEStf := wastedESTable(b)
 
 	// A failed run is a 1 in each slot it has a point in, added up per
 	// group. Not countOf, which adds every run into one series first: a
@@ -600,8 +626,7 @@ func whatKeepsFailing(b *builder) []Panel {
 			GRDesc: "Graphite has no conclusion to filter a sum by here, so this is the whole " +
 				"time rather than the wasted part. " + grRows,
 			ES: wastedES, ESTF: wastedEStf,
-			ESDesc: "In Elasticsearch the wasted share is the complement of the success rate.",
-			ESOver: []any{unitOf(ciSuccessRate, "percentunit", 120)},
+			ESOver: []any{unitOf("Share", "percentunit", 100)},
 		}),
 		panel("table", "Workflows that keep failing", box{W: 12, H: 8, X: 12, Y: 38}, []Target{sqlT(
 			`SELECT r.repo AS "Repository",` +

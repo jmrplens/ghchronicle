@@ -66,7 +66,8 @@ func evalESPanel(t *testing.T, p map[string]any, docs []esDoc) []map[string]any 
 	var frames [][]map[string]any
 	targets, _ := p["targets"].([]any)
 	for _, raw := range targets {
-		frames = append(frames, evalESTable(t, raw.(map[string]any), docs))
+		target, _ := raw.(map[string]any)
+		frames = append(frames, evalESTable(t, target, matching(t, target, docs)))
 	}
 	tfs, _ := p["transformations"].([]any)
 	rows := slices.Concat(frames...)
@@ -93,6 +94,42 @@ func evalESPanel(t *testing.T, p map[string]any, docs []esDoc) []map[string]any 
 		}
 	}
 	return rows
+}
+
+// matching is the documents a query's Lucene filter keeps, for the clauses a
+// panel narrows its documents by: a field holding one value, and a field that
+// is there at all. The index and the repository picker select every document
+// a test hands over, and any other clause is one this evaluator cannot read,
+// which fails the test rather than answering over documents the query would
+// have left out.
+func matching(t *testing.T, target map[string]any, docs []esDoc) []esDoc {
+	t.Helper()
+	query, _ := target["query"].(string)
+	var keep []func(esDoc) bool
+	for clause := range strings.SplitSeq(query, " AND ") {
+		field, value, ok := strings.Cut(clause, ":")
+		switch {
+		case !ok:
+			t.Fatalf("no evaluator for the clause %q of %q", clause, query)
+		case field == "_index" || strings.Contains(value, "${"):
+		case field == "_exists_":
+			keep = append(keep, func(d esDoc) bool { _, has := d[value]; return has })
+		case strings.ContainsAny(clause, `()[]*\"`) || strings.HasPrefix(field, "NOT "):
+			t.Fatalf("no evaluator for the clause %q of %q", clause, query)
+		default:
+			keep = append(keep, func(d esDoc) bool {
+				v, has := d[strings.TrimSuffix(field, ".keyword")]
+				return has && fmt.Sprint(v) == value
+			})
+		}
+	}
+	var out []esDoc
+	for _, d := range docs {
+		if !slices.ContainsFunc(keep, func(k func(esDoc) bool) bool { return !k(d) }) {
+			out = append(out, d)
+		}
+	}
+	return out
 }
 
 // evalESTable is one query's table: a row per bucket of the innermost terms
@@ -351,9 +388,12 @@ func calculated(t *testing.T, rows []map[string]any, options map[string]any) []m
 	for _, row := range rows {
 		left, _ := row[binary["left"].(string)].(float64)
 		right, _ := row[binary["right"].(string)].(float64)
+		// A missing operand is 0, as JavaScript's arithmetic reads a null.
 		switch binary["operator"] {
 		case "-":
 			row[alias] = left - right
+		case "*":
+			row[alias] = left * right
 		case "/":
 			row[alias] = left / right
 		default:
@@ -364,7 +404,7 @@ func calculated(t *testing.T, rows []map[string]any, options map[string]any) []m
 }
 
 // filteredByValue is the filterByValue transformation keeping the rows whose
-// one column is greater than a number.
+// one column is greater than a number, or holds any value at all.
 func filteredByValue(t *testing.T, rows []map[string]any, options map[string]any) []map[string]any {
 	t.Helper()
 	filters, _ := options["filters"].([]any)
@@ -374,13 +414,22 @@ func filteredByValue(t *testing.T, rows []map[string]any, options map[string]any
 	filter, _ := filters[0].(map[string]any)
 	config, _ := filter["config"].(map[string]any)
 	bound, _ := config["options"].(map[string]any)
-	if config["id"] != "greater" {
+	field, _ := filter["fieldName"].(string)
+	var keep func(row map[string]any) bool
+	switch config["id"] {
+	case "greater":
+		keep = func(row map[string]any) bool {
+			v, _ := row[field].(float64)
+			return v > float64(bound["value"].(int))
+		}
+	case "isNotNull":
+		keep = func(row map[string]any) bool { return row[field] != nil }
+	default:
 		t.Fatalf("no evaluator for a %v filter", config["id"])
 	}
 	var out []map[string]any
 	for _, row := range rows {
-		v, _ := row[filter["fieldName"].(string)].(float64)
-		if v > float64(bound["value"].(int)) {
+		if keep(row) {
 			out = append(out, row)
 		}
 	}

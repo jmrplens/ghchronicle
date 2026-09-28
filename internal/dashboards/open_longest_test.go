@@ -169,16 +169,16 @@ func TestTheOpenLongestTablesNameEachItemInElasticsearch(t *testing.T) {
 		return []esDoc{
 			// An older reading of #7, before it was retitled and labeled.
 			{
-				"full_name": "alice/x", "repo": "x", "number": "7", "author": "bob", "url": page(kind, 7),
+				"full_name": "alice/x", "repo": "x", "state": "OPEN", "number": "7", "author": "bob", "url": page(kind, 7),
 				"title": "Draft widget", "seconds_open": 100, "comments": 1, "reviews": 0,
 			},
 			{
-				"full_name": "alice/x", "repo": "x", "number": "7", "author": "bob", "url": page(kind, 7),
+				"full_name": "alice/x", "repo": "x", "state": "OPEN", "number": "7", "author": "bob", "url": page(kind, 7),
 				"title": "Add the widget", "label_names": "enhancement", "seconds_open": 200, "comments": 3, "reviews": 1,
 			},
 			// No labels at all, which the collector writes as no field.
 			{
-				"full_name": "alice/x", "repo": "x", "number": "8", "author": "carol", "url": page(kind, 8),
+				"full_name": "alice/x", "repo": "x", "state": "OPEN", "number": "8", "author": "carol", "url": page(kind, 8),
 				"title": "Fix the build", "seconds_open": 50, "comments": 0, "reviews": 0,
 			},
 		}

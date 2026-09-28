@@ -1310,6 +1310,28 @@ const esNoMedian = "In Elasticsearch a median or an average with nothing in the 
 	"the SQL stores say what the range lacked: an empty bucket is not returned, since " +
 	"the one it would return reads as 0."
 
+// binaryField is a column computed from two others of the same row, which is
+// how an Elasticsearch table derives what a SQL statement selects as an
+// expression over its aggregates.
+func binaryField(alias, left, operator, right string) any {
+	return map[string]any{"id": "calculateField", "options": map[string]any{
+		"mode": "binary", "alias": alias,
+		"binary": map[string]any{"left": left, "operator": operator, "right": right},
+	}}
+}
+
+// keepsValue keeps the rows whose `field` holds a value, for a table that
+// merges two queries and draws only the rows the first one answered.
+func keepsValue(field string) any {
+	return map[string]any{"id": "filterByValue", "options": map[string]any{
+		"type": "include", "match": "any",
+		"filters": []any{map[string]any{
+			"fieldName": field,
+			"config":    map[string]any{"id": "isNotNull", "options": map[string]any{}},
+		}},
+	}}
+}
+
 // aboveZero keeps the rows whose `field` is more than 0, which is what the
 // SQL stores' WHERE says of a table they only list what has any of.
 func aboveZero(field string) any {
