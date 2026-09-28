@@ -12,6 +12,356 @@ Versions follow [semantic versioning](https://semver.org/). The dates are the
 day the tag was pushed, with one exception: 2.5.2 has a section and no tag. It
 was never released on its own, and its changes shipped in 2.6.0.
 
+## 2.6.2 - 2026-09-28
+
+A visual and cross-store review of 2.6.1 on the containerised stack: the five
+dashboards imported into its Grafana 13.2.1, every panel of every store
+photographed over the last thirty days, and the numbers of each panel read side
+by side across the five stores, which the suite fills from the same fixtures.
+It found eleven differences no description explained. Seven were defects of one
+store's panel: a Prometheus table that drew seven rows for one repository, a
+Prometheus bar chart that never drew, Elasticsearch stat tiles without their
+units, an Elasticsearch deployment count of one against two, a table that asked
+its question differently in two of the stores, pie slices all of one color and,
+in two stores, all called "Events", and Elasticsearch series and columns under
+the names its response parser gives them. Four were differences of number or of
+row: InfluxDB estimating the medians PostgreSQL computes, a Graphite row for a
+repository with nothing in the range, an Elasticsearch table without the
+columns that say what it lists, and the Prometheus spend at exactly double,
+which was the exporter adding up a point every store keeps once. Beside them,
+what a reader sees: charts whose one point was not drawn, tiles with an empty
+space where the number goes, tables that led with a flag or a date, raw values
+and field names where the SQL stores draw words, fractional ticks under counts
+and full names cut short. Comparing what the five stores draw then turned up a
+few more of the same kind. The review is now a test: the containerised suite
+replays what Grafana draws from each store's answer and fails when two stores
+draw a panel differently for a reason the panel's own description does not
+give.
+
+- **Elasticsearch stat tiles keep their units.** Grafana applies a panel's
+  field overrides in the order they are listed, and a `byName` override matches
+  the name a field carries when its turn comes. The units of a stat group are
+  shared overrides addressed by the name each tile draws, and in Elasticsearch
+  that name is given by an override of the store's own, a display name on the
+  query, which came after them, so every unit was looked for under the name the
+  response parser makes and was dropped. On the review "Time to merge" read
+  194 K where the other four stores read 2.25 days, the time to review 82.8 K
+  for 23 hours, "Run duration" 260 for 4.33 mins, "Queue wait" 47.5 for 47.5 s,
+  "Artifact storage walked" 205 K for 200 KiB, "Actions cache" 79.1 Mil for
+  75.5 MiB, and "Actions minutes", a count, $214. The success rate and the
+  signed share kept theirs only because the store set them again after its own
+  names. The overrides that name a field now come before every override that
+  addresses it, in every store, and on the same stack the Elasticsearch tiles
+  read 2.25 days, 23 hours, 4.33 mins, 47.5 s, 200 KiB, 75.5 MiB and 214.
+- **"Every repository, ever" draws each repository once in Prometheus.** The
+  table asks seven queries, one per column, and merges them. Each was a
+  selector joined by `or` and `unless`, which hands the series back with its
+  metric name, and a merge joins rows on every field the frames share, so seven
+  metric names were seven rows for `hello-world`, each holding one number. Each
+  query is now an aggregation over the labels the table draws, and the table
+  reads one row with the numbers InfluxDB, PostgreSQL and Elasticsearch read.
+- **"Languages starred" draws in Prometheus.** It sums
+  `github_stars_given_total` by `language`, and the exporter kept only `user`
+  on `gh_star_given`, so the grouping was one series with no label and the bar
+  chart refused it with "Bar charts require a string or time field". That is
+  the exporter's doing, for every account and not only the fixture's. The
+  exporter now keeps the language, which is bounded by the languages GitHub
+  recognizes: a series per language the account has starred in. The repository
+  is still not kept, since that would be a series per star. The series made
+  from `gh_star_given` carry `language` from this release on, so they are new
+  series and the ones without it go stale. "Recently starred" reads the same
+  gauges, so in Prometheus it has a row per language with the mean star count
+  of the repositories starred in it, as its description and the
+  [panels page](https://jmrp.io/docs/ghchronicle/dashboards/panels/) now say.
+  A test that holds every label a Prometheus panel groups, joins or matches by
+  to one the exporter keeps found one more: "Open the longest" grouped by
+  number and author, which the exporter never kept, so those two columns were
+  always empty. It now groups by the repository its description already said a
+  row is.
+- **Elasticsearch counts every deployment of an environment.** "Deployments by
+  environment" bucketed the deployments of each environment and outcome by the
+  address they put live, a url per deployment, so each bucket held one
+  deployment and the table counted, and took the medians of, one address's
+  deployments. On the review `github-pages` read 1 deployment and a To status
+  of 0 s, where InfluxDB and PostgreSQL read 2 and 33 s from the same two. The
+  counts and medians are now one query, bucketed by the repository's
+  deployments page, one value for all of its documents, and the address a
+  second one that keeps the address that sorts last, as `MAX(environment_url)`
+  does in SQL; the panel merges the two. It reads 2 and 33 s.
+- **"Workflows that keep failing" asks the same question in every store.**
+  InfluxDB, PostgreSQL and Prometheus list a workflow once it has failed more
+  than three times in the range, a failure being any conclusion but success.
+  Graphite counted the `failure` conclusion alone and kept no threshold, and
+  Elasticsearch listed every workflow that ran with its success rate: on the
+  review the same two runs read no row in three stores, one failure in Graphite
+  and a row of 2 runs at 50% in Elasticsearch. The threshold is now one
+  constant all five queries read. Graphite drops the successful runs by the
+  conclusion's node and keeps the groups past it, and Elasticsearch counts the
+  runs and adds up the success flag while the panel works out the failures and
+  their share, keeps the workflows past the threshold and the twenty with the
+  highest share, the columns the SQL stores select. On the fixture, whose
+  workflow failed once, no store that answers the panel lists a row; checked
+  with the threshold set to zero, it read one failure in two runs, 50%.
+- **Each event type is a slice of its own color and name.** "Events by type"
+  answers a row per type, and Grafana colors a pie by field, so a column of
+  counts was one field and every slice the same green in all five stores; in
+  Graphite and Elasticsearch every slice was also named "Events", the display
+  name of that field. The panel's last step now makes each row a field of its
+  own, named by the type, in every store, and the fixture's three types are
+  three slices in three colors, each under its name.
+- **Elasticsearch shows the SQL stores' names, in their order.** The legends of
+  "Time to merge over time" read `p50.0 seconds_to_merge` and
+  `p90.0 seconds_to_merge`, and those of "Run duration over time"
+  `p50.0 duration_seconds` and `p95.0 duration_seconds`, where the SQL stores
+  read Median and the percentile; each percentile is now a query of its own
+  under the SQL name. "Slowest steps" opened with a `full_name.keyword` column,
+  the bucket that keeps two owners' repositories of one name apart, which is
+  now hidden as every other table that buckets on it hides it. And an
+  Elasticsearch table's columns came in the order the response parser met
+  them, the buckets first, so nineteen tables led with a flag, a date or a
+  kind, "Every repository, ever" with Fork and "Repositories" with Language
+  among them. Every Elasticsearch table now ends with the order the InfluxDB
+  statement selects its columns in: of the 66 that drew rows beside their
+  InfluxDB twin on the stack, 39 headed the columns the two share in another
+  order, and none does now.
+- **"Open the longest" names each item in Elasticsearch.** The SQL stores list
+  each pull request with its title, author and labels, and Elasticsearch listed
+  a number and a repository. It now carries all three, and "Open issues the
+  longest" its author and labels, each as a bucket of one value under the item,
+  kept by the open time, so a title edited inside the range reads as it stands,
+  as the SQL stores read it from the newest row; a document without the field
+  is an empty cell. Fork is still absent, and the description now says why: the
+  flag is `gh_repo`'s, and Elasticsearch cannot join it.
+- **The exporter reduces a batch as the stores hold it.** The billing collector
+  reads two months, and the fake GitHub of the containerised suite answers both
+  with the same rows. InfluxDB, PostgreSQL, Graphite and Elasticsearch key a
+  row by measurement, tag set and time, so each kept one of each; the
+  exporter's reducer added up every point it was handed, and the Prometheus
+  "Spend in range" read exactly double: $23.4 gross, $3.42 covered by the plan,
+  $20 billed and 428 Actions minutes, against $11.7, $1.71, $10 and 214. The flaw was in every rule that reads more than one point:
+  `count` counted and averaged a pull request offered twice as two, and
+  `keepLast` kept the first of two readings stamped at one instant where every
+  store keeps the last. The reducer now folds a batch into one row per
+  identity before it reduces it, the later point's fields over the earlier
+  one's, and the tile reads $11.7, $1.71, $10 and 214 in all five stores.
+  Across sweeps nothing changes: a gauge is replaced by the next sweep's, and
+  `total` remembers what it counted, now by the same identity. Reviewing the
+  change found one more: `sum` added up `price_per_unit` across the days a SKU
+  was billed, so the Prometheus Price column read the price times the days,
+  0.024 for three days of Linux minutes where the SQL stores' `MAX` reads
+  0.008. A sum now takes the highest price, as the
+  [dating page](https://jmrp.io/docs/ghchronicle/how/dating/#the-reducer-and-what-it-makes-of-each-measurement)
+  and the [Prometheus page](https://jmrp.io/docs/ghchronicle/sinks/prometheus/)
+  say.
+- **Every median in InfluxDB is exact.** "Queue wait" read 52 s in InfluxDB and
+  47.5 s in PostgreSQL and Elasticsearch, from four jobs that waited 30, 35, 60
+  and 65 seconds: InfluxDB estimated every median with
+  `approx_percentile_cont`, a t-digest, where PostgreSQL computes the exact
+  `percentile_cont`. The containerised suite carried it as an allowed
+  disagreement, and no panel said so. DataFusion's exact `percentile_cont` is
+  refused by InfluxDB 3 Core before 3.9.0 (3.8.3 answers "Invalid function"),
+  and its `median` is exact but, over an integer column, an integer that reads
+  47, so every median is now `median(CAST(x AS DOUBLE))`, which reads 47.5 on
+  3.0.3, 3.9.0 and 3.11.2, and PostgreSQL asks `percentile_cont(0.5)`. The
+  95th percentile of the run duration and the 90th of the time to merge are
+  still estimates in InfluxDB, and both panels now say so. On the stack the
+  tile reads 47.5 s in InfluxDB, PostgreSQL and Elasticsearch, and every panel
+  with a median that answers there reads the same in the two SQL dashboards.
+  Graphite reads 50 s, from what its storage kept, as its description says.
+- **Graphite draws no row for a group with nothing in the range.** "Discussion
+  answers" listed `someone_else` with 0 comments beside the two repositories
+  commented in during the thirty days; its one comment was seventy five days
+  old. Graphite answers for every path that exists, a series with nothing in
+  the range as a row of nulls, and `isNonNull` turned the nulls into zeros
+  before the grouping, so the `removeEmptySeries` around the table no longer
+  saw an empty series. Every Graphite table and bar chart that counts per group
+  now drops those series first; "Ruleset changes", which drew a version from
+  outside the range with 0, was the other one the stack showed. A stat keeps
+  its zero, since there a range with nothing in it is a count of 0, which is
+  what `COUNT(*)` answers too.
+- **A count over nothing reads 0 in every store.** Comparing what the five
+  stores draw found "Undecided runs" missing from the Graphite and
+  Elasticsearch tiles, where the SQL stores read 0, and "Issues closed" missing
+  from Elasticsearch: Graphite has no series for a path it has never held, and
+  an Elasticsearch terms bucket keeps no term without a document. A Graphite
+  count now falls back to a constant 0 when nothing matches, and `asPercent`
+  over two of them reads 0 of 2 as 0 and 0 of 0 as nothing, measured against
+  graphite-web 1.1.10; an Elasticsearch count asks for its empty buckets and
+  reads 0. The Releases tile of "Downloads" was the last Graphite count without
+  the fallback. A median or an average over nothing still has no number: the
+  Elasticsearch plugin of Grafana 13.2.1 reads the percentile of an empty
+  bucket as 0, and a wrong number is worse than none, so the three
+  Elasticsearch stat groups that take one say that such a tile leaves the
+  group.
+- **A chart draws a series of one point.** Every time series panel drew its
+  points `never`, and a line needs two, so a series whose range held one value
+  drew nothing while its legend read the value: "Time to merge over time" was
+  an empty grid in all five stores, and a snapshot written once, the star and
+  fork counts, artifact storage and the rate budget, was one in Graphite and
+  Elasticsearch. The points are now `auto`, which Grafana draws while they are
+  fewer than the plot has room for, and the single merged pull request, the
+  Graphite and Elasticsearch star count and the rate budget each draw their
+  point, at a month and at a year. Four Graphite charts read "Data outside time range" instead, and that
+  is graphite-web: a chart asks for at most a hundred points, and graphite-web
+  fits a longer series into bands, moving each point one storage step later.
+  Measured against `graphiteapp/graphite-statsd:1.1.10-5` with an hour a step,
+  a point written at 07:30 UTC and read at 07:59 over thirty days came back
+  stamped 08:00, after the end of the range; asked for a thousand points, it
+  came back at 07:00. The dashboard cannot know the retention a reader's
+  Graphite keeps, so no one `maxDataPoints` turns the banding off, and the
+  [Graphite page](https://jmrp.io/docs/ghchronicle/sinks/graphite/) says why
+  such a chart reads so until the clock reaches the band's end.
+- **A tile with no number says what the range lacked.** A median or a share
+  over a range with nothing to measure has no number, and Grafana drew the tile
+  as an empty space under its label: "Time to close an issue" in InfluxDB,
+  PostgreSQL and Graphite, and in Prometheus the success rate, the signed share
+  of commits and the webhook failure rate gauge. Each such value now carries
+  words, as the review wait already did with "no human review": "none merged"
+  under the time to merge and the lines per pull request, "no issue closed",
+  "none decided" under the success rate, "no runs" and "no jobs" under the run
+  duration and the queue wait, "no commits" under the signed share and "no
+  deliveries" on the gauge. Grafana draws a no-value text in the color of the
+  field's lowest threshold, which is red for the success rate and the signed
+  share, and "none decided" is not a failed build, so the words are a value
+  mapping in the color of the text. On the stack the tile reads "no issue
+  closed" in the three stores, and the Prometheus ones "none decided", "no
+  commits" and "no deliveries".
+- **The series of a state or a reviewer take the SQL stores' names.** Graphite's
+  path node, Elasticsearch's bucket and Prometheus's label drew the raw value,
+  `MERGED`, `OPEN`, `true` and `false`, where the SQL stores draw Merged,
+  Closed, "Open that day", Bot and Human, and the colors and the line the SQL
+  stores pin to those words missed them: the merged bar of "Pull requests over
+  time" was yellow in Graphite, with the open count stacked on it as a bar.
+  The three stores now draw each value under the SQL word, and Graphite and
+  Elasticsearch draw Merged in purple beside the orange "Open that day" line,
+  and Bot and Human.
+- **Graphite's "Contribution totals" reads as the other stores do.** It drew a
+  row per field under Field and Value, each named by the path's last node,
+  `pull_requests` and `restricted` among them, in the alphabet's order. It now
+  reads Commits, Pull requests, Reviews, Issues, New repositories and Private
+  under Metric and Last year, with the numbers the other four show.
+- **Counts tick in whole numbers, flags read yes or no, full names fit.** A bar
+  chart of counts took Grafana's default decimals, so the one open alert of
+  "Alerts by severity" stood on an axis ticked every 0.05 up to 2, and the
+  three events of "Events by repository" on one ticked every 0.2; they tick in
+  whole numbers now. The flag mapping knew the SQL stores' 1 and 0 and not the
+  `true` and `false` of an Elasticsearch document or a Prometheus label, so
+  "Sponsorships" read true and false in Elasticsearch and "Discussions" 0 and 1
+  there and false and true in Prometheus. One mapping carries both spellings,
+  and each reads yes and no wherever it is a flag; Graphite's Answered is a
+  share and keeps its percentage. A
+  Repository column of full names was held to the 110 pixels measured for short
+  names and read `another/projec`; the six such tables give it a minimum of 160
+  instead.
+- **The Graphite page says the dashboard shows a name as the path holds it.**
+  `(ghost)` reads `_ghost_`, `Actions Linux` `Actions_Linux`, `another/project`
+  `another_project` and a cache key's `go-1.27.1` `go-1_27_1`. The sink turns
+  what a path node cannot hold into an underscore, and the dashboard names a
+  series by that node. Nothing undoes it on the way out, since an underscore in
+  a node may have been one in the name.
+- **Four smaller differences the comparison found.** "Downloads by release"
+  lists what has been downloaded, and Graphite drew a release nobody downloaded
+  as a bar of nothing and Elasticsearch as a row of 0; both leave it out now,
+  and Elasticsearch names its bars by tag, as its description says, where both
+  of the fixture's were called `hello-world`. "Work elsewhere" breaks a tie on
+  an item's newest row by the state's name in both SQL stores: two states at
+  one instant cannot come from GitHub, whose searches for each state are
+  disjoint, but the fake answers every search with the same items, and
+  InfluxDB and PostgreSQL drew the one pull request as open in one and closed
+  in the other. "Deploy keys" says in Graphite and Prometheus that a key never
+  used has no row there, and "Answers elsewhere" says in Graphite that it
+  answers only inside the range.
+- **The dashboard checker asks every query of a panel at one instant.** A
+  dashboard resolves its range to two instants in the browser before it asks.
+  The checker posted `now-30d` to `now`, and Grafana resolves `now` once per
+  query, so the six instant queries of Prometheus's "Contributions by year"
+  came back a millisecond apart and a merge drew six half rows where the
+  panel draws three whole ones. `cmd/check_dashboards` and the containerised
+  suite now resolve the range once per panel.
+- **The five dashboards are held to drawing the same values.** The
+  containerised suite asked the stores to agree only on panels that reduce to
+  one number and whose descriptions were identical, so a table, a tile's unit
+  or a bar's name was never compared. `grafana.Draw` now replays what Grafana
+  does between `/api/ds/query` and the screen, for the steps the dashboards
+  use, with Grafana 13's semantics as its frontend has them: the Prometheus
+  datasource's reshaping of a table, the transformations (organize, merge,
+  reduce, calculateField, groupBy, filterByValue, sortBy, limit, transpose and
+  rowsToFields), the `byName` and `byFrameRefID` overrides in their order,
+  display names and value mappings; a step it does not know is an error rather
+  than a guess. `TestTheStoresDrawTheSameValues` compares every pair of stores
+  on every panel: a tile's number, unit and no-value text, a table's rows over
+  the columns both draw, and a bar's name and length. A difference fails
+  unless `dashboardsDiffer` names the panel, the stores and words from each
+  store's own description of it, and an entry fails when its words have left
+  the description or the stores have come to agree.
+  `TestNoPanelDrawsAFieldUnderTheNameItsDatasourceGave` fails on a raw name
+  such as `p50.0 seconds_to_merge` in any panel, time series included. On this
+  release 866 pairs of stores drew the same panel, 771 of them alike and the
+  rest excused by 29 entries. Run against the dashboards of 2.6.1, the two
+  tests fail on eight of the nine findings that lived in the dashboards; the
+  ninth, the columns Elasticsearch's "Open the longest" lacked, is not asked,
+  since a column only one store draws is not compared. A test over the
+  generated files holds every `byName` override of a stat or a gauge to a field
+  the panel carries when the override is reached, and one of a table to a field
+  some store draws. The
+  [testing page](https://jmrp.io/docs/ghchronicle/reference/testing/) and
+  [CONTRIBUTING](https://github.com/jmrplens/ghchronicle/blob/main/CONTRIBUTING.md)
+  say what a store that draws a panel differently now owes.
+
+Each change in behaviour carries a test shown to fail against the code before
+it, run there again for these notes, in each change's own tree with everything
+but its tests undone: the order of the field overrides of every stat and gauge
+of the five dashboards; the seven Prometheus lifetime queries merged as Grafana
+merges them, and every merged Prometheus table to queries that begin with an
+aggregation; every label a Prometheus panel groups, joins or matches by against
+what the exporter keeps; two deployments of one environment bucketed as
+Elasticsearch buckets them; the threshold of "Workflows that keep failing" in
+every store, and the Elasticsearch twin over the runs of two workflows; the pie
+of "Events by type" in every store; every Elasticsearch series and bucket to a
+name of its own; a point read twice in one batch; every Graphite panel that
+reduces a series list to rows; the item columns of the two Elasticsearch
+open-longest tables; every median of both SQL stores; a chart of one point; a
+tile over nothing, and its words off red and orange; the Elasticsearch column
+order; the words of a state or a reviewer, taken from the SQL's own `CASE`; the
+Graphite contribution totals; count axes, flags and full names; the instant a
+panel is asked at; a count over nothing in every store, and the Graphite
+Releases tile; a release nobody downloaded; a tie in "Work elsewhere"; and a
+price billed over three days. Where such a test calls something the old code
+lacks, a constant, a helper or a field, it was run there with that call
+stubbed. The containerised suite passed on this release against InfluxDB
+3.11.2, PostgreSQL 18.6, Elasticsearch 9.5.3,
+`graphiteapp/graphite-statsd:1.1.10-5` and Prometheus 3.14.0, through Grafana
+13.2.1, and the values this release reads, given above, were read off its
+Grafana once the suite had filled the stores.
+
+Not verified, and worth saying plainly:
+
+- None of it has run in production. Every measurement above was taken on the
+  containerised stack, whose fixture is one account with one repository of its
+  own, through Grafana 13.2.1.
+- `grafana.Draw` is a reimplementation, from Grafana 13's frontend, of the
+  steps these dashboards use. It was not run beside the browser on every
+  panel, and a Grafana that changes one of those steps can draw what the
+  replay does not.
+- The comparison leaves out time series and bar charts over time, which each
+  store buckets by a step of its own, and the Prometheus panels built on a
+  range function, which the suite's short-lived exporter cannot answer. So the
+  Prometheus "Languages starred" was seen drawing a bar per language only with
+  the few minutes of history the stack gave it, each at 0, and the charts of
+  one point were read by eye.
+- The reducer's one row per identity was measured where the fixture repeats a
+  month's rows. Whether a real sweep ever hands the exporter one identity twice
+  in a batch, and so what the change moves in a production Prometheus, was not
+  measured.
+- The exact median was run on InfluxDB 3 Core 3.0.3, 3.9.0 and 3.11.2, and no
+  other version.
+- The Graphite banding was measured with an hour a storage step. A Graphite
+  that keeps another retention bands at other boundaries, and nothing in the
+  dashboard changed for it.
+- In InfluxDB "Workflows that keep failing" asks for `gh_workflow.url`, which
+  the fixture does not write, so there the panel is an error on the stack, as
+  the suite lists, and its threshold is held by the query test alone.
+
 ## 2.6.1 - 2026-09-28
 
 An audit of the documentation against the code of 2.6.0, every page in both
