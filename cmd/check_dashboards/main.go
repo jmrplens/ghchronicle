@@ -240,12 +240,15 @@ func vars(ctx context.Context, client grafana.Client, store *dashboards.Store,
 	}
 	// The Graphite dashboard bins its charts by variables a render computes
 	// from the range, which /api/ds/query would hand Graphite by name.
-	span, err := grafana.RangeSpan(rng, "now", time.Now())
-	if err != nil {
-		return v, err
-	}
-	if v.Intervals, err = grafana.AutoIntervals(store.Build(ds), span); err != nil {
-		return v, err
+	if len(store.Hidden) > 0 {
+		span, err := grafana.RangeSpan(rng, "now", time.Now())
+		if err != nil {
+			return v, err
+		}
+		hidden := map[string]any{"templating": map[string]any{"list": store.Hidden}}
+		if v.Intervals, err = grafana.AutoIntervals(hidden, span); err != nil {
+			return v, err
+		}
 	}
 	// The macro expands to a literal interval, and the range is a Grafana
 	// relative time such as now-90d, whose duration is what SQL wants. Only
