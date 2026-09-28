@@ -1,6 +1,6 @@
 ---
 title: GitHub Actions
-description: "Running ghchronicle as a GitHub Action: the composite Action, its three modes, and the two things a hosted runner does not keep."
+description: "Running ghchronicle as a GitHub Action: the composite Action, its four modes, and the two things a hosted runner does not keep."
 searchTitle: Run ghchronicle as a GitHub Action
 defaultColumns:
   - table: Input
@@ -27,7 +27,7 @@ it downloads a release binary and calls it.
 | `token`           | required             | A personal access token. The automatic `GITHUB_TOKEN` is not enough                                               |
 | `config`          | `""`                 | Path to a configuration file. Omit to run with defaults built from `user`, whose state lasts one run and cannot be cached |
 | `user`            | the repository owner | The account to collect when no config file is given                                                               |
-| `mode`            | `once`               | `once`, `backfill` or `card`                                                                                      |
+| `mode`            | `once`               | `once`, `backfill`, `card` or `migrate`                                                                           |
 | `backfill-since`  | `""`                 | Bound for `backfill`: a date, `90d`, `2y` or a Go duration. Empty means no bound                                  |
 | `card`            | `""`                 | Path of the SVG to write. Empty means no card                                                                     |
 | `card-layout`     | `summary`            | One of the thirteen registered layouts                                                                                 |
@@ -39,7 +39,7 @@ it downloads a release binary and calls it.
 | `include-private` | `false`              | `true` counts private repositories when no config file is given. See the warning below |
 | `version`         | `latest`             | The release to install: `latest` for the newest, or a release with or without its `v`, so `__VERSION__` and `v__VERSION__` are the same one. The major tag `v2` is what `uses:` takes, not a release, and is refused |
 
-## The three modes
+## The four modes
 
 <Tabs syncKey="action-mode">
   <TabItem label="once">
@@ -142,7 +142,50 @@ it downloads a release binary and calls it.
     kept part of the benefit.
 
   </TabItem>
+  <TabItem label="migrate">
+    Brings the stores the configuration writes along after an upgrade: it runs
+    `-migrate -yes`, which applies every change [the
+    plan](/ghchronicle/install/upgrading/#migrations) finds pending, the ones
+    that need somebody's word too, and reads what it cleared again. Run it by
+    hand, once, after reading what `-migrate` says about the same
+    configuration.
+
+    ```yaml
+    name: Migrate
+    on:
+      workflow_dispatch:
+
+    jobs:
+      migrate:
+        runs-on: ubuntu-latest
+        timeout-minutes: 60
+        steps:
+          - uses: actions/checkout@v7
+          - uses: jmrplens/ghchronicle@v2
+            with:
+              token: ${{ secrets.GHCHRONICLE_TOKEN }}
+              mode: migrate
+              config: .github/ghchronicle.yaml
+    ```
+
+    It takes no card. A store holding rows of accounts this configuration does
+    not collect is held back and the step fails, since only `-migrate-others`
+    clears it, and that is a decision to take at a terminal, not in a
+    workflow. Every run of the Action starts from a new state file, so a store
+    that cannot be asked, a SQL file, a Graphite or whatever is behind a
+    Telegraf, has no history here and is never taken to need a change. A job
+    that timed out while reading the history again leaves nothing the next
+    job can resume from: run `mode: backfill` for the same configuration after
+    it.
+
+  </TabItem>
 </Tabs>
+
+In `once` and `backfill`, a start checks the stores the same way, applies what
+is safe to apply unattended under `migrate: auto`, and warns about the rest.
+The Action turns every one of those warnings into an annotation on the run, so
+a pending change shows on the workflow's summary page rather than only in its
+log.
 
 ## A card in your profile README
 

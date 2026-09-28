@@ -9,7 +9,14 @@ case "$MODE" in
   once) args+=(-once) ;;
   backfill) args+=(-backfill); [ -n "$SINCE" ] && args+=(-backfill-since "$SINCE") ;;
   card) ;;
-  *) echo "mode must be once, backfill or card, got '$MODE'" >&2; exit 2 ;;
+  # The workflow that asks for this mode is the word -migrate -yes wants:
+  # somebody chose to run it, and it is dispatched by hand.
+  migrate)
+    if [ -n "$CARD" ]; then
+      echo "mode migrate sweeps nothing, so it draws no card; leave card empty" >&2; exit 2
+    fi
+    args+=(-migrate -yes) ;;
+  *) echo "mode must be once, backfill, card or migrate, got '$MODE'" >&2; exit 2 ;;
 esac
 if [ -n "$CARD" ]; then
   # The binary refuses to create directories: it sweeps, and then the
@@ -33,4 +40,19 @@ if [ -n "$CARD" ]; then
 elif [ "$MODE" = card ]; then
   echo "mode card needs a card path" >&2; exit 2
 fi
-ghchronicle "${args[@]}"
+
+# The log goes to the step's output as it always has, and is kept as well, so
+# that a migration a start left pending becomes an annotation on the run: a
+# warning in a log nobody opens is how a store stays in two shapes for weeks.
+# Standard output and the log share the step's output either way; pipefail,
+# set above, makes the status the binary's own.
+log="$(mktemp "${RUNNER_TEMP:-/tmp}/ghchronicle-log.XXXXXX")"
+status=0
+ghchronicle "${args[@]}" 2>&1 | tee "$log" || status=$?
+while IFS= read -r line; do
+  # A workflow command ends at a line break and reads % as an escape.
+  line=${line//'%'/'%25'}
+  printf '::warning title=ghchronicle migration pending::%s\n' "$line"
+done < <(grep -F 'migration pending' "$log" || true)
+rm -f "$log"
+exit "$status"

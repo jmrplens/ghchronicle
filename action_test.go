@@ -230,6 +230,11 @@ func TestTheActionsRunStepBuildsTheRightCommandLineForEachMode(t *testing.T) {
 			wantArgs: []string{"-config", "CONFIG", "-backfill", "-backfill-since", "90d"},
 		},
 		{
+			name:     "migrate applies what the plan finds, the word given by choosing the mode",
+			in:       runInputs{mode: "migrate", layout: "summary", theme: "auto", motion: "once"},
+			wantArgs: []string{"-config", "CONFIG", "-migrate", "-yes"},
+		},
+		{
 			name:     "card mode with a card path renders only the card",
 			in:       runInputs{mode: "card", card: "CARD", layout: "summary", theme: "auto", motion: "once"},
 			wantArgs: []string{"-config", "CONFIG", "-card", "CARD", "-card-layout", "summary", "-card-theme", "auto", "-card-only"},
@@ -370,7 +375,12 @@ func TestTheActionsRunStepRejectsAModeItDoesNotUnderstand(t *testing.T) {
 		{
 			name:    "an unknown mode",
 			in:      runInputs{mode: "bogus", layout: "summary", theme: "auto", motion: "once"},
-			wantMsg: "mode must be once, backfill or card, got 'bogus'",
+			wantMsg: "mode must be once, backfill, card or migrate, got 'bogus'",
+		},
+		{
+			name:    "migrate mode with a card path",
+			in:      runInputs{mode: "migrate", card: "card.svg", layout: "summary", theme: "auto", motion: "once"},
+			wantMsg: "mode migrate sweeps nothing, so it draws no card",
 		},
 		{
 			name:    "card mode without a card path",
@@ -899,4 +909,41 @@ func actionStep(t *testing.T, name string) string {
 	}
 	t.Fatalf("action.yml has no step named %q; it has %q", name, names)
 	return ""
+}
+
+// TestTheActionsRunStepAnnotatesAPendingMigrationAndKeepsTheStatus: a start
+// that leaves a migration pending logs a warning, and the Run step turns each
+// into an annotation on the run, escaped the way a workflow command reads
+// one; the binary's output still reaches the step's log, and its exit status
+// is the step's.
+func TestTheActionsRunStepAnnotatesAPendingMigrationAndKeepsTheStatus(t *testing.T) {
+	if _, err := exec.LookPath("bash"); err != nil {
+		t.Skip("the Action's steps run in bash, and there is none here")
+	}
+	script, err := filepath.Abs(filepath.Join("scripts", "action-run.sh"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stubDir := t.TempDir()
+	pending := `level=WARN msg="migration pending" sink=graphite migration=2.6.1/gh_discussion_comment/is_answer ` +
+		`why="100% of it"`
+	body := "#!/usr/bin/env bash\necho 'level=INFO msg=\"sweep finished\"'\necho '" + pending + "' >&2\nexit 3\n"
+	if err = os.WriteFile(filepath.Join(stubDir, "ghchronicle"), []byte(body), stubMode); err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.CommandContext(t.Context(), "bash", script)
+	cmd.Env = append(os.Environ(), "PATH="+stubDir+":"+os.Getenv("PATH"), "RUNNER_TEMP="+t.TempDir(),
+		"GHC_CONFIG=config.yaml", "MODE=once", "CARD=", "SINCE=", "LAYOUT=summary", "THEME=auto",
+		"FIELDS=", "MOTION=once", "WIDTH=", "SPEED=")
+	out, _ := cmd.CombinedOutput()
+	if status := cmd.ProcessState.ExitCode(); status != 3 {
+		t.Errorf("exit %d, want the binary's 3:\n%s", status, out)
+	}
+	annotation := "::warning title=ghchronicle migration pending::" + strings.ReplaceAll(pending, "%", "%25") + "\n"
+	if !strings.Contains(string(out), annotation) || strings.Count(string(out), "::warning") != 1 {
+		t.Errorf("want one annotation %q in:\n%s", annotation, out)
+	}
+	if !strings.Contains(string(out), `msg="sweep finished"`) || !strings.Contains(string(out), pending+"\n") {
+		t.Errorf("the binary's own output did not reach the step's log:\n%s", out)
+	}
 }

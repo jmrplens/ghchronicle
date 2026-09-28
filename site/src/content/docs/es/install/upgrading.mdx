@@ -142,6 +142,9 @@ cambiar los almacenes en los que escribe. Un servicio arrancado mientras corre
 `-migrate -yes` espera a que termine, y un segundo servicio sobre el mismo
 fichero de estado se rechaza.
 
+En la GitHub Action, `mode: migrate` ejecuta `-migrate -yes`: ver [las
+entradas](/ghchronicle/es/install/actions/#entradas).
+
 ### Lo que el fichero de estado recuerda de cada almacén
 
 La clave `stores` del [fichero de estado](/ghchronicle/es/configuration/#state_file)
