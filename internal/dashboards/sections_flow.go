@@ -101,7 +101,7 @@ func flow(b *builder) []Panel {
 // closed, how long each took, and the same numbers per day.
 func flowRates(b *builder) []Panel {
 	median := func(table, field, where string) string {
-		return fmt.Sprintf("SELECT approx_percentile_cont(%s, 0.5) AS value FROM %s"+
+		return fmt.Sprintf("SELECT median(CAST(%s AS DOUBLE)) AS value FROM %s"+
 			" WHERE $__timeFilter(time) AND %s AND %s", field, table, RF, where)
 	}
 	mergeTime50 := median(pr, "seconds_to_merge", "state = 'MERGED'")
@@ -112,7 +112,7 @@ func flowRates(b *builder) []Panel {
 		" AND " + RF + " AND " + identified + " AND state = 'MERGED'"
 	closedIssues := "SELECT COUNT(*) AS value FROM gh_issue WHERE $__timeFilter(time)" +
 		" AND " + RF + " AND " + identified + " AND state = 'CLOSED'"
-	issueClose := "SELECT approx_percentile_cont(seconds_to_close, 0.5) AS value FROM gh_issue" +
+	issueClose := "SELECT median(CAST(seconds_to_close AS DOUBLE)) AS value FROM gh_issue" +
 		" WHERE $__timeFilter(time) AND " + RF + " AND state = 'CLOSED'"
 	// A closed pull request is one row dated when it closed; an open one is a
 	// row per day at midnight while it stays open, and those rows are not
@@ -124,12 +124,12 @@ func flowRates(b *builder) []Panel {
 		" COUNT(DISTINCT number) AS pulls FROM gh_pull_request WHERE $__timeFilter(time) AND " + RF +
 		" AND " + identified + flowByBucketAndSeries
 	mergeTime := flowSelect + timeBin + "," +
-		` approx_percentile_cont(seconds_to_merge, 0.5) AS "Median",` +
+		` median(CAST(seconds_to_merge AS DOUBLE)) AS "Median",` +
 		` approx_percentile_cont(seconds_to_merge, 0.9) AS "90th percentile"` +
 		flowFromPulls + RF +
 		" AND state = 'MERGED' GROUP BY 1 ORDER BY 1"
 	sizeTime := flowSelect + timeBin + "," +
-		` approx_percentile_cont(churn, 0.5) AS "Median lines changed"` +
+		` median(CAST(churn AS DOUBLE)) AS "Median lines changed"` +
 		flowFromPulls + RF +
 		" AND state = 'MERGED' GROUP BY 1 ORDER BY 1"
 	issuesDay := flowSelect + timeBin + ", " + stateWord + flowSeriesAlias +
@@ -243,7 +243,7 @@ func flowRates(b *builder) []Panel {
 				esq(pr, []any{b.mPct("seconds_to_merge", 90)}, []any{b.dh()}, "B",
 					[]string{flowMergedFilter, ESF}, "90th percentile"),
 			},
-			Desc: bucketFollowsRange,
+			Desc: bucketFollowsRange + " " + estimatedInInfluxDB("90th percentile"),
 		}),
 		panel("timeseries", "Issues over time", box{W: 12, H: 7, X: 0, Y: 13}, []Target{sqlTS(issuesDay)}, &P{
 			Prom: []Target{daily(fmt.Sprintf(
@@ -292,8 +292,8 @@ func pullsAndReviewers(b *builder) []Panel {
 		flowFromPulls + RF + " AND " + identified +
 		" GROUP BY 1 ORDER BY 2 DESC LIMIT 15"
 	byRepo := `SELECT repo AS "Repository", COUNT(*) AS "Merged",` +
-		` approx_percentile_cont(seconds_to_merge, 0.5) AS "Time to merge",` +
-		` approx_percentile_cont(churn, 0.5) AS "Lines changed"` +
+		` median(CAST(seconds_to_merge AS DOUBLE)) AS "Time to merge",` +
+		` median(CAST(churn AS DOUBLE)) AS "Lines changed"` +
 		flowFromPulls + RF + " AND " + identified +
 		" AND state = 'MERGED' GROUP BY full_name, repo ORDER BY 2 DESC"
 	// Who is a reviewer: a bot is named as one, and an author answering a
@@ -303,7 +303,7 @@ func pullsAndReviewers(b *builder) []Panel {
 	who := "CASE WHEN self = 'true' THEN 'own pull request' WHEN bot = 'true'" +
 		" THEN reviewer || ' (bot)' ELSE reviewer END"
 	reviewers := `SELECT ` + who + ` AS "Reviewer", COUNT(*) AS "Reviews",` +
-		` approx_percentile_cont(seconds_to_review, 0.5) AS "Wait"` +
+		` median(CAST(seconds_to_review AS DOUBLE)) AS "Wait"` +
 		" FROM gh_pull_request_review WHERE $__timeFilter(time) AND " + RF +
 		" GROUP BY 1 ORDER BY 2 DESC LIMIT 20"
 	reviewsDay := flowSelect + timeBin + ", " + who + flowSeriesAlias +

@@ -33,7 +33,7 @@ func commitsAndChurn(b *builder) []Panel {
 		" GROUP BY 1 ORDER BY 1"
 	perAuthor := `SELECT author AS "Author", COUNT(*) AS "Commits",` +
 		` SUM(additions) AS "Added", SUM(deletions) AS "Removed",` +
-		` approx_percentile_cont(churn, 0.5) AS "Lines per commit"` +
+		` median(CAST(churn AS DOUBLE)) AS "Lines per commit"` +
 		" FROM gh_commit WHERE $__timeFilter(time) AND " + RF +
 		" GROUP BY 1 ORDER BY 2 DESC LIMIT 20"
 	sigs := `SELECT signature AS "Signature", COUNT(*) AS "Commits" FROM gh_commit` +

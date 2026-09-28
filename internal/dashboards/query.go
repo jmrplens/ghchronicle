@@ -241,7 +241,15 @@ var pgBins = [][2]string{
 
 var (
 	pgPercentile = regexp.MustCompile(`approx_percentile_cont\(([a-z_]+), ([0-9.]+)\)`)
-	pgReserved   = []string{"user", "by", "key", "limit", "check"}
+	// Every median the InfluxDB SQL asks for is DataFusion's own median over
+	// the column made a double, and becomes PostgreSQL's exact percentile_cont.
+	// The estimate approx_percentile_cont gives read 52 s of queue wait where
+	// PostgreSQL read 47.5 s from the same four jobs; DataFusion's exact
+	// percentile_cont is refused by InfluxDB 3 Core before 3.9.0; and a median
+	// over an integer column is an integer, 47. Measured against 3.0.3, 3.9.0
+	// and 3.11.2: the median over the double reads 47.5 in all three.
+	pgMedian   = regexp.MustCompile(`median\(CAST\(([a-z_.]+) AS DOUBLE\)\)`)
+	pgReserved = []string{"user", "by", "key", "limit", "check"}
 	// The InfluxDB plugin's bucket macro and the PostgreSQL plugin's, which
 	// takes the interval as an argument and reads $__interval for it.
 	pgDateBinAlias = regexp.MustCompile(`\$__dateBin\(([a-z.]+)\) AS time`)
@@ -343,6 +351,7 @@ func toPG(q string) string {
 			fmt.Sprintf("$__timeGroupAlias(time, %s)", b[1]))
 	}
 	s = pgPercentile.ReplaceAllString(s, "percentile_cont($2) WITHIN GROUP (ORDER BY $1)")
+	s = pgMedian.ReplaceAllString(s, "percentile_cont(0.5) WITHIN GROUP (ORDER BY $1)")
 	s = strings.ReplaceAll(s, "${repo:singlequote}", "${repo:sqlstring}")
 	s = strings.ReplaceAll(s, identified, `number <> ''`)
 	// Both of these rewrite bare identifiers, so both run outside the quoted
@@ -358,7 +367,7 @@ func toPG(q string) string {
 	// PostgreSQL has a date_bin of its own, which the Sunday week above is
 	// written with; the DataFusion spelling is the one with INTERVAL.
 	if strings.Contains(s, "date_bin(INTERVAL") || strings.Contains(s, "approx_percentile") ||
-		strings.Contains(s, "$__dateBin") || strings.Contains(s, "arrow_cast") {
+		strings.Contains(s, "median(") || strings.Contains(s, "$__dateBin") || strings.Contains(s, "arrow_cast") {
 		panic("untranslated SQL for PostgreSQL: " + s)
 	}
 	return s

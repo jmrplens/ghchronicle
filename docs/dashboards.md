@@ -679,6 +679,12 @@ Queue wait is a job-level number. The run-level figure folds the wait into the
 duration, so a run that took twenty minutes because one job waited eighteen for
 a runner looks identical to one that spent eighteen executing.
 
+Every median of the InfluxDB and PostgreSQL dashboards is exact, so four jobs
+that waited 30, 35, 60 and 65 seconds read 47.5 in both, where the estimate
+InfluxDB used to answer with read 52. The 95th percentile of the run duration
+and the 90th of the time to merge are still estimates in InfluxDB, since
+InfluxDB 3 Core has no exact percentile before 3.9.0, and both panels say so.
+
 Two of these are the ones worth looking at first. "Workflows that keep failing"
 is not about flakiness: measured, two workflows had failed on every single run
 they ever had, dozens of runs apiece, and nobody had switched them off. It

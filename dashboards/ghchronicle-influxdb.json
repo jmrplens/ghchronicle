@@ -2701,14 +2701,14 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT approx_percentile_cont(seconds_to_merge, 0.5) AS \"Time to merge\" FROM gh_pull_request WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) AND state = 'MERGED'",
+              "rawSql": "SELECT median(CAST(seconds_to_merge AS DOUBLE)) AS \"Time to merge\" FROM gh_pull_request WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) AND state = 'MERGED'",
               "refId": "B"
             },
             {
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT approx_percentile_cont(seconds_to_first_human_review, 0.5) AS \"Time to review by someone else\" FROM gh_pull_request WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) AND seconds_to_first_human_review IS NOT NULL",
+              "rawSql": "SELECT median(CAST(seconds_to_first_human_review AS DOUBLE)) AS \"Time to review by someone else\" FROM gh_pull_request WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) AND seconds_to_first_human_review IS NOT NULL",
               "refId": "C"
             },
             {
@@ -2722,14 +2722,14 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT approx_percentile_cont(seconds_to_close, 0.5) AS \"Time to close an issue\" FROM gh_issue WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) AND state = 'CLOSED'",
+              "rawSql": "SELECT median(CAST(seconds_to_close AS DOUBLE)) AS \"Time to close an issue\" FROM gh_issue WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) AND state = 'CLOSED'",
               "refId": "E"
             },
             {
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT approx_percentile_cont(churn, 0.5) AS \"Lines per pull request\" FROM gh_pull_request WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) AND state = 'MERGED'",
+              "rawSql": "SELECT median(CAST(churn AS DOUBLE)) AS \"Lines per pull request\" FROM gh_pull_request WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) AND state = 'MERGED'",
               "refId": "F"
             }
           ],
@@ -2859,7 +2859,7 @@
         },
         {
           "datasource": "${DS_INFLUXDB}",
-          "description": "One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year. In InfluxDB the 90th percentile is an estimate (approx_percentile_cont, a t-digest), since InfluxDB 3 Core has no exact percentile before 3.9.0, so it can read differently from the exact one PostgreSQL draws; the median is exact in both.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -2911,7 +2911,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "time_series",
               "rawQuery": true,
-              "rawSql": "SELECT $__dateBin(time) AS time, approx_percentile_cont(seconds_to_merge, 0.5) AS \"Median\", approx_percentile_cont(seconds_to_merge, 0.9) AS \"90th percentile\" FROM gh_pull_request WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) AND state = 'MERGED' GROUP BY 1 ORDER BY 1",
+              "rawSql": "SELECT $__dateBin(time) AS time, median(CAST(seconds_to_merge AS DOUBLE)) AS \"Median\", approx_percentile_cont(seconds_to_merge, 0.9) AS \"90th percentile\" FROM gh_pull_request WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) AND state = 'MERGED' GROUP BY 1 ORDER BY 1",
               "refId": "A"
             }
           ],
@@ -3094,7 +3094,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "time_series",
               "rawQuery": true,
-              "rawSql": "SELECT $__dateBin(time) AS time, approx_percentile_cont(churn, 0.5) AS \"Median lines changed\" FROM gh_pull_request WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) AND state = 'MERGED' GROUP BY 1 ORDER BY 1",
+              "rawSql": "SELECT $__dateBin(time) AS time, median(CAST(churn AS DOUBLE)) AS \"Median lines changed\" FROM gh_pull_request WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) AND state = 'MERGED' GROUP BY 1 ORDER BY 1",
               "refId": "A"
             }
           ],
@@ -3496,7 +3496,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT repo AS \"Repository\", COUNT(*) AS \"Merged\", approx_percentile_cont(seconds_to_merge, 0.5) AS \"Time to merge\", approx_percentile_cont(churn, 0.5) AS \"Lines changed\" FROM gh_pull_request WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) AND number IS NOT NULL AND state = 'MERGED' GROUP BY full_name, repo ORDER BY 2 DESC",
+              "rawSql": "SELECT repo AS \"Repository\", COUNT(*) AS \"Merged\", median(CAST(seconds_to_merge AS DOUBLE)) AS \"Time to merge\", median(CAST(churn AS DOUBLE)) AS \"Lines changed\" FROM gh_pull_request WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) AND number IS NOT NULL AND state = 'MERGED' GROUP BY full_name, repo ORDER BY 2 DESC",
               "refId": "A"
             }
           ],
@@ -3605,7 +3605,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT CASE WHEN self = 'true' THEN 'own pull request' WHEN bot = 'true' THEN reviewer || ' (bot)' ELSE reviewer END AS \"Reviewer\", COUNT(*) AS \"Reviews\", approx_percentile_cont(seconds_to_review, 0.5) AS \"Wait\" FROM gh_pull_request_review WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) GROUP BY 1 ORDER BY 2 DESC LIMIT 20",
+              "rawSql": "SELECT CASE WHEN self = 'true' THEN 'own pull request' WHEN bot = 'true' THEN reviewer || ' (bot)' ELSE reviewer END AS \"Reviewer\", COUNT(*) AS \"Reviews\", median(CAST(seconds_to_review AS DOUBLE)) AS \"Wait\" FROM gh_pull_request_review WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) GROUP BY 1 ORDER BY 2 DESC LIMIT 20",
               "refId": "A"
             }
           ],
@@ -4376,14 +4376,14 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT approx_percentile_cont(duration_seconds, 0.5) AS \"Run duration\" FROM gh_workflow_run WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})",
+              "rawSql": "SELECT median(CAST(duration_seconds AS DOUBLE)) AS \"Run duration\" FROM gh_workflow_run WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})",
               "refId": "D"
             },
             {
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT approx_percentile_cont(queued_seconds, 0.5) AS \"Queue wait\" FROM gh_workflow_job WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})",
+              "rawSql": "SELECT median(CAST(queued_seconds AS DOUBLE)) AS \"Queue wait\" FROM gh_workflow_job WHERE $__timeFilter(time) AND repo IN (${repo:singlequote})",
               "refId": "E"
             },
             {
@@ -4557,7 +4557,7 @@
         },
         {
           "datasource": "${DS_INFLUXDB}",
-          "description": "One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year. In InfluxDB the 95th percentile is an estimate (approx_percentile_cont, a t-digest), since InfluxDB 3 Core has no exact percentile before 3.9.0, so it can read differently from the exact one PostgreSQL draws; the median is exact in both.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -4609,7 +4609,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "time_series",
               "rawQuery": true,
-              "rawSql": "SELECT $__dateBin(time) AS time, approx_percentile_cont(duration_seconds, 0.5) AS \"Median\", approx_percentile_cont(duration_seconds, 0.95) AS \"95th percentile\" FROM gh_workflow_run WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) GROUP BY 1 ORDER BY 1",
+              "rawSql": "SELECT $__dateBin(time) AS time, median(CAST(duration_seconds AS DOUBLE)) AS \"Median\", approx_percentile_cont(duration_seconds, 0.95) AS \"95th percentile\" FROM gh_workflow_run WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) GROUP BY 1 ORDER BY 1",
               "refId": "A"
             }
           ],
@@ -4670,7 +4670,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "time_series",
               "rawQuery": true,
-              "rawSql": "SELECT $__dateBin(time) AS time, approx_percentile_cont(queued_seconds, 0.5) AS \"Median queue\", MAX(queued_seconds) AS \"Worst queue\" FROM gh_workflow_job WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) GROUP BY 1 ORDER BY 1",
+              "rawSql": "SELECT $__dateBin(time) AS time, median(CAST(queued_seconds AS DOUBLE)) AS \"Median queue\", MAX(queued_seconds) AS \"Worst queue\" FROM gh_workflow_job WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) GROUP BY 1 ORDER BY 1",
               "refId": "A"
             }
           ],
@@ -4892,7 +4892,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT REPLACE(workflow, '.github/workflows/', '') AS \"Workflow\", COUNT(*) AS \"Runs\", r.repo AS \"Repository\", SUM(CASE WHEN conclusion \u003c\u003e 'success' THEN 1 ELSE 0 END) AS \"Not successful\", approx_percentile_cont(duration_seconds, 0.5) AS \"Duration\", MAX(w.url) AS \"Link\" FROM gh_workflow_run r LEFT JOIN (SELECT full_name, path, MAX(url) AS url FROM gh_workflow WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) GROUP BY 1, 2) w ON w.full_name = r.full_name AND w.path = r.workflow WHERE $__timeFilter(time) AND r.repo IN (${repo:singlequote}) GROUP BY 1, r.full_name, 3 ORDER BY 2 DESC LIMIT 30",
+              "rawSql": "SELECT REPLACE(workflow, '.github/workflows/', '') AS \"Workflow\", COUNT(*) AS \"Runs\", r.repo AS \"Repository\", SUM(CASE WHEN conclusion \u003c\u003e 'success' THEN 1 ELSE 0 END) AS \"Not successful\", median(CAST(duration_seconds AS DOUBLE)) AS \"Duration\", MAX(w.url) AS \"Link\" FROM gh_workflow_run r LEFT JOIN (SELECT full_name, path, MAX(url) AS url FROM gh_workflow WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) GROUP BY 1, 2) w ON w.full_name = r.full_name AND w.path = r.workflow WHERE $__timeFilter(time) AND r.repo IN (${repo:singlequote}) GROUP BY 1, r.full_name, 3 ORDER BY 2 DESC LIMIT 30",
               "refId": "A"
             }
           ],
@@ -5002,7 +5002,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT job_name AS \"Job\", approx_percentile_cont(duration_seconds, 0.5) AS \"Duration\", repo AS \"Repository\", COUNT(*) AS \"Times run\", MAX(duration_seconds) AS \"Worst\" FROM gh_workflow_job WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) GROUP BY 1, full_name, 3 ORDER BY 2 DESC LIMIT 30",
+              "rawSql": "SELECT job_name AS \"Job\", median(CAST(duration_seconds AS DOUBLE)) AS \"Duration\", repo AS \"Repository\", COUNT(*) AS \"Times run\", MAX(duration_seconds) AS \"Worst\" FROM gh_workflow_job WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) GROUP BY 1, full_name, 3 ORDER BY 2 DESC LIMIT 30",
               "refId": "A"
             }
           ],
@@ -5124,7 +5124,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT step AS \"Step\", approx_percentile_cont(duration_seconds, 0.5) AS \"Duration\", job_name AS \"Job\", repo AS \"Repository\", COUNT(*) AS \"Times run\", MAX(duration_seconds) AS \"Worst\" FROM gh_workflow_step WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) GROUP BY 1, 3, full_name, 4 ORDER BY 2 DESC LIMIT 30",
+              "rawSql": "SELECT step AS \"Step\", median(CAST(duration_seconds AS DOUBLE)) AS \"Duration\", job_name AS \"Job\", repo AS \"Repository\", COUNT(*) AS \"Times run\", MAX(duration_seconds) AS \"Worst\" FROM gh_workflow_step WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) GROUP BY 1, 3, full_name, 4 ORDER BY 2 DESC LIMIT 30",
               "refId": "A"
             }
           ],
@@ -6140,7 +6140,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT author AS \"Author\", COUNT(*) AS \"Commits\", SUM(additions) AS \"Added\", SUM(deletions) AS \"Removed\", approx_percentile_cont(churn, 0.5) AS \"Lines per commit\" FROM gh_commit WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) GROUP BY 1 ORDER BY 2 DESC LIMIT 20",
+              "rawSql": "SELECT author AS \"Author\", COUNT(*) AS \"Commits\", SUM(additions) AS \"Added\", SUM(deletions) AS \"Removed\", median(CAST(churn AS DOUBLE)) AS \"Lines per commit\" FROM gh_commit WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) GROUP BY 1 ORDER BY 2 DESC LIMIT 20",
               "refId": "A"
             }
           ],
@@ -8210,7 +8210,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT host AS \"Endpoint\", SUM(CASE WHEN ok = 'false' THEN 1 ELSE 0 END) AS \"Failed\", COUNT(*) AS \"Deliveries\", repo AS \"Repository\", SUM(CASE WHEN redelivery THEN 1 ELSE 0 END) AS \"Retried\", approx_percentile_cont(duration_seconds, 0.5) AS \"Latency\" FROM gh_webhook_delivery WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) GROUP BY 1, full_name, 4 ORDER BY 2 DESC, 3 DESC LIMIT 25",
+              "rawSql": "SELECT host AS \"Endpoint\", SUM(CASE WHEN ok = 'false' THEN 1 ELSE 0 END) AS \"Failed\", COUNT(*) AS \"Deliveries\", repo AS \"Repository\", SUM(CASE WHEN redelivery THEN 1 ELSE 0 END) AS \"Retried\", median(CAST(duration_seconds AS DOUBLE)) AS \"Latency\" FROM gh_webhook_delivery WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) GROUP BY 1, full_name, 4 ORDER BY 2 DESC, 3 DESC LIMIT 25",
               "refId": "A"
             }
           ],
@@ -9557,7 +9557,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT environment AS \"Environment\", COUNT(*) AS \"Deployments\", repo AS \"Repository\", approx_percentile_cont(seconds_to_status, 0.5) AS \"To status\", approx_percentile_cont(seconds_live, 0.5) AS \"Live for\", SUM(CASE WHEN success THEN 1 ELSE 0 END) AS \"Successes\", SUM(CASE WHEN outcome = 'pending' THEN 1 ELSE 0 END) AS \"Pending\", MAX(url) AS \"Link\", MAX(environment_url) AS \"Live\" FROM gh_deployment WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) GROUP BY 1, full_name, 3 ORDER BY 2 DESC",
+              "rawSql": "SELECT environment AS \"Environment\", COUNT(*) AS \"Deployments\", repo AS \"Repository\", median(CAST(seconds_to_status AS DOUBLE)) AS \"To status\", median(CAST(seconds_live AS DOUBLE)) AS \"Live for\", SUM(CASE WHEN success THEN 1 ELSE 0 END) AS \"Successes\", SUM(CASE WHEN outcome = 'pending' THEN 1 ELSE 0 END) AS \"Pending\", MAX(url) AS \"Link\", MAX(environment_url) AS \"Live\" FROM gh_deployment WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) GROUP BY 1, full_name, 3 ORDER BY 2 DESC",
               "refId": "A"
             }
           ],
@@ -10764,7 +10764,7 @@
               "datasource": "${DS_INFLUXDB}",
               "format": "table",
               "rawQuery": true,
-              "rawSql": "SELECT severity AS \"Severity\", COUNT(*) AS \"Alerts\", approx_percentile_cont(seconds_to_resolve, 0.5) AS \"Time to resolve\" FROM gh_code_scanning_alert_item WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) AND seconds_to_resolve IS NOT NULL GROUP BY 1 ORDER BY 2 DESC",
+              "rawSql": "SELECT severity AS \"Severity\", COUNT(*) AS \"Alerts\", median(CAST(seconds_to_resolve AS DOUBLE)) AS \"Time to resolve\" FROM gh_code_scanning_alert_item WHERE $__timeFilter(time) AND repo IN (${repo:singlequote}) AND seconds_to_resolve IS NOT NULL GROUP BY 1 ORDER BY 2 DESC",
               "refId": "A"
             }
           ],

@@ -121,19 +121,19 @@ func runOutcomes(b *builder) []Panel {
 		ciFromRuns + RF
 	undecided := "SELECT COUNT(*) AS value FROM gh_workflow_run WHERE $__timeFilter(time) AND " + RF +
 		" AND conclusion IN ('" + cancelledRun + "', 'skipped')"
-	dur := "SELECT approx_percentile_cont(duration_seconds, 0.5) AS value FROM gh_workflow_run" +
+	dur := "SELECT median(CAST(duration_seconds AS DOUBLE)) AS value FROM gh_workflow_run" +
 		ciInRange + RF
-	queue := "SELECT approx_percentile_cont(queued_seconds, 0.5) AS value FROM gh_workflow_job" +
+	queue := "SELECT median(CAST(queued_seconds AS DOUBLE)) AS value FROM gh_workflow_job" +
 		ciInRange + RF
 	perDay := flowSelect + timeBin + ", conclusion AS series," +
 		" COUNT(*) AS runs FROM gh_workflow_run WHERE $__timeFilter(time) AND " + RF +
 		" GROUP BY 1, 2 ORDER BY 1"
 	durTS := flowSelect + timeBin + "," +
-		` approx_percentile_cont(duration_seconds, 0.5) AS "Median",` +
+		` median(CAST(duration_seconds AS DOUBLE)) AS "Median",` +
 		` approx_percentile_cont(duration_seconds, 0.95) AS "95th percentile"` +
 		ciFromRuns + RF + " GROUP BY 1 ORDER BY 1"
 	queueTS := flowSelect + timeBin + "," +
-		` approx_percentile_cont(queued_seconds, 0.5) AS "Median queue",` +
+		` median(CAST(queued_seconds AS DOUBLE)) AS "Median queue",` +
 		` MAX(queued_seconds) AS "Worst queue" FROM gh_workflow_job` +
 		ciInRange + RF + " GROUP BY 1 ORDER BY 1"
 	// A snapshot per repository: the value of a bucket is its newest row, never
@@ -282,7 +282,7 @@ func runOutcomes(b *builder) []Panel {
 				esq(ciRun, []any{b.mPct("duration_seconds", 50)}, []any{b.dh()}, "A", []string{ESF}, "Median"),
 				esq(ciRun, []any{b.mPct("duration_seconds", 95)}, []any{b.dh()}, "B", []string{ESF}, "95th percentile"),
 			},
-			Desc: bucketFollowsRange,
+			Desc: bucketFollowsRange + " " + estimatedInInfluxDB("95th percentile"),
 		}),
 		panel("timeseries", "Queue wait over time", box{W: 12, H: 8, X: 0, Y: 13}, []Target{sqlTS(queueTS)}, &P{
 			Prom: []Target{
@@ -342,16 +342,16 @@ func whereTheTimeGoes(b *builder) []Panel {
 	byWF := `SELECT REPLACE(workflow, '.github/workflows/', '') AS "Workflow", COUNT(*) AS "Runs",` +
 		` r.repo AS "Repository",` +
 		` SUM(CASE WHEN conclusion <> 'success' THEN 1 ELSE 0 END) AS "Not successful",` +
-		` approx_percentile_cont(duration_seconds, 0.5) AS "Duration", MAX(w.url) AS "Link"` +
+		` median(CAST(duration_seconds AS DOUBLE)) AS "Duration", MAX(w.url) AS "Link"` +
 		" FROM gh_workflow_run r LEFT JOIN (" + declaredWorkflows + ") w" +
 		ciOnWorkflowPath +
 		" WHERE $__timeFilter(time) AND r." + RF +
 		" GROUP BY 1, r.full_name, 3 ORDER BY 2 DESC LIMIT 30"
-	jobs := `SELECT job_name AS "Job", approx_percentile_cont(duration_seconds, 0.5) AS "Duration",` +
+	jobs := `SELECT job_name AS "Job", median(CAST(duration_seconds AS DOUBLE)) AS "Duration",` +
 		` repo AS "Repository", COUNT(*) AS "Times run",` +
 		` MAX(duration_seconds) AS "Worst" FROM gh_workflow_job` +
 		ciInRange + RF + " GROUP BY 1, full_name, 3 ORDER BY 2 DESC LIMIT 30"
-	steps := `SELECT step AS "Step", approx_percentile_cont(duration_seconds, 0.5) AS "Duration",` +
+	steps := `SELECT step AS "Step", median(CAST(duration_seconds AS DOUBLE)) AS "Duration",` +
 		` job_name AS "Job", repo AS "Repository", COUNT(*) AS "Times run",` +
 		` MAX(duration_seconds) AS "Worst" FROM gh_workflow_step` +
 		ciInRange + RF + " GROUP BY 1, 3, full_name, 4" +

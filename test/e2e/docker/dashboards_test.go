@@ -1126,24 +1126,22 @@ func dashboardCheckStaleEmpty(t *testing.T, run *dashboardRun, store string) {
 
 // dashboardDisagrees is every panel where two stores answer the same question
 // with different numbers although the panel says nothing about differing. It is
-// meant to stay this short.
+// meant to stay empty: a reader comparing two dashboards that disagree without
+// a word would be right to think one of them is wrong, so the difference is
+// fixed or the description says it, which takes the panel out of this
+// comparison on its own.
 //
-// The one entry is honest rather than a rounding tolerance: InfluxDB's SQL has
-// no exact median. The panel is written as approx_percentile_cont(x, 0.5),
-// which is a t-digest estimate and answers 52 for the two jobs here, while
-// PostgreSQL's percentile_cont and Elasticsearch's percentiles both answer the
-// exact 47.5. Nothing in the panel's description says so, and a reader
-// comparing the two dashboards would be right to think one of them is wrong.
+// Its last entry was "Queue wait": the InfluxDB SQL estimated every median with
+// approx_percentile_cont, a t-digest, which answered 52 for the jobs here where
+// PostgreSQL and Elasticsearch answered the exact 47.5. The medians are exact
+// in InfluxDB now, and the three agree.
 //
 // Keyed by the name a reader sees rather than by ordinal: a panel's title, or
-// a value's own name where the reading is one value of a grouped stat, which
-// is what "Queue wait" now is. An ordinal moves every time a panel is added
-// above it, and the one entry here had drifted from the stat it describes to
-// a timeseries three sections away without anything noticing.
-var dashboardDisagrees = map[string]string{
-	"Queue wait": "InfluxDB has only an approximate median (approx_percentile_cont, a t-digest); " +
-		"PostgreSQL and Elasticsearch answer the exact one",
-}
+// a value's own name where the reading is one value of a grouped stat. An
+// ordinal moves every time a panel is added above it, and an entry here once
+// drifted from the stat it described to a timeseries three sections away
+// without anything noticing.
+var dashboardDisagrees = map[string]string{}
 
 // TestTheDashboardsAgreeOnTheSameNumber is the third question. Two stores
 // asked the same panel should not answer two different numbers, and where they

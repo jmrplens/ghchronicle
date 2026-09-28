@@ -2909,7 +2909,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year. Graphite has no percentile of a bucket, so the upper line is the worst of each bucket. In Graphite two facts landing in the same storage slot of one series are reduced to one point, so the medians are over what the storage kept.",
+          "description": "One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year. In InfluxDB the 90th percentile is an estimate (approx_percentile_cont, a t-digest), since InfluxDB 3 Core has no exact percentile before 3.9.0, so it can read differently from the exact one PostgreSQL draws; the median is exact in both. Graphite has no percentile of a bucket, so the upper line is the worst of each bucket. In Graphite two facts landing in the same storage slot of one series are reduced to one point, so the medians are over what the storage kept.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -4615,7 +4615,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year. Graphite has no percentile of a bucket, so the upper line is the worst of each bucket. In Graphite two facts landing in the same storage slot of one series are reduced to one point, so the medians are over what the storage kept.",
+          "description": "One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year. In InfluxDB the 95th percentile is an estimate (approx_percentile_cont, a t-digest), since InfluxDB 3 Core has no exact percentile before 3.9.0, so it can read differently from the exact one PostgreSQL draws; the median is exact in both. Graphite has no percentile of a bucket, so the upper line is the worst of each bucket. In Graphite two facts landing in the same storage slot of one series are reduced to one point, so the medians are over what the storage kept.",
           "fieldConfig": {
             "defaults": {
               "color": {

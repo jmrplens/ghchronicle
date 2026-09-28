@@ -372,6 +372,13 @@ La espera en cola es una cifra de job. La de la ejecución mete la espera dentro
 de la duración, así que una ejecución que tardó veinte minutos porque un job
 esperó dieciocho por un runner es idéntica a una que pasó dieciocho ejecutando.
 
+Toda mediana de los dashboards de InfluxDB y PostgreSQL es exacta, así que
+cuatro jobs que esperaron 30, 35, 60 y 65 segundos leen 47,5 en los dos, donde
+la estimación con la que respondía InfluxDB leía 52. El percentil 95 de la
+duración de las ejecuciones y el 90 del tiempo hasta la fusión siguen siendo
+estimaciones en InfluxDB, porque InfluxDB 3 Core no tiene un percentil exacto
+antes de la 3.9.0, y los dos paneles lo dicen.
+
 Dos de ellos son los primeros que hay que mirar. "Workflows that keep failing"
 no va de flakiness: medido, dos workflows habían fallado en todas y cada una de
 sus ejecuciones, decenas de ejecuciones cada uno, y nadie los había apagado.

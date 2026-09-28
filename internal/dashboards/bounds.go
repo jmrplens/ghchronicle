@@ -131,3 +131,16 @@ const noRepoFlagsHere = "Only gh_repo carries the fork and archived flags and th
 // panels said it. The bucket is not the thing to change, so the titles are.
 const bucketFollowsRange = "One bar is one bucket, and the bucket widens with the range: " +
 	"a day over a month, a week over a year."
+
+// estimatedInInfluxDB is what a chart that draws a percentile other than the
+// median says of it. Every median is exact in both SQL stores (see pgMedian).
+// No other percentile can be in InfluxDB without leaving InfluxDB 3 Core
+// before 3.9.0 behind, since those versions refuse DataFusion's exact
+// percentile_cont, so the InfluxDB SQL keeps the estimate and the panel says
+// that it is one: the same estimate read 52 s for a median whose exact value
+// was 47.5 s.
+func estimatedInInfluxDB(which string) string {
+	return "In InfluxDB the " + which + " is an estimate (approx_percentile_cont, a t-digest), " +
+		"since InfluxDB 3 Core has no exact percentile before 3.9.0, so it can read " +
+		"differently from the exact one PostgreSQL draws; the median is exact in both."
+}

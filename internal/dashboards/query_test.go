@@ -3,6 +3,7 @@ package dashboards
 import (
 	"fmt"
 	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -41,7 +42,7 @@ func TestOutsideQuotesCopiesAnUnterminatedQuoteAsItIs(t *testing.T) {
 	}
 }
 
-// TestToPGRefusesSQLItCannotTranslate: each of the four DataFusion spellings
+// TestToPGRefusesSQLItCannotTranslate: each of the five DataFusion spellings
 // that PostgreSQL would refuse stops the generator on its own, so a panel
 // written in a shape the rewrites do not know is found when the file is
 // generated and not when a PostgreSQL user opens it.
@@ -50,6 +51,7 @@ func TestToPGRefusesSQLItCannotTranslate(t *testing.T) {
 	for _, q := range []string{
 		"SELECT date_bin(INTERVAL '3 days', time) FROM gh_repo",
 		"SELECT approx_percentile_cont(Duration, 0.5) FROM gh_workflow_run",
+		"SELECT median(duration_seconds) FROM gh_workflow_run",
 		"SELECT $__dateBin(Time) FROM gh_repo",
 		"SELECT arrow_cast(stars, 'Utf8') FROM gh_repo",
 	} {
@@ -154,5 +156,47 @@ func TestGraphitePathIgnoresATagGivenWithoutAValue(t *testing.T) {
 	got := gp("gh_repo_community", "health", "repo", "ghchronicle", "owner")
 	if want := "github.repo_community.*.*.ghchronicle.health"; got != want {
 		t.Errorf("gp = %q, want %q", got, want)
+	}
+}
+
+// TestEveryMedianIsExactInBothSQLStores is "Queue wait" in the cross-store
+// review of 2.6.1: 52 s in InfluxDB against the 47.5 s PostgreSQL and
+// Elasticsearch read from the same four jobs, which waited 30, 35, 60 and 65
+// seconds. The InfluxDB SQL asked for approx_percentile_cont, a t-digest
+// estimate that answers 52 for those four, and PostgreSQL for the exact
+// percentile_cont. DataFusion's exact percentile_cont arrived in InfluxDB 3
+// Core 3.9.0 (3.8.3 refuses it as an invalid function), while its median is
+// exact from 3.0.3 on; over an integer column the median is an integer and
+// reads 47, so the column is made a double first, and then every one of them
+// answers 47.5. Every median of the InfluxDB dashboard is that exact median,
+// and each is PostgreSQL's percentile_cont(0.5) once translated. The two
+// charts that draw a higher percentile keep the estimate, which no version
+// refuses, and say in their description that it is one.
+func TestEveryMedianIsExactInBothSQLStores(t *testing.T) {
+	t.Parallel()
+	estimated := regexp.MustCompile(`approx_percentile_cont\([a-z_.]+, 0\.5\)`)
+	exact := regexp.MustCompile(`median\(CAST\(([a-z_.]+) AS DOUBLE\)\)`)
+	medians := 0
+	for _, p := range renderedPanels(t, "influxdb") {
+		sql := allSQL(p)
+		if m := estimated.FindString(sql); m != "" {
+			t.Errorf("influxdb: %q estimates a median with %s, which InfluxDB answers "+
+				"differently from PostgreSQL's exact one", p["title"], m)
+		}
+		desc, _ := p["description"].(string)
+		if strings.Contains(sql, "approx_percentile_cont(") && !strings.Contains(desc, "is an estimate (approx_percentile_cont") {
+			t.Errorf("influxdb: %q draws an estimated percentile and its description does not say so: %s",
+				p["title"], desc)
+		}
+		medians += len(exact.FindAllString(sql, -1))
+	}
+	if medians < 10 {
+		t.Fatalf("the InfluxDB dashboard asks for %d exact medians, so this checked "+
+			"almost nothing", medians)
+	}
+	got := toPG(`SELECT median(CAST(queued_seconds AS DOUBLE)) AS "Queue wait" FROM gh_workflow_job`)
+	want := `SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY queued_seconds) AS "Queue wait" FROM gh_workflow_job`
+	if got != want {
+		t.Errorf("toPG = %s, want %s", got, want)
 	}
 }

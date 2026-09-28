@@ -2999,7 +2999,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year. In Prometheus this is the mean over the collector's last sweep, not a median over the dashboard range.",
+          "description": "One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year. In InfluxDB the 90th percentile is an estimate (approx_percentile_cont, a t-digest), since InfluxDB 3 Core has no exact percentile before 3.9.0, so it can read differently from the exact one PostgreSQL draws; the median is exact in both. In Prometheus this is the mean over the collector's last sweep, not a median over the dashboard range.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -4266,7 +4266,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year. In Prometheus this is the mean over the collector's last sweep, not a median over the dashboard range.",
+          "description": "One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year. In InfluxDB the 95th percentile is an estimate (approx_percentile_cont, a t-digest), since InfluxDB 3 Core has no exact percentile before 3.9.0, so it can read differently from the exact one PostgreSQL draws; the median is exact in both. In Prometheus this is the mean over the collector's last sweep, not a median over the dashboard range.",
           "fieldConfig": {
             "defaults": {
               "color": {

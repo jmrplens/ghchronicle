@@ -62,7 +62,7 @@ func webhookDeliveries(b *builder) []Panel {
 		` SUM(CASE WHEN ok = 'false' THEN 1 ELSE 0 END) AS "Failed",` +
 		` COUNT(*) AS "Deliveries", repo AS "Repository",` +
 		` SUM(CASE WHEN redelivery THEN 1 ELSE 0 END) AS "Retried",` +
-		` approx_percentile_cont(duration_seconds, 0.5) AS "Latency"` +
+		` median(CAST(duration_seconds AS DOUBLE)) AS "Latency"` +
 		" FROM gh_webhook_delivery WHERE $__timeFilter(time) AND " + RF +
 		" GROUP BY 1, full_name, 4 ORDER BY 2 DESC, 3 DESC LIMIT 25"
 	overTime := "SELECT " + timeBin + ", code AS series," +
@@ -709,8 +709,8 @@ func deploymentsToEnvironments(b *builder) []Panel {
 		" GROUP BY 1, 2 ORDER BY 1"
 	deploys := `SELECT environment AS "Environment", COUNT(*) AS "Deployments",` +
 		` repo AS "Repository",` +
-		` approx_percentile_cont(seconds_to_status, 0.5) AS "To status",` +
-		` approx_percentile_cont(seconds_live, 0.5) AS "Live for",` +
+		` median(CAST(seconds_to_status AS DOUBLE)) AS "To status",` +
+		` median(CAST(seconds_live AS DOUBLE)) AS "Live for",` +
 		` SUM(CASE WHEN success THEN 1 ELSE 0 END) AS "Successes",` +
 		// outcome is a field: a deployment is pending before it is anything
 		// else, and as the tag `state` the one that succeeded after a sweep

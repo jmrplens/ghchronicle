@@ -350,7 +350,7 @@ func scanningAndResolution(b *builder) []Panel {
 	resolved := `alert_state!="open",` + PF
 	csi := "gh_code_scanning_alert_item"
 	scanResolve := `SELECT severity AS "Severity", COUNT(*) AS "Alerts",` +
-		` approx_percentile_cont(seconds_to_resolve, 0.5) AS "Time to resolve"` +
+		` median(CAST(seconds_to_resolve AS DOUBLE)) AS "Time to resolve"` +
 		securityFrom + csi + ciInRange + RF +
 		" AND seconds_to_resolve IS NOT NULL GROUP BY 1 ORDER BY 2 DESC"
 	an, di := "gh_code_scanning_analysis", "gh_dependabot_alert_item"
