@@ -278,8 +278,11 @@ func runOutcomes(b *builder) []Panel {
 				grq(fmt.Sprintf(`alias(%s, "Worst")`, worstBucket(runSeconds)), "B"),
 			},
 			GRDesc: grWorst + " " + grSlot,
-			ES:     []Target{esq(ciRun, []any{b.mPct("duration_seconds", 50, 95)}, []any{b.dh()}, "A", []string{ESF}, "")},
-			Desc:   bucketFollowsRange,
+			ES: []Target{
+				esq(ciRun, []any{b.mPct("duration_seconds", 50)}, []any{b.dh()}, "A", []string{ESF}, "Median"),
+				esq(ciRun, []any{b.mPct("duration_seconds", 95)}, []any{b.dh()}, "B", []string{ESF}, "95th percentile"),
+			},
+			Desc: bucketFollowsRange,
 		}),
 		panel("timeseries", "Queue wait over time", box{W: 12, H: 8, X: 0, Y: 13}, []Target{sqlTS(queueTS)}, &P{
 			Prom: []Target{
@@ -380,7 +383,7 @@ func whereTheTimeGoes(b *builder) []Panel {
 			{"n", ciTimesRun},
 			{"d", "Duration"},
 			{"w", "Worst"},
-		}, []string{ESF})
+		}, []string{ESF}, hideColumns(panelFullNameField))
 
 	stepsGR, stepsGRtf := gTbl(fmt.Sprintf(`limit(sortBy(%s, "median", true), 30)`,
 		grGroupBy(stepSeconds, ciStep, "avg", "step", "job_name", "repo"),
@@ -395,7 +398,7 @@ func whereTheTimeGoes(b *builder) []Panel {
 			{"n", ciTimesRun},
 			{"d", "Duration"},
 			{"w", "Worst"},
-		}, []string{ESF})
+		}, []string{ESF}, hideColumns(panelFullNameField))
 	return []Panel{
 		panel("table", "Workflows", box{W: 12, H: 9, X: 0, Y: 21}, []Target{sqlT(byWF)}, &P{
 			Prom: func() []Target {

@@ -234,8 +234,12 @@ func flowRates(b *builder) []Panel {
 				grq(fmt.Sprintf(`alias(%s, "Worst")`, worstBucket(mergedPath("seconds_to_merge"))), "B"),
 			},
 			GRDesc: grWorst + " " + grSlot,
-			ES: []Target{esq(pr, []any{b.mPct("seconds_to_merge", 50, 90)}, []any{b.dh()}, "A",
-				[]string{flowMergedFilter, ESF}, "")},
+			ES: []Target{
+				esq(pr, []any{b.mPct("seconds_to_merge", 50)}, []any{b.dh()}, "A",
+					[]string{flowMergedFilter, ESF}, "Median"),
+				esq(pr, []any{b.mPct("seconds_to_merge", 90)}, []any{b.dh()}, "B",
+					[]string{flowMergedFilter, ESF}, "90th percentile"),
+			},
 			Desc: bucketFollowsRange,
 		}),
 		panel("timeseries", "Issues over time", box{W: 12, H: 7, X: 0, Y: 13}, []Target{sqlTS(issuesDay)}, &P{
