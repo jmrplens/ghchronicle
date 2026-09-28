@@ -298,8 +298,8 @@ func starsGiven(b *builder) []Panel {
 	// every star into one series first: the grouping had one series to group
 	// and drew one bar.
 	langGR, langGRtf := gTbl(fmt.Sprintf(
-		`limit(sortByMaxima(groupByNode(isNonNull(%s), %d, "sum")), 12)`,
-		gp("gh_star_given", "stars"), gn("gh_star_given", "language"),
+		`limit(sortByMaxima(groupByNode(%s, %d, "sum")), 12)`,
+		counted(gp("gh_star_given", "stars")), gn("gh_star_given", "language"),
 	),
 		"Language", []col{{"sum", overviewStarsGiven}})
 	langES, langEStf := esTbl("gh_star_given", []any{b.tm("language", 12)}, []any{b.mCount()},

@@ -274,8 +274,8 @@ func discussionAndComments(b *builder) []Panel {
 	// owners using the same one would be one row here. Each comment is a 1
 	// added up per repository; countOf added every comment into one series
 	// first, and the table drew that as one row.
-	commentsGR, commentsGRtf := gTbl(fmt.Sprintf(`groupByNode(isNonNull(%s), %d, "sum")`,
-		gp("gh_issue_comment", "comments"), gn("gh_issue_comment", "full_name")),
+	commentsGR, commentsGRtf := gTbl(fmt.Sprintf(`groupByNode(%s, %d, "sum")`,
+		counted(gp("gh_issue_comment", "comments")), gn("gh_issue_comment", "full_name")),
 		"Repository", []col{{"sum", "Comments"}})
 	commentsES, commentsEStf := esTbl("gh_issue_comment", []any{b.tm("full_name", 20)}, []any{b.mCount()},
 		[]named{{panelFullNameField, "Repository"}, {"n", "Comments"}}, nil)
@@ -424,8 +424,8 @@ func answersGiven(b *builder, perItem, grPerItem string) []Panel {
 	elsewhereEStf = append(elsewhereEStf, onePerComment(50)...)
 	// One series per comment across both shapes, then the comments of each
 	// repository added up, bucket by bucket.
-	answersGR, answersGRtf := gTbl(fmt.Sprintf(`groupByNode(isNonNull(groupByNodes(%s, "max", 0, 1)), 0, "sum")`,
-		everyShape(dcc, "comments", []string{"full_name", "comment"})),
+	answersGR, answersGRtf := gTbl(fmt.Sprintf(`groupByNode(%s, 0, "sum")`,
+		counted(fmt.Sprintf(`groupByNodes(%s, "max", 0, 1)`, everyShape(dcc, "comments", []string{"full_name", "comment"})))),
 		"Repository", []col{{"sum", "Comments"}})
 	// A bucket per comment inside each repository's, each the largest of its
 	// documents, and the table adds them up per repository: a sum over the

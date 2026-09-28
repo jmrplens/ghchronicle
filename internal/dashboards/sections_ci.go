@@ -544,7 +544,7 @@ func whatKeepsFailing(b *builder) []Panel {
 	failingGR, failingGRtf := gTbl(fmt.Sprintf(`limit(sortBy(filterSeries(%s, "sum", ">", %d), "sum", true), 20)`,
 		// Concatenated rather than quoted with %q, which would double every
 		// backslash of the expression and leave it matching nothing.
-		grGroupBy(nonNull(`exclude(`+rp(ciRun, "duration_seconds")+`, "`+notSucceeded()+`")`),
+		grGroupBy(counted(`exclude(`+rp(ciRun, "duration_seconds")+`, "`+notSucceeded()+`")`),
 			ciRun, "sum", "repo", "workflow"),
 		keepsFailing,
 	), "Repository, workflow", []col{{"sum", "Failures"}})
@@ -558,7 +558,7 @@ func whatKeepsFailing(b *builder) []Panel {
 		}, []string{ESF}, failingESRows()...)
 
 	failStepsGR, failStepsGRtf := gTbl(fmt.Sprintf(`limit(sortBy(%s, "sum", true), 20)`,
-		grGroupBy(nonNull(rp(ciStep, "duration_seconds", "conclusion", "failure")),
+		grGroupBy(counted(rp(ciStep, "duration_seconds", "conclusion", "failure")),
 			ciStep, "sum", "step", "repo"),
 	), "Step, repository", []col{{"sum", "Failures"}})
 	failStepsES, failStepsEStf := esTbl(ciStep, append([]any{b.tm("step", 20)}, b.tmRepo(50)...),

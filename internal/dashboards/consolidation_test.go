@@ -185,3 +185,44 @@ var consolidatedHow = regexp.MustCompile(`,\s*"([a-z]+)"\s*$`)
 func isIdentifier(c byte) bool {
 	return c == '_' || '0' <= c && c <= '9' || 'a' <= c && c <= 'z' || 'A' <= c && c <= 'Z'
 }
+
+// TestNoGraphiteRowIsAGroupWithNothingInRange is what the cross-store review of
+// 2.6.1 found in "Discussion answers": beside the two repositories commented in
+// during the last thirty days, Graphite drew someone_else with 0 comments. Its
+// one comment was seventy five days old. Graphite answers for every path that
+// exists, a series with nothing in the range as a row of nulls, and isNonNull
+// turns that into a row of zeros, which removeEmptySeries around the table no
+// longer recognizes as empty; the grouping then adds the zeros up into a row
+// the SQL stores do not have, since a group with no row in the range is no
+// group at all.
+//
+// Every table and bar chart that reduces a series list to rows is held to it:
+// wherever one counts with isNonNull, the series with nothing in the range are
+// dropped before the nulls become zeros.
+func TestNoGraphiteRowIsAGroupWithNothingInRange(t *testing.T) {
+	t.Parallel()
+	var titles []string
+	for _, p := range renderedPanels(t, "graphite") {
+		if len(graphiteReducers(p)) == 0 {
+			continue
+		}
+		title, _ := p["title"].(string)
+		for _, raw := range targetList(p) {
+			target, _ := raw.(map[string]any)
+			expr, _ := target["target"].(string)
+			if !strings.Contains(expr, "isNonNull(") {
+				continue
+			}
+			titles = append(titles, title)
+			if n := strings.Count(expr, "isNonNull("); n != strings.Count(expr, "isNonNull(removeEmptySeries(") {
+				t.Errorf("the Graphite panel %q turns the nulls of a series with nothing in the range "+
+					"into zeros before dropping it, so it draws a row that reads 0 for a group the "+
+					"SQL stores do not have: %s", title, expr)
+			}
+		}
+	}
+	if !slices.Contains(titles, "Discussion answers") {
+		t.Fatalf("Discussion answers is not among the Graphite panels that count rows, %v, so this "+
+			"no longer checks the table it was written for", titles)
+	}
+}

@@ -325,8 +325,8 @@ func whatTheyPublish(b *builder) []Panel {
 			{"days_since_update", "Idle"},
 		}, nil)
 
-	tagsGR, tagsGRtf := gTbl(fmt.Sprintf(`groupByNode(isNonNull(%s), %d, "sum")`,
-		gp(pv, "published"), gn(pv, "package")), "Package",
+	tagsGR, tagsGRtf := gTbl(fmt.Sprintf(`groupByNode(%s, %d, "sum")`,
+		counted(gp(pv, "published")), gn(pv, "package")), "Package",
 		[]col{{"sum", "Tags published"}})
 	tagsES, tagsEStf := b.esRaw(pv, 30, []named{
 		{"@timestamp", "Published"},

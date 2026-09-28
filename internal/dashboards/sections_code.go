@@ -83,8 +83,8 @@ func commitsAndChurn(b *builder) []Panel {
 			{"l", codeLinesPerCommit},
 		}, []string{ESF})
 
-	sigsGR, sigsGRtf := gTbl(fmt.Sprintf(`sortByTotal(groupByNode(isNonNull(%s), %d, "sum"))`,
-		cpath("churn"), gn(c, "signature")), "Signature", []col{{"sum", "Commits"}})
+	sigsGR, sigsGRtf := gTbl(fmt.Sprintf(`sortByTotal(groupByNode(%s, %d, "sum"))`,
+		counted(cpath("churn")), gn(c, "signature")), "Signature", []col{{"sum", "Commits"}})
 	sigsES, sigsEStf := esTbl(c, []any{b.tm("signature", 10)}, []any{b.mCount()},
 		[]named{{"signature.keyword", "Signature"}, {"n", "Commits"}}, []string{ESF})
 
@@ -258,8 +258,8 @@ func commitChecks(b *builder) []Panel {
 	// Each check run is a 1 added up per app and check. countOf added every
 	// run into one series first, and the table drew that as one row named
 	// after whichever came first.
-	checksGR, checksGRtf := gTbl(fmt.Sprintf(`groupByNodes(isNonNull(%s), "sum", %d, %d)`,
-		rp(cc, "checks"), gn(cc, "app"), gn(cc, "check")),
+	checksGR, checksGRtf := gTbl(fmt.Sprintf(`groupByNodes(%s, "sum", %d, %d)`,
+		counted(rp(cc, "checks")), gn(cc, "app"), gn(cc, "check")),
 		"App, check", []col{{"sum", "Runs"}})
 	checksES, checksEStf := esTbl(cc, []any{b.tm("app", 20), b.tm("check", 40)},
 		[]any{b.mCount(), b.mSum("failed")},

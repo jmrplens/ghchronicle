@@ -327,8 +327,8 @@ func pullsAndReviewers(b *builder) []Panel {
 	}, esMerged)
 
 	authorsGR, authorsGRtf := gTbl(fmt.Sprintf(
-		`limit(sortByTotal(groupByNode(isNonNull(%s), %d, "sum")), 15)`,
-		anyPath("churn"), gn(pr, "author"),
+		`limit(sortByTotal(groupByNode(%s, %d, "sum")), 15)`,
+		counted(anyPath("churn")), gn(pr, "author"),
 	), "Author", []col{{"sum", "Pull requests"}})
 	authorsES, authorsEStf := esTbl(pr, []any{b.tm("author", 15)}, []any{b.mCount()},
 		[]named{{"author.keyword", "Author"}, {"n", "Pull requests"}},

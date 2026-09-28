@@ -473,6 +473,16 @@ func countOf(path string) string { return "sumSeries(" + nonNull(path) + ")" }
 // group, where countOf is a count of them all.
 func nonNull(expr string) string { return "isNonNull(" + expr + ")" }
 
+// counted is nonNull for a panel that reduces a series list to rows, a table or
+// a bar chart that counts per group. A series with nothing inside the range is
+// dropped first: turned into zeros it is no longer empty, the removeEmptySeries
+// gTbl puts around the table passes it, and the group it belongs to becomes a
+// row that reads 0 where the SQL stores have no row at all. "Discussion
+// answers" drew one for a repository whose only comment was seventy five days
+// old, against a thirty-day range. A stat keeps nonNull: there a range with
+// nothing in it is a count of 0, which is what COUNT(*) answers too.
+func counted(expr string) string { return nonNull(removeEmptySeries(expr)) }
+
 // total makes the whole range one bucket, so a stat can show a sum over it.
 // The bucket is aligned to the range start and outlives any range a dashboard
 // will be given.

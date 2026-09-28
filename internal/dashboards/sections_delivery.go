@@ -601,7 +601,7 @@ func rulesetChanges(b *builder) Panel {
 	// Graphite has no rows and no dates to list by, so the versions become a
 	// count per ruleset and actor type, named from the path.
 	verGR, verGRtf := gTbl(fmt.Sprintf(`sortBy(%s, "sum", true)`,
-		grGroupBy(nonNull(rp(rv, "versions")), rv, "sum", "repo", "ruleset", "actor_type")),
+		grGroupBy(counted(rp(rv, "versions")), rv, "sum", "repo", "ruleset", "actor_type")),
 		"Repository, ruleset, actor", []col{{"sum", "Versions"}})
 	// The documents themselves, newest first, which is the one shape that
 	// returns the target, the actor and the link as strings: a top_metrics
