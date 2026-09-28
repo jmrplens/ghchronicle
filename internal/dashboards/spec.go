@@ -8,6 +8,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/jmrplens/ghchronicle/v2/internal/grafana"
 )
 
 // One panel specification for every dashboard.
@@ -72,8 +74,15 @@ const (
 	sweepCount = "In Prometheus this counts the collector's last sweep, not the dashboard range."
 
 	// The same for Graphite and Elasticsearch.
-	grRows = "Graphite has no rows: each series is one number reduced over the range, so " +
-		"this table keeps the column it is sorted by and drops the others."
+	//
+	// grRows stands where a Graphite table says what its reduction drops, and
+	// panel() writes the sentence out of the table itself (see
+	// graphiteRowsSentence): the numbers it keeps, and every column the SQL
+	// stores draw that it does not and its description does not name. It was
+	// one sentence on fifty tables, "keeps the column it is sorted by and drops
+	// the others", which was false on eleven of them: six keep two numbers,
+	// and five keep a number that is not the one they sort by.
+	grRows = "[the Graphite table's columns]"
 	grSlot = grSlotLead + "the medians are over what the storage kept."
 	// grSlotCounts and grSlotTotals are grSlot for a table that counts or adds
 	// up the points of a series and takes no median: a table that reads the
@@ -93,7 +102,7 @@ const (
 		"it, so it sits at GitHub's count and starts the day the collector did: " + esStackNote
 	// How a per-repository snapshot becomes one curve in Elasticsearch: see
 	// esSnapshotStack in query.go.
-	esStackNote = "one series per repository, its largest reading of the day, stacked so the " +
+	esStackNote = "one series per repository, its largest reading of each bucket, stacked so the " +
 		"top of the stack is the total."
 	esNewest  = "In Elasticsearch this lists the newest 500 documents and the panel sorts them."
 	esPerRepo = "In Elasticsearch the rows are per repository as well, because the newest snapshot is taken per repository."
@@ -322,8 +331,15 @@ func panel(kind, title string, at box, sql []Target, p *P) Panel {
 		panic(title + ": only a text panel can give way to the log store")
 	}
 	shared := placeLinks(title, p.Overrides, stores)
+	if gr := stores["graphite"]; strings.Contains(gr.Desc, grRows) {
+		gr.Desc = graphiteRowsSentence(title, kind, sql, p, gr)
+	}
+	desc := p.Desc
+	if before, after, found := strings.Cut(desc, bucketFollowsRange); found {
+		desc = before + bucketSentence(title, p.Opts) + after
+	}
 	return Panel{
-		Kind: kind, Title: title, W: at.W, H: at.H, X: at.X, Y: at.Y, Desc: p.Desc,
+		Kind: kind, Title: title, W: at.W, H: at.H, X: at.X, Y: at.Y, Desc: desc,
 		Stores: stores, Overrides: shared, Opts: orEmpty(p.Opts),
 		PromTitle: p.PromTitle, Logs: p.Logs,
 	}
@@ -374,6 +390,105 @@ func orderLikeSQL(title string, selected []string, stores map[string]*store, p *
 			st.TF = append(slices.Clone(st.TF), columnOrder(order...))
 		}
 	}
+}
+
+// graphiteRowsSentence is a Graphite table's description with grRows written
+// out: that each series is reduced to the numbers the table keeps, and which
+// columns of the SQL stores' it therefore does not draw, leaving out those its
+// description names already and the link columns, which placeLinks says of.
+// A table that draws every column the SQL stores draw has nothing to say.
+func graphiteRowsSentence(title, kind string, sql []Target, p *P, gr *store) string {
+	if kind != "table" || gr.Q == nil || p.SQLTF != nil {
+		panic(title + ": grRows is for a Graphite table beside a SQL table that draws what it selects")
+	}
+	drawn := namesGiven(gr.TF)
+	links := map[string]bool{}
+	for _, o := range append(append([]any{}, p.Overrides...), p.SQLOver...) {
+		if column := linkedColumn(o); column != "" {
+			links[column] = true
+		}
+	}
+	// A column the description already says is missing is not said again;
+	// one it only mentions, "an archived repository counts from its points
+	// of the last seven days", is still a column the table drops.
+	var missing []string
+	for sentence := range strings.SplitSeq(strings.Replace(gr.Desc, grRows, "", 1), ". ") {
+		if saysMissing.MatchString(sentence) {
+			missing = append(missing, sentence)
+		}
+	}
+	said := strings.Join(missing, ". ")
+	rest := strings.Replace(gr.Desc, grRows, "", 1)
+	selected := selectedColumns(sql)
+	var dropped []string
+	for _, column := range selected {
+		if !links[column] && !grafana.DrawsColumn(drawn, selected, column, true) && !grafana.NamesColumn(said, column) {
+			dropped = append(dropped, column)
+		}
+	}
+	if len(dropped) == 0 {
+		return strings.Join(strings.Fields(rest), " ")
+	}
+	kept := graphiteNumbers(gr.TF)
+	numbers, ok := numberWords[len(kept)]
+	if !ok {
+		panic(fmt.Sprintf("%s: a Graphite table that reduces its series to %d numbers", title, len(kept)))
+	}
+	sentence := fmt.Sprintf("Graphite has no rows: each series is reduced over the range to %s, %s, so ",
+		numbers, listed(kept))
+	verb := " is"
+	if len(dropped) > 1 {
+		verb = " are"
+	}
+	sentence += listed(dropped) + verb + " not in this table."
+	return strings.Replace(gr.Desc, grRows, sentence, 1)
+}
+
+// saysMissing is how a sentence of a Graphite description says a column is
+// not in the table.
+var saysMissing = regexp.MustCompile(`\bmissing\b|\babsent\b|\bnot in (this|the) table\b|\bdrops\b`)
+
+// numberWords spells the few counts graphiteRowsSentence says.
+var numberWords = map[int]string{
+	1: "one number", 2: "two numbers", 3: "three numbers", 4: "four numbers", 5: "five numbers",
+}
+
+// listed is names as prose: a, b and c.
+func listed(names []string) string {
+	if len(names) == 1 {
+		return names[0]
+	}
+	return strings.Join(names[:len(names)-1], ", ") + " and " + names[len(names)-1]
+}
+
+// graphiteNumbers is the columns a Graphite table reduces each series to, in
+// the order it draws them: gTbl's reducers, under the names its organize gives
+// them.
+func graphiteNumbers(tf []any) []string {
+	var reducersAsked []string
+	var rename map[string]any
+	for _, raw := range tf {
+		t, _ := raw.(map[string]any)
+		options, _ := t["options"].(map[string]any)
+		switch t["id"] {
+		case "reduce":
+			for _, r := range asList(options["reducers"]) {
+				id, _ := r.(string)
+				reducersAsked = append(reducersAsked, id)
+			}
+		case "organize":
+			if names, _ := options["renameByName"].(map[string]any); names["Field"] != nil {
+				rename = names
+			}
+		}
+	}
+	var out []string
+	for _, id := range reducersAsked {
+		if name, ok := rename[reducers[id]].(string); ok {
+			out = append(out, name)
+		}
+	}
+	return out
 }
 
 // lokiRepoStage is the LogQL that applies the dashboard's repository
@@ -625,6 +740,48 @@ func target(q *Target, store string, ds any) any {
 	}
 }
 
+// followingTheRange gives an Elasticsearch date histogram binned at the
+// panel's own floor the interval "auto", which is the bucket every other store
+// bins the chart into: the range over the panel's maxDataPoints, rounded, and
+// never under the floor, which is what $__dateBin is in the SQL stores and
+// the bucket variables are in Graphite.
+//
+// A date histogram's interval is sent as it is written otherwise, whatever
+// the range: the datasource makes a bucket of anything but "auto", and "1h"
+// and "1d" are fixed intervals to it, never widened (aggregation_factory.go in
+// grafana-elasticsearch-datasource). Measured on the 2.6.2 review over thirty
+// days, "Events over time" was 721 buckets of an hour in Elasticsearch and
+// 120 of six hours in InfluxDB, so a bar was a sum over a quarter of the time
+// and a median over another set of runs. "auto" is sent as the query's own
+// interval, and the datasource widens it where a range would ask for more
+// buckets than it allows, which a fixed hour across three years did. A
+// histogram at another interval than the floor keeps it: a bucket the width of
+// the whole range, or the week of the weekly commits, is what the panel is.
+func followingTheRange(t any, floor string) any {
+	target, _ := t.(map[string]any)
+	buckets, _ := target["bucketAggs"].([]any)
+	if floor == "" || len(buckets) == 0 {
+		return t
+	}
+	out := maps.Clone(target)
+	list := make([]any, len(buckets))
+	for i, raw := range buckets {
+		list[i] = raw
+		bucket, _ := raw.(map[string]any)
+		settings, _ := bucket["settings"].(map[string]any)
+		if bucket["type"] != "date_histogram" || settings["interval"] != floor {
+			continue
+		}
+		following := maps.Clone(settings)
+		following["interval"] = "auto"
+		auto := maps.Clone(bucket)
+		auto["settings"] = following
+		list[i] = auto
+	}
+	out["bucketAggs"] = list
+	return out
+}
+
 // materialize turns one specification entry into one Grafana panel for the
 // given store. `logs` is the log store datasource, or nil for a dashboard
 // bound to its metrics store alone, which is what every exported file is.
@@ -651,12 +808,15 @@ func materialize(id *ids, p *Panel, storeName string, ds, logs any, y0 int) map[
 		)
 	}
 
+	opts := mergeOpts(p.Opts, st.Opts)
 	targets := make([]any, len(st.Q))
 	for i := range st.Q {
 		targets[i] = target(&st.Q[i], storeName, ds)
+		if storeName == "elasticsearch" {
+			targets[i] = followingTheRange(targets[i], optString(opts, "interval", ""))
+		}
 	}
 	desc := strings.TrimSpace(strings.Join(nonEmpty(p.Desc, st.Desc), " "))
-	opts := mergeOpts(p.Opts, st.Opts)
 	// Every kind takes the shared overrides and the store's own: a stat of
 	// several values names them through overrides as much as a table does.
 	opts["overrides"] = namingFirst(append(append([]any{}, p.Overrides...), st.Overrides...))

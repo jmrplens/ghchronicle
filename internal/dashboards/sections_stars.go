@@ -97,8 +97,8 @@ func stars(b *builder) []Panel {
 	// the value is the day's count rather than a 1 to be counted.
 	dayPath := rp("gh_star_day", "stars")
 
-	byRepoGR, byRepoGRtf := gTbl(fmt.Sprintf("sortByMaxima(%s)",
-		rowsOf(rp("gh_repo", "stars"), gn("gh_repo", "repo"))),
+	byRepoGR, byRepoGRtf := gTbl(grOtherBy(12, "sortByMaxima",
+		rowsOf(fmt.Sprintf("keepLastValue(%s)", rp("gh_repo", "stars")), gn("gh_repo", "repo"))),
 		"Repository", []col{{"lastNotNull", "Stars"}})
 	byRepoES, byRepoEStf := esTbl("gh_repo", b.tmRepo(500), []any{b.mNewest("stars")},
 		[]named{{"repo.keyword", "Repository"}, {"stars", "Stars"}}, []string{ESF},
@@ -119,9 +119,9 @@ func stars(b *builder) []Panel {
 
 	return []Panel{
 		panel("timeseries", "Stars gained over time", box{W: 12, H: 8, X: 0, Y: 0}, []Target{sqlTS(perDay)}, &P{
-			Prom: []Target{daily(fmt.Sprintf(
+			Prom: []Target{daily(promOtherOverTime(fmt.Sprintf(
 				"sum by (full_name, repo) (increase(github_stars_gained_total{%s}[1d]))", PF,
-			), "{{repo}}")},
+			), "full_name, repo", "repo"), "{{repo}}")},
 			Desc: "Stars per day from GitHub's daily star history, which it serves for " +
 				"every repository whatever the token may see of its stargazers. Each day " +
 				"is GitHub's Pacific calendar day, so a star given in a European morning " +
@@ -144,7 +144,7 @@ func stars(b *builder) []Panel {
 				"time holds every repository's count.",
 			Opts:    mergeOpts(Opts{"bars": true, "stack": true}, dayBins),
 			SQLOpts: seriesOpts,
-			GR:      []Target{grq(perRepoBucket(dayPath, "gh_star_day"))},
+			GR:      []Target{grq(grOther(topSeriesKept, perRepoBucket(dayPath, "gh_star_day")))},
 			// Only the days that hold a star. The sums are the same without
 			// the filter, but the terms bucket ranks repositories by document
 			// count, and every repository writes a zero row for each day of
@@ -152,7 +152,8 @@ func stars(b *builder) []Panel {
 			// past fifty repositories the ones kept are arbitrary, and below
 			// it every starless one stands in the legend at zero, which the
 			// SQL stores drop with HAVING.
-			ES: []Target{b.esDaily("gh_star_day", b.mSum("stars"), "repo", "", []string{ESF, "stars:>0"}, "")},
+			ES:     []Target{b.esDaily("gh_star_day", b.mSum("stars"), "repo", "", []string{ESF, "stars:>0"}, "")},
+			ESDesc: esUnfolded(esDailyTerms, "repositories", "series"),
 		}),
 		panel("timeseries", "Stars over time", box{W: 12, H: 8, X: 12, Y: 0}, []Target{sqlTS(curve)}, &P{
 			Prom: []Target{promq(fmt.Sprintf("sum(github_repo_stars{%s})", PF), legend("Stars"))},
@@ -184,7 +185,7 @@ func stars(b *builder) []Panel {
 			PromDesc: "Prometheus shows the twelve and folds nothing.",
 			PromTF:   []any{organize(map[string]string{"repo": "Repository", "Value": "Stars"}, nil)},
 			GR:       byRepoGR, GRTF: byRepoGRtf,
-			ES: byRepoES, ESTF: byRepoEStf,
+			ES: byRepoES, ESTF: byRepoEStf, ESDesc: esUnfolded(500, "repositories", "bar"),
 		}),
 		panel("table", "Recent stars", box{W: 12, H: 8, X: 12, Y: 8}, []Target{sqlT(newest)}, &P{
 			Prom: []Target{promTbl(fmt.Sprintf(
@@ -196,7 +197,8 @@ func stars(b *builder) []Panel {
 				"a repository's admins and collaborators) has its stars in the panels " +
 				"above and no names here.",
 			PromDesc: "Prometheus keeps no stargazer identity, so this is the stars gained " +
-				"per repository over the range instead. " + sinceStart + " The table counts the " +
+				"per repository over the range instead, and the User and Starred at columns " +
+				"are not in it. " + sinceStart + " The table counts the " +
 				"stargazer list, as Stars gained over time does here, so a repository " +
 				"whose list is hidden is in neither and has its stars only in Stars over " +
 				"time and Stars by repository.",
@@ -205,7 +207,8 @@ func stars(b *builder) []Panel {
 			GR:        newestGR, GRTF: newestGRtf,
 			GRDesc: "Graphite has no way to sort by date, so this is the stars gained per " +
 				"repository over the range instead, from the daily star history, which " +
-				"counts every repository. GitHub Enterprise Server does not serve that " +
+				"counts every repository and names no stargazer: the User and Starred at " +
+				"columns are not in it. GitHub Enterprise Server does not serve that " +
 				"history, so against it this table is empty.",
 			GROver: []any{barCell("Stars", "short", 200)},
 			ES:     newestES, ESTF: newestEStf,

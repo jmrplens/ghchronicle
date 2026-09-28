@@ -83,8 +83,9 @@ Graphite guarda los puntos fechados pero no tiene filas. Una serie es una ruta y
 un número, así que:
 
 - No se puede construir una tabla que necesite varios campos de una misma fila.
-  El dashboard incluido conserva la columna por la que ordena y dice en la
-  descripción qué columnas descartó.
+  El dashboard incluido reduce cada serie a los uno o dos números que puede
+  llevar una fila, y la descripción del panel nombra esos y cada columna que
+  descarta.
 - Un título o cualquier otra cadena no es una métrica allí en absoluto, y el
   destino la descarta; los paneles que mostrarían una lo dicen. Un booleano se
   guarda como 1 o 0, igual que cualquier número.
@@ -129,6 +130,19 @@ el cubo del día volvió a las 00:00, y el almacenamiento de artefactos en su
 cubo de seis horas a las 12:00. Un cubo sigue el rango del dashboard, así que una
 gráfica fijada a su propio rango, como lo están dos de los paneles de Code,
 suma en días sea cual sea el rango de la página.
+
+Dos gráficas suman en cambio en un día fijo, porque sus filas ya están a un día
+o a una semana unas de otras y cada una va en su propia fecha: el calendario de
+contribuciones, una fila por día, y los commits semanales, una fila por semana
+fechada en el domingo en que GitHub empieza la semana, sin los días entre
+semanas. Siete días no sirven de cubo ahí: graphite-web los cuenta desde el
+epoch, un jueves, y cada barra semanal quedaba tres días antes, la primera
+semana de un rango de treinta días antes de que empezara el rango.
+
+Una gráfica o una gráfica de barras que nombra sus series más activas y junta
+el resto en una llamada other hace aquí lo mismo que en los dashboards SQL: se
+nombran las más activas de todo el rango, y other es todas las series menos
+esas, punto a punto, dibujada solo donde queda algo.
 
 ## Por dónde seguir
 

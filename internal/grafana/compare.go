@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -565,4 +566,55 @@ func (c cell) String() string {
 		return time.UnixMilli(int64(c.num)).UTC().Format(time.RFC3339)
 	}
 	return strconv.Quote(c.text)
+}
+
+// ── What a description says of a column ─────────────────────────────────────
+
+// DrawsColumn reports whether a table that draws the columns `drawn` draws
+// the SQL stores' column `column`, of the ones they select, `selected`: under
+// its name, or under a name of its own that is the SQL name with a word more
+// or a letter less, "Active share" for Active, as long as the SQL stores do
+// not draw that name themselves, since "Live for" is not the Live link beside
+// it. In Graphite a column is also drawn when it is one of the path nodes a
+// row is named by, "Repository, host".
+func DrawsColumn(drawn map[string]bool, selected []string, column string, graphite bool) bool {
+	for name := range drawn {
+		variant := !slices.Contains(selected, name) &&
+			(strings.HasPrefix(name, column+" ") || column == name+"s")
+		if name == column || variant {
+			return true
+		}
+		if !graphite {
+			continue
+		}
+		for node := range strings.SplitSeq(name, ", ") {
+			if strings.EqualFold(node, column) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// NamesColumn reports whether a store's own words about a panel name a column:
+// its words in order, a hyphen for a space and a plural allowed, whatever the
+// case.
+func NamesColumn(words, column string) bool {
+	parts := strings.Fields(column)
+	for i, w := range parts {
+		parts[i] = regexp.QuoteMeta(w)
+	}
+	return regexp.MustCompile(`(?i)\b` + strings.Join(parts, `[\s-]+`) + `s?\b`).MatchString(words)
+}
+
+// OwnWords is what a store's description of a panel adds to the one every
+// store shares: the text after the longest start the two have in common, so a
+// column the shared text happens to mention is not taken for one the store
+// explains.
+func OwnWords(desc, shared string) string {
+	i := 0
+	for i < len(desc) && i < len(shared) && desc[i] == shared[i] {
+		i++
+	}
+	return desc[i:]
 }

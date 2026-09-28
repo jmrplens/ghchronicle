@@ -94,8 +94,9 @@ func webhookDeliveries(b *builder) []Panel {
 
 	return []Panel{
 		panel("gauge", "Webhook failure rate", box{W: 6, H: 8, X: 0, Y: 0}, []Target{sqlT(failRate)}, &P{
-			Prom: []Target{promNow(fmt.Sprintf(
-				"100 * sum(increase(%s[$__range])) / sum(increase(%s[$__range]))", failed, totalM,
+			Prom: []Target{promNow(promShare(
+				fmt.Sprintf("sum(increase(%s[$__range]))", failed),
+				fmt.Sprintf("sum(increase(%s[$__range]))", totalM),
 			))},
 			Opts: Opts{"no_value": "no deliveries", "thresholds": []any{
 				map[string]any{"color": "green", "value": nil},
@@ -326,9 +327,8 @@ func accessConfiguration(b *builder) []Panel {
 				"told nothing apart.",
 			Overrides: []any{width("Host", 200), width("Active", 90), width(deliveryHookEvents, 150)},
 			GR:        whGR, GRTF: whGRtf,
-			GRDesc: "Graphite has no rows: each series is one number, so this table keeps the " +
-				"events each hook subscribes to and drops its id and whether it is active.",
-			ES: whES, ESTF: whEStf,
+			GRDesc: grRows,
+			ES:     whES, ESTF: whEStf,
 		}),
 		panel("table", "Environments", box{W: 12, H: 8, X: 12, Y: 24}, []Target{sqlT(
 			// Each environment's newest row. The row is a daily snapshot and its

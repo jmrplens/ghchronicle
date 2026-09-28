@@ -245,3 +245,50 @@ func TestDrawnNamesAreWhatAReaderSees(t *testing.T) {
 		}
 	}
 }
+
+// TestAColumnIsDrawnOrNamedAsTheDescriptionsSayIt holds the rule both the
+// specification's test and the containerised suite judge a missing column by:
+// drawn under its name, under the SQL name with a word more or a letter less,
+// or as a node of a Graphite row's name; named in a store's own words with a
+// hyphen for a space and a plural allowed. A name the SQL stores draw
+// themselves stands for no other column.
+func TestAColumnIsDrawnOrNamedAsTheDescriptionsSayIt(t *testing.T) {
+	t.Parallel()
+	selected := []string{"Repository", "Live", "Live for", "Issue templates", "Active"}
+	for _, c := range []struct {
+		drawn    []string
+		column   string
+		graphite bool
+		want     bool
+	}{
+		{[]string{"Active share"}, "Active", false, true},
+		{[]string{"Issue template"}, "Issue templates", false, true},
+		{[]string{"Live for"}, "Live", false, false},
+		{[]string{"Repository, host"}, "Repository", true, true},
+		{[]string{"Repository, host"}, "Repository", false, false},
+	} {
+		drawn := map[string]bool{}
+		for _, name := range c.drawn {
+			drawn[name] = true
+		}
+		if got := DrawsColumn(drawn, selected, c.column, c.graphite); got != c.want {
+			t.Errorf("%v drawn, graphite %v: DrawsColumn(%q) = %v, want %v", c.drawn, c.graphite, c.column, got, c.want)
+		}
+	}
+	for _, c := range []struct {
+		words, column string
+		want          bool
+	}{
+		{"so the One-time share is not in this table", "One time share", true},
+		{"with no By or Forked column", "Forked", true},
+		{"the titles are missing", "Title", true},
+		{"a forked repository", "Fork", false},
+	} {
+		if got := NamesColumn(c.words, c.column); got != c.want {
+			t.Errorf("NamesColumn(%q, %q) = %v, want %v", c.words, c.column, got, c.want)
+		}
+	}
+	if got := OwnWords("Shared. Mine.", "Shared. Other."); got != "Mine." {
+		t.Errorf("OwnWords = %q, want what the store adds", got)
+	}
+}

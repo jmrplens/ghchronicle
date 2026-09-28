@@ -390,6 +390,8 @@ func transform(frames []*Frame, tfs []any) ([]*Frame, error) {
 			frames = transpose(frames, options)
 		case "rowsToFields":
 			frames = rowsToFields(frames, options)
+		case "convertFieldType":
+			frames, err = convertFieldTypes(frames, options)
 		default:
 			err = fmt.Errorf("the %v transformation, which Draw does not replay", tf["id"])
 		}
@@ -504,12 +506,33 @@ func merge(frames []*Frame) []*Frame {
 	for _, name := range order {
 		f := proto[name]
 		for _, row := range rows {
-			f.Values = append(f.Values, row[name])
+			v, has := row[name]
+			if !has {
+				v = undefined
+			}
+			f.Values = append(f.Values, v)
 		}
 		out.Fields = append(out.Fields, f)
 	}
 	return []*Frame{out}
 }
+
+// jsUndefined is JavaScript's undefined: what Grafana's merge leaves in a row
+// for a field the frame the row came from does not have, since the row object
+// has no such key and MutableDataFrame.add stores MISSING_VALUE, which is
+// undefined (Grafana 13.2.1). A datasource answers null instead, and the two
+// read alike everywhere but in arithmetic, where null is 0 and undefined is
+// NaN: "Minutes spent on failed runs" in Elasticsearch merged the failed runs
+// onto every repository's row and multiplied their mean by their count, and a
+// repository with no failed run read NaN where a replay that took the gap for
+// a null read 0.
+type jsUndefined struct{}
+
+// undefined is the one value of jsUndefined. valueAt reads it as nil, the way
+// every comparison Grafana makes with == null does; rawAt keeps it, for the
+// arithmetic of a calculation and for the transformations that carry a value
+// on without reading it.
+var undefined any = jsUndefined{}
 
 // mergeKeys is the fields a merge joins rows on: those every frame carries
 // by the same name, in the order the last frame gives them.
@@ -599,10 +622,34 @@ func fieldByName(frame *Frame, name string) *Field {
 }
 
 func valueAt(f *Field, row int) any {
+	if v := rawAt(f, row); v != undefined {
+		return v
+	}
+	return nil
+}
+
+// rawAt is a field's value in a row as it is held, undefined included: see
+// jsUndefined.
+func rawAt(f *Field, row int) any {
 	if f == nil || row >= len(f.Values) {
 		return nil
 	}
 	return f.Values[row]
+}
+
+// nullish is a list of values with undefined read as nil, for the code that
+// reads a field's values whole.
+func nullish(values []any) []any {
+	if !slices.Contains(values, undefined) {
+		return values
+	}
+	out := make([]any, len(values))
+	for i, v := range values {
+		if v != undefined {
+			out[i] = v
+		}
+	}
+	return out
 }
 
 // reducerNames is what Grafana calls the column a reducer fills.
@@ -662,6 +709,7 @@ func reduceToRows(frames []*Frame, options map[string]any) ([]*Frame, error) {
 // is what a field whose configuration names no null handling gets. The
 // answer is a float64, the value itself for first and last, or nil.
 func reduceField(values []any, reducer string) any {
+	values = nullish(values)
 	switch reducer {
 	case "first":
 		return valueAt(&Field{Values: values}, 0)
@@ -779,7 +827,7 @@ func binaryColumn(frame *Frame, frames []*Frame, binary map[string]any) ([]any, 
 	}
 	values := make([]any, frameLength(frame))
 	for r := range values {
-		v, err := arithmetic(binary["operator"], jsNumber(valueAt(left, r)), jsNumber(valueAt(right, r)))
+		v, err := arithmetic(binary["operator"], jsNumber(rawAt(left, r)), jsNumber(rawAt(right, r)))
 		if err != nil {
 			return nil, err
 		}
@@ -811,25 +859,43 @@ func rowSums(frame *Frame, frames []*Frame, reduce map[string]any) ([]any, error
 	return values, nil
 }
 
+// operand is one side of a binary calculation: the field of that name, or a
+// number, which Grafana fills the column with. A string that is a number is
+// the number unless a field carries it as its name (checkBinaryValueType),
+// which is how "Sponsorship" in Elasticsearch divides its cents by 100.
 func operand(frame *Frame, frames []*Frame, spec any) *Field {
 	name, isName := spec.(string)
+	fixed := name
 	if !isName {
 		m, _ := spec.(map[string]any)
 		matcher, _ := m["matcher"].(map[string]any)
 		name, _ = matcher["options"].(string)
+		fixed, _ = m["fixed"].(string)
 	}
 	for _, f := range frame.Fields {
-		if displayName(f, frame, frames) == name {
+		if name != "" && displayName(f, frame, frames) == name {
 			return f
 		}
 	}
-	return nil
+	n, err := strconv.ParseFloat(fixed, 64)
+	if fixed == "" || err != nil {
+		return nil
+	}
+	constant := &Field{Name: fixed, Type: "number", Config: map[string]any{}}
+	for range frameLength(frame) {
+		constant.Values = append(constant.Values, n)
+	}
+	return constant
 }
 
+// jsNumber is the number JavaScript's arithmetic makes of a value: 0 of a
+// null and NaN of an undefined.
 func jsNumber(v any) float64 {
 	switch t := v.(type) {
 	case nil:
 		return 0
+	case jsUndefined:
+		return math.NaN()
 	case float64:
 		return t
 	case bool:
@@ -995,7 +1061,7 @@ func filterByValue(frames []*Frame, options map[string]any) ([]*Frame, error) {
 		for _, f := range frame.Fields {
 			values := make([]any, 0, len(kept))
 			for _, r := range kept {
-				values = append(values, valueAt(f, r))
+				values = append(values, rawAt(f, r))
 			}
 			f.Values = values
 		}
@@ -1071,7 +1137,7 @@ func sortBy(frames []*Frame, options map[string]any) []*Frame {
 		for _, f := range frame.Fields {
 			sorted := make([]any, len(order))
 			for i, r := range order {
-				sorted[i] = valueAt(f, r)
+				sorted[i] = rawAt(f, r)
 			}
 			f.Values = sorted
 		}
@@ -1189,6 +1255,43 @@ func transposeFrame(frame *Frame, frames []*Frame, firstName, restName string) *
 		fields = append(fields, col)
 	}
 	return &Frame{RefID: "transpose-" + frame.RefID, Name: frame.Name, Fields: fields}
+}
+
+// convertFieldTypes is the convertFieldType transformation for the one
+// conversion a panel asks of it, to an enum: each value becomes its index in
+// the enum's words, and a value that is not one of them undefined. The other
+// conversions are not replayed, since what Grafana makes of a text as a number
+// or a boolean is exactly what a panel has to be held to rather than assume.
+func convertFieldTypes(frames []*Frame, options map[string]any) ([]*Frame, error) {
+	for _, raw := range list(options["conversions"]) {
+		conversion, _ := raw.(map[string]any)
+		name, _ := conversion["targetField"].(string)
+		if conversion["destinationType"] != "enum" {
+			return nil, fmt.Errorf("a conversion to %v, which Draw does not replay", conversion["destinationType"])
+		}
+		enum, _ := conversion["enumConfig"].(map[string]any)
+		words := list(enum["text"])
+		if len(words) == 0 {
+			continue // Grafana leaves the field as it was
+		}
+		for _, frame := range frames {
+			for _, f := range frame.Fields {
+				if displayName(f, frame, frames) != name {
+					continue
+				}
+				for r, v := range f.Values {
+					index := slices.Index(words, v)
+					if index < 0 {
+						f.Values[r] = undefined
+						continue
+					}
+					f.Values[r] = float64(index)
+				}
+				f.Type = "enum"
+			}
+		}
+	}
+	return frames, nil
 }
 
 // rowsToFields turns every row into a field, named by the row's value in the
@@ -1505,7 +1608,7 @@ func Readings(panel map[string]any, frames []*Frame) ([]Reading, error) {
 }
 
 func nanAsNil(v any) any {
-	if n, isNumber := v.(float64); isNumber && math.IsNaN(n) {
+	if n, isNumber := v.(float64); (isNumber && math.IsNaN(n)) || v == undefined {
 		return nil
 	}
 	return v

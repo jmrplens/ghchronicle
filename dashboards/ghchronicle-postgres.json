@@ -925,7 +925,7 @@
       "panels": [
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "Split by repository. GitHub serves a rolling 14-day window and it is rewritten on every sweep, so a gap means the collector was down for longer than that window. The eight repositories with the most in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "Split by repository. GitHub serves a rolling 14-day window and it is rewritten on every sweep, so a gap means the collector was down for longer than that window. The eight repositories with the most in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -986,7 +986,7 @@
         },
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "Split by repository. The eight repositories with the most in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "Split by repository. The eight repositories with the most in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -1047,7 +1047,7 @@
         },
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "Its own panel because continuous integration clones a repository thousands of times for every human visit, and on a shared axis the visits become a flat line at zero. The eight repositories with the most in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "Its own panel because continuous integration clones a repository thousands of times for every human visit, and on a shared axis the visits become a flat line at zero. The eight repositories with the most in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -1566,7 +1566,7 @@
       "panels": [
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "Stars per day from GitHub's daily star history, which it serves for every repository whatever the token may see of its stargazers. Each day is GitHub's Pacific calendar day, so a star given in a European morning can sit a day before the UTC date it was given. An unstar of a star given in the last thirty weeks is taken off the day it was given. Against GitHub Enterprise Server, which does not serve the history, the bars are empty. The eight repositories that gained the most in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "Stars per day from GitHub's daily star history, which it serves for every repository whatever the token may see of its stargazers. Each day is GitHub's Pacific calendar day, so a star given in a European morning can sit a day before the UTC date it was given. An unstar of a star given in the last thirty weeks is taken off the day it was given. Against GitHub Enterprise Server, which does not serve the history, the bars are empty. The eight repositories that gained the most in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -1627,7 +1627,7 @@
         },
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "The star count as it climbed, holding its last value to the end of the range. In InfluxDB and PostgreSQL it is rebuilt from GitHub's daily star history for every repository, back to the first star, so widening the range shows more of it. There it usually sits at or a little below the star count GitHub shows, since that count also includes accounts GitHub no longer lists, but a star given more than thirty weeks ago and later taken back can stay in it, so it can also sit above. Against GitHub Enterprise Server, which does not serve the history, the curve is empty in those two stores. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "The star count as it climbed, holding its last value to the end of the range. In InfluxDB and PostgreSQL it is rebuilt from GitHub's daily star history for every repository, back to the first star, so widening the range shows more of it. There it usually sits at or a little below the star count GitHub shows, since that count also includes accounts GitHub no longer lists, but a star given more than thirty weeks ago and later taken back can stay in it, so it can also sit above. Against GitHub Enterprise Server, which does not serve the history, the curve is empty in those two stores. One point is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -1842,7 +1842,7 @@
         },
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "The fork count as it climbed, a running count of the forks each dated when it was made, so it reaches back to the first fork rather than to the day the collector started, and holds its last value to the end of the range. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "The fork count as it climbed, a running count of the forks each dated when it was made, so it reaches back to the first fork rather than to the day the collector started, and holds its last value to the end of the range. One point is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -2627,7 +2627,7 @@
         },
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "Where the green came from, for the part of it that is commits. The eight repositories with the most commits in the range are named; the rest are `other`. \"Contributions over time\" at the top of this section counts issues, pull requests and reviews as well, so this stack sits under that curve rather than repeating it: a whole year of these days sums to `gh_contributions_total.commits`, the Commits of the totals above. The repositories include the private and third-party ones, which \"Commits by repository\" lists too, undated and unflagged. GraphQL caps the daily breakdown at a hundred repositories per window and, inside each, a hundred distinct commit days returned newest first, so a busier repository loses its oldest days silently: `gh_contribution_repo.commits` minus `commits_dated` is exactly how many commits never got a date. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "Where the green came from, for the part of it that is commits. The eight repositories with the most commits in the range are named; the rest are `other`. \"Contributions over time\" at the top of this section counts issues, pull requests and reviews as well, so this stack sits under that curve rather than repeating it: a whole year of these days sums to `gh_contributions_total.commits`, the Commits of the totals above. The repositories include the private and third-party ones, which \"Commits by repository\" lists too, undated and unflagged. GraphQL caps the daily breakdown at a hundred repositories per window and, inside each, a hundred distinct commit days returned newest first, so a busier repository loses its oldest days silently: `gh_contribution_repo.commits` minus `commits_dated` is exactly how many commits never got a date. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -2988,7 +2988,7 @@
         },
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "Merged and closed are dated at the moment it happened and stacked. Open that day is the line: how many were open on that day, which is a state and not an event, so it is not part of the stack. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "Merged and closed are dated at the moment it happened and stacked. Open that day is the line: how many were open on that day, which is a state and not an event, so it is not part of the stack. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -3110,7 +3110,7 @@
         },
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year. In InfluxDB the 90th percentile is an estimate (approx_percentile_cont, a t-digest), since InfluxDB 3 Core has no exact percentile before 3.9.0, so it can read differently from the exact one PostgreSQL draws; the median is exact in both.",
+          "description": "One point is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there. In InfluxDB the 90th percentile is an estimate (approx_percentile_cont, a t-digest), since InfluxDB 3 Core has no exact percentile before 3.9.0, so it can read differently from the exact one PostgreSQL draws; the median is exact in both.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -3172,7 +3172,7 @@
         },
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "Closed is dated at the moment it happened. Open that day is the line: how many were open on that day, a state rather than an event, so it is not stacked. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "Closed is dated at the moment it happened. Open that day is the line: how many were open on that day, a state rather than an event, so it is not stacked. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -3294,7 +3294,7 @@
         },
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "Lines added plus removed per merged pull request. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "Lines added plus removed per merged pull request. One point is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -3873,7 +3873,7 @@
         },
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -4256,7 +4256,7 @@
         },
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "Dated at the thread's first comment, which is when the objection was raised. Split by whether the reviewer is a bot: on this account the reviewers are review bots, and a backlog of bot threads reads differently from a backlog of human ones. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "Dated at the thread's first comment, which is when the objection was raised. Split by whether the reviewer is a bot: on this account the reviewers are review bots, and a backlog of bot threads reads differently from a backlog of human ones. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -4797,7 +4797,7 @@
         },
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -4949,7 +4949,7 @@
         },
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year. In InfluxDB the 95th percentile is an estimate (approx_percentile_cont, a t-digest), since InfluxDB 3 Core has no exact percentile before 3.9.0, so it can read differently from the exact one PostgreSQL draws; the median is exact in both.",
+          "description": "One point is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there. In InfluxDB the 95th percentile is an estimate (approx_percentile_cont, a t-digest), since InfluxDB 3 Core has no exact percentile before 3.9.0, so it can read differently from the exact one PostgreSQL draws; the median is exact in both.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -5011,7 +5011,7 @@
         },
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "Over the runs whose jobs were expanded, which is the newest runs of each sweep and, after a backfill, every run GitHub still holds, which from 1 October 2026 means the repository's retention period, ninety days by default; not every run the run count includes. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "Over the runs whose jobs were expanded, which is the newest runs of each sweep and, after a backfill, every run GitHub still holds, which from 1 October 2026 means the repository's retention period, ninety days by default; not every run the run count includes. One point is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under an hour, which is six hours over a month and a day over a year.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -5073,7 +5073,7 @@
         },
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "Artifacts that have not expired, over the ones the walk reached, which is a floor on any repository with more than five hundred, and on one whose walk a failed page of the listing cut short: \"Artifact storage counted\" further down has the counts that say which those are. GitHub deletes artifacts on their own schedule, which is why this falls without anyone doing anything. A reading taken at each sweep, so the curve starts the day the collector did: there is no history of it to rebuild. The eight repositories holding the most are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "Artifacts that have not expired, over the ones the walk reached, which is a floor on any repository with more than five hundred, and on one whose walk a failed page of the listing cut short: \"Artifact storage counted\" further down has the counts that say which those are. GitHub deletes artifacts on their own schedule, which is why this falls without anyone doing anything. A reading taken at each sweep, so the curve starts the day the collector did: there is no history of it to rebuild. The eight repositories holding the most are named; the rest are `other`. One point is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under an hour, which is six hours over a month and a day over a year.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -5996,7 +5996,7 @@
         },
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "What the workflows produced, at the resolution of one artifact. Seven hundred and ninety three artifacts and thirteen gigabytes in a single day here, which is where the storage bill comes from. The eight repositories producing the most in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "What the workflows produced, at the resolution of one artifact. Seven hundred and ninety three artifacts and thirteen gigabytes in a single day here, which is where the storage bill comes from. The eight repositories producing the most in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -6346,7 +6346,7 @@
         },
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "Additions above the axis, deletions below, per day. This is the answer to GitHub's own code frequency endpoint, which returns 202 with an empty body forever on a personal account. This panel keeps its own range of ninety days whatever the page is set to. Every commit is a row of its own in the store, and at about ten months of them the query is refused for opening too many files, which the reader would see as an empty panel rather than as an error. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "Additions above the axis, deletions below, per day. This is the answer to GitHub's own code frequency endpoint, which returns 202 with an empty body forever on a personal account. This panel keeps its own range of ninety days whatever the page is set to. Every commit is a row of its own in the store, and at about ten months of them the query is refused for opening too many files, which the reader would see as an empty panel rather than as an error. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -6438,7 +6438,7 @@
         },
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "Pushes, branch creations and deletions, merges and force pushes, per hour. The only place a force push is recorded at all, and as perishable as traffic: a hundred entries covered twenty six hours here. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "Pushes, branch creations and deletions, merges and force pushes, per hour. The only place a force push is recorded at all, and as perishable as traffic: a hundred entries covered twenty six hours here. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under an hour, which is six hours over a month and a day over a year.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -6753,7 +6753,7 @@
         },
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "Whether the commit itself came out green. A workflow run that failed says a job failed, which is not the same claim: of fifty commits measured here, twenty seven left the default branch red. This panel keeps its own range of ninety days whatever the page is set to. Every commit is a row of its own in the store, and at about ten months of them the query is refused for opening too many files, which the reader would see as an empty panel rather than as an error. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "Whether the commit itself came out green. A workflow run that failed says a job failed, which is not the same claim: of fifty commits measured here, twenty seven left the default branch red. This panel keeps its own range of ninety days whatever the page is set to. Every commit is a row of its own in the store, and at about ten months of them the query is refused for opening too many files, which the reader would see as an empty panel rather than as an error. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -7508,7 +7508,7 @@
         },
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "Dated when each fork was created, which the fork count on a repository never says. The eight repositories that gained the most in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "Dated when each fork was created, which the fork count on a repository never says. The eight repositories that gained the most in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -7961,7 +7961,7 @@
                       },
                       {
                         "options": {
-                          "match": "null",
+                          "match": "null+nan",
                           "result": {
                             "color": "text",
                             "index": 4,
@@ -8055,7 +8055,7 @@
         },
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "Labeled, closed, reopened, review requested, renamed: the moment something changed, which the state of an issue does not record. A reopening exists in no other measurement at all. The eight commonest in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "Labeled, closed, reopened, review requested, renamed: the moment something changed, which the state of an issue does not record. A reopening exists in no other measurement at all. The eight commonest in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -8566,7 +8566,7 @@
         },
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under an hour, which is six hours over a month and a day over a year.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -9836,7 +9836,7 @@
         },
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "By environment. Dated at each deployment's own creation, not at the sweep that read it and not at its latest status: the status goes on moving for years afterwards, and the deployment happened once. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "By environment. Dated at each deployment's own creation, not at the sweep that read it and not at its latest status: the status goes on moving for years afterwards, and the deployment happened once. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -10993,7 +10993,7 @@
         },
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "The open count per severity, added up across repositories and ecosystems from the newest reading of each. A reading taken at each sweep, so the curve starts the day the collector did. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "The open count per severity, added up across repositories and ecosystems from the newest reading of each. A reading taken at each sweep, so the curve starts the day the collector did. One point is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -11255,7 +11255,7 @@
         },
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "That the scan ran at all, which the alert list cannot tell you. GitHub prunes these, so they only exist if they were captured. The eight tools that ran the most in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "That the scan ran at all, which the alert list cannot tell you. GitHub prunes these, so they only exist if they were captured. The eight tools that ran the most in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -12549,7 +12549,7 @@
         },
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "Gross cost per day. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "Gross cost per day. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -12609,7 +12609,7 @@
         },
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "Runner minutes per day, by SKU. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "Runner minutes per day, by SKU. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -13081,7 +13081,7 @@
       "panels": [
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "GitHub keeps only the last 300 events, none older than thirty days, so this is only as complete as the sweep interval allowed. The eight busiest types in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "GitHub keeps only the last 300 events, none older than thirty days, so this is only as complete as the sweep interval allowed. The eight busiest types in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under an hour, which is six hours over a month and a day over a year.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -13371,7 +13371,7 @@
         },
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -16109,7 +16109,7 @@
         },
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "What entered and left the dependency graph, and how much of it carried a known advisory. Each row covers a real commit range, from the head of the previous sweep to this one, so the rows do not overlap and adding them up over the range is the whole story rather than a double count. A sweep with nothing to report writes a row of zeros, so the table exists from the first sweep; that series is left out here. One bump measured 370 changes, one of which removed a package with a known advisory, and six rows is all that is kept of it. Vulnerable is a share of those same changes and not a kind of its own, so it crosses the stack as a line rather than adding its own height to it. Off by default: the SBOM is a megabyte or two per repository. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "What entered and left the dependency graph, and how much of it carried a known advisory. Each row covers a real commit range, from the head of the previous sweep to this one, so the rows do not overlap and adding them up over the range is the whole story rather than a double count. A sweep with nothing to report writes a row of zeros, so the table exists from the first sweep; that series is left out here. One bump measured 370 changes, one of which removed a package with a known advisory, and six rows is all that is kept of it. Vulnerable is a share of those same changes and not a kind of its own, so it crosses the stack as a line rather than adding its own height to it. Off by default: the SBOM is a megabyte or two per repository. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -17565,7 +17565,7 @@
       "panels": [
         {
           "datasource": "${DS_POSTGRES}",
-          "description": "The share of each bucket spent, which puts a bucket of five thousand and one of fifteen thousand on the same axis. The buckets worth watching, which are the ones with more than thirty requests in them: search has thirty a minute and would flatten the axis. A bucket this account never touched is left out of the chart entirely, since its flat zero was still a legend entry; \"Every bucket\" beside this lists every one of them, and a Most used of 0 is where that absence belongs. A reading taken at each sweep, so the curve starts the day the collector did. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "The share of each bucket spent, which puts a bucket of five thousand and one of fifteen thousand on the same axis. The buckets worth watching, which are the ones with more than thirty requests in them: search has thirty a minute and would flatten the axis. A bucket this account never touched is left out of the chart entirely, since its flat zero was still a legend entry; \"Every bucket\" beside this lists every one of them, and a Most used of 0 is where that absence belongs. A reading taken at each sweep, so the curve starts the day the collector did. One point is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under five minutes, which is fifteen minutes over a day and six hours over a month.",
           "fieldConfig": {
             "defaults": {
               "color": {

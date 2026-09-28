@@ -1494,7 +1494,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "The run listing's own total_count, which is every run the repository has ever had. The run walk sees the newest few hundred by design, so this is the only place the whole history is counted, and it is the answer InfluxDB 3 Core will not let a reader compute from the rows. A snapshot rewritten every sweep, so this is the newest value per repository rather than the sweeps added up. The ten repositories with the most runs are named; the rest are one bar called other.",
+          "description": "The run listing's own total_count, which is every run the repository has ever had. The run walk sees the newest few hundred by design, so this is the only place the whole history is counted, and it is the answer InfluxDB 3 Core will not let a reader compute from the rows. A snapshot rewritten every sweep, so this is the newest value per repository rather than the sweeps added up. The ten repositories with the most runs are named; the rest are one bar called other. In Elasticsearch each of the first five hundred repositories is a bar of its own and there is no other: a terms aggregation answers the repositories it keeps and nothing about the rest, so there is no remainder to fold.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -1622,7 +1622,7 @@
       "panels": [
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "Split by repository. GitHub serves a rolling 14-day window and it is rewritten on every sweep, so a gap means the collector was down for longer than that window. The eight repositories with the most in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "Split by repository. GitHub serves a rolling 14-day window and it is rewritten on every sweep, so a gap means the collector was down for longer than that window. The eight repositories with the most in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there. In Elasticsearch each of the first fifty repositories is a series of its own and there is no other: a terms aggregation answers the repositories it keeps and nothing about the rest, so there is no remainder to fold.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -1700,7 +1700,7 @@
                   "field": "@timestamp",
                   "id": "39",
                   "settings": {
-                    "interval": "1d",
+                    "interval": "auto",
                     "min_doc_count": "0",
                     "trimEdges": "0"
                   },
@@ -1725,7 +1725,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "Split by repository. The eight repositories with the most in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "Split by repository. The eight repositories with the most in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there. In Elasticsearch each of the first fifty repositories is a series of its own and there is no other: a terms aggregation answers the repositories it keeps and nothing about the rest, so there is no remainder to fold.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -1803,7 +1803,7 @@
                   "field": "@timestamp",
                   "id": "43",
                   "settings": {
-                    "interval": "1d",
+                    "interval": "auto",
                     "min_doc_count": "0",
                     "trimEdges": "0"
                   },
@@ -1828,7 +1828,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "Its own panel because continuous integration clones a repository thousands of times for every human visit, and on a shared axis the visits become a flat line at zero. The eight repositories with the most in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "Its own panel because continuous integration clones a repository thousands of times for every human visit, and on a shared axis the visits become a flat line at zero. The eight repositories with the most in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there. In Elasticsearch each of the first fifty repositories is a series of its own and there is no other: a terms aggregation answers the repositories it keeps and nothing about the rest, so there is no remainder to fold.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -1906,7 +1906,7 @@
                   "field": "@timestamp",
                   "id": "47",
                   "settings": {
-                    "interval": "1d",
+                    "interval": "auto",
                     "min_doc_count": "0",
                     "trimEdges": "0"
                   },
@@ -2682,7 +2682,7 @@
       "panels": [
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "Stars per day from GitHub's daily star history, which it serves for every repository whatever the token may see of its stargazers. Each day is GitHub's Pacific calendar day, so a star given in a European morning can sit a day before the UTC date it was given. An unstar of a star given in the last thirty weeks is taken off the day it was given. Against GitHub Enterprise Server, which does not serve the history, the bars are empty. The eight repositories that gained the most in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "Stars per day from GitHub's daily star history, which it serves for every repository whatever the token may see of its stargazers. Each day is GitHub's Pacific calendar day, so a star given in a European morning can sit a day before the UTC date it was given. An unstar of a star given in the last thirty weeks is taken off the day it was given. Against GitHub Enterprise Server, which does not serve the history, the bars are empty. The eight repositories that gained the most in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there. In Elasticsearch each of the first fifty repositories is a series of its own and there is no other: a terms aggregation answers the repositories it keeps and nothing about the rest, so there is no remainder to fold.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -2760,7 +2760,7 @@
                   "field": "@timestamp",
                   "id": "67",
                   "settings": {
-                    "interval": "1d",
+                    "interval": "auto",
                     "min_doc_count": "0",
                     "trimEdges": "0"
                   },
@@ -2785,7 +2785,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "The star count as it climbed, holding its last value to the end of the range. In InfluxDB and PostgreSQL it is rebuilt from GitHub's daily star history for every repository, back to the first star, so widening the range shows more of it. There it usually sits at or a little below the star count GitHub shows, since that count also includes accounts GitHub no longer lists, but a star given more than thirty weeks ago and later taken back can stay in it, so it can also sit above. Against GitHub Enterprise Server, which does not serve the history, the curve is empty in those two stores. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year. In Elasticsearch the curve is the repositories' star count as each sweep read it, so it sits at GitHub's count and starts the day the collector did: one series per repository, its largest reading of the day, stacked so the top of the stack is the total.",
+          "description": "The star count as it climbed, holding its last value to the end of the range. In InfluxDB and PostgreSQL it is rebuilt from GitHub's daily star history for every repository, back to the first star, so widening the range shows more of it. There it usually sits at or a little below the star count GitHub shows, since that count also includes accounts GitHub no longer lists, but a star given more than thirty weeks ago and later taken back can stay in it, so it can also sit above. Against GitHub Enterprise Server, which does not serve the history, the curve is empty in those two stores. One point is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there. In Elasticsearch the curve is the repositories' star count as each sweep read it, so it sits at GitHub's count and starts the day the collector did: one series per repository, its largest reading of each bucket, stacked so the top of the stack is the total.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -2863,7 +2863,7 @@
                   "field": "@timestamp",
                   "id": "71",
                   "settings": {
-                    "interval": "1d",
+                    "interval": "auto",
                     "min_doc_count": "0",
                     "trimEdges": "0"
                   },
@@ -2888,7 +2888,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "The twelve most starred; the rest are one bar called other.",
+          "description": "The twelve most starred; the rest are one bar called other. In Elasticsearch each of the first five hundred repositories is a bar of its own and there is no other: a terms aggregation answers the repositories it keeps and nothing about the rest, so there is no remainder to fold.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -3147,7 +3147,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "The fork count as it climbed, a running count of the forks each dated when it was made, so it reaches back to the first fork rather than to the day the collector started, and holds its last value to the end of the range. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year. In Elasticsearch the curve is the daily fork count as collected, so it starts the day the collector did: one series per repository, its largest reading of the day, stacked so the top of the stack is the total.",
+          "description": "The fork count as it climbed, a running count of the forks each dated when it was made, so it reaches back to the first fork rather than to the day the collector started, and holds its last value to the end of the range. One point is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there. In Elasticsearch the curve is the daily fork count as collected, so it starts the day the collector did: one series per repository, its largest reading of each bucket, stacked so the top of the stack is the total.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -3225,7 +3225,7 @@
                   "field": "@timestamp",
                   "id": "79",
                   "settings": {
-                    "interval": "1d",
+                    "interval": "auto",
                     "min_doc_count": "0",
                     "trimEdges": "0"
                   },
@@ -3598,6 +3598,7 @@
                   "settings": {
                     "interval": "7d",
                     "min_doc_count": "0",
+                    "offset": "+3d",
                     "trimEdges": "0"
                   },
                   "type": "date_histogram"
@@ -3624,6 +3625,7 @@
                   "settings": {
                     "interval": "7d",
                     "min_doc_count": "0",
+                    "offset": "+3d",
                     "trimEdges": "0"
                   },
                   "type": "date_histogram"
@@ -4415,7 +4417,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "Where the green came from, for the part of it that is commits. The eight repositories with the most commits in the range are named; the rest are `other`. \"Contributions over time\" at the top of this section counts issues, pull requests and reviews as well, so this stack sits under that curve rather than repeating it: a whole year of these days sums to `gh_contributions_total.commits`, the Commits of the totals above. The repositories include the private and third-party ones, which \"Commits by repository\" lists too, undated and unflagged. GraphQL caps the daily breakdown at a hundred repositories per window and, inside each, a hundred distinct commit days returned newest first, so a busier repository loses its oldest days silently: `gh_contribution_repo.commits` minus `commits_dated` is exactly how many commits never got a date. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "Where the green came from, for the part of it that is commits. The eight repositories with the most commits in the range are named; the rest are `other`. \"Contributions over time\" at the top of this section counts issues, pull requests and reviews as well, so this stack sits under that curve rather than repeating it: a whole year of these days sums to `gh_contributions_total.commits`, the Commits of the totals above. The repositories include the private and third-party ones, which \"Commits by repository\" lists too, undated and unflagged. GraphQL caps the daily breakdown at a hundred repositories per window and, inside each, a hundred distinct commit days returned newest first, so a busier repository loses its oldest days silently: `gh_contribution_repo.commits` minus `commits_dated` is exactly how many commits never got a date. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there. In Elasticsearch each of the first fifty repositories is a series of its own and there is no other: a terms aggregation answers the repositories it keeps and nothing about the rest, so there is no remainder to fold.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -4482,7 +4484,7 @@
                   "field": "@timestamp",
                   "id": "104",
                   "settings": {
-                    "interval": "1d",
+                    "interval": "auto",
                     "min_doc_count": "0",
                     "trimEdges": "0"
                   },
@@ -5032,7 +5034,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "Merged and closed are dated at the moment it happened and stacked. Open that day is the line: how many were open on that day, which is a state and not an event, so it is not part of the stack. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "Merged and closed are dated at the moment it happened and stacked. Open that day is the line: how many were open on that day, which is a state and not an event, so it is not part of the stack. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -5196,7 +5198,7 @@
                   "field": "@timestamp",
                   "id": "121",
                   "settings": {
-                    "interval": "1d",
+                    "interval": "auto",
                     "min_doc_count": "0",
                     "trimEdges": "0"
                   },
@@ -5220,7 +5222,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year. In InfluxDB the 90th percentile is an estimate (approx_percentile_cont, a t-digest), since InfluxDB 3 Core has no exact percentile before 3.9.0, so it can read differently from the exact one PostgreSQL draws; the median is exact in both.",
+          "description": "One point is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there. In InfluxDB the 90th percentile is an estimate (approx_percentile_cont, a t-digest), since InfluxDB 3 Core has no exact percentile before 3.9.0, so it can read differently from the exact one PostgreSQL draws; the median is exact in both.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -5275,7 +5277,7 @@
                   "field": "@timestamp",
                   "id": "123",
                   "settings": {
-                    "interval": "1d",
+                    "interval": "auto",
                     "min_doc_count": "0",
                     "trimEdges": "0"
                   },
@@ -5306,7 +5308,7 @@
                   "field": "@timestamp",
                   "id": "125",
                   "settings": {
-                    "interval": "1d",
+                    "interval": "auto",
                     "min_doc_count": "0",
                     "trimEdges": "0"
                   },
@@ -5336,7 +5338,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "Closed is dated at the moment it happened. Open that day is the line: how many were open on that day, a state rather than an event, so it is not stacked. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "Closed is dated at the moment it happened. Open that day is the line: how many were open on that day, a state rather than an event, so it is not stacked. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -5500,7 +5502,7 @@
                   "field": "@timestamp",
                   "id": "128",
                   "settings": {
-                    "interval": "1d",
+                    "interval": "auto",
                     "min_doc_count": "0",
                     "trimEdges": "0"
                   },
@@ -5524,7 +5526,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "Lines added plus removed per merged pull request. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "Lines added plus removed per merged pull request. One point is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -5580,7 +5582,7 @@
                   "field": "@timestamp",
                   "id": "130",
                   "settings": {
-                    "interval": "1d",
+                    "interval": "auto",
                     "min_doc_count": "0",
                     "trimEdges": "0"
                   },
@@ -6376,7 +6378,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -6443,7 +6445,7 @@
                   "field": "@timestamp",
                   "id": "144",
                   "settings": {
-                    "interval": "1d",
+                    "interval": "auto",
                     "min_doc_count": "0",
                     "trimEdges": "0"
                   },
@@ -7092,7 +7094,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "Dated at the thread's first comment, which is when the objection was raised. Split by whether the reviewer is a bot: on this account the reviewers are review bots, and a backlog of bot threads reads differently from a backlog of human ones. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "Dated at the thread's first comment, which is when the objection was raised. Split by whether the reviewer is a bot: on this account the reviewers are review bots, and a backlog of bot threads reads differently from a backlog of human ones. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -7184,7 +7186,7 @@
                   "field": "@timestamp",
                   "id": "165",
                   "settings": {
-                    "interval": "1d",
+                    "interval": "auto",
                     "min_doc_count": "0",
                     "trimEdges": "0"
                   },
@@ -8045,7 +8047,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -8203,7 +8205,7 @@
                   "field": "@timestamp",
                   "id": "188",
                   "settings": {
-                    "interval": "1d",
+                    "interval": "auto",
                     "min_doc_count": "0",
                     "trimEdges": "0"
                   },
@@ -8227,7 +8229,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year. In InfluxDB the 95th percentile is an estimate (approx_percentile_cont, a t-digest), since InfluxDB 3 Core has no exact percentile before 3.9.0, so it can read differently from the exact one PostgreSQL draws; the median is exact in both.",
+          "description": "One point is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there. In InfluxDB the 95th percentile is an estimate (approx_percentile_cont, a t-digest), since InfluxDB 3 Core has no exact percentile before 3.9.0, so it can read differently from the exact one PostgreSQL draws; the median is exact in both.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -8282,7 +8284,7 @@
                   "field": "@timestamp",
                   "id": "190",
                   "settings": {
-                    "interval": "1d",
+                    "interval": "auto",
                     "min_doc_count": "0",
                     "trimEdges": "0"
                   },
@@ -8313,7 +8315,7 @@
                   "field": "@timestamp",
                   "id": "192",
                   "settings": {
-                    "interval": "1d",
+                    "interval": "auto",
                     "min_doc_count": "0",
                     "trimEdges": "0"
                   },
@@ -8343,7 +8345,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "Over the runs whose jobs were expanded, which is the newest runs of each sweep and, after a backfill, every run GitHub still holds, which from 1 October 2026 means the repository's retention period, ninety days by default; not every run the run count includes. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "Over the runs whose jobs were expanded, which is the newest runs of each sweep and, after a backfill, every run GitHub still holds, which from 1 October 2026 means the repository's retention period, ninety days by default; not every run the run count includes. One point is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under an hour, which is six hours over a month and a day over a year.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -8398,7 +8400,7 @@
                   "field": "@timestamp",
                   "id": "194",
                   "settings": {
-                    "interval": "1h",
+                    "interval": "auto",
                     "min_doc_count": "0",
                     "trimEdges": "0"
                   },
@@ -8429,7 +8431,7 @@
                   "field": "@timestamp",
                   "id": "196",
                   "settings": {
-                    "interval": "1h",
+                    "interval": "auto",
                     "min_doc_count": "0",
                     "trimEdges": "0"
                   },
@@ -8454,7 +8456,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "Artifacts that have not expired, over the ones the walk reached, which is a floor on any repository with more than five hundred, and on one whose walk a failed page of the listing cut short: \"Artifact storage counted\" further down has the counts that say which those are. GitHub deletes artifacts on their own schedule, which is why this falls without anyone doing anything. A reading taken at each sweep, so the curve starts the day the collector did: there is no history of it to rebuild. The eight repositories holding the most are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "Artifacts that have not expired, over the ones the walk reached, which is a floor on any repository with more than five hundred, and on one whose walk a failed page of the listing cut short: \"Artifact storage counted\" further down has the counts that say which those are. GitHub deletes artifacts on their own schedule, which is why this falls without anyone doing anything. A reading taken at each sweep, so the curve starts the day the collector did: there is no history of it to rebuild. The eight repositories holding the most are named; the rest are `other`. One point is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under an hour, which is six hours over a month and a day over a year. In Elasticsearch each of the first fifty repositories is a series of its own and there is no other: a terms aggregation answers the repositories it keeps and nothing about the rest, so there is no remainder to fold.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -8531,7 +8533,7 @@
                   "field": "@timestamp",
                   "id": "200",
                   "settings": {
-                    "interval": "1h",
+                    "interval": "auto",
                     "min_doc_count": "0",
                     "trimEdges": "0"
                   },
@@ -9427,11 +9429,37 @@
             {
               "id": "calculateField",
               "options": {
+                "alias": "Failed mean",
+                "mode": "reduceRow",
+                "reduce": {
+                  "include": [
+                    "Average"
+                  ],
+                  "reducer": "sum"
+                }
+              }
+            },
+            {
+              "id": "calculateField",
+              "options": {
+                "alias": "Failed runs",
+                "mode": "reduceRow",
+                "reduce": {
+                  "include": [
+                    "Count"
+                  ],
+                  "reducer": "sum"
+                }
+              }
+            },
+            {
+              "id": "calculateField",
+              "options": {
                 "alias": "Wasted",
                 "binary": {
-                  "left": "Average",
+                  "left": "Failed mean",
                   "operator": "*",
-                  "right": "Count"
+                  "right": "Failed runs"
                 },
                 "mode": "binary"
               }
@@ -9442,6 +9470,8 @@
                 "excludeByName": {
                   "Average": true,
                   "Count": true,
+                  "Failed mean": true,
+                  "Failed runs": true,
                   "Time": true,
                   "__name__": true,
                   "full_name": true,
@@ -9975,7 +10005,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "What the workflows produced, at the resolution of one artifact. Seven hundred and ninety three artifacts and thirteen gigabytes in a single day here, which is where the storage bill comes from. The eight repositories producing the most in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "What the workflows produced, at the resolution of one artifact. Seven hundred and ninety three artifacts and thirteen gigabytes in a single day here, which is where the storage bill comes from. The eight repositories producing the most in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there. In Elasticsearch each of the first fifty repositories is a series of its own and there is no other: a terms aggregation answers the repositories it keeps and nothing about the rest, so there is no remainder to fold.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -10052,7 +10082,7 @@
                   "field": "@timestamp",
                   "id": "239",
                   "settings": {
-                    "interval": "1d",
+                    "interval": "auto",
                     "min_doc_count": "0",
                     "trimEdges": "0"
                   },
@@ -10669,7 +10699,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "Additions above the axis, deletions below, per day. This is the answer to GitHub's own code frequency endpoint, which returns 202 with an empty body forever on a personal account. This panel keeps its own range of ninety days whatever the page is set to. Every commit is a row of its own in the store, and at about ten months of them the query is refused for opening too many files, which the reader would see as an empty panel rather than as an error. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "Additions above the axis, deletions below, per day. This is the answer to GitHub's own code frequency endpoint, which returns 202 with an empty body forever on a personal account. This panel keeps its own range of ninety days whatever the page is set to. Every commit is a row of its own in the store, and at about ten months of them the query is refused for opening too many files, which the reader would see as an empty panel rather than as an error. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -10767,7 +10797,7 @@
                   "field": "@timestamp",
                   "id": "256",
                   "settings": {
-                    "interval": "1d",
+                    "interval": "auto",
                     "min_doc_count": "0",
                     "trimEdges": "0"
                   },
@@ -10793,7 +10823,7 @@
                   "field": "@timestamp",
                   "id": "258",
                   "settings": {
-                    "interval": "1d",
+                    "interval": "auto",
                     "min_doc_count": "0",
                     "trimEdges": "0"
                   },
@@ -10819,7 +10849,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "Pushes, branch creations and deletions, merges and force pushes, per hour. The only place a force push is recorded at all, and as perishable as traffic: a hundred entries covered twenty six hours here. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "Pushes, branch creations and deletions, merges and force pushes, per hour. The only place a force push is recorded at all, and as perishable as traffic: a hundred entries covered twenty six hours here. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under an hour, which is six hours over a month and a day over a year.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -10886,7 +10916,7 @@
                   "field": "@timestamp",
                   "id": "261",
                   "settings": {
-                    "interval": "1h",
+                    "interval": "auto",
                     "min_doc_count": "0",
                     "trimEdges": "0"
                   },
@@ -11311,7 +11341,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "Whether the commit itself came out green. A workflow run that failed says a job failed, which is not the same claim: of fifty commits measured here, twenty seven left the default branch red. This panel keeps its own range of ninety days whatever the page is set to. Every commit is a row of its own in the store, and at about ten months of them the query is refused for opening too many files, which the reader would see as an empty panel rather than as an error. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "Whether the commit itself came out green. A workflow run that failed says a job failed, which is not the same claim: of fifty commits measured here, twenty seven left the default branch red. This panel keeps its own range of ninety days whatever the page is set to. Every commit is a row of its own in the store, and at about ten months of them the query is refused for opening too many files, which the reader would see as an empty panel rather than as an error. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -11469,7 +11499,7 @@
                   "field": "@timestamp",
                   "id": "272",
                   "settings": {
-                    "interval": "1d",
+                    "interval": "auto",
                     "min_doc_count": "0",
                     "trimEdges": "0"
                   },
@@ -12209,7 +12239,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "Dated when each fork was created, which the fork count on a repository never says. The eight repositories that gained the most in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "Dated when each fork was created, which the fork count on a repository never says. The eight repositories that gained the most in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there. In Elasticsearch each of the first fifty repositories is a series of its own and there is no other: a terms aggregation answers the repositories it keeps and nothing about the rest, so there is no remainder to fold.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -12287,7 +12317,7 @@
                   "field": "@timestamp",
                   "id": "291",
                   "settings": {
-                    "interval": "1d",
+                    "interval": "auto",
                     "min_doc_count": "0",
                     "trimEdges": "0"
                   },
@@ -12311,7 +12341,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "Whether a fork was ever pushed to separates a derivative from a bookmark, which most forks are. Idle is the time since that push, counted from the row's own date, so it is right when the panel is drawn rather than when the last sweep ran. Elasticsearch lists the documents themselves and cannot subtract the row's own date from now, so the column is how long after the fork its last push came. A negative is a fork nobody has pushed to, which inherits the parent's own last push and is most of them; Pushed to says the same thing as a word.",
+          "description": "Whether a fork was ever pushed to separates a derivative from a bookmark, which most forks are. Idle is the time since that push, counted from the row's own date, so it is right when the panel is drawn rather than when the last sweep ran. Elasticsearch lists the documents themselves and cannot subtract the row's own date from now, so in place of Idle the column is how long after the fork its last push came. A negative is a fork nobody has pushed to, which inherits the parent's own last push and is most of them; Pushed to says the same thing as a word.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -12741,7 +12771,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "The newest fifty, whatever the range: an account has a handful, and a range of a month hid all but one of them. Answered reads n/a where the category takes no answer at all, an announcement or an idea. In Elasticsearch this lists the newest 500 documents and the panel sorts them. Elasticsearch answers only inside the dashboard range, so years outside it are missing. Its rows are the documents as stored, so Answered is each discussion's own flag, which a row cannot read against its category's: a discussion in a category that takes no answer reads yes or no here rather than n/a.",
+          "description": "The newest fifty, whatever the range: an account has a handful, and a range of a month hid all but one of them. Answered reads n/a where the category takes no answer at all, an announcement or an idea. In Elasticsearch this lists the newest 500 documents and the panel sorts them. Elasticsearch answers only inside the dashboard range, so years outside it are missing.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -12843,7 +12873,7 @@
                       },
                       {
                         "options": {
-                          "match": "null",
+                          "match": "null+nan",
                           "result": {
                             "color": "text",
                             "index": 4,
@@ -12950,6 +12980,7 @@
                 "excludeByName": {},
                 "includeByName": {
                   "@timestamp": true,
+                  "answerable": true,
                   "category": true,
                   "comments": true,
                   "has_answer": true,
@@ -12959,22 +12990,65 @@
                 },
                 "indexByName": {
                   "@timestamp": 1,
+                  "answerable": 6,
                   "category": 3,
                   "comments": 4,
                   "has_answer": 5,
                   "repo": 2,
                   "title": 0,
-                  "url": 6
+                  "url": 7
                 },
                 "renameByName": {
                   "@timestamp": "Opened",
+                  "answerable": "Takes answers",
                   "category": "Category",
                   "comments": "Comments",
-                  "has_answer": "Answered",
+                  "has_answer": "Has answer",
                   "repo": "Repository",
                   "title": "Title",
                   "url": "Link"
                 }
+              }
+            },
+            {
+              "id": "convertFieldType",
+              "options": {
+                "conversions": [
+                  {
+                    "destinationType": "enum",
+                    "enumConfig": {
+                      "text": [
+                        "false",
+                        "true"
+                      ]
+                    },
+                    "targetField": "Takes answers"
+                  }
+                ],
+                "fields": {}
+              }
+            },
+            {
+              "id": "calculateField",
+              "options": {
+                "alias": "Answered",
+                "binary": {
+                  "left": "Has answer",
+                  "operator": "/",
+                  "right": "Takes answers"
+                },
+                "mode": "binary"
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Has answer": true,
+                  "Takes answers": true
+                },
+                "indexByName": {},
+                "renameByName": {}
               }
             },
             {
@@ -12998,7 +13072,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "Labeled, closed, reopened, review requested, renamed: the moment something changed, which the state of an issue does not record. A reopening exists in no other measurement at all. The eight commonest in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "Labeled, closed, reopened, review requested, renamed: the moment something changed, which the state of an issue does not record. A reopening exists in no other measurement at all. The eight commonest in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there. In Elasticsearch each of the first fifty transitions is a series of its own and there is no other: a terms aggregation answers the transitions it keeps and nothing about the rest, so there is no remainder to fold.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -13065,7 +13139,7 @@
                   "field": "@timestamp",
                   "id": "301",
                   "settings": {
-                    "interval": "1d",
+                    "interval": "auto",
                     "min_doc_count": "0",
                     "trimEdges": "0"
                   },
@@ -13895,7 +13969,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under an hour, which is six hours over a month and a day over a year.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -13962,7 +14036,7 @@
                   "field": "@timestamp",
                   "id": "315",
                   "settings": {
-                    "interval": "1h",
+                    "interval": "auto",
                     "min_doc_count": "0",
                     "trimEdges": "0"
                   },
@@ -16131,7 +16205,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "By environment. Dated at each deployment's own creation, not at the sweep that read it and not at its latest status: the status goes on moving for years afterwards, and the deployment happened once. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "By environment. Dated at each deployment's own creation, not at the sweep that read it and not at its latest status: the status goes on moving for years afterwards, and the deployment happened once. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -16198,7 +16272,7 @@
                   "field": "@timestamp",
                   "id": "374",
                   "settings": {
-                    "interval": "1d",
+                    "interval": "auto",
                     "min_doc_count": "0",
                     "trimEdges": "0"
                   },
@@ -17943,7 +18017,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "The open count per severity, added up across repositories and ecosystems from the newest reading of each. A reading taken at each sweep, so the curve starts the day the collector did. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year. In Elasticsearch this is the largest single series of each severity in the day rather than the sum across repositories: a date histogram cannot take the newest of each series before adding them.",
+          "description": "The open count per severity, added up across repositories and ecosystems from the newest reading of each. A reading taken at each sweep, so the curve starts the day the collector did. One point is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there. In Elasticsearch this is the largest single series of each severity in the bucket rather than the sum across repositories: a date histogram cannot take the newest of each series before adding them.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -18071,7 +18145,7 @@
                   "field": "@timestamp",
                   "id": "423",
                   "settings": {
-                    "interval": "1d",
+                    "interval": "auto",
                     "min_doc_count": "0",
                     "trimEdges": "0"
                   },
@@ -18351,7 +18425,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "That the scan ran at all, which the alert list cannot tell you. GitHub prunes these, so they only exist if they were captured. The eight tools that ran the most in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "That the scan ran at all, which the alert list cannot tell you. GitHub prunes these, so they only exist if they were captured. The eight tools that ran the most in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there. In Elasticsearch each of the first fifty tools is a series of its own and there is no other: a terms aggregation answers the tools it keeps and nothing about the rest, so there is no remainder to fold.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -18418,7 +18492,7 @@
                   "field": "@timestamp",
                   "id": "433",
                   "settings": {
-                    "interval": "1d",
+                    "interval": "auto",
                     "min_doc_count": "0",
                     "trimEdges": "0"
                   },
@@ -20645,7 +20719,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "Gross cost per day. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "Gross cost per day. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -20711,7 +20785,7 @@
                   "field": "@timestamp",
                   "id": "493",
                   "settings": {
-                    "interval": "1d",
+                    "interval": "auto",
                     "min_doc_count": "0",
                     "trimEdges": "0"
                   },
@@ -20736,7 +20810,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "Runner minutes per day, by SKU. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "Runner minutes per day, by SKU. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -20803,7 +20877,7 @@
                   "field": "@timestamp",
                   "id": "496",
                   "settings": {
-                    "interval": "1d",
+                    "interval": "auto",
                     "min_doc_count": "0",
                     "trimEdges": "0"
                   },
@@ -21523,7 +21597,7 @@
       "panels": [
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "GitHub keeps only the last 300 events, none older than thirty days, so this is only as complete as the sweep interval allowed. The eight busiest types in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "GitHub keeps only the last 300 events, none older than thirty days, so this is only as complete as the sweep interval allowed. The eight busiest types in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under an hour, which is six hours over a month and a day over a year. In Elasticsearch each of the first fifty types is a series of its own and there is no other: a terms aggregation answers the types it keeps and nothing about the rest, so there is no remainder to fold.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -21590,7 +21664,7 @@
                   "field": "@timestamp",
                   "id": "517",
                   "settings": {
-                    "interval": "1h",
+                    "interval": "auto",
                     "min_doc_count": "0",
                     "trimEdges": "0"
                   },
@@ -21615,7 +21689,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "The share of each event type in the range, in the legend. The eight busiest types are named; the rest are one slice called `other`. In Elasticsearch every type in the range is a slice of its own, up to thirty: a terms aggregation answers the types it keeps and nothing about the others, so there is no remainder to fold into other.",
+          "description": "The share of each event type in the range, in the legend. The eight busiest types are named; the rest are one slice called `other`. In Elasticsearch each of the first thirty types is a slice of its own and there is no other: a terms aggregation answers the types it keeps and nothing about the rest, so there is no remainder to fold.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -21723,7 +21797,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "The ten repositories with the most events; the rest are one bar called other.",
+          "description": "The ten repositories with the most events; the rest are one bar called other. In Elasticsearch each of the first ten repositories is a bar of its own and there is no other: a terms aggregation answers the repositories it keeps and nothing about the rest, so there is no remainder to fold.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -21774,7 +21848,7 @@
                     "min_doc_count": "1",
                     "order": "desc",
                     "orderBy": "520",
-                    "size": "20"
+                    "size": "10"
                   },
                   "type": "terms"
                 }
@@ -21959,7 +22033,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -22026,7 +22100,7 @@
                   "field": "@timestamp",
                   "id": "527",
                   "settings": {
-                    "interval": "1d",
+                    "interval": "auto",
                     "min_doc_count": "0",
                     "trimEdges": "0"
                   },
@@ -25270,7 +25344,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "Every package the dependency graph knows about, by license. Undetermined is GitHub saying it could not tell, which is a blind spot rather than a license. Off by default: the SBOM is a megabyte or two per repository. The eight commonest licenses are named; the rest are one bar called other.",
+          "description": "Every package the dependency graph knows about, by license. Undetermined is GitHub saying it could not tell, which is a blind spot rather than a license. Off by default: the SBOM is a megabyte or two per repository. The eight commonest licenses are named; the rest are one bar called other. In Elasticsearch each of the first twelve licenses is a bar of its own and there is no other: a terms aggregation answers the licenses it keeps and nothing about the rest, so there is no remainder to fold.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -26218,7 +26292,7 @@
         },
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "What entered and left the dependency graph, and how much of it carried a known advisory. Each row covers a real commit range, from the head of the previous sweep to this one, so the rows do not overlap and adding them up over the range is the whole story rather than a double count. A sweep with nothing to report writes a row of zeros, so the table exists from the first sweep; that series is left out here. One bump measured 370 changes, one of which removed a package with a known advisory, and six rows is all that is kept of it. Vulnerable is a share of those same changes and not a kind of its own, so it crosses the stack as a line rather than adding its own height to it. Off by default: the SBOM is a megabyte or two per repository. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "What entered and left the dependency graph, and how much of it carried a known advisory. Each row covers a real commit range, from the head of the previous sweep to this one, so the rows do not overlap and adding them up over the range is the whole story rather than a double count. A sweep with nothing to report writes a row of zeros, so the table exists from the first sweep; that series is left out here. One bump measured 370 changes, one of which removed a package with a known advisory, and six rows is all that is kept of it. Vulnerable is a share of those same changes and not a kind of its own, so it crosses the stack as a line rather than adding its own height to it. Off by default: the SBOM is a megabyte or two per repository. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -26313,7 +26387,7 @@
                   "field": "@timestamp",
                   "id": "615",
                   "settings": {
-                    "interval": "1d",
+                    "interval": "auto",
                     "min_doc_count": "0",
                     "trimEdges": "0"
                   },
@@ -26339,7 +26413,7 @@
                   "field": "@timestamp",
                   "id": "617",
                   "settings": {
-                    "interval": "1d",
+                    "interval": "auto",
                     "min_doc_count": "0",
                     "trimEdges": "0"
                   },
@@ -26378,7 +26452,7 @@
       "panels": [
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "Every cent this account has ever been paid through Sponsors, then GitHub's own estimate of what the sponsorships active right now pay per month, what is waiting for the next payout date, and what this account pays out to the projects it sponsors. The lifetime total is the one that keeps the history: the monthly estimate goes to 0 the moment the last sponsorship lapses, and the money that did arrive stops being visible anywhere else. What is spent sponsoring is not the spend in the Cost section, which is what GitHub charges for Actions, packages and storage; this is money that leaves for somebody else's work. The payout date itself sits on the same row as a string, which no store here can draw as a number. All four are the newest reading of a snapshot rewritten every sweep, not a sum over the range, which would report the lifetime total once per sweep. In Elasticsearch each day is reduced to its largest reading, the last day that has one is taken, and the division into dollars is a server-side expression.",
+          "description": "Every cent this account has ever been paid through Sponsors, then GitHub's own estimate of what the sponsorships active right now pay per month, what is waiting for the next payout date, and what this account pays out to the projects it sponsors. The lifetime total is the one that keeps the history: the monthly estimate goes to 0 the moment the last sponsorship lapses, and the money that did arrive stops being visible anywhere else. What is spent sponsoring is not the spend in the Cost section, which is what GitHub charges for Actions, packages and storage; this is money that leaves for somebody else's work. The payout date itself sits on the same row as a string, which no store here can draw as a number. All four are the newest reading of a snapshot rewritten every sweep, not a sum over the range, which would report the lifetime total once per sweep.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -26397,56 +26471,7 @@
               },
               "unit": "currencyUSD"
             },
-            "overrides": [
-              {
-                "matcher": {
-                  "id": "byFrameRefID",
-                  "options": "C"
-                },
-                "properties": [
-                  {
-                    "id": "displayName",
-                    "value": "Lifetime received"
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byFrameRefID",
-                  "options": "F"
-                },
-                "properties": [
-                  {
-                    "id": "displayName",
-                    "value": "Monthly income"
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byFrameRefID",
-                  "options": "I"
-                },
-                "properties": [
-                  {
-                    "id": "displayName",
-                    "value": "Next payout"
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byFrameRefID",
-                  "options": "L"
-                },
-                "properties": [
-                  {
-                    "id": "displayName",
-                    "value": "Spent sponsoring"
-                  }
-                ]
-              }
-            ]
+            "overrides": []
           },
           "gridPos": {
             "h": 4,
@@ -26473,201 +26498,116 @@
             {
               "bucketAggs": [
                 {
-                  "field": "@timestamp",
-                  "id": "619",
+                  "field": "measurement.keyword",
+                  "id": "618",
                   "settings": {
-                    "interval": "1d",
-                    "min_doc_count": "0",
-                    "trimEdges": "0"
+                    "min_doc_count": "1",
+                    "order": "desc",
+                    "orderBy": "_count",
+                    "size": "1"
                   },
-                  "type": "date_histogram"
+                  "type": "terms"
                 }
               ],
               "datasource": "${DS_ELASTICSEARCH}",
-              "hide": true,
               "metrics": [
                 {
-                  "field": "lifetime_received_cents",
-                  "id": "618",
-                  "type": "max"
+                  "id": "619",
+                  "settings": {
+                    "metrics": [
+                      "lifetime_received_cents",
+                      "monthly_income_cents",
+                      "next_payout_cents",
+                      "sponsor_spend_cents"
+                    ],
+                    "order": "desc",
+                    "orderBy": "@timestamp"
+                  },
+                  "type": "top_metrics"
                 }
               ],
               "query": "_index:ghchronicle-gh_sponsors_listing",
               "refId": "A",
               "timeField": "@timestamp"
-            },
-            {
-              "datasource": {
-                "type": "__expr__",
-                "uid": "__expr__"
-              },
-              "expression": "$A",
-              "hide": true,
-              "reducer": "last",
-              "refId": "B",
-              "settings": {
-                "mode": "dropNN"
-              },
-              "type": "reduce"
-            },
-            {
-              "datasource": {
-                "type": "__expr__",
-                "uid": "__expr__"
-              },
-              "expression": "$B / 100",
-              "refId": "C",
-              "type": "math"
-            },
-            {
-              "bucketAggs": [
-                {
-                  "field": "@timestamp",
-                  "id": "621",
-                  "settings": {
-                    "interval": "1d",
-                    "min_doc_count": "0",
-                    "trimEdges": "0"
-                  },
-                  "type": "date_histogram"
-                }
-              ],
-              "datasource": "${DS_ELASTICSEARCH}",
-              "hide": true,
-              "metrics": [
-                {
-                  "field": "monthly_income_cents",
-                  "id": "620",
-                  "type": "max"
-                }
-              ],
-              "query": "_index:ghchronicle-gh_sponsors_listing",
-              "refId": "D",
-              "timeField": "@timestamp"
-            },
-            {
-              "datasource": {
-                "type": "__expr__",
-                "uid": "__expr__"
-              },
-              "expression": "$D",
-              "hide": true,
-              "reducer": "last",
-              "refId": "E",
-              "settings": {
-                "mode": "dropNN"
-              },
-              "type": "reduce"
-            },
-            {
-              "datasource": {
-                "type": "__expr__",
-                "uid": "__expr__"
-              },
-              "expression": "$E / 100",
-              "refId": "F",
-              "type": "math"
-            },
-            {
-              "bucketAggs": [
-                {
-                  "field": "@timestamp",
-                  "id": "623",
-                  "settings": {
-                    "interval": "1d",
-                    "min_doc_count": "0",
-                    "trimEdges": "0"
-                  },
-                  "type": "date_histogram"
-                }
-              ],
-              "datasource": "${DS_ELASTICSEARCH}",
-              "hide": true,
-              "metrics": [
-                {
-                  "field": "next_payout_cents",
-                  "id": "622",
-                  "type": "max"
-                }
-              ],
-              "query": "_index:ghchronicle-gh_sponsors_listing",
-              "refId": "G",
-              "timeField": "@timestamp"
-            },
-            {
-              "datasource": {
-                "type": "__expr__",
-                "uid": "__expr__"
-              },
-              "expression": "$G",
-              "hide": true,
-              "reducer": "last",
-              "refId": "H",
-              "settings": {
-                "mode": "dropNN"
-              },
-              "type": "reduce"
-            },
-            {
-              "datasource": {
-                "type": "__expr__",
-                "uid": "__expr__"
-              },
-              "expression": "$H / 100",
-              "refId": "I",
-              "type": "math"
-            },
-            {
-              "bucketAggs": [
-                {
-                  "field": "@timestamp",
-                  "id": "625",
-                  "settings": {
-                    "interval": "1d",
-                    "min_doc_count": "0",
-                    "trimEdges": "0"
-                  },
-                  "type": "date_histogram"
-                }
-              ],
-              "datasource": "${DS_ELASTICSEARCH}",
-              "hide": true,
-              "metrics": [
-                {
-                  "field": "sponsor_spend_cents",
-                  "id": "624",
-                  "type": "max"
-                }
-              ],
-              "query": "_index:ghchronicle-gh_sponsors_listing",
-              "refId": "J",
-              "timeField": "@timestamp"
-            },
-            {
-              "datasource": {
-                "type": "__expr__",
-                "uid": "__expr__"
-              },
-              "expression": "$J",
-              "hide": true,
-              "reducer": "last",
-              "refId": "K",
-              "settings": {
-                "mode": "dropNN"
-              },
-              "type": "reduce"
-            },
-            {
-              "datasource": {
-                "type": "__expr__",
-                "uid": "__expr__"
-              },
-              "expression": "$K / 100",
-              "refId": "L",
-              "type": "math"
             }
           ],
           "title": "Sponsorship",
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {},
+                "renameByName": {
+                  "Top Metrics lifetime_received_cents": "Lifetime received in cents",
+                  "Top Metrics monthly_income_cents": "Monthly income in cents",
+                  "Top Metrics next_payout_cents": "Next payout in cents",
+                  "Top Metrics sponsor_spend_cents": "Spent sponsoring in cents"
+                }
+              }
+            },
+            {
+              "id": "calculateField",
+              "options": {
+                "alias": "Lifetime received",
+                "binary": {
+                  "left": "Lifetime received in cents",
+                  "operator": "/",
+                  "right": "100"
+                },
+                "mode": "binary"
+              }
+            },
+            {
+              "id": "calculateField",
+              "options": {
+                "alias": "Monthly income",
+                "binary": {
+                  "left": "Monthly income in cents",
+                  "operator": "/",
+                  "right": "100"
+                },
+                "mode": "binary"
+              }
+            },
+            {
+              "id": "calculateField",
+              "options": {
+                "alias": "Next payout",
+                "binary": {
+                  "left": "Next payout in cents",
+                  "operator": "/",
+                  "right": "100"
+                },
+                "mode": "binary"
+              }
+            },
+            {
+              "id": "calculateField",
+              "options": {
+                "alias": "Spent sponsoring",
+                "binary": {
+                  "left": "Spent sponsoring in cents",
+                  "operator": "/",
+                  "right": "100"
+                },
+                "mode": "binary"
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Lifetime received in cents": true,
+                  "Monthly income in cents": true,
+                  "Next payout in cents": true,
+                  "Spent sponsoring in cents": true
+                },
+                "indexByName": {},
+                "renameByName": {}
+              }
+            }
+          ],
           "type": "stat"
         },
         {
@@ -26871,7 +26811,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "626",
+                  "id": "620",
                   "settings": {
                     "order": "desc",
                     "size": "200",
@@ -27148,7 +27088,7 @@
               "bucketAggs": [
                 {
                   "field": "tier.keyword",
-                  "id": "627",
+                  "id": "621",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -27159,7 +27099,7 @@
                 },
                 {
                   "field": "@timestamp",
-                  "id": "628",
+                  "id": "622",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -27170,7 +27110,7 @@
                 },
                 {
                   "field": "url.keyword",
-                  "id": "629",
+                  "id": "623",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -27183,7 +27123,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "630",
+                  "id": "624",
                   "settings": {
                     "metrics": [
                       "price_cents"
@@ -27195,17 +27135,17 @@
                 },
                 {
                   "field": "one_time",
-                  "id": "631",
+                  "id": "625",
                   "type": "max"
                 },
                 {
                   "field": "retired",
-                  "id": "632",
+                  "id": "626",
                   "type": "max"
                 },
                 {
                   "field": "age_days",
-                  "id": "633",
+                  "id": "627",
                   "type": "max"
                 }
               ],
@@ -27383,7 +27323,7 @@
               "bucketAggs": [
                 {
                   "field": "full_name.keyword",
-                  "id": "634",
+                  "id": "628",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -27394,7 +27334,7 @@
                 },
                 {
                   "field": "repo.keyword",
-                  "id": "635",
+                  "id": "629",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -27405,7 +27345,7 @@
                 },
                 {
                   "field": "@timestamp",
-                  "id": "636",
+                  "id": "630",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -27416,7 +27356,7 @@
                 },
                 {
                   "field": "kind.keyword",
-                  "id": "637",
+                  "id": "631",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -27427,7 +27367,7 @@
                 },
                 {
                   "field": "url.keyword",
-                  "id": "638",
+                  "id": "632",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -27440,7 +27380,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "639",
+                  "id": "633",
                   "settings": {
                     "metrics": [
                       "position"
@@ -27452,12 +27392,12 @@
                 },
                 {
                   "field": "stars",
-                  "id": "640",
+                  "id": "634",
                   "type": "max"
                 },
                 {
                   "field": "days_since_push",
-                  "id": "641",
+                  "id": "635",
                   "type": "max"
                 }
               ],
@@ -27656,7 +27596,7 @@
               "bucketAggs": [
                 {
                   "field": "flag.keyword",
-                  "id": "642",
+                  "id": "636",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "asc",
@@ -27667,7 +27607,7 @@
                 },
                 {
                   "field": "@timestamp",
-                  "id": "643",
+                  "id": "637",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -27678,7 +27618,7 @@
                 },
                 {
                   "field": "url.keyword",
-                  "id": "644",
+                  "id": "638",
                   "settings": {
                     "min_doc_count": "1",
                     "missing": "",
@@ -27693,7 +27633,7 @@
               "metrics": [
                 {
                   "field": "enabled",
-                  "id": "645",
+                  "id": "639",
                   "type": "max"
                 }
               ],
@@ -27910,7 +27850,7 @@
               "bucketAggs": [
                 {
                   "field": "list.keyword",
-                  "id": "646",
+                  "id": "640",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -27921,7 +27861,7 @@
                 },
                 {
                   "field": "@timestamp",
-                  "id": "647",
+                  "id": "641",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -27932,7 +27872,7 @@
                 },
                 {
                   "field": "url.keyword",
-                  "id": "648",
+                  "id": "642",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -27945,7 +27885,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "649",
+                  "id": "643",
                   "settings": {
                     "metrics": [
                       "items"
@@ -27957,12 +27897,12 @@
                 },
                 {
                   "field": "age_days",
-                  "id": "650",
+                  "id": "644",
                   "type": "max"
                 },
                 {
                   "field": "days_since_add",
-                  "id": "651",
+                  "id": "645",
                   "type": "max"
                 }
               ],
@@ -28115,7 +28055,7 @@
               "bucketAggs": [
                 {
                   "field": "achievement.keyword",
-                  "id": "652",
+                  "id": "646",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "asc",
@@ -28126,7 +28066,7 @@
                 },
                 {
                   "field": "url.keyword",
-                  "id": "653",
+                  "id": "647",
                   "settings": {
                     "min_doc_count": "1",
                     "missing": "",
@@ -28140,7 +28080,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "654",
+                  "id": "648",
                   "settings": {
                     "metrics": [
                       "tier_number"
@@ -28480,7 +28420,7 @@
               "bucketAggs": [
                 {
                   "field": "achievement.keyword",
-                  "id": "655",
+                  "id": "649",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "asc",
@@ -28491,7 +28431,7 @@
                 },
                 {
                   "field": "@timestamp",
-                  "id": "656",
+                  "id": "650",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -28502,7 +28442,7 @@
                 },
                 {
                   "field": "image.keyword",
-                  "id": "657",
+                  "id": "651",
                   "settings": {
                     "min_doc_count": "1",
                     "missing": "",
@@ -28514,7 +28454,7 @@
                 },
                 {
                   "field": "url.keyword",
-                  "id": "658",
+                  "id": "652",
                   "settings": {
                     "min_doc_count": "1",
                     "missing": "",
@@ -28529,27 +28469,27 @@
               "metrics": [
                 {
                   "field": "percent",
-                  "id": "659",
+                  "id": "653",
                   "type": "max"
                 },
                 {
                   "field": "count",
-                  "id": "660",
+                  "id": "654",
                   "type": "max"
                 },
                 {
                   "field": "next_threshold",
-                  "id": "661",
+                  "id": "655",
                   "type": "max"
                 },
                 {
                   "field": "tier_number",
-                  "id": "662",
+                  "id": "656",
                   "type": "max"
                 },
                 {
                   "field": "agrees",
-                  "id": "663",
+                  "id": "657",
                   "type": "max"
                 }
               ],
@@ -28623,7 +28563,7 @@
       "panels": [
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "The share of each bucket spent, which puts a bucket of five thousand and one of fifteen thousand on the same axis. The buckets worth watching, which are the ones with more than thirty requests in them: search has thirty a minute and would flatten the axis. A bucket this account never touched is left out of the chart entirely, since its flat zero was still a legend entry; \"Every bucket\" beside this lists every one of them, and a Most used of 0 is where that absence belongs. A reading taken at each sweep, so the curve starts the day the collector did. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year. In Elasticsearch each point is the largest reading of its five minutes.",
+          "description": "The share of each bucket spent, which puts a bucket of five thousand and one of fifteen thousand on the same axis. The buckets worth watching, which are the ones with more than thirty requests in them: search has thirty a minute and would flatten the axis. A bucket this account never touched is left out of the chart entirely, since its flat zero was still a legend entry; \"Every bucket\" beside this lists every one of them, and a Most used of 0 is where that absence belongs. A reading taken at each sweep, so the curve starts the day the collector did. One point is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under five minutes, which is fifteen minutes over a day and six hours over a month. In Elasticsearch each point is the largest reading of its bucket.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -28676,7 +28616,7 @@
               "bucketAggs": [
                 {
                   "field": "resource.keyword",
-                  "id": "665",
+                  "id": "659",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -28687,9 +28627,9 @@
                 },
                 {
                   "field": "@timestamp",
-                  "id": "666",
+                  "id": "660",
                   "settings": {
-                    "interval": "5m",
+                    "interval": "auto",
                     "min_doc_count": "0",
                     "trimEdges": "0"
                   },
@@ -28700,7 +28640,7 @@
               "metrics": [
                 {
                   "field": "used_ratio",
-                  "id": "664",
+                  "id": "658",
                   "type": "max"
                 }
               ],
@@ -28758,7 +28698,7 @@
               "bucketAggs": [
                 {
                   "field": "resource.keyword",
-                  "id": "667",
+                  "id": "661",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -28772,17 +28712,17 @@
               "metrics": [
                 {
                   "field": "limit",
-                  "id": "668",
+                  "id": "662",
                   "type": "max"
                 },
                 {
                   "field": "remaining",
-                  "id": "669",
+                  "id": "663",
                   "type": "min"
                 },
                 {
                   "field": "used",
-                  "id": "670",
+                  "id": "664",
                   "type": "max"
                 }
               ],
@@ -28944,7 +28884,7 @@
               "bucketAggs": [
                 {
                   "field": "family.keyword",
-                  "id": "671",
+                  "id": "665",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -28955,7 +28895,7 @@
                 },
                 {
                   "field": "reason.keyword",
-                  "id": "672",
+                  "id": "666",
                   "settings": {
                     "min_doc_count": "1",
                     "order": "desc",
@@ -28969,16 +28909,16 @@
               "metrics": [
                 {
                   "field": "failed",
-                  "id": "673",
+                  "id": "667",
                   "type": "sum"
                 },
                 {
-                  "id": "674",
+                  "id": "668",
                   "type": "count"
                 },
                 {
                   "field": "repos",
-                  "id": "675",
+                  "id": "669",
                   "type": "max"
                 }
               ],
@@ -29103,7 +29043,7 @@
               "datasource": "${DS_ELASTICSEARCH}",
               "metrics": [
                 {
-                  "id": "676",
+                  "id": "670",
                   "settings": {
                     "order": "desc",
                     "size": "100",

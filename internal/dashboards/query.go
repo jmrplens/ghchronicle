@@ -520,16 +520,50 @@ func medianTotal(path string) string {
 // the range, a tie going to the name that sorts first as the SQL's ORDER BY
 // breaks it, and one series called other for the rest, which is the sum of
 // every series less the sum of those n, point by point. A point where nothing
-// is left over is dropped, so with n series or fewer the rest holds nothing,
-// the removeEmptySeries a table puts around it takes it out, and there is no
-// other row, as the SQL has none. Measured against graphite-web 1.1.10: ten
+// is left over is dropped, so with n series or fewer the rest holds nothing
+// and is taken out, and there is no other row, as the SQL has none, nor an
+// other in the legend of a chart with nothing drawn under it. Measured against graphite-web 1.1.10: ten
 // types of 20 events down to 2 drew the eight busiest and other at 6, five
 // types drew the five, and four types of 5 events each kept the three that
 // sort first.
-func grOther(n int, expr string) string {
-	top := fmt.Sprintf("limit(sortByTotal(sortByName(%s)), %d)", expr, n)
-	return fmt.Sprintf(`group(%s, alias(removeBelowValue(diffSeries(sumSeries(%s), sumSeries(%s)), 1), "other"))`,
+func grOther(n int, expr string) string { return grOtherBy(n, "sortByTotal", expr) }
+
+// grOtherBy is grOther ranking the series by a sort of Graphite's own: by
+// their total for a count over the range, as the SQL stores add one up, and
+// by their largest value for the last reading of a snapshot that only climbs,
+// where the SQL stores rank by the newest.
+func grOtherBy(n int, by, expr string) string {
+	top := fmt.Sprintf("limit(%s(sortByName(%s)), %d)", by, expr, n)
+	return fmt.Sprintf(`group(%s, removeEmptySeries(alias(removeBelowValue(diffSeries(sumSeries(%s), sumSeries(%s)), 1), "other")))`,
 		top, expr, top)
+}
+
+// esUnfolded is what an Elasticsearch panel says in place of folding its tail
+// into other, as grOther and promOther do: a terms aggregation answers a
+// bucket per value it keeps and nothing about the ones it does not, and a
+// panel's transformations cannot keep the first rows and add the rest up
+// under a name of their own, so there is no remainder to fold. `kept` is how
+// many the terms bucket keeps, `items` what they are and `shape` what each is
+// drawn as.
+func esUnfolded(kept int, items, shape string) string {
+	words, ok := keptWords[kept]
+	if !ok {
+		panic(fmt.Sprintf("no words for keeping %d", kept))
+	}
+	return fmt.Sprintf("In Elasticsearch each of the first %s %s is a %s of its own and there is no "+
+		"other: a terms aggregation answers the %s it keeps and nothing about the rest, so there is "+
+		"no remainder to fold.", words, items, shape, items)
+}
+
+// keptWords spells how many values a terms bucket keeps, for esUnfolded.
+var keptWords = map[int]string{
+	8: "eight", 10: "ten", 12: "twelve", 30: "thirty", 50: "fifty", 500: "five hundred",
+}
+
+// noFold is what a store says of a panel it draws every series or bar of,
+// where the SQL stores fold the tail into other.
+func noFold(store, items string) string {
+	return store + " draws every one of the " + items + " and folds none of them into other."
 }
 
 // Binning a Graphite chart over time.
@@ -877,6 +911,21 @@ func (b *builder) dh(span ...string) any {
 		"type": "date_histogram", "id": b.nextESID(), "field": "@timestamp",
 		"settings": map[string]any{"interval": s, "min_doc_count": "0", "trimEdges": "0"},
 	}
+}
+
+// sundayWeeks is a date histogram of weeks that start on a Sunday, the day
+// GitHub starts one on and the collector stamps a week's row at. A bucket of
+// seven days is counted from the epoch, which was a Thursday, so the offset
+// of three days is what moves each bucket onto the Sunday its row is stamped
+// at; without it every weekly bar stood three days early and the first week
+// of a range fell before it (measured on the 2.6.2 review: 2, 0, 3, 6 and 2
+// commits at the Thursdays 08-27 to 09-24, and at the Sundays 08-30 to 09-27
+// with the offset).
+func (b *builder) sundayWeeks() any {
+	weeks := b.dh("7d")
+	settings, _ := agg(weeks)["settings"].(map[string]any)
+	settings["offset"] = "+3d"
+	return weeks
 }
 
 // esDailyTerms is how many values of a tag a dated breakdown keeps. Every
@@ -1513,6 +1562,18 @@ func binaryField(alias, left, operator, right string) any {
 	}}
 }
 
+// orZero is a column holding another's value, and 0 where that one has none:
+// a sum over the row of that one column, which Grafana's standard calculations
+// take skipping every value that == null, undefined as well as null. It is
+// how a value a merge left out of a row, which the arithmetic of a calculation
+// reads as NaN, enters it as the 0 the SQL stores add up for nothing.
+func orZero(alias, field string) any {
+	return map[string]any{"id": "calculateField", "options": map[string]any{
+		"mode": "reduceRow", "alias": alias,
+		"reduce": map[string]any{"include": []any{field}, "reducer": "sum"},
+	}}
+}
+
 // keepsValue keeps the rows whose `field` holds a value, for a table that
 // merges two queries and draws only the rows the first one answered.
 func keepsValue(field string) any {
@@ -1522,6 +1583,23 @@ func keepsValue(field string) any {
 			"fieldName": field,
 			"config":    map[string]any{"id": "isNotNull", "options": map[string]any{}},
 		}},
+	}}
+}
+
+// keepsAnyValue keeps the rows in which any of the fields named holds a
+// value, frame by frame: a field a frame does not have matches nothing in it,
+// so each frame of a chart is kept to the rows its own series holds a value
+// in.
+func keepsAnyValue(fields ...string) any {
+	filters := make([]any, len(fields))
+	for i, field := range fields {
+		filters[i] = map[string]any{
+			"fieldName": field,
+			"config":    map[string]any{"id": "isNotNull", "options": map[string]any{}},
+		}
+	}
+	return map[string]any{"id": "filterByValue", "options": map[string]any{
+		"type": "include", "match": "any", "filters": filters,
 	}}
 }
 

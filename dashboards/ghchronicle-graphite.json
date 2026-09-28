@@ -159,7 +159,7 @@
         {
           "datasource": "${DS_GRAPHITE}",
           "refId": "A",
-          "target": "alias(fallbackSeries(github.account.*.public_repos, removeBelowValue(constantLine(0), 1)), \"Repositories\")",
+          "target": "alias(removeEmptySeries(keepLastValue(github.account.*.public_repos)), \"Repositories\")",
           "textEditor": true
         },
         {
@@ -366,25 +366,25 @@
         {
           "datasource": "${DS_GRAPHITE}",
           "refId": "A",
-          "target": "alias(fallbackSeries(keepLastValue(github.account.*.followers), removeBelowValue(constantLine(0), 1)), \"Followers\")",
+          "target": "alias(removeEmptySeries(keepLastValue(github.account.*.followers)), \"Followers\")",
           "textEditor": true
         },
         {
           "datasource": "${DS_GRAPHITE}",
           "refId": "B",
-          "target": "alias(fallbackSeries(keepLastValue(github.account.*.following), removeBelowValue(constantLine(0), 1)), \"Following\")",
+          "target": "alias(removeEmptySeries(keepLastValue(github.account.*.following)), \"Following\")",
           "textEditor": true
         },
         {
           "datasource": "${DS_GRAPHITE}",
           "refId": "C",
-          "target": "alias(fallbackSeries(keepLastValue(github.account.*.sponsors), removeBelowValue(constantLine(0), 1)), \"Sponsors\")",
+          "target": "alias(removeEmptySeries(keepLastValue(github.account.*.sponsors)), \"Sponsors\")",
           "textEditor": true
         },
         {
           "datasource": "${DS_GRAPHITE}",
           "refId": "D",
-          "target": "alias(fallbackSeries(keepLastValue(github.account.*.sponsoring), removeBelowValue(constantLine(0), 1)), \"Sponsoring\")",
+          "target": "alias(removeEmptySeries(keepLastValue(github.account.*.sponsoring)), \"Sponsoring\")",
           "textEditor": true
         }
       ],
@@ -452,37 +452,37 @@
         {
           "datasource": "${DS_GRAPHITE}",
           "refId": "A",
-          "target": "alias(fallbackSeries(github.contributions_total.*.calendar_total, removeBelowValue(constantLine(0), 1)), \"Contributions\")",
+          "target": "alias(removeEmptySeries(keepLastValue(github.contributions_total.*.calendar_total)), \"Contributions\")",
           "textEditor": true
         },
         {
           "datasource": "${DS_GRAPHITE}",
           "refId": "B",
-          "target": "alias(fallbackSeries(github.account.*.account_age_days, removeBelowValue(constantLine(0), 1)), \"Account age\")",
+          "target": "alias(removeEmptySeries(keepLastValue(github.account.*.account_age_days)), \"Account age\")",
           "textEditor": true
         },
         {
           "datasource": "${DS_GRAPHITE}",
           "refId": "C",
-          "target": "alias(fallbackSeries(github.account.*.watching, removeBelowValue(constantLine(0), 1)), \"Watching\")",
+          "target": "alias(removeEmptySeries(keepLastValue(github.account.*.watching)), \"Watching\")",
           "textEditor": true
         },
         {
           "datasource": "${DS_GRAPHITE}",
           "refId": "D",
-          "target": "alias(fallbackSeries(github.account.*.starred, removeBelowValue(constantLine(0), 1)), \"Stars given\")",
+          "target": "alias(removeEmptySeries(keepLastValue(github.account.*.starred)), \"Stars given\")",
           "textEditor": true
         },
         {
           "datasource": "${DS_GRAPHITE}",
           "refId": "E",
-          "target": "alias(fallbackSeries(github.account.*.gists, removeBelowValue(constantLine(0), 1)), \"Gists\")",
+          "target": "alias(removeEmptySeries(keepLastValue(github.account.*.gists)), \"Gists\")",
           "textEditor": true
         },
         {
           "datasource": "${DS_GRAPHITE}",
           "refId": "F",
-          "target": "alias(fallbackSeries(github.account.*.packages, removeBelowValue(constantLine(0), 1)), \"Packages\")",
+          "target": "alias(removeEmptySeries(keepLastValue(github.account.*.packages)), \"Packages\")",
           "textEditor": true
         }
       ],
@@ -547,37 +547,37 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "alias(fallbackSeries(keepLastValue(github.account_total.*.pulls_merged), removeBelowValue(constantLine(0), 1)), \"Pull requests merged\")",
+              "target": "alias(removeEmptySeries(keepLastValue(github.account_total.*.pulls_merged)), \"Pull requests merged\")",
               "textEditor": true
             },
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "B",
-              "target": "alias(fallbackSeries(keepLastValue(github.account_total.*.pulls_reviewed), removeBelowValue(constantLine(0), 1)), \"Pull requests reviewed\")",
+              "target": "alias(removeEmptySeries(keepLastValue(github.account_total.*.pulls_reviewed)), \"Pull requests reviewed\")",
               "textEditor": true
             },
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "C",
-              "target": "alias(fallbackSeries(keepLastValue(github.account_total.*.commits), removeBelowValue(constantLine(0), 1)), \"Commits\")",
+              "target": "alias(removeEmptySeries(keepLastValue(github.account_total.*.commits)), \"Commits\")",
               "textEditor": true
             },
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "D",
-              "target": "alias(fallbackSeries(keepLastValue(github.account_total.*.issues_opened), removeBelowValue(constantLine(0), 1)), \"Issues opened\")",
+              "target": "alias(removeEmptySeries(keepLastValue(github.account_total.*.issues_opened)), \"Issues opened\")",
               "textEditor": true
             },
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "E",
-              "target": "alias(fallbackSeries(keepLastValue(github.account_total.*.pulls_merged_elsewhere), removeBelowValue(constantLine(0), 1)), \"Merged elsewhere\")",
+              "target": "alias(removeEmptySeries(keepLastValue(github.account_total.*.pulls_merged_elsewhere)), \"Merged elsewhere\")",
               "textEditor": true
             },
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "F",
-              "target": "alias(fallbackSeries(keepLastValue(github.account_total.*.commented_elsewhere), removeBelowValue(constantLine(0), 1)), \"Threads commented elsewhere\")",
+              "target": "alias(removeEmptySeries(keepLastValue(github.account_total.*.commented_elsewhere)), \"Threads commented elsewhere\")",
               "textEditor": true
             }
           ],
@@ -586,7 +586,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "The whole life of each repository in one row: not what happened in the dashboard range, but everything there has ever been. The repository picker holds the repositories the sweeps collect: forks too when `include_forks` is on, and archived ones when `include_archived` is on and for a while after a backfill, which collects them either way. A count here is over every repository the picker holds until it is narrowed. Sorted by commits, a fork of a busy project outranks anything the account wrote, 370,296 commits against 3,385 on the account this was measured on, so the table opens with the account's own repositories first and the forks under them, both ranked by commits. The fork and archived flags are columns here rather than a filter, the title being what it is, and a click on either sorts by it. Each row is the repository's newest reading in the range, so a count that went down, a star taken back or a branch deleted, reads as it stands and not as its highest. With All selected the archived repositories the picker does not list are here too, with their current counts, as long as the collector still reads them: the default filter walks none of their history, but every totals sweep reads this row of each of them again, and one the configuration no longer collects is left out. Graphite has no rows: each series is one number, so this table keeps the commits it is ranked by and drops the other columns, the fork and archived flags among them. In Graphite an archived repository counts from its points of the last seven days, since a target here cannot ask whether the collector still writes a repository while it reads the range, so a range that ended more than a week ago leaves the archived ones out. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "The whole life of each repository in one row: not what happened in the dashboard range, but everything there has ever been. The repository picker holds the repositories the sweeps collect: forks too when `include_forks` is on, and archived ones when `include_archived` is on and for a while after a backfill, which collects them either way. A count here is over every repository the picker holds until it is narrowed. Sorted by commits, a fork of a busy project outranks anything the account wrote, 370,296 commits against 3,385 on the account this was measured on, so the table opens with the account's own repositories first and the forks under them, both ranked by commits. The fork and archived flags are columns here rather than a filter, the title being what it is, and a click on either sorts by it. Each row is the repository's newest reading in the range, so a count that went down, a star taken back or a branch deleted, reads as it stands and not as its highest. With All selected the archived repositories the picker does not list are here too, with their current counts, as long as the collector still reads them: the default filter walks none of their history, but every totals sweep reads this row of each of them again, and one the configuration no longer collects is left out. Graphite has no rows: each series is reduced over the range to one number, Commits, so Fork, Archived, Merged, Issues, Releases, Stars, Branches and Tags are not in this table. In Graphite an archived repository counts from its points of the last seven days, since a target here cannot ask whether the collector still writes a repository while it reads the range, so a range that ended more than a week ago leaves the archived ones out. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -701,7 +701,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "A trailing year at a time, whatever the row above is called: GitHub's contributions collection offers twelve months of them per sweep, so a fresh install sees one year here and the table reaches further back with every year the rows are kept. Each repository the account created, dated when it was created rather than when a sweep noticed it. Forks and private repositories are included, which is the point: those are exactly the ones a sweep with `include_forks` off never discovers. It names its own window rather than taking the dashboard's, so narrowing the range at the top of the page does not narrow this table. Graphite answers only inside the dashboard range, so years outside it are missing. Graphite has no way to list by date either, so each repository created inside the range is one row named from the path, and the column counts the creation itself, which is one on every row. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "A trailing year at a time, whatever the row above is called: GitHub's contributions collection offers twelve months of them per sweep, so a fresh install sees one year here and the table reaches further back with every year the rows are kept. Each repository the account created, dated when it was created rather than when a sweep noticed it. Forks and private repositories are included, which is the point: those are exactly the ones a sweep with `include_forks` off never discovers. It names its own window rather than taking the dashboard's, so narrowing the range at the top of the page does not narrow this table. Graphite answers only inside the dashboard range, so years outside it are missing. Graphite has no way to list by date either, so each repository created inside the range is one row named from the path, and the column counts the creation itself, which is one on every row. A row is one number, so the Fork and Private flags are not in this table. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -982,7 +982,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(aliasByNode(keepLastValue(github.workflow_run_total.*.*.$repo.runs), 4))",
+              "target": "removeEmptySeries(group(limit(sortByMaxima(sortByName(aliasByNode(keepLastValue(github.workflow_run_total.*.*.$repo.runs), 4))), 10), removeEmptySeries(alias(removeBelowValue(diffSeries(sumSeries(aliasByNode(keepLastValue(github.workflow_run_total.*.*.$repo.runs), 4)), sumSeries(limit(sortByMaxima(sortByName(aliasByNode(keepLastValue(github.workflow_run_total.*.*.$repo.runs), 4))), 10))), 1), \"other\"))))",
               "textEditor": true
             }
           ],
@@ -1028,7 +1028,7 @@
       "panels": [
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Split by repository. GitHub serves a rolling 14-day window and it is rewritten on every sweep, so a gap means the collector was down for longer than that window. The eight repositories with the most in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "Split by repository. GitHub serves a rolling 14-day window and it is rewritten on every sweep, so a gap means the collector was down for longer than that window. The eight repositories with the most in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -1080,7 +1080,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "aliasSub(consolidateBy(aliasByNode(groupByNodes(summarize(github.traffic.*.views.*.$repo.count, '$bucket_1d', \"sum\"), \"sum\", 2, 5), 1), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\")",
+              "target": "group(limit(sortByTotal(sortByName(aliasSub(consolidateBy(aliasByNode(groupByNodes(summarize(github.traffic.*.views.*.$repo.count, '$bucket_1d', \"sum\"), \"sum\", 2, 5), 1), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))), 8), removeEmptySeries(alias(removeBelowValue(diffSeries(sumSeries(aliasSub(consolidateBy(aliasByNode(groupByNodes(summarize(github.traffic.*.views.*.$repo.count, '$bucket_1d', \"sum\"), \"sum\", 2, 5), 1), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\")), sumSeries(limit(sortByTotal(sortByName(aliasSub(consolidateBy(aliasByNode(groupByNodes(summarize(github.traffic.*.views.*.$repo.count, '$bucket_1d', \"sum\"), \"sum\", 2, 5), 1), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))), 8))), 1), \"other\")))",
               "textEditor": true
             }
           ],
@@ -1089,7 +1089,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Split by repository. The eight repositories with the most in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "Split by repository. The eight repositories with the most in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -1141,7 +1141,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "aliasSub(consolidateBy(aliasByNode(groupByNodes(summarize(github.traffic.*.views.*.$repo.uniques, '$bucket_1d', \"sum\"), \"sum\", 2, 5), 1), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\")",
+              "target": "group(limit(sortByTotal(sortByName(aliasSub(consolidateBy(aliasByNode(groupByNodes(summarize(github.traffic.*.views.*.$repo.uniques, '$bucket_1d', \"sum\"), \"sum\", 2, 5), 1), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))), 8), removeEmptySeries(alias(removeBelowValue(diffSeries(sumSeries(aliasSub(consolidateBy(aliasByNode(groupByNodes(summarize(github.traffic.*.views.*.$repo.uniques, '$bucket_1d', \"sum\"), \"sum\", 2, 5), 1), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\")), sumSeries(limit(sortByTotal(sortByName(aliasSub(consolidateBy(aliasByNode(groupByNodes(summarize(github.traffic.*.views.*.$repo.uniques, '$bucket_1d', \"sum\"), \"sum\", 2, 5), 1), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))), 8))), 1), \"other\")))",
               "textEditor": true
             }
           ],
@@ -1150,7 +1150,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Its own panel because continuous integration clones a repository thousands of times for every human visit, and on a shared axis the visits become a flat line at zero. The eight repositories with the most in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "Its own panel because continuous integration clones a repository thousands of times for every human visit, and on a shared axis the visits become a flat line at zero. The eight repositories with the most in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -1202,7 +1202,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "aliasSub(consolidateBy(aliasByNode(groupByNodes(summarize(github.traffic.*.clones.*.$repo.count, '$bucket_1d', \"sum\"), \"sum\", 2, 5), 1), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\")",
+              "target": "group(limit(sortByTotal(sortByName(aliasSub(consolidateBy(aliasByNode(groupByNodes(summarize(github.traffic.*.clones.*.$repo.count, '$bucket_1d', \"sum\"), \"sum\", 2, 5), 1), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))), 8), removeEmptySeries(alias(removeBelowValue(diffSeries(sumSeries(aliasSub(consolidateBy(aliasByNode(groupByNodes(summarize(github.traffic.*.clones.*.$repo.count, '$bucket_1d', \"sum\"), \"sum\", 2, 5), 1), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\")), sumSeries(limit(sortByTotal(sortByName(aliasSub(consolidateBy(aliasByNode(groupByNodes(summarize(github.traffic.*.clones.*.$repo.count, '$bucket_1d', \"sum\"), \"sum\", 2, 5), 1), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))), 8))), 1), \"other\")))",
               "textEditor": true
             }
           ],
@@ -1211,7 +1211,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Where the visitors came from over GitHub's trailing fourteen days. GitHub aggregates by host, not by URL, and attaches no dates, so this is the most recent snapshot rather than a sum over the selected range. The link opens the host; a search engine GitHub names without one has no link. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "Where the visitors came from over GitHub's trailing fourteen days. GitHub aggregates by host, not by URL, and attaches no dates, so this is the most recent snapshot rather than a sum over the selected range. The link opens the host; a search engine GitHub names without one has no link. Graphite has no rows: each series is reduced over the range to one number, Views, so Unique is not in this table. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -1349,7 +1349,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Graphite keeps no text, so there is no title. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "Graphite keeps no text, so there is no title. Graphite has no rows: each series is reduced over the range to one number, Views, so Unique and Title are not in this table. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -1499,7 +1499,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Clones divided by the people who made them. There are panels for clones and for views and none for the ratio, which is the only thing that separates adoption from machinery: one repository here is cloned seventy three times per unique cloner and viewed six hundred times in the same month. Graphite divides series, not columns, so the ratio is not in this table. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "Clones divided by the people who made them. There are panels for clones and for views and none for the ratio, which is the only thing that separates adoption from machinery: one repository here is cloned seventy three times per unique cloner and viewed six hundred times in the same month. Graphite divides series, not columns, so it has no ratio of two of them. Graphite has no rows: each series is reduced over the range to one number, Clones, so Clones each, Cloners and Views are not in this table. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -1675,7 +1675,7 @@
       "panels": [
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Stars per day from GitHub's daily star history, which it serves for every repository whatever the token may see of its stargazers. Each day is GitHub's Pacific calendar day, so a star given in a European morning can sit a day before the UTC date it was given. An unstar of a star given in the last thirty weeks is taken off the day it was given. Against GitHub Enterprise Server, which does not serve the history, the bars are empty. The eight repositories that gained the most in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "Stars per day from GitHub's daily star history, which it serves for every repository whatever the token may see of its stargazers. Each day is GitHub's Pacific calendar day, so a star given in a European morning can sit a day before the UTC date it was given. An unstar of a star given in the last thirty weeks is taken off the day it was given. Against GitHub Enterprise Server, which does not serve the history, the bars are empty. The eight repositories that gained the most in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -1727,7 +1727,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "aliasSub(consolidateBy(aliasByNode(groupByNodes(summarize(github.star_day.*.*.$repo.stars, '$bucket_1d', \"sum\"), \"sum\", 2, 4), 1), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\")",
+              "target": "group(limit(sortByTotal(sortByName(aliasSub(consolidateBy(aliasByNode(groupByNodes(summarize(github.star_day.*.*.$repo.stars, '$bucket_1d', \"sum\"), \"sum\", 2, 4), 1), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))), 8), removeEmptySeries(alias(removeBelowValue(diffSeries(sumSeries(aliasSub(consolidateBy(aliasByNode(groupByNodes(summarize(github.star_day.*.*.$repo.stars, '$bucket_1d', \"sum\"), \"sum\", 2, 4), 1), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\")), sumSeries(limit(sortByTotal(sortByName(aliasSub(consolidateBy(aliasByNode(groupByNodes(summarize(github.star_day.*.*.$repo.stars, '$bucket_1d', \"sum\"), \"sum\", 2, 4), 1), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))), 8))), 1), \"other\")))",
               "textEditor": true
             }
           ],
@@ -1736,7 +1736,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "The star count as it climbed, holding its last value to the end of the range. In InfluxDB and PostgreSQL it is rebuilt from GitHub's daily star history for every repository, back to the first star, so widening the range shows more of it. There it usually sits at or a little below the star count GitHub shows, since that count also includes accounts GitHub no longer lists, but a star given more than thirty weeks ago and later taken back can stay in it, so it can also sit above. Against GitHub Enterprise Server, which does not serve the history, the curve is empty in those two stores. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year. In Graphite the curve is the repositories' star count as each sweep read it, so it starts the day the collector did and sits at GitHub's count.",
+          "description": "The star count as it climbed, holding its last value to the end of the range. In InfluxDB and PostgreSQL it is rebuilt from GitHub's daily star history for every repository, back to the first star, so widening the range shows more of it. There it usually sits at or a little below the star count GitHub shows, since that count also includes accounts GitHub no longer lists, but a star given more than thirty weeks ago and later taken back can stay in it, so it can also sit above. Against GitHub Enterprise Server, which does not serve the history, the curve is empty in those two stores. One point is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there. In Graphite the curve is the repositories' star count as each sweep read it, so it starts the day the collector did and sits at GitHub's count.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -1842,7 +1842,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(sortByMaxima(aliasByNode(github.repo.*.*.*.*.*.*.*.$repo.*.stars, 9)))",
+              "target": "removeEmptySeries(group(limit(sortByMaxima(sortByName(aliasByNode(keepLastValue(github.repo.*.*.*.*.*.*.*.$repo.*.stars), 9))), 12), removeEmptySeries(alias(removeBelowValue(diffSeries(sumSeries(aliasByNode(keepLastValue(github.repo.*.*.*.*.*.*.*.$repo.*.stars), 9)), sumSeries(limit(sortByMaxima(sortByName(aliasByNode(keepLastValue(github.repo.*.*.*.*.*.*.*.$repo.*.stars), 9))), 12))), 1), \"other\"))))",
               "textEditor": true
             }
           ],
@@ -1874,7 +1874,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "The newest stargazers, one row each. A repository whose stargazer list GitHub hides from this token (since July 2026 it serves the list only to a repository's admins and collaborators) has its stars in the panels above and no names here. Graphite has no way to sort by date, so this is the stars gained per repository over the range instead, from the daily star history, which counts every repository. GitHub Enterprise Server does not serve that history, so against it this table is empty. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "The newest stargazers, one row each. A repository whose stargazer list GitHub hides from this token (since July 2026 it serves the list only to a repository's admins and collaborators) has its stars in the panels above and no names here. Graphite has no way to sort by date, so this is the stars gained per repository over the range instead, from the daily star history, which counts every repository and names no stargazer: the User and Starred at columns are not in it. GitHub Enterprise Server does not serve that history, so against it this table is empty. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -2010,7 +2010,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "The fork count as it climbed, a running count of the forks each dated when it was made, so it reaches back to the first fork rather than to the day the collector started, and holds its last value to the end of the range. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year. In Graphite the curve is the daily fork count as collected, so it starts the day the collector did.",
+          "description": "The fork count as it climbed, a running count of the forks each dated when it was made, so it reaches back to the first fork rather than to the day the collector started, and holds its last value to the end of the range. One point is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there. In Graphite the curve is the daily fork count as collected, so it starts the day the collector did.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -2286,17 +2286,42 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "alias(summarize(sumSeries(github.commits_week.*.*.$repo.commits), \"7d\", \"sum\"), \"All commits\")",
+              "target": "alias(summarize(sumSeries(github.commits_week.*.*.$repo.commits), \"1d\", \"sum\"), \"All commits\")",
               "textEditor": true
             },
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "B",
-              "target": "alias(summarize(sumSeries(github.commits_week.*.*.$repo.owner_commits), \"7d\", \"sum\"), \"Own commits\")",
+              "target": "alias(summarize(sumSeries(github.commits_week.*.*.$repo.owner_commits), \"1d\", \"sum\"), \"Own commits\")",
               "textEditor": true
             }
           ],
           "title": "Commits per week",
+          "transformations": [
+            {
+              "id": "filterByValue",
+              "options": {
+                "filters": [
+                  {
+                    "config": {
+                      "id": "isNotNull",
+                      "options": {}
+                    },
+                    "fieldName": "All commits"
+                  },
+                  {
+                    "config": {
+                      "id": "isNotNull",
+                      "options": {}
+                    },
+                    "fieldName": "Own commits"
+                  }
+                ],
+                "match": "any",
+                "type": "include"
+              }
+            }
+          ],
           "type": "timeseries"
         },
         {
@@ -2651,7 +2676,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Every year, backfilled at one GraphQL point per year, reaching back to the day the account was created; the year in progress is here too, rewritten daily until it ends. A table rather than a chart because the past years sit outside any dashboard time range you would pick for the rest of the page. Graphite answers only inside the dashboard range, so years outside it are missing. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others.",
+          "description": "Every year, backfilled at one GraphQL point per year, reaching back to the day the account was created; the year in progress is here too, rewritten daily until it ends. A table rather than a chart because the past years sit outside any dashboard time range you would pick for the rest of the page. Graphite answers only inside the dashboard range, so years outside it are missing. Graphite has no rows: each series is reduced over the range to one number, Contributions, so Commits, Pull requests, Reviews, Issues and New repos are not in this table.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -2789,7 +2814,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Where the green came from, for the part of it that is commits. The eight repositories with the most commits in the range are named; the rest are `other`. \"Contributions over time\" at the top of this section counts issues, pull requests and reviews as well, so this stack sits under that curve rather than repeating it: a whole year of these days sums to `gh_contributions_total.commits`, the Commits of the totals above. The repositories include the private and third-party ones, which \"Commits by repository\" lists too, undated and unflagged. GraphQL caps the daily breakdown at a hundred repositories per window and, inside each, a hundred distinct commit days returned newest first, so a busier repository loses its oldest days silently: `gh_contribution_repo.commits` minus `commits_dated` is exactly how many commits never got a date. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "Where the green came from, for the part of it that is commits. The eight repositories with the most commits in the range are named; the rest are `other`. \"Contributions over time\" at the top of this section counts issues, pull requests and reviews as well, so this stack sits under that curve rather than repeating it: a whole year of these days sums to `gh_contributions_total.commits`, the Commits of the totals above. The repositories include the private and third-party ones, which \"Commits by repository\" lists too, undated and unflagged. GraphQL caps the daily breakdown at a hundred repositories per window and, inside each, a hundred distinct commit days returned newest first, so a busier repository loses its oldest days silently: `gh_contribution_repo.commits` minus `commits_dated` is exactly how many commits never got a date. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -2841,7 +2866,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "aliasSub(consolidateBy(groupByNode(summarize(github.contribution_day_repo.*.*.*.*.*.*.commits, '$bucket_1d', \"sum\"), 2, \"sum\"), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\")",
+              "target": "group(limit(sortByTotal(sortByName(aliasSub(consolidateBy(groupByNode(summarize(github.contribution_day_repo.*.*.*.*.*.*.commits, '$bucket_1d', \"sum\"), 2, \"sum\"), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))), 8), removeEmptySeries(alias(removeBelowValue(diffSeries(sumSeries(aliasSub(consolidateBy(groupByNode(summarize(github.contribution_day_repo.*.*.*.*.*.*.commits, '$bucket_1d', \"sum\"), 2, \"sum\"), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\")), sumSeries(limit(sortByTotal(sortByName(aliasSub(consolidateBy(groupByNode(summarize(github.contribution_day_repo.*.*.*.*.*.*.commits, '$bucket_1d', \"sum\"), 2, \"sum\"), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))), 8))), 1), \"other\")))",
               "textEditor": true
             }
           ],
@@ -3159,7 +3184,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Merged and closed are dated at the moment it happened and stacked. Open that day is the line: how many were open on that day, which is a state and not an event, so it is not part of the stack. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "Merged and closed are dated at the moment it happened and stacked. Open that day is the line: how many were open on that day, which is a state and not an event, so it is not part of the stack. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -3317,7 +3342,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year. In InfluxDB the 90th percentile is an estimate (approx_percentile_cont, a t-digest), since InfluxDB 3 Core has no exact percentile before 3.9.0, so it can read differently from the exact one PostgreSQL draws; the median is exact in both. Graphite has no percentile of a bucket, so the upper line is the worst of each bucket. In Graphite two facts landing in the same storage slot of one series are reduced to one point, so the medians are over what the storage kept.",
+          "description": "One point is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there. In InfluxDB the 90th percentile is an estimate (approx_percentile_cont, a t-digest), since InfluxDB 3 Core has no exact percentile before 3.9.0, so it can read differently from the exact one PostgreSQL draws; the median is exact in both. Graphite has no percentile of a bucket, so the upper line is the worst of each bucket. In Graphite two facts landing in the same storage slot of one series are reduced to one point, so the medians are over what the storage kept.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -3383,7 +3408,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Closed is dated at the moment it happened. Open that day is the line: how many were open on that day, a state rather than an event, so it is not stacked. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "Closed is dated at the moment it happened. Open that day is the line: how many were open on that day, a state rather than an event, so it is not stacked. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -3541,7 +3566,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Lines added plus removed per merged pull request. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year. In Graphite two facts landing in the same storage slot of one series are reduced to one point, so the medians are over what the storage kept.",
+          "description": "Lines added plus removed per merged pull request. One point is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there. In Graphite two facts landing in the same storage slot of one series are reduced to one point, so the medians are over what the storage kept.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -3602,7 +3627,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Graphite names each row repository, number and author from the path. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "Graphite names each row repository, number and author from the path. Graphite has no rows: each series is reduced over the range to one number, Lines changed, so Repository, Title, Closed, Author, Association, Labels, Files, Reviews and Time to merge are not in this table. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -3909,7 +3934,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Graphite reduces the merge times of each repository: how many, and their median. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others.",
+          "description": "Graphite reduces the merge times of each repository: how many, and their median. Graphite has no rows: each series is reduced over the range to two numbers, Merged and Time to merge, so Lines changed is not in this table.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -4211,7 +4236,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -4272,7 +4297,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Time to merge only counts what merged. This is the other half: what is still open and how long it has been, which is the number that decides what to do next rather than describing what already happened. The table keeps the twenty-five open longest, the longest first. Each pull request is read from its newest row, so one that merged inside the range is not here any more. Archived repositories are left out, since nothing in one can be merged, closed or run until it is unarchived; narrowing the picker to one shows an empty table here rather than rows nobody can act on. A fork's pull request is still one that can be merged, so those stay and Fork says which they are. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others. This store cannot read each item from its newest row, so one that closed inside the range stays listed as open, at the reading of its last open day, until the range moves past that day. Only gh_repo carries the fork and archived flags and this store cannot join one measurement to another, so the rows the SQL dashboards leave out are listed here. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "Time to merge only counts what merged. This is the other half: what is still open and how long it has been, which is the number that decides what to do next rather than describing what already happened. The table keeps the twenty-five open longest, the longest first. Each pull request is read from its newest row, so one that merged inside the range is not here any more. Archived repositories are left out, since nothing in one can be merged, closed or run until it is unarchived; narrowing the picker to one shows an empty table here rather than rows nobody can act on. A fork's pull request is still one that can be merged, so those stay and Fork says which they are. Graphite has no rows: each series is reduced over the range to one number, Open for, so Title, Author, Labels, Comments, Reviews and Fork are not in this table. This store cannot read each item from its newest row, so one that closed inside the range stays listed as open, at the reading of its last open day, until the range moves past that day. Only gh_repo carries the fork and archived flags and this store cannot join one measurement to another, so the rows the SQL dashboards leave out are listed here. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -4447,7 +4472,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "The same question for issues: what is still open and for how long, the twenty-five open longest, the longest first. Labels is what the issue was filed as, so an old one reads as a bug nobody fixed or a wish nobody granted. Each issue is read from its newest row, so one closed inside the range is not here any more. Archived repositories are left out, since nothing in one can be merged, closed or run until it is unarchived; narrowing the picker to one shows an empty table here rather than rows nobody can act on. A fork's issues stay, and Fork says which they are. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others. This store cannot read each item from its newest row, so one that closed inside the range stays listed as open, at the reading of its last open day, until the range moves past that day. Only gh_repo carries the fork and archived flags and this store cannot join one measurement to another, so the rows the SQL dashboards leave out are listed here. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "The same question for issues: what is still open and for how long, the twenty-five open longest, the longest first. Labels is what the issue was filed as, so an old one reads as a bug nobody fixed or a wish nobody granted. Each issue is read from its newest row, so one closed inside the range is not here any more. Archived repositories are left out, since nothing in one can be merged, closed or run until it is unarchived; narrowing the picker to one shows an empty table here rather than rows nobody can act on. A fork's issues stay, and Fork says which they are. Graphite has no rows: each series is reduced over the range to one number, Open for, so Author, Comments, Labels and Fork are not in this table. This store cannot read each item from its newest row, so one that closed inside the range stays listed as open, at the reading of its last open day, until the range moves past that day. Only gh_repo carries the fork and archived flags and this store cannot join one measurement to another, so the rows the SQL dashboards leave out are listed here. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -4598,7 +4623,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Dated at the thread's first comment, which is when the objection was raised. Split by whether the reviewer is a bot: on this account the reviewers are review bots, and a backlog of bot threads reads differently from a backlog of human ones. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "Dated at the thread's first comment, which is when the objection was raised. Split by whether the reviewer is a bot: on this account the reviewers are review bots, and a backlog of bot threads reads differently from a backlog of human ones. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -4684,7 +4709,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "A review thread is one objection, which GitHub keeps open until somebody resolves it. Threads is the whole conversation on that pull request; Unresolved, Outdated and Comments describe only what is still owed on it. An outdated unresolved thread is one the code has already moved past: debt nobody is going to pay and nobody has closed either. Graphite names each row repository and pull request from the path, and inverts the resolved flag of each thread to count the open ones. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others.",
+          "description": "A review thread is one objection, which GitHub keeps open until somebody resolves it. Threads is the whole conversation on that pull request; Unresolved, Outdated and Comments describe only what is still owed on it. An outdated unresolved thread is one the code has already moved past: debt nobody is going to pay and nobody has closed either. Graphite names each row repository and pull request from the path, and inverts the resolved flag of each thread to count the open ones. Graphite has no rows: each series is reduced over the range to one number, Unresolved, so Threads, Outdated and Comments are not in this table.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -5182,7 +5207,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -5334,7 +5359,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year. In InfluxDB the 95th percentile is an estimate (approx_percentile_cont, a t-digest), since InfluxDB 3 Core has no exact percentile before 3.9.0, so it can read differently from the exact one PostgreSQL draws; the median is exact in both. Graphite has no percentile of a bucket, so the upper line is the worst of each bucket. In Graphite two facts landing in the same storage slot of one series are reduced to one point, so the medians are over what the storage kept.",
+          "description": "One point is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there. In InfluxDB the 95th percentile is an estimate (approx_percentile_cont, a t-digest), since InfluxDB 3 Core has no exact percentile before 3.9.0, so it can read differently from the exact one PostgreSQL draws; the median is exact in both. Graphite has no percentile of a bucket, so the upper line is the worst of each bucket. In Graphite two facts landing in the same storage slot of one series are reduced to one point, so the medians are over what the storage kept.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -5400,7 +5425,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Over the runs whose jobs were expanded, which is the newest runs of each sweep and, after a backfill, every run GitHub still holds, which from 1 October 2026 means the repository's retention period, ninety days by default; not every run the run count includes. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year. In Graphite two facts landing in the same storage slot of one series are reduced to one point, so the medians are over what the storage kept.",
+          "description": "Over the runs whose jobs were expanded, which is the newest runs of each sweep and, after a backfill, every run GitHub still holds, which from 1 October 2026 means the repository's retention period, ninety days by default; not every run the run count includes. One point is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under an hour, which is six hours over a month and a day over a year. In Graphite two facts landing in the same storage slot of one series are reduced to one point, so the medians are over what the storage kept.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -5466,7 +5491,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Artifacts that have not expired, over the ones the walk reached, which is a floor on any repository with more than five hundred, and on one whose walk a failed page of the listing cut short: \"Artifact storage counted\" further down has the counts that say which those are. GitHub deletes artifacts on their own schedule, which is why this falls without anyone doing anything. A reading taken at each sweep, so the curve starts the day the collector did: there is no history of it to rebuild. The eight repositories holding the most are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "Artifacts that have not expired, over the ones the walk reached, which is a floor on any repository with more than five hundred, and on one whose walk a failed page of the listing cut short: \"Artifact storage counted\" further down has the counts that say which those are. GitHub deletes artifacts on their own schedule, which is why this falls without anyone doing anything. A reading taken at each sweep, so the curve starts the day the collector did: there is no history of it to rebuild. The eight repositories holding the most are named; the rest are `other`. One point is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under an hour, which is six hours over a month and a day over a year.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -5517,7 +5542,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(aliasSub(consolidateBy(aliasByNode(groupByNodes(summarize(removeBelowValue(github.artifact_total.*.*.$repo.live_bytes, 1), '$bucket_1h', \"max\"), \"max\", 2, 4), 1), \"max\"), \"^consolidateBy\\((.*),.max.\\)$\", \"\\1\"))",
+              "target": "group(limit(sortByMaxima(sortByName(removeEmptySeries(aliasSub(consolidateBy(aliasByNode(groupByNodes(summarize(removeBelowValue(github.artifact_total.*.*.$repo.live_bytes, 1), '$bucket_1h', \"max\"), \"max\", 2, 4), 1), \"max\"), \"^consolidateBy\\((.*),.max.\\)$\", \"\\1\")))), 8), removeEmptySeries(alias(removeBelowValue(diffSeries(sumSeries(removeEmptySeries(aliasSub(consolidateBy(aliasByNode(groupByNodes(summarize(removeBelowValue(github.artifact_total.*.*.$repo.live_bytes, 1), '$bucket_1h', \"max\"), \"max\", 2, 4), 1), \"max\"), \"^consolidateBy\\((.*),.max.\\)$\", \"\\1\"))), sumSeries(limit(sortByMaxima(sortByName(removeEmptySeries(aliasSub(consolidateBy(aliasByNode(groupByNodes(summarize(removeBelowValue(github.artifact_total.*.*.$repo.live_bytes, 1), '$bucket_1h', \"max\"), \"max\", 2, 4), 1), \"max\"), \"^consolidateBy\\((.*),.max.\\)$\", \"\\1\")))), 8))), 1), \"other\")))",
               "textEditor": true
             }
           ],
@@ -5526,7 +5551,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Graphite names each row workflow and repository from the path; the failures are in the chart above. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "Graphite names each row workflow and repository from the path; the failures are in the chart above. Graphite has no rows: each series is reduced over the range to two numbers, Runs and Duration, so Repository and Not successful are not in this table. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -6005,7 +6030,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Minutes that produced nothing. On the account this was written against, one repository burned 8,530 of its 15,111 minutes in a week on runs that failed. Graphite has no conclusion to filter a sum by here, so this is the whole time rather than the wasted part. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others.",
+          "description": "Minutes that produced nothing. On the account this was written against, one repository burned 8,530 of its 15,111 minutes in a week on runs that failed. Graphite has no conclusion to filter a sum by here, so this is the whole time rather than the wasted part. Graphite has no rows: each series is reduced over the range to one number, Total, so Wasted and Share are not in this table.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -6140,7 +6165,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Not the ones that fail sometimes: the ones nobody has switched off. Two workflows here fail on every single run, 108 of 108 and 86 of 86. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others. In Graphite two facts landing in the same storage slot of one series are reduced to one point, so the counts are over what the storage kept. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "Not the ones that fail sometimes: the ones nobody has switched off. Two workflows here fail on every single run, 108 of 108 and 86 of 86. Graphite has no rows: each series is reduced over the range to one number, Failures, so Runs and Failure rate are not in this table. In Graphite two facts landing in the same storage slot of one series are reduced to one point, so the counts are over what the storage kept. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -6282,7 +6307,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Which step, not which job. This is the question that otherwise gets answered by reading job logs, and it comes from a table already collected. Over the runs whose jobs were expanded, which is the newest runs of each sweep and, after a backfill, every run GitHub still holds, which from 1 October 2026 means the repository's retention period, ninety days by default; not every run the run count includes. Steps reach less far back than jobs: GitHub stops serving a job's steps before the job itself, and measured in September 2026 it served none for runs older than about five and a half months. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others. In Graphite two facts landing in the same storage slot of one series are reduced to one point, so the counts are over what the storage kept.",
+          "description": "Which step, not which job. This is the question that otherwise gets answered by reading job logs, and it comes from a table already collected. Over the runs whose jobs were expanded, which is the newest runs of each sweep and, after a backfill, every run GitHub still holds, which from 1 October 2026 means the repository's retention period, ninety days by default; not every run the run count includes. Steps reach less far back than jobs: GitHub stops serving a job's steps before the job itself, and measured in September 2026 it served none for runs older than about five and a half months. In Graphite two facts landing in the same storage slot of one series are reduced to one point, so the counts are over what the storage kept.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -6441,7 +6466,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "What the workflows produced, at the resolution of one artifact. Seven hundred and ninety three artifacts and thirteen gigabytes in a single day here, which is where the storage bill comes from. The eight repositories producing the most in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "What the workflows produced, at the resolution of one artifact. Seven hundred and ninety three artifacts and thirteen gigabytes in a single day here, which is where the storage bill comes from. The eight repositories producing the most in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -6492,7 +6517,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "aliasSub(consolidateBy(aliasByNode(groupByNodes(summarize(github.artifact.*.*.*.$repo.size_bytes, '$bucket_1d', \"sum\"), \"sum\", 3, 5), 1), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\")",
+              "target": "group(limit(sortByTotal(sortByName(aliasSub(consolidateBy(aliasByNode(groupByNodes(summarize(github.artifact.*.*.*.$repo.size_bytes, '$bucket_1d', \"sum\"), \"sum\", 3, 5), 1), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))), 8), removeEmptySeries(alias(removeBelowValue(diffSeries(sumSeries(aliasSub(consolidateBy(aliasByNode(groupByNodes(summarize(github.artifact.*.*.*.$repo.size_bytes, '$bucket_1d', \"sum\"), \"sum\", 3, 5), 1), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\")), sumSeries(limit(sortByTotal(sortByName(aliasSub(consolidateBy(aliasByNode(groupByNodes(summarize(github.artifact.*.*.*.$repo.size_bytes, '$bucket_1d', \"sum\"), \"sum\", 3, 5), 1), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))), 8))), 1), \"other\")))",
               "textEditor": true
             }
           ],
@@ -6501,7 +6526,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Artifact storage, and how much of it was counted. Three counts, because the live size is on neither of the other two: Declared is GitHub's own total and counts the artifacts it has already expired, Walked is how far the walk went, and Live is the artifacts still held among those, which is what the live size is the size of. A sweep's walk stops at five pages, five hundred artifacts, and any walk stops sooner when a page of the listing fails, the pass writing what it had read: either way Walked is lower than Declared and the live size is a floor rather than a total. Here it is short by a factor of fifty six, and without these columns the tile above would say so nowhere. All four are the newest row of each repository, which is the one the tile reads. Graphite has no rows: each series is one number, so this table keeps the live size, the newest of each repository, and drops the three counts, Declared, Walked and Live, which leaves it unable to say whether that size is a floor.",
+          "description": "Artifact storage, and how much of it was counted. Three counts, because the live size is on neither of the other two: Declared is GitHub's own total and counts the artifacts it has already expired, Walked is how far the walk went, and Live is the artifacts still held among those, which is what the live size is the size of. A sweep's walk stops at five pages, five hundred artifacts, and any walk stops sooner when a page of the listing fails, the pass writing what it had read: either way Walked is lower than Declared and the live size is a floor rather than a total. Here it is short by a factor of fifty six, and without these columns the tile above would say so nowhere. All four are the newest row of each repository, which is the one the tile reads. Graphite has no rows: each series is reduced over the range to one number, Live size, so Declared, Walked and Live are not in this table. Without the three counts it cannot say whether that size is a floor.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -6839,7 +6864,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Additions above the axis, deletions below, per day. This is the answer to GitHub's own code frequency endpoint, which returns 202 with an empty body forever on a personal account. This panel keeps its own range of ninety days whatever the page is set to. Every commit is a row of its own in the store, and at about ten months of them the query is refused for opening too many files, which the reader would see as an empty panel rather than as an error. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "Additions above the axis, deletions below, per day. This is the answer to GitHub's own code frequency endpoint, which returns 202 with an empty body forever on a personal account. This panel keeps its own range of ninety days whatever the page is set to. Every commit is a row of its own in the store, and at about ten months of them the query is refused for opening too many files, which the reader would see as an empty panel rather than as an error. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -6937,7 +6962,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Pushes, branch creations and deletions, merges and force pushes, per hour. The only place a force push is recorded at all, and as perishable as traffic: a hundred entries covered twenty six hours here. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "Pushes, branch creations and deletions, merges and force pushes, per hour. The only place a force push is recorded at all, and as perishable as traffic: a hundred entries covered twenty six hours here. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under an hour, which is six hours over a month and a day over a year.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -6998,7 +7023,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "The twenty authors with the most commits in the window. The repository picker holds the repositories the sweeps collect: forks too when `include_forks` is on, and archived ones when `include_archived` is on and for a while after a backfill, which collects them either way. A count here is over every repository the picker holds until it is narrowed. On an account with forks of busy projects the upstream authors are the top of this table, which is the honest answer to the question as asked: narrow the picker to read it as the account's own work. This panel keeps its own range of ninety days whatever the page is set to. Every commit is a row of its own in the store, and at about ten months of them the query is refused for opening too many files, which the reader would see as an empty panel rather than as an error. Graphite reduces the churn of each author: how many commits, and the median. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others.",
+          "description": "The twenty authors with the most commits in the window. The repository picker holds the repositories the sweeps collect: forks too when `include_forks` is on, and archived ones when `include_archived` is on and for a while after a backfill, which collects them either way. A count here is over every repository the picker holds until it is narrowed. On an account with forks of busy projects the upstream authors are the top of this table, which is the honest answer to the question as asked: narrow the picker to read it as the account's own work. This panel keeps its own range of ninety days whatever the page is set to. Every commit is a row of its own in the store, and at about ten months of them the query is refused for opening too many files, which the reader would see as an empty panel rather than as an error. Graphite reduces the churn of each author: how many commits, and the median. Graphite has no rows: each series is reduced over the range to two numbers, Commits and Lines per commit, so Added and Removed are not in this table.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -7378,7 +7403,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Whether the commit itself came out green. A workflow run that failed says a job failed, which is not the same claim: of fifty commits measured here, twenty seven left the default branch red. This panel keeps its own range of ninety days whatever the page is set to. Every commit is a row of its own in the store, and at about ten months of them the query is refused for opening too many files, which the reader would see as an empty panel rather than as an error. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year. Graphite keeps no strings, so the split is red against not red: the commits whose gate failed, and the other commits a gate ran on.",
+          "description": "Whether the commit itself came out green. A workflow run that failed says a job failed, which is not the same claim: of fifty commits measured here, twenty seven left the default branch red. This panel keeps its own range of ninety days whatever the page is set to. Every commit is a row of its own in the store, and at about ten months of them the query is refused for opening too many files, which the reader would see as an empty panel rather than as an error. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there. Graphite keeps no strings, so the split is red against not red: the commits whose gate failed, and the other commits a gate ran on.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -7537,7 +7562,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Everything Actions runs is already in the two sections above, in far more detail. These are the other gates: the code quality service, the dependency bot, the commit statuses an older integration still writes. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others. In Graphite two facts landing in the same storage slot of one series are reduced to one point, so the counts are over what the storage kept.",
+          "description": "Everything Actions runs is already in the two sections above, in far more detail. These are the other gates: the code quality service, the dependency bot, the commit statuses an older integration still writes. Graphite has no rows: each series is reduced over the range to one number, Runs, so Failed is not in this table. In Graphite two facts landing in the same storage slot of one series are reduced to one point, so the counts are over what the storage kept.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -7698,7 +7723,7 @@
       "panels": [
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "The labels in use, per repository, and the link is that label's issue list. Only the labels something carries are collected, so a label nobody applied is not a row. Graphite names each row repository and label from the path. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "The labels in use, per repository, and the link is that label's issue list. Only the labels something carries are collected, so a label nobody applied is not a row. Graphite names each row repository and label from the path. Graphite has no rows: each series is reduced over the range to one number, Used, so Issues and Pull requests are not in this table. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -7848,7 +7873,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "The due date is collected as a field when a milestone has one, but it is not shown here: InfluxDB creates a column the first time it is written, so a query naming it fails outright on a database where no milestone ever had a due date. Graphite names each row repository, milestone and state from the path. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "The due date is collected as a field when a milestone has one, but it is not shown here: InfluxDB creates a column the first time it is written, so a query naming it fails outright on a database where no milestone ever had a due date. Graphite names each row repository, milestone and state from the path. Graphite has no rows: each series is reduced over the range to one number, Progress, so Repository, State, Issues and Pull requests are not in this table. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -8010,7 +8035,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Dated when each fork was created, which the fork count on a repository never says. The eight repositories that gained the most in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "Dated when each fork was created, which the fork count on a repository never says. The eight repositories that gained the most in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -8062,7 +8087,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "aliasSub(consolidateBy(aliasByNode(groupByNodes(summarize(isNonNull(github.fork.*.*.*.$repo.forks), '$bucket_1d', \"sum\"), \"sum\", 3, 5), 1), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\")",
+              "target": "group(limit(sortByTotal(sortByName(aliasSub(consolidateBy(aliasByNode(groupByNodes(summarize(isNonNull(github.fork.*.*.*.$repo.forks), '$bucket_1d', \"sum\"), \"sum\", 3, 5), 1), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))), 8), removeEmptySeries(alias(removeBelowValue(diffSeries(sumSeries(aliasSub(consolidateBy(aliasByNode(groupByNodes(summarize(isNonNull(github.fork.*.*.*.$repo.forks), '$bucket_1d', \"sum\"), \"sum\", 3, 5), 1), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\")), sumSeries(limit(sortByTotal(sortByName(aliasSub(consolidateBy(aliasByNode(groupByNodes(summarize(isNonNull(github.fork.*.*.*.$repo.forks), '$bucket_1d', \"sum\"), \"sum\", 3, 5), 1), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))), 8))), 1), \"other\")))",
               "textEditor": true
             }
           ],
@@ -8071,7 +8096,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Whether a fork was ever pushed to separates a derivative from a bookmark, which most forks are. Idle is the time since that push, counted from the row's own date, so it is right when the panel is drawn rather than when the last sweep ran. Graphite names each row forker and repository from the path and keeps one number per row, so whether it was pushed to is missing. It cannot subtract the row's own date from now either, so the column is how long after the fork its last push came, which is negative for a fork nobody has pushed to: those inherit the parent's last push. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "Whether a fork was ever pushed to separates a derivative from a bookmark, which most forks are. Idle is the time since that push, counted from the row's own date, so it is right when the panel is drawn rather than when the last sweep ran. Graphite names each row forker and repository from the path and keeps one number per row, so whether it was pushed to is missing. It cannot subtract the row's own date from now either, so the column is how long after the fork its last push came, which is negative for a fork nobody has pushed to: those inherit the parent's last push. Graphite has no rows: each series is reduced over the range to one number, Pushed after, so Forked and Idle are not in this table. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -8212,7 +8237,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Discussions opened in the range, by category and whether they were answered. Graphite keeps no strings and cannot group by the answered flag, so each category is one row and Answered is the share of its discussions that have an answer. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others.",
+          "description": "Discussions opened in the range, by category and whether they were answered. Graphite keeps no strings and cannot group by the answered flag, so each category is one row and Answered is the share of its discussions that have an answer. Graphite has no rows: each series is reduced over the range to two numbers, Discussions and Answered, so Comments each and Upvotes each are not in this table.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -8381,7 +8406,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "The newest fifty, whatever the range: an account has a handful, and a range of a month hid all but one of them. Answered reads n/a where the category takes no answer at all, an announcement or an idea. Graphite names each row repository, number and category from the path and keeps no text, so the title is missing. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "The newest fifty, whatever the range: an account has a handful, and a range of a month hid all but one of them. Answered reads n/a where the category takes no answer at all, an announcement or an idea. Graphite names each row repository, number and category from the path and keeps no text, so the title is missing. Graphite has no rows: each series is reduced over the range to one number, Comments, so Opened and Answered are not in this table. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -8483,7 +8508,7 @@
                       },
                       {
                         "options": {
-                          "match": "null",
+                          "match": "null+nan",
                           "result": {
                             "color": "text",
                             "index": 4,
@@ -8579,7 +8604,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Labeled, closed, reopened, review requested, renamed: the moment something changed, which the state of an issue does not record. A reopening exists in no other measurement at all. The eight commonest in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "Labeled, closed, reopened, review requested, renamed: the moment something changed, which the state of an issue does not record. A reopening exists in no other measurement at all. The eight commonest in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -8631,7 +8656,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "aliasSub(consolidateBy(groupByNode(summarize(isNonNull(github.issue_event.*.*.*.*.*.*.*.*.*.$repo.*.*.events), '$bucket_1d', \"sum\"), 4, \"sum\"), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\")",
+              "target": "group(limit(sortByTotal(sortByName(aliasSub(consolidateBy(groupByNode(summarize(isNonNull(github.issue_event.*.*.*.*.*.*.*.*.*.$repo.*.*.events), '$bucket_1d', \"sum\"), 4, \"sum\"), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))), 8), removeEmptySeries(alias(removeBelowValue(diffSeries(sumSeries(aliasSub(consolidateBy(groupByNode(summarize(isNonNull(github.issue_event.*.*.*.*.*.*.*.*.*.$repo.*.*.events), '$bucket_1d', \"sum\"), 4, \"sum\"), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\")), sumSeries(limit(sortByTotal(sortByName(aliasSub(consolidateBy(groupByNode(summarize(isNonNull(github.issue_event.*.*.*.*.*.*.*.*.*.$repo.*.*.events), '$bucket_1d', \"sum\"), 4, \"sum\"), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))), 8))), 1), \"other\")))",
               "textEditor": true
             }
           ],
@@ -8640,7 +8665,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Comments on issues and pull requests, in any repository. The ones outside this account are the half a sweep over one's own repositories cannot see. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others. In Graphite two facts landing in the same storage slot of one series are reduced to one point, so the counts are over what the storage kept.",
+          "description": "Comments on issues and pull requests, in any repository. The ones outside this account are the half a sweep over one's own repositories cannot see. Graphite has no rows: each series is reduced over the range to one number, Comments, so Elsewhere is not in this table. In Graphite two facts landing in the same storage slot of one series are reduced to one point, so the counts are over what the storage kept.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -8778,7 +8803,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Discussions are the one surface where the work is almost entirely in other people's repositories: gh_discussion sees three rows inside this account, and this sees sixty six across twenty six repositories. Each comment counts once, however many rows a store holds of it, which Answers elsewhere explains. Graphite has no rows: each series is one number, so this table keeps the comments of each repository and drops the accepted answers and the upvotes.",
+          "description": "Discussions are the one surface where the work is almost entirely in other people's repositories: gh_discussion sees three rows inside this account, and this sees sixty six across twenty six repositories. Each comment counts once, however many rows a store holds of it, which Answers elsewhere explains. Graphite has no rows: each series is reduced over the range to one number, Comments, so Accepted answers and Upvotes are not in this table.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -8916,7 +8941,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Every comment this account left in a discussion of a repository it does not own, newest first and whatever the range; Accepted says whether the maintainer marked it the answer. The link opens the comment in its thread. One row per comment, accepted when any of its rows says so. Until 2.6.1 whether a comment was accepted was part of its row's identity, so a store written before then holds a comment read before and after it was accepted as two rows, and one written by 2.6.0 and 2.6.1 holds a third without that part. An answer accepted before 2.6.1 and taken back since reads accepted until gh_discussion_comment is dropped and filled again with a backfill. Graphite names each row by repository and number from the path, and Accepted is the comment's answers leaf. Graphite keeps no strings, so neither the title nor the url exists there. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others. Graphite answers only inside the dashboard range, so years outside it are missing. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "Every comment this account left in a discussion of a repository it does not own, newest first and whatever the range; Accepted says whether the maintainer marked it the answer. The link opens the comment in its thread. One row per comment, accepted when any of its rows says so. Until 2.6.1 whether a comment was accepted was part of its row's identity, so a store written before then holds a comment read before and after it was accepted as two rows, and one written by 2.6.0 and 2.6.1 holds a third without that part. An answer accepted before 2.6.1 and taken back since reads accepted until gh_discussion_comment is dropped and filled again with a backfill. Graphite names each row by repository and number from the path, and Accepted is the comment's answers leaf. Graphite keeps no strings, so neither the title nor the url exists there. Graphite has no rows: each series is reduced over the range to one number, Accepted, so Title and When are not in this table. Graphite answers only inside the dashboard range, so years outside it are missing. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -9154,7 +9179,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under an hour, which is six hours over a month and a day over a year.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -9215,7 +9240,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Only the host is stored. The path of a webhook URL usually carries a secret. A retried delivery is a different fact from a first one that failed, and counting them together makes an endpoint look worse than it is. Graphite names each row host, repository and whether the delivery succeeded from the path, so the failures are their own rows. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others.",
+          "description": "Only the host is stored. The path of a webhook URL usually carries a secret. A retried delivery is a different fact from a first one that failed, and counting them together makes an endpoint look worse than it is. Graphite names each row host, repository and whether the delivery succeeded from the path, so the failures are their own rows. Graphite has no rows: each series is reduced over the range to two numbers, Deliveries and Latency, so Failed and Retried are not in this table.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -9654,7 +9679,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "The panel beside this one is built from deliveries, so a hook that has never delivered anything appears in it nowhere. This is the inventory: an active hook with no traffic is the interesting row. Hook is GitHub's id for it, the number in its settings page: GitHub names every webhook \"web\", so the name told nothing apart. Graphite has no rows: each series is one number, so this table keeps the events each hook subscribes to and drops its id and whether it is active.",
+          "description": "The panel beside this one is built from deliveries, so a hook that has never delivered anything appears in it nowhere. This is the inventory: an active hook with no traffic is the interesting row. Hook is GitHub's id for it, the number in its settings page: GitHub names every webhook \"web\", so the name told nothing apart. Graphite has no rows: each series is reduced over the range to one number, Events subscribed, so Hook and Active are not in this table.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -9772,7 +9797,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "The same question the deploy keys table asks, about deployment targets: one environment here has not been touched in one thousand one hundred and seventy seven days. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "The same question the deploy keys table asks, about deployment targets: one environment here has not been touched in one thousand one hundred and seventy seven days. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -10026,7 +10051,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "What each branch protection enforces. `gh_repo_policy.branch_protection_rules` counts these and stops there, so a protection that is switched on and asks for nothing looks the same as one that blocks force pushes and demands three checks. Reviews is the number of required approvals, Threads whether every conversation must be resolved, and Checks how many status checks are required. Reviews is left empty rather than filled with a zero where GitHub reports no count at all, which is a different state from asking for none. Graphite names each row repository and pattern from the path and keeps one number per row, the status checks, so what else the protection requires is missing. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "What each branch protection enforces. `gh_repo_policy.branch_protection_rules` counts these and stops there, so a protection that is switched on and asks for nothing looks the same as one that blocks force pushes and demands three checks. Reviews is the number of required approvals, Threads whether every conversation must be resolved, and Checks how many status checks are required. Reviews is left empty rather than filled with a zero where GitHub reports no count at all, which is a different state from asking for none. Graphite names each row repository and pattern from the path and keeps one number per row, the status checks, so what else the protection requires is missing. Graphite has no rows: each series is reduced over the range to one number, Checks, so Reviews, Signatures, Linear, Force push and Threads are not in this table. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -10594,7 +10619,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "By environment. Dated at each deployment's own creation, not at the sweep that read it and not at its latest status: the status goes on moving for years afterwards, and the deployment happened once. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "By environment. Dated at each deployment's own creation, not at the sweep that read it and not at its latest status: the status goes on moving for years afterwards, and the deployment happened once. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -10655,7 +10680,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "To status is the median time the deployment took to report one; Live for the median time it stayed the current one. They are the same subtraction against two different meanings, so each keeps its own field and neither is written over the other. The pending rows are kept on purpose: one deployment on this account has been held at an approval for seventy four days, and a filter that hid the states that are not terminal would delete the most interesting row. Graphite names each row repository and environment from the path and keeps no strings, so the outcome is out of reach there: Successes counts the success flag, and the pending deployments are not told apart. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others. Graphite keeps no string beside a number, so the Link and Live columns of the InfluxDB dashboard are absent here.",
+          "description": "To status is the median time the deployment took to report one; Live for the median time it stayed the current one. They are the same subtraction against two different meanings, so each keeps its own field and neither is written over the other. The pending rows are kept on purpose: one deployment on this account has been held at an approval for seventy four days, and a filter that hid the states that are not terminal would delete the most interesting row. Graphite names each row repository and environment from the path and keeps no strings, so the outcome is out of reach there: Successes counts the success flag, and the pending deployments are not told apart. Graphite has no rows: each series is reduced over the range to two numbers, Deployments and Successes, so To status, Live for and Pending are not in this table. Graphite keeps no string beside a number, so the Link and Live columns of the InfluxDB dashboard are absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -11046,7 +11071,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Download fetches the file itself, which is what an asset's url is; the asset's name opens the release page it was published on. Graphite names each row repository, tag and asset from the path. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others. Graphite keeps no string beside a number, so the Download and Link columns of the InfluxDB dashboard are absent here.",
+          "description": "Download fetches the file itself, which is what an asset's url is; the asset's name opens the release page it was published on. Graphite names each row repository, tag and asset from the path. Graphite has no rows: each series is reduced over the range to one number, Downloads, so Tag, Repository and Size are not in this table. Graphite keeps no string beside a number, so the Download and Link columns of the InfluxDB dashboard are absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -11200,7 +11225,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "The counter is cumulative, so what matters is the difference across the range. A day of it here: ninety seven per cent of the downloads are one Linux binary and its checksum file, which is an installer rather than a person. Graphite names each row repository, tag and asset from the path, and differentiates the series itself. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others. Graphite keeps no string beside a number, so the Download column of the InfluxDB dashboard is absent here.",
+          "description": "The counter is cumulative, so what matters is the difference across the range. A day of it here: ninety seven per cent of the downloads are one Linux binary and its checksum file, which is an installer rather than a person. Graphite names each row repository, tag and asset from the path, and differentiates the series itself. Graphite has no rows: each series is reduced over the range to one number, Gained, so Total, Tag and Repository are not in this table. Graphite keeps no string beside a number, so the Download column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -11704,7 +11729,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "The open count per severity, added up across repositories and ecosystems from the newest reading of each. A reading taken at each sweep, so the curve starts the day the collector did. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "The open count per severity, added up across repositories and ecosystems from the newest reading of each. A reading taken at each sweep, so the curve starts the day the collector did. One point is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -11968,7 +11993,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "That the scan ran at all, which the alert list cannot tell you. GitHub prunes these, so they only exist if they were captured. The eight tools that ran the most in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "That the scan ran at all, which the alert list cannot tell you. GitHub prunes these, so they only exist if they were captured. The eight tools that ran the most in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -12020,7 +12045,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "aliasSub(consolidateBy(groupByNode(summarize(isNonNull(github.code_scanning_analysis.*.*.*.*.$repo.*.*.analyses), '$bucket_1d', \"sum\"), 7, \"sum\"), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\")",
+              "target": "group(limit(sortByTotal(sortByName(aliasSub(consolidateBy(groupByNode(summarize(isNonNull(github.code_scanning_analysis.*.*.*.*.$repo.*.*.analyses), '$bucket_1d', \"sum\"), 7, \"sum\"), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))), 8), removeEmptySeries(alias(removeBelowValue(diffSeries(sumSeries(aliasSub(consolidateBy(groupByNode(summarize(isNonNull(github.code_scanning_analysis.*.*.*.*.$repo.*.*.analyses), '$bucket_1d', \"sum\"), 7, \"sum\"), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\")), sumSeries(limit(sortByTotal(sortByName(aliasSub(consolidateBy(groupByNode(summarize(isNonNull(github.code_scanning_analysis.*.*.*.*.$repo.*.*.analyses), '$bucket_1d', \"sum\"), 7, \"sum\"), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))), 8))), 1), \"other\")))",
               "textEditor": true
             }
           ],
@@ -12174,7 +12199,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Dependabot alerts that were fixed or dismissed, newest first, with the advisory each one was and how long it stayed open. Outcome is which of the two it was, read from the alert's own state rather than from the reason it was dismissed: an account that has only ever fixed its alerts has never written such a reason, and a column these stores were never given does not exist to be selected. The score is there because the word rounds it away: one alert in the measured account scores 9.3 under a word whose mean is 6.1. It is the v4 score where the advisory carries one. Graphite names each row repository, severity and package from the path and keeps no text, so the advisory is missing. In Graphite two facts landing in the same storage slot of one series are reduced to one point, so the medians are over what the storage kept. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "Dependabot alerts that were fixed or dismissed, newest first, with the advisory each one was and how long it stayed open. Outcome is which of the two it was, read from the alert's own state rather than from the reason it was dismissed: an account that has only ever fixed its alerts has never written such a reason, and a column these stores were never given does not exist to be selected. The score is there because the word rounds it away: one alert in the measured account scores 9.3 under a word whose mean is 6.1. It is the v4 score where the advisory carries one. Graphite names each row repository, severity and package from the path and keeps no text, so the advisory is missing. Graphite has no rows: each series is reduced over the range to two numbers, Alerts and Time to resolve, so Raised, CVSS and Outcome are not in this table. In Graphite two facts landing in the same storage slot of one series are reduced to one point, so the medians are over what the storage kept. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -12356,7 +12381,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "The panel beside this one says the scan ran. This says what it found, which is what explains a jump in the alert count: one tool here returns sixty three results in three runs and another fifty two in nine hundred and fifty three. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others. In Graphite two facts landing in the same storage slot of one series are reduced to one point, so the totals are over what the storage kept.",
+          "description": "The panel beside this one says the scan ran. This says what it found, which is what explains a jump in the alert count: one tool here returns sixty three results in three runs and another fifty two in nine hundred and fifty three. Graphite has no rows: each series is reduced over the range to one number, Results, so Runs and Rules are not in this table. In Graphite two facts landing in the same storage slot of one series are reduced to one point, so the totals are over what the storage kept.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -12712,7 +12737,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "GitHub's own default setup, and nothing else. A repository can answer not-configured here and still run CodeQL from a workflow it wrote itself, which the Code scanning runs panel above sees and this one does not. In not-configured, `languages` is what GitHub detected in the repository, not what anything analyzed. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others. The number it keeps is `days_since_change`, which GitHub gives only for a setup it has actually changed, so a repository that answers not-configured or unavailable has no series here and no row at all: the other four dashboards list it with the cell empty. The state, the query suite and the schedule are part of the path, so a setup that changed one of them inside the range is two rows, the old and the new.",
+          "description": "GitHub's own default setup, and nothing else. A repository can answer not-configured here and still run CodeQL from a workflow it wrote itself, which the Code scanning runs panel above sees and this one does not. In not-configured, `languages` is what GitHub detected in the repository, not what anything analyzed. Graphite has no rows: each series is reduced over the range to one number, Last changed, so Languages is not in this table. The number it keeps is `days_since_change`, which GitHub gives only for a setup it has actually changed, so a repository that answers not-configured or unavailable has no series here and no row at all: the other four dashboards list it with the cell empty. The state, the query suite and the schedule are part of the path, so a setup that changed one of them inside the range is two rows, the old and the new.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -13000,7 +13025,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Secrets, and when they were last rotated. Both numbers or the panel says nothing: days_since_rotation equals age_days until somebody rotates the secret, so the gap between the two columns is the only evidence a credential was ever replaced. The names are public already, written in the workflow that reads them; the values never leave GitHub. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others.",
+          "description": "Secrets, and when they were last rotated. Both numbers or the panel says nothing: days_since_rotation equals age_days until somebody rotates the secret, so the gap between the two columns is the only evidence a credential was ever replaced. The names are public already, written in the workflow that reads them; the values never leave GitHub. Graphite has no rows: each series is reduced over the range to one number, Last rotated, so Age is not in this table.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -13339,7 +13364,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Gross cost per day. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "Gross cost per day. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -13399,7 +13424,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Runner minutes per day, by SKU. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "Runner minutes per day, by SKU. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -13460,7 +13485,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Price is what explains a small quantity costing more than a large one: thirty thousand macOS minutes cost more than two hundred and forty thousand Linux ones. A repository can appear here and in no other panel, because the list that bills and the list that is swept are not the same list. Every figure here is itemized on the bill itself, which the panel links to. Graphite names each row repository and SKU from the path. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others.",
+          "description": "Price is what explains a small quantity costing more than a large one: thirty thousand macOS minutes cost more than two hundred and forty thousand Linux ones. A repository can appear here and in no other panel, because the list that bills and the list that is swept are not the same list. Every figure here is itemized on the bill itself, which the panel links to. Graphite names each row repository and SKU from the path. Graphite has no rows: each series is reduced over the range to one number, Gross, so Quantity, Unit, Price and Net are not in this table.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -13665,7 +13690,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "The total says a repository holds twelve gigabytes. This says which key holds them and which has not been touched for a week, which is what decides what GitHub evicts at the ten gigabyte ceiling. It is what each repository holds now: the entries of its newest snapshot in the range, the last day the collector read its caches, and none of the refs GitHub has evicted since an earlier one. Graphite cannot find each repository's newest day, so it reads the last UTC day of the range: from midnight UTC until the day's first pass of the `actions` family, within a quarter of an hour at the default cadence, the table is empty, and a repository that pass could not read is missing from it. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others.",
+          "description": "The total says a repository holds twelve gigabytes. This says which key holds them and which has not been touched for a week, which is what decides what GitHub evicts at the ten gigabyte ceiling. It is what each repository holds now: the entries of its newest snapshot in the range, the last day the collector read its caches, and none of the refs GitHub has evicted since an earlier one. Graphite cannot find each repository's newest day, so it reads the last UTC day of the range: from midnight UTC until the day's first pass of the `actions` family, within a quarter of an hour at the default cadence, the table is empty, and a repository that pass could not read is missing from it. Graphite has no rows: each series is reduced over the range to one number, Size, so Entries and Days since use are not in this table.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -13807,7 +13832,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "GitHub caps a repository at ten gigabytes and evicts the least recently used entry past it. The bar is each repository's cache against that cap, so one that has reached the red end is throwing caches away on every run and the panel above says which key goes. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others.",
+          "description": "GitHub caps a repository at ten gigabytes and evicts the least recently used entry past it. The bar is each repository's cache against that cap, so one that has reached the red end is throwing caches away on every run and the panel above says which key goes. Graphite has no rows: each series is reduced over the range to one number, Cache, so Entries is not in this table.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -13967,7 +13992,7 @@
       "panels": [
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "GitHub keeps only the last 300 events, none older than thirty days, so this is only as complete as the sweep interval allowed. The eight busiest types in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "GitHub keeps only the last 300 events, none older than thirty days, so this is only as complete as the sweep interval allowed. The eight busiest types in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under an hour, which is six hours over a month and a day over a year.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -14019,7 +14044,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "aliasSub(consolidateBy(groupByNode(summarize(github.event.*.*.*.*.*.*.events, '$bucket_1h', \"sum\"), -2, \"sum\"), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\")",
+              "target": "group(limit(sortByTotal(sortByName(aliasSub(consolidateBy(groupByNode(summarize(github.event.*.*.*.*.*.*.events, '$bucket_1h', \"sum\"), -2, \"sum\"), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))), 8), removeEmptySeries(alias(removeBelowValue(diffSeries(sumSeries(aliasSub(consolidateBy(groupByNode(summarize(github.event.*.*.*.*.*.*.events, '$bucket_1h', \"sum\"), -2, \"sum\"), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\")), sumSeries(limit(sortByTotal(sortByName(aliasSub(consolidateBy(groupByNode(summarize(github.event.*.*.*.*.*.*.events, '$bucket_1h', \"sum\"), -2, \"sum\"), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))), 8))), 1), \"other\")))",
               "textEditor": true
             }
           ],
@@ -14079,7 +14104,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(aliasSub(consolidateBy(group(limit(sortByTotal(sortByName(groupByNode(github.event.*.*.*.*.*.*.events, -2, \"sum\"))), 8), alias(removeBelowValue(diffSeries(sumSeries(groupByNode(github.event.*.*.*.*.*.*.events, -2, \"sum\")), sumSeries(limit(sortByTotal(sortByName(groupByNode(github.event.*.*.*.*.*.*.events, -2, \"sum\"))), 8))), 1), \"other\")), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))",
+              "target": "removeEmptySeries(aliasSub(consolidateBy(group(limit(sortByTotal(sortByName(groupByNode(github.event.*.*.*.*.*.*.events, -2, \"sum\"))), 8), removeEmptySeries(alias(removeBelowValue(diffSeries(sumSeries(groupByNode(github.event.*.*.*.*.*.*.events, -2, \"sum\")), sumSeries(limit(sortByTotal(sortByName(groupByNode(github.event.*.*.*.*.*.*.events, -2, \"sum\"))), 8))), 1), \"other\"))), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))",
               "textEditor": true
             }
           ],
@@ -14171,7 +14196,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(aliasSub(consolidateBy(limit(sortByTotal(groupByNode(github.event.*.*.*.*.*.*.events, 3, \"sum\")), 20), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))",
+              "target": "removeEmptySeries(aliasSub(consolidateBy(group(limit(sortByTotal(sortByName(groupByNode(github.event.*.*.*.*.*.*.events, 3, \"sum\"))), 10), removeEmptySeries(alias(removeBelowValue(diffSeries(sumSeries(groupByNode(github.event.*.*.*.*.*.*.events, 3, \"sum\")), sumSeries(limit(sortByTotal(sortByName(groupByNode(github.event.*.*.*.*.*.*.events, 3, \"sum\"))), 10))), 1), \"other\"))), \"sum\"), \"^consolidateBy\\((.*),.sum.\\)$\", \"\\1\"))",
               "textEditor": true
             }
           ],
@@ -14329,7 +14354,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -14666,7 +14691,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Whether the account stars small projects or famous ones, which the language breakdown cannot say. Graphite has no rows: each series is one number, so this table keeps the star count of each repository starred in the range and drops when it was starred and its language. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "Whether the account stars small projects or famous ones, which the language breakdown cannot say. Graphite has no rows: each series is reduced over the range to one number, Its stars, so When and Language are not in this table. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -15343,7 +15368,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Age is how long since the repository was created, idle how long since the last push. Network is the whole fork tree, which the fork count of a repository does not include: a fork of a fork is in one and not the other. Graphite names each row from the path. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "Age is how long since the repository was created, idle how long since the last push. Network is the whole fork tree, which the fork count of a repository does not include: a fork of a fork is in one and not the other. Graphite names each row from the path. Graphite has no rows: each series is reduced over the range to one number, Stars, so Forks, Network, Open issues, Watchers, Size, Age and Idle are not in this table. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -15685,7 +15710,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Version counts come from walking the version list: the documented version_count field arrives as zero for a personal account's packages. Graphite names each row package and type from the path. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "Version counts come from walking the version list: the documented version_count field arrives as zero for a personal account's packages. Graphite names each row package and type from the path. Graphite has no rows: each series is reduced over the range to one number, Versions, so Type, Tagged and Idle are not in this table. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -15824,7 +15849,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Graphite carries no description: it is text. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "Graphite carries no description: it is text. Graphite has no rows: each series is reduced over the range to one number, Files, so Description, Comments, Size and Idle are not in this table. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -16146,7 +16171,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "What each repository allows, in the batch that already costs one point of GraphQL. CODEOWNERS errors is the one that fails silently: a broken file stops requesting reviews and says nothing. Graphite has no rows: each series is one number, so this table keeps the protection rules of each repository and drops the other settings. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "What each repository allows, in the batch that already costs one point of GraphQL. CODEOWNERS errors is the one that fails silently: a broken file stops requesting reviews and says nothing. Graphite has no rows: each series is reduced over the range to one number, Protection rules, so Security policy, Delete on merge, Auto merge, Issue templates and CODEOWNERS errors are not in this table. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -16372,7 +16397,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "The keys that sign and open everything. Two of the SSH keys here have never been used at all, and the expiry of the GPG key is the kind of date nobody remembers until the signatures stop verifying. All of them are managed in one place, the keys settings, which is where every row links. Graphite has no rows: each series is one number, so this table keeps the days since each key was last used and drops whether it was ever used and when it expires. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "The keys that sign and open everything. Two of the SSH keys here have never been used at all, and the expiry of the GPG key is the kind of date nobody remembers until the signatures stop verifying. All of them are managed in one place, the keys settings, which is where every row links. Graphite has no rows: each series is reduced over the range to one number, Days since use, so Never used and Days to expiry are not in this table. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -16498,7 +16523,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(sortByMaxima(groupByNode(keepLastValue(github.dependency_license.*.*.*.$repo.packages), 3, \"sum\")))",
+              "target": "removeEmptySeries(group(limit(sortByMaxima(sortByName(groupByNode(keepLastValue(github.dependency_license.*.*.*.$repo.packages), 3, \"sum\"))), 8), removeEmptySeries(alias(removeBelowValue(diffSeries(sumSeries(groupByNode(keepLastValue(github.dependency_license.*.*.*.$repo.packages), 3, \"sum\")), sumSeries(limit(sortByMaxima(sortByName(groupByNode(keepLastValue(github.dependency_license.*.*.*.$repo.packages), 3, \"sum\"))), 8))), 1), \"other\"))))",
               "textEditor": true
             }
           ],
@@ -16530,7 +16555,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "What the profile links to. It is small and it is a check rather than a measurement: these are the same links a personal site publishes as sameAs, and a row that disappears is the signal. Graphite has no strings either, so this is presence by provider and there is no URL column. Graphite keeps no string beside a number, so the URL column of the InfluxDB dashboard is absent here.",
+          "description": "What the profile links to. It is small and it is a check rather than a measurement: these are the same links a personal site publishes as sameAs, and a row that disappears is the signal. Graphite has no strings either, so this is presence by provider. Graphite keeps no string beside a number, so the URL column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -16644,7 +16669,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Four rows per repository: dependabot, codeowners, security and funding. Path is the one in force, or where the file would go if it existed, because a file at the wrong path is a file that does nothing and gh_repo_policy does not carry it. Changes counts every commit against that path over the whole life of the repository, so a file that is gone but has a history was deleted and this row is dated at the deletion. The crossing worth reading: a dependabot row with no blocks, which is a repository absent from the table beside this one, next to vulnerability alerts off in gh_repo_policy, is a repository that receives no dependency updates by either route. Each row is dated at the last commit that touched the path, so this reads the whole history rather than the dashboard range: a file nobody has touched in a year would otherwise vanish as you narrow the range. Graphite has no path either: it is a string. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others. Graphite answers only inside the dashboard range, so years outside it are missing. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "Four rows per repository: dependabot, codeowners, security and funding. Path is the one in force, or where the file would go if it existed, because a file at the wrong path is a file that does nothing and gh_repo_policy does not carry it. Changes counts every commit against that path over the whole life of the repository, so a file that is gone but has a history was deleted and this row is dated at the deletion. The crossing worth reading: a dependabot row with no blocks, which is a repository absent from the table beside this one, next to vulnerability alerts off in gh_repo_policy, is a repository that receives no dependency updates by either route. Each row is dated at the last commit that touched the path, so this reads the whole history rather than the dashboard range: a file nobody has touched in a year would otherwise vanish as you narrow the range. Graphite has no path either: it is a string. Graphite has no rows: each series is reduced over the range to one number, Present, so Path and Changes are not in this table. Graphite answers only inside the dashboard range, so years outside it are missing. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -16822,7 +16847,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "What each dependabot.yml actually updates, and how often. One ecosystem appears more than once when it is configured per directory, which is exactly what blocks counts: five ecosystems across seven blocks is one repository here. Dated from dependabot.yml itself, at the last commit that touched it, so this reads the whole history rather than the dashboard range, and only the newest version of each file: an ecosystem dropped from it, or a schedule moved from daily to weekly, leaves no second row behind. A repository that deleted the file altogether writes no block at all and so keeps its last ones here; the dependabot row beside it in Policy files, with Present at zero, is what says so. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others. Graphite answers only inside the dashboard range, so years outside it are missing. Neither can it read one version of a file: a block removed inside the range keeps its last value here, where the SQL twin drops it.",
+          "description": "What each dependabot.yml actually updates, and how often. One ecosystem appears more than once when it is configured per directory, which is exactly what blocks counts: five ecosystems across seven blocks is one repository here. Dated from dependabot.yml itself, at the last commit that touched it, so this reads the whole history rather than the dashboard range, and only the newest version of each file: an ecosystem dropped from it, or a schedule moved from daily to weekly, leaves no second row behind. A repository that deleted the file altogether writes no block at all and so keeps its last ones here; the dependabot row beside it in Policy files, with Present at zero, is what says so. Graphite answers only inside the dashboard range, so years outside it are missing. Neither can it read one version of a file: a block removed inside the range keeps its last value here, where the SQL twin drops it.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -17061,7 +17086,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "What entered and left the dependency graph, and how much of it carried a known advisory. Each row covers a real commit range, from the head of the previous sweep to this one, so the rows do not overlap and adding them up over the range is the whole story rather than a double count. A sweep with nothing to report writes a row of zeros, so the table exists from the first sweep; that series is left out here. One bump measured 370 changes, one of which removed a package with a known advisory, and six rows is all that is kept of it. Vulnerable is a share of those same changes and not a kind of its own, so it crosses the stack as a line rather than adding its own height to it. Off by default: the SBOM is a megabyte or two per repository. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "What entered and left the dependency graph, and how much of it carried a known advisory. Each row covers a real commit range, from the head of the previous sweep to this one, so the rows do not overlap and adding them up over the range is the whole story rather than a double count. A sweep with nothing to report writes a row of zeros, so the table exists from the first sweep; that series is left out here. One bump measured 370 changes, one of which removed a package with a known advisory, and six rows is all that is kept of it. Vulnerable is a share of those same changes and not a kind of its own, so it crosses the stack as a line rather than adding its own height to it. Off by default: the SBOM is a megabyte or two per repository. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -17216,25 +17241,25 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "alias(fallbackSeries(scale(github.sponsors_listing.*.lifetime_received_cents, 0.01), removeBelowValue(constantLine(0), 1)), \"Lifetime received\")",
+              "target": "alias(removeEmptySeries(keepLastValue(scale(github.sponsors_listing.*.lifetime_received_cents, 0.01))), \"Lifetime received\")",
               "textEditor": true
             },
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "B",
-              "target": "alias(fallbackSeries(scale(github.sponsors_listing.*.monthly_income_cents, 0.01), removeBelowValue(constantLine(0), 1)), \"Monthly income\")",
+              "target": "alias(removeEmptySeries(keepLastValue(scale(github.sponsors_listing.*.monthly_income_cents, 0.01))), \"Monthly income\")",
               "textEditor": true
             },
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "C",
-              "target": "alias(fallbackSeries(scale(github.sponsors_listing.*.next_payout_cents, 0.01), removeBelowValue(constantLine(0), 1)), \"Next payout\")",
+              "target": "alias(removeEmptySeries(keepLastValue(scale(github.sponsors_listing.*.next_payout_cents, 0.01))), \"Next payout\")",
               "textEditor": true
             },
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "D",
-              "target": "alias(fallbackSeries(scale(github.sponsors_listing.*.sponsor_spend_cents, 0.01), removeBelowValue(constantLine(0), 1)), \"Spent sponsoring\")",
+              "target": "alias(removeEmptySeries(keepLastValue(scale(github.sponsors_listing.*.sponsor_spend_cents, 0.01))), \"Spent sponsoring\")",
               "textEditor": true
             }
           ],
@@ -17243,7 +17268,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Every sponsorship in either direction, dated the day it began and not the day of any payment. Amount is the price of the tier it was made at, which is a rate per month unless the column beside it says the payment was one-time: a five dollar a month sponsorship running since 2021 is one row, dated 2021, reading five dollars, and the lifetime tile above is the only figure here that adds the money up. Both connections are read with activeOnly off, which is what recovers a lapsed one, so a row here can be a sponsorship from years ago that no current count still shows. Sponsorable is the literal word private when the sponsorship hides the other party, and no link is written then rather than one being guessed at. There is deliberately no curve of this beside it: on a real account the dated record is a handful of rows spread across years, and drawn against any range a reader would pick it is an empty axis. It is an inventory, so it names its own window rather than taking the dashboard's: a sponsorship made in 2021 is listed at the default thirty days, and the Sponsoring tile on the Overview and this table count the same thing. Graphite has no way to list by date, so this is the price of the tier each sponsorship was made at, named direction and sponsorable from the path. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others. Graphite answers only inside the dashboard range, so years outside it are missing. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "Every sponsorship in either direction, dated the day it began and not the day of any payment. Amount is the price of the tier it was made at, which is a rate per month unless the column beside it says the payment was one-time: a five dollar a month sponsorship running since 2021 is one row, dated 2021, reading five dollars, and the lifetime tile above is the only figure here that adds the money up. Both connections are read with activeOnly off, which is what recovers a lapsed one, so a row here can be a sponsorship from years ago that no current count still shows. Sponsorable is the literal word private when the sponsorship hides the other party, and no link is written then rather than one being guessed at. There is deliberately no curve of this beside it: on a real account the dated record is a handful of rows spread across years, and drawn against any range a reader would pick it is an empty axis. It is an inventory, so it names its own window rather than taking the dashboard's: a sponsorship made in 2021 is listed at the default thirty days, and the Sponsoring tile on the Overview and this table count the same thing. Graphite has no way to list by date, so this is the price of the tier each sponsorship was made at, named direction and sponsorable from the path. Graphite has no rows: each series is reduced over the range to one number, Amount, so Date, Tier, Active and One-time are not in this table. Graphite answers only inside the dashboard range, so years outside it are missing. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -17453,7 +17478,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Standing inventory, the way an SSH key is. The listing says how many tiers there are; this says which and at what price. Dating a tier at its creation would put all of them outside every dashboard range, where they would read as no tiers at all, so they are anchored to the start of the UTC day and the creation date survives as an age. Graphite keeps the price, which is the column this table sorts by. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "Standing inventory, the way an SSH key is. The listing says how many tiers there are; this says which and at what price. Dating a tier at its creation would put all of them outside every dashboard range, where they would read as no tiers at all, so they are anchored to the start of the UTC day and the creation date survives as an age. Graphite keeps the price, which is the column this table sorts by. Graphite has no rows: each series is reduced over the range to one number, Price, so One-time, Retired and Age are not in this table. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -17668,7 +17693,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "What the profile shows first, in the order it shows it. The row worth seeing is a pinned repository nobody has pushed to in two years. Position is a field and not a tag on purpose: a repository that moves from slot two to slot three is the same pin, and as a tag every rearrangement would fork the series. The repository filter at the top of the dashboard does not reach this panel, because a pin can be a gist, which is named by its hash and is in no repository the filter knows. Graphite has no strings either, so this is the slot each pin sits in. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "What the profile shows first, in the order it shows it. The row worth seeing is a pinned repository nobody has pushed to in two years. Position is a field and not a tag on purpose: a repository that moves from slot two to slot three is the same pin, and as a tag every rearrangement would fork the series. The repository filter at the top of the dashboard does not reach this panel, because a pin can be a gist, which is named by its hash and is in no repository the filter knows. Graphite has no strings either, so this is the slot each pin sits in. Graphite has no rows: each series is reduced over the range to one number, Position, so Kind, Stars and Idle are not in this table. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -17814,7 +17839,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "A closed list of eight flags the profile advertises, as they read at the last sweep. Seven are booleans that change once in years, and the day one does is the day worth being able to point at: hireable, developer program, campus expert, GitHub star, bounty hunter, employee and whether the account has a Sponsors listing. The eighth is the availability status, carried as a flag rather than as a measurement of its own. Its message and how long ago it was set are collected on that row and shown nowhere here: the message is text, and the age belongs to the status message rather than to the flag, on one row of eight, so it was a column with seven empty cells and one that read the age of a message beside a flag that was off. GitHub says when none of the badges was granted, so there is no date for the others to fill. Graphite carries all eight booleans. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "A closed list of eight flags the profile advertises, as they read at the last sweep. Seven are booleans that change once in years, and the day one does is the day worth being able to point at: hireable, developer program, campus expert, GitHub star, bounty hunter, employee and whether the account has a Sponsors listing. The eighth is the availability status, carried as a flag rather than as a measurement of its own. Its message and how long ago it was set are collected on that row and shown nowhere here: the message is text, and the age belongs to the status message rather than to the flag, on one row of eight, so it was a column with seven empty cells and one that read the age of a message beside a flag that was off. GitHub says when none of the badges was granted, so there is no date for the others to fill. Graphite carries all eight booleans. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -17968,7 +17993,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "The lists the account files its stars into, and how many each holds. gh_star_given records every star the account gave and the Overview counts them; this is how they are organized, which exists nowhere else. It rides in the account query that was already being paid for, at no extra cost. The row is a daily snapshot: Age is how long ago the list was made and Last added how long ago a star last went into it, both as days so the row can sit inside any dashboard range. Graphite keeps the item count, which is the column this table sorts by. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "The lists the account files its stars into, and how many each holds. gh_star_given records every star the account gave and the Overview counts them; this is how they are organized, which exists nowhere else. It rides in the account query that was already being paid for, at no extra cost. The row is a daily snapshot: Age is how long ago the list was made and Last added how long ago a star last went into it, both as days so the row can sit inside any dashboard range. Graphite keeps the item count, which is the column this table sorts by. Graphite has no rows: each series is reduced over the range to one number, Items, so Private, Age and Last added are not in this table. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -18147,7 +18172,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "The badges on the profile, highest tier first: Pull Shark, Pair Extraordinaire, YOLO and the rest, read every hour from the public profile page because no API lists them. Tier is the number on the badge's label, one where it has none; Level is the color GitHub gives that tier. Empty until the achievements family has run once. Graphite names each row by the badge's slug and keeps its tier. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "The badges on the profile, highest tier first: Pull Shark, Pair Extraordinaire, YOLO and the rest, read every hour from the public profile page because no API lists them. Tier is the number on the badge's label, one where it has none; Level is the color GitHub gives that tier. Empty until the achievements family has run once. Graphite names each row by the badge's slug and keeps its tier. Graphite has no rows: each series is reduced over the range to one number, Tier, so Level is not in this table. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -18258,7 +18283,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "How far each tiered badge is from its next tier. Count is what decides the badge today: merged pull requests for Pull Shark, accepted discussion answers for Galaxy Brain, the stars on the most starred repository for Starstruck, and merged pull requests in public repositories with a co-authored commit for Pair Extraordinaire. That last count is a tally the state file keeps: each hourly pass adds the pull requests merged since the last day it covers, and the whole history is walked again once a week, which is when a count that went down, a repository made private or deleted, comes down here. Without a state file every start walks it whole. Next tier at is the community-observed threshold (Schweinepriester/github-profile-achievements), and Progress is Count against it, full at the top tier. Tier is what the count implies; Page agrees says whether the profile page shows the same tier, and a row that disagrees is a rule the page contradicts, so it carries no target and no bar. The single-tier badges are on the shelf above. Empty until the achievements family has run once. Graphite names each row by the badge's slug and keeps its progress. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "How far each tiered badge is from its next tier. Count is what decides the badge today: merged pull requests for Pull Shark, accepted discussion answers for Galaxy Brain, the stars on the most starred repository for Starstruck, and merged pull requests in public repositories with a co-authored commit for Pair Extraordinaire. That last count is a tally the state file keeps: each hourly pass adds the pull requests merged since the last day it covers, and the whole history is walked again once a week, which is when a count that went down, a repository made private or deleted, comes down here. Without a state file every start walks it whole. Next tier at is the community-observed threshold (Schweinepriester/github-profile-achievements), and Progress is Count against it, full at the top tier. Tier is what the count implies; Page agrees says whether the profile page shows the same tier, and a row that disagrees is a rule the page contradicts, so it carries no target and no bar. The single-tier badges are on the shelf above. Empty until the achievements family has run once. Graphite names each row by the badge's slug and keeps its progress. Graphite has no rows: each series is reduced over the range to one number, Progress, so Badge, Count, Next tier at, Tier and Page agrees are not in this table. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -18577,7 +18602,7 @@
       "panels": [
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "The share of each bucket spent, which puts a bucket of five thousand and one of fifteen thousand on the same axis. The buckets worth watching, which are the ones with more than thirty requests in them: search has thirty a minute and would flatten the axis. A bucket this account never touched is left out of the chart entirely, since its flat zero was still a legend entry; \"Every bucket\" beside this lists every one of them, and a Most used of 0 is where that absence belongs. A reading taken at each sweep, so the curve starts the day the collector did. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "The share of each bucket spent, which puts a bucket of five thousand and one of fifteen thousand on the same axis. The buckets worth watching, which are the ones with more than thirty requests in them: search has thirty a minute and would flatten the axis. A bucket this account never touched is left out of the chart entirely, since its flat zero was still a legend entry; \"Every bucket\" beside this lists every one of them, and a Most used of 0 is where that absence belongs. A reading taken at each sweep, so the curve starts the day the collector did. One point is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under five minutes, which is fifteen minutes over a day and six hours over a month.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -18637,7 +18662,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Every budget GitHub reports, and the one that runs out first decides what a sweep can collect. Reading them costs nothing: GET /rate_limit is free. Most used is the most any reading in the range had spent, and Lowest remaining the least any had left, so a bucket spent an hour ago still says so after it has refilled. Graphite has no rows: each series is one number, so this table keeps the lowest remaining of each bucket and drops the limit and the most used.",
+          "description": "Every budget GitHub reports, and the one that runs out first decides what a sweep can collect. Reading them costs nothing: GET /rate_limit is free. Most used is the most any reading in the range had spent, and Lowest remaining the least any had left, so a bucket spent an hour ago still says so after it has refilled. Graphite has no rows: each series is reduced over the range to one number, Lowest remaining, so Most used and Limit are not in this table.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -18723,7 +18748,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Every collector that ran in the range, with what stopped it where something did, how many sweeps it ran in, and the most repositories one of those sweeps asked it about. For commits, issueevents and issues that count includes the repositories the movement query found nothing new in, which the family left unread and wrote no row for. A family with no row here did not run at all, which is the one thing an empty panel could never say: not due, switched off, or skipped because a rate budget was spent. Why is what separates the two kinds of failure that would otherwise read alike: a spent search budget sorts apart from the 502 that cost a repository its history, and a family that had both has a row for each. Failures is the sweep's own count, so a family that failed on some of its repositories and was still marked as having run says so here; a batched query that failed names no repository and counts as one. One row here is not a family: `discover` is the repository listing, which every family depends on, and it appears only when it failed, because a listing that worked is stated by every other row of the same sweep. No repository filter: these rows belong to the collector rather than to a repository. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others.",
+          "description": "Every collector that ran in the range, with what stopped it where something did, how many sweeps it ran in, and the most repositories one of those sweeps asked it about. For commits, issueevents and issues that count includes the repositories the movement query found nothing new in, which the family left unread and wrote no row for. A family with no row here did not run at all, which is the one thing an empty panel could never say: not due, switched off, or skipped because a rate budget was spent. Why is what separates the two kinds of failure that would otherwise read alike: a spent search budget sorts apart from the 502 that cost a repository its history, and a family that had both has a row for each. Failures is the sweep's own count, so a family that failed on some of its repositories and was still marked as having run says so here; a batched query that failed names no repository and counts as one. One row here is not a family: `discover` is the repository listing, which every family depends on, and it appears only when it failed, because a listing that worked is stated by every other row of the same sweep. No repository filter: these rows belong to the collector rather than to a repository. Graphite has no rows: each series is reduced over the range to one number, Failures, so Sweeps and Repositories are not in this table.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -18885,7 +18910,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "One row per repository one collector could not collect, newest first: which family, which repository, and what GitHub answered. This is where an empty row of the dashboard gets its explanation. Measured on this account on 2026-09-16, before there was anything to read it from: five repositories held no workflow run or job at all, each because one call for the jobs of one run had answered 502 once, and the Continuous integration row was drawn over an account missing its five busiest repositories. An empty table is the good case. No repository filter: a repository a sweep could not collect may be one the filter does not list, since the filter is built from rows the same sweep writes. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others.",
+          "description": "One row per repository one collector could not collect, newest first: which family, which repository, and what GitHub answered. This is where an empty row of the dashboard gets its explanation. Measured on this account on 2026-09-16, before there was anything to read it from: five repositories held no workflow run or job at all, each because one call for the jobs of one run had answered 502 once, and the Continuous integration row was drawn over an account missing its five busiest repositories. An empty table is the good case. No repository filter: a repository a sweep could not collect may be one the filter does not list, since the filter is built from rows the same sweep writes. Graphite has no rows: each series is reduced over the range to one number, Failures, so When and What GitHub said are not in this table.",
           "fieldConfig": {
             "defaults": {
               "custom": {

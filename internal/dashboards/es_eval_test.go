@@ -376,19 +376,38 @@ func organized(rows []map[string]any, options map[string]any) []map[string]any {
 	return out
 }
 
-// calculated is the calculateField transformation in its binary mode, between
-// two columns of the row.
+// calculated is the calculateField transformation: in its binary mode,
+// between two columns of the row, and as a sum over the row of the columns it
+// names.
 func calculated(t *testing.T, rows []map[string]any, options map[string]any) []map[string]any {
 	t.Helper()
-	binary, _ := options["binary"].(map[string]any)
-	if options["mode"] != "binary" {
+	alias, _ := options["alias"].(string)
+	switch options["mode"] {
+	case "binary":
+	case "reduceRow":
+		reduce, _ := options["reduce"].(map[string]any)
+		include, _ := reduce["include"].([]any)
+		if reduce["reducer"] != "sum" {
+			t.Fatalf("no evaluator for a calculateField reducing a row with %v", reduce["reducer"])
+		}
+		for _, row := range rows {
+			// A value that is not there is skipped, whether the row holds
+			// null or the merge left the key out.
+			sum := 0.0
+			for _, name := range include {
+				v, _ := row[name.(string)].(float64)
+				sum += v
+			}
+			row[alias] = sum
+		}
+		return rows
+	default:
 		t.Fatalf("no evaluator for a calculateField in %v mode", options["mode"])
 	}
-	alias, _ := options["alias"].(string)
+	binary, _ := options["binary"].(map[string]any)
 	for _, row := range rows {
-		left, _ := row[binary["left"].(string)].(float64)
-		right, _ := row[binary["right"].(string)].(float64)
-		// A missing operand is 0, as JavaScript's arithmetic reads a null.
+		left := jsOperand(row, binary["left"].(string))
+		right := jsOperand(row, binary["right"].(string))
 		switch binary["operator"] {
 		case "-":
 			row[alias] = left - right
@@ -401,6 +420,25 @@ func calculated(t *testing.T, rows []map[string]any, options map[string]any) []m
 		}
 	}
 	return rows
+}
+
+// jsOperand is a column of the row as JavaScript's arithmetic reads it: a
+// null is 0, a boolean 1 or 0, and a column the row does not have at all,
+// which is what a merge leaves where the frame a row came from lacks it, is
+// undefined and so NaN.
+func jsOperand(row map[string]any, column string) float64 {
+	v, has := row[column]
+	switch n := v.(type) {
+	case float64:
+		return n
+	case bool:
+		return float64(map[bool]int{true: 1}[n])
+	case nil:
+		if has {
+			return 0
+		}
+	}
+	return math.NaN()
 }
 
 // filteredByValue is the filterByValue transformation keeping the rows whose

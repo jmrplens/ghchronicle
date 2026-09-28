@@ -76,8 +76,8 @@ Graphite keeps the dated points but has no rows. A series is a path and a
 number, so:
 
 - A table that needs several fields of one row cannot be built. The shipped
-  dashboard keeps the column it is sorted by and says in the panel description
-  which columns it dropped.
+  dashboard reduces each series to the one or two numbers a row of it can
+  carry, and its panel description names those and every column it drops.
 - A title or any other string is not a metric there at all, and the sink
   drops it; the panels that would show one say so. A boolean is kept as 1 or 0
   like any number.
@@ -120,6 +120,19 @@ that one read "Data outside time range"; summed into the day's bucket it came
 back at 00:00, and the artifact storage in its six-hour bucket at 12:00. A bucket
 follows the dashboard's range, so a chart pinned to its own range, as two of
 the Code panels are, sums into days whatever the page is set to.
+
+Two charts sum into a fixed day instead, because their rows are already a day
+or a week apart and each belongs at its own date: the contribution calendar,
+a row a day, and the weekly commits, a row a week stamped at the Sunday GitHub
+starts the week on, with the days between the weeks left out. Seven days is not
+a bucket there: graphite-web counts one from the epoch, a Thursday, and every
+weekly bar stood three days early, the first week of a thirty-day range before
+the range began.
+
+A chart or a bar chart that names its busiest series and folds the rest into
+one called other does the same here as in the SQL dashboards: the busiest over
+the whole range are named, and other is every series less those, point by
+point, drawn only where something is left over.
 
 ## Where to go next
 

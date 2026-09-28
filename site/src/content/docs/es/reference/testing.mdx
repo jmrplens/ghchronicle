@@ -42,8 +42,10 @@ mitad de las peticiones core de la primera, y que `own_cost` en la fila
 También busca como GitHub. Cada una de las cinco búsquedas salientes pide un
 tipo en un estado, `is:pr is:merged` o `is:issue is:open`, y el falso le sirve
 solo los elementos de su fixture que seleccionan esos calificadores, descontando
-los demás de `issueCount`; un calificador que no sabe leer hace fallar la
-prueba. Hasta 2.6.2 respondía a todas las búsquedas con todos los elementos, así
+los demás de `issueCount`. Un tipo o un estado que no conoce, un `is:`, `type:`
+o `state:` para el que no tiene regla, hace fallar la prueba; el autor, los
+propietarios excluidos y el orden ya son los de la propia fixture, y los pasa
+por alto. Hasta 2.6.2 respondía a todas las búsquedas con todos los elementos, así
 que una pasada escribía la única pull request fusionada cinco veces, una de
 ellas como issue abierta, y los dashboards dibujaban esas filas.
 
@@ -116,7 +118,8 @@ lo que zanja la duda de Elasticsearch de arriba: un panel que no puede agregar
 no devuelve ningún data frame.
 
 Cada panel se envía con su rango resuelto a los dos instantes que manda un
-navegador, y se le hacen tres preguntas: si el datasource lo rechazó, si un
+navegador, y se le hacen tres preguntas, y a cada tarjeta y cada indicador dos
+más, abajo: si el datasource lo rechazó, si un
 panel sobre algo que el barrido escribió dentro del rango respondió con algo, y
 si los cinco almacenes dibujan lo mismo. Para la tercera, cada respuesta se
 reproduce a través de lo que Grafana hace entre la consulta y la pantalla, la
@@ -141,6 +144,44 @@ dibuje también cada otro almacén que dibuja la tabla, o que la nombren las
 palabras propias de ese almacén sobre el panel: en la rama 2.6.2, 33 tablas de
 los otros tres almacenes carecían de una columna que su descripción no
 nombraba, y cada una la dibuja ahora o dice por qué no.
+
+Después se pregunta a cada tarjeta y cada indicador por nada, dos veces: por un
+repositorio para el que ningún barrido escribió nada, y sobre treinta días en
+los que no cae ningún punto de ningún barrido, de cuatrocientos días atrás o
+más. Sobre ninguna fila un recuento SQL es 0 y todo lo demás es nulo, que una
+tarjeta dibuja como las palabras que su panel da a un valor que no está, y se
+exige a cada almacén que dibuje las tarjetas que dibujan los almacenes SQL, con
+las mismas palabras. Se pregunta por el rango porque las instantáneas de la
+propia cuenta no siguen al selector de repositorios: sobre un rango de
+cuatrocientos días atrás Graphite dibujaba tres grupos de cifras como paneles
+sin nada, ni siquiera los nombres. Una tarjeta que un almacén no puede dibujar
+sobre nada se lista en `tilesLeftOverNothing`, en
+`test/e2e/docker/tiles_over_nothing_test.go`, con palabras de la propia
+descripción de ese almacén, y se sujeta a ellas igual que `dashboardsDiffer`.
+
+InfluxDB y PostgreSQL ejecutan una misma sentencia sobre las mismas filas, así
+que también se les exige dibujar las filas de una tabla o de una gráfica de
+barras en un solo orden, cosa que comparar las filas como conjunto no puede
+ver: antes de que las sentencias nombraran su desempate, doce de los 49
+paneles que ambos dibujan con más de una fila ponían dos de ellas al revés en
+una ejecución, y once en la siguiente. `TestEverySQLListOrdersItsRowsCompletely`,
+en `internal/dashboards`, exige al `ORDER BY` de cada lista que nombre lo que
+distingue dos de sus filas, para que el próximo empate no espere a una
+ejecución que por casualidad lo dibuje.
+
+Dos de las reglas que se exigen a lo dibujado se exigen también a la
+especificación, ya que una tabla que la fixture deja vacía en los dos almacenes
+SQL no se dibuja nunca: cada columna que dibujan los almacenes SQL y otro
+almacén no, la nombra la propia descripción de ese almacén, y una gráfica que
+los almacenes SQL pliegan en other se pliega en cada otro almacén o dice que no
+lo hace (`TestEveryColumnAStoreLacksIsNamedInItsDescription` y
+`TestEveryStoreFoldsTheRestIntoOtherOrSaysItDoesNot`). Y una consulta de
+Prometheus que solo falla con series que la fixture nunca crea, un valor de
+etiqueta que nadie escribió o una serie que no se movió en el rango, se pone a
+promtool dentro del propio Prometheus del stack sobre series escritas para ella
+(`TestPrometheusAnswersSeriesTheFixtureHasNoneOfAsTheSQLStoresDo`): hasta
+entonces, Signed commits de una cuenta que nunca firma decía "no commits" junto
+a un recuento de 57.
 
 Un almacén que dibuja un panel de otra forma a propósito dice por qué en su
 propia descripción del panel, y la diferencia se lista en `dashboardsDiffer`, en

@@ -57,16 +57,13 @@ var rangeExtremes = map[string]string{
 	"Open issues the longest": "as Open the longest.",
 	"Social accounts": "present is written as 1 and never as anything else, so the " +
 		"largest is the newest.",
-	"Sponsorship": "each day is reduced to its largest reading and the last day that has " +
-		"one is taken, because the server-side expressions that make dollars of the " +
-		"cents cannot reduce a top_metrics; within one day.",
-	"Stars over time": "a point per repository per day, stacked: a date histogram cannot " +
+	"Stars over time": "a point per repository per bucket, stacked: a date histogram cannot " +
 		"take each repository's newest reading before stacking them, and the largest of " +
-		"one day differs from its newest only by what that day itself lost.",
+		"one bucket differs from its newest only by what that bucket itself lost.",
 	"Forks over time":            "as Stars over time.",
-	"Artifact storage over time": "a point per repository per hour, the largest of the hour.",
-	"Open alerts over time": "a point per severity per day, which the description says is " +
-		"the largest single series of the day in Elasticsearch.",
+	"Artifact storage over time": "a point per repository per bucket, the largest of the bucket.",
+	"Open alerts over time": "a point per severity per bucket, which the description says is " +
+		"the largest single series of the bucket in Elasticsearch.",
 	"Rate budget used": "the most of each bucket spent inside each point, a peak by design.",
 	"Every bucket": "Most used and Lowest remaining are the extremes of the range by " +
 		"design, so a bucket spent an hour ago still says so after it has refilled.",

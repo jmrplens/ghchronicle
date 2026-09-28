@@ -22,16 +22,11 @@ var eachTypeASlice = map[string]any{"id": "rowsToFields", "options": map[string]
 	map[string]any{"fieldName": "Events", "handlerKey": "field.value"},
 }}}
 
-// esNoOther is what the Elasticsearch pie says in place of folding: a terms
-// aggregation answers a bucket per value it keeps and nothing about the ones
-// it does not, and a panel's transformations cannot keep the first eight rows
-// and add the rest up under a name of their own, so the types past the
-// busiest eight have no slice to go into. The pie keeps thirty of them rather
-// than eight, since a pie of the eight alone would draw each share of those
-// eight and read larger than it is.
-const esNoOther = "In Elasticsearch every type in the range is a slice of its own, up to " +
-	"thirty: a terms aggregation answers the types it keeps and nothing about the " +
-	"others, so there is no remainder to fold into other."
+// esNoOther is what the Elasticsearch pie says in place of folding, since the
+// types past the busiest eight have no slice to go into (see esUnfolded). The
+// pie keeps thirty of them rather than eight, since a pie of the eight alone
+// would draw each share of those eight and read larger than it is.
+var esNoOther = esUnfolded(30, "types", "slice")
 
 // ── Activity ────────────────────────────────────────────────────────────────
 
@@ -82,12 +77,10 @@ func activity(b *builder) []Panel {
 	typeES, typeEStf := esTbl(ev, []any{b.tmBy("type", 30, typeEvents)}, []any{typeEvents},
 		[]named{{"type.keyword", "Type"}, {"e", "Events"}}, nil)
 
-	repoGR, repoGRtf := gTbl(fmt.Sprintf(
-		`limit(sortByTotal(groupByNode(%s, %d, "sum")), 20)`, events("events"), gn(ev, "full_name"),
-	),
+	repoGR, repoGRtf := gTbl(grOther(10, fmt.Sprintf(`groupByNode(%s, %d, "sum")`, events("events"), gn(ev, "full_name"))),
 		"Repository", []col{{"sum", "Events"}})
 	repoEvents := b.mSum("events")
-	repoES, repoEStf := esTbl(ev, []any{b.tmBy("full_name", 20, repoEvents)}, []any{repoEvents},
+	repoES, repoEStf := esTbl(ev, []any{b.tmBy("full_name", 10, repoEvents)}, []any{repoEvents},
 		[]named{{"full_name.keyword", "Repository"}, {"e", "Events"}}, nil)
 
 	notifGR, notifGRtf := gTbl(fmt.Sprintf(
@@ -116,14 +109,17 @@ func activity(b *builder) []Panel {
 
 	return append([]Panel{
 		panel("timeseries", "Events over time", box{W: 16, H: 8, X: 0, Y: 0}, []Target{sqlTS(perHour)}, &P{
-			Prom: []Target{hourly("sum by (type) (increase(github_events_total[1h]))", "{{type}}")},
+			Prom: []Target{hourly(promOtherOverTime(
+				"sum by (type) (increase(github_events_total[1h]))", "type", "type",
+			), "{{type}}")},
 			Opts: mergeOpts(Opts{"bars": true, "stack": true}, hourBins), SQLOpts: seriesOpts,
 			Desc: "GitHub keeps only the last 300 events, none older than thirty days, " +
 				"so this is only as complete as the sweep interval allowed. The eight " +
 				"busiest types in the range are named; the rest are `other`. " + bucketFollowsRange,
 			PromDesc: sinceStart,
-			GR:       []Target{grq(perBucket(events("events"), -2, "1h"))},
+			GR:       []Target{grq(grOther(topSeriesKept, perBucket(events("events"), -2, "1h")))},
 			ES:       []Target{b.esDaily(ev, b.mSum("events"), "type", "1h", nil, "")},
+			ESDesc:   esUnfolded(esDailyTerms, "types", "series"),
 		}),
 		// The pie takes the whole height of the hourly chart and of the two
 		// tables under it. The account's feed carries nine event types in a
@@ -159,7 +155,7 @@ func activity(b *builder) []Panel {
 					"would multiply the series by every repository the feed touches, "+
 					"including other people's."),
 			GR: repoGR, GRTF: repoGRtf,
-			ES: repoES, ESTF: repoEStf,
+			ES: repoES, ESTF: repoEStf, ESDesc: esUnfolded(10, "repositories", "bar"),
 		}),
 		panel("table", "Notifications", box{W: 8, H: 8, X: 8, Y: 8}, []Target{sqlT(notifTbl)}, &P{
 			Prom: []Target{promTbl(
@@ -384,10 +380,8 @@ func starsGiven(b *builder) []Panel {
 				barCell(activityItsStars, "short", 120), linkOn("Repository"),
 			},
 			GR: starGR, GRTF: starGRtf,
-			GRDesc: "Graphite has no rows: each series is one number, so this table keeps the " +
-				"star count of each repository starred in the range and drops when it was " +
-				"starred and its language.",
-			ES: starES, ESTF: starEStf,
+			GRDesc: grRows,
+			ES:     starES, ESTF: starEStf,
 		}),
 	}
 }

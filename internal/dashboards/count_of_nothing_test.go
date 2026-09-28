@@ -259,23 +259,61 @@ func saysNothingAs(p map[string]any, name string) bool {
 }
 
 // graphiteValuesFallBack holds every value of a Graphite stat to a fallback
-// for a path the store has never held, which answers no series at all.
+// for a path the store has never held, which answers no series at all, and a
+// value the SQL stores read as the newest row of a snapshot to no series at
+// all where the range holds no reading, grNewest, since the SQL stores have
+// no row there. A path Graphite holds answers a range it holds nothing in
+// with nulls, which a fallback keeps as a tile with nothing in it, and a
+// group of those was a panel with nothing in it, not even the names.
 func graphiteValuesFallBack(t *testing.T) int {
 	t.Helper()
+	newest := newestRowValues(t)
 	checked := 0
 	for _, p := range renderedPanels(t, "graphite") {
 		if p["type"] != "stat" {
 			continue
 		}
+		title, _ := p["title"].(string)
 		for _, target := range panelTargets(p) {
 			checked++
-			if expr, _ := target["target"].(string); !strings.HasPrefix(expr, "alias(fallbackSeries(") {
+			expr, _ := target["target"].(string)
+			named := graphiteAlias.FindStringSubmatch(expr)
+			snapshot := named != nil && newest[title][named[1]]
+			switch {
+			case snapshot && !strings.HasPrefix(expr, "alias(removeEmptySeries(keepLastValue("):
+				t.Errorf("graphite %q: %s is the newest row of a snapshot in the SQL stores, which have no "+
+					"row over a range no sweep reached, and this draws a tile with nothing in it there: %s",
+					title, named[1], expr)
+			case !snapshot && !strings.HasPrefix(expr, "alias(fallbackSeries("):
 				t.Errorf("graphite %q: a value with no fallback draws no tile for a path never held: %s",
-					p["title"], expr)
+					title, expr)
 			}
 		}
 	}
 	return checked
+}
+
+// newestRowValues is, per panel title, every value of a SQL stat that is the
+// newest row of a snapshot rather than an aggregate over the range.
+func newestRowValues(t *testing.T) map[string]map[string]bool {
+	t.Helper()
+	out := map[string]map[string]bool{}
+	for _, p := range renderedPanels(t, "influxdb") {
+		title, _ := p["title"].(string)
+		for _, target := range panelTargets(p) {
+			sql, _ := target["rawSql"].(string)
+			if p["type"] != "stat" || !strings.Contains(sql, "ORDER BY time DESC LIMIT 1") {
+				continue
+			}
+			if out[title] == nil {
+				out[title] = map[string]bool{}
+			}
+			for name := range selectedValues(t, sql) {
+				out[title][name] = true
+			}
+		}
+	}
+	return out
 }
 
 // prometheusAggregationsFallBack holds every aggregation a Prometheus stat

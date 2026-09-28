@@ -231,8 +231,8 @@ func lifetime(b *builder) []Panel {
 		{"url", "Link"},
 	}, nil)
 
-	runsGR, runsGRtf := gTbl(rowsOf(fmt.Sprintf("keepLastValue(%s)", rp(wrt, "runs")),
-		gn(wrt, "repo")), "Repository", []col{{"lastNotNull", "Runs"}})
+	runsGR, runsGRtf := gTbl(grOtherBy(10, "sortByMaxima", rowsOf(fmt.Sprintf("keepLastValue(%s)", rp(wrt, "runs")),
+		gn(wrt, "repo"))), "Repository", []col{{"lastNotNull", "Runs"}})
 	runsES, runsEStf := esTbl(wrt, b.tmRepo(500), []any{b.mNewest("runs")},
 		[]named{{"repo.keyword", "Repository"}, {"runs", "Runs"}}, []string{ESF},
 		hideColumns(panelFullNameField))
@@ -272,9 +272,7 @@ func lifetime(b *builder) []Panel {
 				Overrides: []any{
 					linkOn("Repository"), width("Fork", 70), width("Archived", 90),
 				},
-				GR: twins.GR, GRTF: twins.GRTF, GRDesc: "Graphite has no rows: each series is one number, so this table keeps the " +
-					"commits it is ranked by and drops the other columns, the fork and archived " +
-					"flags among them. " + grArchivedWindow,
+				GR: twins.GR, GRTF: twins.GRTF, GRDesc: grRows + " " + grArchivedWindow,
 				ES: twins.ES, ESTF: twins.ESTF, ESDesc: esArchivedWindow,
 			}),
 		// The description leads with the window rather than explaining it in
@@ -300,8 +298,9 @@ func lifetime(b *builder) []Panel {
 			PromDesc: "The exporter reduces `gh_repo_created` to a count by user and fork, so " +
 				"Prometheus can say how many repositories were created and how many of " +
 				"them were forks, and can name none of them: the repository is not a " +
-				"label on that gauge. It is the last sweep's count, so it is that one " +
-				"trailing year and never the years the other stores have kept.",
+				"label on that gauge, and whether one is private is not either, so the " +
+				"Private column is not in this table. It is the last sweep's count, so it " +
+				"is that one trailing year and never the years the other stores have kept.",
 			Desc: repositoriesCreatedDesc,
 			Overrides: []any{
 				when("Created"), width("Fork", 70), width("Private", 80), linkOn("Repository"),
@@ -310,7 +309,8 @@ func lifetime(b *builder) []Panel {
 			GR:       createdGR, GRTF: createdGRtf,
 			GRDesc: grRange + " Graphite has no way to list by date either, so each " +
 				"repository created inside the range is one row named from the path, and " +
-				"the column counts the creation itself, which is one on every row.",
+				"the column counts the creation itself, which is one on every row. A row " +
+				"is one number, so the Fork and Private flags are not in this table.",
 			ES: createdES, ESTF: createdEStf, ESDesc: esRange,
 		}),
 		panel("table", "Repositories archived", box{W: 8, H: 8, X: 8, Y: 17}, []Target{sqlT(archived)}, &P{
@@ -370,7 +370,7 @@ func lifetime(b *builder) []Panel {
 				"than the sweeps added up. The ten repositories with the most runs are " +
 				"named; the rest are one bar called other.",
 			GR: runsGR, GRTF: runsGRtf,
-			ES: runsES, ESTF: runsEStf,
+			ES: runsES, ESTF: runsEStf, ESDesc: esUnfolded(500, "repositories", "bar"),
 		}),
 	}
 }
@@ -495,7 +495,7 @@ func collectorSection(b *builder) []Panel {
 				GR: []Target{grq(fmt.Sprintf(`aliasByNode(summarize(keepLastValue(%s), %s, "last"), %d)`,
 					gp(rl, "used_ratio"), grBin("5m"), gn(rl, "resource")))},
 				ES:     []Target{b.esDaily(rl, b.mMax("used_ratio"), "resource", "5m", nil, "")},
-				ESDesc: "In Elasticsearch each point is the largest reading of its five minutes.",
+				ESDesc: "In Elasticsearch each point is the largest reading of its bucket.",
 			}),
 		panel("table", "Every bucket", box{W: 12, H: 11, X: 12, Y: 0}, []Target{sqlT(tableQ)}, &P{
 			Prom: []Target{
@@ -515,9 +515,8 @@ func collectorSection(b *builder) []Panel {
 				"remaining the least any had left, so a bucket spent an hour ago still says " +
 				"so after it has refilled.",
 			GR: bucketsGR, GRTF: bucketsGRtf,
-			GRDesc: "Graphite has no rows: each series is one number, so this table keeps the " +
-				"lowest remaining of each bucket and drops the limit and the most used.",
-			ES: bucketsES, ESTF: bucketsEStf,
+			GRDesc: grRows,
+			ES:     bucketsES, ESTF: bucketsEStf,
 		}),
 		panel("table", "Every family", box{W: 12, H: 9, X: 0, Y: 11}, []Target{sqlT(ranQ)}, &P{
 			Prom: []Target{
@@ -566,8 +565,8 @@ func collectorSection(b *builder) []Panel {
 				"Value": collectorFailures,
 			}, []string{"scope"})},
 			PromDesc: "In Prometheus this is the last sweep's failures rather than the " +
-				"range's, and the exporter carries no message, so the What GitHub said " +
-				"column of the InfluxDB dashboard is absent here.",
+				"range's, a gauge carries no date of its own and the exporter no message, so " +
+				"the When and What GitHub said columns of the InfluxDB dashboard are absent here.",
 			Overrides: []any{when("When"), repoColumn(), width("Why", 90)},
 			Desc: "One row per repository one collector could not collect, newest first: " +
 				"which family, which repository, and what GitHub answered. This is where " +

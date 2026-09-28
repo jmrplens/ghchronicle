@@ -263,7 +263,7 @@ func openAlerts(b *builder) []Panel {
 				depOpen, grBin("1d"), gn(da, "severity")), "max"))},
 			ES: []Target{b.esDaily(da, b.mMax("open"), "severity", "", []string{ESF}, "")},
 			ESDesc: "In Elasticsearch this is the largest single series of each severity " +
-				"in the day rather than the sum across repositories: a date histogram " +
+				"in the bucket rather than the sum across repositories: a date histogram " +
 				"cannot take the newest of each series before adding them.",
 		}),
 		panel("table", "Security features", box{W: 12, H: 8, X: 12, Y: 4}, []Target{sqlT(feats)}, &P{
@@ -436,10 +436,9 @@ func scanningAndResolution(b *builder) []Panel {
 
 	return []Panel{
 		panel("timeseries", "Code scanning runs", box{W: 12, H: 8, X: 0, Y: 12}, []Target{sqlTS(analyses)}, &P{
-			Prom: []Target{daily(fmt.Sprintf(
+			Prom: []Target{daily(promOtherOverTime(fmt.Sprintf(
 				"sum by (tool) (increase(github_code_scanning_analyses_total{%s}[1d]))", PF,
-			),
-				"{{tool}}")},
+			), "tool", "tool"), "{{tool}}")},
 			Opts:    mergeOpts(Opts{"bars": true, "stack": true}, dayBins),
 			SQLOpts: seriesOpts,
 			Desc: "That the scan ran at all, which the alert list cannot tell you. GitHub " +
@@ -447,8 +446,9 @@ func scanningAndResolution(b *builder) []Panel {
 				"that ran the most in the range are named; the rest are `other`. " +
 				bucketFollowsRange,
 			PromDesc: sinceStart,
-			GR:       []Target{grq(perBucket(nonNull(rp(an, "analyses")), gn(an, "tool")))},
+			GR:       []Target{grq(grOther(topSeriesKept, perBucket(nonNull(rp(an, "analyses")), gn(an, "tool"))))},
 			ES:       []Target{b.esDaily(an, b.mCount(), "tool", "", []string{ESF}, "")},
+			ESDesc:   esUnfolded(esDailyTerms, "tools", "series"),
 		}),
 		panel("table", "Scanning alerts resolved", box{W: 24, H: 7, X: 0, Y: 20},
 			[]Target{sqlT(scanResolve)}, &P{
@@ -486,7 +486,9 @@ func scanningAndResolution(b *builder) []Panel {
 			Opts:   Opts{"sort": "Raised"},
 			Desc:   securityResolveDesc,
 			PromDesc: "Prometheus keeps the severity only, so this is the alerts resolved per " +
-				"severity, the worst mean score and the mean time. " + sinceStart + " " + lastSweep,
+				"severity, the worst mean score and the mean time, and no alert's Package, " +
+				"Raised, Repository, Advisory, CVSS or Outcome survives the exporter. " +
+				sinceStart + " " + lastSweep,
 			Overrides: []any{
 				when("Raised"), repoColumn(), width("Severity", 90),
 				width("Package", 130), width(securityCVSS, 70), width(securityOutcome, 110),
@@ -498,7 +500,7 @@ func scanningAndResolution(b *builder) []Panel {
 			},
 			GR: resGR, GRTF: resGRtf, GRAt: map[string]string{"Alerts": "Advisory"},
 			GRDesc: "Graphite names each row repository, severity and package from the path " +
-				"and keeps no text, so the advisory is missing. " + grSlot,
+				"and keeps no text, so the advisory is missing. " + grRows + " " + grSlot,
 			ES: resES, ESTF: resEStf, ESDesc: esNewest,
 		}),
 		scanResultsByTool(b),

@@ -164,16 +164,25 @@ func contributionTotals(b *builder) []Panel {
 			Desc: "One bar per week, at the Sunday the week starts on, which is how GitHub " +
 				"serves it and how the rows are stamped.",
 			Opts: Opts{"bars": true},
+			// A day each, which keeps every week at its own Sunday, and the
+			// days between them dropped, so that a bar is as wide as a week
+			// is apart as the SQL stores' rows are. Summarized by seven days,
+			// graphite-web counts the buckets from the epoch, a Thursday
+			// (render/functions.py, summarize without alignToFrom), and every
+			// bar stood three days early: measured on the 2.6.2 review, 2, 0,
+			// 3, 6 and 2 commits at the Thursdays 08-27 to 09-24, and the
+			// first of them before a thirty-day range began and not drawn.
 			GR: []Target{
-				grq(fmt.Sprintf(`alias(summarize(sumSeries(%s), "7d", "sum"), "All commits")`,
+				grq(fmt.Sprintf(`alias(summarize(sumSeries(%s), "1d", "sum"), "All commits")`,
 					weekPath("commits")), "A"),
-				grq(fmt.Sprintf(`alias(summarize(sumSeries(%s), "7d", "sum"), "Own commits")`,
+				grq(fmt.Sprintf(`alias(summarize(sumSeries(%s), "1d", "sum"), "Own commits")`,
 					weekPath("owner_commits")), "B"),
 			},
+			GRTF: []any{keepsAnyValue("All commits", "Own commits")},
 			ES: []Target{
-				esq("gh_commits_week", []any{b.mSum("commits")}, []any{b.dh("7d")}, "A",
+				esq("gh_commits_week", []any{b.mSum("commits")}, []any{b.sundayWeeks()}, "A",
 					[]string{ESF}, "All commits"),
-				esq("gh_commits_week", []any{b.mSum("owner_commits")}, []any{b.dh("7d")}, "B",
+				esq("gh_commits_week", []any{b.mSum("owner_commits")}, []any{b.sundayWeeks()}, "B",
 					[]string{ESF}, "Own commits"),
 			},
 		}),
@@ -385,8 +394,9 @@ func commitsPerRepository(b *builder) []Panel {
 					"The repositories include the private and third-party ones, which " +
 					`"Commits by repository" lists too, undated and unflagged. ` + cap100 +
 					" " + bucketFollowsRange,
-				GR: []Target{grq(perBucket(gp(dayRepo, "commits"), gn(dayRepo, "full_name")))},
-				ES: []Target{b.esDaily(dayRepo, b.mSum("commits"), "full_name", "", nil, "")},
+				GR:     []Target{grq(grOther(topSeriesKept, perBucket(gp(dayRepo, "commits"), gn(dayRepo, "full_name"))))},
+				ES:     []Target{b.esDaily(dayRepo, b.mSum("commits"), "full_name", "", nil, "")},
+				ESDesc: esUnfolded(esDailyTerms, "repositories", "series"),
 			}),
 		panel("barchart", "Commits the profile hides", box{W: 8, H: 8, X: 16, Y: 34},
 			[]Target{sqlT(hidden)}, &P{

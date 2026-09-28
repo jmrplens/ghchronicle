@@ -113,9 +113,9 @@ func commitsAndChurn(b *builder) []Panel {
 				promCounted("A", "Commits", fmt.Sprintf("sum(increase(%s[$__range]))", totalM)),
 				promAggregated("B", codeLinesAdded, added),
 				promAggregated("C", codeLinesRemoved, removed),
-				promAggregated("D", codeSignedCommits, fmt.Sprintf(
-					`100 * sum(increase(github_commits_total{signature="VALID",%s}[$__range])) / sum(increase(%s[$__range]))`,
-					PF, totalM,
+				promAggregated("D", codeSignedCommits, promShare(
+					fmt.Sprintf(`sum(increase(github_commits_total{signature="VALID",%s}[$__range]))`, PF),
+					fmt.Sprintf("sum(increase(%s[$__range]))", totalM),
 				)),
 			},
 			Desc: "How many commits landed in the window, how many lines each way, and what " +

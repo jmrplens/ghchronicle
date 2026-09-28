@@ -275,9 +275,6 @@ const esCents = "Elasticsearch hands the stored field back as it is. The arithme
 	"which is not a shape a table of rows has: so the money column here keeps cents and " +
 	"its heading says so rather than reading as a hundredfold overcharge."
 
-const esMoney = "In Elasticsearch each day is reduced to its largest reading, the last day that " +
-	"has one is taken, and the division into dollars is a server-side expression."
-
 // profileBool renders a stored boolean as a word.
 func profileBool(name string, w int) any {
 	return override(name, []any{
@@ -318,34 +315,32 @@ func sponsorship(b *builder) []Panel {
 			"string, which no store here can draw as a number. All four are the newest " +
 			"reading of a snapshot rewritten every sweep, not a sum over the range, " +
 			"which would report the lifetime total once per sweep.",
-		Opts:   Opts{"unit": "currencyUSD"},
-		ESDesc: esMoney,
+		Opts: Opts{"unit": "currencyUSD"},
 	}
 	var moneyCols []string
+	var inCents []named
+	var inDollars []any
+	var centColumns []string
 	for i, f := range sponsorFields {
 		moneyCols = append(moneyCols, fmt.Sprintf("%s / 100.0 AS %q", f.From, f.To))
 		money.Prom = append(money.Prom,
 			promNamed(ref(i), f.To, "github_sponsors_listing_"+f.From+" / 100"))
 		money.GR = append(money.GR,
-			grNamed(ref(i), f.To, fmt.Sprintf("scale(%s, 0.01)", gp(sl, f.From))))
-		// A max per day and the last of those, not a top_metrics: the
-		// server-side expressions read a series, and an end to end run
-		// found that a top_metrics inside a date histogram is not one it
-		// can reduce, which failed all four of these panels with
-		// sse.dependencyError. A max is the same shape the webhook failure
-		// gauge feeds its expressions, and the only day it decides is the
-		// newest one that has a reading at all, since an empty bucket is
-		// null and dropNN drops it. Three targets per value, so the four
-		// walk the alphabet in threes and only the last of each is drawn.
-		q, reduce, math := ref(3*i), ref(3*i+1), ref(3*i+2)
-		money.ES = append(money.ES, append(collected(
-			b.esDaily(sl, b.mMax(f.From), "", "", nil, q),
-			exprT(reduce, "reduce", "$"+q, map[string]any{
-				"reducer": "last", "settings": map[string]any{"mode": "dropNN"},
-			}),
-		), exprT(math, "math", "$"+reduce+" / 100", nil))...)
-		money.ESOver = append(money.ESOver, frameName(math, f.To))
+			grNewest(ref(i), f.To, fmt.Sprintf("scale(%s, 0.01)", gp(sl, f.From))))
+		cents := f.To + " in cents"
+		inCents = append(inCents, named{f.From, cents})
+		centColumns = append(centColumns, cents)
+		inDollars = append(inDollars, binaryField(f.To, cents, "/", "100"))
 	}
+	// The newest document, as every other snapshot group reads it, and the
+	// dollars a calculation of the panel's. They were four server-side
+	// expressions over a largest reading per day, and an expression answers a
+	// range with no document in it with NaN, which a tile draws as nothing:
+	// over a range no sweep reached the group was four names with no values
+	// where the other stores read "No data" (Grafana 13.2.1, the 2.6.2
+	// review). A bucket with no document in it is no row, and no tile.
+	money.ES, money.ESTF = esTbl(sl, []any{b.one()}, []any{b.mNewest(fieldsOf(sponsorFields)...)},
+		inCents, nil, append(inDollars, hideColumns(centColumns...))...)
 
 	// Two hundred rows because that is the collector's own ceiling: it reads
 	// first: 100 from each of the two connections and both land in this one

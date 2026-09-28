@@ -327,3 +327,131 @@ func TestAValueIsTheTextItsMappingGivesIt(t *testing.T) {
 		}
 	}
 }
+
+// TestAValueAMergeLeavesOutIsUndefinedToTheArithmetic is "Minutes spent on
+// failed runs" as Elasticsearch drew it in 2.6.2: every repository's minutes
+// from one query, the failed runs' mean and count from another, merged, and
+// the product taken. A repository with no failed run has no row in the second
+// query, and Grafana's merge leaves its mean and count undefined, which its
+// arithmetic reads as NaN and a table draws as "NaN". The replay read the gap
+// as a null, which is 0, and drew 0 s where Grafana draws NaN. A reduceRow sum
+// of the one field reads the gap as nothing, 0, as Grafana's standard
+// calculations skip a value that == null.
+func TestAValueAMergeLeavesOutIsUndefinedToTheArithmetic(t *testing.T) {
+	t.Parallel()
+	panel := map[string]any{
+		"type":    "table",
+		"targets": []any{map[string]any{"refId": "A"}, map[string]any{"refId": "B"}},
+		"transformations": []any{
+			map[string]any{"id": "merge", "options": map[string]any{}},
+			map[string]any{"id": "calculateField", "options": map[string]any{
+				"mode": "binary", "alias": "Product",
+				"binary": map[string]any{"left": "Average", "operator": "*", "right": "Count"},
+			}},
+			map[string]any{"id": "calculateField", "options": map[string]any{
+				"mode": "reduceRow", "alias": "Mean or 0",
+				"reduce": map[string]any{"include": []any{"Average"}, "reducer": "sum"},
+			}},
+			map[string]any{"id": "filterByValue", "options": map[string]any{
+				"type": "include", "match": "any",
+				"filters": []any{map[string]any{
+					"fieldName": "Sum",
+					"config":    map[string]any{"id": "isNotNull", "options": map[string]any{}},
+				}},
+			}},
+			map[string]any{"id": "calculateField", "options": map[string]any{
+				"mode": "binary", "alias": "Product after a filter",
+				"binary": map[string]any{"left": "Average", "operator": "*", "right": "Count"},
+			}},
+		},
+	}
+	answer := answerOf(map[string][]map[string]any{
+		"A": {wireFrame("A",
+			wireField{name: "repo", typ: "string", values: []any{"site", "docs"}},
+			wireField{name: "Sum", typ: "number", values: []any{180.0, 20.0}})},
+		"B": {wireFrame("B",
+			wireField{name: "repo", typ: "string", values: []any{"site"}},
+			wireField{name: "Average", typ: "number", values: []any{40.0}},
+			wireField{name: "Count", typ: "number", values: []any{2.0}})},
+	})
+	frames := mustDraw(t, panel, answer)
+	rows := map[string]int{}
+	for r, v := range column(t, frames, "repo").Values {
+		rows[v.(string)] = r
+	}
+	for _, c := range []struct {
+		column, repo string
+		want         float64
+	}{
+		{"Product", "site", 80},
+		{"Product", "docs", math.NaN()},
+		{"Mean or 0", "site", 40},
+		{"Mean or 0", "docs", 0},
+		{"Product after a filter", "docs", math.NaN()},
+	} {
+		got, _ := column(t, frames, c.column).Values[rows[c.repo]].(float64)
+		if !(got == c.want || (math.IsNaN(got) && math.IsNaN(c.want))) {
+			t.Errorf("%s of %s reads %v, and Grafana reads %v", c.column, c.repo, got, c.want)
+		}
+	}
+	if v := valueAt(column(t, frames, "Average"), rows["docs"]); v != nil {
+		t.Errorf("the mean a merge left out reads %v to everything but the arithmetic, where Grafana's == null holds", v)
+	}
+}
+
+// TestANumberIsAnOperandOfItsOwn is "Sponsorship" in Elasticsearch, which
+// takes the newest document's cents and divides them by 100 in the panel: a
+// binary calculation whose right side is a number rather than a field.
+func TestANumberIsAnOperandOfItsOwn(t *testing.T) {
+	t.Parallel()
+	panel := map[string]any{
+		"type":    "stat",
+		"targets": []any{map[string]any{"refId": "A"}},
+		"transformations": []any{map[string]any{"id": "calculateField", "options": map[string]any{
+			"mode": "binary", "alias": "Dollars",
+			"binary": map[string]any{"left": "Cents", "operator": "/", "right": "100"},
+		}}},
+	}
+	answer := answerOf(map[string][]map[string]any{"A": {wireFrame("A",
+		wireField{name: "Cents", typ: "number", values: []any{1275.0}})}})
+	if got := column(t, mustDraw(t, panel, answer), "Dollars").Values[0]; got != 12.75 {
+		t.Errorf("1275 cents over 100 reads %v, want 12.75", got)
+	}
+}
+
+// TestAFlagHeldAsTextEntersTheArithmeticAsAnEnum is "Latest discussions" in
+// Elasticsearch: whether a discussion was answered is a boolean in its
+// document, whether its category takes an answer is a tag and so the text
+// "true" or "false", and Answered is the one over the other, as an enum of the
+// two words makes the text 0 or 1. An idea, whose category takes no answer,
+// is 0 over 0, NaN, which the n/a mapping draws; the SQL stores read it as n/a
+// too, from a CASE.
+func TestAFlagHeldAsTextEntersTheArithmeticAsAnEnum(t *testing.T) {
+	t.Parallel()
+	panel := map[string]any{
+		"type":    "table",
+		"targets": []any{map[string]any{"refId": "A"}},
+		"transformations": []any{
+			map[string]any{"id": "convertFieldType", "options": map[string]any{
+				"conversions": []any{map[string]any{
+					"targetField": "answerable", "destinationType": "enum",
+					"enumConfig": map[string]any{"text": []any{"false", "true"}},
+				}},
+			}},
+			map[string]any{"id": "calculateField", "options": map[string]any{
+				"mode": "binary", "alias": "Answered",
+				"binary": map[string]any{"left": "has_answer", "operator": "/", "right": "answerable"},
+			}},
+		},
+	}
+	answer := answerOf(map[string][]map[string]any{"A": {wireFrame("A",
+		wireField{name: "has_answer", typ: "boolean", values: []any{true, false, false}},
+		wireField{name: "answerable", typ: "string", values: []any{"true", "true", "false"}})}})
+	got := column(t, mustDraw(t, panel, answer), "Answered").Values
+	for i, want := range []float64{1, 0, math.NaN()} {
+		n, _ := got[i].(float64)
+		if !(n == want || (math.IsNaN(n) && math.IsNaN(want))) {
+			t.Errorf("row %d reads %v, want %v", i, got[i], want)
+		}
+	}
+}

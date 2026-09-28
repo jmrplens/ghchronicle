@@ -56,23 +56,24 @@ const dashboardsDir = "../../../dashboards"
 // to be this rather than read blindly, because the whole suite is framed by it:
 // an empty panel is judged against what the sweep wrote inside this window.
 //
-// Deliberately not a wider one. Measured here at now-3y, two stores answer
-// differently for reasons that belong to a store that has seen one sweep and
-// not to any dashboard:
+// Deliberately not a wider one. Measured here at now-3y, Graphite answers
+// differently for a reason that belongs to a store that has seen one sweep
+// and not to any dashboard: it keeps two archives, 1h:120d and 1d:12y, and a
+// query wider than the hourly archive reads the daily one, which whisper
+// fills only by propagating complete hourly slots, so after a single sweep it
+// is empty and a counting panel answers 0 where the other stores answer 1.
+// The hourly archive was thirty days until the Code panels pinned themselves
+// to ninety, which put two of them the wrong side of that edge although the
+// dashboard range never moved; storage-schemas.conf says the rest. That is
+// worth knowing and not a defect this suite should report as one, so the
+// range under test is the dashboard's own.
 //
-//   - Graphite keeps two archives, 1h:120d and 1d:12y. A query wider than the
-//     hourly archive reads the daily one, which whisper fills only by
-//     propagating complete hourly slots, so after a single sweep it is empty
-//     and a counting panel answers 0 where the other stores answer 1. The
-//     hourly archive was thirty days until the Code panels pinned themselves
-//     to ninety, which put two of them the wrong side of that edge although
-//     the dashboard range never moved; storage-schemas.conf says the rest.
-//   - Elasticsearch refuses a date_histogram of one hour across years:
-//     "Trying to create too many buckets ... [65536]". Four panels fail at
-//     now-3y and none of them at thirty days.
-//
-// Both are worth knowing and neither is a defect this suite should report as
-// one, so the range under test is the dashboard's own.
+// Elasticsearch used to be the second reason: it refused a date_histogram of
+// one hour across years, "Trying to create too many buckets ... [65536]", on
+// four panels at now-3y. Its charts bin by the range now, as the other
+// stores' do, and the datasource widens such a bucket where a range would ask
+// for too many; measured on the 2.6.2 branch, the six charts of an hour or
+// five minutes answer three years without an error.
 const (
 	dashboardRange  = "now-30d"
 	dashboardWindow = 30 * 24 * time.Hour
@@ -161,11 +162,14 @@ type dashboardRun struct {
 	// a query computes from now() moves by as much between two stores.
 	asked map[string][2]time.Time
 	// overNothing is what each store's stats and gauges answered about a
-	// repository with nothing in it (see tiles_over_nothing_test.go), asked
-	// here while the exporter Prometheus scrapes is still running: it lives
-	// as long as the test that started it, and a query put to Prometheus once
-	// it is gone finds every series marked stale.
-	overNothing map[string][]grafana.Result
+	// repository with nothing in it, and overQuiet what they answered over
+	// quiet, a range no point of any sweep falls in (see
+	// tiles_over_nothing_test.go). Both are asked here while the exporter
+	// Prometheus scrapes is still running: it lives as long as the test that
+	// started it, and a query put to Prometheus once it is gone finds every
+	// series marked stale.
+	overNothing, overQuiet map[string][]grafana.Result
+	quiet                  [2]time.Time
 }
 
 var (
@@ -196,7 +200,7 @@ func dashboardsRunInto(t *testing.T, s *Stack) (*dashboardRun, error) {
 	ctx := t.Context()
 	run := &dashboardRun{
 		outcomes: map[string]map[int]dashboardOutcome{}, asked: map[string][2]time.Time{},
-		overNothing: map[string][]grafana.Result{},
+		overNothing: map[string][]grafana.Result{}, overQuiet: map[string][]grafana.Result{},
 	}
 	sweep := sqlStoresRun(ctx, t, s)
 	oracle := sqlStoresPoints(t, sweep)
@@ -218,6 +222,7 @@ func dashboardsRunInto(t *testing.T, s *Stack) (*dashboardRun, error) {
 	var exporter []sqlStoresPoint
 	run.promSkip, exporter = dashboardsLoadPrometheus(t, s)
 	run.sweeps = [][]sqlStoresPoint{oracle, pushPoints(t, push), exporter}
+	run.quiet = quietRange(run.sweeps)
 
 	client := grafana.Client{URL: s.GrafanaURL, Token: s.GrafanaToken}
 	repos := dashboardRepos(oracle)
@@ -254,6 +259,7 @@ func dashboardsRunInto(t *testing.T, s *Stack) (*dashboardRun, error) {
 		}
 		if store.name != "prometheus" || run.promSkip == "" {
 			run.overNothing[store.name] = askTilesOverNothing(ctx, client, doc, store)
+			run.overQuiet[store.name] = askTilesOverQuiet(ctx, client, doc, store, repos, run.quiet)
 		}
 	}
 	return run, nil

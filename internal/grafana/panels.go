@@ -419,10 +419,13 @@ func (c Client) checkPanel(ctx context.Context, from, to string,
 ) Result {
 	r := Result{Panel: *panel}
 	// The panel's own range wins over the dashboard's, which is what Grafana
-	// does with timeFrom. `to` stays: timeFrom sets the start of a window
-	// that still ends now.
+	// does with timeFrom: it replaces both ends, with a window that ends now
+	// whatever the dashboard's own end is (applyPanelTimeOverrides, from
+	// describeTextRange's "now-90d" to "now"). Keeping the dashboard's end
+	// asked a range four hundred days back for a start ninety days back,
+	// which Elasticsearch refused as a histogram whose bounds are reversed.
 	if panel.From != "" {
-		from = "now-" + panel.From
+		from, to = "now-"+panel.From, "now"
 		if vars.TimeFilterFormat != "" {
 			// vars is a value, so this is this panel's substitution alone.
 			vars.TimeFilter = fmt.Sprintf(vars.TimeFilterFormat, panel.From)

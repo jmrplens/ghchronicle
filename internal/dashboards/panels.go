@@ -566,6 +566,13 @@ func colorOf(name, color string) any {
 // read ".43 years" and ".9 weeks".
 const dayWidth = 100
 
+// notRead is what a tile says where the store holds no reading of the
+// selection at all: the collector writes the stars and forks, the artifact
+// storage and the cache as one row per repository each time it reads them, 0
+// when there is nothing to count, so no row is no reading rather than none of
+// it.
+const notRead = "not read"
+
 // noValueOf is what one value of a stat group reads when its query answers
 // nothing.
 //
@@ -591,13 +598,6 @@ const dayWidth = 100
 // (Grafana 13.2.1, on the 2.6.2 review). NaN is matched as well as null, so
 // that a share of nothing a store answers as NaN reads as the words and not as
 // "NaN".
-// notRead is what a tile says where the store holds no reading of the
-// selection at all: the collector writes the stars and forks, the artifact
-// storage and the cache as one row per repository each time it reads them, 0
-// when there is nothing to count, so no row is no reading rather than none of
-// it.
-const notRead = "not read"
-
 func noValueOf(name, text string) any {
 	if text == "" {
 		panic("a value with nothing to read needs words: " + name)

@@ -152,17 +152,18 @@ func labelsMilestonesAndForks(b *builder) []Panel {
 			ES:     milesES, ESTF: milesEStf,
 		}),
 		panel("timeseries", "Forks gained over time", box{W: 12, H: 8, X: 0, Y: 8}, []Target{sqlTS(forks)}, &P{
-			Prom: []Target{daily(fmt.Sprintf(
+			Prom: []Target{daily(promOtherOverTime(fmt.Sprintf(
 				"sum by (full_name, repo) (increase(github_forks_seen_total{%s}[1d]))", PF,
-			), "{{repo}}")},
+			), "full_name, repo", "repo"), "{{repo}}")},
 			Opts:    mergeOpts(Opts{"bars": true, "stack": true}, dayBins),
 			SQLOpts: seriesOpts,
 			Desc: "Dated when each fork was created, which the fork count on a repository " +
 				"never says. The eight repositories that gained the most in the range are " +
 				"named; the rest are `other`. " + bucketFollowsRange,
 			PromDesc: sinceStart,
-			GR:       []Target{grq(perRepoBucket(nonNull(rp(fk, "forks")), fk))},
+			GR:       []Target{grq(grOther(topSeriesKept, perRepoBucket(nonNull(rp(fk, "forks")), fk)))},
 			ES:       []Target{b.esDaily(fk, b.mCount(), "repo", "", []string{ESF}, "")},
+			ESDesc:   esUnfolded(esDailyTerms, "repositories", "series"),
 		}),
 		panel("table", "Forks", box{W: 12, H: 8, X: 12, Y: 8}, []Target{sqlT(forkTbl)}, &P{
 			Prom: []Target{
@@ -181,7 +182,8 @@ func labelsMilestonesAndForks(b *builder) []Panel {
 				"which most forks are. Idle is the time since that push, counted from the " +
 				"row's own date, so it is right when the panel is drawn rather than when the " +
 				"last sweep ran.",
-			PromDesc: "Prometheus keeps no forker, so this is per repository: forks seen over " +
+			PromDesc: "Prometheus keeps no forker and no fork's own date, so this is per " +
+				"repository, with no By or Forked column: forks seen over " +
 				"the range, the share ever pushed to, and on average how long after the fork " +
 				"its last push came, which is negative for a fork nobody has pushed to at " +
 				"all: GitHub gives such a fork the parent's own last push, which usually " +
@@ -207,8 +209,8 @@ func labelsMilestonesAndForks(b *builder) []Panel {
 				"pushed to: those inherit the parent's last push. " + grRows,
 			ES: forkES, ESTF: forkEStf,
 			ESDesc: "Elasticsearch lists the documents themselves and cannot subtract the " +
-				"row's own date from now, so the column is how long after the fork its last " +
-				"push came. A negative is a fork nobody has pushed to, which inherits the " +
+				"row's own date from now, so in place of Idle the column is how long after " +
+				"the fork its last push came. A negative is a fork nobody has pushed to, which inherits the " +
 				"parent's own last push and is most of them; Pushed to says the same thing " +
 				"as a word.",
 		}),
@@ -251,9 +253,11 @@ func discussionAndComments(b *builder) []Panel {
 		{"repo", "Repository"},
 		{"category", "Category"},
 		{"comments", "Comments"},
-		{"has_answer", "Answered"},
+		{"has_answer", discussionHasAnswer},
+		{"answerable", discussionTakesAnswers},
 		{"url", "Link"},
 	}, []string{ESF})
+	latestEStf = append(latestEStf, answeredAgainstCategory()...)
 	perItem := "The exporter reduces discussions to counts per category and comments to " +
 		"counts per repository; no item survives, and the title and the url are strings."
 	grPerItem := "Graphite keeps no strings, so neither the title nor the url exists there."
@@ -331,19 +335,16 @@ func discussionAndComments(b *builder) []Panel {
 			},
 			GR: latestGR, GRTF: latestGRtf,
 			ES: latestES, ESTF: latestEStf,
-			ESDesc: esNewest + " " + esRange + " Its rows are the documents as stored, so " +
-				"Answered is each discussion's own flag, which a row cannot read against its " +
-				"category's: a discussion in a category that takes no answer reads yes or no " +
-				"here rather than n/a.",
+			ESDesc: esNewest + " " + esRange,
 		}),
 		// The eight commonest transitions of the range and the rest as
 		// `other`: the legend listed eighty one series.
 		panel("timeseries", "Transitions over time", box{W: 12, H: 8, X: 0, Y: 24}, []Target{sqlTS(
 			topSeries("gh_issue_event", "event", "events", "n", RF),
 		)}, &P{
-			Prom: []Target{daily(fmt.Sprintf(
+			Prom: []Target{daily(promOtherOverTime(fmt.Sprintf(
 				"sum by (event) (increase(github_issue_events_total{%s}[1d]))", PF,
-			), "{{event}}")},
+			), "event", "event"), "{{event}}")},
 			Opts:    mergeOpts(Opts{"bars": true, "stack": true}, dayBins),
 			SQLOpts: seriesOpts,
 			Desc: "Labeled, closed, reopened, review requested, renamed: the moment something " +
@@ -351,9 +352,10 @@ func discussionAndComments(b *builder) []Panel {
 				"no other measurement at all. The eight commonest in the range are named; " +
 				"the rest are `other`. " + bucketFollowsRange,
 			PromDesc: sinceStart,
-			GR: []Target{grq(perBucket(nonNull(rp("gh_issue_event", "events")),
-				gn("gh_issue_event", "event")))},
-			ES: []Target{b.esDaily("gh_issue_event", b.mCount(), "event", "", []string{ESF}, "")},
+			GR: []Target{grq(grOther(topSeriesKept, perBucket(nonNull(rp("gh_issue_event", "events")),
+				gn("gh_issue_event", "event"))))},
+			ES:     []Target{b.esDaily("gh_issue_event", b.mCount(), "event", "", []string{ESF}, "")},
+			ESDesc: esUnfolded(esDailyTerms, "transitions", "series"),
 		}),
 		panel("table", "Comments left", box{W: 12, H: 8, X: 12, Y: 24}, []Target{sqlT(
 			`SELECT full_name AS "Repository", COUNT(*) AS "Comments",` +
@@ -467,9 +469,8 @@ func answersGiven(b *builder, perItem, grPerItem string) []Panel {
 				"comment and not their sum, so there is no Accepted answers or Upvotes column.",
 			Overrides: []any{barCell("Comments", "short", 120), fullNameColumn()},
 			GR:        answersGR, GRTF: answersGRtf,
-			GRDesc: "Graphite has no rows: each series is one number, so this table keeps the " +
-				"comments of each repository and drops the accepted answers and the upvotes.",
-			ES: answersES, ESTF: answersEStf,
+			GRDesc: grRows,
+			ES:     answersES, ESTF: answersEStf,
 			ESDesc: "In Elasticsearch each comment is a bucket inside its repository's, " +
 				"a thousand at most per repository, and the table adds the buckets up.",
 		}),
@@ -566,11 +567,46 @@ func answeredCell(name string, w int) any {
 		map[string]any{"id": "mappings", "value": []any{
 			map[string]any{"type": "value", "options": flagWords("no", "text")},
 			map[string]any{"type": "special", "options": map[string]any{
-				"match":  "null",
+				"match":  "null+nan",
 				"result": map[string]any{"text": "n/a", "color": "text", "index": 4},
 			}},
 		}},
 		map[string]any{"id": "custom.cellOptions", "value": map[string]any{"type": "color-text"}},
 		map[string]any{"id": "custom.width", "value": w},
 	})
+}
+
+// The two flags a discussion's document carries, under the names the
+// Elasticsearch table reads them by before it draws Answered from them.
+const (
+	discussionHasAnswer    = "Has answer"
+	discussionTakesAnswers = "Takes answers"
+)
+
+// answeredAgainstCategory is Answered as the SQL stores read it, drawn in
+// Elasticsearch from the two flags every discussion's document carries: 1 or
+// 0 where the category takes an answer, and nothing where it does not, which
+// reads n/a. The SQL stores read the category's flag with a CASE; here the
+// answer is divided by it, and 0 over 0 is NaN, which answeredCell draws as it
+// draws a null. Drawn as the document's own flag, an idea read "no" in
+// Elasticsearch where the other stores read n/a.
+//
+// The category's flag is a tag, so the document holds it as the text "true"
+// or "false", and Grafana's conversions make neither of them the number the
+// arithmetic needs: to a number both are NaN, and to a boolean both are true,
+// since a non-empty string is (convertFieldType in Grafana 13.2.1). An enum of
+// the two words, in that order, makes "false" 0 and "true" 1. The answer is a
+// boolean in the document and enters the arithmetic as 1 or 0 as it is.
+func answeredAgainstCategory() []any {
+	return []any{
+		map[string]any{"id": "convertFieldType", "options": map[string]any{
+			"fields": map[string]any{},
+			"conversions": []any{map[string]any{
+				"targetField": discussionTakesAnswers, "destinationType": "enum",
+				"enumConfig": map[string]any{"text": []any{"false", "true"}},
+			}},
+		}},
+		binaryField("Answered", discussionHasAnswer, "/", discussionTakesAnswers),
+		hideColumns(discussionHasAnswer, discussionTakesAnswers),
+	}
 }

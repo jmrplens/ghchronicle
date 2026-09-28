@@ -61,6 +61,21 @@ func promAggregated(ref, name, expr string) Target {
 	return promNamed(ref, name, "("+expr+") or vector(NaN)")
 }
 
+// promShare is a percentage of two sums, as the SQL stores take it: a part
+// of nothing is 0 of the whole, and a whole of nothing is no share.
+//
+// The exporter makes a series for a label value only once it has seen one,
+// so an account that has never signed a commit has no series of a valid
+// signature, and a sum over none is not 0 but nothing, which divided by
+// anything is nothing again. Measured with promtool of Prometheus 3.14.0: a
+// Signed commits over unsigned commits alone read NaN, drawn as "no commits"
+// beside a Commits tile of 57, where the SQL stores read 0%. The part falls
+// back to 0, and the whole is kept only above 0, so a range with nothing in
+// it still has no share, as 0 of 0 has none in SQL.
+func promShare(part, whole string) string {
+	return fmt.Sprintf("100 * (%s or vector(0)) / (%s > 0)", part, whole)
+}
+
 // grNamed is one Graphite series drawn under its own name, and a series with
 // nothing in it under that name when the expression matches no path at all.
 //
@@ -77,6 +92,24 @@ func grNamed(ref, name, expr string) Target {
 		expr = fmt.Sprintf("fallbackSeries(%s, %s)", expr, grNothing)
 	}
 	return grq(fmt.Sprintf("alias(%s, %q)", expr, name), ref)
+}
+
+// grNewest is one Graphite series of a snapshot the SQL stores read as the
+// newest row of the range, and no series at all where the range holds no
+// reading of it, as the SQL stores then have no row.
+//
+// Graphite answers a path it holds with a series whatever the range, and over
+// a range no sweep reached that series is nulls from end to end, which
+// keepLastValue has nothing to carry into. A stat group whose every value was
+// such a series drew a panel with nothing in it, not even the names, since
+// Grafana sizes a tile's text by its value (the 2.6.2 review, "Community",
+// "Account" and "Since the account began" over a range four hundred days
+// back, against graphiteapp/graphite-statsd:1.1.10-5); the other stores
+// answer no row there and the panel reads "No data". Dropped, the series is
+// not there either, and Graphite reads the same. It takes no grNothing: a
+// value the SQL stores have no row for is not a tile to draw without a value.
+func grNewest(ref, name, series string) Target {
+	return grq(fmt.Sprintf("alias(removeEmptySeries(keepLastValue(%s)), %q)", series, name), ref)
 }
 
 // grNothing is a series with no value at all: constantLine draws its three
@@ -105,7 +138,7 @@ func fieldGroup(b *builder, m, title string, at box, fields []named, p *P) Panel
 	for i, f := range fields {
 		cols[i] = fmt.Sprintf("%s AS %q", f.From, f.To)
 		p.Prom = append(p.Prom, promNamed(ref(i), f.To, "github_"+strings.TrimPrefix(m, "gh_")+"_"+f.From))
-		p.GR = append(p.GR, grNamed(ref(i), f.To, fmt.Sprintf("keepLastValue(%s)", gp(m, f.From))))
+		p.GR = append(p.GR, grNewest(ref(i), f.To, gp(m, f.From)))
 	}
 	p.ES, p.ESTF = esTbl(m, []any{b.one()}, []any{b.mNewest(fieldsOf(fields)...)}, fields, nil)
 	return statGroup(title, at, []Target{sqlT(fmt.Sprintf(
@@ -261,7 +294,7 @@ func overview(b *builder) []Panel {
 				"archived ones above, private ones included, and forks left out unless " +
 				"`include_forks` is on.",
 			GR: []Target{
-				grNamed("A", "Repositories", gp("gh_account", "public_repos")),
+				grNewest("A", "Repositories", gp("gh_account", "public_repos")),
 				grNamed("B", "Stars", oneEachGR("stars")),
 				grNamed("C", "Forks", oneEachGR("forks")),
 			},
@@ -342,12 +375,12 @@ func overview(b *builder) []Panel {
 				"Inventory lists: GraphQL reports zero packages for a personal account " +
 				"and is not what this reads.",
 			GR: []Target{
-				grNamed("A", "Contributions", gp("gh_contributions_total", "calendar_total")),
-				grNamed("B", overviewAccountAge, gp("gh_account", "account_age_days")),
-				grNamed("C", "Watching", gp("gh_account", "watching")),
-				grNamed("D", overviewStarsGiven, gp("gh_account", "starred")),
-				grNamed("E", "Gists", gp("gh_account", "gists")),
-				grNamed("F", "Packages", gp("gh_account", "packages")),
+				grNewest("A", "Contributions", gp("gh_contributions_total", "calendar_total")),
+				grNewest("B", overviewAccountAge, gp("gh_account", "account_age_days")),
+				grNewest("C", "Watching", gp("gh_account", "watching")),
+				grNewest("D", overviewStarsGiven, gp("gh_account", "starred")),
+				grNewest("E", "Gists", gp("gh_account", "gists")),
+				grNewest("F", "Packages", gp("gh_account", "packages")),
 			},
 			ES: append(contribES, acctES...), ESTF: append(contribEStf, acctEStf...),
 			Overrides: []any{unitOf(overviewAccountAge, "d", 0)},
@@ -374,13 +407,15 @@ func audience(b *builder) []Panel {
 				Prom: []Target{promq(fmt.Sprintf(`sum by (full_name, repo) (github_traffic_%s{kind=%q,%s})`,
 					field, kind, PF), legend("{{repo}}"))},
 				Desc: desc + " The eight repositories with the most in the range are named; " +
-					"the rest are `other`. " + bucketFollowsRange, PromDesc: windowNote,
+					"the rest are `other`. " + bucketFollowsRange,
+				PromDesc: windowNote + " " + noFold("Prometheus", "repositories"),
 				Opts:     mergeOpts(Opts{"stack": true, "bars": true}, dayBins),
 				SQLOpts:  seriesOpts,
 				PromOpts: Opts{"bars": false},
-				GR:       []Target{grq(perRepoBucket(rp("gh_traffic", field, "kind", kind), "gh_traffic"))},
+				GR:       []Target{grq(grOther(topSeriesKept, perRepoBucket(rp("gh_traffic", field, "kind", kind), "gh_traffic")))},
 				ES: []Target{b.esDaily("gh_traffic", b.mSum(field), "repo", "",
 					[]string{"kind:" + kind, ESF}, "")},
+				ESDesc: esUnfolded(esDailyTerms, "repositories", "series"),
 			})
 	}
 
@@ -532,7 +567,7 @@ func audience(b *builder) []Panel {
 				width("Cloners", 100), width("Views", 100), ownerLinkOn("Repository", "the traffic graph"),
 			},
 			GR: cloneGR, GRTF: cloneGRtf,
-			GRDesc: "Graphite divides series, not columns, so the ratio is not in this table. " + grRows,
+			GRDesc: "Graphite divides series, not columns, so it has no ratio of two of them. " + grRows,
 			ES:     cloneES, ESTF: cloneEStf,
 			ESDesc: "In Elasticsearch this is clones and cloners: Clones each, the ratio, is " +
 				"the one column a bucket aggregation cannot divide, and Views are documents of " +

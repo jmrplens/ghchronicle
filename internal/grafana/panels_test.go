@@ -686,6 +686,26 @@ func TestAPanelsOwnRangeIsWhatItIsAskedOver(t *testing.T) {
 	}
 }
 
+// TestAPanelsOwnRangeEndsNowWhereverTheDashboardEnds holds a pinned panel to
+// the window Grafana gives it, which ends now: a dashboard set to a year that
+// ended a year ago still draws the Code panels' last ninety days. The runner
+// kept the dashboard's end, and the containerised suite's question over a
+// range four hundred days back asked Elasticsearch for a histogram from ninety
+// days back to four hundred, which it refused.
+func TestAPanelsOwnRangeEndsNowWhereverTheDashboardEnds(t *testing.T) {
+	t.Parallel()
+	c, seen := fakeGrafana(t, http.StatusOK, `{"results":{}}`)
+	panels := []PanelQuery{{Title: "Pinned", From: "90d", Targets: []map[string]any{{"refId": "A"}}}}
+	before := time.Now()
+	c.CheckPanels(t.Context(), "now-2y", "now-1y", panels, Vars{Datasource: "ds"},
+		Options{Timeout: 5 * time.Second, Workers: 1})
+	req := <-seen
+	from, to := instant(t, req.body["from"]), instant(t, req.body["to"])
+	if to.Before(before.Add(-time.Second)) || !from.Equal(to.AddDate(0, 0, -90)) {
+		t.Errorf("a panel pinned to ninety days was asked from %s to %s, want the ninety days to now", from, to)
+	}
+}
+
 // instant reads a range bound posted as epoch milliseconds.
 func instant(t *testing.T, v any) time.Time {
 	t.Helper()

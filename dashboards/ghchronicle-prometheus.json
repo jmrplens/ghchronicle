@@ -841,7 +841,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "A trailing year at a time, whatever the row above is called: GitHub's contributions collection offers twelve months of them per sweep, so a fresh install sees one year here and the table reaches further back with every year the rows are kept. Each repository the account created, dated when it was created rather than when a sweep noticed it. Forks and private repositories are included, which is the point: those are exactly the ones a sweep with `include_forks` off never discovers. It names its own window rather than taking the dashboard's, so narrowing the range at the top of the page does not narrow this table. The exporter reduces `gh_repo_created` to a count by user and fork, so Prometheus can say how many repositories were created and how many of them were forks, and can name none of them: the repository is not a label on that gauge. It is the last sweep's count, so it is that one trailing year and never the years the other stores have kept. The Prometheus exporter carries no url, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "A trailing year at a time, whatever the row above is called: GitHub's contributions collection offers twelve months of them per sweep, so a fresh install sees one year here and the table reaches further back with every year the rows are kept. Each repository the account created, dated when it was created rather than when a sweep noticed it. Forks and private repositories are included, which is the point: those are exactly the ones a sweep with `include_forks` off never discovers. It names its own window rather than taking the dashboard's, so narrowing the range at the top of the page does not narrow this table. The exporter reduces `gh_repo_created` to a count by user and fork, so Prometheus can say how many repositories were created and how many of them were forks, and can name none of them: the repository is not a label on that gauge, and whether one is private is not either, so the Private column is not in this table. It is the last sweep's count, so it is that one trailing year and never the years the other stores have kept. The Prometheus exporter carries no url, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -1220,7 +1220,7 @@
       "panels": [
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "Split by repository. GitHub serves a rolling 14-day window and it is rewritten on every sweep, so a gap means the collector was down for longer than that window. The eight repositories with the most in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year. In Prometheus this is GitHub's whole trailing window as one number that moves, not days.",
+          "description": "Split by repository. GitHub serves a rolling 14-day window and it is rewritten on every sweep, so a gap means the collector was down for longer than that window. The eight repositories with the most in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there. In Prometheus this is GitHub's whole trailing window as one number that moves, not days. Prometheus draws every one of the repositories and folds none of them into other.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -1284,7 +1284,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "Split by repository. The eight repositories with the most in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year. In Prometheus this is GitHub's whole trailing window as one number that moves, not days.",
+          "description": "Split by repository. The eight repositories with the most in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there. In Prometheus this is GitHub's whole trailing window as one number that moves, not days. Prometheus draws every one of the repositories and folds none of them into other.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -1348,7 +1348,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "Its own panel because continuous integration clones a repository thousands of times for every human visit, and on a shared axis the visits become a flat line at zero. The eight repositories with the most in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year. In Prometheus this is GitHub's whole trailing window as one number that moves, not days.",
+          "description": "Its own panel because continuous integration clones a repository thousands of times for every human visit, and on a shared axis the visits become a flat line at zero. The eight repositories with the most in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there. In Prometheus this is GitHub's whole trailing window as one number that moves, not days. Prometheus draws every one of the repositories and folds none of them into other.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -1799,7 +1799,7 @@
       "panels": [
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "Stars per day from GitHub's daily star history, which it serves for every repository whatever the token may see of its stargazers. Each day is GitHub's Pacific calendar day, so a star given in a European morning can sit a day before the UTC date it was given. An unstar of a star given in the last thirty weeks is taken off the day it was given. Against GitHub Enterprise Server, which does not serve the history, the bars are empty. The eight repositories that gained the most in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year. None of that about the daily history holds in Prometheus, which counts the stargazer list: an unstar is never taken off, GitHub Enterprise Server has bars as well, and only a repository whose list the token may read is here, since July 2026 GitHub serves that list only to a repository's admins and collaborators. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date. Stars over time holds every repository's count.",
+          "description": "Stars per day from GitHub's daily star history, which it serves for every repository whatever the token may see of its stargazers. Each day is GitHub's Pacific calendar day, so a star given in a European morning can sit a day before the UTC date it was given. An unstar of a star given in the last thirty weeks is taken off the day it was given. Against GitHub Enterprise Server, which does not serve the history, the bars are empty. The eight repositories that gained the most in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there. None of that about the daily history holds in Prometheus, which counts the stargazer list: an unstar is never taken off, GitHub Enterprise Server has bars as well, and only a repository whose list the token may read is here, since July 2026 GitHub serves that list only to a repository's admins and collaborators. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date. Stars over time holds every repository's count.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -1851,7 +1851,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (full_name, repo) (increase(github_stars_gained_total{repo=~\"$repo\"}[$__interval]))",
+              "expr": "(sum by (full_name, repo) (increase(github_stars_gained_total{repo=~\"$repo\"}[$__interval]))) and on (full_name, repo) topk(8, (sum by (full_name, repo) (increase(github_stars_gained_total{repo=~\"$repo\"}[$__range] @ end()))) \u003e 0) or label_replace(sum((sum by (full_name, repo) (increase(github_stars_gained_total{repo=~\"$repo\"}[$__interval]))) unless on (full_name, repo) topk(8, (sum by (full_name, repo) (increase(github_stars_gained_total{repo=~\"$repo\"}[$__range] @ end()))) \u003e 0)) \u003e 0, \"repo\", \"other\", \"\", \"\")",
               "instant": false,
               "interval": "1d",
               "legendFormat": "{{repo}}",
@@ -1864,7 +1864,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "The star count as it climbed, holding its last value to the end of the range. In InfluxDB and PostgreSQL it is rebuilt from GitHub's daily star history for every repository, back to the first star, so widening the range shows more of it. There it usually sits at or a little below the star count GitHub shows, since that count also includes accounts GitHub no longer lists, but a star given more than thirty weeks ago and later taken back can stay in it, so it can also sit above. Against GitHub Enterprise Server, which does not serve the history, the curve is empty in those two stores. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year. In Prometheus the curve is the repositories' star count as the exporter read it, so it starts the day the exporter did and sits at GitHub's count.",
+          "description": "The star count as it climbed, holding its last value to the end of the range. In InfluxDB and PostgreSQL it is rebuilt from GitHub's daily star history for every repository, back to the first star, so widening the range shows more of it. There it usually sits at or a little below the star count GitHub shows, since that count also includes accounts GitHub no longer lists, but a star given more than thirty weeks ago and later taken back can stay in it, so it can also sit above. Against GitHub Enterprise Server, which does not serve the history, the curve is empty in those two stores. One point is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there. In Prometheus the curve is the repositories' star count as the exporter read it, so it starts the day the exporter did and sits at GitHub's count.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -2005,7 +2005,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "The newest stargazers, one row each. A repository whose stargazer list GitHub hides from this token (since July 2026 it serves the list only to a repository's admins and collaborators) has its stars in the panels above and no names here. Prometheus keeps no stargazer identity, so this is the stars gained per repository over the range instead. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date. The table counts the stargazer list, as Stars gained over time does here, so a repository whose list is hidden is in neither and has its stars only in Stars over time and Stars by repository. The Prometheus exporter carries no url, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "The newest stargazers, one row each. A repository whose stargazer list GitHub hides from this token (since July 2026 it serves the list only to a repository's admins and collaborators) has its stars in the panels above and no names here. Prometheus keeps no stargazer identity, so this is the stars gained per repository over the range instead, and the User and Starred at columns are not in it. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date. The table counts the stargazer list, as Stars gained over time does here, so a repository whose list is hidden is in neither and has its stars only in Stars over time and Stars by repository. The Prometheus exporter carries no url, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -2141,7 +2141,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "The fork count as it climbed, a running count of the forks each dated when it was made, so it reaches back to the first fork rather than to the day the collector started, and holds its last value to the end of the range. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year. In Prometheus the curve starts the day the exporter did.",
+          "description": "The fork count as it climbed, a running count of the forks each dated when it was made, so it reaches back to the first fork rather than to the day the collector started, and holds its last value to the end of the range. One point is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there. In Prometheus the curve starts the day the exporter did.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -3250,7 +3250,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "Merged and closed are dated at the moment it happened and stacked. Open that day is the line: how many were open on that day, which is a state and not an event, so it is not part of the stack. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date.",
+          "description": "Merged and closed are dated at the moment it happened and stacked. Open that day is the line: how many were open on that day, which is a state and not an event, so it is not part of the stack. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -3412,7 +3412,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year. In InfluxDB the 90th percentile is an estimate (approx_percentile_cont, a t-digest), since InfluxDB 3 Core has no exact percentile before 3.9.0, so it can read differently from the exact one PostgreSQL draws; the median is exact in both. In Prometheus this is the mean over the collector's last sweep, not a median over the dashboard range.",
+          "description": "One point is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there. In InfluxDB the 90th percentile is an estimate (approx_percentile_cont, a t-digest), since InfluxDB 3 Core has no exact percentile before 3.9.0, so it can read differently from the exact one PostgreSQL draws; the median is exact in both. In Prometheus this is the mean over the collector's last sweep, not a median over the dashboard range.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -3475,7 +3475,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "Closed is dated at the moment it happened. Open that day is the line: how many were open on that day, a state rather than an event, so it is not stacked. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date.",
+          "description": "Closed is dated at the moment it happened. Open that day is the line: how many were open on that day, a state rather than an event, so it is not stacked. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -3637,7 +3637,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "Lines added plus removed per merged pull request. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year. In Prometheus this is the mean over the collector's last sweep, not a median over the dashboard range.",
+          "description": "Lines added plus removed per merged pull request. One point is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there. In Prometheus this is the mean over the collector's last sweep, not a median over the dashboard range.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -4080,7 +4080,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date.",
+          "description": "One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -4367,7 +4367,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "Dated at the thread's first comment, which is when the objection was raised. Split by whether the reviewer is a bot: on this account the reviewers are review bots, and a backlog of bot threads reads differently from a backlog of human ones. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date.",
+          "description": "Dated at the thread's first comment, which is when the objection was raised. Split by whether the reviewer is a bot: on this account the reviewers are review bots, and a backlog of bot threads reads differently from a backlog of human ones. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -4754,7 +4754,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "(100 * sum(increase(github_workflow_runs_total{conclusion=\"success\",repo=~\"$repo\"}[$__range])) / sum(increase(github_workflow_runs_total{conclusion=~\"success|failure\",repo=~\"$repo\"}[$__range]))) or vector(NaN)",
+              "expr": "(100 * (sum(increase(github_workflow_runs_total{conclusion=\"success\",repo=~\"$repo\"}[$__range])) or vector(0)) / (sum(increase(github_workflow_runs_total{conclusion=~\"success|failure\",repo=~\"$repo\"}[$__range])) \u003e 0)) or vector(NaN)",
               "instant": true,
               "legendFormat": "Success rate",
               "range": false,
@@ -4811,7 +4811,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date.",
+          "description": "One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -4967,7 +4967,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year. In InfluxDB the 95th percentile is an estimate (approx_percentile_cont, a t-digest), since InfluxDB 3 Core has no exact percentile before 3.9.0, so it can read differently from the exact one PostgreSQL draws; the median is exact in both. In Prometheus this is the mean over the collector's last sweep, not a median over the dashboard range.",
+          "description": "One point is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there. In InfluxDB the 95th percentile is an estimate (approx_percentile_cont, a t-digest), since InfluxDB 3 Core has no exact percentile before 3.9.0, so it can read differently from the exact one PostgreSQL draws; the median is exact in both. In Prometheus this is the mean over the collector's last sweep, not a median over the dashboard range.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -5030,7 +5030,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "Over the runs whose jobs were expanded, which is the newest runs of each sweep and, after a backfill, every run GitHub still holds, which from 1 October 2026 means the repository's retention period, ninety days by default; not every run the run count includes. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year. In Prometheus this is the mean over the collector's last sweep, not a median over the dashboard range.",
+          "description": "Over the runs whose jobs were expanded, which is the newest runs of each sweep and, after a backfill, every run GitHub still holds, which from 1 October 2026 means the repository's retention period, ninety days by default; not every run the run count includes. One point is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under an hour, which is six hours over a month and a day over a year. In Prometheus this is the mean over the collector's last sweep, not a median over the dashboard range.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -5102,7 +5102,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "Artifacts that have not expired, over the ones the walk reached, which is a floor on any repository with more than five hundred, and on one whose walk a failed page of the listing cut short: \"Artifact storage counted\" further down has the counts that say which those are. GitHub deletes artifacts on their own schedule, which is why this falls without anyone doing anything. A reading taken at each sweep, so the curve starts the day the collector did: there is no history of it to rebuild. The eight repositories holding the most are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "Artifacts that have not expired, over the ones the walk reached, which is a floor on any repository with more than five hundred, and on one whose walk a failed page of the listing cut short: \"Artifact storage counted\" further down has the counts that say which those are. GitHub deletes artifacts on their own schedule, which is why this falls without anyone doing anything. A reading taken at each sweep, so the curve starts the day the collector did: there is no history of it to rebuild. The eight repositories holding the most are named; the rest are `other`. One point is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under an hour, which is six hours over a month and a day over a year. Prometheus draws every one of the repositories and folds none of them into other.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -5632,7 +5632,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (full_name, repo) (increase(github_workflow_runs_total{conclusion!=\"success\",repo=~\"$repo\"}[$__range])) * on (full_name, repo) group_left avg by (full_name, repo) (github_workflow_runs_duration_seconds_mean{repo=~\"$repo\"})",
+              "expr": "sum by (full_name, repo) (sum by (full_name, repo) (increase(github_workflow_runs_total{conclusion!=\"success\",repo=~\"$repo\"}[$__range])) * on (full_name, repo) group_left avg by (full_name, repo) (github_workflow_runs_duration_seconds_mean{repo=~\"$repo\"})) or sum by (full_name, repo) (0 * sum by (full_name, repo) (increase(github_workflow_runs_total{repo=~\"$repo\"}[$__range])) * on (full_name, repo) group_left avg by (full_name, repo) (github_workflow_runs_duration_seconds_mean{repo=~\"$repo\"}))",
               "format": "table",
               "instant": true,
               "range": false,
@@ -5650,7 +5650,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (full_name, repo) (100 * (sum by (full_name, repo) (increase(github_workflow_runs_total{conclusion!=\"success\",repo=~\"$repo\"}[$__range])) * on (full_name, repo) group_left avg by (full_name, repo) (github_workflow_runs_duration_seconds_mean{repo=~\"$repo\"})) / ((sum by (full_name, repo) (increase(github_workflow_runs_total{repo=~\"$repo\"}[$__range])) * on (full_name, repo) group_left avg by (full_name, repo) (github_workflow_runs_duration_seconds_mean{repo=~\"$repo\"})) \u003e 0))",
+              "expr": "sum by (full_name, repo) (100 * (sum by (full_name, repo) (sum by (full_name, repo) (increase(github_workflow_runs_total{conclusion!=\"success\",repo=~\"$repo\"}[$__range])) * on (full_name, repo) group_left avg by (full_name, repo) (github_workflow_runs_duration_seconds_mean{repo=~\"$repo\"})) or sum by (full_name, repo) (0 * sum by (full_name, repo) (increase(github_workflow_runs_total{repo=~\"$repo\"}[$__range])) * on (full_name, repo) group_left avg by (full_name, repo) (github_workflow_runs_duration_seconds_mean{repo=~\"$repo\"}))) / ((sum by (full_name, repo) (increase(github_workflow_runs_total{repo=~\"$repo\"}[$__range])) * on (full_name, repo) group_left avg by (full_name, repo) (github_workflow_runs_duration_seconds_mean{repo=~\"$repo\"})) \u003e 0))",
               "format": "table",
               "instant": true,
               "range": false,
@@ -5814,6 +5814,15 @@
               "instant": true,
               "range": false,
               "refId": "B"
+            },
+            {
+              "datasource": "${DS_PROMETHEUS}",
+              "editorMode": "code",
+              "expr": "sum by (full_name, repo, workflow) (100 * (topk(20, sum by (full_name, repo, workflow) (increase(github_workflow_runs_total{conclusion!=\"success\",repo=~\"$repo\"}[$__range])) \u003e 3)) / (sum by (full_name, repo, workflow) (increase(github_workflow_runs_total{repo=~\"$repo\"}[$__range])) and on (full_name, repo, workflow) topk(20, sum by (full_name, repo, workflow) (increase(github_workflow_runs_total{conclusion!=\"success\",repo=~\"$repo\"}[$__range])) \u003e 3)))",
+              "format": "table",
+              "instant": true,
+              "range": false,
+              "refId": "C"
             }
           ],
           "title": "Workflows that keep failing",
@@ -5837,6 +5846,7 @@
                 "renameByName": {
                   "Value #A": "Failures",
                   "Value #B": "Runs",
+                  "Value #C": "Failure rate",
                   "repo": "Repository",
                   "workflow": "Workflow"
                 }
@@ -5847,6 +5857,7 @@
               "options": {
                 "excludeByName": {},
                 "indexByName": {
+                  "Failure rate": 4,
                   "Failures": 1,
                   "Repository": 0,
                   "Runs": 3,
@@ -6297,7 +6308,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "(100 * sum(increase(github_commits_total{signature=\"VALID\",repo=~\"$repo\"}[$__range])) / sum(increase(github_commits_total{repo=~\"$repo\"}[$__range]))) or vector(NaN)",
+              "expr": "(100 * (sum(increase(github_commits_total{signature=\"VALID\",repo=~\"$repo\"}[$__range])) or vector(0)) / (sum(increase(github_commits_total{repo=~\"$repo\"}[$__range])) \u003e 0)) or vector(NaN)",
               "instant": true,
               "legendFormat": "Signed commits",
               "range": false,
@@ -6310,7 +6321,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "Additions above the axis, deletions below, per day. This is the answer to GitHub's own code frequency endpoint, which returns 202 with an empty body forever on a personal account. This panel keeps its own range of ninety days whatever the page is set to. Every commit is a row of its own in the store, and at about ten months of them the query is refused for opening too many files, which the reader would see as an empty panel rather than as an error. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year. In Prometheus this counts the collector's last sweep, not the dashboard range.",
+          "description": "Additions above the axis, deletions below, per day. This is the answer to GitHub's own code frequency endpoint, which returns 202 with an empty body forever on a personal account. This panel keeps its own range of ninety days whatever the page is set to. Every commit is a row of its own in the store, and at about ten months of them the query is refused for opening too many files, which the reader would see as an empty panel rather than as an error. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there. In Prometheus this counts the collector's last sweep, not the dashboard range.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -6414,7 +6425,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "Pushes, branch creations and deletions, merges and force pushes, per hour. The only place a force push is recorded at all, and as perishable as traffic: a hundred entries covered twenty six hours here. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date.",
+          "description": "Pushes, branch creations and deletions, merges and force pushes, per hour. The only place a force push is recorded at all, and as perishable as traffic: a hundred entries covered twenty six hours here. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under an hour, which is six hours over a month and a day over a year. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -6871,7 +6882,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "Whether the commit itself came out green. A workflow run that failed says a job failed, which is not the same claim: of fifty commits measured here, twenty seven left the default branch red. This panel keeps its own range of ninety days whatever the page is set to. Every commit is a row of its own in the store, and at about ten months of them the query is refused for opening too many files, which the reader would see as an empty panel rather than as an error. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date.",
+          "description": "Whether the commit itself came out green. A workflow run that failed says a job failed, which is not the same claim: of fifty commits measured here, twenty seven left the default branch red. This panel keeps its own range of ninety days whatever the page is set to. Every commit is a row of its own in the store, and at about ten months of them the query is refused for opening too many files, which the reader would see as an empty panel rather than as an error. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -7560,7 +7571,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "Dated when each fork was created, which the fork count on a repository never says. The eight repositories that gained the most in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date.",
+          "description": "Dated when each fork was created, which the fork count on a repository never says. The eight repositories that gained the most in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -7612,7 +7623,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (full_name, repo) (increase(github_forks_seen_total{repo=~\"$repo\"}[$__interval]))",
+              "expr": "(sum by (full_name, repo) (increase(github_forks_seen_total{repo=~\"$repo\"}[$__interval]))) and on (full_name, repo) topk(8, (sum by (full_name, repo) (increase(github_forks_seen_total{repo=~\"$repo\"}[$__range] @ end()))) \u003e 0) or label_replace(sum((sum by (full_name, repo) (increase(github_forks_seen_total{repo=~\"$repo\"}[$__interval]))) unless on (full_name, repo) topk(8, (sum by (full_name, repo) (increase(github_forks_seen_total{repo=~\"$repo\"}[$__range] @ end()))) \u003e 0)) \u003e 0, \"repo\", \"other\", \"\", \"\")",
               "instant": false,
               "interval": "1d",
               "legendFormat": "{{repo}}",
@@ -7625,7 +7636,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "Whether a fork was ever pushed to separates a derivative from a bookmark, which most forks are. Idle is the time since that push, counted from the row's own date, so it is right when the panel is drawn rather than when the last sweep ran. Prometheus keeps no forker, so this is per repository: forks seen over the range, the share ever pushed to, and on average how long after the fork its last push came, which is negative for a fork nobody has pushed to at all: GitHub gives such a fork the parent's own last push, which usually predates it, and two thirds of the forks measured here are that. How long a fork has been idle is the row's own date subtracted from now, which only the two SQL stores can do. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date. The Prometheus exporter carries no url, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "Whether a fork was ever pushed to separates a derivative from a bookmark, which most forks are. Idle is the time since that push, counted from the row's own date, so it is right when the panel is drawn rather than when the last sweep ran. Prometheus keeps no forker and no fork's own date, so this is per repository, with no By or Forked column: forks seen over the range, the share ever pushed to, and on average how long after the fork its last push came, which is negative for a fork nobody has pushed to at all: GitHub gives such a fork the parent's own last push, which usually predates it, and two thirds of the forks measured here are that. How long a fork has been idle is the row's own date subtracted from now, which only the two SQL stores can do. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date. The Prometheus exporter carries no url, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -8094,7 +8105,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "Labeled, closed, reopened, review requested, renamed: the moment something changed, which the state of an issue does not record. A reopening exists in no other measurement at all. The eight commonest in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date.",
+          "description": "Labeled, closed, reopened, review requested, renamed: the moment something changed, which the state of an issue does not record. A reopening exists in no other measurement at all. The eight commonest in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -8146,7 +8157,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (event) (increase(github_issue_events_total{repo=~\"$repo\"}[$__interval]))",
+              "expr": "(sum by (event) (increase(github_issue_events_total{repo=~\"$repo\"}[$__interval]))) and on (event) topk(8, (sum by (event) (increase(github_issue_events_total{repo=~\"$repo\"}[$__range] @ end()))) \u003e 0) or label_replace(sum((sum by (event) (increase(github_issue_events_total{repo=~\"$repo\"}[$__interval]))) unless on (event) topk(8, (sum by (event) (increase(github_issue_events_total{repo=~\"$repo\"}[$__range] @ end()))) \u003e 0)) \u003e 0, \"event\", \"other\", \"\", \"\")",
               "instant": false,
               "interval": "1d",
               "legendFormat": "{{event}}",
@@ -8520,7 +8531,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "100 * sum(increase(github_webhook_deliveries_total{ok=\"false\",repo=~\"$repo\"}[$__range])) / sum(increase(github_webhook_deliveries_total{repo=~\"$repo\"}[$__range]))",
+              "expr": "100 * (sum(increase(github_webhook_deliveries_total{ok=\"false\",repo=~\"$repo\"}[$__range])) or vector(0)) / (sum(increase(github_webhook_deliveries_total{repo=~\"$repo\"}[$__range])) \u003e 0)",
               "instant": true,
               "range": false,
               "refId": "A"
@@ -8531,7 +8542,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date.",
+          "description": "One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under an hour, which is six hours over a month and a day over a year. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -10177,7 +10188,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "By environment. Dated at each deployment's own creation, not at the sweep that read it and not at its latest status: the status goes on moving for years afterwards, and the deployment happened once. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date.",
+          "description": "By environment. Dated at each deployment's own creation, not at the sweep that read it and not at its latest status: the status goes on moving for years afterwards, and the deployment happened once. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -11090,7 +11101,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "The open count per severity, added up across repositories and ecosystems from the newest reading of each. A reading taken at each sweep, so the curve starts the day the collector did. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "The open count per severity, added up across repositories and ecosystems from the newest reading of each. A reading taken at each sweep, so the curve starts the day the collector did. One point is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -11374,7 +11385,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "That the scan ran at all, which the alert list cannot tell you. GitHub prunes these, so they only exist if they were captured. The eight tools that ran the most in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date.",
+          "description": "That the scan ran at all, which the alert list cannot tell you. GitHub prunes these, so they only exist if they were captured. The eight tools that ran the most in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -11426,7 +11437,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (tool) (increase(github_code_scanning_analyses_total{repo=~\"$repo\"}[$__interval]))",
+              "expr": "(sum by (tool) (increase(github_code_scanning_analyses_total{repo=~\"$repo\"}[$__interval]))) and on (tool) topk(8, (sum by (tool) (increase(github_code_scanning_analyses_total{repo=~\"$repo\"}[$__range] @ end()))) \u003e 0) or label_replace(sum((sum by (tool) (increase(github_code_scanning_analyses_total{repo=~\"$repo\"}[$__interval]))) unless on (tool) topk(8, (sum by (tool) (increase(github_code_scanning_analyses_total{repo=~\"$repo\"}[$__range] @ end()))) \u003e 0)) \u003e 0, \"tool\", \"other\", \"\", \"\")",
               "instant": false,
               "interval": "1d",
               "legendFormat": "{{tool}}",
@@ -11596,7 +11607,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "Dependabot alerts that were fixed or dismissed, newest first, with the advisory each one was and how long it stayed open. Outcome is which of the two it was, read from the alert's own state rather than from the reason it was dismissed: an account that has only ever fixed its alerts has never written such a reason, and a column these stores were never given does not exist to be selected. The score is there because the word rounds it away: one alert in the measured account scores 9.3 under a word whose mean is 6.1. It is the v4 score where the advisory carries one. Prometheus keeps the severity only, so this is the alerts resolved per severity, the worst mean score and the mean time. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date. In Prometheus this is the mean over the collector's last sweep, not a median over the dashboard range. The Prometheus exporter carries no url, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "Dependabot alerts that were fixed or dismissed, newest first, with the advisory each one was and how long it stayed open. Outcome is which of the two it was, read from the alert's own state rather than from the reason it was dismissed: an account that has only ever fixed its alerts has never written such a reason, and a column these stores were never given does not exist to be selected. The score is there because the word rounds it away: one alert in the measured account scores 9.3 under a word whose mean is 6.1. It is the v4 score where the advisory carries one. Prometheus keeps the severity only, so this is the alerts resolved per severity, the worst mean score and the mean time, and no alert's Package, Raised, Repository, Advisory, CVSS or Outcome survives the exporter. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date. In Prometheus this is the mean over the collector's last sweep, not a median over the dashboard range. The Prometheus exporter carries no url, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -12947,7 +12958,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "Gross cost per day. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year. In Prometheus this is GitHub's whole trailing window as one number that moves, not days.",
+          "description": "Gross cost per day. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there. In Prometheus this is GitHub's whole trailing window as one number that moves, not days.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -13010,7 +13021,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "Runner minutes per day, by SKU. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year. In Prometheus this is GitHub's whole trailing window as one number that moves, not days.",
+          "description": "Runner minutes per day, by SKU. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there. In Prometheus this is GitHub's whole trailing window as one number that moves, not days.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -13665,7 +13676,7 @@
       "panels": [
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "GitHub keeps only the last 300 events, none older than thirty days, so this is only as complete as the sweep interval allowed. The eight busiest types in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date.",
+          "description": "GitHub keeps only the last 300 events, none older than thirty days, so this is only as complete as the sweep interval allowed. The eight busiest types in the range are named; the rest are `other`. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under an hour, which is six hours over a month and a day over a year. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -13717,7 +13728,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "sum by (type) (increase(github_events_total[$__interval]))",
+              "expr": "(sum by (type) (increase(github_events_total[$__interval]))) and on (type) topk(8, (sum by (type) (increase(github_events_total[$__range] @ end()))) \u003e 0) or label_replace(sum((sum by (type) (increase(github_events_total[$__interval]))) unless on (type) topk(8, (sum by (type) (increase(github_events_total[$__range] @ end()))) \u003e 0)) \u003e 0, \"type\", \"other\", \"\", \"\")",
               "instant": false,
               "interval": "1h",
               "legendFormat": "{{type}}",
@@ -13781,7 +13792,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "topk(8, sum by (type) (increase(github_events_total[$__range]))) or label_replace((sum(sum by (type) (increase(github_events_total[$__range]))) - sum(topk(8, sum by (type) (increase(github_events_total[$__range]))))) and on () (count(sum by (type) (increase(github_events_total[$__range]))) \u003e 8), \"type\", \"other\", \"\", \"\")",
+              "expr": "topk(8, (sum by (type) (increase(github_events_total[$__range]))) \u003e 0) or label_replace((sum((sum by (type) (increase(github_events_total[$__range]))) \u003e 0) - sum(topk(8, (sum by (type) (increase(github_events_total[$__range]))) \u003e 0))) and on () (count((sum by (type) (increase(github_events_total[$__range]))) \u003e 0) \u003e 8), \"type\", \"other\", \"\", \"\")",
               "format": "table",
               "instant": true,
               "range": false,
@@ -13977,7 +13988,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date.",
+          "description": "One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there. In Prometheus each item is dated by the sweep that first saw it, counted from the moment the exporter started, not by its own date.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -17009,7 +17020,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "What entered and left the dependency graph, and how much of it carried a known advisory. Each row covers a real commit range, from the head of the previous sweep to this one, so the rows do not overlap and adding them up over the range is the whole story rather than a double count. A sweep with nothing to report writes a row of zeros, so the table exists from the first sweep; that series is left out here. One bump measured 370 changes, one of which removed a package with a known advisory, and six rows is all that is kept of it. Vulnerable is a share of those same changes and not a kind of its own, so it crosses the stack as a line rather than adding its own height to it. Off by default: the SBOM is a megabyte or two per repository. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year. In Prometheus this counts the collector's last sweep, not the dashboard range.",
+          "description": "What entered and left the dependency graph, and how much of it carried a known advisory. Each row covers a real commit range, from the head of the previous sweep to this one, so the rows do not overlap and adding them up over the range is the whole story rather than a double count. A sweep with nothing to report writes a row of zeros, so the table exists from the first sweep; that series is left out here. One bump measured 370 changes, one of which removed a package with a known advisory, and six rows is all that is kept of it. Vulnerable is a share of those same changes and not a kind of its own, so it crosses the stack as a line rather than adding its own height to it. Off by default: the SBOM is a megabyte or two per repository. One bar is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under a day, which is a day up to a range of seven hundred days and a week from there. In Prometheus this counts the collector's last sweep, not the dashboard range.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -18783,7 +18794,7 @@
       "panels": [
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "The share of each bucket spent, which puts a bucket of five thousand and one of fifteen thousand on the same axis. The buckets worth watching, which are the ones with more than thirty requests in them: search has thirty a minute and would flatten the axis. A bucket this account never touched is left out of the chart entirely, since its flat zero was still a legend entry; \"Every bucket\" beside this lists every one of them, and a Most used of 0 is where that absence belongs. A reading taken at each sweep, so the curve starts the day the collector did. One bar is one bucket, and the bucket widens with the range: a day over a month, a week over a year.",
+          "description": "The share of each bucket spent, which puts a bucket of five thousand and one of fifteen thousand on the same axis. The buckets worth watching, which are the ones with more than thirty requests in them: search has thirty a minute and would flatten the axis. A bucket this account never touched is left out of the chart entirely, since its flat zero was still a legend entry; \"Every bucket\" beside this lists every one of them, and a Most used of 0 is where that absence belongs. A reading taken at each sweep, so the curve starts the day the collector did. One point is one bucket, and the bucket widens with the range: a hundredth of it, rounded as Grafana rounds an interval and never under five minutes, which is fifteen minutes over a day and six hours over a month.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -19138,7 +19149,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "One row per repository one collector could not collect, newest first: which family, which repository, and what GitHub answered. This is where an empty row of the dashboard gets its explanation. Measured on this account on 2026-09-16, before there was anything to read it from: five repositories held no workflow run or job at all, each because one call for the jobs of one run had answered 502 once, and the Continuous integration row was drawn over an account missing its five busiest repositories. An empty table is the good case. No repository filter: a repository a sweep could not collect may be one the filter does not list, since the filter is built from rows the same sweep writes. In Prometheus this is the last sweep's failures rather than the range's, and the exporter carries no message, so the What GitHub said column of the InfluxDB dashboard is absent here.",
+          "description": "One row per repository one collector could not collect, newest first: which family, which repository, and what GitHub answered. This is where an empty row of the dashboard gets its explanation. Measured on this account on 2026-09-16, before there was anything to read it from: five repositories held no workflow run or job at all, each because one call for the jobs of one run had answered 502 once, and the Continuous integration row was drawn over an account missing its five busiest repositories. An empty table is the good case. No repository filter: a repository a sweep could not collect may be one the filter does not list, since the filter is built from rows the same sweep writes. In Prometheus this is the last sweep's failures rather than the range's, a gauge carries no date of its own and the exporter no message, so the When and What GitHub said columns of the InfluxDB dashboard are absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {

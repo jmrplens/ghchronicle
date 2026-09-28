@@ -5,6 +5,9 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/jmrplens/ghchronicle/v2/internal/grafana"
 )
 
 // The rule about a panel's own range, from the review of 2026-09-14, which
@@ -86,7 +89,7 @@ func TestNoTitleClaimsAPeriodTheBucketDoesNotKeep(t *testing.T) {
 						"year and the title claims %q", sec.Title, p.Title, strings.TrimSpace(claim))
 				}
 			}
-			if !strings.Contains(p.Desc, bucketFollowsRange) {
+			if !strings.Contains(p.Desc, "is one bucket, and the bucket widens with the range: a hundredth of it") {
 				t.Errorf("%s: %q buckets by $__dateBin and does not say the bucket follows "+
 					"the range", sec.Title, p.Title)
 			}
@@ -321,5 +324,40 @@ func TestTheRepositoryFlagsAreReadOutsideTheRange(t *testing.T) {
 					"turns itself off on a range holding no sweep: %s", store, title, lookup)
 			}
 		}
+	}
+}
+
+// TestTheBucketRuleIsWhatGrafanaRounds holds the examples every chart's
+// description gives of its bucket to what Grafana computes for the floor
+// they name, the way the Graphite dashboard's bucket variables compute the
+// bucket every store bins by: the range over a hundred, rounded, never under
+// the floor. The sentence said "a day over a month, a week over a year" on
+// charts of every floor, and over a month an hour's floor is six hours, and a
+// year is still a day.
+func TestTheBucketRuleIsWhatGrafanaRounds(t *testing.T) {
+	t.Parallel()
+	doc := graphiteDashboard(t)
+	day := 24 * time.Hour
+	for floor, examples := range map[string]map[time.Duration]string{
+		"1d": {30 * day: "1d", 699 * day: "1d", 700 * day: "7d"},
+		"1h": {30 * day: "6h", 365 * day: "1d"},
+		"5m": {day: "15m", 30 * day: "6h"},
+	} {
+		if _, ok := bucketRule[floor]; !ok {
+			t.Errorf("no rule for the floor %s", floor)
+		}
+		for span, want := range examples {
+			got, err := grafana.AutoIntervals(doc, span)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got[grBucketVar(floor)] != want {
+				t.Errorf("under a floor of %s a range of %s is a bucket of %s, and the rule's example "+
+					"says %s", floor, span, got[grBucketVar(floor)], want)
+			}
+		}
+	}
+	if len(bucketRule) != len(grBucketFloors) {
+		t.Errorf("a rule for %d floors, and the charts bin at %d", len(bucketRule), len(grBucketFloors))
 	}
 }

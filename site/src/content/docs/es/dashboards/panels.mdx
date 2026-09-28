@@ -88,6 +88,14 @@ duración de la ejecución y la espera en cola junto a los dos totales de bytes
 salen también, porque ese panel suma cada valor y leería como 0 un valor de
 nada.
 
+Sobre un rango al que no llegó ningún barrido, un grupo de instantáneas del que
+los almacenes SQL leen la fila más reciente, Community, Account, Since the
+account began y Sponsorship, dice "No data" en todos los almacenes, ya que los
+almacenes SQL no tienen fila que leer. Antes de la 2.6.2 Graphite, cuyas rutas
+responden con nulos a un rango en el que no tienen nada, dibujaba tres de ellos
+como un panel sin nada, ni siquiera los nombres, y Elasticsearch dibujaba los
+cuatro nombres de Sponsorship sin nada al lado.
+
 ## Overview
 
 Una cabecera y no un panel: la marca, grande y centrada, el nombre debajo, y
@@ -918,10 +926,10 @@ en vez de fingir.
   desde que arrancó. `increase()` sobre eso es como se responden los paneles
   "por día" y "sobre el rango".
 - **Graphite** conserva los puntos fechados pero no tiene filas: una tabla ahí
-  es un número por serie reducido sobre el rango, así que una tabla que necesita
-  varios campos de una fila se queda con la columna por la que ordena y dice
-  cuál ha soltado, una cadena allí ni siquiera es una métrica, y un booleano se
-  guarda como 1 o 0, igual que cualquier número.
+  es uno o dos números por serie reducidos sobre el rango, así que una tabla que
+  necesita varios campos de una fila se queda con los números que puede llevar
+  una fila y nombra cada columna que suelta, una cadena allí ni siquiera es una
+  métrica, y un booleano se guarda como 1 o 0, igual que cualquier número.
 - **Elasticsearch** conserva los documentos fechados, así que una tabla por
   elemento son los documentos más recientes, o el más reciente de cada elemento
   cuando un elemento tiene varios, y todo lo demás es una agregación por
@@ -935,6 +943,12 @@ por una ventana mientras lee otra, así que los repositorios archivados que el
 filtro por omisión aparta cuentan en el Overview y en Every repository, ever
 por sus filas de los últimos siete días, y un rango que terminó hace más de una
 semana los deja fuera.
+
+Una gráfica o una gráfica de barras que los almacenes SQL pliegan, con sus
+series más activas nombradas y el resto en una llamada other, se pliega igual en
+Graphite, y en Prometheus donde el exportador guarda los recuentos que sumaría.
+Elasticsearch no puede, ya que una agregación terms no dice nada de los valores
+que no guarda, y cada panel suyo que dibuja todas las series lo dice.
 
 Cada panel cuyo gemelo en otro almacén es más rico lo dice en una frase de su
 descripción.

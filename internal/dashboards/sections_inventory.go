@@ -463,10 +463,10 @@ func settingsAndKeys(b *builder) []Panel {
 			{"days_to_expiry", "Days to expiry"},
 		}, nil, hideColumns(panelESTime))
 
-	licGR, licGRtf := gTbl(fmt.Sprintf(
-		`sortByMaxima(groupByNode(keepLastValue(%s), %d, "sum"))`,
+	licGR, licGRtf := gTbl(grOtherBy(8, "sortByMaxima", fmt.Sprintf(
+		`groupByNode(keepLastValue(%s), %d, "sum")`,
 		rp("gh_dependency_license", "packages"), gn("gh_dependency_license", "license"),
-	),
+	)),
 		"License", []col{{"lastNotNull", "Packages"}})
 	licES, licEStf := esTbl("gh_dependency_license", []any{b.tm("license", 12), b.tm("full_name", 500)},
 		[]any{b.mNewest("packages")},
@@ -534,9 +534,8 @@ func settingsAndKeys(b *builder) []Panel {
 				profileBool(inventoryAutoMerge, 100), ownerLinkOn("Repository", "the repository settings"),
 			},
 			GR: polGR, GRTF: polGRtf,
-			GRDesc: "Graphite has no rows: each series is one number, so this table keeps the " +
-				"protection rules of each repository and drops the other settings.",
-			ES: polES, ESTF: polEStf,
+			GRDesc: grRows,
+			ES:     polES, ESTF: polEStf,
 		}),
 		panel("table", "Account keys", box{W: 12, H: 7, X: 0, Y: 43}, []Target{sqlT(
 			// Each key's newest row. The row is a daily snapshot, so the least
@@ -567,9 +566,8 @@ func settingsAndKeys(b *builder) []Panel {
 				"one place, the keys settings, which is where every row links.",
 			Overrides: []any{ownerLinkOn("Key", "the keys settings")},
 			GR:        keysGR, GRTF: keysGRtf,
-			GRDesc: "Graphite has no rows: each series is one number, so this table keeps the " +
-				"days since each key was last used and drops whether it was ever used and when it expires.",
-			ES: keysES, ESTF: keysEStf,
+			GRDesc: grRows,
+			ES:     keysES, ESTF: keysEStf,
 		}),
 		// Eight bars and the rest folded: a license name can be a whole SPDX
 		// expression, and twelve of them in seven units of height were cut off.
@@ -593,7 +591,7 @@ func settingsAndKeys(b *builder) []Panel {
 				"Off by default: the SBOM is a megabyte or two per repository. The eight " +
 				"commonest licenses are named; the rest are one bar called other.",
 			GR: licGR, GRTF: licGRtf,
-			ES: licES, ESTF: licEStf,
+			ES: licES, ESTF: licEStf, ESDesc: esUnfolded(12, "licenses", "bar"),
 		}),
 		panel("table", "Social accounts", box{W: 12, H: 7, X: 0, Y: 50}, []Target{sqlT(
 			`SELECT provider AS "Provider", url AS "URL" FROM (` +
@@ -611,9 +609,8 @@ func settingsAndKeys(b *builder) []Panel {
 			PromDesc:  "The exporter keeps the provider and whether it is present.",
 			Overrides: []any{width("Provider", 140), rawURLColumn("URL")},
 			GR:        socGR, GRTF: socGRtf,
-			GRDesc: "Graphite has no strings either, so this is presence by provider and there " +
-				"is no URL column.",
-			ES: socES, ESTF: socEStf,
+			GRDesc: "Graphite has no strings either, so this is presence by provider.",
+			ES:     socES, ESTF: socEStf,
 		}),
 		panel("table", "Configuration changes", box{W: 12, H: 7, X: 12, Y: 50}, []Target{sqlT(
 			`SELECT repo AS "Repository",` +

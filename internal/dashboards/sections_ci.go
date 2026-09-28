@@ -172,10 +172,9 @@ func runOutcomes(b *builder) []Panel {
 		}, &P{
 			Prom: []Target{
 				promCounted("A", ciRunCount, fmt.Sprintf("sum(increase(%s[$__range]))", promRuns)),
-				promAggregated("B", ciSuccessRate, fmt.Sprintf(
-					`100 * sum(increase(github_workflow_runs_total{conclusion="success",%s}[$__range]))`+
-						` / sum(increase(github_workflow_runs_total{conclusion=~"success|failure",%s}[$__range]))`,
-					PF, PF,
+				promAggregated("B", ciSuccessRate, promShare(
+					fmt.Sprintf(`sum(increase(github_workflow_runs_total{conclusion="success",%s}[$__range]))`, PF),
+					fmt.Sprintf(`sum(increase(github_workflow_runs_total{conclusion=~"success|failure",%s}[$__range]))`, PF),
 				)),
 				promCounted("C", ciUndecidedRuns, fmt.Sprintf(
 					`sum(increase(github_workflow_runs_total{conclusion=~"%s|skipped",%s}[$__range]))`,
@@ -334,9 +333,12 @@ func runOutcomes(b *builder) []Panel {
 			// than after: removeBelowValue renames what it is applied to, and
 			// outside perBucket it named every curve over the name perBucket
 			// had just given back.
-			GR: []Target{grq(removeEmptySeries(perRepoBucket("removeBelowValue("+artifactBytes+", 1)",
-				"gh_artifact_total", "1h", "max")))},
-			ES: []Target{b.esDaily("gh_artifact_total", b.mMax("live_bytes"), "repo", "1h", []string{ESF}, "")},
+			GR: []Target{grq(grOtherBy(topSeriesKept, "sortByMaxima", removeEmptySeries(perRepoBucket(
+				"removeBelowValue("+artifactBytes+", 1)", "gh_artifact_total", "1h", "max",
+			))))},
+			ES:       []Target{b.esDaily("gh_artifact_total", b.mMax("live_bytes"), "repo", "1h", []string{ESF}, "")},
+			ESDesc:   esUnfolded(esDailyTerms, "repositories", "series"),
+			PromDesc: noFold("Prometheus", "repositories"),
 		}),
 	}
 }
@@ -544,12 +546,17 @@ func failingESRows() []any {
 // is their mean times their count rather than their sum: the two sums would
 // both be the column the response parser calls Sum, and a merge joins rows on
 // every column the frames share by name, so it would have kept apart every
-// repository whose two sums differ. A repository none of whose runs failed has
-// no row in the second query, and its mean and count are then empty, which the
-// calculation reads as 0, as the SQL CASE does. The 2.6.1 review found the
-// table drawing the success rate of the runs under a sentence calling it the
-// complement of the wasted share, which it is not: it counts runs and the
-// share weighs them by their minutes.
+// repository whose two sums differ. The 2.6.1 review found the table drawing
+// the success rate of the runs under a sentence calling it the complement of
+// the wasted share, which it is not: it counts runs and the share weighs them
+// by their minutes.
+//
+// A repository none of whose runs failed has no row in the second query, and
+// the merge leaves its mean and its count undefined, which Grafana's
+// arithmetic reads as NaN: its Wasted and its Share read "NaN" where the SQL
+// stores, whose CASE adds up nothing, read 0 s and 0% (Grafana 13.2.1, from
+// its own merge and calculateField). A sum over a row of the one value reads
+// a value that is not there as nothing, 0, and the product is taken of those.
 func wastedESTable(b *builder) (targets []Target, tf []any) {
 	total := b.mSum("duration_seconds")
 	failedMean, failedRuns := b.mAvg("duration_seconds"), b.mCount()
@@ -557,11 +564,13 @@ func wastedESTable(b *builder) (targets []Target, tf []any) {
 		esq(ciRun, []any{total}, b.tmRepo(50), "A", []string{ESF}, ""),
 		esq(ciRun, []any{failedMean, failedRuns}, b.tmRepo(50), "B", []string{ESF, "success:false"}, ""),
 	}
+	const mean, runs = "Failed mean", "Failed runs"
 	return targets, []any{
 		map[string]any{"id": "merge", "options": map[string]any{}},
-		binaryField("Wasted", esNames["avg"], "*", esNames["count"]),
+		orZero(mean, esNames["avg"]), orZero(runs, esNames["count"]),
+		binaryField("Wasted", mean, "*", runs),
 		organize(map[string]string{inventoryRepoTerm: "Repository", esNames["sum"]: "Total"},
-			[]string{panelFullNameField, esNames["avg"], esNames["count"]}),
+			[]string{panelFullNameField, esNames["avg"], esNames["count"], mean, runs}),
 
 		binaryField("Share", "Wasted", "/", "Total"),
 		// A repository among the fifty with the most failed runs and not among
@@ -602,10 +611,16 @@ func whatKeepsFailing(b *builder) []Panel {
 
 	// Minutes as a count of runs times their mean duration, which is what the
 	// exporter keeps of them.
-	wastedProm := fmt.Sprintf(`sum by (full_name, repo) (increase(github_workflow_runs_total{conclusion!="success",%s}[$__range]))`+
-		` * on (full_name, repo) group_left avg by (full_name, repo) (github_workflow_runs_duration_seconds_mean{%s})`, PF, PF)
 	totalProm := fmt.Sprintf(`sum by (full_name, repo) (increase(github_workflow_runs_total{%s}[$__range]))`+
 		` * on (full_name, repo) group_left avg by (full_name, repo) (github_workflow_runs_duration_seconds_mean{%s})`, PF, PF)
+	// A repository none of whose runs has failed since the exporter started
+	// has no series of a conclusion other than success, and the product of
+	// nothing is no row: its Wasted and its Share were empty where the SQL
+	// stores read 0 s and 0%. It wasted nothing of the total it spent, which
+	// is the total times 0.
+	wastedProm := fmt.Sprintf(`sum by (full_name, repo) (sum by (full_name, repo) (increase(github_workflow_runs_total{conclusion!="success",%s}[$__range]))`+
+		` * on (full_name, repo) group_left avg by (full_name, repo) (github_workflow_runs_duration_seconds_mean{%s}))`+
+		` or sum by (full_name, repo) (0 * %s)`, PF, PF, totalProm)
 
 	failStepsGR, failStepsGRtf := gTbl(fmt.Sprintf(`limit(sortBy(%s, "sum", true), 20)`,
 		grGroupBy(counted(rp(ciStep, "duration_seconds", "conclusion", "failure")),
@@ -670,17 +685,21 @@ func whatKeepsFailing(b *builder) []Panel {
 					`sum by (full_name, repo, workflow) (increase(github_workflow_runs_total{conclusion!="success",%s}[$__range])) > %d`,
 					PF, keepsFailing,
 				)
+				failures, runs := promTop(20, rank), promWithin(20, fmt.Sprintf(
+					"sum by (full_name, repo, workflow) (increase(github_workflow_runs_total{%s}[$__range]))", PF,
+				), rank, "full_name", "repo", "workflow")
 				return []Target{
-					promTbl(promTop(20, rank), "A"),
-					promTbl(promWithin(20, fmt.Sprintf(
-						"sum by (full_name, repo, workflow) (increase(github_workflow_runs_total{%s}[$__range]))", PF,
-					),
-						rank, "full_name", "repo", "workflow"), "B"),
+					promTbl(failures, "A"),
+					promTbl(runs, "B"),
+					// The rate as the SQL takes it, which the exporter holds
+					// both halves of.
+					promTbl(fmt.Sprintf("sum by (full_name, repo, workflow) (100 * (%s) / (%s))", failures, runs), "C"),
 				}
 			}(),
 			PromTF: merged(map[string]string{
 				"repo": "Repository", "workflow": "Workflow",
 				inventoryValueCol + "A": "Failures", inventoryValueCol + "B": "Runs",
+				inventoryValueCol + "C": ciFailureRate,
 			}, nil),
 
 			Opts: Opts{"sort": "Failures"},
@@ -792,8 +811,9 @@ func artifactStorage(b *builder) []Panel {
 			PromNote: cannot("artifact bytes created per day, one bar per repository.",
 				"The exporter reduces the per-artifact rows to a count and a mean "+
 					"size, so the bytes created in a day cannot be recovered from it."),
-			GR: []Target{grq(perRepoBucket(rp("gh_artifact", "size_bytes"), "gh_artifact"))},
-			ES: []Target{b.esDaily("gh_artifact", b.mSum("size_bytes"), "repo", "", []string{ESF}, "")},
+			GR:     []Target{grq(grOther(topSeriesKept, perRepoBucket(rp("gh_artifact", "size_bytes"), "gh_artifact")))},
+			ES:     []Target{b.esDaily("gh_artifact", b.mSum("size_bytes"), "repo", "", []string{ESF}, "")},
+			ESDesc: esUnfolded(esDailyTerms, "repositories", "series"),
 		}),
 		// The four counts of one row, each repository's newest. A MAX() of each
 		// over the range put the largest live size the range had held beside a
@@ -836,11 +856,8 @@ func artifactStorage(b *builder) []Panel {
 					width("Walked", 100), width(ciLiveCount, 90),
 				},
 				GR: walkedGR, GRTF: walkedGRtf,
-				GRDesc: "Graphite has no rows: each series is one number, so this table keeps " +
-					"the live size, the newest of each repository, and drops the three counts, " +
-					"Declared, Walked and Live, which leaves it unable to say whether that size " +
-					"is a floor.",
-				ES: walkedES, ESTF: walkedEStf,
+				GRDesc: grRows + " Without the three counts it cannot say whether that size is a floor.",
+				ES:     walkedES, ESTF: walkedEStf,
 			}),
 	}
 }

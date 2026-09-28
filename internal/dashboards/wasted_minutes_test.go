@@ -13,7 +13,8 @@ import (
 // not: two runs of 100 and 50 seconds, one of each outcome, are half the runs
 // and a third of the minutes. The table has to draw the SQL stores' columns
 // with their values: a canceled run is time wasted as a failed one is, and a
-// repository whose runs all succeeded wasted none.
+// repository whose runs all succeeded wasted none, which it read as NaN once
+// the merge had left its failed runs undefined.
 func TestElasticsearchWeighsTheWastedShareByMinutes(t *testing.T) {
 	t.Parallel()
 	var docs []esDoc
@@ -43,8 +44,10 @@ func TestElasticsearchWeighsTheWastedShareByMinutes(t *testing.T) {
 			continue
 		}
 		for column, value := range columns {
+			// NaN is compared as what it is: no number is within any
+			// distance of it, so a distance alone would pass it.
 			got, isNumber := row[column].(float64)
-			if !isNumber || math.Abs(got-value) > 1e-9 {
+			if !isNumber || math.IsNaN(got) || math.Abs(got-value) > 1e-9 {
 				t.Errorf("%s: %s reads %v, want %v as the SQL stores select it: %v",
 					repo, column, row[column], value, row)
 			}

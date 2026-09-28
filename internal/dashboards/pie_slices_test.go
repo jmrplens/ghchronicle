@@ -66,7 +66,7 @@ func TestEventsByTypeFoldsTheRestIntoOtherWhereAStoreCan(t *testing.T) {
 		case "influxdb", "postgres":
 			want = []string{fmt.Sprintf("WHEN rn <= %d THEN", topSeriesKept), "'other'"}
 		case "prometheus":
-			want = []string{fmt.Sprintf("topk(%d, sum by (type)", topSeriesKept), `"type", "other"`}
+			want = []string{fmt.Sprintf("topk(%d, (sum by (type)", topSeriesKept), `"type", "other"`}
 		case "graphite":
 			want = []string{fmt.Sprintf("limit(sortByTotal(sortByName(groupByNode(%s, -2, \"sum\"))), %d)",
 				gp("gh_event", "events"), topSeriesKept), `"other")`}

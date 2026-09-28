@@ -154,15 +154,6 @@ var dashboardsDiffer = []dashboardDiffer{
 			"share of its discussions that have an answer",
 		only: []string{"Answered"},
 	},
-	// The idea, whose category takes no answer, which the SQL stores read
-	// from the category and Elasticsearch cannot.
-	{
-		title: "Latest discussions", stores: []string{"elasticsearch"},
-		reason: "Its rows are the documents as stored, so Answered is each discussion's own flag, which " +
-			"a row cannot read against its category's: a discussion in a category that takes no " +
-			"answer reads yes or no here rather than n/a",
-		only: []string{"Answered"},
-	},
 	// The one answer is from July, which the SQL stores list whatever the
 	// range.
 	{
@@ -440,13 +431,13 @@ func dashboardTables(t *testing.T, run *dashboardRun, index int) map[string]graf
 // the descriptions said them, 33 tables of Graphite, Elasticsearch and
 // Prometheus lacked a column their own words did not name.
 //
-// A store's own words are what its description adds to the one every store
-// shares, so a column the shared text happens to mention is not taken for one
-// the store explains. A column is said when those words name it, a hyphen for
-// a space and a plural allowed, or when the store draws it under the SQL name
-// with a word more or a letter less, "Active share" for Active; in Graphite
-// also when it is a node of the name a row is drawn under, "Repository, host",
-// and wherever dashboardDropsColumns applies.
+// It holds what is drawn, so a table the fixture leaves empty in both SQL
+// stores is not asked here: TestEveryColumnAStoreLacksIsNamedInItsDescription
+// in internal/dashboards holds every table of the specification to the same
+// rule, grafana.DrawsColumn and grafana.NamesColumn, whatever the fixture
+// fills. A Graphite table says what its reduction drops by naming it, since
+// the one sentence every such table carried, "keeps the column it is sorted
+// by and drops the others", was false on eleven of them.
 func TestAColumnAStoreLacksIsSaidInItsDescription(t *testing.T) {
 	s := Start(t)
 	run := dashboardsRun(t, s)
@@ -470,7 +461,7 @@ func TestAColumnAStoreLacksIsSaidInItsDescription(t *testing.T) {
 			}
 			held++
 			o := run.outcomes[store][index]
-			own := ownWords(o.panel.Description, dashboardPanelDescription(run, index))
+			own := grafana.OwnWords(o.panel.Description, dashboardPanelDescription(run, index))
 			if unsaid := columnsUnsaid(store, &o, &pic, sqlColumns, own); len(unsaid) > 0 {
 				t.Errorf("panel %d %q in %s draws no %s, which the SQL stores draw, and its description "+
 					"does not say so: draw the column or name it where the description says what %s "+
@@ -510,32 +501,25 @@ func sqlColumnsOf(tables map[string]grafana.Picture) []string {
 // columnsUnsaid is every column of the SQL stores one store's table does not
 // draw and its own words about the panel do not name.
 func columnsUnsaid(store string, o *dashboardOutcome, pic *grafana.Picture, sqlColumns []string, own string) []string {
-	drawn := pic.Names()
+	drawn := map[string]bool{}
+	for _, name := range pic.Names() {
+		drawn[name] = true
+	}
 	if store == "prometheus" && promNeedsHistory(&o.panel) {
 		// A column of a range function over the exporter's half minute can be
 		// no series at all, which is no column: the one the panel names is
 		// what a Prometheus with history draws.
-		drawn = append(drawn, panelNamesGiven(o.panel.Source)...)
+		for _, name := range panelNamesGiven(o.panel.Source) {
+			drawn[name] = true
+		}
 	}
 	var out []string
 	for _, column := range sqlColumns {
-		if !columnSaid(store, own, drawn, sqlColumns, column) {
+		if !grafana.DrawsColumn(drawn, sqlColumns, column, store == "graphite") && !grafana.NamesColumn(own, column) {
 			out = append(out, column)
 		}
 	}
 	return out
-}
-
-// dashboardDropsColumns is, per store, the one sentence that says of a table
-// that it keeps a number and drops every other column, and so names each
-// column it lacks at once. Graphite says it of a table that reduces each
-// series to one number: "Graphite has no rows: each series is one number
-// reduced over the range, so this table keeps the column it is sorted by and
-// drops the others", or the same with the column named and "drops the other
-// columns" or "the other settings". A sentence that names what it drops, "and
-// drops the limit and the most used", is held to naming each of them.
-var dashboardDropsColumns = map[string]*regexp.Regexp{
-	"graphite": regexp.MustCompile(`Graphite has no rows: each series is one number[^.]* drops the other`),
 }
 
 // panelNamesGiven is every column name a panel's transformations give, what
@@ -568,46 +552,6 @@ func dashboardPanelDescription(run *dashboardRun, index int) string {
 		}
 	}
 	return ""
-}
-
-// ownWords is what a store's description adds to the shared one: the text
-// after the longest start the two have in common.
-func ownWords(desc, shared string) string {
-	i := 0
-	for i < len(desc) && i < len(shared) && desc[i] == shared[i] {
-		i++
-	}
-	return desc[i:]
-}
-
-// columnSaid reports whether a store that does not draw a column under the
-// SQL stores' name says so: see TestAColumnAStoreLacksIsSaidInItsDescription.
-// A name the SQL stores draw themselves stands for no other column: "Live
-// for" is not the Live link beside it.
-func columnSaid(store, own string, drawn, sqlColumns []string, column string) bool {
-	for _, name := range drawn {
-		variant := !slices.Contains(sqlColumns, name) &&
-			(strings.HasPrefix(name, column+" ") || column == name+"s")
-		if name == column || variant {
-			return true
-		}
-		if store != "graphite" {
-			continue
-		}
-		for node := range strings.SplitSeq(name, ", ") {
-			if strings.EqualFold(node, column) {
-				return true
-			}
-		}
-	}
-	if drops := dashboardDropsColumns[store]; drops != nil && drops.MatchString(own) {
-		return true
-	}
-	words := strings.Fields(column)
-	for i, w := range words {
-		words[i] = regexp.QuoteMeta(w)
-	}
-	return regexp.MustCompile(`(?i)\b` + strings.Join(words, `[\s-]+`) + `s?\b`).MatchString(own)
 }
 
 // rawFieldName is a name a datasource gives a field that the panel is meant
@@ -735,7 +679,10 @@ func (c *dashboardComparison) compare(index int, pictures map[string]grafana.Pic
 	return failures
 }
 
-// remember keeps whether two stores drew a panel alike.
+// remember keeps whether two stores drew a panel alike: alike only while they
+// have drawn it alike every time they were asked, since a comparison that puts
+// two questions to the same panels holds an entry to what either of them
+// drew.
 func (c *dashboardComparison) remember(key dashboardPanelKey, a, b string, same bool) {
 	if c.alike == nil {
 		c.alike = map[dashboardPanelKey]map[[2]string]bool{}
@@ -743,7 +690,11 @@ func (c *dashboardComparison) remember(key dashboardPanelKey, a, b string, same 
 	if c.alike[key] == nil {
 		c.alike[key] = map[[2]string]bool{}
 	}
-	c.alike[key][[2]string{a, b}] = same
+	pair := [2]string{a, b}
+	if before, asked := c.alike[key][pair]; asked {
+		same = same && before
+	}
+	c.alike[key][pair] = same
 }
 
 // dashboardPictures is what each store draws for one panel, for the stores
