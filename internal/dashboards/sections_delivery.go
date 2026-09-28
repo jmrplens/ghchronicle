@@ -129,7 +129,7 @@ func webhookDeliveries(b *builder) []Panel {
 				Opts:     mergeOpts(Opts{"bars": true, "stack": true, "legend": "hidden"}, hourBins),
 				SQLOpts:  seriesOpts,
 				PromDesc: sinceStart,
-				GR:       []Target{grq(perBucket("isNonNull("+deliv+")", gn(wd, "code"), "1h"))},
+				GR:       []Target{grq(perBucket(nonNull(deliv), gn(wd, "code"), "1h"))},
 				ES:       []Target{b.esDaily(wd, b.mCount(), "code", "1h", []string{ESF}, "")},
 				Desc:     bucketFollowsRange,
 			}),
@@ -601,7 +601,7 @@ func rulesetChanges(b *builder) Panel {
 	// Graphite has no rows and no dates to list by, so the versions become a
 	// count per ruleset and actor type, named from the path.
 	verGR, verGRtf := gTbl(fmt.Sprintf(`sortBy(%s, "sum", true)`,
-		grGroupBy("isNonNull("+rp(rv, "versions")+")", rv, "sum", "repo", "ruleset", "actor_type")),
+		grGroupBy(nonNull(rp(rv, "versions")), rv, "sum", "repo", "ruleset", "actor_type")),
 		"Repository, ruleset, actor", []col{{"sum", "Versions"}})
 	// The documents themselves, newest first, which is the one shape that
 	// returns the target, the actor and the link as strings: a top_metrics
@@ -714,7 +714,7 @@ func deploymentsToEnvironments(b *builder) []Panel {
 					"that read it and not at its latest status: the status goes on moving for " +
 					"years afterwards, and the deployment happened once. " + bucketFollowsRange,
 				PromDesc: sinceStart,
-				GR:       []Target{grq(perBucket("isNonNull("+rp(dp, "deployments")+")", gn(dp, "environment")))},
+				GR:       []Target{grq(perBucket(nonNull(rp(dp, "deployments")), gn(dp, "environment")))},
 				ES:       []Target{b.esDaily(dp, b.mCount(), "environment", "", []string{ESF}, "")},
 			}),
 		panel("table", "Deployments by environment", box{W: 12, H: 8, X: 12, Y: 56}, []Target{sqlT(deploys)}, &P{

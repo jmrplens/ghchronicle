@@ -458,7 +458,7 @@ func scanningAndResolution(b *builder) []Panel {
 				"that ran the most in the range are named; the rest are `other`. " +
 				bucketFollowsRange,
 			PromDesc: sinceStart,
-			GR:       []Target{grq(perBucket("isNonNull("+rp(an, "analyses")+")", gn(an, "tool")))},
+			GR:       []Target{grq(perBucket(nonNull(rp(an, "analyses")), gn(an, "tool")))},
 			ES:       []Target{b.esDaily(an, b.mCount(), "tool", "", []string{ESF}, "")},
 		}),
 		panel("table", "Scanning alerts resolved", box{W: 24, H: 7, X: 0, Y: 20},

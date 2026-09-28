@@ -198,7 +198,7 @@ func lifetime(b *builder) []Panel {
 	// ones it does not: forks and private repositories that include_forks off
 	// never discovers. Filtering by that list would hide exactly the rows the
 	// panel exists for.
-	createdGR, createdGRtf := gTbl(grGroupBy(fmt.Sprintf("isNonNull(%s)", gp(rcr, "created")), rcr, "sum", "repo"),
+	createdGR, createdGRtf := gTbl(grGroupBy(nonNull(gp(rcr, "created")), rcr, "sum", "repo"),
 		"Repository", []col{{"sum", "Created"}})
 	// esRaw rather than a bucket aggregation, and that is what makes the two
 	// string columns possible: `fork` and `private` reach Grafana as the

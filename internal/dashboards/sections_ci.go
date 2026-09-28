@@ -259,7 +259,7 @@ func runOutcomes(b *builder) []Panel {
 				colorOf(cancelledRun, "orange"), colorOf("skipped", "blue"),
 				colorOf("action_required", "purple"), colorOf("timed_out", "dark-red"),
 			},
-			GR:   []Target{grq(perBucket("isNonNull("+runSeconds+")", gn(ciRun, "conclusion")))},
+			GR:   []Target{grq(perBucket(nonNull(runSeconds), gn(ciRun, "conclusion")))},
 			ES:   []Target{b.esDaily(ciRun, b.mCount(), "conclusion", "", []string{ESF}, "")},
 			Desc: bucketFollowsRange,
 		}),
@@ -487,7 +487,7 @@ func whatKeepsFailing(b *builder) []Panel {
 	// grouping after it had one series to group and drew one row, named
 	// after whichever run came first, with every failure in it.
 	failingGR, failingGRtf := gTbl(fmt.Sprintf(`limit(sortBy(%s, "sum", true), 20)`,
-		grGroupBy("isNonNull("+rp(ciRun, "duration_seconds", "conclusion", "failure")+")",
+		grGroupBy(nonNull(rp(ciRun, "duration_seconds", "conclusion", "failure")),
 			ciRun, "sum", "repo", "workflow"),
 	), "Repository, workflow", []col{{"sum", "Failures"}})
 	failingES, failingEStf := esTbl(ciRun, append(b.tmRepo(50), b.tm("workflow", 30)),
@@ -500,7 +500,7 @@ func whatKeepsFailing(b *builder) []Panel {
 		}, []string{ESF}, hideColumns(panelFullNameField))
 
 	failStepsGR, failStepsGRtf := gTbl(fmt.Sprintf(`limit(sortBy(%s, "sum", true), 20)`,
-		grGroupBy("isNonNull("+rp(ciStep, "duration_seconds", "conclusion", "failure")+")",
+		grGroupBy(nonNull(rp(ciStep, "duration_seconds", "conclusion", "failure")),
 			ciStep, "sum", "step", "repo"),
 	), "Step, repository", []col{{"sum", "Failures"}})
 	failStepsES, failStepsEStf := esTbl(ciStep, append([]any{b.tm("step", 20)}, b.tmRepo(50)...),

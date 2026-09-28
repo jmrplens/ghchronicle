@@ -159,7 +159,7 @@ func labelsMilestonesAndForks(b *builder) []Panel {
 				"never says. The eight repositories that gained the most in the range are " +
 				"named; the rest are `other`. " + bucketFollowsRange,
 			PromDesc: sinceStart,
-			GR:       []Target{grq(perRepoBucket("isNonNull("+rp(fk, "forks")+")", fk))},
+			GR:       []Target{grq(perRepoBucket(nonNull(rp(fk, "forks")), fk))},
 			ES:       []Target{b.esDaily(fk, b.mCount(), "repo", "", []string{ESF}, "")},
 		}),
 		panel("table", "Forks", box{W: 12, H: 8, X: 12, Y: 8}, []Target{sqlT(forkTbl)}, &P{
@@ -340,7 +340,7 @@ func discussionAndComments(b *builder) []Panel {
 				"no other measurement at all. The eight commonest in the range are named; " +
 				"the rest are `other`. " + bucketFollowsRange,
 			PromDesc: sinceStart,
-			GR: []Target{grq(perBucket("isNonNull("+rp("gh_issue_event", "events")+")",
+			GR: []Target{grq(perBucket(nonNull(rp("gh_issue_event", "events")),
 				gn("gh_issue_event", "event")))},
 			ES: []Target{b.esDaily("gh_issue_event", b.mCount(), "event", "", []string{ESF}, "")},
 		}),

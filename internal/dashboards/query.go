@@ -466,7 +466,12 @@ func grq(expr string, ref ...string) Target {
 
 // countOf is one point per fact, whatever the field's value: the twin of
 // COUNT(*).
-func countOf(path string) string { return "sumSeries(isNonNull(" + path + "))" }
+func countOf(path string) string { return "sumSeries(" + nonNull(path) + ")" }
+
+// nonNull is a 1 at every point a series holds anything and a 0 elsewhere, so
+// that a grouping over it adds up how many series had a point: a count per
+// group, where countOf is a count of them all.
+func nonNull(expr string) string { return "isNonNull(" + expr + ")" }
 
 // total makes the whole range one bucket, so a stat can show a sum over it.
 // The bucket is aligned to the range start and outlives any range a dashboard
