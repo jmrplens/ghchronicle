@@ -32,7 +32,8 @@ value of the range where they meant the newest, or the other way round, or
 counted an item once per row a store held of it, or one cell of a grid where
 they meant them all, some Elasticsearch panels read every repository whatever
 the picker held, ranked by a measure they did not name or failed outright, the
-Graphite charts were labelled with the function that consolidated them, and
+Graphite charts were labelled with the function that consolidated them, the
+Graphite cache table was empty for the last hour of every UTC day, and
 every one-shot run reported at Info, as news, how it always runs.
 
 - **A Docker state volume belongs to the collector.** Up to 2.6.0 neither
@@ -330,6 +331,25 @@ every one-shot run reported at Info, as news, how it always runs.
   repository's storage schema, three discussion comments over the last thirty
   days read 1.5 at 500 points and 3 with none. The twenty tables that add
   their points up now ask for the sum.
+- **The Graphite cache table answers in the last hour of the day.** "Cache
+  entries by key" reads, in Graphite, the refs of the last UTC day of the
+  range. graphite-web rounds the end of what it reads up to the next hour, and
+  `summarize` ends its days on the day after that end, so a range ending in
+  the last UTC hour gained a day with no point in it; the query filled the
+  empty buckets with -1 after `summarize` and kept the refs whose last value
+  was not below zero, so it kept none, and the table was empty from 23:00 to
+  midnight UTC. The -1 now goes in before the days are made, the day after
+  the range has nothing to fill and stays null, and the last value read
+  passes over it. A `timeSlice` to `now` does not mend it: graphite-web counts
+  a sliced series' time from the start of the request rather than from the day
+  `summarize` aligned it to, and the day after the range still read as inside
+  it. Measured against `graphiteapp/graphite-statsd:1.1.10-5`, directly and
+  through Grafana 13.2.1, with two refs written on the last day of the range
+  and one evicted the day before, the range ending at 22:30, 23:30 and 23:59
+  UTC: the two refs, then nothing and nothing before; the two refs at all
+  three now. No other Graphite query fills the buckets of a daily
+  `summarize`: the charts' extra bucket lies after the range and is not drawn,
+  and the stats add up over one bucket aligned to the range's start.
 - **The Graphite charts name their series again.** graphite-web renames every
   series it consolidates, as `consolidateBy(name,"sum")`, and Grafana draws
   that name as it is. Measured against the same image and Grafana 13.2.1,
@@ -448,9 +468,11 @@ twins name; an Elasticsearch ranking by an id its query lacks; a consolidated
 Graphite target under the name `consolidateBy` gives it; the card's totals,
 the newest-reading sums in every store and the exporter's five gauges over two
 owners' repositories of one name; the two open-longest tables in every store;
-and every query of every store, and every exporter rule that names a
-repository, over two owners' repositories of one name. Where such a test calls something the old code lacks, it was run there
-with that call stubbed. The binary
+every query of every store, and every exporter rule that names a repository,
+over two owners' repositories of one name; and a Graphite query that fills the
+buckets of a `summarize` not aligned to its range. Where such a test calls
+something the old code lacks, it was run there with that call stubbed. The
+binary
 against the fake GitHub holds that a one-shot run says its refill at
 Debug and never at Info, and that no comment carries `is_answer`. The
 containerised suite holds the two newest-reading tables against InfluxDB 3, as

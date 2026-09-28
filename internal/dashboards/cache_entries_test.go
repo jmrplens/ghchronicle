@@ -48,7 +48,7 @@ func TestCacheEntriesReadEachRepositorysNewestSnapshot(t *testing.T) {
 			checkNewestTimestampBucket(t, targets[0].(map[string]any))
 		case "graphite":
 			expr, _ := targets[0].(map[string]any)["target"].(string)
-			lastDay := fmt.Sprintf(`filterSeries(transformNull(summarize(%s, "1d", "last"), -1), "last", ">=", 0)`,
+			lastDay := fmt.Sprintf(`filterSeries(summarize(transformNull(%s, -1), "1d", "max"), "last", ">=", 0)`,
 				rp("gh_actions_cache_entry", "size_bytes"))
 			if strings.Contains(expr, "keepLastValue") || !strings.Contains(expr, lastDay) {
 				t.Errorf("graphite: Cache entries by key carries refs with nothing on the range's "+
@@ -87,4 +87,76 @@ func checkNewestTimestampBucket(t *testing.T, target map[string]any) {
 				"wherever in the range it is", m)
 		}
 	}
+}
+
+// TestNoGraphiteQueryFillsTheDayAfterItsRange: graphite-web 1.1.10 rounds the
+// end of what it reads up to the next storage slot, and a summarize not
+// aligned to its from ends its buckets on the interval after that end, so a
+// range ending in the last UTC hour of a day holds one more daily bucket, the
+// next day, with no point in it. A transformNull or a keepLastValue over such a
+// summarize fills that bucket like any other, and whatever reads the last
+// value then reads the fill. "Cache entries by key" filled it with -1 and
+// dropped every ref whose last value was below zero, so for an hour a day it
+// answered nothing: measured against graphiteapp/graphite-statsd:1.1.10-5,
+// its two refs at 22:30 UTC, and nothing at 23:30 and 23:59. Filled before the
+// buckets are made, the bucket after the range has nothing to fill and stays
+// null, which every last-value read passes over.
+func TestNoGraphiteQueryFillsTheDayAfterItsRange(t *testing.T) {
+	t.Parallel()
+	summarized := 0
+	for _, p := range renderedPanels(t, "graphite") {
+		for _, raw := range targetList(p) {
+			target, _ := raw.(map[string]any)
+			expr, _ := target["target"].(string)
+			if expr == "" {
+				continue
+			}
+			parser := &exprParser{t: t, s: expr}
+			tree := parseGraphiteCall(parser)
+			summarized += strings.Count(expr, "summarize(")
+			for _, f := range fillsAfterSummarize(tree, "") {
+				t.Errorf("graphite: %q fills the empty bucket after its range with %s: %s", p["title"], f, expr)
+			}
+		}
+	}
+	if summarized == 0 {
+		t.Fatal("no Graphite query summarizes, so this checked nothing")
+	}
+	for expr, want := range map[string]int{
+		`transformNull(summarize(a.b, "1d", "last"), -1)`:        1,
+		`keepLastValue(summarize(a.b, "1h", "max"))`:             1,
+		`summarize(transformNull(a.b, -1), "1d", "max")`:         0,
+		`keepLastValue(summarize(a.b, "100y", "sum", true))`:     0,
+		`sumSeries(keepLastValue(a.b))`:                          0,
+		`alias(transformNull(summarize(a.b, "7d", "sum")), "x")`: 1,
+	} {
+		p := &exprParser{t: t, s: expr}
+		if got := fillsAfterSummarize(parseGraphiteCall(p), ""); len(got) != want {
+			t.Errorf("%s: found %v, want %d", expr, got, want)
+		}
+	}
+}
+
+// fillsAfterSummarize is every summarize not aligned to its from that a
+// transformNull or a keepLastValue above it fills; `filling` is the nearest
+// such function on the way down, or empty.
+func fillsAfterSummarize(c grCall, filling string) []string {
+	var out []string
+	if c.fn == "summarize" && filling != "" {
+		last := c.args[len(c.args)-1]
+		if last.quoted || last.word != "true" {
+			interval := ""
+			if len(c.args) > 1 {
+				interval = c.args[1].word
+			}
+			out = append(out, fmt.Sprintf("%s over summarize(…, %q)", filling, interval))
+		}
+	}
+	if c.fn == "transformNull" || c.fn == "keepLastValue" {
+		filling = c.fn
+	}
+	for _, a := range c.args {
+		out = append(out, fillsAfterSummarize(a, filling)...)
+	}
+	return out
 }

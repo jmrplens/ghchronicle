@@ -245,8 +245,25 @@ func cacheEntries(b *builder) Panel {
 	// it. Graphite cannot find each repository's newest day, so it reads the
 	// last UTC day of the range: summarize makes a point a day, the refs with
 	// nothing on the last one are dropped, and what is left is added up per
-	// cache. The -1 is a stand-in for "nothing that day", since filterSeries
-	// reads the last value that is not null, and a size is never below zero.
+	// cache. The -1 is a stand-in for "nothing that hour", since filterSeries
+	// reads the last value that is not null, and a size is never below zero;
+	// the largest of a day's hours is then the day's row, or -1.
+	//
+	// The -1 goes in before the days are made, not after. graphite-web
+	// 1.1.10 rounds the end of what it reads up to the next hour, and
+	// summarize ends on the day after that end, so a range ending in the last
+	// UTC hour of a day gains one more day, which holds no point. Filled with
+	// -1 after summarize, that day was the last value of every ref, and the
+	// table was empty for the hour. Filled before, it holds no point to fill
+	// and stays null, which filterSeries passes over. Measured against
+	// graphiteapp/graphite-statsd:1.1.10-5 with two refs written on the last
+	// day and one the day before, ending at 22:30, 23:30 and 23:59 UTC: the
+	// two refs, then nothing and nothing before; the two refs at all three
+	// now. A timeSlice to "now" does not mend it: graphite-web counts a
+	// sliced series' time from the start of the request and not from the
+	// start of the day summarize aligned it to, so the day after the range
+	// read as still inside it, and the table stayed empty.
+	//
 	// consolidateBy keeps a long range drawn on a narrow screen reading the
 	// last day rather than the mean of the last two, and it names the series
 	// after itself, so aliasByNode names each row by its repository and cache
@@ -254,7 +271,7 @@ func cacheEntries(b *builder) Panel {
 	// is grouped by its full name, which two owners cannot share, and named
 	// by its short one.
 	ce := "gh_actions_cache_entry"
-	lastDay := fmt.Sprintf(`removeBelowValue(filterSeries(transformNull(summarize(%s, "1d", "last"), -1),`+
+	lastDay := fmt.Sprintf(`removeBelowValue(filterSeries(summarize(transformNull(%s, -1), "1d", "max"),`+
 		` "last", ">=", 0), 0)`, rp(ce, "size_bytes"))
 	entryGR, entryGRtf := gTbl(rowsOf(fmt.Sprintf(`consolidateBy(groupByNodes(%s, "sum", %d, %d, %d), "last")`,
 		lastDay, gn(ce, "full_name"), gn(ce, "repo"), gn(ce, "cache")), 1, 2),

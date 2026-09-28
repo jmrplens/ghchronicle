@@ -12308,7 +12308,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(aliasByNode(consolidateBy(groupByNodes(removeBelowValue(filterSeries(transformNull(summarize(github.actions_cache_entry.*.*.*.*.$repo.size_bytes, \"1d\", \"last\"), -1), \"last\", \"\u003e=\", 0), 0), \"sum\", 3, 6, 2), \"last\"), 1, 2))",
+              "target": "removeEmptySeries(aliasByNode(consolidateBy(groupByNodes(removeBelowValue(filterSeries(summarize(transformNull(github.actions_cache_entry.*.*.*.*.$repo.size_bytes, -1), \"1d\", \"max\"), \"last\", \"\u003e=\", 0), 0), \"sum\", 3, 6, 2), \"last\"), 1, 2))",
               "textEditor": true
             }
           ],
