@@ -33,7 +33,13 @@ var client = &http.Client{Transport: httpx.OwnTransport()}
 
 // ── InfluxDB ────────────────────────────────────────────────────────────────
 
-type influx struct{ sink *config.InfluxSink }
+type influx struct {
+	sink *config.InfluxSink
+	// described is what /ping said, once asked, and v2 whether it is an
+	// InfluxDB 2, which is asked in Flux rather than in SQL.
+	described string
+	v2        bool
+}
 
 func (i *influx) Name() string { return "influxdb" }
 
@@ -140,14 +146,17 @@ func (e *elastic) Drop(ctx context.Context, item string) error {
 func (e *elastic) call(ctx context.Context, method, endpoint string,
 	tolerate map[int]bool,
 ) (body []byte, status int, err error) {
-	return send(ctx, method, endpoint, func(r *http.Request) {
-		switch {
-		case e.sink.APIKey != "":
-			r.Header.Set("Authorization", "ApiKey "+e.sink.APIKey)
-		case e.sink.Username != "":
-			r.SetBasicAuth(e.sink.Username, e.sink.Password)
-		}
-	}, tolerate)
+	return send(ctx, method, endpoint, e.authorize, tolerate)
+}
+
+// authorize applies the sink's credential, an API key or a user and password.
+func (e *elastic) authorize(r *http.Request) {
+	switch {
+	case e.sink.APIKey != "":
+		r.Header.Set("Authorization", "ApiKey "+e.sink.APIKey)
+	case e.sink.Username != "":
+		r.SetBasicAuth(e.sink.Username, e.sink.Password)
+	}
 }
 
 // ── The SQL sink ────────────────────────────────────────────────────────────
@@ -194,35 +203,70 @@ func (s *sqlFile) Drop(_ context.Context, item string) error {
 func send(ctx context.Context, method, endpoint string,
 	auth func(*http.Request), tolerate map[int]bool,
 ) (body []byte, status int, err error) {
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-	req, reqErr := http.NewRequestWithContext(ctx, method, endpoint, http.NoBody)
-	if reqErr != nil {
-		return nil, 0, reqErr
-	}
-	auth(req)
-	res, sendErr := client.Do(req)
-	if sendErr != nil {
-		return nil, 0, sendErr
-	}
-	defer res.Body.Close()
-	body, readErr := io.ReadAll(res.Body)
-	if readErr != nil {
-		return nil, res.StatusCode, readErr
-	}
-	if res.StatusCode >= 200 && res.StatusCode <= 299 || tolerate[res.StatusCode] {
-		return body, res.StatusCode, nil
-	}
-	return nil, res.StatusCode, fmt.Errorf("%s: %s", res.Status, trim(string(body), 200))
+	answer, err := exchange(ctx, request{method: method, endpoint: endpoint, prepare: auth}, tolerate)
+	return answer.body, answer.status, err
 }
 
+// request is one call to a store: what to send, and what to add to it before
+// it goes, a credential and the headers a body needs.
+type request struct {
+	method, endpoint string
+	payload          []byte
+	prepare          func(*http.Request)
+}
+
+// answer is what a store sent back.
+type answer struct {
+	body   []byte
+	header http.Header
+	status int
+}
+
+// exchange sends one request within the timeout and reads the whole answer.
+// A status outside 2xx that the caller did not tolerate is an error carrying
+// the store's own complaint.
+func exchange(ctx context.Context, r request, tolerate map[int]bool) (answer, error) {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	var payload io.Reader = http.NoBody
+	if r.payload != nil {
+		payload = bytes.NewReader(r.payload)
+	}
+	req, err := http.NewRequestWithContext(ctx, r.method, r.endpoint, payload)
+	if err != nil {
+		return answer{}, err
+	}
+	if r.prepare != nil {
+		r.prepare(req)
+	}
+	res, err := client.Do(req)
+	if err != nil {
+		return answer{}, err
+	}
+	defer res.Body.Close()
+	out := answer{header: res.Header, status: res.StatusCode}
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return out, err
+	}
+	if res.StatusCode >= 200 && res.StatusCode <= 299 || tolerate[res.StatusCode] {
+		out.body = body
+		return out, nil
+	}
+	return out, fmt.Errorf("%s: %s", res.Status, trim(string(body)))
+}
+
+// complaint is how much of a store's complaint an error carries: one line's
+// worth.
+const complaint = 200
+
 // trim keeps a store's complaint to one line's worth.
-func trim(s string, n int) string {
+func trim(s string) string {
 	s = strings.TrimSpace(s)
-	if len(s) <= n {
+	if len(s) <= complaint {
 		return s
 	}
-	return s[:n] + "..."
+	return s[:complaint] + "..."
 }
 
 // ── PostgreSQL ──────────────────────────────────────────────────────────────
