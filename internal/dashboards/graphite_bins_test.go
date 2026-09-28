@@ -70,6 +70,35 @@ func TestNoGraphiteChartIsFittedIntoBandsALateStep(t *testing.T) {
 	}
 }
 
+// TestNoGraphitePanelLosesTheFirstPointsOfItsRange holds every Graphite
+// panel that queries, not only the charts over time, to asking for as many
+// points as a binned chart. A table, a bar chart or a stat reduces what
+// graphite-web returns over the whole range, and graphite-web fits a series
+// longer than the points asked for into bands, dropping one value fewer than
+// the steps it moves the first band's start by. Measured against
+// graphiteapp/graphite-statsd:1.1.10-5 with one hour a step, a point at 20:00
+// UTC read from 19:05 over thirty days summed to nothing at 500 points and to
+// 1 at 5,000; "Languages starred" drew the star the containerised suite's
+// fixture gives at that hour as 0 where the other four stores drew 1, on a run
+// that started in the hour before it.
+func TestNoGraphitePanelLosesTheFirstPointsOfItsRange(t *testing.T) {
+	t.Parallel()
+	held := 0
+	for _, p := range renderedPanels(t, "graphite") {
+		if len(panelTargets(p)) == 0 {
+			continue
+		}
+		held++
+		if points, _ := p["maxDataPoints"].(int); points < grMaxDataPoints {
+			t.Errorf("%s %q asks for %d points, so graphite-web fits a longer range into bands and "+
+				"drops its first points before the panel reduces it", p["type"], p["title"], points)
+		}
+	}
+	if held < 100 {
+		t.Fatalf("only %d Graphite panels query anything, too few for this to have held anything", held)
+	}
+}
+
 // checkGraphiteBins holds one target of a Graphite chart to summarizing every
 // series it draws, by its floor's variable when the chart follows the range,
 // and otherwise by a fixed bucket twelve years hold fewer of than the points

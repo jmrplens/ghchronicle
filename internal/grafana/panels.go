@@ -42,6 +42,13 @@ type PanelQuery struct {
 	// ever carries the name before it, so checking one needs both.
 	Links   []string
 	Renames map[string]string
+	// MaxDataPoints is the points the panel names, its `maxDataPoints`, or 0
+	// when it names none. Grafana asks a panel for these and for as many as
+	// it is wide only when there are none, and the Graphite dashboard names
+	// 5,000 on every panel, since graphite-web drops the first points of a
+	// range it fits into fewer: asked for the width, those panels lost their
+	// first hour.
+	MaxDataPoints int
 	// From is the panel's own range, its `timeFrom`, or the empty string
 	// when it takes the dashboard's. Grafana replaces the request's `from`
 	// with this before the query is sent, so a checker that ignored it asked
@@ -89,6 +96,7 @@ func appendPanels(out []PanelQuery, panels any, seen *int) []PanelQuery {
 		q.Links = LinkColumns(p)
 		q.Renames = Renames(p)
 		q.From, _ = p["timeFrom"].(string)
+		q.MaxDataPoints, _ = stepCount(p["maxDataPoints"])
 		q.Source = p
 		for _, t := range targets {
 			if tgt, isObject := t.(map[string]any); isObject {
@@ -371,7 +379,8 @@ type Options struct {
 	Workers int
 	// IntervalMs and MaxDataPoints are what a rendered panel sends: the width
 	// of the browser's graph decides them, and several queries interpolate
-	// $__interval and $__rate_interval out of them.
+	// $__interval and $__rate_interval out of them. A panel that names its
+	// own maxDataPoints is sent that instead, as Grafana sends it.
 	IntervalMs    int
 	MaxDataPoints int
 }
@@ -438,8 +447,8 @@ func (c Client) checkPanel(ctx context.Context, from, to string,
 		if opt.IntervalMs > 0 {
 			q["intervalMs"] = opt.IntervalMs
 		}
-		if opt.MaxDataPoints > 0 {
-			q["maxDataPoints"] = opt.MaxDataPoints
+		if points := cmp.Or(panel.MaxDataPoints, opt.MaxDataPoints); points > 0 {
+			q["maxDataPoints"] = points
 		}
 		if left := Unrendered(q); len(left) > 0 {
 			r.Err = "the render left " + strings.Join(left, ", ") + " in the query"

@@ -600,13 +600,22 @@ var grBucketFloors = []string{"1d", "1h", "5m"}
 // rounding, the maxDataPoints the SQL twins bin by (see binned in panels.go).
 const grBucketSteps = 100
 
-// grMaxDataPoints is what a Graphite chart over time asks for, so that
-// graphite-web never fits it into bands. Grafana rounds a raw interval
-// anywhere between a day and a week down to a day, so a bucket can be as short
-// as the range over seven hundred, and a binned chart has at most some seven
-// hundred points; a chart of one point a day, the contribution calendar, has
-// one per day the daily archive keeps, twelve years of them in the schema the
-// containerised suite keeps.
+// grMaxDataPoints is what every Graphite panel asks for, so that graphite-web
+// never fits it into bands. Grafana rounds a raw interval anywhere between a
+// day and a week down to a day, so a bucket can be as short as the range over
+// seven hundred, and a binned chart has at most some seven hundred points; a
+// chart of one point a day, the contribution calendar, has one per day the
+// daily archive keeps, twelve years of them in the schema the containerised
+// suite keeps.
+//
+// A panel that is not a chart over time reduces the series graphite-web
+// returns over the whole range, and fitting drops the first values of the
+// range, one fewer than the steps it moves the first band's start by.
+// Measured against graphiteapp/graphite-statsd:1.1.10-5 with one hour a step,
+// a point at 20:00 UTC read from 19:05 over thirty days summed to nothing at
+// 500 points and to 1 at 5,000. Such a panel is not summarized, so it holds a
+// point per storage step: 2,880 over the hundred and twenty days the suite's
+// hourly archive keeps, and 4,380 over the twelve years of its daily one.
 const grMaxDataPoints = 5000
 
 // grBucketVar is the name of the bucket variable of a floor.

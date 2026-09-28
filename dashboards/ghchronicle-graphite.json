@@ -141,6 +141,7 @@
         "y": 8
       },
       "id": 2,
+      "maxDataPoints": 5000,
       "options": {
         "colorMode": "none",
         "graphMode": "none",
@@ -281,6 +282,7 @@
         "y": 8
       },
       "id": 3,
+      "maxDataPoints": 5000,
       "options": {
         "colorMode": "none",
         "graphMode": "none",
@@ -348,6 +350,7 @@
         "y": 8
       },
       "id": 4,
+      "maxDataPoints": 5000,
       "options": {
         "colorMode": "none",
         "graphMode": "none",
@@ -434,6 +437,7 @@
         "y": 12
       },
       "id": 5,
+      "maxDataPoints": 5000,
       "options": {
         "colorMode": "none",
         "graphMode": "none",
@@ -529,6 +533,7 @@
             "y": 19
           },
           "id": 7,
+          "maxDataPoints": 5000,
           "options": {
             "colorMode": "none",
             "graphMode": "none",
@@ -633,6 +638,7 @@
             "y": 24
           },
           "id": 8,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -764,6 +770,7 @@
             "y": 36
           },
           "id": 9,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -878,6 +885,7 @@
             "y": 36
           },
           "id": 10,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -961,6 +969,7 @@
             "y": 36
           },
           "id": 11,
+          "maxDataPoints": 5000,
           "options": {
             "legend": {
               "displayMode": "list",
@@ -1285,6 +1294,7 @@
             "y": 54
           },
           "id": 16,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -1435,6 +1445,7 @@
             "y": 62
           },
           "id": 17,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -1597,6 +1608,7 @@
             "y": 70
           },
           "id": 18,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -1821,6 +1833,7 @@
             "y": 88
           },
           "id": 22,
+          "maxDataPoints": 5000,
           "options": {
             "legend": {
               "displayMode": "list",
@@ -1952,6 +1965,7 @@
             "y": 88
           },
           "id": 23,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -2186,6 +2200,7 @@
             "y": 112
           },
           "id": 28,
+          "maxDataPoints": 5000,
           "options": {
             "displayMode": "gradient",
             "maxVizHeight": 300,
@@ -2348,6 +2363,7 @@
             "y": 117
           },
           "id": 30,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -2420,6 +2436,7 @@
             "y": 124
           },
           "id": 31,
+          "maxDataPoints": 5000,
           "options": {
             "legend": {
               "displayMode": "list",
@@ -2497,6 +2514,7 @@
             "y": 124
           },
           "id": 32,
+          "maxDataPoints": 5000,
           "options": {
             "legend": {
               "displayMode": "list",
@@ -2612,6 +2630,7 @@
             "y": 124
           },
           "id": 33,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -2750,6 +2769,7 @@
             "y": 131
           },
           "id": 34,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -2899,6 +2919,7 @@
             "y": 139
           },
           "id": 36,
+          "maxDataPoints": 5000,
           "options": {
             "legend": {
               "displayMode": "list",
@@ -3127,6 +3148,7 @@
             "y": 149
           },
           "id": 38,
+          "maxDataPoints": 5000,
           "options": {
             "colorMode": "none",
             "graphMode": "none",
@@ -3793,6 +3815,7 @@
             "y": 169
           },
           "id": 43,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -3881,6 +3904,7 @@
             "y": 169
           },
           "id": 44,
+          "maxDataPoints": 5000,
           "options": {
             "legend": {
               "displayMode": "list",
@@ -4024,6 +4048,7 @@
             "y": 178
           },
           "id": 45,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -4169,6 +4194,7 @@
             "y": 178
           },
           "id": 46,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -4408,6 +4434,7 @@
             "y": 194
           },
           "id": 48,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -4559,6 +4586,7 @@
             "y": 194
           },
           "id": 49,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -4831,6 +4859,7 @@
             "y": 202
           },
           "id": 51,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -5144,6 +5173,7 @@
             "y": 211
           },
           "id": 53,
+          "maxDataPoints": 5000,
           "options": {
             "colorMode": "value",
             "graphMode": "none",
@@ -5653,6 +5683,7 @@
             "y": 232
           },
           "id": 58,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -5799,6 +5830,7 @@
             "y": 232
           },
           "id": 59,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -5960,6 +5992,7 @@
             "y": 241
           },
           "id": 60,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -6101,6 +6134,7 @@
             "y": 249
           },
           "id": 61,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -6243,6 +6277,7 @@
             "y": 249
           },
           "id": 62,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -6381,6 +6416,7 @@
             "y": 257
           },
           "id": 63,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -6601,6 +6637,7 @@
             "y": 265
           },
           "id": 66,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -6818,6 +6855,7 @@
             "y": 275
           },
           "id": 68,
+          "maxDataPoints": 5000,
           "options": {
             "colorMode": "value",
             "graphMode": "none",
@@ -7121,6 +7159,7 @@
             "y": 287
           },
           "id": 71,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -7213,6 +7252,7 @@
             "y": 287
           },
           "id": 72,
+          "maxDataPoints": 5000,
           "options": {
             "legend": {
               "displayMode": "list",
@@ -7345,6 +7385,7 @@
             "y": 287
           },
           "id": 73,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -7624,6 +7665,7 @@
             "y": 295
           },
           "id": 75,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -7809,6 +7851,7 @@
             "y": 312
           },
           "id": 78,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -7971,6 +8014,7 @@
             "y": 312
           },
           "id": 79,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -8179,6 +8223,7 @@
             "y": 320
           },
           "id": 81,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -8339,6 +8384,7 @@
             "y": 328
           },
           "id": 82,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -8540,6 +8586,7 @@
             "y": 328
           },
           "id": 83,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -8739,6 +8786,7 @@
             "y": 336
           },
           "id": 85,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -8877,6 +8925,7 @@
             "y": 344
           },
           "id": 86,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -9040,6 +9089,7 @@
             "y": 344
           },
           "id": 87,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -9155,6 +9205,7 @@
             "y": 354
           },
           "id": 89,
+          "maxDataPoints": 5000,
           "options": {
             "reduceOptions": {
               "calcs": [
@@ -9354,6 +9405,7 @@
             "y": 362
           },
           "id": 91,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -9484,6 +9536,7 @@
             "y": 362
           },
           "id": 92,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -9594,6 +9647,7 @@
             "y": 370
           },
           "id": 93,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -9738,6 +9792,7 @@
             "y": 378
           },
           "id": 95,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -9848,6 +9903,7 @@
             "y": 378
           },
           "id": 96,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -9987,6 +10043,7 @@
             "y": 386
           },
           "id": 97,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -10292,6 +10349,7 @@
             "y": 386
           },
           "id": 98,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -10434,6 +10492,7 @@
             "y": 394
           },
           "id": 99,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -10561,6 +10620,7 @@
             "y": 402
           },
           "id": 100,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -10810,6 +10870,7 @@
             "y": 410
           },
           "id": 102,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -10944,6 +11005,7 @@
             "y": 420
           },
           "id": 104,
+          "maxDataPoints": 5000,
           "options": {
             "colorMode": "none",
             "graphMode": "none",
@@ -11018,6 +11080,7 @@
             "y": 420
           },
           "id": 105,
+          "maxDataPoints": 5000,
           "options": {
             "legend": {
               "displayMode": "list",
@@ -11161,6 +11224,7 @@
             "y": 428
           },
           "id": 106,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -11311,6 +11375,7 @@
             "y": 437
           },
           "id": 107,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -11542,6 +11607,7 @@
             "y": 447
           },
           "id": 109,
+          "maxDataPoints": 5000,
           "options": {
             "colorMode": "value",
             "graphMode": "none",
@@ -11599,6 +11665,7 @@
             "y": 447
           },
           "id": 110,
+          "maxDataPoints": 5000,
           "options": {
             "legend": {
               "displayMode": "list",
@@ -11676,6 +11743,7 @@
             "y": 447
           },
           "id": 111,
+          "maxDataPoints": 5000,
           "options": {
             "legend": {
               "displayMode": "list",
@@ -11934,6 +12002,7 @@
             "y": 451
           },
           "id": 113,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -12132,6 +12201,7 @@
             "y": 467
           },
           "id": 115,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -12314,6 +12384,7 @@
             "y": 459
           },
           "id": 116,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -12467,6 +12538,7 @@
             "y": 474
           },
           "id": 117,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -12678,6 +12750,7 @@
             "y": 488
           },
           "id": 119,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -12824,6 +12897,7 @@
             "y": 488
           },
           "id": 120,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -12966,6 +13040,7 @@
             "y": 500
           },
           "id": 121,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -13104,6 +13179,7 @@
             "y": 500
           },
           "id": 122,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -13319,6 +13395,7 @@
             "y": 509
           },
           "id": 124,
+          "maxDataPoints": 5000,
           "options": {
             "colorMode": "none",
             "graphMode": "none",
@@ -13626,6 +13703,7 @@
               "url": "https://github.com/settings/billing/summary"
             }
           ],
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -13768,6 +13846,7 @@
             "y": 530
           },
           "id": 128,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -13914,6 +13993,7 @@
             "y": 538
           },
           "id": 129,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -14077,6 +14157,7 @@
             "y": 548
           },
           "id": 132,
+          "maxDataPoints": 5000,
           "options": {
             "displayLabels": [],
             "legend": {
@@ -14175,6 +14256,7 @@
             "y": 556
           },
           "id": 133,
+          "maxDataPoints": 5000,
           "options": {
             "legend": {
               "displayMode": "list",
@@ -14290,6 +14372,7 @@
             "y": 556
           },
           "id": 134,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -14555,6 +14638,7 @@
             "y": 579
           },
           "id": 137,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -14638,6 +14722,7 @@
             "y": 588
           },
           "id": 138,
+          "maxDataPoints": 5000,
           "options": {
             "legend": {
               "displayMode": "list",
@@ -14793,6 +14878,7 @@
             "y": 588
           },
           "id": 139,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -14889,6 +14975,7 @@
             "y": 598
           },
           "id": 141,
+          "maxDataPoints": 5000,
           "options": {
             "legend": {
               "displayMode": "list",
@@ -15304,6 +15391,7 @@
             "y": 598
           },
           "id": 142,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -15547,6 +15635,7 @@
             "y": 606
           },
           "id": 143,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -15646,6 +15735,7 @@
             "y": 617
           },
           "id": 144,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -15785,6 +15875,7 @@
             "y": 617
           },
           "id": 145,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -15964,6 +16055,7 @@
             "y": 617
           },
           "id": 146,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -16113,6 +16205,7 @@
             "y": 625
           },
           "id": 147,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -16338,6 +16431,7 @@
             "y": 633
           },
           "id": 148,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -16419,6 +16513,7 @@
             "y": 641
           },
           "id": 149,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -16502,6 +16597,7 @@
             "y": 641
           },
           "id": 150,
+          "maxDataPoints": 5000,
           "options": {
             "legend": {
               "displayMode": "list",
@@ -16590,6 +16686,7 @@
             "y": 648
           },
           "id": 151,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -16788,6 +16885,7 @@
             "y": 655
           },
           "id": 153,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -16945,6 +17043,7 @@
             "y": 655
           },
           "id": 154,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -17033,6 +17132,7 @@
             "y": 667
           },
           "id": 155,
+          "maxDataPoints": 5000,
           "options": {
             "legend": {
               "displayMode": "list",
@@ -17223,6 +17323,7 @@
             "y": 676
           },
           "id": 158,
+          "maxDataPoints": 5000,
           "options": {
             "colorMode": "none",
             "graphMode": "none",
@@ -17419,6 +17520,7 @@
             "y": 680
           },
           "id": 159,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -17629,6 +17731,7 @@
             "y": 680
           },
           "id": 160,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -17768,6 +17871,7 @@
             "y": 690
           },
           "id": 161,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -17922,6 +18026,7 @@
             "y": 690
           },
           "id": 162,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -18108,6 +18213,7 @@
             "y": 700
           },
           "id": 163,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -18219,6 +18325,7 @@
             "y": 707
           },
           "id": 164,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -18529,6 +18636,7 @@
             "y": 717
           },
           "id": 165,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "lg",
             "footer": {
@@ -18684,6 +18792,7 @@
             "y": 727
           },
           "id": 168,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -18846,6 +18955,7 @@
             "y": 738
           },
           "id": 169,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {
@@ -18973,6 +19083,7 @@
             "y": 738
           },
           "id": 170,
+          "maxDataPoints": 5000,
           "options": {
             "cellHeight": "sm",
             "footer": {

@@ -346,9 +346,19 @@ rows and every tile over nothing, and its list of excused differences went from
   charts pinned to ninety days keep a fixed day, since a bucket variable
   follows the dashboard's range and not a panel's own. `/api/ds/query`
   substitutes no variable, so the panel runner that `cmd/check_dashboards` and
-  the containerised suite share computes these as Grafana does. The
+  the containerised suite share computes these as Grafana does. Every other
+  Graphite panel asks for 5,000 points as well: a table, a bar chart or a stat
+  reduces the points of the whole range, the fitting drops the first of them,
+  and Grafana asks a panel that names no number for as many as it is wide, so a
+  panel narrower than the range's points lost the first hour or hours of the
+  range. The containerised suite asked every panel for 500 and found it on a
+  run begun between 19:00 and 20:00 UTC, when "Languages starred" drew as 0 the
+  star its fixture gives at 20:00 thirty days back, which the four other stores
+  drew as 1; measured on the same Graphite, a point at 20:00 read from 19:05
+  over thirty days summed to nothing at 500 points and to 1 at 5,000. The panel
+  runner now asks a panel for the points it names, as Grafana does. The
   [Graphite page](https://jmrp.io/docs/ghchronicle/sinks/graphite/) says how a
-  chart is binned.
+  chart is binned and why every panel asks for 5,000 points.
 - **Elasticsearch charts bin by the range, and a week stands at its Sunday.**
   An Elasticsearch chart binned by the interval written in the panel, an hour
   or a day at every range, where the other stores bin by the range over a
@@ -571,7 +581,8 @@ over runs of two lengths and over a repository with no failed run; the fold
 into other in every store, the Prometheus pie's still series with it; every
 stat value over nothing, a Graphite snapshot over a range no sweep reached
 among them, and the metrics a bucket script reads; every Graphite chart to its
-bucket and to the points it asks for; every table to the SQL column order;
+bucket, every Graphite panel to the points it asks for, and the panel runner to
+sending a panel the points it names; every table to the SQL column order;
 every Elasticsearch chart to the range's bucket, the weekly rows to their
 Sunday and every chart's sentence about its bucket; every column a store lacks
 to its description; an idea's Answered in Elasticsearch; and, in the replay, a
@@ -621,7 +632,10 @@ Not verified, and worth saying plainly:
 - The Graphite buckets were measured with an hour a storage step, at one
   moment in the hour before a band boundary. A Graphite whose storage step is
   longer than a chart's bucket, a day kept where the chart sums into six
-  hours, was not tried.
+  hours, was not tried. A panel that is not a chart over time holds a point
+  per storage step, so a retention that keeps more than 5,000 steps of a range,
+  an hour a step for longer than the suite's hundred and twenty days or
+  anything finer, is fitted into bands again.
 - The Elasticsearch median and average over a bucket a century wide read null
   over nothing on Grafana 13.2.1, which is the only Grafana they were measured
   on; a plugin that reads such a bucket as 0 would draw a wrong number there.

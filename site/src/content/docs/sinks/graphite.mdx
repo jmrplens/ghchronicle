@@ -129,6 +129,21 @@ a bucket there: graphite-web counts one from the epoch, a Thursday, and every
 weekly bar stood three days early, the first week of a thirty-day range before
 the range began.
 
+Every other panel asks for 5,000 points as well. A table, a bar chart or a stat
+is not summarized: it reduces the points of the whole range to a number, and
+the fitting drops the first of them, one fewer than the steps it moves the
+first band's start by. Grafana asks a panel that names no number for as many
+points as it is wide, so before 2.6.2 a panel narrower than a range's points
+lost the first hour or hours of the range, depending on where the range began.
+Measured on the same Graphite, a point at 20:00 UTC read from 19:05 over thirty
+days summed to nothing at 500 points and to 1 at 5,000, and "Languages starred"
+drew a star given at that hour as 0 in a window 640 pixels wide. Such a panel
+holds a point per storage step, so 5,000 covers the 2,880 hours of the hundred
+and twenty days the containerised suite's schema keeps at an hour a step and
+the 4,380 days of the twelve years it keeps at a day. A retention that keeps
+more than 5,000 steps of a range, an hour a step for longer than a hundred and
+twenty days or anything finer, is fitted into bands again.
+
 A chart or a bar chart that names its busiest series and folds the rest into
 one called other does the same here as in the SQL dashboards: the busiest over
 the whole range are named, and other is every series less those, point by

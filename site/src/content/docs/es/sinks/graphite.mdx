@@ -139,6 +139,23 @@ semanas. Siete días no sirven de cubo ahí: graphite-web los cuenta desde el
 epoch, un jueves, y cada barra semanal quedaba tres días antes, la primera
 semana de un rango de treinta días antes de que empezara el rango.
 
+Todos los demás paneles piden también 5.000 puntos. Una tabla, una gráfica de
+barras o un stat no se resume en cubos: reduce los puntos de todo el rango a un
+número, y el encaje en bandas descarta los primeros, uno menos que los pasos
+que adelanta el inicio de la primera banda. Grafana pide a un panel que no
+indica ningún número tantos puntos como píxeles tiene de ancho, así que antes
+de la 2.6.2 un panel más estrecho que los puntos de un rango perdía la primera
+hora o las primeras horas del rango, según dónde empezara el rango. Medido en
+el mismo Graphite, un punto a las 20:00 UTC leído desde las 19:05 durante
+treinta días sumaba nada con 500 puntos y 1 con 5.000, y "Languages starred"
+dibujaba como 0 una estrella dada a esa hora en una ventana de 640 píxeles de
+ancho. Un panel así tiene un punto por paso de almacenamiento, así que 5.000
+cubre las 2.880 horas de los ciento veinte días que el esquema de la suite en
+contenedores guarda a una hora por paso y los 4.380 días de los doce años que
+guarda a un día. Una retención que guarda más de 5.000 pasos de un rango, una
+hora por paso durante más de ciento veinte días o cualquier cosa más fina,
+vuelve a encajarse en bandas.
+
 Una gráfica o una gráfica de barras que nombra sus series más activas y junta
 el resto en una llamada other hace aquí lo mismo que en los dashboards SQL: se
 nombran las más activas de todo el rango, y other es todas las series menos

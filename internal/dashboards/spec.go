@@ -857,10 +857,12 @@ func materialize(id *ids, p *Panel, storeName string, ds, logs any, y0 int) map[
 // withPanelOptions is what a panel of any kind carries beside its queries and
 // its field configuration.
 func withPanelOptions(out map[string]any, kind, storeName string, opts Opts) map[string]any {
-	// Every Graphite chart over time is summarized into buckets, and asks
-	// for more points than it has buckets so that graphite-web does not fit
-	// it into bands a step late (see grBin).
-	if storeName == "graphite" && kind == "timeseries" {
+	// Every Graphite panel asks for more points than a series of it holds,
+	// so that graphite-web does not fit it into bands (see grBin): a chart
+	// over time, summarized into buckets, would be drawn a step late, and a
+	// table, a bar chart or a stat, which reduces the whole range, would lose
+	// the first points of the range, which the fitting drops.
+	if storeName == "graphite" {
 		out["maxDataPoints"] = grMaxDataPoints
 	}
 	// A panel whose whole subject is one page on GitHub carries the page as

@@ -706,6 +706,37 @@ func TestAPanelsOwnRangeEndsNowWhereverTheDashboardEnds(t *testing.T) {
 	}
 }
 
+// TestAPanelsOwnPointsWinOverTheWidth: Grafana asks a panel for the points
+// its maxDataPoints names, and for as many as it is wide only when it names
+// none. The runner sent every panel the width it was given, so a Graphite
+// panel that asks for 5,000 points, so that graphite-web does not fit the
+// range into bands and drop its first points, was asked for 500 and lost the
+// first hour of the range on the runs that started in the hour before an even
+// one.
+func TestAPanelsOwnPointsWinOverTheWidth(t *testing.T) {
+	t.Parallel()
+	c, seen := fakeGrafana(t, http.StatusOK, `{"results":{}}`)
+	// As a dashboard file decodes, with every number a float64.
+	panels := Panels([]any{
+		map[string]any{"type": "stat", "title": "Own", "maxDataPoints": 5000.0,
+			"targets": []any{map[string]any{"refId": "A"}}},
+		map[string]any{"type": "stat", "title": "Wide", "targets": []any{map[string]any{"refId": "A"}}},
+	})
+	c.CheckPanels(t.Context(), "now-30d", "now", panels, Vars{Datasource: "ds"},
+		Options{Timeout: 5 * time.Second, Workers: 1, MaxDataPoints: 500})
+	for _, want := range []float64{5000, 500} {
+		req := <-seen
+		queries, _ := req.body["queries"].([]any)
+		if len(queries) != 1 {
+			t.Fatalf("posted %d queries, want the panel's one", len(queries))
+		}
+		q, _ := queries[0].(map[string]any)
+		if q["maxDataPoints"] != want {
+			t.Errorf("a panel was asked for %v points, want %v", q["maxDataPoints"], want)
+		}
+	}
+}
+
 // instant reads a range bound posted as epoch milliseconds.
 func instant(t *testing.T, v any) time.Time {
 	t.Helper()
