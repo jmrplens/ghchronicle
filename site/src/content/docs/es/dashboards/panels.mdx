@@ -52,6 +52,16 @@ nombre corto salvo que dos repositorios del rango lo compartan, y entonces por
 sus nombres completos; los otros tres almacenes nombran ambas por el nombre
 corto.
 
+Una tarjeta que es una mediana o una proporción no tiene número en un rango sin
+nada que medir, y desde la 2.6.2 dice qué le faltó al rango en vez de dibujar un
+hueco bajo su etiqueta: "none merged" bajo el tiempo hasta fusionar y las líneas
+por pull request, "no issue closed", "none decided" bajo la tasa de éxito, "no
+runs" y "no jobs" bajo la duración de la ejecución y la espera en cola, "no
+commits" bajo la proporción firmada, y "no deliveries" en la tasa de fallo de
+los webhooks. Un recuento sobre un rango así da 0. En Graphite y Elasticsearch
+un valor cuya consulta no encuentra ninguna ruta o ningún documento no tiene
+campo que lleve ninguno de los dos, y sale de su grupo.
+
 ## Overview
 
 Una cabecera y no un panel: la marca, grande y centrada, el nombre debajo, y

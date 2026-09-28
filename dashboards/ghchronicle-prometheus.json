@@ -2849,6 +2849,42 @@
                     "value": "no human review"
                   }
                 ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Time to merge"
+                },
+                "properties": [
+                  {
+                    "id": "noValue",
+                    "value": "none merged"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Lines per pull request"
+                },
+                "properties": [
+                  {
+                    "id": "noValue",
+                    "value": "none merged"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Time to close an issue"
+                },
+                "properties": [
+                  {
+                    "id": "noValue",
+                    "value": "no issue closed"
+                  }
+                ]
               }
             ]
           },
@@ -4014,6 +4050,42 @@
                   {
                     "id": "unit",
                     "value": "bytes"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Success rate"
+                },
+                "properties": [
+                  {
+                    "id": "noValue",
+                    "value": "none decided"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Run duration"
+                },
+                "properties": [
+                  {
+                    "id": "noValue",
+                    "value": "no runs"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Queue wait"
+                },
+                "properties": [
+                  {
+                    "id": "noValue",
+                    "value": "no jobs"
                   }
                 ]
               }
@@ -5399,6 +5471,18 @@
                         }
                       ]
                     }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Signed commits"
+                },
+                "properties": [
+                  {
+                    "id": "noValue",
+                    "value": "no commits"
                   }
                 ]
               }
@@ -7462,6 +7546,7 @@
               },
               "max": 100,
               "min": 0,
+              "noValue": "no deliveries",
               "thresholds": {
                 "mode": "absolute",
                 "steps": [

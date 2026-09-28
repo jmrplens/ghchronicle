@@ -144,8 +144,11 @@ func commitsAndChurn(b *builder) []Panel {
 			},
 			ESDesc: "In Elasticsearch the signed share is the mean of the boolean `signed` " +
 				"field, as a fraction.",
-			Opts:      mergeOpts(Opts{"thresholds": plainSteps}, bounded()),
-			Overrides: []any{fieldThresholds(codeSignedCommits, "percent", signedSteps)},
+			Opts: mergeOpts(Opts{"thresholds": plainSteps}, bounded()),
+			Overrides: []any{
+				fieldThresholds(codeSignedCommits, "percent", signedSteps),
+				noValueOf(codeSignedCommits, "no commits"),
+			},
 		}),
 		panel("timeseries", "Lines changed over time", box{W: 12, H: 8, X: 0, Y: 4}, []Target{sqlTS(churn)}, &P{
 			Prom: []Target{

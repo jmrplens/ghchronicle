@@ -44,6 +44,16 @@ repository picker still filters by it. A chart in InfluxDB and PostgreSQL names
 a series by its short name unless two repositories in the range share it, and
 then by their full names; the other three stores name both by the short name.
 
+A tile that is a median or a share has no number in a range with nothing to
+measure, and since 2.6.2 it says what the range lacked rather than drawing an
+empty space under its label: "none merged" under the time to merge and the
+lines per pull request, "no issue closed", "none decided" under the success
+rate, "no runs" and "no jobs" under the run duration and the queue wait, "no
+commits" under the signed share, and "no deliveries" on the webhook failure
+rate. A count over such a range reads 0. In Graphite and Elasticsearch a value
+whose query finds no path or no document at all has no field to carry either,
+and leaves its group.
+
 ## Overview
 
 A masthead rather than a panel: the mark, large and centered, the name under

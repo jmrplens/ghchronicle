@@ -81,6 +81,9 @@ const (
 	flowChurn           = "Lines changed"
 	flowPullColumn      = "Pull request"
 	flowOpenAge         = "Open for"
+	// What a median over the merged pull requests reads in a range that
+	// merged none, since the median of nothing is no number at all.
+	flowNoneMerged = "none merged"
 )
 
 // flowNonNull is how a Graphite panel counts rows: every point that exists
@@ -211,6 +214,8 @@ func flowRates(b *builder) []Panel {
 				unitOf(flowMergeTime, "s", 0), unitOf(flowFirstReviewTime, "s", 0),
 				unitOf(flowIssueCloseTime, "s", 0),
 				noValueOf(flowFirstReviewTime, "no human review"),
+				noValueOf(flowMergeTime, flowNoneMerged), noValueOf(flowLinesPerPull, flowNoneMerged),
+				noValueOf(flowIssueCloseTime, "no issue closed"),
 			},
 		}),
 		panel("timeseries", "Pull requests over time", box{W: 12, H: 8, X: 0, Y: 5}, []Target{sqlTS(perDay)}, &P{

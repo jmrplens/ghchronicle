@@ -251,6 +251,10 @@ func runOutcomes(b *builder) []Panel {
 				fieldThresholds(ciSuccessRate, "percent", rateThresholds),
 				unitOf(ciRunTime, "s", 0), unitOf(ciQueueWait, "s", 0),
 				unitOf(ciArtifactStorage, "bytes", 0), unitOf(ciCacheSize, "bytes", 0),
+				// A share of no run and a median of none are no number, and
+				// the tile says which of the two the range lacked.
+				noValueOf(ciSuccessRate, "none decided"), noValueOf(ciRunTime, "no runs"),
+				noValueOf(ciQueueWait, "no jobs"),
 			},
 		}),
 		panel("timeseries", "Runs by outcome over time", box{W: 12, H: 8, X: 0, Y: 5}, []Target{sqlTS(perDay)}, &P{

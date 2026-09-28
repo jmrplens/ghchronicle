@@ -370,14 +370,17 @@ func gauge(a panelArgs, o Opts) map[string]any {
 	if v, ok := optAny(o, "maxv"); ok {
 		maxv = v
 	}
-	p["fieldConfig"] = map[string]any{
-		"defaults": map[string]any{
-			"unit": optString(o, "unit", "percent"), "min": optInt(o, "minv", 0), "max": maxv,
-			"color":      map[string]any{"mode": "thresholds"},
-			"thresholds": map[string]any{"mode": "absolute", "steps": steps},
-		},
-		"overrides": overridesOf(o),
+	defaults := map[string]any{
+		"unit": optString(o, "unit", "percent"), "min": optInt(o, "minv", 0), "max": maxv,
+		"color":      map[string]any{"mode": "thresholds"},
+		"thresholds": map[string]any{"mode": "absolute", "steps": steps},
 	}
+	// A rate of nothing is no number, and a gauge with no value draws an empty
+	// dial, which reads as a broken panel; see noValueOf.
+	if v := optString(o, "no_value", ""); v != "" {
+		defaults["noValue"] = v
+	}
+	p["fieldConfig"] = map[string]any{"defaults": defaults, "overrides": overridesOf(o)}
 	p["options"] = map[string]any{
 		"reduceOptions": map[string]any{
 			"calcs": []any{"lastNotNull"}, "fields": "", "values": false,

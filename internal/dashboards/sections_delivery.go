@@ -95,7 +95,7 @@ func webhookDeliveries(b *builder) []Panel {
 			Prom: []Target{promNow(fmt.Sprintf(
 				"100 * sum(increase(%s[$__range])) / sum(increase(%s[$__range]))", failed, totalM,
 			))},
-			Opts: Opts{"thresholds": []any{
+			Opts: Opts{"no_value": "no deliveries", "thresholds": []any{
 				map[string]any{"color": "green", "value": nil},
 				map[string]any{"color": "orange", "value": 5},
 				map[string]any{"color": "red", "value": 25},
