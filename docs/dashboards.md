@@ -387,7 +387,9 @@ empty space under its label: "none merged" under the time to merge and the
 lines per pull request, "no issue closed", "none decided" under the success
 rate, "no runs" and "no jobs" under the run duration and the queue wait, "no
 commits" under the signed share, and "no deliveries" on the webhook failure
-rate. A count over such a range reads 0 in every store: Graphite draws 0 for a
+rate. The words under a tile are drawn in the color of the text, not in that
+of the tile's lowest threshold, which is red for the success rate and the
+signed share: "none decided" is not a failed build. A count over such a range reads 0 in every store: Graphite draws 0 for a
 path it has never held, and Elasticsearch for a range with no document to
 count. A median or an average still has no field to carry the words where
 Graphite finds no path at all, and in Elasticsearch, whose plugin reads the

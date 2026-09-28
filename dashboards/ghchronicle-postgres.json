@@ -2699,8 +2699,20 @@
                 },
                 "properties": [
                   {
-                    "id": "noValue",
-                    "value": "no human review"
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "no human review"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
                   }
                 ]
               },
@@ -2711,8 +2723,20 @@
                 },
                 "properties": [
                   {
-                    "id": "noValue",
-                    "value": "none merged"
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "none merged"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
                   }
                 ]
               },
@@ -2723,8 +2747,20 @@
                 },
                 "properties": [
                   {
-                    "id": "noValue",
-                    "value": "none merged"
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "none merged"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
                   }
                 ]
               },
@@ -2735,8 +2771,20 @@
                 },
                 "properties": [
                   {
-                    "id": "noValue",
-                    "value": "no issue closed"
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "no issue closed"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
                   }
                 ]
               }
@@ -4428,8 +4476,20 @@
                 },
                 "properties": [
                   {
-                    "id": "noValue",
-                    "value": "none decided"
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "none decided"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
                   }
                 ]
               },
@@ -4440,8 +4500,20 @@
                 },
                 "properties": [
                   {
-                    "id": "noValue",
-                    "value": "no runs"
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "no runs"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
                   }
                 ]
               },
@@ -4452,8 +4524,20 @@
                 },
                 "properties": [
                   {
-                    "id": "noValue",
-                    "value": "no jobs"
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "no jobs"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
                   }
                 ]
               }
@@ -5988,8 +6072,20 @@
                 },
                 "properties": [
                   {
-                    "id": "noValue",
-                    "value": "no commits"
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "no commits"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
                   }
                 ]
               }

@@ -572,11 +572,25 @@ const dayWidth = 100
 // A stat panel with no value draws an empty space, and a group draws that
 // space under the value's own label: "Time to review by someone else" was a
 // labeled hole in the middle of six numbers, which reads as a broken panel
-// rather than as an answer. Grafana's `noValue` fills it with a sentence. It
-// is for a null that means something, not for a zero: a count that is genuinely
-// zero already prints 0.
+// rather than as an answer. The sentence fills it, and it is for a null that
+// means something, not for a zero: a count that is genuinely zero already
+// prints 0.
+//
+// It is a value mapping of the null, in the text color, rather than
+// Grafana's `noValue`, which is drawn in the color of the field's lowest
+// threshold. The success rate and the signed share start at red, so over a
+// range with no run "none decided" read in the color of a failed build, and
+// "no commits" in that of unsigned work, beside "no runs" in the text color
+// (Grafana 13.2.1, on the 2.6.2 review). NaN is matched as well as null, so
+// that a share of nothing a store answers as NaN reads as the words and not as
+// "NaN".
 func noValueOf(name, text string) any {
-	return override(name, []any{map[string]any{"id": "noValue", "value": text}})
+	return override(name, []any{map[string]any{"id": "mappings", "value": []any{
+		map[string]any{"type": "special", "options": map[string]any{
+			"match":  "null+nan",
+			"result": map[string]any{"text": text, "color": "text", "index": 0},
+		}},
+	}}})
 }
 
 func unitOf(name, unit string, w int) any {

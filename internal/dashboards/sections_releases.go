@@ -105,9 +105,12 @@ func releases(b *builder) []Panel {
 			GR: []Target{
 				grNamed("A", "Total", latestSum(rp(rl, "downloads"))),
 				// Graphite counts the series with a download in them; a series
-				// is a release, so this is the same number.
+				// is a release, so this is the same number. With none left
+				// countSeries answers nothing rather than 0, and the tile was
+				// missing where COUNT(*) reads 0, so it falls back as
+				// countTotal does.
 				grNamed("B", "Releases", fmt.Sprintf(
-					"countSeries(removeEmptySeries(removeBelowValue(keepLastValue(%s), 1)))",
+					"fallbackSeries(countSeries(removeEmptySeries(removeBelowValue(keepLastValue(%s), 1))), constantLine(0))",
 					rp(rl, "downloads"),
 				)),
 			},

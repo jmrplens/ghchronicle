@@ -3,6 +3,8 @@ package dashboards
 import (
 	"strings"
 	"testing"
+
+	"github.com/jmrplens/ghchronicle/v2/internal/grafana"
 )
 
 // TestACountOfNothingIsZeroInEveryStore holds every count a stat or a gauge
@@ -20,6 +22,15 @@ func TestACountOfNothingIsZeroInEveryStore(t *testing.T) {
 	}
 }
 
+// graphiteCounts is every way a Graphite target counts: the points of a path
+// added up, which is countTotal's, and the series that are left, which is how
+// "Downloads" counts the releases anybody downloaded. countSeries answers
+// nothing for a list that is empty once removeEmptySeries has run, and the
+// Releases tile was missing from Graphite where the SQL stores read 0, over a
+// range before any release and for a repository whose releases nobody
+// downloaded (measured against graphite-web 1.1.10).
+var graphiteCounts = []string{"summarize(sumSeries(isNonNull(", "countSeries("}
+
 // graphiteCountsFallBack holds every count of a Graphite stat to falling back
 // to the constant 0, and says how many it found.
 func graphiteCountsFallBack(t *testing.T) int {
@@ -31,17 +42,19 @@ func graphiteCountsFallBack(t *testing.T) int {
 		}
 		for _, target := range panelTargets(p) {
 			expr, _ := target["target"].(string)
-			for rest := expr; ; {
-				at := strings.Index(rest, "summarize(sumSeries(isNonNull(")
-				if at < 0 {
-					break
+			for _, count := range graphiteCounts {
+				for rest := expr; ; {
+					at := strings.Index(rest, count)
+					if at < 0 {
+						break
+					}
+					counts++
+					if !strings.HasSuffix(rest[:at], "fallbackSeries(") {
+						t.Errorf("graphite %q counts with no fallback, so a path never held draws no tile "+
+							"where the SQL stores draw 0:\n%s", p["title"], expr)
+					}
+					rest = rest[at+1:]
 				}
-				counts++
-				if !strings.HasSuffix(rest[:at], "fallbackSeries(") {
-					t.Errorf("graphite %q counts with no fallback, so a path never held draws no tile "+
-						"where the SQL stores draw 0:\n%s", p["title"], expr)
-				}
-				rest = rest[at+1:]
 			}
 		}
 	}
@@ -101,4 +114,27 @@ func panelTargets(p map[string]any) []map[string]any {
 		}
 	}
 	return out
+}
+
+// TestNoReleaseAnybodyDownloadedIsZeroReleasesInGraphite evaluates the
+// Releases count of "Downloads" the way graphite-web does, over a repository
+// whose one release nobody has downloaded: COUNT(*) reads 0 there, and
+// Graphite drew no tile at all.
+func TestNoReleaseAnybodyDownloadedIsZeroReleasesInGraphite(t *testing.T) {
+	t.Parallel()
+	for _, store := range AllStores() {
+		if store.Name != "graphite" {
+			continue
+		}
+		allValue, _ := store.Variable["allValue"].(string)
+		vars := grafana.Vars{Datasource: store.DS, AllValue: allValue}
+		target := targetOf(t, mustPanel(t, rendered(t, store.Name), "Downloads"), "B")
+		expr, _ := vars.Apply(target)["target"].(string)
+		nobody := []grSeries{{name: "github.release.false.alice_x.alice.false.x.v1_0_0.downloads", value: 0}}
+		if got := evalGraphite(t, expr, nobody); got != 0 {
+			t.Errorf("%s counts %v releases downloaded where nobody downloaded one", expr, got)
+		}
+		return
+	}
+	t.Fatal("no graphite store")
 }

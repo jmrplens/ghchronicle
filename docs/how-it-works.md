@@ -284,11 +284,21 @@ an exporter with one series per star.
 
 A batch is reduced the way the stores hold it. Two points with the same
 measurement, tags and time are one row in InfluxDB, PostgreSQL, Graphite and
-Elasticsearch, the later one's fields written over the earlier one's, so they
-are one row here too: `sum` adds it once, `count` counts and averages it once,
-and `keepLast` keeps the later of two readings stamped at the same instant.
-Across sweeps nothing more is needed, since each sweep's gauge replaces the
-last one and `total` remembers every item it has already counted.
+Elasticsearch, so they are one row here too: `sum` adds it once, `count` counts
+and averages it once, and `keepLast` keeps the later of two readings stamped at
+the same instant. The row takes a field both points carry from the later one
+and keeps a field only the earlier one carried, as InfluxDB, PostgreSQL and
+Graphite do; Elasticsearch indexes the later point as the whole document, so a
+field only the earlier one carried is gone there. A tag with an empty value is
+no tag, as in InfluxDB, PostgreSQL and Elasticsearch; Graphite writes it as the
+node `none`, so there the point with it and the point without it are two
+paths. Across sweeps nothing more is needed, since each sweep's gauge replaces
+the last one and `total` remembers every item it has already counted.
+
+`sum` adds up every number but a price. The bill repeats a SKU's price on each
+of its rows, one per repository and day, so the reduction keeps the highest,
+which is the `MAX(price_per_unit)` the SQL dashboards read; added up, it read
+the price times the days billed.
 
 `count` averages each of their numbers except the identifiers. A field that
 joins one row to another, `run_id`, `workflow_id`, `pull_request`, `number`,

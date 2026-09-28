@@ -106,7 +106,7 @@ prefix is the first node of every path.
 A chart over time asks Graphite for at most a hundred points, two of them for
 as many as they are pixels wide, and graphite-web fits a series with more into
 bands, moving each point one storage step later as it does. Measured against
-graphiteapp/graphite-statsd:1.1.10-5 with one hour a step, a point written at
+`graphiteapp/graphite-statsd:1.1.10-5` with one hour a step, a point written at
 07:30 UTC and read at 07:59 over thirty days came back stamped 08:00, the start
 of the next eight-hour band and after the end of the range; asked for a
 thousand points, it came back at 07:00. So in the last hour before each band's

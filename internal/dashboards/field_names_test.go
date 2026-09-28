@@ -1,6 +1,7 @@
 package dashboards
 
 import (
+	"maps"
 	"regexp"
 	"slices"
 	"strings"
@@ -18,32 +19,65 @@ import (
 // "194 K" where the other stores read 2.25 days; Run duration read "260" and
 // Actions minutes "$214".
 //
-// So every byName override of a stat, a gauge or a table, in every store, has
-// to name a field the panel draws by the time it is reached: a column the
-// statement aliases, a legend or an alias the query gives, a column a
-// transformation renames to, or a name an override earlier in the list gave.
-// The charts are left out, since their series are named by the data.
+// So every byName override of a stat or a gauge, in every store, has to name
+// a field the panel draws by the time it is reached: a column the statement
+// aliases, a legend or an alias the query gives, a column a transformation
+// renames to, or a name an override earlier in the list gave.
+//
+// A table is held to the same order, and to less than the rest of it. Its
+// overrides are one list for five stores, and a store that does not select a
+// column leaves that column's width and unit addressed to nothing, which
+// draws nothing wrong: of the 1,758 byName overrides on tables on the 2.6.2
+// branch, 261 match no name their own store draws, and every one of them
+// names a column another store does. So a table's override has to name a
+// field some store draws, and where its own store draws the name, to be
+// reached after the field has it. The charts are left out, since their series
+// are named by the data.
 func TestEveryFieldOverrideNamesAFieldThePanelDraws(t *testing.T) {
 	t.Parallel()
 	checked := 0
+	tables := map[string]map[string]bool{}
 	for _, store := range AllStores() {
 		for _, p := range renderedPanels(t, store.Name) {
-			if p["type"] == "stat" || p["type"] == "gauge" {
-				checked += checkOverridesFind(t, store.Name, p)
+			switch p["type"] {
+			case "stat", "gauge":
+				checked += checkOverridesFind(t, store.Name, p, true)
+			case "table":
+				checked += checkOverridesFind(t, store.Name, p, false)
+				title, _ := p["title"].(string)
+				if tables[title] == nil {
+					tables[title] = map[string]bool{}
+				}
+				maps.Copy(tables[title], everDrawn(p))
 			}
 		}
 	}
 	if checked == 0 {
 		t.Fatal("no byName override in any store, so this checked nothing")
 	}
+	for _, store := range AllStores() {
+		for _, p := range renderedPanels(t, store.Name) {
+			title, _ := p["title"].(string)
+			if p["type"] != "table" {
+				continue
+			}
+			for _, name := range byNameTargets(p) {
+				if !tables[title][name] {
+					t.Errorf("%s %q: an override addresses %q, which no store's table draws, so it "+
+						"is dropped in all five", store.Name, title, name)
+				}
+			}
+		}
+	}
 }
 
 // checkOverridesFind walks a panel's overrides in Grafana's order, holding
 // each byName one to a field that carries the name by then, and reports how
-// many it checked.
-func checkOverridesFind(t *testing.T, store string, p map[string]any) int {
+// many it checked. Not strict, a name the panel never draws at all is let
+// through, which is a table's column its store does not select.
+func checkOverridesFind(t *testing.T, store string, p map[string]any, strict bool) int {
 	t.Helper()
-	names := drawnNames(p)
+	names, ever := drawnNames(p), everDrawn(p)
 	checked := 0
 	for _, raw := range overridesOfPanel(p) {
 		o, _ := raw.(map[string]any)
@@ -51,7 +85,7 @@ func checkOverridesFind(t *testing.T, store string, p map[string]any) int {
 		name, _ := matcher["options"].(string)
 		if matcher["id"] == "byName" {
 			checked++
-			if !names[name] {
+			if !names[name] && (strict || ever[name]) {
 				t.Errorf("%s %q: an override addresses %q, which no field carries when "+
 					"Grafana reaches it, so its %v are dropped; the panel draws %v",
 					store, p["title"], name, propertyIDs(o), slices.Sorted(keysOf(names)))
@@ -65,6 +99,33 @@ func checkOverridesFind(t *testing.T, store string, p map[string]any) int {
 		}
 	}
 	return checked
+}
+
+// everDrawn is every name a panel's fields carry at any point: what the
+// queries and the transformations give them, and what any override renames
+// them to.
+func everDrawn(p map[string]any) map[string]bool {
+	names := drawnNames(p)
+	for _, raw := range overridesOfPanel(p) {
+		o, _ := raw.(map[string]any)
+		if renamed := displayNameOf(o); renamed != "" {
+			names[renamed] = true
+		}
+	}
+	return names
+}
+
+// byNameTargets is the name every byName override of a panel addresses.
+func byNameTargets(p map[string]any) []string {
+	var out []string
+	for _, raw := range overridesOfPanel(p) {
+		o, _ := raw.(map[string]any)
+		matcher, _ := o["matcher"].(map[string]any)
+		if name, _ := matcher["options"].(string); matcher["id"] == "byName" {
+			out = append(out, name)
+		}
+	}
+	return out
 }
 
 // The names a query gives its fields, one pattern per way of giving one.

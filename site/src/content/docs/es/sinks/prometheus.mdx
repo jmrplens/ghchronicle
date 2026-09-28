@@ -60,9 +60,15 @@ Una medida sin regla se salta, así que un colector nuevo no puede inundar en
 silencio el exportador con una serie por estrella.
 
 El lote se lee tal como lo guardan los almacenes. Un punto con la misma medida,
-las mismas etiquetas y la misma hora que otro anterior es la misma fila, con
-sus campos escritos sobre los del anterior, así que se suma, se cuenta y se
-promedia una vez, igual que los almacenes de historia lo guardan una vez.
+las mismas etiquetas y la misma hora que otro anterior es la misma fila, así
+que se suma, se cuenta y se promedia una vez, igual que los almacenes de
+historia lo guardan una vez;
+[la fecha del punto](/ghchronicle/es/how/dating/#el-reductor-y-qué-hace-con-cada-medida)
+dice qué campos suyos conserva cada almacén. Un precio es el único número que un `sum` no suma: la
+factura repite el precio de un SKU en cada fila, una por repositorio y día, así
+que `github_billing_usage_price_per_unit` es el más alto de ellos, el
+`MAX(price_per_unit)` de los dashboards SQL, y no el precio multiplicado por
+los días facturados.
 
 Cada media es sobre los elementos que traían el campo, no sobre el recuento. Un
 colector omite un campo cuando no tiene un valor honesto para él: un job sin

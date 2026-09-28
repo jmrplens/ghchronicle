@@ -6,6 +6,7 @@ import (
 	"go/token"
 	"io/fs"
 	"maps"
+	"math"
 	"path/filepath"
 	"slices"
 	"sort"
@@ -302,8 +303,8 @@ func TestSummarizeKeepsTheNewestSnapshot(t *testing.T) {
 }
 
 // TestAPointReadTwiceIsOneRow holds every rule kind to what the row stores
-// keep: one row per measurement, tag set and time, the later point's fields
-// written over the earlier one's. The billing collector reads two months, and
+// keep: one row per measurement, tag set and time, holding the later point's
+// value of a field both carry. The billing collector reads two months, and
 // a report that answers both with the same rows hands the sinks each row
 // twice; InfluxDB, PostgreSQL, Graphite and Elasticsearch each kept one and
 // the exporter added up two, so the Prometheus Spend panel read exactly double
@@ -324,9 +325,10 @@ func TestAPointReadTwiceIsOneRow(t *testing.T) {
 		Fields:      map[string]any{"quantity": 214.0, "gross": 1.712, "net": 0.0},
 		Time:        day,
 	}
-	// The same row, its tags spelled with an empty one: the line protocol
-	// and every other store write no tag for an empty value, so it is the
-	// same row there too.
+	// The same row, its tags spelled with an empty one: the line protocol,
+	// PostgreSQL and Elasticsearch write no tag for an empty value, so it is
+	// the same row there too. Graphite writes the node `none` for it and
+	// would hold two paths.
 	again := minutes
 	again.Tags = with(map[string]string{"user": "octocat", "product": "Actions", "sku": "Actions Linux", "unit": "Minutes", "org": ""})
 	merged := func(n int, seconds float64) Point {
@@ -1190,5 +1192,49 @@ func TestSummarizeLeavesOutAWindowWithNothingToAdd(t *testing.T) {
 	}})
 	if len(out) != 0 {
 		t.Errorf("a window with no number became %+v", out)
+	}
+}
+
+// TestAPriceIsNotAddedUpAcrossTheDaysItWasBilled: the billing report writes a
+// row per repository, SKU and day, and each row carries the SKU's price
+// beside the minutes and the money. Minutes and money add up over the days;
+// a price does not, and the exporter read three days of Linux minutes at
+// 0.008 as a price of 0.024, where the row stores' MAX(price_per_unit) and
+// Elasticsearch's max read 0.008.
+func TestAPriceIsNotAddedUpAcrossTheDaysItWasBilled(t *testing.T) {
+	day := time.Date(2026, 9, 18, 0, 0, 0, 0, time.UTC)
+	billed := func(days int) Point {
+		return Point{
+			Measurement: "gh_billing_usage",
+			Tags: map[string]string{
+				"user": "octocat", "product": "Actions", "sku": "Actions Linux", "unit": "Minutes",
+				"owner": "octocat", "repo": "hello-world", "full_name": "octocat/hello-world",
+			},
+			Fields: map[string]any{"quantity": 10.0, "price_per_unit": 0.008, "gross": 0.08, "net": 0.0},
+			Time:   day.AddDate(0, 0, days),
+		}
+	}
+	out := Summarize([]Point{billed(0), billed(1), billed(2)})
+	if len(out) != 1 {
+		t.Fatalf("three days of one SKU reduced to %d series, want one: %+v", len(out), out)
+	}
+	got := out[0].Fields
+	if got["price_per_unit"] != 0.008 {
+		t.Errorf("three days billed at 0.008 read a price of %v", got["price_per_unit"])
+	}
+	if got["quantity"] != 30.0 || math.Abs(got["gross"].(float64)-0.24) > 1e-9 {
+		t.Errorf("three days of 10 minutes and 0.08 added up to %v minutes and %v, want 30 and 0.24",
+			got["quantity"], got["gross"])
+	}
+}
+
+// TestOnlyASumTakesTheHighest: highest is read by the sum reduction alone,
+// so a rule of another kind naming it would have its fields averaged or kept
+// as they are without a word.
+func TestOnlyASumTakesTheHighest(t *testing.T) {
+	for name, r := range promRules {
+		if len(r.highest) > 0 && r.mode != sum {
+			t.Errorf("%s names %v as highest, and only a sum reads that", name, r.highest)
+		}
 	}
 }

@@ -362,9 +362,14 @@ A measurement with no rule is skipped, so a new collector cannot quietly flood
 the exporter with one series per star.
 
 The batch is read the way the stores hold it. A point with the same
-measurement, tags and time as an earlier one is the same row, its fields
-written over the earlier one's, so it is added, counted and averaged once, as
-the history stores keep it once.
+measurement, tags and time as an earlier one is the same row, so it is added,
+counted and averaged once, as the history stores keep it once;
+[dating a point](https://jmrp.io/docs/ghchronicle/how/dating/#the-reducer-and-what-it-makes-of-each-measurement)
+says which of its fields each store keeps. A price is the one number a `sum`
+does not add: the bill repeats a SKU's price on each row, one per repository
+and day, so `github_billing_usage_price_per_unit` is the highest of them, the
+`MAX(price_per_unit)` of the SQL dashboards, and not the price times the days
+billed.
 
 Each mean is over the items that carried the field, not over the count. A
 collector leaves a field out when it has no honest value for it: a job with no
@@ -886,7 +891,7 @@ prefix is the first node of every path.
 A chart over time asks Graphite for at most a hundred points, two of them for
 as many as they are pixels wide, and graphite-web fits a series with more into
 bands, moving each point one storage step later as it does. Measured against
-graphiteapp/graphite-statsd:1.1.10-5 with one hour a step, a point written at
+`graphiteapp/graphite-statsd:1.1.10-5` with one hour a step, a point written at
 07:30 UTC and read at 07:59 over thirty days came back stamped 08:00, the start
 of the next eight-hour band and after the end of the range; asked for a
 thousand points, it came back at 07:00. So in the last hour before each band's

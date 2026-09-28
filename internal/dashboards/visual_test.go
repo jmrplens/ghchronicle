@@ -1,6 +1,7 @@
 package dashboards
 
 import (
+	"maps"
 	"regexp"
 	"strings"
 	"testing"
@@ -125,7 +126,8 @@ func selectList(sql string) []string {
 }
 
 // noValues is what a panel reads where a value is missing: per field name
-// its override's noValue, and under "value" the panel's own default.
+// its override's noValue or the text it maps a null to, and under "value" the
+// panel's own default.
 func noValues(t *testing.T, p map[string]any) map[string]string {
 	t.Helper()
 	out := map[string]string{}
@@ -138,12 +140,106 @@ func noValues(t *testing.T, p map[string]any) map[string]string {
 		name, _ := matcher["options"].(string)
 		props, _ := o["properties"].([]any)
 		for _, rawProp := range props {
-			if prop, _ := rawProp.(map[string]any); prop["id"] == "noValue" {
+			prop, _ := rawProp.(map[string]any)
+			switch prop["id"] {
+			case "noValue":
 				out[name], _ = prop["value"].(string)
+			case "mappings":
+				if text, _ := nullMapping(prop["value"]); text != "" {
+					out[name] = text
+				}
 			}
 		}
 	}
 	return out
+}
+
+// nullMapping is the text and the color a list of value mappings gives a
+// null, or two empty strings when none of them matches one.
+func nullMapping(mappings any) (text, color string) {
+	list, _ := mappings.([]any)
+	for _, raw := range list {
+		m, _ := raw.(map[string]any)
+		options, _ := m["options"].(map[string]any)
+		if m["type"] != "special" || (options["match"] != "null" && options["match"] != "null+nan") {
+			continue
+		}
+		result, _ := options["result"].(map[string]any)
+		text, _ = result["text"].(string)
+		color, _ = result["color"].(string)
+		return text, color
+	}
+	return "", ""
+}
+
+// TestAWordForNothingIsNotDrawnAsAnAlarm: Grafana draws a field's noValue in
+// the color of its lowest threshold, and the success rate and the signed
+// share both start at red, so over a range with no run "none decided" read in
+// the color of a failed build and "no commits" in that of unsigned work,
+// beside "no runs" and "no jobs" in the text color: Prometheus at thirty
+// days, InfluxDB and Graphite over a range before the fixtures. A sentence
+// that says there is nothing to measure is no verdict, in any store.
+func TestAWordForNothingIsNotDrawnAsAnAlarm(t *testing.T) {
+	t.Parallel()
+	checked := 0
+	for _, store := range AllStores() {
+		for _, p := range renderedPanels(t, store.Name) {
+			if p["type"] != "stat" && p["type"] != "gauge" {
+				continue
+			}
+			for name, words := range noValues(t, p) {
+				checked++
+				if color := nothingColor(t, p, name); strings.Contains(color, "red") ||
+					strings.Contains(color, "orange") {
+					t.Errorf("%s %q: %q under %s is drawn in %s, the color of a verdict, where the "+
+						"range held nothing to judge", store.Name, p["title"], words, name, color)
+				}
+			}
+		}
+	}
+	if checked == 0 {
+		t.Fatal("no stat or gauge says anything for a missing value, so this checked nothing")
+	}
+}
+
+// nothingColor is the color Grafana draws one field's missing value in: the
+// color its value mappings give a null, and failing that the one its color
+// scheme gives the lowest value there is, which is the first threshold's
+// under a thresholds scheme and the fixed color under any other. The field is
+// the panel's defaults with every byName override of it laid on in order;
+// "value" is the panel's own default.
+func nothingColor(t *testing.T, p map[string]any, name string) string {
+	t.Helper()
+	config := maps.Clone(defaultsOf(t, p))
+	for _, raw := range overridesOfPanel(p) {
+		o, _ := raw.(map[string]any)
+		matcher, _ := o["matcher"].(map[string]any)
+		if name == "value" || matcher["id"] != "byName" || matcher["options"] != name {
+			continue
+		}
+		props, _ := o["properties"].([]any)
+		for _, rawProp := range props {
+			prop, _ := rawProp.(map[string]any)
+			if id, _ := prop["id"].(string); id != "" {
+				config[id] = prop["value"]
+			}
+		}
+	}
+	if _, color := nullMapping(config["mappings"]); color != "" {
+		return color
+	}
+	scheme, _ := config["color"].(map[string]any)
+	if scheme["mode"] == "thresholds" {
+		thresholds, _ := config["thresholds"].(map[string]any)
+		steps, _ := thresholds["steps"].([]any)
+		if len(steps) > 0 {
+			lowest, _ := steps[0].(map[string]any)
+			color, _ := lowest["color"].(string)
+			return color
+		}
+	}
+	color, _ := scheme["fixedColor"].(string)
+	return color
 }
 
 // checkPlaced holds one column of an Elasticsearch table to the place the

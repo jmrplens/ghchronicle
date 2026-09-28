@@ -24,7 +24,8 @@ import (
 //   - keepLast: a snapshot. The most recent point per label set wins.
 //   - sum: a window. Every row in the batch is added up, which is what makes
 //     "views over GitHub's 14-day window" a single number. A row is what a
-//     store would keep, so a point offered twice is added once: see rows.
+//     store would keep, so a point offered twice is added once: see rows. A
+//     rate every row repeats, a price, is the highest of them: see highest.
 //   - count: dated items. The points become a count plus the mean of each of
 //     their numeric fields, so "how many pull requests merged and how long they
 //     took" survives as two gauges instead of four hundred series. Each mean is
@@ -75,6 +76,13 @@ type rule struct {
 	// never pushed to does not have; the dashboards read the mean of each as
 	// a share of every contribution and of every fork.
 	absentIsZero []string
+	// highest lists the fields a sum takes the largest of rather than adding
+	// up: a rate that each row repeats rather than a quantity each row adds
+	// to. The billing report prices every row of a SKU, one row per
+	// repository and day, and added up the price of Linux minutes read 0.024
+	// over three days where the row stores' MAX reads 0.008, so the
+	// Prometheus Price column showed the price times the days billed.
+	highest []string
 }
 
 // The three tags that name a repository travel together wherever a rule keeps
@@ -152,7 +160,10 @@ var promRules = map[string]rule{
 	// Windows that only mean anything added up.
 	"gh_traffic":          {mode: sum, keep: []string{"owner", "repo", "full_name", "kind"}},
 	"gh_traffic_referrer": {mode: sum, keep: []string{"owner", "repo", "full_name", "referrer"}},
-	"gh_billing_usage":    {mode: sum, keep: []string{"product", "sku", "unit", "owner", "repo", "full_name"}},
+	"gh_billing_usage": {
+		mode: sum, keep: []string{"product", "sku", "unit", "owner", "repo", "full_name"},
+		highest: []string{"price_per_unit"},
+	},
 
 	// Dated items, reduced to a count and the mean of their numbers.
 	"gh_pull_request": {mode: count, as: "gh_pull_requests", keep: []string{"owner", "repo", "full_name", "state"}},
@@ -464,15 +475,21 @@ func (rd *Reducer) Reduce(points []Point) (gauges []Point, taken int) {
 }
 
 // rows is the batch as the stores hold it: one point per identity, the
-// measurement, the tags that are set and the time, with the fields of a later
-// point written over those of an earlier one, in the order each identity first
-// appeared. InfluxDB, PostgreSQL, Graphite and Elasticsearch key a row that
-// way, so a point offered twice is one row in each of them, and a reduction
-// over the raw batch would count, add up or average it twice. Measured on the containerised suite, where the
-// fake GitHub answers both months the billing collector reads with the same
-// rows: the four row stores showed 214 Actions minutes and the exporter 428.
-// Across batches the reduction already agrees with them: a gauge is replaced
-// by the next sweep's rather than added to, and total remembers identities.
+// measurement, the tags that are set and the time, in the order each identity
+// first appeared. InfluxDB, PostgreSQL, Graphite and Elasticsearch each keep a
+// point offered twice as one row, so a reduction over the raw batch would
+// count, add up or average it twice. Measured on the containerised suite,
+// where the fake GitHub answers both months the billing collector reads with
+// the same rows: the four row stores showed 214 Actions minutes and the
+// exporter 428. Across batches the reduction already agrees with them: a
+// gauge is replaced by the next sweep's rather than added to, and total
+// remembers identities.
+//
+// The row takes a field both points carry from the later one and keeps a
+// field only the earlier one carried, which is what InfluxDB, PostgreSQL's
+// upsert and Graphite's path per field keep. Elasticsearch indexes the later
+// point as the whole document, so a field only the earlier one carried is
+// gone there, and the union is the answer of the other three.
 //
 // Taken counts every point with a rule, the repeated ones too, the way a
 // store accepts a write that rewrites a row it already has.
@@ -499,8 +516,11 @@ func rows(points []Point) (out []Point, taken int) {
 }
 
 // identity is what makes a point one row in a store: its measurement, the
-// tags that are set, since no store writes a tag with an empty value, and its
-// own time.
+// tags that are set, and its own time. A tag with an empty value is no tag in
+// the line protocol, in PostgreSQL, whose tag column reads the empty string
+// either way, and in Elasticsearch's document id. Graphite writes it as the
+// node `none`, so there the point with it and the point without it are two
+// paths, and the identity is the other three's.
 func identity(p Point) string {
 	return p.Measurement + "|" + tagKey(presentTags(p.Tags)) + "@" + strconv.FormatInt(p.Time.UnixNano(), 10)
 }
@@ -555,7 +575,7 @@ func (rd *Reducer) fold(s *series, p Point) {
 		a.total = rd.countDistinct(key, p)
 		a.addNumbers(p.Fields)
 	case sum:
-		a.addNumbers(p.Fields)
+		a.addNumbers(p.Fields, r.highest...)
 	}
 }
 
@@ -625,14 +645,21 @@ func (rd *Reducer) countDistinct(key string, p Point) int {
 }
 
 // addNumbers adds every numeric field into the running total, and counts the
-// point as one that carried it. A string field has no total, so it is passed
-// over rather than coerced.
-func (a *acc) addNumbers(fields map[string]any) {
+// point as one that carried it; a field named in highest keeps the largest
+// value instead. A string field has no total, so it is passed over rather
+// than coerced.
+func (a *acc) addNumbers(fields map[string]any, highest ...string) {
 	for f, v := range fields {
-		if n, ok := numeric(v); ok {
+		n, ok := numeric(v)
+		switch {
+		case !ok:
+			continue
+		case slices.Contains(highest, f) && a.carried[f] > 0:
+			a.fields[f] = max(a.fields[f], n)
+		default:
 			a.fields[f] += n
-			a.carried[f]++
 		}
+		a.carried[f]++
 	}
 }
 

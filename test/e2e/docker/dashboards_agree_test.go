@@ -239,7 +239,9 @@ var dashboardsDiffer = []dashboardDiffer{
 func TestTheStoresDrawTheSameValues(t *testing.T) {
 	s := Start(t)
 	run := dashboardsRun(t, s)
-	c := &dashboardComparison{run: run, drift: sweepDrift(run.sweeps), used: map[int]bool{}}
+	c := &dashboardComparison{
+		run: run, drift: sweepDrift(run.sweeps), used: map[int]bool{}, compared: map[string]map[string]bool{},
+	}
 	indexes := map[int]bool{}
 	for _, store := range dashboardStores {
 		for i := range run.outcomes[store.name] {
@@ -253,7 +255,13 @@ func TestTheStoresDrawTheSameValues(t *testing.T) {
 				index, dashboardPanelTitle(run, index), strings.Join(failures, "\n  "))
 		}
 	}
-	dashboardCheckDiffers(t, run, c.used)
+	stale, unasked := dashboardDifferProblems(dashboardsDiffer, run, c.used, c.compared)
+	for _, problem := range stale {
+		t.Error(problem)
+	}
+	for _, note := range unasked {
+		t.Log(note)
+	}
 	if err := os.WriteFile(filepath.Join("out", "dashboards", "agree.txt"), []byte(c.report.String()), 0o600); err != nil {
 		t.Errorf("keeping the comparison: %v", err)
 	}
@@ -316,9 +324,13 @@ func TestNoPanelDrawsAFieldUnderTheNameItsDatasourceGave(t *testing.T) {
 // dashboardComparison is one pass of the comparison over every panel, and
 // what it found.
 type dashboardComparison struct {
-	run           *dashboardRun
-	drift         map[string]float64
-	used          map[int]bool
+	run   *dashboardRun
+	drift map[string]float64
+	used  map[int]bool
+	// compared is, per panel title, the stores whose picture of it was
+	// compared with another store's. An entry none of whose stores is here
+	// was never asked, which is not the same as no longer being needed.
+	compared      map[string]map[string]bool
 	pairs, agreed int
 	report        strings.Builder
 }
@@ -340,6 +352,10 @@ func (c *dashboardComparison) panel(t *testing.T, index int) []string {
 				continue
 			}
 			c.pairs++
+			if c.compared[title] == nil {
+				c.compared[title] = map[string]bool{}
+			}
+			c.compared[title][a.name], c.compared[title][b.name] = true, true
 			apart := askedApart(c.run, a.name, b.name)
 			like := grafana.Likeness{
 				Equal: dashboardSameName(c.run, index, a.name, b.name),
@@ -488,12 +504,21 @@ func dashboardExcused(title, a, b string, pa, pb *grafana.Picture, like grafana.
 	return true
 }
 
-// dashboardCheckDiffers holds every entry to the panel it names: the panel
+// dashboardDifferProblems holds every entry to the panel it names: the panel
 // exists, each store it names says the reason in its own description of the
 // panel, and the difference it excuses is still there.
-func dashboardCheckDiffers(t *testing.T, run *dashboardRun, used map[int]bool) {
-	t.Helper()
-	for i, e := range dashboardsDiffer {
+//
+// The last is known only of an entry one of whose stores was compared on the
+// panel. Where the exporter could not be loaded, a firewalled docker bridge
+// or a scrape that never came, every Prometheus picture is left out, the
+// entries that name Prometheus alone excuse nothing, and they are still
+// needed: calling them stale told the reader to delete four valid entries on
+// exactly the machines where the other two questions skip Prometheus. Those
+// are returned as unasked, to be logged rather than failed.
+func dashboardDifferProblems(entries []dashboardDiffer, run *dashboardRun, used map[int]bool,
+	compared map[string]map[string]bool,
+) (problems, unasked []string) {
+	for i, e := range entries {
 		found := false
 		for _, store := range e.stores {
 			for _, o := range run.outcomes[store] {
@@ -502,19 +527,27 @@ func dashboardCheckDiffers(t *testing.T, run *dashboardRun, used map[int]bool) {
 				}
 				found = true
 				if !strings.Contains(o.panel.Description, e.reason) {
-					t.Errorf("%q is excused in %s as %q, and that is not what %s's description of the "+
-						"panel says: %q", e.title, store, e.reason, store, o.panel.Description)
+					problems = append(problems, fmt.Sprintf("%q is excused in %s as %q, and that is not "+
+						"what %s's description of the panel says: %q",
+						e.title, store, e.reason, store, o.panel.Description))
 				}
 			}
 		}
+		asked := slices.ContainsFunc(e.stores, func(store string) bool { return compared[e.title][store] })
 		switch {
 		case !found:
-			t.Errorf("%q is excused in %v, and no such panel is drawn by them", e.title, e.stores)
-		case !used[i]:
-			t.Errorf("%q is excused in %v as %q, and the stores now draw it alike: take the entry out",
-				e.title, e.stores, e.reason)
+			problems = append(problems, fmt.Sprintf("%q is excused in %v, and no such panel is drawn by them",
+				e.title, e.stores))
+		case used[i]:
+		case asked:
+			problems = append(problems, fmt.Sprintf("%q is excused in %v as %q, and the stores now draw "+
+				"it alike: take the entry out", e.title, e.stores, e.reason))
+		default:
+			unasked = append(unasked, fmt.Sprintf("%q is excused in %v, and none of them was compared on "+
+				"it in this run, so whether it is still needed was not asked", e.title, e.stores))
 		}
 	}
+	return problems, unasked
 }
 
 // ── What moved between the sweeps ───────────────────────────────────────────

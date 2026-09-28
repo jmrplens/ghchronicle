@@ -918,6 +918,13 @@ func dashboardCheckStale(t *testing.T, run *dashboardRun, store string, list map
 
 // ── 2. Panels that should have rows do ──────────────────────────────────────
 
+// keepsFailingEmpty is why "Workflows that keep failing" answers nothing in
+// the stores that apply its threshold in the query. Elasticsearch applies it
+// in the panel, after the answer this test reads, and Prometheus is left out
+// by promNeedsHistory.
+const keepsFailingEmpty = "the fixture's one workflow failed once in two runs, and the panel lists " +
+	"the ones that failed more than three times"
+
 // dashboardKnownEmpty is every panel that answers nothing although the sweep
 // wrote something inside the dashboard range for the measurement it reads. Each
 // one is a claim about why, checked by hand against the sweep's own points and
@@ -942,13 +949,6 @@ func dashboardCheckStale(t *testing.T, run *dashboardRun, store string, list map
 // it: "Actions minutes" is now one named value of "Spend in range", and a group
 // answers as long as any of its values does, so the empty column would have
 // drawn as a blank beside three numbers and no test would have spoken.
-// keepsFailingEmpty is why "Workflows that keep failing" answers nothing in
-// the stores that apply its threshold in the query. Elasticsearch applies it
-// in the panel, after the answer this test reads, and Prometheus is left out
-// by promNeedsHistory.
-const keepsFailingEmpty = "the fixture's one workflow failed once in two runs, and the panel lists " +
-	"the ones that failed more than three times"
-
 var dashboardKnownEmpty = map[string]map[int]string{
 	"influxdb": {
 		55:  keepsFailingEmpty,

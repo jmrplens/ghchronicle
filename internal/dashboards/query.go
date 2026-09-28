@@ -1301,10 +1301,14 @@ func (b *builder) esTotal(m string, met any, where ...string) []Target {
 var answersNothingAsSQL = map[string]bool{"count": true, "cardinality": true}
 
 // esNoMedian is what an Elasticsearch stat taking a median or an average over
-// the range owes its reader, for the reason answersNothingAsSQL gives.
+// the range owes its reader, for the reason answersNothingAsSQL gives. It
+// names Graphite's case beside it rather than saying every other store draws
+// the words: medianTotal over a path never written answers no series, and
+// that tile leaves its group too.
 const esNoMedian = "In Elasticsearch a median or an average with nothing in the range to " +
-	"take it over has no tile at all, where the other stores say what the range lacked: " +
-	"an empty bucket is not returned, since the one it would return reads as 0."
+	"take it over has no tile at all, as in Graphite for a path it has never held, where " +
+	"the SQL stores say what the range lacked: an empty bucket is not returned, since " +
+	"the one it would return reads as 0."
 
 // aboveZero keeps the rows whose `field` is more than 0, which is what the
 // SQL stores' WHERE says of a table they only list what has any of.

@@ -4421,7 +4421,7 @@
       "panels": [
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "How much closed in the range and how long each took. Every duration is a median: half of what merged or closed took less than the number shown. Time to review by someone else is the wait before a person other than the author looked at a pull request, so review bots, which answer in seconds, and the author's own replies are left out; a range in which nobody else reviewed anything reads \"no human review\" rather than a number, which is the honest answer and not the claim that nothing was reviewed. On the account this was measured against, 0 of 925 pull requests in the range had one. Lines per pull request is the median of added plus removed by a merged one. In Elasticsearch a median or an average with nothing in the range to take it over has no tile at all, where the other stores say what the range lacked: an empty bucket is not returned, since the one it would return reads as 0.",
+          "description": "How much closed in the range and how long each took. Every duration is a median: half of what merged or closed took less than the number shown. Time to review by someone else is the wait before a person other than the author looked at a pull request, so review bots, which answer in seconds, and the author's own replies are left out; a range in which nobody else reviewed anything reads \"no human review\" rather than a number, which is the honest answer and not the claim that nothing was reviewed. On the account this was measured against, 0 of 925 pull requests in the range had one. Lines per pull request is the median of added plus removed by a merged one. In Elasticsearch a median or an average with nothing in the range to take it over has no tile at all, as in Graphite for a path it has never held, where the SQL stores say what the range lacked: an empty bucket is not returned, since the one it would return reads as 0.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -4556,8 +4556,20 @@
                 },
                 "properties": [
                   {
-                    "id": "noValue",
-                    "value": "no human review"
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "no human review"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
                   }
                 ]
               },
@@ -4568,8 +4580,20 @@
                 },
                 "properties": [
                   {
-                    "id": "noValue",
-                    "value": "none merged"
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "none merged"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
                   }
                 ]
               },
@@ -4580,8 +4604,20 @@
                 },
                 "properties": [
                   {
-                    "id": "noValue",
-                    "value": "none merged"
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "none merged"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
                   }
                 ]
               },
@@ -4592,8 +4628,20 @@
                 },
                 "properties": [
                   {
-                    "id": "noValue",
-                    "value": "no issue closed"
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "no issue closed"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
                   }
                 ]
               }
@@ -7234,7 +7282,7 @@
       "panels": [
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "How many runs the range holds and how they ended. The success rate is the runs that succeeded as a share of the runs that succeeded or failed: a run canceled by a newer push under a concurrency group, or skipped by its own condition, decided nothing and is counted beside it as undecided rather than as a failure. The run duration is the median over the range and the queue wait is the time a job spent waiting for a runner, which only exists at job level, the run-level number folding the wait into the duration. Over the runs whose jobs were expanded, which is the newest runs of each sweep and, after a backfill, every run GitHub still holds, which from 1 October 2026 means the repository's retention period, ninety days by default; not every run the run count includes. Last come the bytes the runs left behind, which are the artifacts the walk reached: GitHub lists thousands of them per repository and the walk stops at five hundred, or sooner when a page of the listing fails and the pass keeps what it had read, so this is a floor wherever it stopped short. \"Artifact storage counted\" below puts the two counts beside it. In Elasticsearch the success rate is the mean of the boolean `success` field over those runs, as a fraction. In Elasticsearch a median or an average with nothing in the range to take it over has no tile at all, where the other stores say what the range lacked: an empty bucket is not returned, since the one it would return reads as 0.",
+          "description": "How many runs the range holds and how they ended. The success rate is the runs that succeeded as a share of the runs that succeeded or failed: a run canceled by a newer push under a concurrency group, or skipped by its own condition, decided nothing and is counted beside it as undecided rather than as a failure. The run duration is the median over the range and the queue wait is the time a job spent waiting for a runner, which only exists at job level, the run-level number folding the wait into the duration. Over the runs whose jobs were expanded, which is the newest runs of each sweep and, after a backfill, every run GitHub still holds, which from 1 October 2026 means the repository's retention period, ninety days by default; not every run the run count includes. Last come the bytes the runs left behind, which are the artifacts the walk reached: GitHub lists thousands of them per repository and the walk stops at five hundred, or sooner when a page of the listing fails and the pass keeps what it had read, so this is a floor wherever it stopped short. \"Artifact storage counted\" below puts the two counts beside it. In Elasticsearch the success rate is the mean of the boolean `success` field over those runs, as a fraction. In Elasticsearch a median or an average with nothing in the range to take it over has no tile at all, as in Graphite for a path it has never held, where the SQL stores say what the range lacked: an empty bucket is not returned, since the one it would return reads as 0.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -7431,8 +7479,20 @@
                 },
                 "properties": [
                   {
-                    "id": "noValue",
-                    "value": "none decided"
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "none decided"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
                   }
                 ]
               },
@@ -7443,8 +7503,20 @@
                 },
                 "properties": [
                   {
-                    "id": "noValue",
-                    "value": "no runs"
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "no runs"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
                   }
                 ]
               },
@@ -7455,8 +7527,20 @@
                 },
                 "properties": [
                   {
-                    "id": "noValue",
-                    "value": "no jobs"
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "no jobs"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
                   }
                 ]
               },
@@ -9880,7 +9964,7 @@
       "panels": [
         {
           "datasource": "${DS_ELASTICSEARCH}",
-          "description": "How many commits landed in the window, how many lines each way, and what share carried a signature GitHub could verify. A commit with no signature at all is a different fact from one whose signature failed to verify, and both are counted separately in the chart below. The repository picker holds the repositories the sweeps collect: forks too when `include_forks` is on, and archived ones when `include_archived` is on and for a while after a backfill, which collects them either way. A count here is over every repository the picker holds until it is narrowed. This panel keeps its own range of ninety days whatever the page is set to. Every commit is a row of its own in the store, and at about ten months of them the query is refused for opening too many files, which the reader would see as an empty panel rather than as an error. In Elasticsearch the signed share is the mean of the boolean `signed` field, as a fraction. In Elasticsearch a median or an average with nothing in the range to take it over has no tile at all, where the other stores say what the range lacked: an empty bucket is not returned, since the one it would return reads as 0.",
+          "description": "How many commits landed in the window, how many lines each way, and what share carried a signature GitHub could verify. A commit with no signature at all is a different fact from one whose signature failed to verify, and both are counted separately in the chart below. The repository picker holds the repositories the sweeps collect: forks too when `include_forks` is on, and archived ones when `include_archived` is on and for a while after a backfill, which collects them either way. A count here is over every repository the picker holds until it is narrowed. This panel keeps its own range of ninety days whatever the page is set to. Every commit is a row of its own in the store, and at about ten months of them the query is refused for opening too many files, which the reader would see as an empty panel rather than as an error. In Elasticsearch the signed share is the mean of the boolean `signed` field, as a fraction. In Elasticsearch a median or an average with nothing in the range to take it over has no tile at all, as in Graphite for a path it has never held, where the SQL stores say what the range lacked: an empty bucket is not returned, since the one it would return reads as 0.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -9993,8 +10077,20 @@
                 },
                 "properties": [
                   {
-                    "id": "noValue",
-                    "value": "no commits"
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "options": {
+                          "match": "null+nan",
+                          "result": {
+                            "color": "text",
+                            "index": 0,
+                            "text": "no commits"
+                          }
+                        },
+                        "type": "special"
+                      }
+                    ]
                   }
                 ]
               },
