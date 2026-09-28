@@ -92,7 +92,7 @@ func TestEveryTileIsDrawnOverNothing(t *testing.T) {
 		}
 	}
 	stale, unasked := dashboardDifferProblems(tilesLeftOverNothing, run, c.used, c.compared)
-	for _, problem := range stale {
+	for _, problem := range append(stale, dashboardDifferTooWide(tilesLeftOverNothing, c.alike)...) {
 		t.Error(problem)
 	}
 	for _, note := range unasked {

@@ -140,9 +140,11 @@ compara: lo que un almacén puede guardar es asunto de su propia descripción.
 Un almacén que dibuja un panel de otra forma a propósito dice por qué en su
 propia descripción del panel, y la diferencia se lista en `dashboardsDiffer`, en
 `test/e2e/docker/dashboards_agree_test.go`, con esas palabras. La prueba falla
-cuando las palabras ya no están en la descripción y cuando los almacenes han
-pasado a dibujar el panel igual, así que una entrada no puede sobrevivir a
-ninguna de las dos. Lo que causa el propio arnés se absorbe donde surge en vez
+cuando las palabras ya no están en la descripción, cuando los almacenes han
+pasado a dibujar el panel igual, y cuando un almacén que la entrada nombra
+dibuja el panel como los almacenes que no nombra, así que una entrada no puede
+sobrevivir a su razón ni excusar a un almacén que no necesita excusa. Lo que
+causa el propio arnés se absorbe donde surge en vez
 de listarse: el medio minuto de historia del exporter, los valores que el
 colector calcula con su propio reloj en tres barridos separados por un minuto,
 los valores que una consulta calcula desde `now()` en almacenes consultados con

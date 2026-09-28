@@ -114,10 +114,12 @@ the test fails until it is there.
 
 **A panel one store draws differently from the others** means the reason in
 that store's own description of the panel, and an entry in `dashboardsDiffer`
-(`test/e2e/docker/dashboards_agree_test.go`) quoting those words. The
-containerised suite compares what every store draws, after the panel's
-transformations and overrides, and fails on a difference no description
-explains and on an entry whose words the description no longer holds.
+(`test/e2e/docker/dashboards_agree_test.go`) quoting those words and naming
+only the stores that draw the difference. The containerised suite compares
+what every store draws, after the panel's transformations and overrides, and
+fails on a difference no description explains, on an entry whose words the
+description no longer holds, and on a store an entry names that draws the
+panel as the others do.
 
 **A cadence change** means a measured reason in `config.defaultEvery`, the
 cadence table in both languages, `make config-options` then

@@ -73,3 +73,33 @@ func TestAnEntryOfOneKindIsNotHeldToAnotherPanelOfItsTitle(t *testing.T) {
 		t.Error("an entry about a stat excuses a table of the same title")
 	}
 }
+
+// TestAnEntryNamingAStoreThatDrawsAlikeIsTooWide needs no stack. An entry
+// excuses a pair when it names either store, so a store named beside the one
+// that differs is excused of whatever it draws, and no pair would ever show
+// it. "Commits by repository" named Graphite, Elasticsearch and Prometheus;
+// each has to be the one drawing the difference.
+func TestAnEntryNamingAStoreThatDrawsAlikeIsTooWide(t *testing.T) {
+	entries := []dashboardDiffer{{
+		title: "Commits by repository", stores: []string{"graphite", "prometheus"},
+		reason: "Named in full here", only: []string{"Repository"},
+	}}
+	key := dashboardPanelKey{"Commits by repository", "table"}
+	alike := map[dashboardPanelKey]map[[2]string]bool{key: {
+		{"influxdb", "graphite"}:   false,
+		{"influxdb", "prometheus"}: true,
+		{"graphite", "prometheus"}: false,
+	}}
+	problems := dashboardDifferTooWide(entries, alike)
+	if len(problems) != 1 || !strings.Contains(problems[0], "take prometheus out") {
+		t.Errorf("a store drawing the panel as the unnamed ones do is not called out: %v", problems)
+	}
+	alike[key][[2]string{"influxdb", "prometheus"}] = false
+	if wide := dashboardDifferTooWide(entries, alike); len(wide) > 0 {
+		t.Errorf("an entry both of whose stores differ is called too wide: %v", wide)
+	}
+	onlyNamed := map[dashboardPanelKey]map[[2]string]bool{key: {{"graphite", "prometheus"}: true}}
+	if wide := dashboardDifferTooWide(entries, onlyNamed); len(wide) > 0 {
+		t.Errorf("stores compared only with each other are held to a pair that cannot tell: %v", wide)
+	}
+}

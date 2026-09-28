@@ -37,10 +37,10 @@ import (
 // Then every pair of stores is compared on the panel: a stat, a gauge, a bar
 // gauge and a pie by the values they draw, each with its unit and the text it
 // shows for nothing; a table by the rows it draws over the columns both
-// stores have; a bar chart by its bars, the name each is drawn under and its
-// length. A time series is not compared, nor a bar chart over time: each store
-// buckets those by a step of its own, which is not a difference a reader can
-// see.
+// stores have, and apart from that by the order it heads them in; a bar
+// chart by its bars, the name each is drawn under and its length. A time
+// series is not compared, nor a bar chart over time: each store buckets those
+// by a step of its own, which is not a difference a reader can see.
 //
 // Four things are the harness's and not the dashboards', and each is absorbed
 // where it arises rather than listed:
@@ -77,7 +77,9 @@ type dashboardDiffer struct {
 	// entry is about every panel of its title.
 	kind string
 	// stores are the stores the reason is about. A difference between two
-	// stores is excused when either of them is named here.
+	// stores is excused when either of them is named here, so each of them
+	// has to draw the difference: dashboardDifferTooWide reports one that
+	// draws the panel as the stores the entry does not name.
 	stores []string
 	// reason is words of each named store's own description of the panel,
 	// verbatim. The test holds it to the description, so an entry cannot
@@ -113,44 +115,58 @@ var dashboardsDiffer = []dashboardDiffer{
 	// each the grouping key and the label shown, so two owners' repositories
 	// of one name stay two rows.
 	{
-		title: "Commits by repository", stores: []string{"graphite", "elasticsearch", "prometheus"},
-		reason: "Named in full here", only: []string{"Repository"},
+		title: "Commits by repository", stores: []string{"graphite"},
+		reason: "Named in full here: a Graphite series is labeled by the node it is grouped under, " +
+			"so the owner cannot be dropped without merging two repositories that share a short name",
+		only: []string{"Repository"},
+	},
+	{
+		title: "Commits by repository", stores: []string{"elasticsearch"},
+		reason: "Named in full here, for the reason Graphite gives: the terms bucket is both the grouping key and the label",
+		only:   []string{"Repository"},
+	},
+	{
+		title: "Commits by repository", stores: []string{"prometheus"},
+		reason: "Named in full here, for the reason Graphite gives: the label summed by is the label shown",
+		only:   []string{"Repository"},
 	},
 	// The two years before this one are outside the thirty days.
 	{
 		title: "Contributions by year", stores: []string{"graphite", "elasticsearch"},
-		reason: "answers only inside the dashboard range",
+		reason: "answers only inside the dashboard range, so years outside it are missing",
 	},
 	// Two of the four jobs queued in the same hour: 50 where the others
 	// read 47.5.
 	{
 		title: "Runs in range", stores: []string{"graphite"},
-		reason: "so the medians are over what the storage kept", only: []string{"Queue wait"},
+		reason: "In Graphite two facts landing in the same storage slot of one series are reduced to " +
+			"one point, so the medians are over what the storage kept",
+		only: []string{"Queue wait"},
 	},
 	{
 		title: "Force pushes", stores: []string{"graphite"},
-		reason: "Graphite has no way to sort by date, so this counts them per repository, branch and actor over the range.",
+		reason: "Graphite has no way to sort by date, so this counts them per repository, branch and actor over the range",
 	},
 	{
 		title: "Discussions", stores: []string{"graphite"},
-		reason: "Answered is the share of its discussions that have an answer", only: []string{"Answered"},
+		reason: "cannot group by the answered flag, so each category is one row and Answered is the " +
+			"share of its discussions that have an answer",
+		only: []string{"Answered"},
 	},
 	// The idea, whose category takes no answer, which the SQL stores read
 	// from the category and Elasticsearch cannot.
 	{
 		title: "Latest discussions", stores: []string{"elasticsearch"},
-		reason: "a discussion in a category that takes no answer reads yes or no here rather than n/a",
-		only:   []string{"Answered"},
+		reason: "Its rows are the documents as stored, so Answered is each discussion's own flag, which " +
+			"a row cannot read against its category's: a discussion in a category that takes no " +
+			"answer reads yes or no here rather than n/a",
+		only: []string{"Answered"},
 	},
 	// The one answer is from July, which the SQL stores list whatever the
 	// range.
 	{
-		title: "Answers elsewhere", stores: []string{"graphite"},
-		reason: "Graphite answers only inside the dashboard range",
-	},
-	{
-		title: "Answers elsewhere", stores: []string{"elasticsearch"},
-		reason: "Elasticsearch answers only inside the dashboard range",
+		title: "Answers elsewhere", stores: []string{"graphite", "elasticsearch"},
+		reason: "answers only inside the dashboard range, so years outside it are missing",
 	},
 	{
 		title: "Webhook endpoints", stores: []string{"graphite", "elasticsearch"},
@@ -171,7 +187,9 @@ var dashboardsDiffer = []dashboardDiffer{
 	// v1.3.0-rc1, which nobody has downloaded.
 	{
 		title: "Downloads", stores: []string{"elasticsearch"},
-		reason: "the second counts distinct tags, downloaded or not", only: []string{"Releases"},
+		reason: "In Elasticsearch the second counts distinct tags, downloaded or not: a cardinality " +
+			"cannot be filtered on the newest value",
+		only: []string{"Releases"},
 	},
 	{
 		title: "Downloads by release", stores: []string{"graphite"},
@@ -179,35 +197,28 @@ var dashboardsDiffer = []dashboardDiffer{
 	},
 	{
 		title: "Downloads by release", stores: []string{"elasticsearch"},
-		reason: "the bars are named by tag", only: []string{grafana.BarAxis},
+		reason: "In Elasticsearch the bars are named by tag; the repository is the next column",
+		only:   []string{grafana.BarAxis},
 	},
 	// The two code scanning alerts.
 	{
 		title: "Oldest open alerts", stores: []string{"elasticsearch"},
-		reason: "Elasticsearch lists the Dependabot alerts alone",
+		reason: "Elasticsearch lists the Dependabot alerts alone, the two families being two indices",
 	},
 	// The tags were published before the thirty days.
 	{
 		title: "Container tags published", stores: []string{"graphite"},
-		reason: "this counts the tags published per package over the range",
+		reason: "Graphite has no way to list by date, so this counts the tags published per package over the range",
 	},
 	// Both files were last changed before the thirty days.
 	{
-		title: "Policy files", stores: []string{"graphite"},
-		reason: "Graphite answers only inside the dashboard range",
-	},
-	{
-		title: "Policy files", stores: []string{"elasticsearch"},
-		reason: "Elasticsearch answers only inside the dashboard range",
+		title: "Policy files", stores: []string{"graphite", "elasticsearch"},
+		reason: "answers only inside the dashboard range, so years outside it are missing",
 	},
 	// The one sponsorship began in 2021.
 	{
-		title: "Sponsorships", stores: []string{"graphite"},
-		reason: "Graphite answers only inside the dashboard range",
-	},
-	{
-		title: "Sponsorships", stores: []string{"elasticsearch"},
-		reason: "Elasticsearch answers only inside the dashboard range",
+		title: "Sponsorships", stores: []string{"graphite", "elasticsearch"},
+		reason: "answers only inside the dashboard range, so years outside it are missing",
 	},
 	{
 		title: "Sponsorships", stores: []string{"prometheus"},
@@ -252,7 +263,7 @@ func TestTheStoresDrawTheSameValues(t *testing.T) {
 		}
 	}
 	stale, unasked := dashboardDifferProblems(dashboardsDiffer, run, c.used, c.compared)
-	for _, problem := range stale {
+	for _, problem := range append(stale, dashboardDifferTooWide(dashboardsDiffer, c.alike)...) {
 		t.Error(problem)
 	}
 	for _, note := range unasked {
@@ -474,10 +485,18 @@ type dashboardComparison struct {
 	// compared is, per panel title, the stores whose picture of it was
 	// compared with another store's. An entry none of whose stores is here
 	// was never asked, which is not the same as no longer being needed.
-	compared      map[string]map[string]bool
+	compared map[string]map[string]bool
+	// alike is, per panel, every pair of stores compared on it and whether
+	// the two drew it alike, which is what says whether an entry names a
+	// store it need not.
+	alike         map[dashboardPanelKey]map[[2]string]bool
 	pairs, agreed int
 	report        strings.Builder
 }
+
+// dashboardPanelKey is a panel as an entry names it: its title, and its type
+// for the titles two panels share.
+type dashboardPanelKey struct{ title, kind string }
 
 // panel compares every pair of stores on one panel and answers the
 // differences no entry excuses, one line per pair.
@@ -516,6 +535,7 @@ func (c *dashboardComparison) compare(index int, pictures map[string]grafana.Pic
 				},
 			}
 			diffs := grafana.Compare(&pa, &pb, like)
+			c.remember(dashboardPanelKey{title, pa.Kind}, a.name, b.name, len(diffs) == 0)
 			if len(diffs) == 0 {
 				c.agreed++
 				continue
@@ -531,6 +551,17 @@ func (c *dashboardComparison) compare(index int, pictures map[string]grafana.Pic
 		}
 	}
 	return failures
+}
+
+// remember keeps whether two stores drew a panel alike.
+func (c *dashboardComparison) remember(key dashboardPanelKey, a, b string, same bool) {
+	if c.alike == nil {
+		c.alike = map[dashboardPanelKey]map[[2]string]bool{}
+	}
+	if c.alike[key] == nil {
+		c.alike[key] = map[[2]string]bool{}
+	}
+	c.alike[key][[2]string{a, b}] = same
 }
 
 // dashboardPictures is what each store draws for one panel, for the stores
@@ -698,6 +729,49 @@ func dashboardDifferProblems(entries []dashboardDiffer, run *dashboardRun, used 
 		}
 	}
 	return problems, unasked
+}
+
+// dashboardDifferTooWide holds every entry to the stores it names: each of
+// them has to draw the panel differently from a store the entry does not
+// name, since one that draws it as those do is excused of nothing, and an
+// entry naming it would excuse whatever it drew wrong next. A store compared
+// only with stores the entry names too is not asked, as a pair of them cannot
+// say which of the two needed the entry.
+func dashboardDifferTooWide(entries []dashboardDiffer, alike map[dashboardPanelKey]map[[2]string]bool) []string {
+	var out []string
+	for _, e := range entries {
+		for _, store := range e.stores {
+			if asked, differs := differsFromUnnamed(&e, store, alike); asked && !differs {
+				out = append(out, fmt.Sprintf("%q is excused in %v as %q, and %s draws it as every "+
+					"store the entry does not name does: take %s out of the entry", e.title, e.stores,
+					e.reason, store, store))
+			}
+		}
+	}
+	return out
+}
+
+// differsFromUnnamed reports whether one store an entry names was compared
+// with a store the entry does not name, and whether it drew the panel
+// differently from any of them.
+func differsFromUnnamed(e *dashboardDiffer, store string, alike map[dashboardPanelKey]map[[2]string]bool) (asked, differs bool) {
+	for key, pairs := range alike {
+		if key.title != e.title || (e.kind != "" && key.kind != e.kind) {
+			continue
+		}
+		for pair, same := range pairs {
+			other := pair[0]
+			if other == store {
+				other = pair[1]
+			} else if pair[1] != store {
+				continue
+			}
+			if !slices.Contains(e.stores, other) {
+				asked, differs = true, differs || !same
+			}
+		}
+	}
+	return asked, differs
 }
 
 // ── What moved between the sweeps ───────────────────────────────────────────

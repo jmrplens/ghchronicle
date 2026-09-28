@@ -135,8 +135,10 @@ compared: what a store can hold at all is its own description's business.
 A store that draws a panel differently on purpose says why in its own
 description of the panel, and the difference is listed in `dashboardsDiffer`,
 in `test/e2e/docker/dashboards_agree_test.go`, under those words. The test fails
-when the words are no longer in the description and when the stores have come
-to draw the panel alike, so an entry cannot outlive either. What the harness
+when the words are no longer in the description, when the stores have come
+to draw the panel alike, and when a store the entry names draws the panel as
+the stores it does not name, so an entry can neither outlive its reason nor
+excuse a store that needs no excuse. What the harness
 itself causes is absorbed where it arises rather than listed: the exporter's
 half minute of history, values the collector computes from its own clock across
 three sweeps a minute apart, values a query computes from `now()` across stores
