@@ -3,6 +3,7 @@
 package docker
 
 import (
+	"context"
 	"maps"
 	"slices"
 	"strings"
@@ -63,14 +64,12 @@ var tilesLeftOverNothing = []dashboardDiffer{
 func TestEveryTileIsDrawnOverNothing(t *testing.T) {
 	s := Start(t)
 	run := dashboardsRun(t, s)
-	client := grafana.Client{URL: s.GrafanaURL, Token: s.GrafanaToken}
+	if run.promSkip != "" {
+		t.Logf("Prometheus holds nothing on this machine, so its tiles are not asked: %s", run.promSkip)
+	}
 	pictures := map[int]map[string]grafana.Picture{}
 	for _, store := range dashboardStores {
-		if store.name == "prometheus" && run.promSkip != "" {
-			t.Logf("Prometheus holds nothing on this machine, so its tiles are not asked: %s", run.promSkip)
-			continue
-		}
-		for index, pic := range tilesOverNothing(t, client, store) {
+		for index, pic := range tilesDrawn(t, store.name, run.overNothing[store.name]) {
 			if pictures[index] == nil {
 				pictures[index] = map[string]grafana.Picture{}
 			}
@@ -109,14 +108,11 @@ func TestEveryTileIsDrawnOverNothing(t *testing.T) {
 	}
 }
 
-// tilesOverNothing asks one store's stats and gauges about nothingRepository
-// and answers what each draws, by the panel's index.
-func tilesOverNothing(t *testing.T, client grafana.Client, store dashboardStore) map[int]grafana.Picture {
-	t.Helper()
-	doc, err := dashboardDocument(store.name)
-	if err != nil {
-		t.Fatal(err)
-	}
+// askTilesOverNothing asks one store's stats and gauges about
+// nothingRepository. dashboardsRunInto calls it, with the other questions.
+func askTilesOverNothing(ctx context.Context, client grafana.Client, doc map[string]any,
+	store dashboardStore,
+) []grafana.Result {
 	var tiles []grafana.PanelQuery
 	for _, p := range grafana.Panels(doc["panels"]) {
 		if (p.Type == "stat" || p.Type == "gauge") && (store.name != "prometheus" || !promNeedsHistory(&p)) {
@@ -128,20 +124,26 @@ func tilesOverNothing(t *testing.T, client grafana.Client, store dashboardStore)
 	// otherwise substitute.
 	vars := dashboardVars(doc, store, nil)
 	vars.AllValue, vars.Repos, vars.Text = "", []string{nothingRepository}, nothingRepository
-	results := client.CheckPanels(t.Context(), dashboardRange, "now", tiles, vars, grafana.Options{
+	return client.CheckPanels(ctx, dashboardRange, "now", tiles, vars, grafana.Options{
 		Timeout: 120 * time.Second, Workers: dashboardWorkers(store.name),
 		IntervalMs: dashboardInterval, MaxDataPoints: dashboardMaxDataPoints,
 	})
+}
+
+// tilesDrawn is what each answer askTilesOverNothing had puts on the screen,
+// by the panel's index.
+func tilesDrawn(t *testing.T, store string, results []grafana.Result) map[int]grafana.Picture {
+	t.Helper()
 	out := map[int]grafana.Picture{}
 	for _, r := range results {
 		if r.Err != "" {
 			t.Errorf("panel %d %q of %s fails over a repository with nothing in it: %s",
-				r.Panel.Index, r.Panel.Title, store.name, r.Err)
+				r.Panel.Index, r.Panel.Title, store, r.Err)
 			continue
 		}
-		pic, drawn, drawErr := grafana.Drawing(r.Panel.Source, r.Answer)
-		if drawErr != nil {
-			t.Errorf("panel %d %q of %s cannot be replayed: %v", r.Panel.Index, r.Panel.Title, store.name, drawErr)
+		pic, drawn, err := grafana.Drawing(r.Panel.Source, r.Answer)
+		if err != nil {
+			t.Errorf("panel %d %q of %s cannot be replayed: %v", r.Panel.Index, r.Panel.Title, store, err)
 			continue
 		}
 		if drawn {

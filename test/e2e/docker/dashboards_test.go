@@ -160,6 +160,12 @@ type dashboardRun struct {
 	// asked is when each store's panels were asked, first to last: a value
 	// a query computes from now() moves by as much between two stores.
 	asked map[string][2]time.Time
+	// overNothing is what each store's stats and gauges answered about a
+	// repository with nothing in it (see tiles_over_nothing_test.go), asked
+	// here while the exporter Prometheus scrapes is still running: it lives
+	// as long as the test that started it, and a query put to Prometheus once
+	// it is gone finds every series marked stale.
+	overNothing map[string][]grafana.Result
 }
 
 var (
@@ -188,7 +194,10 @@ func dashboardsRunInto(t *testing.T, s *Stack) (*dashboardRun, error) {
 	// The context is the first test's, which is the one the whole run happens
 	// under: everything below is issued inside the sync.Once above.
 	ctx := t.Context()
-	run := &dashboardRun{outcomes: map[string]map[int]dashboardOutcome{}, asked: map[string][2]time.Time{}}
+	run := &dashboardRun{
+		outcomes: map[string]map[int]dashboardOutcome{}, asked: map[string][2]time.Time{},
+		overNothing: map[string][]grafana.Result{},
+	}
 	sweep := sqlStoresRun(ctx, t, s)
 	oracle := sqlStoresPoints(t, sweep)
 	run.inWindow, run.written = dashboardOracle(oracle, time.Now().Add(-dashboardWindow))
@@ -242,6 +251,9 @@ func dashboardsRunInto(t *testing.T, s *Stack) (*dashboardRun, error) {
 		t.Logf("%-14s %d panels in %s", store.name, len(panels), time.Since(started).Round(time.Millisecond))
 		if reportErr := dashboardReport(store.name, results, run.outcomes[store.name]); reportErr != nil {
 			return nil, reportErr
+		}
+		if store.name != "prometheus" || run.promSkip == "" {
+			run.overNothing[store.name] = askTilesOverNothing(ctx, client, doc, store)
 		}
 	}
 	return run, nil
