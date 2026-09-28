@@ -297,3 +297,34 @@ func TestEnumSeriesAreDrawnUnderTheSQLWords(t *testing.T) {
 		}
 	}
 }
+
+// TestGraphiteContributionTotalsReadAsTheOthers: the other stores transpose
+// one row of six columns into a table headed Metric and Last year whose rows
+// are the SQL's column names in its order. Graphite, which arrives at rows
+// already, drew them under "Field" and "Value" as the path's last node,
+// pull_requests and restricted, in the alphabet's order.
+func TestGraphiteContributionTotalsReadAsTheOthers(t *testing.T) {
+	t.Parallel()
+	const title = "Contribution totals"
+	var rows []string
+	for _, item := range selectList(sqlOf(t, mustPanel(t, rendered(t, "influxdb"), title))) {
+		rows = append(rows, strings.Trim(item[strings.LastIndex(item, " AS ")+len(" AS "):], `"`))
+	}
+	p := mustPanel(t, rendered(t, "graphite"), title)
+	targets, _ := p["targets"].([]any)
+	target, _ := targets[0].(map[string]any)
+	expr, _ := target["target"].(string)
+	var named []string
+	for _, m := range regexp.MustCompile(`alias\([^,]+, "([^"]+)"\)`).FindAllStringSubmatch(expr, -1) {
+		named = append(named, m[1])
+	}
+	if strings.Join(named, "|") != strings.Join(rows, "|") {
+		t.Errorf("Graphite names its rows %q, the other stores %q", named, rows)
+	}
+	tf := asJSON(t, p["transformations"])
+	for _, want := range []string{`"Field":"Metric"`, `"Last *":"Last year"`} {
+		if !strings.Contains(tf, want) {
+			t.Errorf("Graphite does not head its columns as the others, missing %s: %s", want, tf)
+		}
+	}
+}

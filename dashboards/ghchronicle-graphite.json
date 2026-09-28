@@ -2137,7 +2137,7 @@
             {
               "datasource": "${DS_GRAPHITE}",
               "refId": "A",
-              "target": "removeEmptySeries(aliasByNode(github.contributions_total.*.{commits,pull_requests,reviews,issues,repositories,restricted}, 3))",
+              "target": "removeEmptySeries(group(alias(github.contributions_total.*.commits, \"Commits\"), alias(github.contributions_total.*.pull_requests, \"Pull requests\"), alias(github.contributions_total.*.reviews, \"Reviews\"), alias(github.contributions_total.*.issues, \"Issues\"), alias(github.contributions_total.*.repositories, \"New repositories\"), alias(github.contributions_total.*.restricted, \"Private\")))",
               "textEditor": true
             }
           ],
@@ -2159,8 +2159,8 @@
                 "excludeByName": {},
                 "indexByName": {},
                 "renameByName": {
-                  "Field": "Field",
-                  "Last *": "Value"
+                  "Field": "Metric",
+                  "Last *": "Last year"
                 }
               }
             }

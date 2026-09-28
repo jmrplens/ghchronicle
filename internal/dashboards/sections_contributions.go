@@ -97,9 +97,18 @@ func contributionTotals(b *builder) []Panel {
 	}
 	weekPath := func(field string) string { return rp("gh_commits_week", field) }
 
-	promTotals, totalRename, totalFields := perFieldRow("github_contributions_total_", "user", totalCols)
-	totalsGR, totalsGRtf := gTbl(rowsOf(gp("gh_contributions_total",
-		"{"+strings.Join(totalFields, ",")+"}"), 3), "Field", []col{{"lastNotNull", "Value"}})
+	promTotals, totalRename, _ := perFieldRow("github_contributions_total_", "user", totalCols)
+	// A series per field, each under the name the other stores' transposed
+	// table gives its row and in their order, and the two columns under their
+	// headings. Named by the path's last node, the rows read pull_requests
+	// and restricted under "Field" and "Value", in the order the glob
+	// expanded them, which is the alphabet's.
+	totalRows := make([]string, len(totalCols))
+	for i, c := range totalCols {
+		totalRows[i] = fmt.Sprintf("alias(%s, %q)", gp("gh_contributions_total", c.From), c.To)
+	}
+	totalsGR, totalsGRtf := gTbl("group("+strings.Join(totalRows, ", ")+")",
+		"Metric", []col{{"lastNotNull", "Last year"}})
 	totalsES, totalsEStf := b.esRaw("gh_contributions_total", 1, totalCols, nil)
 
 	// Grouped by the full name in these three, where the SQL twin shows the
