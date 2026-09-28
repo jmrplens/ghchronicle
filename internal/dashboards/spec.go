@@ -851,12 +851,12 @@ func materialize(id *ids, p *Panel, storeName string, ds, logs any, y0 int) map[
 	if len(st.TF) > 0 {
 		out["transformations"] = st.TF
 	}
-	return withPanelOptions(out, p.Kind, storeName, opts)
+	return withPanelOptions(out, storeName, opts)
 }
 
 // withPanelOptions is what a panel of any kind carries beside its queries and
 // its field configuration.
-func withPanelOptions(out map[string]any, kind, storeName string, opts Opts) map[string]any {
+func withPanelOptions(out map[string]any, storeName string, opts Opts) map[string]any {
 	// Every Graphite panel asks for more points than a series of it holds,
 	// so that graphite-web does not fit it into bands (see grBin): a chart
 	// over time, summarized into buckets, would be drawn a step late, and a

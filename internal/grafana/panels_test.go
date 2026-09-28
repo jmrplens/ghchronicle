@@ -718,8 +718,10 @@ func TestAPanelsOwnPointsWinOverTheWidth(t *testing.T) {
 	c, seen := fakeGrafana(t, http.StatusOK, `{"results":{}}`)
 	// As a dashboard file decodes, with every number a float64.
 	panels := Panels([]any{
-		map[string]any{"type": "stat", "title": "Own", "maxDataPoints": 5000.0,
-			"targets": []any{map[string]any{"refId": "A"}}},
+		map[string]any{
+			"type": "stat", "title": "Own", "maxDataPoints": 5000.0,
+			"targets": []any{map[string]any{"refId": "A"}},
+		},
 		map[string]any{"type": "stat", "title": "Wide", "targets": []any{map[string]any{"refId": "A"}}},
 	})
 	c.CheckPanels(t.Context(), "now-30d", "now", panels, Vars{Datasource: "ds"},
