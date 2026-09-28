@@ -271,8 +271,12 @@ func accessConfiguration(b *builder) []Panel {
 			Desc:      "A write key nobody has used in a year is a credential to remove.",
 			Overrides: []any{width(deliveryKeyReadOnly, 100), unitOf(deliveryKeyUnused, "d", 120)},
 			GR:        keysGR, GRTF: keysGRtf,
-			GRDesc: "Graphite names each row repository, key and whether it is read-only from the path.",
-			ES:     keysES, ESTF: keysEStf,
+			GRDesc: "Graphite names each row repository, key and whether it is read-only from the path. " +
+				"A key GitHub has never seen used has no reading at all, and Graphite holds a key " +
+				"only as the path of its reading, so such a key has no row here.",
+			PromDesc: "A key GitHub has never seen used has no reading at all, and the exporter " +
+				"holds a key only as the series of its reading, so such a key has no row here.",
+			ES: keysES, ESTF: keysEStf,
 			ESDesc: "A key GitHub has never seen used has no reading at all, in this " +
 				"dashboard or any of the others, and its cell is empty.",
 		}),

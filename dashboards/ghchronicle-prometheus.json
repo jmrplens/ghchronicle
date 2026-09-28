@@ -8308,7 +8308,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "A write key nobody has used in a year is a credential to remove.",
+          "description": "A write key nobody has used in a year is a credential to remove. A key GitHub has never seen used has no reading at all, and the exporter holds a key only as the series of its reading, so such a key has no row here.",
           "fieldConfig": {
             "defaults": {
               "custom": {

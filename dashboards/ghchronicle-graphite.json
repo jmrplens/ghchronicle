@@ -8242,7 +8242,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "Every comment this account left in a discussion of a repository it does not own, newest first and whatever the range; Accepted says whether the maintainer marked it the answer. The link opens the comment in its thread. One row per comment, accepted when any of its rows says so. Until 2.6.1 whether a comment was accepted was part of its row's identity, so a store written before then holds a comment read before and after it was accepted as two rows, and one written by 2.6.0 and 2.6.1 holds a third without that part. An answer accepted before 2.6.1 and taken back since reads accepted until gh_discussion_comment is dropped and filled again with a backfill. Graphite names each row by repository and number from the path, and Accepted is the comment's answers leaf. Graphite keeps no strings, so neither the title nor the url exists there. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "Every comment this account left in a discussion of a repository it does not own, newest first and whatever the range; Accepted says whether the maintainer marked it the answer. The link opens the comment in its thread. One row per comment, accepted when any of its rows says so. Until 2.6.1 whether a comment was accepted was part of its row's identity, so a store written before then holds a comment read before and after it was accepted as two rows, and one written by 2.6.0 and 2.6.1 holds a third without that part. An answer accepted before 2.6.1 and taken back since reads accepted until gh_discussion_comment is dropped and filled again with a backfill. Graphite names each row by repository and number from the path, and Accepted is the comment's answers leaf. Graphite keeps no strings, so neither the title nor the url exists there. Graphite has no rows: each series is one number reduced over the range, so this table keeps the column it is sorted by and drops the others. Graphite answers only inside the dashboard range, so years outside it are missing. Graphite keeps no string beside a number, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -8810,7 +8810,7 @@
         },
         {
           "datasource": "${DS_GRAPHITE}",
-          "description": "A write key nobody has used in a year is a credential to remove. Graphite names each row repository, key and whether it is read-only from the path.",
+          "description": "A write key nobody has used in a year is a credential to remove. Graphite names each row repository, key and whether it is read-only from the path. A key GitHub has never seen used has no reading at all, and Graphite holds a key only as the path of its reading, so such a key has no row here.",
           "fieldConfig": {
             "defaults": {
               "custom": {

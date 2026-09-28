@@ -466,7 +466,7 @@ func answersGiven(b *builder, perItem, grPerItem string) []Panel {
 				"discussions, whether each was accepted as the answer, and a link to each.",
 				perItem),
 			GRDesc: "Graphite names each row by repository and number from the path, and " +
-				"Accepted is the comment's answers leaf. " + grPerItem + " " + grRows,
+				"Accepted is the comment's answers leaf. " + grPerItem + " " + grRows + " " + grRange,
 			Desc: "Every comment this account left in a discussion of a repository it does " +
 				"not own, newest first and whatever the range; Accepted says whether the " +
 				"maintainer marked it the answer. The link opens the comment in its thread. " +
