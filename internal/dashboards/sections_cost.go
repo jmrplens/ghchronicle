@@ -166,7 +166,8 @@ func cost(b *builder) []Panel {
 				"repo": "Repository", "sku": "SKU", "unit": "Unit",
 				panelValueA: "Quantity", panelValueB: "Price", panelValueC: "Gross",
 				panelValueD: "Net",
-			}, nil, nil),
+			}, nil),
+
 			Opts:     mergeOpts(Opts{"sort": "Gross"}, ownerPageLink("Open the bill", billingPage)),
 			PromDesc: sweepCount,
 			Desc: "Price is what explains a small quantity costing more than a large one: " +
@@ -201,7 +202,8 @@ func cost(b *builder) []Panel {
 			},
 			PromTF: merged(map[string]string{
 				"repo": "Repository", panelValueA: "Cache", panelValueB: "Entries",
-			}, nil, nil),
+			}, nil),
+
 			Opts: Opts{"sort": "Cache"},
 			Desc: "GitHub caps a repository at ten gigabytes and evicts the least recently " +
 				"used entry past it. The bar is each repository's cache against that cap, so " +
@@ -310,7 +312,8 @@ func cacheEntries(b *builder) Panel {
 		PromTF: merged(map[string]string{
 			"repo": "Repository", "cache": "Cache", panelValueA: "Size",
 			panelValueB: costCacheIdle, panelValueC: "Entries",
-		}, nil, map[string]int{"repo": 0, "cache": 1}),
+		}, nil),
+
 		Opts: Opts{"sort": "Size"},
 		Desc: "The total says a repository holds twelve gigabytes. This says which key " +
 			"holds them and which has not been touched for a week, which is what decides " +

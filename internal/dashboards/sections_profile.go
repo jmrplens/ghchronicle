@@ -76,7 +76,7 @@ func achievements(b *builder) Panel {
 	// eighth reached only by a scroll inside the table.
 	return panel("table", "Achievements", box{W: 24, H: 10, X: 0, Y: 31}, []Target{sqlT(rows)}, &P{
 		Prom:   []Target{promTbl("max by (achievement) (github_achievement_tier_number)")},
-		PromTF: []any{organize(map[string]string{"achievement": "Achievement", "Value": "Tier"}, []string{"user"}, nil)},
+		PromTF: []any{organize(map[string]string{"achievement": "Achievement", "Value": "Tier"}, []string{"user"})},
 		Opts:   Opts{"sort": "Tier"},
 		Desc: "The badges on the profile, highest tier first: Pull Shark, Pair " +
 			"Extraordinaire, YOLO and the rest, read every hour from the public " +
@@ -153,7 +153,8 @@ func achievementProgress(b *builder) Panel {
 		PromTF: merged(map[string]string{
 			"achievement": "Achievement", panelValueA: "Progress", panelValueB: "Count",
 			panelValueC: profileNextTier, panelValueD: "Tier", panelValueE: profilePageAgrees,
-		}, []string{"user"}, nil),
+		}, []string{"user"}),
+
 		// No sort option: the SQL stores order by progress, and on a phone
 		// a sorted column has to be one of the first two, which are the
 		// badge and its name. Four rows read in any order.
@@ -428,7 +429,11 @@ func sponsorship(b *builder) []Panel {
 				"direction": "Direction", panelValueA: "Sponsorships",
 				panelValueB: "Mean amount", panelValueC: "Active share",
 				panelValueD: "One-time share",
-			}, []string{"user"}, map[string]int{"direction": 0}),
+			}, []string{"user"}),
+
+			// The count where the SQL stores draw the tier each one is at,
+			// and the mean where they draw each amount.
+			PromAt: map[string]string{"Sponsorships": "Tier", "Mean amount": "Amount"},
 			Desc: "Every sponsorship in either direction, dated the day it began and not the day " +
 				"of any payment. Amount is the price of the tier it was made at, which is a rate " +
 				"per month unless the column beside it says the payment was one-time: a five " +
@@ -476,7 +481,8 @@ func sponsorship(b *builder) []Panel {
 			PromTF: merged(map[string]string{
 				"tier": "Tier", panelValueA: "Price", panelValueB: profileOneTime,
 				panelValueC: "Retired", panelValueD: "Age",
-			}, []string{"user"}, map[string]int{"tier": 0}),
+			}, []string{"user"}),
+
 			Opts: Opts{"sort": "Price"},
 			Desc: "Standing inventory, the way an SSH key is. The listing says how many tiers " +
 				"there are; this says which and at what price. Dating a tier at its creation " +
@@ -590,7 +596,9 @@ func profileStanding(b *builder) []Panel {
 			PromTF: append(merged(map[string]string{
 				"repo": "Item", panelValueA: "Position", panelValueB: "Stars",
 				panelValueC: "Idle",
-			}, []string{"user"}, map[string]int{"repo": 0}), sortAsc("Position")),
+			}, []string{"user"}),
+
+				sortAsc("Position")),
 			Desc: "What the profile shows first, in the order it shows it. The row worth seeing " +
 				"is a pinned repository nobody has pushed to in two years. Position is a field " +
 				"and not a tag on purpose: a repository that moves from slot two to slot three " +
@@ -612,7 +620,7 @@ func profileStanding(b *builder) []Panel {
 			Prom: []Target{promTbl("max by (flag) (github_profile_flag_enabled)")},
 			PromTF: []any{organize(map[string]string{
 				"flag": "Flag", "Value": "Enabled",
-			}, []string{"user"}, map[string]int{"flag": 0}), sortAsc("Flag")},
+			}, []string{"user"}), sortAsc("Flag")},
 			Desc: "A closed list of eight flags the profile advertises, as they read at the " +
 				"last sweep. Seven are booleans that change once in years, and the day one " +
 				"does is the day worth being able to point at: hireable, developer program, " +
@@ -689,7 +697,8 @@ func starLists(b *builder) Panel {
 		PromTF: merged(map[string]string{
 			"list": "List", panelValueA: "Items", panelValueB: "Private",
 			panelValueC: "Age", panelValueD: profileLastAdded,
-		}, []string{"user"}, map[string]int{"list": 0}),
+		}, []string{"user"}),
+
 		Opts: Opts{"sort": "Items"},
 		Desc: "The lists the account files its stars into, and how many each holds. " +
 			"gh_star_given records every star the account gave and the Overview counts " +

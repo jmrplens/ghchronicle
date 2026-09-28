@@ -125,6 +125,10 @@ transformaciones del panel y sus overrides de campo, y cada par de almacenes se
 compara en lo que vería un lector: el número de una tarjeta, su unidad y las
 palabras que muestra cuando no hay nada, las filas de una tabla sobre las
 columnas que dibujan ambos almacenes, y el nombre y la longitud de una barra.
+Una tabla se sujeta además a un solo orden de las columnas que dibujan ambos
+almacenes, cosa que las filas emparejadas sobre esas columnas no pueden mostrar:
+en la rama 2.6.2, 28 tablas de Prometheus y 4 de Graphite las encabezaban en
+otro orden que los almacenes SQL, "Every bucket" con Most used al final.
 La revisión de la 2.6.1 encontró once diferencias poniendo los dashboards uno
 junto a otro, entre ellas una tabla que dibujaba siete filas para un
 repositorio y tarjetas que habían perdido su unidad. Nueve estaban en los

@@ -179,17 +179,13 @@ func repositoryList(b *builder) []Panel {
 		"repo": "Repository", "language": "Language",
 		"visibility": "Visibility", "license": "License",
 	}
-	reposOrder := map[string]int{"repo": 0, "language": 1}
 	for i, c := range repoCols {
 		ref := string(rune('A' + i))
 		reposProm = append(reposProm, promTbl(fmt.Sprintf(
 			"sum by (%s) (github_repo_%s{%s})", repoBy, c.From, PF,
 		), ref))
 		reposRename[inventoryValueCol+ref] = c.To
-		reposOrder[inventoryValueCol+ref] = 2 + i
 	}
-	reposOrder["visibility"] = 2 + len(repoCols)
-	reposOrder["license"] = 3 + len(repoCols)
 	repoFieldNames := make([]string, len(repoCols))
 	for i, c := range repoCols {
 		repoFieldNames[i] = c.From
@@ -216,14 +212,14 @@ func repositoryList(b *builder) []Panel {
 			))},
 			PromTF: []any{organize(map[string]string{
 				"language": "Language", "Value": "Bytes",
-			}, nil, nil)},
+			}, nil)},
 			Opts: Opts{"unit": "bytes"},
 			GR:   langsGR, GRTF: langsGRtf,
 			ES: langsES, ESTF: langsEStf,
 		}),
 		panel("table", inventoryCommunityScore, box{W: 12, H: 8, X: 12, Y: 0}, []Target{sqlT(health)}, &P{
 			Prom:      healthProm,
-			PromTF:    merged(healthRename, nil, map[string]int{"repo": 0}),
+			PromTF:    merged(healthRename, nil),
 			Opts:      Opts{"sort": inventoryCommunityScore},
 			Overrides: healthOver,
 			// Shared by the five stores, so it names the column only where it
@@ -248,7 +244,7 @@ func repositoryList(b *builder) []Panel {
 		}),
 		panel("table", "Repositories", box{W: 24, H: 11, X: 0, Y: 8}, []Target{sqlT(repos)}, &P{
 			Prom:   reposProm,
-			PromTF: merged(reposRename, nil, reposOrder),
+			PromTF: merged(reposRename, nil),
 			Opts:   Opts{"sort": "Stars"},
 			Overrides: []any{
 				repoColumn(), width("Language", 110),
@@ -342,7 +338,7 @@ func whatTheyPublish(b *builder) []Panel {
 			))},
 			PromTF: []any{organize(map[string]string{
 				"topic": "Topic", "Value": "Repositories",
-			}, nil, nil)},
+			}, nil)},
 			Opts:      Opts{"sort": "Repositories"},
 			Overrides: []any{width("Repositories", 120), linkOn("Topic")},
 			GR:        topicsGR, GRTF: topicsGRtf,
@@ -357,7 +353,8 @@ func whatTheyPublish(b *builder) []Panel {
 			PromTF: merged(map[string]string{
 				"package": "Package", "type": "Type", inventoryValueCol + "A": "Versions",
 				inventoryValueCol + "B": "Tagged", inventoryValueCol + "C": "Idle",
-			}, nil, nil),
+			}, nil),
+
 			Opts: Opts{"sort": "Versions"},
 			Desc: "Version counts come from walking the version list: the documented " +
 				"version_count field arrives as zero for a personal account's packages.",
@@ -379,7 +376,8 @@ func whatTheyPublish(b *builder) []Panel {
 			PromTF: merged(map[string]string{
 				"gist": "Gist", inventoryValueCol + "A": "Files", inventoryValueCol + "B": "Comments",
 				inventoryValueCol + "C": "Size", inventoryValueCol + "D": "Idle",
-			}, nil, nil),
+			}, nil),
+
 			PromDesc: "Prometheus carries no description: it is text.",
 			Overrides: []any{
 				width("Gist", 100), width("Description", 190), width("Files", 65),
@@ -525,8 +523,8 @@ func settingsAndKeys(b *builder) []Panel {
 				inventoryValueCol + "B": inventoryDeleteOnMerge, inventoryValueCol + "C": inventoryAutoMerge,
 				inventoryValueCol + "D": inventoryProtectionRules, inventoryValueCol + "E": inventoryIssueTemplates,
 				inventoryValueCol + "F": "CODEOWNERS errors",
-			}, []string{"owner", "full_name", "instance", "job", "__name__"},
-				map[string]int{"repo": 0}),
+			}, []string{"owner", "full_name", "instance", "job", "__name__"}),
+
 			Desc: "What each repository allows, in the batch that already costs one point of " +
 				"GraphQL. CODEOWNERS errors is the one that fails silently: a broken file " +
 				"stops requesting reviews and says nothing.",
@@ -560,7 +558,8 @@ func settingsAndKeys(b *builder) []Panel {
 			PromTF: merged(map[string]string{
 				"key": "Key", "kind": "Kind", inventoryValueCol + "A": inventoryKeyIdle,
 				inventoryValueCol + "B": "Never used", inventoryValueCol + "C": "Days to expiry",
-			}, nil, map[string]int{"key": 0, "kind": 1}),
+			}, nil),
+
 			Desc: "The keys that sign and open everything. Two of the SSH keys here have never " +
 				"been used at all, and the expiry of the GPG key is the kind of date nobody " +
 				"remembers until the signatures stop verifying. All of them are managed in " +
@@ -587,7 +586,7 @@ func settingsAndKeys(b *builder) []Panel {
 			PromDesc: "Prometheus shows the eight and folds nothing.",
 			PromTF: []any{organize(map[string]string{
 				"license": "License", "Value": "Packages",
-			}, nil, nil)},
+			}, nil)},
 			Desc: "Every package the dependency graph knows about, by license. Undetermined is " +
 				"GitHub saying it could not tell, which is a blind spot rather than a license. " +
 				"Off by default: the SBOM is a megabyte or two per repository. The eight " +
@@ -604,7 +603,7 @@ func settingsAndKeys(b *builder) []Panel {
 			Prom: []Target{promTbl("max by (provider) (github_social_account_present)")},
 			PromTF: []any{organize(map[string]string{
 				"provider": "Provider", "Value": "Present",
-			}, []string{"user", "instance", "job", "__name__"}, nil)},
+			}, []string{"user", "instance", "job", "__name__"})},
 			Desc: "What the profile links to. It is small and it is a check rather than a " +
 				"measurement: these are the same links a personal site publishes as sameAs, " +
 				"and a row that disappears is the signal.",
@@ -804,7 +803,8 @@ func policyAndDependencies(b *builder) []Panel {
 			PromTF: merged(map[string]string{
 				"repo": "Repository", "file": "File",
 				inventoryValueCol + "A": "Present", inventoryValueCol + "B": "Changes",
-			}, nil, map[string]int{"repo": 0, "file": 1}),
+			}, nil),
+
 			Desc: "Four rows per repository: dependabot, codeowners, security and funding. " +
 				"Path is the one in force, or where the file would go if it existed, because " +
 				"a file at the wrong path is a file that does nothing and gh_repo_policy does " +
@@ -835,7 +835,7 @@ func policyAndDependencies(b *builder) []Panel {
 			PromTF: []any{organize(map[string]string{
 				"repo": "Repository", "ecosystem": "Ecosystem",
 				"interval": "Interval", "Value": "Blocks",
-			}, nil, map[string]int{"repo": 0, "ecosystem": 1, "interval": 2})},
+			}, nil)},
 			Opts: Opts{"sort": "Blocks"},
 			Desc: "What each dependabot.yml actually updates, and how often. One ecosystem " +
 				"appears more than once when it is configured per directory, which is exactly " +
@@ -865,7 +865,7 @@ func policyAndDependencies(b *builder) []Panel {
 				))},
 				PromTF: []any{organize(map[string]string{
 					"ecosystem": "Ecosystem", "Value": "Packages",
-				}, nil, nil)},
+				}, nil)},
 				Desc: "Every package the dependency graph knows about, by the package manager " +
 					"that installs it, read out of the SBOM. A daily snapshot, so this is the " +
 					"newest reading of each repository and ecosystem and only then a sum: " +

@@ -184,8 +184,10 @@ const binStep = "[$__interval]"
 // names one of them: a row per repository is kept apart by its full name and
 // shows the short one, and a table of other people's repositories shows the
 // full name. Grafana drops an excluded column before it renames any, so a
-// full name excluded and renamed at once was no column at all.
-func organize(rename map[string]string, exclude []string, order map[string]int) any {
+// full name excluded and renamed at once was no column at all. It orders
+// nothing: panel() gives a Prometheus table the order of its SQL twin, after
+// the names given here.
+func organize(rename map[string]string, exclude []string) any {
 	excludeBy := map[string]any{}
 	for _, k := range append([]string{
 		"Time", "__name__", "job", "instance", "owner", "full_name",
@@ -197,24 +199,20 @@ func organize(rename map[string]string, exclude []string, order map[string]int) 
 	if rename == nil {
 		rename = map[string]string{}
 	}
-	idx := map[string]any{}
-	for k, v := range order {
-		idx[k] = v
-	}
 	return map[string]any{"id": "organize", "options": map[string]any{
 		"excludeByName": excludeBy,
 		"renameByName":  toAnyMap(rename),
-		"indexByName":   idx,
+		"indexByName":   map[string]any{},
 	}}
 }
 
 // merged joins several instant queries into one table. `merge` unifies the
 // columns the frames share (Time and the `by` labels, which must be identical
 // across the queries) and keeps each Value #X as its own column.
-func merged(rename map[string]string, exclude []string, order map[string]int) []any {
+func merged(rename map[string]string, exclude []string) []any {
 	return []any{
 		map[string]any{"id": "merge", "options": map[string]any{}},
-		organize(rename, exclude, order),
+		organize(rename, exclude),
 	}
 }
 
@@ -1221,7 +1219,8 @@ func keepLargest(field string, n int) []any {
 // not name after them, in the order they came. Grafana's organize keys the
 // order by the name a column carries when its turn comes, so the names are the
 // ones the table draws, after every rename before it. panel() gives every
-// Elasticsearch table the order of its SQL twin through this.
+// Elasticsearch, Prometheus and Graphite table the order of its SQL twin
+// through this.
 func columnOrder(names ...string) any {
 	index := map[string]any{}
 	for i, name := range names {
@@ -1268,17 +1267,26 @@ func selectedColumns(sql []Target) []string {
 // the SQL column's name with a word more or a letter less takes that column's
 // place: Elasticsearch shows "Amount (cents)" where the SQL divides and says
 // Amount, "CVSS v4" beside CVSS, and GitHub's "Issue template" flag where the
-// SQL stores count "Issue templates". A column the SQL does not select at all
-// is left out, and columnOrder puts it after the others.
-func orderLike(selected []string, drawn map[string]bool) []string {
+// SQL stores count "Issue templates". `at` places a column the SQL does not
+// select where the SQL selects the one it names, ahead of that one when the
+// table draws it too: the hook a Prometheus row is named by stands where the
+// SQL stores draw the endpoint. Any other column the SQL does not select is
+// left out, and columnOrder puts it after the others.
+func orderLike(selected []string, drawn map[string]bool, at map[string]string) []string {
 	variants := slices.Sorted(maps.Keys(drawn))
 	var out []string
 	for _, column := range selected {
+		for _, name := range variants {
+			if drawn[name] && at[name] == column {
+				out = append(out, name)
+				drawn[name] = false
+			}
+		}
 		if drawn[column] {
 			out = append(out, column)
 		}
 		for _, name := range variants {
-			if !drawn[name] || slices.Contains(selected, name) {
+			if !drawn[name] || slices.Contains(selected, name) || at[name] != "" {
 				continue
 			}
 			if strings.HasPrefix(name, column+" ") || strings.HasPrefix(column, name) {
@@ -1288,6 +1296,41 @@ func orderLike(selected []string, drawn map[string]bool) []string {
 		}
 	}
 	return out
+}
+
+// graphiteRowName is the column a Graphite table names its rows in: what
+// gTbl renames the field of the series-to-rows reduction to, one or several
+// path nodes. Empty for a table that does not reduce its series to rows.
+func graphiteRowName(tf []any) string {
+	for _, raw := range tf {
+		t, _ := raw.(map[string]any)
+		options, _ := t["options"].(map[string]any)
+		rename, _ := options["renameByName"].(map[string]any)
+		if name, ok := rename["Field"].(string); ok && t["id"] == "organize" {
+			return name
+		}
+	}
+	return ""
+}
+
+// rowNameAt is the SQL column a Graphite row name stands where, when the SQL
+// selects no column of that name: the first the SQL selects of the columns
+// its nodes name, so "Repository, number" stands where the SQL stores draw
+// Number, ahead of Repository, or the first column when it names none of
+// them, as "Pull request" does beside Number.
+func rowNameAt(selected []string, name string) string {
+	nodes := strings.Split(name, ", ")
+	for _, column := range selected {
+		for _, node := range nodes {
+			if strings.EqualFold(node, column) {
+				return column
+			}
+		}
+	}
+	if len(selected) == 0 {
+		return ""
+	}
+	return selected[0]
 }
 
 // namesGiven is every column name a table's transformations give: what an

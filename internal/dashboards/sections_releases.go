@@ -133,7 +133,7 @@ func releases(b *builder) []Panel {
 					` "release", " ", "repo", "tag")`, PF,
 			))},
 			PromTF: []any{organize(map[string]string{"release": "Release", "Value": "Downloads"},
-				[]string{"repo", "tag"}, nil)},
+				[]string{"repo", "tag"})},
 			Desc:      "The twelve most downloaded releases. A click on a bar opens the release page.",
 			Overrides: barLink("Downloads", "Page", "Open the release"),
 			GR:        byTagGR, GRTF: byTagGRtf,

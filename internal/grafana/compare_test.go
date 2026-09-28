@@ -122,6 +122,39 @@ func TestOrderIsHeldOnlyWhereTheRowsAgree(t *testing.T) {
 	}
 }
 
+// TestColumnOrderIsOverTheColumnsBothDraw is "Every bucket" on the 2.6.2
+// branch: the SQL stores headed it Bucket, Most used, Limit, Lowest remaining
+// and Prometheus Bucket, Limit, Lowest remaining, Most used. A column one
+// store lacks has no place to be out of, and a table with no row shows no
+// heading.
+func TestColumnOrderIsOverTheColumnsBothDraw(t *testing.T) {
+	t.Parallel()
+	sql := table(col("Bucket", "string", "core"), col("Most used", "number", 12.0),
+		col("Limit", "number", 5000.0), col("Lowest remaining", "number", 4988.0))
+	prometheus := table(col("Bucket", "string", "core"), col("Limit", "number", 5000.0),
+		col("Lowest remaining", "number", 4988.0), col("Most used", "number", 12.0))
+	if got := ColumnOrder(sql, prometheus); !strings.Contains(got,
+		"[Bucket Most used Limit Lowest remaining] in the first and [Bucket Limit Lowest remaining Most used]") {
+		t.Errorf("Most used moved to the end: ColumnOrder = %q", got)
+	}
+	graphite := table(col("Bucket", "string", "core"), col("Lowest remaining", "number", 4988.0))
+	if got := ColumnOrder(sql, graphite); got != "" {
+		t.Errorf("a store drawing two of the four columns, in their places: ColumnOrder = %q", got)
+	}
+	withAnother := table(col("Bucket", "string", "core"), col("Resets", "number", 1.0),
+		col("Most used", "number", 12.0), col("Limit", "number", 5000.0), col("Lowest remaining", "number", 4988.0))
+	if got := ColumnOrder(sql, withAnother); got != "" {
+		t.Errorf("a column the other store lacks, anywhere: ColumnOrder = %q", got)
+	}
+	nothing := table(col("Limit", "string"), col("Bucket", "number"))
+	if got := ColumnOrder(sql, nothing); got != "" {
+		t.Errorf("a table with no row has no heading, and ColumnOrder = %q", got)
+	}
+	if got := ColumnOrder(tiles(map[string]any{"Merged": 1.0}, ""), tiles(map[string]any{"Merged": 1.0}, "")); got != "" {
+		t.Errorf("a stat has no columns, and ColumnOrder = %q", got)
+	}
+}
+
 // TestLikenessIsWhatTheCallerAllows: a name as Graphite holds it and a number
 // that moved between two sweeps are the caller's to allow, and nothing else is.
 func TestLikenessIsWhatTheCallerAllows(t *testing.T) {

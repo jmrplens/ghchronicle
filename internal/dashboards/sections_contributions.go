@@ -93,7 +93,7 @@ func contributionTotals(b *builder) []Panel {
 		map[string]any{"id": "transpose", "options": map[string]any{
 			"firstFieldName": "Metric", "restFieldsName": "Last year",
 		}},
-		organize(map[string]string{"Last year 1": "Last year"}, nil, nil),
+		organize(map[string]string{"Last year 1": "Last year"}, nil),
 	}
 	weekPath := func(field string) string { return rp("gh_commits_week", field) }
 
@@ -182,7 +182,7 @@ func contributionTotals(b *builder) []Panel {
 				"under the contribution calendar.",
 			Prom:   promTotals,
 			SQLTF:  transpose,
-			PromTF: append(merged(totalRename, []string{"user"}, nil), transpose...),
+			PromTF: append(merged(totalRename, []string{"user"}), transpose...),
 			// One series per field, so the rows Graphite produces are the
 			// transposed table the other stores arrive at.
 			GR: totalsGR, GRTF: totalsGRtf,
@@ -192,7 +192,7 @@ func contributionTotals(b *builder) []Panel {
 		dayCard,
 		panel("table", "Commits by repository", box{W: 6, H: 7, X: 18, Y: 19}, []Target{sqlT(byRepo)}, &P{
 			Prom:      []Target{promTbl(`topk(25, sum by (full_name) (github_contribution_repo_commits{kind="commits"}))`)},
-			PromTF:    []any{organize(map[string]string{"full_name": "Repository", "Value": "Commits"}, nil, nil)},
+			PromTF:    []any{organize(map[string]string{"full_name": "Repository", "Value": "Commits"}, nil)},
 			Opts:      Opts{"sort": "Commits"},
 			Overrides: []any{barCell("Commits", "short", 120), linkOn("Repository")},
 			Desc: "Commits this account made in each repository over the last year, as the " +
@@ -218,7 +218,7 @@ func contributionTotals(b *builder) []Panel {
 				" ORDER BY year DESC",
 		)}, &P{
 			Prom:      promYears,
-			PromTF:    merged(yearRename, nil, nil),
+			PromTF:    merged(yearRename, nil),
 			Opts:      Opts{"sort": "Year"},
 			Desc:      yearsDesc,
 			Overrides: []any{width("Year", 100), barCell("Contributions", "short", 150)},

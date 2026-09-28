@@ -201,7 +201,8 @@ func commitsAndChurn(b *builder) []Panel {
 			}(),
 			PromTF: merged(map[string]string{
 				"author": "Author", panelValueA: "Commits", panelValueB: codeLinesPerCommit,
-			}, nil, nil),
+			}, nil),
+
 			Opts: mergeOpts(Opts{"sort": "Commits"}, bounded()),
 			Desc: "The twenty authors with the most commits in the window. " +
 				forksIncluded + " On an account with forks of busy projects the upstream " +
@@ -221,7 +222,7 @@ func commitsAndChurn(b *builder) []Panel {
 			Opts:     bounded(),
 			Desc:     commitBound,
 			Prom:     []Target{promTbl(fmt.Sprintf("sum by (signature) (increase(%s[$__range]))", totalM))},
-			PromTF:   []any{organize(map[string]string{"signature": "Signature", "Value": "Commits"}, nil, nil)},
+			PromTF:   []any{organize(map[string]string{"signature": "Signature", "Value": "Commits"}, nil)},
 			PromDesc: sinceStart,
 			GR:       sigsGR, GRTF: sigsGRtf,
 			ES: sigsES, ESTF: sigsEStf,
@@ -230,7 +231,7 @@ func commitsAndChurn(b *builder) []Panel {
 			Prom: []Target{promTbl(fmt.Sprintf(
 				`sum by (full_name, repo) (increase(github_repo_activities_total{activity="force_push",%s}[$__range])) > 0`, PF,
 			))},
-			PromTF: []any{organize(map[string]string{"repo": "Repository", "Value": codeForcePushes}, nil, nil)},
+			PromTF: []any{organize(map[string]string{"repo": "Repository", "Value": codeForcePushes}, nil)},
 			Desc:   "Each force push, newest first.",
 			PromDesc: "Prometheus keeps no branch or actor, so this counts them per " +
 				"repository over the range. " + sinceStart,
@@ -314,7 +315,7 @@ func commitChecks(b *builder) []Panel {
 			))},
 			PromTF: []any{organize(map[string]string{
 				"app": "App", "conclusion": "Check", "Value": "Runs",
-			}, nil, nil)},
+			}, nil)},
 			Opts: Opts{"sort": "Runs"},
 			Desc: "Everything Actions runs is already in the two sections above, in far more " +
 				"detail. These are the other gates: the code quality service, the dependency " +

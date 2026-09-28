@@ -242,20 +242,20 @@ func nothingColor(t *testing.T, p map[string]any, name string) string {
 	return color
 }
 
-// checkPlaced holds one column of an Elasticsearch table to the place the
-// SQL statement selects it at, relative to every other column both order.
-func checkPlaced(t *testing.T, title, name string, selected map[string]int, index map[string]any) {
+// checkPlaced holds one column of a store's table to the place the SQL
+// statement selects it at, relative to every other column both order.
+func checkPlaced(t *testing.T, store, title, name string, selected map[string]int, index map[string]any) {
 	t.Helper()
 	got, ordered := index[name].(int)
 	if !ordered {
-		t.Errorf("%q: Elasticsearch leaves %s where its parser put it, not where the SQL selects it",
-			title, name)
+		t.Errorf("%s %q: %s stands where the datasource put it, not where the SQL selects it",
+			store, title, name)
 		return
 	}
 	for other, otherAt := range selected {
 		if otherGot, ok := index[other].(int); ok && (otherAt < selected[name]) != (otherGot < got) {
-			t.Errorf("%q: Elasticsearch orders %s and %s the other way round from the SQL",
-				title, name, other)
+			t.Errorf("%s %q: %s and %s stand the other way round from the SQL",
+				store, title, name, other)
 		}
 	}
 }
@@ -320,31 +320,54 @@ func namesGivenIn(p map[string]any) map[string]bool {
 	return out
 }
 
-// TestElasticsearchTablesKeepTheSQLColumnOrder: an Elasticsearch table's
-// columns came in the order the response parser met them, so "Every
-// repository, ever" led with Fork, "Security features" with Enabled and
-// "Largest merged pull requests" with the date. Every Elasticsearch table
-// ends by ordering the columns it draws under a SQL name as the SQL stores'
-// statement selects them.
-func TestElasticsearchTablesKeepTheSQLColumnOrder(t *testing.T) {
+// TestEveryTableKeepsTheSQLColumnOrder: a table's columns come in the order
+// its datasource meets them. An Elasticsearch table's came as the response
+// parser met them, so "Every repository, ever" led with Fork, "Security
+// features" with Enabled and "Largest merged pull requests" with the date. A
+// Prometheus table's come a label at a time and then each query's value, so
+// "Every bucket" put Most used last and "Secret rotation" led with the
+// repository. A Graphite table's come as the row's name and then the
+// reducers, so "Slowest jobs" counted its runs ahead of their duration.
+// Every such table ends by ordering the columns it draws under a SQL name as
+// the SQL stores' statement selects them, and a Graphite table orders the
+// column its rows are named in too, which is never a SQL name when it is
+// several path nodes.
+func TestEveryTableKeepsTheSQLColumnOrder(t *testing.T) {
 	t.Parallel()
-	es := rendered(t, "elasticsearch")
-	checked := 0
-	for title, p := range rendered(t, "influxdb") {
-		e := mustPanel(t, es, title)
-		if p["type"] != "table" || e["type"] != "table" || p["transformations"] != nil {
-			continue
-		}
-		checked++
-		selected, index := selectedAt(t, p), finalOrder(e)
-		for name := range namesGivenIn(e) {
-			if _, isSQL := selected[name]; isSQL {
-				checkPlaced(t, title, name, selected, index)
+	sqlPanels := rendered(t, "influxdb")
+	for _, store := range []string{"elasticsearch", "prometheus", "graphite"} {
+		panels := rendered(t, store)
+		checked := 0
+		for title, p := range sqlPanels {
+			if p["type"] != "table" || p["transformations"] != nil {
+				continue
+			}
+			if e := mustPanel(t, panels, title); e["type"] == "table" {
+				checked++
+				checkSQLOrder(t, store, title, p, e)
 			}
 		}
+		if checked == 0 {
+			t.Fatalf("no %s table was checked", store)
+		}
 	}
-	if checked == 0 {
-		t.Fatal("no Elasticsearch table was checked")
+}
+
+// checkSQLOrder holds one store's table, e, to the order its SQL twin, p,
+// selects the columns both draw in.
+func checkSQLOrder(t *testing.T, store, title string, p, e map[string]any) {
+	t.Helper()
+	selected, index := selectedAt(t, p), finalOrder(e)
+	for name := range namesGivenIn(e) {
+		if _, isSQL := selected[name]; isSQL {
+			checkPlaced(t, store, title, name, selected, index)
+		}
+	}
+	if name := graphiteRowName(asList(e["transformations"])); name != "" {
+		if _, ordered := index[name].(int); !ordered {
+			t.Errorf("graphite %q: the rows' name %q stands where the reduction put it, "+
+				"not where the SQL draws what it names", title, name)
+		}
 	}
 }
 

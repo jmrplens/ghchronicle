@@ -684,6 +684,17 @@
                   "Last *": "Commits"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Commits": 1,
+                  "Repository": 0
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -795,6 +806,17 @@
                   "Total": "Created"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Created": 1,
+                  "Repository": 0
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -897,6 +919,17 @@
                   "Field": "Repository",
                   "Last *": "Age at archive"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Age at archive": 1,
+                  "Repository": 0
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -1299,6 +1332,17 @@
                   "Last *": "Views"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Referrer": 0,
+                  "Views": 1
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -1437,6 +1481,17 @@
                   "Field": "Path",
                   "Last *": "Views"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Path": 0,
+                  "Views": 1
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -1588,6 +1643,17 @@
                   "Field": "Repository",
                   "Total": "Clones"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Clones": 1,
+                  "Repository": 0
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -1927,6 +1993,16 @@
                   "Field": "Repository",
                   "Total": "Stars"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Repository": 0
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -2558,6 +2634,17 @@
                   "Last *": "Commits"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Commits": 1,
+                  "Repository": 0
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -2684,6 +2771,17 @@
                   "Field": "Year",
                   "Last *": "Contributions"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Contributions": 1,
+                  "Year": 0
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -3717,6 +3815,17 @@
                   "Max": "Lines changed"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Lines changed": 1,
+                  "Pull request": 0
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -3939,6 +4048,18 @@
                   "Median": "Time to merge"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Merged": 1,
+                  "Repository": 0,
+                  "Time to merge": 2
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -4071,6 +4192,18 @@
                   "Field": "Reviewer",
                   "Median": "Wait"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Reviewer": 0,
+                  "Reviews": 1,
+                  "Wait": 2
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -4297,6 +4430,17 @@
                   "Max": "Open for"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Open for": 1,
+                  "Repository, number": 0
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -4436,6 +4580,17 @@
                   "Field": "Repository, number",
                   "Max": "Open for"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Open for": 1,
+                  "Repository, number": 0
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -4697,6 +4852,17 @@
                   "Field": "Repository, pull request",
                   "Total": "Unresolved"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Repository, pull request": 0,
+                  "Unresolved": 1
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -5511,6 +5677,18 @@
                   "Median": "Duration"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Duration": 2,
+                  "Runs": 1,
+                  "Workflow": 0
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -5646,6 +5824,19 @@
                   "Max": "Worst",
                   "Median": "Duration"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Duration": 1,
+                  "Job": 0,
+                  "Times run": 2,
+                  "Worst": 3
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -5795,6 +5986,19 @@
                   "Median": "Duration"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Duration": 1,
+                  "Step": 0,
+                  "Times run": 2,
+                  "Worst": 3
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -5918,6 +6122,17 @@
                   "Field": "Repository",
                   "Total": "Total"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Repository": 0,
+                  "Total": 1
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -6050,6 +6265,17 @@
                   "Total": "Failures"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Failures": 1,
+                  "Repository, workflow": 0
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -6176,6 +6402,17 @@
                   "Field": "Step, repository",
                   "Total": "Failures"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Failures": 1,
+                  "Step, repository": 0
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -6385,6 +6622,17 @@
                   "Field": "Repository",
                   "Last *": "Live size"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Live size": 1,
+                  "Repository": 0
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -6898,6 +7146,18 @@
                   "Median": "Lines per commit"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Author": 0,
+                  "Commits": 1,
+                  "Lines per commit": 2
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -7101,6 +7361,16 @@
                   "Field": "Repository, by",
                   "Total": "Force pushes"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Repository, by": 0
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -7376,6 +7646,17 @@
                   "Total": "Runs"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "App, check": 0,
+                  "Runs": 1
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -7550,6 +7831,17 @@
                   "Last *": "Used"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Repository, label": 0,
+                  "Used": 1
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -7700,6 +7992,17 @@
                   "Field": "Milestone",
                   "Last *": "Progress"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Milestone": 0,
+                  "Progress": 1
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -7893,6 +8196,16 @@
                   "Last *": "Pushed after"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "By, repository": 0
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -8049,6 +8362,18 @@
                   "Field": "Category",
                   "Mean": "Answered"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Answered": 2,
+                  "Category": 0,
+                  "Discussions": 1
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -8236,6 +8561,17 @@
                   "Field": "Repository, number, category",
                   "Last *": "Comments"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Comments": 1,
+                  "Repository, number, category": 0
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -8425,6 +8761,17 @@
                   "Total": "Comments"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Comments": 1,
+                  "Repository": 0
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -8551,6 +8898,17 @@
                   "Field": "Repository",
                   "Total": "Comments"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Comments": 1,
+                  "Repository": 0
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -8703,6 +9061,17 @@
                   "Field": "Repository, number",
                   "Last *": "Accepted"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Accepted": 1,
+                  "Repository, number": 0
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -9009,6 +9378,18 @@
                   "Median": "Latency"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Deliveries": 1,
+                  "Endpoint, repository, ok": 0,
+                  "Latency": 2
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -9120,6 +9501,17 @@
                   "Last *": "Last changed"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Last changed": 1,
+                  "Ruleset": 0
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -9223,6 +9615,17 @@
                   "Field": "Key",
                   "Last *": "Unused for"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Key": 1,
+                  "Unused for": 0
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -9352,6 +9755,17 @@
                   "Last *": "Events subscribed"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Events subscribed": 1,
+                  "Repository, host": 0
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -9455,6 +9869,17 @@
                   "Field": "Repository, environment",
                   "Last *": "Idle"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Idle": 1,
+                  "Repository, environment": 0
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -9583,6 +10008,17 @@
                   "Field": "Repository, branch, default",
                   "Last *": "Idle"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Idle": 1,
+                  "Repository, branch, default": 0
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -9873,6 +10309,17 @@
                   "Last *": "Checks"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Checks": 1,
+                  "Repository, pattern": 0
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -10009,6 +10456,17 @@
                   "Last *": "Bypass actors"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Bypass actors": 1,
+                  "Repository, ruleset, rule": 0
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -10119,6 +10577,16 @@
                   "Field": "Repository, ruleset, actor",
                   "Total": "Versions"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Repository, ruleset, actor": 0
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -10365,6 +10833,18 @@
                   "Field": "Repository, environment",
                   "Total": "Successes"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Deployments": 1,
+                  "Repository, environment": 0,
+                  "Successes": 2
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -10703,6 +11183,17 @@
                   "Last *": "Downloads"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Asset": 0,
+                  "Downloads": 1
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -10841,6 +11332,17 @@
                   "Field": "Asset",
                   "Total": "Gained"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Asset": 0,
+                  "Gained": 1
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -11449,6 +11951,17 @@
                   "Last *": "Open alerts"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Open alerts": 1,
+                  "Repository, feature": 0
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -11643,6 +12156,18 @@
                   "Median": "Time to resolve"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Alerts": 1,
+                  "Severity": 0,
+                  "Time to resolve": 2
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -11813,6 +12338,18 @@
                   "Median": "Time to resolve"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Alerts": 1,
+                  "Repository, severity, package": 0,
+                  "Time to resolve": 2
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -11951,6 +12488,17 @@
                   "Field": "Tool, repository",
                   "Total": "Results"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Results": 1,
+                  "Tool, repository": 0
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -12147,6 +12695,17 @@
                   "Last *": "Enabled"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Enabled": 1,
+                  "Repository, setting, status": 0
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -12282,6 +12841,17 @@
                   "Last *": "Last changed"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Last changed": 1,
+                  "Repository, state, query suite, schedule": 0
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -12412,6 +12982,17 @@
                   "Field": "Repository, permissions",
                   "Last *": "Can approve pull requests"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Can approve pull requests": 1,
+                  "Repository, permissions": 0
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -12544,6 +13125,17 @@
                   "Field": "Repository, kind, secret",
                   "Last *": "Last rotated"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Last rotated": 1,
+                  "Repository, kind, secret": 0
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -13056,6 +13648,17 @@
                   "Total": "Gross"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Gross": 1,
+                  "Repository, SKU": 0
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -13186,6 +13789,17 @@
                   "Field": "Repository, cache",
                   "Last *": "Size"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Repository, cache": 0,
+                  "Size": 1
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -13321,6 +13935,17 @@
                   "Field": "Repository",
                   "Last *": "Cache"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Cache": 1,
+                  "Repository": 0
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -13687,6 +14312,17 @@
                   "Total": "Notifications"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Notifications": 1,
+                  "Reason, kind": 0
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -13936,6 +14572,17 @@
                   "Last *": "Comments"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Comments": 1,
+                  "Repository, kind, number, state": 0
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -14162,6 +14809,17 @@
                   "Field": "Repository",
                   "Last *": "Its stars"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Its stars": 1,
+                  "Repository": 0
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -14668,6 +15326,17 @@
                   "Last *": "Community profile"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Community profile": 1,
+                  "Repository": 0
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -14900,6 +15569,17 @@
                   "Last *": "Stars"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Repository, language, visibility, license": 0,
+                  "Stars": 1
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -14987,6 +15667,17 @@
                   "Field": "Topic",
                   "Last *": "Repositories"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Repositories": 1,
+                  "Topic": 0
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -15115,6 +15806,17 @@
                   "Field": "Package",
                   "Last *": "Versions"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Package": 0,
+                  "Versions": 1
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -15279,6 +15981,17 @@
                   "Last *": "Files"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Files": 1,
+                  "Gist": 0
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -15416,6 +16129,16 @@
                   "Field": "Package",
                   "Total": "Tags published"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Package": 0
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -15632,6 +16355,17 @@
                   "Last *": "Protection rules"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Protection rules": 1,
+                  "Repository": 0
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -15701,6 +16435,17 @@
                   "Field": "Key, kind",
                   "Last *": "Days since use"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Days since use": 1,
+                  "Key, kind": 0
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -15861,6 +16606,16 @@
                   "Field": "Provider",
                   "Last *": "Present"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Provider": 0
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -16050,6 +16805,17 @@
                   "Last *": "Present"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Present": 1,
+                  "Repository, file": 0
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -16200,6 +16966,17 @@
                   "Field": "Repository, ecosystem, interval",
                   "Last *": "Blocks"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Blocks": 1,
+                  "Repository, ecosystem, interval": 0
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -16659,6 +17436,17 @@
                   "Last *": "Amount"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Amount": 1,
+                  "Direction, sponsorable": 0
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -16863,6 +17651,17 @@
                   "Last *": "Price"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Price": 1,
+                  "Tier": 0
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -16997,6 +17796,17 @@
                     "field": "Position"
                   }
                 ]
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Item": 1,
+                  "Position": 0
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -17140,6 +17950,17 @@
                     "field": "Flag"
                   }
                 ]
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Enabled": 1,
+                  "Flag": 0
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -17309,6 +18130,17 @@
                   "Last *": "Items"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Items": 1,
+                  "List": 0
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -17408,6 +18240,17 @@
                   "Field": "Achievement",
                   "Last *": "Tier"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Achievement": 0,
+                  "Tier": 1
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -17703,6 +18546,17 @@
                   "Last *": "Progress"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Achievement": 0,
+                  "Progress": 1
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -17851,6 +18705,17 @@
                   "Field": "Bucket",
                   "Min": "Lowest remaining"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Bucket": 0,
+                  "Lowest remaining": 1
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -18003,6 +18868,17 @@
                   "Total": "Failures"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Failures": 1,
+                  "Family, why": 0
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -18113,6 +18989,16 @@
                   "Field": "Family, repository, why",
                   "Total": "Failures"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Family, repository, why": 0
+                },
+                "renameByName": {}
               }
             }
           ],

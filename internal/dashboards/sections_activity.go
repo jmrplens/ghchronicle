@@ -140,7 +140,7 @@ func activity(b *builder) []Panel {
 			Prom: []Target{promTbl(promOther(topSeriesKept,
 				"sum by (type) (increase(github_events_total[$__range]))", "type"))},
 			PromTF: []any{
-				organize(map[string]string{"type": "Type", "Value": "Events"}, nil, nil),
+				organize(map[string]string{"type": "Type", "Value": "Events"}, nil),
 				eachTypeASlice,
 			},
 			PromDesc: sinceStart,
@@ -167,7 +167,7 @@ func activity(b *builder) []Panel {
 			)},
 			PromTF: []any{organize(map[string]string{
 				"reason": "Reason", "subject_type": "Kind", "Value": "Notifications",
-			}, nil, nil)},
+			}, nil)},
 			Opts: Opts{"sort": "Notifications"}, PromDesc: sinceStart,
 			Overrides: []any{barCell("Notifications", "short", 120)},
 			GR:        notifGR, GRTF: notifGRtf,
@@ -281,7 +281,10 @@ func workElsewhere(b *builder) Panel {
 			PromTF: merged(map[string]string{
 				"full_name": "Repository", panelValueA: "Contributions", panelValueB: "Merged",
 				panelValueC: "Comments", panelValueD: "Stars",
-			}, nil, nil),
+			}, nil),
+
+			// The counts of the items the SQL stores list one per row.
+			PromAt: map[string]string{"Contributions": "Kind", "Merged": "State"},
 			Desc: "Pull requests and issues opened in repositories this account does not own, " +
 				"with the state each ended in. Nothing else sees them: they are not in these " +
 				"repositories, and the event feed keeps only its last three hundred events, " +
@@ -352,7 +355,7 @@ func starsGiven(b *builder) []Panel {
 			)},
 			PromTF: []any{organize(map[string]string{
 				"language": "Language", "Value": overviewStarsGiven,
-			}, nil, nil)},
+			}, nil)},
 			Desc: "The mirror of the stars received: what this account was reading, dated when " +
 				"it starred it. The only measurement here about somebody else's work.",
 			PromDesc: sinceStart,
@@ -369,7 +372,7 @@ func starsGiven(b *builder) []Panel {
 			Prom: []Target{promTbl("topk(25, github_stars_given_repo_stars_mean)")},
 			PromTF: []any{organize(map[string]string{
 				"language": "Language", "Value": activityItsStars,
-			}, []string{"user"}, nil)},
+			}, []string{"user"})},
 			Desc: "Whether the account stars small projects or famous ones, which the language " +
 				"breakdown cannot say.",
 			PromDesc: "The exporter keeps the language of a star and not its repository, so in " +

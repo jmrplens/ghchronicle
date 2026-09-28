@@ -229,7 +229,7 @@ func openAlerts(b *builder) []Panel {
 			))},
 			PromTF: []any{organize(map[string]string{
 				"severity": "Severity", "Value": securityOpenAlerts,
-			}, nil, nil)},
+			}, nil)},
 			GR: sevGR, GRTF: sevGRtf,
 			ES: sevES, ESTF: sevEStf,
 		}),
@@ -239,7 +239,7 @@ func openAlerts(b *builder) []Panel {
 			))},
 			PromTF: []any{organize(map[string]string{
 				"ecosystem": "Ecosystem", "Value": securityOpenAlerts,
-			}, nil, nil)},
+			}, nil)},
 			GR: ecoGR, GRTF: ecoGRtf,
 			ES: ecoES, ESTF: ecoEStf,
 		}),
@@ -274,7 +274,8 @@ func openAlerts(b *builder) []Panel {
 			PromTF: merged(map[string]string{
 				"repo": "Repository", "feature": "Feature", inventoryValueCol + "A": "Enabled",
 				inventoryValueCol + "B": securityOpenAlerts,
-			}, nil, map[string]int{"repo": 0, "feature": 1}),
+			}, nil),
+
 			Desc: "Recorded explicitly, so a repository with the feature switched off is " +
 				"distinguishable from one with no alerts. Each row is the newest reading of " +
 				"the repository's feature, so a feature switched off or an alert fixed inside " +
@@ -470,7 +471,8 @@ func scanningAndResolution(b *builder) []Panel {
 				},
 				PromTF: merged(map[string]string{
 					"severity": "Severity", inventoryValueCol + "A": "Alerts", inventoryValueCol + "B": securityResolveTime,
-				}, nil, nil),
+				}, nil),
+
 				Opts: Opts{"sort": "Alerts"},
 				Desc: "Code scanning alerts that were fixed or dismissed, and how long each " +
 					"severity stayed open. The list was always downloaded whole and these dates " +
@@ -489,9 +491,13 @@ func scanningAndResolution(b *builder) []Panel {
 			PromTF: merged(map[string]string{
 				"severity": "Severity", inventoryValueCol + "A": "Alerts",
 				inventoryValueCol + "B": "Worst CVSS", inventoryValueCol + "C": securityResolveTime,
-			}, nil, nil),
-			Opts: Opts{"sort": "Raised"},
-			Desc: securityResolveDesc,
+			}, nil),
+
+			// The count stands for the alerts the SQL stores list, and the
+			// worst of the scores where they draw each one.
+			PromAt: map[string]string{"Alerts": "Advisory", "Worst CVSS": securityCVSS},
+			Opts:   Opts{"sort": "Raised"},
+			Desc:   securityResolveDesc,
 			PromDesc: "Prometheus keeps the severity only, so this is the alerts resolved per " +
 				"severity, the worst mean score and the mean time. " + sinceStart + " " + lastSweep,
 			Overrides: []any{
@@ -503,7 +509,7 @@ func scanningAndResolution(b *builder) []Panel {
 				unitOf(securityResolveTime, "s", 170), barCell("Alerts", "short", 130),
 				width("Worst CVSS", 120),
 			},
-			GR: resGR, GRTF: resGRtf,
+			GR: resGR, GRTF: resGRtf, GRAt: map[string]string{"Alerts": "Advisory"},
 			GRDesc: "Graphite names each row repository, severity and package from the path " +
 				"and keeps no text, so the advisory is missing. " + grSlot,
 			ES: resES, ESTF: resEStf, ESDesc: esNewest,
@@ -520,7 +526,8 @@ func scanningAndResolution(b *builder) []Panel {
 			},
 			PromTF: merged(map[string]string{
 				"tool": "Tool", "repo": "Repository", inventoryValueCol + "A": "Runs", inventoryValueCol + "B": "Results",
-			}, nil, map[string]int{"tool": 0, "repo": 1}),
+			}, nil),
+
 			Opts: Opts{"sort": "Results"},
 			Desc: "The panel beside this one says the scan ran. This says what it found, which " +
 				"is what explains a jump in the alert count: one tool here returns sixty " +
@@ -692,7 +699,7 @@ func posture(b *builder) []Panel {
 			PromTF: []any{organize(map[string]string{
 				"repo": "Repository", "setting": "Setting", "status": "Status",
 				"Value": "Enabled",
-			}, nil, map[string]int{"repo": 0, "setting": 1, "status": 2})},
+			}, nil)},
 			Desc: "What the repository itself says about the five security_and_analysis keys, " +
 				"which have three states and not two: `unavailable` is GitHub omitting the " +
 				"whole block on a private repository, and that is not `disabled`. Read it " +
@@ -722,8 +729,8 @@ func posture(b *builder) []Panel {
 			PromTF: merged(map[string]string{
 				"repo": "Repository", "state": "State", "query_suite": securityQuerySuite,
 				"schedule": "Schedule", inventoryValueCol + "B": "Languages", inventoryValueCol + "C": deliveryLastChanged,
-			}, []string{inventoryValueCol + "A"},
-				map[string]int{"repo": 0, "state": 1, "query_suite": 2, "schedule": 3}),
+			}, []string{inventoryValueCol + "A"}),
+
 			Desc: "GitHub's own default setup, and nothing else. A repository can answer " +
 				"not-configured here and still run CodeQL from a workflow it wrote itself, " +
 				"which the Code scanning runs panel above sees and this one does not. In " +
@@ -749,7 +756,7 @@ func posture(b *builder) []Panel {
 			PromTF: []any{organize(map[string]string{
 				"repo": "Repository", "permissions": "Permissions",
 				"Value": securityCanApprovePR,
-			}, nil, map[string]int{"repo": 0, "permissions": 1})},
+			}, nil)},
 			Desc: "The default permissions of GITHUB_TOKEN, which is what a compromised action " +
 				"inherits. `write` beside can-approve-pull-requests on is the supply-chain " +
 				"row: that workflow can push a change and approve it. `read` means a workflow " +
@@ -771,7 +778,8 @@ func posture(b *builder) []Panel {
 				PromTF: merged(map[string]string{
 					"repo": "Repository", "kind": "Kind", "secret": "Secret",
 					inventoryValueCol + "A": "Age", inventoryValueCol + "B": securityLastRotated,
-				}, nil, map[string]int{"repo": 0, "kind": 1, "secret": 2}),
+				}, nil),
+
 				Opts: Opts{"sort": securityLastRotated},
 				Desc: "Secrets, and when they were last rotated. Both numbers or the panel " +
 					"says nothing: days_since_rotation equals " +

@@ -430,7 +430,8 @@ func whereTheTimeGoes(b *builder) []Panel {
 			PromTF: merged(map[string]string{
 				"workflow": "Workflow", "repo": "Repository", inventoryValueCol + "A": "Runs",
 				inventoryValueCol + "B": "Not successful", inventoryValueCol + "C": "Duration",
-			}, nil, map[string]int{"workflow": 0, "repo": 1}),
+			}, nil),
+
 			Opts:     Opts{"sort": "Runs"},
 			PromDesc: sinceStart + " " + lastSweep,
 			Overrides: []any{
@@ -458,7 +459,8 @@ func whereTheTimeGoes(b *builder) []Panel {
 			PromTF: merged(map[string]string{
 				"job_name": "Job", "repo": "Repository", inventoryValueCol + "A": "Duration",
 				inventoryValueCol + "B": ciTimesRun,
-			}, nil, map[string]int{"job_name": 0, "repo": 1}),
+			}, nil),
+
 			Opts:     Opts{"sort": "Duration"},
 			Desc:     expanded,
 			PromDesc: lastSweep + " " + sweepCount,
@@ -557,7 +559,8 @@ func wastedESTable(b *builder) (targets []Target, tf []any) {
 		map[string]any{"id": "merge", "options": map[string]any{}},
 		binaryField("Wasted", esNames["avg"], "*", esNames["count"]),
 		organize(map[string]string{inventoryRepoTerm: "Repository", esNames["sum"]: "Total"},
-			[]string{panelFullNameField, esNames["avg"], esNames["count"]}, nil),
+			[]string{panelFullNameField, esNames["avg"], esNames["count"]}),
+
 		binaryField("Share", "Wasted", "/", "Total"),
 		// A repository among the fifty with the most failed runs and not among
 		// the fifty with the most runs has no total to take a share of.
@@ -620,7 +623,8 @@ func whatKeepsFailing(b *builder) []Panel {
 			},
 			PromTF: merged(map[string]string{
 				"repo": "Repository", inventoryValueCol + "A": "Wasted", inventoryValueCol + "B": "Total",
-			}, nil, nil),
+			}, nil),
+
 			Opts: Opts{"sort": "Wasted"},
 			Desc: "Minutes that produced nothing. On the account this was written against, one " +
 				"repository burned 8,530 of its 15,111 minutes in a week on runs that failed.",
@@ -664,7 +668,8 @@ func whatKeepsFailing(b *builder) []Panel {
 			PromTF: merged(map[string]string{
 				"repo": "Repository", "workflow": "Workflow",
 				inventoryValueCol + "A": "Failures", inventoryValueCol + "B": "Runs",
-			}, nil, map[string]int{"repo": 0, "workflow": 1}),
+			}, nil),
+
 			Opts: Opts{"sort": "Failures"},
 			Desc: "Not the ones that fail sometimes: the ones nobody has switched off. Two " +
 				"workflows here fail on every single run, 108 of 108 and 86 of 86.",
@@ -798,7 +803,8 @@ func artifactStorage(b *builder) []Panel {
 				PromTF: merged(map[string]string{
 					"repo": "Repository", inventoryValueCol + "A": "Declared", inventoryValueCol + "B": "Walked",
 					inventoryValueCol + "C": ciLiveSize, inventoryValueCol + "D": ciLiveCount,
-				}, nil, nil),
+				}, nil),
+
 				Opts: Opts{"sort": "Declared"},
 				Desc: "Artifact storage, and how much of it was counted. Three counts, because " +
 					"the live size is on neither of the other two: Declared is GitHub's own " +

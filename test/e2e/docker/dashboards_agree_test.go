@@ -320,6 +320,103 @@ func TestTheSQLStoresDrawTheRowsInOneOrder(t *testing.T) {
 	}
 }
 
+// TestTheStoresHeadEveryTableInOneOrder holds every table to one order of the
+// columns it draws in every store, over the columns each pair of stores both
+// draws. The comparison above matches rows over the shared columns wherever
+// they stand, which is right for the values and blind to the heading: on the
+// 2.6.2 branch the Prometheus "Every bucket" read Bucket, Limit, Lowest
+// remaining, Most used where the SQL stores read Bucket, Most used, Limit,
+// Lowest remaining, and "Artifact storage counted" put its counts in another
+// order. A reader moving between two dashboards reads a table by where its
+// columns stand.
+//
+// A Prometheus panel that needs history is asked here too, unlike in the
+// comparison of values: a count of zero still heads its columns.
+func TestTheStoresHeadEveryTableInOneOrder(t *testing.T) {
+	s := Start(t)
+	run := dashboardsRun(t, s)
+	var report strings.Builder
+	held := 0
+	indexes := map[int]bool{}
+	for _, store := range dashboardStores {
+		for i := range run.outcomes[store.name] {
+			indexes[i] = true
+		}
+	}
+	for _, index := range slices.Sorted(maps.Keys(indexes)) {
+		tables := dashboardTables(t, run, index)
+		if len(tables) == 0 {
+			continue
+		}
+		title := dashboardPanelTitle(run, index)
+		fmt.Fprintf(&report, "%3d %s\n", index, title)
+		for _, store := range dashboardStores {
+			if pic, ok := tables[store.name]; ok {
+				fmt.Fprintf(&report, "    %-14s %s\n", store.name, strings.Join(pic.Names(), " | "))
+			}
+		}
+		pairs, diffs := headingOrders(tables)
+		held += pairs
+		for _, diff := range diffs {
+			t.Errorf("panel %d %q heads its columns in another order in %s", index, title, diff)
+		}
+	}
+	if err := os.WriteFile(filepath.Join("out", "dashboards", "columns.txt"), []byte(report.String()), 0o600); err != nil {
+		t.Errorf("keeping the headings: %v", err)
+	}
+	t.Logf("%d pairs of stores drew the same table with rows", held)
+	// A floor rather than a count, so a change that stops the tables drawing
+	// rows fails instead of passing with nothing held. Measured at 645 on the
+	// 2.6.2 branch.
+	if held < 300 {
+		t.Errorf("only %d pairs of stores drew the same table with rows, which is too few for this "+
+			"to have held anything", held)
+	}
+}
+
+// headingOrders holds every pair of stores that drew one table to one order
+// of the columns both draw, and answers how many pairs it held and a line
+// per pair that heads them in another order.
+func headingOrders(tables map[string]grafana.Picture) (pairs int, diffs []string) {
+	for x, a := range dashboardStores {
+		for _, b := range dashboardStores[x+1:] {
+			pa, okA := tables[a.name]
+			pb, okB := tables[b.name]
+			if !okA || !okB {
+				continue
+			}
+			pairs++
+			if diff := grafana.ColumnOrder(&pa, &pb); diff != "" {
+				diffs = append(diffs, a.name+" and "+b.name+": "+diff)
+			}
+		}
+	}
+	return pairs, diffs
+}
+
+// dashboardTables is every store's drawing of one panel when it is a table
+// that draws a row, which is when a reader sees its heading.
+func dashboardTables(t *testing.T, run *dashboardRun, index int) map[string]grafana.Picture {
+	t.Helper()
+	out := map[string]grafana.Picture{}
+	for _, store := range dashboardStores {
+		o, ok := run.outcomes[store.name][index]
+		if !ok || o.err != "" || o.panel.Type != "table" || (store.name == "prometheus" && run.promSkip != "") {
+			continue
+		}
+		pic, drawn, err := grafana.Drawing(o.panel.Source, o.answer)
+		if err != nil {
+			t.Errorf("panel %d %q of %s cannot be replayed, so its heading is not held: %v",
+				index, o.panel.Title, store.name, err)
+			continue
+		}
+		if drawn && !pic.Empty() {
+			out[store.name] = pic
+		}
+	}
+	return out
+}
+
 // rawFieldName is a name a datasource gives a field that the panel is meant
 // to give another: an Elasticsearch bucket's field, a metric as the response
 // parser names it, a Prometheus value column, the metric name label. The

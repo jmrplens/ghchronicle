@@ -228,6 +228,12 @@ type P struct {
 	PromTF    []any
 	PromOver  []any
 	PromOpts  Opts
+	// PromAt places a Prometheus column the SQL does not select where the
+	// SQL selects the one named, ahead of it: the hook a row is named by
+	// where the SQL stores draw its endpoint. A column not placed goes after
+	// every column the SQL selects. GRAt is the same for Graphite, where the
+	// column a row is named by is placed without it.
+	PromAt map[string]string
 
 	SQLTF   []any
 	SQLOver []any
@@ -245,6 +251,7 @@ type P struct {
 	GRTF   []any
 	GROver []any
 	GROpts Opts
+	GRAt   map[string]string
 
 	ES     []Target
 	ESDesc string
@@ -308,21 +315,8 @@ func panel(kind, title string, at box, sql []Target, p *P) Panel {
 			panic(title + ": a panel without a " + Stores[name] + " query needs a note")
 		}
 	}
-	// An Elasticsearch table's columns come in the order its response parser
-	// meets them, the buckets and then the metrics, or the document's own
-	// fields for raw data, whatever the SQL twin selects: measured on the
-	// 2.6.1 review, "Every repository, ever" led with Fork, "Security
-	// features" with Enabled and "Oldest open alerts" with a wide number.
-	// So the table takes the order the SQL stores' statement selects its
-	// columns in, the order both of them draw. Only there: Prometheus and
-	// Graphite name the column a row is identified by after the label or
-	// the path node it comes from, and the SQL order would put it last. A
-	// SQL twin that reshapes its own frame, as a transpose does, draws
-	// columns its statement does not name, so there is no order to take.
-	if es := stores["elasticsearch"]; kind == "table" && es.Q != nil && p.SQLTF == nil {
-		if order := orderLike(selectedColumns(sql), namesGiven(es.TF)); len(order) > 0 {
-			es.TF = append(slices.Clone(es.TF), columnOrder(order...))
-		}
+	if kind == "table" && p.SQLTF == nil {
+		orderLikeSQL(title, selectedColumns(sql), stores, p)
 	}
 	if p.Logs != nil && kind != "text" {
 		panic(title + ": only a text panel can give way to the log store")
@@ -332,6 +326,53 @@ func panel(kind, title string, at box, sql []Target, p *P) Panel {
 		Kind: kind, Title: title, W: at.W, H: at.H, X: at.X, Y: at.Y, Desc: p.Desc,
 		Stores: stores, Overrides: shared, Opts: orEmpty(p.Opts),
 		PromTitle: p.PromTitle, Logs: p.Logs,
+	}
+}
+
+// orderLikeSQL gives every table the order the SQL stores' statement selects
+// its columns in, `selected`, which is the order both of them draw.
+//
+// A table's columns otherwise come in the order its datasource meets them. An
+// Elasticsearch table's come as the response parser meets them, the buckets
+// and then the metrics, or the document's own fields for raw data: measured
+// on the 2.6.1 review, "Every repository, ever" led with Fork, "Security
+// features" with Enabled and "Oldest open alerts" with a wide number. A
+// Prometheus table's come a label at a time, alphabetically, and then each
+// query's value in turn, so on the 2.6.2 branch "Every bucket" put Most used
+// last and "Secret rotation" led with the repository where the SQL stores
+// lead with the secret. A Graphite table's come as the row's name and then
+// its reducers, so "Slowest jobs" counted its runs ahead of their duration.
+//
+// The column a Graphite row is named by stands where the SQL draws the first
+// column its path nodes name, and a Prometheus column the SQL does not select
+// stands where the panel places it, PromAt, or after the others. A SQL twin
+// that reshapes its own frame, as a transpose does, draws columns its
+// statement does not name, so panel() leaves that table as it is.
+func orderLikeSQL(title string, selected []string, stores map[string]*store, p *P) {
+	at := map[string]map[string]string{"prometheus": p.PromAt, "graphite": maps.Clone(p.GRAt)}
+	if gr := stores["graphite"]; gr.Q != nil {
+		if name := graphiteRowName(gr.TF); name != "" && !slices.Contains(selected, name) && at["graphite"][name] == "" {
+			if at["graphite"] == nil {
+				at["graphite"] = map[string]string{}
+			}
+			at["graphite"][name] = rowNameAt(selected, name)
+		}
+	}
+	for _, name := range []string{"elasticsearch", "prometheus", "graphite"} {
+		st := stores[name]
+		drawn := namesGiven(st.TF)
+		for column, where := range at[name] {
+			if st.Q == nil || !drawn[column] || slices.Contains(selected, column) || !slices.Contains(selected, where) {
+				panic(fmt.Sprintf("%s: %s places %q where the SQL draws %q, and it can only place a "+
+					"column it draws and the SQL does not select, where the SQL selects one", title, Stores[name], column, where))
+			}
+		}
+		if st.Q == nil {
+			continue
+		}
+		if order := orderLike(selected, drawn, at[name]); len(order) > 0 {
+			st.TF = append(slices.Clone(st.TF), columnOrder(order...))
+		}
 	}
 }
 

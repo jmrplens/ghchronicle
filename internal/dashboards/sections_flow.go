@@ -432,7 +432,8 @@ func pullsAndReviewers(b *builder) []Panel {
 			PromTF: merged(map[string]string{
 				"repo": "Repository", inventoryValueCol + "A": "Merged",
 				inventoryValueCol + "B": flowMergeTime, inventoryValueCol + "C": flowChurn,
-			}, nil, nil),
+			}, nil),
+
 			Opts:     Opts{"sort": "Merged"},
 			PromDesc: sinceStart + " " + lastSweep,
 			Overrides: []any{
@@ -450,7 +451,8 @@ func pullsAndReviewers(b *builder) []Panel {
 			},
 			PromTF: merged(map[string]string{
 				"reviewer": "Reviewer", inventoryValueCol + "A": "Reviews", inventoryValueCol + "B": "Wait",
-			}, nil, nil),
+			}, nil),
+
 			Opts: Opts{"sort": "Reviews"},
 			Desc: "Who actually reviews, and how long a review waited. The count on a pull " +
 				"request cannot say whether the work is spread across people or resting on " +
@@ -739,7 +741,8 @@ func stillOpen(b *builder) []Panel {
 			PromTF: merged(map[string]string{
 				"repo":                  "Repository",
 				inventoryValueCol + "A": flowOpenAge, inventoryValueCol + "B": "Comments",
-			}, nil, map[string]int{"repo": 0}),
+			}, nil),
+
 			Opts: Opts{"sort": flowOpenAge},
 			Desc: "Time to merge only counts what merged. This is the other half: what is " +
 				"still open and how long it has been, which is the number that decides what " +

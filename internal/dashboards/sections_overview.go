@@ -465,7 +465,8 @@ func audience(b *builder) []Panel {
 			},
 			PromTF: merged(map[string]string{
 				"referrer": "Referrer", panelValueA: "Views", panelValueB: "Unique",
-			}, nil, nil),
+			}, nil),
+
 			Opts:      Opts{"sort": "Views"},
 			Overrides: []any{barCell("Views", "short", 120), width("Unique", 90), rowLinkOn("Referrer", "Open the referrer")},
 			Desc: "Where the visitors came from over GitHub's trailing fourteen days. GitHub " +
@@ -514,7 +515,8 @@ func audience(b *builder) []Panel {
 			PromTF: merged(map[string]string{
 				"repo": "Repository", panelValueA: "Clones", panelValueB: "Cloners",
 				panelValueC: "Views",
-			}, nil, nil),
+			}, nil),
+
 			Opts: Opts{"sort": "Clones each"},
 			Desc: "Clones divided by the people who made them. There are panels for clones and " +
 				"for views and none for the ratio, which is the only thing that separates " +

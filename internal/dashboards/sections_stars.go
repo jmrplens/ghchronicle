@@ -182,7 +182,7 @@ func stars(b *builder) []Panel {
 			Prom:     []Target{promTbl(fmt.Sprintf("topk(12, max by (full_name, repo) (github_repo_stars{%s}) > 0)", PF))},
 			Desc:     "The twelve most starred; the rest are one bar called other.",
 			PromDesc: "Prometheus shows the twelve and folds nothing.",
-			PromTF:   []any{organize(map[string]string{"repo": "Repository", "Value": "Stars"}, nil, nil)},
+			PromTF:   []any{organize(map[string]string{"repo": "Repository", "Value": "Stars"}, nil)},
 			GR:       byRepoGR, GRTF: byRepoGRtf,
 			ES: byRepoES, ESTF: byRepoEStf,
 		}),
@@ -190,7 +190,7 @@ func stars(b *builder) []Panel {
 			Prom: []Target{promTbl(fmt.Sprintf(
 				"sum by (full_name, repo) (increase(github_stars_gained_total{%s}[$__range])) > 0", PF,
 			))},
-			PromTF: []any{organize(map[string]string{"repo": "Repository", "Value": "Stars"}, nil, nil)},
+			PromTF: []any{organize(map[string]string{"repo": "Repository", "Value": "Stars"}, nil)},
 			Desc: "The newest stargazers, one row each. A repository whose stargazer list " +
 				"GitHub hides from this token (since July 2026 it serves the list only to " +
 				"a repository's admins and collaborators) has its stars in the panels " +

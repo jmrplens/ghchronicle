@@ -145,8 +145,11 @@ func webhookDeliveries(b *builder) []Panel {
 			PromTF: merged(map[string]string{
 				"repo": "Repository", "hook": "Hook", inventoryValueCol + "A": "Deliveries",
 				inventoryValueCol + "B": "Failed", inventoryValueCol + "C": "Retried", inventoryValueCol + "D": "Latency",
-			}, nil, map[string]int{"repo": 0, "hook": 1}),
-			Opts: Opts{"sort": "Failed"},
+			}, nil),
+
+			// The hook names the row as the host does in the other stores.
+			PromAt: map[string]string{"Hook": "Endpoint"},
+			Opts:   Opts{"sort": "Failed"},
 			Desc: "Only the host is stored. The path of a webhook URL usually carries a secret. " +
 				"A retried delivery is a different fact from a first one that failed, and " +
 				"counting them together makes an endpoint look worse than it is.",
@@ -249,7 +252,9 @@ func accessConfiguration(b *builder) []Panel {
 			PromTF: merged(map[string]string{
 				"repo": "Repository", "ruleset": "Ruleset", "enforcement": "Enforcement",
 				inventoryValueCol + "A": "Active", inventoryValueCol + "B": deliveryLastChanged,
-			}, nil, map[string]int{"repo": 0, "ruleset": 1, "enforcement": 2}),
+			}, nil),
+
+			PromAt: map[string]string{"Active": deliveryLastChanged},
 			Desc: "A 404 from branch protection does not mean unprotected: a repository can be " +
 				"governed entirely by rulesets, which that endpoint knows nothing about.",
 			Overrides: []any{
@@ -268,7 +273,7 @@ func accessConfiguration(b *builder) []Panel {
 			PromTF: []any{organize(map[string]string{
 				"repo": "Repository", "key": "Key", "read_only": deliveryKeyReadOnly,
 				"Value": deliveryKeyUnused,
-			}, nil, map[string]int{"repo": 0, "key": 1, "read_only": 2})},
+			}, nil)},
 			Opts:      Opts{"sort": deliveryKeyUnused},
 			Desc:      "A write key nobody has used in a year is a credential to remove.",
 			Overrides: []any{width(deliveryKeyReadOnly, 100), unitOf(deliveryKeyUnused, "d", 120)},
@@ -307,7 +312,7 @@ func accessConfiguration(b *builder) []Panel {
 			PromTF: []any{organize(map[string]string{
 				"repo": "Repository", "host": "Host", "hook": "Hook",
 				"active": "Active", "Value": deliveryHookEvents,
-			}, []string{"owner", "full_name", "instance", "job", "__name__"}, nil)},
+			}, []string{"owner", "full_name", "instance", "job", "__name__"})},
 			Desc: "The panel beside this one is built from deliveries, so a hook that has never " +
 				"delivered anything appears in it nowhere. This is the inventory: an active " +
 				"hook with no traffic is the interesting row. Hook is GitHub's id for it, the " +
@@ -335,7 +340,7 @@ func accessConfiguration(b *builder) []Panel {
 			))},
 			PromTF: []any{organize(map[string]string{
 				"repo": "Repository", "environment": "Environment", "Value": "Idle",
-			}, []string{"owner", "full_name", "instance", "job", "__name__"}, nil)},
+			}, []string{"owner", "full_name", "instance", "job", "__name__"})},
 			Opts: Opts{"sort": "Idle"},
 			Desc: "The same question the deploy keys table asks, about deployment targets: one " +
 				"environment here has not been touched in one thousand one hundred and " +
@@ -488,7 +493,7 @@ func branchesAndProtections(b *builder) []Panel {
 			PromTF: []any{organize(map[string]string{
 				"repo": "Repository", "branch": "Branch", "is_default": "Default",
 				"Value": "Idle",
-			}, nil, map[string]int{"repo": 0, "branch": 1, "is_default": 2})},
+			}, nil)},
 			Opts: Opts{"sort": "Idle"},
 			PromDesc: "Prometheus has no LIMIT, so the twin is the fifty idlest branches " +
 				"rather than every one of them. " + noRepoFlagsHere,
@@ -527,7 +532,8 @@ func branchesAndProtections(b *builder) []Panel {
 					inventoryValueCol + "A": "Reviews", inventoryValueCol + "B": "Signatures",
 					inventoryValueCol + "C": "Linear", inventoryValueCol + "D": deliveryForcePush,
 					inventoryValueCol + "E": "Threads", inventoryValueCol + "F": "Checks",
-				}, nil, map[string]int{"repo": 0, "pattern": 1}),
+				}, nil),
+
 				Desc: "What each branch protection enforces. " +
 					"`gh_repo_policy.branch_protection_rules` counts these and stops there, so a " +
 					"protection that is switched on and asks for nothing looks the same as one " +
@@ -562,7 +568,8 @@ func branchesAndProtections(b *builder) []Panel {
 				PromTF: merged(map[string]string{
 					"repo": "Repository", "ruleset": "Ruleset", "rule": "Rule",
 					inventoryValueCol + "A": deliveryBypassActors, inventoryValueCol + "B": "Always", inventoryValueCol + "C": "Sampled",
-				}, nil, map[string]int{"repo": 0, "ruleset": 1, "rule": 2}),
+				}, nil),
+
 				Opts: Opts{"sort": "Always"},
 				Desc: "Ruleset rules, and who may walk past them. The Rulesets panel above says a " +
 					"ruleset exists and is enforced. This says " +
@@ -634,8 +641,7 @@ func rulesetChanges(b *builder) Panel {
 		PromTF: []any{organize(map[string]string{
 			"repo": "Repository", "ruleset": "Ruleset", "actor_type": "Actor",
 			"Value": "Versions",
-		}, []string{"owner", "full_name", "instance", "job", "__name__"},
-			map[string]int{"repo": 0, "ruleset": 1, "actor_type": 2})},
+		}, []string{"owner", "full_name", "instance", "job", "__name__"})},
 		Desc: "Every saved version of every ruleset, dated the moment GitHub saved it. The " +
 			"Rulesets panel says a protection exists and how many days ago it last " +
 			"changed; this is the changelog that number summarizes, and it is the only " +
@@ -765,7 +771,8 @@ func deploymentsToEnvironments(b *builder) []Panel {
 				"repo": "Repository", "environment": "Environment", inventoryValueCol + "A": "Deployments",
 				inventoryValueCol + "B": deliveryTimeToStatus, inventoryValueCol + "C": deliveryTimeLive,
 				inventoryValueCol + "D": "Successes", inventoryValueCol + "E": "Pending",
-			}, nil, map[string]int{"repo": 0, "environment": 1}),
+			}, nil),
+
 			Opts: Opts{"sort": "Deployments"},
 			Desc: "To status is the median time the deployment took to report one; Live for " +
 				"the median time it stayed the current one. They are the same subtraction against two " +

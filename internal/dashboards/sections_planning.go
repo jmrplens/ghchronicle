@@ -112,7 +112,8 @@ func labelsMilestonesAndForks(b *builder) []Panel {
 			PromTF: merged(map[string]string{
 				"repo": "Repository", "label": "Label", panelValueA: "Used",
 				panelValueB: "Issues", panelValueC: planningPullRequests,
-			}, nil, map[string]int{"repo": 0, "label": 1}),
+			}, nil),
+
 			Opts: Opts{"sort": "Used"},
 			Desc: "The labels in use, per repository, and the link is that label's issue " +
 				"list. Only the labels something carries are collected, so a label nobody " +
@@ -134,7 +135,8 @@ func labelsMilestonesAndForks(b *builder) []Panel {
 			PromTF: merged(map[string]string{
 				"repo": "Repository", "milestone": "Milestone", "state": "State",
 				panelValueA: "Progress", panelValueB: "Issues", panelValueC: planningPullRequests,
-			}, nil, map[string]int{"repo": 0, "milestone": 1, "state": 2}),
+			}, nil),
+
 			Opts: Opts{"sort": "Progress"},
 			Desc: "The due date is collected as a field when a milestone has one, but it is not " +
 				"shown here: InfluxDB creates a column the first time it is written, so a " +
@@ -171,7 +173,10 @@ func labelsMilestonesAndForks(b *builder) []Panel {
 			PromTF: merged(map[string]string{
 				"repo": "Repository", panelValueA: "Forks", panelValueB: planningPushedTo,
 				panelValueC: planningPushedAfter,
-			}, nil, nil),
+			}, nil),
+
+			// The count ahead of the share of it that was pushed to.
+			PromAt: map[string]string{"Forks": planningPushedTo},
 			Desc: "Whether a fork was ever pushed to separates a derivative from a bookmark, " +
 				"which most forks are. Idle is the time since that push, counted from the " +
 				"row's own date, so it is right when the panel is drawn rather than when the " +
@@ -290,7 +295,8 @@ func discussionAndComments(b *builder) []Panel {
 			PromTF: merged(map[string]string{
 				"category": "Category", "has_answer": "Answered", panelValueA: "Discussions",
 				panelValueB: "Comments each", panelValueC: "Upvotes each",
-			}, nil, map[string]int{"category": 0, "has_answer": 1}),
+			}, nil),
+
 			Opts:     Opts{"sort": "Discussions"},
 			Desc:     "Discussions opened in the range, by category and whether they were answered.",
 			PromDesc: sinceStart + " " + lastSweep,
@@ -356,7 +362,7 @@ func discussionAndComments(b *builder) []Panel {
 				" GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT 20",
 		)}, &P{
 			Prom:   []Target{promTbl("topk(20, sum by (full_name) (increase(github_issue_comments_total[$__range])))")},
-			PromTF: []any{organize(map[string]string{"full_name": "Repository", "Value": "Comments"}, nil, nil)},
+			PromTF: []any{organize(map[string]string{"full_name": "Repository", "Value": "Comments"}, nil)},
 			Opts:   Opts{"sort": "Comments"},
 			Desc: "Comments on issues and pull requests, in any repository. The ones outside " +
 				"this account are the half a sweep over one's own repositories cannot see.",
@@ -446,7 +452,7 @@ func answersGiven(b *builder, perItem, grPerItem string) []Panel {
 	return []Panel{
 		panel("table", "Discussion answers", box{W: 8, H: 8, X: 0, Y: 32}, []Target{sqlT(answersSQL)}, &P{
 			Prom:   []Target{promTbl("topk(20, sum by (full_name) (increase(github_discussion_comments_total[$__range])))")},
-			PromTF: []any{organize(map[string]string{"full_name": "Repository", "Value": "Comments"}, nil, nil)},
+			PromTF: []any{organize(map[string]string{"full_name": "Repository", "Value": "Comments"}, nil)},
 			Opts:   Opts{"sort": "Accepted answers"},
 			Desc: "Discussions are the one surface where the work is almost entirely in other " +
 				"people's repositories: gh_discussion sees three rows inside this account, " +

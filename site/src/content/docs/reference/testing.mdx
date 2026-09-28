@@ -120,7 +120,11 @@ Grafana does between the query and the screen, the Prometheus datasource's own
 reshaping of a table, the panel's transformations and its field overrides, and
 every pair of stores is compared on what a reader would see: a tile's number,
 its unit and the words it shows for nothing, a table's rows over the columns
-both stores draw, and a bar's name and length. The review of 2.6.1 found eleven
+both stores draw, and a bar's name and length. A table is held as well to one
+order of the columns both stores draw, which rows matched over those columns
+cannot show: on the 2.6.2 branch 28 Prometheus tables and 4 Graphite ones
+headed them in another order than the SQL stores, "Every bucket" with Most
+used last. The review of 2.6.1 found eleven
 differences by putting the dashboards side by side, among them a table that
 drew seven rows for one repository and stat tiles that had lost their units.
 Nine of them lived in the dashboards, and run against that release's

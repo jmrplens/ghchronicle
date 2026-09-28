@@ -386,6 +386,36 @@ func Order(a, b *Picture, like Likeness) string {
 	return ""
 }
 
+// ColumnOrder says where two drawings of a table head the columns both draw
+// in another order, and nothing when they head them in one order or when
+// either draws no row, since a table with no row shows no heading at all.
+//
+// Compare holds two stores to the same rows over the columns they share and
+// leaves the order of those columns alone, which is how the Prometheus
+// "Every bucket" drew Limit where the SQL stores draw Most used. A column
+// only one store draws is not part of the order: where a store cannot hold a
+// column at all is its description's business, not a place in a heading.
+func ColumnOrder(a, b *Picture) string {
+	if a.Kind != "table" || b.Kind != "table" || a.Empty() || b.Empty() {
+		return ""
+	}
+	inA, inB := columnsByName(a.Columns), columnsByName(b.Columns)
+	shared := func(p *Picture, other map[string]*Field) []string {
+		var out []string
+		for _, f := range p.Columns {
+			if other[f.Display] != nil && !slices.Contains(out, f.Display) {
+				out = append(out, f.Display)
+			}
+		}
+		return out
+	}
+	orderA, orderB := shared(a, inB), shared(b, inA)
+	if slices.Equal(orderA, orderB) {
+		return ""
+	}
+	return fmt.Sprintf("the columns both draw are headed %v in the first and %v in the second", orderA, orderB)
+}
+
 func columnsByName(columns []*Field) map[string]*Field {
 	out := map[string]*Field{}
 	for _, f := range columns {

@@ -265,7 +265,8 @@ func lifetime(b *builder) []Panel {
 					panelValueA: "Commits", panelValueB: "Merged",
 					panelValueC: "Issues", panelValueD: "Releases", panelValueE: "Stars",
 					panelValueF: "Branches", panelValueG: "Tags",
-				}, nil, map[string]int{"repo": 0, panelValueA: 1, "fork": 2, "archived": 3}),
+				}, nil),
+
 				Opts: Opts{"sort": "Commits", "sort_leading": "Fork"},
 				Desc: everyRepositoryDesc,
 				Overrides: []any{
@@ -295,7 +296,7 @@ func lifetime(b *builder) []Panel {
 			Prom: []Target{promTbl("sum by (fork) (github_repos_created_count)")},
 			PromTF: []any{organize(map[string]string{
 				"fork": "Fork", "Value": "Repositories",
-			}, []string{"user"}, nil)},
+			}, []string{"user"})},
 			PromDesc: "The exporter reduces `gh_repo_created` to a count by user and fork, so " +
 				"Prometheus can say how many repositories were created and how many of " +
 				"them were forks, and can name none of them: the repository is not a " +
@@ -324,7 +325,10 @@ func lifetime(b *builder) []Panel {
 			},
 			PromTF: merged(map[string]string{
 				panelValueA: "Repositories archived", panelValueB: lifetimeAgeAtArchive,
-			}, nil, nil),
+			}, nil),
+
+			// The count stands for the repositories the SQL stores list.
+			PromAt: map[string]string{"Repositories archived": "Repository"},
 			PromDesc: "The exporter reduces `gh_repo_archived` to a count by owner, which names " +
 				"the account and not the repository, so Prometheus holds how many have " +
 				"been archived and how long they lived on average, and neither which they " +
@@ -357,7 +361,7 @@ func lifetime(b *builder) []Panel {
 			PromDesc: "Prometheus shows the ten and folds nothing.",
 			PromTF: []any{organize(map[string]string{
 				"repo": "Repository", "Value": "Runs",
-			}, nil, nil)},
+			}, nil)},
 			Desc: "The run listing's own total_count, which is every run the repository has " +
 				"ever had. The run walk sees the newest few hundred by design, so this is " +
 				"the only place the whole history is counted, and it is the answer " +
@@ -502,7 +506,8 @@ func collectorSection(b *builder) []Panel {
 			PromTF: merged(map[string]string{
 				"resource": "Bucket", panelValueA: "Limit",
 				panelValueB: lifetimeLowestRemaining, panelValueC: lifetimeMostUsed,
-			}, nil, nil),
+			}, nil),
+
 			Opts: Opts{"sort": lifetimeMostUsed},
 			Desc: "Every budget GitHub reports, and the one that runs out first decides what " +
 				"a sweep can collect. Reading them costs nothing: GET /rate_limit is free. " +
@@ -522,7 +527,8 @@ func collectorSection(b *builder) []Panel {
 			PromTF: merged(map[string]string{
 				"family": "Family", "reason": "Why",
 				panelValueA: collectorFailures, panelValueB: "Repositories",
-			}, []string{"scope"}, nil),
+			}, []string{"scope"}),
+
 			PromDesc: sweepCount + " There is no Sweeps column here for the same reason: " +
 				"the exporter holds one sweep, so the count would be one on every row.",
 			Opts: Opts{"sort": collectorFailures},
@@ -558,7 +564,7 @@ func collectorSection(b *builder) []Panel {
 			PromTF: []any{organize(map[string]string{
 				"family": "Family", "repo": "Repository", "reason": "Why",
 				"Value": collectorFailures,
-			}, []string{"scope"}, nil)},
+			}, []string{"scope"})},
 			PromDesc: "In Prometheus this is the last sweep's failures rather than the " +
 				"range's, and the exporter carries no message, so the What GitHub said " +
 				"column of the InfluxDB dashboard is absent here.",

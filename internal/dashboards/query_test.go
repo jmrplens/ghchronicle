@@ -200,3 +200,50 @@ func TestEveryMedianIsExactInBothSQLStores(t *testing.T) {
 		t.Errorf("toPG = %s, want %s", got, want)
 	}
 }
+
+// TestAColumnTheSQLDoesNotSelectStandsWhereItIsPlaced: the SQL order leaves a
+// column it does not select for the end, which is right for a count the
+// exporter adds and wrong for the column a row is named by. The Prometheus
+// hook stands where the SQL stores draw the endpoint, a Graphite row name of
+// several path nodes where the SQL draws the first of them, and a placement
+// that no longer names a column the store draws stops the generator rather
+// than ordering nothing.
+func TestAColumnTheSQLDoesNotSelectStandsWhereItIsPlaced(t *testing.T) {
+	t.Parallel()
+	selected := []string{"Endpoint", "Failed", "Deliveries", "Repository"}
+	drawn := map[string]bool{"Repository": true, "Hook": true, "Deliveries": true, "Failed": true}
+	if got := orderLike(selected, drawn, map[string]string{"Hook": "Endpoint"}); !reflect.DeepEqual(got,
+		[]string{"Hook", "Failed", "Deliveries", "Repository"}) {
+		t.Errorf("the hook placed where the endpoint stands: %v", got)
+	}
+	drawn = map[string]bool{"Repository": true, "Hook": true, "Deliveries": true}
+	if got := orderLike(selected, drawn, nil); !reflect.DeepEqual(got, []string{"Deliveries", "Repository"}) {
+		t.Errorf("the hook not placed is left for the end: %v", got)
+	}
+	for _, tc := range []struct {
+		name, want string
+		selected   []string
+	}{
+		{"Repository, number", "Number", []string{"Number", "Open for", "Repository"}},
+		{"Endpoint, repository, ok", "Endpoint", []string{"Endpoint", "Failed", "Deliveries", "Repository"}},
+		{"Pull request", "Number", []string{"Number", "Lines changed", "Repository"}},
+	} {
+		if got := rowNameAt(tc.selected, tc.name); got != tc.want {
+			t.Errorf("rowNameAt(%v, %q) = %q, want %q", tc.selected, tc.name, got, tc.want)
+		}
+	}
+	sql := []Target{sqlT(`SELECT host AS "Endpoint", COUNT(*) AS "Deliveries" FROM gh_webhook_delivery`)}
+	msg := panicOf(t, func() {
+		panel("table", "Webhook endpoints", box{W: 12, H: 8}, sql, &P{
+			Prom:     []Target{promTbl("sum by (hook) (github_webhook_deliveries_total)")},
+			PromTF:   []any{organize(map[string]string{"hook": "Hook", "Value": "Deliveries"}, nil)},
+			PromAt:   map[string]string{"Hooks": "Endpoint"},
+			GRNote:   "none",
+			ESNote:   "none",
+			PromNote: "none",
+		})
+	})
+	if !strings.Contains(msg, `places "Hooks" where the SQL draws "Endpoint"`) {
+		t.Errorf("a placement of a column the store does not draw: %s", msg)
+	}
+}

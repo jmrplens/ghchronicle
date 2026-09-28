@@ -802,12 +802,7 @@
                   "job": true,
                   "owner": true
                 },
-                "indexByName": {
-                  "Value #A": 1,
-                  "archived": 3,
-                  "fork": 2,
-                  "repo": 0
-                },
+                "indexByName": {},
                 "renameByName": {
                   "Value #A": "Commits",
                   "Value #B": "Merged",
@@ -820,6 +815,25 @@
                   "fork": "Fork",
                   "repo": "Repository"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Archived": 3,
+                  "Branches": 8,
+                  "Commits": 1,
+                  "Fork": 2,
+                  "Issues": 5,
+                  "Merged": 4,
+                  "Releases": 6,
+                  "Repository": 0,
+                  "Stars": 7,
+                  "Tags": 9
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -972,6 +986,16 @@
                   "fork": "Fork"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Fork": 0
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -1087,6 +1111,17 @@
                   "Value #A": "Repositories archived",
                   "Value #B": "Age at archive"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Age at archive": 1,
+                  "Repositories archived": 0
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -1512,6 +1547,18 @@
                   "referrer": "Referrer"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Referrer": 0,
+                  "Unique": 2,
+                  "Views": 1
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -1707,6 +1754,19 @@
                   "Value #C": "Views",
                   "repo": "Repository"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Cloners": 2,
+                  "Clones": 1,
+                  "Repository": 0,
+                  "Views": 3
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -2053,6 +2113,16 @@
                   "Value": "Stars",
                   "repo": "Repository"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Repository": 0
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -2663,6 +2733,17 @@
                   "full_name": "Repository"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Commits": 1,
+                  "Repository": 0
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -2843,6 +2924,22 @@
                   "Value #F": "New repos",
                   "year": "Year"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Commits": 2,
+                  "Contributions": 1,
+                  "Issues": 5,
+                  "New repos": 6,
+                  "Pull requests": 3,
+                  "Reviews": 4,
+                  "Year": 0
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -3796,6 +3893,19 @@
                   "repo": "Repository"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Lines changed": 3,
+                  "Merged": 1,
+                  "Repository": 0,
+                  "Time to merge": 2
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -3940,6 +4050,18 @@
                   "Value #B": "Wait",
                   "reviewer": "Reviewer"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Reviewer": 0,
+                  "Reviews": 1,
+                  "Wait": 2
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -4177,14 +4299,24 @@
                   "job": true,
                   "owner": true
                 },
-                "indexByName": {
-                  "repo": 0
-                },
+                "indexByName": {},
                 "renameByName": {
                   "Value #A": "Open for",
                   "Value #B": "Comments",
                   "repo": "Repository"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Comments": 2,
+                  "Open for": 0,
+                  "Repository": 1
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -5176,10 +5308,7 @@
                   "job": true,
                   "owner": true
                 },
-                "indexByName": {
-                  "repo": 1,
-                  "workflow": 0
-                },
+                "indexByName": {},
                 "renameByName": {
                   "Value #A": "Runs",
                   "Value #B": "Not successful",
@@ -5187,6 +5316,20 @@
                   "repo": "Repository",
                   "workflow": "Workflow"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Duration": 4,
+                  "Not successful": 3,
+                  "Repository": 2,
+                  "Runs": 1,
+                  "Workflow": 0
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -5327,16 +5470,26 @@
                   "job": true,
                   "owner": true
                 },
-                "indexByName": {
-                  "job_name": 0,
-                  "repo": 1
-                },
+                "indexByName": {},
                 "renameByName": {
                   "Value #A": "Duration",
                   "Value #B": "Times run",
                   "job_name": "Job",
                   "repo": "Repository"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Duration": 1,
+                  "Job": 0,
+                  "Repository": 2,
+                  "Times run": 3
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -5497,6 +5650,18 @@
                   "repo": "Repository"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Repository": 0,
+                  "Total": 2,
+                  "Wasted": 1
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -5635,16 +5800,26 @@
                   "job": true,
                   "owner": true
                 },
-                "indexByName": {
-                  "repo": 0,
-                  "workflow": 1
-                },
+                "indexByName": {},
                 "renameByName": {
                   "Value #A": "Failures",
                   "Value #B": "Runs",
                   "repo": "Repository",
                   "workflow": "Workflow"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Failures": 1,
+                  "Repository": 0,
+                  "Runs": 3,
+                  "Workflow": 2
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -5870,6 +6045,20 @@
                   "Value #D": "Live",
                   "repo": "Repository"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Declared": 1,
+                  "Live": 3,
+                  "Live size": 4,
+                  "Repository": 0,
+                  "Walked": 2
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -6417,6 +6606,18 @@
                   "author": "Author"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Author": 0,
+                  "Commits": 1,
+                  "Lines per commit": 2
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -6620,6 +6821,16 @@
                   "Value": "Force pushes",
                   "repo": "Repository"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Repository": 0
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -6894,6 +7105,18 @@
                   "conclusion": "Check"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "App": 0,
+                  "Check": 2,
+                  "Runs": 1
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -7084,10 +7307,7 @@
                   "job": true,
                   "owner": true
                 },
-                "indexByName": {
-                  "label": 1,
-                  "repo": 0
-                },
+                "indexByName": {},
                 "renameByName": {
                   "Value #A": "Used",
                   "Value #B": "Issues",
@@ -7095,6 +7315,20 @@
                   "label": "Label",
                   "repo": "Repository"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Issues": 3,
+                  "Label": 0,
+                  "Pull requests": 4,
+                  "Repository": 2,
+                  "Used": 1
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -7263,11 +7497,7 @@
                   "job": true,
                   "owner": true
                 },
-                "indexByName": {
-                  "milestone": 1,
-                  "repo": 0,
-                  "state": 2
-                },
+                "indexByName": {},
                 "renameByName": {
                   "Value #A": "Progress",
                   "Value #B": "Issues",
@@ -7276,6 +7506,21 @@
                   "repo": "Repository",
                   "state": "State"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Issues": 4,
+                  "Milestone": 0,
+                  "Progress": 1,
+                  "Pull requests": 5,
+                  "Repository": 2,
+                  "State": 3
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -7552,6 +7797,18 @@
                   "repo": "Repository"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Forks": 1,
+                  "Pushed to": 2,
+                  "Repository": 0
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -7755,10 +8012,7 @@
                   "job": true,
                   "owner": true
                 },
-                "indexByName": {
-                  "category": 0,
-                  "has_answer": 1
-                },
+                "indexByName": {},
                 "renameByName": {
                   "Value #A": "Discussions",
                   "Value #B": "Comments each",
@@ -7766,6 +8020,20 @@
                   "category": "Category",
                   "has_answer": "Answered"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Answered": 2,
+                  "Category": 0,
+                  "Comments each": 3,
+                  "Discussions": 1,
+                  "Upvotes each": 4
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -7979,6 +8247,17 @@
                   "full_name": "Repository"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Comments": 1,
+                  "Repository": 0
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -8104,6 +8383,17 @@
                   "Value": "Comments",
                   "full_name": "Repository"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Comments": 1,
+                  "Repository": 0
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -8460,10 +8750,7 @@
                   "job": true,
                   "owner": true
                 },
-                "indexByName": {
-                  "hook": 1,
-                  "repo": 0
-                },
+                "indexByName": {},
                 "renameByName": {
                   "Value #A": "Deliveries",
                   "Value #B": "Failed",
@@ -8472,6 +8759,21 @@
                   "hook": "Hook",
                   "repo": "Repository"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Deliveries": 2,
+                  "Failed": 1,
+                  "Hook": 0,
+                  "Latency": 5,
+                  "Repository": 3,
+                  "Retried": 4
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -8603,11 +8905,7 @@
                   "job": true,
                   "owner": true
                 },
-                "indexByName": {
-                  "enforcement": 2,
-                  "repo": 0,
-                  "ruleset": 1
-                },
+                "indexByName": {},
                 "renameByName": {
                   "Value #A": "Active",
                   "Value #B": "Last changed",
@@ -8615,6 +8913,20 @@
                   "repo": "Repository",
                   "ruleset": "Ruleset"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Active": 3,
+                  "Enforcement": 2,
+                  "Last changed": 4,
+                  "Repository": 0,
+                  "Ruleset": 1
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -8714,17 +9026,26 @@
                   "job": true,
                   "owner": true
                 },
-                "indexByName": {
-                  "key": 1,
-                  "read_only": 2,
-                  "repo": 0
-                },
+                "indexByName": {},
                 "renameByName": {
                   "Value": "Unused for",
                   "key": "Key",
                   "read_only": "Read only",
                   "repo": "Repository"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Key": 2,
+                  "Read only": 3,
+                  "Repository": 0,
+                  "Unused for": 1
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -8857,6 +9178,20 @@
                   "repo": "Repository"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Active": 3,
+                  "Events subscribed": 4,
+                  "Hook": 2,
+                  "Host": 1,
+                  "Repository": 0
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -8961,6 +9296,18 @@
                   "environment": "Environment",
                   "repo": "Repository"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Environment": 0,
+                  "Idle": 1,
+                  "Repository": 2
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -9084,17 +9431,26 @@
                   "job": true,
                   "owner": true
                 },
-                "indexByName": {
-                  "branch": 1,
-                  "is_default": 2,
-                  "repo": 0
-                },
+                "indexByName": {},
                 "renameByName": {
                   "Value": "Idle",
                   "branch": "Branch",
                   "is_default": "Default",
                   "repo": "Repository"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Branch": 0,
+                  "Default": 3,
+                  "Idle": 1,
+                  "Repository": 2
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -9428,10 +9784,7 @@
                   "job": true,
                   "owner": true
                 },
-                "indexByName": {
-                  "pattern": 1,
-                  "repo": 0
-                },
+                "indexByName": {},
                 "renameByName": {
                   "Value #A": "Reviews",
                   "Value #B": "Signatures",
@@ -9442,6 +9795,23 @@
                   "pattern": "Pattern",
                   "repo": "Repository"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Checks": 7,
+                  "Force push": 5,
+                  "Linear": 4,
+                  "Pattern": 1,
+                  "Repository": 0,
+                  "Reviews": 2,
+                  "Signatures": 3,
+                  "Threads": 6
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -9595,11 +9965,7 @@
                   "job": true,
                   "owner": true
                 },
-                "indexByName": {
-                  "repo": 0,
-                  "rule": 2,
-                  "ruleset": 1
-                },
+                "indexByName": {},
                 "renameByName": {
                   "Value #A": "Bypass actors",
                   "Value #B": "Always",
@@ -9608,6 +9974,21 @@
                   "rule": "Rule",
                   "ruleset": "Ruleset"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Always": 1,
+                  "Bypass actors": 4,
+                  "Repository": 2,
+                  "Rule": 0,
+                  "Ruleset": 3,
+                  "Sampled": 5
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -9738,17 +10119,25 @@
                   "job": true,
                   "owner": true
                 },
-                "indexByName": {
-                  "actor_type": 2,
-                  "repo": 0,
-                  "ruleset": 1
-                },
+                "indexByName": {},
                 "renameByName": {
                   "Value": "Versions",
                   "actor_type": "Actor",
                   "repo": "Repository",
                   "ruleset": "Ruleset"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Actor": 2,
+                  "Repository": 1,
+                  "Ruleset": 0
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -10032,10 +10421,7 @@
                   "job": true,
                   "owner": true
                 },
-                "indexByName": {
-                  "environment": 1,
-                  "repo": 0
-                },
+                "indexByName": {},
                 "renameByName": {
                   "Value #A": "Deployments",
                   "Value #B": "To status",
@@ -10045,6 +10431,22 @@
                   "environment": "Environment",
                   "repo": "Repository"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Deployments": 1,
+                  "Environment": 0,
+                  "Live for": 4,
+                  "Pending": 6,
+                  "Repository": 2,
+                  "Successes": 5,
+                  "To status": 3
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -10913,16 +11315,26 @@
                   "job": true,
                   "owner": true
                 },
-                "indexByName": {
-                  "feature": 1,
-                  "repo": 0
-                },
+                "indexByName": {},
                 "renameByName": {
                   "Value #A": "Enabled",
                   "Value #B": "Open alerts",
                   "feature": "Feature",
                   "repo": "Repository"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Enabled": 2,
+                  "Feature": 1,
+                  "Open alerts": 3,
+                  "Repository": 0
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -11133,6 +11545,18 @@
                   "Value #B": "Time to resolve",
                   "severity": "Severity"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Alerts": 1,
+                  "Severity": 0,
+                  "Time to resolve": 2
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -11393,6 +11817,19 @@
                   "severity": "Severity"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Alerts": 1,
+                  "Severity": 0,
+                  "Time to resolve": 3,
+                  "Worst CVSS": 2
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -11539,16 +11976,26 @@
                   "job": true,
                   "owner": true
                 },
-                "indexByName": {
-                  "repo": 1,
-                  "tool": 0
-                },
+                "indexByName": {},
                 "renameByName": {
                   "Value #A": "Runs",
                   "Value #B": "Results",
                   "repo": "Repository",
                   "tool": "Tool"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Repository": 2,
+                  "Results": 1,
+                  "Runs": 3,
+                  "Tool": 0
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -11739,17 +12186,26 @@
                   "job": true,
                   "owner": true
                 },
-                "indexByName": {
-                  "repo": 0,
-                  "setting": 1,
-                  "status": 2
-                },
+                "indexByName": {},
                 "renameByName": {
                   "Value": "Enabled",
                   "repo": "Repository",
                   "setting": "Setting",
                   "status": "Status"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Enabled": 3,
+                  "Repository": 0,
+                  "Setting": 1,
+                  "Status": 2
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -11903,12 +12359,7 @@
                   "job": true,
                   "owner": true
                 },
-                "indexByName": {
-                  "query_suite": 2,
-                  "repo": 0,
-                  "schedule": 3,
-                  "state": 1
-                },
+                "indexByName": {},
                 "renameByName": {
                   "Value #B": "Languages",
                   "Value #C": "Last changed",
@@ -11917,6 +12368,21 @@
                   "schedule": "Schedule",
                   "state": "State"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Languages": 4,
+                  "Last changed": 5,
+                  "Query suite": 2,
+                  "Repository": 0,
+                  "Schedule": 3,
+                  "State": 1
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -12043,15 +12509,24 @@
                   "job": true,
                   "owner": true
                 },
-                "indexByName": {
-                  "permissions": 1,
-                  "repo": 0
-                },
+                "indexByName": {},
                 "renameByName": {
                   "Value": "Can approve pull requests",
                   "permissions": "Permissions",
                   "repo": "Repository"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Can approve pull requests": 2,
+                  "Permissions": 1,
+                  "Repository": 0
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -12192,11 +12667,7 @@
                   "job": true,
                   "owner": true
                 },
-                "indexByName": {
-                  "kind": 1,
-                  "repo": 0,
-                  "secret": 2
-                },
+                "indexByName": {},
                 "renameByName": {
                   "Value #A": "Age",
                   "Value #B": "Last rotated",
@@ -12204,6 +12675,20 @@
                   "repo": "Repository",
                   "secret": "Secret"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Age": 2,
+                  "Kind": 4,
+                  "Last rotated": 1,
+                  "Repository": 3,
+                  "Secret": 0
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -12770,6 +13255,22 @@
                   "unit": "Unit"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Gross": 1,
+                  "Net": 6,
+                  "Price": 5,
+                  "Quantity": 3,
+                  "Repository": 0,
+                  "SKU": 2,
+                  "Unit": 4
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -12917,10 +13418,7 @@
                   "job": true,
                   "owner": true
                 },
-                "indexByName": {
-                  "cache": 1,
-                  "repo": 0
-                },
+                "indexByName": {},
                 "renameByName": {
                   "Value #A": "Size",
                   "Value #B": "Days since use",
@@ -12928,6 +13426,20 @@
                   "cache": "Cache",
                   "repo": "Repository"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Cache": 0,
+                  "Days since use": 4,
+                  "Entries": 3,
+                  "Repository": 2,
+                  "Size": 1
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -13077,6 +13589,18 @@
                   "Value #B": "Entries",
                   "repo": "Repository"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Cache": 1,
+                  "Entries": 2,
+                  "Repository": 0
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -13391,6 +13915,18 @@
                   "reason": "Reason",
                   "subject_type": "Kind"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Kind": 2,
+                  "Notifications": 1,
+                  "Reason": 0
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -13733,6 +14269,20 @@
                   "full_name": "Repository"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Comments": 4,
+                  "Contributions": 1,
+                  "Merged": 2,
+                  "Repository": 0,
+                  "Stars": 3
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -13960,6 +14510,17 @@
                   "Value": "Its stars",
                   "language": "Language"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Its stars": 1,
+                  "Language": 0
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -14518,9 +15079,7 @@
                   "job": true,
                   "owner": true
                 },
-                "indexByName": {
-                  "repo": 0
-                },
+                "indexByName": {},
                 "renameByName": {
                   "Value #A": "Community profile",
                   "Value #B": "Readme",
@@ -14531,6 +15090,23 @@
                   "Value #G": "PR template",
                   "repo": "Repository"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Community profile": 1,
+                  "Conduct": 5,
+                  "Contributing": 4,
+                  "Issue templates": 6,
+                  "License": 3,
+                  "PR template": 7,
+                  "Readme": 2,
+                  "Repository": 0
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -14825,20 +15401,7 @@
                   "job": true,
                   "owner": true
                 },
-                "indexByName": {
-                  "Value #A": 2,
-                  "Value #B": 3,
-                  "Value #C": 4,
-                  "Value #D": 5,
-                  "Value #E": 6,
-                  "Value #F": 7,
-                  "Value #G": 8,
-                  "Value #H": 9,
-                  "language": 1,
-                  "license": 11,
-                  "repo": 0,
-                  "visibility": 10
-                },
+                "indexByName": {},
                 "renameByName": {
                   "Value #A": "Stars",
                   "Value #B": "Forks",
@@ -14853,6 +15416,27 @@
                   "repo": "Repository",
                   "visibility": "Visibility"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Age": 8,
+                  "Forks": 3,
+                  "Idle": 9,
+                  "Language": 2,
+                  "License": 11,
+                  "Network": 4,
+                  "Open issues": 5,
+                  "Repository": 0,
+                  "Size": 7,
+                  "Stars": 1,
+                  "Visibility": 10,
+                  "Watchers": 6
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -14941,6 +15525,17 @@
                   "Value": "Repositories",
                   "topic": "Topic"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Repositories": 1,
+                  "Topic": 0
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -15094,6 +15689,20 @@
                   "package": "Package",
                   "type": "Type"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Idle": 4,
+                  "Package": 0,
+                  "Tagged": 3,
+                  "Type": 2,
+                  "Versions": 1
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -15291,6 +15900,20 @@
                   "Value #D": "Idle",
                   "gist": "Gist"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Comments": 2,
+                  "Files": 1,
+                  "Gist": 0,
+                  "Idle": 4,
+                  "Size": 3
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -15571,9 +16194,7 @@
                   "job": true,
                   "owner": true
                 },
-                "indexByName": {
-                  "repo": 0
-                },
+                "indexByName": {},
                 "renameByName": {
                   "Value #A": "Security policy",
                   "Value #B": "Delete on merge",
@@ -15583,6 +16204,22 @@
                   "Value #F": "CODEOWNERS errors",
                   "repo": "Repository"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Auto merge": 3,
+                  "CODEOWNERS errors": 6,
+                  "Delete on merge": 2,
+                  "Issue templates": 5,
+                  "Protection rules": 4,
+                  "Repository": 0,
+                  "Security policy": 1
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -15670,10 +16307,7 @@
                   "job": true,
                   "owner": true
                 },
-                "indexByName": {
-                  "key": 0,
-                  "kind": 1
-                },
+                "indexByName": {},
                 "renameByName": {
                   "Value #A": "Days since use",
                   "Value #B": "Never used",
@@ -15681,6 +16315,20 @@
                   "key": "Key",
                   "kind": "Kind"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Days since use": 2,
+                  "Days to expiry": 4,
+                  "Key": 0,
+                  "Kind": 1,
+                  "Never used": 3
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -15842,6 +16490,16 @@
                   "Value": "Present",
                   "provider": "Provider"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Provider": 0
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -16038,16 +16696,26 @@
                   "job": true,
                   "owner": true
                 },
-                "indexByName": {
-                  "file": 1,
-                  "repo": 0
-                },
+                "indexByName": {},
                 "renameByName": {
                   "Value #A": "Present",
                   "Value #B": "Changes",
                   "file": "File",
                   "repo": "Repository"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Changes": 3,
+                  "File": 1,
+                  "Present": 2,
+                  "Repository": 0
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -16194,17 +16862,26 @@
                   "job": true,
                   "owner": true
                 },
-                "indexByName": {
-                  "ecosystem": 1,
-                  "interval": 2,
-                  "repo": 0
-                },
+                "indexByName": {},
                 "renameByName": {
                   "Value": "Blocks",
                   "ecosystem": "Ecosystem",
                   "interval": "Interval",
                   "repo": "Repository"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Blocks": 1,
+                  "Ecosystem": 2,
+                  "Interval": 3,
+                  "Repository": 0
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -16756,9 +17433,7 @@
                   "owner": true,
                   "user": true
                 },
-                "indexByName": {
-                  "direction": 0
-                },
+                "indexByName": {},
                 "renameByName": {
                   "Value #A": "Sponsorships",
                   "Value #B": "Mean amount",
@@ -16766,6 +17441,20 @@
                   "Value #D": "One-time share",
                   "direction": "Direction"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Active share": 3,
+                  "Direction": 0,
+                  "Mean amount": 2,
+                  "One-time share": 4,
+                  "Sponsorships": 1
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -16997,9 +17686,7 @@
                   "owner": true,
                   "user": true
                 },
-                "indexByName": {
-                  "tier": 0
-                },
+                "indexByName": {},
                 "renameByName": {
                   "Value #A": "Price",
                   "Value #B": "One-time",
@@ -17007,6 +17694,20 @@
                   "Value #D": "Age",
                   "tier": "Tier"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Age": 4,
+                  "One-time": 2,
+                  "Price": 1,
+                  "Retired": 3,
+                  "Tier": 0
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -17148,9 +17849,7 @@
                   "owner": true,
                   "user": true
                 },
-                "indexByName": {
-                  "repo": 0
-                },
+                "indexByName": {},
                 "renameByName": {
                   "Value #A": "Position",
                   "Value #B": "Stars",
@@ -17169,6 +17868,19 @@
                     "field": "Position"
                   }
                 ]
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Idle": 3,
+                  "Item": 1,
+                  "Position": 0,
+                  "Stars": 2
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -17296,9 +18008,7 @@
                   "owner": true,
                   "user": true
                 },
-                "indexByName": {
-                  "flag": 0
-                },
+                "indexByName": {},
                 "renameByName": {
                   "Value": "Enabled",
                   "flag": "Flag"
@@ -17315,6 +18025,17 @@
                     "field": "Flag"
                   }
                 ]
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Enabled": 1,
+                  "Flag": 0
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -17510,9 +18231,7 @@
                   "owner": true,
                   "user": true
                 },
-                "indexByName": {
-                  "list": 0
-                },
+                "indexByName": {},
                 "renameByName": {
                   "Value #A": "Items",
                   "Value #B": "Private",
@@ -17520,6 +18239,20 @@
                   "Value #D": "Last added",
                   "list": "List"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Age": 3,
+                  "Items": 1,
+                  "Last added": 4,
+                  "List": 0,
+                  "Private": 2
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -17621,6 +18354,17 @@
                   "Value": "Tier",
                   "achievement": "Achievement"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Achievement": 0,
+                  "Tier": 1
+                },
+                "renameByName": {}
               }
             }
           ],
@@ -17961,6 +18705,21 @@
                   "achievement": "Achievement"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Achievement": 0,
+                  "Count": 2,
+                  "Next tier at": 3,
+                  "Page agrees": 5,
+                  "Progress": 1,
+                  "Tier": 4
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -18137,6 +18896,19 @@
                   "resource": "Bucket"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Bucket": 0,
+                  "Limit": 2,
+                  "Lowest remaining": 3,
+                  "Most used": 1
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -18304,6 +19076,19 @@
                   "reason": "Why"
                 }
               }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Failures": 1,
+                  "Family": 0,
+                  "Repositories": 3,
+                  "Why": 2
+                },
+                "renameByName": {}
+              }
             }
           ],
           "type": "table"
@@ -18417,6 +19202,18 @@
                   "reason": "Why",
                   "repo": "Repository"
                 }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {},
+                "indexByName": {
+                  "Family": 0,
+                  "Repository": 1,
+                  "Why": 2
+                },
+                "renameByName": {}
               }
             }
           ],
