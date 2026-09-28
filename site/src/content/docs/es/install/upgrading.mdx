@@ -145,6 +145,15 @@ fichero de estado se rechaza.
 En la GitHub Action, `mode: migrate` ejecuta `-migrate -yes`: ver [las
 entradas](/ghchronicle/es/install/actions/#entradas).
 
+Un almacén despejado se vuelve a escribir entero. El [registro de
+escrituras](/ghchronicle/es/sinks/#solo-se-escribe-lo-que-ha-cambiado) olvida la
+medida solo en ese almacén, y cada otra medida y cada otro almacén conservan lo
+que recuerdan, y el [fichero de caché](/ghchronicle/es/configuration/#la-caché-que-hay-a-su-lado)
+olvida lo que afirma de las familias que escriben la medida, sus rechazos y,
+cuando `actions` está entre ellas, las ejecuciones de workflows cuyos jobs
+había escrito, así que las pasadas siguientes preguntan todo lo que pregunta
+una primera pasada.
+
 ### Lo que el fichero de estado recuerda de cada almacén
 
 La clave `stores` del [fichero de estado](/ghchronicle/es/configuration/#state_file)

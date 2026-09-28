@@ -349,7 +349,7 @@ func execute(args []string, stdout, stderr io.Writer) {
 
 	runner := newRunner(cfg, api, sinks, logger, &o)
 	runner.Refill, runner.RefillEveryStart = ledgerForgot(cfg, ledger)
-	stampStores(ctx, runner, cfg, &o, api, sinks, logger)
+	stampStores(ctx, runner, cfg, &o, migration{api: api, sinks: sinks, ledger: ledger, log: logger})
 	switch {
 	case o.backfill:
 		err = runBackfill(ctx, runner, cfg, accumulator, &o, logger)
@@ -377,19 +377,20 @@ func execute(args []string, stdout, stderr io.Writer) {
 // the first sweep marks anything, which is what lets it tell a first start
 // from an upgrade, and then brings along what an upgrade left in them. A
 // card-only run writes to no store and saves no state, so it records nothing
-// and has nothing to bring along.
-func stampStores(ctx context.Context, runner *run.Runner, cfg *config.Config, o *options,
-	api *ghapi.Client, sinks []sink.Sink, logger *slog.Logger,
-) {
+// and has nothing to bring along. m carries the run's API client, sinks,
+// ledger and logger; the rest is filled in here.
+func stampStores(ctx context.Context, runner *run.Runner, cfg *config.Config, o *options, m migration) {
 	if o.cardOnly {
 		return
 	}
+	m.cfg, m.state, m.configPath = cfg, runner.State, o.path
 	for _, w := range migrate.Stamp(runner.State, cfg, version) {
-		logger.Warn(w)
+		m.log.Warn(w)
 	}
-	migrateOnStart(ctx, migration{
-		cfg: cfg, api: api, sinks: sinks, state: runner.State, log: logger, configPath: o.path,
-	}, !o.oneShot())
+	// Before anything is written: a migration applied by an earlier run has
+	// to be forgotten by this run's ledger too.
+	saltLedger(m.ledger, runner.State)
+	migrateOnStart(ctx, m, !o.oneShot())
 }
 
 // oneShot says the run ends after what it was asked to do rather than

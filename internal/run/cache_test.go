@@ -717,3 +717,49 @@ func TestARefillIsReportedAtInfoOnlyWhenAKeptLedgerReadEmpty(t *testing.T) {
 		})
 	}
 }
+
+// TestAClearedStoreIsNotClaimedToHoldWhatItLost: a migration that cleared a
+// store takes out of the cache file what the file claims about the families
+// that write the measurement, the runs whose jobs every store holds and the
+// refusals, so the sweeps after it ask what a first sweep asks. Every other
+// family's refusals, the page sizes and the conditional answers stay.
+func TestAClearedStoreIsNotClaimedToHoldWhatItLost(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "state-cache.bin")
+	until := time.Now().Add(time.Hour)
+	head := &cacheHeader{
+		Written:  time.Now(),
+		Counts:   map[string]collect.ItemCounts{"o/n": {Pulls: 1}},
+		Expanded: []expandedRun{{ID: 7, Attempt: 1, Listed: time.Now().Unix()}},
+		Refusals: map[string][]collect.Refused{
+			"security": {{Path: "/repos/o/n/dependabot/alerts", Status: 403, Until: until}},
+			"deps":     {{Path: "/repos/o/n/dependency-graph/sbom", Status: 404, Until: until}},
+		},
+	}
+	answers := []ghapi.Answer{{URL: "https://api.github.com/x", ETag: `"e"`, Body: []byte(`{"a":1}`), Used: time.Now().Unix()}}
+	if err := writeCache(path, head, answers); err != nil {
+		t.Fatal(err)
+	}
+	if err := ForgetInCache(path, []string{"discussions", "outbound"}); err != nil {
+		t.Fatal(err)
+	}
+	if kept, _, err := readCache(path); err != nil || len(kept.Expanded) != 1 || len(kept.Refusals) != 2 {
+		t.Fatalf("families that were not cleared lost their claims: %+v, %v", kept, err)
+	}
+	if err := ForgetInCache(path, []string{"security", "actions"}); err != nil {
+		t.Fatal(err)
+	}
+	kept, read, err := readCache(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(kept.Expanded) != 0 || len(kept.Refusals["security"]) != 0 {
+		t.Errorf("the cleared families' claims stayed: runs %v, refusals %v", kept.Expanded, kept.Refusals)
+	}
+	if len(kept.Refusals["deps"]) != 1 || kept.Counts["o/n"].Pulls != 1 || len(read) != 1 {
+		t.Errorf("what no cleared family owns went too: %+v, %d answers", kept, len(read))
+	}
+	if err = ForgetInCache(filepath.Join(t.TempDir(), "none.bin"), []string{"actions"}); err != nil {
+		t.Errorf("a file that is not there: %v", err)
+	}
+}

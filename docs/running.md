@@ -2506,6 +2506,14 @@ waits for it to finish, and a second service on the same state file is refused.
 In the GitHub Action, `mode: migrate` runs `-migrate -yes`: see [the
 inputs](https://jmrp.io/docs/ghchronicle/install/actions/#inputs).
 
+A store that was cleared is written again whole. The [write
+ledger](https://jmrp.io/docs/ghchronicle/sinks/#only-what-changed-is-written) forgets the
+measurement in that store alone, every other measurement and every other store
+keeping what it remembers, and the [cache file](https://jmrp.io/docs/ghchronicle/configuration/#the-cache-beside-it)
+forgets what it claims about the families that write the measurement, their
+refusals and, when `actions` is among them, the workflow runs whose jobs it had
+written, so the sweeps after it ask everything a first sweep asks.
+
 #### What the state file remembers of each store
 
 The `stores` key of [the state file](https://jmrp.io/docs/ghchronicle/configuration/#state_file)

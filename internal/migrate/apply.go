@@ -76,8 +76,14 @@ type Applying struct {
 	// Refill reads the cleared items again. Nil is a build that cannot,
 	// which leaves every cleared item owing its history and says so.
 	Refill Refiller
-	Now    func() time.Time
-	Log    *slog.Logger
+	// Cleared, when set, is told of every item applied, once it is recorded
+	// and before the refill, so that what this process remembers of the
+	// measurement in that store is forgotten and the refill writes every row
+	// again: the write ledger's entries, and the cache file's claims about
+	// the families that write it.
+	Cleared func(c Chosen)
+	Now     func() time.Time
+	Log     *slog.Logger
 	// Resume is the sentence a failure ends with: how to try again.
 	Resume string
 }
@@ -137,6 +143,9 @@ func (a Applying) one(ctx context.Context, c Chosen) (Outcome, error) {
 		a.State.Stores[c.Store] = rec
 	}
 	rec.MarkApplied(m.ID, a.now())
+	if a.Cleared != nil {
+		a.Cleared(c)
+	}
 	if err = a.Save(); err != nil {
 		// Applied and not recorded: a store that can be asked shows it
 		// cleared at the next start, a store that cannot is asked to be

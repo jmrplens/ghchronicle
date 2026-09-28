@@ -37,7 +37,9 @@ type migration struct {
 	api   *ghapi.Client
 	sinks []sink.Sink
 	state *run.State
-	log   *slog.Logger
+	// ledger is the run's write ledger, nil for a run that opens none.
+	ledger *sink.Ledger
+	log    *slog.Logger
 	// configPath is -config as it was given, for the command lines a warning
 	// names: the reader copies them into the same shell.
 	configPath string
@@ -57,6 +59,34 @@ var storeWays = func(migration) (map[string]migrate.Applier, migrate.Refiller) {
 		"graphite": migrate.Instructions{},
 		"telegraf": migrate.Instructions{},
 	}, nil
+}
+
+// forgetCleared is what a run forgets once a migration has cleared a store:
+// the write ledger's entries of that measurement in that store, through the
+// salt the record now gives it, and the cache file's claims about the
+// families that write it. Without the first the refill and the sweeps after
+// it would be held back from writing into the cleared table every row the
+// ledger remembers writing into the old one.
+func forgetCleared(m migration) func(migrate.Chosen) {
+	return func(c migrate.Chosen) {
+		measurement := c.Item.Migration.Measurement
+		m.ledger.Salt(c.Store, measurement, migrate.Salt(m.state.Stores[c.Store], measurement))
+		if err := run.ForgetInCache(m.cfg.CacheFile(), c.Item.Refill); err != nil {
+			m.log.Warn("the cache file still claims what the cleared store held", "file", m.cfg.CacheFile(),
+				"err", err, "families", strings.Join(c.Item.Refill, ","))
+		}
+	}
+}
+
+// saltLedger mixes into the ledger every migration the state file records as
+// applied, so that a store cleared by an earlier run, -migrate -yes among
+// them, is written again by this one rather than held back.
+func saltLedger(ledger *sink.Ledger, state *run.State) {
+	for store, measurements := range migrate.Salts(state) {
+		for measurement, salt := range measurements {
+			ledger.Salt(store, measurement, salt)
+		}
+	}
 }
 
 // commandLine is a command the reader can copy, with the configuration this
@@ -113,7 +143,7 @@ func migrateOnStart(ctx context.Context, m migration, service bool) {
 	resume := "the next start tries again, and " + commandLine(m.configPath, "-migrate") + " says what is left"
 	_, err := migrate.Applying{
 		State: m.state, Save: m.state.Save, Appliers: ways, Refill: refill,
-		Log: m.log, Resume: resume,
+		Cleared: forgetCleared(m), Log: m.log, Resume: resume,
 	}.Apply(ctx, chosen)
 	if err != nil {
 		m.log.Error("reading the history of what was cleared again did not finish", "err", err, "resume", resume)
@@ -242,12 +272,12 @@ func migrateApply(ctx context.Context, cfg *config.Config, api *ghapi.Client, o 
 		Resume: "Run the same command again once the cause is fixed: what was applied is recorded and is not " +
 			"done twice.",
 	}
+	m := migration{cfg: cfg, api: api, sinks: sinks, state: state, log: logger, configPath: o.path}
 	if len(chosen) > 0 {
-		ways, refill := storeWays(migration{
-			cfg: cfg, api: api, sinks: sinks, state: state, log: logger, configPath: o.path,
-		})
+		ways, refill := storeWays(m)
 		report.Results, report.Refill = migrate.Applying{
-			State: state, Save: state.Save, Appliers: ways, Refill: refill, Log: logger, Resume: report.Resume,
+			State: state, Save: state.Save, Appliers: ways, Refill: refill, Cleared: forgetCleared(m),
+			Log: logger, Resume: report.Resume,
 		}.Apply(ctx, chosen)
 	}
 	if err = state.Save(); err != nil {

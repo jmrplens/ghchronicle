@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -15,8 +16,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jmrplens/ghchronicle/v2/internal/config"
 	"github.com/jmrplens/ghchronicle/v2/internal/migrate"
 	"github.com/jmrplens/ghchronicle/v2/internal/run"
+	"github.com/jmrplens/ghchronicle/v2/internal/sink"
 	"github.com/jmrplens/ghchronicle/v2/test/e2e/fakegh"
 )
 
@@ -493,5 +496,45 @@ func TestACommandLineNamesTheConfigurationSoTheShellReadsItBack(t *testing.T) {
 		if got := commandLine(path, "-migrate"); got != want {
 			t.Errorf("commandLine(%q) = %q, want %q", path, got, want)
 		}
+	}
+}
+
+// TestAMigrationAppliedEarlierIsForgottenByThisRunsLedger: a store cleared by
+// -migrate -yes, in a process of its own that opened no ledger, is written
+// again by the service that starts after it, for that measurement alone.
+func TestAMigrationAppliedEarlierIsForgottenByThisRunsLedger(t *testing.T) {
+	t.Parallel()
+	at := time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC)
+	comment := sink.Point{
+		Measurement: "gh_discussion_comment", Tags: map[string]string{"comment": "1"},
+		Fields: map[string]any{"answers": 1}, Time: at,
+	}
+	repo := sink.Point{Measurement: "gh_repo", Tags: map[string]string{"repo": "a"}, Fields: map[string]any{"stars": 1}, Time: at}
+	ledger := sink.LoadLedger("", 0, 0)
+	for _, s := range []string{"influxdb", "postgres"} {
+		_, commit := ledger.Reserve(s, []sink.Point{comment, repo})
+		commit()
+	}
+	state := run.LoadState("")
+	state.Stores["influxdb"] = &run.StoreRecord{Destination: "d"}
+	state.Stores["influxdb"].MarkApplied(commentsID, at)
+	saltLedger(ledger, state)
+	if keep, _ := ledger.Reserve("influxdb", []sink.Point{comment, repo}); len(keep) != 1 || keep[0].Measurement != "gh_discussion_comment" {
+		t.Errorf("influxdb is offered %v, want the comment alone", keep)
+	}
+	if keep, _ := ledger.Reserve("postgres", []sink.Point{comment, repo}); len(keep) != 0 {
+		t.Errorf("postgres, never cleared, is offered %v", keep)
+	}
+
+	// In the same process: the item applied is forgotten there and then.
+	state.Stores["postgres"] = &run.StoreRecord{Destination: "e"}
+	state.Stores["postgres"].MarkApplied(commentsID, at)
+	cfg := &config.Config{StateFile: filepath.Join(t.TempDir(), "state.json")}
+	forgetCleared(migration{cfg: cfg, state: state, ledger: ledger, log: slog.New(slog.DiscardHandler)})(migrate.Chosen{
+		Store: "postgres", Item: migrate.Item{Migration: migrate.Registry[slices.IndexFunc(migrate.Registry,
+			func(m migrate.Migration) bool { return m.ID == commentsID })], Refill: []string{"outbound"}},
+	})
+	if keep, _ := ledger.Reserve("postgres", []sink.Point{comment, repo}); len(keep) != 1 || keep[0].Measurement != "gh_discussion_comment" {
+		t.Errorf("postgres after its clearing is offered %v, want the comment alone", keep)
 	}
 }

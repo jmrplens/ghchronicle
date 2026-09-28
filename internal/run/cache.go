@@ -281,6 +281,53 @@ func (r *Runner) saveCache() error {
 	return nil
 }
 
+// ForgetInCache takes out of the cache file at path what it claims about
+// the families named on behalf of a store that a migration has just cleared:
+// the workflow runs whose jobs every store holds, when actions is among
+// them, and each family's refusals. The conditional answers stay, since a
+// 304 is answered with the body kept beside it and still yields every point.
+//
+// A backfill recalls neither, so the refill a migration runs is not held
+// back by them. The sweeps after it are: a run the file remembers is never
+// listed again, so the jobs of every run of the sweep's window would stay
+// out of the store a refill cut short left without them, and a refusal
+// keeps a sweep off an endpoint for the rest of its day. Forgotten, the next
+// sweep of each family asks everything a first sweep asks, and writes what
+// it covers into the cleared store whatever became of the refill. A file
+// that is not there has nothing to forget.
+func ForgetInCache(path string, families []string) error {
+	head, answers, readable := cacheClaims(path)
+	if !readable {
+		return nil
+	}
+	changed := false
+	for _, f := range families {
+		if _, ok := head.Refusals[f]; ok {
+			delete(head.Refusals, f)
+			changed = true
+		}
+		if f == "actions" && len(head.Expanded) > 0 {
+			head.Expanded, changed = nil, true
+		}
+	}
+	if !changed {
+		return nil
+	}
+	return writeCache(path, head, answers)
+}
+
+// cacheClaims is what the cache file at path holds, and whether it holds
+// anything a start would read: a file that is not there, or that this build
+// cannot read whole, is not read at the next start either, which forgets
+// everything in it.
+func cacheClaims(path string) (*cacheHeader, []ghapi.Answer, bool) {
+	if path == "" {
+		return nil, nil, false
+	}
+	head, answers, err := readCache(path)
+	return head, answers, err == nil
+}
+
 // storeNames is the names of the sinks this runner writes to, sorted, each
 // once.
 func (r *Runner) storeNames() []string {
