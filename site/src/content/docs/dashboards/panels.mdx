@@ -606,7 +606,9 @@ The last two panels are the mirror of the stars section: what this account
 starred rather than what was starred, by language and by project, dated when
 each star was given. Whether the projects are small or famous is a different
 question from how many there are, so the second table carries their own star
-counts.
+counts. The Prometheus exporter keeps the language of each star and not its
+repository, so there the second table has a row per language, with the mean
+star count of the repositories starred in it.
 
 The table of work elsewhere carries the same number for the repositories the
 account contributed to: each one's star count at the newest sweep inside the

@@ -323,11 +323,13 @@ func starsGiven(b *builder) []Panel {
 		)}, &P{
 			Prom: []Target{promTbl("topk(25, github_stars_given_repo_stars_mean)")},
 			PromTF: []any{organize(map[string]string{
-				"repo": "Repository", "language": "Language", "Value": activityItsStars,
-			}, []string{"user", "instance", "job", "__name__"}, nil)},
+				"language": "Language", "Value": activityItsStars,
+			}, []string{"user"}, nil)},
 			Desc: "Whether the account stars small projects or famous ones, which the language " +
 				"breakdown cannot say.",
-			PromDesc: lastSweep,
+			PromDesc: "The exporter keeps the language of a star and not its repository, so in " +
+				"Prometheus a row is a language the account starred in, and Its stars the mean " +
+				"over the repositories starred in it. " + lastSweep,
 			Overrides: []any{
 				when("When"), width("Language", 120),
 				barCell(activityItsStars, "short", 120), linkOn("Repository"),

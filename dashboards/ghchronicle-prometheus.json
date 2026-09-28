@@ -3742,7 +3742,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "topk(25, max by (full_name, repo, number, author) (github_pull_requests_seconds_open_mean{state=\"OPEN\",repo=~\"$repo\"}))",
+              "expr": "topk(25, max by (full_name, repo) (github_pull_requests_seconds_open_mean{state=\"OPEN\",repo=~\"$repo\"}))",
               "format": "table",
               "instant": true,
               "range": false,
@@ -3751,7 +3751,7 @@
             {
               "datasource": "${DS_PROMETHEUS}",
               "editorMode": "code",
-              "expr": "max by (full_name, repo, number, author) (github_pull_requests_comments_mean{state=\"OPEN\",repo=~\"$repo\"}) and on (full_name, repo, number, author) topk(25, max by (full_name, repo, number, author) (github_pull_requests_seconds_open_mean{state=\"OPEN\",repo=~\"$repo\"}))",
+              "expr": "max by (full_name, repo) (github_pull_requests_comments_mean{state=\"OPEN\",repo=~\"$repo\"}) and on (full_name, repo) topk(25, max by (full_name, repo) (github_pull_requests_seconds_open_mean{state=\"OPEN\",repo=~\"$repo\"}))",
               "format": "table",
               "instant": true,
               "range": false,
@@ -3776,15 +3776,11 @@
                   "owner": true
                 },
                 "indexByName": {
-                  "author": 2,
-                  "number": 1,
                   "repo": 0
                 },
                 "renameByName": {
                   "Value #A": "Open for",
                   "Value #B": "Comments",
-                  "author": "Author",
-                  "number": "Number",
                   "repo": "Repository"
                 }
               }
@@ -12926,7 +12922,7 @@
         },
         {
           "datasource": "${DS_PROMETHEUS}",
-          "description": "Whether the account stars small projects or famous ones, which the language breakdown cannot say. In Prometheus this is the mean over the collector's last sweep, not a median over the dashboard range. The Prometheus exporter carries no url, so the Link column of the InfluxDB dashboard is absent here.",
+          "description": "Whether the account stars small projects or famous ones, which the language breakdown cannot say. The exporter keeps the language of a star and not its repository, so in Prometheus a row is a language the account starred in, and Its stars the mean over the repositories starred in it. In Prometheus this is the mean over the collector's last sweep, not a median over the dashboard range. The Prometheus exporter carries no url, so the Link column of the InfluxDB dashboard is absent here.",
           "fieldConfig": {
             "defaults": {
               "custom": {
@@ -13056,8 +13052,7 @@
                 "indexByName": {},
                 "renameByName": {
                   "Value": "Its stars",
-                  "language": "Language",
-                  "repo": "Repository"
+                  "language": "Language"
                 }
               }
             }

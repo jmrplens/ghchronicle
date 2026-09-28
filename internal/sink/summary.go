@@ -239,12 +239,17 @@ var promRules = map[string]rule{
 	"gh_repo_activity":          {mode: count, as: "gh_repo_activities", keep: []string{"owner", "repo", "full_name", "activity"}},
 	"gh_code_scanning_analysis": {mode: count, as: "gh_code_scanning_analyses", keep: []string{"owner", "repo", "full_name", "tool"}},
 	"gh_fork":                   {mode: count, as: "gh_forks_seen", keep: []string{"owner", "repo", "full_name"}, absentIsZero: []string{"advanced"}},
-	"gh_star_given":             {mode: count, as: "gh_stars_given", keep: []string{"user"}},
-	"gh_external_contribution":  {mode: count, as: "gh_external_contributions", keep: []string{"user", "owner", "repo", "full_name"}, absentIsZero: []string{"merged"}},
-	"gh_dependabot_alert_item":  {mode: count, as: "gh_dependabot_alerts", keep: []string{"owner", "repo", "full_name", "severity"}, labels: []string{"alert_state"}},
-	"gh_label":                  {mode: keepLast, keep: []string{"owner", "repo", "full_name", "label"}},
-	"gh_milestone":              {mode: keepLast, keep: []string{"owner", "repo", "full_name", "milestone", "state"}},
-	"gh_contribution_year":      {mode: keepLast, keep: []string{"user", "year"}},
+	// The language is kept because "Languages starred" groups by it, and
+	// without it the grouping was one series with no label, which the bar
+	// chart refused. It is bounded by the languages GitHub recognizes, a
+	// series per language the account has starred in; the repository is not
+	// kept, since that is a series per star.
+	"gh_star_given":            {mode: count, as: "gh_stars_given", keep: []string{"user", "language"}},
+	"gh_external_contribution": {mode: count, as: "gh_external_contributions", keep: []string{"user", "owner", "repo", "full_name"}, absentIsZero: []string{"merged"}},
+	"gh_dependabot_alert_item": {mode: count, as: "gh_dependabot_alerts", keep: []string{"owner", "repo", "full_name", "severity"}, labels: []string{"alert_state"}},
+	"gh_label":                 {mode: keepLast, keep: []string{"owner", "repo", "full_name", "label"}},
+	"gh_milestone":             {mode: keepLast, keep: []string{"owner", "repo", "full_name", "milestone", "state"}},
+	"gh_contribution_year":     {mode: keepLast, keep: []string{"user", "year"}},
 
 	// Lifetime counts, which are already one row each: the exporter serves
 	// them as they are. This is the one family that needs no reduction,

@@ -658,20 +658,22 @@ func stillOpen(b *builder) []Panel {
 			// The comments are kept to the rows the open time ranks: capped
 			// on nothing, they listed every repository with an open pull
 			// request, and the merge showed each one past the twenty-fifth
-			// with an empty Open for.
+			// with an empty Open for. Grouped by the repository alone, since
+			// the exporter keeps no number or author on a pull request to
+			// group by.
 			Prom: func() []Target {
-				rank := fmt.Sprintf(`max by (full_name, repo, number, author) (github_pull_requests_seconds_open_mean{state="OPEN",%s})`, PF)
+				rank := fmt.Sprintf(`max by (full_name, repo) (github_pull_requests_seconds_open_mean{state="OPEN",%s})`, PF)
 				return []Target{
 					promTbl(promTop(openLongest, rank), "A"),
 					promTbl(promWithin(openLongest, fmt.Sprintf(
-						`max by (full_name, repo, number, author) (github_pull_requests_comments_mean{state="OPEN",%s})`, PF,
-					), rank, "full_name", "repo", "number", "author"), "B"),
+						`max by (full_name, repo) (github_pull_requests_comments_mean{state="OPEN",%s})`, PF,
+					), rank, "full_name", "repo"), "B"),
 				}
 			}(),
 			PromTF: merged(map[string]string{
-				"repo": "Repository", "number": "Number", "author": "Author",
+				"repo":                  "Repository",
 				inventoryValueCol + "A": flowOpenAge, inventoryValueCol + "B": "Comments",
-			}, nil, map[string]int{"repo": 0, "number": 1, "author": 2}),
+			}, nil, map[string]int{"repo": 0}),
 			Opts: Opts{"sort": flowOpenAge},
 			Desc: "Time to merge only counts what merged. This is the other half: what is " +
 				"still open and how long it has been, which is the number that decides what " +
