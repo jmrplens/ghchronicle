@@ -39,6 +39,16 @@ half the core requests of the first, and that `own_cost` on the
 `gh_rate_limit` row is the number of queries the process made rather than
 zero.
 
+It searches the way GitHub does, too. Each of the five outbound searches asks
+for one kind in one state, `is:pr is:merged` or `is:issue is:open`, and the
+fake serves it only the items of its fixture those qualifiers select, counting
+the others out of `issueCount`. A kind or a state it does not know, an `is:`,
+`type:` or `state:` it has no rule for, fails the test; the author, the owners
+left out and the order are the fixture's own already, and it reads past them.
+Until 2.6.2 it answered every search with every item, so a sweep wrote the one
+merged pull request five times, once as an open issue, and the dashboards drew
+those rows.
+
 A fixture never writes out a recent date. It spells one as an offset the fake
 resolves when it serves the file, `"@DAYS_AGO_12@T00:00:00Z"`, beside the
 `@NOW@`, `@TODAY@` and `@SOON@` it already resolved, and `@DAYS_AHEAD_n@` for
@@ -103,6 +113,79 @@ exactly as it would for a person looking at the dashboard.
 That is what turns three manual checkers into something CI runs, and it is what
 settles the Elasticsearch question above: a panel that cannot aggregate returns
 no frame.
+
+Each panel is posted with its range resolved to the two instants a browser
+sends, and asked three questions, and every stat and gauge two more below:
+did the datasource refuse it, did a panel over
+something the sweep wrote inside the range answer with anything, and do the five
+stores draw the same thing. For the third, each answer is replayed through what
+Grafana does between the query and the screen, the Prometheus datasource's own
+reshaping of a table, the panel's transformations and its field overrides, and
+every pair of stores is compared on what a reader would see: a tile's number,
+its unit and the words it shows for nothing, a table's rows over the columns
+both stores draw, and a bar's name and length. A table is held as well to one
+order of the columns both stores draw, which rows matched over those columns
+cannot show: on the 2.6.2 branch 28 Prometheus tables and 4 Graphite ones
+headed them in another order than the SQL stores, "Every bucket" with Most
+used last. The review of 2.6.1 found eleven
+differences by putting the dashboards side by side, among them a table that
+drew seven rows for one repository and stat tiles that had lost their units.
+Nine of them lived in the dashboards, and run against that release's
+dashboards this fails on eight. The ninth was four columns Elasticsearch's
+"Open the longest" went without, which no comparison of values can see. What a
+store can hold at all is its own description's business, so another assertion
+holds every column the SQL stores draw in a table to being drawn by each other
+store that draws the table, or named in that store's own words about the
+panel: on the 2.6.2 branch 33 tables of the other three stores lacked a column
+their descriptions did not name, and each now draws it or says why not.
+
+Every stat and gauge is then asked about nothing, twice: about a repository no
+sweep wrote anything for, and over thirty days no point of any sweep falls in,
+four hundred days back or more. Over no rows a SQL count is 0 and anything else
+is null, which a tile draws as the words its panel gives a value that is not
+there, and every store is held to drawing the tiles the SQL stores draw, with
+the same words. The range is asked because the account's own snapshots do not
+follow the repository picker: over a range four hundred days back Graphite drew
+three stat groups as panels with nothing in them, not even the names. A tile a
+store cannot draw over nothing is listed in `tilesLeftOverNothing`, in
+`test/e2e/docker/tiles_over_nothing_test.go`, under words of that store's own
+description, and held to them as `dashboardsDiffer` is.
+
+InfluxDB and PostgreSQL run one statement over the same rows, so they are also
+held to drawing the rows of a table or a bar chart in one order, which a
+comparison of the rows as a set cannot see: before the statements named their
+tie-breakers, twelve of the 49 panels both draw with more than one row put
+two of them the other way round in one run, and eleven in the next.
+`TestEverySQLListOrdersItsRowsCompletely`, in `internal/dashboards`, holds
+every list's `ORDER BY` to naming what tells two of its rows apart, so that
+the next tie does not wait for a run that happens to draw it.
+
+Two of the rules held of what is drawn are held of the specification as well,
+since a table the fixture leaves empty in both SQL stores is never drawn at
+all: every column the SQL stores draw that another store does not is named in
+that store's own description, and a chart the SQL stores fold into other folds
+in each other store or says it does not (`TestEveryColumnAStoreLacksIsNamedInItsDescription`
+and `TestEveryStoreFoldsTheRestIntoOtherOrSaysItDoesNot`). And a Prometheus
+query that is wrong only for series the fixture never makes, a label value
+nobody wrote or a series that stood still over the range, is put to promtool
+inside the stack's own Prometheus over series written for it
+(`TestPrometheusAnswersSeriesTheFixtureHasNoneOfAsTheSQLStoresDo`): until it
+was, the Signed commits of an account that never signs read "no commits"
+beside a count of 57.
+
+A store that draws a panel differently on purpose says why in its own
+description of the panel, and the difference is listed in `dashboardsDiffer`,
+in `test/e2e/docker/dashboards_agree_test.go`, under those words. The test fails
+when the words are no longer in the description, when the stores have come
+to draw the panel alike, and when a store the entry names draws the panel as
+the stores it does not name, so an entry can neither outlive its reason nor
+excuse a store that needs no excuse. What the harness
+itself causes is absorbed where it arises rather than listed: the exporter's
+half minute of history, values the collector computes from its own clock across
+three sweeps a minute apart, values a query computes from `now()` across stores
+asked seconds apart, and names Graphite holds as path nodes. A separate
+assertion fails on any panel, time series included, that draws a field under the
+name its datasource gave it, such as `p50.0 seconds_to_merge`.
 
 ## What none of them catch
 

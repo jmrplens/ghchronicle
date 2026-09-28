@@ -306,9 +306,10 @@ func TestDiscussionsAreListedOneByOne(t *testing.T) {
 			t.Errorf("%s links %v", title, titles)
 		}
 	}
-	// The third state of Answered: a category that takes no answer.
+	// The third state of Answered: a category that takes no answer, which
+	// Elasticsearch answers as 0 over 0.
 	mappings := asJSON(t, overrideProperty(mustPanel(t, panels, "Latest discussions"), "Answered", "mappings"))
-	if !strings.Contains(mappings, `"match":"null"`) {
+	if !strings.Contains(mappings, `"match":"null+nan"`) {
 		t.Errorf("an unanswerable discussion reads as an empty cell: %s", mappings)
 	}
 	if p := mustPanel(t, panels, "Discussions"); p["gridPos"].(map[string]any)["w"] != 8 {

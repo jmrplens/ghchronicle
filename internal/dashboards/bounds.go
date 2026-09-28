@@ -1,5 +1,7 @@
 package dashboards
 
+import "strings"
+
 // Panels whose range is their own, and why.
 //
 // Grafana's range picker moves the whole page, which is right for a
@@ -129,5 +131,53 @@ const noRepoFlagsHere = "Only gh_repo carries the fork and archived flags and th
 // median day holds 44: the bar was a week, aligned to the epoch by
 // date_bin(INTERVAL '7 days', time), under a title that said day. Thirteen
 // panels said it. The bucket is not the thing to change, so the titles are.
-const bucketFollowsRange = "One bar is one bucket, and the bucket widens with the range: " +
-	"a day over a month, a week over a year."
+//
+// panel() finishes the sentence with the rule the panel's own floor gives,
+// bucketRule, since the thirty-three charts that carry it have floors of a
+// day, an hour and five minutes. It said "a day over a month, a week over a
+// year" on every one of them, and neither held: over a month an hour's floor
+// draws six hours, and a year over a hundred is 3.65 days, which Grafana
+// rounds to a day; a week takes a range of seven hundred days.
+const bucketFollowsRange = "One bar is one bucket, and the bucket widens with the range."
+
+// bucketRule is how wide a bucket is for the floor a chart names, stated as
+// Grafana computes it: the range over the panel's maxDataPoints, a hundred
+// (see binned), rounded by roundInterval, and never under the floor. The
+// examples are what that table rounds to (internal/grafana/intervals.go
+// reproduces it).
+var bucketRule = map[string]string{
+	"1d": "a hundredth of it, rounded as Grafana rounds an interval and never under a day, " +
+		"which is a day up to a range of seven hundred days and a week from there",
+	"1h": "a hundredth of it, rounded as Grafana rounds an interval and never under an hour, " +
+		"which is six hours over a month and a day over a year",
+	"5m": "a hundredth of it, rounded as Grafana rounds an interval and never under five " +
+		"minutes, which is fifteen minutes over a day and six hours over a month",
+}
+
+// bucketSentence is bucketFollowsRange finished for one panel: a point rather
+// than a bar on a chart of lines, and the rule of its floor.
+func bucketSentence(title string, o Opts) string {
+	floor := optString(o, "interval", "")
+	rule, ok := bucketRule[floor]
+	if !ok {
+		panic(title + ": a chart whose bucket follows the range names no floor it has a rule for: " + floor)
+	}
+	sentence := strings.TrimSuffix(bucketFollowsRange, ".") + ": " + rule + "."
+	if !optBool(o, "bars", false) {
+		sentence = strings.Replace(sentence, "One bar is", "One point is", 1)
+	}
+	return sentence
+}
+
+// estimatedInInfluxDB is what a chart that draws a percentile other than the
+// median says of it. Every median is exact in both SQL stores (see pgMedian).
+// No other percentile can be in InfluxDB without leaving InfluxDB 3 Core
+// before 3.9.0 behind, since those versions refuse DataFusion's exact
+// percentile_cont, so the InfluxDB SQL keeps the estimate and the panel says
+// that it is one: the same estimate read 52 s for a median whose exact value
+// was 47.5 s.
+func estimatedInInfluxDB(which string) string {
+	return "In InfluxDB the " + which + " is an estimate (approx_percentile_cont, a t-digest), " +
+		"since InfluxDB 3 Core has no exact percentile before 3.9.0, so it can read " +
+		"differently from the exact one PostgreSQL draws; the median is exact in both."
+}

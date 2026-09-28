@@ -263,9 +263,9 @@ type promSample struct {
 }
 
 // evalProm evaluates an instant query made of selectors, `or` and `unless`
-// with an optional `on`, sum, max or count with an optional `by`, and a
-// filter by `>` a number, which is every form the panels held by it take, and
-// answers the one value it has to come to.
+// with an optional `on`, sum, max or count with an optional `by`, a filter by
+// `>` a number and a constant vector(), which is every form the panels held by
+// it take, and answers the one value it has to come to.
 func evalProm(t *testing.T, expr string, series []promSample) float64 {
 	t.Helper()
 	out := evalPromSeries(t, expr, series)
@@ -438,6 +438,15 @@ func (p *exprParser) promTerm(series []promSample) []promSample {
 		return out
 	}
 	name := p.word()
+	if name == "vector" {
+		p.want("(")
+		v, err := strconv.ParseFloat(p.word(), 64)
+		if err != nil {
+			p.t.Fatalf("%s: a vector of no number: %v", p.s, err)
+		}
+		p.want(")")
+		return []promSample{{labels: map[string]string{}, value: v}}
+	}
 	if name == "sum" || name == "max" || name == "count" {
 		var by []string
 		if p.eat("by") {
@@ -564,6 +573,9 @@ func (p *exprParser) graphite(series []grSeries) []grSeries {
 		}
 		p.eat(",")
 	}
+	if out, known := graphiteOfLists(word, lists, args); known {
+		return out
+	}
 	var in []grSeries
 	for _, l := range lists {
 		in = append(in, l...)
@@ -573,8 +585,6 @@ func (p *exprParser) graphite(series []grSeries) []grSeries {
 		return in
 	case "removeBelowValue":
 		return atLeast(in, args[0])
-	case "countSeries":
-		return []grSeries{{name: "countSeries", value: float64(len(in)), age: newestOf(in)}}
 	case "timeSlice":
 		return p.sliced(in, args)
 	case "alias":
@@ -600,6 +610,34 @@ func (p *exprParser) graphite(series []grSeries) []grSeries {
 	}
 	p.t.Fatalf("%s: no evaluator for %s()", p.s, word)
 	return nil
+}
+
+// graphiteOfLists evaluates the functions that read their arguments as
+// separate lists, or as none, rather than as one list of series, and reports
+// whether word is one of them.
+func graphiteOfLists(word string, lists [][]grSeries, args []string) ([]grSeries, bool) {
+	switch word {
+	case "countSeries":
+		// graphite-web 1.1.10 answers no series at all for a list that is
+		// empty, and not the 0 its own countSeries() of no argument draws.
+		var in []grSeries
+		for _, l := range lists {
+			in = append(in, l...)
+		}
+		if len(in) == 0 {
+			return nil, true
+		}
+		return []grSeries{{name: "countSeries", value: float64(len(in)), age: newestOf(in)}}, true
+	case "fallbackSeries":
+		if len(lists[0]) > 0 {
+			return lists[0], true
+		}
+		return lists[1], true
+	case "constantLine":
+		n, _ := strconv.ParseFloat(args[0], 64)
+		return []grSeries{{name: "constantLine", value: n}}, true
+	}
+	return nil, false
 }
 
 // aliasedByNode is aliasByNode(series, node...): each series named by the

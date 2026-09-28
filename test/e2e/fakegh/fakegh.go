@@ -180,7 +180,7 @@ var graphQL = []struct{ marker, fixture string }{
 	// totals counters search ISSUE as well, with no page: the page size is
 	// what only an outbound search carries.
 	{"starredRepositories(first:", "graphql_starred.json"},
-	{"search(type: ISSUE, first: 100", "graphql_search_issues.json"},
+	{"search(type: ISSUE, first: 100", outboundSearchFixture},
 	{"search(type: REPOSITORY", "graphql_search_counts.json"},
 	{"fragment totals on Repository", "graphql_repo_totals.json"},
 	{"fragment detail on Repository", "graphql_repo_detail.json"},
@@ -460,6 +460,9 @@ func (s *Server) answer(r *http.Request, body []byte) answer {
 		}
 		a := s.render(name)
 		a.graphQL = query
+		if name == outboundSearchFixture {
+			a.body = s.narrowSearch(a.body, graphQLVariable(body, "query"))
+		}
 		switch {
 		case OffAPI(r.URL.Path):
 			// Off the API: nothing to charge and nothing to validate.
@@ -488,6 +491,144 @@ func graphQLQuery(body []byte) string {
 		return ""
 	}
 	return env.Query
+}
+
+// graphQLVariable reads one string variable out of a GraphQL request body.
+func graphQLVariable(body []byte, name string) string {
+	var env struct {
+		Variables map[string]any `json:"variables"`
+	}
+	if err := json.Unmarshal(body, &env); err != nil {
+		return ""
+	}
+	v, _ := env.Variables[name].(string)
+	return v
+}
+
+// outboundSearchFixture answers the searches for the account's work in other
+// people's repositories. It holds every such item, and each search is served
+// the ones its qualifiers select; see narrowSearch.
+const outboundSearchFixture = "graphql_search_issues.json"
+
+// narrowSearch is an issue search's answer cut to the items its query
+// selects, by kind and by state, the way GitHub's search does.
+//
+// The collector runs five of these, one per kind and state, and writes each
+// item with the kind and the state of the search that found it. Until 2.6.2
+// the fake answered all five with every item, so a sweep wrote the merged pull
+// request five times, as an open issue among them, and the dashboards drew
+// those rows: two states of one item at one instant, which GitHub cannot
+// produce, read as a tie the SQL broke differently in each store.
+//
+// The count is the fixture's less what the qualifiers left out, so an overlay
+// that counts more than it serves, the way GitHub does past its thousandth
+// result, still does after narrowing. A qualifier that selects by state or
+// kind and is not one of those below fails the test rather than being read as
+// "everything", which is how the old answers stayed wrong unnoticed.
+func (s *Server) narrowSearch(body []byte, query string) []byte {
+	keep, ok := s.searchSelects(query)
+	if !ok {
+		return body
+	}
+	var env struct {
+		Data struct {
+			Search map[string]json.RawMessage `json:"search"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &env); err != nil {
+		s.tb.Errorf("%s is not a search answer: %v", outboundSearchFixture, err)
+		return body
+	}
+	var nodes []searchNode
+	var count int
+	if err := json.Unmarshal(env.Data.Search["nodes"], &nodes); err != nil {
+		s.tb.Errorf("the nodes of %s: %v", outboundSearchFixture, err)
+		return body
+	}
+	if err := json.Unmarshal(env.Data.Search["issueCount"], &count); err != nil {
+		s.tb.Errorf("the issueCount of %s: %v", outboundSearchFixture, err)
+		return body
+	}
+	kept := make([]searchNode, 0, len(nodes))
+	for _, n := range nodes {
+		if keep(n) {
+			kept = append(kept, n)
+		}
+	}
+	env.Data.Search["issueCount"] = json.RawMessage(strconv.Itoa(count - (len(nodes) - len(kept))))
+	raw, err := json.Marshal(kept)
+	if err != nil {
+		s.tb.Errorf("narrowing %s: %v", outboundSearchFixture, err)
+		return body
+	}
+	env.Data.Search["nodes"] = raw
+	out, err := json.Marshal(map[string]any{"data": env.Data})
+	if err != nil {
+		s.tb.Errorf("narrowing %s: %v", outboundSearchFixture, err)
+		return body
+	}
+	return out
+}
+
+// searchNode is one item of a search answer, kept whole so a narrowed answer
+// serves it exactly as the fixture spells it.
+type searchNode map[string]json.RawMessage
+
+// pull reports whether the item is a pull request. GitHub's own url for it
+// says so, and a pull request the fixture spells without mergedAt, one still
+// open, is still one.
+func (n searchNode) pull() bool {
+	var url string
+	_ = json.Unmarshal(n["url"], &url)
+	return strings.Contains(url, "/pull/")
+}
+
+// set reports whether a timestamp of the item is there: a closedAt or a
+// mergedAt that is null, or absent, is an item not yet closed or merged.
+func (n searchNode) set(key string) bool {
+	raw, ok := n[key]
+	return ok && string(raw) != "null"
+}
+
+// searchSelects is the test an item has to pass to be in the answer to query,
+// and false when the query names no kind or state at all, which is a search
+// the fake answers whole.
+func (s *Server) searchSelects(query string) (func(searchNode) bool, bool) {
+	var tests []func(searchNode) bool
+	for q := range strings.FieldsSeq(query) {
+		switch q {
+		case "is:pr", "type:pr":
+			tests = append(tests, searchNode.pull)
+		case "is:issue", "type:issue":
+			tests = append(tests, func(n searchNode) bool { return !n.pull() })
+		case "is:open":
+			tests = append(tests, func(n searchNode) bool { return !n.set("closedAt") })
+		case "is:closed":
+			tests = append(tests, func(n searchNode) bool { return n.set("closedAt") })
+		case "is:merged":
+			tests = append(tests, func(n searchNode) bool { return n.pull() && n.set("mergedAt") })
+		case "is:unmerged":
+			// Open or closed without a merge: GitHub's is:unmerged, which
+			// is why the collector pairs it with is:closed.
+			tests = append(tests, func(n searchNode) bool { return n.pull() && !n.set("mergedAt") })
+		default:
+			if strings.HasPrefix(q, "is:") || strings.HasPrefix(q, "type:") || strings.HasPrefix(q, "state:") {
+				s.tb.Errorf("the fake does not know the search qualifier %s in %q, so it cannot "+
+					"say which of its items the search selects", q, query)
+			}
+		}
+	}
+	if len(tests) == 0 {
+		return nil, false
+	}
+	return func(n searchNode) bool {
+		for _, test := range tests {
+			if !test(n) {
+				return false
+			}
+		}
+		return true
+	}, true
 }
 
 // etagOf is the validator of a fixture: a digest of the file as it is on

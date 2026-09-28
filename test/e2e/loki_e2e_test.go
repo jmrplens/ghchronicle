@@ -96,12 +96,12 @@ func TestLokiSinkPushesEventsAsLogLines(t *testing.T) {
 }
 
 // assertContributionsAtTheirClose holds the contribution stream to closings.
-// The fixtures answer each of the five outbound searches with the same two
-// items, a pull request merged 59 days ago and an issue still open, so both
-// open searches write a row of each with the state open, and with ten years of
-// horizon every one of them would reach Loki if it were rendered. None may: an
-// item's row in an open search is a reading repeated every day, not something
-// that happened. The merge is, at the second it happened.
+// The fixtures hold an item for each of the five outbound searches, a pull
+// request and an issue still open among them, so both open searches write a
+// row with the state open, and with ten years of horizon each would reach Loki
+// if it were rendered. Neither may: an item's row in an open search is a
+// reading repeated every day, not something that happened. The merge 59 days
+// ago is, at the second it happened.
 func assertContributionsAtTheirClose(t *testing.T, reqs []capturedRequest) {
 	t.Helper()
 	mergedAt := strconv.FormatInt(fakegh.DaysAgo(59).Add(10*time.Hour).UnixNano(), 10)
@@ -433,8 +433,8 @@ func TestLokiSendsAContributionTheLastPassCouldNotHaveSeen(t *testing.T) {
 }
 
 // contributionsOverlay is a directory holding one page of outbound search
-// results made of these items, which the fake answers every one of the five
-// searches with.
+// results made of these items, of which the fake serves each of the five
+// searches those of its kind and state.
 func contributionsOverlay(t *testing.T, nodes ...map[string]any) string {
 	t.Helper()
 	body, err := json.Marshal(map[string]any{"data": map[string]any{"search": map[string]any{

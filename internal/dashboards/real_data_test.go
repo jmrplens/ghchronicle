@@ -135,7 +135,7 @@ func TestAReviewWaitNobodyEverHadReadsAsWords(t *testing.T) {
 	t.Parallel()
 	for _, store := range Names() {
 		raw := asJSON(t, mustPanel(t, rendered(t, store), "Merged and closed in range")["fieldConfig"])
-		if !strings.Contains(raw, `"id":"noValue","value":"no human review"`) {
+		if !strings.Contains(raw, `"result":{"color":"text","index":0,"text":"no human review"}`) {
 			t.Errorf("%s: the review wait draws an empty space where nobody reviewed: %s", store, raw)
 		}
 	}

@@ -3,6 +3,7 @@ package dashboards
 import (
 	"fmt"
 	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -41,7 +42,7 @@ func TestOutsideQuotesCopiesAnUnterminatedQuoteAsItIs(t *testing.T) {
 	}
 }
 
-// TestToPGRefusesSQLItCannotTranslate: each of the four DataFusion spellings
+// TestToPGRefusesSQLItCannotTranslate: each of the five DataFusion spellings
 // that PostgreSQL would refuse stops the generator on its own, so a panel
 // written in a shape the rewrites do not know is found when the file is
 // generated and not when a PostgreSQL user opens it.
@@ -50,6 +51,7 @@ func TestToPGRefusesSQLItCannotTranslate(t *testing.T) {
 	for _, q := range []string{
 		"SELECT date_bin(INTERVAL '3 days', time) FROM gh_repo",
 		"SELECT approx_percentile_cont(Duration, 0.5) FROM gh_workflow_run",
+		"SELECT median(duration_seconds) FROM gh_workflow_run",
 		"SELECT $__dateBin(Time) FROM gh_repo",
 		"SELECT arrow_cast(stars, 'Utf8') FROM gh_repo",
 	} {
@@ -154,5 +156,114 @@ func TestGraphitePathIgnoresATagGivenWithoutAValue(t *testing.T) {
 	got := gp("gh_repo_community", "health", "repo", "ghchronicle", "owner")
 	if want := "github.repo_community.*.*.ghchronicle.health"; got != want {
 		t.Errorf("gp = %q, want %q", got, want)
+	}
+}
+
+// TestEveryMedianIsExactInBothSQLStores is "Queue wait" in the cross-store
+// review of 2.6.1: 52 s in InfluxDB against the 47.5 s PostgreSQL and
+// Elasticsearch read from the same four jobs, which waited 30, 35, 60 and 65
+// seconds. The InfluxDB SQL asked for approx_percentile_cont, a t-digest
+// estimate that answers 52 for those four, and PostgreSQL for the exact
+// percentile_cont. DataFusion's exact percentile_cont arrived in InfluxDB 3
+// Core 3.9.0 (3.8.3 refuses it as an invalid function), while its median is
+// exact from 3.0.3 on; over an integer column the median is an integer and
+// reads 47, so the column is made a double first, and then every one of them
+// answers 47.5. Every median of the InfluxDB dashboard is that exact median,
+// and each is PostgreSQL's percentile_cont(0.5) once translated. The two
+// charts that draw a higher percentile keep the estimate, which no version
+// refuses, and say in their description that it is one.
+func TestEveryMedianIsExactInBothSQLStores(t *testing.T) {
+	t.Parallel()
+	estimated := regexp.MustCompile(`approx_percentile_cont\([a-z_.]+, 0\.5\)`)
+	exact := regexp.MustCompile(`median\(CAST\(([a-z_.]+) AS DOUBLE\)\)`)
+	medians := 0
+	for _, p := range renderedPanels(t, "influxdb") {
+		sql := allSQL(p)
+		if m := estimated.FindString(sql); m != "" {
+			t.Errorf("influxdb: %q estimates a median with %s, which InfluxDB answers "+
+				"differently from PostgreSQL's exact one", p["title"], m)
+		}
+		desc, _ := p["description"].(string)
+		if strings.Contains(sql, "approx_percentile_cont(") && !strings.Contains(desc, "is an estimate (approx_percentile_cont") {
+			t.Errorf("influxdb: %q draws an estimated percentile and its description does not say so: %s",
+				p["title"], desc)
+		}
+		medians += len(exact.FindAllString(sql, -1))
+	}
+	if medians < 10 {
+		t.Fatalf("the InfluxDB dashboard asks for %d exact medians, so this checked "+
+			"almost nothing", medians)
+	}
+	got := toPG(`SELECT median(CAST(queued_seconds AS DOUBLE)) AS "Queue wait" FROM gh_workflow_job`)
+	want := `SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY queued_seconds) AS "Queue wait" FROM gh_workflow_job`
+	if got != want {
+		t.Errorf("toPG = %s, want %s", got, want)
+	}
+}
+
+// TestAColumnTheSQLDoesNotSelectStandsWhereItIsPlaced: the SQL order leaves a
+// column it does not select for the end, which is right for a count the
+// exporter adds and wrong for the column a row is named by. The Prometheus
+// hook stands where the SQL stores draw the endpoint, a Graphite row name of
+// several path nodes where the SQL draws the first of them, and a placement
+// that no longer names a column the store draws stops the generator rather
+// than ordering nothing.
+func TestAColumnTheSQLDoesNotSelectStandsWhereItIsPlaced(t *testing.T) {
+	t.Parallel()
+	selected := []string{"Endpoint", "Failed", "Deliveries", "Repository"}
+	drawn := map[string]bool{"Repository": true, "Hook": true, "Deliveries": true, "Failed": true}
+	if got := orderLike(selected, drawn, map[string]string{"Hook": "Endpoint"}); !reflect.DeepEqual(got,
+		[]string{"Hook", "Failed", "Deliveries", "Repository"}) {
+		t.Errorf("the hook placed where the endpoint stands: %v", got)
+	}
+	drawn = map[string]bool{"Repository": true, "Hook": true, "Deliveries": true}
+	if got := orderLike(selected, drawn, nil); !reflect.DeepEqual(got, []string{"Deliveries", "Repository"}) {
+		t.Errorf("the hook not placed is left for the end: %v", got)
+	}
+	for _, tc := range []struct {
+		name, want string
+		selected   []string
+	}{
+		{"Repository, number", "Number", []string{"Number", "Open for", "Repository"}},
+		{"Endpoint, repository, ok", "Endpoint", []string{"Endpoint", "Failed", "Deliveries", "Repository"}},
+		{"Pull request", "Number", []string{"Number", "Lines changed", "Repository"}},
+	} {
+		if got := rowNameAt(tc.selected, tc.name); got != tc.want {
+			t.Errorf("rowNameAt(%v, %q) = %q, want %q", tc.selected, tc.name, got, tc.want)
+		}
+	}
+	sql := []Target{sqlT(`SELECT host AS "Endpoint", COUNT(*) AS "Deliveries" FROM gh_webhook_delivery`)}
+	msg := panicOf(t, func() {
+		panel("table", "Webhook endpoints", box{W: 12, H: 8}, sql, &P{
+			Prom:     []Target{promTbl("sum by (hook) (github_webhook_deliveries_total)")},
+			PromTF:   []any{organize(map[string]string{"hook": "Hook", "Value": "Deliveries"}, nil)},
+			PromAt:   map[string]string{"Hooks": "Endpoint"},
+			GRNote:   "none",
+			ESNote:   "none",
+			PromNote: "none",
+		})
+	})
+	if !strings.Contains(msg, `places "Hooks" where the SQL draws "Endpoint"`) {
+		t.Errorf("a placement of a column the store does not draw: %s", msg)
+	}
+}
+
+// TestALostLinkColumnIsNamed: the sentence a store carries for the link
+// columns it cannot return named the Link column alone, which the SQL stores
+// hide, and so said nothing of "Live", the column "Deployments by
+// environment" draws beside it.
+func TestALostLinkColumnIsNamed(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		lost []string
+		want string
+	}{
+		{[]string{"Link"}, promNoLink},
+		{[]string{"Live"}, "so the Live column of the InfluxDB dashboard is absent here."},
+		{[]string{"Link", "Live"}, "so the Link and Live columns of the InfluxDB dashboard are absent here."},
+	} {
+		if got := namingLinks(promNoLink, tc.lost); !strings.HasSuffix(got, tc.want) {
+			t.Errorf("namingLinks(%v) = %q, want it to end %q", tc.lost, got, tc.want)
+		}
 	}
 }

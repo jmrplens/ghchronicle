@@ -4,9 +4,12 @@ import (
 	"fmt"
 	"maps"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/jmrplens/ghchronicle/v2/internal/grafana"
 )
 
 // One panel specification for every dashboard.
@@ -71,8 +74,15 @@ const (
 	sweepCount = "In Prometheus this counts the collector's last sweep, not the dashboard range."
 
 	// The same for Graphite and Elasticsearch.
-	grRows = "Graphite has no rows: each series is one number reduced over the range, so " +
-		"this table keeps the column it is sorted by and drops the others."
+	//
+	// grRows stands where a Graphite table says what its reduction drops, and
+	// panel() writes the sentence out of the table itself (see
+	// graphiteRowsSentence): the numbers it keeps, and every column the SQL
+	// stores draw that it does not and its description does not name. It was
+	// one sentence on fifty tables, "keeps the column it is sorted by and drops
+	// the others", which was false on eleven of them: six keep two numbers,
+	// and five keep a number that is not the one they sort by.
+	grRows = "[the Graphite table's columns]"
 	grSlot = grSlotLead + "the medians are over what the storage kept."
 	// grSlotCounts and grSlotTotals are grSlot for a table that counts or adds
 	// up the points of a series and takes no median: a table that reads the
@@ -92,7 +102,7 @@ const (
 		"it, so it sits at GitHub's count and starts the day the collector did: " + esStackNote
 	// How a per-repository snapshot becomes one curve in Elasticsearch: see
 	// esSnapshotStack in query.go.
-	esStackNote = "one series per repository, its largest reading of the day, stacked so the " +
+	esStackNote = "one series per repository, its largest reading of each bucket, stacked so the " +
 		"top of the stack is the total."
 	esNewest  = "In Elasticsearch this lists the newest 500 documents and the panel sorts them."
 	esPerRepo = "In Elasticsearch the rows are per repository as well, because the newest snapshot is taken per repository."
@@ -227,6 +237,12 @@ type P struct {
 	PromTF    []any
 	PromOver  []any
 	PromOpts  Opts
+	// PromAt places a Prometheus column the SQL does not select where the
+	// SQL selects the one named, ahead of it: the hook a row is named by
+	// where the SQL stores draw its endpoint. A column not placed goes after
+	// every column the SQL selects. GRAt is the same for Graphite, where the
+	// column a row is named by is placed without it.
+	PromAt map[string]string
 
 	SQLTF   []any
 	SQLOver []any
@@ -244,6 +260,7 @@ type P struct {
 	GRTF   []any
 	GROver []any
 	GROpts Opts
+	GRAt   map[string]string
 
 	ES     []Target
 	ESDesc string
@@ -307,15 +324,171 @@ func panel(kind, title string, at box, sql []Target, p *P) Panel {
 			panic(title + ": a panel without a " + Stores[name] + " query needs a note")
 		}
 	}
+	if kind == "table" && p.SQLTF == nil {
+		orderLikeSQL(title, selectedColumns(sql), stores, p)
+	}
 	if p.Logs != nil && kind != "text" {
 		panic(title + ": only a text panel can give way to the log store")
 	}
 	shared := placeLinks(title, p.Overrides, stores)
+	if gr := stores["graphite"]; strings.Contains(gr.Desc, grRows) {
+		gr.Desc = graphiteRowsSentence(title, kind, sql, p, gr)
+	}
+	desc := p.Desc
+	if before, after, found := strings.Cut(desc, bucketFollowsRange); found {
+		desc = before + bucketSentence(title, p.Opts) + after
+	}
 	return Panel{
-		Kind: kind, Title: title, W: at.W, H: at.H, X: at.X, Y: at.Y, Desc: p.Desc,
+		Kind: kind, Title: title, W: at.W, H: at.H, X: at.X, Y: at.Y, Desc: desc,
 		Stores: stores, Overrides: shared, Opts: orEmpty(p.Opts),
 		PromTitle: p.PromTitle, Logs: p.Logs,
 	}
+}
+
+// orderLikeSQL gives every table the order the SQL stores' statement selects
+// its columns in, `selected`, which is the order both of them draw.
+//
+// A table's columns otherwise come in the order its datasource meets them. An
+// Elasticsearch table's come as the response parser meets them, the buckets
+// and then the metrics, or the document's own fields for raw data: measured
+// on the 2.6.1 review, "Every repository, ever" led with Fork, "Security
+// features" with Enabled and "Oldest open alerts" with a wide number. A
+// Prometheus table's come a label at a time, alphabetically, and then each
+// query's value in turn, so on the 2.6.2 branch "Every bucket" put Most used
+// last and "Secret rotation" led with the repository where the SQL stores
+// lead with the secret. A Graphite table's come as the row's name and then
+// its reducers, so "Slowest jobs" counted its runs ahead of their duration.
+//
+// The column a Graphite row is named by stands where the SQL draws the first
+// column its path nodes name, and a Prometheus column the SQL does not select
+// stands where the panel places it, PromAt, or after the others. A SQL twin
+// that reshapes its own frame, as a transpose does, draws columns its
+// statement does not name, so panel() leaves that table as it is.
+func orderLikeSQL(title string, selected []string, stores map[string]*store, p *P) {
+	at := map[string]map[string]string{"prometheus": p.PromAt, "graphite": maps.Clone(p.GRAt)}
+	if gr := stores["graphite"]; gr.Q != nil {
+		if name := graphiteRowName(gr.TF); name != "" && !slices.Contains(selected, name) && at["graphite"][name] == "" {
+			if at["graphite"] == nil {
+				at["graphite"] = map[string]string{}
+			}
+			at["graphite"][name] = rowNameAt(selected, name)
+		}
+	}
+	for _, name := range []string{"elasticsearch", "prometheus", "graphite"} {
+		st := stores[name]
+		drawn := namesGiven(st.TF)
+		for column, where := range at[name] {
+			if st.Q == nil || !drawn[column] || slices.Contains(selected, column) || !slices.Contains(selected, where) {
+				panic(fmt.Sprintf("%s: %s places %q where the SQL draws %q, and it can only place a "+
+					"column it draws and the SQL does not select, where the SQL selects one", title, Stores[name], column, where))
+			}
+		}
+		if st.Q == nil {
+			continue
+		}
+		if order := orderLike(selected, drawn, at[name]); len(order) > 0 {
+			st.TF = append(slices.Clone(st.TF), columnOrder(order...))
+		}
+	}
+}
+
+// graphiteRowsSentence is a Graphite table's description with grRows written
+// out: that each series is reduced to the numbers the table keeps, and which
+// columns of the SQL stores' it therefore does not draw, leaving out those its
+// description names already and the link columns, which placeLinks says of.
+// A table that draws every column the SQL stores draw has nothing to say.
+func graphiteRowsSentence(title, kind string, sql []Target, p *P, gr *store) string {
+	if kind != "table" || gr.Q == nil || p.SQLTF != nil {
+		panic(title + ": grRows is for a Graphite table beside a SQL table that draws what it selects")
+	}
+	drawn := namesGiven(gr.TF)
+	links := map[string]bool{}
+	for _, o := range append(append([]any{}, p.Overrides...), p.SQLOver...) {
+		if column := linkedColumn(o); column != "" {
+			links[column] = true
+		}
+	}
+	// A column the description already says is missing is not said again;
+	// one it only mentions, "an archived repository counts from its points
+	// of the last seven days", is still a column the table drops.
+	var missing []string
+	for sentence := range strings.SplitSeq(strings.Replace(gr.Desc, grRows, "", 1), ". ") {
+		if saysMissing.MatchString(sentence) {
+			missing = append(missing, sentence)
+		}
+	}
+	said := strings.Join(missing, ". ")
+	rest := strings.Replace(gr.Desc, grRows, "", 1)
+	selected := selectedColumns(sql)
+	var dropped []string
+	for _, column := range selected {
+		if !links[column] && !grafana.DrawsColumn(drawn, selected, column, true) && !grafana.NamesColumn(said, column) {
+			dropped = append(dropped, column)
+		}
+	}
+	if len(dropped) == 0 {
+		return strings.Join(strings.Fields(rest), " ")
+	}
+	kept := graphiteNumbers(gr.TF)
+	numbers, ok := numberWords[len(kept)]
+	if !ok {
+		panic(fmt.Sprintf("%s: a Graphite table that reduces its series to %d numbers", title, len(kept)))
+	}
+	sentence := fmt.Sprintf("Graphite has no rows: each series is reduced over the range to %s, %s, so ",
+		numbers, listed(kept))
+	verb := " is"
+	if len(dropped) > 1 {
+		verb = " are"
+	}
+	sentence += listed(dropped) + verb + " not in this table."
+	return strings.Replace(gr.Desc, grRows, sentence, 1)
+}
+
+// saysMissing is how a sentence of a Graphite description says a column is
+// not in the table.
+var saysMissing = regexp.MustCompile(`\bmissing\b|\babsent\b|\bnot in (this|the) table\b|\bdrops\b`)
+
+// numberWords spells the few counts graphiteRowsSentence says.
+var numberWords = map[int]string{
+	1: "one number", 2: "two numbers", 3: "three numbers", 4: "four numbers", 5: "five numbers",
+}
+
+// listed is names as prose: a, b and c.
+func listed(names []string) string {
+	if len(names) == 1 {
+		return names[0]
+	}
+	return strings.Join(names[:len(names)-1], ", ") + " and " + names[len(names)-1]
+}
+
+// graphiteNumbers is the columns a Graphite table reduces each series to, in
+// the order it draws them: gTbl's reducers, under the names its organize gives
+// them.
+func graphiteNumbers(tf []any) []string {
+	var reducersAsked []string
+	var rename map[string]any
+	for _, raw := range tf {
+		t, _ := raw.(map[string]any)
+		options, _ := t["options"].(map[string]any)
+		switch t["id"] {
+		case "reduce":
+			for _, r := range asList(options["reducers"]) {
+				id, _ := r.(string)
+				reducersAsked = append(reducersAsked, id)
+			}
+		case "organize":
+			if names, _ := options["renameByName"].(map[string]any); names["Field"] != nil {
+				rename = names
+			}
+		}
+	}
+	var out []string
+	for _, id := range reducersAsked {
+		if name, ok := rename[reducers[id]].(string); ok {
+			out = append(out, name)
+		}
+	}
+	return out
 }
 
 // lokiRepoStage is the LogQL that applies the dashboard's repository
@@ -411,9 +584,12 @@ func placeLinks(title string, overrides []any, stores map[string]*store) []any {
 	}
 	for name, st := range stores {
 		var kept []any
+		var lost []string
 		for _, o := range links {
 			if st.returns(linkedColumn(o)) {
 				kept = append(kept, o)
+			} else if !slices.Contains(lost, linkedColumn(o)) {
+				lost = append(lost, linkedColumn(o))
 			}
 		}
 		st.Overrides = append(kept, st.Overrides...)
@@ -424,7 +600,7 @@ func placeLinks(title string, overrides []any, stores map[string]*store) []any {
 		case st.Q == nil:
 			st.Note = strings.TrimSpace(st.Note + "\n\n" + noteLink)
 		case noLink[name] != "":
-			st.Desc = strings.TrimSpace(st.Desc + " " + noLink[name])
+			st.Desc = strings.TrimSpace(st.Desc + " " + namingLinks(noLink[name], lost))
 		default:
 			// The SQL stores select the column by name, so a link column
 			// their statement does not alias is a mistake in the panel.
@@ -432,6 +608,26 @@ func placeLinks(title string, overrides []any, stores map[string]*store) []any {
 		}
 	}
 	return shared
+}
+
+// namingLinks is a store's sentence about the link columns it lacks, naming
+// them. The one every panel has is Link, which the SQL stores hide behind the
+// row's first column; a panel with a second one draws it, "Live" beside a
+// deployment's environment, and a sentence that named Link alone left a
+// column the reader sees in the InfluxDB dashboard unexplained here.
+func namingLinks(sentence string, lost []string) string {
+	if len(lost) == 1 && lost[0] == "Link" {
+		return sentence
+	}
+	names := lost[0] + " column"
+	if len(lost) > 1 {
+		names = strings.Join(lost[:len(lost)-1], ", ") + " and " + lost[len(lost)-1] + " columns"
+	}
+	sentence = strings.Replace(sentence, "the Link column", "the "+names, 1)
+	if len(lost) > 1 {
+		sentence = strings.Replace(sentence, "dashboard is absent", "dashboard are absent", 1)
+	}
+	return sentence
 }
 
 // returns reports whether this store's answer has a column of that name:
@@ -544,6 +740,48 @@ func target(q *Target, store string, ds any) any {
 	}
 }
 
+// followingTheRange gives an Elasticsearch date histogram binned at the
+// panel's own floor the interval "auto", which is the bucket every other store
+// bins the chart into: the range over the panel's maxDataPoints, rounded, and
+// never under the floor, which is what $__dateBin is in the SQL stores and
+// the bucket variables are in Graphite.
+//
+// A date histogram's interval is sent as it is written otherwise, whatever
+// the range: the datasource makes a bucket of anything but "auto", and "1h"
+// and "1d" are fixed intervals to it, never widened (aggregation_factory.go in
+// grafana-elasticsearch-datasource). Measured on the 2.6.2 review over thirty
+// days, "Events over time" was 721 buckets of an hour in Elasticsearch and
+// 120 of six hours in InfluxDB, so a bar was a sum over a quarter of the time
+// and a median over another set of runs. "auto" is sent as the query's own
+// interval, and the datasource widens it where a range would ask for more
+// buckets than it allows, which a fixed hour across three years did. A
+// histogram at another interval than the floor keeps it: a bucket the width of
+// the whole range, or the week of the weekly commits, is what the panel is.
+func followingTheRange(t any, floor string) any {
+	target, _ := t.(map[string]any)
+	buckets, _ := target["bucketAggs"].([]any)
+	if floor == "" || len(buckets) == 0 {
+		return t
+	}
+	out := maps.Clone(target)
+	list := make([]any, len(buckets))
+	for i, raw := range buckets {
+		list[i] = raw
+		bucket, _ := raw.(map[string]any)
+		settings, _ := bucket["settings"].(map[string]any)
+		if bucket["type"] != "date_histogram" || settings["interval"] != floor {
+			continue
+		}
+		following := maps.Clone(settings)
+		following["interval"] = "auto"
+		auto := maps.Clone(bucket)
+		auto["settings"] = following
+		list[i] = auto
+	}
+	out["bucketAggs"] = list
+	return out
+}
+
 // materialize turns one specification entry into one Grafana panel for the
 // given store. `logs` is the log store datasource, or nil for a dashboard
 // bound to its metrics store alone, which is what every exported file is.
@@ -570,15 +808,18 @@ func materialize(id *ids, p *Panel, storeName string, ds, logs any, y0 int) map[
 		)
 	}
 
+	opts := mergeOpts(p.Opts, st.Opts)
 	targets := make([]any, len(st.Q))
 	for i := range st.Q {
 		targets[i] = target(&st.Q[i], storeName, ds)
+		if storeName == "elasticsearch" {
+			targets[i] = followingTheRange(targets[i], optString(opts, "interval", ""))
+		}
 	}
 	desc := strings.TrimSpace(strings.Join(nonEmpty(p.Desc, st.Desc), " "))
-	opts := mergeOpts(p.Opts, st.Opts)
 	// Every kind takes the shared overrides and the store's own: a stat of
 	// several values names them through overrides as much as a table does.
-	opts["overrides"] = append(append([]any{}, p.Overrides...), st.Overrides...)
+	opts["overrides"] = namingFirst(append(append([]any{}, p.Overrides...), st.Overrides...))
 
 	// Every kind is placed and identified the same way, so the arguments are
 	// built once and the switch chooses nothing but the builder.
@@ -610,6 +851,20 @@ func materialize(id *ids, p *Panel, storeName string, ds, logs any, y0 int) map[
 	if len(st.TF) > 0 {
 		out["transformations"] = st.TF
 	}
+	return withPanelOptions(out, storeName, opts)
+}
+
+// withPanelOptions is what a panel of any kind carries beside its queries and
+// its field configuration.
+func withPanelOptions(out map[string]any, storeName string, opts Opts) map[string]any {
+	// Every Graphite panel asks for more points than a series of it holds,
+	// so that graphite-web does not fit it into bands (see grBin): a chart
+	// over time, summarized into buckets, would be drawn a step late, and a
+	// table, a bar chart or a stat, which reduces the whole range, would lose
+	// the first points of the range, which the fitting drops.
+	if storeName == "graphite" {
+		out["maxDataPoints"] = grMaxDataPoints
+	}
 	// A panel whose whole subject is one page on GitHub carries the page as
 	// a panel link, in the header, since no row of it has a url of its own.
 	if links := optList(opts, "links"); links != nil {
@@ -625,6 +880,44 @@ func materialize(id *ids, p *Panel, storeName string, ds, logs any, y0 int) map[
 		out["timeFrom"] = v
 	}
 	return out
+}
+
+// namingFirst moves every override that gives a field its name ahead of the
+// others, keeping each group in the order it had.
+//
+// Grafana applies overrides in the order the list gives, and a byName matcher
+// reads the name a field carries when its turn comes. The shared overrides
+// address a value by the name the panel draws, and in Elasticsearch that name
+// is given by an override of the store's own, a displayName on the query's
+// refId, since the response parser names a median "p50.0 seconds_to_merge".
+// Appended after the shared list, those names came too late: measured on the
+// 2.6.1 review, Time to merge read "194 K" there against 2.25 days in the
+// other four stores, and Run duration "260" without its seconds, while the
+// Success rate the store set again after its own names kept its unit.
+func namingFirst(overrides []any) []any {
+	out := make([]any, 0, len(overrides))
+	var rest []any
+	for _, o := range overrides {
+		if givesName(o) {
+			out = append(out, o)
+		} else {
+			rest = append(rest, o)
+		}
+	}
+	return append(out, rest...)
+}
+
+// givesName reports whether an override sets the name its fields are drawn
+// under.
+func givesName(o any) bool {
+	m, _ := o.(map[string]any)
+	props, _ := m["properties"].([]any)
+	for _, raw := range props {
+		if p, _ := raw.(map[string]any); p["id"] == "displayName" {
+			return true
+		}
+	}
+	return false
 }
 
 func nonEmpty(parts ...string) []string {
@@ -722,9 +1015,24 @@ func renumberES(panels []map[string]any) {
 				metrics[id] = m
 			}
 		}
+		renamed := map[string]string{}
 		for _, e := range numbered(t) {
 			n++
-			e["id"] = strconv.Itoa(n)
+			old, _ := e["id"].(string)
+			renamed[old] = strconv.Itoa(n)
+			e["id"] = renamed[old]
+		}
+		// A bucket script reads the metrics it names by id, so they are
+		// renamed with them: left as they were, it read whichever metric of
+		// the query now carried the old number, or none.
+		for _, e := range asList(t["metrics"]) {
+			m, _ := e.(map[string]any)
+			for _, v := range asList(m["pipelineVariables"]) {
+				variable, _ := v.(map[string]any)
+				if id, ok := variable["pipelineAgg"].(string); ok {
+					variable["pipelineAgg"] = renamed[id]
+				}
+			}
 		}
 		for _, e := range asList(t["bucketAggs"]) {
 			bucket, _ := e.(map[string]any)
@@ -824,7 +1132,7 @@ func Dashboard(s *Store, ds, logs any, variable map[string]any) map[string]any {
 		"schemaVersion": 39,
 		"refresh":       "5m",
 		"time":          map[string]any{"from": "now-30d", "to": "now"},
-		"templating":    map[string]any{"list": []any{variable}},
+		"templating":    map[string]any{"list": append([]any{variable}, s.Hidden...)},
 		"panels":        Render(s.Name, ds, logs),
 	}
 }

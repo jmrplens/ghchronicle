@@ -28,16 +28,16 @@ func labelsMilestonesAndForks(b *builder) []Panel {
 	// summed across repositories had nothing to link to.
 	labels := `SELECT label AS "Label", used AS "Used", repo AS "Repository",` +
 		` issues AS "Issues", pull_requests AS "Pull requests", url AS "Link" FROM (` +
-		"SELECT repo, label, used, issues, pull_requests, url, ROW_NUMBER() OVER (" +
+		"SELECT repo, full_name, label, used, issues, pull_requests, url, ROW_NUMBER() OVER (" +
 		"PARTITION BY full_name, label ORDER BY time DESC) AS rn FROM gh_label" +
 		" WHERE $__timeFilter(time) AND " + RF + planningNewestRow +
-		" ORDER BY 2 DESC LIMIT 25"
+		" ORDER BY 2 DESC, full_name, 1 LIMIT 25"
 	miles := `SELECT milestone AS "Milestone", progress AS "Progress", repo AS "Repository",` +
 		` state AS "State", issues AS "Issues",` +
 		` pull_requests AS "Pull requests", url AS "Link" FROM (` +
 		"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, milestone ORDER BY time DESC) AS rn" +
 		" FROM gh_milestone WHERE $__timeFilter(time) AND " + RF + planningNewestRow +
-		" ORDER BY 2 DESC LIMIT 25"
+		" ORDER BY 2 DESC, full_name, 1 LIMIT 25"
 	forks := topRepoSeries("gh_fork", "1", "forks", RF)
 	// Idle is computed rather than stored: the row is dated when the fork was
 	// created and `seconds_to_push` says how long after that its last push
@@ -48,7 +48,7 @@ func labelsMilestonesAndForks(b *builder) []Panel {
 	forkTbl := `SELECT by AS "By", time AS "Forked", repo AS "Repository",` +
 		` advanced AS "` + planningPushedTo + `", ` + forkIdle + `,` +
 		` url AS "Link"` +
-		" FROM gh_fork WHERE $__timeFilter(time) AND " + RF + " ORDER BY time DESC LIMIT 25"
+		" FROM gh_fork WHERE $__timeFilter(time) AND " + RF + " ORDER BY time DESC, full_name, 1 LIMIT 25"
 	// seconds_to_answer is a field only once a discussion has been answered:
 	// InfluxDB creates the column on first write, and naming it before then
 	// fails the whole query. Same reason the milestone due date is not shown.
@@ -112,7 +112,8 @@ func labelsMilestonesAndForks(b *builder) []Panel {
 			PromTF: merged(map[string]string{
 				"repo": "Repository", "label": "Label", panelValueA: "Used",
 				panelValueB: "Issues", panelValueC: planningPullRequests,
-			}, nil, map[string]int{"repo": 0, "label": 1}),
+			}, nil),
+
 			Opts: Opts{"sort": "Used"},
 			Desc: "The labels in use, per repository, and the link is that label's issue " +
 				"list. Only the labels something carries are collected, so a label nobody " +
@@ -134,7 +135,8 @@ func labelsMilestonesAndForks(b *builder) []Panel {
 			PromTF: merged(map[string]string{
 				"repo": "Repository", "milestone": "Milestone", "state": "State",
 				panelValueA: "Progress", panelValueB: "Issues", panelValueC: planningPullRequests,
-			}, nil, map[string]int{"repo": 0, "milestone": 1, "state": 2}),
+			}, nil),
+
 			Opts: Opts{"sort": "Progress"},
 			Desc: "The due date is collected as a field when a milestone has one, but it is not " +
 				"shown here: InfluxDB creates a column the first time it is written, so a " +
@@ -150,17 +152,18 @@ func labelsMilestonesAndForks(b *builder) []Panel {
 			ES:     milesES, ESTF: milesEStf,
 		}),
 		panel("timeseries", "Forks gained over time", box{W: 12, H: 8, X: 0, Y: 8}, []Target{sqlTS(forks)}, &P{
-			Prom: []Target{daily(fmt.Sprintf(
+			Prom: []Target{daily(promOtherOverTime(fmt.Sprintf(
 				"sum by (full_name, repo) (increase(github_forks_seen_total{%s}[1d]))", PF,
-			), "{{repo}}")},
+			), "full_name, repo", "repo"), "{{repo}}")},
 			Opts:    mergeOpts(Opts{"bars": true, "stack": true}, dayBins),
 			SQLOpts: seriesOpts,
 			Desc: "Dated when each fork was created, which the fork count on a repository " +
 				"never says. The eight repositories that gained the most in the range are " +
 				"named; the rest are `other`. " + bucketFollowsRange,
 			PromDesc: sinceStart,
-			GR:       []Target{grq(perRepoBucket(nonNull(rp(fk, "forks")), fk))},
+			GR:       []Target{grq(grOther(topSeriesKept, perRepoBucket(nonNull(rp(fk, "forks")), fk)))},
 			ES:       []Target{b.esDaily(fk, b.mCount(), "repo", "", []string{ESF}, "")},
+			ESDesc:   esUnfolded(esDailyTerms, "repositories", "series"),
 		}),
 		panel("table", "Forks", box{W: 12, H: 8, X: 12, Y: 8}, []Target{sqlT(forkTbl)}, &P{
 			Prom: []Target{
@@ -171,12 +174,16 @@ func labelsMilestonesAndForks(b *builder) []Panel {
 			PromTF: merged(map[string]string{
 				"repo": "Repository", panelValueA: "Forks", panelValueB: planningPushedTo,
 				panelValueC: planningPushedAfter,
-			}, nil, nil),
+			}, nil),
+
+			// The count ahead of the share of it that was pushed to.
+			PromAt: map[string]string{"Forks": planningPushedTo},
 			Desc: "Whether a fork was ever pushed to separates a derivative from a bookmark, " +
 				"which most forks are. Idle is the time since that push, counted from the " +
 				"row's own date, so it is right when the panel is drawn rather than when the " +
 				"last sweep ran.",
-			PromDesc: "Prometheus keeps no forker, so this is per repository: forks seen over " +
+			PromDesc: "Prometheus keeps no forker and no fork's own date, so this is per " +
+				"repository, with no By or Forked column: forks seen over " +
 				"the range, the share ever pushed to, and on average how long after the fork " +
 				"its last push came, which is negative for a fork nobody has pushed to at " +
 				"all: GitHub gives such a fork the parent's own last push, which usually " +
@@ -202,8 +209,8 @@ func labelsMilestonesAndForks(b *builder) []Panel {
 				"pushed to: those inherit the parent's last push. " + grRows,
 			ES: forkES, ESTF: forkEStf,
 			ESDesc: "Elasticsearch lists the documents themselves and cannot subtract the " +
-				"row's own date from now, so the column is how long after the fork its last " +
-				"push came. A negative is a fork nobody has pushed to, which inherits the " +
+				"row's own date from now, so in place of Idle the column is how long after " +
+				"the fork its last push came. A negative is a fork nobody has pushed to, which inherits the " +
 				"parent's own last push and is most of them; Pushed to says the same thing " +
 				"as a word.",
 		}),
@@ -221,7 +228,7 @@ func discussionAndComments(b *builder) []Panel {
 	disc := `SELECT category AS "Category", COUNT(*) AS "Discussions",` +
 		` CAST(has_answer AS INT) AS "Answered", AVG(comments) AS "Comments each",` +
 		` AVG(upvotes) AS "Upvotes each" FROM gh_discussion` +
-		" WHERE $__timeFilter(time) AND " + RF + " GROUP BY 1, 3 ORDER BY 2 DESC"
+		" WHERE $__timeFilter(time) AND " + RF + " GROUP BY 1, 3 ORDER BY 2 DESC, 1, 3"
 	dc := "gh_discussion"
 	// The discussions one by one, whatever the range: an account has a
 	// handful and a thirty day range hid all but one of them under a row
@@ -237,7 +244,7 @@ func discussionAndComments(b *builder) []Panel {
 		` url AS "Link" FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, number` +
 		" ORDER BY time DESC, comments DESC) AS rn FROM gh_discussion" +
 		" WHERE " + wholeHistory + " AND " + RF + planningNewestRow +
-		" ORDER BY 2 DESC LIMIT 50"
+		" ORDER BY 2 DESC, full_name, number LIMIT 50"
 	latestGR, latestGRtf := gTbl(rowsOf(gp(dc, "comments"), gn(dc, "repo"), gn(dc, "number"),
 		gn(dc, "category")), "Repository, number, category", []col{{"lastNotNull", "Comments"}})
 	latestES, latestEStf := b.esRaw(dc, 50, []named{
@@ -246,9 +253,11 @@ func discussionAndComments(b *builder) []Panel {
 		{"repo", "Repository"},
 		{"category", "Category"},
 		{"comments", "Comments"},
-		{"has_answer", "Answered"},
+		{"has_answer", discussionHasAnswer},
+		{"answerable", discussionTakesAnswers},
 		{"url", "Link"},
 	}, []string{ESF})
+	latestEStf = append(latestEStf, answeredAgainstCategory()...)
 	perItem := "The exporter reduces discussions to counts per category and comments to " +
 		"counts per repository; no item survives, and the title and the url are strings."
 	grPerItem := "Graphite keeps no strings, so neither the title nor the url exists there."
@@ -274,8 +283,8 @@ func discussionAndComments(b *builder) []Panel {
 	// owners using the same one would be one row here. Each comment is a 1
 	// added up per repository; countOf added every comment into one series
 	// first, and the table drew that as one row.
-	commentsGR, commentsGRtf := gTbl(fmt.Sprintf(`groupByNode(isNonNull(%s), %d, "sum")`,
-		gp("gh_issue_comment", "comments"), gn("gh_issue_comment", "full_name")),
+	commentsGR, commentsGRtf := gTbl(fmt.Sprintf(`groupByNode(%s, %d, "sum")`,
+		counted(gp("gh_issue_comment", "comments")), gn("gh_issue_comment", "full_name")),
 		"Repository", []col{{"sum", "Comments"}})
 	commentsES, commentsEStf := esTbl("gh_issue_comment", []any{b.tm("full_name", 20)}, []any{b.mCount()},
 		[]named{{panelFullNameField, "Repository"}, {"n", "Comments"}}, nil)
@@ -290,7 +299,8 @@ func discussionAndComments(b *builder) []Panel {
 			PromTF: merged(map[string]string{
 				"category": "Category", "has_answer": "Answered", panelValueA: "Discussions",
 				panelValueB: "Comments each", panelValueC: "Upvotes each",
-			}, nil, map[string]int{"category": 0, "has_answer": 1}),
+			}, nil),
+
 			Opts:     Opts{"sort": "Discussions"},
 			Desc:     "Discussions opened in the range, by category and whether they were answered.",
 			PromDesc: sinceStart + " " + lastSweep,
@@ -298,8 +308,12 @@ func discussionAndComments(b *builder) []Panel {
 				width("Category", 150), width("Answered", 100),
 				barCell("Discussions", "short", 120),
 			},
-			SQLOver: []any{profileBool("Answered", 100)},
-			GR:      discGR, GRTF: discGRtf,
+			// Every store but Graphite, whose Answered is a share of the
+			// category and would read a whole one as yes.
+			SQLOver:  []any{profileBool("Answered", 100)},
+			PromOver: []any{profileBool("Answered", 100)},
+			ESOver:   []any{profileBool("Answered", 100)},
+			GR:       discGR, GRTF: discGRtf,
 			GROver: []any{unitOf("Answered", "percentunit", 100)},
 			GRDesc: "Graphite keeps no strings and cannot group by the answered flag, so each " +
 				"category is one row and Answered is the share of its discussions that have " +
@@ -320,19 +334,17 @@ func discussionAndComments(b *builder) []Panel {
 				width("Comments", 100), answeredCell("Answered", 100), linkOn("Title"),
 			},
 			GR: latestGR, GRTF: latestGRtf,
-			ES: latestES, ESTF: latestEStf, ESDesc: esNewest + " " + esRange,
-			// Elasticsearch's raw documents carry the JSON boolean, which
-			// reads as true and false without a mapping.
-			ESOver: []any{width("Answered", 100)},
+			ES: latestES, ESTF: latestEStf,
+			ESDesc: esNewest + " " + esRange,
 		}),
 		// The eight commonest transitions of the range and the rest as
 		// `other`: the legend listed eighty one series.
 		panel("timeseries", "Transitions over time", box{W: 12, H: 8, X: 0, Y: 24}, []Target{sqlTS(
 			topSeries("gh_issue_event", "event", "events", "n", RF),
 		)}, &P{
-			Prom: []Target{daily(fmt.Sprintf(
+			Prom: []Target{daily(promOtherOverTime(fmt.Sprintf(
 				"sum by (event) (increase(github_issue_events_total{%s}[1d]))", PF,
-			), "{{event}}")},
+			), "event", "event"), "{{event}}")},
 			Opts:    mergeOpts(Opts{"bars": true, "stack": true}, dayBins),
 			SQLOpts: seriesOpts,
 			Desc: "Labeled, closed, reopened, review requested, renamed: the moment something " +
@@ -340,28 +352,34 @@ func discussionAndComments(b *builder) []Panel {
 				"no other measurement at all. The eight commonest in the range are named; " +
 				"the rest are `other`. " + bucketFollowsRange,
 			PromDesc: sinceStart,
-			GR: []Target{grq(perBucket(nonNull(rp("gh_issue_event", "events")),
-				gn("gh_issue_event", "event")))},
-			ES: []Target{b.esDaily("gh_issue_event", b.mCount(), "event", "", []string{ESF}, "")},
+			GR: []Target{grq(grOther(topSeriesKept, perBucket(nonNull(rp("gh_issue_event", "events")),
+				gn("gh_issue_event", "event"))))},
+			ES:     []Target{b.esDaily("gh_issue_event", b.mCount(), "event", "", []string{ESF}, "")},
+			ESDesc: esUnfolded(esDailyTerms, "transitions", "series"),
 		}),
 		panel("table", "Comments left", box{W: 12, H: 8, X: 12, Y: 24}, []Target{sqlT(
 			`SELECT full_name AS "Repository", COUNT(*) AS "Comments",` +
 				` MAX(CASE WHEN own = 'false' THEN 1 ELSE 0 END) AS "Elsewhere"` +
 				" FROM gh_issue_comment WHERE $__timeFilter(time)" +
-				" GROUP BY 1 ORDER BY 2 DESC LIMIT 20",
+				" GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT 20",
 		)}, &P{
 			Prom:   []Target{promTbl("topk(20, sum by (full_name) (increase(github_issue_comments_total[$__range])))")},
-			PromTF: []any{organize(map[string]string{"full_name": "Repository", "Value": "Comments"}, nil, nil)},
+			PromTF: []any{organize(map[string]string{"full_name": "Repository", "Value": "Comments"}, nil)},
 			Opts:   Opts{"sort": "Comments"},
 			Desc: "Comments on issues and pull requests, in any repository. The ones outside " +
 				"this account are the half a sweep over one's own repositories cannot see.",
-			PromDesc:  sinceStart,
-			Overrides: []any{barCell("Comments", "short", 120)},
+			PromDesc:  sinceStart + " " + noElsewhereColumn,
+			Overrides: []any{barCell("Comments", "short", 120), fullNameColumn()},
 			GR:        commentsGR, GRTF: commentsGRtf, GRDesc: grRows + " " + grSlotCounts,
-			ES: commentsES, ESTF: commentsEStf,
+			ES: commentsES, ESTF: commentsEStf, ESDesc: noElsewhereColumn,
 		}),
 	}, answersGiven(b, perItem, grPerItem)...)
 }
+
+// noElsewhereColumn is why a store that counts comments per repository and
+// reads no flag beside the count has no Elsewhere column.
+const noElsewhereColumn = "There is no Elsewhere column here: the owner in each full name " +
+	"says whose repository it is."
 
 // answersGiven is the two tables over gh_discussion_comment: the comments of
 // the range per repository, and the ones left in other people's discussions
@@ -385,7 +403,7 @@ func answersGiven(b *builder, perItem, grPerItem string) []Panel {
 		` answers AS "Accepted", url AS "Link" FROM (SELECT *, ROW_NUMBER() OVER` +
 		" (PARTITION BY comment ORDER BY answers DESC) AS rn FROM gh_discussion_comment" +
 		" WHERE " + wholeHistory + " AND own = 'false') x WHERE rn = 1" +
-		" ORDER BY 2 DESC LIMIT 50"
+		" ORDER BY 2 DESC, comment LIMIT 50"
 	// The comments of the range per repository, one row per comment for the
 	// same reason: counted row by row, a comment read before and after it was
 	// accepted was two comments and two accepted answers.
@@ -393,7 +411,7 @@ func answersGiven(b *builder, perItem, grPerItem string) []Panel {
 		` COUNT(*) AS "Comments", SUM(upvotes) AS "Upvotes" FROM (SELECT full_name,` +
 		" answers, upvotes, ROW_NUMBER() OVER (PARTITION BY comment ORDER BY answers DESC," +
 		" upvotes DESC) AS rn FROM gh_discussion_comment WHERE $__timeFilter(time)) x" +
-		" WHERE rn = 1 GROUP BY 1 ORDER BY 2 DESC, 3 DESC LIMIT 20"
+		" WHERE rn = 1 GROUP BY 1 ORDER BY 2 DESC, 3 DESC, 1 LIMIT 20"
 	dcc := "gh_discussion_comment"
 	// What the list of comments says about the rows it is made of; the
 	// table of counts points at it, since in Prometheus it has no rows to
@@ -424,8 +442,8 @@ func answersGiven(b *builder, perItem, grPerItem string) []Panel {
 	elsewhereEStf = append(elsewhereEStf, onePerComment(50)...)
 	// One series per comment across both shapes, then the comments of each
 	// repository added up, bucket by bucket.
-	answersGR, answersGRtf := gTbl(fmt.Sprintf(`groupByNode(isNonNull(groupByNodes(%s, "max", 0, 1)), 0, "sum")`,
-		everyShape(dcc, "comments", []string{"full_name", "comment"})),
+	answersGR, answersGRtf := gTbl(fmt.Sprintf(`groupByNode(%s, 0, "sum")`,
+		counted(fmt.Sprintf(`groupByNodes(%s, "max", 0, 1)`, everyShape(dcc, "comments", []string{"full_name", "comment"})))),
 		"Repository", []col{{"sum", "Comments"}})
 	// A bucket per comment inside each repository's, each the largest of its
 	// documents, and the table adds them up per repository: a sum over the
@@ -441,18 +459,18 @@ func answersGiven(b *builder, perItem, grPerItem string) []Panel {
 	return []Panel{
 		panel("table", "Discussion answers", box{W: 8, H: 8, X: 0, Y: 32}, []Target{sqlT(answersSQL)}, &P{
 			Prom:   []Target{promTbl("topk(20, sum by (full_name) (increase(github_discussion_comments_total[$__range])))")},
-			PromTF: []any{organize(map[string]string{"full_name": "Repository", "Value": "Comments"}, nil, nil)},
+			PromTF: []any{organize(map[string]string{"full_name": "Repository", "Value": "Comments"}, nil)},
 			Opts:   Opts{"sort": "Accepted answers"},
 			Desc: "Discussions are the one surface where the work is almost entirely in other " +
 				"people's repositories: gh_discussion sees three rows inside this account, " +
 				"and this sees sixty six across twenty six repositories. Each comment counts " +
 				"once, however many rows a store holds of it, which Answers elsewhere explains.",
-			PromDesc:  sinceStart,
-			Overrides: []any{barCell("Comments", "short", 120)},
+			PromDesc: sinceStart + " The exporter keeps the mean answers and upvotes of a " +
+				"comment and not their sum, so there is no Accepted answers or Upvotes column.",
+			Overrides: []any{barCell("Comments", "short", 120), fullNameColumn()},
 			GR:        answersGR, GRTF: answersGRtf,
-			GRDesc: "Graphite has no rows: each series is one number, so this table keeps the " +
-				"comments of each repository and drops the accepted answers and the upvotes.",
-			ES: answersES, ESTF: answersEStf,
+			GRDesc: grRows,
+			ES:     answersES, ESTF: answersEStf,
 			ESDesc: "In Elasticsearch each comment is a bucket inside its repository's, " +
 				"a thousand at most per repository, and the table adds the buckets up.",
 		}),
@@ -461,14 +479,14 @@ func answersGiven(b *builder, perItem, grPerItem string) []Panel {
 				"discussions, whether each was accepted as the answer, and a link to each.",
 				perItem),
 			GRDesc: "Graphite names each row by repository and number from the path, and " +
-				"Accepted is the comment's answers leaf. " + grPerItem + " " + grRows,
+				"Accepted is the comment's answers leaf. " + grPerItem + " " + grRows + " " + grRange,
 			Desc: "Every comment this account left in a discussion of a repository it does " +
 				"not own, newest first and whatever the range; Accepted says whether the " +
 				"maintainer marked it the answer. The link opens the comment in its thread. " +
 				onceEach,
 			Opts: Opts{"sort": "When"},
 			Overrides: []any{
-				when("When"), repoColumn(),
+				when("When"), fullNameColumn(),
 				profileBool("Accepted", 100), linkOn("Title"),
 			},
 			GR: elsewhereGR, GRTF: elsewhereGRtf,
@@ -547,16 +565,48 @@ func perRepositoryFromComments() []any {
 func answeredCell(name string, w int) any {
 	return override(name, []any{
 		map[string]any{"id": "mappings", "value": []any{
-			map[string]any{"type": "value", "options": map[string]any{
-				"0": map[string]any{"text": "no", "color": "text", "index": 1},
-				"1": map[string]any{"text": "yes", "color": "green", "index": 0},
-			}},
+			map[string]any{"type": "value", "options": flagWords("no", "text")},
 			map[string]any{"type": "special", "options": map[string]any{
-				"match":  "null",
-				"result": map[string]any{"text": "n/a", "color": "text", "index": 2},
+				"match":  "null+nan",
+				"result": map[string]any{"text": "n/a", "color": "text", "index": 4},
 			}},
 		}},
 		map[string]any{"id": "custom.cellOptions", "value": map[string]any{"type": "color-text"}},
 		map[string]any{"id": "custom.width", "value": w},
 	})
+}
+
+// The two flags a discussion's document carries, under the names the
+// Elasticsearch table reads them by before it draws Answered from them.
+const (
+	discussionHasAnswer    = "Has answer"
+	discussionTakesAnswers = "Takes answers"
+)
+
+// answeredAgainstCategory is Answered as the SQL stores read it, drawn in
+// Elasticsearch from the two flags every discussion's document carries: 1 or
+// 0 where the category takes an answer, and nothing where it does not, which
+// reads n/a. The SQL stores read the category's flag with a CASE; here the
+// answer is divided by it, and 0 over 0 is NaN, which answeredCell draws as it
+// draws a null. Drawn as the document's own flag, an idea read "no" in
+// Elasticsearch where the other stores read n/a.
+//
+// The category's flag is a tag, so the document holds it as the text "true"
+// or "false", and Grafana's conversions make neither of them the number the
+// arithmetic needs: to a number both are NaN, and to a boolean both are true,
+// since a non-empty string is (convertFieldType in Grafana 13.2.1). An enum of
+// the two words, in that order, makes "false" 0 and "true" 1. The answer is a
+// boolean in the document and enters the arithmetic as 1 or 0 as it is.
+func answeredAgainstCategory() []any {
+	return []any{
+		map[string]any{"id": "convertFieldType", "options": map[string]any{
+			"fields": map[string]any{},
+			"conversions": []any{map[string]any{
+				"targetField": discussionTakesAnswers, "destinationType": "enum",
+				"enumConfig": map[string]any{"text": []any{"false", "true"}},
+			}},
+		}},
+		binaryField("Answered", discussionHasAnswer, "/", discussionTakesAnswers),
+		hideColumns(discussionHasAnswer, discussionTakesAnswers),
+	}
 }

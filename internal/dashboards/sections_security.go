@@ -40,6 +40,7 @@ const (
 	securityCanApprovePR = "Can approve pull requests"
 	securityLastRotated  = "Last rotated"
 	securityCVSS         = "CVSS"
+	securityWorstCVSS    = "Worst CVSS"
 	securityOutcome      = "Outcome"
 )
 
@@ -94,10 +95,7 @@ func threeStates() []any {
 		override("Enabled", []any{
 			map[string]any{"id": securityCellOptions, "value": map[string]any{"type": securityColoredText}},
 			map[string]any{"id": "mappings", "value": []any{map[string]any{
-				"type": "value", "options": map[string]any{
-					"0": map[string]any{"text": "no", "color": "text", "index": 1},
-					"1": map[string]any{"text": "yes", "color": "green", "index": 0},
-				},
+				"type": "value", "options": flagWords("no", "text"),
 			}}},
 			map[string]any{"id": securityCellWidth, "value": 100},
 		}),
@@ -119,11 +117,11 @@ func openAlerts(b *builder) []Panel {
 	bySev := `SELECT severity AS "Severity", SUM(open) AS "Open alerts" FROM (` +
 		"SELECT severity, open, ROW_NUMBER() OVER (PARTITION BY full_name, severity, ecosystem" +
 		" ORDER BY time DESC) AS rn FROM gh_dependabot_alert WHERE $__timeFilter(time) AND " + RF +
-		") x WHERE rn = 1 GROUP BY 1 ORDER BY 2 DESC"
+		") x WHERE rn = 1 GROUP BY 1 ORDER BY 2 DESC, 1"
 	byEco := `SELECT ecosystem AS "Ecosystem", SUM(open) AS "Open alerts" FROM (` +
 		"SELECT ecosystem, open, ROW_NUMBER() OVER (PARTITION BY full_name, severity, ecosystem" +
 		" ORDER BY time DESC) AS rn FROM gh_dependabot_alert WHERE $__timeFilter(time) AND " + RF +
-		") x WHERE rn = 1 GROUP BY 1 ORDER BY 2 DESC"
+		") x WHERE rn = 1 GROUP BY 1 ORDER BY 2 DESC, 1"
 	// The newest reading of each repository's feature, not the largest of the
 	// range: MAX(enabled) read a feature switched off inside the range as on,
 	// and MAX(open_alerts) an alert fixed inside it as still open, which is
@@ -134,7 +132,7 @@ func openAlerts(b *builder) []Panel {
 		` url AS "Link" FROM (` +
 		"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, feature ORDER BY time DESC) AS rn" +
 		securityFrom + "gh_security_feature" + ciInRange + RF + deliveryNewestRow +
-		" ORDER BY 1, 2"
+		" ORDER BY 1, 2, full_name"
 	// A snapshot per repository, severity and ecosystem: the value of a
 	// bucket is the newest row of each series inside it, and the severity's
 	// line is those added up. A MAX per severity took the largest series
@@ -198,8 +196,8 @@ func openAlerts(b *builder) []Panel {
 			{Kind: "sql", Format: "table", Ref: "B", SQL: namedValue(scan, securityCodeScanning)},
 		}, &P{
 			Prom: []Target{
-				promNamed("A", "Dependabot", fmt.Sprintf("sum(github_dependabot_alert_open{%s})", PF)),
-				promNamed("B", securityCodeScanning,
+				promAggregated("A", "Dependabot", fmt.Sprintf("sum(github_dependabot_alert_open{%s})", PF)),
+				promAggregated("B", securityCodeScanning,
 					fmt.Sprintf("sum(github_code_scanning_alert_open{%s})", PF)),
 			},
 			Desc: "Alerts still open, from the newest reading of each repository, which is " +
@@ -216,10 +214,14 @@ func openAlerts(b *builder) []Panel {
 			),
 			ESOver: []any{frameName("A", "Dependabot"), frameName("B", securityCodeScanning)},
 			ESOpts: Opts{"calc": "sum"},
+			ESDesc: esLeftOut("an alert count", esNewestAddedUp("alert")),
 			Opts:   Opts{"thresholds": plainSteps},
 			Overrides: []any{
 				fieldThresholds("Dependabot", "short", alertThresholds),
 				fieldThresholds(securityCodeScanning, "short", alertThresholds),
+				// The collector writes a row per group of alerts that are open
+				// and none for a group with none, so no row is none open.
+				noValueOf("Dependabot", "none open"), noValueOf(securityCodeScanning, "none open"),
 			},
 		}),
 		panel("barchart", "Alerts by severity", box{W: 6, H: 4, X: 12, Y: 0}, []Target{sqlT(bySev)}, &P{
@@ -228,7 +230,7 @@ func openAlerts(b *builder) []Panel {
 			))},
 			PromTF: []any{organize(map[string]string{
 				"severity": "Severity", "Value": securityOpenAlerts,
-			}, nil, nil)},
+			}, nil)},
 			GR: sevGR, GRTF: sevGRtf,
 			ES: sevES, ESTF: sevEStf,
 		}),
@@ -238,7 +240,7 @@ func openAlerts(b *builder) []Panel {
 			))},
 			PromTF: []any{organize(map[string]string{
 				"ecosystem": "Ecosystem", "Value": securityOpenAlerts,
-			}, nil, nil)},
+			}, nil)},
 			GR: ecoGR, GRTF: ecoGRtf,
 			ES: ecoES, ESTF: ecoEStf,
 		}),
@@ -258,11 +260,11 @@ func openAlerts(b *builder) []Panel {
 			// Each series reduced to its newest per bucket, then the group
 			// summed: summing per series first is what keeps the sum from
 			// counting one sweep twice.
-			GR: []Target{grq(consolidated(fmt.Sprintf(`groupByNode(summarize(%s, "1d", "last"), %d, "sum")`,
-				depOpen, gn(da, "severity")), "max"))},
+			GR: []Target{grq(consolidated(fmt.Sprintf(`groupByNode(summarize(%s, %s, "last"), %d, "sum")`,
+				depOpen, grBin("1d"), gn(da, "severity")), "max"))},
 			ES: []Target{b.esDaily(da, b.mMax("open"), "severity", "", []string{ESF}, "")},
 			ESDesc: "In Elasticsearch this is the largest single series of each severity " +
-				"in the day rather than the sum across repositories: a date histogram " +
+				"in the bucket rather than the sum across repositories: a date histogram " +
 				"cannot take the newest of each series before adding them.",
 		}),
 		panel("table", "Security features", box{W: 12, H: 8, X: 12, Y: 4}, []Target{sqlT(feats)}, &P{
@@ -273,7 +275,8 @@ func openAlerts(b *builder) []Panel {
 			PromTF: merged(map[string]string{
 				"repo": "Repository", "feature": "Feature", inventoryValueCol + "A": "Enabled",
 				inventoryValueCol + "B": securityOpenAlerts,
-			}, nil, map[string]int{"repo": 0, "feature": 1}),
+			}, nil),
+
 			Desc: "Recorded explicitly, so a repository with the feature switched off is " +
 				"distinguishable from one with no alerts. Each row is the newest reading of " +
 				"the repository's feature, so a feature switched off or an alert fixed inside " +
@@ -281,7 +284,8 @@ func openAlerts(b *builder) []Panel {
 			Overrides: []any{enabled, width(securityOpenAlerts, 120), ownerLinkOn("Feature", "the security overview")},
 			GR:        featGR, GRTF: featGRtf,
 			GRDesc: "Graphite names each row repository and feature from the path and keeps one " +
-				"number per row, the open alerts, so whether the feature is on is not shown here.",
+				"number per row, the open alerts, so Enabled, whether the feature is on, is not " +
+				"shown here.",
 			ES: featES, ESTF: featEStf,
 		}),
 	}
@@ -343,16 +347,16 @@ func scanningAndResolution(b *builder) []Panel {
 		` COALESCE(cvss_v4, cvss) AS "` + securityCVSS + `", alert_state AS "` + securityOutcome + `",` +
 		` seconds_to_resolve AS "Time to resolve", url AS "Link"` +
 		" FROM gh_dependabot_alert_item WHERE $__timeFilter(time) AND " + RF +
-		" AND seconds_to_resolve IS NOT NULL ORDER BY time DESC LIMIT 25"
+		" AND seconds_to_resolve IS NOT NULL ORDER BY time DESC, full_name, number LIMIT 25"
 	// Both alert families spell "no longer open" the same way. The state is a
 	// field on the row, since it moves after the date the row carries, and
 	// the exporter reads it back as a label.
 	resolved := `alert_state!="open",` + PF
 	csi := "gh_code_scanning_alert_item"
 	scanResolve := `SELECT severity AS "Severity", COUNT(*) AS "Alerts",` +
-		` approx_percentile_cont(seconds_to_resolve, 0.5) AS "Time to resolve"` +
+		` median(CAST(seconds_to_resolve AS DOUBLE)) AS "Time to resolve"` +
 		securityFrom + csi + ciInRange + RF +
-		" AND seconds_to_resolve IS NOT NULL GROUP BY 1 ORDER BY 2 DESC"
+		" AND seconds_to_resolve IS NOT NULL GROUP BY 1 ORDER BY 2 DESC, 1"
 	an, di := "gh_code_scanning_analysis", "gh_dependabot_alert_item"
 	// The alerts still open, oldest first, from both families in one list:
 	// the two stats at the top count them and this is the one place that
@@ -379,7 +383,7 @@ func scanningAndResolution(b *builder) []Panel {
 		` repo AS "Repository", severity AS "Severity", tool AS "Detail",` +
 		" " + openFor + `, url AS "Link"` +
 		securityFrom + csi + openAlerts +
-		" ORDER BY 2 LIMIT 25"
+		" ORDER BY 2, 3, 4, 1, 8 LIMIT 25"
 
 	scanResGR, scanResGRtf := gTbl(fmt.Sprintf(`groupByNode(%s, %d, "avg")`,
 		rp(csi, "seconds_to_resolve"), gn(csi, "severity")),
@@ -431,26 +435,11 @@ func scanningAndResolution(b *builder) []Panel {
 			{"m", "Raised"},
 		}, []string{ESF, "alert_state:open"}, hideColumns(panelFullNameField))
 
-	toolGR, toolGRtf := gTbl(fmt.Sprintf(`limit(sortBy(%s, "sum", true), 25)`,
-		grGroupBy(rp(an, "results"), an, "sum", "tool", "repo"),
-	),
-		"Tool, repository", []col{{"sum", "Results"}})
-	toolES, toolEStf := esTbl(an, append([]any{b.tm("tool", 10)}, b.tmRepo(50)...),
-		[]any{b.mCount(), b.mSum("results"), b.mMax("rules")},
-		[]named{
-			{"tool.keyword", "Tool"},
-			{inventoryRepoTerm, "Repository"},
-			{"n", "Runs"},
-			{"r", "Results"},
-			{"u", "Rules"},
-		}, []string{ESF}, hideColumns(panelFullNameField))
-
 	return []Panel{
 		panel("timeseries", "Code scanning runs", box{W: 12, H: 8, X: 0, Y: 12}, []Target{sqlTS(analyses)}, &P{
-			Prom: []Target{daily(fmt.Sprintf(
+			Prom: []Target{daily(promOtherOverTime(fmt.Sprintf(
 				"sum by (tool) (increase(github_code_scanning_analyses_total{%s}[1d]))", PF,
-			),
-				"{{tool}}")},
+			), "tool", "tool"), "{{tool}}")},
 			Opts:    mergeOpts(Opts{"bars": true, "stack": true}, dayBins),
 			SQLOpts: seriesOpts,
 			Desc: "That the scan ran at all, which the alert list cannot tell you. GitHub " +
@@ -458,8 +447,9 @@ func scanningAndResolution(b *builder) []Panel {
 				"that ran the most in the range are named; the rest are `other`. " +
 				bucketFollowsRange,
 			PromDesc: sinceStart,
-			GR:       []Target{grq(perBucket(nonNull(rp(an, "analyses")), gn(an, "tool")))},
+			GR:       []Target{grq(grOther(topSeriesKept, perBucket(nonNull(rp(an, "analyses")), gn(an, "tool"))))},
 			ES:       []Target{b.esDaily(an, b.mCount(), "tool", "", []string{ESF}, "")},
+			ESDesc:   esUnfolded(esDailyTerms, "tools", "series"),
 		}),
 		panel("table", "Scanning alerts resolved", box{W: 24, H: 7, X: 0, Y: 20},
 			[]Target{sqlT(scanResolve)}, &P{
@@ -469,7 +459,8 @@ func scanningAndResolution(b *builder) []Panel {
 				},
 				PromTF: merged(map[string]string{
 					"severity": "Severity", inventoryValueCol + "A": "Alerts", inventoryValueCol + "B": securityResolveTime,
-				}, nil, nil),
+				}, nil),
+
 				Opts: Opts{"sort": "Alerts"},
 				Desc: "Code scanning alerts that were fixed or dismissed, and how long each " +
 					"severity stayed open. The list was always downloaded whole and these dates " +
@@ -487,12 +478,18 @@ func scanningAndResolution(b *builder) []Panel {
 			},
 			PromTF: merged(map[string]string{
 				"severity": "Severity", inventoryValueCol + "A": "Alerts",
-				inventoryValueCol + "B": "Worst CVSS", inventoryValueCol + "C": securityResolveTime,
-			}, nil, nil),
-			Opts: Opts{"sort": "Raised"},
-			Desc: securityResolveDesc,
+				inventoryValueCol + "B": securityWorstCVSS, inventoryValueCol + "C": securityResolveTime,
+			}, nil),
+
+			// The count stands for the alerts the SQL stores list, and the
+			// worst of the scores where they draw each one.
+			PromAt: map[string]string{"Alerts": "Advisory", securityWorstCVSS: securityCVSS},
+			Opts:   Opts{"sort": "Raised"},
+			Desc:   securityResolveDesc,
 			PromDesc: "Prometheus keeps the severity only, so this is the alerts resolved per " +
-				"severity, the worst mean score and the mean time. " + sinceStart + " " + lastSweep,
+				"severity, the worst mean score and the mean time, and no alert's Package, " +
+				"Raised, Repository, Advisory, CVSS or Outcome survives the exporter. " +
+				sinceStart + " " + lastSweep,
 			Overrides: []any{
 				when("Raised"), repoColumn(), width("Severity", 90),
 				width("Package", 130), width(securityCVSS, 70), width(securityOutcome, 110),
@@ -500,39 +497,14 @@ func scanningAndResolution(b *builder) []Panel {
 			},
 			PromOver: []any{
 				unitOf(securityResolveTime, "s", 170), barCell("Alerts", "short", 130),
-				width("Worst CVSS", 120),
+				width(securityWorstCVSS, 120),
 			},
-			GR: resGR, GRTF: resGRtf,
+			GR: resGR, GRTF: resGRtf, GRAt: map[string]string{"Alerts": "Advisory"},
 			GRDesc: "Graphite names each row repository, severity and package from the path " +
-				"and keeps no text, so the advisory is missing. " + grSlot,
+				"and keeps no text, so the advisory is missing. " + grRows + " " + grSlot,
 			ES: resES, ESTF: resEStf, ESDesc: esNewest,
 		}),
-		panel("table", "Scan results by tool", box{W: 24, H: 7, X: 0, Y: 27}, []Target{sqlT(
-			`SELECT tool AS "Tool", SUM(results) AS "Results", repo AS "Repository",` +
-				` COUNT(*) AS "Runs", MAX(rules) AS "Rules"` +
-				" FROM gh_code_scanning_analysis WHERE $__timeFilter(time) AND " + RF +
-				" GROUP BY 1, full_name, 3 ORDER BY 2 DESC LIMIT 25",
-		)}, &P{
-			Prom: []Target{
-				promTbl(fmt.Sprintf("sum by (tool, full_name, repo) (increase(github_code_scanning_analyses_total{%s}[$__range]))", PF), "A"),
-				promTbl(fmt.Sprintf("avg by (tool, full_name, repo) (github_code_scanning_analyses_results_mean{%s})", PF), "B"),
-			},
-			PromTF: merged(map[string]string{
-				"tool": "Tool", "repo": "Repository", inventoryValueCol + "A": "Runs", inventoryValueCol + "B": "Results",
-			}, nil, map[string]int{"tool": 0, "repo": 1}),
-			Opts: Opts{"sort": "Results"},
-			Desc: "The panel beside this one says the scan ran. This says what it found, which " +
-				"is what explains a jump in the alert count: one tool here returns sixty " +
-				"three results in three runs and another fifty two in nine hundred and " +
-				"fifty three.",
-			PromDesc: sinceStart + " " + lastSweep,
-			Overrides: []any{
-				barCell("Results", "short", 120), width("Runs", 100),
-				width("Rules", 100),
-			},
-			GR: toolGR, GRTF: toolGRtf, GRDesc: grRows + " " + grSlotTotals,
-			ES: toolES, ESTF: toolEStf,
-		}),
+		scanResultsByTool(b),
 		panel("table", "Oldest open alerts", box{W: 24, H: 7, X: 0, Y: 34}, []Target{sqlT(oldest)}, &P{
 			PromNote: cannot("the alerts still open, oldest first, from both families, with "+
 				"the advisory or the rule and a link to each.",
@@ -548,10 +520,11 @@ func scanningAndResolution(b *builder) []Panel {
 			},
 			ES: oldestES, ESTF: oldestEStf,
 			ESDesc: "Elasticsearch lists the Dependabot alerts alone, the two families " +
-				"being two indices, and the advisory is text, which a bucket cannot show. " +
-				"It gives the date each alert was raised rather than how long it has been " +
-				"open, that being the row's own date subtracted from now and not something " +
-				"a bucket can compute, and it is not sorted by that date: ordering a bucket " +
+				"being two indices, so there is no Kind column, and the advisory is text, " +
+				"which a bucket cannot show, so there is no Detail column. " +
+				"It gives the date each alert was raised rather than Open for, how long it " +
+				"has been open, that being the row's own date subtracted from now and not " +
+				"something a bucket can compute, and it is not sorted by that date: ordering a bucket " +
 				"by a metric needs the metric to be its own child, and this one is four " +
 				"buckets deeper. It also lists only the " +
 				"ones raised inside the dashboard range, since every Elasticsearch query " +
@@ -593,23 +566,23 @@ func posture(b *builder) []Panel {
 		// this was measured against was an archived MATLAB repository, and
 		// with 57 repositories in the picker it returns 285 rows and shows
 		// six: the six the reader saw said nothing was wrong anywhere.
-		" ORDER BY 4, 1, 2"
+		" ORDER BY 4, 1, 2, full_name"
 	setup := `SELECT repo AS "Repository", state AS "State", query_suite AS "Query suite",` +
 		` schedule AS "Schedule", languages AS "Languages",` +
 		` days_since_change AS "Last changed" FROM (` +
 		"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn" +
 		securityFrom + csu + ciInRange + RF + deliveryNewestRow +
-		" ORDER BY 1"
+		" ORDER BY 1, full_name"
 	policy := `SELECT repo AS "Repository", permissions AS "Permissions",` +
 		` CAST(can_approve_pr AS INT) AS "Can approve pull requests" FROM (` +
 		"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn" +
 		securityFrom + ap + ciInRange + RF + deliveryNewestRow +
-		" ORDER BY 1"
+		" ORDER BY 1, full_name"
 	secrets := `SELECT secret AS "Secret", days_since_rotation AS "Last rotated",` +
 		` age_days AS "Age", repo AS "Repository", kind AS "Kind" FROM (` +
 		"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, kind, secret ORDER BY time DESC) AS rn" +
 		securityFrom + sc + ciInRange + RF + deliveryNewestRow +
-		" ORDER BY 2 DESC"
+		" ORDER BY 2 DESC, 1, full_name, 5"
 
 	// Graphite carries every tag as a path node, so the identity columns come
 	// free; the number is the one column each table keeps.
@@ -691,7 +664,7 @@ func posture(b *builder) []Panel {
 			PromTF: []any{organize(map[string]string{
 				"repo": "Repository", "setting": "Setting", "status": "Status",
 				"Value": "Enabled",
-			}, nil, map[string]int{"repo": 0, "setting": 1, "status": 2})},
+			}, nil)},
 			Desc: "What the repository itself says about the five security_and_analysis keys, " +
 				"which have three states and not two: `unavailable` is GitHub omitting the " +
 				"whole block on a private repository, and that is not `disabled`. Read it " +
@@ -721,8 +694,8 @@ func posture(b *builder) []Panel {
 			PromTF: merged(map[string]string{
 				"repo": "Repository", "state": "State", "query_suite": securityQuerySuite,
 				"schedule": "Schedule", inventoryValueCol + "B": "Languages", inventoryValueCol + "C": deliveryLastChanged,
-			}, []string{inventoryValueCol + "A"},
-				map[string]int{"repo": 0, "state": 1, "query_suite": 2, "schedule": 3}),
+			}, []string{inventoryValueCol + "A"}),
+
 			Desc: "GitHub's own default setup, and nothing else. A repository can answer " +
 				"not-configured here and still run CodeQL from a workflow it wrote itself, " +
 				"which the Code scanning runs panel above sees and this one does not. In " +
@@ -748,7 +721,7 @@ func posture(b *builder) []Panel {
 			PromTF: []any{organize(map[string]string{
 				"repo": "Repository", "permissions": "Permissions",
 				"Value": securityCanApprovePR,
-			}, nil, map[string]int{"repo": 0, "permissions": 1})},
+			}, nil)},
 			Desc: "The default permissions of GITHUB_TOKEN, which is what a compromised action " +
 				"inherits. `write` beside can-approve-pull-requests on is the supply-chain " +
 				"row: that workflow can push a change and approve it. `read` means a workflow " +
@@ -770,7 +743,8 @@ func posture(b *builder) []Panel {
 				PromTF: merged(map[string]string{
 					"repo": "Repository", "kind": "Kind", "secret": "Secret",
 					inventoryValueCol + "A": "Age", inventoryValueCol + "B": securityLastRotated,
-				}, nil, map[string]int{"repo": 0, "kind": 1, "secret": 2}),
+				}, nil),
+
 				Opts: Opts{"sort": securityLastRotated},
 				Desc: "Secrets, and when they were last rotated. Both numbers or the panel " +
 					"says nothing: days_since_rotation equals " +
@@ -786,4 +760,53 @@ func posture(b *builder) []Panel {
 				ES: scES, ESTF: scEStf,
 			}),
 	}
+}
+
+// scanResultsByTool is what each scanning tool found in each repository, the
+// results that explain a jump in the alert count.
+func scanResultsByTool(b *builder) Panel {
+	an := "gh_code_scanning_analysis"
+	toolGR, toolGRtf := gTbl(fmt.Sprintf(`limit(sortBy(%s, "sum", true), 25)`,
+		grGroupBy(rp(an, "results"), an, "sum", "tool", "repo"),
+	),
+		"Tool, repository", []col{{"sum", "Results"}})
+	toolES, toolEStf := esTbl(an, append([]any{b.tm("tool", 10)}, b.tmRepo(50)...),
+		[]any{b.mCount(), b.mSum("results"), b.mMax("rules")},
+		[]named{
+			{"tool.keyword", "Tool"},
+			{inventoryRepoTerm, "Repository"},
+			{"n", "Runs"},
+			{"r", "Results"},
+			{"u", "Rules"},
+		}, []string{ESF}, hideColumns(panelFullNameField))
+
+	return panel("table", "Scan results by tool", box{W: 24, H: 7, X: 0, Y: 27}, []Target{sqlT(
+		`SELECT tool AS "Tool", SUM(results) AS "Results", repo AS "Repository",` +
+			` COUNT(*) AS "Runs", MAX(rules) AS "Rules"` +
+			" FROM gh_code_scanning_analysis WHERE $__timeFilter(time) AND " + RF +
+			" GROUP BY 1, full_name, 3 ORDER BY 2 DESC, 1, full_name LIMIT 25",
+	)}, &P{
+		Prom: []Target{
+			promTbl(fmt.Sprintf("sum by (tool, full_name, repo) (increase(github_code_scanning_analyses_total{%s}[$__range]))", PF), "A"),
+			promTbl(fmt.Sprintf("avg by (tool, full_name, repo) (github_code_scanning_analyses_results_mean{%s})", PF), "B"),
+			promTbl(fmt.Sprintf("max by (tool, full_name, repo) (github_code_scanning_analyses_rules_mean{%s})", PF), "C"),
+		},
+		PromTF: merged(map[string]string{
+			"tool": "Tool", "repo": "Repository", inventoryValueCol + "A": "Runs", inventoryValueCol + "B": "Results",
+			inventoryValueCol + "C": "Rules",
+		}, nil),
+
+		Opts: Opts{"sort": "Results"},
+		Desc: "The panel beside this one says the scan ran. This says what it found, which " +
+			"is what explains a jump in the alert count: one tool here returns sixty " +
+			"three results in three runs and another fifty two in nine hundred and " +
+			"fifty three.",
+		PromDesc: sinceStart + " " + lastSweep,
+		Overrides: []any{
+			barCell("Results", "short", 120), width("Runs", 100),
+			width("Rules", 100),
+		},
+		GR: toolGR, GRTF: toolGRtf, GRDesc: grRows + " " + grSlotTotals,
+		ES: toolES, ESTF: toolEStf,
+	})
 }

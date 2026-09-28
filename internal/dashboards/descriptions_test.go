@@ -161,7 +161,7 @@ func TestGraphiteNamesTheStorageSlotOnlyForWhatItReduces(t *testing.T) {
 		}
 	}
 	desc := descriptionOf(mustPanel(t, rendered(t, "graphite"), "Every repository, ever"))
-	if !strings.Contains(desc, "keeps the commits it is ranked by and drops the other columns") {
+	if !strings.Contains(desc, "each series is reduced over the range to one number, Commits, so ") {
 		t.Errorf("graphite: Every repository, ever does not say it keeps one column of the "+
 			"many its shared description names: %q", desc)
 	}

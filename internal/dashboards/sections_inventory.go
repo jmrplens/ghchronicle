@@ -55,7 +55,7 @@ func repositoryList(b *builder) []Panel {
 	langs := `SELECT language AS "Language", SUM(bytes) AS "Bytes" FROM (` +
 		"SELECT language, bytes, ROW_NUMBER() OVER (PARTITION BY full_name, language" +
 		" ORDER BY time DESC) AS rn FROM gh_repo_language WHERE $__timeFilter(time) AND " + RF +
-		") x WHERE rn = 1 GROUP BY 1 ORDER BY 2 DESC LIMIT 12"
+		") x WHERE rn = 1 GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT 12"
 	repoFields := []string{
 		"language", "stars", "forks", "network", "open_issues", "watchers",
 		"size_kb", "age_days", "days_since_push", "visibility", "license", "url",
@@ -66,7 +66,7 @@ func repositoryList(b *builder) []Panel {
 		` size_kb AS "Size", age_days AS "Age", days_since_push AS "Idle",` +
 		` visibility AS "Visibility", license AS "License",` +
 		` url AS "Link"` +
-		" FROM (" + latestPerRepo(repoFields) + ") ORDER BY stars DESC"
+		" FROM (" + latestPerRepo(repoFields) + ") ORDER BY stars DESC, full_name"
 	// The six boxes the score is made of, which are stored and were shown
 	// nowhere: eight of thirty-five repositories have no license, which the
 	// percentage alone does not say. Five of them are GitHub's own flags.
@@ -95,7 +95,7 @@ func repositoryList(b *builder) []Panel {
 		" ORDER BY time DESC) AS rn FROM gh_repo_community WHERE $__timeFilter(time) AND " + RF +
 		") c LEFT JOIN (SELECT full_name, issue_templates, ROW_NUMBER() OVER (PARTITION BY full_name" +
 		" ORDER BY time DESC) AS rn FROM gh_repo_policy WHERE $__timeFilter(time) AND " + RF +
-		") p ON p.full_name = c.full_name AND p.rn = 1 WHERE c.rn = 1 ORDER BY 2 DESC"
+		") p ON p.full_name = c.full_name AND p.rn = 1 WHERE c.rn = 1 ORDER BY 2 DESC, c.full_name"
 	repoBy := "full_name, repo, language, visibility, license"
 	repoCols := []named{
 		{"stars", "Stars"},
@@ -179,17 +179,13 @@ func repositoryList(b *builder) []Panel {
 		"repo": "Repository", "language": "Language",
 		"visibility": "Visibility", "license": "License",
 	}
-	reposOrder := map[string]int{"repo": 0, "language": 1}
 	for i, c := range repoCols {
 		ref := string(rune('A' + i))
 		reposProm = append(reposProm, promTbl(fmt.Sprintf(
 			"sum by (%s) (github_repo_%s{%s})", repoBy, c.From, PF,
 		), ref))
 		reposRename[inventoryValueCol+ref] = c.To
-		reposOrder[inventoryValueCol+ref] = 2 + i
 	}
-	reposOrder["visibility"] = 2 + len(repoCols)
-	reposOrder["license"] = 3 + len(repoCols)
 	repoFieldNames := make([]string, len(repoCols))
 	for i, c := range repoCols {
 		repoFieldNames[i] = c.From
@@ -216,14 +212,14 @@ func repositoryList(b *builder) []Panel {
 			))},
 			PromTF: []any{organize(map[string]string{
 				"language": "Language", "Value": "Bytes",
-			}, nil, nil)},
+			}, nil)},
 			Opts: Opts{"unit": "bytes"},
 			GR:   langsGR, GRTF: langsGRtf,
 			ES: langsES, ESTF: langsEStf,
 		}),
 		panel("table", inventoryCommunityScore, box{W: 12, H: 8, X: 12, Y: 0}, []Target{sqlT(health)}, &P{
 			Prom:      healthProm,
-			PromTF:    merged(healthRename, nil, map[string]int{"repo": 0}),
+			PromTF:    merged(healthRename, nil),
 			Opts:      Opts{"sort": inventoryCommunityScore},
 			Overrides: healthOver,
 			// Shared by the five stores, so it names the column only where it
@@ -239,8 +235,9 @@ func repositoryList(b *builder) []Panel {
 				"Issue templates is how many the repository actually has, forms and " +
 				"Markdown, from gh_repo_policy.",
 			GR: healthGR, GRTF: healthGRtf,
-			GRDesc: "Graphite has the percentage; the boxes are not metrics there.",
-			ES:     healthES, ESTF: healthEStf,
+			GRDesc: "Graphite has the percentage; the boxes, Readme, License, Contributing, " +
+				"Conduct, Issue templates and PR template, are not metrics there.",
+			ES: healthES, ESTF: healthEStf,
 			ESDesc: "Issue template here is " +
 				"the API's own flag, which reports only the legacy single file and not a " +
 				"templates directory the page and the score count: " +
@@ -248,7 +245,7 @@ func repositoryList(b *builder) []Panel {
 		}),
 		panel("table", "Repositories", box{W: 24, H: 11, X: 0, Y: 8}, []Target{sqlT(repos)}, &P{
 			Prom:   reposProm,
-			PromTF: merged(reposRename, nil, reposOrder),
+			PromTF: merged(reposRename, nil),
 			Opts:   Opts{"sort": "Stars"},
 			Overrides: []any{
 				repoColumn(), width("Language", 110),
@@ -275,20 +272,20 @@ func whatTheyPublish(b *builder) []Panel {
 	topics := `SELECT topic AS "Topic", COUNT(DISTINCT full_name) AS "Repositories",` +
 		` url AS "Link"` +
 		" FROM gh_repo_topic WHERE $__timeFilter(time) AND " + RF +
-		" GROUP BY 1, 3 ORDER BY 2 DESC LIMIT 30"
+		" GROUP BY 1, 3 ORDER BY 2 DESC, 1, 3 LIMIT 30"
 	packages := `SELECT package AS "Package", versions AS "Versions", type AS "Type",` +
 		` tagged_versions AS "Tagged",` +
 		` days_since_update AS "Idle", url AS "Link" FROM (` +
 		"SELECT *, ROW_NUMBER() OVER (PARTITION BY package, type ORDER BY time DESC) AS rn" +
-		" FROM gh_package WHERE $__timeFilter(time)) x WHERE rn = 1 ORDER BY 2 DESC"
+		" FROM gh_package WHERE $__timeFilter(time)) x WHERE rn = 1 ORDER BY 2 DESC, 1, 3"
 	gists := `SELECT gist AS "Gist", description AS "Description", files AS "Files",` +
 		` comments AS "Comments", size_bytes AS "Size",` +
 		` days_since_update AS "Idle", url AS "Link" FROM (` +
 		"SELECT *, ROW_NUMBER() OVER (PARTITION BY gist ORDER BY time DESC) AS rn" +
-		" FROM gh_gist WHERE $__timeFilter(time)) x WHERE rn = 1 ORDER BY 6 LIMIT 25"
+		" FROM gh_gist WHERE $__timeFilter(time)) x WHERE rn = 1 ORDER BY 6, 1 LIMIT 25"
 	tags := `SELECT package AS "Package", time AS "Published", tag AS "Tag",` +
 		` url AS "Link"` +
-		" FROM gh_package_version WHERE $__timeFilter(time) ORDER BY time DESC LIMIT 30"
+		" FROM gh_package_version WHERE $__timeFilter(time) ORDER BY time DESC, package, tag LIMIT 30"
 	rt, pk, gs, pv := "gh_repo_topic", "gh_package", "gh_gist", "gh_package_version"
 
 	topicsGR, topicsGRtf := gTbl(fmt.Sprintf(
@@ -325,8 +322,8 @@ func whatTheyPublish(b *builder) []Panel {
 			{"days_since_update", "Idle"},
 		}, nil)
 
-	tagsGR, tagsGRtf := gTbl(fmt.Sprintf(`groupByNode(isNonNull(%s), %d, "sum")`,
-		gp(pv, "published"), gn(pv, "package")), "Package",
+	tagsGR, tagsGRtf := gTbl(fmt.Sprintf(`groupByNode(%s, %d, "sum")`,
+		counted(gp(pv, "published")), gn(pv, "package")), "Package",
 		[]col{{"sum", "Tags published"}})
 	tagsES, tagsEStf := b.esRaw(pv, 30, []named{
 		{"@timestamp", "Published"},
@@ -342,7 +339,7 @@ func whatTheyPublish(b *builder) []Panel {
 			))},
 			PromTF: []any{organize(map[string]string{
 				"topic": "Topic", "Value": "Repositories",
-			}, nil, nil)},
+			}, nil)},
 			Opts:      Opts{"sort": "Repositories"},
 			Overrides: []any{width("Repositories", 120), linkOn("Topic")},
 			GR:        topicsGR, GRTF: topicsGRtf,
@@ -357,7 +354,8 @@ func whatTheyPublish(b *builder) []Panel {
 			PromTF: merged(map[string]string{
 				"package": "Package", "type": "Type", inventoryValueCol + "A": "Versions",
 				inventoryValueCol + "B": "Tagged", inventoryValueCol + "C": "Idle",
-			}, nil, nil),
+			}, nil),
+
 			Opts: Opts{"sort": "Versions"},
 			Desc: "Version counts come from walking the version list: the documented " +
 				"version_count field arrives as zero for a personal account's packages.",
@@ -379,7 +377,8 @@ func whatTheyPublish(b *builder) []Panel {
 			PromTF: merged(map[string]string{
 				"gist": "Gist", inventoryValueCol + "A": "Files", inventoryValueCol + "B": "Comments",
 				inventoryValueCol + "C": "Size", inventoryValueCol + "D": "Idle",
-			}, nil, nil),
+			}, nil),
+
 			PromDesc: "Prometheus carries no description: it is text.",
 			Overrides: []any{
 				width("Gist", 100), width("Description", 190), width("Files", 65),
@@ -464,10 +463,10 @@ func settingsAndKeys(b *builder) []Panel {
 			{"days_to_expiry", "Days to expiry"},
 		}, nil, hideColumns(panelESTime))
 
-	licGR, licGRtf := gTbl(fmt.Sprintf(
-		`sortByMaxima(groupByNode(keepLastValue(%s), %d, "sum"))`,
+	licGR, licGRtf := gTbl(grOtherBy(8, "sortByMaxima", fmt.Sprintf(
+		`groupByNode(keepLastValue(%s), %d, "sum")`,
 		rp("gh_dependency_license", "packages"), gn("gh_dependency_license", "license"),
-	),
+	)),
 		"License", []col{{"lastNotNull", "Packages"}})
 	licES, licEStf := esTbl("gh_dependency_license", []any{b.tm("license", 12), b.tm("full_name", 500)},
 		[]any{b.mNewest("packages")},
@@ -510,7 +509,7 @@ func settingsAndKeys(b *builder) []Panel {
 				` url AS "Link" FROM (` +
 				"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn" +
 				" FROM gh_repo_policy" + ciInRange + RF + deliveryNewestRow +
-				" ORDER BY 1",
+				" ORDER BY 1, full_name",
 		)}, &P{
 			Prom: []Target{
 				promTbl(fmt.Sprintf("max by (full_name, repo) (github_repo_policy_security_policy{%s})", PF), "A"),
@@ -525,8 +524,8 @@ func settingsAndKeys(b *builder) []Panel {
 				inventoryValueCol + "B": inventoryDeleteOnMerge, inventoryValueCol + "C": inventoryAutoMerge,
 				inventoryValueCol + "D": inventoryProtectionRules, inventoryValueCol + "E": inventoryIssueTemplates,
 				inventoryValueCol + "F": "CODEOWNERS errors",
-			}, []string{"owner", "full_name", "instance", "job", "__name__"},
-				map[string]int{"repo": 0}),
+			}, []string{"owner", "full_name", "instance", "job", "__name__"}),
+
 			Desc: "What each repository allows, in the batch that already costs one point of " +
 				"GraphQL. CODEOWNERS errors is the one that fails silently: a broken file " +
 				"stops requesting reviews and says nothing.",
@@ -535,9 +534,8 @@ func settingsAndKeys(b *builder) []Panel {
 				profileBool(inventoryAutoMerge, 100), ownerLinkOn("Repository", "the repository settings"),
 			},
 			GR: polGR, GRTF: polGRtf,
-			GRDesc: "Graphite has no rows: each series is one number, so this table keeps the " +
-				"protection rules of each repository and drops the other settings.",
-			ES: polES, ESTF: polEStf,
+			GRDesc: grRows,
+			ES:     polES, ESTF: polEStf,
 		}),
 		panel("table", "Account keys", box{W: 12, H: 7, X: 0, Y: 43}, []Target{sqlT(
 			// Each key's newest row. The row is a daily snapshot, so the least
@@ -560,22 +558,22 @@ func settingsAndKeys(b *builder) []Panel {
 			PromTF: merged(map[string]string{
 				"key": "Key", "kind": "Kind", inventoryValueCol + "A": inventoryKeyIdle,
 				inventoryValueCol + "B": "Never used", inventoryValueCol + "C": "Days to expiry",
-			}, nil, map[string]int{"key": 0, "kind": 1}),
+			}, nil),
+
 			Desc: "The keys that sign and open everything. Two of the SSH keys here have never " +
 				"been used at all, and the expiry of the GPG key is the kind of date nobody " +
 				"remembers until the signatures stop verifying. All of them are managed in " +
 				"one place, the keys settings, which is where every row links.",
 			Overrides: []any{ownerLinkOn("Key", "the keys settings")},
 			GR:        keysGR, GRTF: keysGRtf,
-			GRDesc: "Graphite has no rows: each series is one number, so this table keeps the " +
-				"days since each key was last used and drops whether it was ever used and when it expires.",
-			ES: keysES, ESTF: keysEStf,
+			GRDesc: grRows,
+			ES:     keysES, ESTF: keysEStf,
 		}),
 		// Eight bars and the rest folded: a license name can be a whole SPDX
 		// expression, and twelve of them in seven units of height were cut off.
 		panel("barchart", "Dependencies by license", box{W: 12, H: 7, X: 12, Y: 43}, []Target{sqlT(
 			otherRows(`SELECT license AS "License", SUM(packages) AS "Packages",`+
-				" ROW_NUMBER() OVER (ORDER BY SUM(packages) DESC) AS rn FROM ("+
+				" ROW_NUMBER() OVER (ORDER BY SUM(packages) DESC, license) AS rn FROM ("+
 				"SELECT license, packages, ROW_NUMBER() OVER (PARTITION BY full_name, license"+
 				" ORDER BY time DESC) AS rn FROM gh_dependency_license"+
 				ciInRange+RF+") x WHERE rn = 1"+
@@ -587,13 +585,13 @@ func settingsAndKeys(b *builder) []Panel {
 			PromDesc: "Prometheus shows the eight and folds nothing.",
 			PromTF: []any{organize(map[string]string{
 				"license": "License", "Value": "Packages",
-			}, nil, nil)},
+			}, nil)},
 			Desc: "Every package the dependency graph knows about, by license. Undetermined is " +
 				"GitHub saying it could not tell, which is a blind spot rather than a license. " +
 				"Off by default: the SBOM is a megabyte or two per repository. The eight " +
 				"commonest licenses are named; the rest are one bar called other.",
 			GR: licGR, GRTF: licGRtf,
-			ES: licES, ESTF: licEStf,
+			ES: licES, ESTF: licEStf, ESDesc: esUnfolded(12, "licenses", "bar"),
 		}),
 		panel("table", "Social accounts", box{W: 12, H: 7, X: 0, Y: 50}, []Target{sqlT(
 			`SELECT provider AS "Provider", url AS "URL" FROM (` +
@@ -604,7 +602,7 @@ func settingsAndKeys(b *builder) []Panel {
 			Prom: []Target{promTbl("max by (provider) (github_social_account_present)")},
 			PromTF: []any{organize(map[string]string{
 				"provider": "Provider", "Value": "Present",
-			}, []string{"user", "instance", "job", "__name__"}, nil)},
+			}, []string{"user", "instance", "job", "__name__"})},
 			Desc: "What the profile links to. It is small and it is a check rather than a " +
 				"measurement: these are the same links a personal site publishes as sameAs, " +
 				"and a row that disappears is the signal.",
@@ -625,7 +623,7 @@ func settingsAndKeys(b *builder) []Panel {
 				" FROM gh_repo WHERE $__timeFilter(time) AND " + RF + " GROUP BY full_name, repo" +
 				" HAVING COUNT(DISTINCT visibility) > 1 OR COUNT(DISTINCT archived) > 1" +
 				" OR COUNT(DISTINCT default_branch) > 1 OR COUNT(DISTINCT license) > 1" +
-				" OR COUNT(DISTINCT language) > 1 ORDER BY 1",
+				" OR COUNT(DISTINCT language) > 1 ORDER BY 1, full_name",
 		)}, &P{
 			PromNote: cannot("the repositories whose visibility, archived flag, default branch, "+
 				"license or main language changed inside the range, counted as "+
@@ -687,11 +685,11 @@ func policyAndDependencies(b *builder) []Panel {
 	policy := `SELECT repo AS "Repository", file AS "File",` +
 		` CAST(present AS INT) AS "Present", path AS "Path",` +
 		` changes AS "Changes", url AS "Link" FROM (` +
-		"SELECT repo, file, present, path, changes, url," +
+		"SELECT repo, full_name, file, present, path, changes, url," +
 		" ROW_NUMBER() OVER (PARTITION BY full_name, file ORDER BY time DESC) AS rn" +
 		// The missing files first: ordered by repository the table showed six
 		// rows of whichever repository sorts first, out of 228.
-		" FROM " + pf + " " + everSince + ") x WHERE rn = 1 ORDER BY 3, 1, 2"
+		" FROM " + pf + " " + everSince + ") x WHERE rn = 1 ORDER BY 3, 1, 2, full_name"
 	// `interval` is a type name in PostgreSQL and a keyword in DataFusion, so
 	// the tag is quoted here rather than left to toPG, whose list of reserved
 	// words this one is not on.
@@ -707,14 +705,14 @@ func policyAndDependencies(b *builder) []Panel {
 	// is what makes that reachable, so the two go together.
 	ecosystems := `SELECT repo AS "Repository", blocks AS "Blocks", ecosystem AS "Ecosystem",` +
 		` "interval" AS "Interval" FROM (` +
-		`SELECT repo, ecosystem, "interval", blocks, time,` +
+		`SELECT repo, full_name, ecosystem, "interval", blocks, time,` +
 		" MAX(time) OVER (PARTITION BY full_name) AS newest" +
-		" FROM " + de + " " + everSince + ") x WHERE time = newest ORDER BY 1, 2"
+		" FROM " + de + " " + everSince + ") x WHERE time = newest ORDER BY 1, 2, full_name, 3, 4"
 	packages := `SELECT ecosystem AS "Ecosystem", SUM(packages) AS "Packages" FROM (` +
 		"SELECT ecosystem, packages, ROW_NUMBER() OVER (PARTITION BY full_name, ecosystem" +
 		" ORDER BY time DESC) AS rn FROM " + dep +
 		ciInRange + RF + ") x WHERE rn = 1" +
-		" GROUP BY 1 ORDER BY 2 DESC LIMIT 12"
+		" GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT 12"
 	// Summed, not deduplicated: see the note on the function.
 	changes := "SELECT " + timeBin + ", change AS series," +
 		" SUM(packages) AS packages FROM " + dc +
@@ -804,7 +802,8 @@ func policyAndDependencies(b *builder) []Panel {
 			PromTF: merged(map[string]string{
 				"repo": "Repository", "file": "File",
 				inventoryValueCol + "A": "Present", inventoryValueCol + "B": "Changes",
-			}, nil, map[string]int{"repo": 0, "file": 1}),
+			}, nil),
+
 			Desc: "Four rows per repository: dependabot, codeowners, security and funding. " +
 				"Path is the one in force, or where the file would go if it existed, because " +
 				"a file at the wrong path is a file that does nothing and gh_repo_policy does " +
@@ -835,7 +834,7 @@ func policyAndDependencies(b *builder) []Panel {
 			PromTF: []any{organize(map[string]string{
 				"repo": "Repository", "ecosystem": "Ecosystem",
 				"interval": "Interval", "Value": "Blocks",
-			}, nil, map[string]int{"repo": 0, "ecosystem": 1, "interval": 2})},
+			}, nil)},
 			Opts: Opts{"sort": "Blocks"},
 			Desc: "What each dependabot.yml actually updates, and how often. One ecosystem " +
 				"appears more than once when it is configured per directory, which is exactly " +
@@ -865,7 +864,7 @@ func policyAndDependencies(b *builder) []Panel {
 				))},
 				PromTF: []any{organize(map[string]string{
 					"ecosystem": "Ecosystem", "Value": "Packages",
-				}, nil, nil)},
+				}, nil)},
 				Desc: "Every package the dependency graph knows about, by the package manager " +
 					"that installs it, read out of the SBOM. A daily snapshot, so this is the " +
 					"newest reading of each repository and ecosystem and only then a sum: " +
@@ -904,8 +903,8 @@ func policyAndDependencies(b *builder) []Panel {
 				GR: []Target{
 					grq(perBucket(fmt.Sprintf(`exclude(%s, "\.`+noneGraphiteNode+`\.")`, rp(dc, "packages")), gn(dc, "change")), "A"),
 					grq(fmt.Sprintf(
-						`alias(consolidateBy(summarize(sumSeries(%s), "1d", "sum"), "sum"), "vulnerable")`,
-						rp(dc, "vulnerable"),
+						`alias(consolidateBy(summarize(sumSeries(%s), %s, "sum"), "sum"), "vulnerable")`,
+						rp(dc, "vulnerable"), grBin("1d"),
 					), "B"),
 				},
 				ES: []Target{

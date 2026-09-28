@@ -2,7 +2,9 @@ package dashboards
 
 import (
 	"fmt"
+	"maps"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -182,8 +184,10 @@ const binStep = "[$__interval]"
 // names one of them: a row per repository is kept apart by its full name and
 // shows the short one, and a table of other people's repositories shows the
 // full name. Grafana drops an excluded column before it renames any, so a
-// full name excluded and renamed at once was no column at all.
-func organize(rename map[string]string, exclude []string, order map[string]int) any {
+// full name excluded and renamed at once was no column at all. It orders
+// nothing: panel() gives a Prometheus table the order of its SQL twin, after
+// the names given here.
+func organize(rename map[string]string, exclude []string) any {
 	excludeBy := map[string]any{}
 	for _, k := range append([]string{
 		"Time", "__name__", "job", "instance", "owner", "full_name",
@@ -195,24 +199,20 @@ func organize(rename map[string]string, exclude []string, order map[string]int) 
 	if rename == nil {
 		rename = map[string]string{}
 	}
-	idx := map[string]any{}
-	for k, v := range order {
-		idx[k] = v
-	}
 	return map[string]any{"id": "organize", "options": map[string]any{
 		"excludeByName": excludeBy,
 		"renameByName":  toAnyMap(rename),
-		"indexByName":   idx,
+		"indexByName":   map[string]any{},
 	}}
 }
 
 // merged joins several instant queries into one table. `merge` unifies the
 // columns the frames share (Time and the `by` labels, which must be identical
 // across the queries) and keeps each Value #X as its own column.
-func merged(rename map[string]string, exclude []string, order map[string]int) []any {
+func merged(rename map[string]string, exclude []string) []any {
 	return []any{
 		map[string]any{"id": "merge", "options": map[string]any{}},
-		organize(rename, exclude, order),
+		organize(rename, exclude),
 	}
 }
 
@@ -241,7 +241,15 @@ var pgBins = [][2]string{
 
 var (
 	pgPercentile = regexp.MustCompile(`approx_percentile_cont\(([a-z_]+), ([0-9.]+)\)`)
-	pgReserved   = []string{"user", "by", "key", "limit", "check"}
+	// Every median the InfluxDB SQL asks for is DataFusion's own median over
+	// the column made a double, and becomes PostgreSQL's exact percentile_cont.
+	// The estimate approx_percentile_cont gives read 52 s of queue wait where
+	// PostgreSQL read 47.5 s from the same four jobs; DataFusion's exact
+	// percentile_cont is refused by InfluxDB 3 Core before 3.9.0; and a median
+	// over an integer column is an integer, 47. Measured against 3.0.3, 3.9.0
+	// and 3.11.2: the median over the double reads 47.5 in all three.
+	pgMedian   = regexp.MustCompile(`median\(CAST\(([a-z_.]+) AS DOUBLE\)\)`)
+	pgReserved = []string{"user", "by", "key", "limit", "check"}
 	// The InfluxDB plugin's bucket macro and the PostgreSQL plugin's, which
 	// takes the interval as an argument and reads $__interval for it.
 	pgDateBinAlias = regexp.MustCompile(`\$__dateBin\(([a-z.]+)\) AS time`)
@@ -343,6 +351,7 @@ func toPG(q string) string {
 			fmt.Sprintf("$__timeGroupAlias(time, %s)", b[1]))
 	}
 	s = pgPercentile.ReplaceAllString(s, "percentile_cont($2) WITHIN GROUP (ORDER BY $1)")
+	s = pgMedian.ReplaceAllString(s, "percentile_cont(0.5) WITHIN GROUP (ORDER BY $1)")
 	s = strings.ReplaceAll(s, "${repo:singlequote}", "${repo:sqlstring}")
 	s = strings.ReplaceAll(s, identified, `number <> ''`)
 	// Both of these rewrite bare identifiers, so both run outside the quoted
@@ -358,7 +367,7 @@ func toPG(q string) string {
 	// PostgreSQL has a date_bin of its own, which the Sunday week above is
 	// written with; the DataFusion spelling is the one with INTERVAL.
 	if strings.Contains(s, "date_bin(INTERVAL") || strings.Contains(s, "approx_percentile") ||
-		strings.Contains(s, "$__dateBin") || strings.Contains(s, "arrow_cast") {
+		strings.Contains(s, "median(") || strings.Contains(s, "$__dateBin") || strings.Contains(s, "arrow_cast") {
 		panic("untranslated SQL for PostgreSQL: " + s)
 	}
 	return s
@@ -473,6 +482,16 @@ func countOf(path string) string { return "sumSeries(" + nonNull(path) + ")" }
 // group, where countOf is a count of them all.
 func nonNull(expr string) string { return "isNonNull(" + expr + ")" }
 
+// counted is nonNull for a panel that reduces a series list to rows, a table or
+// a bar chart that counts per group. A series with nothing inside the range is
+// dropped first: turned into zeros it is no longer empty, the removeEmptySeries
+// gTbl puts around the table passes it, and the group it belongs to becomes a
+// row that reads 0 where the SQL stores have no row at all. "Discussion
+// answers" drew one for a repository whose only comment was seventy five days
+// old, against a thirty-day range. A stat keeps nonNull: there a range with
+// nothing in it is a count of 0, which is what COUNT(*) answers too.
+func counted(expr string) string { return nonNull(removeEmptySeries(expr)) }
+
 // total makes the whole range one bucket, so a stat can show a sum over it.
 // The bucket is aligned to the range start and outlives any range a dashboard
 // will be given.
@@ -480,8 +499,160 @@ func total(expr string) string {
 	return fmt.Sprintf(`summarize(%s, "100y", "sum", true)`, expr)
 }
 
+// countTotal is how many facts of a path the range holds, as a stat reads
+// it: the twin of COUNT(*), which answers 0 over no rows. countOf answers
+// nothing at all for a path the store has never held, there being no series
+// to count, and the tile was then not drawn: comparing what the five stores
+// draw, "Undecided runs" read 0 in three dashboards and was missing from
+// Graphite, for an account that has never had a run canceled or skipped.
+// fallbackSeries draws the constant 0 only when nothing matches, and asPercent
+// over two of them reads 0 of 2 as 0 and 0 of 0 as nothing, which is the
+// no-value text the other stores draw (measured against graphite-web 1.1.10).
+func countTotal(path string) string {
+	return fmt.Sprintf("fallbackSeries(%s, constantLine(0))", total(countOf(path)))
+}
+
 func medianTotal(path string) string {
 	return fmt.Sprintf(`summarize(percentileOfSeries(%s, 50), "100y", "median", true)`, path)
+}
+
+// grOther is otherRows in Graphite: the n series with the biggest total over
+// the range, a tie going to the name that sorts first as the SQL's ORDER BY
+// breaks it, and one series called other for the rest, which is the sum of
+// every series less the sum of those n, point by point. A point where nothing
+// is left over is dropped, so with n series or fewer the rest holds nothing
+// and is taken out, and there is no other row, as the SQL has none, nor an
+// other in the legend of a chart with nothing drawn under it. Measured against graphite-web 1.1.10: ten
+// types of 20 events down to 2 drew the eight busiest and other at 6, five
+// types drew the five, and four types of 5 events each kept the three that
+// sort first.
+func grOther(n int, expr string) string { return grOtherBy(n, "sortByTotal", expr) }
+
+// grOtherBy is grOther ranking the series by a sort of Graphite's own: by
+// their total for a count over the range, as the SQL stores add one up, and
+// by their largest value for the last reading of a snapshot that only climbs,
+// where the SQL stores rank by the newest.
+func grOtherBy(n int, by, expr string) string {
+	top := fmt.Sprintf("limit(%s(sortByName(%s)), %d)", by, expr, n)
+	return fmt.Sprintf(`group(%s, removeEmptySeries(alias(removeBelowValue(diffSeries(sumSeries(%s), sumSeries(%s)), 1), "other")))`,
+		top, expr, top)
+}
+
+// esUnfolded is what an Elasticsearch panel says in place of folding its tail
+// into other, as grOther and promOther do: a terms aggregation answers a
+// bucket per value it keeps and nothing about the ones it does not, and a
+// panel's transformations cannot keep the first rows and add the rest up
+// under a name of their own, so there is no remainder to fold. `kept` is how
+// many the terms bucket keeps, `items` what they are and `shape` what each is
+// drawn as.
+func esUnfolded(kept int, items, shape string) string {
+	words, ok := keptWords[kept]
+	if !ok {
+		panic(fmt.Sprintf("no words for keeping %d", kept))
+	}
+	return fmt.Sprintf("In Elasticsearch each of the first %s %s is a %s of its own and there is no "+
+		"other: a terms aggregation answers the %s it keeps and nothing about the rest, so there is "+
+		"no remainder to fold.", words, items, shape, items)
+}
+
+// keptWords spells how many values a terms bucket keeps, for esUnfolded.
+var keptWords = map[int]string{
+	8: "eight", 10: "ten", 12: "twelve", 30: "thirty", 50: "fifty", 500: "five hundred",
+}
+
+// noFold is what a store says of a panel it draws every series or bar of,
+// where the SQL stores fold the tail into other.
+func noFold(store, items string) string {
+	return store + " draws every one of the " + items + " and folds none of them into other."
+}
+
+// Binning a Graphite chart over time.
+//
+// A chart over time asks Graphite for at most maxDataPoints points, and
+// graphite-web fits a series with more than that into bands, moving each point
+// one step of the series later as it does: it moves the first band's start to
+// the next band boundary and drops one value fewer than the steps it moved
+// (graphite-web 1.1.10, render/views.py). So in the last step before each band
+// boundary the newest point of a chart was drawn past its right edge, and a
+// chart whose one point was that one read "Data outside time range". Measured
+// against graphiteapp/graphite-statsd:1.1.10-5 with the suite's one hour step:
+// a point written at 15:30 UTC and read at 15:59 over thirty days came back
+// stamped 16:00 at a hundred points and 15:00 at a thousand.
+//
+// How many points a chart has once graphite-web has read it depends on the
+// retention the reader's Graphite keeps, which no dashboard can know, so
+// raising maxDataPoints alone does not stop the banding. Summarizing every
+// dated chart into a bucket of the dashboard's choosing does: the chart then
+// has a point per bucket whatever the storage step, and a maxDataPoints above
+// that count leaves graphite-web nothing to fit. The bucket is the one the SQL
+// stores bin into, $__dateBin's: the range over a hundred, rounded by
+// Grafana's table and never under the panel's floor. $__interval is that
+// number too, but Grafana computes it from the panel's own maxDataPoints, the
+// number that has to be large for graphite-web to leave the points alone, so
+// the Graphite dashboard carries a hidden interval variable per floor instead,
+// computed from the range and a hundred steps the way $__interval is.
+
+// grBucketFloors is every floor a Graphite chart over time is binned at, each
+// the name of a bucket variable of the Graphite dashboard.
+var grBucketFloors = []string{"1d", "1h", "5m"}
+
+// grBucketSteps is how many buckets the range is cut into before Grafana's
+// rounding, the maxDataPoints the SQL twins bin by (see binned in panels.go).
+const grBucketSteps = 100
+
+// grMaxDataPoints is what every Graphite panel asks for, so that graphite-web
+// never fits it into bands. Grafana rounds a raw interval anywhere between a
+// day and a week down to a day, so a bucket can be as short as the range over
+// seven hundred, and a binned chart has at most some seven hundred points; a
+// chart of one point a day, the contribution calendar, has one per day the
+// daily archive keeps, twelve years of them in the schema the containerised
+// suite keeps.
+//
+// A panel that is not a chart over time reduces the series graphite-web
+// returns over the whole range, and fitting drops the first values of the
+// range, one fewer than the steps it moves the first band's start by.
+// Measured against graphiteapp/graphite-statsd:1.1.10-5 with one hour a step,
+// a point at 20:00 UTC read from 19:05 over thirty days summed to nothing at
+// 500 points and to 1 at 5,000. Such a panel is not summarized, so it holds a
+// point per storage step: 2,880 over the hundred and twenty days the suite's
+// hourly archive keeps, and 4,380 over the twelve years of its daily one.
+const grMaxDataPoints = 5000
+
+// grBucketVar is the name of the bucket variable of a floor.
+func grBucketVar(floor string) string { return "bucket_" + floor }
+
+// grBin is the bucket a Graphite chart over time sums into for its floor, as
+// the variable the dashboard computes it in. In single quotes, which is what
+// Grafana's Graphite datasource rewrites a bucket in minutes in, from its own
+// "5m" to Graphite's "5min", in the browser and in /api/ds/query alike.
+func grBin(floor string) string {
+	if !slices.Contains(grBucketFloors, floor) {
+		panic("no bucket variable for a floor of " + floor)
+	}
+	return "'$" + grBucketVar(floor) + "'"
+}
+
+// grBucketVariables is the Graphite dashboard's bucket variables: hidden,
+// computed from the range, a hundred steps and the floor, which is how
+// Grafana computes a panel's $__interval.
+func grBucketVariables() []any {
+	out := make([]any, len(grBucketFloors))
+	for i, floor := range grBucketFloors {
+		name := grBucketVar(floor)
+		auto := "$__auto_interval_" + name
+		options := []any{map[string]any{"selected": true, "text": "auto", "value": auto}}
+		for _, v := range []string{floor, "7d", "30d"} {
+			options = append(options, map[string]any{"selected": false, "text": v, "value": v})
+		}
+		out[i] = map[string]any{
+			"name": name, "label": "Bucket " + floor, "type": "interval", "hide": 2,
+			"auto": true, "auto_count": grBucketSteps, "auto_min": floor,
+			"query":   floor + ",7d,30d",
+			"current": map[string]any{"selected": false, "text": "auto", "value": auto},
+			"options": options, "refresh": 2, "skipUrlSync": false,
+		}
+	}
+	return out
 }
 
 // perBucket is one series per value of a tag node, one point per bucket.
@@ -495,8 +666,8 @@ func perBucket(expr string, node int, spanHow ...string) string {
 	if len(spanHow) > 1 {
 		how = spanHow[1]
 	}
-	return consolidated(fmt.Sprintf(`groupByNode(summarize(%s, %q, %q), %d, %q)`,
-		expr, span, how, node, how), how)
+	return consolidated(fmt.Sprintf(`groupByNode(summarize(%s, %s, %q), %d, %q)`,
+		expr, grBin(span), how, node, how), how)
 }
 
 // perRepoBucket is perBucket with a series per repository of measurement m,
@@ -509,7 +680,7 @@ func perRepoBucket(expr, m string, spanHow ...string) string {
 	if len(spanHow) > 1 {
 		how = spanHow[1]
 	}
-	return consolidated(grGroupBy(fmt.Sprintf(`summarize(%s, %q, %q)`, expr, span, how), m, how, "repo"), how)
+	return consolidated(grGroupBy(fmt.Sprintf(`summarize(%s, %s, %q)`, expr, grBin(span), how), m, how, "repo"), how)
 }
 
 // grGroupBy groups the series of measurement m by the tags named, in that
@@ -538,7 +709,7 @@ func medianBucket(path string, span ...string) string {
 	if len(span) > 0 {
 		s = span[0]
 	}
-	return fmt.Sprintf(`summarize(percentileOfSeries(%s, 50), %q, "median")`, path, s)
+	return fmt.Sprintf(`summarize(percentileOfSeries(%s, 50), %s, "median")`, path, grBin(s))
 }
 
 func worstBucket(path string, span ...string) string {
@@ -546,7 +717,7 @@ func worstBucket(path string, span ...string) string {
 	if len(span) > 0 {
 		s = span[0]
 	}
-	return fmt.Sprintf(`summarize(maxSeries(%s), %q, "max")`, path, s)
+	return fmt.Sprintf(`summarize(maxSeries(%s), %s, "max")`, path, grBin(s))
 }
 
 func latestSum(path string) string { return "sumSeries(keepLastValue(" + path + "))" }
@@ -751,6 +922,21 @@ func (b *builder) dh(span ...string) any {
 	}
 }
 
+// sundayWeeks is a date histogram of weeks that start on a Sunday, the day
+// GitHub starts one on and the collector stamps a week's row at. A bucket of
+// seven days is counted from the epoch, which was a Thursday, so the offset
+// of three days is what moves each bucket onto the Sunday its row is stamped
+// at; without it every weekly bar stood three days early and the first week
+// of a range fell before it (measured on the 2.6.2 review: 2, 0, 3, 6 and 2
+// commits at the Thursdays 08-27 to 09-24, and at the Sundays 08-30 to 09-27
+// with the offset).
+func (b *builder) sundayWeeks() any {
+	weeks := b.dh("7d")
+	settings, _ := agg(weeks)["settings"].(map[string]any)
+	settings["offset"] = "+3d"
+	return weeks
+}
+
 // esDailyTerms is how many values of a tag a dated breakdown keeps. Every
 // panel that asks for one takes this number, so a series that falls outside it
 // falls outside it everywhere.
@@ -836,6 +1022,22 @@ func (b *builder) tmURL(field ...string) any {
 		name = field[0]
 	}
 	t := b.tm(name, 1)
+	settings, _ := agg(t)["settings"].(map[string]any)
+	settings["missing"] = ""
+	return t
+}
+
+// tmNewest is a string of an item as a bucket of one value under it, which is
+// how an Elasticsearch table carries a title or a list of labels: the value
+// of the documents with the most of `metric`, one of the same query's. For an
+// age that only grows that is the item's newest reading, so a title edited or
+// a label added inside the range reads as it stands, as the SQL stores read it
+// from the newest row; kept by document count, the older value won whenever
+// more of the range's rows held it. A document without the field stays in the
+// table under the empty string, the empty cell the SQL stores draw for a null,
+// where without `missing` the item left the table.
+func (b *builder) tmNewest(tag string, metric any) any {
+	t := b.tmBy(tag, 1, metric)
 	settings, _ := agg(t)["settings"].(map[string]any)
 	settings["missing"] = ""
 	return t
@@ -1071,6 +1273,148 @@ func keepLargest(field string, n int) []any {
 	}
 }
 
+// columnOrder puts a table's columns in the order given, and a column it does
+// not name after them, in the order they came. Grafana's organize keys the
+// order by the name a column carries when its turn comes, so the names are the
+// ones the table draws, after every rename before it. panel() gives every
+// Elasticsearch, Prometheus and Graphite table the order of its SQL twin
+// through this.
+func columnOrder(names ...string) any {
+	index := map[string]any{}
+	for i, name := range names {
+		index[name] = i
+	}
+	return map[string]any{"id": "organize", "options": map[string]any{
+		"excludeByName": map[string]any{}, "indexByName": index,
+		"renameByName": map[string]any{},
+	}}
+}
+
+// selectedColumns is the columns a SQL table selects, in the order it selects
+// them: every quoted alias outside a parenthesis, so a subquery's own aliases
+// are not taken for the table's, and each name once, since the two halves of
+// a UNION select the same columns.
+func selectedColumns(sql []Target) []string {
+	var out []string
+	seen := map[string]bool{}
+	for i := range sql {
+		q := sql[i].SQL
+		depth := 0
+		for at := range len(q) {
+			switch q[at] {
+			case '(':
+				depth++
+			case ')':
+				depth--
+			}
+			if depth != 0 || !strings.HasPrefix(q[at:], ` AS "`) {
+				continue
+			}
+			name, _, closed := strings.Cut(q[at+len(` AS "`):], `"`)
+			if closed && !seen[name] {
+				seen[name] = true
+				out = append(out, name)
+			}
+		}
+	}
+	return out
+}
+
+// orderLike is the columns a table draws, `drawn`, in the order the SQL twin
+// selects its own, `selected`. A column drawn under a name of its own that is
+// the SQL column's name with a word more or a letter less takes that column's
+// place: Elasticsearch shows "Amount (cents)" where the SQL divides and says
+// Amount, "CVSS v4" beside CVSS, and GitHub's "Issue template" flag where the
+// SQL stores count "Issue templates". `at` places a column the SQL does not
+// select where the SQL selects the one it names, ahead of that one when the
+// table draws it too: the hook a Prometheus row is named by stands where the
+// SQL stores draw the endpoint. Any other column the SQL does not select is
+// left out, and columnOrder puts it after the others.
+func orderLike(selected []string, drawn map[string]bool, at map[string]string) []string {
+	variants := slices.Sorted(maps.Keys(drawn))
+	var out []string
+	for _, column := range selected {
+		for _, name := range variants {
+			if drawn[name] && at[name] == column {
+				out = append(out, name)
+				drawn[name] = false
+			}
+		}
+		if drawn[column] {
+			out = append(out, column)
+		}
+		for _, name := range variants {
+			if !drawn[name] || slices.Contains(selected, name) || at[name] != "" {
+				continue
+			}
+			if strings.HasPrefix(name, column+" ") || strings.HasPrefix(column, name) {
+				out = append(out, name)
+				drawn[name] = false
+			}
+		}
+	}
+	return out
+}
+
+// graphiteRowName is the column a Graphite table names its rows in: what
+// gTbl renames the field of the series-to-rows reduction to, one or several
+// path nodes. Empty for a table that does not reduce its series to rows.
+func graphiteRowName(tf []any) string {
+	for _, raw := range tf {
+		t, _ := raw.(map[string]any)
+		options, _ := t["options"].(map[string]any)
+		rename, _ := options["renameByName"].(map[string]any)
+		if name, ok := rename["Field"].(string); ok && t["id"] == "organize" {
+			return name
+		}
+	}
+	return ""
+}
+
+// rowNameAt is the SQL column a Graphite row name stands where, when the SQL
+// selects no column of that name: the first the SQL selects of the columns
+// its nodes name, so "Repository, number" stands where the SQL stores draw
+// Number, ahead of Repository, or the first column when it names none of
+// them, as "Pull request" does beside Number.
+func rowNameAt(selected []string, name string) string {
+	nodes := strings.Split(name, ", ")
+	for _, column := range selected {
+		for _, node := range nodes {
+			if strings.EqualFold(node, column) {
+				return column
+			}
+		}
+	}
+	if len(selected) == 0 {
+		return ""
+	}
+	return selected[0]
+}
+
+// namesGiven is every column name a table's transformations give: what an
+// organize renames a column to and what a calculation names its result. An
+// Elasticsearch table draws its columns under those, since the response
+// parser's own names are renamed or hidden (see
+// TestNoElasticsearchNameReachesTheScreenAsTheParserSpellsIt), so these are
+// the names its column order can be given in.
+func namesGiven(tf []any) map[string]bool {
+	out := map[string]bool{}
+	for _, raw := range tf {
+		t, _ := raw.(map[string]any)
+		options, _ := t["options"].(map[string]any)
+		rename, _ := options["renameByName"].(map[string]any)
+		for _, to := range rename {
+			if name, ok := to.(string); ok {
+				out[name] = true
+			}
+		}
+		if alias, ok := options["alias"].(string); ok && t["id"] == "calculateField" {
+			out[alias] = true
+		}
+	}
+	return out
+}
+
 // hideColumns drops columns a table's query returns only to be grouped by: the
 // full name an Elasticsearch table buckets on so that two owners' repositories
 // of one name are two rows, while the row is named by the short name the other
@@ -1126,8 +1470,158 @@ func (b *builder) esLatestSum(m, field string, by ...string) []Target {
 	return []Target{esq(m, metrics, buckets, "A", []string{ESF}, "")}
 }
 
+// esOverRange is one value of an Elasticsearch stat over the dashboard range,
+// answering a range with nothing in it the way the SQL stores do: 0 for a
+// count, and no value for anything else, which the tile draws as the words
+// its panel gives a value that is not there. It is for a stat that reads the
+// last value of each field; one that adds its values up reads no value as 0
+// (see esLeftOut).
+//
+// A count asks its terms bucket for the empty buckets as well, which
+// answersNothingAsSQL explains. Anything else is taken over one date
+// histogram bucket a century wide, which the datasource returns whether or
+// not a document falls in it: measured against the Elasticsearch datasource
+// of Grafana 13.2.1, a median or an average of that bucket with no document in
+// it reads null, where a terms bucket reads the median of nothing as 0 and is
+// not returned at all when it has to hold a document. A sum of nothing is 0 in
+// Elasticsearch whichever bucket it is taken in, so a sum is asked beside a
+// count, both hidden, and a bucket script keeps it only where the count is not
+// 0: a script that answers null leaves the bucket without a value, the
+// datasource returns no row for it, and a stat reads no row as no value.
+func (b *builder) esOverRange(m string, met any, where ...string) []Target {
+	switch agg(met)["type"] {
+	case "count", "cardinality":
+		return b.esTotal(m, met, where...)
+	case "sum":
+		sum, count := agg(met), agg(b.mCount())
+		sum["hide"], count["hide"] = true, true
+		guarded := b.metric("bucket_script", "", map[string]any{
+			"script": "params.n > 0 ? params.s : null",
+		})
+		agg(guarded)["pipelineVariables"] = []any{
+			map[string]any{"name": "s", "pipelineAgg": sum["id"]},
+			map[string]any{"name": "n", "pipelineAgg": count["id"]},
+		}
+		return []Target{esq(m, []any{sum, count, guarded}, []any{b.dh(esWholeRange)}, "A", where, "")}
+	}
+	return []Target{esq(m, []any{met}, []any{b.dh(esWholeRange)}, "A", where, "")}
+}
+
+// esWholeRange is a date histogram interval no dashboard range reaches across
+// the edge of: buckets are counted from 1970, so the first one ends in 2069.
+const esWholeRange = "36500d"
+
 func (b *builder) esTotal(m string, met any, where ...string) []Target {
-	return []Target{esq(m, []any{met}, []any{b.one()}, "A", where, "")}
+	bucket := b.one()
+	if answersNothingAsSQL[fmt.Sprint(agg(met)["type"])] {
+		settings, _ := agg(bucket)["settings"].(map[string]any)
+		settings["min_doc_count"] = "0"
+	}
+	return []Target{esq(m, []any{met}, []any{bucket}, "A", where, "")}
+}
+
+// answersNothingAsSQL is every metric an empty bucket answers the way the SQL
+// stores answer no rows, 0, as COUNT(*) does, under whichever reduction the
+// stat applies.
+//
+// A terms bucket keeps no term without a document in it, so a total over
+// nothing returned no frame and its tile was not drawn at all: comparing what
+// the five stores draw, "Issues closed" and "Undecided runs" read 0 in the
+// others and were missing from Elasticsearch. Asked for its empty buckets as
+// well, it returns some term of the index with no document under it, and a
+// count reads 0. The rest cannot be asked the same way, measured against
+// grafana-elasticsearch-datasource in Grafana 13.2.1: the plugin reads the
+// percentile of an empty bucket as 0 and a sum of nothing is 0 where SQL's
+// SUM is null. esOverRange asks those over a bucket that answers null.
+var answersNothingAsSQL = map[string]bool{"count": true, "cardinality": true}
+
+// esLeftOut is the sentence an Elasticsearch stat that adds its values up owes
+// its reader for the values it leaves out over a range, or a repository, with
+// nothing in them, where the other stores draw the tile without a value.
+//
+// Such a stat adds up the newest document of each repository, release or
+// alert, since a bucket cannot take the newest of each and add them, and the
+// datasource fails outright on that newest-document aggregation over a bucket
+// with nothing in it (measured against Grafana 13.2.1: a 500, "An error
+// occurred within the plugin", for the whole panel), so the query cannot ask
+// for the empty one and the tile has no field. What else the stat reads is
+// added up as well, and Grafana's sum reads a value that is not there as 0, so
+// a median or a share of nothing is not asked for either rather than drawn as
+// 0: a wrong number is worse than a tile left out.
+func esLeftOut(value, why string) string {
+	return "In Elasticsearch " + value + " leaves its group when the range holds no document " +
+		"of it, where the other stores draw it without a value: " + why
+}
+
+// esNewestAddedUp is esLeftOut's reason for a value added up from the newest
+// document of each item.
+func esNewestAddedUp(item string) string {
+	return "it is the newest document of each " + item + " added up by the panel, and the " +
+		"datasource fails on a newest-document aggregation that finds nothing, so the query " +
+		"cannot ask for the empty one."
+}
+
+// binaryField is a column computed from two others of the same row, which is
+// how an Elasticsearch table derives what a SQL statement selects as an
+// expression over its aggregates.
+func binaryField(alias, left, operator, right string) any {
+	return map[string]any{"id": "calculateField", "options": map[string]any{
+		"mode": "binary", "alias": alias,
+		"binary": map[string]any{"left": left, "operator": operator, "right": right},
+	}}
+}
+
+// orZero is a column holding another's value, and 0 where that one has none:
+// a sum over the row of that one column, which Grafana's standard calculations
+// take skipping every value that == null, undefined as well as null. It is
+// how a value a merge left out of a row, which the arithmetic of a calculation
+// reads as NaN, enters it as the 0 the SQL stores add up for nothing.
+func orZero(alias, field string) any {
+	return map[string]any{"id": "calculateField", "options": map[string]any{
+		"mode": "reduceRow", "alias": alias,
+		"reduce": map[string]any{"include": []any{field}, "reducer": "sum"},
+	}}
+}
+
+// keepsValue keeps the rows whose `field` holds a value, for a table that
+// merges two queries and draws only the rows the first one answered.
+func keepsValue(field string) any {
+	return map[string]any{"id": "filterByValue", "options": map[string]any{
+		"type": "include", "match": "any",
+		"filters": []any{map[string]any{
+			"fieldName": field,
+			"config":    map[string]any{"id": "isNotNull", "options": map[string]any{}},
+		}},
+	}}
+}
+
+// keepsAnyValue keeps the rows in which any of the fields named holds a
+// value, frame by frame: a field a frame does not have matches nothing in it,
+// so each frame of a chart is kept to the rows its own series holds a value
+// in.
+func keepsAnyValue(fields ...string) any {
+	filters := make([]any, len(fields))
+	for i, field := range fields {
+		filters[i] = map[string]any{
+			"fieldName": field,
+			"config":    map[string]any{"id": "isNotNull", "options": map[string]any{}},
+		}
+	}
+	return map[string]any{"id": "filterByValue", "options": map[string]any{
+		"type": "include", "match": "any", "filters": filters,
+	}}
+}
+
+// aboveZero keeps the rows whose `field` is more than 0, which is what the
+// SQL stores' WHERE says of a table they only list what has any of.
+func aboveZero(field string) any {
+	return map[string]any{"id": "filterByValue", "options": map[string]any{
+		"type": "include", "match": "any",
+		"filters": []any{map[string]any{
+			"fieldName": field,
+			"config":    map[string]any{"id": "greater", "options": map[string]any{"value": 0}},
+		}},
+	}}
 }
 
 func (b *builder) esDaily(m string, met any, by, span string, where []string, ref string) Target {

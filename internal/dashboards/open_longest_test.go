@@ -39,7 +39,7 @@ func TestTheOpenLongestTablesKeepTheLongestOpenInEveryStore(t *testing.T) {
 			switch store.Name {
 			case "influxdb", "postgres":
 				sql := allSQL(p)
-				if !strings.HasSuffix(sql, fmt.Sprintf(" ORDER BY x.seconds_open DESC LIMIT %d", openLongest)) {
+				if !strings.HasSuffix(sql, fmt.Sprintf(" ORDER BY x.seconds_open DESC, x.full_name, x.number LIMIT %d", openLongest)) {
 					t.Errorf("%s: %s does not keep the %d open longest, the longest first:\n%s",
 						store.Name, title, openLongest, sql)
 				}
@@ -147,5 +147,68 @@ func checkKeepsTheLargest(t *testing.T, title string, p map[string]any) {
 	if !limited {
 		t.Errorf("elasticsearch: %s does not sort its rows by %s, the largest first, and "+
 			"then keep %d: its transformations are %v", title, flowOpenAge, openLongest, ids)
+	}
+}
+
+// TestTheOpenLongestTablesNameEachItemInElasticsearch is what the cross-store
+// review of 2.6.1 found in "Open the longest": the SQL stores list each pull
+// request with its title, its author and its labels, and Elasticsearch listed
+// a number and a repository, as if it could not carry a string. It can, as a
+// bucket of one value under the item, which is how every other Elasticsearch
+// table carries one. Each such bucket keeps the value of the item's newest
+// reading, the one with the longest open time, so a title edited or a label
+// added inside the range reads as it stands, the way the SQL stores read each
+// item from its newest row; and a document without the field stays in the
+// table under an empty value, as the SQL stores draw a null, rather than
+// taking the item out of it. The issue table is the twin, with its author and
+// its labels.
+func TestTheOpenLongestTablesNameEachItemInElasticsearch(t *testing.T) {
+	t.Parallel()
+	page := func(kind string, n int) string { return fmt.Sprintf("https://github.com/alice/x/%s/%d", kind, n) }
+	docs := func(kind string) []esDoc {
+		return []esDoc{
+			// An older reading of #7, before it was retitled and labeled.
+			{
+				"full_name": "alice/x", "repo": "x", "state": "OPEN", "number": "7", "author": "bob", "url": page(kind, 7),
+				"title": "Draft widget", "seconds_open": 100, "comments": 1, "reviews": 0,
+			},
+			{
+				"full_name": "alice/x", "repo": "x", "state": "OPEN", "number": "7", "author": "bob", "url": page(kind, 7),
+				"title": "Add the widget", "label_names": "enhancement", "seconds_open": 200, "comments": 3, "reviews": 1,
+			},
+			// No labels at all, which the collector writes as no field.
+			{
+				"full_name": "alice/x", "repo": "x", "state": "OPEN", "number": "8", "author": "carol", "url": page(kind, 8),
+				"title": "Fix the build", "seconds_open": 50, "comments": 0, "reviews": 0,
+			},
+		}
+	}
+	panels := rendered(t, "elasticsearch")
+	for _, c := range []struct {
+		title, kind string
+		want        []map[string]any
+	}{
+		{"Open the longest", "pull", []map[string]any{
+			{"Number": "7", "Title": "Add the widget", "Author": "bob", "Labels": "enhancement", flowOpenAge: 200.0, "Comments": 3.0},
+			{"Number": "8", "Title": "Fix the build", "Author": "carol", "Labels": "", flowOpenAge: 50.0, "Comments": 0.0},
+		}},
+		{"Open issues the longest", "issues", []map[string]any{
+			{"Number": "7", "Author": "bob", "Labels": "enhancement", flowOpenAge: 200.0, "Comments": 3.0},
+			{"Number": "8", "Author": "carol", "Labels": "", flowOpenAge: 50.0, "Comments": 0.0},
+		}},
+	} {
+		rows := evalESPanel(t, mustPanel(t, panels, c.title), docs(c.kind))
+		if len(rows) != len(c.want) {
+			t.Errorf("elasticsearch: %s lists %d rows for two open items: %v", c.title, len(rows), rows)
+			continue
+		}
+		for i, want := range c.want {
+			for column, value := range want {
+				if got, has := rows[i][column]; !has || got != value {
+					t.Errorf("elasticsearch: %s row %d reads %s %v, want %v, as the SQL stores read "+
+						"it from the item's newest row: %v", c.title, i, column, got, value, rows[i])
+				}
+			}
+		}
 	}
 }

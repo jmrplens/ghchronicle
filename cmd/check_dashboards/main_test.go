@@ -554,3 +554,20 @@ func TestEveryStoreSpellingOfAMissingColumnIsRecognised(t *testing.T) {
 		}
 	}
 }
+
+// TestVarsComputesTheBucketsGraphiteBinsBy fills in the Graphite dashboard's
+// bucket variables, which a render computes from the range and /api/ds/query
+// would hand Graphite by name, as an offset it refuses for having no unit.
+func TestVarsComputesTheBucketsGraphiteBinsBy(t *testing.T) {
+	store, ok := dashboards.ByName("graphite")
+	if !ok {
+		t.Fatal("no graphite store")
+	}
+	v, err := vars(t.Context(), grafana.Client{}, store, nil, "graphite", "now-30d")
+	if err != nil {
+		t.Fatalf("vars = %v, want the buckets computed", err)
+	}
+	if v.Intervals["bucket_1h"] != "6h" || v.Intervals["bucket_1d"] != "1d" {
+		t.Errorf("the buckets over thirty days are %v, want an hourly chart's six hours and a daily one's day", v.Intervals)
+	}
+}

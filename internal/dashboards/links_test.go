@@ -106,7 +106,8 @@ func checkLinkPlacement(t *testing.T, store string, p map[string]any, influxLink
 	desc, _ := p["description"].(string)
 	options, _ := p["options"].(map[string]any)
 	content, _ := options["content"].(string)
-	if !strings.Contains(desc, noLink[store]) && !strings.Contains(content, noteLink) {
+	why, _, _ := strings.Cut(noLink[store], ", so the ")
+	if !strings.Contains(desc, why) && !strings.Contains(content, noteLink) {
 		t.Errorf("%s: %q lost a link column the InfluxDB dashboard has and does not say so", store, title)
 	}
 }
@@ -193,9 +194,9 @@ func TestRunTablesJoinOneDeclarationPerWorkflow(t *testing.T) {
 func TestRedBranchCommitsAreNewestFirst(t *testing.T) {
 	t.Parallel()
 	sql := sqlOf(t, mustPanel(t, rendered(t, "influxdb"), "Commits behind a red branch"))
-	m := regexp.MustCompile(`ORDER BY (\d+) DESC LIMIT`).FindStringSubmatch(sql)
+	m := regexp.MustCompile(`ORDER BY (\d+) DESC\b`).FindStringSubmatch(sql)
 	if m == nil {
-		t.Fatalf("no positional ORDER BY ... DESC LIMIT in %s", sql)
+		t.Fatalf("no positional ORDER BY ... DESC in %s", sql)
 	}
 	columns := regexp.MustCompile(`AS "([^"]+)"`).FindAllStringSubmatch(sql[:strings.Index(sql, " FROM ")], -1)
 	n, _ := strconv.Atoi(m[1])

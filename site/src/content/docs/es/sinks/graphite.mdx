@@ -54,6 +54,16 @@ como:
 github.repo.false.main.false.acme_edge-cache.Go.MIT.acme.edge-cache.public.stars 37 1757280000
 ```
 
+El dashboard nombra una serie o una fila por el nodo bajo el que la agrupa, así
+que muestra un nombre tal como lo guarda la ruta: el `(ghost)` que el colector
+escribe para una cuenta borrada se lee `_ghost_`, el SKU `Actions Linux`
+`Actions_Linux`, la categoría `Q&A` `Q_A`, `another/project` `another_project`,
+y una clave de caché que contiene `go-1.27.1` contiene `go-1_27_1`. Nada los
+devuelve a su forma al leerlos, porque un guion bajo en un nodo puede haber
+sido uno también en el nombre, así que el dashboard de Graphite los deja como
+están, y los otros cuatro almacenes muestran cada nombre como lo escribió el
+colector.
+
 Un campo que comparte nombre con una etiqueta se salta, la misma regla que
 aplica el line protocol: gana la etiqueta, porque es la que permite agrupar.
 
@@ -73,8 +83,9 @@ Graphite guarda los puntos fechados pero no tiene filas. Una serie es una ruta y
 un número, así que:
 
 - No se puede construir una tabla que necesite varios campos de una misma fila.
-  El dashboard incluido conserva la columna por la que ordena y dice en la
-  descripción qué columnas descartó.
+  El dashboard incluido reduce cada serie a los uno o dos números que puede
+  llevar una fila, y la descripción del panel nombra esos y cada columna que
+  descarta.
 - Un título o cualquier otra cadena no es una métrica allí en absoluto, y el
   destino la descarta; los paneles que mostrarían una lo dicen. Un booleano se
   guarda como 1 o 0, igual que cualquier número.
@@ -100,6 +111,55 @@ una serie no pueda llevar lo dice en su descripción.
 
 Cambia `prefix` y los objetivos del dashboard tienen que cambiar con él, ya que el
 prefijo es el primer nodo de cada ruta.
+
+Cada gráfica en el tiempo suma sus puntos en cubos del ancho que pide el
+rango, el ancho por el que agrupan los dashboards SQL: el rango entre cien,
+redondeado como Grafana redondea un intervalo y nunca por debajo del mínimo de
+la gráfica, un día, una hora o cinco minutos. El dashboard los calcula en tres
+variables ocultas, `bucket_1d`, `bucket_1h` y `bucket_5m`, y cada gráfica pide
+5.000 puntos, más de los cubos que tiene, así que graphite-web devuelve los
+cubos tal cual. Si se le piden menos puntos de los que tiene una serie,
+graphite-web la encaja en bandas y mueve cada punto un paso más tarde al
+hacerlo, y antes de la 2.6.2 eso dejaba la hora más reciente de una gráfica más
+allá de su borde derecho en la última hora antes de cada límite de banda.
+Medido contra `graphiteapp/graphite-statsd:1.1.10-5` con una hora por paso a
+las 15:35 UTC, el recuento de estrellas que un barrido había escrito en esa
+hora volvió fechado a las 16:00 con cien puntos, después del final del rango, y
+una gráfica cuyo único punto era ese decía "Data outside time range"; sumado en
+el cubo del día volvió a las 00:00, y el almacenamiento de artefactos en su
+cubo de seis horas a las 12:00. Un cubo sigue el rango del dashboard, así que una
+gráfica fijada a su propio rango, como lo están dos de los paneles de Code,
+suma en días sea cual sea el rango de la página.
+
+Dos gráficas suman en cambio en un día fijo, porque sus filas ya están a un día
+o a una semana unas de otras y cada una va en su propia fecha: el calendario de
+contribuciones, una fila por día, y los commits semanales, una fila por semana
+fechada en el domingo en que GitHub empieza la semana, sin los días entre
+semanas. Siete días no sirven de cubo ahí: graphite-web los cuenta desde el
+epoch, un jueves, y cada barra semanal quedaba tres días antes, la primera
+semana de un rango de treinta días antes de que empezara el rango.
+
+Todos los demás paneles piden también 5.000 puntos. Una tabla, una gráfica de
+barras o un stat no se resume en cubos: reduce los puntos de todo el rango a un
+número, y el encaje en bandas descarta los primeros, uno menos que los pasos
+que adelanta el inicio de la primera banda. Grafana pide a un panel que no
+indica ningún número tantos puntos como píxeles tiene de ancho, así que antes
+de la 2.6.2 un panel más estrecho que los puntos de un rango perdía la primera
+hora o las primeras horas del rango, según dónde empezara el rango. Medido en
+el mismo Graphite, un punto a las 20:00 UTC leído desde las 19:05 durante
+treinta días sumaba nada con 500 puntos y 1 con 5.000, y "Languages starred"
+dibujaba como 0 una estrella dada a esa hora en una ventana de 640 píxeles de
+ancho. Un panel así tiene un punto por paso de almacenamiento, así que 5.000
+cubre las 2.880 horas de los ciento veinte días que el esquema de la suite en
+contenedores guarda a una hora por paso y los 4.380 días de los doce años que
+guarda a un día. Una retención que guarda más de 5.000 pasos de un rango, una
+hora por paso durante más de ciento veinte días o cualquier cosa más fina,
+vuelve a encajarse en bandas.
+
+Una gráfica o una gráfica de barras que nombra sus series más activas y junta
+el resto en una llamada other hace aquí lo mismo que en los dashboards SQL: se
+nombran las más activas de todo el rango, y other es todas las series menos
+esas, punto a punto, dibujada solo donde queda algo.
 
 ## Por dónde seguir
 

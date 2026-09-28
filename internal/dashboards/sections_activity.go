@@ -7,6 +7,27 @@ import "fmt"
 // Prometheus twins rename their value column to the same words.
 const activityItsStars = "Its stars"
 
+// eachTypeASlice turns the table "Events by type" answers, a row per type
+// with its name and its count, into one field per type, named by the type,
+// which is the shape a pie colors slice by slice.
+//
+// With the rows as they come, every slice was the one count field, and the
+// palette gives a color per field: the 2.6.1 review found every slice the same
+// green in all five stores. It named every slice "Events" in Graphite and
+// Elasticsearch as well, since a rename is a display name on the count field
+// and the pie names a row by it before the row's own text. A field made of a
+// row carries neither.
+var eachTypeASlice = map[string]any{"id": "rowsToFields", "options": map[string]any{"mappings": []any{
+	map[string]any{"fieldName": "Type", "handlerKey": "field.name"},
+	map[string]any{"fieldName": "Events", "handlerKey": "field.value"},
+}}}
+
+// esNoOther is what the Elasticsearch pie says in place of folding, since the
+// types past the busiest eight have no slice to go into (see esUnfolded). The
+// pie keeps thirty of them rather than eight, since a pie of the eight alone
+// would draw each share of those eight and read larger than it is.
+var esNoOther = esUnfolded(30, "types", "slice")
+
 // ── Activity ────────────────────────────────────────────────────────────────
 
 func activity(b *builder) []Panel {
@@ -21,7 +42,7 @@ func activity(b *builder) []Panel {
 	// side by side, PushEvent and IssueCommentEvent two greens. The three
 	// smallest were one or two pixels of arc, which no finger can hit.
 	byType := otherRows(`SELECT type AS "Type", SUM(events) AS "Events",`+
-		" ROW_NUMBER() OVER (ORDER BY SUM(events) DESC) AS rn FROM gh_event"+
+		" ROW_NUMBER() OVER (ORDER BY SUM(events) DESC, type) AS rn FROM gh_event"+
 		" WHERE $__timeFilter(time) GROUP BY 1", "Type", "Events", topSeriesKept)
 	// Ten bars and the rest folded: twenty labels in seven units of height
 	// could not be read at all.
@@ -31,14 +52,14 @@ func activity(b *builder) []Panel {
 	// given are mostly about other people's repositories, where a bare name
 	// identifies nothing and two owners using the same one become one row.
 	byRepo := otherRows(`SELECT full_name AS "Repository", SUM(events) AS "Events",`+
-		" ROW_NUMBER() OVER (ORDER BY SUM(events) DESC) AS rn FROM gh_event"+
+		" ROW_NUMBER() OVER (ORDER BY SUM(events) DESC, full_name) AS rn FROM gh_event"+
 		" WHERE $__timeFilter(time) GROUP BY 1", "Repository", "Events", 10)
 	notif := "SELECT " + timeBin + ", reason AS series," +
 		" SUM(notifications) AS notifications FROM gh_notification" +
 		" WHERE $__timeFilter(time) GROUP BY 1, 2 ORDER BY 1"
 	notifTbl := `SELECT reason AS "Reason", SUM(notifications) AS "Notifications",` +
 		` subject_type AS "Kind" FROM gh_notification` +
-		" WHERE $__timeFilter(time) GROUP BY 1, 3 ORDER BY 2 DESC LIMIT 25"
+		" WHERE $__timeFilter(time) GROUP BY 1, 3 ORDER BY 2 DESC, 1, 3 LIMIT 25"
 	// The threads themselves, newest first: the table above counts them by
 	// reason and the curve by day, and neither can open the comment that
 	// caused one. `notifications` is how many updates the thread had in the
@@ -46,22 +67,20 @@ func activity(b *builder) []Panel {
 	latest := `SELECT title AS "Title", time AS "Updated", full_name AS "Repository",` +
 		` subject_type AS "Kind", reason AS "Reason", notifications AS "Updates",` +
 		` url AS "Link"` +
-		" FROM gh_notification WHERE $__timeFilter(time) ORDER BY time DESC LIMIT 25"
+		" FROM gh_notification WHERE $__timeFilter(time) ORDER BY time DESC, full_name, subject_type, reason LIMIT 25"
 	ev, nt := "gh_event", "gh_notification"
 	notes := gp(nt, "notifications")
 
-	typeGR, typeGRtf := gTbl(fmt.Sprintf(`groupByNode(%s, -2, "sum")`, events("events")),
+	typeGR, typeGRtf := gTbl(grOther(topSeriesKept, fmt.Sprintf(`groupByNode(%s, -2, "sum")`, events("events"))),
 		"Type", []col{{"sum", "Events"}})
 	typeEvents := b.mSum("events")
 	typeES, typeEStf := esTbl(ev, []any{b.tmBy("type", 30, typeEvents)}, []any{typeEvents},
 		[]named{{"type.keyword", "Type"}, {"e", "Events"}}, nil)
 
-	repoGR, repoGRtf := gTbl(fmt.Sprintf(
-		`limit(sortByTotal(groupByNode(%s, %d, "sum")), 20)`, events("events"), gn(ev, "full_name"),
-	),
+	repoGR, repoGRtf := gTbl(grOther(10, fmt.Sprintf(`groupByNode(%s, %d, "sum")`, events("events"), gn(ev, "full_name"))),
 		"Repository", []col{{"sum", "Events"}})
 	repoEvents := b.mSum("events")
-	repoES, repoEStf := esTbl(ev, []any{b.tmBy("full_name", 20, repoEvents)}, []any{repoEvents},
+	repoES, repoEStf := esTbl(ev, []any{b.tmBy("full_name", 10, repoEvents)}, []any{repoEvents},
 		[]named{{"full_name.keyword", "Repository"}, {"e", "Events"}}, nil)
 
 	notifGR, notifGRtf := gTbl(fmt.Sprintf(
@@ -90,14 +109,17 @@ func activity(b *builder) []Panel {
 
 	return append([]Panel{
 		panel("timeseries", "Events over time", box{W: 16, H: 8, X: 0, Y: 0}, []Target{sqlTS(perHour)}, &P{
-			Prom: []Target{hourly("sum by (type) (increase(github_events_total[1h]))", "{{type}}")},
+			Prom: []Target{hourly(promOtherOverTime(
+				"sum by (type) (increase(github_events_total[1h]))", "type", "type",
+			), "{{type}}")},
 			Opts: mergeOpts(Opts{"bars": true, "stack": true}, hourBins), SQLOpts: seriesOpts,
 			Desc: "GitHub keeps only the last 300 events, none older than thirty days, " +
 				"so this is only as complete as the sweep interval allowed. The eight " +
 				"busiest types in the range are named; the rest are `other`. " + bucketFollowsRange,
 			PromDesc: sinceStart,
-			GR:       []Target{grq(perBucket(events("events"), -2, "1h"))},
+			GR:       []Target{grq(grOther(topSeriesKept, perBucket(events("events"), -2, "1h")))},
 			ES:       []Target{b.esDaily(ev, b.mSum("events"), "type", "1h", nil, "")},
+			ESDesc:   esUnfolded(esDailyTerms, "types", "series"),
 		}),
 		// The pie takes the whole height of the hourly chart and of the two
 		// tables under it. The account's feed carries nine event types in a
@@ -111,15 +133,20 @@ func activity(b *builder) []Panel {
 		// three lines of legend, which reads; a legend beside it did not
 		// survive the phone.
 		panel("piechart", "Events by type", box{W: 8, H: 16, X: 16, Y: 0}, []Target{sqlT(byType)}, &P{
-			Prom: []Target{promTbl("sum by (type) (increase(github_events_total[$__range]))")},
-			// No rename: a displayName on the value column would name every
-			// slice "Events"; without it the pie names each slice by its row.
-			PromTF: []any{organize(nil, nil, nil)}, PromDesc: sinceStart,
+			Prom: []Target{promTbl(promOther(topSeriesKept,
+				"sum by (type) (increase(github_events_total[$__range]))", "type"))},
+			PromTF: []any{
+				organize(map[string]string{"type": "Type", "Value": "Events"}, nil),
+				eachTypeASlice,
+			},
+			PromDesc: sinceStart,
 			Desc: "The share of each event type in the range, in the legend. The eight " +
 				"busiest types are named; the rest are one slice called `other`.",
-			Opts: Opts{"legend": "bottom"},
-			GR:   typeGR, GRTF: typeGRtf,
-			ES: typeES, ESTF: typeEStf,
+			Opts:  Opts{"legend": "bottom"},
+			SQLTF: []any{eachTypeASlice},
+			GR:    typeGR, GRTF: append(typeGRtf, eachTypeASlice),
+			ES: typeES, ESTF: append(typeEStf, eachTypeASlice),
+			ESDesc: esNoOther,
 		}),
 		panel("barchart", "Events by repository", box{W: 8, H: 8, X: 0, Y: 8}, []Target{sqlT(byRepo)}, &P{
 			Desc: "The ten repositories with the most events; the rest are one bar called other.",
@@ -128,7 +155,7 @@ func activity(b *builder) []Panel {
 					"would multiply the series by every repository the feed touches, "+
 					"including other people's."),
 			GR: repoGR, GRTF: repoGRtf,
-			ES: repoES, ESTF: repoEStf,
+			ES: repoES, ESTF: repoEStf, ESDesc: esUnfolded(10, "repositories", "bar"),
 		}),
 		panel("table", "Notifications", box{W: 8, H: 8, X: 8, Y: 8}, []Target{sqlT(notifTbl)}, &P{
 			Prom: []Target{promTbl(
@@ -136,7 +163,7 @@ func activity(b *builder) []Panel {
 			)},
 			PromTF: []any{organize(map[string]string{
 				"reason": "Reason", "subject_type": "Kind", "Value": "Notifications",
-			}, nil, nil)},
+			}, nil)},
 			Opts: Opts{"sort": "Notifications"}, PromDesc: sinceStart,
 			Overrides: []any{barCell("Notifications", "short", 120)},
 			GR:        notifGR, GRTF: notifGRtf,
@@ -162,7 +189,7 @@ func activity(b *builder) []Panel {
 				"times the thread moved in one sweep; the link opens the comment or " +
 				"review that caused the newest one.",
 			Overrides: []any{
-				when("Updated"), repoColumn(), width("Kind", 110),
+				when("Updated"), fullNameColumn(), width("Kind", 110),
 				width("Reason", 120), width("Updates", 90), width("Title", 200), linkOn("Title"),
 			},
 			ES: latestES, ESTF: latestEStf, ESDesc: esNewest,
@@ -187,15 +214,29 @@ func workElsewhere(b *builder) Panel {
 	// range and not the whole history, because that measurement is a row
 	// per repository per sweep, and because a range in the past then shows
 	// the count as it stood then.
+	//
+	// The state is a tag, so an item has a row for each state it was seen in
+	// and the newest decides. Two of those rows share an instant only when an
+	// item closed at the very midnight its last open row is stamped with,
+	// since GitHub's searches for each state are disjoint and date a closed
+	// item when it closed; the state's name makes the pick the same in both
+	// SQL stores then, as the Elasticsearch buckets, ordered by their key,
+	// already make it.
+	//
+	// The rows themselves tie on the instant as a rule: every item still
+	// open is stamped at the start of the day it was last seen, so all of
+	// them are one Seen, and the order among them was whatever each store's
+	// sort left, which was not the same in InfluxDB and PostgreSQL. The
+	// item's own identity breaks that tie.
 	external := `SELECT x.full_name AS "Repository", ` + agoSQL("x.time", "x.seconds_open") + ` AS "Opened",` +
 		` x.time AS "Seen", x.kind AS "Kind",` +
 		` x.state AS "State", x.title AS "Title", u.stars AS "Stars", x.comments AS "Comments",` +
 		` x.url AS "Link" FROM (` +
-		"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, kind, number ORDER BY time DESC) AS rn" +
+		"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, kind, number ORDER BY time DESC, state) AS rn" +
 		" FROM gh_external_contribution WHERE $__timeFilter(time)) x" +
 		" LEFT JOIN (SELECT full_name, stars, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn" +
 		" FROM gh_upstream_repo WHERE $__timeFilter(time)) u ON u.full_name = x.full_name AND u.rn = 1" +
-		" WHERE x.rn = 1 ORDER BY x.time DESC LIMIT 40"
+		" WHERE x.rn = 1 ORDER BY x.time DESC, x.full_name, x.kind, x.number LIMIT 40"
 	ec := "gh_external_contribution"
 	extGR, extGRtf := gTbl(rowsOf(gp(ec, "comments"), gn(ec, "full_name"), gn(ec, "kind"),
 		gn(ec, "number"), gn(ec, "state")),
@@ -236,7 +277,10 @@ func workElsewhere(b *builder) Panel {
 			PromTF: merged(map[string]string{
 				"full_name": "Repository", panelValueA: "Contributions", panelValueB: "Merged",
 				panelValueC: "Comments", panelValueD: "Stars",
-			}, nil, nil),
+			}, nil),
+
+			// The counts of the items the SQL stores list one per row.
+			PromAt: map[string]string{"Contributions": "Kind", "Merged": "State"},
 			Desc: "Pull requests and issues opened in repositories this account does not own, " +
 				"with the state each ended in. Nothing else sees them: they are not in these " +
 				"repositories, and the event feed keeps only its last three hundred events, " +
@@ -246,11 +290,12 @@ func workElsewhere(b *builder) Panel {
 				"last sweep inside the range.",
 			PromDesc: "Prometheus keeps the repository only, so this is contributions per " +
 				"repository over the range, the share merged and the mean comments, with no " +
-				"Seen or Opened column, since an item's dates do not survive the exporter. " +
+				"Kind, State or Title column, and no Seen or Opened column, since an item's " +
+				"dates do not survive the exporter. " +
 				"Its Stars is the count the exporter holds at the end of the range, whenever " +
 				"the sweep that read it ran. " + sinceStart,
 			Overrides: []any{
-				when("Opened"), when("Seen"), repoColumn(),
+				when("Opened"), when("Seen"), fullNameColumn(),
 				width("Kind", 110), width("State", 90), width("Comments", 100),
 				unitOf("Stars", "short", 90), linkOn("Repository"),
 			},
@@ -280,8 +325,8 @@ func starsGiven(b *builder) []Panel {
 	// every star into one series first: the grouping had one series to group
 	// and drew one bar.
 	langGR, langGRtf := gTbl(fmt.Sprintf(
-		`limit(sortByMaxima(groupByNode(isNonNull(%s), %d, "sum")), 12)`,
-		gp("gh_star_given", "stars"), gn("gh_star_given", "language"),
+		`limit(sortByMaxima(groupByNode(%s, %d, "sum")), 12)`,
+		counted(gp("gh_star_given", "stars")), gn("gh_star_given", "language"),
 	),
 		"Language", []col{{"sum", overviewStarsGiven}})
 	langES, langEStf := esTbl("gh_star_given", []any{b.tm("language", 12)}, []any{b.mCount()},
@@ -300,14 +345,14 @@ func starsGiven(b *builder) []Panel {
 		panel("barchart", "Languages starred", box{W: 12, H: 8, X: 0, Y: 40}, []Target{sqlT(
 			`SELECT language AS "Language", COUNT(*) AS "Stars given"` +
 				" FROM gh_star_given WHERE $__timeFilter(time) AND language <> ''" +
-				" GROUP BY 1 ORDER BY 2 DESC LIMIT 12",
+				" GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT 12",
 		)}, &P{
 			Prom: []Target{promTbl(
 				"topk(12, sum by (language) (increase(github_stars_given_total[$__range])))",
 			)},
 			PromTF: []any{organize(map[string]string{
 				"language": "Language", "Value": overviewStarsGiven,
-			}, nil, nil)},
+			}, nil)},
 			Desc: "The mirror of the stars received: what this account was reading, dated when " +
 				"it starred it. The only measurement here about somebody else's work.",
 			PromDesc: sinceStart,
@@ -319,24 +364,24 @@ func starsGiven(b *builder) []Panel {
 				` language AS "Language", repo_stars AS "Its stars",` +
 				` url AS "Link"` +
 				" FROM gh_star_given WHERE $__timeFilter(time)" +
-				" ORDER BY time DESC LIMIT 25",
+				" ORDER BY time DESC, full_name LIMIT 25",
 		)}, &P{
 			Prom: []Target{promTbl("topk(25, github_stars_given_repo_stars_mean)")},
 			PromTF: []any{organize(map[string]string{
-				"repo": "Repository", "language": "Language", "Value": activityItsStars,
-			}, []string{"user", "instance", "job", "__name__"}, nil)},
+				"language": "Language", "Value": activityItsStars,
+			}, []string{"user"})},
 			Desc: "Whether the account stars small projects or famous ones, which the language " +
 				"breakdown cannot say.",
-			PromDesc: lastSweep,
+			PromDesc: "The exporter keeps the language of a star and not its repository, so in " +
+				"Prometheus a row is a language the account starred in, and Its stars the mean " +
+				"over the repositories starred in it, with no Repository or When column. " + lastSweep,
 			Overrides: []any{
-				when("When"), width("Language", 120),
+				when("When"), width("Language", 120), fullNameColumn(),
 				barCell(activityItsStars, "short", 120), linkOn("Repository"),
 			},
 			GR: starGR, GRTF: starGRtf,
-			GRDesc: "Graphite has no rows: each series is one number, so this table keeps the " +
-				"star count of each repository starred in the range and drops when it was " +
-				"starred and its language.",
-			ES: starES, ESTF: starEStf,
+			GRDesc: grRows,
+			ES:     starES, ESTF: starEStf,
 		}),
 	}
 }

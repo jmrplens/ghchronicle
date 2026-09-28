@@ -171,10 +171,19 @@ func timeseries(a panelArgs, o Opts) map[string]any {
 	if stack == "normal" && drawStyle == "bars" {
 		fill, gradient = 50, "none"
 	}
+	// Points where the series is sparse, and none where it is dense. A line
+	// needs two points, so under `never` a series with one value in the range
+	// drew nothing at all while its legend read the value: measured on the
+	// 2.6.1 review against Grafana 13.2.1, the one merged pull request of the
+	// fixture left "Time to merge over time" an empty grid in all five
+	// stores, and a snapshot written once (stars, artifact storage, the rate
+	// budget) did the same in Graphite and Elasticsearch. `auto` draws the
+	// points while they are fewer than the plot has room for, which is every
+	// daily bin of a month, and leaves a year of them a line.
 	custom := map[string]any{
 		"drawStyle": drawStyle, "lineWidth": 1,
 		"fillOpacity": optInt(o, "fill", fill), "gradientMode": gradient,
-		"showPoints": "never", "spanNulls": false,
+		"showPoints": "auto", "spanNulls": false,
 		"stacking": map[string]any{"mode": stack, "group": "A"},
 	}
 	if optBool(o, "min_zero", true) {
@@ -240,15 +249,20 @@ func binned(p map[string]any, o Opts) {
 
 func barchart(a panelArgs, o Opts) map[string]any {
 	p := base("barchart", a)
-	p["fieldConfig"] = map[string]any{
-		"defaults": map[string]any{
-			"unit": optString(o, "unit", "short"), "color": map[string]any{"mode": panelClassicPalette},
-			"custom": map[string]any{
-				"lineWidth": 1, "fillOpacity": 80, "gradientMode": "hue", "axisSoftMin": 0,
-			},
+	unit := optString(o, "unit", "short")
+	defaults := map[string]any{
+		"unit": unit, "color": map[string]any{"mode": panelClassicPalette},
+		"custom": map[string]any{
+			"lineWidth": 1, "fillOpacity": 80, "gradientMode": "hue", "axisSoftMin": 0,
 		},
-		"overrides": overridesOf(o),
 	}
+	// `short` on a bar is a count, as on a line: a bar of one open alert
+	// stood on an axis ticked every 0.05 up to 2, and three events on one
+	// ticked every 0.2. Whole numbers put the ticks on whole numbers too.
+	if unit == "short" {
+		defaults["decimals"] = 0
+	}
+	p["fieldConfig"] = map[string]any{"defaults": defaults, "overrides": overridesOf(o)}
 	orientation := "horizontal"
 	if !optBool(o, "horizontal", true) {
 		orientation = "vertical"
@@ -361,14 +375,17 @@ func gauge(a panelArgs, o Opts) map[string]any {
 	if v, ok := optAny(o, "maxv"); ok {
 		maxv = v
 	}
-	p["fieldConfig"] = map[string]any{
-		"defaults": map[string]any{
-			"unit": optString(o, "unit", "percent"), "min": optInt(o, "minv", 0), "max": maxv,
-			"color":      map[string]any{"mode": "thresholds"},
-			"thresholds": map[string]any{"mode": "absolute", "steps": steps},
-		},
-		"overrides": overridesOf(o),
+	defaults := map[string]any{
+		"unit": optString(o, "unit", "percent"), "min": optInt(o, "minv", 0), "max": maxv,
+		"color":      map[string]any{"mode": "thresholds"},
+		"thresholds": map[string]any{"mode": "absolute", "steps": steps},
 	}
+	// A rate of nothing is no number, and a gauge with no value draws an empty
+	// dial, which reads as a broken panel; see noValueOf.
+	if v := optString(o, "no_value", ""); v != "" {
+		defaults["noValue"] = v
+	}
+	p["fieldConfig"] = map[string]any{"defaults": defaults, "overrides": overridesOf(o)}
 	p["options"] = map[string]any{
 		"reduceOptions": map[string]any{
 			"calcs": []any{"lastNotNull"}, "fields": "", "values": false,
@@ -549,17 +566,48 @@ func colorOf(name, color string) any {
 // read ".43 years" and ".9 weeks".
 const dayWidth = 100
 
+// notRead is what a tile says where the store holds no reading of the
+// selection at all: the collector writes the stars and forks, the artifact
+// storage and the cache as one row per repository each time it reads them, 0
+// when there is nothing to count, so no row is no reading rather than none of
+// it.
+const notRead = "not read"
+
 // noValueOf is what one value of a stat group reads when its query answers
 // nothing.
 //
 // A stat panel with no value draws an empty space, and a group draws that
 // space under the value's own label: "Time to review by someone else" was a
 // labeled hole in the middle of six numbers, which reads as a broken panel
-// rather than as an answer. Grafana's `noValue` fills it with a sentence. It
-// is for a null that means something, not for a zero: a count that is genuinely
-// zero already prints 0.
+// rather than as an answer. The sentence fills it, and it is for a null that
+// means something, not for a zero: a count that is genuinely zero already
+// prints 0.
+//
+// A total of nothing is null as well, the SQL stores' SUM of no rows, and a
+// stat group whose every value was null drew a panel with nothing in it at
+// all, not even the names: Grafana sizes a tile's text by its value, and an
+// empty one is drawn at nought pixels (measured on Grafana 13.2.1, "Open
+// alerts" and "Traffic in range" over a repository with nothing in it). So
+// every value a group can have none of says so.
+//
+// It is a value mapping of the null, in the text color, rather than
+// Grafana's `noValue`, which is drawn in the color of the field's lowest
+// threshold. The success rate and the signed share start at red, so over a
+// range with no run "none decided" read in the color of a failed build, and
+// "no commits" in that of unsigned work, beside "no runs" in the text color
+// (Grafana 13.2.1, on the 2.6.2 review). NaN is matched as well as null, so
+// that a share of nothing a store answers as NaN reads as the words and not as
+// "NaN".
 func noValueOf(name, text string) any {
-	return override(name, []any{map[string]any{"id": "noValue", "value": text}})
+	if text == "" {
+		panic("a value with nothing to read needs words: " + name)
+	}
+	return override(name, []any{map[string]any{"id": "mappings", "value": []any{
+		map[string]any{"type": "special", "options": map[string]any{
+			"match":  "null+nan",
+			"result": map[string]any{"text": text, "color": "text", "index": 0},
+		}},
+	}}})
 }
 
 func unitOf(name, unit string, w int) any {

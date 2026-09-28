@@ -6,6 +6,7 @@ import "fmt"
 // Elasticsearch, Graphite and Prometheus twins: the twin renames its value
 // column to one of these, and a column named anything else arrives empty.
 const (
+	lifetimeArchived        = "Repositories archived"
 	lifetimeAgeAtArchive    = "Age at archive"
 	lifetimeLowestRemaining = "Lowest remaining"
 	lifetimeMostUsed        = "Most used"
@@ -100,13 +101,21 @@ func everyRepositoryTwins(b *builder) *P {
 		},
 		[]string{ESF, "(archived.keyword:false OR " + esCollectedWindow + ")"},
 		hideColumns("full_name.keyword"))
+	// Each query is wrapped in an aggregation over the labels the table
+	// draws, because `or` and `unless` hand back the series as they are,
+	// metric name included, and the merge that joins the seven columns
+	// joins on every label the frames share: seven metric names were seven
+	// rows per repository, one number each (the 2.6.1 review, on hello-world).
+	// max rather than sum, so that two series of one repository, should the
+	// selection ever leave two, read as one reading and not as their total.
 	var prom []Target
 	for i, field := range []string{
 		"commits", "pulls_merged", "issues", "releases", "stars", "branches", "tags",
 	} {
 		archived := fmt.Sprintf(`github_repo_total_%s{archived="true",%s}`, field, PF)
 		prom = append(prom, promTbl(fmt.Sprintf(
-			"%s or (github_repo_total_%s{%s} unless on (full_name) %s)", archived, field, PF, archived,
+			"max by (full_name, repo, fork, archived) (%s or (github_repo_total_%s{%s} unless on (full_name) %s))",
+			archived, field, PF, archived,
 		), string(rune('A'+i))))
 	}
 	return &P{Prom: prom, GR: gr, GRTF: grtf, ES: es, ESTF: estf}
@@ -157,7 +166,7 @@ func lifetime(b *builder) []Panel {
 		"SELECT time, full_name, repo, commits, fork, archived, pulls_merged, issues," +
 		" releases, stars, branches, tags, url" +
 		" FROM gh_repo_total WHERE $__timeFilter(time) AND " + RFA +
-		") f) x WHERE rn = 1 ORDER BY 2 DESC"
+		") f) x WHERE rn = 1 ORDER BY 2 DESC, full_name"
 	twins := everyRepositoryTwins(b)
 
 	// The two dated measurements on the row below sit years outside any range a
@@ -168,7 +177,7 @@ func lifetime(b *builder) []Panel {
 	const everSince = " WHERE " + wholeHistory
 	created := `SELECT repo AS "Repository", time AS "Created", fork AS "Fork",` +
 		` private AS "Private", url AS "Link" FROM gh_repo_created` + everSince +
-		" ORDER BY time DESC"
+		" ORDER BY time DESC, full_name"
 	// No repository filter, in any store: the $repo variable lists the
 	// repositories a sweep collects, and these rows are the ones the filter
 	// set aside, so "All" would name none of them and the table would be
@@ -176,7 +185,7 @@ func lifetime(b *builder) []Panel {
 	// store, none on the panel, until the filter came off.
 	archived := `SELECT repo AS "Repository", time AS "Archived",` +
 		` age_days_at_archive AS "Age at archive", url AS "Link"` +
-		" FROM gh_repo_archived" + everSince + " ORDER BY time DESC"
+		" FROM gh_repo_archived" + everSince + " ORDER BY time DESC, full_name"
 	// gh_workflow_run_total is current state rewritten on every sweep, so the
 	// newest row per repository is the count; adding the range up would
 	// multiply it by however many sweeps landed in the range.
@@ -184,7 +193,7 @@ func lifetime(b *builder) []Panel {
 	// were seven pixels each and overlapped. A repository is a bar by its full
 	// name and named by repoNameSQL, since the fold groups by the label.
 	runsEver := otherRows(`SELECT `+repoNameSQL+` AS "Repository", runs AS "Runs",`+
-		" ROW_NUMBER() OVER (ORDER BY runs DESC) AS rn FROM ("+
+		" ROW_NUMBER() OVER (ORDER BY runs DESC, full_name) AS rn FROM ("+
 		"SELECT repo, full_name, runs, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn"+
 		" FROM gh_workflow_run_total WHERE $__timeFilter(time) AND "+RF+
 		") x WHERE rn = 1", "Repository", "Runs", 10)
@@ -198,7 +207,7 @@ func lifetime(b *builder) []Panel {
 	// ones it does not: forks and private repositories that include_forks off
 	// never discovers. Filtering by that list would hide exactly the rows the
 	// panel exists for.
-	createdGR, createdGRtf := gTbl(grGroupBy(nonNull(gp(rcr, "created")), rcr, "sum", "repo"),
+	createdGR, createdGRtf := gTbl(grGroupBy(counted(gp(rcr, "created")), rcr, "sum", "repo"),
 		"Repository", []col{{"sum", "Created"}})
 	// esRaw rather than a bucket aggregation, and that is what makes the two
 	// string columns possible: `fork` and `private` reach Grafana as the
@@ -223,8 +232,8 @@ func lifetime(b *builder) []Panel {
 		{"url", "Link"},
 	}, nil)
 
-	runsGR, runsGRtf := gTbl(rowsOf(fmt.Sprintf("keepLastValue(%s)", rp(wrt, "runs")),
-		gn(wrt, "repo")), "Repository", []col{{"lastNotNull", "Runs"}})
+	runsGR, runsGRtf := gTbl(grOtherBy(10, "sortByMaxima", rowsOf(fmt.Sprintf("keepLastValue(%s)", rp(wrt, "runs")),
+		gn(wrt, "repo"))), "Repository", []col{{"lastNotNull", "Runs"}})
 	runsES, runsEStf := esTbl(wrt, b.tmRepo(500), []any{b.mNewest("runs")},
 		[]named{{"repo.keyword", "Repository"}, {"runs", "Runs"}}, []string{ESF},
 		hideColumns(panelFullNameField))
@@ -257,17 +266,14 @@ func lifetime(b *builder) []Panel {
 					panelValueA: "Commits", panelValueB: "Merged",
 					panelValueC: "Issues", panelValueD: "Releases", panelValueE: "Stars",
 					panelValueF: "Branches", panelValueG: "Tags",
-				}, []string{
-					"owner", "full_name", "visibility", "instance", "job", "__name__",
-				}, map[string]int{"repo": 0, panelValueA: 1, "fork": 2, "archived": 3}),
+				}, nil),
+
 				Opts: Opts{"sort": "Commits", "sort_leading": "Fork"},
 				Desc: everyRepositoryDesc,
 				Overrides: []any{
 					linkOn("Repository"), width("Fork", 70), width("Archived", 90),
 				},
-				GR: twins.GR, GRTF: twins.GRTF, GRDesc: "Graphite has no rows: each series is one number, so this table keeps the " +
-					"commits it is ranked by and drops the other columns, the fork and archived " +
-					"flags among them. " + grArchivedWindow,
+				GR: twins.GR, GRTF: twins.GRTF, GRDesc: grRows + " " + grArchivedWindow,
 				ES: twins.ES, ESTF: twins.ESTF, ESDesc: esArchivedWindow,
 			}),
 		// The description leads with the window rather than explaining it in
@@ -289,12 +295,13 @@ func lifetime(b *builder) []Panel {
 			Prom: []Target{promTbl("sum by (fork) (github_repos_created_count)")},
 			PromTF: []any{organize(map[string]string{
 				"fork": "Fork", "Value": "Repositories",
-			}, []string{"user"}, nil)},
+			}, []string{"user"})},
 			PromDesc: "The exporter reduces `gh_repo_created` to a count by user and fork, so " +
 				"Prometheus can say how many repositories were created and how many of " +
 				"them were forks, and can name none of them: the repository is not a " +
-				"label on that gauge. It is the last sweep's count, so it is that one " +
-				"trailing year and never the years the other stores have kept.",
+				"label on that gauge, and whether one is private is not either, so the " +
+				"Private column is not in this table. It is the last sweep's count, so it " +
+				"is that one trailing year and never the years the other stores have kept.",
 			Desc: repositoriesCreatedDesc,
 			Overrides: []any{
 				when("Created"), width("Fork", 70), width("Private", 80), linkOn("Repository"),
@@ -303,10 +310,11 @@ func lifetime(b *builder) []Panel {
 			GR:       createdGR, GRTF: createdGRtf,
 			GRDesc: grRange + " Graphite has no way to list by date either, so each " +
 				"repository created inside the range is one row named from the path, and " +
-				"the column counts the creation itself, which is one on every row.",
+				"the column counts the creation itself, which is one on every row. A row " +
+				"is one number, so the Fork and Private flags are not in this table.",
 			ES: createdES, ESTF: createdEStf, ESDesc: esRange,
 		}),
-		panel("table", "Repositories archived", box{W: 8, H: 8, X: 8, Y: 17}, []Target{sqlT(archived)}, &P{
+		panel("table", lifetimeArchived, box{W: 8, H: 8, X: 8, Y: 17}, []Target{sqlT(archived)}, &P{
 			// Counted, so the count is not all that survives: the reduction
 			// takes the mean of every number the archived rows carried, and
 			// `age_days_at_archive` is one of them. Two of the panel's four
@@ -317,8 +325,11 @@ func lifetime(b *builder) []Panel {
 				promTbl("avg by (owner) (github_repos_archived_age_days_at_archive_mean)", "B"),
 			},
 			PromTF: merged(map[string]string{
-				panelValueA: "Repositories archived", panelValueB: lifetimeAgeAtArchive,
-			}, nil, nil),
+				panelValueA: lifetimeArchived, panelValueB: lifetimeAgeAtArchive,
+			}, nil),
+
+			// The count stands for the repositories the SQL stores list.
+			PromAt: map[string]string{lifetimeArchived: "Repository"},
 			PromDesc: "The exporter reduces `gh_repo_archived` to a count by owner, which names " +
 				"the account and not the repository, so Prometheus holds how many have " +
 				"been archived and how long they lived on average, and neither which they " +
@@ -351,7 +362,7 @@ func lifetime(b *builder) []Panel {
 			PromDesc: "Prometheus shows the ten and folds nothing.",
 			PromTF: []any{organize(map[string]string{
 				"repo": "Repository", "Value": "Runs",
-			}, nil, nil)},
+			}, nil)},
 			Desc: "The run listing's own total_count, which is every run the repository has " +
 				"ever had. The run walk sees the newest few hundred by design, so this is " +
 				"the only place the whole history is counted, and it is the answer " +
@@ -360,7 +371,7 @@ func lifetime(b *builder) []Panel {
 				"than the sweeps added up. The ten repositories with the most runs are " +
 				"named; the rest are one bar called other.",
 			GR: runsGR, GRTF: runsGRtf,
-			ES: runsES, ESTF: runsEStf,
+			ES: runsES, ESTF: runsEStf, ESDesc: esUnfolded(500, "repositories", "bar"),
 		}),
 	}
 }
@@ -396,7 +407,7 @@ func collectorSection(b *builder) []Panel {
 		" WHERE ever > 0 ORDER BY 1"
 	tableQ := `SELECT resource AS "Bucket", MAX(used) AS "Most used", MAX(limit) AS "Limit",` +
 		` MIN(remaining) AS "Lowest remaining"` +
-		" FROM gh_rate_limit WHERE $__timeFilter(time) GROUP BY 1 ORDER BY 2 DESC"
+		" FROM gh_rate_limit WHERE $__timeFilter(time) GROUP BY 1 ORDER BY 2 DESC, 1"
 	rl := "gh_rate_limit"
 
 	// The extremes of the range in every store, as the SQL takes them. The
@@ -435,10 +446,10 @@ func collectorSection(b *builder) []Panel {
 	ranQ := `SELECT family AS "Family", SUM(failed) AS "Failures", reason AS "Why",` +
 		` COUNT(*) AS "Sweeps", MAX(repos) AS "Repositories"` +
 		" FROM " + cf + " WHERE $__timeFilter(time) AND scope = 'family'" +
-		" GROUP BY 1, 3 ORDER BY 2 DESC, 1"
+		" GROUP BY 1, 3 ORDER BY 2 DESC, 1, 3"
 	lostQ := `SELECT time AS "When", family AS "Family", repo AS "Repository",` +
 		` reason AS "Why", error AS "What GitHub said" FROM ` + cf +
-		" WHERE $__timeFilter(time) AND scope = 'repo' ORDER BY time DESC LIMIT 100"
+		" WHERE $__timeFilter(time) AND scope = 'repo' ORDER BY time DESC, family, full_name, reason LIMIT 100"
 
 	ranGR, ranGRtf := gTbl(rowsOf(gp(cf, "failed", "scope", scopeFamilyTag),
 		gn(cf, "family"), gn(cf, "reason")),
@@ -480,10 +491,12 @@ func collectorSection(b *builder) []Panel {
 					"one of them, and a Most used of 0 is where that absence belongs. A reading " +
 					"taken at each sweep, so the curve starts the day the collector did. " +
 					bucketFollowsRange,
-				GR: []Target{grq(fmt.Sprintf("aliasByNode(keepLastValue(%s), %d)",
-					gp(rl, "used_ratio"), gn(rl, "resource")))},
+				// The newest reading of each bucket, as the SQL's ROW_NUMBER
+				// keeps it.
+				GR: []Target{grq(fmt.Sprintf(`aliasByNode(summarize(keepLastValue(%s), %s, "last"), %d)`,
+					gp(rl, "used_ratio"), grBin("5m"), gn(rl, "resource")))},
 				ES:     []Target{b.esDaily(rl, b.mMax("used_ratio"), "resource", "5m", nil, "")},
-				ESDesc: "In Elasticsearch each point is the largest reading of its five minutes.",
+				ESDesc: "In Elasticsearch each point is the largest reading of its bucket.",
 			}),
 		panel("table", "Every bucket", box{W: 12, H: 11, X: 12, Y: 0}, []Target{sqlT(tableQ)}, &P{
 			Prom: []Target{
@@ -494,7 +507,8 @@ func collectorSection(b *builder) []Panel {
 			PromTF: merged(map[string]string{
 				"resource": "Bucket", panelValueA: "Limit",
 				panelValueB: lifetimeLowestRemaining, panelValueC: lifetimeMostUsed,
-			}, nil, nil),
+			}, nil),
+
 			Opts: Opts{"sort": lifetimeMostUsed},
 			Desc: "Every budget GitHub reports, and the one that runs out first decides what " +
 				"a sweep can collect. Reading them costs nothing: GET /rate_limit is free. " +
@@ -502,9 +516,8 @@ func collectorSection(b *builder) []Panel {
 				"remaining the least any had left, so a bucket spent an hour ago still says " +
 				"so after it has refilled.",
 			GR: bucketsGR, GRTF: bucketsGRtf,
-			GRDesc: "Graphite has no rows: each series is one number, so this table keeps the " +
-				"lowest remaining of each bucket and drops the limit and the most used.",
-			ES: bucketsES, ESTF: bucketsEStf,
+			GRDesc: grRows,
+			ES:     bucketsES, ESTF: bucketsEStf,
 		}),
 		panel("table", "Every family", box{W: 12, H: 9, X: 0, Y: 11}, []Target{sqlT(ranQ)}, &P{
 			Prom: []Target{
@@ -514,7 +527,8 @@ func collectorSection(b *builder) []Panel {
 			PromTF: merged(map[string]string{
 				"family": "Family", "reason": "Why",
 				panelValueA: collectorFailures, panelValueB: "Repositories",
-			}, []string{"scope"}, nil),
+			}, []string{"scope"}),
+
 			PromDesc: sweepCount + " There is no Sweeps column here for the same reason: " +
 				"the exporter holds one sweep, so the count would be one on every row.",
 			Opts: Opts{"sort": collectorFailures},
@@ -550,10 +564,10 @@ func collectorSection(b *builder) []Panel {
 			PromTF: []any{organize(map[string]string{
 				"family": "Family", "repo": "Repository", "reason": "Why",
 				"Value": collectorFailures,
-			}, []string{"scope"}, nil)},
+			}, []string{"scope"})},
 			PromDesc: "In Prometheus this is the last sweep's failures rather than the " +
-				"range's, and the exporter carries no message, so the What GitHub said " +
-				"column of the InfluxDB dashboard is absent here.",
+				"range's, a gauge carries no date of its own and the exporter no message, so " +
+				"the When and What GitHub said columns of the InfluxDB dashboard are absent here.",
 			Overrides: []any{when("When"), repoColumn(), width("Why", 90)},
 			Desc: "One row per repository one collector could not collect, newest first: " +
 				"which family, which repository, and what GitHub answered. This is where " +

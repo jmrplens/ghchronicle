@@ -7,6 +7,7 @@ import (
 	"maps"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -41,6 +42,13 @@ type PanelQuery struct {
 	// ever carries the name before it, so checking one needs both.
 	Links   []string
 	Renames map[string]string
+	// MaxDataPoints is the points the panel names, its `maxDataPoints`, or 0
+	// when it names none. Grafana asks a panel for these and for as many as
+	// it is wide only when there are none, and the Graphite dashboard names
+	// 5,000 on every panel, since graphite-web drops the first points of a
+	// range it fits into fewer: asked for the width, those panels lost their
+	// first hour.
+	MaxDataPoints int
 	// From is the panel's own range, its `timeFrom`, or the empty string
 	// when it takes the dashboard's. Grafana replaces the request's `from`
 	// with this before the query is sent, so a checker that ignored it asked
@@ -49,6 +57,10 @@ type PanelQuery struct {
 	// years they came back with the file limit error under a dashboard that
 	// draws them perfectly.
 	From string
+	// Source is the panel as the dashboard holds it. Its transformations and
+	// field configuration are what Draw replays over an answer, since they
+	// decide what the reader sees and /api/ds/query applies none of them.
+	Source map[string]any
 }
 
 // Panels walks a dashboard document and yields every panel that queries
@@ -84,6 +96,8 @@ func appendPanels(out []PanelQuery, panels any, seen *int) []PanelQuery {
 		q.Links = LinkColumns(p)
 		q.Renames = Renames(p)
 		q.From, _ = p["timeFrom"].(string)
+		q.MaxDataPoints, _ = stepCount(p["maxDataPoints"])
+		q.Source = p
 		for _, t := range targets {
 			if tgt, isObject := t.(map[string]any); isObject {
 				q.Targets = append(q.Targets, tgt)
@@ -200,6 +214,11 @@ type Vars struct {
 	// left empty the panel's own range still moves the request's from and to
 	// and the plugin does the rest.
 	TimeFilterFormat string
+	// Intervals is what each interval variable of the dashboard becomes, by
+	// name, which AutoIntervals computes for a range. A render substitutes
+	// them from the dashboard's range, not a panel's own, so they are the
+	// same for every panel.
+	Intervals map[string]string
 }
 
 // The repository variable, in each of the forms the five dashboards ask for.
@@ -245,6 +264,12 @@ func (v Vars) Apply(target map[string]any) map[string]any {
 func (v Vars) text(s string) string {
 	if v.TimeFilter != "" {
 		s = strings.ReplaceAll(s, "$__timeFilter(time)", v.TimeFilter)
+	}
+	// Longest first, so that no name eats the head of a longer one.
+	names := slices.SortedFunc(maps.Keys(v.Intervals), func(a, b string) int { return cmp.Compare(len(b), len(a)) })
+	for _, name := range names {
+		s = strings.ReplaceAll(s, "${"+name+"}", v.Intervals[name])
+		s = strings.ReplaceAll(s, "$"+name, v.Intervals[name])
 	}
 	for _, r := range repoTokens {
 		if !strings.Contains(s, r.token) {
@@ -354,7 +379,8 @@ type Options struct {
 	Workers int
 	// IntervalMs and MaxDataPoints are what a rendered panel sends: the width
 	// of the browser's graph decides them, and several queries interpolate
-	// $__interval and $__rate_interval out of them.
+	// $__interval and $__rate_interval out of them. A panel that names its
+	// own maxDataPoints is sent that instead, as Grafana sends it.
 	IntervalMs    int
 	MaxDataPoints int
 }
@@ -402,23 +428,27 @@ func (c Client) checkPanel(ctx context.Context, from, to string,
 ) Result {
 	r := Result{Panel: *panel}
 	// The panel's own range wins over the dashboard's, which is what Grafana
-	// does with timeFrom. `to` stays: timeFrom sets the start of a window
-	// that still ends now.
+	// does with timeFrom: it replaces both ends, with a window that ends now
+	// whatever the dashboard's own end is (applyPanelTimeOverrides, from
+	// describeTextRange's "now-90d" to "now"). Keeping the dashboard's end
+	// asked a range four hundred days back for a start ninety days back,
+	// which Elasticsearch refused as a histogram whose bounds are reversed.
 	if panel.From != "" {
-		from = "now-" + panel.From
+		from, to = "now-"+panel.From, "now"
 		if vars.TimeFilterFormat != "" {
 			// vars is a value, so this is this panel's substitution alone.
 			vars.TimeFilter = fmt.Sprintf(vars.TimeFilterFormat, panel.From)
 		}
 	}
+	from, to = resolveRange(from, to, time.Now())
 	queries := make([]any, 0, len(panel.Targets))
 	for _, t := range panel.Targets {
 		q := vars.Apply(t)
 		if opt.IntervalMs > 0 {
 			q["intervalMs"] = opt.IntervalMs
 		}
-		if opt.MaxDataPoints > 0 {
-			q["maxDataPoints"] = opt.MaxDataPoints
+		if points := cmp.Or(panel.MaxDataPoints, opt.MaxDataPoints); points > 0 {
+			q["maxDataPoints"] = points
 		}
 		if left := Unrendered(q); len(left) > 0 {
 			r.Err = "the render left " + strings.Join(left, ", ") + " in the query"
@@ -437,6 +467,55 @@ func (c Client) checkPanel(ctx context.Context, from, to string,
 		r.Err = linksAnswered(res, panel)
 	}
 	return r
+}
+
+// resolveRange turns a relative range into the two instants a browser sends.
+//
+// A dashboard resolves "now" once, in the browser, before it asks, so every
+// query of a panel is answered at the same instant. Posted as "now", Grafana
+// resolves it once per query instead, and the instant queries of one panel
+// come back a millisecond apart: a merge keys its rows on every field the
+// frames share, the time included, so "Contributions by year" in Prometheus
+// came back as six half rows a year where the rendered panel draws three
+// whole ones. A form this does not know, a rounding such as now/d, is sent as
+// it is.
+func resolveRange(from, to string, now time.Time) (fromAt, toAt string) {
+	return resolveTime(from, now), resolveTime(to, now)
+}
+
+// relativeTime is the date math a dashboard range is written in: now, or now
+// minus a count of one unit.
+var relativeTime = regexp.MustCompile(`^now(?:-(\d+)([smhdwMy]))?$`)
+
+func resolveTime(s string, now time.Time) string {
+	m := relativeTime.FindStringSubmatch(s)
+	if m == nil {
+		return s
+	}
+	at := now
+	if m[1] != "" {
+		n, err := strconv.Atoi(m[1])
+		if err != nil {
+			return s
+		}
+		switch m[2] {
+		case "s":
+			at = now.Add(-time.Duration(n) * time.Second)
+		case "m":
+			at = now.Add(-time.Duration(n) * time.Minute)
+		case "h":
+			at = now.Add(-time.Duration(n) * time.Hour)
+		case "d":
+			at = now.AddDate(0, 0, -n)
+		case "w":
+			at = now.AddDate(0, 0, -7*n)
+		case "M":
+			at = now.AddDate(0, -n, 0)
+		case "y":
+			at = now.AddDate(-n, 0, 0)
+		}
+	}
+	return strconv.FormatInt(at.UnixMilli(), 10)
 }
 
 // linkValue is what a link column may hold: an absolute url, which the value

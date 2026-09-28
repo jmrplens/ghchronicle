@@ -18,6 +18,7 @@ const (
 	costActionsMinutes = "Actions minutes"
 	costSumSeries      = "sumSeries("
 	costCacheIdle      = "Days since use"
+	costNoUsage        = "no usage"
 )
 
 // promByRepo is one column of the cost table in Prometheus: a billing field
@@ -51,7 +52,7 @@ func cost(b *builder) []Panel {
 		` SUM(quantity) AS "Quantity", MAX(unit) AS "Unit",` +
 		` MAX(price_per_unit) AS "Price", SUM(net) AS "Net"` +
 		" FROM gh_billing_usage WHERE $__timeFilter(time) AND repo <> " + noneSQL +
-		" GROUP BY 1, full_name, 3 ORDER BY 2 DESC LIMIT 40"
+		" GROUP BY 1, full_name, 3 ORDER BY 2 DESC, full_name, 3 LIMIT 40"
 	minutes := "SELECT " + timeBin + ", sku AS series," +
 		" SUM(quantity) AS quantity FROM gh_billing_usage" +
 		" WHERE $__timeFilter(time) AND unit = 'Minutes' GROUP BY 1, 2 ORDER BY 1"
@@ -94,10 +95,10 @@ func cost(b *builder) []Panel {
 				" FROM gh_billing_usage WHERE $__timeFilter(time)",
 		)}, &P{
 			Prom: []Target{
-				promNamed("A", "Gross", "sum(github_billing_usage_gross)"),
-				promNamed("B", costCovered, "sum(github_billing_usage_discount)"),
-				promNamed("C", costBilled, "sum(github_billing_usage_net)"),
-				promNamed("D", costActionsMinutes, `sum(github_billing_usage_quantity{unit="Minutes"})`),
+				promAggregated("A", "Gross", "sum(github_billing_usage_gross)"),
+				promAggregated("B", costCovered, "sum(github_billing_usage_discount)"),
+				promAggregated("C", costBilled, "sum(github_billing_usage_net)"),
+				promAggregated("D", costActionsMinutes, `sum(github_billing_usage_quantity{unit="Minutes"})`),
 			},
 			Desc: "What the usage would have cost at list price, what the plan covered, and " +
 				"what was actually billed, which is not always zero because the monthly " +
@@ -112,17 +113,23 @@ func cost(b *builder) []Panel {
 				grNamed("D", costActionsMinutes, total(costSumSeries+mins+")")),
 			},
 			ES: []Target{
-				esRef("A", b.esTotal(bu, b.mSum("gross"))),
-				esRef("B", b.esTotal(bu, b.mSum("discount"))),
-				esRef("C", b.esTotal(bu, b.mSum("net"))),
-				esRef("D", b.esTotal(bu, b.mSum("quantity"), "unit:Minutes")),
+				esRef("A", b.esOverRange(bu, b.mSum("gross"))),
+				esRef("B", b.esOverRange(bu, b.mSum("discount"))),
+				esRef("C", b.esOverRange(bu, b.mSum("net"))),
+				esRef("D", b.esOverRange(bu, b.mSum("quantity"), "unit:Minutes")),
 			},
 			ESOver: []any{
 				frameName("A", "Gross"), frameName("B", costCovered),
 				frameName("C", costBilled), frameName("D", costActionsMinutes),
 			},
-			Opts:      Opts{"unit": "currencyUSD"},
-			Overrides: []any{unitOf(costActionsMinutes, "short", 0)},
+			Opts: Opts{"unit": "currencyUSD"},
+			Overrides: []any{
+				unitOf(costActionsMinutes, "short", 0),
+				// GitHub answers the products that were used, so no row is no
+				// usage.
+				noValueOf("Gross", costNoUsage), noValueOf(costCovered, costNoUsage),
+				noValueOf(costBilled, costNoUsage), noValueOf(costActionsMinutes, costNoUsage),
+			},
 		}),
 		panel("timeseries", "Cost over time by product", box{W: 12, H: 8, X: 0, Y: 4},
 			[]Target{sqlTS(perDay)}, &P{
@@ -160,7 +167,8 @@ func cost(b *builder) []Panel {
 				"repo": "Repository", "sku": "SKU", "unit": "Unit",
 				panelValueA: "Quantity", panelValueB: "Price", panelValueC: "Gross",
 				panelValueD: "Net",
-			}, nil, nil),
+			}, nil),
+
 			Opts:     mergeOpts(Opts{"sort": "Gross"}, ownerPageLink("Open the bill", billingPage)),
 			PromDesc: sweepCount,
 			Desc: "Price is what explains a small quantity costing more than a large one: " +
@@ -187,7 +195,7 @@ func cost(b *builder) []Panel {
 				` count AS "Entries" FROM (` +
 				"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn" +
 				" FROM gh_actions_cache WHERE $__timeFilter(time) AND " + RF +
-				") x WHERE rn = 1 ORDER BY 2 DESC",
+				") x WHERE rn = 1 ORDER BY 2 DESC, full_name",
 		)}, &P{
 			Prom: []Target{
 				promTbl(fmt.Sprintf("max by (full_name, repo) (github_actions_cache_size_bytes{%s})", PF), "A"),
@@ -195,7 +203,8 @@ func cost(b *builder) []Panel {
 			},
 			PromTF: merged(map[string]string{
 				"repo": "Repository", panelValueA: "Cache", panelValueB: "Entries",
-			}, nil, nil),
+			}, nil),
+
 			Opts: Opts{"sort": "Cache"},
 			Desc: "GitHub caps a repository at ten gigabytes and evicts the least recently " +
 				"used entry past it. The bar is each repository's cache against that cap, so " +
@@ -294,7 +303,7 @@ func cacheEntries(b *builder) Panel {
 			"SELECT time, full_name, repo, cache, size_bytes, caches, days_since_use," +
 			" MAX(time) OVER (PARTITION BY full_name) AS newest" +
 			" FROM gh_actions_cache_entry WHERE $__timeFilter(time) AND " + RF +
-			") x WHERE time = newest GROUP BY 1, full_name, 3 ORDER BY 2 DESC LIMIT 25",
+			") x WHERE time = newest GROUP BY 1, full_name, 3 ORDER BY 2 DESC, 1, full_name LIMIT 25",
 	)}, &P{
 		Prom: []Target{
 			promTbl(fmt.Sprintf("topk(25, sum by (full_name, repo, cache) (github_actions_cache_entry_size_bytes{%s}))", PF), "A"),
@@ -304,7 +313,8 @@ func cacheEntries(b *builder) Panel {
 		PromTF: merged(map[string]string{
 			"repo": "Repository", "cache": "Cache", panelValueA: "Size",
 			panelValueB: costCacheIdle, panelValueC: "Entries",
-		}, nil, map[string]int{"repo": 0, "cache": 1}),
+		}, nil),
+
 		Opts: Opts{"sort": "Size"},
 		Desc: "The total says a repository holds twelve gigabytes. This says which key " +
 			"holds them and which has not been touched for a week, which is what decides " +

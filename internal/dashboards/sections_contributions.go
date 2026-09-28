@@ -5,6 +5,14 @@ import (
 	"strings"
 )
 
+// The column and series titles a panel here shares with its Elasticsearch,
+// Graphite and Prometheus twins, which have to spell them alike or the twin
+// arrives beside an empty column or a legend nothing overrides.
+const (
+	contributionsAllCommits = "All commits"
+	contributionsLastYear   = "Last year"
+)
+
 // ── Contributions ───────────────────────────────────────────────────────────
 
 // contributions is the profile's own account of the work, and then the split
@@ -60,9 +68,9 @@ func contributionTotals(b *builder) []Panel {
 	// name, so the window partitions by `full_name`: the newest row is picked
 	// per repository and not per name.
 	byRepo := `SELECT repo AS "Repository", commits AS "Commits", url AS "Link" FROM (` +
-		"SELECT repo, commits, url, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn" +
+		"SELECT repo, full_name, commits, url, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn" +
 		" FROM gh_contribution_repo WHERE $__timeFilter(time) AND kind = 'commits') x WHERE rn = 1" +
-		" ORDER BY 2 DESC LIMIT 25"
+		" ORDER BY 2 DESC, full_name LIMIT 25"
 	totals := `SELECT commits AS "Commits", pull_requests AS "Pull requests",` +
 		` reviews AS "Reviews", issues AS "Issues", repositories AS "New repositories",` +
 		` restricted AS "Private" FROM gh_contributions_total` +
@@ -91,15 +99,24 @@ func contributionTotals(b *builder) []Panel {
 	// first, so the rename holds for all of them.
 	transpose := []any{
 		map[string]any{"id": "transpose", "options": map[string]any{
-			"firstFieldName": "Metric", "restFieldsName": "Last year",
+			"firstFieldName": "Metric", "restFieldsName": contributionsLastYear,
 		}},
-		organize(map[string]string{"Last year 1": "Last year"}, nil, nil),
+		organize(map[string]string{contributionsLastYear + " 1": contributionsLastYear}, nil),
 	}
 	weekPath := func(field string) string { return rp("gh_commits_week", field) }
 
-	promTotals, totalRename, totalFields := perFieldRow("github_contributions_total_", "user", totalCols)
-	totalsGR, totalsGRtf := gTbl(rowsOf(gp("gh_contributions_total",
-		"{"+strings.Join(totalFields, ",")+"}"), 3), "Field", []col{{"lastNotNull", "Value"}})
+	promTotals, totalRename, _ := perFieldRow("github_contributions_total_", "user", totalCols)
+	// A series per field, each under the name the other stores' transposed
+	// table gives its row and in their order, and the two columns under their
+	// headings. Named by the path's last node, the rows read pull_requests
+	// and restricted under "Field" and "Value", in the order the glob
+	// expanded them, which is the alphabet's.
+	totalRows := make([]string, len(totalCols))
+	for i, c := range totalCols {
+		totalRows[i] = fmt.Sprintf("alias(%s, %q)", gp("gh_contributions_total", c.From), c.To)
+	}
+	totalsGR, totalsGRtf := gTbl("group("+strings.Join(totalRows, ", ")+")",
+		"Metric", []col{{"lastNotNull", contributionsLastYear}})
 	totalsES, totalsEStf := b.esRaw("gh_contributions_total", 1, totalCols, nil)
 
 	// Grouped by the full name in these three, where the SQL twin shows the
@@ -139,7 +156,9 @@ func contributionTotals(b *builder) []Panel {
 				"as it moves: it falls when a busy week ages out of the window.",
 			Opts:     Opts{"bars": true, "fill": 60, "legend": "hidden"},
 			PromOpts: Opts{"bars": false, "legend": "bottom"},
-			GR: []Target{grq(fmt.Sprintf(`alias(%s, "Contributions")`,
+			// A day each, as the SQL's rows are, rather than a point per
+			// storage step with nothing in all but one of them.
+			GR: []Target{grq(fmt.Sprintf(`alias(summarize(%s, "1d", "sum"), "Contributions")`,
 				gp("gh_contribution_day", "contributions")))},
 			ES: []Target{esq("gh_contribution_day", []any{b.mSum("contributions")},
 				[]any{b.dh()}, "A", nil, "Contributions")},
@@ -148,21 +167,30 @@ func contributionTotals(b *builder) []Panel {
 		contributionMix(b),
 		panel("timeseries", "Commits per week", box{W: 12, H: 7, X: 0, Y: 12}, []Target{sqlTS(weekly)}, &P{
 			Prom: []Target{promq(fmt.Sprintf("sum(increase(github_commits_total{%s}[7d]))", PF),
-				legend("All commits"), step("7d"))},
+				legend(contributionsAllCommits), step("7d"))},
 			PromDesc: sinceStart,
 			Desc: "One bar per week, at the Sunday the week starts on, which is how GitHub " +
 				"serves it and how the rows are stamped.",
 			Opts: Opts{"bars": true},
+			// A day each, which keeps every week at its own Sunday, and the
+			// days between them dropped, so that a bar is as wide as a week
+			// is apart as the SQL stores' rows are. Summarized by seven days,
+			// graphite-web counts the buckets from the epoch, a Thursday
+			// (render/functions.py, summarize without alignToFrom), and every
+			// bar stood three days early: measured on the 2.6.2 review, 2, 0,
+			// 3, 6 and 2 commits at the Thursdays 08-27 to 09-24, and the
+			// first of them before a thirty-day range began and not drawn.
 			GR: []Target{
-				grq(fmt.Sprintf(`alias(summarize(sumSeries(%s), "7d", "sum"), "All commits")`,
-					weekPath("commits")), "A"),
-				grq(fmt.Sprintf(`alias(summarize(sumSeries(%s), "7d", "sum"), "Own commits")`,
+				grq(fmt.Sprintf(`alias(summarize(sumSeries(%s), "1d", "sum"), %q)`,
+					weekPath("commits"), contributionsAllCommits), "A"),
+				grq(fmt.Sprintf(`alias(summarize(sumSeries(%s), "1d", "sum"), "Own commits")`,
 					weekPath("owner_commits")), "B"),
 			},
+			GRTF: []any{keepsAnyValue(contributionsAllCommits, "Own commits")},
 			ES: []Target{
-				esq("gh_commits_week", []any{b.mSum("commits")}, []any{b.dh("7d")}, "A",
-					[]string{ESF}, "All commits"),
-				esq("gh_commits_week", []any{b.mSum("owner_commits")}, []any{b.dh("7d")}, "B",
+				esq("gh_commits_week", []any{b.mSum("commits")}, []any{b.sundayWeeks()}, "A",
+					[]string{ESF}, contributionsAllCommits),
+				esq("gh_commits_week", []any{b.mSum("owner_commits")}, []any{b.sundayWeeks()}, "B",
 					[]string{ESF}, "Own commits"),
 			},
 		}),
@@ -171,7 +199,7 @@ func contributionTotals(b *builder) []Panel {
 				"under the contribution calendar.",
 			Prom:   promTotals,
 			SQLTF:  transpose,
-			PromTF: append(merged(totalRename, []string{"user"}, nil), transpose...),
+			PromTF: append(merged(totalRename, []string{"user"}), transpose...),
 			// One series per field, so the rows Graphite produces are the
 			// transposed table the other stores arrive at.
 			GR: totalsGR, GRTF: totalsGRtf,
@@ -181,7 +209,7 @@ func contributionTotals(b *builder) []Panel {
 		dayCard,
 		panel("table", "Commits by repository", box{W: 6, H: 7, X: 18, Y: 19}, []Target{sqlT(byRepo)}, &P{
 			Prom:      []Target{promTbl(`topk(25, sum by (full_name) (github_contribution_repo_commits{kind="commits"}))`)},
-			PromTF:    []any{organize(map[string]string{"full_name": "Repository", "Value": "Commits"}, nil, nil)},
+			PromTF:    []any{organize(map[string]string{"full_name": "Repository", "Value": "Commits"}, nil)},
 			Opts:      Opts{"sort": "Commits"},
 			Overrides: []any{barCell("Commits", "short", 120), linkOn("Repository")},
 			Desc: "Commits this account made in each repository over the last year, as the " +
@@ -207,7 +235,7 @@ func contributionTotals(b *builder) []Panel {
 				" ORDER BY year DESC",
 		)}, &P{
 			Prom:      promYears,
-			PromTF:    merged(yearRename, nil, nil),
+			PromTF:    merged(yearRename, nil),
 			Opts:      Opts{"sort": "Year"},
 			Desc:      yearsDesc,
 			Overrides: []any{width("Year", 100), barCell("Contributions", "short", 150)},
@@ -239,7 +267,7 @@ func punchCards(b *builder) (hour, day Panel) {
 			node, name, node, RF, order)
 	}
 	byHour := punchSQL("hour", "Hour", "1")
-	byDay := punchSQL("weekday", "Weekday", "2 DESC")
+	byDay := punchSQL("weekday", "Weekday", "2 DESC, 1")
 
 	punchcardWhy := "The exporter skips `gh_commit_punchcard`: on an account with eighteen " +
 		"repositories it is 1,217 series, four fifths of the whole exporter, for " +
@@ -335,7 +363,7 @@ func commitsPerRepository(b *builder) []Panel {
 		` WHEN own = 'true' THEN 'Yours, public'` +
 		` ELSE 'Somebody else''s, public' END AS "Where",` +
 		` SUM(commits) AS "Commits" FROM ` + dayRepo +
-		" WHERE $__timeFilter(time) GROUP BY 1 ORDER BY 2 DESC"
+		" WHERE $__timeFilter(time) GROUP BY 1 ORDER BY 2 DESC, 1"
 
 	why := "The exporter skips `gh_contribution_day_repo` for the reason it skips " +
 		"`gh_contribution_day`: it is history with no current value, and counting it would " +
@@ -374,8 +402,9 @@ func commitsPerRepository(b *builder) []Panel {
 					"The repositories include the private and third-party ones, which " +
 					`"Commits by repository" lists too, undated and unflagged. ` + cap100 +
 					" " + bucketFollowsRange,
-				GR: []Target{grq(perBucket(gp(dayRepo, "commits"), gn(dayRepo, "full_name")))},
-				ES: []Target{b.esDaily(dayRepo, b.mSum("commits"), "full_name", "", nil, "")},
+				GR:     []Target{grq(grOther(topSeriesKept, perBucket(gp(dayRepo, "commits"), gn(dayRepo, "full_name"))))},
+				ES:     []Target{b.esDaily(dayRepo, b.mSum("commits"), "full_name", "", nil, "")},
+				ESDesc: esUnfolded(esDailyTerms, "repositories", "series"),
 			}),
 		panel("barchart", "Commits the profile hides", box{W: 8, H: 8, X: 16, Y: 34},
 			[]Target{sqlT(hidden)}, &P{

@@ -52,6 +52,50 @@ nombre corto salvo que dos repositorios del rango lo compartan, y entonces por
 sus nombres completos; los otros tres almacenes nombran ambas por el nombre
 corto.
 
+Una tarjeta que es una mediana o una proporción no tiene número en un rango sin
+nada que medir, y desde la 2.6.2 dice qué le faltó al rango en vez de dibujar un
+hueco bajo su etiqueta: "none merged" bajo el tiempo hasta fusionar y las líneas
+por pull request, "no issue closed", "none decided" bajo la tasa de éxito, "no
+runs" y "no jobs" bajo la duración de la ejecución y la espera en cola, "no
+commits" bajo la proporción firmada, y "no deliveries" en la tasa de fallo de
+los webhooks. Las palabras bajo una tarjeta se dibujan en el color del texto, no
+en el del umbral más bajo de la tarjeta, que es rojo para la tasa de éxito y la
+proporción firmada: "none decided" no es una compilación fallida. Un recuento
+sobre un rango así da 0. Un total tampoco tiene número, ya que en los almacenes
+SQL la suma de ninguna fila es nula, y también dice qué le faltó al rango: "no
+traffic" bajo las visitas y los dos recuentos únicos, "not read" bajo las
+estrellas y los forks, el almacenamiento de artefactos y la caché, "no commits"
+bajo las líneas añadidas y eliminadas, "no releases" bajo el total de
+descargas, "none open" bajo las alertas abiertas, y "no usage" bajo el gasto.
+Antes de la 2.6.2 un grupo de totales de los que el rango no tenía ninguno, el
+tráfico o las alertas abiertas de un repositorio sin ellos, era un panel sin
+nada en absoluto, ni siquiera los nombres: Grafana dimensiona el texto de una
+tarjeta por su valor, y uno vacío se dibuja sin tamaño.
+
+Sobre un rango o un repositorio sin nada, todos los almacenes dibujan las
+tarjetas que dibujan los almacenes SQL, con 0 o sin valor donde ellos lo hacen:
+Graphite para una ruta que nunca ha tenido, Elasticsearch para un rango en el
+que no tiene ningún documento, y Prometheus para una consulta que no encuentra
+ninguna serie. Antes de la 2.6.2 una tarjeta así salía de su grupo en esos tres,
+y sobre un repositorio sin nada faltaban dieciocho tarjetas en Graphite y veinte
+en Elasticsearch. Queda un caso, en Elasticsearch, y los cuatro paneles a los
+que afecta lo dicen: un valor sumado del documento más reciente de cada
+repositorio, release o alerta, los recuentos de estrellas y forks, el
+almacenamiento de artefactos y la caché, el total de descargas y las alertas
+abiertas, sigue saliendo de su grupo cuando no hay tal documento, ya que el
+datasource falla sin más con esa agregación sobre nada. La tasa de éxito, la
+duración de la ejecución y la espera en cola junto a los dos totales de bytes
+salen también, porque ese panel suma cada valor y leería como 0 un valor de
+nada.
+
+Sobre un rango al que no llegó ningún barrido, un grupo de instantáneas del que
+los almacenes SQL leen la fila más reciente, Community, Account, Since the
+account began y Sponsorship, dice "No data" en todos los almacenes, ya que los
+almacenes SQL no tienen fila que leer. Antes de la 2.6.2 Graphite, cuyas rutas
+responden con nulos a un rango en el que no tienen nada, dibujaba tres de ellos
+como un panel sin nada, ni siquiera los nombres, y Elasticsearch dibujaba los
+cuatro nombres de Sponsorship sin nada al lado.
+
 ## Overview
 
 Una cabecera y no un panel: la marca, grande y centrada, el nombre debajo, y
@@ -372,9 +416,19 @@ La espera en cola es una cifra de job. La de la ejecución mete la espera dentro
 de la duración, así que una ejecución que tardó veinte minutos porque un job
 esperó dieciocho por un runner es idéntica a una que pasó dieciocho ejecutando.
 
+Toda mediana de los dashboards de InfluxDB y PostgreSQL es exacta, así que
+cuatro jobs que esperaron 30, 35, 60 y 65 segundos leen 47,5 en los dos, donde
+la estimación con la que respondía InfluxDB leía 52. El percentil 95 de la
+duración de las ejecuciones y el 90 del tiempo hasta la fusión siguen siendo
+estimaciones en InfluxDB, porque InfluxDB 3 Core no tiene un percentil exacto
+antes de la 3.9.0, y los dos paneles lo dicen.
+
 Dos de ellos son los primeros que hay que mirar. "Workflows that keep failing"
 no va de flakiness: medido, dos workflows habían fallado en todas y cada una de
 sus ejecuciones, decenas de ejecuciones cada uno, y nadie los había apagado.
+Lista un workflow en cuanto ha fallado más de tres veces en el rango, siendo un
+fallo cualquier conclusión que no sea success, y los cinco almacenes hacen esa
+misma pregunta.
 "Workflows that never ran" es la otra cara de lo mismo, y necesita
 `gh_workflow` y `gh_workflow_run` a la vez, que es por lo que es el único panel
 aquí que solo pueden responder los dos almacenes SQL.
@@ -644,12 +698,18 @@ ciento del panel, pida lo que pida el panel, y una leyenda colocada al lado se
 dibuja allí como columna, una entrada por línea, que en un teléfono se cortaba
 tras siete entradas; una lista colocada debajo se ajusta en varias líneas, y con
 la altura que tiene el pastel los once tipos de un mes caben enteros a 360
-píxeles.
+píxeles. Cada tipo es un sector con un color propio y con su propio nombre en
+todos los almacenes: la consulta responde una fila por tipo, y el panel hace de
+cada fila un campo, porque Grafana colorea un pastel por campo y una columna de
+cuentas es un solo campo, que pintaba todos los sectores del mismo verde.
 
 Los dos últimos paneles son el espejo de la sección de estrellas: las estrellas
 que dio esta cuenta, no las que recibió, por lenguaje y por proyecto, fechadas
 cuando dio cada una. Si los proyectos son pequeños o famosos es otra pregunta
 distinta de cuántos son, así que la segunda tabla lleva sus propias estrellas.
+El exportador de Prometheus guarda el lenguaje de cada estrella y no su
+repositorio, así que allí la segunda tabla tiene una fila por lenguaje, con la
+media de estrellas de los repositorios marcados en él.
 
 La tabla del trabajo en otros repositorios lleva ese mismo número para los
 repositorios a los que contribuyó la cuenta: las estrellas de cada uno en la
@@ -866,10 +926,10 @@ en vez de fingir.
   desde que arrancó. `increase()` sobre eso es como se responden los paneles
   "por día" y "sobre el rango".
 - **Graphite** conserva los puntos fechados pero no tiene filas: una tabla ahí
-  es un número por serie reducido sobre el rango, así que una tabla que necesita
-  varios campos de una fila se queda con la columna por la que ordena y dice
-  cuál ha soltado, una cadena allí ni siquiera es una métrica, y un booleano se
-  guarda como 1 o 0, igual que cualquier número.
+  es uno o dos números por serie reducidos sobre el rango, así que una tabla que
+  necesita varios campos de una fila se queda con los números que puede llevar
+  una fila y nombra cada columna que suelta, una cadena allí ni siquiera es una
+  métrica, y un booleano se guarda como 1 o 0, igual que cualquier número.
 - **Elasticsearch** conserva los documentos fechados, así que una tabla por
   elemento son los documentos más recientes, o el más reciente de cada elemento
   cuando un elemento tiene varios, y todo lo demás es una agregación por
@@ -883,6 +943,12 @@ por una ventana mientras lee otra, así que los repositorios archivados que el
 filtro por omisión aparta cuentan en el Overview y en Every repository, ever
 por sus filas de los últimos siete días, y un rango que terminó hace más de una
 semana los deja fuera.
+
+Una gráfica o una gráfica de barras que los almacenes SQL pliegan, con sus
+series más activas nombradas y el resto en una llamada other, se pliega igual en
+Graphite, y en Prometheus donde el exportador guarda los recuentos que sumaría.
+Elasticsearch no puede, ya que una agregación terms no dice nada de los valores
+que no guarda, y cada panel suyo que dibuja todas las series lo dice.
 
 Cada panel cuyo gemelo en otro almacén es más rico lo dice en una frase de su
 descripción.

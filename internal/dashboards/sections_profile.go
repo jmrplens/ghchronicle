@@ -16,6 +16,7 @@ const (
 	profilePageAgrees = "Page agrees"
 	profileOneTime    = "One-time"
 	profileLastAdded  = "Last added"
+	profileMeanAmount = "Mean amount"
 )
 
 // ── Profile and sponsorship ─────────────────────────────────────────────────
@@ -60,7 +61,7 @@ func achievements(b *builder) Panel {
 	rows := `SELECT name AS "Achievement", tier_number AS "Tier", tier_name AS "Level",` +
 		` url AS "Link" FROM (` +
 		"SELECT *, ROW_NUMBER() OVER (PARTITION BY achievement ORDER BY time DESC) AS rn" +
-		profileFrom + ac + " WHERE $__timeFilter(time)) x WHERE rn = 1 ORDER BY 2 DESC, 1"
+		profileFrom + ac + " WHERE $__timeFilter(time)) x WHERE rn = 1 ORDER BY 2 DESC, 1, achievement"
 	gr, grtf := gTbl(rowsOf(profileKeepLast+gp(ac, "tier_number")+")", gn(ac, "achievement")),
 		"Achievement", []col{{"lastNotNull", "Tier"}})
 	es, estf := esTbl(ac, []any{b.tm("achievement", 50, "_key", "asc"), b.tmURL()},
@@ -76,7 +77,7 @@ func achievements(b *builder) Panel {
 	// eighth reached only by a scroll inside the table.
 	return panel("table", "Achievements", box{W: 24, H: 10, X: 0, Y: 31}, []Target{sqlT(rows)}, &P{
 		Prom:   []Target{promTbl("max by (achievement) (github_achievement_tier_number)")},
-		PromTF: []any{organize(map[string]string{"achievement": "Achievement", "Value": "Tier"}, []string{"user"}, nil)},
+		PromTF: []any{organize(map[string]string{"achievement": "Achievement", "Value": "Tier"}, []string{"user"})},
 		Opts:   Opts{"sort": "Tier"},
 		Desc: "The badges on the profile, highest tier first: Pull Shark, Pair " +
 			"Extraordinaire, YOLO and the rest, read every hour from the public " +
@@ -84,13 +85,13 @@ func achievements(b *builder) Panel {
 			"badge's label, one where it has none; Level is the color GitHub gives " +
 			"that tier. Empty until the achievements family has run once.",
 		PromDesc: "Prometheus keeps the badge by its slug and its tier; the display name " +
-			"and the tier's color are strings and do not survive as metrics.",
+			"and Level, the tier's color, are strings and do not survive as metrics.",
 		Overrides: []any{width("Tier", 80), width("Level", 100), linkOn("Achievement")},
 		GR:        gr, GRTF: grtf,
 		GRDesc: "Graphite names each row by the badge's slug and keeps its tier. " + grRows,
 		ES:     es, ESTF: estf,
 		ESDesc: "Elasticsearch names each row by the badge's slug; the display name and " +
-			"the tier's color are strings a top metric cannot carry.",
+			"Level, the tier's color, are strings a top metric cannot carry.",
 	})
 }
 
@@ -109,7 +110,7 @@ func achievementProgress(b *builder) Panel {
 		` next_threshold AS "Next tier at", tier_number AS "Tier", agrees AS "Page agrees",` +
 		` url AS "Link" FROM (` +
 		"SELECT *, ROW_NUMBER() OVER (PARTITION BY achievement ORDER BY time DESC) AS rn" +
-		profileFrom + ap + " WHERE $__timeFilter(time)) x WHERE rn = 1 ORDER BY 3 DESC, 2"
+		profileFrom + ap + " WHERE $__timeFilter(time)) x WHERE rn = 1 ORDER BY 3 DESC, 2, achievement"
 	gr, grtf := gTbl(rowsOf(profileKeepLast+gp(ap, "percent")+")", gn(ap, "achievement")),
 		"Achievement", []col{{"lastNotNull", "Progress"}})
 	// The badge image and the url reach the table as buckets of one value
@@ -153,7 +154,8 @@ func achievementProgress(b *builder) Panel {
 		PromTF: merged(map[string]string{
 			"achievement": "Achievement", panelValueA: "Progress", panelValueB: "Count",
 			panelValueC: profileNextTier, panelValueD: "Tier", panelValueE: profilePageAgrees,
-		}, []string{"user"}, nil),
+		}, []string{"user"}),
+
 		// No sort option: the SQL stores order by progress, and on a phone
 		// a sorted column has to be one of the first two, which are the
 		// badge and its name. Four rows read in any order.
@@ -223,10 +225,7 @@ func progressCell(name string) any {
 func agreesCell(name string) any {
 	return override(name, []any{
 		map[string]any{"id": "mappings", "value": []any{map[string]any{
-			"type": "value", "options": map[string]any{
-				"0": map[string]any{"text": "disagrees", "color": "red", "index": 1},
-				"1": map[string]any{"text": "yes", "color": "green", "index": 0},
-			},
+			"type": "value", "options": flagWords("disagrees", "red"),
 		}}},
 		map[string]any{"id": panelCellOptionsField, "value": map[string]any{"type": "color-text"}},
 		map[string]any{"id": panelWidthField, "value": 110},
@@ -277,21 +276,11 @@ const esCents = "Elasticsearch hands the stored field back as it is. The arithme
 	"which is not a shape a table of rows has: so the money column here keeps cents and " +
 	"its heading says so rather than reading as a hundredfold overcharge."
 
-const esMoney = "In Elasticsearch each day is reduced to its largest reading, the last day that " +
-	"has one is taken, and the division into dollars is a server-side expression."
-
-// profileBool renders a stored boolean as a word. Every store that carries one
-// at all carries it as 1 or 0: the SQL twins cast it, the exporter publishes it
-// that way, and an Elasticsearch max over a boolean field is answered as a
-// number. Elasticsearch's raw documents are the one exception and show the
-// JSON true and false, which needs no mapping to be read.
+// profileBool renders a stored boolean as a word.
 func profileBool(name string, w int) any {
 	return override(name, []any{
 		map[string]any{"id": "mappings", "value": []any{map[string]any{
-			"type": "value", "options": map[string]any{
-				"0": map[string]any{"text": "no", "color": "text", "index": 1},
-				"1": map[string]any{"text": "yes", "color": "green", "index": 0},
-			},
+			"type": "value", "options": flagWords("no", "text"),
 		}}},
 		map[string]any{"id": panelCellOptionsField, "value": map[string]any{"type": "color-text"}},
 		map[string]any{"id": panelWidthField, "value": w},
@@ -327,34 +316,32 @@ func sponsorship(b *builder) []Panel {
 			"string, which no store here can draw as a number. All four are the newest " +
 			"reading of a snapshot rewritten every sweep, not a sum over the range, " +
 			"which would report the lifetime total once per sweep.",
-		Opts:   Opts{"unit": "currencyUSD"},
-		ESDesc: esMoney,
+		Opts: Opts{"unit": "currencyUSD"},
 	}
 	var moneyCols []string
+	var inCents []named
+	var inDollars []any
+	var centColumns []string
 	for i, f := range sponsorFields {
 		moneyCols = append(moneyCols, fmt.Sprintf("%s / 100.0 AS %q", f.From, f.To))
 		money.Prom = append(money.Prom,
 			promNamed(ref(i), f.To, "github_sponsors_listing_"+f.From+" / 100"))
 		money.GR = append(money.GR,
-			grNamed(ref(i), f.To, fmt.Sprintf("scale(%s, 0.01)", gp(sl, f.From))))
-		// A max per day and the last of those, not a top_metrics: the
-		// server-side expressions read a series, and an end to end run
-		// found that a top_metrics inside a date histogram is not one it
-		// can reduce, which failed all four of these panels with
-		// sse.dependencyError. A max is the same shape the webhook failure
-		// gauge feeds its expressions, and the only day it decides is the
-		// newest one that has a reading at all, since an empty bucket is
-		// null and dropNN drops it. Three targets per value, so the four
-		// walk the alphabet in threes and only the last of each is drawn.
-		q, reduce, math := ref(3*i), ref(3*i+1), ref(3*i+2)
-		money.ES = append(money.ES, append(collected(
-			b.esDaily(sl, b.mMax(f.From), "", "", nil, q),
-			exprT(reduce, "reduce", "$"+q, map[string]any{
-				"reducer": "last", "settings": map[string]any{"mode": "dropNN"},
-			}),
-		), exprT(math, "math", "$"+reduce+" / 100", nil))...)
-		money.ESOver = append(money.ESOver, frameName(math, f.To))
+			grNewest(ref(i), f.To, fmt.Sprintf("scale(%s, 0.01)", gp(sl, f.From))))
+		cents := f.To + " in cents"
+		inCents = append(inCents, named{f.From, cents})
+		centColumns = append(centColumns, cents)
+		inDollars = append(inDollars, binaryField(f.To, cents, "/", "100"))
 	}
+	// The newest document, as every other snapshot group reads it, and the
+	// dollars a calculation of the panel's. They were four server-side
+	// expressions over a largest reading per day, and an expression answers a
+	// range with no document in it with NaN, which a tile draws as nothing:
+	// over a range no sweep reached the group was four names with no values
+	// where the other stores read "No data" (Grafana 13.2.1, the 2.6.2
+	// review). A bucket with no document in it is no row, and no tile.
+	money.ES, money.ESTF = esTbl(sl, []any{b.one()}, []any{b.mNewest(fieldsOf(sponsorFields)...)},
+		inCents, nil, append(inDollars, hideColumns(centColumns...))...)
 
 	// Two hundred rows because that is the collector's own ceiling: it reads
 	// first: 100 from each of the two connections and both land in this one
@@ -365,12 +352,12 @@ func sponsorship(b *builder) []Panel {
 		` amount_cents / 100.0 AS "Amount",` +
 		` CAST(active AS INT) AS "Active", CAST(one_time AS INT) AS "One-time",` +
 		` url AS "Link"` +
-		profileFrom + sp + " WHERE " + wholeHistory + " ORDER BY time DESC LIMIT 200"
+		profileFrom + sp + " WHERE " + wholeHistory + " ORDER BY time DESC, direction, sponsorable LIMIT 200"
 	tiers := `SELECT tier AS "Tier", price_cents / 100.0 AS "Price",` +
 		` CAST(one_time AS INT) AS "One-time", CAST(retired AS INT) AS "Retired",` +
 		` age_days AS "Age", url AS "Link" FROM (` +
 		"SELECT *, ROW_NUMBER() OVER (PARTITION BY tier ORDER BY time DESC) AS rn" +
-		profileFrom + st + " WHERE $__timeFilter(time)) x WHERE rn = 1 ORDER BY 2 DESC"
+		profileFrom + st + " WHERE $__timeFilter(time)) x WHERE rn = 1 ORDER BY 2 DESC, 1"
 
 	// Graphite has no rows and no dates to list by, so the sponsorships become
 	// the price of the tier each was made at, named from the path. A sponsorship
@@ -389,7 +376,7 @@ func sponsorship(b *builder) []Panel {
 		{"@timestamp", "Date"},
 		{"direction", "Direction"},
 		{"sponsorable", "Sponsorable"},
-		{"tier_number", "Tier"},
+		{"tier", "Tier"},
 		{"amount_cents", "Amount (cents)"},
 		{"active", "Active"},
 		{"one_time", profileOneTime},
@@ -436,9 +423,13 @@ func sponsorship(b *builder) []Panel {
 			},
 			PromTF: merged(map[string]string{
 				"direction": "Direction", panelValueA: "Sponsorships",
-				panelValueB: "Mean amount", panelValueC: "Active share",
+				panelValueB: profileMeanAmount, panelValueC: "Active share",
 				panelValueD: "One-time share",
-			}, []string{"user"}, map[string]int{"direction": 0}),
+			}, []string{"user"}),
+
+			// The count where the SQL stores draw the tier each one is at,
+			// and the mean where they draw each amount.
+			PromAt: map[string]string{"Sponsorships": "Tier", profileMeanAmount: "Amount"},
 			Desc: "Every sponsorship in either direction, dated the day it began and not the day " +
 				"of any payment. Amount is the price of the tier it was made at, which is a rate " +
 				"per month unless the column beside it says the payment was one-time: a five " +
@@ -456,7 +447,7 @@ func sponsorship(b *builder) []Panel {
 				"is listed at the default thirty days, and the Sponsoring tile on the " +
 				"Overview and this table count the same thing.",
 			PromDesc: "Prometheus counts sponsorships per direction and drops the other party, " +
-				"because a series per sponsorable would never move again. So this is one row " +
+				"the date and the tier, because a series per sponsorable would never move again. So this is one row " +
 				"for money in and one for money out, with the mean amount and the two shares " +
 				"beside the count. " + sweepCount + " It is the one store here that is not " +
 				"bound by the dashboard range, so a lapsed sponsorship is counted in it " +
@@ -466,7 +457,7 @@ func sponsorship(b *builder) []Panel {
 				profileBool("Active", 80), profileBool(profileOneTime, 90), linkOn("Sponsorable"),
 			},
 			PromOver: []any{
-				unitOf("Mean amount", "currencyUSD", 130),
+				unitOf(profileMeanAmount, "currencyUSD", 130),
 				unitOf("Active share", "percentunit", 110),
 				unitOf("One-time share", "percentunit", 130),
 			},
@@ -486,7 +477,8 @@ func sponsorship(b *builder) []Panel {
 			PromTF: merged(map[string]string{
 				"tier": "Tier", panelValueA: "Price", panelValueB: profileOneTime,
 				panelValueC: "Retired", panelValueD: "Age",
-			}, []string{"user"}, map[string]int{"tier": 0}),
+			}, []string{"user"}),
+
 			Opts: Opts{"sort": "Price"},
 			Desc: "Standing inventory, the way an SSH key is. The listing says how many tiers " +
 				"there are; this says which and at what price. Dating a tier at its creation " +
@@ -517,7 +509,7 @@ func profileStanding(b *builder) []Panel {
 	pins := `SELECT "position" AS "Position", repo AS "Item", kind AS "Kind",` +
 		` stars AS "Stars", days_since_push AS "Idle", url AS "Link" FROM (` +
 		"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name ORDER BY time DESC) AS rn" +
-		profileFrom + pi + " WHERE $__timeFilter(time)) x WHERE rn = 1 ORDER BY 1"
+		profileFrom + pi + " WHERE $__timeFilter(time)) x WHERE rn = 1 ORDER BY 1, full_name"
 	// Two columns and the link. The measurement carries a third field, the
 	// days since the availability status was set, but on one row of eight,
 	// and on live data that row read four years on a flag that was off: it
@@ -600,7 +592,9 @@ func profileStanding(b *builder) []Panel {
 			PromTF: append(merged(map[string]string{
 				"repo": "Item", panelValueA: "Position", panelValueB: "Stars",
 				panelValueC: "Idle",
-			}, []string{"user"}, map[string]int{"repo": 0}), sortAsc("Position")),
+			}, []string{"user"}),
+
+				sortAsc("Position")),
 			Desc: "What the profile shows first, in the order it shows it. The row worth seeing " +
 				"is a pinned repository nobody has pushed to in two years. Position is a field " +
 				"and not a tag on purpose: a repository that moves from slot two to slot three " +
@@ -622,7 +616,7 @@ func profileStanding(b *builder) []Panel {
 			Prom: []Target{promTbl("max by (flag) (github_profile_flag_enabled)")},
 			PromTF: []any{organize(map[string]string{
 				"flag": "Flag", "Value": "Enabled",
-			}, []string{"user"}, map[string]int{"flag": 0}), sortAsc("Flag")},
+			}, []string{"user"}), sortAsc("Flag")},
 			Desc: "A closed list of eight flags the profile advertises, as they read at the " +
 				"last sweep. Seven are booleans that change once in years, and the day one " +
 				"does is the day worth being able to point at: hireable, developer program, " +
@@ -659,7 +653,7 @@ func starLists(b *builder) Panel {
 	lists := `SELECT list AS "List", items AS "Items", CAST(private AS INT) AS "Private",` +
 		` age_days AS "Age", days_since_add AS "Last added", url AS "Link" FROM (` +
 		"SELECT *, ROW_NUMBER() OVER (PARTITION BY list ORDER BY time DESC) AS rn" +
-		profileFrom + sl + " WHERE $__timeFilter(time)) x WHERE rn = 1 ORDER BY 2 DESC"
+		profileFrom + sl + " WHERE $__timeFilter(time)) x WHERE rn = 1 ORDER BY 2 DESC, 1"
 
 	listGR, listGRtf := gTbl(rowsOf(profileKeepLast+gp(sl, "items")+")", gn(sl, "list")),
 		"List", []col{{"lastNotNull", "Items"}})
@@ -699,7 +693,8 @@ func starLists(b *builder) Panel {
 		PromTF: merged(map[string]string{
 			"list": "List", panelValueA: "Items", panelValueB: "Private",
 			panelValueC: "Age", panelValueD: profileLastAdded,
-		}, []string{"user"}, map[string]int{"list": 0}),
+		}, []string{"user"}),
+
 		Opts: Opts{"sort": "Items"},
 		Desc: "The lists the account files its stars into, and how many each holds. " +
 			"gh_star_given records every star the account gave and the Overview counts " +

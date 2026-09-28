@@ -354,12 +354,22 @@ Before serving, `Summarize` reduces each measurement according to a rule.
 | Rule       | What survives                                                     |
 | ---------- | ----------------------------------------------------------------- |
 | `keepLast` | The most recent value per label set. Snapshots                    |
-| `sum`      | The batch added up. Windows, such as views over the fourteen days |
+| `sum`      | The rows added up. Windows, such as views over the fourteen days  |
 | `count`    | A count plus the mean of each numeric field. Dated items          |
 | `skip`     | Nothing                                                           |
 
 A measurement with no rule is skipped, so a new collector cannot quietly flood
 the exporter with one series per star.
+
+The batch is read the way the stores hold it. A point with the same
+measurement, tags and time as an earlier one is the same row, so it is added,
+counted and averaged once, as the history stores keep it once;
+[dating a point](https://jmrp.io/docs/ghchronicle/how/dating/#the-reducer-and-what-it-makes-of-each-measurement)
+says which of its fields each store keeps. A price is the one number a `sum`
+does not add: the bill repeats a SKU's price on each row, one per repository
+and day, so `github_billing_usage_price_per_unit` is the highest of them, the
+`MAX(price_per_unit)` of the SQL dashboards, and not the price times the days
+billed.
 
 Each mean is over the items that carried the field, not over the count. A
 collector leaves a field out when it has no honest value for it: a job with no
@@ -826,6 +836,15 @@ repo=edge-cache visibility=public` with a `stars` field becomes:
 github.repo.false.main.false.acme_edge-cache.Go.MIT.acme.edge-cache.public.stars 37 1757280000
 ```
 
+The dashboard names a series or a row by the node it is grouped under, so it
+shows a name as the path holds it: the `(ghost)` the collector writes for a
+deleted account reads `_ghost_`, the `Actions Linux` SKU `Actions_Linux`, the
+`Q&A` category `Q_A`, `another/project` `another_project`, and a cache key
+holding `go-1.27.1` holds `go-1_27_1`. Nothing turns them back on the way out,
+since an underscore in a node may have been one in the name as well, so the
+Graphite dashboard leaves them as they are, and the other four stores show each
+name as the collector wrote it.
+
 A field that shares its name with a tag is skipped, the same rule the line
 protocol applies: the tag wins, because it is the one that can be grouped by.
 
@@ -842,8 +861,8 @@ Graphite keeps the dated points but has no rows. A series is a path and a
 number, so:
 
 - A table that needs several fields of one row cannot be built. The shipped
-  dashboard keeps the column it is sorted by and says in the panel description
-  which columns it dropped.
+  dashboard reduces each series to the one or two numbers a row of it can
+  carry, and its panel description names those and every column it drops.
 - A title or any other string is not a metric there at all, and the sink
   drops it; the panels that would show one say so. A boolean is kept as 1 or 0
   like any number.
@@ -868,6 +887,52 @@ says so in its description.
 
 Change `prefix` and the dashboard targets have to change with it, since the
 prefix is the first node of every path.
+
+Every chart over time adds its points up into buckets the width the range
+calls for, the width the SQL dashboards bin by: the range over a hundred,
+rounded the way Grafana rounds an interval and never under the chart's floor of
+a day, an hour or five minutes. The dashboard computes them in three hidden
+variables, `bucket_1d`, `bucket_1h` and `bucket_5m`, and each chart asks for
+5,000 points, more than it has buckets, so graphite-web hands the buckets back
+as they are. Asked for fewer points than a series holds, graphite-web fits the
+series into bands and moves each point one step later as it does, and before
+2.6.2 that put the newest hour of a chart past its right edge in the last hour
+before each band boundary. Measured against
+`graphiteapp/graphite-statsd:1.1.10-5` with one hour a step at 15:35 UTC, the
+star count a sweep had written in that hour came back stamped 16:00 at a
+hundred points, after the end of the range, and a chart whose one point was
+that one read "Data outside time range"; summed into the day's bucket it came
+back at 00:00, and the artifact storage in its six-hour bucket at 12:00. A bucket
+follows the dashboard's range, so a chart pinned to its own range, as two of
+the Code panels are, sums into days whatever the page is set to.
+
+Two charts sum into a fixed day instead, because their rows are already a day
+or a week apart and each belongs at its own date: the contribution calendar,
+a row a day, and the weekly commits, a row a week stamped at the Sunday GitHub
+starts the week on, with the days between the weeks left out. Seven days is not
+a bucket there: graphite-web counts one from the epoch, a Thursday, and every
+weekly bar stood three days early, the first week of a thirty-day range before
+the range began.
+
+Every other panel asks for 5,000 points as well. A table, a bar chart or a stat
+is not summarized: it reduces the points of the whole range to a number, and
+the fitting drops the first of them, one fewer than the steps it moves the
+first band's start by. Grafana asks a panel that names no number for as many
+points as it is wide, so before 2.6.2 a panel narrower than a range's points
+lost the first hour or hours of the range, depending on where the range began.
+Measured on the same Graphite, a point at 20:00 UTC read from 19:05 over thirty
+days summed to nothing at 500 points and to 1 at 5,000, and "Languages starred"
+drew a star given at that hour as 0 in a window 640 pixels wide. Such a panel
+holds a point per storage step, so 5,000 covers the 2,880 hours of the hundred
+and twenty days the containerised suite's schema keeps at an hour a step and
+the 4,380 days of the twelve years it keeps at a day. A retention that keeps
+more than 5,000 steps of a range, an hour a step for longer than a hundred and
+twenty days or anything finer, is fitted into bands again.
+
+A chart or a bar chart that names its busiest series and folds the rest into
+one called other does the same here as in the SQL dashboards: the busiest over
+the whole range are named, and other is every series less those, point by
+point, drawn only where something is left over.
 
 ### Where to go next
 

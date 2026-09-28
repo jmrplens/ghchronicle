@@ -2,9 +2,10 @@ package dashboards
 
 import "fmt"
 
-// The SQL every commit query opens with, and the column titles each panel
-// here shares with its Elasticsearch, Graphite and Prometheus twins: a twin
-// that renames a column to anything else arrives beside an empty one.
+// The SQL every commit query opens with, the column titles each panel
+// here shares with its Elasticsearch, Graphite and Prometheus twins (a twin
+// that renames a column to anything else arrives beside an empty one), and
+// what a commit stat reads over a range with no commit in it.
 const (
 	codeSelect         = "SELECT "
 	codeInRange        = " WHERE $__timeFilter(time) AND "
@@ -13,6 +14,7 @@ const (
 	codeLinesAdded     = "Lines added"
 	codeLinesRemoved   = "Lines removed"
 	codeSignedCommits  = "Signed commits"
+	codeNoCommits      = "no commits"
 )
 
 // ── Code ────────────────────────────────────────────────────────────────────
@@ -33,11 +35,11 @@ func commitsAndChurn(b *builder) []Panel {
 		" GROUP BY 1 ORDER BY 1"
 	perAuthor := `SELECT author AS "Author", COUNT(*) AS "Commits",` +
 		` SUM(additions) AS "Added", SUM(deletions) AS "Removed",` +
-		` approx_percentile_cont(churn, 0.5) AS "Lines per commit"` +
+		` median(CAST(churn AS DOUBLE)) AS "Lines per commit"` +
 		" FROM gh_commit WHERE $__timeFilter(time) AND " + RF +
-		" GROUP BY 1 ORDER BY 2 DESC LIMIT 20"
+		" GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT 20"
 	sigs := `SELECT signature AS "Signature", COUNT(*) AS "Commits" FROM gh_commit` +
-		codeInRange + RF + " GROUP BY 1 ORDER BY 2 DESC"
+		codeInRange + RF + " GROUP BY 1 ORDER BY 2 DESC, 1"
 	activity := codeSelect + timeBin + ", activity AS series," +
 		" SUM(events) AS n FROM gh_repo_activity WHERE $__timeFilter(time) AND " + RF +
 		" GROUP BY 1, 2 ORDER BY 1"
@@ -46,7 +48,7 @@ func commitsAndChurn(b *builder) []Panel {
 	// one push moved them all in the same second.
 	force := `SELECT repo AS "Repository", time AS "When", ref_name AS "Branch",` +
 		` actor AS "By" FROM gh_repo_activity WHERE $__timeFilter(time)` +
-		" AND " + RF + " AND activity = 'force_push' ORDER BY time DESC LIMIT 25"
+		" AND " + RF + " AND activity = 'force_push' ORDER BY time DESC, full_name, actor LIMIT 25"
 
 	totalM := fmt.Sprintf("github_commits_total{%s}", PF)
 	// The exporter serves a mean per commit and a count per sweep. Their
@@ -83,8 +85,8 @@ func commitsAndChurn(b *builder) []Panel {
 			{"l", codeLinesPerCommit},
 		}, []string{ESF})
 
-	sigsGR, sigsGRtf := gTbl(fmt.Sprintf(`sortByTotal(groupByNode(isNonNull(%s), %d, "sum"))`,
-		cpath("churn"), gn(c, "signature")), "Signature", []col{{"sum", "Commits"}})
+	sigsGR, sigsGRtf := gTbl(fmt.Sprintf(`sortByTotal(groupByNode(%s, %d, "sum"))`,
+		counted(cpath("churn")), gn(c, "signature")), "Signature", []col{{"sum", "Commits"}})
 	sigsES, sigsEStf := esTbl(c, []any{b.tm("signature", 10)}, []any{b.mCount()},
 		[]named{{"signature.keyword", "Signature"}, {"n", "Commits"}}, []string{ESF})
 
@@ -110,12 +112,12 @@ func commitsAndChurn(b *builder) []Panel {
 	return []Panel{
 		statGroup("Commits", box{W: 24, H: 4, X: 0, Y: 0}, []Target{sqlT(commitStats)}, &P{
 			Prom: []Target{
-				promNamed("A", "Commits", fmt.Sprintf("sum(increase(%s[$__range]))", totalM)),
-				promNamed("B", codeLinesAdded, added),
-				promNamed("C", codeLinesRemoved, removed),
-				promNamed("D", codeSignedCommits, fmt.Sprintf(
-					`100 * sum(increase(github_commits_total{signature="VALID",%s}[$__range])) / sum(increase(%s[$__range]))`,
-					PF, totalM,
+				promCounted("A", "Commits", fmt.Sprintf("sum(increase(%s[$__range]))", totalM)),
+				promAggregated("B", codeLinesAdded, added),
+				promAggregated("C", codeLinesRemoved, removed),
+				promAggregated("D", codeSignedCommits, promShare(
+					fmt.Sprintf(`sum(increase(github_commits_total{signature="VALID",%s}[$__range]))`, PF),
+					fmt.Sprintf("sum(increase(%s[$__range]))", totalM),
 				)),
 			},
 			Desc: "How many commits landed in the window, how many lines each way, and what " +
@@ -124,18 +126,18 @@ func commitsAndChurn(b *builder) []Panel {
 				"both are counted separately in the chart below. " + forksIncluded + " " + commitBound,
 			PromDesc: sinceStart + " " + sweepCount,
 			GR: []Target{
-				grNamed("A", "Commits", total(countOf(cpath("churn")))),
+				grNamed("A", "Commits", countTotal(cpath("churn"))),
 				grNamed("B", codeLinesAdded, total(fmt.Sprintf("sumSeries(%s)", cpath("additions")))),
 				grNamed("C", codeLinesRemoved, total(fmt.Sprintf("sumSeries(%s)", cpath("deletions")))),
 				grNamed("D", codeSignedCommits, fmt.Sprintf("asPercent(%s, %s)",
-					total(countOf(rp(c, "churn", "signature", "VALID"))),
-					total(countOf(cpath("churn"))))),
+					countTotal(rp(c, "churn", "signature", "VALID")),
+					countTotal(cpath("churn")))),
 			},
 			ES: []Target{
-				esRef("A", b.esTotal(c, b.mCount(), ESF)),
-				esRef("B", b.esTotal(c, b.mSum("additions"), ESF)),
-				esRef("C", b.esTotal(c, b.mSum("deletions"), ESF)),
-				esRef("D", b.esTotal(c, b.mAvg("signed"), ESF)),
+				esRef("A", b.esOverRange(c, b.mCount(), ESF)),
+				esRef("B", b.esOverRange(c, b.mSum("additions"), ESF)),
+				esRef("C", b.esOverRange(c, b.mSum("deletions"), ESF)),
+				esRef("D", b.esOverRange(c, b.mAvg("signed"), ESF)),
 			},
 			ESOver: []any{
 				frameName("A", "Commits"), frameName("B", codeLinesAdded),
@@ -144,8 +146,12 @@ func commitsAndChurn(b *builder) []Panel {
 			},
 			ESDesc: "In Elasticsearch the signed share is the mean of the boolean `signed` " +
 				"field, as a fraction.",
-			Opts:      mergeOpts(Opts{"thresholds": plainSteps}, bounded()),
-			Overrides: []any{fieldThresholds(codeSignedCommits, "percent", signedSteps)},
+			Opts: mergeOpts(Opts{"thresholds": plainSteps}, bounded()),
+			Overrides: []any{
+				fieldThresholds(codeSignedCommits, "percent", signedSteps),
+				noValueOf(codeSignedCommits, codeNoCommits),
+				noValueOf(codeLinesAdded, codeNoCommits), noValueOf(codeLinesRemoved, codeNoCommits),
+			},
 		}),
 		panel("timeseries", "Lines changed over time", box{W: 12, H: 8, X: 0, Y: 4}, []Target{sqlTS(churn)}, &P{
 			Prom: []Target{
@@ -197,14 +203,16 @@ func commitsAndChurn(b *builder) []Panel {
 			}(),
 			PromTF: merged(map[string]string{
 				"author": "Author", panelValueA: "Commits", panelValueB: codeLinesPerCommit,
-			}, nil, nil),
+			}, nil),
+
 			Opts: mergeOpts(Opts{"sort": "Commits"}, bounded()),
 			Desc: "The twenty authors with the most commits in the window. " +
 				forksIncluded + " On an account with forks of busy projects the upstream " +
 				"authors are the top of this table, which is the honest answer to the " +
 				"question as asked: narrow the picker to read it as the account's own work. " +
 				commitBound,
-			PromDesc: sinceStart + " " + lastSweep,
+			PromDesc: sinceStart + " " + lastSweep + " The exporter keeps the mean lines a " +
+				"commit added and removed and not their sum, so there is no Added or Removed column.",
 			Overrides: []any{
 				barCell("Commits", "short", 130), width("Added", 110),
 				width("Removed", 110), width(codeLinesPerCommit, 130),
@@ -217,7 +225,7 @@ func commitsAndChurn(b *builder) []Panel {
 			Opts:     bounded(),
 			Desc:     commitBound,
 			Prom:     []Target{promTbl(fmt.Sprintf("sum by (signature) (increase(%s[$__range]))", totalM))},
-			PromTF:   []any{organize(map[string]string{"signature": "Signature", "Value": "Commits"}, nil, nil)},
+			PromTF:   []any{organize(map[string]string{"signature": "Signature", "Value": "Commits"}, nil)},
 			PromDesc: sinceStart,
 			GR:       sigsGR, GRTF: sigsGRtf,
 			ES: sigsES, ESTF: sigsEStf,
@@ -226,15 +234,15 @@ func commitsAndChurn(b *builder) []Panel {
 			Prom: []Target{promTbl(fmt.Sprintf(
 				`sum by (full_name, repo) (increase(github_repo_activities_total{activity="force_push",%s}[$__range])) > 0`, PF,
 			))},
-			PromTF: []any{organize(map[string]string{"repo": "Repository", "Value": codeForcePushes}, nil, nil)},
+			PromTF: []any{organize(map[string]string{"repo": "Repository", "Value": codeForcePushes}, nil)},
 			Desc:   "Each force push, newest first.",
 			PromDesc: "Prometheus keeps no branch or actor, so this counts them per " +
-				"repository over the range. " + sinceStart,
+				"repository over the range, with no When, Branch or By column. " + sinceStart,
 			Overrides: []any{when("When")},
 			PromOver:  []any{barCell(codeForcePushes, "short", 120)},
 			GR:        forceGR, GRTF: forceGRtf,
 			GRDesc: "Graphite has no way to sort by date, so this counts them per repository, " +
-				"branch and actor over the range.",
+				"branch and actor over the range, with no When column.",
 			GROver: []any{barCell(codeForcePushes, "short", 120)},
 			ES:     forceES, ESTF: forceEStf,
 		}),
@@ -253,13 +261,13 @@ func commitChecks(b *builder) []Panel {
 	otherChecks := `SELECT app AS "App", COUNT(*) AS "Runs", check AS "Check",` +
 		` SUM(failed) AS "Failed"` +
 		" FROM gh_commit_check WHERE $__timeFilter(time) AND " + RF +
-		" GROUP BY 1, 3 ORDER BY 2 DESC LIMIT 20"
+		" GROUP BY 1, 3 ORDER BY 2 DESC, 1, 3 LIMIT 20"
 
 	// Each check run is a 1 added up per app and check. countOf added every
 	// run into one series first, and the table drew that as one row named
 	// after whichever came first.
-	checksGR, checksGRtf := gTbl(fmt.Sprintf(`groupByNodes(isNonNull(%s), "sum", %d, %d)`,
-		rp(cc, "checks"), gn(cc, "app"), gn(cc, "check")),
+	checksGR, checksGRtf := gTbl(fmt.Sprintf(`groupByNodes(%s, "sum", %d, %d)`,
+		counted(rp(cc, "checks")), gn(cc, "app"), gn(cc, "check")),
 		"App, check", []col{{"sum", "Runs"}})
 	checksES, checksEStf := esTbl(cc, []any{b.tm("app", 20), b.tm("check", 40)},
 		[]any{b.mCount(), b.mSum("failed")},
@@ -309,13 +317,16 @@ func commitChecks(b *builder) []Panel {
 				"sum by (app, conclusion) (increase(github_commit_checks_total{%s}[$__range]))", PF,
 			))},
 			PromTF: []any{organize(map[string]string{
-				"app": "App", "conclusion": "Check", "Value": "Runs",
-			}, nil, nil)},
+				"app": "App", "conclusion": "Conclusion", "Value": "Runs",
+			}, nil)},
 			Opts: Opts{"sort": "Runs"},
 			Desc: "Everything Actions runs is already in the two sections above, in far more " +
 				"detail. These are the other gates: the code quality service, the dependency " +
 				"bot, the commit statuses an older integration still writes.",
-			PromDesc:  sinceStart,
+			PromDesc: "The exporter keeps the app and the conclusion of a check run and not the " +
+				"check's name, so a row is an app and a conclusion, with no Check column, and " +
+				"the failed runs are the rows that conclude in failure rather than a Failed " +
+				"column. " + sinceStart,
 			Overrides: []any{barCell("Runs", "short", 120)},
 			GR:        checksGR, GRTF: checksGRtf, GRDesc: grRows + " " + grSlotCounts,
 			ES: checksES, ESTF: checksEStf,
@@ -341,7 +352,7 @@ func commitChecks(b *builder) []Panel {
 				" ON c.full_name = r.full_name AND c.oid = r.head_sha" +
 				// Newest first: the cap is 25 rows, and ordered by the first
 				// column it kept the alphabetically last repositories instead.
-				" ORDER BY 2 DESC LIMIT 25",
+				" ORDER BY 2 DESC, c.full_name, c.oid LIMIT 25",
 		)}, &P{
 			PromNote: cannot("each commit that left the default branch red, with its message, "+
 				"its author and how many runs failed on it.",

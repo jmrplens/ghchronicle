@@ -27,10 +27,11 @@ import (
 // and an hour with two weekdays, so each panel has a bar that only a sum
 // draws right.
 //
-// TestTheDashboardsAgreeOnTheSameNumber cannot see this: it compares panels
-// that reduce to one number, and a bar chart is many. So this reads every bar,
-// after the one step of the panel's own transformations that decides the
-// number in Elasticsearch, the sum over the rows a bar is made of.
+// TestTheStoresDrawTheSameValues cannot see this: it holds the stores to each
+// other, and three of the four drew the same wrong number. So this reads every
+// bar against the sweep's own points, after the one step of the panel's own
+// transformations that decides the number in Elasticsearch, the sum over the
+// rows a bar is made of.
 func TestThePunchCardsAddUpEveryCellInEveryStore(t *testing.T) {
 	s := Start(t)
 	dashboardsRun(t, s)

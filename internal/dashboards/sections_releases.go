@@ -16,7 +16,7 @@ func releases(b *builder) []Panel {
 		` url AS "Page" FROM (` +
 		"SELECT repo, full_name, tag, downloads, url, ROW_NUMBER() OVER (PARTITION BY full_name, tag" +
 		" ORDER BY time DESC) AS rn FROM gh_release WHERE $__timeFilter(time) AND " + RF +
-		") x WHERE rn = 1 AND downloads > 0 ORDER BY 2 DESC LIMIT 12"
+		") x WHERE rn = 1 AND downloads > 0 ORDER BY 2 DESC, full_name, tag LIMIT 12"
 	// How many releases have been downloaded at all: the number beside the
 	// total, so the tile above it is not the only thing in its column. A
 	// release is a tag of a repository by its full name, as in the total.
@@ -37,10 +37,15 @@ func releases(b *builder) []Panel {
 		"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, tag, asset ORDER BY time DESC) AS rn" +
 		" FROM gh_release_asset WHERE $__timeFilter(time) AND " + RF + ") a" +
 		" LEFT JOIN (" + release + ") r ON r.full_name = a.full_name AND r.tag = a.tag AND r.rn = 1" +
-		" WHERE a.rn = 1 ORDER BY a.downloads DESC LIMIT 40"
+		" WHERE a.rn = 1 ORDER BY a.downloads DESC, a.full_name, a.tag, a.asset LIMIT 40"
 	rl, ra := "gh_release", "gh_release_asset"
 
-	byTagGR, byTagGRtf := gTbl(topRows(rp(rl, "downloads"), 12, gn(rl, "repo"), gn(rl, "tag")),
+	// A release nobody has downloaded is left out, as the SQL stores' WHERE
+	// leaves it out: a series of zeros is not an empty one, so Graphite drew
+	// it as a bar of nothing and Elasticsearch as a row of 0, and the chart
+	// the other stores draw had a release more in these two.
+	byTagGR, byTagGRtf := gTbl(topRows(fmt.Sprintf("removeBelowValue(%s, 1)", rp(rl, "downloads")),
+		12, gn(rl, "repo"), gn(rl, "tag")),
 		"Release", []col{{"lastNotNull", "Downloads"}})
 	byTagES, byTagEStf := esTbl(rl, slices.Concat([]any{b.tm("tag", 500)}, b.tmRepo(50), []any{b.tmURL()}),
 		[]any{b.mNewest("downloads")},
@@ -88,8 +93,8 @@ func releases(b *builder) []Panel {
 			{Kind: "sql", Format: "table", Ref: "B", SQL: namedValue(countSQL, "Releases")},
 		}, &P{
 			Prom: []Target{
-				promNamed("A", "Total", fmt.Sprintf("sum(github_release_downloads{%s})", PF)),
-				promNamed("B", "Releases", fmt.Sprintf(
+				promAggregated("A", "Total", fmt.Sprintf("sum(github_release_downloads{%s})", PF)),
+				promCounted("B", "Releases", fmt.Sprintf(
 					"count(sum by (full_name, tag) (github_release_downloads{%s}) > 0)", PF,
 				)),
 			},
@@ -100,9 +105,12 @@ func releases(b *builder) []Panel {
 			GR: []Target{
 				grNamed("A", "Total", latestSum(rp(rl, "downloads"))),
 				// Graphite counts the series with a download in them; a series
-				// is a release, so this is the same number.
+				// is a release, so this is the same number. With none left
+				// countSeries answers nothing rather than 0, and the tile was
+				// missing where COUNT(*) reads 0, so it falls back as
+				// countTotal does.
 				grNamed("B", "Releases", fmt.Sprintf(
-					"countSeries(removeEmptySeries(removeBelowValue(keepLastValue(%s), 1)))",
+					"fallbackSeries(countSeries(removeEmptySeries(removeBelowValue(keepLastValue(%s), 1))), constantLine(0))",
 					rp(rl, "downloads"),
 				)),
 			},
@@ -111,9 +119,13 @@ func releases(b *builder) []Panel {
 				esRef("B", b.esTotal(rl, b.mUniq("tag"), ESF)),
 			),
 			ESOver: []any{frameName("A", "Total"), frameName("B", "Releases")},
-			ESOpts: Opts{"calc": "sum"},
+			// Every release is a row each time the releases are read, 0
+			// downloads and all, so no row is no release.
+			Overrides: []any{noValueOf("Total", "no releases")},
+			ESOpts:    Opts{"calc": "sum"},
 			ESDesc: "In Elasticsearch the second counts distinct tags, downloaded or not: a " +
-				"cardinality cannot be filtered on the newest value.",
+				"cardinality cannot be filtered on the newest value. " +
+				esLeftOut("the download total", esNewestAddedUp("release")),
 		}),
 		panel("barchart", "Downloads by release", box{W: 18, H: 8, X: 6, Y: 0}, []Target{sqlT(byTag)}, &P{
 			Prom: []Target{promTbl(fmt.Sprintf(
@@ -121,11 +133,15 @@ func releases(b *builder) []Panel {
 					` "release", " ", "repo", "tag")`, PF,
 			))},
 			PromTF: []any{organize(map[string]string{"release": "Release", "Value": "Downloads"},
-				[]string{"repo", "tag"}, nil)},
+				[]string{"repo", "tag"})},
 			Desc:      "The twelve most downloaded releases. A click on a bar opens the release page.",
 			Overrides: barLink("Downloads", "Page", "Open the release"),
 			GR:        byTagGR, GRTF: byTagGRtf,
-			ES: byTagES, ESTF: byTagEStf,
+			GRDesc: "Graphite names each bar repository and tag from the path.",
+			// A bar chart names its bars by its first string field, and the
+			// repository's bucket stands ahead of the tag's in the frame, so
+			// both of the suite's releases were bars called hello-world.
+			ES: byTagES, ESTF: append(byTagEStf, aboveZero("Downloads"), columnOrder("Release")),
 			ESDesc: "In Elasticsearch the bars are named by tag; the repository is the next column.",
 		}),
 		panel("table", "Release assets", box{W: 24, H: 9, X: 0, Y: 8}, []Target{sqlT(assets)}, &P{
@@ -151,7 +167,7 @@ func releases(b *builder) []Panel {
 				` MAX(url) AS "Download"` +
 				" FROM gh_release_asset WHERE $__timeFilter(time) AND " + RF +
 				" GROUP BY 1, 4, full_name, 5 HAVING MAX(downloads) > MIN(downloads)" +
-				" ORDER BY 2 DESC LIMIT 25",
+				" ORDER BY 2 DESC, full_name, 4, 1 LIMIT 25",
 		)}, &P{
 			PromNote: cannot("what each release asset gained across the range, as the "+
 				"difference of a cumulative counter.",

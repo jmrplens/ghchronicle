@@ -16,8 +16,10 @@ const deliveryNewestRow = ") x WHERE rn = 1"
 // deliveryIdlestFirst orders the three tables whose second column is how long
 // something has sat untouched, a deploy key unused, an environment unchanged
 // or a branch without a commit, with the longest first: that is the one a
-// reader removes or asks about.
-const deliveryIdlestFirst = " ORDER BY 2 DESC"
+// reader removes or asks about. Two of them untouched for as long are told
+// apart by what the row is, which each table names, or each store's sort
+// breaks the tie its own way.
+func deliveryIdlestFirst(identity string) string { return " ORDER BY 2 DESC, " + identity }
 
 // What the columns of this section are called wherever they are read. The same
 // name has to reach the panel from all five stores, since the overrides, the
@@ -62,9 +64,9 @@ func webhookDeliveries(b *builder) []Panel {
 		` SUM(CASE WHEN ok = 'false' THEN 1 ELSE 0 END) AS "Failed",` +
 		` COUNT(*) AS "Deliveries", repo AS "Repository",` +
 		` SUM(CASE WHEN redelivery THEN 1 ELSE 0 END) AS "Retried",` +
-		` approx_percentile_cont(duration_seconds, 0.5) AS "Latency"` +
+		` median(CAST(duration_seconds AS DOUBLE)) AS "Latency"` +
 		" FROM gh_webhook_delivery WHERE $__timeFilter(time) AND " + RF +
-		" GROUP BY 1, full_name, 4 ORDER BY 2 DESC, 3 DESC LIMIT 25"
+		" GROUP BY 1, full_name, 4 ORDER BY 2 DESC, 3 DESC, 1, full_name LIMIT 25"
 	overTime := "SELECT " + timeBin + ", code AS series," +
 		" COUNT(*) AS n FROM gh_webhook_delivery WHERE $__timeFilter(time) AND " + RF +
 		" GROUP BY 1, 2 ORDER BY 1"
@@ -92,10 +94,11 @@ func webhookDeliveries(b *builder) []Panel {
 
 	return []Panel{
 		panel("gauge", "Webhook failure rate", box{W: 6, H: 8, X: 0, Y: 0}, []Target{sqlT(failRate)}, &P{
-			Prom: []Target{promNow(fmt.Sprintf(
-				"100 * sum(increase(%s[$__range])) / sum(increase(%s[$__range]))", failed, totalM,
+			Prom: []Target{promNow(promShare(
+				fmt.Sprintf("sum(increase(%s[$__range]))", failed),
+				fmt.Sprintf("sum(increase(%s[$__range]))", totalM),
 			))},
-			Opts: Opts{"thresholds": []any{
+			Opts: Opts{"no_value": "no deliveries", "thresholds": []any{
 				map[string]any{"color": "green", "value": nil},
 				map[string]any{"color": "orange", "value": 5},
 				map[string]any{"color": "red", "value": 25},
@@ -104,7 +107,7 @@ func webhookDeliveries(b *builder) []Panel {
 				"weeks except this.",
 			PromDesc: sinceStart,
 			GR: []Target{grq(fmt.Sprintf("asPercent(%s, %s)",
-				total(countOf(failedPath)), total(countOf(deliv))))},
+				countTotal(failedPath), countTotal(deliv)))},
 			// `ok` is a tag, so it is text in Elasticsearch and no boolean
 			// mean exists: the two counts are reduced and divided server-side.
 			ES: append(collected(
@@ -143,13 +146,17 @@ func webhookDeliveries(b *builder) []Panel {
 			PromTF: merged(map[string]string{
 				"repo": "Repository", "hook": "Hook", inventoryValueCol + "A": "Deliveries",
 				inventoryValueCol + "B": "Failed", inventoryValueCol + "C": "Retried", inventoryValueCol + "D": "Latency",
-			}, nil, map[string]int{"repo": 0, "hook": 1}),
-			Opts: Opts{"sort": "Failed"},
+			}, nil),
+
+			// The hook names the row as the host does in the other stores.
+			PromAt: map[string]string{"Hook": "Endpoint"},
+			Opts:   Opts{"sort": "Failed"},
 			Desc: "Only the host is stored. The path of a webhook URL usually carries a secret. " +
 				"A retried delivery is a different fact from a first one that failed, and " +
 				"counting them together makes an endpoint look worse than it is.",
-			PromDesc: "Prometheus keeps the hook name rather than the host, and the retries as " +
-				"a fraction rather than a count. " + sinceStart,
+			PromDesc: "Prometheus keeps the hook name rather than the host, so Hook stands where " +
+				"the other stores draw Endpoint, and the retries as a fraction rather than a " +
+				"count. " + sinceStart,
 			Overrides: []any{
 				width("Endpoint", 150), barCell("Deliveries", "short", 120),
 				width("Failed", 90), width("Retried", 90), unitOf("Latency", "s", 100),
@@ -158,7 +165,9 @@ func webhookDeliveries(b *builder) []Panel {
 			GRDesc: "Graphite names each row host, repository and whether the delivery succeeded " +
 				"from the path, so the failures are their own rows. " + grRows,
 			ES: hooksES, ESTF: hooksEStf,
-			ESDesc: "In Elasticsearch the failures are their own rows, split by the `ok` tag.",
+			ESDesc: "In Elasticsearch the failures are their own rows, split by the `ok` tag, " +
+				"rather than a Failed column, and a redelivery is counted among the deliveries " +
+				"rather than in a Retried column.",
 		}),
 	}
 }
@@ -172,12 +181,12 @@ func accessConfiguration(b *builder) []Panel {
 		` days_since_change AS "Last changed", url AS "Link" FROM (` +
 		"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, ruleset ORDER BY time DESC) AS rn" +
 		" FROM gh_ruleset WHERE $__timeFilter(time) AND " + RF + deliveryNewestRow +
-		" ORDER BY 1, 2"
+		" ORDER BY 1, 2, full_name"
 	keys := `SELECT repo AS "Repository", days_since_use AS "Unused for", key AS "Key",` +
 		` read_only AS "Read only" FROM (` +
 		"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, key ORDER BY time DESC) AS rn" +
 		" FROM gh_deploy_key WHERE $__timeFilter(time) AND " + RF + deliveryNewestRow +
-		deliveryIdlestFirst
+		deliveryIdlestFirst("full_name, key")
 	rs, dk := "gh_ruleset", "gh_deploy_key"
 
 	rulesGR, rulesGRtf := gTbl(rowsOf(rp(rs, "days_since_change"), gn(rs, "repo"),
@@ -218,11 +227,12 @@ func accessConfiguration(b *builder) []Panel {
 	whGR, whGRtf := gTbl(rowsOf("keepLastValue("+rp("gh_webhook", "events")+")",
 		gn("gh_webhook", "repo"), gn("gh_webhook", "host")),
 		"Repository, host", []col{{"lastNotNull", deliveryHookEvents}})
-	whES, whEStf := esTbl("gh_webhook", append(b.tmRepo(500), b.tm("host", 50), b.tm("active", 2)),
+	whES, whEStf := esTbl("gh_webhook", append(b.tmRepo(500), b.tm("host", 50), b.tm("hook", 50), b.tm("active", 2)),
 		[]any{b.mNewest("events")},
 		[]named{
 			{inventoryRepoTerm, "Repository"},
 			{"host.keyword", "Host"},
+			{"hook.keyword", "Hook"},
 			{"active.keyword", "Active"},
 			{"events", deliveryHookEvents},
 		}, []string{ESF}, hideColumns(panelFullNameField))
@@ -247,9 +257,13 @@ func accessConfiguration(b *builder) []Panel {
 			PromTF: merged(map[string]string{
 				"repo": "Repository", "ruleset": "Ruleset", "enforcement": "Enforcement",
 				inventoryValueCol + "A": "Active", inventoryValueCol + "B": deliveryLastChanged,
-			}, nil, map[string]int{"repo": 0, "ruleset": 1, "enforcement": 2}),
+			}, nil),
+
+			PromAt: map[string]string{"Active": deliveryLastChanged},
 			Desc: "A 404 from branch protection does not mean unprotected: a repository can be " +
 				"governed entirely by rulesets, which that endpoint knows nothing about.",
+			PromDesc: "The exporter keeps a ruleset's enforcement and not its target, so there " +
+				"is no Target column.",
 			Overrides: []any{
 				width("Enforcement", 120), width("Target", 100),
 				unitOf(deliveryLastChanged, "d", 130), ownerLinkOn("Ruleset", "the ruleset settings"),
@@ -266,13 +280,17 @@ func accessConfiguration(b *builder) []Panel {
 			PromTF: []any{organize(map[string]string{
 				"repo": "Repository", "key": "Key", "read_only": deliveryKeyReadOnly,
 				"Value": deliveryKeyUnused,
-			}, nil, map[string]int{"repo": 0, "key": 1, "read_only": 2})},
+			}, nil)},
 			Opts:      Opts{"sort": deliveryKeyUnused},
 			Desc:      "A write key nobody has used in a year is a credential to remove.",
 			Overrides: []any{width(deliveryKeyReadOnly, 100), unitOf(deliveryKeyUnused, "d", 120)},
 			GR:        keysGR, GRTF: keysGRtf,
-			GRDesc: "Graphite names each row repository, key and whether it is read-only from the path.",
-			ES:     keysES, ESTF: keysEStf,
+			GRDesc: "Graphite names each row repository, key and whether it is read-only from the path. " +
+				"A key GitHub has never seen used has no reading at all, and Graphite holds a key " +
+				"only as the path of its reading, so such a key has no row here.",
+			PromDesc: "A key GitHub has never seen used has no reading at all, and the exporter " +
+				"holds a key only as the series of its reading, so such a key has no row here.",
+			ES: keysES, ESTF: keysEStf,
 			ESDesc: "A key GitHub has never seen used has no reading at all, in this " +
 				"dashboard or any of the others, and its cell is empty.",
 		}),
@@ -293,7 +311,7 @@ func accessConfiguration(b *builder) []Panel {
 				"SELECT full_name, repo, host, hook, active, events, ROW_NUMBER() OVER (" +
 				"PARTITION BY full_name, hook, host ORDER BY time DESC) AS rn FROM gh_webhook" +
 				" WHERE $__timeFilter(time) AND " + RF + deliveryNewestRow +
-				" GROUP BY full_name, 1, 2, 3, 4 ORDER BY 1, 2",
+				" GROUP BY full_name, 1, 2, 3, 4 ORDER BY 1, 2, full_name, 3, 4",
 		)}, &P{
 			Prom: []Target{promTbl(fmt.Sprintf(
 				"max by (full_name, repo, host, hook, active) (github_webhook_events{%s})", PF,
@@ -301,7 +319,7 @@ func accessConfiguration(b *builder) []Panel {
 			PromTF: []any{organize(map[string]string{
 				"repo": "Repository", "host": "Host", "hook": "Hook",
 				"active": "Active", "Value": deliveryHookEvents,
-			}, []string{"owner", "full_name", "instance", "job", "__name__"}, nil)},
+			}, []string{"owner", "full_name", "instance", "job", "__name__"})},
 			Desc: "The panel beside this one is built from deliveries, so a hook that has never " +
 				"delivered anything appears in it nowhere. This is the inventory: an active " +
 				"hook with no traffic is the interesting row. Hook is GitHub's id for it, the " +
@@ -309,9 +327,8 @@ func accessConfiguration(b *builder) []Panel {
 				"told nothing apart.",
 			Overrides: []any{width("Host", 200), width("Active", 90), width(deliveryHookEvents, 150)},
 			GR:        whGR, GRTF: whGRtf,
-			GRDesc: "Graphite has no rows: each series is one number, so this table keeps the " +
-				"events each hook subscribes to and drops its id and whether it is active.",
-			ES: whES, ESTF: whEStf,
+			GRDesc: grRows,
+			ES:     whES, ESTF: whEStf,
 		}),
 		panel("table", "Environments", box{W: 12, H: 8, X: 12, Y: 24}, []Target{sqlT(
 			// Each environment's newest row. The row is a daily snapshot and its
@@ -322,14 +339,14 @@ func accessConfiguration(b *builder) []Panel {
 				` repo AS "Repository", url AS "Link" FROM (` +
 				"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, environment" +
 				" ORDER BY time DESC) AS rn FROM gh_environment" + ciInRange + RF +
-				deliveryNewestRow + deliveryIdlestFirst,
+				deliveryNewestRow + deliveryIdlestFirst("1, full_name"),
 		)}, &P{
 			Prom: []Target{promTbl(fmt.Sprintf(
 				"min by (full_name, repo, environment) (github_environment_days_since_change{%s})", PF,
 			))},
 			PromTF: []any{organize(map[string]string{
 				"repo": "Repository", "environment": "Environment", "Value": "Idle",
-			}, []string{"owner", "full_name", "instance", "job", "__name__"}, nil)},
+			}, []string{"owner", "full_name", "instance", "job", "__name__"})},
 			Opts: Opts{"sort": "Idle"},
 			Desc: "The same question the deploy keys table asks, about deployment targets: one " +
 				"environment here has not been touched in one thousand one hundred and " +
@@ -389,7 +406,7 @@ func branchesAndProtections(b *builder) []Panel {
 		" FROM gh_branch WHERE $__timeFilter(time) AND " + RF + ") b" +
 		repoFlagsJoin("b") +
 		" WHERE b.rn = 1 AND " + notAFork + " AND " + notArchived +
-		deliveryIdlestFirst
+		deliveryIdlestFirst("b.full_name, 1")
 	protections := `SELECT repo AS "Repository", pattern AS "Pattern",` +
 		` required_reviews AS "Reviews",` +
 		` CAST(requires_commit_signatures AS INT) AS "Signatures",` +
@@ -399,13 +416,13 @@ func branchesAndProtections(b *builder) []Panel {
 		` required_checks AS "Checks", url AS "Link" FROM (` +
 		"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, pattern ORDER BY time DESC) AS rn" +
 		" FROM gh_branch_protection WHERE $__timeFilter(time) AND " + RF + deliveryNewestRow +
-		" ORDER BY 1, 2"
+		" ORDER BY 1, 2, full_name"
 	ruleRows := `SELECT rule AS "Rule", bypass_always AS "Always", repo AS "Repository",` +
 		` ruleset AS "Ruleset", bypass_actors AS "Bypass actors",` +
 		` bypass_sampled AS "Sampled" FROM (` +
 		"SELECT *, ROW_NUMBER() OVER (PARTITION BY full_name, ruleset, rule ORDER BY time DESC) AS rn" +
 		" FROM gh_ruleset_rule WHERE $__timeFilter(time) AND " + RF + deliveryNewestRow +
-		" ORDER BY 2 DESC, 3, 4, 1"
+		" ORDER BY 2 DESC, 3, 4, 1, full_name"
 	branchGR, branchGRtf := gTbl(rowsOf(rp(gb, "days_since_commit"),
 		gn(gb, "repo"), gn(gb, "branch"), gn(gb, "is_default")),
 		"Repository, branch, default", []col{{"lastNotNull", "Idle"}})
@@ -482,7 +499,7 @@ func branchesAndProtections(b *builder) []Panel {
 			PromTF: []any{organize(map[string]string{
 				"repo": "Repository", "branch": "Branch", "is_default": "Default",
 				"Value": "Idle",
-			}, nil, map[string]int{"repo": 0, "branch": 1, "is_default": 2})},
+			}, nil)},
 			Opts: Opts{"sort": "Idle"},
 			PromDesc: "Prometheus has no LIMIT, so the twin is the fifty idlest branches " +
 				"rather than every one of them. " + noRepoFlagsHere,
@@ -521,7 +538,8 @@ func branchesAndProtections(b *builder) []Panel {
 					inventoryValueCol + "A": "Reviews", inventoryValueCol + "B": "Signatures",
 					inventoryValueCol + "C": "Linear", inventoryValueCol + "D": deliveryForcePush,
 					inventoryValueCol + "E": "Threads", inventoryValueCol + "F": "Checks",
-				}, nil, map[string]int{"repo": 0, "pattern": 1}),
+				}, nil),
+
 				Desc: "What each branch protection enforces. " +
 					"`gh_repo_policy.branch_protection_rules` counts these and stops there, so a " +
 					"protection that is switched on and asks for nothing looks the same as one " +
@@ -556,7 +574,8 @@ func branchesAndProtections(b *builder) []Panel {
 				PromTF: merged(map[string]string{
 					"repo": "Repository", "ruleset": "Ruleset", "rule": "Rule",
 					inventoryValueCol + "A": deliveryBypassActors, inventoryValueCol + "B": "Always", inventoryValueCol + "C": "Sampled",
-				}, nil, map[string]int{"repo": 0, "ruleset": 1, "rule": 2}),
+				}, nil),
+
 				Opts: Opts{"sort": "Always"},
 				Desc: "Ruleset rules, and who may walk past them. The Rulesets panel above says a " +
 					"ruleset exists and is enforced. This says " +
@@ -573,9 +592,9 @@ func branchesAndProtections(b *builder) []Panel {
 				GRDesc: "Graphite names each row repository, ruleset and rule from the path, and " +
 					"has no rows: each series is one number reduced over the range, so this " +
 					"table keeps one of the three bypass columns. It keeps Bypass actors, the " +
-					"exact total, and not the column the panel is sorted by: a count on ALWAYS " +
-					"read alone, against a total this table cannot show beside it, is exactly " +
-					"the misreading the panel exists to prevent.",
+					"exact total, and drops Sampled and Always, the column the panel is sorted " +
+					"by: a count on ALWAYS read alone, against a total this table cannot show " +
+					"beside it, is exactly the misreading the panel exists to prevent.",
 				ES: ruleES, ESTF: ruleEStf,
 			}),
 		rulesetChanges(b),
@@ -597,11 +616,11 @@ func rulesetChanges(b *builder) Panel {
 	versions := `SELECT ruleset AS "Ruleset", time AS "Date", repo AS "Repository",` +
 		` target AS "Target", actor_type AS "Actor", url AS "Link"` +
 		" FROM gh_ruleset_version WHERE $__timeFilter(time) AND " + RF +
-		" ORDER BY time DESC LIMIT 200"
+		" ORDER BY time DESC, full_name, ruleset LIMIT 200"
 	// Graphite has no rows and no dates to list by, so the versions become a
 	// count per ruleset and actor type, named from the path.
 	verGR, verGRtf := gTbl(fmt.Sprintf(`sortBy(%s, "sum", true)`,
-		grGroupBy(nonNull(rp(rv, "versions")), rv, "sum", "repo", "ruleset", "actor_type")),
+		grGroupBy(counted(rp(rv, "versions")), rv, "sum", "repo", "ruleset", "actor_type")),
 		"Repository, ruleset, actor", []col{{"sum", "Versions"}})
 	// The documents themselves, newest first, which is the one shape that
 	// returns the target, the actor and the link as strings: a top_metrics
@@ -628,8 +647,7 @@ func rulesetChanges(b *builder) Panel {
 		PromTF: []any{organize(map[string]string{
 			"repo": "Repository", "ruleset": "Ruleset", "actor_type": "Actor",
 			"Value": "Versions",
-		}, []string{"owner", "full_name", "instance", "job", "__name__"},
-			map[string]int{"repo": 0, "ruleset": 1, "actor_type": 2})},
+		}, []string{"owner", "full_name", "instance", "job", "__name__"})},
 		Desc: "Every saved version of every ruleset, dated the moment GitHub saved it. The " +
 			"Rulesets panel says a protection exists and how many days ago it last " +
 			"changed; this is the changelog that number summarizes, and it is the only " +
@@ -638,17 +656,61 @@ func rulesetChanges(b *builder) Panel {
 			"Every store answers inside the dashboard range: a ruleset nobody has touched " +
 			"in the range is absent here, not unprotected.",
 		PromDesc: "Prometheus counts versions per ruleset and actor type and drops the " +
-			"dates, because a series per version would never move again. " + sweepCount,
+			"dates, because a series per version would never move again. It keeps no " +
+			"target either, so there is no Target column. " + sweepCount,
 		Overrides: []any{
 			when("Date"), width("Target", 90), width("Actor", 110), linkOn("Ruleset"),
 		},
 		PromOver: []any{width("Actor", 110), width("Versions", 100)},
 		GR:       verGR, GRTF: verGRtf,
 		GRDesc: "Graphite has no way to list by date, so this is the number of versions per " +
-			"repository, ruleset and actor type over the range, named from the path.",
+			"repository, ruleset and actor type over the range, named from the path, which " +
+			"groups by no target: there is no Target column.",
 		ES: verES, ESTF: verEStf,
 		ESDesc: "Elasticsearch lists the documents themselves, newest first.",
 	})
+}
+
+// deploymentsES is "Deployments by environment" in Elasticsearch: two queries
+// on the same four buckets, repository, environment and outcome, merged on
+// them into one row each.
+//
+// The address the environment was put live at is a url per deployment, not
+// per environment, and a bucket holds the documents it keeps and nothing
+// else: as a bucket of one under the others, it kept the deployments of one
+// address and left every other one out of the count and the medians beneath
+// it. Measured on the 2.6.1 review, github-pages read 1 deployment and a To
+// status of 0 s where the two SQL stores, which read the same two
+// deployments, read 2 and 33 s. So the counts and medians are one query,
+// whose url bucket is the repository's deployments page and so one value for
+// every document of it, and the address is a second query that keeps, of each
+// row's addresses, the one that sorts last, as MAX(environment_url) does in
+// SQL. Its metric is only there because a query must have one, and the merge
+// drops it along with the full name.
+func deploymentsES(b *builder, dp string) (targets []Target, tf []any) {
+	keys := func() []any {
+		return append(b.tmRepo(500), b.tm("environment", 50), b.tm("outcome", 10))
+	}
+	targets, tf = esTbl(dp, append(keys(), b.tmURL()),
+		[]any{b.mCount(), b.mPct("seconds_to_status", 50), b.mPct("seconds_live", 50)},
+		[]named{
+			{inventoryRepoTerm, "Repository"},
+			{"environment.keyword", "Environment"},
+			{"outcome.keyword", "Outcome"},
+			{inventoryURLTerm, "Link"},
+			{"n", "Deployments"},
+			{"s", deliveryTimeToStatus},
+			{"l", deliveryTimeLive},
+		}, []string{ESF})
+	live := b.tm("environment_url", 1, "_key", "desc")
+	settings, _ := agg(live)["settings"].(map[string]any)
+	settings["missing"] = ""
+	targets = append(targets, esq(dp, []any{b.mSum("deployments")}, append(keys(), live), "B", []string{ESF}, ""))
+	options, _ := agg(tf[0])["options"].(map[string]any)
+	rename, _ := options["renameByName"].(map[string]any)
+	rename["environment_url.keyword"] = "Live"
+	tf = append([]any{map[string]any{"id": "merge", "options": map[string]any{}}}, tf...)
+	return targets, append(tf, hideColumns(panelFullNameField, esNames["sum"]))
 }
 
 // deploymentsToEnvironments is what reached the environments the section lists
@@ -667,8 +729,8 @@ func deploymentsToEnvironments(b *builder) []Panel {
 		" GROUP BY 1, 2 ORDER BY 1"
 	deploys := `SELECT environment AS "Environment", COUNT(*) AS "Deployments",` +
 		` repo AS "Repository",` +
-		` approx_percentile_cont(seconds_to_status, 0.5) AS "To status",` +
-		` approx_percentile_cont(seconds_live, 0.5) AS "Live for",` +
+		` median(CAST(seconds_to_status AS DOUBLE)) AS "To status",` +
+		` median(CAST(seconds_live AS DOUBLE)) AS "Live for",` +
 		` SUM(CASE WHEN success THEN 1 ELSE 0 END) AS "Successes",` +
 		// outcome is a field: a deployment is pending before it is anything
 		// else, and as the tag `state` the one that succeeded after a sweep
@@ -678,7 +740,7 @@ func deploymentsToEnvironments(b *builder) []Panel {
 		// url is what the newest deployment put live, when it put anything.
 		` MAX(url) AS "Link", MAX(environment_url) AS "Live"` +
 		" FROM gh_deployment WHERE $__timeFilter(time) AND " + RF +
-		" GROUP BY 1, full_name, 3 ORDER BY 2 DESC"
+		" GROUP BY 1, full_name, 3 ORDER BY 2 DESC, 1, full_name"
 
 	// The outcome is a bucket in Elasticsearch, so the pending deployments
 	// are rows of their own there rather than a column. Graphite keeps no
@@ -687,19 +749,7 @@ func deploymentsToEnvironments(b *builder) []Panel {
 	depGR, depGRtf := gTbl(fmt.Sprintf(`sortBy(%s, "sum", true)`,
 		grGroupBy(rp(dp, "success"), dp, "sum", "repo", "environment")),
 		"Repository, environment", []col{{"count", "Deployments"}, {"sum", "Successes"}})
-	depES, depEStf := esTbl(dp,
-		append(b.tmRepo(500), b.tm("environment", 50), b.tm("outcome", 10), b.tmURL(), b.tmURL("environment_url")),
-		[]any{b.mCount(), b.mPct("seconds_to_status", 50), b.mPct("seconds_live", 50)},
-		[]named{
-			{inventoryRepoTerm, "Repository"},
-			{"environment.keyword", "Environment"},
-			{"outcome.keyword", "Outcome"},
-			{inventoryURLTerm, "Link"},
-			{"environment_url.keyword", "Live"},
-			{"n", "Deployments"},
-			{"s", deliveryTimeToStatus},
-			{"l", deliveryTimeLive},
-		}, []string{ESF}, hideColumns(panelFullNameField))
+	depES, depEStf := deploymentsES(b, dp)
 
 	return []Panel{
 		panel("timeseries", "Deployments over time", box{W: 12, H: 8, X: 0, Y: 56},
@@ -722,14 +772,20 @@ func deploymentsToEnvironments(b *builder) []Panel {
 				promTbl(fmt.Sprintf("sum by (full_name, repo, environment) (increase(github_deployments_total{%s}[$__range]))", PF), "A"),
 				promTbl(fmt.Sprintf("avg by (full_name, repo, environment) (github_deployments_seconds_to_status_mean{%s})", PF), "B"),
 				promTbl(fmt.Sprintf("avg by (full_name, repo, environment) (github_deployments_seconds_live_mean{%s})", PF), "C"),
-				promTbl(fmt.Sprintf(`sum by (full_name, repo, environment) (increase(github_deployments_total{outcome="success",%s}[$__range]))`, PF), "D"),
-				promTbl(fmt.Sprintf(`sum by (full_name, repo, environment) (increase(github_deployments_total{outcome="pending",%s}[$__range]))`, PF), "E"),
+				// An outcome with no deployment in the range is no series at
+				// all, and a query that finds none answers no column: the
+				// zero of every environment keeps the column, as the SQL does.
+				promTbl(fmt.Sprintf(`sum by (full_name, repo, environment) (increase(github_deployments_total{outcome="success",%s}[$__range]))`+
+					` or sum by (full_name, repo, environment) (0 * increase(github_deployments_total{%s}[$__range]))`, PF, PF), "D"),
+				promTbl(fmt.Sprintf(`sum by (full_name, repo, environment) (increase(github_deployments_total{outcome="pending",%s}[$__range]))`+
+					` or sum by (full_name, repo, environment) (0 * increase(github_deployments_total{%s}[$__range]))`, PF, PF), "E"),
 			},
 			PromTF: merged(map[string]string{
 				"repo": "Repository", "environment": "Environment", inventoryValueCol + "A": "Deployments",
 				inventoryValueCol + "B": deliveryTimeToStatus, inventoryValueCol + "C": deliveryTimeLive,
 				inventoryValueCol + "D": "Successes", inventoryValueCol + "E": "Pending",
-			}, nil, map[string]int{"repo": 0, "environment": 1}),
+			}, nil),
+
 			Opts: Opts{"sort": "Deployments"},
 			Desc: "To status is the median time the deployment took to report one; Live for " +
 				"the median time it stayed the current one. They are the same subtraction against two " +
@@ -750,7 +806,8 @@ func deploymentsToEnvironments(b *builder) []Panel {
 				"no strings, so the outcome is out of reach there: Successes counts the " +
 				"success flag, and the pending deployments are not told apart. " + grRows,
 			ES: depES, ESTF: depEStf,
-			ESDesc: "In Elasticsearch each outcome is its own row, split by the `outcome` field.",
+			ESDesc: "In Elasticsearch each outcome is its own row, split by the `outcome` field, " +
+				"rather than a Successes and a Pending column.",
 		}),
 	}
 }

@@ -10,13 +10,16 @@ import (
 // overviewNewestRow ends the queries over gh_account: the table is rewritten
 // whole every sweep, so the account as it stands is the last row of it, never
 // a sum over the range. The titles beside it are what the Elasticsearch,
-// Graphite and Prometheus twins rename their own columns to.
+// Graphite and Prometheus twins rename their own columns to, and the last is
+// what a traffic stat reads over a range with no traffic day in it.
 const (
 	overviewNewestRow      = " WHERE $__timeFilter(time) ORDER BY time DESC LIMIT 1"
 	overviewAccountAge     = "Account age"
 	overviewStarsGiven     = "Stars given"
 	overviewUniqueVisitors = "Unique visitors"
 	overviewUniqueCloners  = "Unique cloners"
+	overviewClonesEach     = "Clones each"
+	overviewNoTraffic      = "no traffic"
 )
 
 // ── Overview ────────────────────────────────────────────────────────────────
@@ -43,10 +46,80 @@ func promNamed(ref, name, expr string) Target {
 	return promq(expr, instant(), legend(name), withRef(ref))
 }
 
-// grNamed is one Graphite series drawn under its own name.
+// promCounted and promAggregated are promNamed for a value that aggregates
+// series, and so carries no label: a count, which reads 0 where it finds no
+// series at all, and anything else, which reads NaN there. Over a repository
+// nothing was written for, an aggregation of no series is an empty answer,
+// and a stat draws no tile for it, where the SQL stores draw a count of
+// nothing as 0 and anything else of nothing as null. A stat draws NaN as it
+// draws null: as the words its panel gives a value that is not there. Only an
+// aggregation, since `or` keeps a vector() beside any series whose labels it
+// does not share, which is every series a selector returns, and the fallback
+// would be a second value rather than the one.
+func promCounted(ref, name, expr string) Target {
+	return promNamed(ref, name, "("+expr+") or vector(0)")
+}
+
+func promAggregated(ref, name, expr string) Target {
+	return promNamed(ref, name, "("+expr+") or vector(NaN)")
+}
+
+// promShare is a percentage of two sums, as the SQL stores take it: a part
+// of nothing is 0 of the whole, and a whole of nothing is no share.
+//
+// The exporter makes a series for a label value only once it has seen one,
+// so an account that has never signed a commit has no series of a valid
+// signature, and a sum over none is not 0 but nothing, which divided by
+// anything is nothing again. Measured with promtool of Prometheus 3.14.0: a
+// Signed commits over unsigned commits alone read NaN, drawn as "no commits"
+// beside a Commits tile of 57, where the SQL stores read 0%. The part falls
+// back to 0, and the whole is kept only above 0, so a range with nothing in
+// it still has no share, as 0 of 0 has none in SQL.
+func promShare(part, whole string) string {
+	return fmt.Sprintf("100 * (%s or vector(0)) / (%s > 0)", part, whole)
+}
+
+// grNamed is one Graphite series drawn under its own name, and a series with
+// nothing in it under that name when the expression matches no path at all.
+//
+// Graphite answers a path it has never held with no series, and a stat draws
+// no tile for a series that is not there, so a value of a repository with no
+// runs, no releases or no alerts left its group where the SQL stores draw it:
+// comparing what the five stores draw over a repository with nothing in it,
+// eighteen tiles of seven groups were missing from Graphite. The fallback is
+// the SQL stores' null, which the tile draws as the words its panel gives a
+// value that is not there; a count falls back to 0 inside its own expression
+// first (see countTotal), and so never reaches this one.
 func grNamed(ref, name, expr string) Target {
+	if !strings.HasPrefix(expr, "fallbackSeries(") {
+		expr = fmt.Sprintf("fallbackSeries(%s, %s)", expr, grNothing)
+	}
 	return grq(fmt.Sprintf("alias(%s, %q)", expr, name), ref)
 }
+
+// grNewest is one Graphite series of a snapshot the SQL stores read as the
+// newest row of the range, and no series at all where the range holds no
+// reading of it, as the SQL stores then have no row.
+//
+// Graphite answers a path it holds with a series whatever the range, and over
+// a range no sweep reached that series is nulls from end to end, which
+// keepLastValue has nothing to carry into. A stat group whose every value was
+// such a series drew a panel with nothing in it, not even the names, since
+// Grafana sizes a tile's text by its value (the 2.6.2 review, "Community",
+// "Account" and "Since the account began" over a range four hundred days
+// back, against graphiteapp/graphite-statsd:1.1.10-5); the other stores
+// answer no row there and the panel reads "No data". Dropped, the series is
+// not there either, and Graphite reads the same. It takes no grNothing: a
+// value the SQL stores have no row for is not a tile to draw without a value.
+func grNewest(ref, name, series string) Target {
+	return grq(fmt.Sprintf("alias(removeEmptySeries(keepLastValue(%s)), %q)", series, name), ref)
+}
+
+// grNothing is a series with no value at all: constantLine draws its three
+// points at the start, the middle and the end of the range, and
+// removeBelowValue takes each of them out (measured against graphite-web
+// 1.1.10).
+const grNothing = "removeBelowValue(constantLine(0), 1)"
 
 // frameName names every field a query returns, for the stores whose response
 // parser gives two queries the same column name.
@@ -68,7 +141,7 @@ func fieldGroup(b *builder, m, title string, at box, fields []named, p *P) Panel
 	for i, f := range fields {
 		cols[i] = fmt.Sprintf("%s AS %q", f.From, f.To)
 		p.Prom = append(p.Prom, promNamed(ref(i), f.To, "github_"+strings.TrimPrefix(m, "gh_")+"_"+f.From))
-		p.GR = append(p.GR, grNamed(ref(i), f.To, fmt.Sprintf("keepLastValue(%s)", gp(m, f.From))))
+		p.GR = append(p.GR, grNewest(ref(i), f.To, gp(m, f.From)))
 	}
 	p.ES, p.ESTF = esTbl(m, []any{b.one()}, []any{b.mNewest(fieldsOf(fields)...)}, fields, nil)
 	return statGroup(title, at, []Target{sqlT(fmt.Sprintf(
@@ -112,13 +185,13 @@ func overview(b *builder) []Panel {
 		return fmt.Sprintf("SUM(CASE WHEN kind = '%s' THEN %s ELSE 0 END)", kind, field)
 	}
 	trafficProm := func(ref, name, kind, field string) Target {
-		return promNamed(ref, name, fmt.Sprintf(`sum(github_traffic_%s{kind=%q,%s})`, field, kind, PF))
+		return promAggregated(ref, name, fmt.Sprintf(`sum(github_traffic_%s{kind=%q,%s})`, field, kind, PF))
 	}
 	trafficGR := func(ref, name, kind, field string) Target {
 		return grNamed(ref, name, total(fmt.Sprintf("sumSeries(%s)", rp("gh_traffic", field, "kind", kind))))
 	}
 	trafficES := func(ref, kind, field string) Target {
-		t := b.esTotal("gh_traffic", b.mSum(field), "kind:"+kind, ESF)[0]
+		t := b.esOverRange("gh_traffic", b.mSum(field), "kind:"+kind, ESF)[0]
 		t.Ref = ref
 		return t
 	}
@@ -203,8 +276,8 @@ func overview(b *builder) []Panel {
 		}, &P{
 			Prom: []Target{
 				promNamed("A", "Repositories", "github_account_public_repos"),
-				promNamed("B", "Stars", oneEach("stars")),
-				promNamed("C", "Forks", oneEach("forks")),
+				promAggregated("B", "Stars", oneEach("stars")),
+				promAggregated("C", "Forks", oneEach("forks")),
 			},
 			Desc: "Public repositories of the account, and the current stars and forks of " +
 				"the selected ones, summed over the newest row of each repository rather " +
@@ -224,7 +297,7 @@ func overview(b *builder) []Panel {
 				"archived ones above, private ones included, and forks left out unless " +
 				"`include_forks` is on.",
 			GR: []Target{
-				grNamed("A", "Repositories", gp("gh_account", "public_repos")),
+				grNewest("A", "Repositories", gp("gh_account", "public_repos")),
 				grNamed("B", "Stars", oneEachGR("stars")),
 				grNamed("C", "Forks", oneEachGR("forks")),
 			},
@@ -234,7 +307,9 @@ func overview(b *builder) []Panel {
 			GRDesc: grArchivedWindow,
 			ES:     append(countES, reposES...), ESTF: append(countEStf, reposEStf...),
 			ESOpts: Opts{"calc": "sum"},
-			ESDesc: esArchivedWindow,
+			ESDesc: esArchivedWindow + " " + esLeftOut("a star or a fork count",
+				esNewestAddedUp("repository")),
+			Overrides: []any{noValueOf("Stars", notRead), noValueOf("Forks", notRead)},
 		}),
 		statGroup("Traffic in range", box{W: 8, H: 4, X: 8, Y: brandHeight}, []Target{sqlT(
 			"SELECT " + trafficSQL("views", "count") + ` AS "Views", ` +
@@ -263,6 +338,11 @@ func overview(b *builder) []Panel {
 			ESOver: []any{
 				frameName("A", "Views"), frameName("B", overviewUniqueVisitors),
 				frameName("C", overviewUniqueCloners),
+			},
+			// GitHub answers the days that had traffic, so no row is none.
+			Overrides: []any{
+				noValueOf("Views", overviewNoTraffic), noValueOf(overviewUniqueVisitors, overviewNoTraffic),
+				noValueOf(overviewUniqueCloners, overviewNoTraffic),
 			},
 		}),
 		fieldGroup(b, "gh_account", "Community", box{W: 8, H: 4, X: 16, Y: brandHeight}, []named{
@@ -298,12 +378,12 @@ func overview(b *builder) []Panel {
 				"Inventory lists: GraphQL reports zero packages for a personal account " +
 				"and is not what this reads.",
 			GR: []Target{
-				grNamed("A", "Contributions", gp("gh_contributions_total", "calendar_total")),
-				grNamed("B", overviewAccountAge, gp("gh_account", "account_age_days")),
-				grNamed("C", "Watching", gp("gh_account", "watching")),
-				grNamed("D", overviewStarsGiven, gp("gh_account", "starred")),
-				grNamed("E", "Gists", gp("gh_account", "gists")),
-				grNamed("F", "Packages", gp("gh_account", "packages")),
+				grNewest("A", "Contributions", gp("gh_contributions_total", "calendar_total")),
+				grNewest("B", overviewAccountAge, gp("gh_account", "account_age_days")),
+				grNewest("C", "Watching", gp("gh_account", "watching")),
+				grNewest("D", overviewStarsGiven, gp("gh_account", "starred")),
+				grNewest("E", "Gists", gp("gh_account", "gists")),
+				grNewest("F", "Packages", gp("gh_account", "packages")),
 			},
 			ES: append(contribES, acctES...), ESTF: append(contribEStf, acctEStf...),
 			Overrides: []any{unitOf(overviewAccountAge, "d", 0)},
@@ -330,13 +410,15 @@ func audience(b *builder) []Panel {
 				Prom: []Target{promq(fmt.Sprintf(`sum by (full_name, repo) (github_traffic_%s{kind=%q,%s})`,
 					field, kind, PF), legend("{{repo}}"))},
 				Desc: desc + " The eight repositories with the most in the range are named; " +
-					"the rest are `other`. " + bucketFollowsRange, PromDesc: windowNote,
+					"the rest are `other`. " + bucketFollowsRange,
+				PromDesc: windowNote + " " + noFold("Prometheus", "repositories"),
 				Opts:     mergeOpts(Opts{"stack": true, "bars": true}, dayBins),
 				SQLOpts:  seriesOpts,
 				PromOpts: Opts{"bars": false},
-				GR:       []Target{grq(perRepoBucket(rp("gh_traffic", field, "kind", kind), "gh_traffic"))},
+				GR:       []Target{grq(grOther(topSeriesKept, perRepoBucket(rp("gh_traffic", field, "kind", kind), "gh_traffic")))},
 				ES: []Target{b.esDaily("gh_traffic", b.mSum(field), "repo", "",
 					[]string{"kind:" + kind, ESF}, "")},
+				ESDesc: esUnfolded(esDailyTerms, "repositories", "series"),
 			})
 	}
 
@@ -353,7 +435,7 @@ func audience(b *builder) []Panel {
 		"SELECT referrer, count, uniques, referrer_url, ROW_NUMBER() OVER (" +
 		"PARTITION BY full_name, referrer ORDER BY time DESC) AS rn" +
 		" FROM gh_traffic_referrer WHERE $__timeFilter(time) AND " + RF +
-		") x WHERE rn = 1 GROUP BY 1 ORDER BY 2 DESC LIMIT 25"
+		") x WHERE rn = 1 GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT 25"
 	// The column the table is sorted by comes second, so it is on the screen
 	// beside the identifier on a phone; the title, which can be long, after.
 	paths := `SELECT path AS "Path", SUM(count) AS "Views", SUM(uniques) AS "Unique",` +
@@ -361,7 +443,7 @@ func audience(b *builder) []Panel {
 		"SELECT path, title, count, uniques, url, ROW_NUMBER() OVER (" +
 		"PARTITION BY full_name, path ORDER BY time DESC) AS rn" +
 		" FROM gh_traffic_path WHERE $__timeFilter(time) AND " + RF +
-		") x WHERE rn = 1 GROUP BY 1, 5 ORDER BY 2 DESC LIMIT 25"
+		") x WHERE rn = 1 GROUP BY 1, 5 ORDER BY 2 DESC, 1, 5 LIMIT 25"
 
 	refsGR, refsGRtf := gTbl(fmt.Sprintf(`limit(sortByMaxima(groupByNode(%s, %d, "sum")), 25)`,
 		rp("gh_traffic_referrer", "count"), gn("gh_traffic_referrer", "referrer")),
@@ -421,7 +503,8 @@ func audience(b *builder) []Panel {
 			},
 			PromTF: merged(map[string]string{
 				"referrer": "Referrer", panelValueA: "Views", panelValueB: "Unique",
-			}, nil, nil),
+			}, nil),
+
 			Opts:      Opts{"sort": "Views"},
 			Overrides: []any{barCell("Views", "short", 120), width("Unique", 90), rowLinkOn("Referrer", "Open the referrer")},
 			Desc: "Where the visitors came from over GitHub's trailing fourteen days. GitHub " +
@@ -460,32 +543,38 @@ func audience(b *builder) []Panel {
 				` SUM(CASE WHEN kind = 'views' THEN count ELSE 0 END) AS "Views",` +
 				` MAX(url) AS "Link"` +
 				" FROM gh_traffic WHERE $__timeFilter(time) AND " + RF +
-				" GROUP BY full_name, repo ORDER BY 2 DESC",
+				" GROUP BY full_name, repo ORDER BY 2 DESC, full_name",
 		)}, &P{
 			Prom: []Target{
 				promTbl(fmt.Sprintf(`sum by (full_name, repo) (github_traffic_count{kind="clones",%s})`, PF), "A"),
 				promTbl(fmt.Sprintf(`sum by (full_name, repo) (github_traffic_uniques{kind="clones",%s})`, PF), "B"),
 				promTbl(fmt.Sprintf(`sum by (full_name, repo) (github_traffic_count{kind="views",%s})`, PF), "C"),
+				// The ratio as the SQL takes it, and a repository nobody
+				// cloned has none rather than a division by nothing.
+				promTbl(fmt.Sprintf(`sum by (full_name, repo) (github_traffic_count{kind="clones",%s})`+
+					` / (sum by (full_name, repo) (github_traffic_uniques{kind="clones",%s}) > 0)`, PF, PF), "D"),
 			},
 			PromTF: merged(map[string]string{
 				"repo": "Repository", panelValueA: "Clones", panelValueB: "Cloners",
-				panelValueC: "Views",
-			}, nil, nil),
-			Opts: Opts{"sort": "Clones each"},
+				panelValueC: "Views", panelValueD: overviewClonesEach,
+			}, nil),
+
+			Opts: Opts{"sort": overviewClonesEach},
 			Desc: "Clones divided by the people who made them. There are panels for clones and " +
 				"for views and none for the ratio, which is the only thing that separates " +
 				"adoption from machinery: one repository here is cloned seventy three times " +
 				"per unique cloner and viewed six hundred times in the same month.",
 			PromDesc: windowNote,
 			Overrides: []any{
-				barCell("Clones each", "short", 120), width("Clones", 100),
+				barCell(overviewClonesEach, "short", 120), width("Clones", 100),
 				width("Cloners", 100), width("Views", 100), ownerLinkOn("Repository", "the traffic graph"),
 			},
 			GR: cloneGR, GRTF: cloneGRtf,
-			GRDesc: "Graphite divides series, not columns, so the ratio is not in this table. " + grRows,
+			GRDesc: "Graphite divides series, not columns, so it has no ratio of two of them. " + grRows,
 			ES:     cloneES, ESTF: cloneEStf,
-			ESDesc: "In Elasticsearch this is clones and cloners; the ratio is the one column " +
-				"a bucket aggregation cannot divide.",
+			ESDesc: "In Elasticsearch this is clones and cloners: Clones each, the ratio, is " +
+				"the one column a bucket aggregation cannot divide, and Views are documents of " +
+				"the other kind, which a query of the clones does not read.",
 		}),
 	}
 }

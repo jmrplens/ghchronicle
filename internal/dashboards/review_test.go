@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 )
 
 // The visual review of 2026-09-12 read the rendered InfluxDB dashboard at
@@ -152,7 +153,9 @@ func TestTableCellsScaleByTheirOwnColumn(t *testing.T) {
 
 // TestCommitsPerWeekKeepsTheWeekTheCollectorStamped: the rows are stamped at
 // the Sunday each week starts on; a seven-day bin aligned to the epoch moved
-// them to the Thursday before and out of a seven-day range.
+// them to the Thursday before and out of a seven-day range. The SQL stores
+// were fixed first, and Graphite and Elasticsearch kept the epoch's weeks
+// until the 2.6.2 review measured every bar there three days early.
 func TestCommitsPerWeekKeepsTheWeekTheCollectorStamped(t *testing.T) {
 	t.Parallel()
 	for _, store := range []string{"influxdb", "postgres"} {
@@ -163,6 +166,28 @@ func TestCommitsPerWeekKeepsTheWeekTheCollectorStamped(t *testing.T) {
 		}
 		if !strings.Contains(sql, "SELECT time, SUM(commits)") {
 			t.Errorf("%s does not sum the repositories at the week's own stamp: %s", store, sql)
+		}
+	}
+	// 1970-01-01 was a Thursday: a bucket counted from it starts on a
+	// Sunday once it is moved three days on.
+	if epoch := time.Unix(0, 0).UTC().AddDate(0, 0, 3).Weekday(); epoch != time.Sunday {
+		t.Fatalf("three days after the epoch is a %s", epoch)
+	}
+	for _, target := range panelTargets(mustPanel(t, rendered(t, "graphite"), "Commits per week")) {
+		expr, _ := target["target"].(string)
+		if strings.Contains(expr, `"7d"`) {
+			t.Errorf("graphite summarizes the weekly rows by seven days counted from the epoch: %s", expr)
+		}
+	}
+	for _, target := range panelTargets(mustPanel(t, rendered(t, "elasticsearch"), "Commits per week")) {
+		buckets, _ := target["bucketAggs"].([]any)
+		for _, raw := range buckets {
+			bucket, _ := raw.(map[string]any)
+			settings, _ := bucket["settings"].(map[string]any)
+			if bucket["type"] == "date_histogram" && (settings["interval"] != "7d" || settings["offset"] != "+3d") {
+				t.Errorf("elasticsearch buckets the weekly rows into weeks that do not start on a Sunday: %v",
+					settings)
+			}
 		}
 	}
 }
@@ -345,9 +370,14 @@ func TestOpenItemsAreReadFromTheirNewestRow(t *testing.T) {
 			t.Errorf("%s stacks the open count with the events: %s", title, raw)
 		}
 	}
-	promRaw := asJSON(t, mustPanel(t, rendered(t, "prometheus"), "Pull requests over time")["fieldConfig"])
-	if strings.Contains(promRaw, "Open that day") {
-		t.Error("the SQL-only overrides reached the Prometheus dashboard")
+	// The other three stores name the series by the tag's raw value, and draw
+	// it under the SQL's word, so the line holds there too: see
+	// TestEnumSeriesAreDrawnUnderTheSQLWords.
+	for _, store := range []string{"prometheus", "graphite", "elasticsearch"} {
+		raw := asJSON(t, mustPanel(t, rendered(t, store), "Pull requests over time")["fieldConfig"])
+		if !strings.Contains(raw, `"custom.drawStyle","value":"line"`) {
+			t.Errorf("%s stacks the open count with the events: %s", store, raw)
+		}
 	}
 	sql := sqlOf(t, mustPanel(t, panels, "Work elsewhere"))
 	if !strings.Contains(sql, `AS "Opened"`) || !strings.Contains(sql, `time AS "Seen"`) ||

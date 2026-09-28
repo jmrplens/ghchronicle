@@ -112,6 +112,28 @@ collector writes only under a condition goes in `conditionalColumns`
 (`internal/dashboards/conditional_columns_test.go`) when a SQL panel reads it;
 the test fails until it is there.
 
+**A panel one store draws differently from the others** means the reason in
+that store's own description of the panel, and an entry in `dashboardsDiffer`
+(`test/e2e/docker/dashboards_agree_test.go`) quoting those words and naming
+only the stores that draw the difference. The containerised suite compares
+what every store draws, after the panel's transformations and overrides, and
+fails on a difference no description explains, on an entry whose words the
+description no longer holds, and on a store an entry names that draws the
+panel as the others do. A table heads the columns every store draws in the
+order the SQL stores select them, and a column the SQL stores draw that
+another store does not is named in that store's own description of the panel;
+the suite fails on either, and `TestEveryColumnAStoreLacksIsNamedInItsDescription`
+holds every table to the second whether or not the fixture fills it. A
+Graphite table says what it drops with `grRows`, which writes the sentence out
+of the table itself. A stat value one store cannot draw over a repository or
+a range with nothing in it is the same, with its entry in `tilesLeftOverNothing`
+(`test/e2e/docker/tiles_over_nothing_test.go`). A chart or a bar chart the SQL
+stores fold into other folds in each other store or says it does not
+(`TestEveryStoreFoldsTheRestIntoOtherOrSaysItDoesNot`). And a list's
+`ORDER BY` names what tells two of its rows apart after the column it sorts
+by, the item's own identity where the rows are items, since InfluxDB and
+PostgreSQL break a tie each its own way (`TestEverySQLListOrdersItsRowsCompletely`).
+
 **A cadence change** means a measured reason in `config.defaultEvery`, the
 cadence table in both languages, `make config-options` then
 `make config-cases`, the figures (`cd site && pnpm run figures`), `make docs`,

@@ -39,6 +39,16 @@ la primera vez volvió 304 la segunda, que la segunda pasada cobró menos de la
 mitad de las peticiones core de la primera, y que `own_cost` en la fila
 `gh_rate_limit` es el número de consultas que hizo el proceso y no cero.
 
+También busca como GitHub. Cada una de las cinco búsquedas salientes pide un
+tipo en un estado, `is:pr is:merged` o `is:issue is:open`, y el falso le sirve
+solo los elementos de su fixture que seleccionan esos calificadores, descontando
+los demás de `issueCount`. Un tipo o un estado que no conoce, un `is:`, `type:`
+o `state:` para el que no tiene regla, hace fallar la prueba; el autor, los
+propietarios excluidos y el orden ya son los de la propia fixture, y los pasa
+por alto. Hasta 2.6.2 respondía a todas las búsquedas con todos los elementos, así
+que una pasada escribía la única pull request fusionada cinco veces, una de
+ellas como issue abierta, y los dashboards dibujaban esas filas.
+
 Una fixture nunca escribe una fecha reciente. La deletrea como un desplazamiento
 que el falso resuelve al servir el fichero, `"@DAYS_AGO_12@T00:00:00Z"`, junto a
 los `@NOW@`, `@TODAY@` y `@SOON@` que ya resolvía, y `@DAYS_AHEAD_n@` para lo que
@@ -106,6 +116,88 @@ panel pasa por Grafana igual que para una persona que mira el dashboard.
 Eso es lo que convierte tres comprobadores manuales en algo que la CI ejecuta, y
 lo que zanja la duda de Elasticsearch de arriba: un panel que no puede agregar
 no devuelve ningún data frame.
+
+Cada panel se envía con su rango resuelto a los dos instantes que manda un
+navegador, y se le hacen tres preguntas, y a cada tarjeta y cada indicador dos
+más, abajo: si el datasource lo rechazó, si un
+panel sobre algo que el barrido escribió dentro del rango respondió con algo, y
+si los cinco almacenes dibujan lo mismo. Para la tercera, cada respuesta se
+reproduce a través de lo que Grafana hace entre la consulta y la pantalla, la
+remodelación propia del datasource de Prometheus de una tabla, las
+transformaciones del panel y sus overrides de campo, y cada par de almacenes se
+compara en lo que vería un lector: el número de una tarjeta, su unidad y las
+palabras que muestra cuando no hay nada, las filas de una tabla sobre las
+columnas que dibujan ambos almacenes, y el nombre y la longitud de una barra.
+Una tabla se sujeta además a un solo orden de las columnas que dibujan ambos
+almacenes, cosa que las filas emparejadas sobre esas columnas no pueden mostrar:
+en la rama 2.6.2, 28 tablas de Prometheus y 4 de Graphite las encabezaban en
+otro orden que los almacenes SQL, "Every bucket" con Most used al final.
+La revisión de la 2.6.1 encontró once diferencias poniendo los dashboards uno
+junto a otro, entre ellas una tabla que dibujaba siete filas para un
+repositorio y tarjetas que habían perdido su unidad. Nueve estaban en los
+dashboards, y ejecutada contra los dashboards de esa versión esta comprobación
+falla en ocho. La novena eran cuatro columnas de las que carecía "Open the
+longest" en Elasticsearch, que ninguna comparación de valores puede ver. Lo que
+un almacén puede guardar es asunto de su propia descripción, así que otra
+aserción exige que cada columna que dibujan los almacenes SQL en una tabla la
+dibuje también cada otro almacén que dibuja la tabla, o que la nombren las
+palabras propias de ese almacén sobre el panel: en la rama 2.6.2, 33 tablas de
+los otros tres almacenes carecían de una columna que su descripción no
+nombraba, y cada una la dibuja ahora o dice por qué no.
+
+Después se pregunta a cada tarjeta y cada indicador por nada, dos veces: por un
+repositorio para el que ningún barrido escribió nada, y sobre treinta días en
+los que no cae ningún punto de ningún barrido, de cuatrocientos días atrás o
+más. Sobre ninguna fila un recuento SQL es 0 y todo lo demás es nulo, que una
+tarjeta dibuja como las palabras que su panel da a un valor que no está, y se
+exige a cada almacén que dibuje las tarjetas que dibujan los almacenes SQL, con
+las mismas palabras. Se pregunta por el rango porque las instantáneas de la
+propia cuenta no siguen al selector de repositorios: sobre un rango de
+cuatrocientos días atrás Graphite dibujaba tres grupos de cifras como paneles
+sin nada, ni siquiera los nombres. Una tarjeta que un almacén no puede dibujar
+sobre nada se lista en `tilesLeftOverNothing`, en
+`test/e2e/docker/tiles_over_nothing_test.go`, con palabras de la propia
+descripción de ese almacén, y se sujeta a ellas igual que `dashboardsDiffer`.
+
+InfluxDB y PostgreSQL ejecutan una misma sentencia sobre las mismas filas, así
+que también se les exige dibujar las filas de una tabla o de una gráfica de
+barras en un solo orden, cosa que comparar las filas como conjunto no puede
+ver: antes de que las sentencias nombraran su desempate, doce de los 49
+paneles que ambos dibujan con más de una fila ponían dos de ellas al revés en
+una ejecución, y once en la siguiente. `TestEverySQLListOrdersItsRowsCompletely`,
+en `internal/dashboards`, exige al `ORDER BY` de cada lista que nombre lo que
+distingue dos de sus filas, para que el próximo empate no espere a una
+ejecución que por casualidad lo dibuje.
+
+Dos de las reglas que se exigen a lo dibujado se exigen también a la
+especificación, ya que una tabla que la fixture deja vacía en los dos almacenes
+SQL no se dibuja nunca: cada columna que dibujan los almacenes SQL y otro
+almacén no, la nombra la propia descripción de ese almacén, y una gráfica que
+los almacenes SQL pliegan en other se pliega en cada otro almacén o dice que no
+lo hace (`TestEveryColumnAStoreLacksIsNamedInItsDescription` y
+`TestEveryStoreFoldsTheRestIntoOtherOrSaysItDoesNot`). Y una consulta de
+Prometheus que solo falla con series que la fixture nunca crea, un valor de
+etiqueta que nadie escribió o una serie que no se movió en el rango, se pone a
+promtool dentro del propio Prometheus del stack sobre series escritas para ella
+(`TestPrometheusAnswersSeriesTheFixtureHasNoneOfAsTheSQLStoresDo`): hasta
+entonces, Signed commits de una cuenta que nunca firma decía "no commits" junto
+a un recuento de 57.
+
+Un almacén que dibuja un panel de otra forma a propósito dice por qué en su
+propia descripción del panel, y la diferencia se lista en `dashboardsDiffer`, en
+`test/e2e/docker/dashboards_agree_test.go`, con esas palabras. La prueba falla
+cuando las palabras ya no están en la descripción, cuando los almacenes han
+pasado a dibujar el panel igual, y cuando un almacén que la entrada nombra
+dibuja el panel como los almacenes que no nombra, así que una entrada no puede
+sobrevivir a su razón ni excusar a un almacén que no necesita excusa. Lo que
+causa el propio arnés se absorbe donde surge en vez
+de listarse: el medio minuto de historia del exporter, los valores que el
+colector calcula con su propio reloj en tres barridos separados por un minuto,
+los valores que una consulta calcula desde `now()` en almacenes consultados con
+segundos de diferencia, y los nombres que Graphite guarda como nodos de ruta.
+Una aserción aparte falla con cualquier panel, series temporales incluidas, que
+dibuje un campo con el nombre que le dio su datasource, como
+`p50.0 seconds_to_merge`.
 
 ## Lo que no detecta ninguna
 

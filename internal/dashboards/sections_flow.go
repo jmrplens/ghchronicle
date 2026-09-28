@@ -1,6 +1,10 @@
 package dashboards
 
-import "fmt"
+import (
+	"fmt"
+	"maps"
+	"slices"
+)
 
 // ── Pull requests and issues ────────────────────────────────────────────────
 
@@ -31,8 +35,9 @@ const stateWord = "CASE WHEN state = 'MERGED' THEN 'Merged' WHEN state = 'CLOSED
 
 // stateOverrides draws those three the way each is meant: the two events as
 // stacked bars in the colors the words carry, the open count as a line on its
-// own, outside the stack. They match the words the SQL spells, so they go to
-// the two SQL stores alone.
+// own, outside the stack. They match the words the SQL spells, which the
+// other three stores give their series through stateWords, so they hold in
+// every store.
 var stateOverrides = []any{
 	colorOf("Merged", "purple"),
 	colorOf("Closed", "red"),
@@ -42,6 +47,33 @@ var stateOverrides = []any{
 		map[string]any{"id": "custom.fillOpacity", "value": 0},
 		map[string]any{"id": "color", "value": map[string]any{"mode": "fixed", "fixedColor": "orange"}},
 	}),
+}
+
+// stateWords names the series of the three stores that split on the `state`
+// tag itself, and draw its value, with the words stateWord spells in SQL.
+// Graphite's path node, Elasticsearch's terms bucket and Prometheus's label
+// all read MERGED, CLOSED and OPEN, so the legends were the tag's and the
+// colors and the line of stateOverrides, matched by the words, missed them:
+// measured on the 2.6.1 review, the merged bar was yellow in Graphite and
+// the open count stacked on it.
+var stateWords = seriesWords(map[string]string{
+	"MERGED": "Merged", "CLOSED": "Closed", "OPEN": "Open that day",
+})
+
+// botWords is stateWords for the `bot` tag of a review thread, which the SQL
+// spells Bot and Human and the other three stores drew as true and false.
+var botWords = seriesWords(map[string]string{"true": "Bot", "false": "Human"})
+
+// seriesWords draws each series named by a tag's raw value under the word
+// the SQL stores give that value. A displayName, so the byName overrides
+// that address the word find it: namingFirst puts it ahead of them.
+func seriesWords(words map[string]string) []any {
+	raw := slices.Sorted(maps.Keys(words))
+	out := make([]any, len(raw))
+	for i, value := range raw {
+		out[i] = override(value, []any{map[string]any{"id": "displayName", "value": words[value]}})
+	}
+	return out
 }
 
 // The pieces every query in this section is assembled from: the head of a
@@ -78,6 +110,9 @@ const (
 	flowChurn           = "Lines changed"
 	flowPullColumn      = "Pull request"
 	flowOpenAge         = "Open for"
+	// What a median over the merged pull requests reads in a range that
+	// merged none, since the median of nothing is no number at all.
+	flowNoneMerged = "none merged"
 )
 
 // flowNonNull is how a Graphite panel counts rows: every point that exists
@@ -87,6 +122,11 @@ const flowNonNull = "isNonNull("
 // flowNumberTerm is the pull request or issue number as Elasticsearch keeps
 // it, which is a term to group by rather than a number to measure.
 const flowNumberTerm = "number.keyword"
+
+// flowAuthorTerm is the author as Elasticsearch keeps it: the term the pull
+// requests by author are counted under, and the one each open pull request
+// and issue is listed with.
+const flowAuthorTerm = "author.keyword"
 
 // flow is how much moved and how fast, and then which pull requests and
 // which people moved it.
@@ -98,7 +138,7 @@ func flow(b *builder) []Panel {
 // closed, how long each took, and the same numbers per day.
 func flowRates(b *builder) []Panel {
 	median := func(table, field, where string) string {
-		return fmt.Sprintf("SELECT approx_percentile_cont(%s, 0.5) AS value FROM %s"+
+		return fmt.Sprintf("SELECT median(CAST(%s AS DOUBLE)) AS value FROM %s"+
 			" WHERE $__timeFilter(time) AND %s AND %s", field, table, RF, where)
 	}
 	mergeTime50 := median(pr, "seconds_to_merge", "state = 'MERGED'")
@@ -109,7 +149,7 @@ func flowRates(b *builder) []Panel {
 		" AND " + RF + " AND " + identified + " AND state = 'MERGED'"
 	closedIssues := "SELECT COUNT(*) AS value FROM gh_issue WHERE $__timeFilter(time)" +
 		" AND " + RF + " AND " + identified + " AND state = 'CLOSED'"
-	issueClose := "SELECT approx_percentile_cont(seconds_to_close, 0.5) AS value FROM gh_issue" +
+	issueClose := "SELECT median(CAST(seconds_to_close AS DOUBLE)) AS value FROM gh_issue" +
 		" WHERE $__timeFilter(time) AND " + RF + " AND state = 'CLOSED'"
 	// A closed pull request is one row dated when it closed; an open one is a
 	// row per day at midnight while it stays open, and those rows are not
@@ -121,12 +161,12 @@ func flowRates(b *builder) []Panel {
 		" COUNT(DISTINCT number) AS pulls FROM gh_pull_request WHERE $__timeFilter(time) AND " + RF +
 		" AND " + identified + flowByBucketAndSeries
 	mergeTime := flowSelect + timeBin + "," +
-		` approx_percentile_cont(seconds_to_merge, 0.5) AS "Median",` +
+		` median(CAST(seconds_to_merge AS DOUBLE)) AS "Median",` +
 		` approx_percentile_cont(seconds_to_merge, 0.9) AS "90th percentile"` +
 		flowFromPulls + RF +
 		" AND state = 'MERGED' GROUP BY 1 ORDER BY 1"
 	sizeTime := flowSelect + timeBin + "," +
-		` approx_percentile_cont(churn, 0.5) AS "Median lines changed"` +
+		` median(CAST(churn AS DOUBLE)) AS "Median lines changed"` +
 		flowFromPulls + RF +
 		" AND state = 'MERGED' GROUP BY 1 ORDER BY 1"
 	issuesDay := flowSelect + timeBin + ", " + stateWord + flowSeriesAlias +
@@ -148,22 +188,22 @@ func flowRates(b *builder) []Panel {
 			{Kind: "sql", Format: "table", Ref: "F", SQL: namedValue(prSize50, flowLinesPerPull)},
 		}, &P{
 			Prom: []Target{
-				promNamed("A", flowMergedCount, fmt.Sprintf(
+				promCounted("A", flowMergedCount, fmt.Sprintf(
 					"sum(increase(github_pull_requests_total{%s}[$__range]))", promMerged,
 				)),
-				promNamed("B", flowMergeTime, fmt.Sprintf(
+				promAggregated("B", flowMergeTime, fmt.Sprintf(
 					"avg(github_pull_requests_seconds_to_merge_mean{%s})", promMerged,
 				)),
-				promNamed("C", flowFirstReviewTime, fmt.Sprintf(
+				promAggregated("C", flowFirstReviewTime, fmt.Sprintf(
 					"avg(github_pull_requests_seconds_to_first_human_review_mean{%s})", PF,
 				)),
-				promNamed("D", flowIssuesClosed, fmt.Sprintf(
+				promCounted("D", flowIssuesClosed, fmt.Sprintf(
 					`sum(increase(github_issues_total{state="CLOSED",%s}[$__range]))`, PF,
 				)),
-				promNamed("E", flowIssueCloseTime, fmt.Sprintf(
+				promAggregated("E", flowIssueCloseTime, fmt.Sprintf(
 					`avg(github_issues_seconds_to_close_mean{state="CLOSED",%s})`, PF,
 				)),
-				promNamed("F", flowLinesPerPull, fmt.Sprintf(
+				promAggregated("F", flowLinesPerPull, fmt.Sprintf(
 					"avg(github_pull_requests_churn_mean{%s})", promMerged,
 				)),
 			},
@@ -179,25 +219,25 @@ func flowRates(b *builder) []Panel {
 				"pull request is the median of added plus removed by a merged one.",
 			PromDesc: sinceStart + " " + lastSweep,
 			GR: []Target{
-				grNamed("A", flowMergedCount, total(countOf(mergedPath("churn")))),
+				grNamed("A", flowMergedCount, countTotal(mergedPath("churn"))),
 				grNamed("B", flowMergeTime, medianTotal(mergedPath("seconds_to_merge"))),
 				grNamed("C", flowFirstReviewTime,
 					medianTotal(anyPath("seconds_to_first_human_review"))),
 				grNamed("D", flowIssuesClosed,
-					total(countOf(rp("gh_issue", "comments", "state", "CLOSED")))),
+					countTotal(rp("gh_issue", "comments", "state", "CLOSED"))),
 				grNamed("E", flowIssueCloseTime,
 					medianTotal(rp("gh_issue", "seconds_to_close", "state", "CLOSED"))),
 				grNamed("F", flowLinesPerPull, medianTotal(mergedPath("churn"))),
 			},
 			GRDesc: grSlot,
 			ES: []Target{
-				esRef("A", b.esTotal(pr, b.mCount(), esMerged...)),
-				esRef("B", b.esTotal(pr, b.mPct("seconds_to_merge", 50), ESF, flowMergedFilter)),
-				esRef("C", b.esTotal(pr, b.mPct("seconds_to_first_human_review", 50), ESF,
+				esRef("A", b.esOverRange(pr, b.mCount(), esMerged...)),
+				esRef("B", b.esOverRange(pr, b.mPct("seconds_to_merge", 50), ESF, flowMergedFilter)),
+				esRef("C", b.esOverRange(pr, b.mPct("seconds_to_first_human_review", 50), ESF,
 					"_exists_:seconds_to_first_human_review")),
-				esRef("D", b.esTotal("gh_issue", b.mCount(), "state:CLOSED", ESF, esIdentified)),
-				esRef("E", b.esTotal("gh_issue", b.mPct("seconds_to_close", 50), "state:CLOSED", ESF)),
-				esRef("F", b.esTotal(pr, b.mPct("churn", 50), flowMergedFilter, ESF)),
+				esRef("D", b.esOverRange("gh_issue", b.mCount(), "state:CLOSED", ESF, esIdentified)),
+				esRef("E", b.esOverRange("gh_issue", b.mPct("seconds_to_close", 50), "state:CLOSED", ESF)),
+				esRef("F", b.esOverRange(pr, b.mPct("churn", 50), flowMergedFilter, ESF)),
 			},
 			ESOver: []any{
 				frameName("A", flowMergedCount), frameName("B", flowMergeTime),
@@ -208,6 +248,8 @@ func flowRates(b *builder) []Panel {
 				unitOf(flowMergeTime, "s", 0), unitOf(flowFirstReviewTime, "s", 0),
 				unitOf(flowIssueCloseTime, "s", 0),
 				noValueOf(flowFirstReviewTime, "no human review"),
+				noValueOf(flowMergeTime, flowNoneMerged), noValueOf(flowLinesPerPull, flowNoneMerged),
+				noValueOf(flowIssueCloseTime, "no issue closed"),
 			},
 		}),
 		panel("timeseries", "Pull requests over time", box{W: 12, H: 8, X: 0, Y: 5}, []Target{sqlTS(perDay)}, &P{
@@ -217,12 +259,15 @@ func flowRates(b *builder) []Panel {
 			Desc: "Merged and closed are dated at the moment it happened and stacked. " +
 				"Open that day is the line: how many were open on that day, which is a " +
 				"state and not an event, so it is not part of the stack. " + bucketFollowsRange,
-			PromDesc: sinceStart,
-			Opts:     mergeOpts(Opts{"bars": true, "stack": true}, dayBins),
-			SQLOpts:  seriesOpts,
-			SQLOver:  stateOverrides,
-			GR:       []Target{grq(perBucket(flowNonNull+anyPath("churn")+")", gn(pr, "state")))},
-			ES:       []Target{b.esDaily(pr, b.mCount(), "state", "", []string{ESF, esIdentified}, "")},
+			PromDesc:  sinceStart,
+			Opts:      mergeOpts(Opts{"bars": true, "stack": true}, dayBins),
+			SQLOpts:   seriesOpts,
+			Overrides: stateOverrides,
+			PromOver:  stateWords,
+			GR:        []Target{grq(perBucket(flowNonNull+anyPath("churn")+")", gn(pr, "state")))},
+			GROver:    stateWords,
+			ES:        []Target{b.esDaily(pr, b.mCount(), "state", "", []string{ESF, esIdentified}, "")},
+			ESOver:    stateWords,
 		}),
 		panel("timeseries", "Time to merge over time", box{W: 12, H: 8, X: 12, Y: 5}, []Target{sqlTS(mergeTime)}, &P{
 			Prom: []Target{promq(fmt.Sprintf("avg(github_pull_requests_seconds_to_merge_mean{%s})", promMerged),
@@ -234,9 +279,13 @@ func flowRates(b *builder) []Panel {
 				grq(fmt.Sprintf(`alias(%s, "Worst")`, worstBucket(mergedPath("seconds_to_merge"))), "B"),
 			},
 			GRDesc: grWorst + " " + grSlot,
-			ES: []Target{esq(pr, []any{b.mPct("seconds_to_merge", 50, 90)}, []any{b.dh()}, "A",
-				[]string{flowMergedFilter, ESF}, "")},
-			Desc: bucketFollowsRange,
+			ES: []Target{
+				esq(pr, []any{b.mPct("seconds_to_merge", 50)}, []any{b.dh()}, "A",
+					[]string{flowMergedFilter, ESF}, "Median"),
+				esq(pr, []any{b.mPct("seconds_to_merge", 90)}, []any{b.dh()}, "B",
+					[]string{flowMergedFilter, ESF}, "90th percentile"),
+			},
+			Desc: bucketFollowsRange + " " + estimatedInInfluxDB("90th percentile"),
 		}),
 		panel("timeseries", "Issues over time", box{W: 12, H: 7, X: 0, Y: 13}, []Target{sqlTS(issuesDay)}, &P{
 			Prom: []Target{daily(fmt.Sprintf(
@@ -245,13 +294,16 @@ func flowRates(b *builder) []Panel {
 			Desc: "Closed is dated at the moment it happened. Open that day is the line: " +
 				"how many were open on that day, a state rather than an event, so it " +
 				"is not stacked. " + bucketFollowsRange,
-			PromDesc: sinceStart,
-			Opts:     mergeOpts(Opts{"bars": true, "stack": true}, dayBins),
-			SQLOpts:  seriesOpts,
-			SQLOver:  stateOverrides,
+			PromDesc:  sinceStart,
+			Opts:      mergeOpts(Opts{"bars": true, "stack": true}, dayBins),
+			SQLOpts:   seriesOpts,
+			Overrides: stateOverrides,
+			PromOver:  stateWords,
 			GR: []Target{grq(perBucket(flowNonNull+issuePath("comments")+")",
 				gn("gh_issue", "state")))},
-			ES: []Target{b.esDaily("gh_issue", b.mCount(), "state", "", []string{ESF, esIdentified}, "")},
+			GROver: stateWords,
+			ES:     []Target{b.esDaily("gh_issue", b.mCount(), "state", "", []string{ESF, esIdentified}, "")},
+			ESOver: stateWords,
 		}),
 		panel("timeseries", "Pull request size", box{W: 12, H: 7, X: 12, Y: 13}, []Target{sqlTS(sizeTime)}, &P{
 			Prom: []Target{promq(fmt.Sprintf("avg(github_pull_requests_churn_mean{%s})", promMerged),
@@ -280,15 +332,15 @@ func pullsAndReviewers(b *builder) []Panel {
 		` changed_files AS "Files", reviews AS "Reviews", seconds_to_merge AS "Time to merge",` +
 		` url AS "Link"` +
 		flowFromPulls + RF + " AND " + identified +
-		" AND state = 'MERGED' ORDER BY churn DESC LIMIT 25"
+		" AND state = 'MERGED' ORDER BY churn DESC, full_name, number LIMIT 25"
 	authors := `SELECT author AS "Author", COUNT(*) AS "Pull requests"` +
 		flowFromPulls + RF + " AND " + identified +
-		" GROUP BY 1 ORDER BY 2 DESC LIMIT 15"
+		" GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT 15"
 	byRepo := `SELECT repo AS "Repository", COUNT(*) AS "Merged",` +
-		` approx_percentile_cont(seconds_to_merge, 0.5) AS "Time to merge",` +
-		` approx_percentile_cont(churn, 0.5) AS "Lines changed"` +
+		` median(CAST(seconds_to_merge AS DOUBLE)) AS "Time to merge",` +
+		` median(CAST(churn AS DOUBLE)) AS "Lines changed"` +
 		flowFromPulls + RF + " AND " + identified +
-		" AND state = 'MERGED' GROUP BY full_name, repo ORDER BY 2 DESC"
+		" AND state = 'MERGED' GROUP BY full_name, repo ORDER BY 2 DESC, full_name"
 	// Who is a reviewer: a bot is named as one, and an author answering a
 	// review on their own pull request is not reviewing it, so those rows
 	// read "own" rather than the reviewer's login. Otherwise the busiest
@@ -296,9 +348,9 @@ func pullsAndReviewers(b *builder) []Panel {
 	who := "CASE WHEN self = 'true' THEN 'own pull request' WHEN bot = 'true'" +
 		" THEN reviewer || ' (bot)' ELSE reviewer END"
 	reviewers := `SELECT ` + who + ` AS "Reviewer", COUNT(*) AS "Reviews",` +
-		` approx_percentile_cont(seconds_to_review, 0.5) AS "Wait"` +
+		` median(CAST(seconds_to_review AS DOUBLE)) AS "Wait"` +
 		" FROM gh_pull_request_review WHERE $__timeFilter(time) AND " + RF +
-		" GROUP BY 1 ORDER BY 2 DESC LIMIT 20"
+		" GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT 20"
 	reviewsDay := flowSelect + timeBin + ", " + who + flowSeriesAlias +
 		" COUNT(*) AS reviews FROM gh_pull_request_review WHERE $__timeFilter(time)" +
 		" AND " + RF + flowByBucketAndSeries
@@ -323,11 +375,11 @@ func pullsAndReviewers(b *builder) []Panel {
 	}, esMerged)
 
 	authorsGR, authorsGRtf := gTbl(fmt.Sprintf(
-		`limit(sortByTotal(groupByNode(isNonNull(%s), %d, "sum")), 15)`,
-		anyPath("churn"), gn(pr, "author"),
+		`limit(sortByTotal(groupByNode(%s, %d, "sum")), 15)`,
+		counted(anyPath("churn")), gn(pr, "author"),
 	), "Author", []col{{"sum", "Pull requests"}})
 	authorsES, authorsEStf := esTbl(pr, []any{b.tm("author", 15)}, []any{b.mCount()},
-		[]named{{"author.keyword", "Author"}, {"n", "Pull requests"}},
+		[]named{{flowAuthorTerm, "Author"}, {"n", "Pull requests"}},
 		[]string{ESF, esIdentified})
 
 	byRepoGR, byRepoGRtf := gTbl(grGroupBy(mergedPath("seconds_to_merge"), pr, "avg", "repo"), "Repository",
@@ -385,7 +437,8 @@ func pullsAndReviewers(b *builder) []Panel {
 			PromTF: merged(map[string]string{
 				"repo": "Repository", inventoryValueCol + "A": "Merged",
 				inventoryValueCol + "B": flowMergeTime, inventoryValueCol + "C": flowChurn,
-			}, nil, nil),
+			}, nil),
+
 			Opts:     Opts{"sort": "Merged"},
 			PromDesc: sinceStart + " " + lastSweep,
 			Overrides: []any{
@@ -403,7 +456,8 @@ func pullsAndReviewers(b *builder) []Panel {
 			},
 			PromTF: merged(map[string]string{
 				"reviewer": "Reviewer", inventoryValueCol + "A": "Reviews", inventoryValueCol + "B": "Wait",
-			}, nil, nil),
+			}, nil),
+
 			Opts: Opts{"sort": "Reviews"},
 			Desc: "Who actually reviews, and how long a review waited. The count on a pull " +
 				"request cannot say whether the work is spread across people or resting on " +
@@ -476,7 +530,7 @@ func reviewDebt(b *builder) []Panel {
 		` SUM(outdated * (1 - resolved)) AS "Outdated",` +
 		` SUM(comments * (1 - resolved)) AS "Comments"` +
 		" FROM gh_review_thread WHERE $__timeFilter(time) AND " + RF +
-		" GROUP BY 1, full_name, 3 ORDER BY 2 DESC LIMIT 25"
+		" GROUP BY 1, full_name, 3 ORDER BY 2 DESC, full_name, 1 LIMIT 25"
 
 	// `comments` is on every thread, so counting the points of that leaf is
 	// one point per thread; `resolved` is the flag the debt is computed from.
@@ -536,9 +590,12 @@ func reviewDebt(b *builder) []Panel {
 				PromDesc: sinceStart,
 				Opts:     mergeOpts(Opts{"bars": true, "stack": true}, dayBins),
 				SQLOpts:  seriesOpts,
+				PromOver: botWords,
 				GR: []Target{grq(perBucket(flowNonNull+openedPath+")",
 					gn(reviewThread, "bot")))},
-				ES: []Target{b.esDaily(reviewThread, b.mCount(), "bot", "", []string{ESF}, "")},
+				GROver: botWords,
+				ES:     []Target{b.esDaily(reviewThread, b.mCount(), "bot", "", []string{ESF}, "")},
+				ESOver: botWords,
 			}),
 		panel("table", "The review debt", box{W: 12, H: 7, X: 12, Y: 53}, []Target{sqlT(debt)}, &P{
 			Desc: "A review thread is one objection, which GitHub keeps open until somebody " +
@@ -576,6 +633,11 @@ const stillOpenNote = "This store cannot read each item from its newest row, so 
 	"closed inside the range stays listed as open, at the reading of its last open day, " +
 	"until the range moves past that day."
 
+// noForkColumn is why the two tables of what is still open have no Fork column
+// in a store that can carry every other string of the row: the flag is
+// gh_repo's, which noRepoFlagsHere says this store cannot join.
+const noForkColumn = "For the same reason there is no Fork column."
+
 // openLongest is how many rows the two tables of what is still open list, in
 // every store: the items open longest, the longest first.
 const openLongest = 25
@@ -595,7 +657,7 @@ func stillOpen(b *builder) []Panel {
 		flowFromPulls + RF + " AND " + identified +
 		") x" + repoFlagsJoin("x") +
 		" WHERE x.rn = 1 AND x.state = 'OPEN' AND " + notArchived +
-		fmt.Sprintf(" ORDER BY x.seconds_open DESC LIMIT %d", openLongest)
+		fmt.Sprintf(" ORDER BY x.seconds_open DESC, x.full_name, x.number LIMIT %d", openLongest)
 	// The twin for issues, read the same way: until this table no issue was
 	// reachable by unit from any panel, only counted. `label_names` is the
 	// field the collector writes for what the issue is about, which is what
@@ -607,7 +669,7 @@ func stillOpen(b *builder) []Panel {
 		" FROM gh_issue WHERE $__timeFilter(time) AND " + RF + " AND " + identified +
 		") x" + repoFlagsJoin("x") +
 		" WHERE x.rn = 1 AND x.state = 'OPEN' AND " + notArchived +
-		fmt.Sprintf(" ORDER BY x.seconds_open DESC LIMIT %d", openLongest)
+		fmt.Sprintf(" ORDER BY x.seconds_open DESC, x.full_name, x.number LIMIT %d", openLongest)
 
 	openGR, openGRtf := gTbl(fmt.Sprintf(`limit(sortBy(%s, "max", true), %d)`,
 		grGroupBy(rp("gh_pull_request", "seconds_open", "state", "OPEN"), "gh_pull_request", "max", "repo", "number"),
@@ -623,12 +685,18 @@ func stillOpen(b *builder) []Panel {
 	// the bucket kept showed whichever had the most rows in the range.
 	prAge := b.mMax("seconds_open")
 	openES, openEStf := esTbl("gh_pull_request",
-		append(b.tmRepoBy(50, prAge), b.tmBy("number", openLongest, prAge), b.tm("url", 1)),
+		slices.Concat(b.tmRepoBy(50, prAge), []any{
+			b.tmBy("number", openLongest, prAge), b.tm("url", 1),
+			b.tmNewest("title", prAge), b.tm("author", 1), b.tmNewest("label_names", prAge),
+		}),
 		[]any{prAge, b.mMax("comments"), b.mMax("reviews")},
 		[]named{
 			{inventoryRepoTerm, "Repository"},
 			{flowNumberTerm, "Number"},
 			{"url.keyword", "Link"},
+			{"title.keyword", "Title"},
+			{flowAuthorTerm, "Author"},
+			{"label_names.keyword", "Labels"},
 			{"s", flowOpenAge},
 			{"c", "Comments"},
 			{"r", "Reviews"},
@@ -642,12 +710,17 @@ func stillOpen(b *builder) []Panel {
 		"Repository, number", []col{{"max", flowOpenAge}})
 	issueAge := b.mMax("seconds_open")
 	openIssuesES, openIssuesEStf := esTbl("gh_issue",
-		append(b.tmRepoBy(50, issueAge), b.tmBy("number", openLongest, issueAge), b.tm("url", 1)),
+		slices.Concat(b.tmRepoBy(50, issueAge), []any{
+			b.tmBy("number", openLongest, issueAge), b.tm("url", 1), b.tm("author", 1),
+			b.tmNewest("label_names", issueAge),
+		}),
 		[]any{issueAge, b.mMax("comments")},
 		[]named{
 			{inventoryRepoTerm, "Repository"},
 			{flowNumberTerm, "Number"},
 			{"url.keyword", "Link"},
+			{flowAuthorTerm, "Author"},
+			{"label_names.keyword", "Labels"},
 			{"s", flowOpenAge},
 			{"c", "Comments"},
 		},
@@ -658,20 +731,27 @@ func stillOpen(b *builder) []Panel {
 			// The comments are kept to the rows the open time ranks: capped
 			// on nothing, they listed every repository with an open pull
 			// request, and the merge showed each one past the twenty-fifth
-			// with an empty Open for.
+			// with an empty Open for. Grouped by the repository alone, since
+			// the exporter keeps no number or author on a pull request to
+			// group by.
 			Prom: func() []Target {
-				rank := fmt.Sprintf(`max by (full_name, repo, number, author) (github_pull_requests_seconds_open_mean{state="OPEN",%s})`, PF)
+				rank := fmt.Sprintf(`max by (full_name, repo) (github_pull_requests_seconds_open_mean{state="OPEN",%s})`, PF)
 				return []Target{
 					promTbl(promTop(openLongest, rank), "A"),
 					promTbl(promWithin(openLongest, fmt.Sprintf(
-						`max by (full_name, repo, number, author) (github_pull_requests_comments_mean{state="OPEN",%s})`, PF,
-					), rank, "full_name", "repo", "number", "author"), "B"),
+						`max by (full_name, repo) (github_pull_requests_comments_mean{state="OPEN",%s})`, PF,
+					), rank, "full_name", "repo"), "B"),
+					promTbl(promWithin(openLongest, fmt.Sprintf(
+						`max by (full_name, repo) (github_pull_requests_reviews_mean{state="OPEN",%s})`, PF,
+					), rank, "full_name", "repo"), "C"),
 				}
 			}(),
 			PromTF: merged(map[string]string{
-				"repo": "Repository", "number": "Number", "author": "Author",
+				"repo":                  "Repository",
 				inventoryValueCol + "A": flowOpenAge, inventoryValueCol + "B": "Comments",
-			}, nil, map[string]int{"repo": 0, "number": 1, "author": 2}),
+				inventoryValueCol + "C": "Reviews",
+			}, nil),
+
 			Opts: Opts{"sort": flowOpenAge},
 			Desc: "Time to merge only counts what merged. This is the other half: what is " +
 				"still open and how long it has been, which is the number that decides what " +
@@ -683,7 +763,9 @@ func stillOpen(b *builder) []Panel {
 			PromDesc: "In Prometheus a row is a repository and not a pull request, since " +
 				"the exporter keeps no pull request of its own: Open for is the mean over " +
 				"the repository's open pull requests at the collector's last sweep, and the " +
-				"twenty-five rows are the repositories where it is longest. " + noRepoFlagsHere,
+				"twenty-five rows are the repositories where it is longest. Comments and " +
+				"Reviews are the means over the same pull requests, and there is no Number, " +
+				"Title, Author or Labels column. " + noRepoFlagsHere,
 			Overrides: []any{
 				repoColumn(), width("Number", 80), width("Author", 120),
 				unitOf(flowOpenAge, "s", 130),
@@ -691,7 +773,7 @@ func stillOpen(b *builder) []Panel {
 				linkOn("Number"),
 			},
 			GR: openGR, GRTF: openGRtf, GRDesc: grRows + " " + stillOpenNote + " " + noRepoFlagsHere,
-			ES: openES, ESTF: openEStf, ESDesc: stillOpenNote + " " + noRepoFlagsHere,
+			ES: openES, ESTF: openEStf, ESDesc: stillOpenNote + " " + noRepoFlagsHere + " " + noForkColumn,
 		}),
 		panel("table", "Open issues the longest", box{W: 12, H: 8, X: 12, Y: 45}, []Target{sqlT(openIssues)}, &P{
 			PromNote: cannot("the twenty-five open issues that have waited longest, with "+
@@ -713,7 +795,7 @@ func stillOpen(b *builder) []Panel {
 			GR: openIssuesGR, GRTF: openIssuesGRtf,
 			GRDesc: grRows + " " + stillOpenNote + " " + noRepoFlagsHere,
 			ES:     openIssuesES, ESTF: openIssuesEStf,
-			ESDesc: stillOpenNote + " " + noRepoFlagsHere,
+			ESDesc: stillOpenNote + " " + noRepoFlagsHere + " " + noForkColumn,
 		}),
 	}
 }

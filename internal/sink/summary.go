@@ -22,8 +22,10 @@ import (
 // So each measurement gets a rule saying how to reduce it:
 //
 //   - keepLast: a snapshot. The most recent point per label set wins.
-//   - sum: a window. Every point in the batch is added up, which is what makes
-//     "views over GitHub's 14-day window" a single number.
+//   - sum: a window. Every row in the batch is added up, which is what makes
+//     "views over GitHub's 14-day window" a single number. A row is what a
+//     store would keep, so a point offered twice is added once: see rows. A
+//     rate every row repeats, a price, is the highest of them: see highest.
 //   - count: dated items. The points become a count plus the mean of each of
 //     their numeric fields, so "how many pull requests merged and how long they
 //     took" survives as two gauges instead of four hundred series. Each mean is
@@ -74,6 +76,13 @@ type rule struct {
 	// never pushed to does not have; the dashboards read the mean of each as
 	// a share of every contribution and of every fork.
 	absentIsZero []string
+	// highest lists the fields a sum takes the largest of rather than adding
+	// up: a rate that each row repeats rather than a quantity each row adds
+	// to. The billing report prices every row of a SKU, one row per
+	// repository and day, and added up the price of Linux minutes read 0.024
+	// over three days where the row stores' MAX reads 0.008, so the
+	// Prometheus Price column showed the price times the days billed.
+	highest []string
 }
 
 // The three tags that name a repository travel together wherever a rule keeps
@@ -151,7 +160,10 @@ var promRules = map[string]rule{
 	// Windows that only mean anything added up.
 	"gh_traffic":          {mode: sum, keep: []string{"owner", "repo", "full_name", "kind"}},
 	"gh_traffic_referrer": {mode: sum, keep: []string{"owner", "repo", "full_name", "referrer"}},
-	"gh_billing_usage":    {mode: sum, keep: []string{"product", "sku", "unit", "owner", "repo", "full_name"}},
+	"gh_billing_usage": {
+		mode: sum, keep: []string{"product", "sku", "unit", "owner", "repo", "full_name"},
+		highest: []string{"price_per_unit"},
+	},
 
 	// Dated items, reduced to a count and the mean of their numbers.
 	"gh_pull_request": {mode: count, as: "gh_pull_requests", keep: []string{"owner", "repo", "full_name", "state"}},
@@ -239,12 +251,17 @@ var promRules = map[string]rule{
 	"gh_repo_activity":          {mode: count, as: "gh_repo_activities", keep: []string{"owner", "repo", "full_name", "activity"}},
 	"gh_code_scanning_analysis": {mode: count, as: "gh_code_scanning_analyses", keep: []string{"owner", "repo", "full_name", "tool"}},
 	"gh_fork":                   {mode: count, as: "gh_forks_seen", keep: []string{"owner", "repo", "full_name"}, absentIsZero: []string{"advanced"}},
-	"gh_star_given":             {mode: count, as: "gh_stars_given", keep: []string{"user"}},
-	"gh_external_contribution":  {mode: count, as: "gh_external_contributions", keep: []string{"user", "owner", "repo", "full_name"}, absentIsZero: []string{"merged"}},
-	"gh_dependabot_alert_item":  {mode: count, as: "gh_dependabot_alerts", keep: []string{"owner", "repo", "full_name", "severity"}, labels: []string{"alert_state"}},
-	"gh_label":                  {mode: keepLast, keep: []string{"owner", "repo", "full_name", "label"}},
-	"gh_milestone":              {mode: keepLast, keep: []string{"owner", "repo", "full_name", "milestone", "state"}},
-	"gh_contribution_year":      {mode: keepLast, keep: []string{"user", "year"}},
+	// The language is kept because "Languages starred" groups by it, and
+	// without it the grouping was one series with no label, which the bar
+	// chart refused. It is bounded by the languages GitHub recognizes, a
+	// series per language the account has starred in; the repository is not
+	// kept, since that is a series per star.
+	"gh_star_given":            {mode: count, as: "gh_stars_given", keep: []string{"user", "language"}},
+	"gh_external_contribution": {mode: count, as: "gh_external_contributions", keep: []string{"user", "owner", "repo", "full_name"}, absentIsZero: []string{"merged"}},
+	"gh_dependabot_alert_item": {mode: count, as: "gh_dependabot_alerts", keep: []string{"owner", "repo", "full_name", "severity"}, labels: []string{"alert_state"}},
+	"gh_label":                 {mode: keepLast, keep: []string{"owner", "repo", "full_name", "label"}},
+	"gh_milestone":             {mode: keepLast, keep: []string{"owner", "repo", "full_name", "milestone", "state"}},
+	"gh_contribution_year":     {mode: keepLast, keep: []string{"user", "year"}},
 
 	// Lifetime counts, which are already one row each: the exporter serves
 	// them as they are. This is the one family that needs no reduction,
@@ -450,12 +467,62 @@ func (rd *Reducer) Reduce(points []Point) (gauges []Point, taken int) {
 	defer rd.mu.Unlock()
 
 	var s series
-	for _, p := range points {
-		if rd.fold(&s, p) {
-			taken++
-		}
+	distinct, taken := rows(points)
+	for _, p := range distinct {
+		rd.fold(&s, p)
 	}
 	return s.gauges(time.Now()), taken
+}
+
+// rows is the batch as the stores hold it: one point per identity, the
+// measurement, the tags that are set and the time, in the order each identity
+// first appeared. InfluxDB, PostgreSQL, Graphite and Elasticsearch each keep a
+// point offered twice as one row, so a reduction over the raw batch would
+// count, add up or average it twice. Measured on the containerised suite,
+// where the fake GitHub answers both months the billing collector reads with
+// the same rows: the four row stores showed 214 Actions minutes and the
+// exporter 428. Across batches the reduction already agrees with them: a
+// gauge is replaced by the next sweep's rather than added to, and total
+// remembers identities.
+//
+// The row takes a field both points carry from the later one and keeps a
+// field only the earlier one carried, which is what InfluxDB, PostgreSQL's
+// upsert and Graphite's path per field keep. Elasticsearch indexes the later
+// point as the whole document, so a field only the earlier one carried is
+// gone there, and the union is the answer of the other three.
+//
+// Taken counts every point with a rule, the repeated ones too, the way a
+// store accepts a write that rewrites a row it already has.
+func rows(points []Point) (out []Point, taken int) {
+	at := map[string]int{}
+	for _, p := range points {
+		if r, known := promRules[p.Measurement]; !known || r.mode == skip {
+			continue
+		}
+		taken++
+		id := identity(p)
+		i, seen := at[id]
+		if !seen {
+			at[id] = len(out)
+			out = append(out, p)
+			continue
+		}
+		fields := make(map[string]any, len(out[i].Fields)+len(p.Fields))
+		maps.Copy(fields, out[i].Fields)
+		maps.Copy(fields, p.Fields)
+		out[i].Fields = fields
+	}
+	return out, taken
+}
+
+// identity is what makes a point one row in a store: its measurement, the
+// tags that are set, and its own time. A tag with an empty value is no tag in
+// the line protocol, in PostgreSQL, whose tag column reads the empty string
+// either way, and in Elasticsearch's document id. Graphite writes it as the
+// node `none`, so there the point with it and the point without it are two
+// paths, and the identity is the other three's.
+func identity(p Point) string {
+	return p.Measurement + "|" + tagKey(presentTags(p.Tags)) + "@" + strconv.FormatInt(p.Time.UnixNano(), 10)
 }
 
 // series is the set of accumulators a reduction is building, in the order each
@@ -485,14 +552,10 @@ func (s *series) at(key, name string, r rule, tags map[string]string) *acc {
 	return a
 }
 
-// fold adds one point to the series its rule reduces it to, and reports
-// whether it took it. A measurement with no rule, or one whose rule is skip,
-// has no honest current value and is left out entirely.
-func (rd *Reducer) fold(s *series, p Point) bool {
-	r, known := promRules[p.Measurement]
-	if !known || r.mode == skip {
-		return false
-	}
+// fold adds one point to the series its rule reduces it to. rows has already
+// left out every point whose rule is skip or that has none.
+func (rd *Reducer) fold(s *series, p Point) {
+	r := promRules[p.Measurement]
 	name := p.Measurement
 	if r.as != "" {
 		name = r.as
@@ -512,9 +575,8 @@ func (rd *Reducer) fold(s *series, p Point) bool {
 		a.total = rd.countDistinct(key, p)
 		a.addNumbers(p.Fields)
 	case sum:
-		a.addNumbers(p.Fields)
+		a.addNumbers(p.Fields, r.highest...)
 	}
-	return true
 }
 
 // keptTags is the reduced label set: the tags the rule names and nothing else,
@@ -558,7 +620,7 @@ func promote(tags map[string]string, fields map[string]any, labels []string) {
 
 // countDistinct remembers this item under its reduced series and reports how
 // many distinct items that series has seen since the process started. The
-// identity of an item is its full tag set and its own time, which is exactly
+// identity of an item is the one rows dedups a batch by, which is exactly
 // what makes it one row in InfluxDB.
 //
 // An item that stands for several events counts as that many: gh_repo_activity
@@ -569,7 +631,7 @@ func promote(tags map[string]string, fields map[string]any, labels []string) {
 // weight it was seen with, so a row rewritten with a larger count corrects
 // the total rather than adding to it.
 func (rd *Reducer) countDistinct(key string, p Point) int {
-	ident := tagKey(p.Tags) + "@" + strconv.FormatInt(p.Time.UnixNano(), 10)
+	ident := identity(p)
 	if rd.seen[key] == nil {
 		rd.seen[key] = map[string]int{}
 	}
@@ -583,14 +645,21 @@ func (rd *Reducer) countDistinct(key string, p Point) int {
 }
 
 // addNumbers adds every numeric field into the running total, and counts the
-// point as one that carried it. A string field has no total, so it is passed
-// over rather than coerced.
-func (a *acc) addNumbers(fields map[string]any) {
+// point as one that carried it; a field named in highest keeps the largest
+// value instead. A string field has no total, so it is passed over rather
+// than coerced.
+func (a *acc) addNumbers(fields map[string]any, highest ...string) {
 	for f, v := range fields {
-		if n, ok := numeric(v); ok {
+		n, ok := numeric(v)
+		switch {
+		case !ok:
+			continue
+		case slices.Contains(highest, f) && a.carried[f] > 0:
+			a.fields[f] = max(a.fields[f], n)
+		default:
 			a.fields[f] += n
-			a.carried[f]++
 		}
+		a.carried[f]++
 	}
 }
 
