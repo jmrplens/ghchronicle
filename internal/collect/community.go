@@ -975,13 +975,14 @@ func (o Outbound) search(ctx context.Context, c *ghapi.Client, s outboundSearch,
 	for page := 1; page <= most; page++ {
 		var res outboundSearchPage
 		if err := c.GraphQL(ctx, outboundSearchQuery, vars, &res); err != nil {
-			// GitHub's timeout too, and not asked again smaller: this page
-			// is not near the gateway's limit. From 2026-09-11 to 2026-09-29
-			// the production proxy logged 280 asks of the merged search,
-			// 279 answered in at most 5.3 s and one with the 502 after
-			// 10.9 s. The next sweep reads back to a cadence before this one
-			// and the sweep before it read the cadence before that, so an
-			// item that moved inside this sweep's window is read either way.
+			// GitHub's timeout too, and not asked again smaller: this page is not
+			// near the gateway's limit. From 2026-09-11 to 2026-09-29 the
+			// production proxy logged 117 asks of the merged search, 116 answered
+			// in at most 5.3 s and one with the 502 after 10.9 s, and the other
+			// four searches answered all 468 of theirs in at most 3.5 s. The next
+			// sweep reads back to a cadence before this one and the sweep before
+			// it read the cadence before that, so an item that moved inside this
+			// sweep's window is read either way.
 			return points, err
 		}
 		found := &res.Search
