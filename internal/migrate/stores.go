@@ -44,6 +44,9 @@ type store struct {
 	exclude []string
 	// prefix is the first node of every Graphite path.
 	prefix string
+	// influx is the InfluxDB sink, for the request that removes a copy a
+	// server keeps for good.
+	influx *config.InfluxSink
 }
 
 // storesOf is every store the configuration writes, in the order of the
@@ -58,7 +61,7 @@ func storesOf(cfg *config.Config) []store {
 		}
 		out = append(out, store{
 			name: "influxdb", reach: asked,
-			destination: dest + " bucket=" + i.Bucket, exclude: i.Exclude,
+			destination: dest + " bucket=" + i.Bucket, exclude: i.Exclude, influx: i,
 		})
 	}
 	if s.Prometheus != nil {

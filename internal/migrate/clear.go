@@ -45,6 +45,8 @@ func (c Clearing) Apply(ctx context.Context, it Item) (Outcome, error) {
 		out.Did = "the store held no " + m + " any more, so nothing was set aside"
 	case aside.ByServer && aside.Name == "":
 		out.Did = "InfluxDB deleted the table " + m + ", and listed no copy of it afterwards"
+	case aside.ForGood:
+		out.Did = "InfluxDB set the table " + m + " aside as " + aside.Name + ", for good: " + aside.Stays
 	case aside.ByServer:
 		out.Did = "InfluxDB set the table " + m + " aside, and purges it itself from " +
 			PurgedFrom(run.Aside{At: aside.At, ByServer: true, Until: aside.Until}).UTC().Format(timeLayout)
@@ -64,13 +66,14 @@ func kept(it Item, aside teardown.Aside) *run.Aside {
 	}
 	return &run.Aside{
 		Name: aside.Name, Measurement: it.Migration.Measurement, Migration: it.Migration.ID, At: aside.At,
-		ByServer: aside.ByServer, Until: aside.Until,
+		ByServer: aside.ByServer, Until: aside.Until, ForGood: aside.ForGood,
 	}
 }
 
 // PurgedFrom is when a copy falls due: when the store said it purges it,
 // or, where it did not say, a day after it was made for a copy ghchronicle
-// purges and InfluxDB 3's own default for one the server does.
+// purges and InfluxDB 3's own default for one the server does. A copy the
+// server keeps for good falls due for the record alone, at that default.
 func PurgedFrom(a run.Aside) time.Time {
 	switch {
 	case !a.Until.IsZero():

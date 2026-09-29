@@ -215,23 +215,35 @@ var (
 		`(?: WHERE "([^"]+)" IS NULL OR lower\("[^"]+"\) <> lower\('([^']*)'\))?( ORDER BY v)?$`)
 	selected = regexp.MustCompile(`^"([^"]+)" AS (v\d*)$`)
 	// querySystem is when the server purges a table it soft deleted, which
-	// 3.11.2 keeps in the system table of its _internal database.
+	// 3.11.2 keeps in the system table of its _internal database, and
+	// queryDeleted the same for every table it deleted, which -migrate asks
+	// to find the copies nothing will purge.
 	querySystem = regexp.MustCompile(`^SELECT hard_deletion_time FROM system\.tables ` +
 		`WHERE database_name = '([^']+)' AND table_name = '([^']+)'$`)
+	queryDeleted = regexp.MustCompile(`^SELECT table_name, hard_deletion_time FROM system\.tables ` +
+		`WHERE database_name = '([^']+)' AND deleted$`)
 )
 
-// system answers the one question asked of _internal: the 72 hours 3.11.2
+// system answers the questions asked of _internal with the 72 hours 3.11.2
 // schedules a soft deleted table's hard deletion for (measured).
 func (s *influx3) system(w http.ResponseWriter, q string) {
-	m := querySystem.FindStringSubmatch(q)
-	if m == nil {
+	rows := []map[string]any{}
+	purged := func(at time.Time) string { return at.Add(72 * time.Hour).Format(time.RFC3339) }
+	switch m := querySystem.FindStringSubmatch(q); {
+	case m != nil:
+		if at, deleted := s.deletedAt[m[2]]; deleted && m[1] == s.database {
+			rows = append(rows, map[string]any{"hard_deletion_time": purged(at)})
+		}
+	case queryDeleted.MatchString(q):
+		if queryDeleted.FindStringSubmatch(q)[1] == s.database {
+			for _, name := range slices.Sorted(maps.Keys(s.deletedAt)) {
+				rows = append(rows, map[string]any{"table_name": name, "hard_deletion_time": purged(s.deletedAt[name])})
+			}
+		}
+	default:
 		s.t.Errorf("InfluxDB 3 was asked %q of _internal, which the model does not answer", q)
 		http.Error(w, "the model does not answer this query", http.StatusBadRequest)
 		return
-	}
-	rows := []map[string]any{}
-	if at, deleted := s.deletedAt[m[2]]; deleted && m[1] == s.database {
-		rows = append(rows, map[string]any{"hard_deletion_time": at.Add(72 * time.Hour).Format(time.RFC3339)})
 	}
 	s.answer(w, rows)
 }

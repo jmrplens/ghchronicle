@@ -107,7 +107,11 @@ type StorePlan struct {
 	Items []Item
 	// Kept is the copies of old rows a migration set aside here that the
 	// state file names and nobody has purged yet: what undoing it needs.
-	Kept []run.Aside
+	// Where the store keeps a copy for good, which -migrate asks it, the
+	// copy is here whether the state file names it or not, and Stays says
+	// why and what removes it, by the copy's name.
+	Kept  []run.Aside
+	Stays map[string]string
 	// Owed is the history a migration cleared here and has not read back,
 	// nil when there is none.
 	Owed *run.Refill
@@ -280,7 +284,46 @@ func (in *Input) plan(ctx context.Context, st store, asker teardown.Inspector) S
 		}
 		sp.Items = append(sp.Items, in.item(ctx, st, asker, sp.Server, m))
 	}
+	in.keptForGood(ctx, &sp, asker)
 	return sp
+}
+
+// unpurger is a store that can say which copies nothing will ever purge on
+// its own: InfluxDB 3.
+type unpurger interface {
+	Unpurged(ctx context.Context, measurements []string) ([]teardown.Aside, error)
+}
+
+// keptForGood adds to what the plan says is kept aside every copy the store
+// keeps for good, which the state file forgets after three days and a new
+// state file never knew, and says of each why it stays. A store that does not
+// answer leaves the list as the state file has it: the plan's own questions
+// already say whether the store answers, and this one only adds to them.
+// Only -migrate asks it, since only -migrate prints the list.
+func (in *Input) keptForGood(ctx context.Context, sp *StorePlan, asker teardown.Inspector) {
+	u, ok := asker.(unpurger)
+	if !ok || sp.Server == "" || in.TrustRecord {
+		return
+	}
+	found, err := u.Unpurged(ctx, clearable())
+	if err != nil {
+		return
+	}
+	kept := slices.Clone(sp.Kept)
+	stays := map[string]string{}
+	for k := range kept {
+		kept[k].ForGood = false
+	}
+	for _, a := range found {
+		stays[a.Name] = a.Stays
+		k := slices.IndexFunc(kept, func(r run.Aside) bool { return r.Name == a.Name })
+		if k < 0 {
+			kept = append(kept, run.Aside{Name: a.Name, Measurement: a.Measurement, At: a.At, ByServer: true})
+			k = len(kept) - 1
+		}
+		kept[k].ForGood = true
+	}
+	sp.Kept, sp.Stays = kept, stays
 }
 
 // settledByRecord is the item the record settles without asking the store,
@@ -633,13 +676,13 @@ func action(st store, server string, m Migration) (what string, commands []strin
 		if isInfluxDB2(server) {
 			return "delete every row of " + m.Measurement + ": InfluxDB 2 keeps no table aside, so the delete is final", nil
 		}
-		what = "set aside: InfluxDB renames the table " + m.Measurement + "-<time> and keeps it queryable " +
-			"until it purges it itself, 72 hours later by default"
-		if influxBefore34(server) {
-			what = "set aside: InfluxDB renames the table " + m.Measurement + "-<time>; 3.0.0 has no deleter, " +
-				"so a server before 3.4.0 may keep it until somebody drops it"
+		if teardown.KeepsForGood(server) && st.influx != nil {
+			stay := teardown.InfluxStay(server, st.influx, m.Measurement+"-<time>")
+			return "set aside for good: InfluxDB renames the table " + m.Measurement + "-<time> and keeps it " +
+				"queryable; " + stay.Why + ". " + stay.How + ":", []string{stay.Command}
 		}
-		return what, nil
+		return "set aside: InfluxDB renames the table " + m.Measurement + "-<time> and keeps it queryable " +
+			"until it purges it itself, 72 hours later by default", nil
 	case "postgres":
 		return "set aside: the table is renamed " + m.Measurement + "-<time>, and dropped 24 hours later", nil
 	case "elasticsearch":
@@ -676,18 +719,6 @@ func graphiteCommands(st store, m Migration) []string {
 
 // isInfluxDB2 reads what /ping said.
 func isInfluxDB2(server string) bool { return strings.HasPrefix(server, "InfluxDB 2") }
-
-// influxBefore34 says whether an InfluxDB 3 is older than the first release
-// measured to purge what it soft deletes: 3.0.0 has no deleter at all, 3.4.0
-// starts one with a 24 hour grace, and the releases between were not measured.
-func influxBefore34(server string) bool {
-	fields := strings.Fields(server)
-	if len(fields) == 0 {
-		return false
-	}
-	version := fields[len(fields)-1]
-	return compareRelease(version, "3.0.0") >= 0 && compareRelease(version, "3.4.0") < 0
-}
 
 // appliedEvidence begins the evidence of an item the state file records as
 // applied, before the day it was.

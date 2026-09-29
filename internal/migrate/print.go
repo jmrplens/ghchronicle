@@ -215,12 +215,23 @@ func printStore(w io.Writer, st StorePlan) {
 			bound(e.Refill.Since), quoted(e.Refill.Measurements), quoted(e.Refill.Migrations), e.Destination)
 	}
 	for _, a := range st.Kept {
-		purged := "purged by ghchronicle after "
-		if a.ByServer {
-			purged = "purged by the store itself after "
+		name := a.Name
+		if a.Migration != "" {
+			name = a.Migration + ": " + a.Name
 		}
-		fmt.Fprintf(w, "  %-*s%s: %s, set aside %s, %s%s\n", statusWidth, "kept aside", a.Migration, a.Name,
-			a.At.UTC().Format(timeLayout), purged, PurgedFrom(a).UTC().Format(timeLayout))
+		var until string
+		switch {
+		case a.ForGood && st.Stays[a.Name] != "":
+			until = "for good: " + st.Stays[a.Name]
+		case a.ForGood:
+			until = "for good: the server has no hard deletion, so it never purges the copy"
+		case a.ByServer:
+			until = "purged by the store itself after " + PurgedFrom(a).UTC().Format(timeLayout)
+		default:
+			until = "purged by ghchronicle after " + PurgedFrom(a).UTC().Format(timeLayout)
+		}
+		fmt.Fprintf(w, "  %-*s%s, set aside %s, %s\n", statusWidth, "kept aside", name,
+			a.At.UTC().Format(timeLayout), until)
 	}
 }
 

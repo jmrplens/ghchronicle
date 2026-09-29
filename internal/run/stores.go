@@ -124,6 +124,10 @@ type Aside struct {
 	// Until is when the store said it purges the copy itself, zero when it
 	// did not say.
 	Until time.Time `json:"until,omitzero"`
+	// ForGood says the store never purges the copy, InfluxDB 3 before 3.2.
+	// The record still forgets it when a copy the server purges would fall
+	// due: -migrate asks the server for the copies it keeps for good.
+	ForGood bool `json:"for_good,omitempty"`
 }
 
 // KeepAside records a copy, replacing a record of the same name.
