@@ -518,7 +518,9 @@ func TestThePlanReadsAsWritten(t *testing.T) {
 	p := Make(t.Context(), in)
 	var out bytes.Buffer
 	p.Print(&out)
-	got := strings.ReplaceAll(out.String(), filepath.Dir(in.Config.Sinks.SQL.Path), "<dir>")
+	// The file's directory is the test's own, and the separator after it the
+	// system's: the golden file holds one form of both.
+	got := strings.ReplaceAll(out.String(), filepath.Dir(in.Config.Sinks.SQL.Path)+string(filepath.Separator), "<dir>/")
 	const golden = "testdata/plan.txt"
 	if *updateIdentity {
 		if err := os.WriteFile(golden, []byte(got), 0o600); err != nil {
