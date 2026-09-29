@@ -48,10 +48,17 @@ func TestElasticsearchAcceptsTheBulkTheSinkWrites(t *testing.T) {
 	t.Run("the cluster refused nothing", func(t *testing.T) {
 		// A bulk request answers 200 even when every item failed, so the sink
 		// reads the verdict per item and reports it. Either of these lines in
-		// the log means documents were lost.
-		for _, complaint := range []string{"sink rejected some lines", "sink write failed"} {
-			if strings.Contains(sweep.Log, complaint) {
-				t.Errorf("the sweep reported %q:\n%s", complaint, tail(sweep.Log))
+		// the log means documents were lost, when it is this sink's: the sweep
+		// writes to six sinks at once, and a Loki refusing every push once
+		// failed this test with the cluster having refused nothing.
+		for line := range strings.SplitSeq(sweep.Log, "\n") {
+			if !strings.Contains(line, "sink=elasticsearch") {
+				continue
+			}
+			for _, complaint := range []string{"sink rejected some lines", "sink write failed"} {
+				if strings.Contains(line, complaint) {
+					t.Errorf("the sweep reported %q:\n%s", complaint, line)
+				}
 			}
 		}
 	})

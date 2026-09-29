@@ -6,7 +6,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"maps"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -335,8 +337,81 @@ func seedPanels(ctx context.Context, t *testing.T, s *Stack, ns string, old []si
 	}
 	n.before = string(body)
 	storeCall(ctx, t, http.MethodPost, s.ElasticsearchURL+"/"+ns+"-*/_refresh", "", "")
+	n.awaitCarbon(ctx, t, graphiteFilesSent(ctx, t, ns, old))
 	n.datasources(ctx, t)
 	return n
+}
+
+// awaitCarbon waits until carbon has a whisper file for every path it was
+// sent. The sink's write returns once the lines are on the socket, and carbon
+// creates the files afterwards: measured against the suite's graphite, five
+// seeds of 132 paths in a row showed none of them on disk right after the
+// write and all of them ten seconds later. What a namespace holds is read as
+// a fingerprint and compared later, and one read before carbon caught up
+// compared a partial listing with the whole one: "the namespace no
+// configuration names changed", with nothing having touched it.
+func (n *panelsNS) awaitCarbon(ctx context.Context, t *testing.T, want []string) {
+	t.Helper()
+	err := WaitUntil(ctx, "carbon writing what "+n.name+" was sent", 2*time.Minute, func(ctx context.Context) error {
+		out, _ := n.s.Exec(ctx, "graphite", "sh", "-c",
+			"cd /opt/graphite/storage/whisper/"+n.name+" 2>/dev/null && find . -name '*.wsp'")
+		have := strings.Fields(out)
+		missing := slices.DeleteFunc(slices.Clone(want), func(f string) bool { return slices.Contains(have, f) })
+		if len(missing) > 0 {
+			return fmt.Errorf("%d of %d files missing, %s among them", len(missing), len(want), missing[0])
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+// graphiteFilesSent is the whisper file each path the Graphite sink sends for
+// these points lands in, relative to the prefix's directory. The sink renders
+// them into a listener here, so the list is what it sends and not a second
+// account of how it names a path.
+func graphiteFilesSent(ctx context.Context, t *testing.T, prefix string, points []sink.Point) []string {
+	t.Helper()
+	var lc net.ListenConfig
+	ln, err := lc.Listen(ctx, "tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+	received := make(chan []byte, 1)
+	go func() {
+		conn, acceptErr := ln.Accept()
+		if acceptErr != nil {
+			received <- nil
+			return
+		}
+		defer conn.Close()
+		body, _ := io.ReadAll(conn)
+		received <- body
+	}()
+	g := sink.NewGraphite(ln.Addr().String(), prefix, 1000, 10*time.Second)
+	if _, err = g.Write(ctx, points); err != nil {
+		t.Fatal(err)
+	}
+	if err = g.Close(); err != nil {
+		t.Fatal(err)
+	}
+	var files []string
+	for line := range strings.SplitSeq(string(<-received), "\n") {
+		path, _, ok := strings.Cut(line, " ")
+		if !ok {
+			continue
+		}
+		file := "./" + strings.ReplaceAll(strings.TrimPrefix(path, prefix+"."), ".", "/") + ".wsp"
+		if !slices.Contains(files, file) {
+			files = append(files, file)
+		}
+	}
+	if len(files) == 0 {
+		t.Fatalf("the Graphite sink sent nothing for %d points", len(points))
+	}
+	return files
 }
 
 // dsn is the connecting sink's DSN for the namespace's database.

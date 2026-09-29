@@ -66,6 +66,12 @@ E2E_DOCKER_COMPOSE := docker compose -p $(E2E_DOCKER_PROJECT) -f $(E2E_DOCKER_DI
 # Bringing nine containers up cold is minutes, not seconds, and Elasticsearch
 # and InfluxDB are most of it.
 E2E_DOCKER_TIMEOUT := 30m
+# The containerized suite runs without the maintainer's GitHub token, as the
+# release and the scheduled job run it: a test that read GITHUB_TOKEN from the
+# environment passed on the machine that had one and stopped the 2.6.2
+# release, where nothing sets it. The suite talks to a fake GitHub and never
+# needs a real token.
+E2E_DOCKER_ENV := env -u GITHUB_TOKEN -u GH_TOKEN
 # Extra `go test` flags for the containerized suite. Empty for the ordinary
 # run; test-e2e-docker-race sets it to -race.
 E2E_DOCKER_TESTFLAGS ?=
@@ -237,7 +243,7 @@ test-e2e-docker: ## Run the containerized suite against the real stores
 	$(E2E_DOCKER_COMPOSE) up -d --wait --wait-timeout 600
 	@echo "=== Running the suite ==="
 	@set +e; \
-		go test -count=1 $(E2E_DOCKER_TESTFLAGS) -tags $(E2E_DOCKER_TAG) -timeout $(E2E_DOCKER_TIMEOUT) -v ./$(E2E_DOCKER_DIR)/; \
+		$(E2E_DOCKER_ENV) go test -count=1 $(E2E_DOCKER_TESTFLAGS) -tags $(E2E_DOCKER_TAG) -timeout $(E2E_DOCKER_TIMEOUT) -v ./$(E2E_DOCKER_DIR)/; \
 		echo $$? > $(E2E_DOCKER_DIR)/out/.status
 	@echo "=== Tearing down ==="
 	@status=$$(cat $(E2E_DOCKER_DIR)/out/.status); \
@@ -273,7 +279,7 @@ e2e-docker-up: ## Start the containerized stores and leave them running
 	@$(E2E_DOCKER_COMPOSE) ps
 	@echo
 	@echo "Run the suite against it with:"
-	@echo "  go test -count=1 -tags $(E2E_DOCKER_TAG) -timeout $(E2E_DOCKER_TIMEOUT) -v ./$(E2E_DOCKER_DIR)/"
+	@echo "  $(E2E_DOCKER_ENV) go test -count=1 -tags $(E2E_DOCKER_TAG) -timeout $(E2E_DOCKER_TIMEOUT) -v ./$(E2E_DOCKER_DIR)/"
 
 e2e-docker-down: ## Stop the containerized stores and remove their volumes
 	$(E2E_DOCKER_COMPOSE) down --volumes --remove-orphans

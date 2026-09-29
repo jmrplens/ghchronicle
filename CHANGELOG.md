@@ -9,8 +9,44 @@ so every link in one is absolute; the release page adds the pull and
 verification commands and a link to the commits.
 
 Versions follow [semantic versioning](https://semver.org/). The dates are the
-day the tag was pushed, with one exception: 2.5.2 has a section and no tag. It
-was never released on its own, and its changes shipped in 2.6.0.
+day the tag was pushed, with two exceptions: 2.5.2 has a section and no tag,
+and its changes shipped in 2.6.0; 2.6.2 has a tag and no release, since its
+release stopped at the containerised suite, and its changes shipped in 2.6.3.
+
+## 2.6.3 - 2026-09-29
+
+2.6.2 was tagged and never released. Its release workflow stopped at the
+containerised suite, before anything was built or published: two tests of the
+upgrade migration built their configuration without a GitHub token, so they
+took the one in the environment, which the machine they were written on had
+and the release job does not. Everything 2.6.2 changed ships here, as its
+[section of the changelog](https://github.com/jmrplens/ghchronicle/blob/v2.6.3/CHANGELOG.md#262---2026-09-29)
+describes: the five dashboards drawn and held to the same values across the
+stores, and the upgrade migration that brings a store along when a release
+changes a measurement's shape
+([#96](https://github.com/jmrplens/ghchronicle/issues/96)).
+
+- **The migration tests carry their own token.** They talk to the fake GitHub
+  and to the stores in their containers, and need no real one; they now say
+  so in their configuration, as every other test of the suite does.
+- **The containerised suite runs without the maintainer's token.**
+  `make test-e2e-docker` now clears `GITHUB_TOKEN` and `GH_TOKEN` for the
+  suite, as the release and the scheduled job run it, so a local run that
+  passes is the run the release will see.
+- **The suite no longer depends on the host's free disk.** Run again that
+  way, it failed on Loki and on a test that read Loki's refusals as
+  Elasticsearch's: the disk of the machine that ran it had passed 90 per cent,
+  and Loki's write-ahead log refuses every push past that threshold with
+  "Ingester is shutting down" while its readiness check still answers ready.
+  The suite's Loki runs without the write-ahead log, which nothing in a run
+  outlives; the harness now pushes one line before it calls Loki ready, so a
+  Loki that takes no write stops the start with Loki's own reason; the
+  Elasticsearch check reads only the Elasticsearch sink's lines; and a
+  migration test waits for carbon to write every file it was sent. The suite
+  passed on the commit these notes are part of, at 90 per cent of disk.
+
+Not verified: the release workflow itself on this tag until it runs; the
+suite's clean run above is the reason to expect it through.
 
 ## 2.6.2 - 2026-09-29
 

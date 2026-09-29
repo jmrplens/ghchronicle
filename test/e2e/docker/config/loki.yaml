@@ -55,6 +55,19 @@ ingester:
   # push is answered. It becomes queryable once its chunk has been flushed,
   # which with the periods above is seconds rather than the default minutes, so
   # read it back by polling rather than by asking once.
+  #
+  # No write-ahead log. It exists to replay what a crashed ingester held, and
+  # nothing here outlives the run. Worse, it watches the disk it sits on, which
+  # is the host's: past wal.disk_full_threshold, 90% by default, it throttles
+  # by refusing every push with a 500 "Ingester is shutting down" while /ready
+  # still answers ready. Measured on 2026-09-29 with the host filesystem at
+  # 90.2% used: the same image, configuration and push answered 500 at the
+  # default threshold and 204 at 0.99, and every Loki test and the sweep's
+  # "sink write failed" check failed with nothing in the code having changed.
+  # The suite has to answer the same whatever the disk of the machine it runs
+  # on holds, and TestLokiIsNotThrottledByTheHostsDisk keeps this off.
+  wal:
+    enabled: false
 
 limits_config:
   reject_old_samples: false
