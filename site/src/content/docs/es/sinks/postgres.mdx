@@ -274,6 +274,20 @@ Nada del dashboard cambia.
 `dashboards/ghchronicle-postgres.json` tiene los mismos {stats.panels} paneles que el de
 InfluxDB, con cada consulta traducida a PostgreSQL contra este esquema.
 
+La traducción compara el texto por sus bytes, como InfluxDB: cada columna de
+texto por la que una consulta ordena, o de la que toma el menor o el mayor
+valor, lleva `COLLATE "C"`. Si se deja a la base de datos, el orden es el de su
+intercalación, y en un PostgreSQL construido sobre glibc cuya base se creó con
+una configuración regional como `en_US.UTF-8` esa intercalación deja a un lado
+mayúsculas y signos de puntuación en su primera pasada. **Medido contra
+PostgreSQL 18.6 en Debian**, cuya base se crea como `en_US.utf8`: antes de
+esto, "(ghost)" iba después de "alice" y "VALID" después de "unsigned", y tres
+paneles listaban sus filas en otro orden que el dashboard de InfluxDB. La
+imagen Alpine coincidía solo porque musl compara bytes se llame como se llame
+la configuración regional. En la base de datos no cambia nada: sus columnas
+conservan la intercalación con que se crearon, y solo las consultas del
+dashboard dicen cómo comparar.
+
 ## Por dónde seguir
 
 - [Elegir almacén](/ghchronicle/es/sinks/) compara PostgreSQL con los demás, y

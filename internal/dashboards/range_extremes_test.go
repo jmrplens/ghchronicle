@@ -144,7 +144,9 @@ func sqlExtremes(target map[string]any) []string {
 	sql, _ := target["rawSql"].(string)
 	var out []string
 	for _, m := range sqlExtreme.FindAllStringSubmatch(sql, -1) {
-		if !slices.Contains(sqlNewestPicks, strings.TrimSpace(m[2])) {
+		// The collation PostgreSQL's translation gives a text argument decides
+		// which string is the extreme, not whether one is read.
+		if !slices.Contains(sqlNewestPicks, withoutCollation(strings.TrimSpace(m[2]))) {
 			out = append(out, m[0])
 		}
 	}

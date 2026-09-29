@@ -860,7 +860,9 @@ pretend.
   happened, so they draw the traffic of a particular Tuesday, the star curve
   since 2018 and the merge time of a pull request closed in July. The
   PostgreSQL set is the InfluxDB SQL translated, because the SQL sink writes
-  the same facts as tables.
+  the same facts as tables, and it compares text by its bytes as InfluxDB
+  does, so a list is in the same order in both whatever collation the
+  database was created with.
 - **Prometheus** stamps every sample at scrape time, so the exporter reduces
   the per-item rows to current values plus, for the counted measurements, a
   monotonic `_total` of distinct items seen since the exporter started.

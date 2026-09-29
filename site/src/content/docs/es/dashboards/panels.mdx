@@ -919,7 +919,9 @@ en vez de fingir.
   así que dibujan el tráfico de un martes concreto, la curva de estrellas desde
   2018 y el tiempo de fusión de una pull request cerrada en julio. El juego de
   PostgreSQL es el SQL de InfluxDB traducido, porque el destino SQL escribe los
-  mismos hechos como tablas.
+  mismos hechos como tablas, y compara el texto por sus bytes como InfluxDB,
+  así que una lista sale en el mismo orden en los dos, sea cual sea la
+  intercalación con que se creó la base de datos.
 - **Prometheus** sella cada muestra en el momento del scrape, así que el
   exportador reduce las filas por elemento a valores actuales más, para las
   medidas que se cuentan, un `_total` monótono de elementos distintos vistos

@@ -264,6 +264,19 @@ Nothing in the dashboard changes.
 `dashboards/ghchronicle-postgres.json` has the same {stats.panels} panels as the InfluxDB
 one, with every query translated to PostgreSQL against this schema.
 
+The translation compares text by its bytes, as InfluxDB does: every text
+column a query sorts by, or takes the least or the greatest of, carries
+`COLLATE "C"`. Left to the database, the order is its collation's, and on a
+PostgreSQL built on glibc whose database was created under a locale such as
+`en_US.UTF-8` that one sets case and punctuation aside on its first pass.
+**Measured against PostgreSQL 18.6 on Debian**, whose database is created as
+`en_US.utf8`: before this, "(ghost)" sorted after "alice" and "VALID" after
+"unsigned", and three panels listed their rows in another order than the
+InfluxDB dashboard. The Alpine image agreed only because musl compares bytes
+whatever the locale is called. Nothing changes in the database: its columns
+keep the collation they were created with, and only the dashboard's queries say
+how to compare.
+
 ## Where to go next
 
 - [Choosing a store](/ghchronicle/sinks/) compares PostgreSQL with the others,

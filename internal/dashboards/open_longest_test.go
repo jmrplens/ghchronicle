@@ -39,7 +39,11 @@ func TestTheOpenLongestTablesKeepTheLongestOpenInEveryStore(t *testing.T) {
 			switch store.Name {
 			case "influxdb", "postgres":
 				sql := allSQL(p)
-				if !strings.HasSuffix(sql, fmt.Sprintf(" ORDER BY x.seconds_open DESC, x.full_name, x.number LIMIT %d", openLongest)) {
+				tie := "x.full_name, x.number"
+				if store.Name == "postgres" {
+					tie = `x.full_name COLLATE "C", x.number COLLATE "C"`
+				}
+				if !strings.HasSuffix(sql, fmt.Sprintf(" ORDER BY x.seconds_open DESC, %s LIMIT %d", tie, openLongest)) {
 					t.Errorf("%s: %s does not keep the %d open longest, the longest first:\n%s",
 						store.Name, title, openLongest, sql)
 				}

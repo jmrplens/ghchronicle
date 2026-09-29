@@ -319,9 +319,10 @@ func outsideQuotes(s string, f func(string) string) string {
 // The SQL sink writes the same facts as one table per measurement with the
 // same names, so the translation is dialect only: Grafana's time macro, the
 // percentile aggregate, the series column the PostgreSQL datasource names
-// `metric`, and the tag names that are reserved words there. The `number` tag
-// is never NULL in PostgreSQL (a tag column is TEXT NOT NULL DEFAULT ”), so
-// the identity test compares against the empty string.
+// `metric`, the tag names that are reserved words there, and the order of
+// text, which byteOrder makes InfluxDB's whatever the database's collation.
+// The `number` tag is never NULL in PostgreSQL (a tag column is TEXT NOT NULL
+// DEFAULT ”), so the identity test compares against the empty string.
 func toPG(q string) string {
 	s := q
 	// A dollar in a replacement is a group reference, so the macros' own
@@ -364,6 +365,7 @@ func toPG(q string) string {
 		}
 		return run
 	})
+	s = byteOrder(s)
 	// PostgreSQL has a date_bin of its own, which the Sunday week above is
 	// written with; the DataFusion spelling is the one with INTERVAL.
 	if strings.Contains(s, "date_bin(INTERVAL") || strings.Contains(s, "approx_percentile") ||

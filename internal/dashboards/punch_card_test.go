@@ -33,7 +33,7 @@ func TestThePunchCardsAddUpEachRepositorysNewestGrid(t *testing.T) {
 			p := panelOf(t, mustBuild(t, store), c.title, "barchart")
 			switch store {
 			case "influxdb", "postgres":
-				checkPunchCardSQL(t, store, c.title, c.node, allSQL(p))
+				checkPunchCardSQL(t, store, c.title, c.node, withoutCollation(allSQL(p)))
 			case "elasticsearch":
 				checkPunchCardES(t, c.title, c.node, c.name, p)
 			case "graphite":

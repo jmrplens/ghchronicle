@@ -11,9 +11,14 @@ import (
 // other, a different one each run.
 func TestWorkElsewhereBreaksATieTheSameWayInBothSQLStores(t *testing.T) {
 	t.Parallel()
-	for _, store := range []string{"influxdb", "postgres"} {
+	for store, tie := range map[string]string{
+		"influxdb": "PARTITION BY full_name, kind, number ORDER BY time DESC, state)",
+		// The state is text, and PostgreSQL compares it by the database's
+		// collation unless told to compare its bytes as InfluxDB does.
+		"postgres": `PARTITION BY full_name, kind, number ORDER BY time DESC, state COLLATE "C")`,
+	} {
 		sql := queriesOf(mustPanel(t, rendered(t, store), "Work elsewhere"))
-		if !strings.Contains(sql, "PARTITION BY full_name, kind, number ORDER BY time DESC, state)") {
+		if !strings.Contains(sql, tie) {
 			t.Errorf("%s picks the newest row of an item with nothing to break a tie on the instant:\n%s",
 				store, sql)
 		}
